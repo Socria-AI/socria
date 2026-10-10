@@ -151,7 +151,8 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'Is there a student or team price?',
         a: [
-          'Not yet. When there is, it will be on the Socria One page — not buried in a sales call.',
+          'For UT Arlington students, this semester: your first month of Socria One is free. Verify your UTA email (@mavs.uta.edu) under Manage Account by 31 December and the month starts — no card, and nothing renews.',
+          'There is no team price yet. When there is, it will be on the Socria One page — not buried in a sales call.',
         ],
       },
     ],

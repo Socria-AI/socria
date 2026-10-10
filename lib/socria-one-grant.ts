@@ -14,10 +14,18 @@
 
 import { clerkClient } from '@clerk/nextjs/server';
 import { entitledBy } from './entitlement-rule';
-import { hasEduAccess, verifiedEduEmail } from './socria-edu';
+import { readStudentMonth, studentStanding, type EmailLike, type StudentMonth } from './socria-edu';
 
 const GRANT_KEY = 'socriaOne';
 const GRANT_VALUE = 'comp';
+
+/**
+ * Where a student's free month is recorded: the address it began with and
+ * when (lib/socria-edu.ts STUDENT_OFFER). A record of a START, not a grant —
+ * whether it entitles anybody is decided on every read, from the date and the
+ * addresses on the account, so it cannot outlive either.
+ */
+const STUDENT_KEY = 'socriaStudent';
 
 /**
  * Where a PAID subscription is mirrored, beside the comp grant.
@@ -104,9 +112,17 @@ async function readGrant(userId: string): Promise<{ v: boolean; ok: boolean }> {
         e?.verification?.status === 'verified' &&
         COMPED_EMAILS.has(e.emailAddress?.toLowerCase?.() ?? '')
     );
-    // A student at an approved university, by verified address. Inert unless
-    // SOCRIA_EDU_DOMAINS names a domain — see lib/socria-edu.ts.
-    const student = hasEduAccess(user?.emailAddresses ?? []);
+    // A student at an approved university, by verified address: their one
+    // free month, begun the first time it is seen while the offer is open
+    // (lib/socria-edu.ts STUDENT_OFFER). Inert where neither SOCRIA_EDU_DOMAINS
+    // nor an open offer names a domain.
+    const standing = studentStanding({
+      emails: (user?.emailAddresses ?? []) as EmailLike[],
+      recorded: readStudentMonth(meta?.[STUDENT_KEY]),
+      now: Date.now(),
+    });
+    if (standing.begins && standing.month) void recordStudentMonth(userId, standing.month);
+    const student = standing.active;
     // A paid subscription, as the webhook last saw it. Checked here so that
     // somebody who has actually paid is entitled even when the subscriptions
     // table cannot be read.
@@ -115,11 +131,9 @@ async function readGrant(userId: string): Promise<{ v: boolean; ok: boolean }> {
     cache.set(userId, { v, at: Date.now() });
     // Make a list match permanent on the account itself.
     //
-    // Deliberately NOT done for a student: that grant is a mirror of a
-    // verified address, and writing it into metadata would outlive the
-    // address it came from. Somebody who removes the university email, or
-    // whose access is meant to end when the programme does, would keep One
-    // for ever because of a row nothing updates.
+    // Deliberately NOT done for a student: what is written for them is when
+    // their month BEGAN (recordStudentMonth), never a grant — a grant would
+    // outlive the address it came from and the month it was for.
     if (comped && !granted) void writeAccountGrant(userId).catch(() => {});
     return { v, ok: true };
   } catch {
@@ -193,15 +207,58 @@ export async function writeStripeMirror(
 }
 
 /**
- * The verified university address behind a student's access, if any.
- *
- * Read by the surfaces that want to SAY which address qualified. Uncached,
- * because it is asked once on a settings page rather than on every request.
+ * Record that a student's free month has begun — once per account; the read
+ * that saw it begin is the only caller. Primes the grant, so the person who
+ * has just verified arrives to Socria One rather than to the free tier for
+ * another minute. Never throws: a record that could not be written means the
+ * month begins again at the next read, which costs at most a few minutes.
  */
-export async function studentEmail(userId: string): Promise<string | null> {
+async function recordStudentMonth(userId: string, month: StudentMonth): Promise<boolean> {
+  try {
+    await clerkClient().users.updateUserMetadata(userId, {
+      privateMetadata: { [STUDENT_KEY]: { email: month.email, since: month.since } },
+    });
+    cache.set(userId, { v: true, at: Date.now() });
+    return true;
+  } catch (e) {
+    console.error('[socria] could not record a student month', e);
+    return false;
+  }
+}
+
+/** A student's standing, as the surfaces say it. */
+export interface StudentStatus {
+  /** the verified university address on the account, if any */
+  email: string | null;
+  /** their free month — running, or over — or none yet */
+  month: { since: number; until: number; active: boolean } | null;
+  /** a month began with this read */
+  began: boolean;
+}
+
+/**
+ * The verified university address and the free month behind a student's
+ * access, for the surfaces that want to SAY which address qualified and until
+ * when. Begins the month when this is the first read to see a qualifying
+ * address — the plan route asks this before it resolves the plan, so verifying
+ * and being told "until 9 November" happen in the same breath. Uncached,
+ * because it is asked on a settings page rather than on every request.
+ */
+export async function studentStatus(userId: string): Promise<StudentStatus | null> {
   try {
     const user = await clerkClient().users.getUser(userId);
-    return verifiedEduEmail(user?.emailAddresses ?? []);
+    const meta = user?.privateMetadata as Record<string, unknown> | null;
+    const standing = studentStanding({
+      emails: (user?.emailAddresses ?? []) as EmailLike[],
+      recorded: readStudentMonth(meta?.[STUDENT_KEY]),
+      now: Date.now(),
+    });
+    const began = standing.begins && !!standing.month && (await recordStudentMonth(userId, standing.month));
+    return {
+      email: standing.email,
+      month: standing.month ? { since: standing.month.since, until: standing.month.until, active: standing.active } : null,
+      began,
+    };
   } catch {
     return null;
   }

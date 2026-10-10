@@ -335,13 +335,16 @@ export default function PrivacyPage() {
 
       <h2 id="students">Students</h2>
       <p>
-        Socria One is free for students at universities we have approved, and
+        Students at universities we have approved can have their first month
+        of Socria One free &mdash; this semester, at UT Arlington &mdash; and
         the way we check is a <strong>verified</strong> email address at that
         university &mdash; added to your ordinary account the way anyone adds a
         second address, and verified by a code sent to it, because anyone can
-        type a domain. The programme runs only where we have switched it on;
-        where it is not running, adding a university address does nothing
-        beyond adding an email address.
+        type a domain. The month is free with no card and nothing renews; we
+        keep only when it began, on your account, so it is given once. The
+        programme runs only where we have switched it on; where it is not
+        running, adding a university address does nothing beyond adding an
+        email address.
       </p>
       <p>
         That address is on your account for <strong>one purpose</strong>: to
@@ -382,7 +385,7 @@ export default function PrivacyPage() {
       <p>
         Socria is not affiliated with, endorsed by, or acting on behalf of any
         university. Remove the address from{' '}
-        <a href="/account">your account</a> and the free access ends with it;
+        <a href="/account">your account</a> and the free month pauses with it;
         nothing else about your account changes, and everything you have
         written stays yours. The age rule below applies to students in exactly
         the same way as to everyone else.

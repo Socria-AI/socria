@@ -7,14 +7,24 @@
 //   What cannot be faked is receiving the code sent to it. Every check here
 //   is on verification status, never on the string alone.
 //
-//   OFF UNLESS SWITCHED ON. The domains come from the environment, so a
-//   deployment that has not opted in answers no to everything and the code is
-//   inert rather than merely unused.
+//   OFF UNLESS SWITCHED ON. The domains come from the environment — or from a
+//   student offer while it is open, which is that same decision made for one
+//   school and one semester. Past the offer, a deployment that has not opted
+//   in answers no to everything and the code is inert rather than merely
+//   unused.
+//
+// And the offer itself: the FIRST MONTH free, once per account, begun when a
+// verified address is first seen while the offer is open.
 
 import {
   eduDomains, eduProgrammeOn, isEduEmail, verifiedEduEmail, hasEduAccess, eduDomainLabel,
-  emailMatchesHosts, eduSchool,
+  emailMatchesHosts, eduSchool, STUDENT_OFFER, studentOfferOpen, readStudentMonth, studentStanding,
 } from './.tmp/socria-edu.mjs';
+
+/** A moment while the offer is open, and one after it has closed. */
+const OPEN = Date.UTC(2026, 9, 10, 15);
+const AFTER = STUDENT_OFFER.closes + 1;
+const DAY = 86_400_000;
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -32,16 +42,71 @@ const withDomains = (value, fn) => {
 const verified = (a) => ({ emailAddress: a, verification: { status: 'verified' } });
 const unverified = (a) => ({ emailAddress: a, verification: { status: 'unverified' } });
 
-console.log('=== off unless switched on ===');
+console.log('=== off unless switched on — once the offer has closed ===');
 {
   for (const off of [undefined, '', '   ', ',', ' , ']) {
     withDomains(off, () => {
-      ok(`${JSON.stringify(off)}: the programme is off`, eduProgrammeOn() === false);
-      ok(`${JSON.stringify(off)}: no domain qualifies`, isEduEmail('a@mavs.uta.edu') === false);
-      ok(`${JSON.stringify(off)}: nobody has access`, hasEduAccess([verified('a@mavs.uta.edu')]) === false);
-      ok(`${JSON.stringify(off)}: and there is nothing to say`, eduDomainLabel() === '');
+      ok(`${JSON.stringify(off)}: the programme is off`, eduProgrammeOn(AFTER) === false);
+      ok(`${JSON.stringify(off)}: no domain qualifies`, isEduEmail('a@mavs.uta.edu', AFTER) === false);
+      ok(`${JSON.stringify(off)}: nobody has access`, hasEduAccess([verified('a@mavs.uta.edu')], AFTER) === false);
+      ok(`${JSON.stringify(off)}: and there is nothing to say`, eduDomainLabel(AFTER) === '');
     });
   }
+}
+
+console.log('\n=== this semester’s offer switches it on, for UTA alone ===');
+{
+  ok('the offer is for UT Arlington’s student domain', JSON.stringify(STUDENT_OFFER.domains) === JSON.stringify(['mavs.uta.edu']));
+  ok('  a month of thirty days', STUDENT_OFFER.days === 30);
+  ok('  closing at the end of 31 December 2026, Central time', new Date(STUDENT_OFFER.closes).toISOString() === '2027-01-01T06:00:00.000Z');
+  ok('open now, closed after', studentOfferOpen(OPEN) && !studentOfferOpen(AFTER));
+  withDomains(undefined, () => {
+    ok('unset, while open: the programme is on', eduProgrammeOn(OPEN) === true);
+    ok('  for the offer’s domain', JSON.stringify(eduDomains(OPEN)) === JSON.stringify(['mavs.uta.edu']));
+    ok('  named as UT Arlington', eduSchool(OPEN)?.short === 'UTA');
+    ok('  and a verified UTA address qualifies', hasEduAccess([verified('a@mavs.uta.edu')], OPEN) === true);
+    ok('  but not the staff domain, nor another school', !isEduEmail('a@uta.edu', OPEN) && !isEduEmail('a@other.edu', OPEN));
+    ok('  and still verified, not typed', hasEduAccess([unverified('a@mavs.uta.edu')], OPEN) === false);
+  });
+  withDomains('example.edu', () => {
+    ok('the variable, when set, decides instead', JSON.stringify(eduDomains(OPEN)) === JSON.stringify(['example.edu']) && !isEduEmail('a@mavs.uta.edu', OPEN));
+    ok('  whatever the date', JSON.stringify(eduDomains(AFTER)) === JSON.stringify(['example.edu']));
+  });
+}
+
+console.log('\n=== the first month, free — once ===');
+{
+  withDomains(undefined, () => {
+    const uta = [verified('me@gmail.com'), verified('ella@mavs.uta.edu')];
+    const first = studentStanding({ emails: uta, recorded: null, now: OPEN });
+    ok('a verified student with no month begins one now', first.begins && first.active && first.month?.since === OPEN);
+    ok('  thirty days long', first.month?.until === OPEN + 30 * DAY);
+    ok('  with the address that began it', first.month?.email === 'ella@mavs.uta.edu' && first.email === 'ella@mavs.uta.edu');
+
+    const recorded = readStudentMonth({ email: 'ella@mavs.uta.edu', since: OPEN });
+    ok('the record reads back as the same month', recorded?.until === OPEN + 30 * DAY && recorded?.email === 'ella@mavs.uta.edu');
+    const day12 = studentStanding({ emails: uta, recorded, now: OPEN + 12 * DAY });
+    ok('day twelve: Socria One, and nothing new to record', day12.active && !day12.begins);
+    const day31 = studentStanding({ emails: uta, recorded, now: OPEN + 30 * DAY + 1 });
+    ok('day thirty-one: over', !day31.active && !day31.begins && day31.month?.until === OPEN + 30 * DAY);
+    ok('  and never a second month, while the offer is still open', studentOfferOpen(OPEN + 31 * DAY) && !studentStanding({ emails: uta, recorded, now: OPEN + 31 * DAY }).begins);
+
+    const removed = studentStanding({ emails: [verified('me@gmail.com')], recorded, now: OPEN + 5 * DAY });
+    ok('removing the address pauses it', !removed.active && !removed.begins);
+    const readded = studentStanding({ emails: uta, recorded, now: OPEN + 6 * DAY });
+    ok('  adding it back picks the SAME month up — it does not begin another', readded.active && !readded.begins && readded.month?.since === OPEN);
+    const typed = studentStanding({ emails: [verified('me@gmail.com'), unverified('ella@mavs.uta.edu')], recorded: null, now: OPEN });
+    ok('an unverified address begins nothing', !typed.begins && !typed.active && typed.month === null);
+    const late = studentStanding({ emails: uta, recorded: null, now: AFTER });
+    ok('verified after the offer closed: no month', !late.begins && !late.active && late.month === null);
+    const straddle = readStudentMonth({ email: 'ella@mavs.uta.edu', since: STUDENT_OFFER.closes - 2 * DAY });
+    const january = studentStanding({ emails: uta, recorded: straddle, now: STUDENT_OFFER.closes + 10 * DAY });
+    ok('a month begun before the close runs its whole length past it', january.active && eduProgrammeOn(STUDENT_OFFER.closes + 10 * DAY) === false);
+  });
+  for (const junk of [null, undefined, 'x', 42, {}, { email: '' , since: 5 }, { email: 'a@mavs.uta.edu' }, { email: 'a@mavs.uta.edu', since: 'yesterday' }, { email: 'a@mavs.uta.edu', since: -1 }, { email: 'a@mavs.uta.edu', since: Infinity }]) {
+    ok(`a record of ${JSON.stringify(junk)} reads as none`, readStudentMonth(junk) === null);
+  }
+  ok('a record’s address is read as the address, whatever its case', readStudentMonth({ email: ' Ella@MAVS.uta.edu ', since: OPEN })?.email === 'ella@mavs.uta.edu');
 }
 
 console.log('\n=== verified, not typed ===');
@@ -188,10 +253,10 @@ console.log('\n=== naming the school, and knowing when not to ===');
     ok('an unknown domain alone silences it', eduSchool() === null);
   });
   withDomains('', () => {
-    ok('the programme being off silences it', eduSchool() === null);
+    ok('the programme being off silences it', eduSchool(AFTER) === null);
   });
   withDomains(undefined, () => {
-    ok('and so does it being unset', eduSchool() === null);
+    ok('and so does it being unset, once the offer has closed', eduSchool(AFTER) === null);
   });
 
   // The naming must never be what decides access.

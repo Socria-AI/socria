@@ -50,6 +50,10 @@ export interface StudentState {
   school: { name: string; short: string } | null;
   /** the verified address that qualified, or null if none does yet */
   email: string | null;
+  /** their free month — running or over — or null when none has begun */
+  month: { since: number; until: number; active: boolean } | null;
+  /** this semester's offer: whether a month can still begin, until when, and how long one runs */
+  offer: { open: boolean; closes: number; days: number } | null;
 }
 
 /**
@@ -149,6 +153,20 @@ export function usePlan(): PlanState {
                     ? { name: j.student.school.name, short: j.student.school.short }
                     : null,
                 email: typeof j.student.email === 'string' ? j.student.email : null,
+                month:
+                  j.student.month &&
+                  Number.isFinite(j.student.month.since) &&
+                  Number.isFinite(j.student.month.until)
+                    ? { since: j.student.month.since, until: j.student.month.until, active: !!j.student.month.active }
+                    : null,
+                offer:
+                  j.student.offer && Number.isFinite(j.student.offer.closes)
+                    ? {
+                        open: !!j.student.offer.open,
+                        closes: j.student.offer.closes,
+                        days: Number.isFinite(j.student.offer.days) ? j.student.offer.days : 30,
+                      }
+                    : null,
               }
             : undefined;
         const promo: PromoInfo | undefined =

@@ -94,12 +94,25 @@ export function dayWindow(kind: 'day-3' | 'day-7', now: number): { from: number;
 // cannot see the rule would quietly ignore it. Where both exist the suite
 // checks they agree.
 
-/** The approved university domains, or none where the programme is off. */
+/**
+ * Domains a student offer has run for (lib/socria-edu.ts STUDENT_OFFER), kept
+ * here as well for the reason above. ALWAYS refused, not only while the offer
+ * is open: an address somebody verified to claim a free month stays on their
+ * account after the month, and the promise not to write to it does not expire
+ * with the offer. The suite checks this contains the offer's domains.
+ */
+export const OFFER_STUDENT_DOMAINS: readonly string[] = ['mavs.uta.edu'];
+
+/**
+ * The university domains no note is addressed to: the programme's configured
+ * ones, and every domain a student offer has run for.
+ */
 export function studentDomains(): string[] {
-  return (process.env.SOCRIA_EDU_DOMAINS || '')
+  const configured = (process.env.SOCRIA_EDU_DOMAINS || '')
     .split(',')
     .map((d) => d.trim().toLowerCase().replace(/^[@.]+/, ''))
     .filter(Boolean);
+  return [...new Set([...configured, ...OFFER_STUDENT_DOMAINS])];
 }
 
 /**

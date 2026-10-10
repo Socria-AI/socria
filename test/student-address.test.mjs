@@ -1,7 +1,7 @@
 // A university address is not a mailing list.
 //
-// Socria One is free for students, checked by a verified email address at an
-// approved university. That address is on the account for one reason —
+// A student's first month of Socria One is free, checked by a verified email
+// address at an approved university. That address is on the account for one reason —
 // proving eligibility — and the privacy policy now says, in so many words,
 // that nothing Socria sends is ever addressed to it, and that if it is the
 // only address we hold then nothing is sent at all.
@@ -22,7 +22,7 @@
 // the cost of being wrong is an email we promised not to send. So the
 // sender's set must CONTAIN the programme's, and that is what is asserted.
 
-import { isStudentAddress, lifecycleAddress, studentDomains } from './.tmp/lifecycle.mjs';
+import { isStudentAddress, lifecycleAddress, studentDomains, OFFER_STUDENT_DOMAINS } from './.tmp/lifecycle.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -30,20 +30,21 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 const UTA = ['mavs.uta.edu'];
 const addr = (address, primary = false) => ({ address, primary });
 
-console.log('=== the programme exists only where it is switched on ===');
+console.log('=== which domains are never written to ===');
 {
-  // Every deployment that has not opted in has SOCRIA_EDU_DOMAINS unset, and
-  // then there is no such thing as a student address — the rule is inert
-  // rather than merely unused.
+  // Without the variable, the only student addresses are the ones a student
+  // offer has run for (lib/socria-edu.ts STUDENT_OFFER) — and those for good:
+  // an address verified to claim a free month stays on the account after the
+  // month, and the promise not to write to it does not end with the offer.
   delete process.env.SOCRIA_EDU_DOMAINS;
-  ok('no domains without the variable', studentDomains().length === 0);
-  ok('nothing is a student address', isStudentAddress('someone@mavs.uta.edu') === false);
-  ok('...so the primary address is simply used',
-    lifecycleAddress([addr('someone@mavs.uta.edu', true)]) === 'someone@mavs.uta.edu');
+  ok('without the variable, only the offer’s domains', JSON.stringify(studentDomains()) === JSON.stringify([...OFFER_STUDENT_DOMAINS]));
+  ok('  so a UTA student address is never written to', isStudentAddress('someone@mavs.uta.edu') === true);
+  ok('  even when it is the only address', lifecycleAddress([addr('someone@mavs.uta.edu', true)]) === null);
+  ok('  while any other school’s address is just an address', isStudentAddress('someone@other.edu') === false);
 
-  process.env.SOCRIA_EDU_DOMAINS = ' @Mavs.UTA.edu , ';
-  ok('domains are read, trimmed, lowercased and unprefixed',
-    JSON.stringify(studentDomains()) === JSON.stringify(['mavs.uta.edu']));
+  process.env.SOCRIA_EDU_DOMAINS = ' @Mavs.UTA.edu , example.edu ';
+  ok('configured domains are read, trimmed, lowercased and unprefixed — and joined with the offer’s, once each',
+    JSON.stringify(studentDomains()) === JSON.stringify(['mavs.uta.edu', 'example.edu']), JSON.stringify(studentDomains()));
   delete process.env.SOCRIA_EDU_DOMAINS;
 }
 
@@ -97,8 +98,8 @@ console.log('\n=== nothing Socria sends is addressed to one ===');
   ok('junk entries are ignored',
     lifecycleAddress([{ address: 42 }, { address: 'no-at-sign' }, addr('me@gmail.com')], UTA) === 'me@gmail.com');
 
-  // With the programme off, a .edu address is just an address.
-  ok('with the programme off nothing is stepped past',
+  // With no student domains at all, a .edu address is just an address.
+  ok('with no student domains nothing is stepped past',
     lifecycleAddress([addr('me@mavs.uta.edu', true)], []) === 'me@mavs.uta.edu');
 }
 
@@ -135,6 +136,11 @@ console.log('\n=== the sender never mails an address the programme counts ===');
     for (const bad of ['a@notmavs.uta.edu', 'a@mavs.uta.edu.example.com']) {
       ok(`neither counts "${bad}"`, !edu.emailMatchesHosts(bad, UTA) && !isStudentAddress(bad, UTA));
     }
+    // Every domain an offer grants a month for is one the sender refuses,
+    // with or without the variable — the two lists are kept apart on purpose
+    // (see the header) and this is what holds them together.
+    ok('the sender refuses every domain a student offer runs for',
+      edu.STUDENT_OFFER.domains.every((d) => studentDomains().includes(d)), `${edu.STUDENT_OFFER.domains} vs ${studentDomains()}`);
   }
 }
 

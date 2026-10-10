@@ -31,6 +31,7 @@
 // up with an unverified address, which is worth nothing.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import Link from 'next/link';
 import { useClerk, useUser } from '@clerk/nextjs';
 import type { EmailAddressResource } from '@clerk/types';
 import {
@@ -41,7 +42,14 @@ import {
   withReverification,
 } from '@/lib/clerk-errors';
 import { emailMatchesHosts } from '@/lib/socria-edu';
+import { priceWithPeriod } from '@/lib/socria-one';
 import type { PlanState } from './usePlan';
+
+/** A day as the panel says it: "9 November". */
+const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
+/** The offer's close, on the campus clock — "31 December" wherever the reader is. */
+const closeDay = (closes: number) =>
+  new Date(closes - 1).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'America/Chicago' });
 
 export function StudentAccess({ state }: { state: PlanState }) {
   const { isLoaded, user } = useUser();
@@ -185,41 +193,103 @@ export function StudentAccess({ state }: { state: PlanState }) {
   // The programme is not running here, or Clerk has not spoken yet.
   if (!student?.on || !isLoaded || !user) return null;
 
-  // Already qualified. Say which address did it — "you have student access" is
-  // something they have to take on trust, and an address is something they can
-  // check against their own inbox.
+  const month = student.month;
+  const offer = student.offer;
+  const eyebrow = school ? `${school.short} student access` : 'Student access';
+
+  // THE FIRST MONTH, said as what it is (lib/socria-edu.ts STUDENT_OFFER): free
+  // until a date, no card taken, nothing that renews — and, once it is over,
+  // over, with the plain way to keep Socria One. Which address qualified is
+  // said too: an address is something they can check against their own inbox.
+  if (student.email && month) {
+    return (
+      <section className="edu-panel is-done" aria-labelledby="edu-title">
+        <p className="edu-eyebrow">{eyebrow}</p>
+        <h2 id="edu-title" className="edu-title">
+          Verified as <span className="edu-addr">{student.email}</span>
+        </h2>
+        {month.active ? (
+          <p className="edu-line">
+            Your first month of Socria One is free, until {day(month.until)}. No card was
+            taken and nothing renews — after that this account is on the free plan, unless
+            you choose to subscribe.
+          </p>
+        ) : (
+          <p className="edu-line">
+            Your free month of Socria One ended on {day(month.until)} — it was this
+            account&rsquo;s one month. Socria One continues at {priceWithPeriod()}.{' '}
+            <Link href="/one">Continue with Socria One →</Link>
+          </p>
+        )}
+      </section>
+    );
+  }
+
+  // Verified, but no month began: the offer had closed by the time they did.
   if (student.email) {
     return (
       <section className="edu-panel is-done" aria-labelledby="edu-title">
-        <p className="edu-eyebrow">
-          {school ? `${school.short} student access` : 'Student access'}
-        </p>
+        <p className="edu-eyebrow">{eyebrow}</p>
         <h2 id="edu-title" className="edu-title">
           Verified as <span className="edu-addr">{student.email}</span>
         </h2>
         <p className="edu-line">
-          Socria One is on this account, free, for as long as that address stays
-          verified on it.
+          {offer
+            ? `This semester’s free month for students closed on ${closeDay(offer.closes)}.`
+            : 'There is no free month for students running just now.'}{' '}
+          <Link href="/one">See Socria One →</Link>
         </p>
       </section>
     );
   }
 
+  // A month already used on this account, and the address since removed. Over:
+  // say so, rather than offer a second. Still running: the form below picks it
+  // back up — the month is the account's, and only needs the address again.
+  const pickUp = !!month && month.until > Date.now();
+  if (month && !pickUp) {
+    return (
+      <section className="edu-panel is-done" aria-labelledby="edu-title">
+        <p className="edu-eyebrow">{eyebrow}</p>
+        <h2 id="edu-title" className="edu-title">Your free month</h2>
+        <p className="edu-line">
+          Your free month of Socria One ended on {day(month.until)} — it was this
+          account&rsquo;s one month. <Link href="/one">Continue with Socria One →</Link>
+        </p>
+      </section>
+    );
+  }
+
+  // Nothing to offer once the offer has closed.
+  if (!pickUp && offer && !offer.open) return null;
+
   return (
     <section className="edu-panel" aria-labelledby="edu-title">
-      <p className="edu-eyebrow">
-        {school ? `${school.short} student access` : 'Student access'}
-      </p>
-      <h2 id="edu-title" className="edu-title">
-        Socria <em>One</em>, free, for{' '}
-        {school ? `${school.name} students` : 'students'}
-      </h2>
-      <p className="edu-line">
-        Verify your {school ? school.short : 'university'} email ({student.domains})
-        on this account and Socria One turns on. You keep the account and the
-        sign-in you already have — the {school ? school.short : 'university'}{' '}
-        address is added alongside it.
-      </p>
+      <p className="edu-eyebrow">{eyebrow}</p>
+      {pickUp && month ? (
+        <>
+          <h2 id="edu-title" className="edu-title">Pick your free month back up</h2>
+          <p className="edu-line">
+            Your free month of Socria One runs until {day(month.until)} while your{' '}
+            {school ? school.short : 'university'} email ({student.domains}) is verified on
+            this account. Verify it again to carry on.
+          </p>
+        </>
+      ) : (
+        <>
+          <h2 id="edu-title" className="edu-title">
+            Your first month of Socria <em>One</em>, free, for{' '}
+            {school ? `${school.name} students` : 'students'}
+          </h2>
+          <p className="edu-line">
+            Verify your {school ? school.short : 'university'} email ({student.domains})
+            on this account{offer ? ` by ${closeDay(offer.closes)}` : ''} and your first{' '}
+            {offer ? `${offer.days} days` : 'month'} of Socria One are free — no card, and
+            nothing renews. You keep the account and the sign-in you already have — the{' '}
+            {school ? school.short : 'university'} address is added alongside it.
+          </p>
+        </>
+      )}
 
       {err && (
         <p className="edu-err" role="alert">
