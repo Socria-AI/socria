@@ -47,7 +47,7 @@ import type { PlanState } from './usePlan';
 
 /** A day as the panel says it: "9 November". */
 const day = (ms: number) => new Date(ms).toLocaleDateString('en-GB', { day: 'numeric', month: 'long' });
-/** The offer's close, on the campus clock — "31 December" wherever the reader is. */
+/** The offer's close, on the campus clock — "9 December" wherever the reader is. */
 const closeDay = (closes: number) =>
   new Date(closes - 1).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'America/Chicago' });
 

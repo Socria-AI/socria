@@ -58,7 +58,7 @@ console.log('\n=== this semester’s offer switches it on, for UTA alone ===');
 {
   ok('the offer is for UT Arlington’s student domain', JSON.stringify(STUDENT_OFFER.domains) === JSON.stringify(['mavs.uta.edu']));
   ok('  a month of thirty days', STUDENT_OFFER.days === 30);
-  ok('  closing at the end of 31 December 2026, Central time', new Date(STUDENT_OFFER.closes).toISOString() === '2027-01-01T06:00:00.000Z');
+  ok('  closing at the end of 9 December 2026, Central time', new Date(STUDENT_OFFER.closes).toISOString() === '2026-12-10T06:00:00.000Z');
   ok('open now, closed after', studentOfferOpen(OPEN) && !studentOfferOpen(AFTER));
   withDomains(undefined, () => {
     ok('unset, while open: the programme is on', eduProgrammeOn(OPEN) === true);

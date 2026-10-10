@@ -37,7 +37,8 @@ const DAY_MS = 86_400_000;
 // same answer on every device.
 //
 // FOR THIS SEMESTER. A month can begin until the offer closes, at the end of
-// UT Arlington's fall 2026 term; one begun before then runs its whole length.
+// 9 December 2026 on UT Arlington's clock; one begun before then runs its
+// whole length.
 // After that nothing new begins, and the student panel offers nothing.
 //
 // NO CARD, NOTHING RENEWS. The month is a grant, like a reward's — Stripe is
@@ -53,8 +54,8 @@ export const STUDENT_OFFER = {
   domains: ['mavs.uta.edu'] as readonly string[],
   /** how long the free month runs, from when a verified address is first seen */
   days: 30,
-  /** the last moment a month can begin: midnight at the end of 31 December 2026, Central time */
-  closes: Date.UTC(2027, 0, 1, 6, 0, 0),
+  /** the last moment a month can begin: midnight at the end of 9 December 2026, Central time */
+  closes: Date.UTC(2026, 11, 10, 6, 0, 0),
 } as const;
 
 /** Whether a free month can still begin. */
