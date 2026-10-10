@@ -1228,4 +1228,31 @@ registerDisplay({
   noun: 'market',
   handle: 'M',
   about: 'Supply and demand the person can move — taxes, subsidies, shifts, ceilings and floors — predicting what happens before revealing it.',
+  practice: true,
+  // a supply-and-demand GRAPH stays the plotting surface's; these are the words for practice
+  called: [
+    {
+      words: [
+        'supply and demand exercise',
+        'supply and demand practice',
+        'supply and demand simulator',
+        'supply and demand game',
+        'market exercise',
+        'market simulator',
+        'market simulation',
+        'tax incidence exercise',
+        'price ceiling exercise',
+        'price floor exercise',
+        'economics practice',
+      ],
+      view: 'graph',
+    },
+  ],
+  spec: `{"title": "short", "demand": {"intercept": 100, "slope": -1}, "supply": {"intercept": 20, "slope": 1}, "units": {"price": "$", "quantity": "units"}}
+  Each curve is P = intercept + slope × Q: demand slopes down, supply up, and they must cross at a positive price and quantity. Use the curves the person gave; otherwise simple example numbers, and say in "gaps" that they are examples. Write no prediction, scenario or result — the person makes those.`,
+  example: { title: 'Coffee', demand: { intercept: 10, slope: -0.5 }, supply: { intercept: 2, slope: 0.5 }, units: { price: '$', quantity: 'cups' } },
+  tell: (guarded) =>
+    guarded
+      ? 'A MARKET is practice: the person predicts what a change does before revealing it. Until they reveal, do not state the new price, quantity, who bears a tax, or any welfare figure — ask what they expect and why. After the reveal, explain from the computed numbers above.'
+      : 'A MARKET is practice: the person predicts what a change does before revealing it. Do not give away a prediction they have not revealed; once revealed, explain from the computed numbers above, never recomputing them.',
 });

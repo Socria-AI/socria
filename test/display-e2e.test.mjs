@@ -173,6 +173,40 @@ console.log('\n=== a plan made from the map ===');
   ok('an empty map makes nothing, and says why', empty.json.display?.ok === false && /nothing on the map yet/.test(empty.json.display.says));
 }
 
+console.log('\n=== made without a model: a worksheet, a labeling exercise ===');
+{
+  const ws = await mapTurn('Give me a balance sheet worksheet to practise on', [EXTRACTED]);
+  const w = (ws.json.map?.objects?.objs ?? []).find((o) => o.kind === 'worksheet');
+  ws.calls.length === 1 || console.log(ws.calls.map(systemOf).map((x) => x.slice(0, 60)));
+  ok('a worksheet is made from its template — no model asked to write it', ws.calls.length === 1 && w?.states[0].template === 'balance-sheet' && ws.json.display?.ok, String(ws.calls.length));
+  ok('  every amount left for the person', w?.states[0].sections.every((sec) => sec.lines.every((l) => l.amount === null)));
+  const heart = {
+    id: 'D1', kind: 'diagram', name: 'D1', origin: 'socria', steps: [], at: 0,
+    states: [{ title: 'The heart', view: 'concept', detail: 'full', nodes: [{ id: 'a', label: 'Aorta', by: 'socria' }, { id: 'b', label: 'Left ventricle', by: 'socria' }, { id: 'c', label: 'Right atrium', by: 'socria' }], edges: [{ from: 'b', to: 'a', by: 'socria' }] }],
+  };
+  const withHeart = { nodes: [{ id: 'h', label: 'The heart', type: 'concept' }], edges: [], objects: { objs: [heart] } };
+  const ex = await mapTurn('Quiz me on this diagram', [{ ...withHeart, context: 'learning', ask: { action: 'construct', artifact: 'display' } }], { map: withHeart });
+  const x = (ex.json.map?.objects?.objs ?? []).find((o) => o.kind === 'exercise');
+  ok('"quiz me on this diagram": a labeling exercise over it, no model asked', ex.calls.length === 1 && x?.states[0].parts.length === 3 && x.states[0].source.kind === 'diagram');
+  ok('  every label hidden, and the diagram said to be Socria’s, unverified', x?.states[0].hidden.length === 3 && x.states[0].source.verified === false);
+  const none = await mapTurn('Make a quiz about the causes of World War One', [{ nodes: [], edges: [], ask: { action: 'construct', artifact: 'display' } }]);
+  ok('a quiz about a topic, with nothing here, is not written — it says why', none.json.display?.ok === false && /made from something already here/.test(none.json.display.says) && none.calls.length === 1);
+}
+
+console.log('\n=== a drafted table: the person’s numbers, or labelled examples ===');
+{
+  const said = 'Make a bar chart of my spending: rent 1,200, food 400, transport 150';
+  const table = (food, basis) => ({
+    display: { kind: 'data', state: { title: 'Spending', view: 'bar', basis, columns: [{ id: 'k', name: 'Category', type: 'text' }, { id: 'v', name: 'Amount', type: 'number', unit: '$' }], rows: [['Rent', 1200], ['Food', food], ['Transport', 150]], x: 'k', y: ['v'] } },
+  });
+  const good = await mapTurn(said, [EXTRACTED, table(400, 'given')]);
+  const t = (good.json.map?.objects?.objs ?? []).find((o) => o.kind === 'data');
+  ok('their numbers, as theirs, drawn as bars', t?.states[0].basis === 'given' && t.states[0].view === 'bar' && good.json.display?.ok);
+  const bad = await mapTurn(said, [EXTRACTED, table(425, 'given')]);
+  const tb = (bad.json.map?.objects?.objs ?? []).find((o) => o.kind === 'data');
+  ok('a number they never wrote: the table is marked as examples, and the turn says so', tb?.states[0].basis === 'illustrative' && /not in what you wrote or attached/.test(bad.json.display?.says ?? ''), bad.json.display?.says);
+}
+
 console.log('\n=== a model is still a model ===');
 {
   const FORMAL = {

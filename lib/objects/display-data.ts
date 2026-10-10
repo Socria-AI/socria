@@ -1458,4 +1458,36 @@ registerDisplay({
   noun: 'chart',
   handle: 'T',
   about: 'A table of the person’s own numbers, checked and drawn as a table, bar, line, area, scatter, pie, histogram or heatmap — example numbers are labelled as examples.',
+  // "graph" and "plot" alone stay with the plotting surface: "graph y = x²" is a function, not a table
+  called: [
+    { words: ['bar chart', 'bar graph', 'column chart'], view: 'bar' },
+    { words: ['line chart', 'line graph'], view: 'line' },
+    { words: ['area chart'], view: 'area' },
+    { words: ['scatter plot', 'scatterplot', 'scatter chart'], view: 'scatter' },
+    { words: ['pie chart'], view: 'pie' },
+    { words: ['histogram'], view: 'histogram' },
+    { words: ['heatmap', 'heat map'], view: 'heatmap' },
+    { words: ['data table', 'spreadsheet', 'table of my data', 'budget table'], view: 'table' },
+    { words: ['chart', 'table'] },
+  ],
+  spec: `{"title": "short", "view": "table|bar|line|area|scatter|pie|histogram|heatmap", "basis": "given|source|illustrative", "columns": [{"id": "c1", "name": "Month", "type": "text|category|number|date", "unit": "$"}], "rows": [["Jan", 1200], ["Feb", 1250]], "x": "c1", "y": ["c2"]}
+  "basis" is "given" only when every number is one the person wrote, "source" when they come from material they attached, otherwise "illustrative" — and then say in "gaps" that they are examples. Never present invented numbers as real; a value you do not have is an empty cell (null).`,
+  example: {
+    title: 'Monthly rent',
+    view: 'bar',
+    basis: 'given',
+    columns: [
+      { id: 'm', name: 'Month', type: 'text' },
+      { id: 'r', name: 'Rent', type: 'number', unit: '$' },
+    ],
+    rows: [
+      ['Jan', 1200],
+      ['Feb', 1200],
+      ['Mar', 1250],
+    ],
+    x: 'm',
+    y: ['r'],
+  },
+  tell: () =>
+    'A CHART’s numbers are the person’s, from material they attached, or examples — which one is stated above; never treat example numbers as facts. Its totals, averages, shares and scales are computed by the workspace: use them, never recompute them.',
 });

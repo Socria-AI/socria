@@ -86,6 +86,12 @@ export function readDisplayRequest(text: unknown, opts: { stated?: string | null
   const words = vocabulary();
   if (!words.length) return null;
 
+  // "quiz me on this map", "test me on the diagram": practice over what is already here —
+  // never a quiz written about a topic (display-make.ts makes it from a diagram or the map)
+  if (/\b(?:quiz|test)\s+(?:me|us)\b/.test(t) && words.some((w) => w.kind === 'exercise')) {
+    return { kind: 'exercise', kinds: ['exercise'], fromMap: new RegExp(String.raw`\b${MAPPED}\b`).test(t), noun: 'quiz' };
+  }
+
   for (const w of words) {
     const noun = esc(w.word);
     // TURN: "turn this map into a checklist", "convert my notes to a timeline"

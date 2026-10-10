@@ -28,12 +28,11 @@
 import { create, kindOf, MAX_OBJECTS, type ObjectSpace, type ThoughtObject } from './core';
 import { cleanText, displayKinds, displayMeta, freshHandle, isDisplayKind } from './display-base';
 import type { DisplayRequest } from './display-request';
+import { sealDraft, type MapMaterial } from './display-make';
 
-/** The map's ideas, as much of them as a display made from the map needs. */
-export interface MapMaterial {
-  nodes: { id: string; label: string; type?: string; role?: string; origin?: string; status?: string }[];
-  edges: { from: string; to: string; relation: string }[];
-}
+// a plan made from the map, and the map's ideas themselves, live with the other displays that are made, not drafted
+export { planFromMap, type MapMaterial } from './display-make';
+
 
 export type Proposal =
   | { ok: true; kind: string; state: unknown; gaps: string[] }
@@ -116,7 +115,7 @@ function unclaimed(v: unknown, depth = 0): unknown {
  * be one the workspace has and, when the person named one, the one they named
  * — a plan asked for and a comparison returned is not quietly accepted.
  */
-export function readDisplayProposal(raw: unknown, ctx: { request: DisplayRequest | null }): Proposal {
+export function readDisplayProposal(raw: unknown, ctx: { request: DisplayRequest | null; said?: string }): Proposal {
   const wantedNoun = nounOf(ctx.request?.kind ?? null);
   if (!raw || typeof raw !== 'object') return { ok: false, failure: 'malformed', says: `What came back was not ${aOrAn(wantedNoun)}, so nothing was added.` };
   const r = raw as Record<string, unknown>;
@@ -131,6 +130,10 @@ export function readDisplayProposal(raw: unknown, ctx: { request: DisplayRequest
     const can = displayKinds().map((m) => m.noun);
     return { ok: false, failure: 'unsupported', says: `The workspace cannot make that kind of display. It can make ${can.slice(0, -1).join(', ')}${can.length > 1 ? ' or ' : ''}${can[can.length - 1]}.` };
   }
+  // a worksheet or an exercise is MADE from a template or from what is here (display-make.ts), never drafted
+  if (!displayMeta(kind)?.spec) {
+    return { ok: false, failure: 'unsupported', says: `${aOrAn(nounOf(kind)).replace(/^./, (c) => c.toUpperCase())} is made from what is already here, not drafted — ask for it by name.` };
+  }
   const req = ctx.request;
   if (req && (req.kind ? req.kind !== kind : req.kinds.length && !req.kinds.includes(kind))) {
     return { ok: false, failure: 'malformed', says: `You asked for ${aOrAn(wantedNoun)} and what came back was ${aOrAn(nounOf(kind))}, so nothing was added. Ask again and it will be drafted afresh.` };
@@ -143,57 +146,10 @@ export function readDisplayProposal(raw: unknown, ctx: { request: DisplayRequest
   if (state === null) return { ok: false, failure: 'malformed', says: `What came back was not ${aOrAn(nounOf(kind))} the workspace can hold, so nothing was added.` };
   // an empty display is made only when one was plainly asked for — it opens on its starting point
   if (!k.parts(state).length && !req) return { ok: false, failure: 'empty', says: `There was not enough in the conversation to fill ${aOrAn(nounOf(kind))}, so none was made.` };
-  const gaps = Array.isArray(r.gaps) ? r.gaps.map((g) => cleanText(g, 160)).filter(Boolean).slice(0, 4) : [];
-  return { ok: true, kind, state, gaps };
-}
-
-// ── a plan made from the map ─────────────────────────────────────────
-
-const SEQUENCE = new Set(['precedes', 'leads_to']);
-
-/**
- * The map's ideas as a plan, computed: every idea in the person's words, in
- * an order the map's own sequence relations allow (a → b where a precedes or
- * leads to b, or b depends on a), with those relations kept as "waits on"
- * links. Questions stay on the map — a plan is things to do or that happen.
- */
-export function planFromMap(map: MapMaterial, opts: { title?: string; view?: string } = {}): unknown {
-  const nodes = map.nodes.filter((n) => n.type !== 'question' && cleanText(n.label, 120)).slice(0, 40);
-  const ids = new Set(nodes.map((n) => n.id));
-  const after: [string, string][] = [];
-  for (const e of map.edges) {
-    if (!ids.has(e.from) || !ids.has(e.to) || e.from === e.to) continue;
-    if (SEQUENCE.has(e.relation)) after.push([e.from, e.to]);
-    else if (e.relation === 'depends') after.push([e.to, e.from]);
-  }
-  // a stable topological order: the map's order wherever the relations leave a choice
-  const indeg = new Map(nodes.map((n) => [n.id, 0]));
-  for (const [, b] of after) indeg.set(b, (indeg.get(b) ?? 0) + 1);
-  const order: string[] = [];
-  const done = new Set<string>();
-  while (order.length < nodes.length) {
-    const next = nodes.find((n) => !done.has(n.id) && (indeg.get(n.id) ?? 0) === 0) ?? nodes.find((n) => !done.has(n.id))!;
-    done.add(next.id);
-    order.push(next.id);
-    for (const [a, b] of after) if (a === next.id) indeg.set(b, (indeg.get(b) ?? 1) - 1);
-  }
-  const byId = new Map(nodes.map((n) => [n.id, n]));
-  const itemId = new Map(order.map((id, i) => [id, `i${i + 1}`]));
-  return {
-    title: cleanText(opts.title, 80) || 'From the map',
-    ...(opts.view ? { view: opts.view } : { view: 'checklist' }),
-    items: order.map((id) => {
-      const n = byId.get(id)!;
-      return {
-        id: itemId.get(id),
-        text: cleanText(n.label, 120),
-        ...(n.status === 'resolved' ? { status: 'done' } : {}),
-        by: n.origin === 'socria' ? 'socria' : 'person',
-      };
-    }),
-    // the sanitizer drops any link that would close a loop, so a cyclic map still makes a plan
-    links: after.map(([a, b]) => ({ from: itemId.get(a), to: itemId.get(b), by: 'person' })),
-  };
+  const said = Array.isArray(r.gaps) ? r.gaps.map((g) => cleanText(g, 160)).filter(Boolean).slice(0, 4) : [];
+  // what the draft must pass beyond the kind's own rules: numbers called theirs are theirs, examples are named
+  const sealed = sealDraft(kind, state, ctx.said ?? '');
+  return { ok: true, kind, state: sealed.state, gaps: [...sealed.gaps, ...said].slice(0, 5) };
 }
 
 // ── into the workspace ───────────────────────────────────────────────

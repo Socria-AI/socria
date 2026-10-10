@@ -31,7 +31,8 @@ export { SCENE, SCENE_OPS, DIMS, SHAPES, MATERIALS, settle, sanitizeScene, nodeL
 // the everyday displays: one registry, read through here so every kind is in it
 export { displayKinds, displayMeta, isDisplayKind, isoDay, todayDay, localDay, type DisplayMeta } from './display-base';
 export { readDisplayRequest, type DisplayRequest } from './display-request';
-export { buildDisplayPrompt, readDisplayProposal, planFromMap, makeDisplay, madeSays, type MapMaterial, type Proposal } from './display-propose';
+export { buildDisplayPrompt, readDisplayProposal, makeDisplay, madeSays, type Proposal } from './display-propose';
+export { planFromMap, exerciseFromDiagram, exerciseFromMap, worksheetFromWords, makeFromRequest, sealDraft, numbersIn, type MapMaterial, type MadeDisplay } from './display-make';
 
 export const spaceOf = (map: ThinkingMap | null | undefined): ObjectSpace => map?.objects ?? EMPTY_SPACE;
 

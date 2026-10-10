@@ -1458,4 +1458,31 @@ registerDisplay({
   noun: 'worksheet',
   handle: 'W',
   about: 'Structured practice the person fills in — a balance sheet, a journal entry, an income statement — checked by standard rules, with hints only when asked.',
+  practice: true,
+  // made from a template (display-make.ts worksheetFromWords), never drafted: no spec. A bare
+  // "worksheet" or "journal entry" is not claimed — a fractions worksheet or a diary entry is not this
+  called: [
+    {
+      words: [
+        'balance sheet worksheet',
+        'balance sheet exercise',
+        'balance sheet practice',
+        'blank balance sheet',
+        'balance sheet',
+        'journal entry exercise',
+        'journal entry practice',
+        'accounting journal entry',
+        't accounts',
+        't account',
+        'income statement worksheet',
+        'income statement',
+        'accounting worksheet',
+        'accounting practice',
+      ],
+    },
+  ],
+  tell: (guarded) =>
+    guarded
+      ? 'A WORKSHEET is the person’s practice: they enter every amount. Its checks (does it balance, is each line where it belongs) and its hint ladder are computed — do not fill in an amount, name a missing account or state a total for them; ask what the check suggests and let the hint button do its work.'
+      : 'A WORKSHEET is the person’s practice: they enter every amount, and its checks are computed. Explain a failing check when asked; do not fill the sheet in for them.',
 });

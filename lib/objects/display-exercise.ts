@@ -755,4 +755,15 @@ registerDisplay({
   noun: 'exercise',
   handle: 'X',
   about: 'Labeling and retrieval practice over another display’s parts — the labels hidden, the answers graded, hints only when asked.',
+  practice: true,
+  // made from a diagram or the map (display-make.ts), never drafted — a quiz about a topic is not made
+  called: [
+    {
+      words: ['labeling exercise', 'labelling exercise', 'labeling quiz', 'labelling quiz', 'labeling practice', 'labelling practice', 'recall exercise', 'recall practice', 'practice quiz', 'self test', 'quiz'],
+    },
+  ],
+  tell: (guarded) =>
+    guarded
+      ? 'An EXERCISE is the person recalling labels of their own diagram or map. Do not say a hidden label, confirm a guess or give the answer to a part — the workspace grades their answers and gives hints when they ask; ask what they remember about the part instead.'
+      : 'An EXERCISE is the person recalling labels of their own diagram or map; the workspace grades their answers. Do not give hidden labels away unless they ask to see one.',
 });

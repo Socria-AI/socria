@@ -33,7 +33,7 @@ import {
   readDisplayRequest,
   buildDisplayPrompt,
   readDisplayProposal,
-  planFromMap,
+  makeFromRequest,
   makeDisplay,
   madeSays,
   kindOf,
@@ -420,20 +420,25 @@ export async function POST(req: NextRequest) {
     if (displayAsked) {
       const space = next.objects ?? EMPTY_SPACE;
       const onMap = current.nodes.length ? current : next;
-      const material: MapMaterial | null = displayWords?.fromMap
-        ? {
-            nodes: onMap.nodes.map((n) => ({ id: n.id, label: n.label, type: n.type, role: n.role, origin: n.origin, status: n.status })),
-            edges: onMap.edges.map((e) => ({ from: e.from, to: e.to, relation: e.relation })),
-          }
-        : null;
+      const mapIdeas: MapMaterial = {
+        nodes: onMap.nodes.map((n) => ({ id: n.id, label: n.label, type: n.type, role: n.role, origin: n.origin, status: n.status })),
+        edges: onMap.edges.map((e) => ({ from: e.from, to: e.to, relation: e.relation })),
+      };
+      // what the PERSON said, with what they attached — the only numbers a table may call theirs
+      const personSaid = kept
+        .filter((m: any) => m.role === 'user')
+        .map((m: any) => renderMessageForModel({ role: 'user', content: m.content, attachments: sanitizeAttachments(m.attachments) }, true))
+        .join('\n');
       try {
-        let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person' } | null = null;
-        if (material && displayWords?.kind === 'plan' && material.nodes.length) {
-          // the map's ideas, in its words and its order — nothing for a model to write
-          const state = kindOf('plan')!.sanitize(planFromMap(material, { title: next.ask?.topic, view: displayWords.view }));
-          if (state) sealed = { kind: 'plan', state, gaps: [], origin: 'person' };
-        } else if (material && !material.nodes.length) {
-          display = { ok: false, failure: 'empty', says: 'There is nothing on the map yet to make that from.' };
+        let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person'; says?: string } | null = null;
+        // MADE, NOT DRAFTED: a plan from the map, a labeling exercise over what is here, a worksheet from a template
+        const madeHere = displayWords ? makeFromRequest(displayWords, { said: personSaid, map: mapIdeas, space, topic: next.ask?.topic }) : null;
+        if (madeHere && 'why' in madeHere) {
+          display = { ok: false, failure: 'empty', says: madeHere.why };
+        } else if (madeHere) {
+          const state = kindOf(madeHere.kind)?.sanitize(madeHere.state) ?? null;
+          if (state) sealed = { kind: madeHere.kind, state, gaps: [], origin: madeHere.origin, says: madeHere.says };
+          else display = { ok: false, failure: 'malformed', says: 'That could not be made from what is here.' };
         } else {
           const drafted = await openai.chat.completions.create({
             model: configured,
@@ -447,7 +452,7 @@ export async function POST(req: NextRequest) {
                   request: displayWords,
                   today: isoDay(body?.today) ?? todayDay(),
                   guarded: resolveGuard(body?.guard) === 'guard',
-                  map: material,
+                  map: displayWords?.fromMap ? mapIdeas : null,
                 }),
               },
               { role: 'user', content: transcript },
@@ -460,7 +465,7 @@ export async function POST(req: NextRequest) {
           } catch {
             parsed = null;
           }
-          const read = readDisplayProposal(parsed, { request: displayWords });
+          const read = readDisplayProposal(parsed, { request: displayWords, said: personSaid });
           if (read.ok) sealed = { kind: read.kind, state: read.state, gaps: read.gaps, origin: 'socria' };
           else display = { ok: false, failure: read.failure, says: read.says };
         }
@@ -468,7 +473,7 @@ export async function POST(req: NextRequest) {
           const made = makeDisplay(space, sealed.kind, sealed.state, sealed.origin);
           if (made.ok) {
             next = { ...next, objects: made.space };
-            display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: madeSays(made.obj, sealed.gaps) };
+            display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: [madeSays(made.obj, sealed.gaps), sealed.says].filter(Boolean).join(' ').slice(0, 300) };
           } else display = { ok: false, failure: made.failure, says: made.says };
         }
         console.info('logos map: display %s — %s', display?.ok ? 'made' : 'not made', display?.says?.slice(0, 160));
