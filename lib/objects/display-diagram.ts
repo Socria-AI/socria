@@ -1590,4 +1590,32 @@ registerDisplay({
   noun: 'diagram',
   handle: 'D',
   about: 'Things and how they connect — a concept map, a mind map, a hierarchy or org chart, a flowchart, a decision tree.',
+  // "mind map" and "concept map" are the Thinking Map's own shapes; said of a new artifact, these words are a diagram's
+  called: [
+    { words: ['flowchart', 'flow chart', 'process diagram', 'process flowchart', 'workflow diagram'], view: 'flow' },
+    { words: ['decision tree', 'probability tree', 'tree diagram', 'expected value tree'], view: 'decision' },
+    { words: ['org chart', 'organisational chart', 'organizational chart', 'hierarchy chart', 'hierarchy diagram', 'family tree'], view: 'hierarchy' },
+    { words: ['spider diagram', 'radial diagram', 'spider map'], view: 'mind' },
+    { words: ['concept diagram', 'network diagram', 'node diagram', 'relationship diagram'], view: 'concept' },
+  ],
+  spec: `{"title": "short", "view": "concept|mind|hierarchy|flow|decision|outline", "nodes": [{"id": "n1", "label": "a few words", "note": "optional", "group": "optional cluster", "kind": "decision|chance|outcome — decision trees only", "value": 100}], "edges": [{"from": "n1", "to": "n2", "label": "optional, e.g. yes / no", "prob": 0.4}], "root": "n1"}
+  "value" is an outcome's payoff and "prob" a chance branch's probability — write them only where the conversation gives them (the branches out of a chance node must add up to 1); leave a gap rather than guess one. What a decision is worth is computed, never written.`,
+  example: {
+    title: 'Signing up',
+    view: 'flow',
+    nodes: [
+      { id: 'a', label: 'Open the app' },
+      { id: 'b', label: 'Enter an email' },
+      { id: 'c', label: 'Email valid?' },
+      { id: 'd', label: 'Account made' },
+    ],
+    edges: [
+      { from: 'a', to: 'b' },
+      { from: 'b', to: 'c' },
+      { from: 'c', to: 'd', label: 'yes' },
+      { from: 'c', to: 'b', label: 'no' },
+    ],
+  },
+  tell: () =>
+    'A DIAGRAM is the person’s structure. How it is laid out and — in a decision tree — what each choice is worth are computed by the workspace: use those values, never recompute them. A missing probability or payoff is a gap to name, never one to fill with a guess.',
 });

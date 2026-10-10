@@ -839,4 +839,22 @@ registerDisplay({
   noun: 'argument map',
   handle: 'A',
   about: 'An essay’s or a debate’s reasoning — thesis, claims, evidence, counterarguments, rebuttals and open questions — which stays the person’s own.',
+  called: [
+    { words: ['argument map', 'argument diagram', 'debate map', 'essay map', 'map of my argument', 'claim and evidence map'], view: 'map' },
+    { words: ['argument outline', 'essay outline'], view: 'outline' },
+  ],
+  spec: `{"title": "short", "view": "map|outline", "items": [{"id": "t", "role": "thesis|claim|evidence|counter|rebuttal|question|conclusion", "text": "one sentence", "parent": "the id of the item it bears on", "source": "a citation THE PERSON gave"}]}
+  One thesis, the root. Claims sit under the thesis; evidence under a claim, the thesis, a counterargument or a rebuttal; a counterargument against the thesis, a claim or evidence; a rebuttal under a counterargument; a question anywhere; the conclusion under the thesis. The thesis, rebuttals and conclusion are the person's own words from the conversation — leave them out if they have not said them. Never invent evidence or a source: evidence you add is a kind of thing to look for, without a source.`,
+  example: {
+    title: 'School uniforms',
+    view: 'map',
+    items: [
+      { id: 't', role: 'thesis', text: 'Schools should not require uniforms.' },
+      { id: 'c1', role: 'claim', parent: 't', text: 'Uniforms limit how students express themselves.' },
+      { id: 'k1', role: 'counter', parent: 't', text: 'Uniforms can make differences in family income less visible.' },
+      { id: 'q1', role: 'question', parent: 'k1', text: 'Is there evidence that uniforms change rates of bullying?' },
+    ],
+  },
+  tell: () =>
+    'An ARGUMENT MAP is the person’s reasoning. Its gaps — claims with no evidence, counterarguments nobody has answered, evidence with no source, claims resting only on Socria’s suggestions — are computed: name them when they help, never fill them in. Suggest the kind of evidence worth looking for; never invent a source, a study or a statistic. The thesis, the rebuttals and the conclusion are theirs to write.',
 });
