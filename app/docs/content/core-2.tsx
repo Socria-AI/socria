@@ -86,7 +86,9 @@ export function Core2() {
       <p>
         Core 2 was free and worked without an account, and it was never part of
         the <Link href="/docs/socria-one">Socria One</Link> paywall. Core 3.1
-        keeps both of those promises.
+        keeps the first of those: a signed-out visitor still gets a session
+        with no account. Signed in, it counts toward the free plan&rsquo;s
+        daily Core allowance, like every model but Logos.
       </p>
     </Article>
   );

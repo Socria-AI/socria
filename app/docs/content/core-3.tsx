@@ -5,6 +5,7 @@ import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoChips, DemoSynthesis } from '../DocsDemo';
 import { docPage } from '../registry';
+import { PLANS } from '@/lib/entitlements';
 
 const page = docPage('core-3')!;
 const sections = [
@@ -142,8 +143,14 @@ export function Core3() {
         impersonate Socria&rsquo;s own structured output.
       </p>
       <p>
-        Core 3.1 requires signing in (or an access key). Its depth control and
-        everything on this page come with it — see{' '}
+        Core 3.1 needs no account for a first session, which stays in your
+        browser; after that, sign in. On the free plan it shares Core&rsquo;s
+        allowance with <Link href="/docs/core-4">Core 4</Link>:{' '}
+        {PLANS.free.counters['core-chats']} new chats and{' '}
+        {PLANS.free.counters['core-messages']} messages a day, by the UTC day,
+        with no daily count on <Link href="/docs/socria-one">Socria One</Link>.
+        Signed in, its depth control and everything on this page come with
+        it — see{' '}
         <Link href="/docs/depth-personality">Depth &amp; Personality</Link>{' '}
         for the settings themselves.
       </p>

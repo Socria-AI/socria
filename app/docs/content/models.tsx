@@ -11,8 +11,11 @@ import Link from 'next/link';
 import { Article, H2, Callout, TableWrap } from '../Article';
 import { DemoModelPicker } from '../DocsDemo';
 import { docPage } from '../registry';
+import { PLANS } from '@/lib/entitlements';
 
 const page = docPage('models')!;
+/** The free plan's counts, from the plan table: Core is every model but Logos. */
+const FREE = PLANS.free.counters;
 const sections = [
   { id: 'compare', heading: 'Side by side' },
   { id: 'switching', heading: 'Switching between them' },
@@ -66,11 +69,15 @@ export function Models() {
             </tr>
             <tr>
               <td><strong>Account</strong></td>
-              <td>Not required</td>
-              <td>Sign-in (or an access key)</td>
-              <td>Sign-in (or an access key). Two lines of thinking a month free,
+              <td>Not for a first session, kept in your browser; then sign-in.
+                Free: {FREE['core-chats']} new chats and {FREE['core-messages']}{' '}
+                messages a day, shared with Core 4</td>
+              <td>Sign-in (or an access key). Free: {FREE['core-chats']} new chats
+                and {FREE['core-messages']} messages a day, shared with Core 3.1</td>
+              <td>Sign-in (or an access key). Free: {FREE.chats} lines of thinking
+                a month and {FREE.messages} messages a day, shared with Logos 3,
                 then <Link href="/docs/socria-one">Socria One</Link></td>
-              <td>Sign-in, for both people</td>
+              <td>Sign-in, for both people. Free: counted with Logos 2</td>
             </tr>
             <tr>
               <td><strong>Thinking depth</strong></td>

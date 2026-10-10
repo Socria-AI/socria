@@ -22,6 +22,7 @@ import {
   highlight,
 } from './.tmp/support-faq.mjs';
 import { WITHHELD_OAUTH } from './.tmp/auth-flow.mjs';
+import { PLANS } from './.tmp/entitlements.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -78,7 +79,19 @@ console.log('\n=== it recommends what the product actually ships ===');
     ok(`  ${id} is withdrawn and is not recommended in bold`, !recommended);
   }
   ok('Core 4 is named, since it is what the rest of the site introduces', /core 4/i.test(PROSE));
-  ok('the free tier is stated rather than left to be discovered', /two core 4 conversations a calendar month/i.test(PROSE));
+  // THE FREE TIER, IN THE PLAN TABLE'S OWN NUMBERS. Read from lib/entitlements
+  // rather than typed here, so a change to the table fails this line until the
+  // answer catches up — the page once promised "two Core 4 conversations a
+  // calendar month" and "a map pauses at four branches" long after both had
+  // stopped being true.
+  const f = PLANS.free.counters;
+  ok('the free tier is stated rather than left to be discovered',
+    PROSE.includes(`${f['core-chats']} new chats and ${f['core-messages']} messages a day`) &&
+      PROSE.includes(`${f.chats} new lines of thinking a calendar month and ${f.messages} messages a day`),
+    PROSE.match(/.{0,60}messages a day.{0,20}/g)?.join(' || ') ?? 'no daily limit is stated');
+  ok('  and no limit that has gone is still promised',
+    !/four branches|core 4 conversations a calendar month|handful of sessions|core 3\.1 is open either way/i.test(PROSE),
+    PROSE.match(/.{0,40}(four branches|conversations a calendar month|handful of sessions|open either way).{0,40}/g)?.join(' || ') ?? '');
 }
 
 console.log('\n=== every link goes somewhere this app serves ===');

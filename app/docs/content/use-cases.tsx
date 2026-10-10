@@ -142,7 +142,8 @@ export function UseCases() {
       <H2 id="quick">Just thinking out loud</H2>
       <p>
         <strong>Core 3.1</strong> if you want no machinery and no account —
-        it works signed out — or if the thread is one you will come back to:
+        it works signed out for a first session — or if the thread is one you
+        will come back to:
         it holds memory across the conversation, periodically synthesizes what
         you have worked out, and keeps a running picture of how you tend to
         think. <strong><Link href="/docs/core-4">Core 4</Link></strong> if the

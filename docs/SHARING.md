@@ -65,13 +65,28 @@ sign-in and comes straight back.
 
 ## Socria One
 
-- **Hosting is Socria One.** Inviting anyone, or turning on a link or a code,
-  answers 402 for a free owner. Closing a door is never paywalled, so an owner
-  whose plan has lapsed can still remove everyone.
-- **Joining is free.** A free guest has their full role inside someone else's
-  space. Their turns to Socria there are counted against
-  `FREE_GUEST_TURNS_PER_DAY`, never against the host's plan or their own
-  monthly chats.
+- **The free plan shares one chat at a time.** A free owner can share one
+  conversation — a Core chat or a Logos line of thinking. A chat counts as
+  shared while a link or an invite code is on, or anybody is in it; an
+  invitation nobody has accepted yet counts. Opening another door on a chat
+  that is already shared never takes a second slot.
+- **More than that is Socria One.** Sharing a Project (which shares every
+  conversation in it), or a second chat while one is already shared, is
+  Socria One. The rule is `hostRefusal` in `lib/share/roles.ts`; the count it
+  is held to is `openShares` in `lib/share/server.ts`; both are enforced in
+  `app/api/share/route.ts`, read from the database on every request. A free
+  owner who tries to open a door past the rule — an invitation, a link, a
+  code, or a reset link — is answered 402, with `upgrade: 'share'` and the
+  reason (`hostRefusalNote`).
+- **Closing a door is never paywalled.** Stopping sharing frees the slot, and
+  an owner whose plan has lapsed can still remove everyone.
+- **Joining is free** for everyone: by link, by code or by emailed invitation.
+  A free guest has their full role inside someone else's space, and their
+  turns to Socria there are their own daily messages
+  (`lib/entitlements.ts`: 20 a day in Core, 10 in Logos). Each counts as the
+  guest's message — never as one of their chats, and never against the host's
+  plan (`lib/share/turn.ts`). There is no separate guest allowance:
+  `FREE_GUEST_TURNS_PER_DAY` is gone.
 
 ## Privacy (`lib/share/turn.ts`)
 

@@ -24,8 +24,10 @@
 //     model before it reads as though nobody told support.
 //   · "Logos" as a thing you pick — Logos 1 is withdrawn in favour of Logos 2
 //     (lib/socria-prompt.ts), so the name people see is Logos 2.
-//   · the free tier — the export did not mention the Core 4 limit at all, and
-//     it is the single most likely reason somebody arrives at a support page.
+//   · the free tier — the export did not mention its limits at all, and they
+//     are the single most likely reason somebody arrives at a support page.
+//     They are now by the day as well as the month (lib/entitlements.ts), and
+//     the suite holds these answers to the plan table's own numbers.
 //
 // Answers carry inline HTML because the design's do — <em>, <b> and links are
 // part of how these read. It is OUR OWN STRING in OUR OWN SOURCE, never
@@ -62,7 +64,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'Do I need an account to use it?',
         a: [
-          'For Core 2 and Core 3.1, no — they work signed out for a handful of sessions, and the conversation stays in this browser rather than being saved anywhere.',
+          'For Core 3.1, no — it works signed out for one session, and the conversation stays in this browser rather than being saved anywhere. After that, sign in to keep going.',
           'Core 4 and Logos need an account. Core 4 keeps a record of the reasoning itself, and a Thinking Map has to be kept somewhere.',
         ],
       },
@@ -76,8 +78,9 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What do I get without paying?',
         a: [
-          'Two Core 4 conversations a calendar month, counted when a conversation is <em>started</em> — one you have already begun stays open however long it runs and whenever you come back to it. Core 3.1 is open either way.',
-          'In Logos, a map draws for real and pauses at four branches. Nothing is taken away when it pauses; it simply stops growing.',
+          'In Core — Core 3.1 and Core 4 together — 4 new chats and 20 messages a day, on the UTC day. A chat is counted when it is <em>started</em>, so going back to one you have already begun never costs a chat, only its messages.',
+          'In Logos, 2 new lines of thinking a calendar month and 10 messages a day; a message to a node’s own conversation counts too. Every lens, every depth and Draft Space are the same on both plans, and a map grows as far as the thinking does.',
+          'Reach a limit and nothing is taken away: everything you started stays open, and the day’s allowance comes back tomorrow. You can share one chat at a time, and join anyone else’s for free — what you send Socria there counts toward your own day, never theirs.',
         ],
       },
       {
@@ -128,7 +131,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What does Socria One add?',
         a: [
-          'Unbounded maps, Research across the whole map, all four depths including Abstract, Draft Space in full, and persistent reasoning across devices. $15 a month.',
+          'No daily count on chats or messages, in Core or in Logos, and lines of thinking held only by a fair-use ceiling. Socria carries more of how you reason between conversations (160 things, against 12), reads documents up to 30 MB rather than 4 MB, and shares as many chats as you like, and whole Projects. $15 a month.',
           '<a href="/one">See the full comparison</a>.',
         ],
       },
@@ -186,9 +189,10 @@ export const TOPICS: FaqTopic[] = [
     t: 'Logos and the map',
     qs: [
       {
-        q: 'The map stopped adding branches.',
+        q: 'Logos says I’ve used today’s messages.',
         a: [
-          'On the free plan a map pauses at four branches. Everything you built stays visible and yours; Socria One lets it keep growing.',
+          'On the free plan Logos holds 10 messages a day, on the UTC day, and a message to a node’s own conversation counts. Your lines of thinking stay open and stay yours, and the day’s messages come back tomorrow; Socria One has no daily count.',
+          'The map itself never stops growing. On both plans it grows as far as the thinking does.',
         ],
       },
       {

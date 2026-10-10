@@ -455,15 +455,15 @@ export function LogosStory() {
             <div className="t-grid">
               <div className="tier fade">
                 <h3>Logos, free</h3>
-                <p className="tp">Two lines of thinking a month · no card</p>
+                <p className="tp">Two lines of thinking a month, ten messages a day · no card</p>
                 <ul>
                   <li>The whole of Logos, not a sample of it.</li>
                   <li>Maps that grow as far as the thinking does, every view.</li>
                   <li>All four depths, Research, Draft Space, Trace.</li>
                   <li>The Answer Guard, whole. It is never for sale.</li>
                 </ul>
-                <p className="stoprow"><span className="o"></span>Free stops at two a month<span className="sep">·</span><span className="f"></span>One does not count them</p>
-                <p className="stoprow"><span className="o"></span>Free starts each one fresh<span className="sep">·</span><span className="f"></span>One carries you between them</p>
+                <p className="stoprow"><span className="o"></span>Free stops at two a month, and ten messages a day<span className="sep">·</span><span className="f"></span>One does not count them</p>
+                <p className="stoprow"><span className="o"></span>Free carries a dozen things between them<span className="sep">·</span><span className="f"></span>One carries the whole picture</p>
               </div>
               <div className="tier one fade d1">
                 <h3>Socria <span className="em">One</span></h3>

@@ -45,13 +45,15 @@ export function AccountsData() {
         <Def term="Your account (cloud)">
           Conversations and Logos sessions (each holding its messages, map,
           draft and grounded contexts), your cross-conversation Thinking
-          Journey, your Conversation Style, redeemed grants, and — if you
-          subscribe — the billing projection Stripe writes.
+          Journey, your Conversation Style, redeemed grants, the free
+          plan&rsquo;s counts of the chats you start and the messages you send
+          — kept on the server, never in the browser — and, if you subscribe,
+          the billing projection Stripe writes.
         </Def>
         <Def term="Your browser (local)">
           Interface state and preferences: which model and depth you were
           on, Logos&rsquo;s personality dials and custom instructions, which
-          solutions you chose to reveal, free-tier counters, a copy of your
+          solutions you chose to reveal, a copy of your
           Conversation Style so a visit does not wait for it, and — when
           signed out — the conversations themselves.
         </Def>

@@ -120,8 +120,9 @@ export default function TermsPage() {
 
       <h2 id="free">The free tier</h2>
       <p>
-        The free tier has limits on how many lines of thinking you keep, how far
-        a map grows, and how often Research runs. Reaching a limit stops new
+        The free tier has limits on how many conversations you start and
+        messages you send each day, and how many lines of thinking you begin
+        each month. Reaching a limit stops new
         growth; <strong>it never hides or deletes what you already made.</strong>{' '}
         Your maps stay visible and interactive at every tier, including after a
         subscription ends.

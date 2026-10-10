@@ -82,7 +82,9 @@ and Socria answers when it is asked:
 - **Reply** to one of Socria's messages.
 
 Anything else is just posted. There is no model call, no map pass and nothing
-spent, so people can talk to each other freely. You can keep talking to the
+spent, so people can talk to each other freely. Asking Socria is a message
+like any other: on the free plan it counts toward the day of whoever asked —
+a guest's never lands on the host (`docs/SHARING.md`). You can keep talking to the
 others while Socria answers someone. Asking Socria a second time from the same
 screen waits until its current answer is in.
 

@@ -7,6 +7,7 @@
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { docPage } from '../registry';
+import { PLANS } from '@/lib/entitlements';
 
 const page = docPage('core-4')!;
 const sections = [
@@ -359,12 +360,14 @@ export function Core4() {
         </p>
       </Callout>
       <p>
-        Core 4 requires signing in, and the free tier holds two Core 4
-        conversations a calendar month — the same count, on the same clock, as
-        the lines of thinking it holds in Logos. The limit is on conversations{' '}
-        <em>started</em>: one you have already begun stays open however long it
-        runs and whenever you come back to it, and{' '}
-        <Link href="/docs/core-3">Core 3.1</Link> is open either way. See{' '}
+        Core 4 requires signing in. On the free plan it shares Core&rsquo;s
+        allowance with <Link href="/docs/core-3">Core 3.1</Link>:{' '}
+        {PLANS.free.counters['core-chats']} new chats and{' '}
+        {PLANS.free.counters['core-messages']} messages a day, by the UTC day.
+        Starting a chat and sending a message are counted apart, so going back
+        to a conversation you have already begun never costs a chat, only its
+        messages; reaching either count leaves everything you started open,
+        and the day&rsquo;s allowance comes back tomorrow. See{' '}
         <Link href="/docs/socria-one">Socria One</Link> for the whole table.
       </p>
       <p>

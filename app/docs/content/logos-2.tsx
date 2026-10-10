@@ -20,6 +20,7 @@ import type { ReactNode } from 'react';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoLibraryFigure, DemoModelWorkspace, DemoRefusal } from '../DocsDemo';
 import { docPage } from '../registry';
+import { PLANS } from '@/lib/entitlements';
 
 const page = docPage('logos-2')!;
 const sections = [
@@ -402,8 +403,13 @@ export function Logos2() {
         with a second seat and thinking depth.
       </p>
       <Callout tag="Free, then Socria One">
-        Two lines of thinking a month are free. After that, Logos 2 is part of{' '}
-        <Link href="/docs/socria-one">Socria One</Link>.
+        On the free plan, Logos holds {PLANS.free.counters.chats} new lines of
+        thinking a calendar month and {PLANS.free.counters.messages} messages a
+        day, counted across Logos 2 and Logos 3; going back to a line of
+        thinking you have begun costs only its messages, and reaching either
+        count leaves everything you started open. Past them, Logos 2 is part
+        of <Link href="/docs/socria-one">Socria One</Link>, which has no daily
+        count.
       </Callout>
       <p>
         The conversation, the lenses and the moves on each card are the ones

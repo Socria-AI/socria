@@ -8,6 +8,14 @@
 // so the page and the checkout can never disagree about what One costs —
 // the mockup hardcodes $15 in four places and that is exactly the kind of
 // number that goes stale in one of them.
+//
+// The limits are read the same way, from lib/entitlements. This page once
+// sold a free tier that had already gone — four branches, Research once per
+// map, two depths — because its numbers were typed into the copy and the
+// plan table moved without it. What the plans differ on now is how much a
+// day and a month hold, what is carried between conversations, the size of
+// a document and how much can be shared; what Socria can do is the same on
+// both.
 
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
@@ -16,8 +24,29 @@ import { Label, LogosNode, OneLock, OneMark, SpecTable, type NodeType } from '@/
 import { Colophon } from '@/components/Colophon';
 import { initJournal } from '@/components/journal/drivers';
 import { priceLabel, priceWithPeriod } from '@/lib/socria-one';
+import { PLANS, boundaryNote, megabytes } from '@/lib/entitlements';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { usePlan } from '@/components/usePlan';
+
+/* ── the numbers, from the plan table ─────────────────────────────── */
+
+const FREE = PLANS.free;
+const ONE = PLANS.one;
+
+const NUM = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine'];
+/** A count as the page says it: a word to nine, a numeral after. */
+function said(n: number | null, capital = false): string {
+  const w = n === null ? 'unlimited' : NUM[n] ?? String(n);
+  return capital ? w.charAt(0).toUpperCase() + w.slice(1) : w;
+}
+
+/** Core — every model but Logos — counts by the day; Logos by the month and the day. */
+const CORE_CHATS = FREE.counters['core-chats'];
+const CORE_MESSAGES = FREE.counters['core-messages'];
+const LOGOS_LINES = FREE.counters.chats;
+const LOGOS_MESSAGES = FREE.counters.messages;
+/** One's monthly ceiling on lines of thinking: fair use, not an allowance. */
+const ONE_LINES = ONE.counters.chats;
 
 /* ── the plan rail ───────────────────────────────────────────────────
  *
@@ -50,14 +79,16 @@ interface Tier {
 const TIERS: Tier[] = [
   {
     id: 'free',
-    name: 'Logos, free',
+    name: 'Socria, free',
     price: '$0',
     per: '/ forever',
     items: [
-      'Real Thinking Maps, drawn live',
-      'Every lens and every move',
-      'Research, once per map',
-      'Quick and Balanced depth',
+      `${said(CORE_CHATS, true)} new chats and ${said(CORE_MESSAGES)} messages a day in Core`,
+      `${said(LOGOS_LINES, true)} lines of thinking a month and ${said(LOGOS_MESSAGES)} messages a day in Logos`,
+      'Every lens, every depth, and Draft Space',
+      `${said(FREE.memoryEntries, true)} things about how you reason, carried between conversations`,
+      `Documents up to ${megabytes(FREE.uploadBytes)}`,
+      'Share one chat at a time',
     ],
     note: 'Free is a beginning, not a demonstration.',
   },
@@ -68,11 +99,11 @@ const TIERS: Tier[] = [
     price: priceLabel(),
     per: '/ month',
     items: [
-      'Unbounded maps — branch without end',
-      'Research across the whole map',
-      'All four depths, including Abstract',
-      'Draft Space in full, and long-form',
-      'Persistent reasoning, on every device',
+      'No daily count, in Core or in Logos',
+      'As many lines of thinking as you need, within fair use',
+      `${said(ONE.memoryEntries, true)} things about how you reason, carried between conversations`,
+      `Documents up to ${megabytes(ONE.uploadBytes)}`,
+      'Share every chat you like, and whole Projects',
     ],
     cta: `Subscribe — ${priceWithPeriod()}`,
     note: 'Secure checkout by Stripe. Cancel any time.',
@@ -211,7 +242,8 @@ function PlanRail() {
   );
 }
 
-/* The free map: four real nodes, and the two it was about to draw. */
+/* A free day in Logos: the map so far, and the two nodes the next messages
+   would have drawn — tomorrow, or today with One. The map itself never stops. */
 const OPEN: { t: NodeType; l: string; x: number; y: number }[] = [
   { t: 'question', l: 'Should I take the job?', x: 13, y: 48 },
   { t: 'claim', l: 'It pays more', x: 40, y: 19 },
@@ -220,7 +252,7 @@ const OPEN: { t: NodeType; l: string; x: number; y: number }[] = [
 ];
 const LOCKED = [
   { l: 'the tension you were about to name', x: 63, y: 56 },
-  { l: 'research across the whole map', x: 87, y: 80 },
+  { l: 'the question you meant to ask next', x: 87, y: 80 },
 ];
 const E_OPEN: [number, number, number, number][] = [
   [13, 48, 40, 19],
@@ -234,46 +266,57 @@ const E_LOCK: [number, number, number, number][] = [
 ];
 
 const PLATES: [string, string, string[], string, [string, string]][] = [
-  ['I', 'The map',
-    ['Full, <em>extended Thinking Maps</em> — no boundary on how far a thought can grow.',
-     'Branch every line of inquiry as far as it deserves to go.',
-     'Every way of seeing it: <em>Structure, Graph and Board.</em>'],
-    '— so a thought can grow to its real size.',
-    ['Free pauses at four branches', 'One branches without end']],
-  ['II', 'The depth',
-    ['All four depth modes, at will: <em>Quick, Balanced, Deep, Abstract.</em>',
-     'Run full <em>Research across the map</em> — as often as the question calls.',
-     'More Logos conversations, at the pace your thinking sets.'],
-    '— so no question has to stay shallow.',
-    ['Free tastes Research once', 'One researches without asking twice']],
-  ['III', 'The craft',
-    ['<em>Draft Space</em> — a studio for advanced writing and creative work.',
-     'Long-form and pasted-content workflows, for real material.',
-     'Images and multimodal reasoning, when available.'],
-    '— so the thinking becomes the work.',
-    ['Free drafts in fragments', 'One opens the full Draft Space']],
-  ['IV', 'The continuity',
-    ['<em>Persistent reasoning</em> and history — every map, every thread, kept.',
-     'Personalisation that learns <em>how you reason</em>, not just what you ask.',
+  ['I', 'The day',
+    ['<em>No daily count</em>, in Core or in Logos — talk it through for as long as the question takes.',
+     'Begin a new chat whenever a new question arrives, however many the day brings.',
+     `Lines of thinking in Logos as you need them — <em>a fair-use ceiling</em>, set where serious work does not reach it, in place of ${said(LOGOS_LINES)} a month.`],
+    '— so a long day of thinking is not cut short by a count.',
+    [`Free holds ${said(CORE_MESSAGES)} messages a day in Core, ${said(LOGOS_MESSAGES)} in Logos`, 'One does not count them']],
+  ['II', 'The continuity',
+    ['<em>Memory between conversations</em> — what Socria learns about how you reason, carried into each new one.',
+     'Personalisation that learns <em>how you reason</em>, not just what you ask — in Logos as well as Core.',
+     'Your positions and what you have already settled, carried forward instead of restarting.'],
+    '— so you do not begin from nothing each time.',
+    [`Free carries ${said(FREE.memoryEntries)} things between conversations`, `One carries ${said(ONE.memoryEntries)}`]],
+  ['III', 'The material',
+    [`Documents up to <em>${megabytes(ONE.uploadBytes)}</em> — long reports, whole papers, the real material.`,
+     'The larger ones travel through private storage, and are deleted the moment they have been read.',
      'Connected sources — Drive, Docs and Notion, when available.'],
-    '— so nothing you build is ever lost.',
-    ['Free forgets between visits', 'One keeps every thread']],
+    '— so the thinking can start from what you already have.',
+    [`Free reads documents up to ${megabytes(FREE.uploadBytes)}`, `One reads them up to ${megabytes(ONE.uploadBytes)}`]],
+  ['IV', 'Together',
+    ['Share <em>as many chats as you like</em> — Core conversations and Logos lines of thinking, all at once.',
+     'Share <em>a whole Project</em>, and every conversation in it.',
+     'Joining stays free for everyone you invite — by link, by code or by email.'],
+    '— so the people you think with can be in all of it.',
+    ['Free shares one chat at a time', 'One shares every chat, and Projects']],
 ];
 
 const STANDARD: [string, string][] = [
-  ['Thinking Maps', 'Free draws real maps and pauses at four branches. One branches without end.'],
-  ['Research', 'Free runs it once per map, in full. One runs it across the whole map, as often as it is called for.'],
-  ['Depth', 'Free reasons at Quick and Balanced. One adds Deep and Abstract.'],
-  ['Draft Space', 'Free drafts in fragments. One opens the full studio, with long-form and pasted material.'],
-  ['Memory', 'Free forgets between visits. One keeps every thread, on every device.'],
+  ['Core', `Core 3.1 and Core 4 together: ${said(CORE_CHATS)} new chats and ${said(CORE_MESSAGES)} messages a day, by the UTC day. Going back to a chat already started never costs a chat, only its messages. One has no daily count.`],
+  ['Logos', `Logos 2 and Logos 3 together: ${said(LOGOS_LINES)} new lines of thinking a calendar month and ${said(LOGOS_MESSAGES)} messages a day — a message to a node’s own conversation counts. One has no daily count, and a fair-use ceiling of ${said(ONE_LINES)} lines of thinking a month.`],
+  ['At a limit', 'Free says what was used. Everything you started stays open, nothing is deleted, and the day’s allowance comes back tomorrow.'],
+  ['Thinking', 'Identical at both tiers: every lens, every depth, Draft Space, Explore and Challenge, and maps that grow as far as the thinking does.'],
+  ['Memory', `Free carries ${said(FREE.memoryEntries)} things about how you reason between conversations. One carries ${said(ONE.memoryEntries)}.`],
+  ['Documents', `Free reads documents up to ${megabytes(FREE.uploadBytes)}. One reads them up to ${megabytes(ONE.uploadBytes)}.`],
+  ['Sharing', 'Free shares one chat at a time, and stopping frees the slot. One shares as many as you like, and whole Projects. Joining is free for everyone.'],
   ['Sources', 'One connects Drive, Docs and Notion, where available.'],
+  ['No account', 'Core 3.1 opens for one session, kept in your browser. Core 4 and Logos ask you to sign in.'],
   ['The guard', 'Identical at both tiers. It never relaxes for members.'],
   ['What is yours', 'Identical at both tiers. Every map you have made stays yours, always.'],
 ];
 
-/** The boundary, demonstrated rather than described. */
+/**
+ * The boundary, demonstrated rather than described.
+ *
+ * A free map no longer stops — it grows as far as the thinking does. What a
+ * free day meets is its last message, so that is what is shown, and the line
+ * under it is the product's own sentence at that moment (boundaryNote), not
+ * a paraphrase of it that could drift.
+ */
 function Boundary() {
   const [open, setOpen] = useState(false);
+  const holds = `Free · ${said(LOGOS_MESSAGES)} Logos messages a day, then it holds until tomorrow`;
   return (
     <section className="demo deep" data-screen-label="The boundary">
       <div className="wrap">
@@ -281,11 +324,11 @@ function Boundary() {
           <Label tone="paper">The boundary · demonstrated</Label>
         </span>
         <h2>
-          This is where a free map <span className="em">stops.</span>
+          This is where a free day <span className="em">pauses.</span>
         </h2>
         <p className="deck">
-          Not a paywall across your work — everything you built stays open, visible and yours. It
-          simply stops growing.
+          Not a paywall across your work — everything you started stays open, visible and yours.
+          The day’s messages simply come back tomorrow.
         </p>
         <div className={'stage' + (open ? ' unlocked' : '')}>
           <svg className="edges" viewBox="0 0 100 100" preserveAspectRatio="none">
@@ -310,11 +353,11 @@ function Boundary() {
           <div className="capline">
             {open ? (
               <>
-                <span className="off-state">Free · four branches, then it holds</span>
-                <span className="on-state">With One · it keeps going</span>
+                <span className="off-state">{holds}</span>
+                <span className="on-state">With One · it keeps going today</span>
               </>
             ) : (
-              <span className="off-state">Free · four branches, then it holds</span>
+              <span className="off-state">{holds}</span>
             )}
           </div>
         </div>
@@ -326,10 +369,7 @@ function Boundary() {
             what else opens
           </Link>
         </div>
-        <p className="vow">
-          Your free map has reached its limit — not been taken away. Socria One is what lets you
-          keep developing it.
-        </p>
+        <p className="vow">{boundaryNote('messages')}</p>
       </div>
     </section>
   );
@@ -379,8 +419,8 @@ export function OneIssue() {
             Socria <span className="em">One.</span>
           </h1>
           <p className="st rv d2">
-            Everything Socria does, without the ceiling. Not more AI — the complete reasoning
-            environment, and every thread you have already started.
+            Everything Socria does, without the ceiling. Not more AI — the same Socria, with no
+            daily count, and more of how you reason carried from one conversation into the next.
           </p>
 
           {/* The rail replaces the single big price line the cover used to
@@ -414,7 +454,7 @@ export function OneIssue() {
         who="Socria asks"
         socria
         ground="question"
-        answer="Most people can name it exactly. A branch you wanted to open. A second research pass. The thread you came back for and could not find."
+        answer={`Most people can name it exactly. One more message, on a day with more to say. A new chat, after the day’s ${said(CORE_CHATS)}. A second chat to share while the first was still open.`}
       >
         What stopped you last time?
       </Turn>
@@ -426,7 +466,7 @@ export function OneIssue() {
         who="Socria asks"
         socria
         aside="name it — you already know"
-        answer="That is the whole of what One is for. Not more output — the room to keep going when the question turns out to be larger than a trial can responsibly hold."
+        answer="That is the whole of what One is for. Not more output — the room to keep going when the question turns out to be larger than a free day can hold."
       >
         What were you about to find?
       </Turn>
@@ -438,10 +478,11 @@ export function OneIssue() {
             <Label tone="faint">Socria One · MMXXVI</Label>
           </div>
           <h2>
-            The whole instrument, in your <span className="em">hands.</span>
+            The whole day, in your <span className="em">hands.</span>
           </h2>
           <p className="deck">
-            Four chapters, each sealed. Everything below is what the boundary was holding back.
+            Four chapters, each sealed. What Socria can do is the same on either plan — everything
+            below is what One adds around it.
           </p>
           <p className="ledger-note">
             Not a bundle of credits, and not a quota.{' '}
@@ -510,8 +551,9 @@ export function OneIssue() {
               <span className="rn2">i.</span>
               <h3>Nothing is held hostage</h3>
               <p>
-                Reach the free limit and your map stays whole — visible, interactive, and yours.
-                Cancel a membership and it is still there.
+                Reach a free limit and everything you started stays whole — visible, interactive,
+                and yours — and the day’s allowance comes back tomorrow. Cancel a membership and
+                it is still there.
               </p>
             </div>
             <div className="c">

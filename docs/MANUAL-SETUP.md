@@ -27,7 +27,10 @@ question, but a paying user locked out by an unrun migration is a broken
 product. So the failure is silent and generous.
 
 The consequence: **free-tier limits are not being enforced.** Free accounts
-currently get unlimited Logos chats, Explore, images and files.
+currently get unlimited chats and messages: none of the free plan's counts —
+4 new chats and 20 messages a day in Core, 2 lines of thinking a month and 10
+messages a day in Logos — is held, and neither are the fair-use ceilings both
+plans share (Research, images, files).
 
 It also broke checkout, until it was made not to. `socria_subscriptions` is
 in this file, so recording a customer before checkout threw, and every attempt
@@ -402,7 +405,9 @@ development works because `localhost:3000` is stable and registered above.
 Once §1 and §2 are done, this is the state you should be able to confirm:
 
 - `select count(*) from logos_usage` returns a number, not an error
-- A free account hits the boundary on its third Logos chat in a month
+- A free account hits the boundary on its fifth new Core chat of the (UTC)
+  day, its twenty-first Core message of the day, its eleventh Logos message of
+  the day, and its third Logos line of thinking in a month
 - The repository's default branch reads `main`
 - A direct `git push` to `main` is rejected
 - A pull request into `main` shows a required `typecheck · test · build` check

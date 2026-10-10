@@ -430,9 +430,10 @@ export function OneStory() {
             <p className="body fade d1">
               Inside a single line of thinking the free tier is not a sample of Socria — it is
               Socria: the full map, every lens, all four depths, Research, Draft Space, nothing
-              clipped. What it holds two of is <em>lines of thinking</em>, each month. One stops
-              counting them, and carries what it learns about how you reason from each one into
-              the next.
+              clipped. What it counts is how much: four new chats and twenty messages a day in
+              Core, and two <em>lines of thinking</em> a month and ten messages a day in Logos. One
+              stops counting by the day, and carries what it learns about how you reason from each
+              one into the next.
             </p>
           </div>
         </section>
@@ -455,7 +456,7 @@ export function OneStory() {
                     <li><GlBranch />Every one of them kept, with its map and its whole history.</li>
                   </ul>
                   <p className="payoff">— so a question never has to wait for next month.</p>
-                  <p className="stoprow"><span className="o" />Free holds two a month<span className="sep">·</span><span className="f" />One does not count them</p>
+                  <p className="stoprow"><span className="o" />Free holds two a month, and ten messages a day<span className="sep">·</span><span className="f" />One does not count them</p>
                 </div>
                 <div className="mini" aria-hidden="true">
                   <svg viewBox="0 0 120 120">
@@ -555,13 +556,13 @@ export function OneStory() {
             <h2 className="fade">A limit should end the asking — never the thinking.</h2>
             <p className="intro fade d1">
               A free line of thinking runs to its own end, not to ours: the map grows as far as
-              the thought does, and when the month&rsquo;s second one is spent, nothing is taken
-              away. Every map stays whole, visible, and yours to work with, and the conversations
-              you have already begun keep going.
+              the thought does, and when the month&rsquo;s second one or the day&rsquo;s messages
+              are spent, nothing is taken away. Every map stays whole, visible, and yours to work
+              with, and the conversations you have already begun stay open for tomorrow.
             </p>
             <div className="artifacts">
               <div className="fade d1">
-                <div className="mapviz" id="mapviz" role="img" aria-label="A Thinking Map growing to its free edge">
+                <div className="mapviz" id="mapviz" role="img" aria-label="A Thinking Map, kept whole at the end of a free day">
                   <svg viewBox="0 0 440 300">
                     <path className="ln l1" d="M220,150 C180,130 130,110 96,84" />
                     <path className="ln l2" d="M220,150 C265,128 310,112 348,92" />
@@ -577,11 +578,11 @@ export function OneStory() {
                 </div>
                 <div className="limit-card">
                   <div className="lc-mono"><span>I</span></div>
-                  <h3>Your free Thinking Map has reached its limit.</h3>
+                  <h3>That is today&rsquo;s free messages.</h3>
                   <p className="lc-body">
                     Everything you&rsquo;ve built here remains yours — fully visible, fully
-                    interactive. <em>Socria One</em> lets this map keep developing: new branches,
-                    deeper research, further questions.
+                    interactive — and picks up again tomorrow. <em>Socria One</em> lets you keep
+                    going today.
                   </p>
                   <div className="lc-row">
                     <button type="button" className="lc-cta" onClick={subscribe} disabled={busy}>
@@ -591,7 +592,7 @@ export function OneStory() {
                   </div>
                   <p className="lc-note">Your map is never deleted, hidden, or held back.</p>
                 </div>
-                <p className="art-cap">The moment a map reaches its free edge</p>
+                <p className="art-cap">The moment a free day reaches its last message</p>
               </div>
               <div className="chips fade d2">
                 <div className="chip-demo">

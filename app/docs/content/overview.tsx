@@ -6,6 +6,7 @@ import { Article, H2, Callout } from '../Article';
 import { DemoSplit } from '@/app/logos/LogosDemo';
 import { DOC_PAGES, docPage } from '../registry';
 import { priceWithPeriod } from '@/lib/socria-one';
+import { PLANS } from '@/lib/entitlements';
 
 const page = docPage('overview')!;
 const sections = [
@@ -52,7 +53,7 @@ export function Overview() {
           <strong><Link href="/docs/core-3">Core 3.1</Link></strong> — the
           conversation that remembers: thread memory, periodic syntheses of
           what you have worked out, and a running model of how you think. It
-          is open with no account.
+          opens with no account, for a first session kept in your browser.
         </li>
         <li>
           <strong><Link href="/docs/core-4">Core 4</Link></strong> — the model
@@ -91,9 +92,10 @@ export function Overview() {
         thing — an environment — and it is the centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
         {priceWithPeriod()} plan. Its free tier is not a trial of Logos 2 but
-        Logos 2 itself, twice a month: what Socria One sells is how many lines
-        of thinking you get and what is carried between them, never a better
-        version of any one of them.
+        Logos 2 itself, counted — {PLANS.free.counters.chats} lines of thinking
+        a month and {PLANS.free.counters.messages} messages a day: what Socria
+        One sells is how much a day and a month can hold, and what is carried
+        between conversations, never a better version of any one of them.
       </p>
 
       <H2 id="principles">What never changes</H2>
@@ -124,10 +126,12 @@ export function Overview() {
           tell Socria it read you wrong. Neither is ever gated.
         </li>
         <li>
-          <strong>Nothing held hostage.</strong> Spending the month&rsquo;s free
-          lines of thinking stops new ones; it never hides, deletes, or locks
-          what you have already thought. Your existing maps stay visible and
-          interactive, and the conversations you have begun keep going.
+          <strong>Nothing held hostage.</strong> Reaching a free limit — the
+          day&rsquo;s chats or messages, or the month&rsquo;s lines of thinking
+          — pauses only what is new; it never hides, deletes, or locks what you
+          have already thought. Your existing maps stay visible and
+          interactive, the conversations you have begun stay open, and the
+          day&rsquo;s allowance comes back tomorrow.
         </li>
       </ul>
 

@@ -76,8 +76,8 @@ They are shown **once per boundary per tab**, though. The first press of an
 exhausted control deserves an answer; the fourth is the same person doing the
 same thing, and answering it again with a sheet across the screen is the
 nagging the rest of this system exists to prevent. Each trigger is counted
-separately: being told the month's chats are gone says nothing about why
-Research stopped.
+separately: being told today's messages are gone says nothing about why a new
+chat would not start.
 
 The reason rationing them was once forbidden is real and still holds — silence
 would leave someone staring at a button that did nothing. So the surfaces keep
@@ -93,10 +93,23 @@ like paranoia below is aimed at these.
 
 | Trigger | Intent | Category |
 |---|---|---|
-| `chats-spent` `explore-spent` `research-spent` `challenge-spent` `context-spent` `images-spent` `files-spent` | urgent | entitlement |
+| `messages-spent` "Keep thinking today" (Logos, the day's 10 messages) · `core-chats-spent` "Start something new today" (Core, the day's 4 new chats) · `core-messages-spent` "Keep this conversation going" (Core, the day's 20 messages) | urgent | entitlement |
+| `chats-spent` "Keep this line of thinking" (Logos, the month's 2) `explore-spent` `research-spent` `challenge-spent` `context-spent` `images-spent` `files-spent` | urgent | entitlement |
 | `map-full` `depth-locked` `lenses-locked` `draft-locked` `connections-locked` | high | entitlement |
 | `returning-thinker` | medium | proactive |
 | `asked` (they pressed the Socria One button) | low | — |
+
+The day's three (October 2026) take their bodies from `boundaryNote()` like
+every other counter: what was used, that everything already started stays
+open, and the line Socria One answers it with — "Upgrade to Socria One to
+keep going today" for the messages, "…to start as many as you like" for new
+chats. Only the
+four counters in `TIERED_COUNTERS` — `chats`, `messages`, `core-chats`,
+`core-messages` — are things Socria One lifts; the other `-spent` triggers
+are fair-use ceilings shared by both plans, and say so instead of offering
+anything. `map-full`, `depth-locked`, `lenses-locked` and `draft-locked` can
+no longer fire — maps do not fill, and every depth, lens and Draft Space is
+open on both plans — and are kept for checkout attribution.
 
 Intent orders simultaneous triggers via `bestTrigger()`, so a counter that just
 ran out always beats a generic nudge. It never justifies showing one — a high
@@ -146,7 +159,9 @@ the server refuses never reaches the extractor.
 
 The composer also checks the boundary before sending at all, so a turn that
 would begin a chat there is no room for costs no round trip. Continuing an open
-line of thinking is never stopped: a chat is counted once, when it starts.
+line of thinking never costs a chat — a chat is counted once, when it starts —
+but on the free plan each message still counts toward the day's messages, so
+the day's last one is where an open conversation pauses until tomorrow.
 
 ### Dismissal counting
 

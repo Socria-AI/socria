@@ -30,14 +30,17 @@ export function SocriaOne() {
       <H2 id="plans">The two plans</H2>
       <p>
         Socria has one paid plan: <strong>Socria One, {priceWithPeriod()}</strong>.
-        What it opens is <em>volume and continuity</em>: as many lines of thinking
-        in a month as you have, kept with their full history, and a Socria that
-        carries what it learns about how you reason from each one into the next —
-        into Logos 2 as well as Core. Core 3.1 needs no account at all.
+        What it opens is <em>volume and continuity</em>: no daily count on
+        chats or messages, in Core or in Logos, lines of thinking held only by a
+        fair-use ceiling, and a Socria that carries what it learns about how you
+        reason from each conversation into the next — into Logos 2 as well as
+        Core. It also shares as many chats as you like, and whole Projects,
+        where the free plan shares one chat at a time. Core 3.1 needs no account
+        for a first session, kept in your browser.
       </p>
       <p>
-        What it deliberately does <em>not</em> open is anything inside a single
-        line of thinking. All four{' '}
+        What it deliberately does <em>not</em> open is anything Socria can do
+        inside a single line of thinking. All four{' '}
         <Link href="/docs/depth-personality">depth modes</Link>, Thinking Maps
         with unbounded branching and every lens, Research, Draft Space and
         grounding in your own material are on the free tier too, at full
@@ -47,8 +50,9 @@ export function SocriaOne() {
         they have only watched be mediocre.
       </p>
       <p>
-        The one difference inside a line of thinking is the size of a
-        document. Anything up to {megabytes(PLANS.free.uploadBytes)} travels
+        Inside a line of thinking, two things differ: how many messages a day
+        holds, counted below, and the size of a document. Anything up to{' '}
+        {megabytes(PLANS.free.uploadBytes)} travels
         straight to our server and is read there, on either plan. Socria One
         carries larger documents, up to {megabytes(PLANS.one.uploadBytes)},
         through private storage instead, and deletes each one the moment it
@@ -65,9 +69,21 @@ export function SocriaOne() {
       <H2 id="free">What the free tier holds</H2>
       <p>
         Inside one line of thinking, the free tier is not a trial of Socria —
-        it <em>is</em> Socria. What it holds two of is lines of thinking, per
-        calendar month — two in Logos, and two Core 4 conversations, counted
-        the same way and on the same clock. Its exact shape:
+        it <em>is</em> Socria, counted by the day. In Core — every model but
+        Logos, so Core 3.1 and Core 4 together — it holds{' '}
+        {PLANS.free.counters['core-chats']} new chats and{' '}
+        {PLANS.free.counters['core-messages']} messages a day. In Logos it
+        holds {PLANS.free.counters.chats} new lines of thinking a calendar
+        month and {PLANS.free.counters.messages} messages a day, and a message
+        to a node&rsquo;s own conversation counts; the first thought you bring
+        into Logos from onboarding costs neither. The day is the UTC day.
+      </p>
+      <p>
+        Starting a chat and sending a message are counted apart, so going back
+        to a chat you have already started never costs a chat — only its
+        messages. Every message you send Socria counts, including as a guest in
+        somebody else&rsquo;s shared conversation, where it is your message,
+        never one of your chats, and never the host&rsquo;s. Its exact shape:
       </p>
       <DemoLimitsTable />
       <p className="d-after-table">
@@ -81,12 +97,12 @@ export function SocriaOne() {
       </p>
       <Callout tag="Boundary, not wall">
         <p>
-          Hitting the month&rsquo;s limit stops <em>new</em> lines of thinking.
-          It never hides, deletes, or locks anything you already thought: every
-          map you built stays on screen, stays interactive, and stays yours, and
-          the conversations you have already begun keep going — including the
-          Core 4 ones, for as long as they run and whenever you come back to
-          them. Core 3.1 is open either way.
+          Reaching a limit says what you have used and pauses only what
+          is <em>new</em> — a new chat, a new line of thinking, or the
+          day&rsquo;s next message. It never hides, deletes, or locks anything
+          you already thought: every map you built stays on screen, stays
+          interactive, and stays yours, everything you have begun stays open,
+          and the day&rsquo;s allowance comes back tomorrow.
         </p>
       </Callout>
 
@@ -104,8 +120,10 @@ export function SocriaOne() {
       </p>
       <Defs>
         <Def term="You reached a boundary">
-          You began a third line of thinking this month and it stopped. The
-          prompt names what stopped and how to carry on. These appear
+          You reached one of the free counts — the day&rsquo;s messages, the
+          day&rsquo;s new chats in Core, or the month&rsquo;s lines of thinking
+          in Logos — and what you tried stopped. The prompt names what stopped
+          and how to carry on. These appear
           immediately and are not rationed by the rules below — a button that
           silently does nothing is worse than an explanation — though the same
           boundary is only explained once per browser session. A fair-use
