@@ -240,6 +240,8 @@ const MODULES = [
   'lib/objects/display-argument.ts',
   'lib/objects/display-diagram.ts',
   'components/display/PlanFigure.tsx',
+  'lib/objects/display-data.ts',
+  'lib/objects/display-market.ts',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',
