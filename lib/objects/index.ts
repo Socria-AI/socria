@@ -16,6 +16,8 @@ import './display-argument';
 import './display-diagram';
 import './display-data';
 import './display-market';
+import './display-worksheet';
+import './display-exercise';
 import { apply, create, currentOf, kindOf, objOf, originSaid, stepWho, EMPTY_SPACE, type ObjectOrigin, type ObjectSpace, type ThoughtObject, type Step } from './core';
 import { diffCells, findMatrices, matrixTeX, readMatrixOp, type MatrixState } from './matrix';
 import { findFunctions } from './function';
