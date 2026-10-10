@@ -176,7 +176,8 @@ console.log('=== a stored history is re-computed, not believed ===');
   const cut = sanitizeSpace(forged).objs[0];
   ok('a state that does not follow from its step cuts the history there', cut.states.length === 3, cut.states.length);
   const badArgs = JSON.parse(JSON.stringify(space));
-  badArgs.objs[0].steps[0].args.dims = 'x'.repeat(500);
+  // past the scene's limit (4096 characters — the longest argument its own operations accept)
+  badArgs.objs[0].steps[0].args.dims = 'x'.repeat(5000);
   ok('an argument past the kind’s limit is not read', sanitizeSpace(badArgs).objs[0].states.length === 1);
   ok('a node with a broken shape is dropped on load', sanitizeScene({ nodes: [{ id: 'box1', shape: 'box', dims: { w: 1, h: -2, d: 1 } }], next: 2 }).nodes.length === 0);
   ok('a support that is not there is no support', sanitizeScene({ nodes: [{ id: 'box1', shape: 'box', dims: { w: 1, h: 1, d: 1 }, on: 'ghost7' }], next: 2 }).nodes[0].on === undefined);
@@ -186,7 +187,8 @@ console.log('=== a long history survives storage ===');
 {
   let sp = create({ objs: [] }, 'scene', EMPTY, { name: 'Long', origin: 'person' }).space;
   const lid = sp.objs[0].id;
-  for (let t = 0; t < 45; t++) sp = apply(sp, lid, 'add', { shape: t % 2 ? 'box' : 'sphere', at: `${t},0,0` }, { by: 'person', at: 1 }).space;
+  // forty-five separate steps, each at its own moment: steps that share one are one description, kept whole
+  for (let t = 0; t < 45; t++) sp = apply(sp, lid, 'add', { shape: t % 2 ? 'box' : 'sphere', at: `${t},0,0` }, { by: 'person', at: t + 1 }).space;
   const o = sp.objs[0];
   ok('a scene keeps fewer states than a matrix — each is the whole scene', o.states.length === 24 && o.trimmed === 46 - 24);
   const back = sanitizeSpace(JSON.parse(JSON.stringify(sp))).objs[0];

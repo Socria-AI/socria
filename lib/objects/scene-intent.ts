@@ -19,6 +19,13 @@
 // rather than filled in. Defaults are used only for sizes nobody gave, and
 // they are marked as defaults in the scene.
 //
+// What a request is WRAPPED IN is read as framing, and noted: "create an
+// interactive 3D model of …", "with sliders for the diameter and height",
+// "labelled dimensions", "display its volume" (REQUEST_FRAMING). And the
+// words before a shape noun name the part: "a rocket nose cone" is a cone
+// called "rocket nose cone", "a steel flywheel cylinder" a steel cylinder
+// called "flywheel" (modifiersBefore). Neither is ever geometry.
+//
 // Each operation is applied as it is read (with the scene kind's own
 // operations), so "it" and "them" can mean what an earlier clause made, and
 // the preview the person sees is exactly what committing will compute.
@@ -26,7 +33,7 @@
 // PURE.
 
 import { compileExpr } from '@/lib/logos-math';
-import { DIMS, EXPRS, MAX_NODES, NOMINAL_DENSITY, SCENE_OPS, SHAPE_WORD, UNIT_M, fitKey, sceneBox, writePairs, type LengthUnit, type SceneNode, type SceneShape, type SceneState } from './scene';
+import { DIMS, EXPRS, MAX_NODES, NAME_MAX, NOMINAL_DENSITY, SCENE_OPS, SHAPE_WORD, UNIT_M, fitKey, keepProblem, sceneBox, writePairs, type LengthUnit, type SceneNode, type SceneShape, type SceneState } from './scene';
 import { worldBox, type Vec3 } from './scene-geometry';
 
 export interface SceneOp {
@@ -44,6 +51,16 @@ export interface ClauseReading {
   skipped?: string[];
   /** notes on choices made (a default size, the most recent of two boxes) */
   notes?: string[];
+  /**
+   * request framing read and set aside, in the person's words — "interactive
+   * 3D model", "sliders for the diameter and height", "the base area, surface
+   * area and volume" — and what a part was said to be when it was also given
+   * a name. Noted is never a problem: a clause that is only framing builds
+   * nothing and blocks nothing (REQUEST_FRAMING).
+   */
+  noted?: string[];
+  /** the kinds of framing noted (for saying what Live 3D does with each) */
+  framing?: FramingKind[];
 }
 
 export interface Reading {
@@ -98,7 +115,10 @@ const COLORS: Record<string, string> = {
 };
 const METALS = new Set(['gold', 'golden', 'silver', 'copper', 'bronze', 'brass', 'steel', 'chrome', 'iron', 'aluminum', 'aluminium', 'metal', 'metallic']);
 
-const UNIT_RE = '(m|meters?|metres?|cm|centimeters?|centimetres?|mm|millimeters?|millimetres?|inch(?:es)?|in(?=\\s*(?:wide|tall|high|deep|long|thick|$|,|\\s+(?:and|by|x)\\b))|"|ft|foot|feet|\')';
+// A UNIT IS A WHOLE WORD, longest spelling first. "m" came first and had no end,
+// so at the end of a phrase "50 mm" read as 50 m (and "m" left over), "2 meters"
+// as 2 m and "eters": the reader took a millimetre for a metre.
+const UNIT_RE = '(millimet(?:er|re)s?|centimet(?:er|re)s?|met(?:er|re)s?|mm(?![a-z])|cm(?![a-z])|m(?![a-z])|inch(?:es)?|in(?=\\s*(?:wide|tall|high|deep|long|thick|$|,|\\s+(?:and|by|x)\\b))|"|ft(?![a-z])|foot|feet|\')';
 const NUM_RE = '(-?\\d+(?:\\.\\d+)?(?:\\s*/\\s*\\d+)?|-?\\.\\d+|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|fifteen|twenty|thirty|forty|fifty|half)';
 
 function unitOf(raw: string | undefined, fallback: LengthUnit): number {
@@ -142,13 +162,24 @@ const plural = (w: string) => (w === 'torus' ? 'tori' : /(?:x|s|ch|sh)$/.test(w)
 
 // ── a clause, consumed as it is read ────────────────────────────────
 
+/** Words that are never content: the glue of a sentence, and the courtesies of a request said in the conversation ("can you make it red, thanks"). */
+const STOP_WORDS = /^(?:a|an|the|and|with|of|to|it|its|that|this|is|be|please|pls|now|also|then|me|i|we|you|your|want|need|like|some|just|make|put|place|add|create|build|draw|give|let|lets|let's|us|have|there|should|would|can|could|over|in|into|onto|on|at|for|from|by|as|so|one|more|very|really|nice|little|big|small|large|tiny|huge|new|another|other|same|which|who|where|here|space|scene|object|objects|thing|things|shape|shapes|part|parts|units?|axis|direction|side|sides|size|ok|okay|thanks|thank|hey)$/;
+
 class Clause {
   readonly text: string;
   work: string;
   notes: string[] = [];
+  /** request framing read and set aside, in the person's words (REQUEST_FRAMING) */
+  noted: string[] = [];
+  /** the kinds of framing among them */
+  framing: FramingKind[] = [];
   constructor(text: string) {
     this.text = text;
     this.work = text;
+  }
+  /** blank out [from, to) of the work, so it is not read again */
+  blank(from: number, to: number) {
+    this.work = this.work.slice(0, from) + ' '.repeat(Math.max(0, to - from)) + this.work.slice(to);
   }
   /** match a pattern, and blank out what it matched so it is not read twice */
   take(re: RegExp): RegExpMatchArray | null {
@@ -162,13 +193,120 @@ class Clause {
   }
   /** content words not read */
   leftover(): string[] {
-    // the words of a polite request said in the conversation ("can you make it red, thanks") are not content
-    const stop = /^(?:a|an|the|and|with|of|to|it|its|that|this|is|be|please|pls|now|also|then|me|i|we|you|your|want|need|like|some|just|make|put|place|add|create|build|draw|give|let|lets|let's|us|have|there|should|would|can|could|over|in|into|onto|on|at|for|from|by|as|so|one|more|very|really|nice|little|big|small|large|tiny|huge|new|another|other|same|which|who|where|here|space|scene|object|objects|thing|things|shape|shapes|part|parts|units?|axis|direction|side|sides|size|ok|okay|thanks|thank|hey)$/;
     return this.work
       .replace(/[(),;:!?=+*/^×]/g, ' ')
       .replace(/(?<!\d)[.-]|\.(?!\d)/g, ' ')
       .split(/\s+/)
-      .filter((w) => w && !stop.test(w));
+      .filter((w) => w && !STOP_WORDS.test(w));
+  }
+}
+
+// ── request framing ─────────────────────────────────────────────────
+
+/**
+ * REQUEST FRAMING — the words a request for a shape comes wrapped in. They say
+ * what the person wants done with it, not what it is, so they are read as
+ * framing: NOTED in the reading (so the panel and the conversation can say what
+ * was understood), never left over as words nobody read, never a reason to
+ * build nothing, and never geometry — a slider asked for makes no part.
+ *
+ *   view      an interactive 3D model of · a CAD model of · a model of ·
+ *             a 3D model · interactive · 3D · 3-D · three-dimensional ·
+ *             rotatable · adjustable · in 3D
+ *   controls  (with / add) sliders (for the diameter and height) · controls
+ *   labels    labelled (labeled) dimensions · with dimensions · annotated ·
+ *             label the dimensions
+ *   measures  show / display (its) volume, surface area, base area, lateral
+ *             area, slant height, mass — measures asked to be SHOWN. "What
+ *             is" or "calculate the volume of a sphere" is a question, not
+ *             framing: it stays with the conversation, which answers it.
+ *
+ * The verbs a request opens with — create, make, build, model, draw, render,
+ * show, display, design, generate, give me, I want / need, can you, could
+ * you, please, let's — are framing as well. The creation reader takes them
+ * where they open a clause (ASK_VERBS, in CREATE_VERB), and the courtesies
+ * are never content (STOP_WORDS). They are not repeated back as noted.
+ *
+ * Anything else a person writes that the reader does not know still blocks a
+ * build, exactly as before: "a lot of people think a sphere is the most
+ * efficient shape for a tank" is not a description of a sphere.
+ */
+export type FramingKind = 'view' | 'controls' | 'labels' | 'measures';
+
+const LIST = (item: string) => `(?:(?:the|its|their|each)\\s+)?(?:${item})(?:\\s*(?:,\\s*(?:and\\s+)?|\\s+and\\s+|\\s+or\\s+|\\s*&\\s*)(?:(?:the|its|their)\\s+)?(?:${item}))*`;
+/** what a slider might be asked for — not a dimension that is given a value there ("base diameter 20 cm" is a size) */
+const SLIDER_FOR = `(?:(?:base|top|bottom|outer|inner|slant|overall)\\s+)?(?:diameters?|radi(?:us|i)|heights?|widths?|depths?|lengths?|thickness(?:es)?|sizes?|dimensions?|sides?|angles?|proportions?|scale|parameters?)(?!\\s*(?:of\\s+|=|:|is\\s+)?\\s*-?[\\d.])`;
+const MEASURED = `(?:(?:total|lateral|curved|side|base|outer|inner|cross[\\s-]sectional)\\s+)?(?:surface\\s+)?areas?|volumes?|mass(?:es)?|weights?|slant\\s+heights?|centroids?|cent(?:re|er)s?\\s+of\\s+(?:mass|gravity)|capacity|perimeters?|circumferences?`;
+const VIEW_ADJ = '(?:interactive|rotatable|adjustable|parametric|3-?d|three[\\s-]dimensional|cad|digital|virtual|simple)';
+const AND = '(?:(?:and|also|then|plus)\\s+)?';
+
+/** The vocabulary, in the order it is read: the longer phrases before the words they contain. */
+export const REQUEST_FRAMING: readonly { kind: FramingKind; re: RegExp }[] = [
+  // "add sliders for the diameter and height", "with sliders", "and some controls to adjust its size"
+  { kind: 'controls', re: new RegExp(`\\b${AND}(?:(?:add|with|include|give\\s+(?:it|them|me|us)|having|use)\\s+)?(?:(?:some|a\\s+few|a\\s+set\\s+of|the)\\s+)?(?:(?:adjustable|interactive|parameter)\\s+)?(?:sliders?|controls?|knobs?)\\b(?:\\s+(?:for|to\\s+(?:adjust|change|control|set|vary|tweak|edit)|that\\s+(?:adjust|change|control|set|vary))\\s+${LIST(SLIDER_FOR)})?`, 'g') },
+  // "labelled dimensions", "with labeled dimensions", "label the dimensions", "annotate it"
+  { kind: 'labels', re: new RegExp(`\\b${AND}(?:(?:with|add|show|include|having)\\s+)?(?:(?:the|its|their|all\\s+(?:the|its))\\s+)?(?:labell?ed|annotated|marked)\\s+(?:dimensions?|measurements?|sizes?|lengths?)\\b`, 'g') },
+  { kind: 'labels', re: new RegExp(`\\b${AND}(?:label|annotate|dimension)\\s+(?:(?:the|its|their|all(?:\\s+the|\\s+its)?)\\s+)?(?:dimensions?|measurements?|sizes?|lengths?|it|them)\\b`, 'g') },
+  // "with dimensions" — and not "with dimensions 2 x 1 x 3 m", which is its size
+  { kind: 'labels', re: /\b(?:(?:and|also|plus)\s+)?with\s+(?:(?:the|its|their)\s+)?dimensions(?:\s+(?:shown|labell?ed|marked))?\b(?!\s*(?:of\s+|:|=)?\s*[-\d.(])/g },
+  { kind: 'labels', re: /\b(?:annotated|labell?ed|dimensioned)\b/g },
+  // "display the base area, surface area and volume", "show its volume", "with its mass shown"
+  { kind: 'measures', re: new RegExp(`\\b${AND}(?:show|display)\\s+(?:me\\s+|us\\s+)?${LIST(MEASURED)}\\b(?:\\s+of\\s+(?:it|them|each|all|both)\\b)?`, 'g') },
+  { kind: 'measures', re: new RegExp(`\\b${AND}with\\s+(?:the|its|their)\\s+${LIST(MEASURED)}\\s+(?:shown|displayed|labell?ed)\\b`, 'g') },
+  // "an interactive 3D model of", "a CAD model of", "a model of"; "a 3D model", "an interactive model"
+  { kind: 'view', re: new RegExp(`\\b(?:(?:an?|the)\\s+)?(?:${VIEW_ADJ}\\s+)*(?:model|rendering|visuali[sz]ation|representation|mock-?up)\\s+of\\b`, 'g') },
+  { kind: 'view', re: new RegExp(`\\b(?:(?:an?|the)\\s+)?(?:${VIEW_ADJ}\\s+)+(?:model|rendering|visuali[sz]ation)\\b`, 'g') },
+  // "in 3D"; "interactive", "3D", "3-D", "three-dimensional", "rotatable", "adjustable"
+  { kind: 'view', re: /\bin\s+(?:3-?d|three\s+dimensions)\b/g },
+  { kind: 'view', re: /\b(?:interactive|rotatable|adjustable|3-?d|three[\s-]dimensional)\b/g },
+];
+
+/** The framing phrase as it is said back: without the conjunction or verb that led into it, or the "of" that led out. */
+const framingSaid = (kind: FramingKind, s: string) => {
+  let t = s.trim().replace(/[,;:]+$/, '');
+  for (;;) {
+    const u = t.replace(/^(?:and|also|then|plus|with|add|include|having|use|give\s+(?:it|them|me|us)|show(?:\s+(?:me|us))?|display(?:\s+(?:me|us))?)\s+/i, '');
+    if (u === t) break;
+    t = u;
+  }
+  if (kind === 'view') t = t.replace(/^(?:an?|the)\s+/i, '').replace(/\s+of$/i, '');
+  return t;
+};
+
+/**
+ * Take the request framing out of a clause — before anything else reads it,
+ * so a shape, a size or an edit is read from what is left — and note it.
+ * A measure asked for "of the cone" (a part there, or one this description
+ * made) takes the reference with it: "display the volume of the cone" is all
+ * framing, and makes nothing.
+ */
+function readFraming(c: Clause, raw: string, s: SceneState): void {
+  const said = raw.length === c.text.length ? raw : c.text;
+  // a lead-in that names the shape, then a colon, then the shape itself — "now draw one wing: a NACA 2412
+  // aluminium wing …" — is one thing, described once: the lead-in is framing, and is not said back
+  const lead = /\b(?:one|a|an)\s+([a-z]+)\s*:\s*/.exec(c.work);
+  if (lead && shapeOfNoun(lead[1]) && nounIn(c.work.slice(lead.index + lead[0].length))?.shape === shapeOfNoun(lead[1])) c.blank(lead.index, lead.index + lead[0].length);
+  for (const { kind, re } of REQUEST_FRAMING) {
+    re.lastIndex = 0;
+    const w0 = c.work;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(w0))) {
+      if (!m[0].trim()) {
+        re.lastIndex++;
+        continue;
+      }
+      let end = m.index + m[0].length;
+      if (kind === 'measures') {
+        // "… of the cone", to the end of the clause: the part whose measures they are
+        const of = /^\s+of\s+/.exec(c.work.slice(end));
+        const words = of ? refAt(c.work.slice(end + of[0].length), s) : null;
+        const after = end + (of?.[0].length ?? 0) + (words?.len ?? 0);
+        if (of && words && !words.bare && /^[\s.,;:!?]*$/.test(c.work.slice(after))) end = after;
+      }
+      c.blank(m.index, end);
+      c.noted.push(framingSaid(kind, said.slice(m.index, end)));
+      c.framing.push(kind);
+    }
   }
 }
 
@@ -190,6 +328,9 @@ interface DimReading {
   span?: number;
   /** "3 m long": a width for most shapes, the extrusion for an outline */
   long?: number;
+  /** "outer diameter 50 mm", "inner diameter 40 mm": a pipe's, a ring's, a round shape's */
+  od?: number;
+  id?: number;
 }
 
 function readDims(c: Clause, unit: LengthUnit): DimReading {
@@ -198,6 +339,8 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
     const v = numOf(n);
     return v === null ? null : v * unitOf(un, unit);
   };
+  // the words that introduce a size — "with dimensions 2 x 1 x 3 m", "measuring 2 by 3 m"
+  c.take(new RegExp(`\\b(?:with\\s+)?(?:(?:the|its|overall)\\s+)?(?:dimensions|measurements)\\s*(?:of|:|=)?\\s*(?=${NUM_RE}\\s*${UNIT_RE}?\\s*(?:x|by)\\s*${NUM_RE})|\\bmeasuring\\s+(?=${NUM_RE})`, 'i'));
   // 2 x 3 x 4 (m): length × width × height  →  width (x), depth (z), height (y)
   let m = c.take(new RegExp(`${NUM_RE}\\s*${UNIT_RE}?\\s*(?:x|by)\\s*${NUM_RE}\\s*${UNIT_RE}?\\s*(?:x|by)\\s*${NUM_RE}\\s*${UNIT_RE}?`, 'i'));
   if (m) {
@@ -214,8 +357,8 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
       out.d = u(m[3], m[4] ?? un) ?? undefined;
     }
   }
-  // NUM UNIT wide / tall / high / deep / long / thick / across / in diameter / in radius
-  const adj = new RegExp(`${NUM_RE}\\s*${UNIT_RE}?\\s*(?:-\\s*)?(wide|tall|high|deep|long|thick|across|in diameter|diameter|in radius)\\b`, 'gi');
+  // NUM UNIT wide / tall / high / deep / long / thick / across / in diameter / in radius / (base, outer, inner) diameter
+  const adj = new RegExp(`${NUM_RE}\\s*${UNIT_RE}?\\s*(?:-\\s*)?(wide|tall|high|deep|long|thick|across|in diameter|outer diameter|inner diameter|(?:base |bottom )?diameter|in radius)\\b`, 'gi');
   let a: RegExpExecArray | null;
   const w0 = c.work;
   while ((a = adj.exec(w0))) {
@@ -227,6 +370,8 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
     else if (k === 'deep') out.d = v;
     else if (k === 'long') out.w = out.long = v;
     else if (k === 'thick') out.depth = v;
+    else if (k === 'outer diameter') out.od = v;
+    else if (k === 'inner diameter') out.id = v;
     else if (k === 'across' || k.includes('diameter')) out.diameter = v;
     else if (k.includes('radius')) out.r = v;
   }
@@ -248,18 +393,21 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
       if (k === 'thick') out.depth = v;
     }
   }
-  // named dimension = NUM UNIT
+  // named dimension = NUM UNIT — and a round shape's base: "base diameter 20 cm", "the radius of the base is 10 cm"
   const named = new RegExp(
-    `(outer radius|inner radius|tube radius|ring radius|major radius|minor radius|radius|diameter|width|height|depth|length|thickness|side(?: length)?|size|edge|chord|span)\\s*(?:of|=|:|is|to)?\\s*${NUM_RE}\\s*${UNIT_RE}?`,
+    `(outer radius|inner radius|tube radius|ring radius|major radius|minor radius|outer diameter|inner diameter|(?:base|bottom) (?:radius|diameter)|(?:radius|diameter) (?:of|at) (?:the|its) (?:base|bottom)|radius|diameter|width|height|depth|length|thickness|side(?: length)?|size|edge(?: length)?|chord|span)\\s*(?:of|=|:|is|to)?\\s*${NUM_RE}\\s*${UNIT_RE}?`,
     'gi'
   );
   const w1 = c.work;
   while ((a = named.exec(w1))) {
     const v = u(a[2], a[3]);
     if (v === null) continue;
-    const k = a[1].toLowerCase();
+    // a cone's or a cylinder's base is where its radius is measured
+    const k = a[1].toLowerCase().replace(/^(?:base|bottom) /, '').replace(/ (?:of|at) (?:the|its) (?:base|bottom)$/, '');
     if (k === 'outer radius' || k === 'ring radius' || k === 'major radius') out.R = v;
     else if (k === 'inner radius') out.ri = v;
+    else if (k === 'outer diameter') out.od = v;
+    else if (k === 'inner diameter') out.id = v;
     else if (k === 'tube radius' || k === 'minor radius') out.tube = v;
     else if (k === 'radius') out.r = v;
     else if (k === 'diameter') out.diameter = v;
@@ -273,6 +421,12 @@ function readDims(c: Clause, unit: LengthUnit): DimReading {
     else out.side = v;
   }
   c.work = c.work.replace(named, (s) => ' '.repeat(s.length));
+  // "2 m on a side", "2 m to a side", "2 m along each edge", "2 m per side": every edge of it
+  const each = c.take(new RegExp(`${NUM_RE}\\s*${UNIT_RE}?\\s+(?:(?:on|to|along)\\s+(?:a|each|every|one)|per)\\s+(?:side|edge)\\b`, 'i'));
+  if (each) {
+    const v = u(each[1], each[2]);
+    if (v !== null) out.side = v;
+  }
   // N sides / N points / N-sided
   const sides = c.take(new RegExp(`(?:with\\s+)?${NUM_RE}\\s*(?:-\\s*)?(?:sides|sided|points|pointed|corners)\\b`, 'i'));
   if (sides) out.n = numOf(sides[1]) ?? undefined;
@@ -350,7 +504,7 @@ const MATTER_WORDS = '(stainless steel|steel|iron|alumin(?:i)?um|copper|brass|br
  * density given takes its nominal one (scene.ts NOMINAL_DENSITY), which the
  * scene says is nominal.
  */
-function readMatter(c: Clause): { name?: string; density?: number; said: string } | null {
+function readMatter(c: Clause): { name?: string; density?: number; said: string; word?: string } | null {
   const d =
     c.take(new RegExp(`\\bdensity\\s*(?:of|=|:|is)?\\s*${NUM_RE}\\s*(?:kg\\s*\\/\\s*m(?:3|³|\\^3)|kg per cubic met(?:er|re)s?)?`, 'i')) ??
     c.take(new RegExp(`\\b${NUM_RE}\\s*(?:kg\\s*\\/\\s*m(?:3|³|\\^3)|kg per cubic met(?:er|re)s?)`, 'i'));
@@ -362,7 +516,8 @@ function readMatter(c: Clause): { name?: string; density?: number; said: string 
   if (name === 'aluminum') name = 'aluminium';
   if (!name && density === undefined) return null;
   if (density === undefined && name && NOMINAL_DENSITY[name] === undefined) return null;
-  return { ...(name ? { name } : {}), ...(density !== undefined ? { density } : {}), said: [name, density !== undefined ? `${density} kg/m³` : ''].filter(Boolean).join(', ') };
+  // the word as written: the look takes those that are also colours (steel, wood); the caller takes the rest once the look has read
+  return { ...(name ? { name, word: w![1].toLowerCase() } : {}), ...(density !== undefined ? { density } : {}), said: [name, density !== undefined ? `${density} kg/m³` : ''].filter(Boolean).join(', ') };
 }
 
 // ── which part is meant ─────────────────────────────────────────────
@@ -698,7 +853,7 @@ function readParametric(c: Clause, unit: LengthUnit): { shape: SceneShape; dims:
     if (!ex || !ey || !ez || ![ex, ey, ez].every((e) => compileExpr(e, ['t']))) return { problem: 'The curve’s x, y and z must each be an expression in t.' };
     const tr = readRange(t, 't') ?? [0, 2 * Math.PI];
     if (!readRange(t, 't')) c.notes.push('t runs from 0 to 2π (no range given)');
-    const rad = /(?:tube\s+)?(?:radius|thickness)\s*(?:of|=)?\s*(-?[\d.]+)\s*(m|cm|mm)?/i.exec(t);
+    const rad = new RegExp(`(?:tube\\s+)?(?:radius|thickness)\\s*(?:of|=)?\\s*(-?[\\d.]+)\\s*${UNIT_RE}?`, 'i').exec(t);
     const r = rad ? Number(rad[1]) * unitOf(rad[2], unit) : 0.05;
     if (!rad) c.notes.push('tube radius 0.05 m (none given)');
     c.work = ' '.repeat(c.work.length);
@@ -739,7 +894,11 @@ function run(st: Ctx, op: string, args: SceneOp['args']): string | null {
   const def = SCENE_OPS[op];
   const why = def.check(st.s, args);
   if (why) return why;
-  st.s = def.apply(st.s, args);
+  const next = def.apply(st.s, args);
+  // what the scene could not save is said now, not built and lost on reload (core.apply refuses it too)
+  const lost = keepProblem(next);
+  if (lost) return lost;
+  st.s = next;
   st.ops.push({ op, args });
   return null;
 }
@@ -749,7 +908,9 @@ const lastAdded = (before: SceneState, after: SceneState) => after.nodes.filter(
 function dimArgs(shape: SceneShape, d: DimReading, cube: boolean): { dims: Record<string, number>; notes: string[] } {
   const dims: Record<string, number> = {};
   const notes: string[] = [];
-  const r = d.r ?? (d.diameter !== undefined ? d.diameter / 2 : undefined);
+  // a round shape's radius: given, or half its diameter — its outer one, for a shape with no hole
+  const r = d.r ?? (d.diameter !== undefined ? d.diameter / 2 : d.od !== undefined && shape !== 'torus' ? d.od / 2 : undefined);
+  const ri = d.ri ?? (d.id !== undefined ? d.id / 2 : undefined);
   switch (shape) {
     case 'box': {
       const side = d.side ?? (cube ? (d.w ?? d.h ?? d.d) : undefined);
@@ -781,8 +942,10 @@ function dimArgs(shape: SceneShape, d: DimReading, cube: boolean): { dims: Recor
     case 'torus':
       if (d.R !== undefined) dims.R = d.R;
       else if (r !== undefined) dims.R = r;
+      else if (d.od !== undefined && d.id !== undefined && d.od > d.id) dims.R = (d.od + d.id) / 4;
       if (d.tube !== undefined) dims.r = d.tube;
       else if (d.depth !== undefined) dims.r = d.depth / 2;
+      else if (d.od !== undefined && d.id !== undefined && d.od > d.id) dims.r = (d.od - d.id) / 4;
       break;
     case 'plane':
       if (d.w !== undefined) dims.w = d.w;
@@ -800,14 +963,14 @@ function dimArgs(shape: SceneShape, d: DimReading, cube: boolean): { dims: Recor
       if (d.n !== undefined) dims.n = d.n;
       if (d.R !== undefined) dims.r = d.R;
       else if (r !== undefined) dims.r = r;
-      if (d.ri !== undefined) dims.ri = d.ri;
+      if (ri !== undefined) dims.ri = ri;
       if (d.depth !== undefined) dims.h = d.depth;
       else if (d.h !== undefined) dims.h = d.h;
       break;
     case 'ring':
       if (d.R !== undefined) dims.R = d.R;
       else if (r !== undefined) dims.R = r;
-      if (d.ri !== undefined) dims.r = d.ri;
+      if (ri !== undefined) dims.r = ri;
       if (d.depth !== undefined) dims.h = d.depth;
       else if (d.h !== undefined) dims.h = d.h;
       break;
@@ -854,11 +1017,93 @@ function nounIn(work: string): { index: number; text: string; shape: SceneShape;
   return pick ? { index: pick.index, text: pick.text, shape: pick.shape, ...(pick.opts ? { opts: pick.opts } : {}) } : null;
 }
 
+/**
+ * The verbs of making and showing a request opens with — request framing
+ * (REQUEST_FRAMING), taken where they open a clause: "create", "model",
+ * "render", "display" make what follows as surely as "add" does.
+ */
+const ASK_VERBS = 'add|make|create|build|draw|model|render|design|generate|construct|sketch|visuali[sz]e|display|put|place|set|stack|pile|insert|drop|lay|stand|show';
 // said in the conversation, a request comes with its courtesies — "could you build me a ring of 9 balls" — and
 // the count after them is still the count
-const CREATE_VERB = /^\s*(?:(?:please|now|also|and|then|ok|okay|just|so|hey)\s+)*(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?)?(?:(?:add|make|create|build|draw|put|place|set|stack|pile|insert|drop|lay|stand|show)(?:\s+(?:me|us)(?![a-z]))?|give (?:me|us)|i want|i need|i'd like|let'?s have|let'?s add|there is|there's|we need)(?![a-z])\s*/i;
+const CREATE_VERB = new RegExp(`^\\s*(?:(?:please|now|also|and|then|ok|okay|just|so|hey)\\s+)*(?:(?:can|could|would|will)\\s+you\\s+(?:please\\s+)?)?(?:(?:${ASK_VERBS})(?:\\s+(?:me|us)(?![a-z]))?|give (?:me|us)|i want|i need|i'd like|let'?s (?:have|add|make|build|create|draw|model)|there is|there's|we need)(?![a-z])\\s*`, 'i');
 /** "a hexagonal prism": sides from the adjective */
 const POLY_ADJ: Record<string, number> = { triangular: 3, square: 4, pentagonal: 5, hexagonal: 6, heptagonal: 7, octagonal: 8 };
+
+// ── names from modifiers ────────────────────────────────────────────
+
+/** Words a part cannot be named by: they open its noun phrase, or the reader knows them as something else — a number, a colour, a finish, a size, a sided shape. */
+const NAME_STOP = new RegExp(
+  `^(?:this|these|those|their|his|her|my|our|any|every|each|both|all|no|or|but|nor|than|last|latest|newest|light|pale|dark|deep|${[...Object.keys(NUMBER_WORDS), ...Object.keys(ORDINALS), ...Object.keys(SIZE_Q), ...Object.keys(POLY_ADJ), ...Object.keys(COLORS), ...Object.keys(FINISH_Q)].join('|')})$`
+);
+/** A unit, as a word on its own. */
+const UNIT_WORD = /^(?:m|cm|mm|in|ft|inch(?:es)?|foot|feet|(?:milli|centi)?met(?:er|re)s?)$/;
+const MATTER_WORD = new RegExp(`^${MATTER_WORDS}$`);
+/**
+ * Words that claim a geometry this scene does not build. They are never a
+ * name: "a truncated cone" is not a whole cone called "truncated cone" — the
+ * word is said back, unread, and nothing is built in its place.
+ */
+const UNBUILT_GEOMETRY = /^(?:truncated|hollow|rounded|filleted|chamfered|bevell?ed|tapered|twisted|bent|curved|oblique|slanted|tilted|inverted|elliptic(?:al)?|oval|open|stepped|notched|slotted|threaded|perforated|ribbed|grooved|fluted|flared|domed|capped|split|sliced|cut|frustum|semi\w*|hemi\w*)$/;
+/**
+ * Shape nouns that say only which solid a thing is. After a modifier they are
+ * the shape, not part of the name: "a flywheel cylinder" is the flywheel, as a
+ * cylinder. Any other shape noun is part of what a thing is called: "a rocket
+ * nose cone", "a key ring", "a piston rod".
+ */
+const SHAPE_ONLY = /^(?:cylinders?|spheres?|cuboids?|prisms?|tor(?:us|i)|annul(?:us|i)|triangles?|pentagons?|hexagons?|heptagons?|octagons?|(?:\d+|three|four|five|six|seven|eight|nine|ten|twelve)-?(?:gons?|sided (?:prisms?|columns?|shapes?)))$/;
+const singular = (w: string) => (w === 'tori' ? 'torus' : w === 'annuli' ? 'annulus' : /(?:x|ch|sh|ss)es$/.test(w) ? w.slice(0, -2) : /[^su]s$/.test(w) ? w.slice(0, -1) : w);
+
+/**
+ * NAMES FROM MODIFIERS. The words a person puts before a shape noun, inside
+ * its noun phrase, say what the thing IS — "a rocket nose cone", "a steel
+ * flywheel cylinder" — and when no "called …" is given they are its name: a
+ * cone called "rocket nose cone", a steel cylinder called "flywheel". Any
+ * words, any shape: this is how a phrase names a thing, not a list of things.
+ * At most three, the nearest the noun; the phrase ends at an article, a
+ * number, a comma, or a word the reader knows as something else (STOP_WORDS,
+ * NAME_STOP, a unit, a material, another shape), and read words — a colour,
+ * a finish, framing — are passed over. A word that claims a geometry the
+ * scene does not build (UNBUILT_GEOMETRY) ends it too, and stays unread.
+ */
+function modifiersBefore(c: Clause, at: number): { word: string; from: number; to: number }[] {
+  const toks = [...c.text.slice(0, at).matchAll(/[a-z0-9][a-z0-9'’-]*/g)];
+  const out: { word: string; from: number; to: number }[] = [];
+  let next = at;
+  for (let i = toks.length - 1; i >= 0; i--) {
+    const w = toks[i][0];
+    const from = toks[i].index ?? 0;
+    const to = from + w.length;
+    // nothing but spaces between it and the next word of the phrase
+    if (!/^\s*$/.test(c.text.slice(to, next))) break;
+    next = from;
+    if (STOP_WORDS.test(w) || NAME_STOP.test(w) || UNBUILT_GEOMETRY.test(w) || UNIT_WORD.test(w) || MATTER_WORD.test(w) || /^\d/.test(w) || shapeOfNoun(w)) break;
+    // read already, as something else: inside the phrase, not part of the name
+    if (!c.work.slice(from, to).trim()) continue;
+    if (out.length === 3) break;
+    out.unshift({ word: w, from, to });
+  }
+  return out;
+}
+
+/** The name the modifiers give, and how many of them (the nearest the noun) it uses — fewer when all of them would be too long to keep. */
+function nameFrom(words: string[], noun: string): { name: string; words: number } | null {
+  const n = noun.toLowerCase().trim();
+  const only = SHAPE_ONLY.test(n);
+  for (let k = words.length; k >= 1; k--) {
+    const ws = words.slice(words.length - k).join(' ');
+    const name = only ? ws : `${ws} ${singular(n)}`;
+    if (name.length <= NAME_MAX) return { name, words: k };
+  }
+  return null;
+}
+
+/** Take each word of a phrase out of the work, wherever it still stands. */
+function takeWords(c: Clause, phrase: string) {
+  for (const w of phrase.split(/\s+/).filter(Boolean)) {
+    const m = new RegExp(`\\b${w.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\b`, 'i').exec(c.work);
+    if (m) c.blank(m.index, m.index + m[0].length);
+  }
+}
 
 function readCreate(c: Clause, st: Ctx): string | null {
   const before = st.s;
@@ -882,8 +1127,9 @@ function readCreate(c: Clause, st: Ctx): string | null {
   const arrangedAs = param
     ? null
     : c.take(new RegExp(`\\b(?:a|an)?\\s*(row|line|column|stack|tower|pile|ring|circle|grid)\\s+of(?=\\s+(?:${NUM_RE}|several|a couple of|some)\\b|\\s+(?:[a-z]+\\s+){0,2}${PLURAL_NOUNS}\\b)`, 'i'))?.[1]?.toLowerCase() ?? null;
+  let found: ReturnType<typeof nounIn> = null;
   if (!shape) {
-    const found = nounIn(c.work);
+    found = nounIn(c.work);
     if (found) {
       c.work = c.work.slice(0, found.index) + ' '.repeat(found.text.length) + c.work.slice(found.index + found.text.length);
       shape = found.shape;
@@ -899,14 +1145,15 @@ function readCreate(c: Clause, st: Ctx): string | null {
   const stackVerb = /^\s*(?:(?:please|now|also|and|then|just)\s+)*(?:stack|pile)(?![a-z])/i.test(c.work);
   c.take(CREATE_VERB);
   const arrangement = arrangedAs ?? (stackVerb ? 'stack' : null);
-  const countM = c.take(new RegExp(`^\\s*(?:(?:please|now|also|and)\\s+)*(?:${NUM_RE}|a couple of|several|another|a|an)(?![a-z0-9])`, 'i'));
+  // a number that is a size is not a count: "2 x 2 x 2 m cube", "2 by 2 by 2 m", "2 m cube"
+  const countM = c.take(new RegExp(`^\\s*(?:(?:please|now|also|and)\\s+)*(?:${NUM_RE}(?!\\s*(?:${UNIT_RE}|(?:x|by)\\s*${NUM_RE}))|a couple of|several|another|a|an)(?![a-z0-9])`, 'i'));
   let count = 1;
   if (countM) {
     const w = countM[0].trim().toLowerCase().replace(/^(?:(?:please|now|also|and)\s+)+/, '');
     count = w === 'a couple of' ? 2 : w === 'several' ? 3 : w === 'another' || w === 'a' || w === 'an' ? 1 : Math.max(1, Math.round(numOf(countM[1] ?? '1') ?? 1));
     if (w === 'several') c.notes.push('“several” read as 3');
   } else {
-    const inline = new RegExp(`\\b${NUM_RE}\\s+(?:[a-z]+\\s+){0,3}?(?:cubes|boxes|spheres|balls|cylinders|cones|tori|stars|rings|prisms|pyramids|blocks|bricks|columns|pillars|discs|disks|capsules)\\b`, 'i').exec(t);
+    const inline = new RegExp(`\\b${NUM_RE}(?!\\s*${UNIT_RE})\\s+(?:[a-z]+\\s+){0,3}?(?:cubes|boxes|spheres|balls|cylinders|cones|tori|stars|rings|prisms|pyramids|blocks|bricks|columns|pillars|discs|disks|capsules)\\b`, 'i').exec(t);
     if (inline) {
       count = Math.max(1, Math.round(numOf(inline[1]) ?? 1));
       // the count was read, so it is not left over as a word nobody understood
@@ -918,6 +1165,8 @@ function readCreate(c: Clause, st: Ctx): string | null {
   if (count > MAX_NODES) return `A scene holds at most ${MAX_NODES} parts.`;
   const name = earlyName ?? c.take(NAMED)?.[1];
   const look = readLook(c);
+  // a material the look does not take ("oak", "concrete", "titanium") was still read — as what it is made of
+  if (matter?.word) takeWords(c, matter.word);
   if (shape === 'prism') {
     const adj = c.take(/\b(triangular|square|pentagonal|hexagonal|heptagonal|octagonal)\b/i);
     if (adj && sidesFromNoun === undefined) sidesFromNoun = POLY_ADJ[adj[1].toLowerCase()];
@@ -962,9 +1211,33 @@ function readCreate(c: Clause, st: Ctx): string | null {
   }
   // sizes before places: in "a sphere of radius 0.5 on top of it" the 0.5 is the sphere's
   const d = param && param.shape !== 'polygon' ? ({} as DimReading) : readDims(c, st.unit);
+  // "a 2 m cube", "a 10-inch cube": a length left just before the noun is every edge of it
+  if (opts?.cube && found && d.side === undefined) {
+    const m = new RegExp(`${NUM_RE}\\s*(?:-\\s*)?${UNIT_RE}(?:\\s*-)?\\s*$`, 'i').exec(c.work.slice(0, found.index));
+    const v = m && (m.index === 0 || /\s/.test(c.work[m.index - 1])) ? numOf(m[1]) : null;
+    if (m && v !== null) {
+      d.side = v * unitOf(m[2], st.unit);
+      c.blank(m.index, m.index + m[0].length);
+    }
+  }
   const place = readPlacement(c, st.s, st.ctx, st.recent, st.unit);
   if (place && 'problem' in place) return place.problem;
   if (sidesFromNoun !== undefined && d.n === undefined) d.n = sidesFromNoun;
+  // what the words before the noun say it is: its name, unless it was given one ("called …")
+  let inferred: string | null = null;
+  if (found) {
+    const mods = modifiersBefore(c, found.index);
+    const said = mods.length ? nameFrom(mods.map((x) => x.word), found.text) : null;
+    if (said) {
+      const used = mods.slice(mods.length - said.words);
+      for (const x of used) c.blank(x.from, x.to);
+      if (name) c.noted.push(said.name);
+      else {
+        inferred = said.name;
+        c.notes.push(`called “${said.name}”, from the word${used.length > 1 ? 's' : ''} before “${found.text}”`);
+      }
+    }
+  }
   const { dims } = param
     ? { dims: param.shape === 'polygon' ? { ...param.dims, ...dimArgs('polygon', d, false).dims } : param.dims }
     : dimArgs(shape, d, !!opts?.cube);
@@ -972,7 +1245,7 @@ function readCreate(c: Clause, st: Ctx): string | null {
   const args: SceneOp['args'] = { shape };
   if (Object.keys(dims).length) args.dims = writePairs(dims);
   if (param) args.exprs = Object.entries(param.exprs).map(([k, v]) => `${k}=${v}`).join(';');
-  if (name) args.name = name.trim();
+  if (name ?? inferred) args.name = (name ?? inferred)!.trim();
   const lookPairs: Record<string, string | number> = {};
   if (look.color) lookPairs.color = look.color;
   if (look.mat) lookPairs.mat = look.mat;
@@ -1130,7 +1403,7 @@ function verbRef(c: Clause, verbs: string, st: Ctx): VerbRef | null {
 const missing = (st: Ctx, phrase: string) =>
   st.s.nodes.length ? `There is nothing called “${phrase.replace(/^(?:the|all the|all|every|each)\s+/, '')}” in the scene.` : 'The scene is empty — describe something to build first.';
 
-const DIM_WORD = '(outer radius|inner radius|tube radius|ring radius|radius|diameter|width|height|depth|length|thickness|sides|points|chord|span)';
+const DIM_WORD = '(outer radius|inner radius|tube radius|ring radius|outer diameter|inner diameter|(?:base|bottom) (?:radius|diameter)|radius|diameter|width|height|depth|length|thickness|sides|points|chord|span)';
 
 /** Verbs that only ever change what is there — a clause led by one never makes something new. */
 const EDIT_ONLY = new RegExp(`${LEAD}(?:move|shift|slide|push|pull|nudge|lift|raise|lower|rotate|turn|spin|tilt|twist|roll|flip|scale|resize|grow|shrink|enlarge|double|halve|triple|colou?r|paint|tint|dye|delete|remove|erase|duplicate|copy|clone|repeat|rename|call|name|change)(?![a-z])`, 'i');
@@ -1470,8 +1743,10 @@ function readEdit(c: Clause, st: Ctx): string | null {
   return null;
 }
 
-function applyNamedDim(st: Ctx, ref: Ref, key: string, v: number, touch: (ids: string[]) => void): string {
+function applyNamedDim(st: Ctx, ref: Ref, said: string, v: number, touch: (ids: string[]) => void): string {
   if (!Number.isFinite(v)) return 'That needs a number.';
+  // a round shape's base is where its radius is measured
+  const key = said.replace(/^(?:base|bottom) /, '');
   for (const id of ref.ids) {
     const n = st.s.nodes.find((x) => x.id === id)!;
     const has = (k: string) => DIMS[n.shape].some((d) => d.key === k);
@@ -1480,6 +1755,13 @@ function applyNamedDim(st: Ctx, ref: Ref, key: string, v: number, touch: (ids: s
     if (key === 'radius') dimKey = has('r') ? 'r' : has('R') ? 'R' : null;
     else if (key === 'diameter') {
       dimKey = has('r') ? 'r' : has('R') ? 'R' : null;
+      val = v / 2;
+    } else if (key === 'outer diameter') {
+      // a torus's outer diameter is not one of its dimensions (it is 2(R + r))
+      dimKey = n.shape === 'torus' ? null : has('R') ? 'R' : has('r') ? 'r' : null;
+      val = v / 2;
+    } else if (key === 'inner diameter') {
+      dimKey = has('ri') ? 'ri' : n.shape === 'ring' ? 'r' : null;
       val = v / 2;
     } else if (key === 'outer radius' || key === 'ring radius') dimKey = has('R') ? 'R' : has('r') ? 'r' : null;
     else if (key === 'inner radius') dimKey = has('ri') ? 'ri' : n.shape === 'ring' ? 'r' : null;
@@ -1521,6 +1803,7 @@ function readMakeIt(c: Clause, st: Ctx, ref: Ref, touch: (ids: string[]) => void
     if (matter.density === undefined) c.notes.push(`${matter.name}: a nominal density of ${NOMINAL_DENSITY[matter.name!]} kg/m³ — a typical value; give a measured one to replace it`);
   }
   const look = readLook(c);
+  if (matter?.word) takeWords(c, matter.word);
   for (const id of ref.ids) {
     if (look.color || look.mat || look.opacity !== undefined) {
       const why = run(st, 'look', { id, ...(look.color ? { color: look.color } : {}), ...(look.mat ? { mat: look.mat } : {}), ...(look.opacity !== undefined ? { opacity: look.opacity } : {}) });
@@ -1598,6 +1881,8 @@ function readMakeIt(c: Clause, st: Ctx, ref: Ref, touch: (ids: string[]) => void
     ['diameter', d.diameter],
     ['outer radius', d.R],
     ['inner radius', d.ri],
+    ['outer diameter', d.od],
+    ['inner diameter', d.id],
     ['tube radius', d.tube],
     ['sides', d.n],
     ['width', d.w],
@@ -1703,7 +1988,7 @@ export function readsAsDescription(text: string): boolean {
   const t = String(text ?? '').trim().toLowerCase();
   if (!t || /\?\s*$/.test(t)) return false;
   const rest = t.replace(/^(?:(?:please|pls|now|and|also|then|ok|okay|so|just|hey|hi)[,!\s]+)*(?:(?:can|could|would|will) you\s+(?:please\s+)?)?/, '');
-  return new RegExp(`^(?:${VERBS}|give me|i want|i need|i'd like|let'?s|there is|there's|we need|show|stack|pile|drop|lay|stand|a|an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\d+)(?![a-z'])`).test(rest);
+  return new RegExp(`^(?:${VERBS}|${ASK_VERBS}|give me|i want|i need|i'd like|let'?s|there is|there's|we need|a|an|another|one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|\\d+)(?![a-z'])`).test(rest);
 }
 
 export function readScene(text: string, state: SceneState, ctx: ReadContext = {}): Reading {
@@ -1713,13 +1998,16 @@ export function readScene(text: string, state: SceneState, ctx: ReadContext = {}
     const c = new Clause(raw.toLowerCase());
     const opsBefore = st.ops.length;
     const saved = { s: st.s, ctx: st.ctx, recent: st.recent, unit: st.unit };
+    // what the request is wrapped in comes out first, and is noted: a shape, a size or an edit is read from what is left
+    readFraming(c, raw, st.s);
     let result = readEdit(c, st);
     // a clause led by an edit verb is never read as a request for something new
     if (result === null && !EDIT_ONLY.test(c.work)) result = readCreate(c, st);
     else if (result === null) result = `Not read as an edit — say which part (it, the red box, box 2) and what to do to it.`;
     const reading: ClauseReading = { text: raw };
     if (result === null) {
-      reading.problem = 'Not read — name a shape (box, sphere, cylinder, cone, torus, prism, star, ring, plane, or a surface z = …) or an edit (move, rotate, scale, make it …, copy, remove).';
+      // a clause that is all framing — "add sliders for the diameter and height" — is noted, and is no problem
+      if (!c.noted.length || c.leftover().length) reading.problem = 'Not read — name a shape (box, sphere, cylinder, cone, torus, prism, star, ring, plane, or a surface z = …) or an edit (move, rotate, scale, make it …, copy, remove).';
     } else if (result.startsWith('✓')) {
       reading.understood = result.slice(1);
       const left = c.leftover();
@@ -1732,6 +2020,10 @@ export function readScene(text: string, state: SceneState, ctx: ReadContext = {}
       Object.assign(st, saved);
     }
     if (c.notes.length) reading.notes = [...new Set(c.notes)];
+    if (c.noted.length) {
+      reading.noted = [...new Set(c.noted)];
+      if (c.framing.length) reading.framing = [...new Set(c.framing)];
+    }
     clauses.push(reading);
   }
   // the preview is recomputed from the kept operations, so a failed clause leaves no trace

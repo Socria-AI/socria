@@ -29,7 +29,7 @@
 // PURE.
 
 import { register, type ObjectKind } from './core';
-import { centroid, localBox, measure, parsePoints, revolveThroat, rotateAbout, sectionOf, toWorld, worldBox, type Box3, type Vec3 } from './scene-geometry';
+import { centroid, localBox, measure, parsePoints, revolveProblem, revolveThroat, rotateAbout, sectionOf, surfaceGrid, toWorld, tubePath, worldBox, type Box3, type Vec3 } from './scene-geometry';
 import { compileExpr } from '@/lib/logos-math';
 
 export type LengthUnit = 'm' | 'cm' | 'mm' | 'in' | 'ft';
@@ -74,6 +74,20 @@ export interface SceneState {
 }
 
 export const MAX_NODES = 48;
+
+/** A scene with nothing in it: where a description is read against when no scene has been made yet. */
+export const EMPTY_SCENE: SceneState = { nodes: [], next: 1, unit: 'm' };
+
+/**
+ * WHAT A PART KEEPS, the same when it is made as when it is read back. These
+ * were only enforced on load — 400 characters for any expression — so a tube
+ * with a longer expression, or a 40-corner outline, was built live and gone on
+ * reload. Now a part is held to them when it is made, and a longer one is
+ * refused with the reason; and the load accepts everything that was made.
+ */
+export const EXPR_MAX = 1000; // characters in one expression: a surface's f, a tube's x, y or z, a profile's r
+export const PTS_MAX = 4000; // characters in an outline's corners (at most 64 corners, as parsePoints reads them)
+export const NAME_MAX = 40; // characters in a part's name
 
 /**
  * NOMINAL DENSITIES, kg/m³ — typical room-temperature values for common
@@ -163,8 +177,15 @@ const vec3 = (v: unknown, def: Vec3): Vec3 | null => {
   return [v[0], v[1], v[2]];
 };
 
-/** Why these dimensions and expressions are not a shape, or null when they are. */
-export function shapeProblem(shape: SceneShape, dims: Record<string, number>, exprs?: Record<string, string>): string | null {
+/**
+ * Why these dimensions and expressions are not a shape, or null when they are.
+ *
+ * `stored`: the shape is being read back from a history, not made now. A
+ * revolved profile that is not a number between its ends used to be built (and
+ * drawn as nothing); one made before that was refused is kept, rather than
+ * cutting the history it is part of. Everything else is the same either way.
+ */
+export function shapeProblem(shape: SceneShape, dims: Record<string, number>, exprs?: Record<string, string>, opts: { stored?: boolean } = {}): string | null {
   for (const d of DIMS[shape]) {
     const v = dims[d.key];
     if (typeof v !== 'number' || !Number.isFinite(v)) return `The ${SHAPE_WORD[shape]} needs a ${d.label}.`;
@@ -184,9 +205,40 @@ export function shapeProblem(shape: SceneShape, dims: Record<string, number>, ex
       const e = exprs?.[key];
       if (!e) return `The ${SHAPE_WORD[shape]} needs ${key === 'pts' ? 'its corners' : `${key} as an expression`}.`;
       if (key === 'pts') {
+        if (e.length > PTS_MAX) return `That outline’s corners run past what a part can keep (${PTS_MAX} characters).`;
         if (!parsePoints(e)) return 'A shape needs at least three corners, as numbers.';
-      } else if (!compileExpr(e, vars)) return `“${e}” could not be read as an expression in ${vars.join(', ')}.`;
+      } else {
+        if (e.length > EXPR_MAX) return `The ${SHAPE_WORD[shape]}’s ${key} = … is ${e.length} characters long, more than a part can keep (${EXPR_MAX}).`;
+        if (!compileExpr(e, vars)) return `“${e}” could not be read as an expression in ${vars.join(', ')}.`;
+      }
     }
+  }
+  // A SHAPE GIVEN BY AN EQUATION MUST BE THERE TO DRAW. A revolved profile not a
+  // number somewhere between its ends, a surface defined nowhere over its range, a
+  // curve not a number at some t: each was "built in Live 3D" and drawn as nothing.
+  if (!opts.stored && (shape === 'revolve' || shape === 'surface' || shape === 'tube')) {
+    const s = { shape, dims, exprs, pos: [0, 0, 0] as Vec3, rot: [0, 0, 0] as Vec3, scale: [1, 1, 1] as Vec3 };
+    if (shape === 'revolve') {
+      const why = revolveProblem(s);
+      if (why) return why;
+    } else if (shape === 'surface' && !surfaceGrid(s)) return `z = ${exprs?.f} is not a number anywhere over x from ${dims.x0} to ${dims.x1} and y from ${dims.y0} to ${dims.y1}, so there is no surface to draw.`;
+    else if (shape === 'tube' && !tubePath(s)) return `The curve (${exprs?.x}, ${exprs?.y}, ${exprs?.z}) is not a number at some t between ${Number(dims.t0.toFixed(3))} and ${Number(dims.t1.toFixed(3))}, so there is no tube to draw along it.`;
+  }
+  return null;
+}
+
+/**
+ * What the scene's own operations do not already rule out but a saved scene
+ * cannot hold: a part more than 100 km out, turned or stretched past what is
+ * kept. Cheap, for the reader to ask after every operation, so a description
+ * the scene could not keep is said back rather than built (core.apply makes
+ * the full test, by saving and reading back, when a step is taken).
+ */
+export function keepProblem(s: SceneState): string | null {
+  const far = (v: Vec3) => !v.every((x) => Number.isFinite(x) && Math.abs(x) < 1e5);
+  for (const n of s.nodes) {
+    if (far(n.pos)) return `That would put ${n.name} more than 100 km from the middle of the scene, where it cannot be kept.`;
+    if (far(n.rot) || far(n.scale) || n.scale.some((v) => !(v > 0))) return `That would turn or stretch ${n.name} past what the scene can keep.`;
   }
   return null;
 }
@@ -209,16 +261,16 @@ function sanitizeNode(raw: unknown, ids: Set<string>): SceneNode | null {
     exprs = {};
     for (const key of Object.keys(EXPRS[shape]!)) {
       const e = (r.exprs as Record<string, unknown> | undefined)?.[key];
-      if (typeof e !== 'string' || e.length > 400) return null;
+      if (typeof e !== 'string' || e.length > (key === 'pts' ? PTS_MAX : EXPR_MAX)) return null;
       exprs[key] = e;
     }
   }
-  if (shapeProblem(shape, dims, exprs)) return null;
+  if (shapeProblem(shape, dims, exprs, { stored: true })) return null;
   const pos = vec3(r.pos, [0, 0, 0]);
   const rot = vec3(r.rot, [0, 0, 0]);
   const scale = vec3(r.scale, [1, 1, 1]);
   if (!pos || !rot || !scale || scale.some((s) => s <= 0)) return null;
-  const name = typeof r.name === 'string' && r.name.trim() && r.name.length <= 40 ? r.name.trim() : SHAPE_WORD[shape];
+  const name = typeof r.name === 'string' && r.name.trim() && r.name.length <= NAME_MAX ? r.name.trim() : SHAPE_WORD[shape];
   const opacity = num(r.opacity);
   const off = Array.isArray(r.off) && r.off.length === 2 && r.off.every((x) => typeof x === 'number' && Number.isFinite(x)) ? ([r.off[0], r.off[1]] as [number, number]) : undefined;
   const node: SceneNode = {
@@ -446,7 +498,8 @@ function addOp(s: SceneState, a: Args): SceneState {
   const rot = readVec(getStr(a, 'rot')) ?? ((shape === 'airfoil' ? [-90, 0, 0] : [0, 0, 0]) as Vec3);
   const node: SceneNode = {
     id,
-    name: getStr(a, 'name') || freshNodeName(s, SHAPE_WORD[shape]),
+    // trimmed as it is read back, so the part made is the part reloaded
+    name: getStr(a, 'name')?.trim() || freshNodeName(s, SHAPE_WORD[shape]),
     shape,
     dims,
     ...(exprs ? { exprs } : {}),
@@ -511,19 +564,21 @@ function copyOp(s: SceneState, a: Args): SceneState {
   return settle({ ...s, nodes, next });
 }
 
-export const SCENE_OPS: Record<string, { label: string; check: (s: SceneState, a: Args) => string | null; apply: (s: SceneState, a: Args) => SceneState; say: (a: Args) => string }> = {
+export const SCENE_OPS: Record<string, { label: string; check: (s: SceneState, a: Args, ctx?: { replay?: boolean }) => string | null; apply: (s: SceneState, a: Args) => SceneState; say: (a: Args) => string }> = {
   add: {
     label: 'Add a part',
-    check: (s, a) => {
+    check: (s, a, ctx) => {
       const shape = getStr(a, 'shape') as SceneShape;
       if (!SHAPES.includes(shape)) return 'That is not a shape this scene can make.';
       if (s.nodes.length >= MAX_NODES) return `A scene holds at most ${MAX_NODES} parts.`;
+      const name = getStr(a, 'name')?.trim();
+      if (name && name.length > NAME_MAX) return `A part’s name can be at most ${NAME_MAX} characters.`;
       const given = readPairs(getStr(a, 'dims'));
       const dims: Record<string, number> = {};
       for (const d of DIMS[shape]) dims[d.key] = given[d.key] !== undefined ? Number(given[d.key]) : d.def;
       const exprPairs = readPairs(getStr(a, 'exprs'));
       const exprs = EXPRS[shape] ? Object.fromEntries(Object.keys(EXPRS[shape]!).map((k) => [k, exprPairs[k] ?? ''])) : undefined;
-      const p = shapeProblem(shape, dims, exprs);
+      const p = shapeProblem(shape, dims, exprs, { stored: ctx?.replay });
       if (p) return p;
       const place = readPairs(getStr(a, 'place'));
       if (place.on && place.on !== 'ground' && !byId(s, place.on)) return 'There is no such part to put it on.';
@@ -539,7 +594,7 @@ export const SCENE_OPS: Record<string, { label: string; check: (s: SceneState, a
   },
   set: {
     label: 'Set a dimension',
-    check: (s, a) => {
+    check: (s, a, ctx) => {
       const miss = need(s, a);
       if (miss) return miss;
       const n = byId(s, getStr(a, 'id')!)!;
@@ -548,12 +603,12 @@ export const SCENE_OPS: Record<string, { label: string; check: (s: SceneState, a
         const k = key.slice(5);
         const vars = EXPRS[n.shape]?.[k];
         if (!vars) return `A ${SHAPE_WORD[n.shape]} has no expression ${k}.`;
-        return shapeProblem(n.shape, n.dims, { ...(n.exprs ?? {}), [k]: String(a.value) });
+        return shapeProblem(n.shape, n.dims, { ...(n.exprs ?? {}), [k]: String(a.value) }, { stored: ctx?.replay });
       }
       if (!DIMS[n.shape].some((d) => d.key === key)) return `A ${SHAPE_WORD[n.shape]} has no ${key}.`;
       const v = getNum(a, 'value');
       if (v === undefined) return 'That needs a number.';
-      return shapeProblem(n.shape, { ...n.dims, [key]: v }, n.exprs);
+      return shapeProblem(n.shape, { ...n.dims, [key]: v }, n.exprs, { stored: ctx?.replay });
     },
     apply: (s, a) =>
       withNode(s, getStr(a, 'id')!, (n) => {
@@ -1029,9 +1084,14 @@ export const SCENE: ObjectKind<SceneState> = {
   ],
   size: (_s, mode) => (mode === 'card' ? { w: 220, h: 120 } : mode === 'trail' ? { w: 160, h: 90 } : { w: 360, h: 240 }),
   shape: (s) => `scene · ${s.nodes.length} part${s.nodes.length === 1 ? '' : 's'}`,
-  argLimits: { count: 12, length: 400 },
+  // long enough for the longest argument the operations above accept — an
+  // outline's corners ("pts=" and PTS_MAX), a tube's three expressions of
+  // EXPR_MAX — so what a description builds is what a reload re-reads
+  argLimits: { count: 12, length: 4096 },
   // a state is the whole scene, so fewer are kept than for a matrix
   maxStates: 24,
+  // the operations one description makes share its moment, and Undo takes them back whole
+  descriptions: true,
 };
 
 register(SCENE);

@@ -140,6 +140,9 @@
 .s3-skip { color: var(--lg-tension); font-size: 12px; }
 .s3-note { color: var(--lg-ink-60); font-size: 12px; }
 .s3-read .s3-note::before { content: '· '; }
+/* request framing — "sliders for the diameter and height" — read and set aside: noted, never a problem */
+.s3-read li.is-noted { color: var(--lg-ink-60); }
+.s3-noted { color: var(--lg-ink-60); font-size: 12px; font-style: italic; }
 
 .s3-side {
   display: grid;
@@ -214,6 +217,8 @@
 .s3-f input[type='color'] { padding: 0 2px; height: 26px; }
 .s3-f em { position: absolute; right: 6px; bottom: 4px; font-style: normal; font-size: 11px; color: var(--lg-ink-40); pointer-events: none; }
 .s3-measure p { margin: 2px 0; }
+/* the Answer Guard's hand, as on the board and the plot: what is held back, said in the margin */
+.s3-measure .s3-guardnote { font-family: var(--lg-hand); font-size: 13px; color: var(--lg-accent); opacity: 0.75; }
 .s3-how { margin-left: 8px; font-size: 10.5px; border-radius: 4px; padding: 0 5px; border: 1px solid var(--lg-line); color: var(--lg-ink-60); }
 .s3-how.is-numerical { border-style: dashed; }
 .s3-insp footer { display: flex; gap: 6px; margin-top: 10px; }

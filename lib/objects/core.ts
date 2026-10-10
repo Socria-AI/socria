@@ -92,8 +92,15 @@ export interface ViewDecl<S = unknown> {
 
 export interface OpDef<S> {
   label: string;
-  /** null when the operation is legitimate on this state; otherwise why not */
-  check: (state: S, args: Record<string, string | number>) => string | null;
+  /**
+   * null when the operation is legitimate on this state; otherwise why not.
+   * `replay` is set when a stored history is being re-read (sanitizeSpace)
+   * rather than a step being taken now: a rule a kind has added since lets the
+   * kind keep a step that was taken before the rule existed, instead of cutting
+   * the history it is part of. A rule that matters to what a state IS belongs
+   * in the check either way.
+   */
+  check: (state: S, args: Record<string, string | number>, ctx?: { replay?: boolean }) => string | null;
   apply: (state: S, args: Record<string, string | number>) => S;
   say: (args: Record<string, string | number>) => string;
 }
@@ -128,6 +135,15 @@ export interface ObjectKind<S = unknown> {
   argLimits?: { count: number; length: number };
   /** states kept for one object of this kind; absent, MAX_STATES. A scene's states are large, so it keeps fewer. */
   maxStates?: number;
+  /**
+   * Steps given one moment (`who.at`) are one DESCRIPTION, which Undo takes
+   * back whole — a Live 3D message is many operations, all applied at one
+   * moment. The history cap then never cuts into the description being
+   * applied, so Undo can always return to the state before it, and never
+   * leaves the earliest state it keeps part-way through an older one. Absent:
+   * every step stands alone, as for a matrix.
+   */
+  descriptions?: boolean;
 }
 
 // ── the registry ─────────────────────────────────────────────────────
@@ -147,6 +163,38 @@ export const MAX_OBJECTS = 8;
 /** States kept per object. The oldest go first; a long elimination is ~10 steps. */
 export const MAX_STATES = 40;
 const capOf = (k: ObjectKind<any> | null) => Math.max(2, Math.min(MAX_STATES, k?.maxStates ?? MAX_STATES));
+/**
+ * The most steps one description may take. Every state it makes is kept, so
+ * Undo can take it back whole, which bounds it: a grid of 47 parts centred on
+ * a base is about 90. One that would take more is refused, and nothing of it
+ * is built, rather than built past undoing.
+ */
+export const MAX_DESCRIPTION = 120;
+const limitsOf = (k: ObjectKind<any>) => k.argLimits ?? { count: 8, length: 60 };
+
+/** How many steps at the end of a history share the last one's moment: the description it ends with. */
+function trailingDescription(steps: readonly unknown[]): number {
+  const at = (s: unknown) => (s && typeof s === 'object' ? (s as { at?: unknown }).at : undefined);
+  const last = at(steps[steps.length - 1]);
+  if (typeof last !== 'number') return steps.length ? 1 : 0;
+  let n = 0;
+  for (let i = steps.length - 1; i >= 0 && at(steps[i]) === last; i--) n++;
+  return n;
+}
+
+/**
+ * Whether a state survives being saved and read back. sanitizeSpace keeps a
+ * stored step only when the kind's sanitize of the stored state is the state
+ * the step computes; this is that same test, made before the step is taken.
+ */
+function keeps(k: ObjectKind<any>, state: unknown): boolean {
+  try {
+    const back = k.sanitize(JSON.parse(JSON.stringify(state)));
+    return back !== null && k.same(back, state);
+  } catch {
+    return false;
+  }
+}
 
 export const currentOf = <S>(o: ThoughtObject<S>): S => o.states[Math.min(Math.max(0, o.at), o.states.length - 1)];
 export const objOf = (space: ObjectSpace | null | undefined, id: string | null | undefined): ThoughtObject | null =>
@@ -204,6 +252,15 @@ export function apply(
   const k = kindOf(obj.kind);
   const def = k?.ops[op];
   if (!k || !def) return { ok: false, why: `A ${k?.label.toLowerCase() ?? 'thing'} cannot do that.` };
+  // WHAT IS TAKEN IS WHAT IS KEPT. A stored history is re-read with the kind's
+  // argument limits (sanitizeSpace below). A step whose arguments went past them
+  // used to be taken here and then lost on the next load — and with it every
+  // step after it: a tube with a long expression, built live, was gone on reload.
+  const lim = limitsOf(k);
+  const vals = Object.values(args);
+  if (vals.length > lim.count || vals.some((v) => (typeof v === 'number' ? !Number.isFinite(v) : typeof v !== 'string' || v.length > lim.length))) {
+    return { ok: false, why: `That is more than one step on a ${k.label.toLowerCase()} can keep: at most ${lim.count} values, each a number or at most ${lim.length} characters.` };
+  }
   const before = currentOf(obj);
   const refused = def.check(before, args);
   if (refused) return { ok: false, why: refused };
@@ -213,6 +270,8 @@ export function apply(
   } catch (e) {
     return { ok: false, why: e instanceof Error ? e.message : 'That could not be computed.' };
   }
+  // …and the state it computes must be one the kind keeps when it is read back
+  if (!keeps(k, after)) return { ok: false, why: `That would leave the ${k.label.toLowerCase()} in a state it cannot save and reopen, so it was not done.` };
   const note = k.consequence(before, after, { op, args });
   const step: Step = {
     op,
@@ -226,16 +285,38 @@ export function apply(
   let states = [...obj.states.slice(0, obj.at + 1), after];
   let steps = [...obj.steps.slice(0, obj.at), step];
   let trimmed = obj.trimmed ?? 0;
+  // The description this step belongs to, for a kind whose steps come in
+  // descriptions: the steps at the end that share this step's moment.
+  const run = k.descriptions && who.at !== undefined ? trailingDescription(steps) : 1;
+  if (run > MAX_DESCRIPTION) return { ok: false, why: `One description can make at most ${MAX_DESCRIPTION} changes and still be undone whole, and this one makes more. Describe it in parts.` };
   // Past the cap the OLDEST states go, the start among them. What is kept must
   // still be a chain in which each state follows from the one before by its
   // step — that is what sanitizeSpace re-computes on every load. Keeping the
   // start and dropping states after it broke the chain at the gap, and the
   // next load cut the whole history back to the start.
-  const cap = capOf(k);
+  //
+  // NEVER THE STATE BEFORE THE DESCRIPTION BEING APPLIED. One description can
+  // make more states than the cap — "a grid of 40 cubes" is 35 operations
+  // against a scene's 24 — and trimming inside it left Undo unable to return
+  // to the scene before it: the earliest state kept already held 18 cubes. So
+  // the cap stretches to hold the whole description and the state before it,
+  // and the extra states go, oldest first, once a later step is taken.
+  const cap = Math.max(capOf(k), run + 1);
+  let cut: number | null = null;
   while (states.length > cap) {
+    cut = steps[0].at;
     states = states.slice(1);
     steps = steps.slice(1);
     trimmed++;
+  }
+  // …and never part-way through an older description: the earliest state kept
+  // is one a description ended on, so Undo never lands in the middle of one
+  if (k.descriptions && cut !== null) {
+    while (steps.length > run && steps[0].at === cut) {
+      states = states.slice(1);
+      steps = steps.slice(1);
+      trimmed++;
+    }
   }
   const next: ThoughtObject = { ...obj, states, steps, at: states.length - 1, ...(trimmed ? { trimmed } : {}) };
   return { ok: true, space: { objs: space.objs.map((o) => (o.id === id ? next : o)) }, obj: next, step };
@@ -281,20 +362,25 @@ export function sanitizeSpace(raw: unknown): ObjectSpace | undefined {
     const kept: unknown[] = [first];
     const steps: Step[] = [];
     const rawSteps = Array.isArray(o.steps) ? o.steps : [];
-    for (let i = 0; i < rawSteps.length && kept.length < capOf(k); i++) {
+    // as many states as apply keeps: the cap, or — when the history ends in a
+    // description longer than the cap — all of that description and the state
+    // before it, so what Undo could reach before the reload it can reach after
+    const room = Math.max(capOf(k), (k.descriptions ? Math.min(trailingDescription(rawSteps), MAX_DESCRIPTION) : 0) + 1);
+    for (let i = 0; i < rawSteps.length && kept.length < room; i++) {
       const s = rawSteps[i] as Record<string, unknown> | null;
       const def = s && typeof s.op === 'string' ? k.ops[s.op] : null;
       if (!s || !def) break;
       const args: Record<string, string | number> = {};
       if (s.args && typeof s.args === 'object') {
-        const lim = k.argLimits ?? { count: 8, length: 60 };
+        // the same limits apply holds a step to when it is taken
+        const lim = limitsOf(k);
         for (const [a, v] of Object.entries(s.args as Record<string, unknown>).slice(0, lim.count)) {
           if (typeof v === 'number' && Number.isFinite(v)) args[a] = v;
           else if (typeof v === 'string' && v.length <= lim.length) args[a] = v;
         }
       }
       const before = kept[kept.length - 1];
-      if (def.check(before, args)) break;
+      if (def.check(before, args, { replay: true })) break;
       let after: unknown;
       try {
         after = def.apply(before, args);

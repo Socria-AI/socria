@@ -10,6 +10,8 @@
 //                    a regular polygon, a star, an annulus, or the person's
 //                    own corners — with its exact area and perimeter
 //   surfaceGrid      z = f(x, y) sampled from the expression on a grid
+//   revolveRadius    r(y), with an end taken as its limit from inside where
+//                    the expression is not a number exactly there
 //   revolveProfile   r(y) sampled, for a surface of revolution
 //   tubePath         (x(t), y(t), z(t)) sampled, for a tube along a curve
 //   localBox         each shape's extent about its own origin
@@ -231,22 +233,68 @@ export function surfaceGrid(s: ShapeLike): Grid | null {
   return { positions, indices, minY, maxY, holes, area };
 }
 
-/** r(y) sampled over [y0, y1]: the profile a surface of revolution is turned from. Negative r is not a radius. */
-export function revolveProfile(s: ShapeLike): { pts: [number, number][]; clipped: number } | null {
+/**
+ * A revolved shape's radius r(y), as it is drawn and measured: the person's
+ * expression — and at an END of its range, where the expression is not a
+ * number exactly there, its LIMIT FROM INSIDE. A nose cone written
+ * r = sqrt(0.01 − y²) for y from 0 to 0.1 closes to a point at y = 0.1, but
+ * 0.01 − 0.1² is −1.7·10⁻¹⁸ in floating point and its square root is NaN: the
+ * part was drawn as nothing. The limit is taken only where the profile settles
+ * as the end is approached (each of three heights a thousand times nearer
+ * moves it less); a radius that runs away (1/y at y = 0) has none, and stays
+ * not a number. Not clipped: a negative radius is the caller's to clip, and
+ * count, as anywhere else on the profile.
+ */
+export function revolveRadius(s: ShapeLike): ((y: number) => number) | null {
   const c = s.exprs?.r ? compileExpr(s.exprs.r, ['y']) : null;
   if (!c) return null;
+  const { y0, y1 } = s.dims;
+  const L = y1 - y0;
+  const raw = (y: number): number => {
+    try {
+      const v = c.eval({ y });
+      return typeof v === 'number' ? v : NaN;
+    } catch {
+      return NaN;
+    }
+  };
+  const limit = (end: number, inward: 1 | -1): number => {
+    const v = raw(end);
+    if (Number.isFinite(v)) return v;
+    const a = raw(end + inward * 1e-6 * L);
+    const b = raw(end + inward * 1e-9 * L);
+    const d = raw(end + inward * 1e-12 * L);
+    if (!Number.isFinite(a) || !Number.isFinite(b) || !Number.isFinite(d)) return NaN;
+    // no radius at that end (a logarithm's −∞): clipped to nothing, as anywhere else
+    if (b <= 0 && d <= 0) return d;
+    const scale = Math.max(Math.abs(a), Math.abs(b), Math.abs(d), Math.abs(L));
+    if (Math.abs(d - b) > 0.5 * Math.abs(b - a) + 1e-12 * scale) return NaN;
+    // extrapolated as a square root approaches its zero — the usual way an end is
+    // lost, a radicand reaching 0 there: exact for that, and within a hair for a smooth end
+    const lim = d - (b - d) / (Math.sqrt(1000) - 1);
+    return Math.abs(lim) <= 1e-9 * scale ? 0 : lim;
+  };
+  let lo: number | undefined;
+  let hi: number | undefined;
+  const tol = 1e-12 * Math.abs(L);
+  return (y: number) => {
+    if (y <= y0 + tol) return (lo ??= limit(y0, 1));
+    if (y >= y1 - tol) return (hi ??= limit(y1, -1));
+    return raw(y);
+  };
+}
+
+/** r(y) sampled over [y0, y1]: the profile a surface of revolution is turned from. Negative r is not a radius. */
+export function revolveProfile(s: ShapeLike): { pts: [number, number][]; clipped: number } | null {
+  const radius = revolveRadius(s);
+  if (!radius) return null;
   const { y0, y1 } = s.dims;
   const n = Math.max(8, Math.min(200, Math.round(s.dims.n || 64)));
   const pts: [number, number][] = [];
   let clipped = 0;
   for (let i = 0; i <= n; i++) {
     const y = y0 + ((y1 - y0) * i) / n;
-    let r = NaN;
-    try {
-      r = c.eval({ y });
-    } catch {
-      r = NaN;
-    }
+    let r = radius(y);
     if (!Number.isFinite(r)) return null;
     if (r < 0) {
       clipped++;
@@ -255,6 +303,29 @@ export function revolveProfile(s: ShapeLike): { pts: [number, number][]; clipped
     pts.push([r, y - (y0 + y1) / 2]);
   }
   return { pts, clipped };
+}
+
+/**
+ * Why a revolved shape has nothing to turn, or null when it has: its radius must
+ * be a number at every height it is drawn and measured at — the profile's own
+ * samples and Simpson's — ends included (as limits from inside), and more than
+ * nothing somewhere. Said plainly, for the person to put another way.
+ */
+export function revolveProblem(s: ShapeLike): string | null {
+  const radius = revolveRadius(s);
+  if (!radius) return null; // an expression that does not compile is shapeProblem's to say
+  const { y0, y1 } = s.dims;
+  if (!(y1 > y0)) return null;
+  const n = Math.max(8, Math.min(200, Math.round(s.dims.n || 64)));
+  const ys = [...Array.from({ length: n + 1 }, (_, i) => y0 + ((y1 - y0) * i) / n), ...Array.from({ length: SIMPSON_N + 1 }, (_, i) => y0 + ((y1 - y0) * i) / SIMPSON_N)];
+  const num = (v: number) => String(Number(v.toPrecision(4)));
+  let some = false;
+  for (const y of ys) {
+    const r = radius(y);
+    if (!Number.isFinite(r)) return `r = ${s.exprs?.r} is not a number at y = ${num(y)}, so there is no profile to turn there: a radius is needed at every height from ${num(y0)} to ${num(y1)}.`;
+    if (r > 0) some = true;
+  }
+  return some ? null : `r = ${s.exprs?.r} is nowhere more than 0 between y = ${num(y0)} and ${num(y1)}, so there is nothing to turn.`;
 }
 
 /** (x(t), y(t), z(t)) in math axes, sampled over [t0, t1], returned in scene axes. */
@@ -435,12 +506,55 @@ export interface Measure {
   note?: string;
 }
 
-const simpson = (f: (x: number) => number, a: number, b: number, n = 400) => {
+const SIMPSON_N = 400;
+const simpson = (f: (x: number) => number, a: number, b: number, n = SIMPSON_N) => {
   const h = (b - a) / n;
   let s = f(a) + f(b);
   for (let i = 1; i < n; i++) s += f(a + i * h) * (i % 2 ? 4 : 2);
   return (s * h) / 3;
 };
+
+/** The four-point Gauss–Legendre rule on [−1, 1]: nodes and weights. */
+const GL4: [number, number][] = [
+  [-0.8611363115940526, 0.3478548451374538],
+  [-0.3399810435848563, 0.6521451548625461],
+  [0.3399810435848563, 0.6521451548625461],
+  [0.8611363115940526, 0.3478548451374538],
+];
+/**
+ * ∫f over [a, b] by Gauss–Legendre on m panels. It never evaluates f at a or
+ * b — where a revolved profile can stand vertical (a sphere's pole, a nose's
+ * tip) and the area's integrand is 0 · ∞ — and it is exact for polynomials
+ * up to the seventh degree on each panel.
+ */
+const gauss = (f: (x: number) => number, a: number, b: number, m = 128) => {
+  const w = (b - a) / m;
+  let s = 0;
+  for (let i = 0; i < m; i++) {
+    const c = a + (i + 0.5) * w;
+    for (const [x, wt] of GL4) s += wt * f(c + (x * w) / 2);
+  }
+  return (s * w) / 2;
+};
+
+/**
+ * r′(y) by differences that stay INSIDE [y0, y1]: central, with a step a
+ * thousandth of the distance to the nearer end (so a square-root tip is
+ * differenced on its own scale), and one-sided at an end. The old difference
+ * reached past the end, where the profile is not a number, and its NaN became
+ * a "surface area NaN m²".
+ */
+function slopeInside(r: (y: number) => number, y: number, y0: number, y1: number): number {
+  const L = y1 - y0;
+  const room = Math.min(y - y0, y1 - y);
+  const h = Math.min(1e-6 * L, room / 1000);
+  if (h > 1e-14 * L) return (r(y + h) - r(y - h)) / (2 * h);
+  const k = 1e-6 * L;
+  return y - y0 <= y1 - y ? (r(y0 + k) - r(y0)) / k : (r(y1) - r(y1 - k)) / k;
+}
+
+/** A measure that is not a number is no measure: null, never NaN (Math.max(0, NaN) is NaN). */
+const finite = (v: number | null) => (v !== null && Number.isFinite(v) ? v : null);
 
 export function measure(s: ShapeLike): Measure {
   const d = s.dims;
@@ -449,8 +563,8 @@ export function measure(s: ShapeLike): Measure {
   const uniform = Math.abs(sx - sy) < 1e-9 && Math.abs(sy - sz) < 1e-9;
   const as = uniform ? sx * sx : NaN;
   const out = (volume: number | null, area: number | null, how: Measure['how'] = 'exact', note?: string): Measure => ({
-    volume: volume === null ? null : volume * vs,
-    area: area === null || !uniform ? null : area * as,
+    volume: finite(volume === null ? null : volume * vs),
+    area: finite(area === null || !uniform ? null : area * as),
     how,
     ...(note ? { note } : !uniform && area !== null ? { note: 'stretched unevenly, so its surface area is not a scaled formula' } : {}),
   });
@@ -486,16 +600,20 @@ export function measure(s: ShapeLike): Measure {
     }
     case 'surface': {
       const g = surfaceGrid(s);
-      return { volume: null, area: g && uniform ? g.area * as : null, how: 'numerical', note: g ? `an open surface — its area summed over the ${Math.round(d.n || 48)}² drawn grid${g.holes ? `; ${g.holes} cells left out where f is undefined` : ''}` : undefined };
+      return { volume: null, area: finite(g && uniform ? g.area * as : null), how: 'numerical', note: g ? `an open surface — its area summed over the ${Math.round(d.n || 48)}² drawn grid${g.holes ? `; ${g.holes} cells left out where f is undefined` : ''}` : undefined };
     }
     case 'revolve': {
-      const c = s.exprs?.r ? compileExpr(s.exprs.r, ['y']) : null;
-      if (!c) return { volume: null, area: null, how: 'numerical' };
-      const r = (y: number) => Math.max(0, c.eval({ y }));
-      const dr = (y: number) => (r(y + 1e-6) - r(y - 1e-6)) / 2e-6;
+      const radius = revolveRadius(s);
+      if (!radius) return { volume: null, area: null, how: 'numerical' };
+      // a negative radius is none; a radius that is not a number stays NaN here, and is said below rather than shown
+      const r = (y: number) => {
+        const v = radius(y);
+        return v < 0 ? 0 : v;
+      };
       const V = simpson((y) => Math.PI * r(y) ** 2, d.y0, d.y1);
-      const A = simpson((y) => 2 * Math.PI * r(y) * Math.sqrt(1 + dr(y) ** 2), d.y0, d.y1);
-      return out(V, A, 'numerical', 'π∫r(y)² dy and 2π∫r√(1 + r′²) dy by Simpson’s rule (the open ends not counted)');
+      if (!Number.isFinite(V)) return { volume: null, area: null, how: 'numerical', note: 'its radius is not a number at some height between its ends, so it is not measured' };
+      const A = gauss((y) => 2 * Math.PI * r(y) * Math.hypot(1, slopeInside(r, y, d.y0, d.y1)), d.y0, d.y1);
+      return out(V, Number.isFinite(A) ? A : null, 'numerical', 'π∫r(y)² dy by Simpson’s rule and 2π∫r√(1 + r′²) dy by Gauss–Legendre, the slope taken inside the range (the open ends not counted)');
     }
     case 'tube': {
       const pts = tubePath(s);
@@ -550,13 +668,16 @@ export function centroid(s: ShapeLike): Vec3 | null {
       return a ? [cx / (6 * a), 0, cz / (6 * a)] : null;
     }
     case 'revolve': {
-      const c = s.exprs?.r ? compileExpr(s.exprs.r, ['y']) : null;
-      if (!c) return null;
-      const r = (y: number) => Math.max(0, c.eval({ y }));
+      const radius = revolveRadius(s);
+      if (!radius) return null;
+      const r = (y: number) => {
+        const v = radius(y);
+        return v < 0 ? 0 : v;
+      };
       const mid = (d.y0 + d.y1) / 2;
       const V = simpson((y) => Math.PI * r(y) ** 2, d.y0, d.y1);
       const M = simpson((y) => Math.PI * r(y) ** 2 * (y - mid), d.y0, d.y1);
-      return V ? [0, M / V, 0] : null;
+      return V && Number.isFinite(V) && Number.isFinite(M) ? [0, M / V, 0] : null;
     }
     case 'tube': {
       const pts = tubePath(s);
@@ -583,18 +704,19 @@ export function toWorld(s: ShapeLike, p: Vec3): Vec3 {
 
 /** A revolved shape's narrowest and end radii, from its own r(y): a nozzle's throat and its two ends. */
 export function revolveThroat(s: ShapeLike): { rMin: number; yMin: number; rStart: number; rEnd: number } | null {
-  const c = s.exprs?.r ? compileExpr(s.exprs.r, ['y']) : null;
-  if (!c) return null;
+  // its ends as limits from inside, so a profile that closes to a point (a nose's tip) has a radius there: 0
+  const radius = revolveRadius(s);
+  if (!radius) return null;
   const { y0, y1 } = s.dims;
   const n = 2000;
   let best = { r: Infinity, y: y0 };
   for (let i = 0; i <= n; i++) {
     const y = y0 + ((y1 - y0) * i) / n;
-    const r = c.eval({ y });
+    const r = radius(y);
     if (Number.isFinite(r) && r < best.r) best = { r, y };
   }
-  const rStart = c.eval({ y: y0 });
-  const rEnd = c.eval({ y: y1 });
+  const rStart = radius(y0);
+  const rEnd = radius(y1);
   if (![best.r, rStart, rEnd].every(Number.isFinite)) return null;
   return { rMin: best.r, yMin: best.y, rStart, rEnd };
 }

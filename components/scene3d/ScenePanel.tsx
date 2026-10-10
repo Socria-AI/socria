@@ -19,7 +19,12 @@
 // Every number here is the scene's: sizes, positions, volumes. The panel says
 // what the scene is — a geometric preview — and what it is not: nothing in it
 // is loaded, stressed or simulated; a mass is density × volume, and only where a
-// density was given.
+// density was given. Under the Answer Guard (`guarded`) the volumes, areas and
+// masses are held back here as they are in the conversation.
+//
+// What a description is wrapped in — "an interactive 3D model of", "with
+// sliders", "labelled dimensions", "display its volume" — is read back as
+// noted, not as a problem (scene-intent.ts REQUEST_FRAMING).
 
 import dynamic from 'next/dynamic';
 import { Component, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -54,6 +59,14 @@ export interface ScenePanelProps {
   onSuggest?: (text: string) => void;
   readOnly?: boolean;
   dark?: boolean;
+  /**
+   * The Answer Guard is up (learning mode): the conversation is holding back
+   * the volumes, areas and masses, so the panel does too — its Measured
+   * section says they are held back while the person works them out, and the
+   * parts list shows no mass. Sizes, places and the scene itself still show.
+   * Default false: everything is shown.
+   */
+  guarded?: boolean;
 }
 
 /** The 3D view, or — where WebGL cannot start — a sentence saying so. The parts and the description still work. */
@@ -215,11 +228,13 @@ export function ScenePanel(p: ScenePanelProps) {
           <ol>
             {notice && <li className="is-problem">{notice}</li>}
             {turn?.reading.clauses.map((c, i) => (
-              <li key={i} className={c.problem ? 'is-problem' : 'is-ok'}>
+              <li key={i} className={c.problem ? 'is-problem' : c.understood ? 'is-ok' : 'is-noted'}>
                 <span className="s3-mark" aria-hidden>
-                  {c.problem ? '✗' : '✓'}
+                  {c.problem ? '✗' : c.understood ? '✓' : '·'}
                 </span>
-                <span>{c.problem ?? c.understood}</span>
+                {/* a clause that is only request framing — "add sliders …" — builds nothing, and is noted */}
+                <span>{c.problem ?? c.understood ?? `noted: ${(c.noted ?? []).join('; ')}`}</span>
+                {c.understood && c.noted?.length ? <span className="s3-noted">noted: {c.noted.join('; ')}</span> : null}
                 {c.skipped?.length ? <span className="s3-skip">not read: {c.skipped.join(', ')}</span> : null}
                 {c.notes?.map((n) => (
                   <span key={n} className="s3-note">
@@ -240,8 +255,8 @@ export function ScenePanel(p: ScenePanelProps) {
       </div>
       <aside className="s3-side" aria-label="Parts of the scene">
         {/* the part in hand first, so it is in view however many parts there are */}
-        {sel && <Inspector key={sel.id} node={sel} scene={scene} readOnly={!!p.readOnly} edit={edit} onDone={() => p.onSelect(null)} />}
-        <PartsList scene={scene} selected={p.selected} onSelect={p.onSelect} />
+        {sel && <Inspector key={sel.id} node={sel} scene={scene} readOnly={!!p.readOnly} guarded={!!p.guarded} edit={edit} onDone={() => p.onSelect(null)} />}
+        <PartsList scene={scene} selected={p.selected} onSelect={p.onSelect} guarded={!!p.guarded} />
         {recent.length > 0 && (
           <div className="s3-steps">
             <h4>Steps</h4>
@@ -261,8 +276,9 @@ export function ScenePanel(p: ScenePanelProps) {
   );
 }
 
-function PartsList({ scene, selected, onSelect }: { scene: SceneState; selected: string | null; onSelect: (id: string | null) => void }) {
-  const weighed = useMemo(() => sceneMass(scene), [scene]);
+function PartsList({ scene, selected, onSelect, guarded }: { scene: SceneState; selected: string | null; onSelect: (id: string | null) => void; guarded: boolean }) {
+  // under the Answer Guard a mass is an answer (density × volume): it is not shown here either
+  const weighed = useMemo(() => (guarded ? null : sceneMass(scene)), [scene, guarded]);
   if (!scene.nodes.length) return null;
   return (
     <div className="s3-parts">
@@ -322,7 +338,7 @@ function Field({ label, value, onCommit, disabled, suffix, wide }: { label: stri
   );
 }
 
-function Inspector({ node: n, scene, readOnly, edit, onDone }: { node: SceneNode; scene: SceneState; readOnly: boolean; edit: (op: string, a: Record<string, string | number>) => boolean; onDone: () => void }) {
+function Inspector({ node: n, scene, readOnly, guarded, edit, onDone }: { node: SceneNode; scene: SceneState; readOnly: boolean; guarded: boolean; edit: (op: string, a: Record<string, string | number>) => boolean; onDone: () => void }) {
   const u = scene.unit;
   const k = UNIT_M[u];
   const m = useMemo(() => measure(n), [n]);
@@ -463,19 +479,29 @@ function Inspector({ node: n, scene, readOnly, edit, onDone }: { node: SceneNode
       </section>
       <section className="s3-measure">
         <h5>Measured</h5>
-        <p>
-          {m.volume !== null ? `volume ${num(m.volume / k ** 3)} ${u}³` : 'no volume'}
-          {m.area !== null ? ` · surface ${num(m.area / k ** 2)} ${u}²` : ''}
-          <span className={`s3-how is-${m.how}`}>{m.how === 'exact' ? 'exact' : 'numerical'}</span>
-        </p>
-        {mass && (
-          <p>
-            mass {mass.kg >= 1000 ? `${num(mass.kg / 1000)} t` : `${num(mass.kg)} kg`}
-            <span className={`s3-how is-${mass.how}`}>{mass.nominal ? 'nominal density' : mass.how === 'exact' ? 'exact' : 'numerical'}</span>
+        {guarded ? (
+          // THE ANSWER GUARD, here too: the conversation holds back the volumes, areas and masses
+          // while the person works them out (SCENE.facts guarded), so the panel does not hand them over
+          <p className="s3-guardnote" role="note">
+            working it out — its volume, surface area and mass stay yours until you reveal them
           </p>
+        ) : (
+          <>
+            <p>
+              {m.volume !== null ? `volume ${num(m.volume / k ** 3)} ${u}³` : 'no volume'}
+              {m.area !== null ? ` · surface ${num(m.area / k ** 2)} ${u}²` : ''}
+              <span className={`s3-how is-${m.how}`}>{m.how === 'exact' ? 'exact' : 'numerical'}</span>
+            </p>
+            {mass && (
+              <p>
+                mass {mass.kg >= 1000 ? `${num(mass.kg / 1000)} t` : `${num(mass.kg)} kg`}
+                <span className={`s3-how is-${mass.how}`}>{mass.nominal ? 'nominal density' : mass.how === 'exact' ? 'exact' : 'numerical'}</span>
+              </p>
+            )}
+            {m.note && <p className="s3-note">{m.note}</p>}
+          </>
         )}
-        {m.note && <p className="s3-note">{m.note}</p>}
-        <p className="s3-note">{mass ? 'Mass is density × volume. Nothing is loaded or stressed — no strength is modelled.' : 'Give it a material or a density for its mass. Nothing is loaded or stressed — no strength is modelled.'}</p>
+        <p className="s3-note">{guarded ? 'Nothing is loaded or stressed — no strength is modelled.' : mass ? 'Mass is density × volume. Nothing is loaded or stressed — no strength is modelled.' : 'Give it a material or a density for its mass. Nothing is loaded or stressed — no strength is modelled.'}</p>
       </section>
       <footer>
         <button type="button" disabled={readOnly} onClick={() => edit('copy', { id: n.id, count: 1, dx: Math.max(0.25, 1.25 * (sizeOfX(n) || 1)) })}>
