@@ -29,6 +29,8 @@
 .sh-one{margin-top:16px;display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;padding:12px 14px;border-radius:12px;background:var(--moss-50);border:1px solid var(--moss-100)}
 .sh-one p{margin:0;flex:1 1 240px;font-size:13.5px;line-height:1.5;color:var(--ink-70)}
 .sh-one b{font-weight:600;color:var(--ink)}
+.sh-one a.sh-btn{text-decoration:none;display:inline-block}
+.sh-freeline{margin:12px 0 0;font-size:12.5px;line-height:1.5}
 
 .sh-add{display:flex;gap:8px;margin-top:18px}
 .sh-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--ink-16);border-radius:10px;background:#fff;color:var(--ink)}

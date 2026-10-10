@@ -171,7 +171,10 @@ export function DemoAdAs() {
 
 /** How each counter is described to a reader, and what its period is. */
 const COUNTER_LABEL: Record<Counter, string> = {
-  chats: 'Lines of thinking begun',
+  'core-chats': 'Core chats begun',
+  'core-messages': 'Core messages',
+  chats: 'Logos lines of thinking begun',
+  messages: 'Logos messages',
   explore: 'Explore, on a node',
   research: 'Research runs',
   challenge: 'Challenge — Logos pushing back',
@@ -180,8 +183,9 @@ const COUNTER_LABEL: Record<Counter, string> = {
   files: 'Files read',
 };
 
-const PERIOD: Record<'month' | 'chat', string> = {
+const PERIOD: Record<'month' | 'day' | 'chat', string> = {
   month: 'per month',
+  day: 'per day',
   chat: 'per conversation',
 };
 
@@ -227,10 +231,11 @@ export function DemoLimitsTable() {
           </tr>
         </thead>
         <tbody>
-          {/* Almost every row below is the same on both sides, and that is
-              the table telling the truth rather than the table being lazy:
-              inside one line of thinking the free tier is the whole product.
-              Only the rows that differ are the ones Socria One is sold on. */}
+          {/* Most rows below are the same on both sides, and that is the
+              table telling the truth rather than the table being lazy: what
+              Socria can do is the whole product on either plan. The rows that
+              differ — conversations and messages, by the day and the month —
+              are the ones Socria One is sold on. */}
           {counters.map((c) => (
             <tr key={c}>
               <td>

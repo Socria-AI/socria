@@ -11,18 +11,22 @@
 //
 // ENFORCED HERE, NOT IN THE DIALOG. Every action but leaving is the owner's,
 // checked against the database (lib/share/server.ts). Opening a door — a
-// link, a code, an invitation — is hosting, and hosting is Socria One
-// (lib/share/roles.ts mayHost); closing one is never paywalled, so an owner
-// whose plan lapsed can still take everyone out.
+// link, a code, an invitation — is hosting. On Socria One, anything; on the
+// free plan, one chat at a time and no Projects (lib/share/roles.ts
+// hostRefusal). Closing a door is never paywalled, so an owner whose plan
+// lapsed can still take everyone out.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { cleanEmail, cleanRole, cleanType, mayHost, ROLE_WORD } from '@/lib/share/roles';
 import {
-  ShareError, displayNameOf, invite, removeMember, resetLink, resourceInfo, setCode, setLink,
-  setMemberRole, shareState, stopSharing,
+  cleanEmail, cleanRole, cleanType, hostRefusal, hostRefusalNote, landing, ROLE_WORD,
+  type HostRefusal, type ResourceType,
+} from '@/lib/share/roles';
+import {
+  ShareError, displayNameOf, invite, openShares, removeMember, resetLink, resourceInfo, setCode, setLink,
+  setMemberRole, shareState, stopSharing, type OpenShare,
 } from '@/lib/share/server';
 import { inviteUrl, invitesOn, sendInvite } from '@/lib/share/email';
 
@@ -37,6 +41,37 @@ function fail(e: unknown) {
   return NextResponse.json({ error: 'That could not be changed just now.' }, { status: 500 });
 }
 
+interface Hosting {
+  plan: 'free' | 'one';
+  refusal: HostRefusal | null;
+  /** the chat a free owner already has open, when that is the reason */
+  sharing: (OpenShare & { open: string }) | null;
+}
+
+/**
+ * May this owner open a door on this thing — and if not, why. Socria One
+ * hosts anything; the free plan, one conversation at a time and no Project.
+ * Read from the database each time, never from the dialog.
+ */
+async function hosting(req: NextRequest, userId: string, type: ResourceType, id: string): Promise<Hosting> {
+  const plan = (await resolvePlanForRequest(req, userId)) === 'one' ? 'one' : 'free';
+  if (plan === 'one') return { plan, refusal: null, sharing: null };
+  const open = type === 'conversation' ? await openShares(userId, 'conversation') : [];
+  const others = open.filter((o) => o.id !== id);
+  const refusal = hostRefusal({ plan, type, open: open.some((o) => o.id === id), othersOpen: others.length });
+  const other = refusal === 'one-chat' ? others[0] ?? null : null;
+  return { plan, refusal, sharing: other ? { ...other, open: landing(other) } : null };
+}
+
+/** What the sheet is told about hosting, beside who has access. */
+function hostingAnswer(h: Hosting) {
+  return {
+    mayHost: !h.refusal,
+    plan: h.plan,
+    ...(h.refusal ? { refusal: h.refusal, refusalNote: hostRefusalNote(h.refusal, h.sharing?.title || (h.sharing ? 'Untitled' : null)), sharing: h.sharing } : {}),
+  };
+}
+
 export async function GET(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
@@ -48,8 +83,8 @@ export async function GET(req: NextRequest) {
   try {
     const state = await shareState(userId, type, id);
     if (!state) return NextResponse.json({ error: 'No such thing.' }, { status: 404 });
-    const plan = state.role === 'owner' ? await resolvePlanForRequest(req, userId) : null;
-    return NextResponse.json({ ...state, mayHost: plan ? mayHost(plan === 'one' ? 'one' : 'free') : false, emails: invitesOn() });
+    const host = state.role === 'owner' ? hostingAnswer(await hosting(req, userId, type, id)) : { mayHost: false };
+    return NextResponse.json({ ...state, ...host, emails: invitesOn() });
   } catch (e) {
     return fail(e);
   }
@@ -70,12 +105,14 @@ export async function POST(req: NextRequest) {
   const opens =
     (action === 'link' && body?.role !== null) || (action === 'code' && body?.role !== null) || action === 'invite' || action === 'reset-link';
   if (opens) {
-    const plan = await resolvePlanForRequest(req, userId);
-    if (!mayHost(plan === 'one' ? 'one' : 'free')) {
-      return NextResponse.json(
-        { error: 'Sharing is part of Socria One. Anyone you invite can join for free.', upgrade: 'share' },
-        { status: 402 }
-      );
+    let h: Hosting;
+    try {
+      h = await hosting(req, userId, type, id);
+    } catch (e) {
+      return fail(e);
+    }
+    if (h.refusal) {
+      return NextResponse.json({ error: hostRefusalNote(h.refusal, h.sharing?.title || (h.sharing ? 'Untitled' : null)), upgrade: 'share', ...hostingAnswer(h) }, { status: 402 });
     }
   }
 

@@ -88,8 +88,9 @@ export function isOne(plan: Plan): boolean {
 // The free tier has every one of those now, so naming them here would be
 // selling somebody a thing they are already using — the fastest way to teach
 // a person that the pricing page is not to be believed. What is left is what
-// is actually on the other side of the price: how MANY lines of thinking, and
-// what Socria carries between them.
+// is actually on the other side of the price: how MANY conversations and
+// messages — the free plan counts them by the day and the month — whom you
+// can think together with, and what Socria carries between them.
 
 export type OneFeature =
   | 'map'
@@ -100,13 +101,14 @@ export type OneFeature =
   | 'connections'
   | 'images'
   | 'conversations'
-  | 'history';
+  | 'history'
+  | 'together';
 
 export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = [
   {
     id: 'conversations',
-    title: 'Every line of thinking',
-    blurb: 'as many in a month as you have, kept with their history.',
+    title: 'No daily count',
+    blurb: 'as many chats and messages as your thinking takes, in Core and in Logos.',
   },
   {
     id: 'history',
@@ -117,6 +119,11 @@ export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = 
     id: 'map',
     title: 'The thread between them',
     blurb: 'what you are working through, held across conversations.',
+  },
+  {
+    id: 'together',
+    title: 'Think together on everything',
+    blurb: 'share every chat and whole Projects — the free plan shares one chat at a time.',
   },
   {
     id: 'connections',

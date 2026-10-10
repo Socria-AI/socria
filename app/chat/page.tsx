@@ -450,6 +450,10 @@ export default function ChatPage() {
    */
   const [activity, setActivity] = useState<Activity>('thinking');
   const [error, setError] = useState<string | null>(null);
+  // The free day's messages still to come, as the server counted them with the
+  // last reply (X-Socria-Left). Said quietly under the conversation once it is
+  // nearly spent; null on Socria One and signed out, where nothing is counted.
+  const [messagesLeft, setMessagesLeft] = useState<number | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   // What is typed in the rail's search box, and whether the "Maps only" chip
   // is down. Neither is persisted: a filter that survives a reload is a list
@@ -539,8 +543,10 @@ export default function ChatPage() {
   // Everything about frequency, plan, context and rationing is decided inside
   // `ask` (lib/one-prompt.ts). This surface only names the moments:
   //
-  //   'chats-spent'  — Core 4's month ran out mid-turn. They pressed send and
-  //                    it stopped; explaining that is not promotion.
+  //   'core-messages-spent' / 'core-chats-spent'
+  //                  — the free day's twenty messages, or its four new chats,
+  //                    ran out mid-turn (lib/entitlements.ts). They pressed
+  //                    send and it stopped; explaining that is not promotion.
   //   'welcome-back' — they came back, on the free tier, having used it
   //                    before. Nobody asked for this one, and it is a
   //                    deliberate product decision rather than an event; the
@@ -1928,12 +1934,18 @@ export default function ChatPage() {
 
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
-        // A boundary, not a failure: Core 4's free month is spent. They
-        // pressed send and it stopped, so the answer to "why" is owed
-        // immediately — that is what an entitlement prompt is, and it is the
-        // one kind this system never rations.
-        if (res.status === 429 && body?.upgrade === 'chats') askOne('chats-spent');
+        // A boundary, not a failure: the free day's messages or new chats are
+        // spent. They pressed send and it stopped, so the answer to "why" is
+        // owed immediately — that is what an entitlement prompt is, and it is
+        // the one kind this system never rations.
+        if (res.status === 402 && (body?.upgrade === 'core-messages' || body?.upgrade === 'core-chats')) {
+          askOne(body.upgrade === 'core-chats' ? 'core-chats-spent' : 'core-messages-spent');
+        }
         throw new Error(failureText(body, 'Something went wrong'));
+      }
+      {
+        const left = res.headers.get('X-Socria-Left');
+        setMessagesLeft(left === null ? null : Math.max(0, Number(left) || 0));
       }
 
       const reader = res.body?.getReader();
@@ -3719,6 +3731,21 @@ export default function ChatPage() {
                 >
                   ×
                 </button>
+              </div>
+            )}
+
+            {/* The free day, said before it is met rather than after: the last
+                few messages are counted out loud, once, quietly. */}
+            {messagesLeft !== null && messagesLeft <= 5 && planState.plan !== 'one' && !sending && (
+              <div className="my-3 flex items-baseline gap-3 px-1 text-[12.5px] text-ink/60" role="note">
+                <span className="font-serif italic flex-1">
+                  {messagesLeft === 0
+                    ? 'That was today’s last free message. Everything here stays, and picks up again tomorrow.'
+                    : `${messagesLeft} free ${messagesLeft === 1 ? 'message' : 'messages'} left today.`}
+                </span>
+                <Link href="/one" className="underline underline-offset-2 hover:text-ink">
+                  Socria One
+                </Link>
               </div>
             )}
 

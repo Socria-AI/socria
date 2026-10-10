@@ -34,6 +34,7 @@ import { FEEDBACK_URL } from '@/lib/feedback';
 import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
 import { anyModelGated } from '@/lib/socria-model-store';
+import { PLANS } from '@/lib/entitlements';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
 import { ConversationStylePicker } from './ConversationStylePicker';
@@ -306,6 +307,12 @@ export function AccountSheet({
   );
 }
 
+/** The free plan's day and month, read from the one table (lib/entitlements.ts) rather than typed twice. */
+function freeTerms(): string {
+  const c = PLANS.free.counters;
+  return `Every model, lens and move. Each day: ${c['core-chats']} new chats and ${c['core-messages']} messages in Core, ${c.messages} messages in Logos — and ${c.chats} Logos lines of thinking a month.`;
+}
+
 /**
  * The membership line. Socria One from a REWARD alone is said as such — with
  * how long is left and the way to keep it — rather than as a membership with
@@ -326,7 +333,7 @@ function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState 
                   Socria <span className="em">One</span>
                 </>
               ) : (
-                'Logos, free'
+                'Socria, free'
               )}
             </span>
           </div>
@@ -334,8 +341,8 @@ function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState 
             {fromReward
               ? `From Socria Rewards — ${promo!.daysLeft} ${promo!.daysLeft === 1 ? 'day' : 'days'} left. A membership keeps it, and saves the days still to come.`
               : isOne
-                ? 'Unbounded maps, Research across the whole map, every depth, Draft Space in full.'
-                : 'Real maps, every lens and every move.'}
+                ? 'No daily count, every chat shared if you like, and how you reason carried between conversations.'
+                : freeTerms()}
           </p>
         </div>
         <Link className="link-act" href="/one" onClick={onClose}>

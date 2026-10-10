@@ -32,8 +32,8 @@ import { getProject } from '@/lib/mind/store';
 import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
 import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
-import { conversationsThisMonth } from '@/lib/core4/store';
-import { core4ChatAllowed, limitMessage } from '@/lib/core4/limits';
+import { boundaryNote } from '@/lib/entitlements';
+import { bumpUsage, chatAlreadyCounted, checkAllowance, markChatCounted } from '@/lib/usage';
 import { encodeActivity, type Activity } from '@/lib/core4/activity';
 import { renderDisclosure } from '@/lib/core4/web';
 import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
@@ -167,8 +167,8 @@ export async function POST(req: NextRequest) {
     //
     // Answered here, before the model and before any counter is spent: it is
     // a fixed two-word reply, so paying OpenAI for it — or charging one of a
-    // free tier's two lines of thinking for it — would both be absurd. After
-    // the rate limit, though, so it cannot be used to get around one.
+    // free day's messages for it — would both be absurd. After the rate
+    // limit, though, so it cannot be used to get around one.
     //
     // See lib/easter-eggs.ts for why this is a real answer in Socria's voice
     // rather than a gag, and for the care taken to keep it from firing on
@@ -214,7 +214,7 @@ export async function POST(req: NextRequest) {
     const plan = userId ? await resolvePlanForRequest(req, userId) : 'free';
     // A SHARED CONVERSATION (lib/share/turn.ts): nobody's personal memory in
     // or out, the Project's own context kept, and a guest needs `ask`.
-    const sharedCtx = await sharedTurn(userId ?? null, body?.conversationId, plan);
+    const sharedCtx = await sharedTurn(userId ?? null, body?.conversationId);
     if (sharedCtx.refuse) {
       return NextResponse.json(
         { error: sharedCtx.refuse.error, ...(sharedCtx.refuse.upgrade ? { upgrade: sharedCtx.refuse.upgrade } : {}) },
@@ -333,40 +333,65 @@ export async function POST(req: NextRequest) {
       typeof body?.conversationId === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(body.conversationId)
         ? body.conversationId
         : null;
-    if (socriaModel === 'core-4') {
-      // ── THE MONTH'S CONVERSATIONS ──────────────────────────────────
-      //
-      // Two Core 4 conversations a month on the free plan, counted as distinct
-      // conversations rather than messages: a thread already counted stays open
-      // however long it runs, and coming back to it next week costs nothing.
-      // The number and the period are the free tier the rest of the product
-      // already sells past (lib/entitlements.ts, `chats: 2` per month), so a
-      // person meets one boundary rather than two differently shaped ones.
-      //
-      // One indexed read, before any model call. A failed read lets the turn
-      // through: a cap that eats somebody's conversation during a database blip
-      // is worse than a few turns of overage.
-      // A guest's turn in someone else's shared conversation is counted by the
-      // guest allowance (lib/share/turn.ts), not as one of their own chats.
-      const month = userId && !sharedCtx.guest ? await conversationsThisMonth(userId, now) : { ids: [], ok: false };
-      const allowance = core4ChatAllowed({
-        plan: plan === 'one' ? 'one' : 'free',
-        usedThisMonth: month.ids,
-        conversationId,
-        countOk: month.ok,
-      });
-      if (!allowance.allowed) {
+    // ── THE DAY'S CHATS AND MESSAGES (lib/entitlements.ts) ─────────
+    //
+    // Every Core model — everything but Logos — on the free plan: four new
+    // chats a day and twenty messages. Checked here, before any model call,
+    // Core 4's preparation included; CHARGED only once the model has taken the
+    // turn (`charge`, below), because a turn that never produced an answer must
+    // not cost one — the rule app/api/logos/chat/route.ts learned the hard way.
+    //
+    // A CHAT is counted when a conversation begins — its first user turn — and
+    // once per conversation: a retried first turn is not charged again (the
+    // marker in lib/usage.ts), and going back to a chat already started never
+    // costs a chat, only its messages. A guest's turn in somebody else's shared
+    // conversation is one of their messages and never one of their chats.
+    //
+    // Signed out there is no account to count against: the open model is
+    // bounded by the rate limiter. A store that cannot answer lets the turn
+    // through (lib/usage.ts fails open) — a limit that eats somebody's
+    // conversation during a database blip is worse than a few turns over.
+    const metered = !!userId && plan !== 'one';
+    const beginsChat =
+      metered && !sharedCtx.guest && rawUserTurns <= 1 && !(await chatAlreadyCounted(userId, conversationId, 'core-chats'));
+    // What the free day holds after this turn, said back in a header so the
+    // page can say it quietly once it is nearly spent — nobody should meet a
+    // limit they could not see coming. Null on Socria One and signed out.
+    let messagesLeft: number | null = null;
+    if (metered) {
+      const messagesToday = await checkAllowance(userId, plan, 'core-messages');
+      if (messagesToday.limit !== null) messagesLeft = Math.max(0, messagesToday.limit - messagesToday.used - 1);
+      const chatsToday = beginsChat ? await checkAllowance(userId, plan, 'core-chats') : null;
+      const refused = !messagesToday.ok
+        ? { counter: 'core-messages' as const, at: messagesToday }
+        : chatsToday && !chatsToday.ok
+          ? { counter: 'core-chats' as const, at: chatsToday }
+          : null;
+      if (refused) {
         return NextResponse.json(
           {
-            error: limitMessage(allowance),
-            limit: { model: 'core-4', used: allowance.used, limit: allowance.limit, period: 'month' },
-            // The same word the rest of the product uses for this boundary, so
-            // the client can raise the Socria One prompt it already has for it.
-            upgrade: 'chats',
+            error: boundaryNote(refused.counter),
+            // the counter's own name, so the client raises the Socria One
+            // prompt it has for exactly this boundary
+            upgrade: refused.counter,
+            used: refused.at.used,
+            limit: refused.at.limit,
           },
-          { status: 429 }
+          { status: 402 }
         );
       }
+    }
+    const leftHeader: Record<string, string> = messagesLeft === null ? {} : { 'X-Socria-Left': String(messagesLeft) };
+    const charge = async () => {
+      if (!metered || !userId) return;
+      await bumpUsage(userId, 'core-messages');
+      if (beginsChat) {
+        await bumpUsage(userId, 'core-chats');
+        await markChatCounted(userId, conversationId, 'core-chats');
+      }
+    };
+
+    if (socriaModel === 'core-4') {
       const project = userId && projectId ? await getProject(userId, projectId).catch(() => null) : null;
       const brief = (withFiles ?? clean).map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -573,6 +598,8 @@ export async function POST(req: NextRequest) {
         prepared,
         openaiModel,
         fallbackModel: fallbackOpenAIModel(model),
+        charge,
+        headers: leftHeader,
         after: (reply: string) => {
           if (!userId) return;
           // a shared conversation teaches nobody's memory (lib/share/turn.ts)
@@ -651,6 +678,8 @@ export async function POST(req: NextRequest) {
         throw e;
       }
     }
+    // The model has the turn: from here it is a message they sent.
+    await charge();
 
     const encoder = new TextEncoder();
 
@@ -704,6 +733,7 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'X-Content-Type-Options': 'nosniff',
+        ...leftHeader,
       },
     });
   } catch (e: any) {
@@ -744,6 +774,10 @@ function core4Reply(x: {
   prepared: PreparedTurn | null;
   openaiModel: string;
   fallbackModel: string | null;
+  /** spend the day's message (and chat) — once the model has taken the turn */
+  charge: () => Promise<void>;
+  /** what the free day holds after this turn, for the page (X-Socria-Left) */
+  headers: Record<string, string>;
   after: (reply: string) => void;
 }): Response {
   const encoder = new TextEncoder();
@@ -823,6 +857,9 @@ function core4Reply(x: {
             throw e;
           }
         }
+        // The first word is in: the model has the turn, and it is a message
+        // they sent. Never the reason a reply fails.
+        await x.charge().catch((e) => console.error('[socria/chat] usage charge failed', e));
         const { s, it } = opened;
         const deltas = (async function* () {
           if (!opened.first.done) yield opened.first.value as string;
@@ -944,6 +981,7 @@ function core4Reply(x: {
       'Content-Type': 'text/plain; charset=utf-8',
       'Cache-Control': 'no-cache, no-transform',
       'X-Content-Type-Options': 'nosniff',
+      ...x.headers,
     },
   });
 }

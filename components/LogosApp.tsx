@@ -2485,6 +2485,8 @@ export function LogosApp({
     return !!u && u.limit !== null && u.used >= u.limit;
   };
   const chatsSpent = spentOf('chats');
+  // the free day's ten Logos messages (lib/entitlements.ts `messages`)
+  const messagesSpent = spentOf('messages');
   const researchLocked = spentOf('research');
 
   async function runAction(mode: NodeMode, node: MapNodeRef) {
@@ -2639,6 +2641,12 @@ export function LogosApp({
       });
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
+        // A node's conversation spends the same day's messages as the main
+        // one: at the boundary, the sheet once (then the sentence in place).
+        if (res.status === 402 && body?.upgrade === 'messages') {
+          void refreshUsage(activeIdRef.current);
+          ask('messages-spent');
+        }
         throw new Error(failureText(body));
       }
 
@@ -3170,6 +3178,14 @@ export function LogosApp({
       if (!ask('chats-spent')) setError(boundaryNote('chats'));
       return;
     }
+    // The day's messages are spent: the same reasoning, for every turn that
+    // would go to Socria. A command to the map or the scene never reaches
+    // here — those spend nothing — and neither does a word said to the others
+    // in a group. The count can be a turn stale; the server holds the line.
+    if (!one && messagesSpent && !firstThoughtRef.current) {
+      if (!ask('messages-spent')) setError(boundaryNote('messages'));
+      return;
+    }
 
     setError(null);
     setInput('');
@@ -3322,8 +3338,10 @@ export function LogosApp({
           setReplyTo(replying);
         }
         setBusy(false);
-        // Same rule as the pre-flight above: the sheet once, then in place.
-        if (!ask('chats-spent')) setError(body?.error || boundaryNote('chats'));
+        // Same rule as the pre-flight above: the sheet once, then in place —
+        // for whichever boundary the server named.
+        const reached: Counter = body?.upgrade === 'messages' ? 'messages' : 'chats';
+        if (!ask(reasonForCounter(reached))) setError(body?.error || boundaryNote(reached));
         return;
       }
       if (!res.ok) {
@@ -3333,6 +3351,9 @@ export function LogosApp({
 
       // The turn was accepted. Now the map may be rebuilt from it.
       refreshMap();
+      // ...and it was one of the day's messages: the count is re-read, so the
+      // next send knows where the free day stands before it goes.
+      if (!one) void refreshUsage(activeIdRef.current);
       // The server says when this was onboarding's free first thought, so the
       // free plan's count can be read honestly under the answer.
       if (res.headers.get('X-Socria-First-Thought') === '1') {
@@ -4435,8 +4456,8 @@ export function LogosApp({
               "1 Explore per chat", "1 Research per chat" — which read as a
               product measured out by the spoonful. Those ceilings are fair use
               now, identical on both plans and far out of reach, so the panel
-              says the one number that is actually a boundary and then says
-              what is NOT bounded, because that is the more useful sentence. */}
+              says the numbers that actually are boundaries: the month's lines
+              of thinking and the day's messages. */}
           {!one && usage.chats && (
             <div className="lg-allow" role="note">
               <span className="lg-allow-tier">Free Logos</span>
@@ -4452,7 +4473,19 @@ export function LogosApp({
                     </span>
                   );
                 })()}
-                <span>everything inside them, in full</span>
+                {usage.messages?.limit != null ? (
+                  (() => {
+                    const cap = usage.messages.limit ?? 0;
+                    const left = Math.max(0, cap - usage.messages.used);
+                    return (
+                      <span className={left === 0 ? 'is-out' : undefined}>
+                        {left} of {cap} {cap === 1 ? 'message' : 'messages'} left today
+                      </span>
+                    );
+                  })()
+                ) : (
+                  <span>everything inside them, in full</span>
+                )}
               </span>
               <button type="button" className="lg-allow-go" onClick={() => askOne()}>
                 Socria One

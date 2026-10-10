@@ -32,6 +32,20 @@
 // If a number below ever makes the free tier feel small inside a single
 // conversation again, it is the wrong number.
 //
+// AND NOW BY THE DAY AS WELL (October 2026). The free plan also counts what
+// a day holds — a decision about what the free plan costs to run and what
+// Socria One is for, made knowing what it trades away:
+//
+//   Core (every model but Logos)   4 new chats a day, 20 messages a day
+//   Logos                          2 new lines of thinking a month, 10 messages a day
+//
+// A message limit CAN end a conversation mid-thought, which the paragraphs
+// above were written to avoid. So the boundary says the three things a person
+// needs when they meet it: what they have used, that everything they started
+// stays open and comes back tomorrow, and that Socria One lifts it. Starting
+// a chat and sending a message are counted separately, so going back to a
+// chat already started never costs a chat — only its messages.
+//
 // Two things are never gated at any tier: TRACE (where a thought came from)
 // and CORRECTION (telling Logos it read you wrong). Charging to see your own
 // reasoning, or to fix it, would make the product dishonest.
@@ -45,6 +59,12 @@ import type { Plan } from './socria-one';
 export const COUNTERS = [
   /** Logos conversations begun, per calendar month */
   'chats',
+  /** messages sent to Socria in Logos, per day (UTC) */
+  'messages',
+  /** Core conversations begun — every model but Logos — per day (UTC) */
+  'core-chats',
+  /** messages sent to Socria in Core, per day (UTC) */
+  'core-messages',
   /** Explore actions on a node, per conversation */
   'explore',
   /** Research runs, per conversation */
@@ -60,9 +80,12 @@ export const COUNTERS = [
 ] as const;
 export type Counter = (typeof COUNTERS)[number];
 
-/** Whether a counter resets monthly or lives with a single conversation. */
-export const COUNTER_SCOPE: Record<Counter, 'month' | 'chat'> = {
+/** Whether a counter resets monthly, resets daily, or lives with a single conversation. */
+export const COUNTER_SCOPE: Record<Counter, 'month' | 'day' | 'chat'> = {
   chats: 'month',
+  messages: 'day',
+  'core-chats': 'day',
+  'core-messages': 'day',
   explore: 'chat',
   research: 'chat',
   challenge: 'chat',
@@ -123,16 +146,21 @@ export const megabytes = (bytes: number) => `${Math.round(bytes / (1024 * 1024))
  * Every per-conversation ceiling below is identical for the two tiers and is
  * set where nobody working seriously will ever meet it: they are a guard
  * against a runaway loop, not a boundary a person notices, and the rate
- * limiter is the real defence against abuse. Only two rows differ, and they
- * are the two the product is sold on — `chats`, which is how many lines of
- * thinking a month, and `memoryEntries`, which is how much of you is carried
- * between them.
+ * limiter is the real defence against abuse. The rows that differ are the
+ * ones the product is sold on — how many conversations and messages
+ * (`chats` a month in Logos; `messages` a day in Logos; `core-chats` and
+ * `core-messages` a day in Core) and `memoryEntries`, which is how much of
+ * you is carried between them.
  */
 export const PLANS: Record<Plan, Limits> = {
   free: {
     counters: {
-      // The one limit anybody meets. Everything else here matches One.
+      // The limits anybody meets: conversations and messages. Everything
+      // else here matches One.
       chats: 2,
+      messages: 10,
+      'core-chats': 4,
+      'core-messages': 20,
       explore: null,
       research: 120,
       challenge: null,
@@ -154,6 +182,9 @@ export const PLANS: Record<Plan, Limits> = {
   one: {
     counters: {
       chats: 400,
+      messages: null,
+      'core-chats': null,
+      'core-messages': null,
       explore: null,
       research: 120,
       challenge: null,
@@ -178,7 +209,7 @@ export const PLANS: Record<Plan, Limits> = {
  * ceiling would be selling somebody something they already have. The suite
  * asserts this list is the truth rather than a comment.
  */
-export const TIERED_COUNTERS: readonly Counter[] = ['chats'];
+export const TIERED_COUNTERS: readonly Counter[] = ['chats', 'messages', 'core-chats', 'core-messages'];
 
 export function limitsFor(plan: Plan): Limits {
   return PLANS[plan];
@@ -207,10 +238,10 @@ export function remaining(plan: Plan, counter: Counter, used: number): number | 
 // and never a countdown: nobody should feel a meter running while they think.
 // These live here rather than at each call site so the voice stays one voice.
 //
-// Only `chats` is a boundary the product sells past. The rest are the fair-use
-// ceilings above, identical on both plans, and their note says so — offering
-// somebody Socria One at a ceiling Socria One also has is a lie, and a small
-// lie at a moment of friction is the most expensive kind.
+// Only the TIERED counters are boundaries the product sells past. The rest are
+// the fair-use ceilings above, identical on both plans, and their note says so
+// — offering somebody Socria One at a ceiling Socria One also has is a lie,
+// and a small lie at a moment of friction is the most expensive kind.
 
 /**
  * "both", for two — the free month's count read from the table rather than
@@ -222,10 +253,22 @@ function freeChats(): string {
   return n === 2 ? 'both' : `all ${n}`;
 }
 
+/** A daily number from the table, as the copy says it. */
+const perDay = (c: Counter) => PLANS.free.counters[c] ?? 0;
+
 const REACHED: Record<Counter, string> = {
   chats:
     `That is ${freeChats()} of your free lines of thinking for this month. ` +
     'The ones you have stay open, and stay yours.',
+  messages:
+    `That is today’s ${perDay('messages')} Logos messages on the free plan. ` +
+    'Your lines of thinking stay open, and stay yours — they pick up again tomorrow.',
+  'core-chats':
+    `That is today’s ${perDay('core-chats')} new chats on the free plan. ` +
+    'The ones you have started stay open — keep going in any of them.',
+  'core-messages':
+    `That is today’s ${perDay('core-messages')} messages on the free plan. ` +
+    'Everything you have started stays here, and picks up again tomorrow.',
   explore: 'Explore has run as far as it goes on this map.',
   research: 'Research has run as far as it goes in this line of thinking.',
   challenge: 'Challenge has run as far as it goes in this line of thinking.',
@@ -237,6 +280,9 @@ const REACHED: Record<Counter, string> = {
 /** Only where the plans differ. Keys here must be exactly TIERED_COUNTERS. */
 const OFFERS: Partial<Record<Counter, string>> = {
   chats: 'Socria One keeps as many lines of thinking as you have.',
+  messages: 'Upgrade to Socria One to keep going today.',
+  'core-chats': 'Upgrade to Socria One to start as many as you like.',
+  'core-messages': 'Upgrade to Socria One to keep going today.',
 };
 
 /** Said where they do not: the truth, which is that there is nothing to buy. */

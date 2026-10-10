@@ -164,7 +164,6 @@ const MODULES = [
   'lib/core4/budget.ts',
   'lib/core4/split.ts',
   'lib/core4/activity.ts',
-  'lib/core4/limits.ts',
   'lib/core4/allocation.ts',
   'lib/core4/intervene.ts',
   'lib/core4/considered.ts',

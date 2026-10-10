@@ -1,8 +1,8 @@
 // GET /api/logos/usage?chat=<sessionId>
 //
 // What this person has spent, so the UI can say what is left before they run
-// into it. Read-only and cheap — one query for the month and the conversation
-// together.
+// into it. Read-only and cheap — one query for the month, the day and the
+// conversation together.
 //
 // The numbers are the server's, which is the point: the client draws the
 // panel from the same counts the routes enforce against, so what it shows and

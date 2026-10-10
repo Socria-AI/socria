@@ -236,8 +236,8 @@ export async function POST(req: NextRequest) {
     const sessionId = typeof body?.sessionId === 'string' ? body.sessionId : null;
     // A SHARED line of thinking (lib/share/turn.ts): nobody's memory in or
     // out, the Project's own context kept, a guest needs `ask`, and a guest's
-    // turns are counted by the guest allowance rather than as their chats.
-    const sharedCtx = await sharedTurn(userId ?? null, sessionId, plan);
+    // turns are their own messages for the day — never one of their chats.
+    const sharedCtx = await sharedTurn(userId ?? null, sessionId);
     if (sharedCtx.refuse) {
       return NextResponse.json(
         { error: sharedCtx.refuse.error, ...(sharedCtx.refuse.upgrade ? { upgrade: sharedCtx.refuse.upgrade } : {}) },
@@ -287,6 +287,23 @@ export async function POST(req: NextRequest) {
             used: allowance.used,
             limit: allowance.limit,
           },
+          { status: 402 }
+        );
+      }
+    }
+
+    // ── the day's messages ────────────────────────────────────────
+    //
+    // Ten a day in Logos on the free plan (lib/entitlements.ts `messages`),
+    // every turn sent to Socria — a node's own conversation and a turn in
+    // somebody else's shared line of thinking included. Checked here, before
+    // the model; charged beside the chat, once the model has taken the turn.
+    // Onboarding's first thought is a gift in this count too.
+    if (!firstThought) {
+      const today = await checkAllowance(userId, plan, 'messages');
+      if (!today.ok) {
+        return NextResponse.json(
+          { error: boundaryNote('messages'), upgrade: 'messages', used: today.used, limit: today.limit },
           { status: 402 }
         );
       }
@@ -577,6 +594,8 @@ export async function POST(req: NextRequest) {
       if (!gifted) await bumpUsage(userId, 'chats');
       await markChatCounted(userId, sessionId);
     }
+    // ...and the day's message, under the same rule: the model has the turn.
+    if (!gifted && userId && limitOf(plan, 'messages') !== null) await bumpUsage(userId, 'messages');
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({

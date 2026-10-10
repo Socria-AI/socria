@@ -41,6 +41,12 @@ function Glyph({ kind }: { kind: OneFeature }) {
         <circle cx="6" cy="9" r="4" />
         <circle cx="12" cy="9" r="4" />
       </>
+    ) : kind === 'together' ? (
+      <>
+        <circle cx="5.5" cy="6.5" r="2.3" />
+        <circle cx="12.5" cy="6.5" r="2.3" />
+        <path d="M2,15 C2.8,11.4 8.2,11.4 9,15 M9,15 C9.8,11.4 15.2,11.4 16,15" />
+      </>
     ) : (
       <circle cx="9" cy="9" r="6.5" />
     );

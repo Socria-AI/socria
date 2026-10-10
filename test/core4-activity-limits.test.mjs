@@ -1,9 +1,9 @@
-// The word under the dots, and the day's chats.
+// The word under the dots, and the day a limit counts in.
 //
 // Two small things, both policy rather than mechanism, which is why they are
 // tested apart from what they sit on: an indicator that lies is worse than one
-// that says nothing, and a cap that eats somebody's conversation is worse than
-// no cap at all.
+// that says nothing, and a limit that resets whenever the browser says so is
+// no limit at all.
 //
 // THE INDICATOR'S ONE RULE: never name an operation that is not running. Every
 // marker is emitted from the place that does the work, and the tests below are
@@ -11,20 +11,16 @@
 // at once, and a minimum dwell so the truth does not change faster than a person
 // can read it.
 //
-// THE CAP'S ONE RULE: it counts conversations STARTED, not messages sent. A
-// thread already counted stays open however long it runs, and a database that
-// cannot answer lets the turn through.
+// THE DAY'S ONE RULE: it is the server's day, in UTC. Core's chats and
+// messages, and Logos's messages, are counted by it (lib/entitlements.ts); the
+// Core 4 cap that counted two conversations a month is gone — Core is counted
+// by the day now, every model alike. The limits themselves, end to end through
+// the real routes: test/free-limits-e2e.test.mjs.
 
 import {
   ACTIVITIES, ACTIVITY_MARK, ActivityTrack, encodeActivity, readActivity, shownActivity,
 } from './.tmp/activity.mjs';
-import {
-  core4ChatAllowed,
-  dayStart,
-  monthStart,
-  limitMessage,
-  FREE_CORE4_CHATS_PER_MONTH,
-} from './.tmp/limits.mjs';
+import { dayKey } from './.tmp/usage-scope.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -90,53 +86,16 @@ console.log('\n=== it does not flicker ===');
   ok('  and takes over when the first has had its moment', u.start('searching', 900) === 'searching');
 }
 
-console.log('\n=== two conversations a month, counted as conversations ===');
-{
-  const allow = (over) =>
-    core4ChatAllowed({ plan: 'free', usedThisMonth: [], conversationId: 'c-new', ...over });
-  // The same number and period the rest of the product sells past, so a person
-  // meets ONE boundary rather than two differently shaped ones.
-  ok(`the limit is ${FREE_CORE4_CHATS_PER_MONTH}`, FREE_CORE4_CHATS_PER_MONTH === 2);
-  ok('a first conversation is allowed', allow({}).allowed);
-  ok('a second is', allow({ usedThisMonth: ['a'] }).allowed);
-  ok('a third is not', !allow({ usedThisMonth: ['a', 'b'] }).allowed);
-  // THE ONE THAT MATTERS: a conversation already counted stays open, however
-  // many turns it runs and whenever they come back to it.
-  ok('CONTINUING a counted conversation is always free',
-    allow({ usedThisMonth: ['a', 'b'], conversationId: 'b' }).allowed);
-  ok('  and it is not counted twice', allow({ usedThisMonth: ['a', 'a', 'b'], conversationId: 'b' }).used === 2);
-  ok('One has no cap', allow({ plan: 'one', usedThisMonth: ['a', 'b', 'c', 'd'] }).allowed);
-  // A read that failed is not a refusal: a cap that eats somebody's
-  // conversation during a database blip is worse than a few turns of overage.
-  ok('a failed count lets the turn through', allow({ usedThisMonth: [], countOk: false }).allowed);
-
-  const spent = limitMessage(allow({ usedThisMonth: ['a', 'b'] }));
-  ok('the message says the work is not gone', /stay open, and stay yours/.test(spent), spent);
-  ok('  names what changes it', /Socria One/.test(spent));
-  ok('  leaves a way to keep working', /Core 3\.1/.test(spent));
-  ok('  counts in words, since it is two', /both of your free Core 4 conversations/.test(spent));
-  ok('  and never counts down at them', !/left|remaining|\bonly\b/i.test(spent), spent);
-}
-
-console.log('\n=== the month boundary is fixed, not caller-supplied ===');
-{
-  const mid = Date.UTC(2026, 2, 14, 12, 30, 5);
-  ok('a month starts at midnight UTC on the first', monthStart(mid) === Date.UTC(2026, 2, 1));
-  ok('  and every moment in that month agrees',
-    monthStart(Date.UTC(2026, 2, 31, 23, 59, 59)) === monthStart(mid));
-  ok('  while the next one does not', monthStart(Date.UTC(2026, 3, 1, 0, 0, 1)) !== monthStart(mid));
-  // December → January is where a naive month + 1 wraps into the wrong year.
-  ok('  and the year rolls over correctly',
-    monthStart(Date.UTC(2026, 11, 31, 23, 0)) === Date.UTC(2026, 11, 1) &&
-    monthStart(Date.UTC(2027, 0, 1, 0, 30)) === Date.UTC(2027, 0, 1));
-}
-
 console.log('\n=== the day boundary is fixed, not caller-supplied ===');
 {
   const noon = Date.UTC(2026, 2, 14, 12, 30, 5);
-  ok('a day starts at midnight UTC', dayStart(noon) === Date.UTC(2026, 2, 14));
-  ok('  and every moment in that day agrees', dayStart(Date.UTC(2026, 2, 14, 23, 59, 59)) === dayStart(noon));
-  ok('  while the next one does not', dayStart(Date.UTC(2026, 2, 15, 0, 0, 1)) !== dayStart(noon));
+  ok('a day is named for its UTC date', dayKey(noon) === 'day:2026-03-14', dayKey(noon));
+  ok('  and every moment in that day agrees', dayKey(Date.UTC(2026, 2, 14, 23, 59, 59)) === dayKey(noon));
+  ok('  from its first moment', dayKey(Date.UTC(2026, 2, 14, 0, 0, 0)) === dayKey(noon));
+  ok('  while the next one does not', dayKey(Date.UTC(2026, 2, 15, 0, 0, 1)) !== dayKey(noon));
+  // December → January is where a naive day + 1 wraps into the wrong year.
+  ok('  and the year rolls over correctly', dayKey(Date.UTC(2026, 11, 31, 23, 59)) === 'day:2026-12-31' && dayKey(Date.UTC(2027, 0, 1, 0, 1)) === 'day:2027-01-01');
+  ok('a day can never be read as a month', !/^\d{4}-\d{2}$/.test(dayKey(noon)) && dayKey(noon).startsWith('day:'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

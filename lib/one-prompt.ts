@@ -71,6 +71,10 @@ export const INTENT_RANK: Record<Intent, number> = {
 export const TRIGGER_REASONS = [
   // urgent — a free counter ran out with work in progress
   'chats-spent',
+  // the day's messages and chats (October 2026): Logos messages, Core chats, Core messages
+  'messages-spent',
+  'core-chats-spent',
+  'core-messages-spent',
   'explore-spent',
   'research-spent',
   'challenge-spent',
@@ -127,8 +131,8 @@ export interface TriggerSpec {
  * one is a different reason the count matters — what is carried between
  * conversations, what the free tier actually is, what happens to the work
  * already done — and none of them is a countdown, a discount, or a claim that
- * the free tier is worse at thinking. It is not: it is the same Socria, twice
- * a month.
+ * the free tier is worse at thinking. It is not: it is the same Socria, counted
+ * by the day and the month.
  *
  * The person picking these up in sequence should feel like they are being told
  * something, not measured. If a line here ever reads as pressure, it is the
@@ -138,14 +142,14 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
   {
     title: 'Pick it back up',
     body:
-      'Your free month holds two lines of thinking. Socria One holds as many ' +
-      'as you have, and carries what it learns about how you reason from each ' +
-      'one into the next.',
+      'The free plan holds four new chats a day in Core and two lines of thinking ' +
+      'a month in Logos. Socria One holds as many as you have, and carries what ' +
+      'it learns about how you reason from each one into the next.',
   },
   {
     title: 'What stays between conversations',
     body:
-      'The free tier gives you the whole of Socria twice a month. What Socria ' +
+      'The free tier gives you the whole of Socria, a day at a time. What Socria ' +
       'One adds is continuity: your positions, what you have already settled, ' +
       'and how you tend to think, carried forward instead of restarting.',
   },
@@ -183,6 +187,24 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     intent: 'urgent',
     counter: 'chats',
     title: 'Keep this line of thinking',
+  },
+  'messages-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'messages',
+    title: 'Keep thinking today',
+  },
+  'core-chats-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'core-chats',
+    title: 'Start something new today',
+  },
+  'core-messages-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'core-messages',
+    title: 'Keep this conversation going',
   },
   'explore-spent': {
     category: 'entitlement',
@@ -338,11 +360,11 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
  * The one place a trigger's numbers are filled in.
  *
  * There is nothing left to fill: the copy above no longer names a quantity,
- * because the only quantity the free tier now has is the month's lines of
- * thinking, and that sentence is written once in lib/entitlements and reached
- * through boundaryNote(). Kept as the seam it always was, so the next piece
- * of copy that does need a number has somewhere to get it from rather than
- * writing it down a second time.
+ * because the quantities the free tier has — the month's lines of thinking,
+ * the day's chats and messages — are each written once in lib/entitlements
+ * and reached through boundaryNote(). Kept as the seam it always was, so the
+ * next piece of copy that does need a number has somewhere to get it from
+ * rather than writing it down a second time.
  */
 function fill(text: string): string {
   return text;
@@ -588,7 +610,7 @@ export function decide(input: DecideInput): Decision {
     // rationed", on the reasoning that silence would leave someone staring
     // at a control that did nothing; that reasoning is about the FIRST
     // press and does not survive the fourth. Someone who has been told the
-    // month's chats are spent and types again has not asked a new question,
+    // day's messages are spent and types again has not asked a new question,
     // and answering it again with a sheet across the screen is the exact
     // behaviour the rest of this file exists to prevent. The allowance
     // panel and the boundary note say the same sentence, in place, for as

@@ -14,6 +14,7 @@ import {
   foldUsageRows,
   chatScopeFor,
   chatMarkerScope,
+  dayKey,
 } from './.tmp/usage-scope.mjs';
 import { COUNTER_SCOPE } from './.tmp/entitlements.mjs';
 
@@ -120,16 +121,20 @@ console.log('\n=== each counter is read from its own home ===');
   const got2r = foldUsageRows([...chatsRows].reverse(), MONTH, CHAT);
   ok('...in either row order', got2r.chats === 2, JSON.stringify(got2r));
 
-  // Every counter the table declares round-trips from its declared home.
+  // Every counter the table declares round-trips from its declared home —
+  // the month, the day, or the conversation — and from nowhere else.
+  const DAY = dayKey(Date.UTC(2026, 8, 20, 12));
+  const HOME = { month: MONTH, day: DAY, chat: CHAT };
   for (const [counter, where] of Object.entries(COUNTER_SCOPE)) {
-    const scope = where === 'month' ? MONTH : CHAT;
-    const r = foldUsageRows([{ counter, scope, n: 7 }], MONTH, CHAT);
+    const r = foldUsageRows([{ counter, scope: HOME[where], n: 7 }], MONTH, CHAT, DAY);
     ok(`${counter} reads from its declared ${where} scope`, r[counter] === 7, JSON.stringify(r));
 
-    // ...and is NOT read from the other one.
-    const wrong = where === 'month' ? CHAT : MONTH;
-    const r2 = foldUsageRows([{ counter, scope: wrong, n: 7 }], MONTH, CHAT);
-    ok(`${counter} is ignored in the wrong scope`, r2[counter] === undefined, JSON.stringify(r2));
+    // ...and is NOT read from either of the others.
+    for (const [other, scope] of Object.entries(HOME)) {
+      if (other === where) continue;
+      const r2 = foldUsageRows([{ counter, scope, n: 7 }], MONTH, CHAT, DAY);
+      ok(`${counter} is ignored in the ${other} scope`, r2[counter] === undefined, JSON.stringify(r2));
+    }
   }
 }
 
@@ -196,6 +201,30 @@ console.log('\n=== nothing here is worth a 500 ===');
     CHAT
   );
   ok('a valid row among junk still counts', mixed.chats === 2, JSON.stringify(mixed));
+}
+
+console.log('\n=== the day is a namespace of its own ===');
+{
+  const DAY = dayKey(Date.UTC(2026, 8, 14, 9));
+  const rows = [
+    { counter: 'chats', scope: MONTH, n: 1 },
+    { counter: 'messages', scope: DAY, n: 7 },
+    { counter: 'core-messages', scope: DAY, n: 19 },
+    { counter: 'core-chats', scope: DAY, n: 3 },
+    // yesterday's tally, and a Core chat's marker, must speak for nothing
+    { counter: 'core-messages', scope: dayKey(Date.UTC(2026, 8, 13, 9)), n: 20 },
+    { counter: 'core-chats', scope: chatMarkerScope('c1'), n: 1 },
+    // a daily counter in the month's scope is not the day's count
+    { counter: 'messages', scope: MONTH, n: 99 },
+  ];
+  const out = foldUsageRows(rows, MONTH, CHAT, DAY);
+  ok('the day is read from the day', out.messages === 7 && out['core-messages'] === 19 && out['core-chats'] === 3, JSON.stringify(out));
+  ok('  and the month from the month', out.chats === 1);
+  const same = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
+  ok('  in either order', same(foldUsageRows([...rows].reverse(), MONTH, CHAT, DAY), out));
+  ok('without a day, no daily count is trusted', foldUsageRows(rows, MONTH, CHAT).messages === undefined);
+  ok('the day, the month and a conversation never share a spelling',
+    DAY !== MONTH && !DAY.startsWith('chat:') && !DAY.startsWith('chatmark:') && DAY === 'day:2026-09-14', DAY);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

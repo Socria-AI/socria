@@ -17,14 +17,15 @@ import 'server-only';
 //   A GUEST NEEDS `ask`. Viewers and commenters read; only an editor (or the
 //   owner) can send Socria a turn. Checked here, on the server.
 //
-//   A FREE GUEST IS COUNTED. Joining is free; their turns inside someone
-//   else's space are capped per day (FREE_GUEST_TURNS_PER_DAY), so a host's
-//   plan is never what a guest spends.
+//   A GUEST SPENDS THEIR OWN DAY. Joining is free; a free guest's turns to
+//   Socria inside someone else's space are messages like any other, counted
+//   against THEIR day by the chat route (lib/entitlements.ts: 20 in Core, 10
+//   in Logos) — never against the host's plan, and never as one of their
+//   chats, because the conversation is not theirs.
 
-import { supabaseAdmin } from '@/lib/supabase';
 import { getProject, listSources, loadGraph } from '@/lib/mind/store';
 import { renderProjectContext } from '@/lib/mind/projects';
-import { FREE_GUEST_TURNS_PER_DAY, can, type Role } from './roles';
+import { can, type Role } from './roles';
 import { isShared, resourceInfo, shareAccess } from './server';
 
 export interface SharedTurn {
@@ -41,7 +42,7 @@ export interface SharedTurn {
 
 const NONE: SharedTurn = { shared: false, guest: false, role: null, ownerId: null, projectBlock: '' };
 
-export async function sharedTurn(userId: string | null, conversationId: unknown, plan: 'free' | 'one' | string): Promise<SharedTurn> {
+export async function sharedTurn(userId: string | null, conversationId: unknown): Promise<SharedTurn> {
   const id = typeof conversationId === 'string' && /^[A-Za-z0-9_-]{1,120}$/.test(conversationId) ? conversationId : null;
   if (!userId || !id) return NONE;
   let info;
@@ -62,23 +63,6 @@ export async function sharedTurn(userId: string | null, conversationId: unknown,
   }
   const shared = guest || (await isShared('conversation', id).catch(() => false));
   if (!shared) return { ...NONE, role };
-
-  if (guest && plan !== 'one') {
-    const day = new Date().toISOString().slice(0, 10);
-    const { data } = await supabaseAdmin().rpc('bump_logos_usage', {
-      p_user: userId, p_scope: `guest:${day}`, p_counter: 'turns', p_by: 1, p_at: Date.now(),
-    });
-    if (typeof data === 'number' && data > FREE_GUEST_TURNS_PER_DAY) {
-      return {
-        ...NONE, shared, guest, role, ownerId: info.ownerId,
-        refuse: {
-          status: 402,
-          error: `That is today's ${FREE_GUEST_TURNS_PER_DAY} turns in other people's shared spaces. You can still read and comment, and Socria One lifts the limit.`,
-          upgrade: 'chats',
-        },
-      };
-    }
-  }
 
   let projectBlock = '';
   if (info.projectId) {

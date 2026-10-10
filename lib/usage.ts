@@ -2,12 +2,13 @@
 //
 // The counters behind the product's boundaries, read and written server-side.
 //
-// Two different things live here now. `chats` is the one real plan boundary —
-// two lines of thinking a month on the free tier, effectively uncounted on
-// Socria One. Everything else is a fair-use ceiling identical on both plans,
-// set where serious work does not reach it, and lib/entitlements.ts says
-// which is which (TIERED_COUNTERS). Nothing in this file needs to know the
-// difference; the copy and the prompts do.
+// Two different things live here now. The plan boundaries — two lines of
+// thinking a month and ten messages a day in Logos, four new chats and twenty
+// messages a day in Core, on the free tier; effectively uncounted on Socria
+// One. Everything else is a fair-use ceiling identical on both plans, set
+// where serious work does not reach it, and lib/entitlements.ts says which is
+// which (TIERED_COUNTERS). Nothing in this file needs to know the difference;
+// the copy and the prompts do.
 //
 // The thing this replaces is a number the browser sent us. The Research limit
 // used to be enforced from `body.researchUsed`, which meant posting a zero
@@ -26,9 +27,9 @@ import {
   limitOf,
   type Counter,
 } from './entitlements';
-import { chatMarkerScope, chatScopeFor, foldUsageRows, type UsageRow } from './usage-scope';
+import { chatMarkerScope, chatScopeFor, dayKey, foldUsageRows, type UsageRow } from './usage-scope';
 
-export { chatMarkerScope, chatScopeFor, foldUsageRows, type UsageRow };
+export { chatMarkerScope, chatScopeFor, dayKey, foldUsageRows, type UsageRow };
 import type { Plan } from './socria-one';
 
 /** The month a monthly counter belongs to, in UTC. */
@@ -38,12 +39,14 @@ export function monthKey(at = Date.now()): string {
 }
 
 /**
- * Where a counter lives. Monthly counters share a month; per-chat counters
- * are keyed to the conversation, and a conversation with no id gets a scope
- * of its own so an anonymous action cannot spend someone else's allowance.
+ * Where a counter lives. Monthly counters share a month, daily counters a day;
+ * per-chat counters are keyed to the conversation, and a conversation with no
+ * id gets a scope of its own so an anonymous action cannot spend someone
+ * else's allowance.
  */
 export function scopeFor(counter: Counter, chatId?: string | null, at = Date.now()): string {
   if (COUNTER_SCOPE[counter] === 'month') return monthKey(at);
+  if (COUNTER_SCOPE[counter] === 'day') return dayKey(at);
   return chatScopeFor(chatId || 'unknown');
 }
 
@@ -84,15 +87,17 @@ export async function readUsage(
   }
 }
 
-/** Every counter for one conversation plus the month, in one round trip. */
+/** Every counter for one conversation plus the month and the day, in one round trip. */
 export async function readAllUsage(
   userId: string,
   chatId?: string | null
 ): Promise<Record<string, number>> {
   try {
-    const month = monthKey();
+    const now = Date.now();
+    const month = monthKey(now);
+    const day = dayKey(now);
     const chatScope = chatId ? chatScopeFor(chatId) : null;
-    const scopes = [month];
+    const scopes = [month, day];
     if (chatScope) scopes.push(chatScope);
     const { data, error } = await supabaseAdmin()
       .from('logos_usage')
@@ -103,7 +108,7 @@ export async function readAllUsage(
       if (!unavailable(error)) console.error('usage read-all:', error.message);
       return {};
     }
-    return foldUsageRows(data as UsageRow[] | null, month, chatScope);
+    return foldUsageRows(data as UsageRow[] | null, month, chatScope, day);
   } catch {
     return {};
   }
@@ -157,7 +162,9 @@ export async function bumpUsage(
  */
 export async function chatAlreadyCounted(
   userId: string | null,
-  sessionId: string | null | undefined
+  sessionId: string | null | undefined,
+  /** which conversations: Logos lines of thinking (`chats`) or Core chats (`core-chats`) */
+  counter: 'chats' | 'core-chats' = 'chats'
 ): Promise<boolean> {
   if (!userId || !sessionId) return false;
   try {
@@ -166,7 +173,7 @@ export async function chatAlreadyCounted(
       .select('n')
       .eq('user_id', userId)
       .eq('scope', chatMarkerScope(sessionId))
-      .eq('counter', 'chats')
+      .eq('counter', counter)
       .maybeSingle();
     if (error) {
       if (!unavailable(error)) console.error('chat marker read:', error.message);
@@ -183,14 +190,15 @@ export async function chatAlreadyCounted(
 /** Remember that this conversation has cost its one chat. */
 export async function markChatCounted(
   userId: string | null,
-  sessionId: string | null | undefined
+  sessionId: string | null | undefined,
+  counter: 'chats' | 'core-chats' = 'chats'
 ): Promise<void> {
   if (!userId || !sessionId) return;
   try {
     await supabaseAdmin().rpc('bump_logos_usage', {
       p_user: userId,
       p_scope: chatMarkerScope(sessionId),
-      p_counter: 'chats',
+      p_counter: counter,
       p_by: 1,
       p_at: Date.now(),
     });

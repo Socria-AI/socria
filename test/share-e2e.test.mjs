@@ -5,7 +5,7 @@
 //   cara   free, joins by link as a viewer
 //   erin   free, joins by code as a commenter
 //   dan    a stranger with nobody's link
-//   frank  free, owns something and tries to share it
+//   frank  free, shares one chat — and finds the free plan shares one at a time
 //
 // The route handlers are the real ones, bundled from app/api, against the
 // in-memory database (which enforces the real keys), a Clerk that knows these
@@ -139,13 +139,39 @@ await save('c-lit', 'Literature', [{ role: 'user', content: 'Which papers?' }], 
 await save('c-diary', 'My private diary', [{ role: 'user', content: 'A very personal note' }]);
 ok('alice has three conversations, two in the Project', db.rows('conversations').filter((c) => c.user_id === 'alice').length === 3);
 
-console.log('=== hosting is Socria One; joining is free ===');
+console.log('=== the free plan shares one chat at a time; joining is free ===');
 as('frank');
 await save('f-1', 'Frank thinks', [{ role: 'user', content: 'hi' }]);
+await save('f-2', 'Frank, again', [{ role: 'user', content: 'and another thing' }]);
+const frankSheet = await call(R.share.GET, 'GET', '/api/share?type=conversation&id=f-1');
+ok('a free owner is told they may share this one', frankSheet.json?.mayHost === true && frankSheet.json?.plan === 'free' && !frankSheet.json?.refusal, frankSheet.text.slice(0, 300));
 const frankLink = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'link', role: 'viewer' });
-ok('a free owner cannot open a link', frankLink.status === 402 && frankLink.json?.upgrade === 'share', frankLink.text);
-const frankInvite = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'invite', email: 'bob@example.com', role: 'viewer' });
-ok('  nor invite anyone', frankInvite.status === 402);
+ok('a free owner shares their first chat by link', frankLink.status === 200 && !!frankLink.json?.link?.token, frankLink.text.slice(0, 200));
+const frankInvite = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'invite', email: 'pal@example.com', role: 'viewer' });
+ok('  invites somebody to the same chat — no second slot', frankInvite.status === 200 && frankInvite.json?.members?.some((m) => m.pending), frankInvite.text.slice(0, 200));
+const frankCode = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'code', role: 'commenter' });
+ok('  and turns its code on', frankCode.status === 200 && !!frankCode.json?.code?.code);
+const second = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-2', action: 'link', role: 'viewer' });
+ok('a second chat is refused while the first is shared', second.status === 402 && second.json?.upgrade === 'share' && second.json?.refusal === 'one-chat', second.text.slice(0, 300));
+ok('  naming the chat already shared, and where it opens', /“Frank thinks”/.test(second.json?.error ?? '') && second.json?.sharing?.id === 'f-1' && second.json?.sharing?.open === '/chat?shared=f-1', second.text.slice(0, 300));
+ok('  and the link was not turned on anyway', !db.rows('shares').some((x) => x.resource_id === 'f-2' && x.link_role));
+const secondSheet = await call(R.share.GET, 'GET', '/api/share?type=conversation&id=f-2');
+ok('the second chat\'s sheet says so before anything is pressed', secondSheet.json?.mayHost === false && secondSheet.json?.refusal === 'one-chat' && secondSheet.json?.sharing?.title === 'Frank thinks', secondSheet.text.slice(0, 300));
+ok('  nor can anyone be invited to it', (await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-2', action: 'invite', email: 'pal@example.com', role: 'viewer' })).status === 402);
+ok('  nor a code turned on', (await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-2', action: 'code', role: 'viewer' })).status === 402);
+const frankProject = (await call(R.projects.POST, 'POST', '/api/projects', { name: 'Frank\'s project' })).json?.project?.id;
+const projShare = await call(R.share.POST, 'POST', '/api/share', { type: 'project', id: frankProject, action: 'link', role: 'viewer' });
+ok('a Project is Socria One — it shares every conversation in it', !!frankProject && projShare.status === 402 && projShare.json?.refusal === 'project', projShare.text.slice(0, 300));
+const stopped = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'stop' });
+ok('stopping sharing is never paywalled', stopped.status === 200);
+const nowSecond = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-2', action: 'link', role: 'viewer' });
+ok('  and frees the slot: the second chat shares now', nowSecond.status === 200 && !!nowSecond.json?.link?.token, nowSecond.text.slice(0, 200));
+ok('  while the first, closed, would be a second again', (await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'link', role: 'viewer' })).status === 402);
+ok('closing a door on the open one is always allowed', (await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-2', action: 'link', role: null })).status === 200);
+// a chat deleted while shared opens nothing, and holds no slot
+await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-2', action: 'link', role: 'viewer' });
+db.tables.conversations = db.rows('conversations').filter((c) => c.id !== 'f-2');
+ok('a deleted chat that was shared does not hold the free slot', (await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'f-1', action: 'link', role: 'viewer' })).status === 200);
 
 console.log('=== only the owner shares ===');
 as('dan');

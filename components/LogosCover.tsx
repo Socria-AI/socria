@@ -26,8 +26,8 @@
 //
 // AND ALMOST NO PROSE AROUND IT. A title, one standfirst, the terms, and the
 // way in. The terms are read from the plan table rather than written here, so
-// "two lines of thinking a month" cannot go stale while the number it
-// describes changes underneath it.
+// "two lines of thinking a month and 10 messages a day" cannot go stale while
+// the numbers it describes change underneath it.
 
 import { useEffect, useLayoutEffect, useMemo, useState } from 'react';
 import { ModelView } from '@/components/model/ModelView';
@@ -50,11 +50,14 @@ function spell(n: number | null): string {
   return (['Zero', 'One', 'Two', 'Three', 'Four', 'Five', 'Six'][n] ?? String(n));
 }
 
-/** The free month, as the plan table states it. Exported so a suite can hold it to the table. */
+/** The free month and day, as the plan table states them. Exported so a suite can hold it to the table. */
 export function freeTerms(): string {
   const n = PLANS.free.counters.chats;
+  const day = PLANS.free.counters.messages;
   if (n === null) return 'Every line of thinking, free.';
-  return `${spell(n)} line${n === 1 ? '' : 's'} of thinking a month, free. Socria One for every one after.`;
+  const month = `${spell(n)} line${n === 1 ? '' : 's'} of thinking a month`;
+  const each = day === null ? '' : ` and ${day} message${day === 1 ? '' : 's'} a day`;
+  return `${month}${each}, free. Socria One for everything after.`;
 }
 
 /** The next turn of the showcase, remembered so the following opening shows another. */

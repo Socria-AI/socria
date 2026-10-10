@@ -6,10 +6,11 @@
 // asserted them one by one, which meant it was the thing standing behind a
 // free tier nobody could watch be good.
 //
-// It asserts the SHAPE now rather than a list of figures: that inside a line
-// of thinking the two plans are identical, that exactly the rows the product
-// is sold on differ, and — the assertion that keeps the copy honest — that no
-// boundary note offers Socria One at a ceiling Socria One also has.
+// It asserts the SHAPE now rather than a list of figures: that what Socria
+// can do is identical on both plans, that exactly the rows the product is sold
+// on differ — conversations and messages, by the month and by the day — and,
+// the assertion that keeps the copy honest, that no boundary note offers
+// Socria One at a ceiling Socria One also has.
 
 import {
   PLANS,
@@ -49,11 +50,15 @@ console.log('=== the axis: what differs is volume, not quality ===');
     f.memoryTurns === null && o.memoryTurns === null);
 }
 
-console.log('\n=== ...and exactly these rows differ: chats, memory, document size ===');
+console.log('\n=== ...and exactly these rows differ: conversations, messages, memory, document size ===');
 {
-  ok('two free lines of thinking a month', f.counters.chats === 2);
-  ok('chats is the only tiered counter',
-    TIERED_COUNTERS.length === 1 && TIERED_COUNTERS[0] === 'chats');
+  ok('two free lines of thinking a month in Logos', f.counters.chats === 2);
+  ok('ten free Logos messages a day', f.counters.messages === 10 && COUNTER_SCOPE.messages === 'day');
+  ok('four free new chats a day in Core', f.counters['core-chats'] === 4 && COUNTER_SCOPE['core-chats'] === 'day');
+  ok('twenty free Core messages a day', f.counters['core-messages'] === 20 && COUNTER_SCOPE['core-messages'] === 'day');
+  ok('Socria One counts none of the day', o.counters.messages === null && o.counters['core-chats'] === null && o.counters['core-messages'] === null);
+  ok('the conversations and the messages are the tiered counters',
+    TIERED_COUNTERS.join() === 'chats,messages,core-chats,core-messages');
   ok('TIERED_COUNTERS is the truth, not a comment',
     COUNTERS.filter((c) => f.counters[c] !== o.counters[c]).join() === TIERED_COUNTERS.join());
   ok('One holds far more of them', (o.counters.chats ?? 0) >= 100);
@@ -104,9 +109,11 @@ console.log('\n=== the fair-use ceilings are guards, not boundaries ===');
 
 console.log('\n=== scopes ===');
 {
+  const daily = ['messages', 'core-chats', 'core-messages'];
   ok('chats reset monthly', COUNTER_SCOPE.chats === 'month');
+  ok('the messages and Core\'s chats reset daily', daily.every((c) => COUNTER_SCOPE[c] === 'day'));
   ok('everything else lives with one conversation',
-    COUNTERS.filter((c) => c !== 'chats').every((c) => COUNTER_SCOPE[c] === 'chat'));
+    COUNTERS.filter((c) => c !== 'chats' && !daily.includes(c)).every((c) => COUNTER_SCOPE[c] === 'chat'));
 }
 
 console.log('\n=== the boundary is said calmly, and only sold where there is something to sell ===');
@@ -121,6 +128,11 @@ console.log('\n=== the boundary is said calmly, and only sold where there is som
   // to pay: offering somebody a thing they already hold, at the exact moment
   // they are annoyed, is the most expensive sentence in the product.
   ok('the month names One', boundaryNote('chats').includes('Socria One keeps as many'));
+  // The day's boundaries say what was used, that nothing is lost and it comes
+  // back, and that Socria One lifts it — with the numbers read from the table.
+  ok('the Logos day: its number, what stays, and One', /today’s 10 Logos messages/.test(boundaryNote('messages')) && /stay open/.test(boundaryNote('messages')) && /tomorrow/.test(boundaryNote('messages')) && /Upgrade to Socria One/.test(boundaryNote('messages')), boundaryNote('messages'));
+  ok('Core\'s new chats: its number, that started chats stay open, and One', /today’s 4 new chats/.test(boundaryNote('core-chats')) && /stay open/.test(boundaryNote('core-chats')) && /Upgrade to Socria One/.test(boundaryNote('core-chats')), boundaryNote('core-chats'));
+  ok('Core\'s messages: its number, that nothing is lost, and One', /today’s 20 messages/.test(boundaryNote('core-messages')) && /tomorrow/.test(boundaryNote('core-messages')) && /Upgrade to Socria One/.test(boundaryNote('core-messages')), boundaryNote('core-messages'));
   for (const c of shared) {
     const note = boundaryNote(c);
     ok(`${c}: does not offer One as the fix`, !/Socria One (gives|opens|lets|grounds|reads|keeps)/.test(note), note);
@@ -156,9 +168,9 @@ console.log('\n=== a line of thinking costs one, however many times it is sent =
   ok('being charged twice for one would read as spent',
     isSpent('free', 'chats', 2) && remaining('free', 'chats', 2) === 0);
 
-  // Core is not metered by this counter at all — it has no chats limit to
-  // spend, and nothing outside the Logos route may spend one.
-  ok('Core 3.1 is free and unmetered by chats', PLANS.free.counters.chats === 2);
+  // Core is not metered by THIS counter: it has its own (core-chats, by the
+  // day), and nothing outside the Logos route may spend a Logos chat.
+  ok('Core counts its own chats, not Logos\'s', PLANS.free.counters.chats === 2 && PLANS.free.counters['core-chats'] === 4);
   ok('a member is not stopped', !isSpent('one', 'chats', 50));
 }
 

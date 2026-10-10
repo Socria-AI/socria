@@ -9,10 +9,14 @@
 // someone, resetting the link — is on the same sheet and needs no tutorial.
 //
 // It decides nothing. Every change is a request to /api/share, which checks
-// the role and the plan on the server; this only draws what came back.
+// the role and the plan on the server; this only draws what came back — and
+// that includes the free plan's one shared chat: the server says whether this
+// owner may open a door here, and if not, which chat they already share.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { ROLE_WORD, showCode, type GrantRole, type ResourceType, type Role } from '@/lib/share/roles';
+import {
+  ROLE_WORD, hostRefusalNote, showCode, type GrantRole, type HostRefusal, type ResourceType, type Role,
+} from '@/lib/share/roles';
 import './share.css';
 
 interface Member {
@@ -31,6 +35,12 @@ interface State {
   members: Member[];
   owner: { name: string; you: boolean };
   mayHost: boolean;
+  /** the owner's plan, for the owner only */
+  plan?: 'free' | 'one';
+  /** why this owner may not open a door here, when they may not */
+  refusal?: HostRefusal;
+  /** the chat a free owner already shares, with where it opens */
+  sharing?: { type: ResourceType; id: string; title: string; open: string } | null;
   emails: boolean;
 }
 
@@ -105,7 +115,9 @@ export function ShareDialog({
       });
       const j = await res.json().catch(() => null);
       if (res.status === 402) {
+        // the server says why: a Project, or the one chat already shared
         setNeedsOne(true);
+        setState((s) => (s ? { ...s, mayHost: false, refusal: j?.refusal ?? s.refusal, sharing: j?.sharing ?? s.sharing ?? null } : s));
         return null;
       }
       if (!res.ok) throw new Error(j?.error || 'That could not be changed.');
@@ -166,13 +178,24 @@ export function ShareDialog({
 
         {state && (
           <>
-            {(needsOne || (owner && !state.mayHost)) && (
+            {owner && (needsOne || !state.mayHost) && (
               <div className="sh-one">
                 <p>
-                  <b>Sharing is part of Socria One.</b> Anyone you invite joins for free.
+                  {state.refusal ? hostRefusalNote(state.refusal, state.sharing ? state.sharing.title || 'Untitled' : null) : 'Sharing this is part of Socria One.'}{' '}
+                  Anyone you invite joins for free.
                 </p>
+                {state.sharing && (
+                  <a className="sh-btn ghost" href={state.sharing.open}>Open “{state.sharing.title || 'Untitled'}”</a>
+                )}
                 {onUpgrade && <button className="sh-btn" onClick={onUpgrade}>Get Socria One</button>}
               </div>
+            )}
+            {owner && state.mayHost && state.plan === 'free' && (
+              <p className="sh-quiet sh-freeline">
+                {state.members.length > 0 || state.link || state.code
+                  ? 'This is the one chat you can share on the free plan. Stop sharing it to share another — or Socria One shares as many as you like.'
+                  : 'On the free plan you can share one chat at a time.'}
+              </p>
             )}
 
             {owner && (

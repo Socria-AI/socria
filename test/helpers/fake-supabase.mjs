@@ -38,7 +38,14 @@ export const db = {
   absent: new Set(),
   /** every write, in order, for tests that care about sequencing */
   log: [],
-  reset() { this.tables = {}; this.missing = {}; this.absent = new Set(); this.log = []; },
+  /**
+   * Database functions a test supplies (`db.rpcs.bump_logos_usage = …`). A
+   * suite that supplies none sees what every suite always saw — an rpc that
+   * answers nothing — so counting is opt-in and no older suite starts meeting
+   * a limit it never asked about.
+   */
+  rpcs: {},
+  reset() { this.tables = {}; this.missing = {}; this.absent = new Set(); this.log = []; this.rpcs = {}; },
   rows(t) { return (this.tables[t] ??= []); },
 };
 
@@ -174,7 +181,7 @@ class Query {
 
 const client = {
   from: (t) => new Query(t),
-  rpc: async () => ({ data: null, error: null }),
+  rpc: async (name, args) => (typeof db.rpcs?.[name] === 'function' ? db.rpcs[name](args ?? {}) : { data: null, error: null }),
 };
 
 export function supabaseAdmin() {

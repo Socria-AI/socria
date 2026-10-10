@@ -291,6 +291,45 @@ export async function shareAccess(userId: string, type: ResourceType, id: string
   return best;
 }
 
+/** A thing an owner has open to other people right now. */
+export interface OpenShare {
+  type: ResourceType;
+  id: string;
+  title: string;
+  kind: ResourceInfo['kind'];
+}
+
+/**
+ * Everything of this kind the owner has open to other people now — a link
+ * on, a code on, or anybody in it, an invitation not yet accepted included.
+ * The free plan shares one chat at a time (lib/share/roles.ts hostRefusal),
+ * and this is the count it is held to. A share left behind by a conversation
+ * that has since been deleted opens nothing, and is not counted.
+ */
+export async function openShares(ownerId: string, type: ResourceType): Promise<OpenShare[]> {
+  const db = supabaseAdmin();
+  const { data, error } = await db.from('shares').select('*').eq('owner_id', ownerId).eq('resource_type', type);
+  if (error) {
+    if (missing(error)) return [];
+    throw error;
+  }
+  const rows = ((data ?? []) as Record<string, unknown>[]).map(rowToShare);
+  if (!rows.length) return [];
+  const peopled = new Set<string>();
+  const m = await db.from('share_members').select('share_id').in('share_id', rows.map((s) => s.id)).is('removed_at', null);
+  if (m.error && !missing(m.error)) throw m.error;
+  for (const r of (m.data ?? []) as { share_id: string }[]) peopled.add(String(r.share_id));
+  const out: OpenShare[] = [];
+  for (const s of rows) {
+    // the same test isShared uses: a door is open if anybody could walk through it
+    if (!s.linkRole && !s.code && !peopled.has(s.id)) continue;
+    const info = await resourceInfo(s.resourceType, s.resourceId).catch(() => null);
+    if (!info || info.ownerId !== ownerId) continue;
+    out.push({ type: s.resourceType, id: s.resourceId, title: info.title, kind: info.kind });
+  }
+  return out;
+}
+
 /** Whether anybody besides the owner can reach it — memory goes quiet if so. */
 export async function isShared(type: ResourceType, id: string): Promise<boolean> {
   const info = await resourceInfo(type, id).catch(() => null);

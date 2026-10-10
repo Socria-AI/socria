@@ -30,7 +30,8 @@ console.log('=== the terms are the plan table’s ===');
 {
   const n = PLANS.free.counters.chats;
   ok('the free month is two lines of thinking', n === 2, `${n}`);
-  ok('and the cover says so, in words', freeTerms() === 'Two lines of thinking a month, free. Socria One for every one after.', freeTerms());
+  ok('  and the free day ten messages', PLANS.free.counters.messages === 10, `${PLANS.free.counters.messages}`);
+  ok('and the cover says both, the month in words', freeTerms() === 'Two lines of thinking a month and 10 messages a day, free. Socria One for everything after.', freeTerms());
   ok('  read from the table, not written down', !/'Two lines of thinking/.test(read('components/LogosCover.tsx')));
 }
 
@@ -121,7 +122,7 @@ console.log('=== rendered ===');
   ok('the Logos 3 gate renders', !g3.threw, g3.threw?.message);
   ok('  with its title', /Watch it get built\./.test(g3.html));
   ok('  a request somebody could type, and its name', g3.html.includes(COVER_SHOWCASE[0].title) && /class="l2-said"/.test(g3.html));
-  ok('  the terms', /Two lines of thinking a month, free\./.test(g3.html));
+  ok('  the terms', /Two lines of thinking a month and 10 messages a day, free\./.test(g3.html));
   ok('  the way in, by name', /Sign in to open Logos 3/.test(g3.html) && /href="\/sign-in"/.test(g3.html) && !/Logos 2/.test(g3.html));
   ok('  the key, behind a disclosure', /Have an access key\?/.test(g3.html));
   ok('  and no sheet behind it', !/core3-modal-backdrop/.test(g3.html));

@@ -54,26 +54,38 @@ export function chatMarkerScope(sessionId: string): string {
 }
 
 /**
- * Fold the rows for the month AND the open conversation into one map.
+ * The day a daily counter belongs to, in UTC: `day:2026-10-10`.
+ *
+ * UTC and not the person's zone, deliberately — a zone is caller-supplied, and
+ * a limit that resets whenever the browser says so is not a limit. Prefixed so
+ * it can never be read as a month (`2026-10`) or a conversation.
+ */
+export function dayKey(at = Date.now()): string {
+  return `day:${new Date(at).toISOString().slice(0, 10)}`;
+}
+
+/**
+ * Fold the rows for the month, the day AND the open conversation into one map.
  *
  * A row only speaks for a counter when it sits in that counter's OWN home
- * scope: monthly counters are read from the month, per-conversation counters
- * from the conversation. Anything else — a marker, a stale row, a counter a
- * later version writes and this one does not know — is skipped rather than
- * trusted, because the alternative is silently overwriting a real number with
- * an unrelated one.
+ * scope: monthly counters are read from the month, daily counters from the
+ * day, per-conversation counters from the conversation. Anything else — a
+ * marker, yesterday's row, a counter a later version writes and this one does
+ * not know — is skipped rather than trusted, because the alternative is
+ * silently overwriting a real number with an unrelated one.
  */
 export function foldUsageRows(
   rows: readonly UsageRow[] | null | undefined,
   month: string,
-  chatScope: string | null
+  chatScope: string | null,
+  day: string | null = null
 ): Record<string, number> {
   const out: Record<string, number> = {};
   for (const row of rows ?? []) {
     if (!row || typeof row.counter !== 'string' || typeof row.scope !== 'string') continue;
     const declared = COUNTER_SCOPE[row.counter as Counter];
     if (!declared) continue;
-    const home = declared === 'month' ? month : chatScope;
+    const home = declared === 'month' ? month : declared === 'day' ? day : chatScope;
     if (!home || row.scope !== home) continue;
     if (typeof row.n !== 'number' || !Number.isFinite(row.n)) continue;
     out[row.counter] = row.n;
