@@ -37,6 +37,7 @@ import { useMemo, useState } from 'react';
 import Link from 'next/link';
 import { Logo } from './Logo';
 import { RewardsBadges } from './rewards/RewardsBadges';
+import { FEEDBACK_URL } from '@/lib/feedback';
 import { MapGlyph } from './MapGlyph';
 import { NodeTile } from './NodeTile';
 import { relTime, type LogosSession } from '@/lib/logos-sessions';
@@ -72,6 +73,13 @@ const MEMORY_ICON = (
     <circle cx="17.5" cy="8.5" r="2.3" />
     <circle cx="11" cy="17.5" r="2.3" />
     <path d="M8.8 7.3l6.4.9M7.4 9.1l2.7 6.3M16.2 10.4l-3.9 5.2" />
+  </svg>
+);
+// The foot's Feedback row: a speech bubble, in the same hand as the others.
+const FEEDBACK_ICON = (
+  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z" />
+    <path d="M8 10h8M8 13h5" />
   </svg>
 );
 const PLUS_ICON = (
@@ -574,15 +582,19 @@ export function LogosRail({
       </div>
 
       <div className="s-foot">
-        {/* The same rows, in the same style, as the Core rail's foot. Memory
-            only: importing history from other AIs feeds Core's answers, not
+        {/* The same rows, in the same style, as the Core rail's foot, less
+            one: importing history from other AIs feeds Core's answers, not
             Logos's, so it is offered where it does something. /memory IS the
             Mind Graph, and the older Cores' Journey is on that page too. */}
-        <nav className="s-foot-nav" aria-label="Memory">
+        <nav className="s-foot-nav" aria-label="Memory and feedback">
           <Link href="/memory" className="s-link">
             {MEMORY_ICON}
             <span>Memory</span>
           </Link>
+          <a href={FEEDBACK_URL} target="_blank" rel="noopener noreferrer" className="s-link" title="Tell us what is wrong, or what is missing">
+            {FEEDBACK_ICON}
+            <span>Send feedback</span>
+          </a>
         </nav>
       </div>
     </aside>

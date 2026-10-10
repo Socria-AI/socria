@@ -1,9 +1,10 @@
 // The sidebar's foot, in the Core rail and the Logos rail.
 //
-// Socria One's card, then two rows and nothing else: Import your history (the
-// existing import) and Memory (/memory, the Mind Graph). No sync tagline, no
-// second sign-in line, no feedback link: signing in is offered at the top of
-// the rail and in the header, and feedback lives under Manage Account.
+// Socria One's card, then three rows and nothing else: Import your history
+// (the existing import), Memory (/memory, the Mind Graph) and Send feedback
+// (the form, in a new tab — it is under Manage Account too). No sync tagline
+// and no second sign-in line: signing in is offered at the top of the rail and
+// in the header.
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -31,18 +32,21 @@ function footOf(src) {
 const rows = (foot) => [...foot.matchAll(/className="s-link"[\s\S]*?<span>([^<]+)<\/span>/g)].map((m) => m[1].trim());
 /** What a person can see: no comments, no hover titles. */
 const shown = (foot) => foot.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\stitle="[^"]*"/g, '');
-const clutter = /s-vow|s-feedback|FEEDBACK_URL|Send feedback|Synced across|Kept in this browser|Nothing here is sent|Sign in to sync|from other AIs|className="(?:yes|no)"/;
+const clutter = /s-vow|s-feedback|Synced across|Kept in this browser|Nothing here is sent|Sign in to sync|from other AIs|className="(?:yes|no)"/;
+/** The feedback row: the one form, in a new tab, never the opener's window. */
+const feedbackRow = (foot) => /<a\s+href=\{FEEDBACK_URL\}\s+target="_blank"\s+rel="noopener noreferrer"\s+className="s-link"/.test(foot);
 
 console.log('=== the Core rail ===');
 {
   const foot = footOf(read('app/chat/page.tsx'));
   ok('the foot is found', foot.length > 0);
   ok('Socria One\'s card stays, when the plan is known', /planState\.known && <OneFoot state=\{planState\} \/>/.test(foot));
-  ok('two rows: Import your history, then Memory', JSON.stringify(rows(foot)) === '["Import your history","Memory"]', JSON.stringify(rows(foot)));
+  ok('three rows: Import your history, Memory, Send feedback', JSON.stringify(rows(foot)) === '["Import your history","Memory","Send feedback"]', JSON.stringify(rows(foot)));
+  ok('feedback opens the one form, in a new tab', feedbackRow(foot) && /import \{ FEEDBACK_URL \} from '@\/lib\/feedback'/.test(read('app/chat/page.tsx')));
   ok('Import opens the existing import', /setImportOpen\(true\)/.test(foot));
   ok('Memory goes to /memory', /<Link href="\/memory" className="s-link"/.test(foot));
   ok('imported history in use is a dot, not a sentence', /importedProfile && \(\s*<span className="s-link-on">/.test(foot));
-  ok('no tagline, no sign-in line, no feedback link, no second line of description', !clutter.test(shown(foot)), (shown(foot).match(clutter) ?? [])[0]);
+  ok('no tagline, no sign-in line, no second line of description', !clutter.test(shown(foot)), (shown(foot).match(clutter) ?? [])[0]);
 }
 
 console.log('\n=== the Logos rail ===');
@@ -50,9 +54,10 @@ console.log('\n=== the Logos rail ===');
   const src = read('components/LogosRail.tsx');
   const foot = footOf(src);
   ok('the foot is found', foot.length > 0);
-  ok('Memory alone: importing feeds Core, not Logos', JSON.stringify(rows(foot)) === '["Memory"]', JSON.stringify(rows(foot)));
+  ok('Memory, then Send feedback: importing feeds Core, not Logos', JSON.stringify(rows(foot)) === '["Memory","Send feedback"]', JSON.stringify(rows(foot)));
+  ok('feedback opens the one form, in a new tab', feedbackRow(foot) && /import \{ FEEDBACK_URL \} from '@\/lib\/feedback'/.test(src));
   ok('Memory goes to /memory', /<Link href="\/memory" className="s-link"/.test(foot));
-  ok('no tagline and no feedback link', !clutter.test(shown(foot)), (shown(foot).match(clutter) ?? [])[0]);
+  ok('no tagline', !clutter.test(shown(foot)), (shown(foot).match(clutter) ?? [])[0]);
   ok('nor the prop that only the tagline read', !/\bcloud\b/.test(src));
 }
 
@@ -61,7 +66,7 @@ console.log('\n=== feedback, under Manage Account ===');
   const sheet = read('components/account/AccountSheet.tsx');
   ok('the account sheet links to the feedback form', /import \{ FEEDBACK_URL \} from '@\/lib\/feedback'/.test(sheet) && /<a className="act" href=\{FEEDBACK_URL\} target="_blank" rel="noopener noreferrer"/.test(sheet));
   ok('in a section of its own', /<span className="lbl">Feedback<\/span>/.test(sheet));
-  ok('and nowhere in either rail', !/FEEDBACK_URL/.test(read('app/chat/page.tsx')) && !/FEEDBACK_URL/.test(read('components/LogosRail.tsx')));
+  ok('and in both rails\' feet, the same constant', [read('app/chat/page.tsx'), read('components/LogosRail.tsx')].every((src) => /href=\{FEEDBACK_URL\}/.test(footOf(src))));
 }
 
 console.log('\n=== signing out, from the account page ===');
