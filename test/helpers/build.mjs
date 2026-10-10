@@ -237,6 +237,7 @@ const MODULES = [
   // Logos 3.5 — the everyday displays (objects of thought)
   'lib/objects/display-base.ts',
   'lib/objects/display-plan.ts',
+  'components/display/PlanFigure.tsx',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',

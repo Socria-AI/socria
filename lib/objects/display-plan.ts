@@ -178,9 +178,9 @@ export function clashes(s: PlanState): Clash[] {
   return out;
 }
 
+/** How much is done. Everything in the plan counts: what has no status yet is still to do, as the board shows it. */
 export function progress(s: PlanState): { done: number; total: number } {
-  const tracked = s.items.filter((i) => i.status);
-  return { done: tracked.filter((i) => i.status === 'done').length, total: tracked.length || s.items.length };
+  return { done: s.items.filter((i) => i.status === 'done').length, total: s.items.length };
 }
 
 /** The first and last days the plan covers, or null when nothing is dated. */
@@ -229,6 +229,56 @@ export function timelineBars(s: PlanState, minWidth = 0.012): { bars: TimelineBa
     bars.push({ id: i.id, x0, x1, row, lane });
   }
   return { bars, lanes, span: sp };
+}
+
+/**
+ * Ticks for a timeline's axis, as calendar days with their place along the
+ * span (0..1): days for a short span, Mondays for a few months, the first of
+ * each month beyond that, every other month past a year and a half.
+ */
+export function planTicks(sp: { start: string; end: string; days: number }, max = 8): { day: string; x: number; label: string }[] {
+  const total = Math.max(1, sp.days);
+  const out: { day: string; x: number; label: string }[] = [];
+  const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+  const push = (day: string, label: string) => {
+    const x = dayDiff(sp.start, day) / total;
+    if (x >= -1e-9 && x <= 1 + 1e-9) out.push({ day, x: Math.min(1, Math.max(0, x)), label });
+  };
+  if (sp.days <= 21) {
+    const step = Math.max(1, Math.ceil((sp.days + 1) / max));
+    for (let d = 0; d <= sp.days; d += step) {
+      const day = addDays(sp.start, d);
+      push(day, `${Number(day.slice(8))} ${MON[Number(day.slice(5, 7)) - 1]}`);
+    }
+    return out;
+  }
+  if (sp.days <= 120) {
+    const dow = new Date(`${sp.start}T00:00:00Z`).getUTCDay();
+    let day = addDays(sp.start, (8 - dow) % 7); // the first Monday on or after the start
+    const weeks = Math.ceil(sp.days / 7);
+    const step = Math.max(1, Math.ceil(weeks / max));
+    for (; dayDiff(day, sp.end) >= 0; day = addDays(day, 7 * step)) push(day, `${Number(day.slice(8))} ${MON[Number(day.slice(5, 7)) - 1]}`);
+    return out;
+  }
+  const months = Math.ceil(sp.days / 30.4);
+  const step = months > 18 ? Math.ceil(months / max) : Math.max(1, Math.ceil(months / max));
+  let y = Number(sp.start.slice(0, 4));
+  let m = Number(sp.start.slice(5, 7)); // the month after the start's (its 1st is on or after the start)
+  if (sp.start.slice(8) !== '01') m += 1;
+  let saidYear = 0;
+  for (let i = 0; i < 400; i += 1) {
+    if (m > 12) {
+      y += Math.floor((m - 1) / 12);
+      m = ((m - 1) % 12) + 1;
+    }
+    const day = `${y}-${String(m).padStart(2, '0')}-01`;
+    if (dayDiff(day, sp.end) < 0) break;
+    // the year is said on the first tick and wherever it turns
+    push(day, y !== saidYear ? `${MON[m - 1]} ${y}` : MON[m - 1]);
+    saidYear = y;
+    m += step;
+  }
+  return out;
 }
 
 const itemSaid = (s: PlanState, id: string) => `‘${s.items.find((i) => i.id === id)?.text ?? id}’`;

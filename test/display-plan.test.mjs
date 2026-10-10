@@ -70,7 +70,7 @@ console.log('\n=== what is computed ===');
   const late = sanitizePlan({ ...semester, items: semester.items.map((i) => (i.id === 'i2' ? { ...i, date: '2026-10-20' } : i)) });
   const c = clashes(late);
   ok('a draft dated inside its own research is a clash', c.length === 1 && c[0].item === 'i2' && c[0].waitsOn === 'i1' && c[0].by === 3, JSON.stringify(c));
-  ok('progress counts what has a status', progress(s).total === 2 && progress(s).done === 0);
+  ok('progress counts every item, and what has no status is still to do', progress(s).total === 5 && progress(s).done === 0);
   ok('the span is first to last day', span(s).start === '2026-10-12' && span(s).end === '2026-10-26' && span(s).days === 14);
   const tb = timelineBars(s);
   ok('every dated item has a bar', tb.bars.length === 4);

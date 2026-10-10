@@ -32,34 +32,21 @@ import { planOf } from '@/lib/objects/scene-plan';
 import { sampleAdaptive } from '@/lib/logos-viz';
 import { analyseMatrix } from '@/lib/objects/matrix-analysis';
 import type { SceneState } from '@/lib/objects/scene';
+import { figureFor, registerFigure, type FigureMode, type FigureProps } from './figures';
+// the everyday displays (Logos 3.5) register their figures beside their kinds
+import '@/components/display/register';
 import './objects.css';
 
-export type FigureMode = 'live' | 'trail' | 'card';
+export type { FigureMode, FigureProps } from './figures';
 
-export interface FigureProps {
-  obj: ThoughtObject;
-  at: number;
-  mode: FigureMode;
-  guarded?: boolean;
-  /** the selected part of THIS object, if any ('r2', 'e2.1', 'p:a') */
-  sel?: string | null;
-  onSelect?: (part: string | null) => void;
-  /** an operation the person chose; the answer is whether it was computed, and why not if not */
-  onOp?: (op: string, args: Record<string, string | number>, suggested?: boolean) => { ok: boolean; why?: string };
-  /** put a sentence into the chat box, to be finished and sent there — the caret at `caret` */
-  onDraft?: (text: string, caret?: number) => void;
-  onSeek?: (at: number) => void;
-  /** operations Socria suggested, offered — never applied by themselves */
-  suggestions?: { op: string; args: Record<string, string | number>; said: string }[];
-  /** open a view that lives elsewhere (a 2 × 2 matrix on the plane) */
-  onView?: (view: string) => void;
-}
-
+/**
+ * An object of thought, drawn by the figure its kind registered
+ * (components/objects/figures.ts) — no switch on kind names here, so a new
+ * kind is a registry entry, not an edit to this file.
+ */
 export function ObjectFigure(p: FigureProps) {
-  if (p.obj.kind === 'matrix') return <MatrixFigure {...p} />;
-  if (p.obj.kind === 'function') return <FunctionFigure {...p} />;
-  if (p.obj.kind === 'scene') return <SceneFigure {...p} />;
-  return null;
+  const Figure = figureFor(p.obj.kind);
+  return Figure ? <Figure {...p} /> : null;
 }
 
 // ── scene ────────────────────────────────────────────────────────────
@@ -623,3 +610,7 @@ function FunctionFigure({ obj, at, mode, guarded, sel, onSelect, onOp, onDraft, 
     </div>
   );
 }
+
+registerFigure('matrix', MatrixFigure);
+registerFigure('function', FunctionFigure);
+registerFigure('scene', SceneFigure);
