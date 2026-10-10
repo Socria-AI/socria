@@ -260,7 +260,20 @@ export interface VizFrame {
   caption: string;
   /** while the guard is up: the noticing the visual is asking them to do */
   ask?: string;
+  /**
+   * What each axis measures, said on the axis — "Quantity" and "Price" on a
+   * market, the two goods on a frontier. A diagram whose axes are unnamed
+   * cannot be read; the frame carries the names so every renderer draws them.
+   */
+  axes?: { x: string; y: string };
 }
+
+/** What a kind's axes measure when the scene does not say: the conventions of the diagram itself. */
+export const AXIS_DEFAULTS: Partial<Record<string, { x: string; y: string }>> = {
+  'supply-demand': { x: 'Quantity', y: 'Price' },
+  'ad-as': { x: 'Real output', y: 'Price level' },
+  ppc: { x: 'good X', y: 'good Y' },
+};
 
 // ── the open kind's parts ───────────────────────────────────────────
 //
@@ -4451,12 +4464,14 @@ export function buildFrame(
   const frame = KINDS[scene.kind](scene, fn, vals, view, guarded);
   const extra = overlayObjects(scene, vals, view);
   const objects = extra.length ? [...frame.objects, ...extra] : frame.objects;
+  // the axes are named where the scene names them, else by the diagram's own conventions
+  const axes = frame.axes ?? scene.axes ?? AXIS_DEFAULTS[scene.kind];
   // Ids become React keys, and a duplicate key silently drops a mark from the
   // screen. Builders compose their ids from parameter names — an expression
   // with a coefficient called `fa` collides with the `fa` readout — so rather
   // than asking every builder to be careful, uniqueness is enforced once,
   // here, on the one path every frame takes.
-  return { ...frame, objects: uniqueById(objects), readouts: uniqueById(frame.readouts) };
+  return { ...frame, objects: uniqueById(objects), readouts: uniqueById(frame.readouts), ...(axes ? { axes } : {}) };
 }
 
 function uniqueById<T extends { id: string }>(items: T[]): T[] {
@@ -5390,7 +5405,9 @@ function econFields(kind: VizKind, raw: any): Partial<VizScene> {
   if (raw?.axes && typeof raw.axes === 'object') {
     const nm = (v: any, d: string) =>
       typeof v === 'string' && v.trim() ? v.trim().slice(0, 40) : d;
-    out.axes = { x: nm(raw.axes.x, 'good X'), y: nm(raw.axes.y, 'good Y') };
+    // a side the scene leaves unnamed takes the diagram's own convention, not another diagram's
+    const d = AXIS_DEFAULTS[kind] ?? { x: 'x', y: 'y' };
+    out.axes = { x: nm(raw.axes.x, d.x), y: nm(raw.axes.y, d.y) };
   }
 
   return out;

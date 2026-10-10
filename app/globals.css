@@ -6240,6 +6240,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-viz-grid { stroke: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07); stroke-width: 1; }
 .logos-root .lg-viz-axis { stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.32); stroke-width: 1.2; }
 .logos-root .lg-viz-tick { fill: var(--lg-ink-40); font-size: 10px; }
+.logos-root .lg-viz-axis-names text { fill: var(--lg-ink-60); font-size: 11px; font-style: italic; font-family: var(--serif, Georgia, serif); paint-order: stroke; stroke: var(--lg-paper, #f6f3ec); stroke-width: 3px; pointer-events: none; }
 .logos-root .lg-viz-lab {
   font-family: var(--lg-stix);
   font-size: 11.5px;

@@ -869,6 +869,18 @@ export function MathViz({
             </text>
           ))}
 
+          {/* what each axis measures — a market's quantity and price, a frontier's two goods */}
+          {frame.axes && (
+            <g className="lg-viz-axis-names">
+              <text x={PAD.l + plotW} y={PAD.t + plotH - 6} textAnchor="end">
+                {frame.axes.x}
+              </text>
+              <text x={PAD.l + 6} y={PAD.t + 12} textAnchor="start">
+                {frame.axes.y}
+              </text>
+            </g>
+          )}
+
           <g clipPath={`url(#${clipId})`}>
             {/* Every mark wrapped in its id. One group per object is the whole
                 cost of being able to answer "what is this?" about it, and it

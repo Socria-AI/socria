@@ -100,6 +100,30 @@ export function resolveGuard(input: unknown): GuardSignal {
   return input === 'guard' || input === 'reveal' ? input : '';
 }
 
+/** Diagrams whose readings are the exercise: a market's equilibrium and its tax wedge, a frontier's trade-off, AD–AS. */
+const PRACTICE_SCENES = new Set(['supply-demand', 'ppc', 'ad-as']);
+
+/**
+ * Does the Answer Guard watch this line of thinking?
+ *
+ * Learning mathematics, as it always has. Studying economics with a market,
+ * a frontier or AD–AS on screen — the prediction the diagram asks for ("what
+ * happens to the price when the tax rises?") never showed, because the guard
+ * was mathematics-only and the caption gave the answer instead. And any line
+ * holding a display the person practises in (a worksheet, an exercise),
+ * which checks their own answers and must not be answered around. Never for
+ * a conversation that is only learning ABOUT something: that is not a
+ * problem with an answer to withhold. The person can always reveal.
+ */
+export function guardWatches(
+  map: { context?: string | null; intent?: string | null; viz?: { kind?: string } | null },
+  practising = false
+): boolean {
+  if (map.context === 'math' && map.intent === 'learning') return true;
+  if (map.context === 'learning' && !!map.viz?.kind && PRACTICE_SCENES.has(map.viz.kind)) return true;
+  return practising;
+}
+
 /**
  * The depth + guard text to append to a surface's system prompt. 'chat' gets
  * the full progressive-assistance ladder; every other surface gets the

@@ -102,7 +102,7 @@ import {
   type SocriaModel,
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
-import type { GuardSignal } from '@/lib/logos-guidance';
+import { guardWatches, type GuardSignal } from '@/lib/logos-guidance';
 import { MAX_STYLE, STYLE_CHANGED, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
 import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
@@ -768,12 +768,11 @@ export function LogosApp({
   // The Answer Guard is one shared state: on only while LEARNING math and the
   // person hasn't chosen to reveal this session's solution. Every surface reads
   // the same signal, so Chat can't hide an answer that the map or board leaks.
-  const guard: GuardSignal =
-    map.context === 'math' && map.intent === 'learning'
-      ? revealedIds.has(activeId ?? '')
-        ? 'reveal'
-        : 'guard'
-      : '';
+  const guard: GuardSignal = guardWatches(map, (map.objects?.objs ?? []).some((o) => !!displayMeta(o.kind)?.practice))
+    ? revealedIds.has(activeId ?? '')
+      ? 'reveal'
+      : 'guard'
+    : '';
   const guarded = guard === 'guard';
   // async closures (refreshMap, sends) read the latest through refs
   const depthRef = useRef<ThinkingDepth>('balanced');
@@ -3844,6 +3843,7 @@ export function LogosApp({
             last={sceneLastRef.current}
             onSuggest={(text) => draftToComposer(text)}
             readOnly={togetherReadOnly}
+            guarded={guarded}
           />
         );
       }
