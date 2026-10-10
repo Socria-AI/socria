@@ -328,7 +328,7 @@ export function ShareDialog({
 }
 
 /** "Join with a code" — eight characters, then straight in. */
-export function JoinWithCode({ onDone }: { onDone?: () => void }) {
+export function JoinWithCode({ onDone, autoFocus = false }: { onDone?: () => void; autoFocus?: boolean }) {
   const [code, setCode] = useState('');
   const [err, setErr] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -355,6 +355,7 @@ export function JoinWithCode({ onDone }: { onDone?: () => void }) {
         onChange={(e) => setCode(e.target.value.toUpperCase())}
         placeholder="ABCD-EFGH"
         aria-label="Invite code"
+        autoFocus={autoFocus}
         maxLength={9}
         autoCapitalize="characters"
         spellCheck={false}
@@ -362,5 +363,36 @@ export function JoinWithCode({ onDone }: { onDone?: () => void }) {
       <button type="submit" disabled={busy || code.replace(/[^A-Z0-9]/gi, '').length !== 8}>Join</button>
       {err && <span className="sh-join-err" role="alert">{err}</span>}
     </form>
+  );
+}
+
+/**
+ * The code, asked for in a popup — opened from the rail's "Join with a code"
+ * button rather than sitting in the rail as a field. Escape, the backdrop or ×
+ * closes it; a code that opens something goes straight there.
+ */
+export function JoinCodeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
+  useEffect(() => {
+    if (!open) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [open, onClose]);
+  if (!open) return null;
+  return (
+    <div className="sh-scrim" role="dialog" aria-modal="true" aria-label="Join with a code">
+      <div className="sh-back" onClick={onClose} aria-hidden="true" />
+      <div className="sh-sheet sh-joinsheet">
+        <header className="sh-head">
+          <span className="sh-kicker">Shared with you</span>
+          <h2>Join with a code</h2>
+          <button className="sh-x" onClick={onClose} aria-label="Close">×</button>
+        </header>
+        <p className="sh-quiet">The eight-character code someone gave you, for a Project, a conversation or a room.</p>
+        <JoinWithCode onDone={onClose} autoFocus />
+      </div>
+    </div>
   );
 }

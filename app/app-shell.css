@@ -732,5 +732,11 @@
 .app-root .mp-other.on{background:rgba(var(--moss-rgb, 94, 118, 51), .1);color:var(--ink)}
 
 /* Shared with you: the code field sits under the list, quietly */
-.app-root .s-shared .s-joincode{padding:6px 10px 2px}
+/* "Join with a code": a quiet row under New, opening the code popup */
+.app-root .s-joinbtn{display:flex;align-items:center;gap:8px;width:calc(100% - 24px);margin:-4px 12px 12px;padding:7px 12px;
+  border:0;border-radius:8px;background:transparent;font-size:13px;color:var(--ink-70);cursor:pointer;text-align:left;transition:background .15s,color .15s}
+.app-root .s-joinbtn:hover{background:rgba(var(--ink-rgb,31,31,31),.05);color:var(--ink)}
+.app-root .s-joinbtn svg{color:var(--ink-45);flex:0 0 auto}
+.app-root .s-joinbtn:hover svg{color:var(--moss-700)}
+.app-root .s-joinbtn:focus-visible{outline:2px solid var(--moss);outline-offset:1px}
 .app-root .s-shared .n{border-radius:999px;background:var(--moss-100, #e4eada);color:var(--moss-800, #38481f);min-width:18px;text-align:center}

@@ -102,3 +102,9 @@
 .ms-list button{width:100%;display:flex;justify-content:space-between;align-items:center;gap:10px;padding:10px 10px;border:none;border-radius:10px;background:none;font:inherit;font-size:14.5px;color:var(--ink);cursor:pointer;text-align:left}
 .ms-list button:hover{background:rgba(31,31,31,.05)}
 .ms-list i{font-style:normal;font-size:12px;color:var(--moss-700)}
+
+/* "Join with a code", as a popup from the rail */
+.sh-joinsheet{width:min(420px,100%)}
+.sh-joinsheet .sh-quiet{margin:10px 0 14px}
+.sh-joinsheet .sh-join input{font-size:15px;padding:10px 12px}
+.sh-joinsheet .sh-join button{font-size:13px;padding:9px 16px}

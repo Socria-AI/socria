@@ -77,6 +77,19 @@ console.log('\n=== signing out, from the account page ===');
   ok('it clears this browser\'s Socria data before signing out', /clearSocriaLocalData\(\);\s*void signOut\(\{ redirectUrl: '\/' \}\)/.test(panel));
 }
 
+console.log('\n=== joining with a code: a button and a popup ===');
+{
+  const page = read('app/chat/page.tsx');
+  const dialog = read('components/share/ShareDialog.tsx');
+  const iNew = page.indexOf('className="s-new"'), iJoin = page.indexOf('className="s-joinbtn"'), iList = page.indexOf('<div className="s-list">');
+  ok('a "Join with a code" button between New and the Projects', iNew > 0 && iNew < iJoin && iJoin < iList && /Join with a code\s*<\/button>/.test(page));
+  ok('  for somebody signed in', /\{!hydrating && isSignedIn && \(\s*<button type="button" className="s-joinbtn" onClick=\{\(\) => setJoinOpen\(true\)\}/.test(page));
+  ok('  which opens the code popup', /<JoinCodeDialog open=\{joinOpen\} onClose=\{\(\) => setJoinOpen\(false\)\} \/>/.test(page) && /export function JoinCodeDialog/.test(dialog));
+  ok('the popup asks for the code, focused, and closes on Escape', /<JoinWithCode onDone=\{onClose\} autoFocus \/>/.test(dialog) && /e\.key === 'Escape'/.test(dialog) && /aria-label="Join with a code"/.test(dialog));
+  ok('Shared with you no longer carries the field', !/s-joincode|<JoinWithCode \/>/.test(page));
+  ok('nothing else opens over the popup', /acctOpen \|\| importOpen \|\| joinOpen \|\|/.test(page));
+}
+
 console.log('\n=== the style ===');
 {
   const css = read('app/app-shell.css');

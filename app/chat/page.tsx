@@ -75,7 +75,7 @@ import { RewardsBadges } from '@/components/rewards/RewardsBadges';
 import { RewardsPopups } from '@/components/rewards/RewardsPopups';
 import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
-import { JoinWithCode, ShareDialog } from '@/components/share/ShareDialog';
+import { JoinCodeDialog, ShareDialog } from '@/components/share/ShareDialog';
 import { SharedThread } from '@/components/share/SharedThread';
 import { useConversationStyle } from '@/components/useConversationStyle';
 import { limitsFor } from '@/lib/entitlements';
@@ -416,6 +416,8 @@ export default function ChatPage() {
   // starts to matter.
   const [tourOpen, setTourOpen] = useState(false);
   const [acctOpen, setAcctOpen] = useState(false);
+  /** the "Join with a code" popup */
+  const [joinOpen, setJoinOpen] = useState(false);
 
   // ── find in this conversation ──
   // Cmd/Ctrl-F, the shortcut people already have in their hands for exactly
@@ -492,7 +494,7 @@ export default function ChatPage() {
   // under the Logos modal on a first visit. Depending on the real state
   // means the tour simply waits, and opens when the screen is free.
   const anythingOpen =
-    logosModalOpen || core4IntroOpen || acctOpen || importOpen || !!shareInsight;
+    logosModalOpen || core4IntroOpen || acctOpen || importOpen || joinOpen || !!shareInsight;
   // THE TOUR RUNS ONCE, STARTED BY ONBOARDING: after the sentence onboarding
   // sent has been answered (see the effect beside the auto-send). Otherwise
   // it is reachable from the account sheet for anyone who wants the
@@ -2991,6 +2993,7 @@ export default function ChatPage() {
       {/* Socria Rewards: a friend's link opened before sign-up, a friend's first real conversations */}
       <RewardsSync enabled={!!isSignedIn} />
       <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="core" onOpenLogos={openNewestLogos} />
+      <JoinCodeDialog open={joinOpen} onClose={() => setJoinOpen(false)} />
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
@@ -3038,6 +3041,18 @@ export default function ChatPage() {
           <span className="p" aria-hidden="true">{lockedOut ? '↗' : '+'}</span>
           {lockedOut ? 'Sign in for more sessions' : 'New thought session'}
         </button>
+
+        {/* An invite code, asked for in a popup: a button here, between a
+            new chat and the Projects, rather than a field in Shared with you. */}
+        {!hydrating && isSignedIn && (
+          <button type="button" className="s-joinbtn" onClick={() => setJoinOpen(true)} title="Open something shared with you by its code">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="8" cy="15" r="3.5" />
+              <path d="M10.5 12.5 19 4M15.5 7.5l2.5 2.5M13.5 9.5l2 2" />
+            </svg>
+            Join with a code
+          </button>
+        )}
 
         <SignedOut>
           <div className="s-anon">
@@ -3155,8 +3170,8 @@ export default function ChatPage() {
             </section>
           )}
           {/* SHARED WITH YOU — Projects and conversations others opened to
-              this person, and the one field for an invite code. Below their
-              own Projects: their own work comes first. */}
+              this person. Below their own Projects: their own work comes
+              first. The invite code is the "Join with a code" button above. */}
           {!hydrating && isSignedIn && !railFiltering && (
             <section className="s-proj s-shared" aria-label="Shared with you">
               <div className="s-proj-h">
@@ -3185,9 +3200,6 @@ export default function ChatPage() {
                 </div>
               ))}
               {!sharedItems.length && <p className="s-none">When someone shares with you, it appears here.</p>}
-              <div className="s-joincode">
-                <JoinWithCode />
-              </div>
             </section>
           )}
           {hydrating ? (
