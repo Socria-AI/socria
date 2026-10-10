@@ -245,6 +245,8 @@ const MODULES = [
   'lib/objects/display-accounts.ts',
   'lib/objects/display-worksheet.ts',
   'lib/objects/display-exercise.ts',
+  'lib/objects/display-compare.ts',
+  'lib/objects/display-venn.ts',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',
