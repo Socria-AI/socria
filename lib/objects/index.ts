@@ -150,9 +150,12 @@ export function describeObject(o: ThoughtObject, opts: { guarded: boolean; histo
   const cur = currentOf(o);
   const lines = [`${k.label} ${o.name} — ${k.shape(cur)}, ${originSaid(o)}${o.trimmed ? ` (its earliest ${o.trimmed} step${o.trimmed === 1 ? ' is' : 's are'} no longer kept)` : ''}.`];
   const steps = o.steps.slice(0, o.at);
+  // a display's step notes say what the step computed — a total, who now leads — which is
+  // exactly what a person practising works out: under the guard they are not passed on
+  const quiet = opts.guarded && isDisplay(o.kind);
   if (steps.length) {
     lines.push(`Steps so far (each one computed by the workspace):`);
-    for (const s of steps.slice(-(opts.history ?? 6))) lines.push(`  ${s.said} — ${stepWho(s)}.${s.note ? ` ${s.note}` : ''}`);
+    for (const s of steps.slice(-(opts.history ?? 6))) lines.push(`  ${s.said} — ${stepWho(s)}.${s.note && !quiet ? ` ${s.note}` : ''}`);
   }
   if (o.at < o.states.length - 1) lines.push(`They have stepped back to state ${o.at} of ${o.states.length - 1}.`);
   lines.push(`Now:\n${k.text(cur)}`);
@@ -168,7 +171,9 @@ export function describeObject(o: ThoughtObject, opts: { guarded: boolean; histo
  */
 export function objectsBlock(space: ObjectSpace | undefined, opts: { guarded: boolean; lastStep?: { obj: string; step: Step } | null; refused?: string | null }): string {
   if (!space?.objs.length) return '';
-  const parts = space.objs.map((o) => describeObject(o, { guarded: opts.guarded }).join('\n'));
+  // newest first when there are displays: a long plan must not push the one just made out of the block
+  const ordered = space.objs.some((o) => isDisplay(o.kind)) ? [...space.objs].reverse() : space.objs;
+  const parts = ordered.map((o) => describeObject(o, { guarded: opts.guarded }).join('\n'));
   const scene = space.objs.some((o) => o.kind === 'scene');
   const displays = space.objs.filter((o) => isDisplay(o.kind));
   // the rules for matrices and functions are theirs; a workspace of displays alone is not told them
@@ -179,7 +184,9 @@ export function objectsBlock(space: ObjectSpace | undefined, opts: { guarded: bo
       ? 'These are COMPUTED by the workspace and shown to the person as the objects themselves. Never do arithmetic on them yourself and never write out a resulting matrix or value: if a step should be taken, the person takes it (they write an operation like "R2 ← R2 − 3R1" in the chat, which the buttons under the matrix start for them) and the workspace computes it.'
       : '',
     opts.lastStep
-      ? `They just took a step: ${opts.lastStep.step.said} (${stepWho(opts.lastStep.step)}). The result above is what it computed${opts.lastStep.step.note ? ` — ${opts.lastStep.step.note}` : ''}. Respond to what THEIR step did: what it shows, what they might notice.`
+      ? `They just took a step: ${opts.lastStep.step.said} (${stepWho(opts.lastStep.step)}). The result above is what it computed${
+          opts.lastStep.step.note && !(opts.guarded && isDisplay(space.objs.find((o) => o.id === opts.lastStep!.obj)?.kind ?? '')) ? ` — ${opts.lastStep.step.note}` : ''
+        }. Respond to what THEIR step did: what it shows, what they might notice.`
       : '',
     opts.refused ? `They tried an operation the workspace refused: ${opts.refused} Help them see why, without handing them the right one.` : '',
     !worked

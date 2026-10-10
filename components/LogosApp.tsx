@@ -145,7 +145,8 @@ import {
   type PanelNode,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import { afterDisplay, arrangementsFor, factsFrom, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { briefOf } from '@/lib/representation';
 import {
@@ -3148,6 +3149,23 @@ export function LogosApp({
           postPair(...pairOf(viewSaid(want.lens)));
           return;
         }
+      }
+    }
+
+    // A SURFACE ASKED FOR BY NAME — "open the display", "show the model beside
+    // the map", "close the 3D view", "just the map" (lib/workspace/
+    // interface-request.ts, whole names only). The workspace is arranged and
+    // what was done is said in a line; nothing goes to the model and nothing
+    // is spent. A lens asked for by name was read just above, as it always was.
+    if (workspaceOn && wsLayout && !atts.length && !objTurn.lastStep) {
+      const asked = readInterfaceRequest(content, interfaceContext(wsFacts));
+      if (asked) {
+        changeLayout(layoutForRequest(asked, wsLayout, wsFacts));
+        setError(null);
+        setInput('');
+        setReplyTo(null);
+        postPair(...pairOf(interfaceSaid(asked)));
+        return;
       }
     }
 

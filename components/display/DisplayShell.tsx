@@ -144,7 +144,8 @@ export function DisplayShell<S extends { title: string; view: string }>({
             {d.why}
           </p>
         )}
-        {!d.why && last?.note && (
+        {/* what the last step computed — not while the person is practising, when it is what they are working out */}
+        {!d.why && last?.note && !p.guarded && (
           <p className="dsp-note" role="status">
             {last.note}
           </p>
