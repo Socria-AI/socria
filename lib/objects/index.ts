@@ -10,6 +10,8 @@
 import './matrix';
 import './function';
 import './scene';
+// the everyday displays (Logos 3.5): objects of thought like the rest — see display-base.ts
+import './display-plan';
 import { apply, create, currentOf, kindOf, objOf, originSaid, stepWho, EMPTY_SPACE, type ObjectOrigin, type ObjectSpace, type ThoughtObject, type Step } from './core';
 import { diffCells, findMatrices, matrixTeX, readMatrixOp, type MatrixState } from './matrix';
 import { findFunctions } from './function';

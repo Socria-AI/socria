@@ -99,8 +99,14 @@ export interface OpDef<S> {
    * kind keep a step that was taken before the rule existed, instead of cutting
    * the history it is part of. A rule that matters to what a state IS belongs
    * in the check either way.
+   *
+   * `by` is who is applying the step — the person, or Socria. A kind whose
+   * state holds things the person wrote uses it to refuse Socria changing
+   * them: Socria may add, suggest and change what it wrote; what the person
+   * wrote changes only when the person changes it. On replay it is the
+   * stored step's `by`, so the rule holds for a history read back too.
    */
-  check: (state: S, args: Record<string, string | number>, ctx?: { replay?: boolean }) => string | null;
+  check: (state: S, args: Record<string, string | number>, ctx?: { replay?: boolean; by?: 'person' | 'socria' }) => string | null;
   apply: (state: S, args: Record<string, string | number>) => S;
   say: (args: Record<string, string | number>) => string;
 }
@@ -159,7 +165,12 @@ export const kinds = (): ObjectKind<any>[] => [...KINDS.values()];
 // ── reading an object ────────────────────────────────────────────────
 
 export const EMPTY_SPACE: ObjectSpace = { objs: [] };
-export const MAX_OBJECTS = 8;
+/**
+ * Objects one line of thinking holds. Eight was set for matrices and
+ * functions; the everyday displays (a plan, a comparison, an argument, a
+ * worksheet…) are objects too, and a real piece of work holds several.
+ */
+export const MAX_OBJECTS = 12;
 /** States kept per object. The oldest go first; a long elimination is ~10 steps. */
 export const MAX_STATES = 40;
 const capOf = (k: ObjectKind<any> | null) => Math.max(2, Math.min(MAX_STATES, k?.maxStates ?? MAX_STATES));
@@ -262,7 +273,7 @@ export function apply(
     return { ok: false, why: `That is more than one step on a ${k.label.toLowerCase()} can keep: at most ${lim.count} values, each a number or at most ${lim.length} characters.` };
   }
   const before = currentOf(obj);
-  const refused = def.check(before, args);
+  const refused = def.check(before, args, { by: who.by });
   if (refused) return { ok: false, why: refused };
   let after: unknown;
   try {
@@ -380,7 +391,7 @@ export function sanitizeSpace(raw: unknown): ObjectSpace | undefined {
         }
       }
       const before = kept[kept.length - 1];
-      if (def.check(before, args, { replay: true })) break;
+      if (def.check(before, args, { replay: true, by: s.by === 'socria' ? 'socria' : 'person' })) break;
       let after: unknown;
       try {
         after = def.apply(before, args);

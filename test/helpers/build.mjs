@@ -234,6 +234,9 @@ const MODULES = [
   'lib/science/records.ts',
   'lib/science/bundle.ts',
   'components/workspace/panels.tsx',
+  // Logos 3.5 — the everyday displays (objects of thought)
+  'lib/objects/display-base.ts',
+  'lib/objects/display-plan.ts',
   'lib/lifecycle.ts',
   'lib/email.ts',
   'lib/socria-prompt.ts',
