@@ -260,3 +260,15 @@
 @media (prefers-reduced-motion: reduce) {
   .dsp-bar, .dsp-progress span, .dsp-col { transition: none; }
 }
+
+/* ── a display in a workspace panel of its own ────────────────────── */
+.dsp-panel { --dsp-body-max: none; height: 100%; overflow: auto; padding: 6px 4px 12px; }
+.dsp-panel-empty { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.dsp-panel-empty .dsp-empty { max-width: 46ch; text-align: center; }
+.dsp-panel-pick { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 12px 6px; border-bottom: 1px solid var(--lg-line, rgba(35, 36, 31, 0.12)); }
+.dsp-panel-pick button {
+  padding: 2px 10px; border: 1px solid var(--lg-line, rgba(35, 36, 31, 0.12)); border-radius: 999px; background: none; cursor: pointer;
+  font: inherit; font-size: 12px; color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+.dsp-panel-pick button.is-on { color: var(--lg-ink, #23241f); border-color: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); background: color-mix(in srgb, var(--lg-primary, #354620) 8%, transparent); }
+.dsp-panel-noun { font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-ink-40, rgba(35, 36, 31, 0.42)); }

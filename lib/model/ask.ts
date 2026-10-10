@@ -120,6 +120,7 @@ export const ARTIFACTS = [
   'draft',         // writing
   'research',      // sources and what they say
   'comparison',
+  'display',       // an everyday display to work in: a plan, a table, an argument map, a chart, a worksheet (lib/objects/display-*.ts)
 ] as const;
 export type Artifact = (typeof ARTIFACTS)[number];
 

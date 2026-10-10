@@ -37,7 +37,7 @@ import {
   readView,
   registerDisplay,
   sayDay,
-  todayDay,
+  localDay,
   type Args,
   type By,
   type Ctx,
@@ -628,7 +628,8 @@ export const PLAN = displayKind<PlanState>({
   label: 'Plan',
   sanitize: sanitizePlan,
   ops: PLAN_OPS,
-  readOp: (text, s) => readPlanOp(text, s, todayDay()),
+  // read where the person writes — in their browser, on their calendar
+  readOp: (text, s) => readPlanOp(text, s, localDay()),
   consequence: (before, after) => {
     const was = new Set(clashes(before).map((c) => `${c.item}<${c.waitsOn}`));
     const now = clashes(after);
@@ -668,4 +669,33 @@ export const PLAN = displayKind<PlanState>({
 });
 
 register(PLAN);
-registerDisplay({ kind: 'plan', noun: 'plan', handle: 'P', about: 'Things to do or that happened, in time or in order — a timeline, a board, a checklist, a storyboard.' });
+registerDisplay({
+  kind: 'plan',
+  noun: 'plan',
+  handle: 'P',
+  about: 'Things to do or that happened, in time or in order — a timeline, a board, a checklist, a storyboard.',
+  called: [
+    { words: ['timeline', 'time line', 'gantt chart', 'gantt', 'schedule', 'study schedule', 'revision schedule', 'roadmap', 'itinerary', 'chronology'], view: 'timeline' },
+    { words: ['kanban board', 'kanban', 'task board', 'project board'], view: 'board' },
+    { words: ['checklist', 'check list', 'to-do list', 'todo list', 'to do list', 'task list'], view: 'checklist' },
+    { words: ['storyboard', 'story board', 'shot list'], view: 'storyboard' },
+    { words: ['study plan', 'revision plan', 'project plan', 'plan', 'agenda', 'step by step plan'] },
+  ],
+  spec: `{"title": "short", "view": "timeline|board|checklist|storyboard|list", "items": [{"id": "i1", "text": "what it is, under 120 characters", "date": "YYYY-MM-DD (only a day the conversation gives or plainly implies)", "end": "YYYY-MM-DD, for something that lasts", "status": "todo|doing|done", "lane": "a group, e.g. a course", "note": "optional"}], "links": [{"from": "i1", "to": "i2"}]}
+  A link means "to" waits on "from". Dates are real calendar days; leave "date" out rather than guess one.`,
+  example: {
+    title: 'Essay week',
+    view: 'timeline',
+    items: [
+      { id: 'i1', text: 'Find three sources', date: '2026-10-12', end: '2026-10-14', status: 'todo' },
+      { id: 'i2', text: 'Outline', date: '2026-10-15', status: 'todo' },
+      { id: 'i3', text: 'First draft', date: '2026-10-16', end: '2026-10-18' },
+    ],
+    links: [
+      { from: 'i1', to: 'i2' },
+      { from: 'i2', to: 'i3' },
+    ],
+  },
+  tell: () =>
+    'A PLAN is the person’s own document. Its clashes (something dated before what it waits on) and its progress are computed by the workspace — use them, never recompute them. The person changes it by hand or in words ("move the outline to Friday", "the draft waits on the outline", "mark the outline done"); you cannot change it from the reply, so offer the words to send rather than a rewritten plan.',
+});

@@ -153,7 +153,7 @@ console.log('=== asking for an interface: what is read ===');
     ['get rid of the sliders', 'close:params'],
     ['close the plot', 'close:map/plot'],
     ['close the chat', 'close:chat'],
-    ['close everything', 'close:model+scene+params+inspector+trace+mind'],
+    ['close everything', 'close:model+scene+display+params+inspector+trace+mind'],
     ['just the model', 'only:model'],
     ['only the map please', 'only:map'],
     ['show only the model', 'only:model'],
@@ -605,7 +605,7 @@ console.log('\n=== the tiling primitives they use ===');
 
 console.log('\n=== every view, by name ===');
 {
-  ok('the catalogue, in order', VIEW_CATALOGUE.map((v) => v.name).join(' | ') === 'Thinking Map | Math plotting | Modeling | Studio (CAD) | Parameters | Inspector | Trace | Mind | Conversation', VIEW_CATALOGUE.map((v) => v.name).join(' | '));
+  ok('the catalogue, in order', VIEW_CATALOGUE.map((v) => v.name).join(' | ') === 'Thinking Map | Math plotting | Modeling | Studio (CAD) | Displays | Parameters | Inspector | Trace | Mind | Conversation', VIEW_CATALOGUE.map((v) => v.name).join(' | '));
   ok('every kind of surface is in it', Object.keys(SURFACES).every((t) => VIEW_CATALOGUE.some((v) => v.type === t)));
   ok('Math plotting is the map’s plot lens, as a panel', VIEW_CATALOGUE.find((v) => v.id === 'plot').type === 'map' && VIEW_CATALOGUE.find((v) => v.id === 'plot').config?.lens === 'plot');
   ok('the names', VIEW_NAMES.scene === 'Studio (CAD)' && VIEW_NAMES.model === 'Modeling' && VIEW_NAMES.plot === 'Math plotting' && VIEW_NAMES.map === 'Thinking Map');

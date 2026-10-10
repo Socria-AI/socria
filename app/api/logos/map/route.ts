@@ -1,6 +1,7 @@
 // app/api/logos/map/route.ts
-// POST /api/logos/map  → { map, build? } — the rebuilt Thinking Map, and the
-// model the engine built from this turn's proposal, if there was one.
+// POST /api/logos/map  → { map, build?, display? } — the rebuilt Thinking Map,
+// the model the engine built from this turn's proposal, if there was one, and
+// the everyday display it made, if one was asked for.
 //
 // Runs INDEPENDENTLY of the conversational reply (the client fires both in
 // parallel), so the map grows while the answer is still streaming.
@@ -24,7 +25,22 @@ import {
   EMPTY_MAP,
   type ThinkingMap,
 } from '@/lib/logos';
-import { discover, bindNodes, objectsForExtractor, EMPTY_SPACE } from '@/lib/objects';
+import {
+  discover,
+  bindNodes,
+  objectsForExtractor,
+  EMPTY_SPACE,
+  readDisplayRequest,
+  buildDisplayPrompt,
+  readDisplayProposal,
+  planFromMap,
+  makeDisplay,
+  madeSays,
+  kindOf,
+  isoDay,
+  todayDay,
+  type MapMaterial,
+} from '@/lib/objects';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
@@ -383,6 +399,84 @@ export async function POST(req: NextRequest) {
       for (const t of theirs) objects = discover(objects, t, 'person').space;
       next = bindNodes({ ...rest, ...(objects.objs.length ? { objects } : {}) } as typeof next, theirs.join('\n')) as typeof next;
     }
+    // ── AN EVERYDAY DISPLAY ───────────────────────────────────────
+    //
+    // "Make me a study plan for finals", "turn this map into a checklist":
+    // an artifact to look at and work in, not a model of anything. Asked for
+    // in their words (lib/objects/display-request.ts) or read so by the
+    // extractor (ask: construct → display), it is made HERE, beside the
+    // model on-ramp and under the same rule: a language model may propose a
+    // display's state, and only the kind's own sanitizer decides what of it
+    // the workspace holds (lib/objects/display-propose.ts). A display made
+    // from the map is computed from the map, not drafted. Either way the turn
+    // says what came of it — and the model second pass, which would read the
+    // same construction as a model nobody proposed, stands aside.
+    const displayWords = readDisplayRequest(said, { stated });
+    const displayAsked =
+      !answeredByScene() &&
+      (!!displayWords ||
+        (next.ask?.action === 'construct' && (next.ask.artifact === 'display' || (next.ask.artifact === 'comparison' && !next.viz))));
+    let display: { ok: boolean; says: string; id?: string; kind?: string; failure?: string } | null = null;
+    if (displayAsked) {
+      const space = next.objects ?? EMPTY_SPACE;
+      const onMap = current.nodes.length ? current : next;
+      const material: MapMaterial | null = displayWords?.fromMap
+        ? {
+            nodes: onMap.nodes.map((n) => ({ id: n.id, label: n.label, type: n.type, role: n.role, origin: n.origin, status: n.status })),
+            edges: onMap.edges.map((e) => ({ from: e.from, to: e.to, relation: e.relation })),
+          }
+        : null;
+      try {
+        let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person' } | null = null;
+        if (material && displayWords?.kind === 'plan' && material.nodes.length) {
+          // the map's ideas, in its words and its order — nothing for a model to write
+          const state = kindOf('plan')!.sanitize(planFromMap(material, { title: next.ask?.topic, view: displayWords.view }));
+          if (state) sealed = { kind: 'plan', state, gaps: [], origin: 'person' };
+        } else if (material && !material.nodes.length) {
+          display = { ok: false, failure: 'empty', says: 'There is nothing on the map yet to make that from.' };
+        } else {
+          const drafted = await openai.chat.completions.create({
+            model: configured,
+            temperature: 0,
+            max_tokens: 2400,
+            response_format: { type: 'json_object' },
+            messages: [
+              {
+                role: 'system',
+                content: buildDisplayPrompt({
+                  request: displayWords,
+                  today: isoDay(body?.today) ?? todayDay(),
+                  guarded: resolveGuard(body?.guard) === 'guard',
+                  map: material,
+                }),
+              },
+              { role: 'user', content: transcript },
+            ],
+          });
+          const text = drafted.choices?.[0]?.message?.content;
+          let parsed: unknown = null;
+          try {
+            parsed = text ? JSON.parse(text) : null;
+          } catch {
+            parsed = null;
+          }
+          const read = readDisplayProposal(parsed, { request: displayWords });
+          if (read.ok) sealed = { kind: read.kind, state: read.state, gaps: read.gaps, origin: 'socria' };
+          else display = { ok: false, failure: read.failure, says: read.says };
+        }
+        if (sealed) {
+          const made = makeDisplay(space, sealed.kind, sealed.state, sealed.origin);
+          if (made.ok) {
+            next = { ...next, objects: made.space };
+            display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: madeSays(made.obj, sealed.gaps) };
+          } else display = { ok: false, failure: made.failure, says: made.says };
+        }
+        console.info('logos map: display %s — %s', display?.ok ? 'made' : 'not made', display?.says?.slice(0, 160));
+      } catch (e) {
+        console.warn('logos map: display pass failed', e);
+        display = { ok: false, failure: 'failed', says: 'The display could not be drafted just now — ask again in a moment.' };
+      }
+    }
     // ── THE ON-RAMP ───────────────────────────────────────────────
     //
     // A proposal reaches the engine HERE, on the server, and only here. The
@@ -439,7 +533,7 @@ export async function POST(req: NextRequest) {
     const wantedBuild = settle(next.ask ?? null, { proposed: false, built: false }).wanted;
     const prose = !!made && !made.doc && !(made.refusal?.missing?.length);
     let secondPass = false;
-    if (!answeredByScene() && ((!proposal && wantedBuild) || prose)) {
+    if (!answeredByScene() && !displayAsked && ((!proposal && wantedBuild) || prose)) {
       try {
         const again = await openai.chat.completions.create({
           model: configured,
@@ -481,7 +575,7 @@ export async function POST(req: NextRequest) {
     // engine like any other proposal (lib/model/solid-words.ts). Only for a
     // construction nothing built; only what they said, each size a control.
     let byReader = false;
-    if (!answeredByScene() && wantedBuild && !made?.doc) {
+    if (!answeredByScene() && !displayAsked && wantedBuild && !made?.doc) {
       const read = solidFromWords(said);
       const got = read ? openFromProposal(models, read.proposal, { at: Date.now() }) : null;
       if (read && got?.doc) {
@@ -540,7 +634,7 @@ export async function POST(req: NextRequest) {
     // beside it, is exactly the note that made this look broken.
     const verdict = settle(next.ask ?? null, {
       proposed: !!proposal,
-      built: !!made?.doc || answeredByScene(),
+      built: !!made?.doc || answeredByScene() || !!display?.ok,
       because: made?.doc ? undefined : made?.says,
       missing: made?.refusal?.missing,
     });
@@ -566,7 +660,7 @@ export async function POST(req: NextRequest) {
       build = null;
     } else if (made) {
       build = { ok: false, says: made.says, ...(verdict.failure ? { failure: verdict.failure } : {}) };
-    } else if (verdict.wanted) {
+    } else if (verdict.wanted && !displayAsked) {
       // ASKED FOR, AND NOTHING WAS EVEN PROPOSED. This is the original bug in
       // its purest form and it is now reported rather than absorbed: the
       // extractor read a construction request and returned only a map.
@@ -590,9 +684,10 @@ export async function POST(req: NextRequest) {
         map: { ...held.map, ...(models.docs.length ? { models } : {}), ...(next.objects ? { objects: next.objects } : {}) },
         capped: held.capped,
         ...(build ? { build } : {}),
+        ...(display ? { display } : {}),
       });
     }
-    return NextResponse.json({ map: withModels, ...(build ? { build } : {}) });
+    return NextResponse.json({ map: withModels, ...(build ? { build } : {}), ...(display ? { display } : {}) });
   } catch (e) {
     console.error('logos map error:', e);
     return NextResponse.json({ map: salvage(current ?? EMPTY_MAP) });

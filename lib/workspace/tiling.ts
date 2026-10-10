@@ -19,7 +19,7 @@
 // PURE. Every operation takes a layout and returns a new one; the shell
 // renders it and the suite holds it.
 
-export const SURFACE_TYPES = ['chat', 'map', 'model', 'params', 'inspector', 'trace', 'scene', 'mind'] as const;
+export const SURFACE_TYPES = ['chat', 'map', 'model', 'params', 'inspector', 'trace', 'scene', 'mind', 'display'] as const;
 export type SurfaceType = (typeof SURFACE_TYPES)[number];
 
 /** What a panel is pointed at, beyond its type. All optional, all small. */
@@ -36,7 +36,7 @@ export interface PanelConfig {
   view?: string;
   /** a lens of the Thinking Map */
   lens?: string;
-  /** an object of thought the panel is pinned to — a Live 3D scene (lib/objects/scene.ts) */
+  /** an object of thought the panel is pinned to — a Live 3D scene (lib/objects/scene.ts), or an everyday display (lib/objects/display-*.ts) */
   obj?: string;
 }
 

@@ -190,6 +190,11 @@ export function dayDiff(a: string, b: string): number {
 /** Today, as a calendar day in UTC — only ever read where the person is writing, never inside an operation. */
 export const todayDay = (): string => toDay(Date.now());
 
+/** Today on the person's own calendar — what a browser sends, so "next Friday" is their Friday, not the server's. */
+export function localDay(d: Date = new Date()): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
 /** "20 Oct 2026" */
 export function sayDay(day: string): string {
   const t = fromDay(day);
@@ -377,6 +382,21 @@ export interface DisplayMeta {
   about: string;
   /** the short handle prefix objects of this kind are named with: P1, C1 … */
   handle: string;
+  /**
+   * The words a person uses for it, each with the view it opens on — "kanban"
+   * is a plan shown as a board. Read by the request reader
+   * (display-request.ts) only where a making verb governs them. A word two
+   * kinds both declare ("table") leaves the choice to the proposal pass.
+   */
+  called?: readonly { words: readonly string[]; view?: string }[];
+  /** how its state is written, for the proposal pass: the JSON shape, briefly, in the kind's own field names */
+  spec?: string;
+  /** a small state of this kind that its sanitizer keeps — shown to the proposal pass, and held to by a test */
+  example?: unknown;
+  /** what the reply model is told about displays of this kind beyond their facts — guard-aware */
+  tell?: (guarded: boolean) => string;
+  /** a display a person practises in (a worksheet, an exercise): what it checks is not given away while the guard is up */
+  practice?: boolean;
 }
 
 const META = new Map<string, DisplayMeta>();

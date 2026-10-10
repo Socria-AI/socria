@@ -1247,7 +1247,7 @@ export function layoutTimeline(map: ThinkingMap, w: number, h: number): Layout {
 // come from each kind's own declaration (lib/objects/), so a new kind lays out
 // here without this function learning its name.
 
-import { kindOf, currentOf, type ThoughtObject } from './objects';
+import { kindOf, currentOf, isDisplayKind, type ThoughtObject } from './objects';
 import { routeBetween } from './canvas';
 
 const TRAIL_GAP = 92;
@@ -1297,8 +1297,9 @@ export function layoutWork(map: ThinkingMap, w: number, _h: number): Layout {
     }
     y = Math.max(y + live.h, ay) + 44;
 
-    // the trail: every state, and the step between each pair
-    if (o.states.length > 1) {
+    // the trail: every state, and the step between each pair — a display's
+    // history is its undo, not a row of small copies of itself
+    if (o.states.length > 1 && !isDisplayKind(o.kind)) {
       const last = o.states.length - 1;
       const first = Math.max(0, last - TRAIL_MAX + 1);
       const sizes = o.states.slice(first).map((st) => k.size(st, 'trail'));

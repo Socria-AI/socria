@@ -1275,7 +1275,7 @@ Return ONLY JSON, exactly this shape:
 {
   "building": {"kind": "${GRAMMAR_IDS.join('|')}", "also": ["other shapes present in the same thinking"], "why": "one short line: what they are constructing"},
   "context": "deciding|writing|creating|researching|learning|planning|brainstorming|reflecting|analysing|math",
-  "ask": {"action": "discuss|explore|explain|question|map|construct|modify|remove|compute|simulate|estimate|represent|compare|trace|research|verify", "artifact": "answer|map|model|simulation|plot|diagram|estimate|draft|research|comparison", "topic": "the subject in their words", "domain": "the field, if it is clear", "formal": {"outcome": "what is being explained, or what the model is of", "inputs": ["what explains it"], "states": ["named states, bodies, compartments, stocks"], "parameters": ["named coefficients or constants"], "equations": ["an equation THEY wrote"], "method": "a method THEY named — never one you chose", "data": "data they referred to or supplied"}, "operations": ["manipulate", "run", "fit", "compare"]},
+  "ask": {"action": "discuss|explore|explain|question|map|construct|modify|remove|compute|simulate|estimate|represent|compare|trace|research|verify", "artifact": "answer|map|model|simulation|plot|diagram|estimate|draft|research|comparison|display", "topic": "the subject in their words", "domain": "the field, if it is clear", "formal": {"outcome": "what is being explained, or what the model is of", "inputs": ["what explains it"], "states": ["named states, bodies, compartments, stocks"], "parameters": ["named coefficients or constants"], "equations": ["an equation THEY wrote"], "method": "a method THEY named — never one you chose", "data": "data they referred to or supplied"}, "operations": ["manipulate", "run", "fit", "compare"]},
   "propose": { … a structured model — see PROPOSING A STRUCTURED MODEL below. A SIBLING OF "viz", never inside it },
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
   "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "role": "<its structural role in what they are building>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
@@ -1303,6 +1303,10 @@ Same subject, opposite asks:
   "Model a 2 × 2 × 2 metre cube." "Make a 3D model of a       → CONSTRUCT → model: a "solid" with its
    nose cone with sliders for the diameter and height."           dimensions. The engine measures it.
   "What is the formula for the volume of a cone?"             → explain.
+  "Make me a study plan for finals." "Put the three phones   → CONSTRUCT → display: an everyday display
+   in a comparison table." "Turn my map into a checklist."       the workspace drafts and they work in —
+                                                                  a plan, a table, an argument map, a chart
+                                                                  of their data, a worksheet. Not a model.
 
 READ THE WHOLE SENTENCE, NOT THE VERBS. "Explain how economists build models" contains "build models" and asks for an explanation. "Build me a model with X as the independent variable" asks for a model. The difference is what they expect to be holding afterwards, and nothing else.
 

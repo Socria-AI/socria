@@ -236,7 +236,12 @@ export function atlasMapOf(raw: unknown): ThinkingMap | null {
     .map((d: any) => ({ id: str(d?.id, 40), title: str(d?.title, 90) }))
     .filter((d: { title: string }) => d.title);
   const objs = (Array.isArray(r.objects?.objs) ? r.objects.objs : []).slice(0, 12)
-    .map((o: any) => ({ id: str(o?.id, 40), kind: str(o?.kind, 24), name: str(o?.name, 24), steps: Array.isArray(o?.steps) ? o.steps.slice(0, 200).map(() => ({})) : [] }))
+    .map((o: any) => {
+      // an everyday display (a plan, a table) is known by its title, as it stands now
+      const now = Array.isArray(o?.states) ? o.states[Math.min(Math.max(0, Number(o?.at) || 0), o.states.length - 1)] : null;
+      const title = str(now?.title, 80);
+      return { id: str(o?.id, 40), kind: str(o?.kind, 24), name: str(o?.name, 24), ...(title ? { title } : {}), steps: Array.isArray(o?.steps) ? o.steps.slice(0, 200).map(() => ({})) : [] };
+    })
     .filter((o: { id: string }) => o.id);
   const context = str(r.context, 24);
   const building = r.building && typeof r.building === 'object' ? str(r.building.kind, 24) : '';
@@ -415,11 +420,13 @@ export function buildAtlas(input: AtlasInput): Atlas {
       // repeats the kind ("Scene", "Matrix") is not said twice.
       const word = kind === 'scene' ? 'Live 3D' : titleCase(kind);
       const name = clipLabel(o.name, 24);
+      const t = (o as unknown as { title?: unknown }).title;
+      const title = typeof t === 'string' ? clipLabel(t, 60) : '';
       nodes.set(id, {
         id,
         kind: 'object',
         type: 'Object',
-        label: name.toLowerCase() === kind.toLowerCase() ? (kind === 'scene' ? 'Live 3D scene' : word) : `${word} ${name}`.trim(),
+        label: title ? `${word} · ${title}` : name.toLowerCase() === kind.toLowerCase() ? (kind === 'scene' ? 'Live 3D scene' : word) : `${word} ${name}`.trim(),
         sub: `${(o.steps?.length ?? 0)} step${o.steps?.length === 1 ? '' : 's'}`,
         chats: [c.id],
       });

@@ -315,7 +315,7 @@ console.log('\n=== when nothing proposed builds: the shape they stated, from the
   ok('the unit is the one attached to a number', spokenUnit('a cone 20 cm across') === 'cm' && spokenUnit('three metres') === null && spokenUnit('2 m cube') === 'm' && spokenUnit('a 3 inch ball') === 'in');
 
   const route = readFileSync('app/api/logos/map/route.ts', 'utf8');
-  ok('the map route reads it only for a construction nothing built', /if \(!answeredByScene\(\) && wantedBuild && !made\?\.doc\) \{\s*const read = solidFromWords\(said\);/.test(route));
+  ok('the map route reads it only for a construction nothing built', /if \(!answeredByScene\(\) && (?:!displayAsked && )?wantedBuild && !made\?\.doc\) \{\s*const read = solidFromWords\(said\);/.test(route));
   ok('  and the engine still decides: it goes through openFromProposal', /const got = read \? openFromProposal\(models, read\.proposal/.test(route) && /reader: true/.test(route));
 }
 

@@ -78,7 +78,7 @@ const MAX_CHARS = 100;
 const MAX_WORDS = 12;
 
 /** The order panels are laid out in, left to right. */
-const ORDER: SurfaceType[] = ['map', 'model', 'scene', 'params', 'inspector', 'trace', 'mind', 'chat'];
+const ORDER: SurfaceType[] = ['map', 'model', 'scene', 'display', 'params', 'inspector', 'trace', 'mind', 'chat'];
 const STAGE = new Set<SurfaceType>(['map', 'model', 'scene']);
 
 type Token =
@@ -104,6 +104,7 @@ const NAMES: [RegExp, Token][] = [
   [/^inspector$/, { kind: 'surface', surface: 'inspector' }],
   [/^(?:trace|history|model history|model's history|history of the model|change history|change log|changelog|revisions|revision history|undo history)$/, { kind: 'surface', surface: 'trace' }],
   [/^(?:mind|mind atlas|atlas)$/, { kind: 'surface', surface: 'mind' }],
+  [/^(?:display|displays)$/, { kind: 'surface', surface: 'display' }],
   [/^(?:chat|conversation|thread|messages|composer)$/, { kind: 'surface', surface: 'chat' }],
   [/^(?:both|both of them|both of those|them both|the two|the two of them|two)$/, { kind: 'both' }],
   [/^(?:all three|all 3|all three of them|the three|three)$/, { kind: 'all', three: true }],
@@ -388,7 +389,7 @@ export function readInterfaceRequest(text: unknown, ctx: InterfaceContext = {}):
   if (all) {
     // "close everything": back to the map, where Logos 3 rests; the conversation keeps its place
     if (close) {
-      ['model', 'scene', 'params', 'inspector', 'trace', 'mind'].forEach((s) => surfaces.add(s as SurfaceType));
+      ['model', 'scene', 'display', 'params', 'inspector', 'trace', 'mind'].forEach((s) => surfaces.add(s as SurfaceType));
       everything = true;
     } else {
       if (three || ctx.hasMap !== false) surfaces.add('map');
@@ -469,6 +470,7 @@ const NAME: Record<SurfaceType, string> = {
   inspector: 'the inspector',
   trace: 'the trace',
   mind: 'the Mind view',
+  display: 'the display',
   chat: 'the conversation',
 };
 

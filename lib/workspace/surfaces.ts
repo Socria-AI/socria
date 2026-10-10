@@ -32,6 +32,7 @@ import type { Model } from '@/lib/model/schema';
 import { viewsFor } from '@/lib/model/views';
 import { inputsOf } from '@/lib/model/derive';
 import { surfacesNamed, type InterfaceRequest } from './interface-request';
+import { displayMeta, isDisplayKind } from '@/lib/objects';
 import {
   addPanel,
   besideShare,
@@ -87,6 +88,8 @@ export const SURFACES: Record<SurfaceType, SurfaceContract> = {
   scene: { type: 'scene', title: 'Studio (CAD)', represents: 'object', emits: ['object'], responds: ['object'], duplicable: true, canBeStale: false, heavy: true },
   // Mind: this line of thinking among every other, and what Socria remembers (lib/mind/atlas.ts)
   mind: { type: 'mind', title: 'Mind', represents: 'memory', emits: [], responds: [], duplicable: false, canBeStale: true, heavy: true },
+  // an everyday display (Logos 3.5): a plan, a table, a worksheet — an object of thought, worked in where it is drawn
+  display: { type: 'display', title: 'Display', represents: 'object', emits: ['object'], responds: ['object'], duplicable: true, canBeStale: false, heavy: false },
 };
 
 // ── what this line of thinking holds, as the workspace needs to know it ──
@@ -114,6 +117,8 @@ export interface WorkspaceFacts {
   viz: 'simulation' | 'picture' | null;
   /** Live 3D scenes among the objects of thought */
   scenes: { id: string; name: string; parts: number }[];
+  /** everyday displays among the objects of thought, oldest first (lib/objects/display-*.ts) */
+  displays?: { id: string; name: string; kind: string; noun: string; title: string }[];
   /** there is an account whose memory this line of thinking joins — the Mind view is offered */
   mind?: boolean;
   /** the lens a map panel with no lens of its own opens on (logos-layout leadLens) */
@@ -167,6 +172,15 @@ export function factsFrom(map: ThinkingMap | null | undefined, opts: FactsOption
     scenes: (m.objects?.objs ?? [])
       .filter((o) => o.kind === 'scene')
       .map((o) => ({ id: o.id, name: o.name, parts: ((o.states[o.at] as { nodes?: unknown[] } | undefined)?.nodes ?? []).length })),
+    displays: (m.objects?.objs ?? [])
+      .filter((o) => isDisplayKind(o.kind))
+      .map((o) => ({
+        id: o.id,
+        name: o.name,
+        kind: o.kind,
+        noun: displayMeta(o.kind)?.noun ?? o.kind,
+        title: String((o.states[o.at] as { title?: unknown } | undefined)?.title ?? o.name),
+      })),
     // the same reading ThinkingMap makes: a model is a picture of its own
     lead: leadLens(lenses, !!m.viz || !!ws?.docs?.length, building),
     reasoning: reasoningLens(lenses, building),
@@ -280,13 +294,18 @@ export function suggestViews(facts: WorkspaceFacts, layout: WorkspaceLayout): Vi
     push({ type: 'scene', label: `${VIEW_NAMES.scene} · experimental`, why: 'describe shapes in the chat and they are drawn as you type — a geometric preview, not a simulation', score: 30 });
   }
 
+  // Every everyday display in this line of thinking, each in a panel of its own.
+  for (const d of facts.displays ?? []) {
+    push({ type: 'display', config: { obj: d.id }, label: `${d.noun[0].toUpperCase()}${d.noun.slice(1)} · ${d.title}`, why: 'made from the conversation — change it by hand or in words', score: 89 });
+  }
+
   // Where this line of thinking sits among all the others, and what Socria
   // remembers — offered to an account, whose memory it joins.
   if (facts.mind) {
     push({ type: 'mind', label: 'Mind', why: 'this line of thinking among all your others, and what Socria remembers', score: 54 });
   }
 
-  const order: SurfaceType[] = ['model', 'params', 'inspector', 'map', 'scene', 'chat', 'trace', 'mind'];
+  const order: SurfaceType[] = ['model', 'display', 'params', 'inspector', 'map', 'scene', 'chat', 'trace', 'mind'];
   return out.sort((a, b) => Number(a.open) - Number(b.open) || b.score - a.score || order.indexOf(a.type) - order.indexOf(b.type));
 }
 
@@ -300,9 +319,16 @@ export interface Arrangement {
 }
 
 /** How much room each surface is given when several are laid side by side. */
-const WEIGHT: Record<SurfaceType, number> = { map: 3, model: 4, scene: 4, mind: 3, params: 2, inspector: 2, trace: 2, chat: 2 };
+const WEIGHT: Record<SurfaceType, number> = { map: 3, model: 4, scene: 4, display: 4, mind: 3, params: 2, inspector: 2, trace: 2, chat: 2 };
 /** Left to right. */
-const LAYOUT_ORDER: SurfaceType[] = ['map', 'model', 'scene', 'params', 'inspector', 'trace', 'mind', 'chat'];
+const LAYOUT_ORDER: SurfaceType[] = ['map', 'model', 'scene', 'display', 'params', 'inspector', 'trace', 'mind', 'chat'];
+
+/** The display panel for what is here: the one asked for, else the newest display. Null when there is none. */
+function displayPanel(facts: WorkspaceFacts, obj?: string): { type: SurfaceType; config: PanelConfig } | null {
+  const ds = facts.displays ?? [];
+  const d = (obj ? ds.find((x) => x.id === obj) : null) ?? ds[ds.length - 1];
+  return d ? { type: 'display', config: { obj: d.id } } : null;
+}
 
 /**
  * The 3D panel for what is here: the solids of a model (`doc`, the active
@@ -490,6 +516,8 @@ export interface SurfaceOptions {
   solids?: boolean;
   /** the map's lens; otherwise a map beside a model or a 3D view shows its reasoning (facts.reasoning) */
   lens?: LensId;
+  /** the display a display panel is for — the one just made; the newest when absent */
+  obj?: string;
 }
 
 /** The lens a map panel actually shows: its own, while the map can draw it, else the one the map leads with. */
@@ -545,6 +573,8 @@ export function panelFor(
       return pin ? { type: surface, config: pin } : { type: surface };
     case 'scene':
       return threeDPanel(facts, opts.doc, opts.doc ? opts.solids : undefined) ?? { type: 'scene' };
+    case 'display':
+      return displayPanel(facts, opts.obj) ?? { type: 'display' };
     default:
       return { type: surface };
   }
@@ -574,6 +604,9 @@ function reusable(layout: WorkspaceLayout, spec: { type: SurfaceType; config?: P
       if (spec.config?.obj) return ps.find((p) => p.config?.obj === spec.config!.obj) ?? ps.find((p) => !p.config?.obj && !p.config?.doc) ?? null;
       return ps.find((p) => !p.config?.doc) ?? null;
     }
+    case 'display':
+      // a panel pinned to another display is somebody's choice; it is not re-pointed
+      return spec.config?.obj ? (ps.find((p) => p.config?.obj === spec.config!.obj) ?? ps.find((p) => !p.config?.obj) ?? null) : ps[0];
     default:
       return ps[0];
   }
@@ -803,6 +836,24 @@ export function afterBuild(
   return { suggestion: builtSuggestion(built) };
 }
 
+/**
+ * What a display the turn just made opens: itself, beside what is there — it
+ * was asked for in so many words, so it is shown rather than suggested. A
+ * workspace resting on the map opens map | display; a display already on
+ * screen (pinned to it, or the unpinned panel that follows the newest) is
+ * left where it is. Nothing the person arranged is closed.
+ */
+export function afterDisplay(current: WorkspaceLayout, facts: WorkspaceFacts, obj: string): WorkspaceLayout | null {
+  const newest = (facts.displays ?? [])[(facts.displays ?? []).length - 1]?.id;
+  const shown = visiblePanels(current).some((p) => p.type === 'display' && (p.config?.obj === obj || (!p.config?.obj && newest === obj)));
+  if (shown) return null;
+  const stage = panelsOf(current).filter((p) => p.type !== 'chat');
+  if (!stage.length || (stage.length === 1 && stage[0].type === 'map')) return layoutForSurfaces(['map', 'display'], current, facts, { obj });
+  const unpinned = panelsOf(current).find((p) => p.type === 'display' && !p.config?.obj);
+  if (unpinned) return restore(current);
+  return openBeside(current, { type: 'display', config: { obj } }, facts).layout;
+}
+
 /** Is an arrangement already what is on screen? Then suggesting it says nothing. */
 function inPlace(arr: WorkspaceLayout, layout: WorkspaceLayout, facts: WorkspaceFacts): boolean {
   const vis = visiblePanels(layout);
@@ -814,6 +865,7 @@ function inPlace(arr: WorkspaceLayout, layout: WorkspaceLayout, facts: Workspace
         return want.config?.lens ? shown === want.config.lens || (shown !== 'plot' && shown !== 'work') : true;
       }
       if (p.type === 'scene') return (p.config?.doc ?? '') === (want.config?.doc ?? '') && (!want.config?.obj || !p.config?.obj || p.config.obj === want.config.obj);
+      if (p.type === 'display') return !want.config?.obj || p.config?.obj === want.config.obj;
       if (p.type === 'model') return docShownBy(p, facts) === (want.config?.doc ?? shownDoc(facts)?.id ?? null) && (p.config?.view ?? '') === (want.config?.view ?? '');
       return true;
     })
@@ -827,7 +879,7 @@ function inPlace(arr: WorkspaceLayout, layout: WorkspaceLayout, facts: Workspace
 // — or put away the ones they do not want. A view with nothing to show yet can
 // still be opened onto its own empty state; the menu says so, quietly.
 
-export type ViewId = 'map' | 'plot' | 'model' | 'scene' | 'params' | 'inspector' | 'trace' | 'mind' | 'chat';
+export type ViewId = 'map' | 'plot' | 'model' | 'scene' | 'display' | 'params' | 'inspector' | 'trace' | 'mind' | 'chat';
 
 /** What each kind of view is called — in "+ View", and wherever the workspace titles a panel of it. */
 export const VIEW_NAMES: Record<ViewId, string> = {
@@ -835,6 +887,7 @@ export const VIEW_NAMES: Record<ViewId, string> = {
   plot: 'Math plotting',
   model: 'Modeling',
   scene: 'Studio (CAD)',
+  display: 'Displays',
   params: 'Parameters',
   inspector: 'Inspector',
   trace: 'Trace',
@@ -848,6 +901,7 @@ export const VIEW_CATALOGUE: readonly { id: ViewId; type: SurfaceType; config?: 
   { id: 'plot', type: 'map', config: { lens: 'plot' }, name: VIEW_NAMES.plot, says: 'the functions and models of this line of thinking, plotted' },
   { id: 'model', type: 'model', name: VIEW_NAMES.model, says: 'a model you can move: its sliders, readouts and views' },
   { id: 'scene', type: 'scene', name: VIEW_NAMES.scene, says: 'shapes in 3D, built by describing them — a geometric preview' },
+  { id: 'display', type: 'display', name: VIEW_NAMES.display, says: 'a plan, a table, a worksheet — made from the conversation and worked in here' },
   { id: 'params', type: 'params', name: VIEW_NAMES.params, says: 'every control of the model, each one a change to it' },
   { id: 'inspector', type: 'inspector', name: VIEW_NAMES.inspector, says: 'what the selected thing is, and how it was computed' },
   { id: 'trace', type: 'trace', name: VIEW_NAMES.trace, says: 'every change to the model, each one undoable' },
@@ -892,6 +946,8 @@ function catalogueSpec(id: ViewId, layout: WorkspaceLayout, facts?: WorkspaceFac
     }
     case 'scene':
       return (facts && threeDPanel(facts)) || { type: 'scene' };
+    case 'display':
+      return (facts && displayPanel(facts)) || { type: 'display' };
     default:
       return { type: id };
   }
@@ -909,6 +965,8 @@ function emptyNote(id: ViewId, facts?: WorkspaceFacts | null, offered?: readonly
         return hasModel(facts) ? null : 'no model yet — ask for one in the conversation';
       case 'scene':
         return facts.scenes.length || doc?.solids ? null : 'empty — describe a shape in the conversation';
+      case 'display':
+        return facts.displays?.length ? null : 'nothing yet — ask for a plan, a table or a checklist in the conversation';
       case 'params':
         return !doc ? 'no model yet' : doc.params + doc.inputs ? null : 'the model has nothing to adjust';
       case 'inspector':
@@ -928,6 +986,8 @@ function emptyNote(id: ViewId, facts?: WorkspaceFacts | null, offered?: readonly
         return any('model') ? null : 'no model yet — ask for one in the conversation';
       case 'scene':
         return any('scene', 'obj') || any('scene', 'doc') ? null : 'empty — describe a shape in the conversation';
+      case 'display':
+        return any('display', 'obj') ? null : 'nothing yet — ask for a plan, a table or a checklist in the conversation';
       case 'params':
         return any('params') ? null : 'nothing to adjust yet';
       case 'inspector':

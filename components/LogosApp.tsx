@@ -25,6 +25,9 @@ import {
   create as createObject,
   currentOf,
   discover,
+  displayMeta,
+  isDisplayKind,
+  localDay,
   mergeSpaces,
   objOf,
   readOperation,
@@ -129,6 +132,7 @@ import type { Model } from '@/lib/model/schema';
 import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Workspace';
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
 import { ScenePanel } from '@/components/scene3d/ScenePanel';
+import { DisplayPanel } from '@/components/display/DisplayPanel';
 import { sceneTurn } from '@/lib/objects/scene-chat';
 import type { SceneState } from '@/lib/objects/scene';
 import {
@@ -141,7 +145,7 @@ import {
   type PanelNode,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import { arrangementsFor, factsFrom, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { afterDisplay, arrangementsFor, factsFrom, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { briefOf } from '@/lib/representation';
 import {
@@ -435,6 +439,8 @@ export function LogosApp({
   const [mapCapped, setMapCapped] = useState(false);
   /** what the engine said about a model built (or refused) this turn */
   const [buildNote, setBuildNote] = useState<string | null>(null);
+  // a display the last turn made, to be opened beside the map once the map holds it (surfaces.ts afterDisplay)
+  const [displayToOpen, setDisplayToOpen] = useState<string | null>(null);
   // They have a Stripe customer behind them, so billing can be managed.
   const [oneManageable, setOneManageable] = useState(false);
   // Just came back from a completed checkout.
@@ -2194,6 +2200,8 @@ export function LogosApp({
             // context isn't in it yet — callers that just changed grounding
             // pass the fresh map explicitly.
             contexts: contextsOverride ?? contextsRef.current,
+            // the person's own calendar day, for a plan's "next Friday" — never the server's
+            today: localDay(),
             ...guidance(),
           }),
         });
@@ -2333,11 +2341,16 @@ export function LogosApp({
                 .filter(Boolean)
                 .join(' ');
               setBuildNote(note.slice(0, 300));
+            } else if (json.display?.says) {
+              // AN EVERYDAY DISPLAY: made, or why not, in a sentence — and when
+              // it was made it opens beside the map (Logos 3.5).
+              setBuildNote(String(json.display.says).slice(0, 300));
             } else {
               // A turn with no build dismisses the last one's note — it was
               // never cleared, so "built …" outranked the delta line forever.
               setBuildNote(null);
             }
+            if (json.display?.ok && typeof json.display.id === 'string') setDisplayToOpen(json.display.id);
           }
         }
       } catch {
@@ -3564,6 +3577,16 @@ export function LogosApp({
       } catch {}
     }, 250);
   }, []);
+  // A DISPLAY THE TURN MADE OPENS where it can be worked in — beside the map,
+  // once the map that holds it has landed. Asked for in words, so shown, not suggested.
+  useEffect(() => {
+    if (!displayToOpen) return;
+    if (!workspaceOn || !wsLayout) return setDisplayToOpen(null);
+    if (!wsFacts.displays?.some((d) => d.id === displayToOpen)) return;
+    const next = afterDisplay(wsLayout, wsFacts, displayToOpen);
+    if (next) changeLayout(next);
+    setDisplayToOpen(null);
+  }, [displayToOpen, workspaceOn, wsLayout, wsFacts, changeLayout]);
   const wsViews = useMemo(() => (wsLayout ? suggestViews(wsFacts, wsLayout) : []), [wsFacts, wsLayout]);
   const wsArrangements = useMemo(() => (wsLayout ? arrangementsFor(wsFacts, wsLayout) : []), [wsFacts, wsLayout]);
   // THE ONE SURFACE FOLLOWS THE WORK — only while it is one surface. When a
@@ -3753,6 +3776,11 @@ export function LogosApp({
     return pinned ?? (p.config?.obj ? null : objs.find((o) => o.kind === 'scene') ?? null);
   };
 
+  /** The display a display panel shows: the one it is pinned to, else the newest. */
+  const displaysHere = (map.objects?.objs ?? []).filter((o) => isDisplayKind(o.kind));
+  const displayOfPanel = (p: PanelNode): ThoughtObject | null =>
+    (p.config?.obj ? displaysHere.find((o) => o.id === p.config!.obj) : null) ?? displaysHere[displaysHere.length - 1] ?? null;
+
   function renderPanel(p: PanelNode) {
     switch (p.type) {
       case 'chat':
@@ -3819,6 +3847,25 @@ export function LogosApp({
           />
         );
       }
+      case 'display': {
+        // AN EVERYDAY DISPLAY (Logos 3.5): the plan, table or worksheet itself,
+        // worked in here — every change an operation on the object, so it
+        // undoes, syncs and is read by the conversation like any other.
+        const d = displayOfPanel(p);
+        return (
+          <DisplayPanel
+            obj={d}
+            all={displaysHere}
+            guarded={guarded}
+            sel={d && objSel?.obj === d.id ? objSel.part : null}
+            onSelect={(part) => d && onObject({ type: 'select', obj: d.id, part })}
+            onOp={(op, args) => (d ? onObject({ type: 'op', obj: d.id, op, args }) : null) ?? { ok: false, why: 'Nothing here can compute that.' }}
+            onSeek={(at) => d && onObject({ type: 'seek', obj: d.id, at })}
+            onPick={(id) => wsLayout && changeLayout(configurePanel(wsLayout, p.id, { obj: id }))}
+            readOnly={togetherReadOnly}
+          />
+        );
+      }
       case 'mind':
         // WHERE THIS LINE OF THINKING SITS among every other, and what Socria
         // remembers (lib/mind/atlas.ts) — read through the logos scope, so
@@ -3866,6 +3913,11 @@ export function LogosApp({
       }
       case 'mind':
         return { title: 'Mind', sub: 'what this connects to' };
+      case 'display': {
+        const d = displayOfPanel(p);
+        const noun = d ? (displayMeta(d.kind)?.noun ?? d.kind) : null;
+        return { title: noun ? noun[0].toUpperCase() + noun.slice(1) : 'Display', sub: d ? String((d.states[d.at] as { title?: unknown } | undefined)?.title ?? d.name) : undefined };
+      }
     }
   }
 
