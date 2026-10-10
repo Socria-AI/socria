@@ -756,6 +756,24 @@ export const VENN_META: DisplayMeta = {
   noun: 'Venn diagram',
   handle: 'V',
   about: 'Two or three sets and what each holds — what they share, what is only in one, and what is in none.',
+  called: [{ words: ['venn diagram', 'venn', 'set diagram'], view: 'venn' }],
+  spec: `{"title": "short", "view": "venn|table", "sets": [{"id": "s1", "name": "Has fur"}], "elements": [{"id": "e1", "label": "Platypus", "sets": ["s1", "s2"]}]}
+  Two or three sets. Put an element only in the sets the conversation places it in; one that belongs to none of them has "sets": [].`,
+  example: {
+    title: 'Animals',
+    view: 'venn',
+    sets: [
+      { id: 'f', name: 'Has fur' },
+      { id: 'e', name: 'Lays eggs' },
+    ],
+    elements: [
+      { id: 'e1', label: 'Cat', sets: ['f'] },
+      { id: 'e2', label: 'Chicken', sets: ['e'] },
+      { id: 'e3', label: 'Platypus', sets: ['f', 'e'] },
+    ],
+  },
+  tell: () =>
+    'A VENN DIAGRAM’s regions and counts are computed from where each element is placed — use them. Where an element sits is a claim the person can check: if a placement looks wrong, say so; never quietly correct it.',
 };
 
 register(VENN);

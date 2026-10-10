@@ -1332,6 +1332,35 @@ export const COMPARE_META: DisplayMeta = {
   noun: 'comparison',
   handle: 'C',
   about: 'Options weighed against what matters — a decision matrix with weights, scores and their uncertainty, a ranking, and what would change it.',
+  called: [
+    {
+      words: ['comparison table', 'comparison chart', 'comparison grid', 'comparison matrix', 'decision matrix', 'weighted decision matrix', 'pros and cons table', 'table comparing', 'chart comparing', 'side by side comparison'],
+      view: 'matrix',
+    },
+    { words: ['ranking of my options', 'ranking of the options'], view: 'ranking' },
+    // "a table" is a chart's word too: the proposal pass chooses which
+    { words: ['table'] },
+  ],
+  spec: `{"title": "short", "view": "matrix|ranking|sensitivity", "options": [{"id": "o1", "name": "Job A", "note": "a few words"}], "criteria": [{"id": "c1", "name": "Salary", "weight": 5}], "scores": [{"option": "o1", "criterion": "c1", "value": null, "note": "the fact behind it: $62k"}]}
+  Two to eight options, one to ten criteria. A score (0–10, 10 best FOR THEM) is the person's own judgment: write one only where they gave it; a fact they gave goes in "note" with "value": null. A weight (0–10) only where they said what matters more; otherwise 5.`,
+  example: {
+    title: 'Two job offers',
+    view: 'matrix',
+    options: [
+      { id: 'a', name: 'Job A', note: 'downtown, hybrid' },
+      { id: 'b', name: 'Job B', note: 'suburbs, on site' },
+    ],
+    criteria: [
+      { id: 's', name: 'Salary', weight: 8 },
+      { id: 'c', name: 'Commute', weight: 5 },
+    ],
+    scores: [
+      { option: 'a', criterion: 's', value: 7, note: '$62k' },
+      { option: 'b', criterion: 's', value: null, note: '$58k' },
+    ],
+  },
+  tell: () =>
+    'A COMPARISON is the person’s decision. Its scores and weights are their judgments; its totals, ranking and the weight at which the order would turn are computed — use them, never recompute them, and say so when two options are too close to call. Never fill in a score they have not given.',
 };
 
 register(COMPARE);
