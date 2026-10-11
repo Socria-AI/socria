@@ -5,6 +5,8 @@
 import { registerFigure } from '@/components/objects/figures';
 import { PlanFigure } from './PlanFigure';
 import { VennFigure } from './VennFigure';
+import { CompareFigure } from './CompareFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
+registerFigure('compare', CompareFigure);
