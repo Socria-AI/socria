@@ -72,7 +72,7 @@ export const TOPICS: FaqTopic[] = [
         q: 'Which model should I pick?',
         a: [
           '<b>Core 4</b> for almost everything. It decides each turn which part of the work is yours, does the research and the checking in full, and hands back the step that would have made you more capable for taking it.',
-          '<b>Logos 3</b> when you want to see your reasoning drawn as a map beside the conversation, with what you describe built as models you can move — alone or with someone. <b>Core 3.1</b> if you would rather set the depth yourself.',
+          '<b>Logos 3.5</b> when you want to see your reasoning drawn as a map beside the conversation, with what you describe built beside it — models you can move, and charts, plans and comparisons made from your own words — alone or with someone. <b>Core 3.1</b> if you would rather set the depth yourself.',
         ],
       },
       {

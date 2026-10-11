@@ -86,7 +86,7 @@ const HOW_2: How[] = [
 // built beside the map, and someone can think it through with you.
 const HOW_3: How[] = [
   TALK,
-  { model: 'logos-3', title: 'See it laid out', line: 'Your reasoning drawn as a live map, and what you describe built beside it: models you can move, alone or with someone.', name: 'Socria Logos 3' },
+  { model: 'logos-3', title: 'See it laid out', line: 'Your reasoning drawn as a live map, and what you describe built beside it: models you can move, alone or with someone.', name: 'Socria Logos 3.5' },
 ];
 const isLogos = (m: StartModel | null | undefined) => m === 'logos-2' || m === 'logos-3';
 

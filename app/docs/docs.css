@@ -649,3 +649,19 @@
   .docs-root .d-cad-wake,
   .docs-root .d-cad-cap button { display: none; }
 }
+
+/* Logos 3.5's displays, live on the page (app/docs/DocsDisplays.tsx). The
+   figures draw themselves (components/display/display.css); this is only the
+   frame round each, and a guard against the wiki's prose styles reaching in. */
+.docs-root .d-displays { display: grid; grid-template-columns: minmax(0, 1fr); gap: 28px; margin: 18px 0 8px; }
+.docs-root .d-display { margin: 0; display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.docs-root .d-display-frame { border: 1px solid var(--d-line); border-radius: 10px; background: #f6f3ec; overflow: hidden; min-width: 0; }
+.docs-root .d-display-before { font-style: italic; color: var(--d-ink-45); }
+.docs-root .d-display-none { padding: 16px; color: var(--d-ink-45); font-size: 14px; }
+.docs-root .d-display figcaption { font-size: 14px; line-height: 1.55; color: var(--ink-60, rgba(0,0,0,.62)); }
+.docs-root .d-display-frame .dsp ul, .docs-root .d-display-frame .dsp ol { margin: 0; padding: 0; }
+.docs-root .d-display-frame .dsp li { margin: 0; }
+.docs-root .d-display-frame .dsp li::marker { content: none; }
+.docs-root .d-display-frame .dsp p { margin: 0; }
+.docs-root .d-display-frame .dsp table { margin: 0; width: 100%; }
+.docs-root .d-display-frame .dsp button { font: inherit; }

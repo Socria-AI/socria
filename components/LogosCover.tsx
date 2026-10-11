@@ -103,7 +103,7 @@ export function LogosCover({
   const [keyError, setKeyError] = useState(false);
   const [turn, setTurn] = useState(0);
   const three = version === 'logos-3';
-  const name = three ? 'Logos 3' : 'Logos 2';
+  const name = three ? 'Logos 3.5' : 'Logos 2';
   // Logos 2: built once per cover. The library sanitises on the way out, exactly
   // as a model arriving from a conversation would be.
   const saddle = useMemo(() => (three ? null : modelById('saddle')), [three]);
@@ -155,9 +155,9 @@ export function LogosCover({
               Say what you are working through. <span className="j3-title-em">Watch it get built.</span>
             </h2>
             <p className="j3-standfirst reveal-in" style={{ animationDelay: '130ms' }}>
-              Logos 3 is one workspace for a hard problem: the conversation, a map of your reasoning, models the
-              engine solves, and designs drawn in 3D from your words — side by side. Move a value and what depends on
-              it moves. Ask about anything on it by name.
+              Logos 3.5 is one workspace for a hard problem: the conversation, a map of your reasoning, models the
+              engine solves, designs drawn in 3D — and charts, plans, comparisons and decisions made from your own
+              words. Move a value and what depends on it moves. Ask about anything on it by name.
             </p>
           </>
         ) : (

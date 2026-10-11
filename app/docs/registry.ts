@@ -44,7 +44,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'models',
     title: 'The models',
-    blurb: 'Core 3.1, Core 4, Logos 2 and Logos 3 side by side — what each is for and how to switch.',
+    blurb: 'Core 3.1, Core 4, Logos 2 and Logos 3.5 side by side — what each is for and how to switch.',
     group: 'The models',
   },
   {
@@ -80,7 +80,13 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'logos-3',
     title: 'Socria Logos 3',
-    blurb: 'The current Logos: the conversation, the map, models the engine solves and designs drawn in 3D from your words, in one workspace — and room for a second person.',
+    blurb: 'The current Logos, now 3.5: the conversation, the map, models the engine solves and designs drawn in 3D from your words, in one workspace — and room for a second person.',
+    group: 'The models',
+  },
+  {
+    slug: 'logos-3-5',
+    title: 'What’s new in Logos 3.5',
+    blurb: 'Charts, plans, calendars, comparisons, diagrams, number lines and decisions made from your own words beside the map — plus the experiences, a memory that tracks how your thinking changes, and what it will not do.',
     group: 'The models',
   },
   {

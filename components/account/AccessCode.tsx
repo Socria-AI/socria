@@ -11,7 +11,7 @@ import { useUser } from '@clerk/nextjs';
 import { accountGates, GATE_CHANGED, GATE_LABEL, openGates, rememberGate, type GateId } from '@/lib/feature-gates';
 
 const OPENS: Record<GateId, { href: string; says: string }> = {
-  logos3: { href: '/chat?model=logos-3', says: 'Open Logos 3 →' },
+  logos3: { href: '/chat?model=logos-3', says: 'Open Logos 3.5 →' },
 };
 
 export function AccessCode({ onOpened }: { onOpened?: () => void }) {

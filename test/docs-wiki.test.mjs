@@ -149,5 +149,18 @@ console.log('\n=== prev/next walks the whole wiki ===');
   ok('following next reaches every page exactly once', steps === DOC_PAGES.length, String(steps));
 }
 
+console.log('\n=== Logos 3.5 is documented, and documented honestly ===');
+{
+  const p = docPage('logos-3-5');
+  ok('it is in the registry, right after Logos 3', !!p && DOC_PAGES[DOC_PAGES.findIndex((x) => x.slug === 'logos-3') + 1]?.slug === 'logos-3-5');
+  ok('  and the picker calls the model what the page does', SOCRIA_MODELS['logos-3'].short === 'Logos 3.5' && SOCRIA_MODELS['logos-3'].label === 'Socria Logos 3.5');
+  const src = read('app/docs/content/logos-3-5.tsx');
+  ok('  shows the displays live, made by the product’s own code', /<DisplaysShowcase items=\{EXAMPLES\} \/>/.test(src));
+  ok('  says numbers are never made up', /does not make up revenue/.test(src) && /Make up your numbers/.test(src));
+  ok('  says nothing is decided for you', /Decide for you/.test(src));
+  ok('  and says what is not there yet', /<H2 id="yet">Not there yet<\/H2>/.test(src) && /stacked bar/i.test(src));
+  ok('  the Logos 3 page points to it', /href="\/docs\/logos-3-5"/.test(read('app/docs/content/logos-3.tsx')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

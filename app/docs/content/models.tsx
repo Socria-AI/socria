@@ -54,7 +54,7 @@ export function Models() {
               <th>Core 3.1</th>
               <th>Core 4</th>
               <th>Logos 2</th>
-              <th>Logos 3</th>
+              <th>Logos 3.5</th>
             </tr>
           </thead>
           <tbody>
@@ -165,9 +165,11 @@ export function Models() {
           fitted to data, a black hole.
         </li>
         <li>
-          <strong><Link href="/docs/logos-3">Logos 3</Link></strong> — the same,
-          with somebody else: a decision two people share, a disagreement worth
-          making precise, a plan you are building together.
+          <strong><Link href="/docs/logos-3">Logos 3.5</Link></strong> — the same,
+          with the everyday displays (charts, plans, comparisons, decisions —{' '}
+          <Link href="/docs/logos-3-5">what is new</Link>) and with somebody else: a
+          decision two people share, a disagreement worth making precise, a plan
+          you are building together.
         </li>
       </ul>
       <Callout tag="Under the hood">

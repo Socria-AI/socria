@@ -1649,12 +1649,16 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   // Same surface, same engine; `collab` is the difference. And depth: Logos 3
   // has the four registers Core 3.1 has, chosen in the same model picker —
   // the Logos routes have always read them (lib/logos-guidance.ts).
+  // LOGOS 3.5 is this entry, updated in place: the everyday displays, the
+  // experiences and the living memory shipped as the next version of Logos 3,
+  // so the id stays `logos-3` and every saved line of thinking, link and
+  // preference that names it still opens it.
   'logos-3': {
     id: 'logos-3',
-    label: 'Socria Logos 3',
-    short: 'Logos 3',
+    label: 'Socria Logos 3.5',
+    short: 'Logos 3.5',
     description:
-      'Think together. Two people, one map and one set of models, Socria between you — naming the connections, the disagreements and the open questions.',
+      'Think together, or alone. Say what you are working through and it is built beside you — a map, models, and charts, plans, comparisons and decisions made from your own words.',
     defaultOpenAIModel: 'gpt-5.6-sol',
     supportsDepth: true,
     requiresAuth: true,

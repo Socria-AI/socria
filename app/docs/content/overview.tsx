@@ -75,9 +75,11 @@ export function Overview() {
           grounded in real sources.
         </li>
         <li>
-          <strong><Link href="/docs/logos-3">Logos 3</Link></strong> — Logos 2
-          for two people at once: one map, one set of models, and Socria as the
-          layer between you, naming the connections and the disagreements
+          <strong><Link href="/docs/logos-3">Logos 3.5</Link></strong> — Logos 2
+          with a workspace around it: charts, plans, comparisons and decisions made
+          from your own words (<Link href="/docs/logos-3-5">what is new</Link>), and
+          room for two people at once — one map, one set of models, and Socria as
+          the layer between you, naming the connections and the disagreements
           without taking a side.
         </li>
       </ul>

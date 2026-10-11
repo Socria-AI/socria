@@ -87,7 +87,7 @@ console.log('=== each surface its own subjects ===');
   }
   const l2 = read('app/docs/content/logos-2.tsx');
   ok('the Logos 2 page keeps no screenshots — its figures are live', !/\.png|<img/.test(l2) && /<DemoLibraryFigure id=\{g\.id\}/.test(l2));
-  ok('…and says Logos 3 is the current Logos', /Logos 3 is the current Logos/.test(l2));
+  ok('…and says Logos 3 is the current Logos', /Logos 3\.5 is the current Logos/.test(l2));
   ok('the Logos 3 page shows its own, live', /<DemoShowcase items=\{DOCS_SHOWCASE\} \/>/.test(read('app/docs/content/logos-3.tsx')));
   ok('live figures sit inside the Logos surface wrapper, where the view’s styles live', (read('app/docs/DocsDemo.tsx').match(/logos-root lg-demo d-live-surface/g) || []).length === 2);
 }

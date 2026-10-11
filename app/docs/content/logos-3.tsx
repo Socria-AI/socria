@@ -27,6 +27,11 @@ const sections = [
 export function Logos3() {
   return (
     <Article page={page} sections={sections}>
+      <Callout tag="Now Logos 3.5">
+        Logos 3 has been updated to <strong>Logos 3.5</strong>: everything on this page, plus charts,
+        plans, calendars, comparisons, diagrams, number lines and decisions made from your own words,
+        beside the map. See <Link href="/docs/logos-3-5">what is new in Logos 3.5</Link>.
+      </Callout>
       <p>
         Logos 3 is the current Logos: one workspace for a hard problem. Say what you are working
         through and it builds beside you — a live{' '}
@@ -79,7 +84,7 @@ export function Logos3() {
       <H2 id="start">Starting a room</H2>
       <ol>
         <li>
-          Pick <strong>Logos 3</strong> in the model menu — it is listed under{' '}
+          Pick <strong>Logos 3.5</strong> in the model menu — it is listed under{' '}
           <em>think together</em>.
         </li>
         <li>

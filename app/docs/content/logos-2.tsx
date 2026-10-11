@@ -77,8 +77,8 @@ function Gallery() {
 export function Logos2() {
   return (
     <Article page={page} sections={sections}>
-      <Callout tag="Logos 3 is the current Logos">
-        Everything on this page is in <Link href="/docs/logos-3">Logos 3</Link> too — with a workspace
+      <Callout tag="Logos 3.5 is the current Logos">
+        Everything on this page is in <Link href="/docs/logos-3">Logos 3.5</Link> too — with a workspace
         around it: the map, the models and designs drawn in 3D from your words, side by side. The figures
         here are built live on this page by the same engine, not screenshots of an older screen.
       </Callout>
@@ -398,9 +398,9 @@ export function Logos2() {
       <p>
         Logos 2 needs an account. Pick it from the model menu beside the chat
         box; leaving it returns you to whichever Core model you were on. The{' '}
-        <em>Try Logos 3</em> invitation beside the chat opens{' '}
-        <Link href="/docs/logos-3">Logos 3</Link>, which is everything here
-        with a second seat and thinking depth.
+        <em>Try Logos 3.5</em> invitation beside the chat opens{' '}
+        <Link href="/docs/logos-3">Logos 3.5</Link>, which is everything here
+        with a second seat, thinking depth and the everyday displays.
       </p>
       <Callout tag="Free, then Socria One">
         On the free plan, Logos holds {PLANS.free.counters.chats} new lines of
