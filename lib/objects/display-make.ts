@@ -23,16 +23,19 @@
 // PURE.
 
 import { currentOf, kindOf, type ObjectSpace, type ThoughtObject } from './core';
-import { cleanText, norm } from './display-base';
+import { cleanText, norm, todayDay } from './display-base';
 import { drawDiagram, type DiagramState } from './display-diagram';
 import { exerciseFrom } from './display-exercise';
 import { blankBalanceSheet, blankIncomeStatement, journalEntry } from './display-worksheet';
 import { LIBRARY } from './display-accounts';
 import { readNumber, type DataState } from './display-data';
 import type { MarketState } from './display-market';
+import type { CompareState } from './display-compare';
 import type { DisplayRequest } from './display-request';
 import { crossroadsFromWords, sealCrossroads, type CrossroadsState } from './display-crossroads';
+import { numberLineFromWords } from './display-numberline';
 import { untangleFromWords } from './display-untangle';
+import { checklistFromWords, compareFromWords, dataFromWords, dataNumbersIn, datedFromWords, decisionTreeFromWords, emptyChart, flowFromWords, mindFromWords, prosConsFromWords, vennFromWords } from './display-words';
 import { groundFromWords } from './display-commonground';
 import { timeMachineFromWords } from './display-timemachine';
 import { overlap } from './reasoning';
@@ -192,6 +195,8 @@ export interface MadeDisplay {
   state: unknown;
   origin: 'socria' | 'person';
   says?: string;
+  /** what it was made from, said to the person: their map, their own words, or a fixed template */
+  from?: 'map' | 'words' | 'template';
 }
 
 /** An experience already in the workspace that the request is about — opened rather than made twice. */
@@ -223,50 +228,93 @@ export function dumpFrom(latest: string, turns: readonly string[]): string {
  */
 export function makeFromRequest(
   req: DisplayRequest,
-  ctx: { said: string; map: MapMaterial | null; space: ObjectSpace; topic?: string; latest?: string; turns?: readonly string[] }
+  ctx: { said: string; map: MapMaterial | null; space: ObjectSpace; topic?: string; latest?: string; turns?: readonly string[]; today?: string }
 ): MadeDisplay | OpenDisplay | { why: string } | null {
   const kind = req.kind;
   const latest = ctx.latest ?? ctx.said;
+  const earlier = ctx.turns ?? [];
+  const words = (made: { state: unknown; says?: string } | null, k: string): MadeDisplay | null =>
+    made ? { kind: k, state: made.state, origin: 'person', from: 'words', ...(made.says ? { says: made.says } : {}) } : null;
   // THE EXPERIENCES are started from the person's own words and nothing else — no one's opinion,
   // no reading of the person, nothing about the other side of a conversation is drafted
   if (kind === 'crossroads') {
     const same = [...ctx.space.objs].reverse().find((o) => o.kind === 'crossroads' && overlap((currentOf(o) as CrossroadsState).decision, latest) >= 0.6);
     if (same) return { open: same.id, says: `Your decision “${(currentOf(same) as CrossroadsState).title}” is already here — opened it.` };
     const made = crossroadsFromWords(latest);
-    return made ? { kind, state: made, origin: 'person' } : null;
+    if (made) return { kind, state: made, origin: 'person', from: 'words' };
+    // "pros and cons of moving to Denver": the option, and not doing it, with what they listed for and against
+    return words(prosConsFromWords(latest), kind);
   }
   if (kind === 'untangle') {
     const state = untangleFromWords(dumpFrom(latest, ctx.turns ?? []));
     if (!state) return { why: 'That could not be untangled.' };
-    return { kind, state, origin: 'person', ...(state.dump ? {} : { says: 'Write everything on your mind into it — it will be separated into thoughts in your words.' }) };
+    return { kind, state, origin: 'person', from: 'words', ...(state.dump ? {} : { says: 'Write everything on your mind into it — it will be separated into thoughts in your words.' }) };
   }
   if (kind === 'commonground') {
     const state = groundFromWords(latest);
-    return state ? { kind, state, origin: 'person', says: 'Each person joins in their own name and writes their own perspective — Socria never speaks for anyone.' } : { why: 'That could not be set up.' };
+    return state ? { kind, state, origin: 'person', from: 'words', says: 'Each person joins in their own name and writes their own perspective — Socria never speaks for anyone.' } : { why: 'That could not be set up.' };
   }
   if (kind === 'timemachine') {
     const state = timeMachineFromWords(latest);
-    return state ? { kind, state, origin: 'person' } : { why: 'That could not be opened.' };
+    return state ? { kind, state, origin: 'person', from: 'words' } : { why: 'That could not be opened.' };
   }
-  if (kind === 'plan' && req.fromMap) {
-    if (!ctx.map?.nodes.length) return { why: 'There is nothing on the map yet to make that from.' };
-    return { kind: 'plan', state: planFromMap(ctx.map, { title: ctx.topic, view: req.view }), origin: 'person' };
+  if (kind === 'plan') {
+    // the items written in the request itself come first: "make a checklist: buy milk, call mom"
+    const view = req.view;
+    const dated = view === 'timeline' || view === 'calendar' || view === undefined ? datedFromWords(latest, { today: ctx.today ?? todayDay(), view: view ?? 'timeline' }) : null;
+    if (dated) return words(dated, 'plan');
+    const listed = checklistFromWords(latest, { view: view ?? 'checklist' });
+    if (listed) return words(listed, 'plan');
+    if (req.fromMap && ctx.map?.nodes.length) return { kind: 'plan', state: planFromMap(ctx.map, { title: ctx.topic, view }), origin: 'person', from: 'map' };
+    // "turn these notes into a checklist", "a calendar of these deadlines": what they wrote just before
+    const back = (view === 'timeline' || view === 'calendar' ? datedFromWords(latest, { today: ctx.today ?? todayDay(), earlier, view }) : null) ?? checklistFromWords(latest, { earlier, view: view ?? 'checklist' });
+    if (back) return words(back, 'plan');
+    if (req.fromMap) return { why: 'There is nothing on the map yet to make that from.' };
+    return null;
   }
+  if (kind === 'diagram') {
+    const view = req.view;
+    const made =
+      view === 'flow' ? flowFromWords(latest, { earlier }) : view === 'decision' ? decisionTreeFromWords(latest) : view === 'mind' || view === 'concept' || view === 'hierarchy' ? mindFromWords(latest, { view }) : null;
+    return words(made, 'diagram');
+  }
+  if (kind === 'venn') return words(vennFromWords(latest), 'venn');
+  // a set of numbers is drawn as written, never drafted — and with none written, the line opens empty
+  if (kind === 'numberline') {
+    const state = numberLineFromWords(latest);
+    return state
+      ? { kind, state, origin: 'person', from: 'words' }
+      : { kind, state: { title: 'Number line', view: 'line', variable: 'x', intervals: [], points: [] }, origin: 'person', from: 'words', says: 'Write the inequality or interval in it — “x > 3”, “−2 ≤ x < 5”, “[2, 5)” — and it is drawn.' };
+  }
+  if (kind === 'compare') return words(compareFromWords(latest, { view: req.view }), 'compare');
   if (kind === 'exercise') {
     const diagram = [...ctx.space.objs].reverse().find((o) => o.kind === 'diagram' && (currentOf(o) as DiagramState)?.nodes?.length);
     if (diagram && !req.fromMap) {
       const state = exerciseFromDiagram(diagram);
-      if (state) return { kind: 'exercise', state, origin: diagram.origin === 'socria' ? 'socria' : 'person', says: undefined };
+      if (state) return { kind: 'exercise', state, origin: diagram.origin === 'socria' ? 'socria' : 'person', from: 'map' };
     }
     const fromMap = ctx.map ? exerciseFromMap(ctx.map, ctx.topic) : null;
-    if (fromMap) return { kind: 'exercise', state: fromMap, origin: 'person' };
+    if (fromMap) return { kind: 'exercise', state: fromMap, origin: 'person', from: 'map' };
     return {
       why: 'An exercise is made from something already here — a diagram or the ideas on your map — and there is not enough of either yet. Make a diagram (or talk it through) first.',
     };
   }
   if (kind === 'worksheet') {
     const w = worksheetFromWords(ctx.said);
-    return { kind: 'worksheet', state: w.state, origin: 'socria', ...(w.says ? { says: w.says } : {}) };
+    return { kind: 'worksheet', state: w.state, origin: 'socria', from: 'template', ...(w.says ? { says: w.says } : {}) };
+  }
+  // A CHART OF THEIR OWN NUMBERS is read from what they wrote — no model copies them, so none can
+  // drop, round or relabel one. With no numbers anywhere in what they said, it opens empty to be
+  // filled in; numbers it cannot read plainly (prose, an attachment) are left to the drafted path.
+  if (kind === 'data' || (!kind && req.kinds.includes('data'))) {
+    // "a table of my grades" opens as the table it asked for
+    const view = req.view ?? (/\b(?:table|spreadsheet)\b/.test(req.noun) ? 'table' : undefined);
+    const made = dataFromWords(latest, { view, earlier: ctx.turns });
+    if (made) return { kind: 'data', state: made.state, origin: 'person', from: 'words', ...(made.says ? { says: made.says } : {}) };
+    if (kind === 'data' && dataNumbersIn(ctx.said) === 0) {
+      const blank = emptyChart(latest, { view });
+      return { kind: 'data', state: blank.state, origin: 'person', from: 'words', says: blank.says };
+    }
   }
   return null;
 }
@@ -312,6 +360,27 @@ const SEALS: Record<string, (state: unknown, said: string) => Sealed> = {
       gaps.push('these are example numbers, not yours — give yours and they will replace them');
     }
     return { state: { ...s, basis }, gaps };
+  },
+  // A drafted comparison may suggest the options and criteria; how much each criterion matters and
+  // how each option does are the person's judgments — a score or weight not in their words is
+  // taken out, and a note with a figure they never gave is dropped rather than shown as fact
+  compare: (raw, said) => {
+    const s = raw as CompareState;
+    const theirs = numbersIn(said);
+    let cleared = 0;
+    const scores = s.scores
+      .map((x) => {
+        const ownValue = x.value !== null && theirs.has(x.value);
+        const figures = x.note ? [...numbersIn(x.note)] : [];
+        const ownNote = !x.note || figures.every((n) => theirs.has(n));
+        if ((x.value !== null && !ownValue) || !ownNote) cleared += 1;
+        const { low: _l, high: _h, ...rest } = x;
+        return { ...(ownValue ? x : rest), value: ownValue ? x.value : null, ...(ownNote ? {} : { note: undefined }) };
+      })
+      .filter((x) => x.value !== null || x.note);
+    const criteria = s.criteria.map((c) => (theirs.has(c.weight) && c.weight !== 5 ? c : { ...c, weight: 5 }));
+    const gaps = cleared ? ['scores and figures you did not give were left empty — how each option does is yours to say'] : [];
+    return { state: { ...s, scores, criteria }, gaps };
   },
   market: (raw, said) => {
     const s = raw as MarketState;

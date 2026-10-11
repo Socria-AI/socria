@@ -18,6 +18,7 @@ import { crossroadsFromWords } from '@/lib/objects/display-crossroads';
 import { untangleFromWords } from '@/lib/objects/display-untangle';
 import { groundFromWords } from '@/lib/objects/display-commonground';
 import { timeMachineFromWords } from '@/lib/objects/display-timemachine';
+import { numberLineFromWords } from '@/lib/objects/display-numberline';
 import './gallery.css';
 
 /** Example states for the experiences, made by their own makers from example words — labelled as examples where they are shown. */
@@ -26,6 +27,7 @@ const SAMPLES: Record<string, () => unknown> = {
   untangle: () => untangleFromWords('I need to finish the essay, my car is making a noise, not sure if I should drop chem, rent is due Friday, want to start running again'),
   commonground: () => groundFromWords('Help us find common ground on how to split the chores'),
   timemachine: () => timeMachineFromWords('How has my thinking changed?'),
+  numberline: () => numberLineFromWords('Show -2 <= x < 5 or x = 7 on a number line'),
 };
 
 function sampleOf(m: DisplayMeta): ThoughtObject | null {

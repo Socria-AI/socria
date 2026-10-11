@@ -60,6 +60,8 @@ import {
   type Wanted,
 } from '@/lib/model/wants';
 import { dropRemoved } from '@/lib/map-edit';
+import { sanitizeViz } from '@/lib/logos-viz';
+import { readPlotRequest, sameCurve } from '@/lib/plot-words';
 import { isSynthesisText } from '@/lib/logos-synthesis';
 import { settle, unanswered } from '@/lib/model/ask';
 import {
@@ -430,10 +432,10 @@ export async function POST(req: NextRequest) {
         .map((m: any) => renderMessageForModel({ role: 'user', content: m.content, attachments: sanitizeAttachments(m.attachments) }, true))
         .join('\n');
       try {
-        let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person'; says?: string } | null = null;
+        let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person'; says?: string; from?: 'map' | 'words' | 'template' } | null = null;
         // MADE, NOT DRAFTED: a plan from the map, a labeling exercise over what is here, a worksheet from a template
         const turns = kept.filter((m: any) => m.role === 'user').map((m: any) => String(m.content ?? ''));
-        const madeHere = displayWords ? makeFromRequest(displayWords, { said: personSaid, map: mapIdeas, space, topic: next.ask?.topic, latest: said, turns }) : null;
+        const madeHere = displayWords ? makeFromRequest(displayWords, { said: personSaid, map: mapIdeas, space, topic: next.ask?.topic, latest: said, turns, today: isoDay(body?.today) ?? todayDay() }) : null;
         if (madeHere && 'why' in madeHere) {
           display = { ok: false, failure: 'empty', says: madeHere.why };
         } else if (madeHere && 'open' in madeHere) {
@@ -442,7 +444,7 @@ export async function POST(req: NextRequest) {
           display = { ok: true, id: madeHere.open, kind: there?.kind, says: madeHere.says };
         } else if (madeHere) {
           const state = kindOf(madeHere.kind)?.sanitize(madeHere.state) ?? null;
-          if (state) sealed = { kind: madeHere.kind, state, gaps: [], origin: madeHere.origin, says: madeHere.says };
+          if (state) sealed = { kind: madeHere.kind, state, gaps: [], origin: madeHere.origin, says: madeHere.says, from: madeHere.from };
           else display = { ok: false, failure: 'malformed', says: 'That could not be made from what is here.' };
         } else {
           const drafted = await openai.chat.completions.create({
@@ -478,13 +480,48 @@ export async function POST(req: NextRequest) {
           const made = makeDisplay(space, sealed.kind, sealed.state, sealed.origin);
           if (made.ok) {
             next = { ...next, objects: made.space };
-            display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: [madeSays(made.obj, sealed.gaps), sealed.says].filter(Boolean).join(' ').slice(0, 300) };
+            display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: [madeSays(made.obj, sealed.gaps, sealed.from), sealed.says].filter(Boolean).join(' ').slice(0, 300) };
+            // ONE ANSWER TO ONE ASK. Told to draw whenever someone says "chart" or "plot", the
+            // extractor also drew this turn's numbers as a picture of its own — a second, cruder
+            // copy on the Plot lens, made by hand from the same words. The display is the answer;
+            // a picture this turn invented beside it is dropped, and one already on screen stays.
+            const drewBars = next.viz && ['diagram', 'distribution', 'sequence'].includes(String(next.viz.kind));
+            if (sealed.kind === 'data' && sealed.from === 'words' && drewBars && JSON.stringify(next.viz) !== JSON.stringify(current.viz ?? null)) {
+              const { viz: _drawn, ...rest } = next;
+              next = (current.viz ? { ...rest, viz: current.viz } : rest) as typeof next;
+            }
           } else display = { ok: false, failure: made.failure, says: made.says };
         }
         console.info('logos map: display %s — %s', display?.ok ? 'made' : 'not made', display?.says?.slice(0, 160));
       } catch (e) {
         console.warn('logos map: display pass failed', e);
         display = { ok: false, failure: 'failed', says: 'The display could not be drafted just now — ask again in a moment.' };
+      }
+    }
+    // ── A FUNCTION THEY ASKED TO SEE ──────────────────────────────
+    //
+    // "Graph y = x²" holds the whole curve. The extractor was the only thing
+    // that drew it, so what appeared was whatever a language model copied out —
+    // a different function, a misplaced exponent, or nothing when it filed the
+    // turn as conversation. Read from their words (lib/plot-words.ts), the Plot
+    // lens draws exactly what they wrote; the extractor's own picture stands
+    // when it already plots the same curve, since it may carry more (sliders,
+    // a caption) than the bare curve does.
+    {
+      const stated = !displayAsked && !answeredByScene() ? readPlotRequest(said) : null;
+      if (stated && !(next.viz?.kind === 'function' && sameCurve(next.viz.expr, stated.expr))) {
+        const scene = sanitizeViz({
+          kind: 'function',
+          expr: stated.expr,
+          varName: 'x',
+          title: stated.title,
+          ...(stated.more.length ? { overlays: stated.more.map((expr, i) => ({ id: `c${i + 2}`, expr, visible: true, source: 'user' })) } : {}),
+          ...(stated.view ? { view: stated.view } : {}),
+        });
+        if (scene) {
+          next = { ...next, viz: scene };
+          console.info('logos map: drew the function they wrote — %s', stated.title);
+        }
       }
     }
     // ── THE ON-RAMP ───────────────────────────────────────────────

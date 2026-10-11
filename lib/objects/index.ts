@@ -20,6 +20,7 @@ import './display-worksheet';
 import './display-exercise';
 import './display-compare';
 import './display-venn';
+import './display-numberline';
 // the human-first experiences (Logos 3.5): objects of thought too, sharing one vocabulary of reasoning (reasoning.ts)
 import './display-crossroads';
 import './display-untangle';
@@ -40,6 +41,8 @@ export { displayKinds, displayMeta, isDisplayKind, isoDay, todayDay, localDay, t
 export { readDisplayRequest, type DisplayRequest } from './display-request';
 export { buildDisplayPrompt, readDisplayProposal, makeDisplay, madeSays, type Proposal } from './display-propose';
 export { planFromMap, exerciseFromDiagram, exerciseFromMap, worksheetFromWords, makeFromRequest, sealDraft, numbersIn, dumpFrom, type MapMaterial, type MadeDisplay, type OpenDisplay } from './display-make';
+export { dataFromWords, emptyChart, readPairs, subjectOf, dataNumbersIn, listIn, checklistFromWords, datedFromWords, flowFromWords, mindFromWords, vennFromWords, compareFromWords, prosConsFromWords, decisionTreeFromWords, type Pair, type FromWords } from './display-words';
+export { numberLineFromWords, readNumberSet, unionOf, intervalNotation, inequalityOf, setBuilder, lineWindow, type NumberLineState, type Piece } from './display-numberline';
 export { BASIS_WORD, REL_WORD, type Basis, type Link } from './reasoning';
 export { timelineOf, compareStates, compareMap, keyOfStep, type TimelineEvent, type Timeline, type StateDiff } from './timeline';
 

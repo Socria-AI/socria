@@ -44,7 +44,7 @@
 .dsp-title-in:focus { border-bottom-color: var(--dsp-primary); outline: none; }
 .dsp-kind { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dsp-40); }
 .dsp-aside { font-size: 11.5px; color: var(--dsp-60); font-variant-numeric: tabular-nums; }
-.dsp-head-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.dsp-head-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; flex-wrap: wrap; justify-content: flex-end; max-width: 100%; min-width: 0; }
 .dsp-history { display: inline-flex; gap: 2px; }
 .dsp-history button {
   min-width: 28px; min-height: 28px; padding: 0 6px; border: 0; border-radius: 4px; background: none; cursor: pointer;
@@ -275,7 +275,7 @@
 .dsp-panel-noun { font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-ink-40, rgba(35, 36, 31, 0.42)); }
 
 /* ── the shared controls (primitives.tsx) ─────────────────────────── */
-.dsp-tools { display: inline-flex; align-items: center; gap: 2px; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--dsp-line); }
+.dsp-tools { display: inline-flex; flex-wrap: wrap; align-items: center; gap: 2px; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--dsp-line); }
 .dsp-tool {
   padding: 3px 8px; border: 0; border-radius: 4px; background: none; cursor: pointer; font-size: 12px; color: var(--dsp-60); white-space: nowrap;
 }
@@ -356,3 +356,58 @@
 .dsp-details { margin-top: 8px; font-size: 12.5px; }
 .dsp-details summary { cursor: pointer; color: var(--dsp-60); }
 .dsp-panel-pick .dsp-panel-new { margin-left: auto; border-style: dashed; }
+
+/* ── a plan as a calendar ─────────────────────────────────────────── */
+.dsp-cal-head { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; flex-wrap: wrap; }
+.dsp-cal-title { margin: 0; min-width: 9.5em; font-family: var(--serif, Georgia, serif); font-size: 16px; }
+.dsp-cal-step { border: 1px solid var(--dsp-line); background: none; border-radius: 4px; width: 26px; height: 26px; cursor: pointer; color: var(--dsp-ink); font-size: 15px; line-height: 1; }
+.dsp-cal-head .dsp-seg { margin-left: auto; }
+.dsp-cal-grid { display: grid; gap: 0; border-top: 1px solid var(--dsp-line); border-left: 1px solid var(--dsp-line); }
+.dsp-cal-row { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); }
+.dsp-cal-name { padding: 3px 5px; font-size: 11px; color: var(--dsp-60); border-right: 1px solid var(--dsp-line); border-bottom: 1px solid var(--dsp-line); }
+.dsp-cal-day { min-height: 64px; padding: 3px 4px; border-right: 1px solid var(--dsp-line); border-bottom: 1px solid var(--dsp-line); display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.dsp-cal-grid.is-week .dsp-cal-day { min-height: 150px; }
+.dsp-cal-day.is-out { background: color-mix(in srgb, var(--dsp-ink) 3%, transparent); }
+.dsp-cal-day.is-out .dsp-cal-num { color: var(--dsp-40); }
+.dsp-cal-day.is-today .dsp-cal-num { color: var(--dsp-paper); background: var(--dsp-primary); border-radius: 999px; padding: 0 5px; }
+.dsp-cal-day.is-over { background: var(--dsp-tint-2); }
+.dsp-cal-num { font-size: 11px; color: var(--dsp-60); align-self: flex-start; }
+.dsp-cal-item { display: block; width: 100%; text-align: left; border: 0; border-left: 2px solid var(--dsp-primary); background: var(--dsp-tint); color: var(--dsp-ink); font: inherit; font-size: 11.5px; line-height: 1.25; padding: 1px 4px; border-radius: 2px; cursor: pointer; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.dsp-cal-item.is-socria { border-left-style: dashed; }
+.dsp-cal-item.is-cont { opacity: 0.7; }
+.dsp-cal-item.is-done { text-decoration: line-through; color: var(--dsp-60); }
+.dsp-cal-item.is-sel { outline: 1.5px solid var(--dsp-accent); }
+.dsp-cal-item[draggable='true'] { cursor: grab; }
+@container (max-width: 480px) {
+  .dsp-cal-day { min-height: 46px; padding: 2px; }
+  .dsp-cal-item { font-size: 10.5px; }
+  .dsp-cal-name { font-size: 10px; padding: 2px; }
+}
+
+/* ── a number line ────────────────────────────────────────────────── */
+.dsp-nl { display: block; width: 100%; height: auto; max-width: 720px; touch-action: none; user-select: none; }
+.dsp-nl-axis { stroke: var(--dsp-ink); stroke-width: 1.4; }
+.dsp-nl-axis-arrow { fill: var(--dsp-ink); }
+.dsp-nl-tick { stroke: var(--dsp-60); stroke-width: 1; }
+.dsp-nl-ticklabel { font-size: 11px; fill: var(--dsp-60); font-variant-numeric: tabular-nums; }
+.dsp-nl-var { font-family: var(--serif, Georgia, serif); font-style: italic; font-size: 14px; fill: var(--dsp-ink); }
+.dsp-nl-seg { stroke: var(--dsp-accent); stroke-width: 4; stroke-linecap: butt; opacity: 0.55; }
+.dsp-nl-union .dsp-nl-seg { stroke: var(--dsp-primary); stroke-width: 5; opacity: 0.9; }
+.dsp-nl-arrow { fill: var(--dsp-accent); opacity: 0.7; }
+.dsp-nl-union .dsp-nl-arrow { fill: var(--dsp-primary); opacity: 1; }
+.dsp-nl-piece.is-socria .dsp-nl-seg { stroke-dasharray: 6 4; }
+.dsp-nl-end { fill: var(--dsp-accent); stroke: var(--dsp-accent); stroke-width: 2; }
+.dsp-nl-end.is-union { fill: var(--dsp-primary); stroke: var(--dsp-primary); }
+.dsp-nl-end.is-open { fill: var(--dsp-paper); }
+.dsp-nl-end.is-live, .dsp-nl-hit { cursor: ew-resize; }
+.dsp-nl-hit { fill: transparent; stroke: none; }
+.dsp-nl-hit:focus-visible, .dsp-nl-end.is-live:focus-visible { outline: none; stroke: var(--dsp-tension); stroke-width: 3; }
+.dsp-nl-says { display: grid; grid-template-columns: max-content 1fr; gap: 2px 12px; margin: 8px 0 4px; }
+.dsp-nl-says dt { color: var(--dsp-60); font-size: 12px; }
+.dsp-nl-says dd { margin: 0; font-family: var(--serif, Georgia, serif); font-size: 15px; }
+.dsp-nl-list { list-style: none; margin: 0; padding: 0; }
+.dsp-nl-list li { display: flex; gap: 14px; align-items: baseline; padding: 4px 0; border-bottom: 1px solid var(--dsp-line); }
+.dsp-nl-list li.is-socria { color: var(--dsp-60); }
+.dsp-nl-not { font-family: var(--serif, Georgia, serif); font-size: 15px; min-width: 7em; }
+.dsp-nl-ineq { flex: 1; color: var(--dsp-60); }
+.dsp-cal-grid.is-week .dsp-cal-item { white-space: normal; overflow-wrap: anywhere; }

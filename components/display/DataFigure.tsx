@@ -52,6 +52,7 @@ export function DataFigure(p: FigureProps) {
   const [binding, setBinding] = useState(false);
   const s = d.state;
   const off = availability(s)[s.view];
+  const filling = d.live && (!!off || s.rows.some((r) => r.cells.some((c) => c === null)));
   const cell = sel?.startsWith('cell:') ? sel.slice(5).split('|') : null;
   const b = BASIS[s.basis];
   return (
@@ -88,8 +89,11 @@ export function DataFigure(p: FigureProps) {
       ) : (
         <Chart s={s} d={d} sel={sel} select={select} />
       )}
+      {/* a chart still being filled in — an empty template, a row added — is filled in right here,
+          under it, and draws as each row is completed */}
+      {s.view !== 'table' && filling && <Table s={s} d={d} sel={sel} select={select} />}
       {cell && <CellInspector s={s} d={d} row={Number(cell[0])} col={cell[1]} onClose={() => select(null)} />}
-      {s.view !== 'table' && !off && <Numbers s={s} />}
+      {s.view !== 'table' && !off && !filling && <Numbers s={s} />}
     </DisplayShell>
   );
 }

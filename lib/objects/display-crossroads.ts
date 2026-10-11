@@ -973,7 +973,11 @@ export const CROSSROADS_META: DisplayMeta = {
   noun: 'decision',
   handle: 'CR',
   about: 'A decision you are working through: the options, what matters to you and how much, how each option serves it, the trade-offs, what you are assuming and what is still unknown. You decide; it never does.',
-  called: [{ words: ['crossroads', 'decision workspace', 'decision board'] }],
+  called: [
+    { words: ['crossroads', 'decision workspace', 'decision board'] },
+    // for and against, per option — and never a verdict: the Crossroads holds pros and cons without deciding
+    { words: ['pros and cons', 'pros and cons list', 'pros and cons chart', 'pros and cons table', 'pro and con list', 'pros cons list', 'pros/cons'], view: 'compare' },
+  ],
   intents: [
     /^(?:so\s+)?should i\b.+\bor\b/,
     /\bhelp me (?:decide|choose|make (?:a|this|the) (?:decision|choice))\b/,

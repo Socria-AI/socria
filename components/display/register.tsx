@@ -16,6 +16,7 @@ import { CrossroadsFigure } from './CrossroadsFigure';
 import { UntangleFigure } from './UntangleFigure';
 import { GroundFigure } from './GroundFigure';
 import { TimeFigure } from './TimeFigure';
+import { NumberLineFigure } from './NumberLineFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
@@ -26,6 +27,7 @@ registerFigure('diagram', DiagramFigure);
 registerFigure('market', MarketFigure);
 registerFigure('worksheet', WorksheetFigure);
 registerFigure('exercise', ExerciseFigure);
+registerFigure('numberline', NumberLineFigure);
 // the human-first experiences
 registerFigure('crossroads', CrossroadsFigure);
 registerFigure('untangle', UntangleFigure);

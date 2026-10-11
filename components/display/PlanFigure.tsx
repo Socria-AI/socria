@@ -15,11 +15,11 @@
 // convenience, never the only way.
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent } from 'react';
-import { clashes, timelineBars, planTicks, STATUS_WORD, PLAN_LIMITS, type PlanItem, type PlanState, type Status } from '@/lib/objects/display-plan';
+import { addMonths, calendarMonth, calendarStart, calendarWeek, clashes, timelineBars, planTicks, STATUS_WORD, PLAN_LIMITS, type CalendarDay, type PlanItem, type PlanState, type Status } from '@/lib/objects/display-plan';
 import { addDays, dayDiff, sayDay, todayDay } from '@/lib/objects/display-base';
 import type { FigureProps } from '@/components/objects/figures';
 import { AddRow, DisplayShell, Edit, useDisplay, type Display } from './DisplayShell';
-import { useSelection } from './primitives';
+import { Segmented, useSelection } from './primitives';
 
 type D = Display<PlanState>;
 type Select = (id: string | null) => void;
@@ -57,6 +57,8 @@ export function PlanFigure(p: FigureProps) {
         </p>
       ) : s.view === 'timeline' ? (
         <Timeline s={s} d={d} sel={sel} select={select} year={year} />
+      ) : s.view === 'calendar' ? (
+        <Calendar s={s} d={d} sel={sel} select={select} />
       ) : s.view === 'board' ? (
         <Board s={s} d={d} sel={sel} select={select} year={year} add={add} />
       ) : s.view === 'checklist' ? (
@@ -71,7 +73,7 @@ export function PlanFigure(p: FigureProps) {
         <AddDated
           label={s.view === 'storyboard' ? 'Add a frame' : 'Add an item'}
           placeholder={s.view === 'storyboard' ? 'What happens next…' : 'Something to do, or that happens…'}
-          dated={s.view === 'timeline'}
+          dated={s.view === 'timeline' || s.view === 'calendar'}
           onAdd={(text, date) => add(text, date ? { date } : {})}
         />
       )}
@@ -371,6 +373,131 @@ function Undated({ s, d, select }: { s: PlanState; d: D; select: Select }) {
           </li>
         ))}
       </ul>
+    </div>
+  );
+}
+
+// ── calendar ─────────────────────────────────────────────────────────
+
+const WEEKDAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+const MONTH_NAME = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+
+/**
+ * The plan on its days, a month or a week at a time. An item sits on every
+ * day it covers. Dragging one to another day is `shift` — its length kept —
+ * and with an item selected the arrow keys move it a day (← →) or a week
+ * (↑ ↓): the same operation, so it undoes and syncs like any other.
+ */
+function Calendar({ s, d, sel, select }: { s: PlanState; d: D; sel: string | null; select: Select }) {
+  const today = todayDay();
+  const [scale, setScale] = useState<'month' | 'week'>('month');
+  const [month, setMonth] = useState(() => calendarStart(s, today));
+  const [weekOf, setWeekOf] = useState(() => `${calendarStart(s, today)}-01`);
+  const [over, setOver] = useState<string | null>(null);
+  const byId = new Map(s.items.map((i) => [i.id, i]));
+  const weeks: CalendarDay[][] = scale === 'month' ? calendarMonth(s, month) : [calendarWeek(s, weekOf)];
+  const [y, m] = month.split('-').map(Number);
+  const heading =
+    scale === 'month' ? `${MONTH_NAME[m - 1]} ${y}` : `Week of ${sayDay(weeks[0][0].day)}`;
+  const step = (n: number) => (scale === 'month' ? setMonth((v) => addMonths(v, n)) : setWeekOf((v) => addDays(v, 7 * n)));
+  const moveTo = (id: string, day: string) => {
+    const it = byId.get(id);
+    if (!it?.date || !d.live) return;
+    const days = dayDiff(it.date, day);
+    if (days) d.act('shift', { id, days });
+  };
+  const onKey = (e: KeyboardEvent<HTMLButtonElement>, id: string) => {
+    const by = e.key === 'ArrowLeft' ? -1 : e.key === 'ArrowRight' ? 1 : e.key === 'ArrowUp' ? -7 : e.key === 'ArrowDown' ? 7 : 0;
+    if (!by || !d.live) return;
+    e.preventDefault();
+    const it = byId.get(id);
+    if (it?.date) d.act('shift', { id, days: by });
+  };
+  return (
+    <div className="dsp-cal">
+      <div className="dsp-cal-head">
+        <button type="button" className="dsp-cal-step" onClick={() => step(-1)} aria-label={scale === 'month' ? 'Previous month' : 'Previous week'}>
+          ‹
+        </button>
+        <p className="dsp-cal-title" aria-live="polite">
+          {heading}
+        </p>
+        <button type="button" className="dsp-cal-step" onClick={() => step(1)} aria-label={scale === 'month' ? 'Next month' : 'Next week'}>
+          ›
+        </button>
+        <Segmented
+          label="Show a month or a week"
+          options={[
+            { id: 'month', label: 'Month' },
+            { id: 'week', label: 'Week' },
+          ]}
+          value={scale}
+          onChange={(v) => {
+            if (v === 'week') setWeekOf(month === today.slice(0, 7) ? today : `${month}-01`);
+            else setMonth(weekOf.slice(0, 7));
+            setScale(v);
+          }}
+        />
+      </div>
+      <div className={`dsp-cal-grid is-${scale}`} role="grid" aria-label={heading}>
+        <div className="dsp-cal-row is-names" role="row">
+          {WEEKDAYS.map((w) => (
+            <span key={w} className="dsp-cal-name" role="columnheader">
+              {w}
+            </span>
+          ))}
+        </div>
+        {weeks.map((week) => (
+          <div className="dsp-cal-row" role="row" key={week[0].day}>
+            {week.map((c) => (
+              <div
+                key={c.day}
+                role="gridcell"
+                aria-label={`${sayDay(c.day)}${c.items.length ? `, ${c.items.length} item${c.items.length === 1 ? '' : 's'}` : ''}`}
+                className={['dsp-cal-day', c.inside ? '' : 'is-out', c.day === today ? 'is-today' : '', over === c.day ? 'is-over' : ''].filter(Boolean).join(' ')}
+                onDragOver={(e) => {
+                  if (!d.live) return;
+                  e.preventDefault();
+                  setOver(c.day);
+                }}
+                onDragLeave={() => setOver((v) => (v === c.day ? null : v))}
+                onDrop={(e) => {
+                  e.preventDefault();
+                  setOver(null);
+                  const id = e.dataTransfer.getData('text/plan-item');
+                  if (id) moveTo(id, c.day);
+                }}
+              >
+                <span className="dsp-cal-num">{Number(c.day.slice(8))}</span>
+                {c.items.map((id) => {
+                  const it = byId.get(id)!;
+                  const starts = it.date === c.day;
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      className={['dsp-cal-item', it.by === 'socria' ? 'is-socria' : '', it.status === 'done' ? 'is-done' : '', sel === id ? 'is-sel' : '', starts ? '' : 'is-cont']
+                        .filter(Boolean)
+                        .join(' ')}
+                      draggable={d.live && starts}
+                      onDragStart={(e) => {
+                        e.dataTransfer.setData('text/plan-item', id);
+                        e.dataTransfer.effectAllowed = 'move';
+                      }}
+                      onClick={() => select(sel === id ? null : id)}
+                      onKeyDown={(e) => onKey(e, id)}
+                      title={`${it.text}${it.end ? ` — until ${sayDay(it.end)}` : ''}${d.live ? ' · drag to another day, or select and use the arrow keys' : ''}`}
+                    >
+                      {starts ? it.text : `↳ ${it.text}`}
+                    </button>
+                  );
+                })}
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+      <Undated s={s} d={d} select={select} />
     </div>
   );
 }

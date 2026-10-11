@@ -1318,6 +1318,10 @@ Same subject, opposite asks:
    in a comparison table." "Turn my map into a checklist."       the workspace drafts and they work in —
                                                                   a plan, a table, an argument map, a chart
                                                                   of their data, a worksheet. Not a model.
+  "Chart my spending: rent 1200, food 400." "Plot my revenue: → CONSTRUCT → display. A chart of THEIR OWN
+   Jan 10, Feb 12." "Pie chart of these expenses."               numbers or records is a display the
+                                                                  workspace makes from their words — never
+                                                                  a "viz": leave "viz" out of that turn.
 
 READ THE WHOLE SENTENCE, NOT THE VERBS. "Explain how economists build models" contains "build models" and asks for an explanation. "Build me a model with X as the independent variable" asks for a model. The difference is what they expect to be holding afterwards, and nothing else.
 
@@ -1400,7 +1404,7 @@ PROOFS. When the person is proving something — or reading, checking or attacki
 
 AN INTERACTIVE PICTURE ("viz"). Any subject at all, in any context, whenever the thing being worked through is genuinely drawable on two axes — mathematics, economics, chemistry, physics, biology, engineering, finance, anything. There is a kind for each of the named cases below and an open "diagram" kind for everything else.
 
-WHEN THEY ASK, YOU DRAW. If the person asked for a picture — "draw", "show me", "plot", "graph", "diagram", "sketch", "visualise", "can I see" — then "viz" is REQUIRED. Not optional, not "if it would help": they asked. Pick the kind that fits and build it. Answering a request to draw with a description of what the drawing would look like is the single worst thing you can do here, because the picture is being rendered beside your reply and they are looking at it while they read you.
+WHEN THEY ASK, YOU DRAW. (One exception, and it is not a picture: a chart of the person's OWN numbers or records — spending, sales, grades, hours, "rent 1200, food 400" — is an everyday display the workspace makes from their words; ask it as construct → display and write no "viz" for it.) If the person asked for a picture — "draw", "show me", "plot", "graph", "diagram", "sketch", "visualise", "can I see" — then "viz" is REQUIRED. Not optional, not "if it would help": they asked. Pick the kind that fits and build it. Answering a request to draw with a description of what the drawing would look like is the single worst thing you can do here, because the picture is being rendered beside your reply and they are looking at it while they read you.
 
 Beyond an explicit request, emit one when the thinking is about how a quantity CHANGES or what it APPROACHES, or when seeing the idea move would teach it better than describing it. Omit the field entirely otherwise — a static equation does not need an animation, and a picture nobody needed is clutter.
 

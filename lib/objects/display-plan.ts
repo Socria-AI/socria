@@ -44,7 +44,7 @@ import {
   type DisplayHead,
 } from './display-base';
 
-export type PlanView = 'timeline' | 'board' | 'checklist' | 'storyboard' | 'list';
+export type PlanView = 'timeline' | 'calendar' | 'board' | 'checklist' | 'storyboard' | 'list';
 export type Status = 'todo' | 'doing' | 'done';
 
 export interface PlanItem {
@@ -144,7 +144,7 @@ export function sanitizePlan(raw: unknown): PlanState | null {
     if (closesLoop(links, from, to)) continue;
     links.push({ from, to, by: cleanBy(o?.by) });
   }
-  const view = (['timeline', 'board', 'checklist', 'storyboard', 'list'] as PlanView[]).includes(r.view as PlanView)
+  const view = (['timeline', 'calendar', 'board', 'checklist', 'storyboard', 'list'] as PlanView[]).includes(r.view as PlanView)
     ? (r.view as PlanView)
     : items.some((i) => i.date)
       ? 'timeline'
@@ -283,6 +283,66 @@ export function planTicks(sp: { start: string; end: string; days: number }, max 
 
 const itemSaid = (s: PlanState, id: string) => `‘${s.items.find((i) => i.id === id)?.text ?? id}’`;
 
+// ── a calendar: the items on their days ─────────────────────────────
+
+export interface CalendarDay {
+  day: string;
+  /** in the month (or week) being shown, not a neighbour's day filling out the grid */
+  inside: boolean;
+  /** the items on this day — starting, ending or running through it — in plan order */
+  items: string[];
+}
+
+const CAL_MON = (day: string) => day.slice(0, 7);
+
+/** The month a calendar opens on: the next dated item's from today, else the last one's, else today's. */
+export function calendarStart(s: PlanState, today: string): string {
+  const days = s.items.map((i) => i.date).filter((d): d is string => !!d).sort();
+  const next = days.find((d) => d >= today) ?? days[days.length - 1] ?? today;
+  return CAL_MON(next);
+}
+
+/** "2026-10" moved by some months. */
+export function addMonths(month: string, n: number): string {
+  const [y, m] = month.split('-').map(Number);
+  const t = y * 12 + (m - 1) + n;
+  return `${Math.floor(t / 12)}-${String((t % 12) + 1).padStart(2, '0')}`;
+}
+
+/**
+ * A month as weeks of seven days, Sunday first, filled out with the
+ * neighbouring months' days — every item on each day it covers (an item
+ * with an end runs through every day to its end).
+ */
+export function calendarMonth(s: PlanState, month: string): CalendarDay[][] {
+  const first = `${month}-01`;
+  const lead = new Date(`${first}T00:00:00Z`).getUTCDay();
+  let day = addDays(first, -lead);
+  const weeks: CalendarDay[][] = [];
+  do {
+    const week: CalendarDay[] = [];
+    for (let k = 0; k < 7; k++) {
+      week.push({ day, inside: CAL_MON(day) === month, items: itemsOn(s, day) });
+      day = addDays(day, 1);
+    }
+    weeks.push(week);
+  } while (CAL_MON(day) === month);
+  return weeks;
+}
+
+/** The seven days, Sunday first, of the week holding a day. */
+export function calendarWeek(s: PlanState, anyDay: string): CalendarDay[] {
+  const start = addDays(anyDay, -new Date(`${anyDay}T00:00:00Z`).getUTCDay());
+  return Array.from({ length: 7 }, (_, k) => {
+    const day = addDays(start, k);
+    return { day, inside: true, items: itemsOn(s, day) };
+  });
+}
+
+function itemsOn(s: PlanState, day: string): string[] {
+  return s.items.filter((i) => i.date && i.date <= day && (i.end ?? i.date) >= day).map((i) => i.id);
+}
+
 // ── operations ───────────────────────────────────────────────────────
 
 const views: ViewDecl<PlanState>[] = [
@@ -293,6 +353,13 @@ const views: ViewDecl<PlanState>[] = [
     interactions: ['drag an item to change its day', 'drag its end to change how long it lasts'],
     unavailable: (s) => (s.items.some((i) => i.date) ? null : 'Nothing in it has a date yet — give items dates and they line up in time.'),
   },
+  {
+    id: 'calendar',
+    label: 'Calendar',
+    shows: 'what falls on which day, a month or a week at a time',
+    interactions: ['drag an item to another day', 'step between months'],
+    unavailable: (s) => (s.items.some((i) => i.date) ? null : 'Nothing in it has a date yet — give items dates and they appear on their days.'),
+  },
   { id: 'board', label: 'Board', shows: 'what is to do, in progress and done', interactions: ['move a card to another column'] },
   { id: 'checklist', label: 'Checklist', shows: 'how much is done', interactions: ['tick an item off'] },
   { id: 'storyboard', label: 'Storyboard', shows: 'the sequence as frames, one after another', interactions: ['reorder frames'] },
@@ -301,6 +368,7 @@ const views: ViewDecl<PlanState>[] = [
 
 const VIEW_WORDS: Record<string, string[]> = {
   timeline: ['timeline', 'gantt', 'schedule'],
+  calendar: ['calendar', 'month view', 'month'],
   board: ['board', 'kanban', 'columns'],
   checklist: ['checklist', 'check list', 'todo list', 'to do list'],
   storyboard: ['storyboard', 'story board', 'frames'],
@@ -677,12 +745,13 @@ registerDisplay({
   about: 'Things to do or that happened, in time or in order — a timeline, a board, a checklist, a storyboard.',
   called: [
     { words: ['timeline', 'time line', 'gantt chart', 'gantt', 'schedule', 'study schedule', 'revision schedule', 'roadmap', 'itinerary', 'chronology'], view: 'timeline' },
+    { words: ['calendar', 'deadline calendar', 'study calendar', 'monthly calendar', 'calendar view'], view: 'calendar' },
     { words: ['kanban board', 'kanban', 'task board', 'project board'], view: 'board' },
     { words: ['checklist', 'check list', 'to-do list', 'todo list', 'to do list', 'task list'], view: 'checklist' },
     { words: ['storyboard', 'story board', 'shot list'], view: 'storyboard' },
     { words: ['study plan', 'revision plan', 'project plan', 'plan', 'agenda', 'step by step plan'] },
   ],
-  spec: `{"title": "short", "view": "timeline|board|checklist|storyboard|list", "items": [{"id": "i1", "text": "what it is, under 120 characters", "date": "YYYY-MM-DD (only a day the conversation gives or plainly implies)", "end": "YYYY-MM-DD, for something that lasts", "status": "todo|doing|done", "lane": "a group, e.g. a course", "note": "optional"}], "links": [{"from": "i1", "to": "i2"}]}
+  spec: `{"title": "short", "view": "timeline|calendar|board|checklist|storyboard|list", "items": [{"id": "i1", "text": "what it is, under 120 characters", "date": "YYYY-MM-DD (only a day the conversation gives or plainly implies)", "end": "YYYY-MM-DD, for something that lasts", "status": "todo|doing|done", "lane": "a group, e.g. a course", "note": "optional"}], "links": [{"from": "i1", "to": "i2"}]}
   A link means "to" waits on "from". Dates are real calendar days; leave "date" out rather than guess one.`,
   example: {
     title: 'Essay week',

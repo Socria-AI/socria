@@ -175,12 +175,13 @@ export function makeDisplay(
 }
 
 /** What the person is told a display is, once it exists: one line, in their terms. */
-export function madeSays(obj: ThoughtObject, gaps: string[] = []): string {
+export function madeSays(obj: ThoughtObject, gaps: string[] = [], from?: 'map' | 'words' | 'template'): string {
   const k = kindOf(obj.kind);
   const st = obj.states[obj.at] as { title?: string } | undefined;
   const noun = nounOf(obj.kind);
   const shape = k ? k.shape(obj.states[obj.at] as never) : noun;
-  const who = obj.origin === 'person' ? 'Made from your map' : 'Drafted by Socria';
+  const who =
+    from === 'words' ? 'Made from what you wrote' : from === 'template' ? 'Made from a template' : from === 'map' || obj.origin === 'person' ? 'Made from your map' : 'Drafted by Socria';
   const named = st?.title ? ` “${st.title}”` : '';
   const left = gaps.length ? ` It could not fill: ${gaps.join('; ')}.` : '';
   return `${who}: ${aOrAn(noun)}${named} (${shape}) — yours to change by hand or in words.${left}`.slice(0, 300);

@@ -238,6 +238,9 @@ const MODULES = [
   // Logos 3.5 — the everyday displays (objects of thought)
   'lib/objects/display-base.ts',
   'lib/objects/display-plan.ts',
+  'lib/plot-words.ts',
+  'lib/objects/display-numberline.ts',
+  'lib/objects/display-words.ts',
   'lib/objects/display-argument.ts',
   'lib/objects/display-diagram.ts',
   'components/display/PlanFigure.tsx',
