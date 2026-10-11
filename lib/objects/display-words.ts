@@ -467,7 +467,7 @@ export function emptyChart(said: string, opts: { view?: string } = {}): FromWord
   return {
     state: s,
     empty: true,
-    says: `No numbers were given, so nothing was made up: the ${VIEW_NAME[view]} is empty — type a label and a number for ${what} (or say them) and it draws as you go.`,
+    says: `No numbers were given, so nothing was made up: the ${VIEW_NAME[view]} is empty — type a label and a number for ${what} in its table and it draws as you go.`,
   };
 }
 
