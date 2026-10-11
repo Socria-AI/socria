@@ -19,6 +19,7 @@ import { clashes, timelineBars, planTicks, STATUS_WORD, PLAN_LIMITS, type PlanIt
 import { addDays, dayDiff, sayDay, todayDay } from '@/lib/objects/display-base';
 import type { FigureProps } from '@/components/objects/figures';
 import { AddRow, DisplayShell, Edit, useDisplay, type Display } from './DisplayShell';
+import { useSelection } from './primitives';
 
 type D = Display<PlanState>;
 type Select = (id: string | null) => void;
@@ -29,13 +30,6 @@ const COLUMNS: Status[] = ['todo', 'doing', 'done'];
 function shortDay(day: string, year?: string): string {
   const said = sayDay(day);
   return year && day.slice(0, 4) === year ? said.replace(/ \d{4}$/, '') : said;
-}
-
-/** The selected item: the map's selection when the map keeps one, else the figure's own. */
-function useSelection(p: FigureProps): [string | null, Select] {
-  const [own, setOwn] = useState<string | null>(null);
-  if (p.onSelect) return [p.sel ?? null, (id) => p.onSelect?.(id)];
-  return [own, setOwn];
 }
 
 export function PlanFigure(p: FigureProps) {

@@ -7,15 +7,18 @@
 // kind shares, so a plan and a worksheet feel like one product:
 //
 //   the head    its name (renamed in place), what kind of thing it is, the
-//               views of the SAME state it can be shown as, and undo/redo
-//               through its history — nothing is lost by stepping back;
+//               views of the SAME state it can be shown as, the kind's own
+//               few tools (a toolbar that changes with the kind and the
+//               view), undo/redo through its history — nothing is lost by
+//               stepping back (⌘Z / ⇧⌘Z too) — and full screen;
 //   the foot    what the last step computed (a clash, a balance), where the
 //               display came from and who did what, and — when something
 //               could not be done — why, in a sentence, out loud.
 //
 // It keeps no state of its own but a half-typed title and the last refusal.
 
-import { useEffect, useState, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { createPortal } from 'react-dom';
 import { kindOf, originSaid, stepWho, type ThoughtObject } from '@/lib/objects/core';
 import type { FigureProps } from '@/components/objects/figures';
 import './display.css';
@@ -49,16 +52,44 @@ export function DisplayShell<S extends { title: string; view: string }>({
   d,
   children,
   aside,
+  tools,
 }: {
   p: FigureProps;
   d: Display<S>;
   children: ReactNode;
   /** a line of the kind's own beside the views — progress, a total */
   aside?: ReactNode;
+  /** the kind's own few tools, for this view — shown only while it can be edited */
+  tools?: ReactNode;
 }) {
   const kind = kindOf(p.obj.kind);
   const s = d.state;
   const last = p.at > 0 ? p.obj.steps[p.at - 1] : null;
+  // FULL SCREEN: drawn over the whole Logos surface, and handed back on Escape.
+  // The map draws objects inside a transformed canvas, where `fixed` means
+  // nothing, so the full-screen display is portalled to the Logos root.
+  const [full, setFull] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const hostRef = useRef<Element | null>(null);
+  useEffect(() => {
+    if (!full) return;
+    const esc = (e: globalThis.KeyboardEvent) => e.key === 'Escape' && setFull(false);
+    window.addEventListener('keydown', esc);
+    return () => window.removeEventListener('keydown', esc);
+  }, [full]);
+  const goFull = () => {
+    hostRef.current = rootRef.current?.closest('.logos-root') ?? (typeof document !== 'undefined' ? document.body : null);
+    setFull(true);
+  };
+  const canUndo = !!p.onSeek && p.at > 0;
+  const canRedo = !!p.onSeek && p.at < p.obj.states.length - 1;
+  // ⌘Z / ⇧⌘Z inside the display, unless a field has the keys
+  const keys = (e: KeyboardEvent<HTMLDivElement>) => {
+    if (!(e.metaKey || e.ctrlKey) || e.key.toLowerCase() !== 'z') return;
+    if ((e.target as HTMLElement).closest('input, textarea, select, [contenteditable="true"]')) return;
+    e.preventDefault();
+    if (e.shiftKey ? canRedo : canUndo) p.onSeek?.(p.at + (e.shiftKey ? 1 : -1));
+  };
 
   if (p.mode !== 'live') {
     return (
@@ -77,32 +108,48 @@ export function DisplayShell<S extends { title: string; view: string }>({
     );
   }
 
-  return (
+  const body = (
     <div
-      className="dsp is-live"
+      ref={rootRef}
+      className={`dsp is-live${full ? ' is-full' : ''}`}
       data-kind={p.obj.kind}
+      role={full ? 'dialog' : undefined}
+      aria-modal={full ? true : undefined}
+      aria-label={full ? s.title : undefined}
+      onKeyDown={keys}
       // what the hand works — a bar, a card, a field — keeps the pointer; the
       // rest of the frame still moves the display about the map like any card
       onPointerDown={(e) => {
-        if ((e.target as HTMLElement).closest(WORKED)) e.stopPropagation();
+        if (full || (e.target as HTMLElement).closest(WORKED)) e.stopPropagation();
       }}
     >
       <div className="dsp-head">
         <Title value={s.title} live={d.live} onDone={(title) => d.act('title', { title })} />
         <span className="dsp-kind">{kind?.label}</span>
         {aside && <span className="dsp-aside">{aside}</span>}
-        <span className="dsp-history" role="group" aria-label="History">
-          <button type="button" disabled={!p.onSeek || p.at <= 0} onClick={() => p.onSeek?.(p.at - 1)} aria-label="Undo" title="Undo">
-            ↶
-          </button>
+        <span className="dsp-head-end">
+          {d.live && tools && (
+            <span className="dsp-tools" role="toolbar" aria-label={`${kind?.label ?? 'Display'} tools`}>
+              {tools}
+            </span>
+          )}
+          <span className="dsp-history" role="group" aria-label="History">
+            <button type="button" disabled={!canUndo} onClick={() => p.onSeek?.(p.at - 1)} aria-label="Undo" title="Undo (⌘Z)">
+              ↶
+            </button>
+            <button type="button" disabled={!canRedo} onClick={() => p.onSeek?.(p.at + 1)} aria-label="Redo" title="Redo (⇧⌘Z)">
+              ↷
+            </button>
+          </span>
           <button
             type="button"
-            disabled={!p.onSeek || p.at >= p.obj.states.length - 1}
-            onClick={() => p.onSeek?.(p.at + 1)}
-            aria-label="Redo"
-            title="Redo"
+            className="dsp-full-btn"
+            onClick={() => (full ? setFull(false) : goFull())}
+            aria-label={full ? 'Leave full screen' : 'Full screen'}
+            aria-pressed={full}
+            title={full ? 'Leave full screen (Esc)' : 'Full screen'}
           >
-            ↷
+            {full ? '⤡' : '⤢'}
           </button>
         </span>
       </div>
@@ -157,6 +204,20 @@ export function DisplayShell<S extends { title: string; view: string }>({
       </div>
     </div>
   );
+  if (full && hostRef.current) {
+    return (
+      <>
+        <div className="dsp is-live is-away" data-kind={p.obj.kind}>
+          <span className="dsp-title">{s.title}</span>
+          <button type="button" className="dsp-open" onClick={() => setFull(false)}>
+            Shown full screen — bring it back
+          </button>
+        </div>
+        {createPortal(body, hostRef.current)}
+      </>
+    );
+  }
+  return body;
 }
 
 /** The parts of a display the hand works, which the map's canvas must not take the pointer from. */

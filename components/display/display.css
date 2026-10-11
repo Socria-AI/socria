@@ -44,7 +44,8 @@
 .dsp-title-in:focus { border-bottom-color: var(--dsp-primary); outline: none; }
 .dsp-kind { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dsp-40); }
 .dsp-aside { font-size: 11.5px; color: var(--dsp-60); font-variant-numeric: tabular-nums; }
-.dsp-history { margin-left: auto; display: inline-flex; gap: 2px; }
+.dsp-head-end { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; }
+.dsp-history { display: inline-flex; gap: 2px; }
 .dsp-history button {
   min-width: 28px; min-height: 28px; padding: 0 6px; border: 0; border-radius: 4px; background: none; cursor: pointer;
   font-size: 16px; color: var(--dsp-60);
@@ -272,3 +273,85 @@
 }
 .dsp-panel-pick button.is-on { color: var(--lg-ink, #23241f); border-color: var(--lg-ink-24, rgba(35, 36, 31, 0.24)); background: color-mix(in srgb, var(--lg-primary, #354620) 8%, transparent); }
 .dsp-panel-noun { font-size: 9.5px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-ink-40, rgba(35, 36, 31, 0.42)); }
+
+/* ── the shared controls (primitives.tsx) ─────────────────────────── */
+.dsp-tools { display: inline-flex; align-items: center; gap: 2px; padding-right: 6px; margin-right: 2px; border-right: 1px solid var(--dsp-line); }
+.dsp-tool {
+  padding: 3px 8px; border: 0; border-radius: 4px; background: none; cursor: pointer; font-size: 12px; color: var(--dsp-60); white-space: nowrap;
+}
+.dsp-tool:hover:not(:disabled) { color: var(--dsp-primary); background: var(--dsp-tint); }
+.dsp-tool.is-on { color: var(--dsp-ink); background: var(--dsp-tint-2); }
+.dsp-tool:disabled { opacity: 0.35; cursor: default; }
+.dsp-full-btn {
+  min-width: 28px; min-height: 28px; padding: 0 6px; border: 0; border-radius: 4px; background: none; cursor: pointer; font-size: 15px; color: var(--dsp-60);
+}
+.dsp-full-btn:hover { color: var(--dsp-primary); background: var(--dsp-tint); }
+
+/* full screen: over the whole Logos surface, the body given all the room */
+.dsp.is-full {
+  position: fixed; inset: 0; z-index: 1200; display: flex; flex-direction: column; padding: 18px clamp(16px, 4vw, 48px) 14px;
+  background: var(--lg-paper, var(--dsp-paper)); overflow: hidden; box-shadow: 0 0 0 100vmax rgba(0, 0, 0, 0.18);
+}
+.dsp.is-full .dsp-body { --dsp-body-max: none; flex: 1 1 auto; min-height: 0; overflow: auto; }
+.dsp.is-full .dsp-title { font-size: 26px; }
+.dsp.is-away { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 16px; }
+
+.dsp-num {
+  width: 5.5em; min-width: 0; padding: 3px 4px; border: 0; border-bottom: 1px solid var(--dsp-24); background: transparent;
+  font: inherit; font-size: 13px; color: var(--dsp-ink); font-variant-numeric: tabular-nums; text-align: right; outline: none;
+}
+.dsp-num:focus { border-bottom-color: var(--dsp-primary); }
+.dsp-num:disabled { opacity: 0.55; }
+.dsp-stepper { display: inline-flex; align-items: center; gap: 2px; }
+.dsp-stepper button {
+  width: 22px; height: 22px; padding: 0; border: 1px solid var(--dsp-line); border-radius: 50%; background: none; cursor: pointer; line-height: 1; color: var(--dsp-60);
+}
+.dsp-stepper button:hover:not(:disabled) { color: var(--dsp-primary); border-color: var(--dsp-24); }
+.dsp-stepper button:disabled { opacity: 0.3; cursor: default; }
+.dsp-stepper-v { min-width: 2.2em; text-align: center; font-variant-numeric: tabular-nums; font-size: 13px; border-radius: 3px; }
+.dsp-slider { display: inline-flex; align-items: center; gap: 8px; min-width: 0; }
+.dsp-slider input { flex: 1 1 80px; min-width: 60px; accent-color: var(--dsp-primary); }
+.dsp-slider-v { min-width: 2.2em; text-align: right; font-variant-numeric: tabular-nums; font-size: 12px; color: var(--dsp-60); }
+.dsp-seg { display: inline-flex; border: 1px solid var(--dsp-line); border-radius: 999px; padding: 1px; }
+.dsp-seg button { padding: 2px 10px; border: 0; border-radius: 999px; background: none; cursor: pointer; font-size: 12px; color: var(--dsp-60); }
+.dsp-seg button.is-on { background: var(--dsp-tint-2); color: var(--dsp-ink); }
+.dsp-seg button:disabled { opacity: 0.4; cursor: default; }
+.dsp-confirm { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--dsp-60); }
+.dsp-editor-title { flex: 1; min-width: 0; font-weight: 600; font-size: 13.5px; overflow-wrap: anywhere; }
+.dsp-field { display: grid; gap: 2px; min-width: 0; }
+.dsp-field > span:first-child { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp-field.is-wide { grid-column: 1 / -1; }
+.dsp-fields { display: grid; grid-template-columns: repeat(auto-fill, minmax(140px, 1fr)); gap: 8px 12px; margin-top: 8px; }
+.dsp-row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 8px; }
+
+/* ── boxes joined by lines (NodeLinks.tsx) ────────────────────────── */
+.dsp-nl { overflow: auto; max-width: 100%; border-radius: 6px; background: color-mix(in srgb, var(--dsp-panel) 50%, transparent); }
+.dsp-nl-stage { position: relative; margin: 0 auto; }
+.dsp-nl-lines { position: absolute; inset: 0; overflow: visible; pointer-events: none; }
+.dsp-nl-line line { stroke: var(--dsp-40); stroke-width: 1.1; fill: none; }
+.dsp-nl-line text { font-size: 10.5px; fill: var(--dsp-60); paint-order: stroke; stroke: var(--dsp-paper); stroke-width: 3px; }
+.dsp-nl-head { fill: var(--dsp-40); }
+.dsp-nl-box {
+  position: absolute; display: flex; align-items: stretch; border: 1px solid var(--dsp-line); border-radius: 6px; background: var(--dsp-paper);
+  box-shadow: 0 1px 0 rgba(0, 0, 0, 0.03); transition: box-shadow 0.15s, border-color 0.15s;
+}
+.dsp-nl-box.is-draggable { cursor: grab; touch-action: none; }
+.dsp-nl-box.is-dragging { cursor: grabbing; z-index: 3; box-shadow: 0 6px 18px rgba(0, 0, 0, 0.14); transition: none; }
+.dsp-nl-box.is-sel { border-color: var(--dsp-primary); box-shadow: 0 0 0 2px var(--dsp-tint-2); }
+
+/* ── the axes charts stand on (PlotFrame.tsx) ─────────────────────── */
+.dsp-plot { display: block; width: 100%; height: auto; max-height: 420px; overflow: visible; }
+.dsp-plot-grid line { stroke: var(--dsp-line); stroke-width: 1; }
+.dsp-plot-axis line { stroke: var(--dsp-24); stroke-width: 1; }
+.dsp-plot-axis .dsp-plot-zero { stroke: var(--dsp-60); stroke-width: 1.2; }
+.dsp-plot-ticks text { font-size: 10.5px; fill: var(--dsp-40); font-variant-numeric: tabular-nums; }
+.dsp-plot-titles text { font-size: 11.5px; fill: var(--dsp-60); font-style: italic; font-family: var(--serif, Georgia, serif); }
+.dsp.is-full .dsp-plot { max-height: calc(100vh - 220px); }
+
+/* a table beside a picture, for the numbers a screen reader (or a careful eye) wants */
+.dsp-table { width: 100%; border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.dsp-table th, .dsp-table td { padding: 4px 8px; border-bottom: 1px solid var(--dsp-line); text-align: left; }
+.dsp-table th { font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp-table td.is-num, .dsp-table th.is-num { text-align: right; }
+.dsp-details { margin-top: 8px; font-size: 12.5px; }
+.dsp-details summary { cursor: pointer; color: var(--dsp-60); }
