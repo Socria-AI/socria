@@ -37,6 +37,8 @@ export interface DisplayRequest {
   fromMap: boolean;
   /** the words that named it, as they were said */
   noun: string;
+  /** asked for by what the person wants (a kind's `intents`), not by its name */
+  intent?: boolean;
 }
 
 interface Word {
@@ -81,10 +83,15 @@ function isQuestionAbout(t: string): boolean {
 export function readDisplayRequest(text: unknown, opts: { stated?: string | null } = {}): DisplayRequest | null {
   if (typeof text !== 'string') return null;
   const t = norm(text).slice(0, 400);
-  if (!t || isQuestionAbout(t)) return null;
-  if (/\b(?:don't|do\s+not|dont|no\s+need\s+to|never|stop)\s+(?:\w+\s+){0,2}?(?:make|create|build|draw|generate|turn|convert)\b/.test(t)) return null;
+  if (!t) return null;
+  if (/\b(?:don't|do\s+not|dont|no\s+need\s+to|never|stop)\s+(?:\w+\s+){0,2}?(?:make|create|build|draw|generate|turn|convert|open)\b/.test(t)) return null;
   const words = vocabulary();
   if (!words.length) return null;
+  // WHAT THEY WANT, NOT WHAT THEY CALL IT: "should I take the job or stay?" wants a Crossroads, even
+  // phrased as a question — unless the words name a display, when they are about that display
+  const intended = byIntent(t, words);
+  if (intended) return intended;
+  if (isQuestionAbout(t)) return null;
 
   // "quiz me on this map", "test me on the diagram": practice over what is already here —
   // never a quiz written about a topic (display-make.ts makes it from a diagram or the map)
@@ -113,6 +120,15 @@ export function readDisplayRequest(text: unknown, opts: { stated?: string | null
       fromMap,
       noun: w.word,
     };
+  }
+  return null;
+}
+
+/** The kind whose `intents` the words match — none when they also name a display ("should I use a venn or a table?"). */
+function byIntent(t: string, words: Word[]): DisplayRequest | null {
+  if (words.some((w) => new RegExp(String.raw`\b${esc(w.word)}\b`).test(t) && !displayKinds().some((m) => m.intents && m.kind === w.kind))) return null;
+  for (const m of displayKinds()) {
+    if (m.intents?.some((rx) => rx.test(t))) return { kind: m.kind, kinds: [m.kind], fromMap: false, noun: m.noun, intent: true };
   }
   return null;
 }

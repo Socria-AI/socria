@@ -1,0 +1,24 @@
+/* components/display/argument.css — the argument map. Roles are said in words in every box;
+   the border repeats them quietly. Gaps are said in words too. */
+.dsp .dsp-arg-box { padding: 0; border: 1px solid var(--dsp-line); border-left: 3px solid var(--dsp-24); border-radius: 5px; background: var(--dsp-panel); }
+.dsp .dsp-arg-box.is-thesis { border-color: var(--dsp-ink); border-left-width: 4px; }
+.dsp .dsp-arg-box.is-claim { border-left-color: var(--dsp-ink); }
+.dsp .dsp-arg-box.is-evidence { border-left-color: var(--dsp-primary); }
+.dsp .dsp-arg-box.is-counter { border-left-color: var(--dsp-tension); }
+.dsp .dsp-arg-box.is-rebuttal { border-left-color: var(--dsp-accent); }
+.dsp .dsp-arg-box.is-question { border-left-style: dashed; border-left-color: var(--dsp-accent); }
+.dsp .dsp-arg-box.is-socria { border-style: dashed; }
+.dsp .dsp-arg-box.is-sel { box-shadow: 0 0 0 2px var(--dsp-tint-2); border-color: var(--dsp-primary); }
+.dsp .dsp-arg-in { display: flex; flex-direction: column; gap: 1px; width: 100%; padding: 5px 8px; border: 0; background: none; text-align: left; cursor: pointer; }
+.dsp .dsp-arg-role { font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp .dsp-arg-text { font-size: 12px; line-height: 1.3; display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden; }
+.dsp .dsp-arg-flag { font-size: 10.5px; color: var(--dsp-tension); }
+.dsp .dsp-arg-src { color: var(--dsp-60); font-size: 12px; }
+.dsp .dsp-nl-line.is-opposes line { stroke: var(--dsp-tension); }
+.dsp .dsp-nl-line.is-answers line { stroke: var(--dsp-accent); }
+.dsp .dsp-arg-outline { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px; }
+.dsp .dsp-arg-line { width: 100%; padding: 3px 6px; border: 0; border-radius: 4px; background: none; text-align: left; cursor: pointer; font-size: 13px; line-height: 1.4; }
+.dsp .dsp-arg-line:hover, .dsp .dsp-arg-line.is-sel { background: var(--dsp-tint); }
+.dsp .dsp-arg-outline li.is-thesis .dsp-arg-line { font-family: var(--serif, Georgia, serif); font-size: 15px; }
+.dsp .dsp-arg-audit ul { margin: 2px 0 6px; padding-left: 18px; }
+.dsp .dsp-link { padding: 0; border: 0; background: none; color: var(--dsp-accent); cursor: pointer; text-align: left; text-decoration: underline; text-decoration-color: var(--dsp-24); }

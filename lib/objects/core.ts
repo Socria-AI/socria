@@ -168,9 +168,10 @@ export const EMPTY_SPACE: ObjectSpace = { objs: [] };
 /**
  * Objects one line of thinking holds. Eight was set for matrices and
  * functions; the everyday displays (a plan, a comparison, an argument, a
- * worksheet…) are objects too, and a real piece of work holds several.
+ * worksheet…) are objects too, and a real piece of work holds several — and
+ * the experiences (a decision, an untangled dump, a rehearsal…) more.
  */
-export const MAX_OBJECTS = 12;
+export const MAX_OBJECTS = 16;
 /** States kept per object. The oldest go first; a long elimination is ~10 steps. */
 export const MAX_STATES = 40;
 const capOf = (k: ObjectKind<any> | null) => Math.max(2, Math.min(MAX_STATES, k?.maxStates ?? MAX_STATES));
@@ -337,6 +338,25 @@ export function apply(
 export function seek(space: ObjectSpace, id: string, at: number): ObjectSpace {
   return {
     objs: space.objs.map((o) => (o.id === id ? { ...o, at: Math.min(Math.max(0, Math.round(at)), o.states.length - 1) } : o)),
+  };
+}
+
+/**
+ * FORGET THE HISTORY BEFORE A STATE — the person's own retention control. The
+ * states before `at` and the steps between them are deleted; the state at
+ * `at` becomes the object's first, and the count of what was forgotten is
+ * kept in `trimmed` so nothing afterwards pretends the history began there.
+ * The object as it is now does not change. What remains is still a chain
+ * each state of which follows from the one before, so it reloads intact.
+ */
+export function forgetBefore(space: ObjectSpace, id: string, at: number): ObjectSpace {
+  return {
+    objs: space.objs.map((o) => {
+      if (o.id !== id) return o;
+      const k = Math.min(Math.max(0, Math.round(at)), o.states.length - 1);
+      if (!k) return o;
+      return { ...o, states: o.states.slice(k), steps: o.steps.slice(k), at: Math.max(0, o.at - k), trimmed: (o.trimmed ?? 0) + k };
+    }),
   };
 }
 

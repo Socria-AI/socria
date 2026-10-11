@@ -1499,6 +1499,7 @@ export const DATA = displayKind<DataState>({
 register(DATA);
 registerDisplay({
   kind: 'data',
+  prompts: ['Chart my monthly spending: rent 1200, food 400, transport 150', 'Make a line chart of my study hours: Mon 2, Tue 3, Wed 1, Thu 4'],
   noun: 'chart',
   handle: 'T',
   about: 'A table of the person’s own numbers, checked and drawn as a table, bar, line, area, scatter, pie, histogram or heatmap — example numbers are labelled as examples.',

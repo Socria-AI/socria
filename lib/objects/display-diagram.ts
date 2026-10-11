@@ -1587,6 +1587,7 @@ export const DIAGRAM = displayKind<DiagramState>({
 register(DIAGRAM);
 registerDisplay({
   kind: 'diagram',
+  prompts: ['Draw a diagram of how a bill becomes a law', 'Make a concept map of photosynthesis'],
   noun: 'diagram',
   handle: 'D',
   about: 'Things and how they connect — a concept map, a mind map, a hierarchy or org chart, a flowchart, a decision tree.',

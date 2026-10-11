@@ -432,9 +432,14 @@ export async function POST(req: NextRequest) {
       try {
         let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person'; says?: string } | null = null;
         // MADE, NOT DRAFTED: a plan from the map, a labeling exercise over what is here, a worksheet from a template
-        const madeHere = displayWords ? makeFromRequest(displayWords, { said: personSaid, map: mapIdeas, space, topic: next.ask?.topic }) : null;
+        const turns = kept.filter((m: any) => m.role === 'user').map((m: any) => String(m.content ?? ''));
+        const madeHere = displayWords ? makeFromRequest(displayWords, { said: personSaid, map: mapIdeas, space, topic: next.ask?.topic, latest: said, turns }) : null;
         if (madeHere && 'why' in madeHere) {
           display = { ok: false, failure: 'empty', says: madeHere.why };
+        } else if (madeHere && 'open' in madeHere) {
+          // the experience this is about is already here: opened, not made twice
+          const there = space.objs.find((o) => o.id === madeHere.open);
+          display = { ok: true, id: madeHere.open, kind: there?.kind, says: madeHere.says };
         } else if (madeHere) {
           const state = kindOf(madeHere.kind)?.sanitize(madeHere.state) ?? null;
           if (state) sealed = { kind: madeHere.kind, state, gaps: [], origin: madeHere.origin, says: madeHere.says };

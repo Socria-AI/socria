@@ -9,8 +9,12 @@
 // shared line of thinking someone may only read is drawn without its
 // controls — the operations are refused upstream too (LogosApp onObject).
 
+import { useState } from 'react';
 import { ObjectFigure } from '@/components/objects/ObjectFigure';
-import { displayMeta, type ThoughtObject } from '@/lib/objects';
+import type { AskExperience, WorkspaceAction, WorkspaceResult } from '@/components/objects/figures';
+import { displayMeta, type ObjectSpace, type ThoughtObject } from '@/lib/objects';
+import type { MapHistory } from '@/lib/map-history';
+import { Gallery } from './Gallery';
 
 export function DisplayPanel({
   obj,
@@ -22,6 +26,13 @@ export function DisplayPanel({
   onSeek,
   onPick,
   readOnly,
+  space,
+  history,
+  me,
+  shared,
+  onWorkspace,
+  ask,
+  onPrompt,
 }: {
   obj: ThoughtObject | null;
   all: ThoughtObject[];
@@ -32,22 +43,38 @@ export function DisplayPanel({
   onSeek: (at: number) => void;
   onPick: (id: string) => void;
   readOnly?: boolean;
+  space?: ObjectSpace;
+  history?: MapHistory;
+  me?: { id: string; name: string };
+  shared?: boolean;
+  onWorkspace?: (a: WorkspaceAction) => WorkspaceResult;
+  ask?: AskExperience;
+  /** put an example prompt into the composer, to be finished and sent there */
+  onPrompt?: (text: string) => void;
 }) {
-  if (!obj) {
+  const [browsing, setBrowsing] = useState(false);
+  if (!obj || browsing) {
     return (
       <div className="dsp-panel dsp-panel-empty">
-        <p className="dsp-empty">
-          No display yet. Ask for one in the conversation — “make me a study plan for finals”, “put these options in a comparison table”, “turn this map into a
-          checklist” — and it opens here, yours to change.
-        </p>
+        <Gallery
+          onPrompt={
+            onPrompt
+              ? (text) => {
+                  onPrompt(text);
+                  setBrowsing(false);
+                }
+              : undefined
+          }
+          onClose={obj ? () => setBrowsing(false) : undefined}
+        />
       </div>
     );
   }
   return (
     <div className="dsp-panel">
-      {all.length > 1 && (
-        <nav className="dsp-panel-pick" aria-label="Displays in this line of thinking">
-          {all.map((o) => {
+      <nav className="dsp-panel-pick" aria-label="Displays in this line of thinking">
+        {all.length > 1 &&
+          all.map((o) => {
             const title = String((o.states[o.at] as { title?: unknown } | undefined)?.title ?? o.name);
             return (
               <button key={o.id} type="button" className={o.id === obj.id ? 'is-on' : ''} aria-pressed={o.id === obj.id} onClick={() => o.id !== obj.id && onPick(o.id)}>
@@ -55,8 +82,10 @@ export function DisplayPanel({
               </button>
             );
           })}
-        </nav>
-      )}
+        <button type="button" className="dsp-panel-new" onClick={() => setBrowsing(true)} title="What else can be made here">
+          New…
+        </button>
+      </nav>
       <ObjectFigure
         obj={obj}
         at={obj.at}
@@ -65,7 +94,11 @@ export function DisplayPanel({
         sel={sel}
         onSelect={onSelect}
         onSeek={onSeek}
-        {...(readOnly ? {} : { onOp: (op: string, args: Record<string, string | number>) => onOp(op, args) })}
+        space={space}
+        history={history}
+        me={me}
+        shared={shared}
+        {...(readOnly ? {} : { onOp: (op: string, args: Record<string, string | number>) => onOp(op, args), onWorkspace, ask })}
       />
     </div>
   );

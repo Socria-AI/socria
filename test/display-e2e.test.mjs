@@ -142,9 +142,9 @@ console.log('\n=== what cannot be made says so, and adds nothing ===');
   ok('a pass that declines: its reason, said', no.json.display?.failure === 'declined' && /Nothing in the conversation is scheduled/.test(no.json.display.says));
   const threw = await mapTurn('make me a timeline of my week', [EXTRACTED, new Error('upstream down')]);
   ok('a pass that fails: said as a failure, the map still returned', threw.status === 200 && threw.json.display?.ok === false && threw.json.map?.nodes?.length === 1);
-  const full = { nodes: [{ id: 'a', label: 'Moving', type: 'concept' }], edges: [], objects: { objs: Array.from({ length: 12 }, (_, i) => ({ id: `P${i + 1}`, kind: 'plan', name: `P${i + 1}`, origin: 'socria', states: [{ title: `Plan ${i}`, view: 'list', items: [{ id: 'i1', text: 'x', by: 'socria' }], links: [] }], steps: [], at: 0 })) } };
+  const full = { nodes: [{ id: 'a', label: 'Moving', type: 'concept' }], edges: [], objects: { objs: Array.from({ length: 16 }, (_, i) => ({ id: `P${i + 1}`, kind: 'plan', name: `P${i + 1}`, origin: 'socria', states: [{ title: `Plan ${i}`, view: 'list', items: [{ id: 'i1', text: 'x', by: 'socria' }], links: [] }], steps: [], at: 0 })) } };
   const over = await mapTurn('make me a checklist for moving house', [EXTRACTED, PLAN], { map: full });
-  ok('a full workspace: said, and nothing evicted', over.json.display?.failure === 'full' && plansIn(over.json).length === 12, JSON.stringify(over.json.display));
+  ok('a full workspace: said, and nothing evicted', over.json.display?.failure === 'full' && plansIn(over.json).length === 16, JSON.stringify(over.json.display));
 }
 
 console.log('\n=== a plan made from the map ===');

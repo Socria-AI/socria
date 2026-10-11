@@ -1,0 +1,21 @@
+/* components/display/worksheet.css — a worksheet the person fills in. */
+.dsp .dsp-ws-scenario { margin: 0 0 8px; padding: 6px 10px; border-left: 2px solid var(--dsp-ink); font-family: var(--serif, Georgia, serif); font-size: 15px; }
+.dsp .dsp-ws-hint { margin: 0 0 8px; padding: 6px 10px; border: 1px dashed var(--dsp-24); border-radius: 4px; font-size: 13px; }
+.dsp .dsp-ws-sec { margin: 0 0 12px; }
+.dsp .dsp-ws-h { margin: 0 0 2px; font-family: var(--serif, Georgia, serif); font-style: italic; font-weight: 400; font-size: 15px; }
+.dsp .dsp-ws-term { font-family: var(--lg-sans, system-ui, sans-serif); font-style: normal; font-size: 11px; color: var(--dsp-40); }
+.dsp .dsp-ws-table th { font-size: 12.5px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--dsp-ink); }
+.dsp .dsp-ws-table .dsp-num { width: 110px; text-align: right; }
+.dsp .dsp-ws-table tr.is-socria th { font-style: italic; }
+.dsp .dsp-ws-total th, .dsp .dsp-ws-total td { border-bottom: 0; border-top: 1px solid var(--dsp-24); font-weight: 600; }
+.dsp .dsp-ws-acts { width: 1%; white-space: nowrap; text-align: right; }
+.dsp .dsp-ws-sums { display: flex; flex-wrap: wrap; gap: 10px; margin: 8px 0 2px; }
+.dsp .dsp-ws-sums > div { padding: 6px 10px; border: 1px solid var(--dsp-line); border-radius: 4px; }
+.dsp .dsp-ws-sums dt { font-size: 10.5px; color: var(--dsp-60); }
+.dsp .dsp-ws-sums dd { margin: 0; font-family: var(--serif, Georgia, serif); font-size: 17px; font-variant-numeric: tabular-nums; }
+.dsp .dsp-ws-checks ul { list-style: none; margin: 4px 0; padding: 0; display: flex; flex-direction: column; gap: 4px; }
+.dsp .dsp-ws-checks li { padding: 4px 8px; border-left: 2px solid var(--dsp-line); font-size: 13px; }
+.dsp .dsp-ws-checks li.is-fail { border-left-color: var(--dsp-tension); }
+.dsp .dsp-ws-checks li.is-ok { border-left-color: var(--dsp-primary); }
+.dsp .dsp-ws-checks li.is-unchecked { border-left-style: dashed; }
+.dsp .dsp-ws-mark { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); margin-right: 6px; }

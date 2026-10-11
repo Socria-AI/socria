@@ -753,6 +753,7 @@ export const VENN = displayKind<VennState>({
 
 export const VENN_META: DisplayMeta = {
   kind: 'venn',
+  prompts: ['Make a Venn diagram of mammals, birds and animals that fly', 'Draw a Venn diagram comparing capitalism and socialism'],
   noun: 'Venn diagram',
   handle: 'V',
   about: 'Two or three sets and what each holds — what they share, what is only in one, and what is in none.',

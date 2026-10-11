@@ -1329,6 +1329,7 @@ export const COMPARE = displayKind<CompareState>({
 
 export const COMPARE_META: DisplayMeta = {
   kind: 'compare',
+  prompts: ['Compare the iPhone 16, Pixel 9 and Galaxy S25 on price, camera and battery', 'Put these three apartments in a comparison table'],
   noun: 'comparison',
   handle: 'C',
   about: 'Options weighed against what matters — a decision matrix with weights, scores and their uncertainty, a ranking, and what would change it.',

@@ -15,6 +15,7 @@ import { sanitizeWorkspace, type ModelWorkspace } from './model/docs';
 import { sanitizeSpace, type ObjectSpace } from './objects';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
+import { sanitizeHistory, type MapHistory } from './map-history';
 
 import {
   buildingLine,
@@ -294,6 +295,14 @@ export interface ThinkingMap {
    * (dropRemoved). An edit the person made is not a suggestion.
    */
   removed?: string[];
+  /**
+   * WHAT CHANGED ON THE MAP, AND WHEN — ideas that came, went or were
+   * reworded, from the moment recording began (lib/map-history.ts). The Time
+   * Machine reads it; nothing before `since` is known, and the person can
+   * forget it. Kept by the client as turns land and edits are made; the
+   * server carries it, never writes it.
+   */
+  history?: MapHistory;
   /**
    * A STRUCTURED MODEL THIS TURN PROPOSED, raw and unjudged.
    *
@@ -608,6 +617,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
   // default here would reintroduce the exact bug this field exists to fix.
   const ask = sanitizeAsk(raw.ask);
   // What the person removed by hand: plain lowercase keys, never anything else.
+  const history = sanitizeHistory(raw.history);
   const removed = (Array.isArray(raw.removed) ? raw.removed : [])
     .filter((r: unknown): r is string => typeof r === 'string')
     .map((r: string) => r.replace(/\s+/g, ' ').trim().toLowerCase().slice(0, MAX_LABEL))
@@ -618,6 +628,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     nodes,
     edges,
     ...(removed.length ? { removed } : {}),
+    ...(history ? { history } : {}),
     ...(named ? { context: named } : {}),
     ...(building ? { building } : {}),
     ...(intent && named === 'math' ? { intent } : {}),

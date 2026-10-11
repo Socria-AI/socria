@@ -31,6 +31,12 @@ import { LIBRARY } from './display-accounts';
 import { readNumber, type DataState } from './display-data';
 import type { MarketState } from './display-market';
 import type { DisplayRequest } from './display-request';
+import { crossroadsFromWords, sealCrossroads, type CrossroadsState } from './display-crossroads';
+import { untangleFromWords } from './display-untangle';
+import { rehearsalFromWords } from './display-rehearsal';
+import { groundFromWords } from './display-commonground';
+import { timeMachineFromWords } from './display-timemachine';
+import { overlap } from './reasoning';
 
 /** The map's ideas, as much of them as a display made from the map needs. */
 export interface MapMaterial {
@@ -189,6 +195,28 @@ export interface MadeDisplay {
   says?: string;
 }
 
+/** An experience already in the workspace that the request is about — opened rather than made twice. */
+export interface OpenDisplay {
+  open: string;
+  says: string;
+}
+
+/**
+ * What a person poured out to be untangled: what follows the request on the
+ * same message, else the whole message when it is long enough to be the dump
+ * itself, else their message before, else nothing — the dump is then written
+ * in Untangle.
+ */
+export function dumpFrom(latest: string, turns: readonly string[]): string {
+  const after = /\b(?:untangle|brain ?dump|thought dump|dump)\b[^:\n]{0,40}[:\n—-]\s*([\s\S]+)$/i.exec(latest);
+  if (after && after[1].trim().length >= 12) return after[1].trim();
+  const bare = latest.replace(/^[^.:!?\n]*\b(?:untangle|brain ?dump|sort out|organi[sz]e)\b[^.:!?\n]*[.:!?\n]?/i, '').trim();
+  if (bare.length >= 60) return bare;
+  const before = turns.length >= 2 ? turns[turns.length - 2] : '';
+  if (before.trim().length >= 60) return before.trim();
+  return '';
+}
+
 /**
  * The display a request makes without a model, or why it cannot be made, or
  * null when this request is one to draft. `space` is the workspace (an
@@ -196,9 +224,35 @@ export interface MadeDisplay {
  */
 export function makeFromRequest(
   req: DisplayRequest,
-  ctx: { said: string; map: MapMaterial | null; space: ObjectSpace; topic?: string }
-): MadeDisplay | { why: string } | null {
+  ctx: { said: string; map: MapMaterial | null; space: ObjectSpace; topic?: string; latest?: string; turns?: readonly string[] }
+): MadeDisplay | OpenDisplay | { why: string } | null {
   const kind = req.kind;
+  const latest = ctx.latest ?? ctx.said;
+  // THE EXPERIENCES are started from the person's own words and nothing else — no one's opinion,
+  // no reading of the person, nothing about the other side of a conversation is drafted
+  if (kind === 'crossroads') {
+    const same = [...ctx.space.objs].reverse().find((o) => o.kind === 'crossroads' && overlap((currentOf(o) as CrossroadsState).decision, latest) >= 0.6);
+    if (same) return { open: same.id, says: `Your decision “${(currentOf(same) as CrossroadsState).title}” is already here — opened it.` };
+    const made = crossroadsFromWords(latest);
+    return made ? { kind, state: made, origin: 'person' } : null;
+  }
+  if (kind === 'untangle') {
+    const state = untangleFromWords(dumpFrom(latest, ctx.turns ?? []));
+    if (!state) return { why: 'That could not be untangled.' };
+    return { kind, state, origin: 'person', ...(state.dump ? {} : { says: 'Write everything on your mind into it — it will be separated into thoughts in your words.' }) };
+  }
+  if (kind === 'rehearsal') {
+    const state = rehearsalFromWords(latest);
+    return state ? { kind, state, origin: 'person', says: 'Say what you want from the conversation and who it is with, then start — Socria plays only the other side.' } : { why: 'That could not be set up.' };
+  }
+  if (kind === 'commonground') {
+    const state = groundFromWords(latest);
+    return state ? { kind, state, origin: 'person', says: 'Each person joins in their own name and writes their own perspective — Socria never speaks for anyone.' } : { why: 'That could not be set up.' };
+  }
+  if (kind === 'timemachine') {
+    const state = timeMachineFromWords(latest);
+    return state ? { kind, state, origin: 'person' } : { why: 'That could not be opened.' };
+  }
   if (kind === 'plan' && req.fromMap) {
     if (!ctx.map?.nodes.length) return { why: 'There is nothing on the map yet to make that from.' };
     return { kind: 'plan', state: planFromMap(ctx.map, { title: ctx.topic, view: req.view }), origin: 'person' };
@@ -248,6 +302,7 @@ export interface Sealed {
  * theirs; examples are named as examples; practice starts unanswered.
  */
 const SEALS: Record<string, (state: unknown, said: string) => Sealed> = {
+  crossroads: (raw, said) => sealCrossroads(raw as CrossroadsState, said),
   data: (raw, said) => {
     const s = raw as DataState;
     const gaps: string[] = [];

@@ -1,0 +1,30 @@
+/* components/display/market.css — supply and demand. Each curve is named on the graph in words (D, S,
+   S + tax); colour only repeats it. */
+.dsp .dsp-mk line { stroke-width: 2; fill: none; }
+.dsp .dsp-mk-demand { stroke: var(--dsp-accent); }
+.dsp .dsp-mk-supply { stroke: var(--dsp-primary); }
+.dsp .dsp-mk-ghost { stroke: var(--dsp-24); stroke-dasharray: 4 4; stroke-width: 1.4 !important; }
+.dsp .dsp-mk-wedge { stroke: var(--dsp-tension); stroke-dasharray: 6 3; }
+.dsp .dsp-mk-lab { font-size: 12px; font-weight: 600; fill: var(--dsp-60); }
+.dsp .dsp-mk-lab.is-wedge { fill: var(--dsp-tension); }
+.dsp .dsp-mk-guide { stroke: var(--dsp-40); stroke-width: 1 !important; stroke-dasharray: 3 3; }
+.dsp .dsp-mk-eq circle { fill: var(--dsp-ink); }
+.dsp .dsp-mk-ctl line { stroke: var(--dsp-tension); stroke-width: 1.4 !important; }
+.dsp .dsp-mk-ctl text { font-size: 11px; fill: var(--dsp-tension); }
+.dsp .dsp-mk-gap { stroke: var(--dsp-tension); stroke-width: 5 !important; opacity: 0.35; }
+.dsp .dsp-mk-practice { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--dsp-line); border-radius: 6px; }
+.dsp .dsp-mk-practice.is-waiting { border-color: var(--dsp-24); }
+.dsp .dsp-mk-row, .dsp .dsp-mk-pair { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.dsp .dsp-mk-pair .dsp-num { width: 72px; }
+.dsp .dsp-mk-posed { margin: 0 0 4px; }
+.dsp .dsp-mk-q { margin: 2px 0 8px; font-family: var(--serif, Georgia, serif); font-size: 15px; }
+.dsp .dsp-mk-pred { margin: 4px 0; font-size: 13px; }
+.dsp .dsp-mk-form { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 8px 12px; align-items: end; }
+.dsp .dsp-mk-form input:not(.dsp-num) { font: inherit; padding: 3px 6px; border: 1px solid var(--dsp-line); border-radius: 4px; background: var(--dsp-panel); }
+.dsp .dsp-mk-form button[type='submit'], .dsp .dsp-mk-reveal { padding: 4px 14px; border: 1px solid var(--dsp-ink); border-radius: 999px; background: none; cursor: pointer; color: var(--dsp-ink); }
+.dsp .dsp-mk-form button[type='submit'] { background: var(--dsp-ink); color: var(--dsp-paper); justify-self: start; }
+.dsp .dsp-mk-form button[type='submit']:disabled { opacity: 0.35; cursor: default; }
+.dsp .dsp-mk-reveal { margin-top: 8px; }
+.dsp .dsp-mk-result { margin: 4px 0; font-size: 13px; }
+.dsp .dsp-mk-why { margin: 4px 0; padding-left: 18px; font-size: 12.5px; color: var(--dsp-60); }
+.dsp .dsp-mk-log { margin: 4px 0; padding-left: 18px; font-size: 12px; }

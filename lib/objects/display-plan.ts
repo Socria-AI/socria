@@ -671,6 +671,7 @@ export const PLAN = displayKind<PlanState>({
 register(PLAN);
 registerDisplay({
   kind: 'plan',
+  prompts: ['Make me a study plan for finals week', 'Turn this map into a checklist', 'Make a kanban board for the apartment move'],
   noun: 'plan',
   handle: 'P',
   about: 'Things to do or that happened, in time or in order — a timeline, a board, a checklist, a storyboard.',

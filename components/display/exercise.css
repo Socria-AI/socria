@@ -1,0 +1,26 @@
+/* components/display/exercise.css — labels to recall. A hidden label is never drawn: its box holds a
+   number and a blank. Grades are said in words. */
+.dsp .dsp-ex-source { margin: 0 0 8px; font-size: 12px; color: var(--dsp-60); }
+.dsp .dsp-ex-unverified { color: var(--dsp-tension); }
+.dsp .dsp-ex-box { padding: 4px 6px; border: 1px solid var(--dsp-24); border-radius: 5px; background: var(--dsp-panel); font-size: 12px; }
+.dsp .dsp-ex-box.is-secret { border-style: dashed; }
+.dsp .dsp-ex-box.is-right { border-color: var(--dsp-primary); }
+.dsp .dsp-ex-box.is-wrong { border-color: var(--dsp-tension); }
+.dsp .dsp-ex-label { display: flex; flex-wrap: wrap; align-items: baseline; gap: 4px; }
+.dsp .dsp-ex-n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 4px; border-radius: 9px; background: var(--dsp-ink); color: var(--dsp-paper); font-size: 10.5px; font-weight: 600; }
+.dsp .dsp-ex-slot { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
+.dsp .dsp-ex-form { flex: 1 1 80px; min-width: 0; }
+.dsp .dsp-ex-form input { width: 100%; padding: 2px 4px; border: 0; border-bottom: 1px solid var(--dsp-24); background: transparent; font: inherit; font-size: 12.5px; color: var(--dsp-ink); }
+.dsp .dsp-ex-form input:focus { outline: none; border-bottom-color: var(--dsp-primary); }
+.dsp .dsp-ex-fb { flex-basis: 100%; font-size: 11px; color: var(--dsp-60); }
+.dsp .dsp-ex-fb.is-wrong { color: var(--dsp-tension); }
+.dsp .dsp-ex-hint { flex-basis: 100%; font-size: 11px; color: var(--dsp-accent); }
+.dsp .dsp-ex-acts { display: inline-flex; gap: 2px; }
+.dsp .dsp-ex-slot.is-compact .dsp-ex-acts .dsp-tool { padding: 1px 5px; font-size: 11px; }
+.dsp .dsp-ex-list { margin: 8px 0; padding-left: 0; list-style: none; display: flex; flex-direction: column; gap: 8px; }
+.dsp .dsp-ex-cue { display: block; font-size: 12.5px; color: var(--dsp-60); margin-bottom: 2px; }
+.dsp .dsp-ex-tally { margin: 8px 0 0; font-size: 12.5px; color: var(--dsp-60); }
+.dsp .dsp-ex-counts { display: flex; flex-wrap: wrap; gap: 10px; }
+.dsp .dsp-ex-counts > div { padding: 6px 12px; border: 1px solid var(--dsp-line); border-radius: 4px; }
+.dsp .dsp-ex-counts dt { font-size: 10.5px; color: var(--dsp-60); }
+.dsp .dsp-ex-counts dd { margin: 0; font-family: var(--serif, Georgia, serif); font-size: 20px; }

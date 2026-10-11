@@ -397,6 +397,17 @@ export interface DisplayMeta {
   tell?: (guarded: boolean) => string;
   /** a display a person practises in (a worksheet, an exercise): what it checks is not given away while the guard is up */
   practice?: boolean;
+  /**
+   * What a person says when they want this without naming it — "should I take
+   * the job or stay?" wants a Crossroads. Matched against the person's own
+   * words as `norm` leaves them (lower case, no punctuation, no apostrophes,
+   * no leading article) by the request reader, before the vocabulary.
+   */
+  intents?: readonly RegExp[];
+  /** an experience (Crossroads, the Rehearsal Room…) rather than an everyday display — the gallery shows it in its own section */
+  experience?: boolean;
+  /** things a person might say to start one — shown in the gallery, and put into the composer when chosen */
+  prompts?: readonly string[];
 }
 
 const META = new Map<string, DisplayMeta>();

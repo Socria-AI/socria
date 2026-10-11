@@ -1225,6 +1225,7 @@ export const MARKET = displayKind<MarketState>({
 register(MARKET);
 registerDisplay({
   kind: 'market',
+  prompts: ['Make a supply and demand practice where demand is P = 100 − 2Q and supply is P = 20 + 2Q', 'Show me a market practice for a price ceiling'],
   noun: 'market',
   handle: 'M',
   about: 'Supply and demand the person can move — taxes, subsidies, shifts, ceilings and floors — predicting what happens before revealing it.',

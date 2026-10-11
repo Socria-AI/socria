@@ -264,7 +264,7 @@
 
 /* ── a display in a workspace panel of its own ────────────────────── */
 .dsp-panel { --dsp-body-max: none; height: 100%; overflow: auto; padding: 6px 4px 12px; }
-.dsp-panel-empty { display: flex; align-items: center; justify-content: center; padding: 24px; }
+.dsp-panel-empty { display: block; padding: 0; }
 .dsp-panel-empty .dsp-empty { max-width: 46ch; text-align: center; }
 .dsp-panel-pick { display: flex; flex-wrap: wrap; gap: 4px; padding: 4px 12px 6px; border-bottom: 1px solid var(--lg-line, rgba(35, 36, 31, 0.12)); }
 .dsp-panel-pick button {
@@ -355,3 +355,4 @@
 .dsp-table td.is-num, .dsp-table th.is-num { text-align: right; }
 .dsp-details { margin-top: 8px; font-size: 12.5px; }
 .dsp-details summary { cursor: pointer; color: var(--dsp-60); }
+.dsp-panel-pick .dsp-panel-new { margin-left: auto; border-style: dashed; }

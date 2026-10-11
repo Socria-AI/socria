@@ -836,6 +836,7 @@ export const ARGUMENT = displayKind<ArgumentState>({
 register(ARGUMENT);
 registerDisplay({
   kind: 'argument',
+  prompts: ['Map the argument for a four-day work week', 'Make an argument map of whether homework should be banned'],
   noun: 'argument map',
   handle: 'A',
   about: 'An essay’s or a debate’s reasoning — thesis, claims, evidence, counterarguments, rebuttals and open questions — which stays the person’s own.',

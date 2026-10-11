@@ -20,6 +20,12 @@ import './display-worksheet';
 import './display-exercise';
 import './display-compare';
 import './display-venn';
+// the human-first experiences (Logos 3.5): objects of thought too, sharing one vocabulary of reasoning (reasoning.ts)
+import './display-crossroads';
+import './display-untangle';
+import './display-rehearsal';
+import './display-commonground';
+import './display-timemachine';
 import { apply, create, currentOf, kindOf, objOf, originSaid, stepWho, EMPTY_SPACE, type ObjectOrigin, type ObjectSpace, type ThoughtObject, type Step } from './core';
 import { diffCells, findMatrices, matrixTeX, readMatrixOp, type MatrixState } from './matrix';
 import { findFunctions } from './function';
@@ -34,7 +40,9 @@ export { SCENE, SCENE_OPS, DIMS, SHAPES, MATERIALS, settle, sanitizeScene, nodeL
 export { displayKinds, displayMeta, isDisplayKind, isoDay, todayDay, localDay, type DisplayMeta } from './display-base';
 export { readDisplayRequest, type DisplayRequest } from './display-request';
 export { buildDisplayPrompt, readDisplayProposal, makeDisplay, madeSays, type Proposal } from './display-propose';
-export { planFromMap, exerciseFromDiagram, exerciseFromMap, worksheetFromWords, makeFromRequest, sealDraft, numbersIn, type MapMaterial, type MadeDisplay } from './display-make';
+export { planFromMap, exerciseFromDiagram, exerciseFromMap, worksheetFromWords, makeFromRequest, sealDraft, numbersIn, dumpFrom, type MapMaterial, type MadeDisplay, type OpenDisplay } from './display-make';
+export { BASIS_WORD, REL_WORD, type Basis, type Link } from './reasoning';
+export { timelineOf, compareStates, compareMap, keyOfStep, type TimelineEvent, type Timeline, type StateDiff } from './timeline';
 
 export const spaceOf = (map: ThinkingMap | null | undefined): ObjectSpace => map?.objects ?? EMPTY_SPACE;
 

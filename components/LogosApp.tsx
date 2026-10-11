@@ -26,7 +26,10 @@ import {
   currentOf,
   discover,
   displayMeta,
+  forgetBefore,
   isDisplayKind,
+  kindOf,
+  makeDisplay,
   localDay,
   mergeSpaces,
   objOf,
@@ -197,6 +200,8 @@ import { viewsFor } from '@/lib/model/views';
 import { affectedBy } from '@/lib/model/deps';
 import { readSeen, markSeen } from '@/lib/hints';
 import { applyMapEdits, dropRemoved, readMapCommand, type MapEdit } from '@/lib/map-edit';
+import { forgetMapBefore, recordChange } from '@/lib/map-history';
+import type { AskExperience, WorkspaceAction, WorkspaceResult } from '@/components/objects/figures';
 import { readViewRequest, viewSaid } from '@/lib/view-request';
 import type { ExploreResult, NodeMode } from '@/lib/logos-explore';
 import {
@@ -2301,14 +2306,19 @@ export function LogosApp({
               // What the person took off stays off, whatever the extractor
               // made of a transcript that still mentions it (lib/map-edit.ts).
               const kept = dropRemoved(map, s.map?.removed);
+              // WHAT CHANGED, AND WHEN — kept for the Time Machine, with the
+              // person's own words on the turn that changed it (lib/map-history.ts)
+              const words = [...s.messages].reverse().find((m) => m.role === 'user')?.content;
+              const history = recordChange(s.map?.history, s.map?.nodes ?? [], kept.nodes, Date.now(), 'turn', typeof words === 'string' ? words : undefined);
               // Shared: the host draws, both see it. onLocalMap returns the
               // map with each node attributed to whoever it was drawn from,
               // so the local view shows the same author dots the other
               // person sees; alone it returns the map unchanged.
-              const shown =
+              const drawn =
                 roomRef.current.active && sharedIdsRef.current.has(s.id)
                   ? roomRef.current.onLocalMap(kept as TMap)
                   : kept;
+              const shown = history ? { ...drawn, history } : drawn;
               return { ...s, map: shown, contexts };
             });
             setChanged(new Set(delta.changed));
@@ -2738,10 +2748,13 @@ export function LogosApp({
       return null;
     }
     const liveIds = new Set(out.map.nodes.map((n) => n.id));
+    // an edit by hand is a change the Time Machine can show, as one
+    const history = recordChange(current.map.history, current.map.nodes, out.map.nodes, Date.now(), 'edit');
+    const edited = history ? { ...out.map, history } : out.map;
     patchActive((s) => {
       // Grounding keyed on a removed node would linger invisibly.
       const contexts = Object.fromEntries(Object.entries(s.contexts ?? {}).filter(([id]) => liveIds.has(id)));
-      return { ...s, map: out.map, contexts };
+      return { ...s, map: edited, contexts };
     });
     const said = out.applied.map((a) => a.said).join(' ');
     const before = new Set(current.map.nodes.map((n) => n.id));
@@ -2977,6 +2990,112 @@ export function LogosApp({
   }
 
   /** Something done TO an object in the workspace: computed here, and only here. */
+  /**
+   * WHAT AN EXPERIENCE ASKS OF THE WORKSPACE (components/objects/figures.ts
+   * WorkspaceAction): a linked object made beside it, Socria's own steps from a
+   * reply it was asked for, a look back, a fresh start from an earlier state,
+   * history forgotten. Each is the person's action, refused for anyone who may
+   * only read; each lands as an ordinary change to the objects, so it undoes,
+   * syncs and is read by the conversation like any other.
+   */
+  function onWorkspace(a: WorkspaceAction): WorkspaceResult {
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+      return { ok: false, why: 'You can look at this line of thinking, but not change it.' };
+    }
+    let space = spaceOf(mapRef.current);
+    if (a.type === 'make') {
+      const made = makeDisplay(space, a.kind, a.state, 'person');
+      if (!made.ok) return { ok: false, why: made.says };
+      space = made.space;
+      // the connection both ways, where each side can hold one
+      if (a.from) {
+        const there = applyObjectOp(space, made.obj.id, 'link', { obj: a.from.obj, ...(a.from.part ? { part: a.from.part } : {}), rel: 'from' }, { by: 'person' });
+        if (there.ok) space = there.space;
+        const back = applyObjectOp(space, a.from.obj, 'link', { obj: made.obj.id, ...(a.from.part ? { part: a.from.part } : {}), rel: 'led_to' }, { by: 'person' });
+        if (back.ok) space = back.space;
+      }
+      commitObjects(space, objOf(space, made.obj.id));
+      setDisplayToOpen(made.obj.id);
+      return { ok: true, id: made.obj.id };
+    }
+    if (a.type === 'socria') {
+      let n = 0;
+      let why: string | undefined;
+      const at = Date.now();
+      for (const step of a.ops.slice(0, 24)) {
+        const r = applyObjectOp(space, a.obj, step.op, step.args, { by: 'socria', at });
+        if (r.ok) {
+          space = r.space;
+          n++;
+        } else why ??= r.why;
+      }
+      if (n) commitObjects(space, objOf(space, a.obj));
+      return n ? { ok: true, applied: n, ...(why ? { why } : {}) } : { ok: false, why: why ?? 'Nothing came back that could be used.' };
+    }
+    if (a.type === 'seek') {
+      const next = seekObject(space, a.obj, a.at);
+      commitObjects(next, objOf(next, a.obj));
+      return { ok: true, id: a.obj };
+    }
+    if (a.type === 'branch') {
+      const o = objOf(space, a.obj);
+      const state = o?.states[a.at];
+      if (!o || state === undefined) return { ok: false, why: 'That moment is no longer kept.' };
+      // a new object from an earlier state — the old one is untouched
+      const made = makeDisplay(space, o.kind, state, o.origin === 'socria' ? 'socria' : 'person');
+      if (!made.ok) {
+        const c = !isDisplayKind(o.kind) ? createObject(space, o.kind, state, { origin: o.origin }) : null;
+        if (!c) return { ok: false, why: made.says };
+        space = c.space;
+        commitObjects(space, c.obj);
+        return { ok: true, id: c.obj.id };
+      }
+      space = made.space;
+      if (kindOf(o.kind)?.ops.link) {
+        const r = applyObjectOp(space, made.obj.id, 'link', { obj: o.id, rel: 'from' }, { by: 'person' });
+        if (r.ok) space = r.space;
+      }
+      if (a.from) {
+        const r = applyObjectOp(space, a.from, 'link', { obj: made.obj.id, rel: 'led_to' }, { by: 'person' });
+        if (r.ok) space = r.space;
+      }
+      commitObjects(space, objOf(space, made.obj.id));
+      setDisplayToOpen(made.obj.id);
+      return { ok: true, id: made.obj.id };
+    }
+    if (a.type === 'forget') {
+      const next = forgetBefore(space, a.obj, a.before);
+      commitObjects(next, objOf(next, a.obj));
+      return { ok: true };
+    }
+    if (a.type === 'forgetMap') {
+      const h = mapRef.current.history;
+      if (!h) return { ok: false, why: 'There is no record of the map to forget.' };
+      const history = forgetMapBefore(h, a.before);
+      mapRef.current = { ...mapRef.current, history };
+      patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), history } }));
+      return { ok: true };
+    }
+    if (a.type === 'open') {
+      if (!objOf(space, a.obj)) return { ok: false, why: 'That is no longer in this workspace.' };
+      setDisplayToOpen(a.obj);
+      return { ok: true, id: a.obj };
+    }
+    return { ok: false, why: 'That cannot be done here.' };
+  }
+
+  /** The experience route, asked for one thing — a counterpart's line, suggestions. What comes back is applied as Socria's, never by itself. */
+  const askExperience: AskExperience = async (body) => {
+    try {
+      const res = await fetch('/api/logos/experience', { method: 'POST', headers: { 'Content-Type': 'application/json', ...keyHeaders() }, body: JSON.stringify(body) });
+      const json = (await res.json().catch(() => ({}))) as Record<string, unknown>;
+      if (!res.ok) return { ok: false, why: typeof json.error === 'string' ? json.error : 'Socria could not answer just now — try again in a moment.' };
+      return { ok: true, data: json };
+    } catch {
+      return { ok: false, why: 'Socria could not be reached — check your connection and try again.' };
+    }
+  };
+
   function onObject(a: ObjectAction): { ok: boolean; why?: string } | void {
     const space = spaceOf(mapRef.current);
     if (a.type === 'op') {
@@ -3881,6 +4000,13 @@ export function LogosApp({
             onSeek={(at) => d && onObject({ type: 'seek', obj: d.id, at })}
             onPick={(id) => wsLayout && changeLayout(configurePanel(wsLayout, p.id, { obj: id }))}
             readOnly={togetherReadOnly}
+            space={map.objects}
+            history={map.history}
+            me={{ id: user?.id || (room.active ? room.me.id : 'you'), name: myName }}
+            shared={together.active || (room.active && sharedIdsRef.current.has(activeId ?? ''))}
+            onWorkspace={onWorkspace}
+            ask={askExperience}
+            onPrompt={(text) => draftToComposer(text)}
           />
         );
       }

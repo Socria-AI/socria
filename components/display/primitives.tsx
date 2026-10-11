@@ -302,3 +302,15 @@ export const Field = ({ label, children, wide }: { label: string; children: Reac
     {children}
   </label>
 );
+
+/**
+ * A labelled group of buttons — a Segmented, a pair of steps. Not a <label>:
+ * a label wrapping a button names that button, and the choices inside would
+ * lose their own names to a screen reader.
+ */
+export const Group = ({ label, children, wide }: { label: string; children: ReactNode; wide?: boolean }) => (
+  <div className={`dsp-field${wide ? ' is-wide' : ''}`} role="group" aria-label={label}>
+    <span>{label}</span>
+    {children}
+  </div>
+);

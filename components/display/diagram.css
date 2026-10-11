@@ -1,0 +1,27 @@
+/* components/display/diagram.css — a diagram in its shape. What a node is in a decision tree is said in
+   words in the box; the shape of the border only repeats it. */
+.dsp .dsp-dg-box { padding: 0; border: 1px solid var(--dsp-24); border-radius: 5px; background: var(--dsp-panel); }
+.dsp .dsp-dg-box.is-socria { border-style: dashed; }
+.dsp .dsp-dg-box.is-loose { opacity: 0.75; }
+.dsp .dsp-dg-box.is-placed { border-color: var(--dsp-ink); }
+.dsp .dsp-dg-box.is-decision { border-radius: 2px; border-color: var(--dsp-ink); }
+.dsp .dsp-dg-box.is-chance { border-radius: 22px; }
+.dsp .dsp-dg-box.is-outcome { border-left: 3px solid var(--dsp-primary); }
+.dsp .dsp-dg-box.is-sel { box-shadow: 0 0 0 2px var(--dsp-tint-2); border-color: var(--dsp-primary); }
+.dsp .dsp-dg-in { display: flex; flex-direction: column; gap: 0; width: 100%; padding: 5px 8px; border: 0; background: none; text-align: left; cursor: inherit; }
+.dsp .dsp-dg-kind { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp .dsp-dg-label { font-size: 12.5px; line-height: 1.3; }
+.dsp .dsp-dg-val { font-size: 11px; color: var(--dsp-accent); font-variant-numeric: tabular-nums; }
+.dsp .dsp-dg-group { font-size: 10.5px; color: var(--dsp-40); font-style: italic; }
+.dsp .dsp-nl-line.is-best line { stroke: var(--dsp-ink); stroke-width: 2; }
+.dsp .dsp-nl-line.is-back line, .dsp .dsp-nl-line.is-across line { stroke: var(--dsp-24); }
+.dsp .dsp-dg-outline { list-style: none; margin: 0; padding: 0; }
+.dsp .dsp-dg-line { width: 100%; padding: 3px 6px; border: 0; border-radius: 4px; background: none; text-align: left; cursor: pointer; font-size: 13px; }
+.dsp .dsp-dg-line:hover, .dsp .dsp-dg-line.is-sel { background: var(--dsp-tint); }
+.dsp .dsp-dg-note { color: var(--dsp-60); font-size: 12px; }
+.dsp .dsp-dg-best { margin: 2px 0; font-size: 12.5px; }
+.dsp .dsp-dg-problems { margin: 4px 0; padding-left: 18px; color: var(--dsp-tension); font-size: 12px; }
+.dsp .dsp-dg-edges ul { list-style: none; margin: 2px 0 6px; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+.dsp .dsp-dg-edges li { display: flex; align-items: center; gap: 6px; }
+.dsp .dsp-dg-edges .dsp-num { width: 64px; }
+.dsp .dsp-dg-connect { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; margin: 6px 0; }

@@ -328,7 +328,7 @@ function contraHere(c: Classified | null, role: SectionRole): boolean {
 }
 
 /** What a line adds to its heading's total, in cents. */
-function lineValue(l: WorksheetLine, sec: WorksheetSection): number {
+export function lineValue(l: WorksheetLine, sec: WorksheetSection): number {
   if (l.amount === null) return 0;
   const v = cents(l.amount);
   return contraHere(classify(l.label), sec.role) ? -Math.abs(v) : v;
@@ -1455,6 +1455,7 @@ export const WORKSHEET = displayKind<WorksheetState>({
 register(WORKSHEET);
 registerDisplay({
   kind: 'worksheet',
+  prompts: ['Make a journal entry worksheet for buying equipment with cash', 'Give me a balance sheet worksheet'],
   noun: 'worksheet',
   handle: 'W',
   about: 'Structured practice the person fills in — a balance sheet, a journal entry, an income statement — checked by standard rules, with hints only when asked.',

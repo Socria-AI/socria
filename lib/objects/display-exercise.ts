@@ -752,6 +752,7 @@ export const EXERCISE = displayKind<ExerciseState>({
 register(EXERCISE);
 registerDisplay({
   kind: 'exercise',
+  prompts: ['Quiz me on this map', 'Make a labeling exercise from the diagram'],
   noun: 'exercise',
   handle: 'X',
   about: 'Labeling and retrieval practice over another display’s parts — the labels hidden, the answers graded, hints only when asked.',
