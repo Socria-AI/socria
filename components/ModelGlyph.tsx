@@ -6,7 +6,8 @@
 //   Core 2    a plain outlined circle — the quiet one
 //   Core 3.1  the same circle, polished: a gradient ring with a slow sweep
 //             of light across it; it is the one that notices language
-//   Logos 2   the neuron, the same mark the Logos header carries
+//   Logos     the Logos 3 mark — one idea, a thought worked through and one
+//             still forming — the same mark the Logos header carries
 //
 // Gradients need ids that are unique per instance — two of these render at
 // once (the button and its menu row) — so they're keyed off useId().
@@ -27,7 +28,7 @@ export function ModelGlyph({
   const uid = useId().replace(/:/g, '');
   const cls = className ? `socria-glyph ${className}` : 'socria-glyph';
 
-  // The neuron is open line-work that reaches to its corners, so at the same
+  // The mark is line-work with open space between its strokes, so at the same
   // nominal size it reads lighter than a solid ring. Give it a little back so
   // the marks sit at the same visual weight in a row.
   // Any Logos surface, by the registry rather than by name: Logos 2 was
