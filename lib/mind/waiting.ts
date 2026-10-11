@@ -57,6 +57,21 @@ export async function recordImpact(
 }
 
 /**
+ * Record what a change SOCRIA read from a conversation reached — a change of
+ * position, a tension, a rewording. The same marks as a hand edit leaves, with
+ * one difference: the changed node's own mark is NOT cleared, because nobody
+ * has looked at it — the change itself is waiting for the person's review.
+ */
+export async function recordChangeImpact(userId: string, graph: MindGraph, changedId: string, at: number): Promise<number> {
+  const ws = projectMind(emptyWorkspace(), graph);
+  const plan = planImpact(ws, `mind:${changedId}`);
+  if (!plan || !plan.affected.length) return 0;
+  const marks: StaleMark[] = plan.affected.map((a) => ({ nodeId: bare(a.id), becauseId: changedId, becauseLabel: plan.label, kind: a.kind, distance: a.distance, at }));
+  await writeStale(userId, marks);
+  return marks.length;
+}
+
+/**
  * The same walk, without writing anything — for showing somebody what an edit
  * would reach before they make it. Exported separately so the two can never
  * disagree about what counts as affected.

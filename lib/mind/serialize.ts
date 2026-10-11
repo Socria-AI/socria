@@ -43,7 +43,9 @@ function edgeNote(e: MindEdge): string {
   // nothing.
   if (MEMBERSHIP_RELATIONSHIPS.has(e.relationship)) return '';
   const withNote = [...e.provenance].reverse().find((p) => p.note);
-  return withNote?.note ? ` — ${withNote.note}` : '';
+  // a change Socria read and the person has not confirmed is said to be one (lib/mind/evolve.ts)
+  const unconfirmed = e.provenance[0]?.review === 'proposed' ? ' (unconfirmed — Socria’s reading)' : '';
+  return withNote?.note ? ` — ${withNote.note}${unconfirmed}` : unconfirmed;
 }
 
 export interface SerializeOptions {
@@ -141,7 +143,8 @@ Statuses are marked and they matter. A superseded or historical item is what
 they USED to think, kept because how understanding changed is often the most
 useful thing here; do not present it as current. A tentative or uncertain item
 is a reading, not a fact. A contradicted item is in dispute and should be
-treated as open.
+treated as open. A relationship marked unconfirmed is a change Socria read
+from a conversation that the person has not confirmed: do not rely on it.
 
 This is context, not truth. What they say now takes precedence over anything
 here, and if something below is wrong, believe them and move on.

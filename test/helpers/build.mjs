@@ -190,6 +190,7 @@ const MODULES = [
   'lib/mind/self.ts',
   'lib/mind/gate.ts',
   'lib/mind/apply.ts',
+  'lib/mind/evolve.ts',
   'lib/mind/activate.ts',
   'lib/mind/serialize.ts',
   'lib/mind/extract.ts',

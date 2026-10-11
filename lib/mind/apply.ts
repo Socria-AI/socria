@@ -143,8 +143,19 @@ export function applyCandidates(
     // rarely resembles the one it replaces — that is what makes it new — so
     // resolving for it would miss almost every real change of mind and
     // quietly create an unconnected second belief instead.
-    const replaced = c.replaces ? byLabel(c.replaces) : undefined;
-    const conflicted = c.conflictsWith ? byLabel(c.conflictsWith) : undefined;
+    // …unless the person already rejected exactly that change: a rejected
+    // reading leaves a tombstone on its link (lib/mind/evolve.ts), and reading
+    // it in again next turn would undo their decision without asking
+    const rejected = (other: MindNode | undefined, rel: string) =>
+      !!other && isForgotten(working, fingerprintEdge(other.type, other.label, rel, clip(c.type, MAX_LABEL), label));
+    const replacedRaw = c.replaces ? byLabel(c.replaces) : undefined;
+    const conflictedRaw = c.conflictsWith ? byLabel(c.conflictsWith) : undefined;
+    const replaced = rejected(replacedRaw, 'superseded_by') ? undefined : replacedRaw;
+    const conflicted = rejected(conflictedRaw, 'contradicts') ? undefined : conflictedRaw;
+    // A change Socria read from a conversation is PROPOSED until the person
+    // looks; one they made themselves is theirs. `prior` is what it displaced,
+    // so rejecting it restores exactly that.
+    const review = opts.provenance.surface === 'user' ? ('confirmed' as const) : ('proposed' as const);
 
     const verdict = gate({
       type: c.type,
@@ -189,7 +200,7 @@ export function applyCandidates(
         nodes[j] = { ...same, content, status: verdict.status, seen: (same.seen ?? 1) + 1, confidence: reinforceConfidence(same.confidence),
           updatedAt: opts.now, provenance: boundProvenance([...same.provenance, prov(c.kind)]) };
         if (!edges.some((e) => e.sourceId === replaced.id && e.targetId === same.id && e.relationship === 'superseded_by')) {
-          edges.push(makeEdge(replaced.id, same.id, 'superseded_by', opts, prov(c.kind, { note: `changed from: ${replaced.content}` })));
+          edges.push(makeEdge(replaced.id, same.id, 'superseded_by', opts, prov(c.kind, { note: `changed from: ${replaced.content}`, review, prior: { status: replaced.status } })));
         }
         report.nodes.push({ label, action: 'superseded', id: same.id });
         continue;
@@ -199,7 +210,7 @@ export function applyCandidates(
         // touching the words they gave.
         nodes[i] = { ...replaced, status: 'superseded', updatedAt: opts.now };
         if (!edges.some((e) => e.sourceId === replaced.id && e.targetId === same.id && e.relationship === 'superseded_by')) {
-          edges.push(makeEdge(replaced.id, same.id, 'superseded_by', opts, prov(c.kind, { note: `changed from: ${replaced.content}` })));
+          edges.push(makeEdge(replaced.id, same.id, 'superseded_by', opts, prov(c.kind, { note: `changed from: ${replaced.content}`, review, prior: { status: replaced.status } })));
         }
         report.nodes.push({ label, action: 'superseded', id: same.id });
         continue;
@@ -214,7 +225,7 @@ export function applyCandidates(
       nodes.push(fresh);
       edges.push(
         makeEdge(replaced.id, fresh.id, 'superseded_by', opts,
-          prov(c.kind, { note: `changed from: ${replaced.content}` }))
+          prov(c.kind, { note: `changed from: ${replaced.content}`, review, prior: { status: replaced.status } }))
       );
       report.nodes.push({ label, action: 'superseded', id: fresh.id });
       continue;
@@ -233,7 +244,7 @@ export function applyCandidates(
       nodes[i] = { ...conflicted, status: 'contradicted', updatedAt: opts.now };
       const fresh = makeNode(c, label, content, 'tentative', opts, prov(c.kind));
       nodes.push({ ...fresh, status: 'contradicted' });
-      edges.push(makeEdge(conflicted.id, fresh.id, 'contradicts', opts, prov(c.kind)));
+      edges.push(makeEdge(conflicted.id, fresh.id, 'contradicts', opts, prov(c.kind, { review, prior: { status: conflicted.status, toStatus: 'tentative' } })));
       report.nodes.push({ label, action: 'conflicted', id: fresh.id });
       continue;
     }
@@ -294,7 +305,7 @@ export function applyCandidates(
         confidence: verdict.mayRewrite ? reinforceConfidence(n.confidence) : n.confidence,
         provenance: boundProvenance([
           ...n.provenance,
-          prov(c.kind, revised ? { note: `was: ${n.content}` } : undefined),
+          prov(c.kind, revised ? { note: `was: ${n.content}`, review, prior: { content: n.content } } : undefined),
         ]),
         updatedAt: opts.now,
         lastAccessed: opts.now,

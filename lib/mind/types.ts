@@ -251,7 +251,19 @@ export interface Provenance {
   charEnd?: number;
   /** what the person said when they challenged or corrected it */
   note?: string;
+  /**
+   * For a CHANGE Socria read from a conversation — a supersession, a
+   * conflict, a rewording, a possible contradiction — whether the person has
+   * confirmed it. 'proposed' until they look; nothing they wrote themselves
+   * is ever proposed (lib/mind/evolve.ts).
+   */
+  review?: ReviewState;
+  /** what the change displaced, so rejecting it restores exactly what was there */
+  prior?: { status?: NodeStatus; toStatus?: NodeStatus; content?: string };
 }
+
+export const REVIEW_STATES = ['proposed', 'confirmed', 'rejected'] as const;
+export type ReviewState = (typeof REVIEW_STATES)[number];
 
 // ── the objects themselves ──────────────────────────────────────────
 

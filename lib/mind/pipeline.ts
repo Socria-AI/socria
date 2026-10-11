@@ -15,6 +15,8 @@ import 'server-only';
 import { activate, touch, type ActivatedSubgraph } from './activate';
 import { nameCandidate, nameFrom, renderProfile, standingProfile } from './self';
 import { projectIndex } from './projects';
+import { affectedBy, changesBlock, changesOf, detectContradictions, impactView, selectForPrompt } from './evolve';
+import { recordChangeImpact } from './waiting';
 import { applyCandidates, type ApplyReport, type EdgeCandidate, type NodeCandidate } from './apply';
 import { extract } from './extract';
 import { FILE_BUDGET, TURN_BUDGET, type Budget } from './gate';
@@ -207,8 +209,16 @@ export async function recall(
     // Recall strengthens memory. Best-effort and not awaited on the hot path.
     void touchNodes(userId, touch(subgraph, opts.now));
 
+    // HOW THEIR THINKING HAS BEEN CHANGING — the changes touching what was
+    // recalled, then the recent unconfirmed ones (lib/mind/evolve.ts). Private
+    // memories stay out of Logos here exactly as they do everywhere else.
+    const changes = changesOf(graph, { excludePrivate: opts.surface === 'logos', here: opts.conversationId, withAffected: false });
+    const picked = selectForPrompt(changes, new Set(subgraph.nodes.map((n) => n.id)), { now: opts.now });
+    const view = picked.length ? impactView(graph) : null;
+    const living = changesBlock(picked.map((c) => ({ ...c, affected: view ? affectedBy(graph, c.from.id, 4, view).filter((a) => !(opts.surface === 'logos' && graph.nodes.find((n) => n.id === a.id)?.private)) : [] })));
+
     return {
-      block: profile + renderMindGraph(subgraph, { now: opts.now, maxTokens: win.tokens, origin }),
+      block: profile + renderMindGraph(subgraph, { now: opts.now, maxTokens: win.tokens, origin }) + living,
       subgraph,
       graph,
       projectBlock,
@@ -340,7 +350,30 @@ export async function remember(
       ).graph;
     }
 
+    // POSSIBLE CONTRADICTIONS, by plain rules — between what this turn touched
+    // and what was already held. Proposed only: neither claim changes until
+    // the person confirms it (lib/mind/evolve.ts).
+    const touched = report.nodes.map((r) => r.id);
+    const detected = detectContradictions(graph, touched, {
+      now: opts.now,
+      nextId: () => `m_${opts.now.toString(36)}_c${(n++).toString(36)}_${Math.random().toString(36).slice(2, 8)}`,
+      provenance: { surface: opts.surface, conversationId: opts.conversationId },
+    });
+    graph = detected.graph;
+
     const saved = await persistGraph(userId, before, graph);
+    if (saved.ok) {
+      // WHAT EACH CHANGE REACHED, marked for the person to look at — the claims
+      // resting on the position that moved, or on either side of a tension.
+      // Best-effort: a mark not written costs a hint, never the turn.
+      const changed = new Set<string>();
+      for (const e of graph.edges) {
+        if (e.createdAt !== opts.now) continue;
+        if (e.relationship === 'superseded_by' || e.relationship === 'contradicts') changed.add(e.sourceId);
+      }
+      for (const r of report.nodes) if (r.action === 'revised') changed.add(r.id);
+      void Promise.all([...changed].slice(0, 6).map((id) => recordChangeImpact(userId, graph, id, opts.now).catch(() => 0)));
+    }
     if (!saved.ok) {
       // persistGraph has already logged which write failed and why. This says
       // what was lost, which is the part that matters when a whole session of

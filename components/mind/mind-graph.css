@@ -412,3 +412,39 @@
 
 /* the atlas on an empty Memory page: chats and maps connect before memories exist */
 .mem-root .mem-everything{padding:0 clamp(18px,4vw,56px) 28px}
+
+/* ── how your thinking has changed (components/mind/MindChanges.tsx) ── */
+.mem-root .gr-node .ring.changed{fill:none;stroke:var(--moss-700);stroke-width:1.8}
+.mem-root .gr-node .ring.affected{fill:none;stroke:var(--moss-700);stroke-width:1.2;stroke-dasharray:3 3;opacity:.8}
+.mem-root .mem-changes{margin:0 0 24px;padding:16px 18px;border:1px solid var(--ink-12);border-left:2px solid var(--moss-700);border-radius:0 10px 10px 0;background:rgba(0,0,0,.012)}
+.mem-root .mem-changes h2{font-family:var(--serif);font-size:1.25rem;letter-spacing:-.015em;margin:7px 0 0}
+.mem-root .mem-changes .deck{margin:8px 0 0;font-size:13.5px;line-height:1.6;color:var(--ink-70);max-width:66ch}
+.mem-root .mem-changes .deck em{font-style:italic;color:var(--moss-700)}
+.mem-root .clist{list-style:none;margin:12px 0 0;padding:0;display:flex;flex-direction:column;gap:12px}
+.mem-root .crow{display:grid;gap:3px;padding:0 0 10px;border-bottom:1px solid var(--ink-12)}
+.mem-root .crow:last-child{border-bottom:0}
+.mem-root .crow .ck{font-size:11px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-50)}
+.mem-root .crow .cbody{margin:0;font-size:14px;line-height:1.55}
+.mem-root .crow .cwas{color:var(--ink-50)}
+.mem-root .crow .cnow{color:var(--ink)}
+.mem-root .crow .carrow{color:var(--moss-700)}
+.mem-root .crow .sr{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+.mem-root .crow .cnote,.mem-root .crow .caff{margin:0;font-size:12.5px;color:var(--ink-60, var(--ink-70));line-height:1.5}
+.mem-root .crow .cl{font:inherit;padding:0;border:0;background:none;color:var(--ink);cursor:pointer;border-bottom:1px solid var(--ink-16);text-align:left}
+.mem-root .crow .cl:hover{border-color:var(--ink)}
+.mem-root .crow .cacts{display:flex;flex-wrap:wrap;gap:6px;margin-top:4px}
+.mem-root .crow .cacts button{font:inherit;font-size:12px;padding:5px 12px;border:1px solid var(--ink-16);border-radius:999px;background:transparent;color:var(--ink-70);cursor:pointer;white-space:nowrap}
+.mem-root .crow .cacts .ok:hover:not(:disabled){color:var(--moss-700);border-color:var(--moss-700)}
+.mem-root .crow .cacts .no:hover:not(:disabled){color:var(--ink);border-color:var(--ink-40)}
+.mem-root .crow .cacts button:disabled{opacity:.45;cursor:not-allowed}
+.mem-root .chist{margin-top:12px}
+.mem-root .chist-t{font:inherit;font-size:12.5px;padding:0;border:0;background:none;color:var(--ink-60, var(--ink-70));cursor:pointer;text-decoration:underline;text-decoration-color:var(--ink-16)}
+.mem-root .clist.is-history .crow{opacity:.85}
+.mem-root .panel .evo{margin:18px 0 0}
+.mem-root .panel .evo h4{margin:0 0 6px;font-size:12px;letter-spacing:.08em;text-transform:uppercase;color:var(--ink-50);font-weight:600}
+.mem-root .mem-evo{list-style:none;margin:0;padding:0 0 0 12px;border-left:1px solid var(--ink-16);display:flex;flex-direction:column;gap:8px}
+.mem-root .mem-evo li{display:grid;gap:1px;font-size:13px;line-height:1.45}
+.mem-root .mem-evo .evk{font-size:10.5px;letter-spacing:.06em;text-transform:uppercase;color:var(--ink-50)}
+.mem-root .mem-evo li.is-proposed .evk{color:var(--moss-700)}
+.mem-root .mem-evo .cl{font:inherit;padding:0;border:0;background:none;color:var(--ink);cursor:pointer;text-align:left;border-bottom:1px solid var(--ink-16)}
+.mem-root .gr-edge.changed{stroke:var(--moss-700);stroke-width:1.8;opacity:1}

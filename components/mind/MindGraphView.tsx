@@ -33,6 +33,8 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Label, Button } from '@/components/journal/ds';
+import { MindChanges, MindEvolution } from './MindChanges';
+import type { Change, EvolutionStep } from '@/lib/mind/evolve';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import type { LogosNodeType } from '@/lib/logos';
 import { settle, foldLayout, type Positions } from '@/lib/mind/layout';
@@ -151,11 +153,15 @@ type Tri = [string, string, string];
 // ── the canvas ──────────────────────────────────────────────────────
 
 export function Graph({
-  nodes, edges, sel, onSel, width = 1000,
+  nodes, edges, sel, onSel, width = 1000, changed, affected,
 }: {
   nodes: Node[]; edges: Tri[]; sel: string | null; onSel: (id: string) => void;
   /** the drawing's own width — smaller in a panel, so its text is not shrunk to nothing */
   width?: number;
+  /** memories a change waiting for review touches (lib/mind/evolve.ts) — a solid ring */
+  changed?: ReadonlySet<string>;
+  /** memories resting on such a change — a dashed ring */
+  affected?: ReadonlySet<string>;
 }) {
   const [fold, setFold] = useState(true);
   const [open, setOpen] = useState<string | null>(null);
@@ -342,10 +348,12 @@ export function Graph({
           const pa = pos[a], pb = pos[b];
           if (!pa || !pb) return null;
           const lit = !!focus && (a === focus || b === focus);
+          // a change waiting for review: the link that records it is drawn as one
+          const pendingChange = (rel === 'superseded_by' || rel === 'contradicts') && !!changed?.has(a) && !!changed?.has(b);
           return (
             <g key={i} opacity={focus && !lit ? 0.25 : 1}>
               <line
-                className={`gr-edge${lit ? ' on' : ''}`}
+                className={`gr-edge${lit ? ' on' : ''}${pendingChange ? ' changed' : ''}`}
                 x1={pa.x} y1={pa.y} x2={pb.x} y2={pb.y}
                 strokeDasharray={rel === 'superseded_by' ? '4 4' : undefined}
               />
@@ -375,7 +383,11 @@ export function Graph({
               opacity={(marker ? 1 : fade(status)) * dim}
               tabIndex={0}
               role="button"
-              aria-label={marker ? `Open the ${marker.type} folder` : `${d.type}: ${label}. Status ${status}.`}
+              aria-label={
+                marker
+                  ? `Open the ${marker.type} folder`
+                  : `${d.type}: ${label}. Status ${status}.${changed?.has(d.id) ? ' Changed — waiting for your review.' : affected?.has(d.id) ? ' May be affected by a change.' : ''}`
+              }
               onPointerDown={(e) => {
                 e.stopPropagation();
                 const q = toSvg(e);
@@ -410,6 +422,8 @@ export function Graph({
               }}
             >
               {marker && <circle className="fold-chip" r={13} />}
+              {!marker && changed?.has(d.id) && <circle className="ring changed" r={r + 8} />}
+              {!marker && !changed?.has(d.id) && affected?.has(d.id) && <circle className="ring affected" r={r + 7} />}
               {d.id === sel && !marker && <circle className="ring" r={r + 5} />}
               {d.id === hov && d.id !== sel && !marker && <circle className="ring hov" r={r + 4} />}
               {!marker && (
@@ -584,6 +598,17 @@ function Panel({
   const [challenge, setChallenge] = useState('');
   const [step, setStep] = useState(0);
   useEffect(() => { setContent(node.content); setChallenge(''); setStep(0); }, [node.id, node.content]);
+  // how this memory came to be what it is, from the record alone (lib/mind/evolve.ts)
+  const [evolution, setEvolution] = useState<EvolutionStep[] | null>(null);
+  useEffect(() => {
+    let live = true;
+    setEvolution(null);
+    fetch(`/api/mind/changes?node=${encodeURIComponent(node.id)}`, { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => live && setEvolution(Array.isArray(j?.evolution) ? j.evolution : []))
+      .catch(() => live && setEvolution([]));
+    return () => { live = false; };
+  }, [node.id, node.content, node.status]);
 
   const byId = useMemo(() => new Map(nodes.map((n) => [n.id, n])), [nodes]);
   const conns = useMemo(
@@ -698,6 +723,11 @@ function Panel({
           </p>
         </div>
 
+        <div className="evo">
+          <h4>How this changed</h4>
+          <MindEvolution steps={evolution} onSelect={onSel} />
+        </div>
+
         <div className="forget">
           {step === 0 ? (
             <button className="start" disabled={busy} onClick={() => setStep(1)}>Forget this permanently</button>
@@ -753,6 +783,8 @@ export function MindGraphView() {
   /** what is waiting on a change they made — see lib/workspace/impact.ts */
   const [waiting, setWaiting] = useState<Waiting[]>([]);
   const [ask, setAsk] = useState<Ask>({ text: '', yours: false, unsettled: false, waiting: false });
+  /** every change the memory records, newest first — see lib/mind/evolve.ts */
+  const [changes, setChanges] = useState<Change[]>([]);
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -768,6 +800,9 @@ export function MindGraphView() {
       setWaiting(j.waiting ?? []);
       setForgotten(j.forgotten ?? 0);
       setErr(null);
+      // changes are read beside the graph; failing to read them costs the review list, never the page
+      const ch = await fetch('/api/mind/changes', { cache: 'no-store' }).then((r) => (r.ok ? r.json() : null)).catch(() => null);
+      setChanges(Array.isArray(ch?.changes) ? ch.changes : []);
     } catch {
       setErr('Could not read your memory just now.');
     }
@@ -790,6 +825,20 @@ export function MindGraphView() {
       setNote(method === 'DELETE' ? 'Forgotten. It will not come back.' : 'Saved.');
     } catch {
       setNote('That did not save.');
+    }
+    setBusy(false);
+  }
+
+  async function decide(id: string, decision: 'confirm' | 'reject' | 'forget') {
+    setBusy(true); setNote(null);
+    try {
+      const res = await fetch('/api/mind/changes', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, decision }) });
+      const j = await res.json().catch(() => ({}));
+      if (!res.ok) throw new Error(j?.error || 'failed');
+      await load();
+      setNote(j.say ?? 'Saved.');
+    } catch (e) {
+      setNote(e instanceof Error && e.message !== 'failed' ? e.message : 'That did not save.');
     }
     setBusy(false);
   }
@@ -884,6 +933,9 @@ export function MindGraphView() {
 
   const node = useMemo(() => nodes.find((n) => n.id === selected) ?? null, [nodes, selected]);
   const tri = useMemo<Tri[]>(() => edges.map((e) => [e.sourceId, e.targetId, e.relationship]), [edges]);
+  // the rings: what a change waiting for review touches, and what rests on it
+  const changedIds = useMemo(() => new Set(changes.filter((c) => c.review === 'proposed').flatMap((c) => [c.from.id, c.to.id])), [changes]);
+  const affectedIds = useMemo(() => new Set(changes.filter((c) => c.review === 'proposed').flatMap((c) => c.affected.map((a) => a.id))), [changes]);
 
   const head = (title: string) => (
     <div className="mem-head">
@@ -1078,6 +1130,8 @@ export function MindGraphView() {
             onDone={(say) => { setNote(say); void load(); }}
           />
 
+          <MindChanges changes={changes} busy={busy} onSelect={setSelected} onDecide={(id, d) => void decide(id, d)} />
+
           {waiting.length > 0 && (
             <section className="mem-wait">
               <Label tone="moss">Waiting on a change</Label>
@@ -1116,7 +1170,7 @@ export function MindGraphView() {
             // happens in the graph and the list.
             <MindAtlas scope="all" onOpenChat={openChat} />
           ) : view === 'graph' ? (
-            <Graph nodes={visible} edges={tri} sel={selected} onSel={setSelected} />
+            <Graph nodes={visible} edges={tri} sel={selected} onSel={setSelected} changed={changedIds} affected={affectedIds} />
           ) : (
             <List nodes={visible} sel={selected} onSel={setSelected} />
           )}
