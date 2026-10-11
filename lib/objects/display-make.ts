@@ -33,7 +33,6 @@ import type { MarketState } from './display-market';
 import type { DisplayRequest } from './display-request';
 import { crossroadsFromWords, sealCrossroads, type CrossroadsState } from './display-crossroads';
 import { untangleFromWords } from './display-untangle';
-import { rehearsalFromWords } from './display-rehearsal';
 import { groundFromWords } from './display-commonground';
 import { timeMachineFromWords } from './display-timemachine';
 import { overlap } from './reasoning';
@@ -240,10 +239,6 @@ export function makeFromRequest(
     const state = untangleFromWords(dumpFrom(latest, ctx.turns ?? []));
     if (!state) return { why: 'That could not be untangled.' };
     return { kind, state, origin: 'person', ...(state.dump ? {} : { says: 'Write everything on your mind into it — it will be separated into thoughts in your words.' }) };
-  }
-  if (kind === 'rehearsal') {
-    const state = rehearsalFromWords(latest);
-    return state ? { kind, state, origin: 'person', says: 'Say what you want from the conversation and who it is with, then start — Socria plays only the other side.' } : { why: 'That could not be set up.' };
   }
   if (kind === 'commonground') {
     const state = groundFromWords(latest);

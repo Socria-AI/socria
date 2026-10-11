@@ -1,9 +1,8 @@
 // app/api/logos/experience/route.ts
 // POST /api/logos/experience → { ops: [{ op, args }], refused?: string[] }
 //
-// ONE THING ASKED OF A MODEL FOR ONE EXPERIENCE — the rehearsal counterpart's
-// next line, another way to put a line, suggestions for sorting an untangled
-// dump, questions and unknowns for a decision, hypothetical scenarios,
+// ONE THING ASKED OF A MODEL FOR ONE EXPERIENCE — suggestions for sorting an
+// untangled dump, questions and unknowns for a decision, hypothetical scenarios,
 // possible common ground. lib/objects/experience-asks.ts builds the prompt
 // from that experience's own state alone and reads the answer into
 // operations; every operation is applied AS SOCRIA to a scratch copy, so the
@@ -11,8 +10,7 @@
 // what comes back, as Socria's, under the same rules again.
 //
 // Who may ask: a signed-in account, or the typed access key, like every Logos
-// route. A counterpart's line is a turn of conversation and counts against the
-// day's messages on a free plan; suggestions count only against the rate limit.
+// route. Suggestions count against the rate limit.
 // When no model answers, it says so — nothing is made up in its place.
 
 import { NextRequest, NextResponse } from 'next/server';
@@ -23,9 +21,6 @@ import '@/lib/objects';
 import { buildPrompt, precheck, readAnswer, readAsk, readState, vetOps } from '@/lib/objects/experience-asks';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
-import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { bumpUsage, checkAllowance } from '@/lib/usage';
-import { boundaryNote, limitOf } from '@/lib/entitlements';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -43,14 +38,6 @@ export async function POST(req: NextRequest) {
   if (state === null) return NextResponse.json({ error: 'That could not be read.' }, { status: 400 });
   const refusedFirst = precheck(ask, state);
   if (refusedFirst) return NextResponse.json({ error: refusedFirst }, { status: 409 });
-
-  // a counterpart's line is a turn of conversation: it is counted like one
-  const isTurn = ask.kind === 'rehearsal' && ask.action === 'reply';
-  const plan = isTurn ? await resolvePlanForRequest(req, userId) : null;
-  if (isTurn && plan) {
-    const today = await checkAllowance(userId, plan, 'messages');
-    if (!today.ok) return NextResponse.json({ error: boundaryNote('messages'), upgrade: 'messages', used: today.used, limit: today.limit }, { status: 402 });
-  }
 
   const apiKey = process.env.OPENAI_API_KEY;
   if (!apiKey) return NextResponse.json({ error: 'Socria cannot answer this just now.' }, { status: 503 });
@@ -84,7 +71,6 @@ export async function POST(req: NextRequest) {
     }
     const vetted = vetOps(ask.kind, state, readAnswer(ask, state, parsed));
     if (!vetted.ops.length) return NextResponse.json({ error: 'Nothing came back that could be used — try again.', refused: vetted.refused.slice(0, 3) }, { status: 422 });
-    if (isTurn && plan && userId && limitOf(plan, 'messages') !== null) await bumpUsage(userId, 'messages');
     return NextResponse.json({ ops: vetted.ops, ...(vetted.refused.length ? { refused: vetted.refused.slice(0, 3) } : {}) });
   } catch (e) {
     console.warn('logos experience: the model did not answer', e instanceof Error ? e.message : e);

@@ -14,7 +14,6 @@ import { WorksheetFigure } from './WorksheetFigure';
 import { ExerciseFigure } from './ExerciseFigure';
 import { CrossroadsFigure } from './CrossroadsFigure';
 import { UntangleFigure } from './UntangleFigure';
-import { RehearsalFigure } from './RehearsalFigure';
 import { GroundFigure } from './GroundFigure';
 import { TimeFigure } from './TimeFigure';
 
@@ -30,6 +29,5 @@ registerFigure('exercise', ExerciseFigure);
 // the human-first experiences
 registerFigure('crossroads', CrossroadsFigure);
 registerFigure('untangle', UntangleFigure);
-registerFigure('rehearsal', RehearsalFigure);
 registerFigure('commonground', GroundFigure);
 registerFigure('timemachine', TimeFigure);

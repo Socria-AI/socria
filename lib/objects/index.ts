@@ -23,7 +23,6 @@ import './display-venn';
 // the human-first experiences (Logos 3.5): objects of thought too, sharing one vocabulary of reasoning (reasoning.ts)
 import './display-crossroads';
 import './display-untangle';
-import './display-rehearsal';
 import './display-commonground';
 import './display-timemachine';
 import { apply, create, currentOf, kindOf, objOf, originSaid, stepWho, EMPTY_SPACE, type ObjectOrigin, type ObjectSpace, type ThoughtObject, type Step } from './core';

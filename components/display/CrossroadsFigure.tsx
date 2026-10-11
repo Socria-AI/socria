@@ -80,20 +80,6 @@ export function CrossroadsFigure(p: FigureProps) {
       <Links links={s.links} p={p} />
       {d.live && p.onWorkspace && s.alternatives.length > 0 && (
         <div className="xp-onward">
-          <button
-            type="button"
-            className="xp-onward-btn"
-            onClick={() =>
-              p.onWorkspace?.({
-                type: 'make',
-                kind: 'rehearsal',
-                state: { title: `Talking about: ${s.title}`.slice(0, 80), view: 'setup', situation: s.decision, situationBy: s.decisionBy, goal: '', goalBy: 'socria' },
-                from: { obj: p.obj.id },
-              })
-            }
-          >
-            Rehearse a conversation about this
-          </button>
           <button type="button" className="xp-onward-btn" onClick={() => p.onWorkspace?.({ type: 'make', kind: 'timemachine', state: { title: `Looking back: ${s.title}`.slice(0, 80), subject: s.decision, subjectBy: s.decisionBy, tracked: [p.obj.id], map: false }, from: { obj: p.obj.id } })}>
             Look back at how this changed
           </button>

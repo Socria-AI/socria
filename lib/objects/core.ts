@@ -169,7 +169,7 @@ export const EMPTY_SPACE: ObjectSpace = { objs: [] };
  * Objects one line of thinking holds. Eight was set for matrices and
  * functions; the everyday displays (a plan, a comparison, an argument, a
  * worksheet…) are objects too, and a real piece of work holds several — and
- * the experiences (a decision, an untangled dump, a rehearsal…) more.
+ * the experiences (a decision, an untangled dump, a session finding common ground…) more.
  */
 export const MAX_OBJECTS = 16;
 /** States kept per object. The oldest go first; a long elimination is ~10 steps. */

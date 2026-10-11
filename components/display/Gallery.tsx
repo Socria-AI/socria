@@ -16,7 +16,6 @@ import { ObjectFigure } from '@/components/objects/ObjectFigure';
 import { apply, create, displayKinds, EMPTY_SPACE, type DisplayMeta, type ObjectSpace, type ThoughtObject } from '@/lib/objects';
 import { crossroadsFromWords } from '@/lib/objects/display-crossroads';
 import { untangleFromWords } from '@/lib/objects/display-untangle';
-import { rehearsalFromWords } from '@/lib/objects/display-rehearsal';
 import { groundFromWords } from '@/lib/objects/display-commonground';
 import { timeMachineFromWords } from '@/lib/objects/display-timemachine';
 import './gallery.css';
@@ -25,7 +24,6 @@ import './gallery.css';
 const SAMPLES: Record<string, () => unknown> = {
   crossroads: () => crossroadsFromWords('Should I take the job in Austin or stay in Dallas? I care about salary and being near family.'),
   untangle: () => untangleFromWords('I need to finish the essay, my car is making a noise, not sure if I should drop chem, rent is due Friday, want to start running again'),
-  rehearsal: () => rehearsalFromWords('Rehearse asking my manager for a raise'),
   commonground: () => groundFromWords('Help us find common ground on how to split the chores'),
   timemachine: () => timeMachineFromWords('How has my thinking changed?'),
 };

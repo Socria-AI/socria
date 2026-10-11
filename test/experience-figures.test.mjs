@@ -1,8 +1,7 @@
 // THE EXPERIENCES AND THE REMAINING DISPLAYS, DRAWN — what reaches the page, as the server renders it.
 //
 // Held down here: every figure draws its example without failing; what is
-// Socria's is labelled in words; Socria's lines in a rehearsal say they are
-// simulated; a weighted score says it is not a verdict; a hidden label is not
+// Socria's is labelled in words; a weighted score says it is not a verdict; a hidden label is not
 // in the markup at all until it is got right or shown; a market's answer is
 // not on the page before the reveal; a read-only figure offers no controls;
 // and the gallery shows every kind with ways to ask for it.
@@ -13,7 +12,6 @@ import { ObjectFigure } from './.tmp/ObjectFigure.mjs';
 import { Gallery } from './.tmp/Gallery.mjs';
 import { crossroadsFromWords, sanitizeCrossroads, CROSSROADS_META } from './.tmp/display-crossroads.mjs';
 import { untangleFromWords } from './.tmp/display-untangle.mjs';
-import { rehearsalFromWords, sanitizeRehearsal } from './.tmp/display-rehearsal.mjs';
 import { groundFromWords, sanitizeGround } from './.tmp/display-commonground.mjs';
 import { timeMachineFromWords } from './.tmp/display-timemachine.mjs';
 import { exerciseFrom, sanitizeExercise } from './.tmp/display-exercise.mjs';
@@ -54,26 +52,6 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'
   ok('a reading is marked as Socria’s (the question mark on the kind)', html.includes('Task?'));
   const src = draw('untangle', { ...u, view: 'source' });
   ok('what they wrote is shown exactly', src.includes(dump.replace(/'/g, '&#x27;')));
-}
-
-// ── rehearsal ────────────────────────────────────────────────────────
-{
-  const rr = sanitizeRehearsal({
-    ...rehearsalFromWords('Rehearse asking my manager for a raise'),
-    view: 'room',
-    turns: [
-      { id: 'u1', branch: 'b1', who: 'you', text: 'Could we talk about my salary?', by: 'person' },
-      { id: 'u2', branch: 'b1', who: 'them', text: 'Sure — what did you have in mind?', by: 'socria' },
-    ],
-  });
-  const html = draw('rehearsal', rr, { ask: async () => ({ ok: false, why: 'x' }), onWorkspace: () => ({ ok: true }) });
-  ok('the person’s line is drawn as theirs', text(html).includes('You Could we talk about my salary?'));
-  ok('Socria’s line says it is simulated, not a prediction', text(html).includes('simulated — a possibility, not a prediction'));
-  ok('the room says whose lines are whose', text(html).includes('Your lines are yours'));
-  const setup = draw('rehearsal', rehearsalFromWords('Rehearse asking my manager for a raise'));
-  ok('setup holds their goal in their words', setup.includes('asking my manager for a raise'));
-  const review = draw('rehearsal', { ...rr, view: 'review' });
-  ok('looking back says counts are not a judgment', text(review).includes('not a judgment'));
 }
 
 // ── common ground ────────────────────────────────────────────────────
@@ -197,7 +175,8 @@ const text = (html) => html.replace(/<[^>]+>/g, ' ').replace(/&#x27;|&#39;/g, "'
 {
   const html = renderToStaticMarkup(h(Gallery, { onPrompt: () => {} }));
   ok('the gallery lists experiences and displays apart', text(html).includes('Think it through') && text(html).includes('Displays to work in'));
-  for (const name of ['Decision', 'Untangle', 'Rehearsal', 'Common ground session', 'Time machine', 'Plan', 'Venn diagram', 'Argument map'])
+  ok('the gallery no longer offers a rehearsal', !/Rehearsal/.test(text(html)));
+  for (const name of ['Decision', 'Untangle', 'Common ground session', 'Time machine', 'Plan', 'Venn diagram', 'Argument map'])
     ok(`the gallery shows ${name}`, text(html).includes(name), name);
   ok('each kind offers words to ask for it', (html.match(/class="gal-prompt"/g) ?? []).length >= 20);
   ok('previews are not reachable by keyboard', html.includes('inert=""') && html.includes('aria-hidden="true"'));

@@ -22,7 +22,7 @@ export type FigureMode = 'live' | 'trail' | 'card';
  * one the person's action, refused for anyone who may only read:
  *
  *   make      a new object linked to this one ("make a plan from my next
- *             steps", "rehearse this decision") — opened beside it
+ *             steps", "look back at this decision") — opened beside it
  *   socria    Socria's own steps on this object, from a reply it was asked
  *             for: the counterpart's line, a suggestion — applied AS Socria,
  *             so the kind's rules about what is the person's still hold

@@ -1,7 +1,7 @@
 // lib/objects/reasoning.ts — the shared vocabulary of human reasoning the experiences are built from.
 //
-// Crossroads, the Rehearsal Room, Untangle, Common Ground and the Time
-// Machine are five ways of working with ONE kind of material: what a person
+// Crossroads, Untangle, Common Ground and the Time Machine are four ways of
+// working with ONE kind of material: what a person
 // thinks — their thoughts and questions, beliefs and assumptions, evidence,
 // alternatives, priorities, trade-offs, uncertainties, decisions,
 // commitments and reflections — and how it changes. Each experience is an
@@ -11,13 +11,13 @@
 // THE RULE THAT MATTERS MOST: where something came from is never lost.
 // Every element carries who put it there (`by`) and on what footing
 // (`basis`). What the person stated is never confused with what Socria
-// suggested, a relationship Socria inferred, a reply a rehearsal simulated,
+// suggested, a relationship Socria inferred, a scenario Socria imagined,
 // evidence with a source, or a number the workspace computed — and a basis
 // is recorded, not claimed: Socria cannot mark its own words as the
 // person's, or as evidence.
 //
 // Elements in different experiences are joined by explicit links (an
-// Untangle thought that became a Crossroads decision; a rehearsal started
+// Untangle thought that became a Crossroads decision; a look back started
 // from that decision), resolved live where they are drawn — never by copying
 // one experience's content into another.
 //

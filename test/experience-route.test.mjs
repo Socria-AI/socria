@@ -3,8 +3,8 @@
 // What is held down: only signed-in people (or the access key) may ask; only
 // the asks it knows are answered; the state it is sent is read by the kind,
 // and nothing else of it is trusted; what the model proposes comes back only
-// as operations the kind accepts from Socria — a counterpart's line marked
-// simulated, never the person's line; suggestions that recommend an option or
+// as operations the kind accepts from Socria — never a commitment, never a
+// participant's view, never the person's own call; suggestions that recommend an option or
 // give odds are dropped; and when no model answers, it says so rather than
 // making something up.
 
@@ -63,44 +63,28 @@ async function askRoute(body, script) {
   return { status: r.status, json: await r.json(), calls: globalThis.__logosCalls };
 }
 
-// a rehearsal where the person has said their first line
-let sp = create(EMPTY_SPACE, 'rehearsal', { title: 'Raise', goal: 'ask my manager for a raise', goalBy: 'person', counterpart: { name: '', role: 'my manager', about: 'busy, fair' }, counterpartBy: 'person' }, { origin: 'person', name: 'RR1' }).space;
-const id = sp.objs[0].id;
-sp = apply(sp, id, 'say', { who: 'you', text: 'Could we talk about my salary?', by: 'person' }, { by: 'person' }).space;
-const rr = currentOf(sp.objs[0]);
+// an untangled dump — the generic checks run against it
+let ut0 = create(EMPTY_SPACE, 'untangle', { dump: 'pay rent; call mom; finish essay' }, { origin: 'person', name: 'UT0' }).space;
+ut0 = apply(ut0, ut0.objs[0].id, 'separate', {}, { by: 'person' }).space;
+const sorted = currentOf(ut0.objs[0]);
 
 {
-  const r = await askRoute({ kind: 'rehearsal', action: 'reply', state: rr }, [{ line: 'Sure — what did you have in mind?' }]);
-  ok('the counterpart’s line comes back as Socria’s operation', r.status === 200 && r.json.ops?.length === 1 && r.json.ops[0].op === 'say' && r.json.ops[0].args.who === 'them' && r.json.ops[0].args.by === 'socria', JSON.stringify(r.json));
-  const sys = String(r.calls[0]?.messages?.[0]?.content ?? '');
-  ok('the model is told it plays one role and never the person', /ONE role/.test(sys) && /Never write the person's lines/.test(sys));
-  ok('…that it is a simulation, not a prediction', /not a prediction/.test(sys));
-  ok('…and what the person said about them is their view', /their view, not a fact/.test(sys));
-  ok('the conversation is the person’s line as user', r.calls[0].messages[1]?.role === 'user' && /salary/.test(r.calls[0].messages[1].content));
-  const applied = apply(sp, id, r.json.ops[0].op, r.json.ops[0].args, { by: 'socria' });
-  ok('…which the browser applies, marked simulated', applied.ok && currentOf(applied.space.objs[0]).turns.at(-1).basis === 'simulated');
-}
-{
-  const r = await askRoute({ kind: 'rehearsal', action: 'reply', state: currentOf(apply(sp, id, 'say', { who: 'them', text: 'Go on.', by: 'socria' }, { by: 'socria' }).space.objs[0]) }, [{ line: 'x' }]);
-  ok('not the counterpart’s turn: refused before any model is asked', r.status === 409 && r.calls.length === 0, JSON.stringify(r.json));
-}
-{
-  const r = await askRoute({ kind: 'rehearsal', action: 'rephrase', state: rr }, [{ text: 'I’d like to discuss my compensation.' }]);
-  ok('another way to say it is offered as a suggestion, not their line', r.status === 200 && r.json.ops[0].op === 'hint' && r.json.ops[0].args.by === 'socria');
-}
-{
-  const r = await askRoute({ kind: 'rehearsal', action: 'reply', state: rr }, ['not json']);
+  const r = await askRoute({ kind: 'untangle', action: 'sort', state: sorted }, ['not json']);
   ok('an unreadable answer: nothing is made up', r.status === 422 && !r.json.ops);
 }
 {
-  const r = await askRoute({ kind: 'rehearsal', action: 'reply', state: rr }, [new Error('upstream down')]);
+  const r = await askRoute({ kind: 'untangle', action: 'sort', state: sorted }, [new Error('upstream down')]);
   ok('no answer: said so', r.status === 502 && /could not answer/.test(r.json.error));
 }
 {
-  const r = await askRoute({ kind: 'rehearsal', action: 'write-my-lines', state: rr }, []);
+  const r = await askRoute({ kind: 'untangle', action: 'decide-for-me', state: sorted }, []);
   ok('an ask it does not know: refused', r.status === 400);
-  const bad = await askRoute({ kind: 'rehearsal', action: 'reply', state: 'nonsense' }, []);
+  const gone = await askRoute({ kind: 'rehearsal', action: 'reply', state: {} }, []);
+  ok('the retired rehearsal asks are refused', gone.status === 400);
+  const bad = await askRoute({ kind: 'untangle', action: 'sort', state: 'nonsense' }, []);
   ok('a state the kind cannot read: refused', bad.status === 400);
+  const empty = await askRoute({ kind: 'untangle', action: 'sort', state: { dump: '' } }, []);
+  ok('nothing to sort: refused before any model is asked', empty.status === 409 && empty.calls.length === 0);
 }
 
 // untangle: readings and groups, never a commitment, never the person's own call
@@ -157,7 +141,7 @@ const rr = currentOf(sp.objs[0]);
 
 {
   globalThis.__uid = null;
-  const r = await askRoute({ kind: 'rehearsal', action: 'reply', state: rr }, []);
+  const r = await askRoute({ kind: 'untangle', action: 'sort', state: sorted }, []);
   ok('signed out without a key: refused', r.status === 401);
   globalThis.__uid = 'user_experience_e2e';
 }

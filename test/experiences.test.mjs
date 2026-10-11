@@ -1,4 +1,4 @@
-// THE HUMAN-FIRST EXPERIENCES — Crossroads, Untangle, the Rehearsal Room, Common Ground, the Time Machine.
+// THE HUMAN-FIRST EXPERIENCES — Crossroads, Untangle, Common Ground, the Time Machine.
 //
 // What is held down here, for each: it starts from the person's own words
 // (nothing about anyone is drafted); its state is canonical and survives a
@@ -11,7 +11,6 @@
 import { apply, create, currentOf, forgetBefore, readOperation, sanitizeSpace, seek, kindOf, EMPTY_SPACE, readDisplayRequest, makeFromRequest, timelineOf, compareStates } from './.tmp/index.mjs';
 import { crossroadsFromWords, sealCrossroads, standings, tradeoffs, missing, readCrossroadsOp, CROSSROADS_META } from './.tmp/display-crossroads.mjs';
 import { untangleFromWords, separate, readCategory, unsorted, nextSteps, quadrants } from './.tmp/display-untangle.mjs';
-import { rehearsalFromWords, lineOf, feedback, whoseTurn } from './.tmp/display-rehearsal.mjs';
 import { groundFromWords, standing, sharedGround, waitingOn } from './.tmp/display-commonground.mjs';
 import { timeMachineFromWords } from './.tmp/display-timemachine.mjs';
 import { dumpFrom } from './.tmp/display-make.mjs';
@@ -109,7 +108,7 @@ ok('a simulated line stays simulated', cleanBasis('simulated', 'socria') === 'si
   ok('"should I … or …" asks for a Crossroads', r?.kind === 'crossroads' && r.intent === true, J(r));
   ok('a question about displays is not a decision', readDisplayRequest('should I use a venn diagram or a table?')?.kind !== 'crossroads');
   ok('a question about making a display is still not a request', readDisplayRequest('how do I make a gantt chart in Excel?') === null);
-  ok('rehearse → the Rehearsal Room', readDisplayRequest('Can you help me rehearse asking my manager for a raise?')?.kind === 'rehearsal');
+  ok('the Rehearsal Room is gone: "rehearse" opens nothing', readDisplayRequest('Can you help me rehearse asking my manager for a raise?') === null);
   ok('untangle → Untangle', readDisplayRequest('untangle this: rent, essay, car')?.kind === 'untangle');
   ok('we disagree → Common Ground', readDisplayRequest('My partner and I can’t agree on where to live')?.kind === 'commonground');
   ok('how has my thinking changed → the Time Machine', readDisplayRequest('How has my thinking on this changed?')?.kind === 'timemachine');
@@ -176,48 +175,6 @@ ok('a simulated line stays simulated', cleanBasis('simulated', 'socria') === 'si
   ok('dump from the message before', dumpFrom('help me untangle that', ['I have so much going on: the move, the job, my sister’s wedding, money is tight and I can’t sleep', 'help me untangle that']).startsWith('I have so much'));
   ok('no dump: an empty Untangle', dumpFrom('help me untangle my thoughts', ['help me untangle my thoughts']) === '');
   ok('a thought in words', readOperation(sp, 'park the essay')?.op === 'status');
-}
-
-// ── THE REHEARSAL ROOM ───────────────────────────────────────────────
-{
-  const rr = rehearsalFromWords('Rehearse asking my manager for a raise');
-  ok('the goal is in their words', rr.goal === 'asking my manager for a raise' && rr.goalBy === 'person', J(rr.goal));
-  ok('who it is with, as they named them', rr.counterpart.role === 'my manager' && rr.counterpartBy === 'person', J(rr.counterpart));
-  ok('nothing is invented about them', rr.counterpart.about === '' && rr.counterpart.name === '');
-  let sp = create(EMPTY_SPACE, 'rehearsal', rr, { name: 'RR1', origin: 'person' }).space;
-  const id = sp.objs[0].id;
-  ok('Socria cannot write the person’s lines', /yours to write/.test(S(sp, id, 'say', { who: 'you', text: 'Hi, can we talk?', by: 'socria' }).why ?? ''));
-  ok('Socria cannot choose how hard they push back', !S(sp, id, 'setup', { difficulty: 'tough', by: 'socria' }).ok);
-  ok('Socria cannot rewrite their goal', !S(sp, id, 'setup', { goal: 'something else', by: 'socria' }).ok);
-  sp = P(sp, id, 'addObjective', { text: 'I took on the Henderson account', by: 'person' }).space;
-  let r = P(sp, id, 'say', { who: 'you', text: 'I just wanted to ask, sorry, if maybe we could talk about my salary?', by: 'person' });
-  ok('the person says a line', r.ok);
-  sp = r.space;
-  ok('then it is their turn', whoseTurn(currentOf(sp.objs[0])) === 'them');
-  r = S(sp, id, 'say', { who: 'them', text: 'Sure. What did you have in mind?', by: 'socria' });
-  ok('Socria plays the other side, marked simulated', r.ok && currentOf(r.space.objs[0]).turns.at(-1).basis === 'simulated');
-  sp = r.space;
-  const firstLine = currentOf(sp.objs[0]).turns[0].id;
-  sp = P(sp, id, 'say', { who: 'you', text: 'Since I took on the Henderson account in March, I would like a 10% raise because my role has grown.', by: 'person' }).space;
-  const f = feedback(currentOf(sp.objs[0]));
-  ok('questions asked are counted', f.questions === 1, J(f));
-  ok('softening words are counted, not judged', f.softeners.some((x) => x.word === 'sorry') && f.softeners.some((x) => x.word === 'just'), J(f.softeners));
-  ok('specifics are found', f.specifics.some((x) => /10%/.test(x)) && f.specifics.some((x) => /march/i.test(x)), J(f.specifics));
-  ok('reasons are counted', f.reasons >= 2, J(f.reasons));
-  ok('an aim said out loud is seen', f.objectives[0].said === true);
-  ok('their question was touched by the next line', f.theirQuestions.length === 1 && f.theirQuestions[0].touched === false || f.theirQuestions[0].touched === true);
-  r = P(sp, id, 'branch', { after: firstLine });
-  ok('another take from a line', r.ok);
-  sp = r.space;
-  const st = currentOf(sp.objs[0]);
-  ok('the new take shares the conversation up to that line', lineOf(st).length === 1 && lineOf(st)[0].id === firstLine);
-  ok('the first take is kept', lineOf(st, 'b1').length === 3);
-  sp = P(sp, id, 'pause', { on: 'yes' }).space;
-  ok('paused, nothing is said', !P(sp, id, 'say', { who: 'you', text: 'hello', by: 'person' }).ok);
-  const forged = sanitizeSpace({ objs: [{ ...sp.objs[0], states: sp.objs[0].states.map((x) => ({ ...x, turns: [...x.turns, { id: 'u99', branch: 'b1', who: 'you', text: 'forged', by: 'socria' }] })) }] });
-  ok('a "you" line Socria wrote is never kept as theirs', forged && !currentOf(forged.objs[0]).turns.some((t) => t.text === 'forged'));
-  ok('it survives a save', J(currentOf(roundTrip(sp).objs[0])) === J(currentOf(sp.objs[0])));
-  ok('"make it tougher" in words', readOperation(sp, 'make it tougher')?.args?.difficulty === 'tough');
 }
 
 // ── COMMON GROUND ────────────────────────────────────────────────────

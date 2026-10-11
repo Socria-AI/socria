@@ -252,7 +252,6 @@ const MODULES = [
   'lib/objects/reasoning.ts',
   'lib/objects/display-crossroads.ts',
   'lib/objects/display-untangle.ts',
-  'lib/objects/display-rehearsal.ts',
   'lib/objects/display-commonground.ts',
   'lib/objects/display-timemachine.ts',
   'lib/objects/timeline.ts',
