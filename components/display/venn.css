@@ -1,0 +1,54 @@
+/* components/display/venn.css — the Venn diagram: soft circles on paper, items as chips. */
+
+.dsp-venn { position: relative; width: min(100%, 420px); aspect-ratio: 1 / 1; margin: 4px auto 0; user-select: none; }
+.dsp-panel .dsp-venn { width: min(100%, 560px); }
+.dsp.is-full .dsp-venn { max-width: min(80vh, 760px); }
+.dsp-venn-svg { position: absolute; inset: 0; width: 100%; height: 100%; }
+.dsp-venn-universe { fill: none; stroke: var(--dsp-line); stroke-width: 0.3; }
+.dsp-venn-circle { stroke-width: 0.35; transition: fill-opacity 0.15s; fill-opacity: 0.1; }
+.dsp-venn-circle.is-a { fill: var(--dsp-primary); stroke: var(--dsp-primary); }
+.dsp-venn-circle.is-b { fill: var(--dsp-accent); stroke: var(--dsp-accent); }
+.dsp-venn-circle.is-c { fill: var(--dsp-tension); stroke: var(--dsp-tension); }
+.dsp-venn-circle.is-over { fill-opacity: 0.22; }
+.dsp-venn-name {
+  position: absolute; transform: translate(-50%, -50%); padding: 1px 8px; border: 0; border-radius: 999px; background: none; cursor: pointer;
+  font-family: var(--serif, Georgia, serif); font-style: italic; font-size: 15px; white-space: nowrap; color: var(--dsp-ink);
+}
+.dsp-venn-name.is-a { color: var(--dsp-primary); }
+.dsp-venn-name.is-b { color: var(--dsp-accent); }
+.dsp-venn-name.is-c { color: var(--dsp-tension); }
+.dsp-venn-name:hover, .dsp-venn-name.is-sel { background: var(--dsp-tint); }
+.dsp-venn-region { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 3px; pointer-events: none; }
+.dsp-venn-count { font-size: 10px; font-weight: 600; color: var(--dsp-40); font-variant-numeric: tabular-nums; }
+.dsp-venn-none { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp-venn-members { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
+.dsp-venn-chip {
+  pointer-events: auto; padding: 1px 7px; border: 1px solid var(--dsp-line); border-radius: 999px; background: var(--dsp-paper); cursor: grab;
+  font-size: 12px; line-height: 18px; color: var(--dsp-ink); white-space: nowrap; touch-action: none; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+}
+.dsp-venn-chip:hover { border-color: var(--dsp-24); }
+.dsp-venn-chip.is-sel { border-color: var(--dsp-primary); box-shadow: 0 0 0 2px var(--dsp-tint-2); }
+.dsp-venn-chip.is-socria { border-style: dashed; }
+.dsp-venn-chip.is-moving { opacity: 0.35; }
+.dsp-venn-ghost {
+  position: absolute; transform: translate(-50%, -50%); padding: 1px 8px; border-radius: 999px; background: var(--dsp-ink); color: var(--dsp-paper);
+  font-size: 12px; line-height: 18px; white-space: nowrap; pointer-events: none; z-index: 3;
+}
+.dsp-venn-empty { position: absolute; left: 50%; bottom: 3%; transform: translateX(-50%); margin: 0; font-size: 12px; color: var(--dsp-40); font-style: italic; white-space: nowrap; }
+.dsp-venn-table tr.is-sel td { background: var(--dsp-tint); }
+.dsp-venn-table input[type='checkbox'] { accent-color: var(--dsp-primary); width: 15px; height: 15px; }
+.dsp-venn-counts { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12.5px; }
+.dsp-venn-counts li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; border-bottom: 1px solid var(--dsp-line); }
+.dsp-venn-in { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
+.dsp-venn-in legend { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); margin-bottom: 4px; }
+.dsp-venn-tick { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; cursor: pointer; }
+.dsp-venn-tick input { accent-color: var(--dsp-primary); }
+.dsp-venn-tick.is-a { color: var(--dsp-primary); }
+.dsp-venn-tick.is-b { color: var(--dsp-accent); }
+.dsp-venn-tick.is-c { color: var(--dsp-tension); }
+.dsp-venn-into { display: inline-flex; flex-wrap: wrap; gap: 8px; }
+@container (max-width: 420px) {
+  .dsp-venn-chip { font-size: 11px; padding: 0 5px; }
+  .dsp-venn-name { font-size: 13px; }
+}
+.dsp-editor .dsp-venn-tick, .dsp-add .dsp-venn-tick { display: inline-flex; grid-template-columns: none; }
