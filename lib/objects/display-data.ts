@@ -309,7 +309,10 @@ export function bindingsFor(s: DataState, view: DataView): Bindings {
     }
     case 'line':
     case 'area': {
-      const x = isAxis(boundX) ? boundX : (s.columns.find((c) => c.type === 'date') ?? nums[0] ?? null);
+      // dates first; then labels in table order (months, names — "sales by month"); then a number column
+      const x = isAxis(boundX) || isLabel(boundX)
+        ? boundX
+        : (s.columns.find((c) => c.type === 'date') ?? (labels.length && nums.length ? labels[0] : null) ?? nums[0] ?? null);
       let y = boundY.filter((c): c is DataColumn => isNum(c) && c !== x);
       if (!y.length) y = nums.filter((c) => c !== x).slice(0, DATA_LIMITS.series);
       return { x, y, value: null };
@@ -738,6 +741,8 @@ export interface XYLayout {
   xScale: Scale | null;
   /** for a date axis */
   xDates: { lo: string; hi: string; ticks: (DateTick & { at: number })[] } | null;
+  /** for an axis of labels: each label, in table order, evenly spaced */
+  xCats?: { at: number; label: string }[] | null;
   yScale: Scale;
   /** cells left out because they were empty */
   missing: number;
@@ -752,6 +757,7 @@ export function xyLayout(s: DataState, view: 'line' | 'area' | 'scatter'): XYLay
   if (viewUnavailable(s, view)) return null;
   const b = bindingsFor(s, view);
   const xc = b.x!;
+  if (xc.type === 'text' || xc.type === 'category') return ordinalLayout(s, view, xc, b.y);
   const dated = xc.type === 'date';
   const xnum = (v: Cell): number => (dated ? dayNumber(v as string) : (v as number));
   const withX = s.rows.map((r, i) => ({ i, xv: cellAt(s, r, xc) })).filter((o): o is { i: number; xv: string | number } => o.xv !== null);
@@ -792,6 +798,44 @@ export function xyLayout(s: DataState, view: 'line' | 'area' | 'scatter'): XYLay
     return { col: c.id, name: c.name, points: pts };
   });
   return { x: { col: xc.id, name: xc.name, type: xc.type }, series, xScale, xDates, yScale, missing: s.rows.length * b.y.length - points };
+}
+
+/**
+ * A line over labels — "rent by month": each row a step along the axis in
+ * the order the table shows it, evenly spaced, the label its tick. A row
+ * with no value breaks the line there, as anywhere.
+ */
+function ordinalLayout(s: DataState, view: 'line' | 'area' | 'scatter', xc: DataColumn, ys: DataColumn[]): XYLayout {
+  const order = displayOrder(s).filter((i) => cellAt(s, s.rows[i], xc) !== null);
+  const n = Math.max(1, order.length);
+  const at = (k: number) => clean((k + 0.5) / n);
+  const vals = order.flatMap((i) => ys.map((c) => numAt(s, s.rows[i], c))).filter((v): v is number => v !== null);
+  const yScale = linearScale(vals, { zero: view === 'area' });
+  let points = 0;
+  const series = ys.map((c) => {
+    const pts: XYPoint[] = [];
+    let gap = false;
+    order.forEach((i, k) => {
+      const v = numAt(s, s.rows[i], c);
+      if (v === null) {
+        gap = true;
+        return;
+      }
+      pts.push({ row: i, x: at(k), y: scaleAt(yScale, v), xv: String(cellAt(s, s.rows[i], xc)), yv: v, gap: gap && pts.length > 0 && view !== 'scatter' });
+      gap = false;
+    });
+    points += pts.length;
+    return { col: c.id, name: c.name, points: pts };
+  });
+  return {
+    x: { col: xc.id, name: xc.name, type: xc.type },
+    series,
+    xScale: null,
+    xDates: null,
+    xCats: order.map((i, k) => ({ at: at(k), label: String(cellAt(s, s.rows[i], xc)) })),
+    yScale,
+    missing: s.rows.length * ys.length - points,
+  };
 }
 
 // ── heatmap ──────────────────────────────────────────────────────────

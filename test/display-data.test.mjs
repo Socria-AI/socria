@@ -498,5 +498,17 @@ console.log('\n=== words become operations only when they plainly are one ===');
   ok('the kind reads words the same way, against today', J(kindOf('data').readOp('set March rent to 1200', s)) === J(r('set March rent to 1200')));
 }
 
+console.log('\n=== a line over labels: months in table order ===');
+{
+  const months = sanitizeData({ title: 'Profit', view: 'line', basis: 'given', columns: [{ id: 'm', name: 'Month', type: 'text' }, { id: 'p', name: 'Profit', type: 'number' }, { id: 'c', name: 'Costs', type: 'number' }], rows: [['Jan', 400, 900], ['Feb', -250, 1200], ['Mar', null, 800], ['Apr', 610, 700]] });
+  const L = xyLayout(months, 'line');
+  ok('the months run along the bottom, not one number against another', L.x.col === 'm' && L.xCats.map((t) => t.label).join() === 'Jan,Feb,Mar,Apr');
+  ok('  evenly spaced, in table order', L.xCats.every((t, k) => Math.abs(t.at - (k + 0.5) / 4) < 1e-9));
+  const profit = L.series.find((x) => x.col === 'p');
+  ok('  every number column drawn against them', L.series.length === 2);
+  ok('  a missing month breaks the line', profit.points.length === 3 && profit.points[2].gap === true && !profit.points[1].gap);
+  ok('  values sit where the scale puts them', Math.abs(profit.points[1].y - (-250 - L.yScale.lo) / (L.yScale.hi - L.yScale.lo)) < 1e-9);
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

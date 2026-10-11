@@ -1,0 +1,71 @@
+/* components/display/data.css — charts in the Logos palette: one ink colour, then the accent, quiet axes. */
+
+.dsp-data-basis { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp-data-basis.is-example { color: var(--dsp-tension); padding: 4px 8px; border: 1px dashed color-mix(in srgb, var(--dsp-tension) 55%, transparent); border-radius: 4px; }
+.dsp-data-basis.is-given { color: var(--dsp-primary); }
+.dsp-data-basis .dsp-tool { text-transform: none; letter-spacing: 0; font-weight: 400; }
+.dsp-data-bind { padding: 6px 0 8px; border-bottom: 1px solid var(--dsp-line); margin-bottom: 6px; }
+.dsp-data-series { display: inline-flex; flex-wrap: wrap; gap: 10px; font-size: 12.5px; }
+.dsp-data-series label { display: inline-flex; align-items: center; gap: 4px; }
+.dsp-data-series input { accent-color: var(--dsp-primary); }
+
+.dsp-data-bar { cursor: pointer; transition: opacity 0.15s; }
+.dsp-data-bar:hover, .dsp-data-bar:focus { opacity: 0.8; outline: none; }
+.dsp-data-bar.is-sel { stroke: var(--dsp-ink); stroke-width: 1.5; }
+.is-s0.dsp-data-bar, .is-s0 .dsp-data-line { fill: var(--dsp-primary); stroke: var(--dsp-primary); }
+.is-s1.dsp-data-bar, .is-s1 .dsp-data-line { fill: var(--dsp-accent); stroke: var(--dsp-accent); }
+.is-s2.dsp-data-bar, .is-s2 .dsp-data-line { fill: var(--dsp-tension); stroke: var(--dsp-tension); }
+.is-s3.dsp-data-bar, .is-s3 .dsp-data-line { fill: var(--dsp-60); stroke: var(--dsp-60); }
+.dsp-data-bar.is-neg { fill-opacity: 0.75; }
+.dsp-data-line { fill: none !important; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
+.dsp-data-area { fill-opacity: 0.12; stroke: none; }
+.is-s0 .dsp-data-area, .is-s0 .dsp-data-pt { fill: var(--dsp-primary); }
+.is-s1 .dsp-data-area, .is-s1 .dsp-data-pt { fill: var(--dsp-accent); }
+.is-s2 .dsp-data-area, .is-s2 .dsp-data-pt { fill: var(--dsp-tension); }
+.is-s3 .dsp-data-area, .is-s3 .dsp-data-pt { fill: var(--dsp-60); }
+.dsp-data-pt { stroke: var(--dsp-paper); stroke-width: 1.5; cursor: pointer; }
+.dsp-data-pt.is-sel { stroke: var(--dsp-ink); stroke-width: 2; }
+.dsp-data-pt:focus { outline: none; stroke: var(--dsp-ink); }
+
+.dsp-data-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; }
+.dsp-data-pie svg { width: min(100%, 260px); height: auto; }
+.dsp-data-slice { cursor: pointer; }
+.dsp-data-slice path, .dsp-data-slice circle { stroke: var(--dsp-paper); stroke-width: 1.5; }
+.dsp-data-slice.is-s0 path, .dsp-data-slice.is-s0 circle { fill: var(--dsp-primary); }
+.dsp-data-slice.is-s1 path, .dsp-data-slice.is-s1 circle { fill: var(--dsp-accent); }
+.dsp-data-slice.is-s2 path, .dsp-data-slice.is-s2 circle { fill: var(--dsp-tension); }
+.dsp-data-slice.is-s3 path, .dsp-data-slice.is-s3 circle { fill: var(--dsp-60); }
+.dsp-data-slice.is-sel path { stroke: var(--dsp-ink); stroke-width: 2; }
+.dsp-data-slice text { font-size: 11px; fill: #fff; pointer-events: none; }
+.dsp-data-key { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12.5px; }
+.dsp-data-key.is-row { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 4px; }
+.dsp-data-key em { font-style: normal; color: var(--dsp-60); font-variant-numeric: tabular-nums; margin-left: 4px; }
+.dsp-data-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
+.dsp-data-sw.is-s0 { background: var(--dsp-primary); }
+.dsp-data-sw.is-s1 { background: var(--dsp-accent); }
+.dsp-data-sw.is-s2 { background: var(--dsp-tension); }
+.dsp-data-sw.is-s3 { background: var(--dsp-60); }
+
+.dsp-data-heat-wrap { overflow-x: auto; }
+.dsp-data-heat { border-collapse: separate; border-spacing: 2px; font-size: 12px; font-variant-numeric: tabular-nums; }
+.dsp-data-heat th { font-weight: 500; color: var(--dsp-60); padding: 2px 6px; text-align: left; }
+.dsp-data-heat td { min-width: 44px; padding: 6px; text-align: center; border-radius: 3px; background: var(--dsp-line); }
+.dsp-data-scale { display: flex; align-items: center; gap: 6px; font-size: 11.5px; color: var(--dsp-60); }
+.dsp-data-ramp { display: inline-block; width: 90px; height: 8px; border-radius: 4px; }
+.dsp-data-ramp.is-sequential { background: linear-gradient(90deg, #eef2ff, #1e3a8a); }
+.dsp-data-ramp.is-diverging { background: linear-gradient(90deg, #b45309, #f4f4f5, #1d4ed8); }
+
+.dsp-data-grid-wrap { overflow-x: auto; }
+.dsp-data-grid th .dsp-edit { font-weight: 600; font-size: 11px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--dsp-60); border-bottom-color: transparent; width: 100%; }
+.dsp-data-grid td .dsp-edit, .dsp-data-grid td .dsp-num { width: 100%; border-bottom-color: transparent; }
+.dsp-data-grid td .dsp-edit:focus, .dsp-data-grid td .dsp-num:focus, .dsp-data-grid td .dsp-edit:hover, .dsp-data-grid td .dsp-num:hover { border-bottom-color: var(--dsp-24); }
+.dsp-data-grid td.is-sel { background: var(--dsp-tint); }
+.dsp-data-grid tr.is-socria td { font-style: italic; }
+.dsp-data-colmeta { display: inline-flex; align-items: center; gap: 2px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--dsp-40); }
+.dsp-data-colmeta .dsp-danger { border: 0; padding: 0 4px; font-size: 12px; color: var(--dsp-40); }
+.dsp-data-sort { padding: 0 3px; border: 0; background: none; cursor: pointer; color: var(--dsp-40); font-size: 11px; }
+.dsp-data-sort:hover { color: var(--dsp-primary); }
+.dsp-data-empty { color: var(--dsp-24); }
+.dsp-data-rowx { width: 28px; }
+.dsp-data-rowx .dsp-x { opacity: 0.4; }
+.dsp-data-grid tr:hover .dsp-data-rowx .dsp-x { opacity: 1; }
