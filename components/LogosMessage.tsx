@@ -48,6 +48,15 @@ function useCites(text: string, refs: DocRef[] | undefined): ((key: string, befo
   return useMemo(() => (refs?.length ? citeVerdicts(text, refs) : null), [text, refs]);
 }
 
+/** A chip's verdict in a sentence or two — the check's own reason added only where it says something more. */
+function sayGround(g: Ground, why?: string): string {
+  const base = GROUND_SAY[g];
+  if (!why || g === 'verbatim' || why === base) return base;
+  // the check already opens the way the verdict does ("The cited passage…"): its words alone
+  if (g === 'unsupported' && /^The cited passage\b/.test(why)) return why;
+  return `${base} ${why}`;
+}
+
 export type Side = 'mine' | 'other' | 'socria';
 
 /** What a person typed, with each @socria drawn as a mention — never reinterpreted otherwise. */
@@ -186,7 +195,7 @@ export function LogosMessage({
             );
           }
           const label = i?.ok ? `${letter} · p.${i.page}` : `${k}?`;
-          const say = !i?.ok ? 'This citation names a passage the document does not have.' : i.ground ? `${GROUND_SAY[i.ground]}${i.why && i.ground !== 'verbatim' ? ` ${i.why}` : ''}` : 'Open the passage.';
+          const say = !i?.ok ? 'This citation names a passage the document does not have.' : i.ground ? sayGround(i.ground, i.why) : 'Open the passage.';
           return (
             <button
               key={k}
