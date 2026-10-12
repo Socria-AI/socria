@@ -107,8 +107,12 @@ function checksLine(doc: SourceDoc): string {
   return issues.length ? `Reading checks: ${issues.map((c) => c.says).join(' ')}` : 'Reading checks: no problems found.';
 }
 
-/** One document, whole or in part, within a character budget. */
-export function renderDoc(ref: DocRef, opts: { query?: string; budget: number }): string {
+/**
+ * One document, whole or in part, within a character budget. `focus` is the
+ * passages the person has selected in the document view: always shown, and
+ * named as what they are pointing at.
+ */
+export function renderDoc(ref: DocRef, opts: { query?: string; budget: number; focus?: readonly string[] }): string {
   const { letter, doc } = ref;
   const visible = doc.blocks.filter((b) => b.kind !== 'header' && b.kind !== 'footer');
   const lines = new Map<string, string>(visible.map((b) => [b.id, blockLine(letter, b, doc)]));
@@ -116,6 +120,8 @@ export function renderDoc(ref: DocRef, opts: { query?: string; budget: number })
   const head = `<document key="${letter}" name="${defuse(doc.name).replace(/"/g, "'")}" format="${doc.format}" pages="${doc.pageCount}">`;
   const meta = [`Document ${letter}: ${defuse(doc.name)}${doc.title ? ` — “${defuse(doc.title)}”` : ''}, ${doc.pageCount} page${doc.pageCount === 1 ? '' : 's'}.`, checksLine(doc)];
   if (doc.unread) meta.push(`Pages ${doc.unread.from}–${doc.unread.to} were not read.`);
+  const focus = (opts.focus ?? []).filter((id) => lines.has(id)).slice(0, 6);
+  if (focus.length) meta.push(`The person has selected ${focus.map((id) => `[${citeKey(letter, id)}]`).join(', ')} in this document — “this” in their message most likely means ${focus.length === 1 ? 'that passage' : 'those passages'}.`);
   if (total <= opts.budget) return [head, ...meta, ...visible.map((b) => lines.get(b.id)!), '</document>'].join('\n');
 
   // too long for the turn: the outline, the opening, and what bears on the question
@@ -130,6 +136,7 @@ export function renderDoc(ref: DocRef, opts: { query?: string; budget: number })
     used += n;
     return true;
   };
+  for (const id of focus) take(visible.find((b) => b.id === id)!);
   for (const b of outline.slice(0, 120)) take(b);
   let opening = 0;
   for (const b of visible) {
@@ -162,14 +169,16 @@ export function renderDoc(ref: DocRef, opts: { query?: string; budget: number })
  * Every document of a conversation, within one budget shared between them by
  * how much each bears on the question (and at least a fair share each).
  */
-export function renderDocs(refs: DocRef[], opts: { query?: string; budget: number }): string {
+export function renderDocs(refs: DocRef[], opts: { query?: string; budget: number; focus?: Readonly<Record<string, readonly string[]>> }): string {
   if (!refs.length) return '';
   const weights = refs.map((r) => {
     const top = selectPassages(r.doc, opts.query ?? '', 5).reduce((n, p) => n + p.score, 0);
     return 1 + top;
   });
   const sum = weights.reduce((a, b) => a + b, 0);
-  return refs.map((r, i) => renderDoc(r, { query: opts.query, budget: Math.max(3000, Math.floor((opts.budget * weights[i]) / sum)) })).join('\n\n');
+  return refs
+    .map((r, i) => renderDoc(r, { query: opts.query, budget: Math.max(3000, Math.floor((opts.budget * weights[i]) / sum)), ...(opts.focus?.[r.doc.id] ? { focus: opts.focus[r.doc.id] } : {}) }))
+    .join('\n\n');
 }
 
 /**

@@ -18,15 +18,62 @@
 // off. They are real buttons in reading order — reachable by Tab, shown on
 // hover and focus, and always shown on a touch screen.
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import type { LogosMsg } from '@/lib/logos-sessions';
 import { mentionParts } from '@/lib/chat-thread';
 import { copyText } from '@/lib/copy-text';
 import { initialOf } from '@/lib/collab';
 import { AttachmentList } from '@/components/LogosComposer';
 import { MathText } from '@/components/TeX';
-import { Inline, RichText } from '@/components/RichText';
+import { Inline, RichText, type CiteRender } from '@/components/RichText';
+import { checkReply } from '@/lib/docs/ground';
+import type { DocRef } from '@/lib/docs/render';
+import type { Ground } from '@/lib/docs/types';
 import './logos-thread.css';
+
+/** What a citation's chip says about the sentence it supports. */
+const GROUND_SAY: Record<Ground, string> = {
+  verbatim: 'The document says this.',
+  derived: 'Calculated from the document’s numbers.',
+  interpretation: 'A reading of the passage, in other words.',
+  unsupported: 'The cited passage does not hold this.',
+};
+/** The graver ground wins when a key supports more than one sentence. */
+const GRAVITY: Record<Ground, number> = { verbatim: 0, interpretation: 1, derived: 1, unsupported: 2 };
+
+interface CiteInfo {
+  ok: boolean;
+  doc?: string;
+  block?: string;
+  page?: number;
+  ground?: Ground;
+  why?: string;
+}
+
+/**
+ * The citations in one reply, each checked against the passage it names
+ * (lib/docs/ground.ts) — pure and deterministic, so it is computed where it
+ * is drawn rather than stored with the message.
+ */
+function useCites(text: string, refs: DocRef[] | undefined): Map<string, CiteInfo> | null {
+  return useMemo(() => {
+    if (!refs?.length || !/\[[A-Z]\d/.test(text)) return null;
+    const { cites, claims } = checkReply(text, refs);
+    const out = new Map<string, CiteInfo>();
+    for (const c of cites) out.set(c.key, { ok: c.ok, ...(c.doc ? { doc: c.doc } : {}), ...(c.block ? { block: c.block } : {}), ...(c.page ? { page: c.page } : {}) });
+    for (const cl of claims) {
+      for (const k of cl.keys) {
+        const info = out.get(k);
+        if (!info) continue;
+        if (!info.ground || GRAVITY[cl.ground] > GRAVITY[info.ground]) {
+          info.ground = cl.ground;
+          info.why = cl.calc?.length ? `${cl.why} ${cl.calc.join('; ')}` : cl.why;
+        }
+      }
+    }
+    return out;
+  }, [text, refs]);
+}
 
 export type Side = 'mine' | 'other' | 'socria';
 
@@ -119,7 +166,16 @@ export function LogosMessage({
   onReply,
   onJump,
   toLabel,
+  docRefs,
+  onOpenCite,
+  onOpenDoc,
 }: {
+  /** the conversation's documents, with their letters — a reply's citations are checked against them */
+  docRefs?: DocRef[];
+  /** open the passage a citation names */
+  onOpenCite?: (docId: string, blockId: string) => void;
+  /** open a document attached to this message */
+  onOpenDoc?: (docId: string) => void;
   m: LogosMsg;
   side: Side;
   /** whom Socria is answering, as this screen says it ("You" for your own question) */
@@ -141,6 +197,42 @@ export function LogosMessage({
   const style = hue ? ({ '--by': hue } as CSSProperties) : undefined;
   const to = group && side === 'socria' && m.replyTo?.role === 'user' ? toLabel ?? m.replyTo.who : null;
   const quote = showQuote ? m.replyTo : undefined;
+  const cites = useCites(m.role === 'assistant' ? m.content : '', docRefs);
+  const cite: CiteRender | undefined = useCallback<CiteRender>(
+    (keys) => (
+      <span className="lg-cites">
+        {keys.map((k) => {
+          const i = cites?.get(k);
+          const letter = k[0];
+          // a document read on another device cannot be checked here — said, not called broken
+          if (!docRefs?.some((r) => r.letter === letter)) {
+            return (
+              <span key={k} className="lg-cite is-away" title="This document’s reading is not on this device, so the citation cannot be checked or opened here.">
+                {k}
+              </span>
+            );
+          }
+          const label = i?.ok ? `${letter} · p.${i.page}` : `${k}?`;
+          const say = !i?.ok ? 'This citation names a passage the document does not have.' : i.ground ? `${GROUND_SAY[i.ground]}${i.why && i.ground !== 'verbatim' ? ` ${i.why}` : ''}` : 'Open the passage.';
+          return (
+            <button
+              key={k}
+              type="button"
+              className={`lg-cite${i?.ok ? '' : ' is-broken'}${i?.ground ? ` is-${i.ground}` : ''}`}
+              title={say}
+              aria-label={`${i?.ok ? `Document ${letter}, page ${i.page}` : `Citation ${k}`} — ${say}`}
+              disabled={!i?.ok || !onOpenCite}
+              onClick={() => i?.ok && i.doc && i.block && onOpenCite?.(i.doc, i.block)}
+            >
+              {label}
+              {i?.ground === 'unsupported' && <span aria-hidden="true"> ⚠</span>}
+            </button>
+          );
+        })}
+      </span>
+    ),
+    [cites, onOpenCite, docRefs]
+  );
   return (
     <div
       id={m.id ? `lg-m-${m.id}` : undefined}
@@ -167,7 +259,7 @@ export function LogosMessage({
           </button>
         )}
         <div className="lg-msg-stack">
-          {!!m.attachments?.length && <AttachmentList items={m.attachments} />}
+          {!!m.attachments?.length && <AttachmentList items={m.attachments} onOpenDoc={onOpenDoc} />}
           {m.content && (
             <div className="lg-msg-body">
               {m.role === 'assistant' ? (
@@ -177,7 +269,7 @@ export function LogosMessage({
                 // arrived as literal asterisks and hyphens. What the
                 // person typed is never reinterpreted: their own
                 // asterisks stay asterisks; only @socria is drawn as itself.
-                <RichText text={m.content} math />
+                <RichText text={m.content} math cite={cites ? cite : undefined} />
               ) : (
                 <SaidText text={m.content} />
               )}

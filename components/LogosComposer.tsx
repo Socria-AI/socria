@@ -21,6 +21,10 @@ import {
   wordCount,
 } from '@/lib/logos-attachments';
 import { isImageFile, isTextFile, prepareImage, readTextFile } from '@/lib/logos-upload';
+import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, TEXT_EXTENSIONS, kindOfFile, refusalFor } from '@/lib/file-kinds';
+
+/** What the attach button offers: pictures, documents (a zip is opened in Core) and anything that is text. */
+const DOC_ACCEPT = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e !== 'zip'), ...TEXT_EXTENSIONS].map((e) => `.${e}`).join(',');
 import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
 import './logos-thread.css';
 
@@ -33,15 +37,21 @@ export interface Draft extends Attachment {
 let seq = 0;
 const nextId = () => `att_${++seq}_${Date.now().toString(36)}`;
 
+const FORMAT_NAME: Record<string, string> = { pdf: 'PDF', docx: 'Word', pptx: 'slides', xlsx: 'spreadsheet', odt: 'document', odp: 'slides', ods: 'spreadsheet', rtf: 'RTF', md: 'Markdown', txt: 'text', csv: 'CSV', tsv: 'TSV', html: 'web page', tex: 'LaTeX', ipynb: 'notebook', image: 'image', code: 'code' };
+const UNIT: Record<string, [string, string]> = { pptx: ['slide', 'slides'], odp: ['slide', 'slides'], xlsx: ['sheet', 'sheets'], ods: ['sheet', 'sheets'] };
+
 export function AttachmentList({
   items,
   onRemove,
   onOrigin,
+  onOpenDoc,
 }: {
   items: (Attachment & { id?: string; status?: string; error?: string })[];
   onRemove?: (id: string) => void;
   /** correcting whose thinking a note is — only offered while it's a draft */
   onOrigin?: (id: string, origin: AttachmentOrigin) => void;
+  /** open a document's reading beside the map */
+  onOpenDoc?: (docId: string) => void;
 }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
   if (!items.length) return null;
@@ -51,6 +61,56 @@ export function AttachmentList({
       {items.map((a, i) => {
         const id = a.id ?? String(i);
         const isOpen = openNote === id;
+        if (a.kind === 'doc') {
+          const unit = UNIT[a.format ?? ''] ?? ['page', 'pages'];
+          const canOpen = !!onOpenDoc && !!a.doc && a.status !== 'reading';
+          return (
+            <div key={id} className="lg-att lg-att-doc">
+              <span className="lg-att-glyph" aria-hidden="true">
+                <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.3">
+                  <path d="M4 2.5h5.5L12.5 5.5V13a.5.5 0 0 1-.5.5H4a.5.5 0 0 1-.5-.5V3a.5.5 0 0 1 .5-.5Z" />
+                  <path d="M9.5 2.5V5a.5.5 0 0 0 .5.5h2.5M5.5 8h5M5.5 10.5h3" strokeLinecap="round" />
+                </svg>
+              </span>
+              <span className="lg-att-meta">
+                {canOpen ? (
+                  <button type="button" className="lg-att-name lg-att-open" onClick={() => onOpenDoc!(a.doc!)} title="Open the reading beside the map">
+                    {a.name || 'Document'}
+                  </button>
+                ) : (
+                  <span className="lg-att-name">{a.name || 'Document'}</span>
+                )}
+                <span className="lg-att-sub">
+                  {a.status === 'reading'
+                    ? 'reading…'
+                    : a.status === 'error'
+                      ? (a.error ?? 'could not be read')
+                      : [a.pages ? `${a.pages} ${a.pages === 1 ? unit[0] : unit[1]}` : '', a.format ? FORMAT_NAME[a.format] ?? a.format : ''].filter(Boolean).join(' · ') || 'read'}
+                  {a.status !== 'reading' && a.status !== 'error' && a.checks && (
+                    <span className="lg-att-warn" title={a.checks}>
+                      {' '}· check the reading
+                    </span>
+                  )}
+                  {!onOrigin && a.origin && a.origin !== 'source' && <span className="lg-att-origin-tag">{ORIGIN_LABEL[a.origin]}</span>}
+                </span>
+              </span>
+              {onRemove && a.id && (
+                <button type="button" className="lg-att-x" onClick={() => onRemove(a.id!)} aria-label={`Remove ${a.name || 'attachment'}`}>
+                  ×
+                </button>
+              )}
+              {onOrigin && a.id && a.status === 'ready' && (
+                <div className="lg-att-origin" role="radiogroup" aria-label="Whose writing is this?">
+                  {ORIGINS.map((o) => (
+                    <button key={o} type="button" role="radio" aria-checked={(a.origin ?? 'source') === o} className={(a.origin ?? 'source') === o ? 'is-on' : undefined} onClick={() => onOrigin(a.id!, o)}>
+                      {ORIGIN_LABEL[o]}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+          );
+        }
         return (
           <div key={id} className={`lg-att lg-att-${a.kind}`}>
             {a.kind === 'image' ? (
@@ -174,11 +234,21 @@ export function LogosComposer({
   onSend,
   busy,
   readImage,
+  readDocument,
+  onOpenDoc,
   focusSignal,
   replyTo,
   onCancelReply,
   group,
 }: {
+  /**
+   * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
+   * a document attachment (lib/docs/client.ts). Without it, the composer
+   * takes images and plain text only, as it always did.
+   */
+  readDocument?: (file: File) => Promise<Attachment>;
+  /** open a document's reading beside the map */
+  onOpenDoc?: (docId: string) => void;
   value: string;
   onChange: (v: string) => void;
   /** text put into the box from elsewhere — a figure's template, a suggestion — brings the caret here, at `caret` or the end */
@@ -310,12 +380,27 @@ export function LogosComposer({
     }
   }
 
+  async function addDocument(file: File) {
+    const id = nextId();
+    addDraft({ id, kind: 'doc', name: file.name, status: 'reading' });
+    try {
+      const att = await readDocument!(file);
+      setDrafts((prev) => prev.map((d) => (d.id === id ? { ...att, id, status: 'ready' } : d)));
+    } catch (e: any) {
+      setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'error', error: e?.message || 'could not be read' } : d)));
+    }
+  }
+
   async function takeFiles(files: FileList | File[]) {
     setNotice(null);
     const list = Array.from(files).slice(0, MAX_ATTACHMENTS);
     for (const f of list) {
       if (isImageFile(f)) await addImage(f);
-      else if (isTextFile(f)) {
+      else if (readDocument) {
+        const kind = kindOfFile(f.name, f.type);
+        if (kind === 'secret' || (kind === 'unsupported' && !isTextFile(f)) || /\.zip$/i.test(f.name)) setNotice(/\.zip$/i.test(f.name) ? 'Attach the files inside the zip one by one.' : refusalFor(f.name));
+        else await addDocument(f);
+      } else if (isTextFile(f)) {
         try {
           const { text, name } = await readTextFile(f);
           if (text.trim()) addNote(text, name);
@@ -408,6 +493,7 @@ export function LogosComposer({
           onOrigin={(id, origin) =>
             setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, origin } : d)))
           }
+          onOpenDoc={onOpenDoc}
         />
 
         {keypad && mathAvailable && (
@@ -429,8 +515,8 @@ export function LogosComposer({
             className="lg-attach"
             onClick={() => fileRef.current?.click()}
             disabled={drafts.length >= MAX_ATTACHMENTS}
-            aria-label="Attach an image or a text file"
-            title="Attach an image or a text file"
+            aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
+            title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
           >
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
               <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
@@ -440,7 +526,7 @@ export function LogosComposer({
             ref={fileRef}
             type="file"
             multiple
-            accept="image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json"
+            accept={readDocument ? DOC_ACCEPT : 'image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json'}
             className="lg-file"
             onChange={(e) => {
               if (e.target.files?.length) void takeFiles(e.target.files);
@@ -538,7 +624,7 @@ export function LogosComposer({
 
       {(notice || readying) && (
         <p className="lg-composer-note">
-          {readying ? 'Reading the image…' : notice}
+          {readying ? (drafts.some((d) => d.status === 'reading' && d.kind === 'doc') ? 'Reading the document…' : 'Reading the image…') : notice}
         </p>
       )}
     </div>

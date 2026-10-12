@@ -85,6 +85,32 @@ export interface DataState extends DisplayHead {
   bins?: number;
   /** the order rows are SHOWN in — the stored order never changes */
   sort?: DataSort;
+  /** where in an attached document these numbers were read — kept only for numbers from material the person attached */
+  source?: DataSource;
+}
+
+/** A table in a document the person attached: which document, which table, on which page. */
+export interface DataSource {
+  /** the document's id (lib/docs: a hash of the file) */
+  doc: string;
+  /** its file name, as shown */
+  name: string;
+  /** the table's id in it: "t3" */
+  table: string;
+  page: number;
+}
+
+/** "table t3 on page 4 of “report.pdf”" */
+export const sourceSaid = (src: DataSource): string => `table ${src.table} on page ${src.page} of “${src.name}”`;
+
+function cleanSource(raw: unknown): DataSource | undefined {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!o) return undefined;
+  const doc = typeof o.doc === 'string' && /^[0-9a-f]{16}$/.test(o.doc) ? o.doc : null;
+  const table = typeof o.table === 'string' && /^t\d{1,4}$/.test(o.table) ? o.table : null;
+  const page = typeof o.page === 'number' && Number.isInteger(o.page) && o.page >= 1 && o.page <= 100_000 ? o.page : null;
+  const name = cleanText(o.name, 120);
+  return doc && table && page && name ? { doc, name, table, page } : undefined;
 }
 
 export const DATA_LIMITS = { columns: 12, rows: 200, name: 40, unit: 12, text: 80, title: 80, series: 4, minBins: 2, maxBins: 40 } as const;
@@ -250,17 +276,21 @@ export function sanitizeData(raw: unknown): DataState | null {
   const bins = typeof r.bins === 'number' && Number.isInteger(r.bins) && r.bins >= DATA_LIMITS.minBins && r.bins <= DATA_LIMITS.maxBins ? r.bins : undefined;
   const so = r.sort && typeof r.sort === 'object' ? (r.sort as Record<string, unknown>) : null;
   const sort: DataSort | undefined = so && has(so.col) ? { col: so.col, dir: so.dir === 'desc' ? 'desc' : 'asc' } : undefined;
+  const basis: Basis = BASES.includes(r.basis as Basis) ? (r.basis as Basis) : 'illustrative';
+  // a document's table is named only for numbers that came from it
+  const source = basis === 'source' ? cleanSource(r.source) : undefined;
   const base: DataState = {
     title: cleanText(r.title, DATA_LIMITS.title) || 'Data',
     view: 'table',
     columns,
     rows,
     // where the numbers came from is never assumed to be the person: unsaid, they are examples
-    basis: BASES.includes(r.basis as Basis) ? (r.basis as Basis) : 'illustrative',
+    basis,
     ...(x ? { x } : {}),
     ...(y.length ? { y } : {}),
     ...(bins ? { bins } : {}),
     ...(sort ? { sort } : {}),
+    ...(source ? { source } : {}),
   };
   return { ...base, view: DATA_VIEWS.includes(r.view as DataView) ? (r.view as DataView) : defaultView(base) };
 }
@@ -995,7 +1025,20 @@ function inferType(values: string[]): { type: ColumnType; unit?: string } {
  * csvOverflow to say how much.
  */
 export function dataFromCSV(text: string, title: string, opts: { basis?: Basis; by?: By } = {}): DataState | null {
-  const grid = parseCSV(text).filter((row) => !(row.length === 1 && row[0].trim() === ''));
+  return dataFromGrid(
+    parseCSV(text).filter((row) => !(row.length === 1 && row[0].trim() === '')),
+    title,
+    opts
+  );
+}
+
+/**
+ * A table from rows already split into cells — a CSV's, or a table read from
+ * a document — read as dataFromCSV reads one: the first row names the columns
+ * (an empty name becomes "Column n"), each column typed from every value in
+ * it. `source` names the document table the numbers came from.
+ */
+export function dataFromGrid(grid: readonly (readonly string[])[], title: string, opts: { basis?: Basis; by?: By; source?: DataSource } = {}): DataState | null {
   if (!grid.length) return null;
   const header = grid[0].slice(0, DATA_LIMITS.columns);
   if (!header.length) return null;
@@ -1006,7 +1049,7 @@ export function dataFromCSV(text: string, title: string, opts: { basis?: Basis; 
     return { id: `c${i + 1}`, name: cleanText(h, DATA_LIMITS.name) || `Column ${i + 1}`, type, ...(unit ? { unit } : {}), by };
   });
   const rows = body.map((r) => ({ cells: columns.map((c, i) => (isMissing(r[i] ?? '') ? null : cleanCell((r[i] ?? '').trim(), c.type))), by }));
-  return sanitizeData({ title: cleanText(title, DATA_LIMITS.title) || 'Data', columns, rows, basis: opts.basis ?? 'source' });
+  return sanitizeData({ title: cleanText(title, DATA_LIMITS.title) || 'Data', columns, rows, basis: opts.basis ?? 'source', ...(opts.source ? { source: opts.source } : {}) });
 }
 
 /** How much of a CSV a table can hold: rows and columns written, and how many of each are kept. */
@@ -1405,7 +1448,7 @@ function factsOf(s: DataState, guarded: boolean): string[] {
       ? 'These are ILLUSTRATIVE numbers — examples, not real data. Say so whenever they are used.'
       : s.basis === 'given'
         ? 'These are the person’s own numbers.'
-        : 'These numbers come from material the person attached.'
+        : `These numbers come from material the person attached${s.source ? ` — ${sourceSaid(s.source)}` : ''}.`
   );
   if (s.view !== 'table') {
     const why = viewUnavailable(s, s.view);
@@ -1427,7 +1470,7 @@ function factsOf(s: DataState, guarded: boolean): string[] {
 
 function textOf(s: DataState): string {
   const head = [
-    `DATA “${s.title}” — ${BASIS_SAID[s.basis]}${s.sort ? `; shown sorted by ${colOf(s, s.sort.col)?.name ?? s.sort.col}, ${s.sort.dir === 'desc' ? 'descending' : 'ascending'}` : ''}`,
+    `DATA “${s.title}” — ${BASIS_SAID[s.basis]}${s.source ? ` (${sourceSaid(s.source)})` : ''}${s.sort ? `; shown sorted by ${colOf(s, s.sort.col)?.name ?? s.sort.col}, ${s.sort.dir === 'desc' ? 'descending' : 'ascending'}` : ''}`,
     `Columns: ${s.columns.map((c) => `${c.name} (${c.type}${c.unit ? `, ${c.unit}` : ''})`).join(' | ')}`,
   ];
   const lines: string[] = [];

@@ -3,16 +3,22 @@
 // Thinking doesn't always arrive as a chat message. Sometimes it's three pages
 // of notes you already wrote, or a photo of a whiteboard. Logos takes both.
 //
-// Two kinds:
-//   note   long pasted text or a .txt/.md file, kept whole
+// Three kinds:
+//   note   long pasted text, kept whole
 //   image  read ONCE into a text "reading" at attach time
+//   doc    a file — PDF, Word, a spreadsheet, slides, Markdown, CSV… — read
+//          ONCE into a structured reading (lib/docs) that the browser keeps
+//          and sends with the conversation, so replies cite its passages. The
+//          attachment itself carries only the reading's id and a plain-text
+//          rendering of it, for wherever the reading is not at hand (another
+//          device, someone else in a shared line of thinking).
 //
 // The reading matters more than it looks. Everything downstream — the reply,
 // the map extraction, exploring a node — reads text, so turning an image into
 // text once means the map sees exactly what the conversation saw, at one
 // vision call rather than one per turn per surface.
 
-export type AttachmentKind = 'note' | 'image';
+export type AttachmentKind = 'note' | 'image' | 'doc';
 
 // Whose thinking this is. The distinction is load-bearing: a map that turns a
 // quoted author's position into the user's own belief is worse than a map that
@@ -47,7 +53,18 @@ export interface Attachment {
   truncated?: boolean;
   /** note: only the opening travels with this request (lib/chat-attachments.ts forRequest) */
   opening?: boolean;
+  /** doc: the reading's id (lib/docs — a hash of the file); `text` is the reading as plain text */
+  doc?: string;
+  /** doc: pages, slides or sheets */
+  pages?: number;
+  /** doc: what kind of file it was ("pdf", "docx"…) */
+  format?: string;
+  /** doc: what the reading's checks found that is not fine, in a line — shown on the chip */
+  checks?: string;
 }
+
+const DOC_ID = /^[0-9a-f]{16}$/;
+const DOC_FORMAT = /^(pdf|docx|pptx|xlsx|odt|odp|ods|rtf|md|txt|csv|tsv|html|tex|ipynb|image|code)$/;
 
 export const MAX_ATTACHMENTS = 6;
 export const MAX_NOTE_CHARS = 24_000;
@@ -119,6 +136,24 @@ export function sanitizeAttachments(raw: unknown, maxNoteChars: number = MAX_NOT
           : {}),
         ...(a.opening === true ? { opening: true } : {}),
       });
+    } else if (a.kind === 'doc') {
+      // a document's reading is never trusted from the client either: its id
+      // must look like one, and its text is capped like a note's
+      const doc = typeof a.doc === 'string' && DOC_ID.test(a.doc) ? a.doc : null;
+      const text = clip(a.text, maxNoteChars).trim();
+      if (!doc && !text) continue;
+      out.push({
+        kind: 'doc',
+        name: clip(a.name, MAX_NAME) || undefined,
+        // a file someone attached is source material until they say otherwise
+        origin: ORIGINS.includes(a.origin) ? (a.origin as AttachmentOrigin) : 'source',
+        ...(doc ? { doc } : {}),
+        ...(text ? { text, words: wordCount(text) } : {}),
+        ...(typeof a.pages === 'number' && Number.isInteger(a.pages) && a.pages > 0 && a.pages < 100_000 ? { pages: a.pages } : {}),
+        ...(typeof a.format === 'string' && DOC_FORMAT.test(a.format) ? { format: a.format } : {}),
+        ...(clip(a.checks, 300).trim() ? { checks: clip(a.checks, 300).trim() } : {}),
+        ...(a.truncated === true || (typeof a.text === 'string' && a.text.length > maxNoteChars) ? { truncated: true } : {}),
+      });
     } else if (a.kind === 'image') {
       const thumb = clip(a.thumb, MAX_THUMB_CHARS);
       const reading = clip(a.reading, MAX_READING_CHARS).trim();
@@ -151,12 +186,37 @@ export interface RenderableMsg {
  * Flatten a message plus its attachments into the single string every Logos
  * prompt consumes. `full` is reserved for the turn being answered right now.
  */
-export function renderMessageForModel(m: RenderableMsg, full = false): string {
+export function renderMessageForModel(m: RenderableMsg, full = false, docs?: ReadonlyMap<string, string>): string {
   const parts: string[] = [];
   const body = (m.content ?? '').trim();
   if (body) parts.push(body);
 
   for (const a of m.attachments ?? []) {
+    if (a.kind === 'doc') {
+      const named = a.name ? `Attached document “${a.name}”` : 'Attached document';
+      const whose =
+        a.origin === 'mine'
+          ? 'the user’s own writing'
+          : a.origin === 'context'
+            ? 'context they supplied but do not necessarily endorse'
+            : 'source material — NOT the user’s own position';
+      const letter = a.doc ? docs?.get(a.doc) : undefined;
+      if (letter) {
+        // its passages are in the DOCUMENTS part of the instructions, each with its key
+        parts.push(`[${named} — document ${letter}${a.pages ? `, ${a.pages} page${a.pages === 1 ? '' : 's'}` : ''} — ${whose}. Its passages are shown under DOCUMENTS with keys like [${letter}1.1].]`);
+        continue;
+      }
+      // the reading is not at hand on this request: its text, as a note is shown
+      const text = a.text ?? '';
+      if (!text) {
+        parts.push(`[${named} — ${whose} — its reading is not available here]`);
+        continue;
+      }
+      const count = a.words ?? wordCount(text);
+      if (full || text.length <= HISTORY_NOTE_CHARS) parts.push(`[${named} — ${whose} — ${count} words, as text]\n${text}`);
+      else parts.push(`[${named} — ${whose} — ${count} words, opening only]\n${text.slice(0, HISTORY_NOTE_CHARS)}…`);
+      continue;
+    }
     if (a.kind === 'note') {
       const named = a.name ? `Attached note “${a.name}”` : 'Attached note';
       // The tag is the whole point of the block — it tells everything

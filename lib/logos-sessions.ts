@@ -94,7 +94,9 @@ export function titleFor(messages: LogosMsg[]): string {
     (firstTurn?.attachments?.length
       ? firstTurn.attachments[0].kind === 'image'
         ? 'An image'
-        : 'A note'
+        : firstTurn.attachments[0].kind === 'doc'
+          ? 'A document'
+          : 'A note'
       : '');
   if (!first) return UNTITLED;
   const clean = first.replace(/\s+/g, ' ');

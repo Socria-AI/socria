@@ -223,6 +223,10 @@ export function sanitizeSourceDoc(raw: unknown): SourceDoc | null {
     const tbl = kind === 'table' && typeof o.table === 'string' && tableIds.has(o.table) ? o.table : undefined;
     const fig = kind === 'figure' && typeof o.figure === 'string' && figureIds.has(o.figure) ? o.figure : undefined;
     const tex = kind === 'equation' ? str(o.tex, L.blockText).trim() : '';
+    const fl = flags(o.flags);
+    // the reading before a correction, only where there was one
+    const was = fl?.includes('corrected') ? str(o.was, L.blockText) : '';
+    text += was.length;
     blocks.push({
       id,
       page: pg,
@@ -235,7 +239,8 @@ export function sanitizeSourceDoc(raw: unknown): SourceDoc | null {
       ...(tex ? { tex } : {}),
       method: method(o.method),
       ...(conf(o.conf) !== undefined ? { conf: conf(o.conf) } : {}),
-      ...(flags(o.flags) ? { flags: flags(o.flags) } : {}),
+      ...(fl ? { flags: fl } : {}),
+      ...(was ? { was } : {}),
     });
     if (blocks.length >= L.blocks) break;
   }

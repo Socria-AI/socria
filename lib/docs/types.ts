@@ -84,6 +84,8 @@ export interface DocBlock {
   /** 0..1, absent when the reading is as good as the file */
   conf?: number;
   flags?: BlockFlag[];
+  /** what the reading said before the person corrected it — kept so a correction can be taken back */
+  was?: string;
 }
 
 export interface DocTable {

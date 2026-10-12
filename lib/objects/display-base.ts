@@ -408,6 +408,12 @@ export interface DisplayMeta {
   experience?: boolean;
   /** things a person might say to start one — shown in the gallery, and put into the composer when chosen */
   prompts?: readonly string[];
+  /**
+   * Made only by something the person does elsewhere — a document opens one
+   * when it is attached — so it is never offered: not in the gallery, not to
+   * the request reader, not to the proposal pass.
+   */
+  internal?: boolean;
 }
 
 const META = new Map<string, DisplayMeta>();
@@ -417,6 +423,8 @@ export function registerDisplay(m: DisplayMeta): void {
 export const displayMeta = (kind: string): DisplayMeta | null => META.get(kind) ?? null;
 export const isDisplayKind = (kind: string): boolean => META.has(kind);
 export const displayKinds = (): DisplayMeta[] => [...META.values()];
+/** The kinds a person or Socria may ask for by name — every kind but those only something else makes. */
+export const offeredKinds = (): DisplayMeta[] => displayKinds().filter((m) => !m.internal);
 
 /** A handle no object in the space has: P1, P2 … — names in a space are capped at 8 characters. */
 export function freshHandle(names: Iterable<string>, prefix: string): string {

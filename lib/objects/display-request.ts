@@ -25,7 +25,7 @@
 //
 // PURE.
 
-import { displayKinds, norm } from './display-base';
+import { offeredKinds, norm } from './display-base';
 import { numberLineFromWords } from './display-numberline';
 
 export interface DisplayRequest {
@@ -51,7 +51,7 @@ interface Word {
 /** Every word every display kind answers to, longest first so "comparison table" wins over "table". */
 function vocabulary(): Word[] {
   const out: Word[] = [];
-  for (const m of displayKinds()) {
+  for (const m of offeredKinds()) {
     for (const c of m.called ?? []) for (const w of c.words) out.push({ word: norm(w), kind: m.kind, ...(c.view ? { view: c.view } : {}) });
   }
   return out.sort((a, b) => b.word.length - a.word.length);
@@ -207,8 +207,8 @@ function compareRequest(text: string): DisplayRequest | null {
 
 /** The kind whose `intents` the words match — none when they also name a display ("should I use a venn or a table?"). */
 function byIntent(t: string, words: Word[]): DisplayRequest | null {
-  if (words.some((w) => new RegExp(String.raw`\b${esc(w.word)}\b`).test(t) && !displayKinds().some((m) => m.intents && m.kind === w.kind))) return null;
-  for (const m of displayKinds()) {
+  if (words.some((w) => new RegExp(String.raw`\b${esc(w.word)}\b`).test(t) && !offeredKinds().some((m) => m.intents && m.kind === w.kind))) return null;
+  for (const m of offeredKinds()) {
     if (m.intents?.some((rx) => rx.test(t))) return { kind: m.kind, kinds: [m.kind], fromMap: false, noun: m.noun, intent: true };
   }
   return null;

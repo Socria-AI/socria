@@ -33,6 +33,7 @@ export function DisplayPanel({
   onWorkspace,
   ask,
   onPrompt,
+  onDraft,
 }: {
   obj: ThoughtObject | null;
   all: ThoughtObject[];
@@ -51,6 +52,8 @@ export function DisplayPanel({
   ask?: AskExperience;
   /** put an example prompt into the composer, to be finished and sent there */
   onPrompt?: (text: string) => void;
+  /** put a sentence a display offers (an equation from a document) into the composer */
+  onDraft?: (text: string) => void;
 }) {
   const [browsing, setBrowsing] = useState(false);
   if (!obj || browsing) {
@@ -98,7 +101,7 @@ export function DisplayPanel({
         history={history}
         me={me}
         shared={shared}
-        {...(readOnly ? {} : { onOp: (op: string, args: Record<string, string | number>) => onOp(op, args), onWorkspace, ask })}
+        {...(readOnly ? {} : { onOp: (op: string, args: Record<string, string | number>) => onOp(op, args), onWorkspace, ask, ...(onDraft ? { onDraft } : {}) })}
       />
     </div>
   );

@@ -163,12 +163,14 @@ const CONF = { high: 0.9, medium: 0.7, low: 0.45 } as const;
  * document's; the page is marked read by vision; the checks that do not need
  * the file's text are run again, and those that did are kept.
  */
-export function mergePageReading(doc: SourceDoc, page: number, read: VisionBlock[] | null, textLayer = ''): SourceDoc {
+export function mergePageReading(doc: SourceDoc, page: number, read: VisionBlock[] | null, textLayer = '', partial = false): SourceDoc {
   const pg = doc.pages.find((p) => p.n === page);
   if (!pg) return doc;
   if (!read) {
     return withChecks({ ...doc, pages: doc.pages.map((p) => (p.n === page ? { ...p, ocr: 'failed' as const } : p)) });
   }
+  // a reading cut off at the model's limit is a part of the page, and is said to be
+  if (partial) doc = { ...doc, checks: [...doc.checks.filter((c) => !(c.id === 'unread' && c.pages?.length === 1 && c.pages[0] === page)), { id: 'unread', level: 'warn', says: `Page ${page} was read from its image only in part: it holds more than one reading carries.`, pages: [page] }] };
   const layerNums = new Set(numbersIn(textLayer).map((n) => numberKey(Math.abs(n.value))));
   const hasLayer = textLayer.trim().length > 20;
   const keepBlocks = doc.blocks.filter((b) => b.page !== page);

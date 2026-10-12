@@ -17,6 +17,7 @@ import { UntangleFigure } from './UntangleFigure';
 import { GroundFigure } from './GroundFigure';
 import { TimeFigure } from './TimeFigure';
 import { NumberLineFigure } from './NumberLineFigure';
+import { DocumentFigure } from './DocumentFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
@@ -28,6 +29,8 @@ registerFigure('market', MarketFigure);
 registerFigure('worksheet', WorksheetFigure);
 registerFigure('exercise', ExerciseFigure);
 registerFigure('numberline', NumberLineFigure);
+// a document the person attached, as it was read
+registerFigure('document', DocumentFigure);
 // the human-first experiences
 registerFigure('crossroads', CrossroadsFigure);
 registerFigure('untangle', UntangleFigure);

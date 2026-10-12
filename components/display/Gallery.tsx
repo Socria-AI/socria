@@ -60,7 +60,8 @@ function sampleSpace(): ObjectSpace | undefined {
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
 
 export function Gallery({ onPrompt, onClose }: { onPrompt?: (text: string) => void; onClose?: () => void }) {
-  const all = displayKinds();
+  // a kind only something else makes (a document's reading) is never offered here
+  const all = displayKinds().filter((m) => !m.internal);
   const experiences = all.filter((m) => m.experience);
   const displays = all.filter((m) => !m.experience);
   return (

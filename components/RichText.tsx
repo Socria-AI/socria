@@ -17,14 +17,46 @@
 // KaTeX splitter over every sentence of a chat that will never contain a `$`
 // is work for nothing — so the surface says whether to look.
 
-import type { ReactNode } from 'react';
+import { Fragment, type ReactNode } from 'react';
 import { parseBlocks, splitInline, stripMarks, type Block } from '@/lib/rich-text';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
 
-/** A run of text, with math inside it when the surface asked for math. */
-function Body({ text, math }: { text: string; math?: boolean }): ReactNode {
-  return math ? <MathText>{text}</MathText> : text;
+/**
+ * How a surface draws a citation key — [A3.12], [A3.12, A4.2] — when its
+ * replies cite documents (Logos). Absent, a key is just text.
+ */
+export type CiteRender = (keys: string[], raw: string) => ReactNode;
+
+const CITE = /\[\s*[A-Z]\d{1,4}\.\d{1,5}(?:\s*[,;]\s*[A-Z]?\d{1,4}\.\d{1,5})*\s*\]/g;
+
+/** The keys in one bracket, a bare page.n taking the letter before it ("A3.12, 3.14" → A3.12, A3.14). */
+function keysOf(bracket: string): string[] {
+  let letter = '';
+  return bracket
+    .replace(/^\[\s*|\s*\]$/g, '')
+    .split(/\s*[,;]\s*/)
+    .map((k) => {
+      if (/^[A-Z]/.test(k)) letter = k[0];
+      return /^[A-Z]/.test(k) ? k : `${letter}${k}`;
+    });
+}
+
+/** A run of text, with math inside it when the surface asked for math — and its citations drawn, when it draws them. */
+function Body({ text, math, cite }: { text: string; math?: boolean; cite?: CiteRender }): ReactNode {
+  const plain = (t: string) => (math ? <MathText>{t}</MathText> : t);
+  if (!cite || !text.includes('[')) return plain(text);
+  const out: ReactNode[] = [];
+  let last = 0;
+  for (const m of text.matchAll(CITE)) {
+    const at = m.index ?? 0;
+    if (at > last) out.push(<Fragment key={`t${last}`}>{plain(text.slice(last, at))}</Fragment>);
+    out.push(<Fragment key={`c${at}`}>{cite(keysOf(m[0]), m[0])}</Fragment>);
+    last = at + m[0].length;
+  }
+  if (!out.length) return plain(text);
+  if (last < text.length) out.push(<Fragment key={`t${last}`}>{plain(text.slice(last))}</Fragment>);
+  return <>{out}</>;
 }
 
 /**
@@ -38,16 +70,18 @@ export function Inline({
   text,
   math,
   keyBase = 'i',
+  cite,
 }: {
   text: string;
   math?: boolean;
   keyBase?: string;
+  cite?: CiteRender;
 }) {
   return (
     <>
       {splitInline(text).map((seg, i) => {
         const key = `${keyBase}-${i}`;
-        const body = <Body text={seg.text} math={math} />;
+        const body = <Body text={seg.text} math={math} cite={cite} />;
         if (seg.kind === 'text') return <span key={key}>{body}</span>;
         if (seg.kind === 'strong') {
           return (
@@ -72,17 +106,17 @@ export function Inline({
   );
 }
 
-function BlockNode({ block, math, k }: { block: Block; math?: boolean; k: string }): ReactNode {
+function BlockNode({ block, math, k, cite }: { block: Block; math?: boolean; k: string; cite?: CiteRender }): ReactNode {
   switch (block.kind) {
     case 'p':
-      return <p key={k}>{<Inline text={block.text} math={math} keyBase={k} />}</p>;
+      return <p key={k}>{<Inline text={block.text} math={math} keyBase={k} cite={cite} />}</p>;
 
     case 'ul':
       return (
         <ul key={k}>
           {block.items.map((it, i) => (
             <li key={i}>
-              <Inline text={it} math={math} keyBase={`${k}-${i}`} />
+              <Inline text={it} math={math} keyBase={`${k}-${i}`} cite={cite} />
             </li>
           ))}
         </ul>
@@ -93,7 +127,7 @@ function BlockNode({ block, math, k }: { block: Block; math?: boolean; k: string
         <ol key={k}>
           {block.items.map((it, i) => (
             <li key={i}>
-              <Inline text={it} math={math} keyBase={`${k}-${i}`} />
+              <Inline text={it} math={math} keyBase={`${k}-${i}`} cite={cite} />
             </li>
           ))}
         </ol>
@@ -114,7 +148,7 @@ function BlockNode({ block, math, k }: { block: Block; math?: boolean; k: string
                 <ul>
                   {g.items.map((it, ii) => (
                     <li key={ii}>
-                      <Inline text={it} math={math} keyBase={`${k}-${gi}-${ii}`} />
+                      <Inline text={it} math={math} keyBase={`${k}-${gi}-${ii}`} cite={cite} />
                     </li>
                   ))}
                 </ul>
@@ -149,7 +183,7 @@ function BlockNode({ block, math, k }: { block: Block; math?: boolean; k: string
                 <tr key={ri}>
                   {r.map((c, ci) => (
                     <td key={ci}>
-                      <Inline text={c} math={math} keyBase={`${k}-${ri}-${ci}`} />
+                      <Inline text={c} math={math} keyBase={`${k}-${ri}-${ci}`} cite={cite} />
                     </td>
                   ))}
                 </tr>
@@ -161,7 +195,7 @@ function BlockNode({ block, math, k }: { block: Block; math?: boolean; k: string
   }
 }
 
-/** A finished reply: paragraphs, lists, titled groups and small tables. */
-export function RichText({ text, math }: { text: string; math?: boolean }) {
-  return <>{parseBlocks(text).map((b, i) => BlockNode({ block: b, math, k: `b${i}` }))}</>;
+/** A finished reply: paragraphs, lists, titled groups and small tables — and, where the surface draws them, its citations. */
+export function RichText({ text, math, cite }: { text: string; math?: boolean; cite?: CiteRender }) {
+  return <>{parseBlocks(text).map((b, i) => BlockNode({ block: b, math, k: `b${i}`, cite }))}</>;
 }

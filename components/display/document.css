@@ -1,0 +1,116 @@
+/* components/display/document.css — a document as it was read (DocumentFigure). */
+
+.doc-fig { display: flex; flex-direction: column; gap: 8px; min-width: 0; }
+.dsp[data-kind='document'] { --dsp-body-max: 620px; }
+
+.doc-bar { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; }
+.doc-find { flex: 1 1 180px; max-width: 320px; }
+.doc-hits { display: inline-flex; align-items: center; gap: 4px; font-size: 12px; color: var(--dsp-60); font-variant-numeric: tabular-nums; }
+.doc-warn {
+  margin-left: auto; padding: 2px 10px; border: 1px solid color-mix(in srgb, var(--dsp-tension) 40%, transparent); border-radius: 999px;
+  background: none; cursor: pointer; font-size: 11.5px; color: var(--dsp-tension);
+}
+.doc-warn:hover:not(:disabled) { background: color-mix(in srgb, var(--dsp-tension) 8%, transparent); }
+.doc-scan {
+  display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 0; padding: 6px 10px; border-radius: 6px;
+  background: var(--dsp-tint); font-size: 12.5px; color: var(--dsp-ink);
+}
+
+/* ── the reading ──────────────────────────────────────────────────── */
+.doc-pass { display: flex; flex-direction: column; }
+.doc-page {
+  display: flex; align-items: baseline; gap: 8px; margin: 14px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--dsp-line);
+  font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dsp-40);
+}
+.doc-page:first-child { margin-top: 2px; }
+.doc-page em { font-style: italic; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 12px; font-family: var(--serif, Georgia, serif); }
+
+.doc-b {
+  display: grid; grid-template-columns: 52px minmax(0, 1fr); column-gap: 8px; padding: 3px 4px; border-radius: 4px;
+  scroll-margin: 40px; content-visibility: auto; contain-intrinsic-size: auto 28px;
+}
+.doc-b:hover { background: color-mix(in srgb, var(--dsp-ink) 3%, transparent); }
+.doc-b.is-sel { background: var(--dsp-tint); box-shadow: inset 2px 0 0 var(--dsp-primary); }
+.doc-b.is-vision .doc-main > :first-child { color: color-mix(in srgb, var(--dsp-ink) 88%, transparent); }
+.doc-b.is-doubted .doc-main > :first-child { text-decoration: underline wavy color-mix(in srgb, var(--dsp-tension) 55%, transparent); text-underline-offset: 3px; }
+.doc-b.is-corrected .doc-main > :first-child { color: var(--dsp-accent); }
+.doc-key {
+  align-self: start; margin-top: 2px; padding: 0 4px; border: 0; border-radius: 3px; background: none; cursor: pointer; text-align: right;
+  font-size: 10.5px; color: var(--dsp-40); font-variant-numeric: tabular-nums; white-space: nowrap;
+}
+.doc-key:hover, .doc-b.is-sel .doc-key { color: var(--dsp-primary); }
+.doc-main { min-width: 0; overflow-wrap: anywhere; }
+.doc-main p, .doc-main blockquote, .doc-main pre { margin: 0; }
+.doc-t-p, .doc-t-li { font-family: var(--serif, Georgia, serif); font-size: 15px; line-height: 1.5; }
+.doc-t-title { font-family: var(--serif, Georgia, serif); font-size: 21px; line-height: 1.25; font-style: italic; }
+.doc-t-h { font-family: var(--serif, Georgia, serif); line-height: 1.3; margin-top: 4px !important; }
+.doc-t-h.is-l1 { font-size: 18.5px; }
+.doc-t-h.is-l2 { font-size: 16.5px; }
+.doc-t-h.is-l3, .doc-t-h.is-l4 { font-size: 15px; font-weight: 600; }
+.doc-t-q { padding-left: 10px; border-left: 2px solid var(--dsp-line); font-family: var(--serif, Georgia, serif); font-style: italic; font-size: 15px; line-height: 1.5; }
+.doc-t-eq { font-family: var(--serif, Georgia, serif); font-style: italic; font-size: 15.5px; text-align: center; padding: 2px 0; }
+.doc-t-code { font-family: var(--mono, ui-monospace, monospace); font-size: 12.5px; white-space: pre-wrap; padding: 6px 8px; border-radius: 4px; background: var(--dsp-tint); }
+.doc-t-small { font-size: 12.5px; line-height: 1.45; color: var(--dsp-60); }
+.doc-t-cap { display: block; margin-bottom: 4px; font-size: 12.5px; font-style: italic; color: var(--dsp-60); }
+.doc-t-fig { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px dashed var(--dsp-line); border-radius: 4px; }
+.doc-fig-kind { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); }
+.doc-t-alt { font-size: 13px; color: var(--dsp-ink); }
+.doc-t-int { font-size: 12.5px; font-style: italic; color: var(--dsp-accent); }
+.doc-table-wrap { overflow-x: auto; max-width: 100%; }
+.doc-t-table table { border-collapse: collapse; font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.doc-t-table th, .doc-t-table td { padding: 3px 8px; border-bottom: 1px solid var(--dsp-line); text-align: left; vertical-align: top; }
+.doc-t-table th { font-weight: 600; color: var(--dsp-ink); border-bottom-color: var(--dsp-24); }
+.doc-cell-empty { display: inline-block; width: 10px; border-bottom: 1px dotted var(--dsp-24); }
+.doc-main mark { background: color-mix(in srgb, var(--dsp-accent) 22%, transparent); color: inherit; border-radius: 2px; }
+.doc-tags { display: block; margin-top: 1px; font-size: 11px; color: var(--dsp-tension); }
+
+.doc-acts { display: flex; flex-direction: column; gap: 4px; margin: 6px 0 2px; }
+.doc-acts-hint { font-size: 11.5px; color: var(--dsp-60); font-style: italic; }
+.doc-acts-do { display: flex; flex-wrap: wrap; gap: 4px; }
+.doc-acts-said { font-size: 12px; color: var(--dsp-accent); }
+.doc-correct { display: flex; flex-direction: column; gap: 6px; }
+.doc-correct-in {
+  width: 100%; padding: 6px 8px; border: 1px solid var(--dsp-24); border-radius: 4px; background: var(--dsp-panel);
+  font-family: var(--serif, Georgia, serif); font-size: 15px; line-height: 1.5; color: var(--dsp-ink); resize: vertical;
+}
+.doc-correct-in:focus { outline: none; border-color: var(--dsp-primary); }
+.doc-correct-do { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+.doc-correct-say { font-size: 11.5px; color: var(--dsp-60); }
+.doc-more { align-self: center; margin-top: 10px; }
+.doc-unread { margin: 10px 0 0; font-size: 12.5px; color: var(--dsp-tension); }
+
+/* ── the outline ──────────────────────────────────────────────────── */
+.doc-outline { list-style: none; margin: 0; padding: 0; }
+.doc-outline li button {
+  display: flex; justify-content: space-between; gap: 12px; width: 100%; padding: 3px 4px; border: 0; border-radius: 3px; background: none;
+  cursor: pointer; text-align: left; color: var(--dsp-ink);
+}
+.doc-outline li button:hover { background: var(--dsp-tint); }
+.doc-outline-text { font-family: var(--serif, Georgia, serif); font-size: 14.5px; min-width: 0; overflow-wrap: anywhere; }
+.doc-outline-key { flex: none; font-size: 10.5px; color: var(--dsp-40); font-variant-numeric: tabular-nums; }
+.doc-outline li.is-title .doc-outline-text { font-style: italic; font-size: 16.5px; }
+.doc-outline li.is-l2 { padding-left: 14px; }
+.doc-outline li.is-l3, .doc-outline li.is-l4 { padding-left: 28px; }
+.doc-outline li.is-table .doc-outline-text, .doc-outline li.is-figure .doc-outline-text, .doc-outline li.is-equation .doc-outline-text { font-family: inherit; font-size: 12.5px; color: var(--dsp-60); }
+
+/* ── the checks ───────────────────────────────────────────────────── */
+.doc-checks { display: flex; flex-direction: column; gap: 8px; }
+.doc-how { margin: 0; font-size: 12.5px; color: var(--dsp-60); }
+.doc-check-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
+.doc-check-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; font-size: 13px; line-height: 1.45; }
+.doc-check-mark { font-weight: 700; text-align: center; color: var(--dsp-primary); }
+.doc-check-list li.is-warn .doc-check-mark { color: var(--dsp-tension); }
+.doc-check-list li.is-fail .doc-check-mark { color: var(--dsp-tension); }
+.doc-check-at { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; }
+.doc-check-at button, .doc-check-at span {
+  padding: 0 6px; border: 1px solid var(--dsp-line); border-radius: 999px; background: none; font-size: 11px; color: var(--dsp-60);
+  font-variant-numeric: tabular-nums;
+}
+.doc-check-at button { cursor: pointer; }
+.doc-check-at button:hover { color: var(--dsp-primary); border-color: var(--dsp-24); }
+.doc-edits { margin: 0; font-size: 12.5px; color: var(--dsp-accent); }
+
+@media (max-width: 560px) {
+  .doc-b { grid-template-columns: 40px minmax(0, 1fr); column-gap: 6px; }
+  .doc-t-p, .doc-t-li { font-size: 14.5px; }
+}

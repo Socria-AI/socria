@@ -276,6 +276,8 @@ const MODULES = [
   'lib/rewards/referral-rule.ts',
   'lib/rewards/rewards-service.ts',
   'lib/rewards/popup-rule.ts',
+  // documents in Logos: the readers, grounding, the document view and its context, in one bundle
+  'test/helpers/docs-under-test.tsx',
 ];
 
 export async function buildAll() {

@@ -26,6 +26,7 @@ import {
   currentOf,
   discover,
   displayMeta,
+  documentFromDoc,
   forgetBefore,
   isDisplayKind,
   kindOf,
@@ -112,10 +113,10 @@ import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
-import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
+import { MAX_NOTE_CHARS, type Attachment, type AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
-import { boundaryNote, limitsFor, type Counter } from '@/lib/entitlements';
+import { boundaryNote, DIRECT_UPLOAD_BYTES, limitsFor, type Counter } from '@/lib/entitlements';
 import { failureText } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import {
@@ -136,6 +137,13 @@ import { DOCK_SIDES, Workspace, type DockSide } from '@/components/workspace/Wor
 import { InspectorPanel, ModelPanel, ParamsPanel, TracePanel } from '@/components/workspace/panels';
 import { ScenePanel } from '@/components/scene3d/ScenePanel';
 import { DisplayPanel } from '@/components/display/DisplayPanel';
+import { DocsContext, type DocsApi } from '@/components/display/docs-context';
+import { AUTO_PAGES, docNow, loadDocs, onDoc, pagesToRead, putDoc, putOriginal, readFileAsDoc, readPages as readDocPages } from '@/lib/docs/client';
+import { docLetters, docsForRequest } from '@/lib/docs/conversation';
+import { renderDocAsNote, type DocRef } from '@/lib/docs/render';
+import { BLOCK_ID } from '@/lib/docs/sanitize';
+import type { SourceDoc } from '@/lib/docs/types';
+import type { DocumentState } from '@/lib/objects/display-document';
 import { sceneTurn } from '@/lib/objects/scene-chat';
 import type { SceneState } from '@/lib/objects/scene';
 import {
@@ -586,6 +594,40 @@ export function LogosApp({
   );
   const messages = active?.messages ?? [];
   const map = active?.map ?? EMPTY_MAP;
+
+  // ── DOCUMENTS (lib/docs) ──────────────────────────────────────────
+  // Every document this line of thinking was given, as it was read. The
+  // reading stays on this device (lib/docs/client.ts — memory and IndexedDB):
+  // a turn sends the conversation's documents with it, the replies' citations
+  // are checked against them here, and the document view shows them. Letters
+  // come from the conversation itself (lib/docs/conversation.ts), the same
+  // way the server letters what it shows the model.
+  const [docs, setDocs] = useState<ReadonlyMap<string, SourceDoc>>(() => new Map());
+  const docsRef = useRef(docs);
+  docsRef.current = docs;
+  const [docReading, setDocReading] = useState<Record<string, { done: number; of: number }>>({});
+  const letters = useMemo(() => docLetters(messages), [messages]);
+  const docRefs = useMemo<DocRef[]>(() => [...letters].flatMap(([id, letter]) => (docs.get(id) ? [{ letter, doc: docs.get(id)! }] : [])), [letters, docs]);
+  const docIdsKey = [...letters.keys()].join(',');
+  // a document changed anywhere on this device — a page read, a correction — is the one shown and sent
+  useEffect(() => onDoc((doc) => setDocs((m) => (m.get(doc.id) === doc ? m : new Map(m).set(doc.id, doc)))), []);
+  // the documents of the open line of thinking, from what this device kept
+  useEffect(() => {
+    const missing = (docIdsKey ? docIdsKey.split(',') : []).filter((id) => !docsRef.current.has(id));
+    if (!missing.length) return;
+    let off = false;
+    void loadDocs(missing).then((found) => {
+      if (off || !found.length) return;
+      setDocs((m) => {
+        const n = new Map(m);
+        for (const d of found) n.set(d.id, d);
+        return n;
+      });
+    });
+    return () => {
+      off = true;
+    };
+  }, [docIdsKey]);
 
   // ── Trace's structural half ───────────────────────────────────────
   // The map stays the store; this projects it into the shared workspace
@@ -2723,6 +2765,118 @@ export function LogosApp({
     [keyHeaders]
   );
 
+  /** Pages of a document read from their pictures, with how far it has got shown while it reads. */
+  const readPagesNow = useCallback(
+    async (doc: SourceDoc, pages: number[]): Promise<{ doc: SourceDoc; read: number; stopped?: string }> => {
+      if (!pages.length) return { doc, read: 0 };
+      setDocReading((r) => ({ ...r, [doc.id]: { done: 0, of: pages.length } }));
+      try {
+        return await readDocPages(doc, pages, {
+          headers: keyHeaders,
+          sessionId: activeIdRef.current,
+          onPage: () => setDocReading((r) => (r[doc.id] ? { ...r, [doc.id]: { ...r[doc.id], done: r[doc.id].done + 1 } } : r)),
+        });
+      } finally {
+        setDocReading((r) => {
+          const n = { ...r };
+          delete n[doc.id];
+          return n;
+        });
+      }
+    },
+    [keyHeaders]
+  );
+
+  /**
+   * A document attached in the composer: read once (lib/docs/client.ts), kept
+   * on this device, and carried into the conversation as an attachment that
+   * names its reading. A scan has no text to read, so its first pages are
+   * read from their pictures before it is sent — the rest when asked for in
+   * the document view.
+   */
+  const readDocument = useCallback(
+    async (file: File): Promise<Attachment> => {
+      const read = await readFileAsDoc(file, { headers: keyHeaders, uploadLimit: limits.uploadBytes, directLimit: DIRECT_UPLOAD_BYTES });
+      // too large to come back as a reading: it travels as its text, like a note, and says so
+      if (read.note) {
+        const text = read.note.text.slice(0, MAX_NOTE_CHARS);
+        return { kind: 'note', name: file.name, origin: 'source', text, words: text.split(/\s+/).filter(Boolean).length, ...(read.note.truncated || read.note.text.length > MAX_NOTE_CHARS ? { truncated: true } : {}) };
+      }
+      const doc = read.doc;
+      await putDoc(doc);
+      let cur = doc;
+      const waiting = pagesToRead(doc);
+      if (waiting.length && (doc.format === 'pdf' || doc.format === 'image')) {
+        await putOriginal(doc.id, file);
+        cur = (await readPagesNow(doc, waiting.slice(0, AUTO_PAGES))).doc;
+      }
+      return docAttachment(cur);
+    },
+    [keyHeaders, limits.uploadBytes, readPagesNow]
+  );
+
+  /** What the document view reads from: the documents here, their letters, and reading more of them. */
+  const docsApi = useMemo<DocsApi>(
+    () => ({
+      docs,
+      letterOf: (id) => letters.get(id) ?? null,
+      readPages: async (id, pages) => {
+        const doc = docsRef.current.get(id) ?? docNow(id);
+        if (!doc) return { read: 0, stopped: 'That document is not on this device.' };
+        const r = await readPagesNow(doc, pages);
+        return { read: r.read, ...(r.stopped ? { stopped: r.stopped } : {}) };
+      },
+      reading: docReading,
+      save: (doc) => void putDoc(doc),
+    }),
+    [docs, letters, docReading, readPagesNow]
+  );
+
+  /** The document view of a document in this workspace — made if there is none yet. Null when it cannot be. */
+  function documentDisplay(docId: string): string | null {
+    let space = spaceOf(mapRef.current);
+    const there = space.objs.find((o) => o.kind === 'document' && (o.states[o.at] as DocumentState | undefined)?.doc === docId);
+    if (there) return there.id;
+    // someone who may only read a shared line of thinking adds nothing to it
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') return null;
+    const doc = docsRef.current.get(docId) ?? docNow(docId);
+    const state = doc ? documentFromDoc(doc) : null;
+    if (!state) return null;
+    const made = makeDisplay(space, 'document', state, 'person');
+    if (!made.ok) {
+      setError(made.says);
+      return null;
+    }
+    space = made.space;
+    commitObjects(space, made.obj);
+    return made.obj.id;
+  }
+
+  /** Open a document as it was read, beside the map. */
+  function openDoc(docId: string) {
+    if (!workspaceOn) return;
+    const id = documentDisplay(docId);
+    if (id) setDisplayToOpen(id);
+  }
+
+  /** Open the passage a citation names, selected — so what is asked next is about it. */
+  function openCite(docId: string, blockId: string) {
+    if (!workspaceOn) return;
+    const id = documentDisplay(docId);
+    if (!id) return;
+    onObject({ type: 'select', obj: id, part: blockId });
+    setDisplayToOpen(id);
+  }
+
+  /** The passage selected in a document view, as the next turn's "this". */
+  function docFocusOf(sel: { obj: string; part: string } | null): { doc: string; block: string } | null {
+    if (!sel || !BLOCK_ID.test(sel.part)) return null;
+    const o = objOf(spaceOf(mapRef.current), sel.obj);
+    if (!o || o.kind !== 'document') return null;
+    const st = o.states[o.at] as DocumentState | undefined;
+    return st?.doc ? { doc: st.doc, block: sel.part } : null;
+  }
+
   function sendFromComposer() {
     // Anything still being read, or that failed, is left behind rather than
     // sent as a silent blank.
@@ -2900,7 +3054,8 @@ export function LogosApp({
     const found = discover(space0, content, 'person');
     let space = found.space;
     for (const a of atts) {
-      const t = a.kind === 'note' ? a.text : a.reading;
+      // a document is read as a document (its equations are graphed from its view), not mined for objects
+      const t = a.kind === 'note' ? a.text : a.kind === 'image' ? a.reading : undefined;
       if (t) space = discover(space, t, 'source').space;
     }
     let lastStep: { obj: string; said: string } | null = null;
@@ -3370,6 +3525,13 @@ export function LogosApp({
     const sid = activeIdRef.current ?? '';
     const before = messages;
     const sent = postTurn(turn, group);
+    // A document attached for the first time opens beside the map, as it was read.
+    if (workspaceOn) {
+      const fresh = atts.filter((a) => a.kind === 'doc' && a.doc && !before.some((m) => m.attachments?.some((x) => x.kind === 'doc' && x.doc === a.doc)));
+      let opened: string | null = null;
+      for (const a of fresh) opened = documentDisplay(a.doc!) ?? opened;
+      if (opened) setDisplayToOpen(opened);
+    }
     // The first thought, anywhere — once, ever (lib/first-run.ts).
     firstRun.reach('socria.thought');
     // the conversation as it stands now, with this turn — others' words included
@@ -3424,6 +3586,23 @@ export function LogosApp({
         body: JSON.stringify({
           sessionId: activeIdRef.current,
           messages: next,
+          // The conversation's documents, as read on this device — the newest
+          // first, within a size (lib/docs/conversation.ts). The server shows
+          // the model their passages, keyed, and only for documents attached here.
+          ...(() => {
+            const held = new Map<string, SourceDoc>();
+            for (const id of docLetters(next).keys()) {
+              const d = docsRef.current.get(id) ?? docNow(id);
+              if (d) held.set(id, d);
+            }
+            const sentDocs = docsForRequest(next, held);
+            return sentDocs.length ? { docs: sentDocs } : {};
+          })(),
+          // the passage selected in a document view: what "this" means
+          ...(() => {
+            const f = docFocusOf(objSelRef.current);
+            return f ? { docFocus: f } : {};
+          })(),
           ...guidance(),
           // What Logos knows about this person, for accounts; the server
           // decides what the plan carries of it. The recurrence line is
@@ -4007,6 +4186,7 @@ export function LogosApp({
             onWorkspace={onWorkspace}
             ask={askExperience}
             onPrompt={(text) => draftToComposer(text)}
+            onDraft={(text) => draftToComposer(text)}
           />
         );
       }
@@ -4452,6 +4632,8 @@ export function LogosApp({
                   onReply={startReply}
                   onJump={jumpTo}
                   toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
+                  docRefs={docRefs}
+                  {...(workspaceOn ? { onOpenCite: openCite, onOpenDoc: openDoc } : {})}
                 />
               );
             })}
@@ -4637,6 +4819,8 @@ export function LogosApp({
             onSend={sendFromComposer}
             busy={busy}
             readImage={readImage}
+            readDocument={readDocument}
+            {...(workspaceOn ? { onOpenDoc: openDoc } : {})}
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             group={groupLive}
@@ -5059,6 +5243,7 @@ export function LogosApp({
     ) : null;
 
   return (
+    <DocsContext.Provider value={docsApi}>
     <div
       className="logos-root"
     >
@@ -5390,9 +5575,26 @@ export function LogosApp({
         </div>
       </div>
     </div>
+    </DocsContext.Provider>
   );
 }
 
+/** A document as an attachment: its reading's id, its text for wherever the reading is not at hand, and what its checks found. */
+function docAttachment(doc: SourceDoc): Attachment {
+  const note = renderDocAsNote(doc, MAX_NOTE_CHARS);
+  const issues = doc.checks.filter((c) => c.level !== 'ok').map((c) => c.says);
+  return {
+    kind: 'doc',
+    name: doc.name,
+    origin: 'source',
+    doc: doc.id,
+    text: note.text,
+    ...(note.truncated ? { truncated: true } : {}),
+    pages: doc.pageCount,
+    format: doc.format,
+    ...(issues.length ? { checks: issues.join(' ').slice(0, 400) } : {}),
+  };
+}
 
 /**
  * The first-run screen over Logos — and its own "started" event, fired once

@@ -22,6 +22,7 @@ const sections = [
   { id: 'working', heading: 'Working in a display' },
   { id: 'math', heading: 'Graphs and number lines' },
   { id: 'experiences', heading: 'The experiences' },
+  { id: 'documents', heading: 'Documents you attach' },
   { id: 'memory', heading: 'A memory that keeps up' },
   { id: 'not', heading: 'What it will not do' },
   { id: 'yet', heading: 'Not there yet' },
@@ -89,6 +90,11 @@ export function Logos35() {
         <li>
           <strong>A memory that keeps up.</strong> When your thinking changes, what Socria remembers is
           shown changing too — and the change is yours to confirm or reject.
+        </li>
+        <li>
+          <strong>Documents, read and cited.</strong> Attach a PDF, a Word file, slides or a spreadsheet:
+          replies cite the passages they rely on, each citation is checked against its passage, and the
+          document opens beside the map as it was read.
         </li>
         <li>
           <strong>A gallery</strong> of everything it can make, under <em>New…</em> in the display
@@ -284,6 +290,58 @@ export function Logos35() {
         </Def>
       </Defs>
 
+      <H2 id="documents">Documents you attach</H2>
+      <p>
+        Attach a file with the paperclip, or drop it on the box you type in: PDF, Word, PowerPoint, Excel,
+        OpenDocument, RTF, Markdown, CSV, HTML, LaTeX, a notebook or plain text. It is read once — headings,
+        paragraphs, lists, tables, equations, captions, footnotes and speaker notes, in reading order —
+        and what the reading could not do is said beside it rather than smoothed over.
+      </p>
+      <Defs>
+        <Def term="Every passage has a key">
+          [A3.12] is document A, page 3, passage 12. Replies cite the passages they rely on, right after
+          what they say; a citation opens the document at that passage. Each one is checked by code
+          against the passage it names — whether it holds the sentence’s numbers and words — and marked as
+          said by the document, calculated from it, a reading of it, or not found in it (⚠).
+        </Def>
+        <Def term="Data, never instructions">
+          What a document says is shown to Socria as the file’s content, never as instructions. Socria is
+          told never to follow instructions written inside a file, and to say when a file contains them;
+          text in a file cannot pass itself off as part of the conversation.
+        </Def>
+        <Def term="Kept apart">
+          What the document says, what Socria calculated from its numbers, Socria’s own reading of it, and
+          what it does not say are kept apart in the reply. If the document does not answer the question,
+          the reply says so.
+        </Def>
+        <Def term="Beside the map">
+          The document opens as it was read: every passage with its key, how it was read and how sure the
+          reading is, its tables and equations, an outline, and the checks the reading passed. Select a
+          passage and ask about “this” — the question is about that passage.
+        </Def>
+        <Def term="Scans and photographs">
+          A page with no text in it is read from its picture by a vision model — the first 12 pages when
+          you attach it, the rest when you ask in the document view. Those passages are marked as read
+          from the image; numbers the page’s own text does not confirm are marked; what could not be read
+          says [illegible] and is never guessed.
+        </Def>
+        <Def term="Yours to correct">
+          Correct a passage that was read wrongly, or mark it as read wrongly. Socria is told which
+          passages you corrected and which you doubt; the original reading is kept, and taking a
+          correction back restores it.
+        </Def>
+        <Def term="Tables and equations">
+          A table can be charted — a chart display of its numbers that names the table and page they came
+          from. An equation the engine can plot as a function of one variable can be sent to the
+          conversation to work with.
+        </Def>
+      </Defs>
+      <p>
+        The full reading is kept in your browser and sent with the turns that use it; the server that
+        reads the file keeps nothing. The conversation keeps a document’s text, up to 24,000 characters,
+        like any attachment.
+      </p>
+
       <H2 id="memory">A memory that keeps up</H2>
       <p>
         What Socria remembers about your beliefs, goals, decisions and assumptions used to be overwritten
@@ -324,6 +382,12 @@ export function Logos35() {
           Filling an empty chart by listing numbers in the chat — type them into its table, which shows
           under the chart until every row is filled.
         </li>
+        <li>
+          A document’s reading is kept in the browser that read it: on another device, or for someone
+          else in a shared line of thinking, the document view says it is not there. A PDF is read up to
+          150 pages at a time, and the pages past that are named, not read.
+        </li>
+        <li>Ideas on the map are not yet linked to the passages they came from.</li>
       </ul>
       <p>
         Everything else in Logos — the map, the models, Live 3D, depth and thinking together — is on the{' '}

@@ -26,7 +26,7 @@
 // PURE.
 
 import { create, kindOf, MAX_OBJECTS, type ObjectSpace, type ThoughtObject } from './core';
-import { cleanText, displayKinds, displayMeta, freshHandle, isDisplayKind } from './display-base';
+import { cleanText, displayMeta, freshHandle, isDisplayKind, offeredKinds } from './display-base';
 import type { DisplayRequest } from './display-request';
 import { sealDraft, type MapMaterial } from './display-make';
 
@@ -51,7 +51,7 @@ export function buildDisplayPrompt(opts: {
   map?: MapMaterial | null;
 }): string {
   const r = opts.request;
-  const kinds = displayKinds().filter((m) => m.spec);
+  const kinds = offeredKinds().filter((m) => m.spec);
   const offered = r?.kind ? kinds.filter((m) => m.kind === r.kind) : r?.kinds.length ? kinds.filter((m) => r.kinds.includes(m.kind)) : kinds;
   const catalogue = (offered.length ? offered : kinds)
     .map((m) => {
@@ -126,8 +126,8 @@ export function readDisplayProposal(raw: unknown, ctx: { request: DisplayRequest
   const d = r.display as Record<string, unknown> | undefined;
   const kind = typeof d?.kind === 'string' ? d.kind.trim().toLowerCase() : '';
   if (!d || !kind) return { ok: false, failure: 'malformed', says: `What came back was not ${aOrAn(wantedNoun)}, so nothing was added.` };
-  if (!isDisplayKind(kind) || !kindOf(kind)) {
-    const can = displayKinds().map((m) => m.noun);
+  if (!isDisplayKind(kind) || !kindOf(kind) || displayMeta(kind)?.internal) {
+    const can = offeredKinds().map((m) => m.noun);
     return { ok: false, failure: 'unsupported', says: `The workspace cannot make that kind of display. It can make ${can.slice(0, -1).join(', ')}${can.length > 1 ? ' or ' : ''}${can[can.length - 1]}.` };
   }
   // a worksheet or an exercise is MADE from a template or from what is here (display-make.ts), never drafted
