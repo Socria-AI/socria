@@ -448,7 +448,7 @@ function Actions({
     if (!chartable || !p.onWorkspace) return;
     const made = chartFromTable(doc, chartable);
     if (!made) return setSaid('That table holds nothing to chart.');
-    const r = p.onWorkspace({ type: 'make', kind: 'data', state: made.state, from: { obj: p.obj.id } });
+    const r = p.onWorkspace({ type: 'make', kind: 'data', state: made.state, from: { obj: p.obj.id }, origin: 'source' });
     setSaid(r.ok ? (made.left.length ? `Charted beside this — left out: ${made.left.join('; ')}.` : 'Charted beside this, with where its numbers came from.') : r.why ?? 'It could not be charted.');
   };
   return (

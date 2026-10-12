@@ -163,7 +163,7 @@ export function makeDisplay(
   space: ObjectSpace,
   kind: string,
   state: unknown,
-  origin: 'socria' | 'person'
+  origin: 'socria' | 'person' | 'source'
 ): { ok: true; space: ObjectSpace; obj: ThoughtObject } | { ok: false; failure: 'full' | 'malformed'; says: string } {
   if (space.objs.length >= MAX_OBJECTS) {
     return { ok: false, failure: 'full', says: `The workspace already holds ${MAX_OBJECTS} things, which is as many as it keeps — remove one and ask again.` };

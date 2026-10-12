@@ -2842,7 +2842,7 @@ export function LogosApp({
     const doc = docsRef.current.get(docId) ?? docNow(docId);
     const state = doc ? documentFromDoc(doc) : null;
     if (!state) return null;
-    const made = makeDisplay(space, 'document', state, 'person');
+    const made = makeDisplay(space, 'document', state, 'source');
     if (!made.ok) {
       setError(made.says);
       return null;
@@ -3159,7 +3159,7 @@ export function LogosApp({
     }
     let space = spaceOf(mapRef.current);
     if (a.type === 'make') {
-      const made = makeDisplay(space, a.kind, a.state, 'person');
+      const made = makeDisplay(space, a.kind, a.state, a.origin === 'source' ? 'source' : 'person');
       if (!made.ok) return { ok: false, why: made.says };
       space = made.space;
       // the connection both ways, where each side can hold one

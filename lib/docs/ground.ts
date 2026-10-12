@@ -311,6 +311,51 @@ export function checkReply(text: string, refs: DocRef[]): { cites: CiteCheck[]; 
   return { cites: checked, claims };
 }
 
+/** What one citation in a reply comes to, where it stands: the passage it names, and how the sentence it closes stands on it. */
+export interface CiteVerdict {
+  ok: boolean;
+  doc?: string;
+  block?: string;
+  page?: number;
+  ground?: Ground;
+  why?: string;
+}
+
+const GRAVITY: Record<Ground, number> = { verbatim: 0, interpretation: 1, derived: 1, unsupported: 2 };
+const wordsOf = (s: string) => s.toLowerCase().replace(/\[[^\]]*\]/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim();
+
+/**
+ * The verdicts of a reply's citations, one per place a key is cited — so
+ * the same passage cited under a sentence it holds and under one it does
+ * not is marked differently each time. Asked with the words just before a
+ * citation (as they are drawn), it finds the sentence that ends there;
+ * with nothing to go on, a key takes the gravest verdict it has anywhere.
+ * Null when the reply cites nothing it can check.
+ */
+export function citeVerdicts(text: string, refs: DocRef[]): ((key: string, before?: string) => CiteVerdict | null) | null {
+  if (!refs.length || !/\[[A-Z]\d/.test(text)) return null;
+  const { cites, claims } = checkReply(text, refs);
+  const byKey = new Map<string, CiteVerdict>();
+  for (const c of cites) {
+    if (!byKey.has(c.key)) byKey.set(c.key, { ok: c.ok, ...(c.doc ? { doc: c.doc } : {}), ...(c.block ? { block: c.block } : {}), ...(c.page ? { page: c.page } : {}) });
+  }
+  const said = claims.map((c) => ({ ...c, words: ` ${wordsOf(c.text)} ` }));
+  return (key, before = '') => {
+    const base = byKey.get(key);
+    if (!base) return null;
+    const mine = said.filter((c) => c.keys.includes(key));
+    if (!mine.length) return base;
+    let claim = mine.length === 1 ? mine[0] : null;
+    const words = wordsOf(before).split(' ').filter(Boolean);
+    for (let n = Math.min(8, words.length); n >= 2 && !claim; n--) {
+      const tail = ` ${words.slice(-n).join(' ')} `;
+      claim = mine.find((c) => c.words.includes(tail)) ?? null;
+    }
+    claim ??= mine.reduce((a, b) => (GRAVITY[b.ground] > GRAVITY[a.ground] ? b : a));
+    return { ...base, ground: claim.ground, why: claim.calc?.length ? `${claim.why} ${claim.calc.join('; ')}` : claim.why };
+  };
+}
+
 /** The key for a block of a document in a conversation, for linking back: document id + block id → "A3.12". */
 export function keyFor(refs: DocRef[], docId: string, blockId: string): string | null {
   const r = refs.find((x) => x.doc.id === docId);

@@ -5,7 +5,7 @@
 export * from '@/lib/docs/conversation';
 export * from '@/lib/docs/edit';
 export { renderDoc, renderDocs, renderDocAsNote, citeKey, parseKey, DOC_RULES, defuse } from '@/lib/docs/render';
-export { checkReply, groundOf, selectPassages } from '@/lib/docs/ground';
+export { checkReply, citeVerdicts, groundOf, selectPassages } from '@/lib/docs/ground';
 export { readDocument } from '@/lib/docs/read';
 export { sanitizeSourceDoc } from '@/lib/docs/sanitize';
 export { sanitizeAttachments, renderMessageForModel } from '@/lib/logos-attachments';

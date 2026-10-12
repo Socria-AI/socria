@@ -22,7 +22,9 @@ export type FigureMode = 'live' | 'trail' | 'card';
  * one the person's action, refused for anyone who may only read:
  *
  *   make      a new object linked to this one ("make a plan from my next
- *             steps", "look back at this decision") — opened beside it
+ *             steps", "look back at this decision") — opened beside it;
+ *             `origin: 'source'` when what it holds came from material the
+ *             person attached (a document's table, charted)
  *   socria    Socria's own steps on this object, from a reply it was asked
  *             for: the counterpart's line, a suggestion — applied AS Socria,
  *             so the kind's rules about what is the person's still hold
@@ -33,7 +35,7 @@ export type FigureMode = 'live' | 'trail' | 'card';
  *   open      bring another object into view
  */
 export type WorkspaceAction =
-  | { type: 'make'; kind: string; state: unknown; from?: { obj: string; part?: string } }
+  | { type: 'make'; kind: string; state: unknown; from?: { obj: string; part?: string }; origin?: 'source' }
   | { type: 'socria'; obj: string; ops: { op: string; args: Record<string, string | number> }[] }
   | { type: 'seek'; obj: string; at: number }
   | { type: 'branch'; obj: string; at: number; from?: string }

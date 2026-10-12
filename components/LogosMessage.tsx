@@ -26,7 +26,7 @@ import { initialOf } from '@/lib/collab';
 import { AttachmentList } from '@/components/LogosComposer';
 import { MathText } from '@/components/TeX';
 import { Inline, RichText, type CiteRender } from '@/components/RichText';
-import { checkReply } from '@/lib/docs/ground';
+import { citeVerdicts, type CiteVerdict } from '@/lib/docs/ground';
 import type { DocRef } from '@/lib/docs/render';
 import type { Ground } from '@/lib/docs/types';
 import './logos-thread.css';
@@ -38,41 +38,14 @@ const GROUND_SAY: Record<Ground, string> = {
   interpretation: 'A reading of the passage, in other words.',
   unsupported: 'The cited passage does not hold this.',
 };
-/** The graver ground wins when a key supports more than one sentence. */
-const GRAVITY: Record<Ground, number> = { verbatim: 0, interpretation: 1, derived: 1, unsupported: 2 };
-
-interface CiteInfo {
-  ok: boolean;
-  doc?: string;
-  block?: string;
-  page?: number;
-  ground?: Ground;
-  why?: string;
-}
-
 /**
- * The citations in one reply, each checked against the passage it names
- * (lib/docs/ground.ts) — pure and deterministic, so it is computed where it
- * is drawn rather than stored with the message.
+ * The citations in one reply, each checked where it stands against the
+ * passage it names (lib/docs/ground.ts citeVerdicts) — pure and
+ * deterministic, so it is computed where it is drawn rather than stored with
+ * the message.
  */
-function useCites(text: string, refs: DocRef[] | undefined): Map<string, CiteInfo> | null {
-  return useMemo(() => {
-    if (!refs?.length || !/\[[A-Z]\d/.test(text)) return null;
-    const { cites, claims } = checkReply(text, refs);
-    const out = new Map<string, CiteInfo>();
-    for (const c of cites) out.set(c.key, { ok: c.ok, ...(c.doc ? { doc: c.doc } : {}), ...(c.block ? { block: c.block } : {}), ...(c.page ? { page: c.page } : {}) });
-    for (const cl of claims) {
-      for (const k of cl.keys) {
-        const info = out.get(k);
-        if (!info) continue;
-        if (!info.ground || GRAVITY[cl.ground] > GRAVITY[info.ground]) {
-          info.ground = cl.ground;
-          info.why = cl.calc?.length ? `${cl.why} ${cl.calc.join('; ')}` : cl.why;
-        }
-      }
-    }
-    return out;
-  }, [text, refs]);
+function useCites(text: string, refs: DocRef[] | undefined): ((key: string, before?: string) => CiteVerdict | null) | null {
+  return useMemo(() => (refs?.length ? citeVerdicts(text, refs) : null), [text, refs]);
 }
 
 export type Side = 'mine' | 'other' | 'socria';
@@ -199,10 +172,10 @@ export function LogosMessage({
   const quote = showQuote ? m.replyTo : undefined;
   const cites = useCites(m.role === 'assistant' ? m.content : '', docRefs);
   const cite: CiteRender | undefined = useCallback<CiteRender>(
-    (keys) => (
+    (keys, _raw, before) => (
       <span className="lg-cites">
         {keys.map((k) => {
-          const i = cites?.get(k);
+          const i = cites?.(k, before);
           const letter = k[0];
           // a document read on another device cannot be checked here — said, not called broken
           if (!docRefs?.some((r) => r.letter === letter)) {

@@ -24,9 +24,11 @@ import { SourceCards } from '@/components/SourceCards';
 
 /**
  * How a surface draws a citation key — [A3.12], [A3.12, A4.2] — when its
- * replies cite documents (Logos). Absent, a key is just text.
+ * replies cite documents (Logos). Absent, a key is just text. `before` is the
+ * text just before the citation, so a surface can tell which sentence it
+ * closes.
  */
-export type CiteRender = (keys: string[], raw: string) => ReactNode;
+export type CiteRender = (keys: string[], raw: string, before: string) => ReactNode;
 
 const CITE = /\[\s*[A-Z]\d{1,4}\.\d{1,5}(?:\s*[,;]\s*[A-Z]?\d{1,4}\.\d{1,5})*\s*\]/g;
 
@@ -51,7 +53,7 @@ function Body({ text, math, cite }: { text: string; math?: boolean; cite?: CiteR
   for (const m of text.matchAll(CITE)) {
     const at = m.index ?? 0;
     if (at > last) out.push(<Fragment key={`t${last}`}>{plain(text.slice(last, at))}</Fragment>);
-    out.push(<Fragment key={`c${at}`}>{cite(keysOf(m[0]), m[0])}</Fragment>);
+    out.push(<Fragment key={`c${at}`}>{cite(keysOf(m[0]), m[0], text.slice(last, at))}</Fragment>);
     last = at + m[0].length;
   }
   if (!out.length) return plain(text);

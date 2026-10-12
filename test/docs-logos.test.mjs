@@ -109,6 +109,12 @@ console.log('\n=== a reply’s citations, checked against what they cite ===');
   ok('a number the passage does not hold is unsupported', r2.claims[0]?.ground === 'unsupported', JSON.stringify(r2.claims));
   const r3 = T.checkReply('Revenue fell [A9.99].', refs);
   ok('a key that names no passage is caught', r3.cites[0] && !r3.cites[0].ok && r3.claims[0]?.ground === 'unsupported');
+  const reply = `Revenue rose 12.5% to $4.2 million in 2023 [${k}]. Revenue rose 30% in 2023 [${k}].`;
+  const at = T.citeVerdicts(reply, refs);
+  ok('the same passage cited twice is judged where each citation stands', at(k, 'Revenue rose 12.5% to $4.2 million in 2023 ')?.ground === 'verbatim' && at(k, '. Revenue rose 30% in 2023 ')?.ground === 'unsupported');
+  ok('  with nothing before it to go on, the gravest verdict the key has', at(k, '')?.ground === 'unsupported');
+  ok('  a citation names its page, for the chip', at(k, '')?.page === 1 && at(k, '')?.block === revenue.id);
+  ok('  and a reply that cites nothing is not checked', T.citeVerdicts('No citations here.', refs) === null);
 }
 
 console.log('\n=== the person’s corrections, and their doubts ===');
@@ -142,8 +148,9 @@ console.log('\n=== the document view: a display, never offered ===');
   ok('  made only by attaching a file: never offered by name', !T.offeredKinds().some((m) => m.kind === 'document'));
   ok('  nor to the proposal pass', !T.buildDisplayPrompt('make a table', '', null).includes('"document"'));
   ok('asking to "make a document" does not make one', T.readDisplayRequest('make a document about my week')?.kind !== 'document');
-  const made = T.makeDisplay(T.EMPTY_SPACE, 'document', state, 'person');
+  const made = T.makeDisplay(T.EMPTY_SPACE, 'document', state, 'source');
   ok('it is kept in the workspace like any display', made.ok && made.obj.kind === 'document' && made.obj.name.startsWith('Doc'));
+  ok('  as material the person attached, not their own words', made.obj.origin === 'source');
   const facts = T.kindOf('document').facts(state, { guarded: false }).join(' ');
   ok('what the reply is told about it names the file, and points to the passages', facts.includes('report.md') && /only as the passages/.test(facts));
   ok('the reading itself is not in the display’s state', !JSON.stringify(made.obj).includes('Revenue rose'));
@@ -175,7 +182,7 @@ console.log('\n=== a table, charted — and an equation, sent on ===');
 console.log('\n=== the document view, drawn ===');
 {
   const state = T.documentFromDoc(doc);
-  const made = T.makeDisplay(T.EMPTY_SPACE, 'document', state, 'person');
+  const made = T.makeDisplay(T.EMPTY_SPACE, 'document', state, 'source');
   const fixed = T.markMisread(T.correctBlock(doc, revenue.id, 'Revenue rose 12.5% to $4.2 million in FY2023.'), equation.id, true);
   const api = { docs: new Map([[doc.id, fixed]]), letterOf: () => 'A', readPages: async () => ({ read: 0 }), reading: {}, save: () => {} };
   const draw = (props, value = api) => renderToStaticMarkup(h(T.DocsContext.Provider, { value }, h(T.DocumentFigure, { obj: made.obj, at: 0, mode: 'live', onOp: () => ({ ok: true }), onSeek: () => {}, ...props })));
@@ -205,9 +212,10 @@ console.log('\n=== the document view, drawn ===');
 
 console.log('\n=== citations in a reply, drawn ===');
 {
-  const html = renderToStaticMarkup(h(T.RichText, { text: 'Revenue rose 12.5% [A1.2]. Costs held [A1.3, 1.4].', cite: (keys) => h('cite', null, keys.join('+')) }));
-  ok('a citation is drawn by the surface that draws them', html.includes('<cite>A1.2</cite>'));
-  ok('  a bare page.n takes the letter before it', html.includes('<cite>A1.3+A1.4</cite>'));
+  const html = renderToStaticMarkup(h(T.RichText, { text: 'Revenue rose 12.5% [A1.2]. Costs held [A1.3, 1.4].', cite: (keys, _raw, before) => h('cite', { 'data-before': before }, keys.join('+')) }));
+  ok('a citation is drawn by the surface that draws them', html.includes('>A1.2</cite>'));
+  ok('  a bare page.n takes the letter before it', html.includes('>A1.3+A1.4</cite>'));
+  ok('  told the words just before it, so it can tell which sentence it closes', html.includes('data-before="Revenue rose 12.5% "') && html.includes('data-before=". Costs held "'));
   ok('without a renderer, a key is just text', renderToStaticMarkup(h(T.RichText, { text: 'See [A1.2].' })).includes('[A1.2]'));
 }
 
