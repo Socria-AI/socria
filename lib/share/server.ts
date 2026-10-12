@@ -236,7 +236,10 @@ async function ensureShare(ownerId: string, type: ResourceType, id: string): Pro
   const row = { id: newId('sh'), resource_type: type, resource_id: id, owner_id: ownerId, created_at: now, updated_at: now };
   const { error } = await supabaseAdmin().from('shares').insert(row);
   if (error) {
-    if (missing(error)) throw new ShareError(503, 'Sharing is not set up on this deployment yet.');
+    if (missing(error)) {
+      console.error('[socria/share] the sharing tables are missing — run supabase/think-together.sql in the Supabase SQL editor');
+      throw new ShareError(503, 'Sharing is not set up on this deployment yet.');
+    }
     // a concurrent first share: read the one that won
     const again = await shareFor(ownerId, type, id);
     if (again) return again;
