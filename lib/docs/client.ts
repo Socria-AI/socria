@@ -224,11 +224,11 @@ async function openPdf(file: Blob): Promise<PdfLike> {
   return (await getDocumentProxy(new Uint8Array(await file.arrayBuffer()))) as unknown as PdfLike;
 }
 
-/** One page of an open PDF drawn to a JPEG. */
-async function pdfPageImage(pdf: PdfLike, n: number): Promise<string> {
+/** One page of an open PDF drawn to a JPEG, its long edge `edge` pixels at most. */
+async function pdfPageImage(pdf: PdfLike, n: number, edge = PAGE_EDGE): Promise<string> {
   const page = await pdf.getPage(n);
   const base = page.getViewport({ scale: 1 });
-  const scale = Math.min(3, PAGE_EDGE / Math.max(base.width, base.height));
+  const scale = Math.min(3, edge / Math.max(base.width, base.height));
   const vp = page.getViewport({ scale });
   const canvas = document.createElement('canvas');
   canvas.width = Math.ceil(vp.width);
@@ -239,6 +239,22 @@ async function pdfPageImage(pdf: PdfLike, n: number): Promise<string> {
   ctx.fillRect(0, 0, canvas.width, canvas.height);
   await page.render({ canvasContext: ctx, viewport: vp }).promise;
   return canvasToJpeg(canvas);
+}
+
+/**
+ * The original of a PDF kept on this device, opened for looking at: its page
+ * count and a way to draw any page. Null when the original is not kept here
+ * (another device, or one of the oldest documents). Close it when done.
+ */
+export async function openOriginalPdf(id: string): Promise<{ pages: number; draw: (n: number, edge?: number) => Promise<string>; close: () => void } | null> {
+  const original = await getOriginal(id);
+  if (!original) return null;
+  const pdf = (await openPdf(original)) as PdfLike & { numPages?: number };
+  return {
+    pages: pdf.numPages ?? 1,
+    draw: (n, edge = 1100) => pdfPageImage(pdf, n, edge),
+    close: () => void pdf.loadingTask.destroy().catch(() => {}),
+  };
 }
 
 /** An image file, drawn no larger than a page reading needs. */

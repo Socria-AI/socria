@@ -9,6 +9,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { MathKeypad } from './MathKeypad';
+import { DocPreview } from './DocPreview';
 import type { MathTopic } from '@/lib/math-context';
 import type { Attachment, AttachmentOrigin } from '@/lib/logos-attachments';
 import {
@@ -54,6 +55,8 @@ export function AttachmentList({
   onOpenDoc?: (docId: string) => void;
 }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
+  /** the document being looked at under its chip */
+  const [preview, setPreview] = useState<string | null>(null);
   if (!items.length) return null;
 
   return (
@@ -64,6 +67,8 @@ export function AttachmentList({
         if (a.kind === 'doc') {
           const unit = UNIT[a.format ?? ''] ?? ['page', 'pages'];
           const canOpen = !!onOpenDoc && !!a.doc && a.status !== 'reading';
+          const canPreview = !!a.doc && a.status !== 'reading' && a.status !== 'error';
+          const previewing = canPreview && preview === id;
           return (
             <div key={id} className="lg-att lg-att-doc">
               <span className="lg-att-glyph" aria-hidden="true">
@@ -94,6 +99,11 @@ export function AttachmentList({
                   {!onOrigin && a.origin && a.origin !== 'source' && <span className="lg-att-origin-tag">{ORIGIN_LABEL[a.origin]}</span>}
                 </span>
               </span>
+              {canPreview && (
+                <button type="button" className="lg-att-pv" aria-expanded={previewing} onClick={() => setPreview(previewing ? null : id)}>
+                  {previewing ? 'Hide' : 'Preview'}
+                </button>
+              )}
               {onRemove && a.id && (
                 <button type="button" className="lg-att-x" onClick={() => onRemove(a.id!)} aria-label={`Remove ${a.name || 'attachment'}`}>
                   ×
@@ -108,6 +118,7 @@ export function AttachmentList({
                   ))}
                 </div>
               )}
+              {previewing && <DocPreview docId={a.doc!} name={a.name || 'Document'} format={a.format} pages={a.pages} {...(canOpen ? { onOpen: () => onOpenDoc!(a.doc!) } : {})} />}
             </div>
           );
         }

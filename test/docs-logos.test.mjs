@@ -210,6 +210,18 @@ console.log('\n=== the document view, drawn ===');
   ok('the checks say how it was read and what the person changed', chk.includes('from its own structure') && chk.includes('You corrected 1 passage') && checks.length > 0);
 }
 
+console.log('\n=== a document looked at in the conversation ===');
+{
+  const api = { docs: new Map([[doc.id, doc]]), letterOf: () => 'A', readPages: async () => ({ read: 0 }), reading: {}, save: () => {} };
+  const md = renderToStaticMarkup(h(T.DocsContext.Provider, { value: api }, h(T.DocPreview, { docId: doc.id, name: 'report.md', format: 'md', pages: 1, onOpen: () => {} })));
+  ok('a file that is not a PDF is previewed as its reading, and says so', md.includes('Shown as Socria read it') && md.includes('Quarterly report') && md.includes('<th>Quarter</th>'));
+  ok('  with a way to open it beside the map', md.includes('Open beside the map'));
+  const pdf = renderToStaticMarkup(h(T.DocsContext.Provider, { value: api }, h(T.DocPreview, { docId: doc.id, name: 'notes.pdf', format: 'pdf', pages: 3 })));
+  ok('a PDF opens its own pages, from the original kept on the device', pdf.includes('Opening the PDF') && !pdf.includes('Shown as Socria read it'));
+  const away = renderToStaticMarkup(h(T.DocsContext.Provider, { value: { ...api, docs: new Map() } }, h(T.DocPreview, { docId: 'ffffffffffffffff', name: 'x.docx', format: 'docx' })));
+  ok('a document not on this device says so', away.includes('not on this device'));
+}
+
 console.log('\n=== citations in a reply, drawn ===');
 {
   const html = renderToStaticMarkup(h(T.RichText, { text: 'Revenue rose 12.5% [A1.2]. Costs held [A1.3, 1.4].', cite: (keys, _raw, before) => h('cite', { 'data-before': before }, keys.join('+')) }));

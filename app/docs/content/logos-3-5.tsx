@@ -314,6 +314,10 @@ export function Logos35() {
           what it does not say are kept apart in the reply. If the document does not answer the question,
           the reply says so.
         </Def>
+        <Def term="A look at the file">
+          Preview a document under its chip in the conversation. A PDF shows its own pages, drawn in your
+          browser from the file; anything else shows its reading, page by page, and says that is what it is.
+        </Def>
         <Def term="Beside the map">
           The document opens as it was read: every passage with its key, how it was read and how sure the
           reading is, its tables and equations, an outline, and the checks the reading passed. Select a

@@ -16,3 +16,4 @@ export { DocumentFigure } from '@/components/display/DocumentFigure';
 export { DocsContext } from '@/components/display/docs-context';
 export { Gallery } from '@/components/display/Gallery';
 export { RichText } from '@/components/RichText';
+export { DocPreview } from '@/components/DocPreview';

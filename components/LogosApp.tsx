@@ -2805,9 +2805,11 @@ export function LogosApp({
       const doc = read.doc;
       await putDoc(doc);
       let cur = doc;
+      // a PDF's original stays on this device: its pages can be looked at in the
+      // conversation, and a scan's read from their pictures
+      if (doc.format === 'pdf' || doc.format === 'image') await putOriginal(doc.id, file);
       const waiting = pagesToRead(doc);
       if (waiting.length && (doc.format === 'pdf' || doc.format === 'image')) {
-        await putOriginal(doc.id, file);
         cur = (await readPagesNow(doc, waiting.slice(0, AUTO_PAGES))).doc;
       }
       return docAttachment(cur);
