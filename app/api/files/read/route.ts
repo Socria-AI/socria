@@ -1,7 +1,12 @@
 // app/api/files/read/route.ts
-// POST multipart { file } → { notes, images, skipped }
-// POST JSON { path }       → the same, for a large file already uploaded to
-//                            private storage (Socria One, app/api/files/upload)
+// POST multipart { file, docs? } → { notes, images, skipped, docs? }
+// POST JSON { path, docs? }       → the same, for a large file already uploaded to
+//                                   private storage (Socria One, app/api/files/upload)
+//
+// `docs` asks for the structured reading too (lib/docs: blocks, tables,
+// figures, equations, where each came from, and the checks run against the
+// file's own text) — what Logos cites, passage by passage, and shows beside
+// the map. Core 4 reads the notes alone.
 //
 // Reads one attached file into text for Core 4: PDF, Word, PowerPoint, Excel,
 // OpenDocument, RTF, or a zip of any of those plus plain text and code. Plain
@@ -41,8 +46,9 @@ export async function POST(req: NextRequest) {
   // A LARGE FILE, ALREADY IN STORAGE: read it from there, and delete it whatever happens.
   if ((req.headers.get('content-type') || '').includes('application/json')) {
     if (!userId) return NextResponse.json({ error: 'Sign in to attach files.' }, { status: 401 });
-    const body = (await req.json().catch(() => null)) as { path?: unknown } | null;
+    const body = (await req.json().catch(() => null)) as { path?: unknown; docs?: unknown } | null;
     const path = body?.path;
+    const wantDocs = body?.docs === true;
     if (!ownsUploadPath(userId, path)) return NextResponse.json({ error: 'No such upload.' }, { status: 404 });
     try {
       const plan = await resolvePlanForRequest(req, userId);
@@ -51,7 +57,7 @@ export async function POST(req: NextRequest) {
       if (!buf) return NextResponse.json({ error: 'The upload could not be found — try attaching it again.' }, { status: 404 });
       if (buf.length > limit) return NextResponse.json({ error: `That file is too large — ${megabytes(limit)} is the limit.` }, { status: 413 });
       const name = (path as string).split('/').pop() || 'file';
-      const result = await extractFile(name, buf);
+      const result = await extractFile(name, buf, { docs: wantDocs });
       return NextResponse.json(result);
     } catch (e) {
       console.error('[socria/files] read from storage failed', e);
@@ -77,10 +83,11 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: `That file is too large to send directly — ${megabytes(DIRECT_UPLOAD_BYTES)} is the limit.` }, { status: 413 });
   }
   const name = (file.name || 'file').replace(/[\u0000-\u001f]/g, '').slice(0, 120);
+  const wantDocs = form?.get('docs') === '1';
 
   try {
     const buf = Buffer.from(await file.arrayBuffer());
-    const result = await extractFile(name, buf);
+    const result = await extractFile(name, buf, { docs: wantDocs });
     return NextResponse.json(result);
   } catch (e) {
     console.error('[socria/files] read failed', e);

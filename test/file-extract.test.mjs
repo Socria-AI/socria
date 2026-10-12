@@ -92,13 +92,13 @@ const docx = zip([
     'word/document.xml',
     W(
       P('Why McCombs') +
-        `<w:p><w:r><w:t>Funding</w:t></w:r><w:r><w:tab/><w:t>&amp; investors &lt;UTA&gt;</w:t></w:r></w:p>` +
+        `<w:p><w:r><w:t>Funding</w:t></w:r><w:r><w:tab/><w:t>&amp; investors &lt;UTA&gt;</w:t></w:r><w:r><w:footnoteReference w:id="1"/></w:r></w:p>` +
         `<w:tbl><w:tr><w:tc>${P('School')}</w:tc><w:tc>${P('Startups')}</w:tc></w:tr>` +
         `<w:tr><w:tc>${P('McCombs')}</w:tc><w:tc>${P('Strong')}</w:tc></w:tr></w:tbl>` +
         P('The end.')
     ),
   ],
-  ['word/footnotes.xml', W(P('A footnote about funding.'))],
+  ['word/footnotes.xml', `<w:footnotes xmlns:w="w"><w:footnote w:id="1">${P('A footnote about funding.')}</w:footnote></w:footnotes>`],
 ]);
 
 console.log('=== Word ===');
@@ -107,26 +107,27 @@ console.log('=== Word ===');
   const t = r.notes[0]?.text ?? '';
   ok('one note, named for the file', r.notes.length === 1 && r.notes[0].name === 'essay.docx');
   ok('paragraphs in order', t.indexOf('Why McCombs') < t.indexOf('The end.'), t);
-  ok('tabs and entities decoded', t.includes('Funding\t& investors <UTA>'), JSON.stringify(t));
+  ok('tabs and entities decoded', t.includes('Funding & investors <UTA>'), JSON.stringify(t));
   ok('a table row reads as a row', t.includes('School | Startups') && t.includes('McCombs | Strong'), t);
-  ok('footnotes come along', /Footnotes:\nA footnote about funding\./.test(t), t);
+  ok('footnotes come along, marked where they are cited', t.includes('<UTA>¹') && /\(Footnote\) ¹ A footnote about funding\./.test(t), t);
   ok('nothing skipped', r.skipped.length === 0, r.skipped.join('; '));
 }
 
 console.log('\n=== PowerPoint ===');
 {
   const A = (t) => `<a:p><a:r><a:t>${t}</a:t></a:r></a:p>`;
-  const S = (b) => `<p:sld xmlns:a="a" xmlns:p="p"><p:cSld><p:spTree>${b}</p:spTree></p:cSld></p:sld>`;
+  const S = (b) => `<p:sld xmlns:a="a" xmlns:p="p"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="2" name="Text"/><p:cNvSpPr txBox="1"/><p:nvPr/></p:nvSpPr><p:txBody>${b}</p:txBody></p:sp></p:spTree></p:cSld></p:sld>`;
+  const N = (b) => `<p:notes xmlns:a="a" xmlns:p="p"><p:cSld><p:spTree><p:sp><p:nvSpPr><p:cNvPr id="3" name="Notes"/><p:cNvSpPr/><p:nvPr><p:ph type="body" idx="1"/></p:nvPr></p:nvSpPr><p:txBody>${b}</p:txBody></p:sp></p:spTree></p:cSld></p:notes>`;
   const pptx = zip([
     ['ppt/slides/slide10.xml', S(A('Tenth'))],
     ['ppt/slides/slide2.xml', S(A('Second') + A('two lines'))],
     ['ppt/slides/slide1.xml', S(A('First'))],
-    ['ppt/notesSlides/notesSlide1.xml', S(A('Say this slowly'))],
+    ['ppt/notesSlides/notesSlide1.xml', N(A('Say this slowly'))],
   ]);
   const t = (await extractFile('deck.pptx', pptx)).notes[0]?.text ?? '';
   ok('slides in NUMERIC order, not string order', t.indexOf('First') < t.indexOf('Second') && t.indexOf('Second') < t.indexOf('Tenth'), t);
-  ok('each slide is labelled', /Slide 1\nFirst/.test(t) && /Slide 3\nTenth/.test(t), t);
-  ok('speaker notes are kept with their slide', /Slide 1\nFirst\nSpeaker notes: Say this slowly/.test(t), t);
+  ok('each slide is labelled', /— Slide 1 —\nFirst/.test(t) && /— Slide 3 —\nTenth/.test(t), t);
+  ok('speaker notes are kept with their slide', /— Slide 1 —\nFirst\n\(Note\) Say this slowly\n/.test(t) && t.indexOf('Say this slowly') < t.indexOf('Second'), t);
 }
 
 console.log('\n=== Excel ===');
@@ -144,10 +145,10 @@ console.log('\n=== Excel ===');
     ],
   ]);
   const t = (await extractFile('budget.xlsx', xlsx)).notes[0]?.text ?? '';
-  ok('sheet named from the workbook', t.startsWith('Sheet: Budget & plan'), t);
-  ok('shared strings resolved, rich text joined', t.includes('Item\tCost') && t.includes('Rent (monthly)'), t);
-  ok('a skipped column keeps its place', t.includes('Rent (monthly)\t\t1450'), JSON.stringify(t));
-  ok('inline strings and booleans', t.includes('Paid?\tTRUE'), t);
+  ok('sheet named from the workbook', t.startsWith('# Budget & plan'), t);
+  ok('shared strings resolved, rich text joined', t.includes('Item | Cost') && t.includes('Rent (monthly)'), t);
+  ok('a skipped column keeps its place', t.includes('Rent (monthly) |  | 1450'), JSON.stringify(t));
+  ok('inline strings and booleans', t.includes('Paid? | TRUE'), t);
 }
 
 console.log('\n=== PDF, OpenDocument, RTF ===');
@@ -160,7 +161,7 @@ console.log('\n=== PDF, OpenDocument, RTF ===');
 
   const odt = zip([['content.xml', '<office:document-content><office:body><office:text><text:h>Title</text:h><text:p>One<text:tab/>two<text:s text:c="2"/>three</text:p></office:text></office:body></office:document-content>']]);
   const o = (await extractFile('notes.odt', odt)).notes[0]?.text ?? '';
-  ok('OpenDocument text, with tabs and spaces', o === 'Title\nOne\ttwo  three', JSON.stringify(o));
+  ok('OpenDocument text: its heading, and its words with their spacing read as spaces', o === '# Title\nOne two three', JSON.stringify(o));
 
   const r2 = await extractFile('letter.rtf', Buffer.from('{\\rtf1\\ansi{\\fonttbl\\f0\\fswiss Helvetica;}\\f0\\pard Dear team,\\par We caf\\\'e9 at nine.\\par}', 'latin1'));
   const rt = r2.notes[0]?.text ?? '';
@@ -219,7 +220,7 @@ console.log('\n=== hostile archives ===');
 console.log('\n=== limits and refusals ===');
 {
   const big = await extractFile('long.docx', zip([['word/document.xml', W(P('word '.repeat(20_000)))]]));
-  ok('a very long document is cut at the ceiling and says so', big.notes[0].text.length === MAX_FILE_TEXT && big.notes[0].truncated === true);
+  ok('a very long document is cut at the ceiling and says so', big.notes[0].text.length <= MAX_FILE_TEXT && big.notes[0].text.length > MAX_FILE_TEXT - 400 && big.notes[0].truncated === true && /not included/.test(big.notes[0].text));
   ok('an old .doc is told what to do', /Save it as \.docx/.test((await extractFile('old.doc', Buffer.from([0xd0, 0xcf, 0x11, 0xe0, 0, 0]))).skipped[0] ?? ''));
   ok('a top-level .env is refused outright', /secrets file/.test((await extractFile('.env', Buffer.from('A=1'))).skipped[0] ?? ''));
   ok('HEIC gets advice', /Export it as JPEG/.test(refusalFor('IMG_0001.HEIC')));
