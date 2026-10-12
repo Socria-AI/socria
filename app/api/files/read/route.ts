@@ -23,7 +23,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
-import { extractFile } from '@/lib/file-extract';
+import { extractFile, type ExtractResult } from '@/lib/file-extract';
 import { DIRECT_UPLOAD_BYTES, limitsFor, megabytes } from '@/lib/entitlements';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { ownsUploadPath } from '@/lib/upload-paths';
@@ -33,6 +33,34 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 // A 30 MB PDF takes longer to read than a 4 MB one; the same ceiling as chat.
 export const maxDuration = 60;
+
+/**
+ * A response small enough to arrive: Vercel refuses a body over 4.5 MB, so a
+ * structured reading that would push past ~3.6 MB of JSON goes back as its
+ * note only — said, never silently dropped. Pictures go first, then readings.
+ */
+function fit(result: ExtractResult): ExtractResult {
+  if (!result.docs?.length) return result;
+  const LIMIT = 3_600_000;
+  let size = JSON.stringify({ ...result, docs: [] }).length;
+  const docs: NonNullable<ExtractResult['docs']> = [];
+  const left: string[] = [];
+  for (const d of result.docs) {
+    let read = d;
+    let n = JSON.stringify(read).length;
+    if (size + n > LIMIT && d.media.some((m) => m.dataUrl)) {
+      read = { ...d, media: d.media.map(({ dataUrl: _u, ...m }) => m) };
+      n = JSON.stringify(read).length;
+    }
+    if (size + n > LIMIT) {
+      left.push(d.doc.name);
+      continue;
+    }
+    docs.push(read);
+    size += n;
+  }
+  return left.length ? { ...result, docs, skipped: [...result.skipped, ...left.map((n) => `${n} (too large to send back whole — read as text instead)`)] } : { ...result, docs };
+}
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
@@ -58,7 +86,7 @@ export async function POST(req: NextRequest) {
       if (buf.length > limit) return NextResponse.json({ error: `That file is too large — ${megabytes(limit)} is the limit.` }, { status: 413 });
       const name = (path as string).split('/').pop() || 'file';
       const result = await extractFile(name, buf, { docs: wantDocs });
-      return NextResponse.json(result);
+      return NextResponse.json(fit(result));
     } catch (e) {
       console.error('[socria/files] read from storage failed', e);
       return NextResponse.json({ error: 'That file could not be read.' }, { status: 500 });
@@ -88,7 +116,7 @@ export async function POST(req: NextRequest) {
   try {
     const buf = Buffer.from(await file.arrayBuffer());
     const result = await extractFile(name, buf, { docs: wantDocs });
-    return NextResponse.json(result);
+    return NextResponse.json(fit(result));
   } catch (e) {
     console.error('[socria/files] read failed', e);
     return NextResponse.json({ error: `${name} could not be read.` }, { status: 500 });
