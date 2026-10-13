@@ -167,7 +167,7 @@ export default function PrivacyPage() {
             <tr>
               <td><strong>Resend, Inc.</strong></td>
               <td>Email delivery</td>
-              <td>Your email address and the note itself, on the few occasions we send one. No content.</td>
+              <td>Your email address and the note or newsletter issue itself, when we send one. No content.</td>
             </tr>
           </tbody>
         </table>
@@ -248,6 +248,16 @@ export default function PrivacyPage() {
           <a href="/account/data">Data &amp; Privacy</a>. None is ever
           addressed to a university address added for{' '}
           <a href="#students">student access</a>.
+        </li>
+        <li>
+          <strong>The newsletter</strong> &mdash; the sign-up form has a box,
+          ticked to begin with, for Socria&rsquo;s newsletter: what is new in
+          the product, now and then. Untick it and you are not subscribed. It
+          is about Socria, never about you or anything you wrote; every issue
+          carries a one-click unsubscribe, the switch under{' '}
+          <a href="/account/data">Data &amp; Privacy</a> turns it on or off at
+          any time, and like the notes it is never sent to a university
+          address added for student access.
         </li>
       </ul>
       <p>

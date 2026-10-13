@@ -267,6 +267,68 @@ Whether the day-3 and day-7 notes should be opt-in rather than opt-out for
 people in the EU and UK has not been decided; that is why the switch ships
 off. Turn it on when it has.
 
+## Newsletter
+
+The sign-up form carries one checkbox, **ticked by default**: "Send me the
+Socria newsletter". Left ticked, the new account is subscribed the moment
+it is signed in (`PUT /api/email/preferences {newsletter: true}`); unticked,
+nothing is written. The subscription is a row in the same ledger as the
+notes (`lifecycle_emails`, kind `newsletter`), so there is no migration to
+run. The switch under Data & Privacy writes and removes the same row, and
+so does every unsubscribe link: an issue's own link (`l=newsletter`) stops
+the newsletter alone; any other Socria unsubscribe link stops everything.
+
+Issues are code. Each one is an entry in `lib/newsletter-issues.ts`,
+reviewed and deployed before it can go; the send route sends only an issue
+it finds there, by id, and nothing in a request becomes email copy. Every
+issue carries the reason it arrived, a one-click unsubscribe and the
+`List-Unsubscribe` headers, and is never sent to a university address added
+for student access.
+
+**Off by default, and separate from the notes.** A real send needs all of:
+
+| Variable | What it is |
+|---|---|
+| `NEWSLETTER_EMAILS` | `on` — its own kill switch; unset is off. Turning on `LIFECYCLE_EMAILS` does not send a newsletter, and this does not start the notes. |
+| `NEWSLETTER_POSTAL_ADDRESS` | The sender's postal address, printed in every issue. US law (CAN-SPAM) requires one in a commercial email; an issue does not render without it. |
+| `EMAIL_SECRET`, `RESEND_API_KEY` | As for the notes. |
+| `CRON_SECRET` | The bearer token for the send route. |
+
+Set them on **Production only**, as with the notes.
+
+**Sending an issue**, which only a person does — there is no cron for it:
+
+1. Write the issue in `lib/newsletter-issues.ts` with `draft: true`, and deploy.
+2. Rehearse. Nothing is sent or claimed; the answer has the counts
+   (`would-send`, `no-address`), what a real send still needs (`missing`)
+   and the rendered issue (`preview`):
+
+   ```
+   curl -X POST "https://<deployment>/api/email/newsletter" \
+     -H "Authorization: Bearer $CRON_SECRET" -H "Content-Type: application/json" \
+     -d '{"issue":"<id>"}'
+   ```
+
+3. Take `draft` off, deploy, and send it to yourself first:
+   `-d '{"issue":"<id>","send":true,"only":["<your user id>"]}'`.
+4. Send it: `-d '{"issue":"<id>","send":true}'`. Each call sends a batch
+   (40 by default, at most 50, paced under Resend's default two requests a
+   second); call again until the answer says `"done": true`. Every person's
+   copy is claimed in the ledger before it goes (`newsletter:<id>`), so a
+   repeated or overlapping call never sends anyone a second copy.
+
+An issue's id is permanent once it has gone to anyone — it is that
+once-ever key, so a changed id is a new issue and would go to everyone
+again.
+
+**The ticked box is a decision for the US.** CAN-SPAM allows it, so long
+as every issue carries the unsubscribe and the postal address, which the
+code enforces. The GDPR does not accept a pre-ticked box as consent
+(Recital 32; the UK's PECR uses the same standard), and Canada's CASL wants
+an opt-in the person makes themselves. If Socria is marketed to people in
+those places, the box should start unticked for them — the same open
+question as the day-N notes above.
+
 ---
 
 ## What CI does not do, and why

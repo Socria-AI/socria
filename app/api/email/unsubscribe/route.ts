@@ -1,6 +1,14 @@
 // app/api/email/unsubscribe/route.ts
-// GET  → a one-button page asking whether to stop the notes.
-// POST → stop them.
+// GET  → a one-button page asking whether to stop the email.
+// POST → stop it.
+//
+// Two scopes, chosen by `l`. A link from a newsletter issue carries
+// `l=newsletter` and stops the newsletter alone (lib/newsletter.ts); every
+// other link — a note's, or one with `l` taken off — stops everything: the
+// notes, and the newsletter with them, because a person who presses
+// unsubscribe on a Socria email wants Socria email to stop. `l` can only
+// narrow a press, never widen it to anyone else: the token still has to be
+// the one made for the id in the link.
 //
 // This is pressed from a mail client, on a phone that has never seen Socria,
 // by someone who may be mildly annoyed. So it has to work signed out, in one
@@ -23,7 +31,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { emailSecret } from '@/lib/email';
 import { escapeHtml, verifyUnsubscribeToken } from '@/lib/lifecycle';
-import { setUnsubscribed } from '@/lib/lifecycle-store';
+import { setNewsletter, setUnsubscribed } from '@/lib/lifecycle-store';
+import { NEWSLETTER_LIST, unsubscribeScope } from '@/lib/newsletter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -91,19 +100,31 @@ function resolveUser(u: string | null, t: string | null): string | null {
 export async function GET(req: NextRequest) {
   const u = req.nextUrl.searchParams.get('u');
   const t = req.nextUrl.searchParams.get('t');
+  const scope = unsubscribeScope(req.nextUrl.searchParams.get('l'));
   const userId = resolveUser(u, t);
   if (!userId) return invalid();
 
   const hidden =
     (u ? `<input type="hidden" name="u" value="${escapeHtml(u)}">` : '') +
-    (t ? `<input type="hidden" name="t" value="${escapeHtml(t)}">` : '');
+    (t ? `<input type="hidden" name="t" value="${escapeHtml(t)}">` : '') +
+    (scope === 'newsletter' ? `<input type="hidden" name="l" value="${NEWSLETTER_LIST}">` : '');
+
+  if (scope === 'newsletter') {
+    return page(
+      'Unsubscribe from the newsletter?',
+      `<p ${P}>Press below and no more issues of the Socria newsletter will come.</p>` +
+        `<form method="post" action="/api/email/unsubscribe">${hidden}` +
+        `<button type="submit" ${BUTTON}>Unsubscribe</button></form>` +
+        `<p ${MUTED}>Your account, your conversations and your maps are untouched. You can subscribe again under Data &amp; Privacy.</p>`
+    );
+  }
 
   return page(
-    'Stop these notes?',
-    `<p ${P}>Socria sends the occasional note about your thinking here — that a map is where you left it, or when something opens. Press below and it stops.</p>` +
+    'Stop these emails?',
+    `<p ${P}>Socria sends the occasional note about your thinking here — that a map is where you left it, or when something opens — and the newsletter, if you get it. Press below and all of it stops.</p>` +
       `<form method="post" action="/api/email/unsubscribe">${hidden}` +
-      `<button type="submit" ${BUTTON}>Stop these notes</button></form>` +
-      `<p ${MUTED}>Your account, your conversations and your maps are untouched. You can turn the notes back on under Data &amp; Privacy.</p>`
+      `<button type="submit" ${BUTTON}>Stop these emails</button></form>` +
+      `<p ${MUTED}>Your account, your conversations and your maps are untouched. You can turn either back on under Data &amp; Privacy.</p>`
   );
 }
 
@@ -112,13 +133,16 @@ export async function POST(req: NextRequest) {
   // List-Unsubscribe address, or our own form's action) or in the form body.
   let u = req.nextUrl.searchParams.get('u');
   let t = req.nextUrl.searchParams.get('t');
-  if (!u || !t) {
+  let l = req.nextUrl.searchParams.get('l');
+  if (!u || !t || !l) {
     try {
       const form = await req.formData();
       const fu = form.get('u');
       const ft = form.get('t');
-      if (typeof fu === 'string' && fu) u = fu;
-      if (typeof ft === 'string' && ft) t = ft;
+      const fl = form.get('l');
+      if (!u && typeof fu === 'string' && fu) u = fu;
+      if (!t && typeof ft === 'string' && ft) t = ft;
+      if (!l && typeof fl === 'string' && fl) l = fl;
     } catch {
       // No body, or not a form. The query and the session are what remain.
     }
@@ -126,8 +150,14 @@ export async function POST(req: NextRequest) {
 
   const userId = resolveUser(u, t);
   if (!userId) return invalid();
+  const scope = unsubscribeScope(l);
 
-  const ok = await setUnsubscribed(userId, true);
+  // The newsletter's own link stops the newsletter. Any other stops both,
+  // and says it worked only if both were written.
+  const ok =
+    scope === 'newsletter'
+      ? await setNewsletter(userId, false)
+      : (await setUnsubscribed(userId, true)) && (await setNewsletter(userId, false));
   if (!ok) {
     return page(
       'That did not save',
@@ -136,9 +166,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
+  if (scope === 'newsletter') {
+    return page(
+      'Done',
+      `<p ${P}>You will not get the Socria newsletter again. Everything else stays as it is.</p>` +
+        `<p ${MUTED}>Changed your mind later? The switch is under <a href="/account/data" style="color:inherit">Data &amp; Privacy</a>.</p>`
+    );
+  }
+
   return page(
     'Done',
-    `<p ${P}>No more notes from Socria. Everything else stays as it is.</p>` +
-      `<p ${MUTED}>Changed your mind later? The switch is under <a href="/account/data" style="color:inherit">Data &amp; Privacy</a>.</p>`
+    `<p ${P}>No more email from Socria — no notes, and no newsletter. Everything else stays as it is.</p>` +
+      `<p ${MUTED}>Changed your mind later? The switches are under <a href="/account/data" style="color:inherit">Data &amp; Privacy</a>.</p>`
   );
 }

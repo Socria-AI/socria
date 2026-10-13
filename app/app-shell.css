@@ -660,6 +660,14 @@
   border-bottom:1px solid var(--moss-700);padding-bottom:1px}
 .app-root .opt-note button:hover{color:var(--ink);border-color:var(--ink)}
 
+/* The newsletter box on the sign-up form: a real checkbox in the form's moss,
+   with its one line of terms beneath the label rather than behind a link. */
+.app-root .auth-check{display:flex;align-items:flex-start;gap:10px;cursor:pointer;
+  font-size:.94rem;line-height:1.45;color:var(--ink)}
+.app-root .auth-check input{flex:0 0 auto;width:16px;height:16px;margin:3px 0 0;
+  accent-color:var(--moss);cursor:pointer}
+.app-root .auth-check small{display:block;margin-top:2px;font-size:.84rem;color:var(--ink-70)}
+
 /* The refusal, in Clerk's own words — see lib/clerk-errors.ts. Vermilion
    rather than red: it is this system's one alarm colour and it already means
    "the machine has something to say". */

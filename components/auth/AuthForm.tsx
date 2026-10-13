@@ -24,6 +24,13 @@
 // lib/clerk-errors.ts above all, are used here too rather than reimplemented,
 // so the two screens cannot start disagreeing about what a Clerk refusal says.
 //
+// THE NEWSLETTER BOX. Sign-up carries one checkbox — the Socria newsletter,
+// ticked to begin with. Its answer cannot be recorded until there is an
+// account to record it against, so it is held here through the password and
+// code steps and written once the new session is active (land(), below),
+// through the same route the Data & Privacy switch uses. Unticked, nothing is
+// written: not subscribed is what an account starts as.
+//
 // The branching lives in lib/auth-flow.ts, tested without a browser. This
 // file is the rendering and the calls.
 
@@ -45,6 +52,31 @@ import {
   type ChosenFactor,
 } from '@/lib/auth-flow';
 import type { AuthKind } from '@/lib/auth-links';
+
+/**
+ * Record the newsletter box for an account that has just been made and
+ * signed in. Waits a moment and no longer — the person is on their way to
+ * their first page, and a slow answer must not hold them at a finished form.
+ * A failure is quiet and lands on the safe side: they are not subscribed,
+ * and the switch under Data & Privacy is one press away.
+ */
+async function subscribeToNewsletter(): Promise<void> {
+  const ctl = new AbortController();
+  const timer = setTimeout(() => ctl.abort(), 2500);
+  try {
+    await fetch('/api/email/preferences', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ newsletter: true }),
+      signal: ctl.signal,
+      keepalive: true,
+    });
+  } catch {
+    // Not subscribed. See above.
+  } finally {
+    clearTimeout(timer);
+  }
+}
 
 export function AuthForm({
   kind,
@@ -77,6 +109,8 @@ export function AuthForm({
   /** when the current code was sent, for the resend hold */
   const [sentAt, setSentAt] = useState(0);
   const [hold, setHold] = useState(0);
+  /** sign-up only: the newsletter box, ticked to begin with */
+  const [newsletter, setNewsletter] = useState(true);
 
   const box = useRef<HTMLInputElement>(null);
 
@@ -109,9 +143,11 @@ export function AuthForm({
         router.push(to);
         return;
       }
-      void activate({ session: sessionId }).then(() => router.push(to));
+      void activate({ session: sessionId })
+        .then(() => (made && kind === 'sign-up' && newsletter ? subscribeToNewsletter() : undefined))
+        .then(() => router.push(to));
     },
-    [kind, redirectTo, router, setInActive, setUpActive]
+    [kind, redirectTo, router, setInActive, setUpActive, newsletter]
   );
 
   const fail = (e: unknown, fallback: string) => {
@@ -403,6 +439,19 @@ export function AuthForm({
                 onChange={(ev) => setEmail(ev.target.value)}
               />
             </div>
+            {kind === 'sign-up' && (
+              <label className="auth-check">
+                <input
+                  type="checkbox"
+                  checked={newsletter}
+                  onChange={(ev) => setNewsletter(ev.target.checked)}
+                />
+                <span>
+                  Send me the Socria newsletter
+                  <small>What&rsquo;s new, now and then. Unsubscribe from any issue in one click.</small>
+                </span>
+              </label>
+            )}
             <Button variant="primary" size="lg" arrow disabled={!ready || busy} onClick={() => void identify()}>
               {busy ? 'One moment…' : cta}
             </Button>

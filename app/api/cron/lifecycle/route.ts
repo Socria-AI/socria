@@ -34,9 +34,9 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import { timingSafeEqual } from 'node:crypto';
-import { clerkClient } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { trackServer } from '@/lib/analytics-server';
+import { addressesFor } from '@/lib/email-recipients';
 import { sweepStaleUploads } from '@/lib/upload-store';
 import {
   emailBaseUrl,
@@ -52,7 +52,6 @@ import {
   resetDateFor,
   unsubscribeToken,
   unsubscribeUrl,
-  lifecycleAddress,
   type LifecycleKind,
 } from '@/lib/lifecycle';
 import {
@@ -74,8 +73,6 @@ export const maxDuration = 60;
 
 /** How many of each kind one run will send. A backlog drains over days. */
 const PER_KIND = 200;
-/** Clerk's page size for getUserList by id. */
-const CLERK_BATCH = 100;
 
 type Counts = Record<string, number>;
 
@@ -90,38 +87,6 @@ function authorised(req: NextRequest, secret: string): boolean {
   const a = Buffer.from(token, 'utf8');
   const b = Buffer.from(secret, 'utf8');
   return a.length === b.length && a.length > 0 && timingSafeEqual(a, b);
-}
-
-/**
- * Where a note may go, per user id, in batches of a hundred.
- *
- * Not simply the primary address: a university address added for the student
- * programme is on the account to prove eligibility and for nothing else, so
- * `lifecycleAddress` skips past it, and answers null when every address we
- * hold is one. A user Clerk does not return — deleted since, or the lookup
- * failed — has no address either; both are skipped, and the ledger row is
- * released so nothing is recorded as sent that was not.
- */
-async function addressesFor(userIds: string[]): Promise<Map<string, string>> {
-  const out = new Map<string, string>();
-  for (let i = 0; i < userIds.length; i += CLERK_BATCH) {
-    const batch = userIds.slice(i, i + CLERK_BATCH);
-    try {
-      const { data } = await clerkClient().users.getUserList({ userId: batch, limit: CLERK_BATCH });
-      for (const u of data) {
-        const to = lifecycleAddress(
-          u.emailAddresses.map((e) => ({
-            address: e.emailAddress,
-            primary: e.id === u.primaryEmailAddressId,
-          }))
-        );
-        if (to) out.set(u.id, to);
-      }
-    } catch (e) {
-      console.warn('lifecycle cron: clerk lookup failed for a batch', e instanceof Error ? e.message : '');
-    }
-  }
-  return out;
 }
 
 interface SendJob {

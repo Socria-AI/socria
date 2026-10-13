@@ -17,6 +17,12 @@
 //                         unsubscribe link is one that must not go out.
 //   RESEND_API_KEY        the provider itself.
 //
+// The newsletter (lib/newsletter.ts) has its own kill switch,
+// NEWSLETTER_EMAILS=on, with the same default and checked in the same place.
+// They are separate decisions: turning on the day-3 notes must not start a
+// newsletter, and sending an issue must not start the notes. A message says
+// which it is with `stream`; a message that says nothing is a note.
+//
 // sendEmail never throws. Every caller is on a path — a webhook, a 402, a
 // cron — where an email is the least important thing happening, and where an
 // exception would turn a missed note into a missed payment or a 500.
@@ -41,6 +47,30 @@ export const DEFAULT_FROM = 'Socria <hello@socria.app>';
 /** The kill switch. Unset is off. */
 export function lifecycleEmailsOn(): boolean {
   return (process.env.LIFECYCLE_EMAILS || '').trim().toLowerCase() === 'on';
+}
+
+/** The newsletter's kill switch. Unset is off, exactly as above. */
+export function newsletterEmailsOn(): boolean {
+  return (process.env.NEWSLETTER_EMAILS || '').trim().toLowerCase() === 'on';
+}
+
+/**
+ * The postal address every newsletter issue carries, or null. US law
+ * (CAN-SPAM) requires one in a commercial email, so an issue does not render
+ * without it (lib/newsletter.ts newsletterCopy) — and it is configuration,
+ * not code, because it is a fact about the business that this file cannot
+ * know and must not guess.
+ */
+export function newsletterPostalAddress(): string | null {
+  const a = (process.env.NEWSLETTER_POSTAL_ADDRESS || '').trim();
+  return a || null;
+}
+
+/** Which kind of email a message is: a note (the default) or a newsletter issue. */
+export type EmailStream = 'lifecycle' | 'newsletter';
+
+function streamOn(stream: EmailStream): boolean {
+  return stream === 'newsletter' ? newsletterEmailsOn() : lifecycleEmailsOn();
 }
 
 export function emailFrom(): string {
@@ -79,6 +109,8 @@ export interface EmailMessage {
   /** the one-click unsubscribe address; sets the List-Unsubscribe headers */
   unsubscribeUrl?: string;
   headers?: Record<string, string>;
+  /** which switch governs this message; a note when unsaid */
+  stream?: EmailStream;
 }
 
 export type SendResult =
@@ -100,7 +132,7 @@ const ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  * first when they want a note to stop.
  */
 export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
-  if (!lifecycleEmailsOn()) return { ok: false, reason: 'off' };
+  if (!streamOn(msg.stream ?? 'lifecycle')) return { ok: false, reason: 'off' };
   if (!emailSecret()) return { ok: false, reason: 'unconfigured' };
 
   const key = (process.env.RESEND_API_KEY || '').trim();

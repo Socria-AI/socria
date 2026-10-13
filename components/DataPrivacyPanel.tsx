@@ -27,6 +27,11 @@ export function DataPrivacyPanel() {
   // shown as off when the store cannot say.
   const [notes, setNotes] = useState<boolean | null>(null);
   const [notesBusy, setNotesBusy] = useState(false);
+  // The newsletter: what is new in Socria, now and then. Its own switch and
+  // its own row — the sign-up box writes it, every issue's unsubscribe link
+  // removes it. Same rule: null until known, off when unknowable.
+  const [letter, setLetter] = useState<boolean | null>(null);
+  const [letterBusy, setLetterBusy] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -35,7 +40,10 @@ export function DataPrivacyPanel() {
         const res = await fetch('/api/email/preferences', { cache: 'no-store' });
         if (!res.ok) return;
         const json = await res.json();
-        if (!cancelled) setNotes(json?.lifecycle === true);
+        if (!cancelled) {
+          setNotes(json?.lifecycle === true);
+          setLetter(json?.newsletter === true);
+        }
       } catch {}
     })();
     return () => {
@@ -57,6 +65,22 @@ export function DataPrivacyPanel() {
       setErr('Could not save that just now. Try again in a moment.');
     }
     setNotesBusy(false);
+  }
+
+  async function setLetterOn(on: boolean) {
+    setLetterBusy(true); setErr(null);
+    try {
+      const res = await fetch('/api/email/preferences', {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newsletter: on }),
+      });
+      if (!res.ok) throw new Error('failed');
+      setLetter(on);
+    } catch {
+      setErr('Could not save that just now. Try again in a moment.');
+    }
+    setLetterBusy(false);
   }
 
   async function exportData() {
@@ -186,6 +210,25 @@ export function DataPrivacyPanel() {
           aria-pressed={notes === true}
         >
           {notes === null ? '…' : notesBusy ? 'Saving…' : notes ? 'On — turn off' : 'Off — turn on'}
+        </button>
+      </section>
+
+      <section className="dp-act">
+        <div>
+          <h3>The newsletter</h3>
+          <p>
+            What is new in Socria, now and then. About Socria, never about
+            you, and never sent to a university address added for student
+            access. Every issue has a one-click unsubscribe.
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={() => void setLetterOn(!(letter ?? false))}
+          disabled={letterBusy || letter === null}
+          aria-pressed={letter === true}
+        >
+          {letter === null ? '…' : letterBusy ? 'Saving…' : letter ? 'Subscribed — unsubscribe' : 'Off — subscribe'}
         </button>
       </section>
 

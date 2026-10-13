@@ -2,7 +2,8 @@
 //
 // It implements the slice of PostgREST the app actually uses — select with a
 // column list or *, eq / in / lt / not-is-null filters, order, limit, maybeSingle,
-// head counts, insert / upsert / update / delete with exact counts — and it
+// head counts, insert / upsert / update / delete with exact counts (and gt /
+// lte, for the email ledger's paging) — and it
 // enforces the constraints that matter to the code under test: primary keys,
 // the unique Project name per person, and (when a test asks for it) a table
 // that is MISSING a column, answered with the same error codes Postgres and
@@ -23,6 +24,7 @@ const PK = {
   core4_turns: ['user_id', 'conversation_id', 'turn'],
   capability_evidence: ['user_id', 'id'],
   share_presence: ['resource_type', 'resource_id', 'user_id'],
+  lifecycle_emails: ['user_id', 'kind'],
 };
 
 export const db = {
@@ -89,6 +91,8 @@ class Query {
   eq(c, v) { this.filters.push((r) => r[c] === v); this._cols = [...(this._cols ?? []), c]; return this; }
   in(c, vs) { this.filters.push((r) => vs.includes(r[c])); this._cols = [...(this._cols ?? []), c]; return this; }
   lt(c, v) { this.filters.push((r) => r[c] < v); this._cols = [...(this._cols ?? []), c]; return this; }
+  gt(c, v) { this.filters.push((r) => r[c] > v); this._cols = [...(this._cols ?? []), c]; return this; }
+  lte(c, v) { this.filters.push((r) => r[c] <= v); this._cols = [...(this._cols ?? []), c]; return this; }
   is(c, v) { this.filters.push((r) => (v === null ? r[c] === null || r[c] === undefined : r[c] === v)); this._cols = [...(this._cols ?? []), c]; return this; }
   not(c, op, v) {
     if (op === 'is' && v === null) this.filters.push((r) => r[c] !== null && r[c] !== undefined);

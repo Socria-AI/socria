@@ -4,11 +4,13 @@
 export function auth() {
   return { userId: globalThis.__uid ?? null };
 }
+// The first address is the primary one, as it is for an account made with it.
 const shape = (id, u) => ({
   id,
   firstName: u.firstName ?? null,
   username: u.username ?? null,
-  emailAddresses: (u.emails ?? []).map((e) => ({ emailAddress: e, verification: { status: 'verified' } })),
+  primaryEmailAddressId: (u.emails ?? []).length ? `${id}_e0` : null,
+  emailAddresses: (u.emails ?? []).map((e, i) => ({ id: `${id}_e${i}`, emailAddress: e, verification: { status: 'verified' } })),
 });
 export const clerkClient = () => ({
   users: {

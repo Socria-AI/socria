@@ -13,6 +13,11 @@
 // The opt-out is a row too, under kind 'unsubscribed'. Same table, so a
 // database that can send can record a refusal without a second migration.
 //
+// So is the newsletter (lib/newsletter.ts), twice over: its subscription is a
+// row under kind 'newsletter' — present means asked for, absent means not —
+// and each issue is claimed per person under 'newsletter:<issue>', by the
+// same insert-first rule as every note. Still ids and timestamps only.
+//
 // Some deployments have not run every migration (see the missingColumn
 // fallback in app/api/conversations/route.ts). When this table is missing
 // the answer is always "do not send": a ledger that cannot be written cannot
@@ -22,6 +27,10 @@
 
 import { supabaseAdmin } from './supabase';
 import { UNSUBSCRIBED_KIND, type LifecycleKind } from './lifecycle';
+import { NEWSLETTER_KIND, type IssueKind } from './newsletter';
+
+/** Everything a sender claims: a note, or one newsletter issue. */
+export type LedgerKind = LifecycleKind | IssueKind;
 
 const TABLE = 'lifecycle_emails';
 const RPC = 'lifecycle_candidates';
@@ -70,7 +79,7 @@ export type ClaimResult = 'claimed' | 'already' | 'unavailable';
  */
 export async function claimLifecycle(
   userId: string,
-  kind: LifecycleKind,
+  kind: LedgerKind,
   opts: { dueAt?: number | null; now?: number } = {}
 ): Promise<ClaimResult> {
   try {
@@ -95,7 +104,7 @@ export async function claimLifecycle(
 }
 
 /** The send landed. */
-export async function markSent(userId: string, kind: LifecycleKind, at = Date.now()): Promise<boolean> {
+export async function markSent(userId: string, kind: LedgerKind, at = Date.now()): Promise<boolean> {
   try {
     const { error } = await supabaseAdmin()
       .from(TABLE)
@@ -113,7 +122,7 @@ export async function markSent(userId: string, kind: LifecycleKind, at = Date.no
  * Only an UNSENT row is released — a claim that has been marked sent is a
  * fact, and deleting it would open the door to a second copy.
  */
-export async function releaseClaim(userId: string, kind: LifecycleKind): Promise<boolean> {
+export async function releaseClaim(userId: string, kind: LedgerKind): Promise<boolean> {
   try {
     const { error } = await supabaseAdmin()
       .from(TABLE)
@@ -128,15 +137,16 @@ export async function releaseClaim(userId: string, kind: LifecycleKind): Promise
 }
 
 /**
- * Has this person said stop? null when the store cannot say.
+ * Whether the row for a standing preference — a refusal, a subscription — is
+ * there. null when the store cannot say.
  */
-export async function readUnsubscribed(userId: string): Promise<boolean | null> {
+async function readFlag(userId: string, kind: string): Promise<boolean | null> {
   try {
     const { data, error } = await supabaseAdmin()
       .from(TABLE)
       .select('kind')
       .eq('user_id', userId)
-      .eq('kind', UNSUBSCRIBED_KIND)
+      .eq('kind', kind)
       .maybeSingle();
     if (error) {
       if (unavailable(error)) warnOnce('read', error);
@@ -149,24 +159,14 @@ export async function readUnsubscribed(userId: string): Promise<boolean | null> 
   }
 }
 
-/**
- * The sender's question. A refusal that cannot be read is honoured, not
- * overridden: when the store is silent the answer is "yes, treat them as
- * unsubscribed", because sending to someone who may have said stop is the
- * failure, and not sending to someone who has not is only a delay.
- */
-export async function isUnsubscribed(userId: string): Promise<boolean> {
-  return (await readUnsubscribed(userId)) ?? true;
-}
-
-/** Record, or withdraw, the refusal. Returns whether it was written. */
-export async function setUnsubscribed(userId: string, on: boolean): Promise<boolean> {
+/** Write, or remove, a standing preference's row. Returns whether it was written. */
+async function setFlag(userId: string, kind: string, on: boolean): Promise<boolean> {
   try {
     const db = supabaseAdmin();
     if (on) {
       const { error } = await db.from(TABLE).insert({
         user_id: userId,
-        kind: UNSUBSCRIBED_KIND,
+        kind,
         created_at: Date.now(),
         due_at: null,
         sent_at: null,
@@ -181,7 +181,7 @@ export async function setUnsubscribed(userId: string, on: boolean): Promise<bool
       .from(TABLE)
       .delete()
       .eq('user_id', userId)
-      .eq('kind', UNSUBSCRIBED_KIND);
+      .eq('kind', kind);
     if (error) {
       if (unavailable(error)) warnOnce('set', error);
       return false;
@@ -190,6 +190,79 @@ export async function setUnsubscribed(userId: string, on: boolean): Promise<bool
   } catch (e) {
     warnOnce('set', e);
     return false;
+  }
+}
+
+/**
+ * Has this person said stop? null when the store cannot say.
+ */
+export async function readUnsubscribed(userId: string): Promise<boolean | null> {
+  return readFlag(userId, UNSUBSCRIBED_KIND);
+}
+
+/**
+ * The sender's question. A refusal that cannot be read is honoured, not
+ * overridden: when the store is silent the answer is "yes, treat them as
+ * unsubscribed", because sending to someone who may have said stop is the
+ * failure, and not sending to someone who has not is only a delay.
+ */
+export async function isUnsubscribed(userId: string): Promise<boolean> {
+  return (await readUnsubscribed(userId)) ?? true;
+}
+
+/** Record, or withdraw, the refusal. Returns whether it was written. */
+export async function setUnsubscribed(userId: string, on: boolean): Promise<boolean> {
+  return setFlag(userId, UNSUBSCRIBED_KIND, on);
+}
+
+/**
+ * Has this person asked for the newsletter? null when the store cannot say —
+ * and a sender treats that as "no", the mirror of isUnsubscribed: an issue
+ * goes only to someone whose request can be read.
+ */
+export async function readNewsletter(userId: string): Promise<boolean | null> {
+  return readFlag(userId, NEWSLETTER_KIND);
+}
+
+/** Subscribe (the sign-up box, the switch) or unsubscribe (the switch, any link). */
+export async function setNewsletter(userId: string, on: boolean): Promise<boolean> {
+  return setFlag(userId, NEWSLETTER_KIND, on);
+}
+
+/** PostgREST's ceiling on rows per request; pages are read at this size. */
+const PAGE = 1000;
+/** How many ids one listing will read before it stops and says so. */
+const LIST_CAP = 50_000;
+
+/**
+ * Every person holding a row of this kind, by id: the newsletter's
+ * subscribers ('newsletter'), or everyone an issue has been claimed for
+ * ('newsletter:<issue>'). Read a page at a time, ordered by id. null when
+ * the store cannot say — and a sender then sends to nobody, never to a list
+ * it could not read whole. Ids only; the ledger holds nothing else.
+ */
+export async function idsWithKind(kind: string): Promise<{ ids: string[]; capped: boolean } | null> {
+  const ids: string[] = [];
+  try {
+    let after: string | null = null;
+    while (ids.length < LIST_CAP) {
+      let q = supabaseAdmin().from(TABLE).select('user_id').eq('kind', kind);
+      if (after) q = q.gt('user_id', after);
+      const { data, error } = await q.order('user_id', { ascending: true }).limit(PAGE);
+      if (error) {
+        if (unavailable(error)) warnOnce('list', error);
+        else console.warn('lifecycle store: list failed', error.code);
+        return null;
+      }
+      const page = (data ?? []).map((r) => String(r.user_id)).filter(Boolean);
+      ids.push(...page);
+      if (page.length < PAGE) return { ids, capped: false };
+      after = page[page.length - 1];
+    }
+    return { ids: ids.slice(0, LIST_CAP), capped: true };
+  } catch (e) {
+    warnOnce('list', e);
+    return null;
   }
 }
 

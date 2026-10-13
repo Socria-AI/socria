@@ -266,6 +266,8 @@ const MODULES = [
   'components/display/Gallery.tsx',
   'lib/lifecycle.ts',
   'lib/email.ts',
+  'lib/newsletter.ts',
+  'lib/newsletter-issues.ts',
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
   'app/docs/registry.ts',
