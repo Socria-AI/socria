@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, TableWrap } from '../Article';
-import { DemoModelPicker } from '../DocsDemo';
+import { DemoModelPicker } from '../demos';
 import { docPage } from '../registry';
 import { PLANS } from '@/lib/entitlements';
 

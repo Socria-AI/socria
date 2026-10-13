@@ -18,14 +18,24 @@
 
 import type { Metadata } from 'next';
 import { JournalIssue } from '@/components/journal/JournalIssue';
+import { JsonLd } from '@/components/JsonLd';
+import { DEFAULT_DESCRIPTION, HOME_TITLE, pageMetadata } from '@/lib/seo';
+import { organizationLd, softwareApplicationLd, websiteLd } from '@/lib/structured-data';
 import './journal.css';
 
-export const metadata: Metadata = {
-  title: 'Socria Logos 3 — AI that makes you better at thinking',
-  description:
-    'Introducing Logos 3: say what you are working through and it becomes a workspace beside you — a map of your reasoning, models the engine solves, and designs drawn in 3D from your words — that you can move, compute and ask about by name. Issue No. 4 of the Socria Journal.',
-};
+export const metadata: Metadata = pageMetadata({
+  path: '/',
+  title: HOME_TITLE,
+  absolute: true,
+  description: DEFAULT_DESCRIPTION,
+  og: 'home',
+});
 
 export default function Page() {
-  return <JournalIssue />;
+  return (
+    <>
+      <JsonLd data={[organizationLd(), websiteLd(), softwareApplicationLd()]} />
+      <JournalIssue />
+    </>
+  );
 }

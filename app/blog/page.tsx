@@ -13,14 +13,15 @@ import {
   totalPostCount,
   type PostListItem,
 } from '@/sanity/lib/queries';
+import { pageMetadata } from '@/lib/seo';
 
 export const revalidate = 60;
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: '/blog',
   title: 'Blog — Notes on thinking clearly',
-  description:
-    'Essays on reasoning, metacognition, and human-first AI. Think for yourself.',
-};
+  description: 'Essays on reasoning, metacognition, and human-first AI. Think for yourself.',
+});
 
 function formatDate(iso: string) {
   if (!iso) return '';

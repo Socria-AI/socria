@@ -5,12 +5,14 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Terms — Socria',
+export const metadata: Metadata = pageMetadata({
+  path: '/terms',
+  title: 'Terms',
   description:
     'The agreement for using Socria: what you can expect, what we ask of you, and how billing works.',
-};
+});
 
 export default function TermsPage() {
   return (

@@ -57,3 +57,15 @@ export function newsletterTickedByDefault(country: string | null | undefined): b
   const c = countryFrom(country);
   return c !== null && !OPT_IN_COUNTRIES.has(c);
 }
+
+/**
+ * Whether Socria may keep a note on this visitor's device of how they first
+ * arrived (lib/first-touch.ts) without asking. The same answer as the
+ * newsletter box, for the same reason: where the law wants a person's own
+ * opt-in for one, it wants it for the other — device storage for analytics
+ * falls under the ePrivacy rules in the EU and PECR in the UK — and an
+ * unknown country is treated as one of those places.
+ */
+export function attributionAllowed(country: string | null | undefined): boolean {
+  return newsletterTickedByDefault(country);
+}

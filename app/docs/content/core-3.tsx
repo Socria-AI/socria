@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoChips, DemoSynthesis } from '../DocsDemo';
+import { DemoChips, DemoSynthesis } from '../demos';
 import { docPage } from '../registry';
 import { PLANS } from '@/lib/entitlements';
 

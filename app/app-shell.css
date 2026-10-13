@@ -748,3 +748,16 @@
 .app-root .s-joinbtn:hover svg{color:var(--moss-700)}
 .app-root .s-joinbtn:focus-visible{outline:2px solid var(--moss);outline-offset:1px}
 .app-root .s-shared .n{border-radius:999px;background:var(--moss-100, #e4eada);color:var(--moss-800, #38481f);min-width:18px;text-align:center}
+
+/* ---------- /students: the free month, in three steps ---------- */
+.app-root .steps{margin:0;padding-left:1.3em;display:flex;flex-direction:column;gap:10px;
+  font-size:.98rem;line-height:1.5;color:var(--ink)}
+.app-root .steps li::marker{color:var(--moss-700);font-family:var(--font-serif, Georgia, serif)}
+.app-root .steps strong{font-weight:600}
+.app-root .steps.plain{list-style:none;padding-left:0}
+.app-root .steps.plain li{padding-left:1.1em;position:relative;color:var(--ink-70)}
+.app-root .steps.plain li::before{content:"";position:absolute;left:0;top:.62em;width:6px;height:6px;border-radius:50%;background:var(--moss)}
+.app-root .steps-h{font-size:1.3rem}
+.app-root .try-link{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:1rem;
+  color:var(--moss-700);border-bottom:1px solid var(--moss-700);padding-bottom:1px;cursor:pointer;background:none}
+.app-root .try-link:hover{color:var(--ink);border-color:var(--ink)}

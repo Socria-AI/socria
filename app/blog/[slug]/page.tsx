@@ -7,6 +7,9 @@ import { BlogNav, BlogFooter } from '@/components/BlogShell';
 import { BlogMotion } from '@/components/BlogMotion';
 import { CoverArt } from '@/components/CoverArt';
 import { getPostBySlug, listPostSlugs } from '@/sanity/lib/queries';
+import { JsonLd } from '@/components/JsonLd';
+import { pageMetadata } from '@/lib/seo';
+import { blogPostingLd } from '@/lib/structured-data';
 
 export const revalidate = 60;
 
@@ -20,11 +23,16 @@ export async function generateMetadata({
   params: { slug: string };
 }): Promise<Metadata> {
   const post = await getPostBySlug(params.slug);
-  if (!post) return { title: 'Not found — Socria' };
-  return {
+  if (!post) return { title: 'Not found' };
+  return pageMetadata({
+    path: `/blog/${params.slug}`,
     title: `${post.title} — Socria Blog`,
+    absolute: true,
     description: post.excerpt,
-  };
+    og: `blog/${params.slug}`,
+    type: 'article',
+    publishedTime: post.publishedAt,
+  });
 }
 
 function formatDate(iso: string) {
@@ -56,6 +64,15 @@ export default async function BlogPost({
 
   return (
     <div className="blog-page">
+      <JsonLd
+        data={blogPostingLd({
+          slug: params.slug,
+          title: post.title,
+          excerpt: post.excerpt,
+          publishedAt: post.publishedAt,
+          authorName: post.authorName,
+        })}
+      />
       <div className="progress" aria-hidden="true" />
 
       <BlogNav />

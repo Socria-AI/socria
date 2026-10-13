@@ -17,12 +17,14 @@ import { redirect } from 'next/navigation';
 // its chrome from docs.css and the `.logos-root` block in globals.css.
 import '../journal.css';
 import { LogosIssue } from './LogosIssue';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: '/logos',
   title: 'Logos — think out loud, watch it take shape',
   description:
-    'Logos reads how you reason and draws it live beside the conversation: claims, assumptions, tensions and open questions, as a Thinking Map that reorganizes while you think.',
-};
+    'Know what you think, and why. Logos reads how you reason and draws it live beside the conversation: claims, assumptions, tensions and open questions, as a Thinking Map that reorganizes while you think.',
+});
 
 const APP_PARAMS = ['s', 'one', 'connect', 'session_id'];
 

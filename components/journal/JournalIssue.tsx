@@ -45,7 +45,7 @@ export function JournalIssue() {
 
       {/* THE DOOR — the composer is the cover. The headline it displaces
           closes the issue, which is where it was always going. */}
-      <Door issue="Issue No. 4 · Logos 3 · MMXXVI" />
+      <Door issue="Issue No. 4 · Logos 3.5 · MMXXVI" />
 
       {/* THE ANCHOR THE DOOR POINTS AT. "Or watch it work first" is the one
           way past the composer for somebody not ready to type, and it was a

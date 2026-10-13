@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
-import { DemoSplit } from '@/app/logos/LogosDemo';
+import { DemoSplit } from '../demos';
 import { DOC_PAGES, docPage } from '../registry';
 import { priceWithPeriod } from '@/lib/socria-one';
 import { PLANS } from '@/lib/entitlements';

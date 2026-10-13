@@ -17,6 +17,8 @@ import {
 } from '@/lib/environment';
 import { EnvBadge } from '@/components/EnvBadge';
 import { SetupNotice } from '@/components/SetupNotice';
+import { rootMetadata } from '@/lib/seo';
+import { FirstTouch } from '@/components/FirstTouch';
 
 // THE FACES ARE IN THE REPOSITORY (app/fonts), NOT FETCHED AT BUILD.
 //
@@ -65,39 +67,11 @@ const stix = localFont({
   adjustFontFallback: 'Times New Roman',
 });
 
-const siteUrl =
-  process.env.NEXT_PUBLIC_SITE_URL || 'https://socria.app';
-
-export const metadata: Metadata = {
-  metadataBase: new URL(siteUrl),
-  // A preview build carries its own noindex, so it stays out of search even
-  // if something links to it. robots.txt asks; this tells.
-  ...(isProduction()
-    ? {}
-    : { robots: { index: false, follow: false, nocache: true } }),
-  title: {
-    default: 'Socria — AI that sharpens your thinking',
-    template: '%s — Socria',
-  },
-  description:
-    'Socria helps you reason through ideas, decisions, and uncertainty without outsourcing your thinking. Human-first AI.',
-  applicationName: 'Socria',
-  alternates: { canonical: '/' },
-  openGraph: {
-    type: 'website',
-    url: siteUrl,
-    siteName: 'Socria',
-    title: 'Socria — AI that sharpens your thinking',
-    description:
-      'Human-first AI that strengthens how you think instead of thinking for you. Think for yourself.',
-  },
-  twitter: {
-    card: 'summary_large_image',
-    title: 'Socria — AI that sharpens your thinking',
-    description:
-      'Human-first AI that strengthens how you think instead of thinking for you.',
-  },
-};
+// Search, previews and the rest of how the site introduces itself live in
+// lib/seo.ts. No canonical here: a layout's canonical is inherited by every
+// page that does not set its own, and '/' here once told search engines that
+// every page on the site was a copy of the homepage.
+export const metadata: Metadata = rootMetadata(isProduction());
 
 export default function RootLayout({
   children,
@@ -224,6 +198,9 @@ export default function RootLayout({
             />
           )}
           <Analytics />
+          {/* How this browser first arrived, where the visitor's country
+              allows keeping that note — see lib/first-touch.ts. */}
+          <FirstTouch />
         </body>
       </html>
     </ClerkProvider>

@@ -18,7 +18,7 @@
 import Link from 'next/link';
 import type { ReactNode } from 'react';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoLibraryFigure, DemoModelWorkspace, DemoRefusal } from '../DocsDemo';
+import { DemoLibraryFigure, DemoModelWorkspace, DemoRefusal } from '../demos';
 import { docPage } from '../registry';
 import { PLANS } from '@/lib/entitlements';
 

@@ -12,12 +12,15 @@ import Link from 'next/link';
 import { Colophon } from '@/components/Colophon';
 import Image from 'next/image';
 import { ExploreShowcase } from './ExploreShowcase';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: '/explore',
   title: 'Explore Socria — what a reasoning environment is actually for',
+  absolute: true,
   description:
     'Six things people bring to Socria — research, learning, decisions, argument, creative work, and plain conversation — each shown in the running product rather than described.',
-};
+});
 
 export default function ExplorePage() {
   return (

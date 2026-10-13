@@ -6,13 +6,24 @@ import { AuthForm } from '@/components/auth/AuthForm';
 import { isSafeRedirect } from '@/lib/auth-links';
 import { rewardsConfig } from '@/lib/rewards/rewards-config';
 import { newsletterTickedByDefault } from '@/lib/newsletter-consent';
+import { pageMetadata } from '@/lib/seo';
 import '../../app-shell.css';
 
-export const metadata: Metadata = {
-  title: 'Create your account — Socria',
-  description:
-    'Create a free Socria account to save your thought sessions and unlock Core 3.',
-};
+// A friend's referral link (app/r/[code]) lands here with ?invited=1, and the
+// card a shared link shows is drawn from this page — so an invitation gets
+// the invitation's card, and only while referrals are running.
+export function generateMetadata({ searchParams }: { searchParams?: { invited?: string } }): Metadata {
+  const cfg = rewardsConfig();
+  const invited = searchParams?.invited === '1' && cfg.enabled;
+  return pageMetadata({
+    path: '/sign-up',
+    title: 'Create your account',
+    description: invited
+      ? 'A friend invited you to Socria. Create your free account — no card needed. Think for yourself.'
+      : 'Create a free Socria account and keep your thinking across every device. Think for yourself.',
+    og: invited ? 'invited' : 'sign-up',
+  });
+}
 
 export default function SignUpPage({
   searchParams,

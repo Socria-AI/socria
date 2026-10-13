@@ -6,12 +6,14 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Sub-processors — Socria',
+export const metadata: Metadata = pageMetadata({
+  path: '/subprocessors',
+  title: 'Sub-processors',
   description:
     'The companies that process data on Socria’s behalf, what each one receives, and why.',
-};
+});
 
 const ROWS = [
   {

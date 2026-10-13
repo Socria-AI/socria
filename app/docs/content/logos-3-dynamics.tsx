@@ -8,7 +8,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoEngineering } from '../DocsDemo';
+import { DemoEngineering } from '../demos';
 import { docPage } from '../registry';
 import { DYNAMICS, type DynamicsExample, type Topic } from '@/lib/model/dynamics-examples';
 

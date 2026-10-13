@@ -4,12 +4,13 @@ import { AuthPlate } from '@/components/auth/AuthPlate';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { isSafeRedirect } from '@/lib/auth-links';
 import '../../app-shell.css';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Sign in — Socria',
-  description:
-    'Sign in to Socria to keep your thought sessions across every device.',
-};
+export const metadata: Metadata = pageMetadata({
+  path: '/sign-in',
+  title: 'Sign in',
+  description: 'Sign in to Socria to keep your thought sessions across every device.',
+});
 
 export default function SignInPage({
   searchParams,

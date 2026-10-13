@@ -8,7 +8,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoShowcase } from '../DocsDemo';
+import { DemoShowcase } from '../demos';
 import { DOCS_SHOWCASE } from '@/lib/logos3-showcase';
 import { docPage } from '../registry';
 

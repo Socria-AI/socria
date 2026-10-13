@@ -1280,6 +1280,12 @@ html.anim-off .jr-root .board:not(.app) .fix, html:not(.js) .jr-root .board:not(
    on the screen is smaller than it, deliberately. */
 .jr-root .door{min-height:100svh;display:flex;align-items:center;padding:clamp(80px,12vh,140px) var(--edge) clamp(56px,8vh,90px);position:relative}
 .jr-root .door .wrap{width:var(--measure);margin:0 auto;position:relative}
+.jr-root .door-h1{margin:clamp(14px,2.4vh,22px) 0 0;font-weight:400;display:flex;flex-direction:column;gap:clamp(8px,1.4vh,14px)}
+.jr-root .door-h1-line{font-family:var(--font-serif, Georgia, serif);font-size:clamp(2.1rem,4.6vw,3.4rem);
+  line-height:1.02;letter-spacing:-.025em;color:var(--ink)}
+.jr-root .door-h1-line em{font-style:italic;color:var(--moss)}
+.jr-root .door-h1-sub{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);
+  font-size:clamp(1rem,1.5vw,1.14rem);line-height:1.5;letter-spacing:0;color:var(--ink-70);max-width:46ch}
 .jr-root .door-ask{margin-top:clamp(18px,3.4vh,34px);border-bottom:2px solid var(--ink);padding-bottom:14px;position:relative}
 /* the typed question sits exactly where the placeholder would, so the handover
    to the reader's own typing is invisible */

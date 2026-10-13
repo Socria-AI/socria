@@ -93,6 +93,10 @@ export const EVENTS = [
   // where (`surface`), and for a dismissal how (`outcome`: 'closed' | 'not_now')
   'rewards_popup_viewed',
   'rewards_popup_dismissed',
+  // An account was made. Carries how this browser first arrived, as kinds
+  // only (lib/first-touch.ts): `landing`, `referrer`, and the utm_* tags a
+  // link of ours carried — or 'unknown' where no note could be kept.
+  'signup_completed',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -146,6 +150,14 @@ export interface EventProps {
   object?: string;
   /** what became of a reward — 'active' | 'banked' | 'bank_full' | 'monthly_cap' (lib/rewards/promo-engine.ts) */
   outcome?: string;
+  /** the KIND of page a person first arrived on — 'docs' | 'blog' | 'home' … (lib/first-touch.ts) */
+  landing?: string;
+  /** the KIND of site that sent them — 'google' | 'reddit' | 'direct' | 'other' …, never a hostname */
+  referrer?: string;
+  /** a campaign tag one of our own links carried, as a short token */
+  utm_source?: string;
+  utm_medium?: string;
+  utm_campaign?: string;
 }
 
 const ALLOWED_KEYS = new Set<keyof EventProps>([
@@ -168,6 +180,11 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
   'step',
   'object',
   'outcome',
+  'landing',
+  'referrer',
+  'utm_source',
+  'utm_medium',
+  'utm_campaign',
 ]);
 
 /**

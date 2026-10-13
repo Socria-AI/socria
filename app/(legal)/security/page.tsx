@@ -5,12 +5,14 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Security — Socria',
+export const metadata: Metadata = pageMetadata({
+  path: '/security',
+  title: 'Security',
   description:
     'How Socria protects accounts and data: where it is stored, how it is encrypted, and what the server refuses to trust.',
-};
+});
 
 export default function SecurityPage() {
   return (

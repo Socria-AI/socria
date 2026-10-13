@@ -4,12 +4,14 @@
 // fill rather than invented.
 
 import type { Metadata } from 'next';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Privacy — Socria',
+export const metadata: Metadata = pageMetadata({
+  path: '/privacy',
+  title: 'Privacy',
   description:
     'What Socria collects, why, who it is shared with, and how to get it back or have it deleted.',
-};
+});
 
 export default function PrivacyPage() {
   return (
@@ -97,6 +99,7 @@ export default function PrivacyPage() {
             <tr><td>Student access</td><td>A verified university email address, to check that it is at a school we have approved &mdash; and for nothing else</td></tr>
             <tr><td>Keeping the service up</td><td>Rate limiting and abuse prevention</td></tr>
             <tr><td>Understanding usage</td><td>Aggregate, privacy-preserving page analytics</td></tr>
+            <tr><td>Knowing what brings people in</td><td>Outside the EU, the EEA, the UK, Switzerland and Canada: a note in your browser of how you first arrived &mdash; the kind of page, the kind of site that sent you (a search engine, say) and any campaign tag in our own link. It is reported once, when you create an account, never with who you are, and then deleted. In those countries nothing is kept.</td></tr>
           </tbody>
         </table>
       </div>
@@ -152,7 +155,7 @@ export default function PrivacyPage() {
             <tr>
               <td><strong>Vercel, Inc.</strong></td>
               <td>Analytics</td>
-              <td>Aggregate page views</td>
+              <td>Aggregate page views, and the shape of each sign-up &mdash; how the browser first arrived, never who you are</td>
             </tr>
             <tr>
               <td><strong>Upstash, Inc.</strong></td>

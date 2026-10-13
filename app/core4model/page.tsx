@@ -14,17 +14,14 @@ import type { Metadata } from 'next';
 import Link from 'next/link';
 import { Core4Model } from './Core4Model';
 import './core4model.css';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
-  title: 'Core 4, as a model you can turn — Socria',
+export const metadata: Metadata = pageMetadata({
+  path: '/core4model',
+  title: 'Core 4, as a model you can turn',
   description:
     'One Core 4 turn as a three-dimensional object: six stages a reply falls through, the eight-dimension split, the single door every move leaves by, and the guard that sends a draft back. Drag to turn it.',
-  openGraph: {
-    title: 'Core 4, as a model you can turn',
-    description:
-      'Six stages a reply falls through, the eight-dimension split, and the guard that sends a draft back to be written again.',
-  },
-};
+});
 
 export default function Core4ModelPage() {
   return (

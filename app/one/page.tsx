@@ -6,11 +6,14 @@ import type { Metadata } from 'next';
 import { OneIssue } from './OneIssue';
 import { priceWithPeriod } from '@/lib/socria-one';
 import '../journal.css';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: '/one',
   title: 'Socria One — the complete reasoning environment',
-  description: `Socria One. Everything Socria does, without the ceiling. ${priceWithPeriod()}.`,
-};
+  absolute: true,
+  description: `Socria One. Everything Socria does, without the ceiling: no daily count, in Core or in Logos. ${priceWithPeriod()}.`,
+});
 
 export default function OnePage() {
   return <OneIssue />;

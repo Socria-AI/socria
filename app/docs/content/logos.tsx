@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
-import { DemoSplit } from '@/app/logos/LogosDemo';
+import { DemoSplit } from '../demos';
 import { docPage } from '../registry';
 
 const page = docPage('logos')!;

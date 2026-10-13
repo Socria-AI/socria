@@ -3,7 +3,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
-import { DemoLenses, DemoMoves } from '@/app/logos/LogosDemo';
+import { DemoLenses, DemoMoves } from '../demos';
 import { docPage } from '../registry';
 
 const page = docPage('thinking-map')!;

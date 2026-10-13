@@ -9,12 +9,15 @@ import { BlackHoleSurface } from '@/components/surfaces/BlackHoleSurface';
 import { BigBangSurface } from '@/components/surfaces/BigBangSurface';
 import { GravitySurface } from '@/components/surfaces/GravitySurface';
 import './page.css';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: '/surfaces',
   title: 'Working surfaces — Socria Logos',
+  absolute: true,
   description:
     'A Kerr black hole with integrated geodesics and a Doppler-coloured disc, the thermal history of the universe, and gravity as an N-body integration. Every control moves the physics.',
-};
+});
 
 export default function SurfacesPage() {
   return (

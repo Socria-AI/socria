@@ -4,7 +4,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoAdAs, DemoCeiling, DemoMarket, DemoPpc } from '../DocsDemo';
+import { DemoAdAs, DemoCeiling, DemoMarket, DemoPpc } from '../demos';
 import { docPage } from '../registry';
 
 const page = docPage('economics')!;

@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoLimitsTable } from '../DocsDemo';
+import { DemoLimitsTable } from '../demos';
 import { priceWithPeriod } from '@/lib/socria-one';
 import { PLANS, megabytes } from '@/lib/entitlements';
 import { docPage } from '../registry';

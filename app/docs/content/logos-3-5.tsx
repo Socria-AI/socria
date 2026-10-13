@@ -9,7 +9,8 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
-import { DisplaysShowcase, type DisplayExample } from '../DocsDisplays';
+import { DisplaysShowcase } from '../demos';
+import type { DisplayExample } from '../DocsDisplays';
 import { docPage } from '../registry';
 
 const page = docPage('logos-3-5')!;

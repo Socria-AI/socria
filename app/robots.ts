@@ -26,9 +26,17 @@ export default function robots(): MetadataRoute.Robots {
   return {
     rules: [
       {
+        // Every crawler, the AI ones included. Being read by answer engines
+        // (ChatGPT search, Perplexity, Google's AI answers, Claude) is how
+        // somebody asking one of them for a thinking tool hears about Socria;
+        // /llms.txt is the summary written for them. One group on purpose: a
+        // crawler that finds a group naming it ignores this one, disallows
+        // and all, so naming them here would open what this closes.
         userAgent: '*',
         allow: '/',
         // Nothing behind sign-in, and nothing that is a person's own work.
+        // Share links (/s/…) stay crawlable so the noindex on them is seen;
+        // a blocked page can still be listed from a link to it.
         disallow: ['/api/', '/chat', '/account', '/studio'],
       },
     ],

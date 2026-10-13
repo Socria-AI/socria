@@ -11,8 +11,8 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
-import { DemoEngineering } from '../DocsDemo';
-import { DemoScene } from '../DocsScene';
+import { DemoEngineering } from '../demos';
+import { DemoScene } from '../demos';
 import { docPage } from '../registry';
 import { ENGINEERING, SCENE_EXAMPLES, type Discipline, type EngineeringExample, type SceneExample } from '@/lib/model/engineering';
 import { readScene } from '@/lib/objects/scene-intent';

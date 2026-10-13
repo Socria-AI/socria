@@ -9,7 +9,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
-import { DemoBoard, DemoGuard } from '@/app/logos/LogosDemo';
+import { DemoBoard, DemoGuard } from '../demos';
 import {
   DemoCollege,
   DemoPlot,
@@ -18,7 +18,7 @@ import {
   DemoVizOthers,
   DemoVizRiemann,
   DemoVizTaylor,
-} from '../DocsDemo';
+} from '../demos';
 import { docPage } from '../registry';
 
 const page = docPage('mathematics')!;

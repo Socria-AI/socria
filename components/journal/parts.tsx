@@ -481,7 +481,7 @@ const DOOR_ASKS = [
  * touches before they have decided anything.
  */
 export function Door({
-  issue = 'Issue No. 4 · Logos 3 · MMXXVI',
+  issue = 'Issue No. 4 · Logos 3.5 · MMXXVI',
   to = '/chat',
 }: {
   issue?: string;
@@ -584,6 +584,15 @@ export function Door({
     <section className="door" data-screen-label="The door">
       <div className="wrap">
         <Label tone="moss">{issue}</Label>
+        {/* The page's one heading: the line Socria stands on, and in a
+            smaller voice what it is — for the reader who arrives cold, and
+            for a search engine, which had no heading on this page at all. */}
+        <h1 className="door-h1">
+          <span className="door-h1-line">
+            Think for <em>yourself.</em>
+          </span>
+          <span className="door-h1-sub">Socria is the AI that sharpens your reasoning instead of doing it for you.</span>
+        </h1>
         <form
           className="door-ask"
           onSubmit={(e) => {

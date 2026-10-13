@@ -9,12 +9,14 @@
 import type { Metadata } from 'next';
 import { Logos2Workspace } from './Logos2Workspace';
 import './logos2.css';
+import { pageMetadata } from '@/lib/seo';
 
-export const metadata: Metadata = {
+export const metadata: Metadata = pageMetadata({
+  path: '/logos2',
   title: 'Logos 2 — a workspace you arrange',
   description:
     'Every pane closes and comes back. A Thinking Map, a transcript, and a working surface where the physics is real: a Kerr black hole with integrated geodesics, the thermal history of the universe, and gravity as an N-body integration.',
-};
+});
 
 export default function Logos2Page() {
   return <Logos2Workspace />;

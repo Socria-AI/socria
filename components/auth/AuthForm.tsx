@@ -55,6 +55,8 @@ import {
   type ChosenFactor,
 } from '@/lib/auth-flow';
 import type { AuthKind } from '@/lib/auth-links';
+import { track } from '@/lib/analytics';
+import { forgetFirstTouch, recallFirstTouch, signupProps } from '@/lib/first-touch';
 
 /**
  * Record the newsletter box for an account that has just been made and
@@ -141,6 +143,19 @@ export function AuthForm({
     (sessionId: string | null | undefined, made: boolean) => {
       const to = redirectTo ?? (made ? '/onboarding' : AFTER_AUTH);
       const activate = kind === 'sign-in' ? setInActive : setUpActive;
+      // An account was just made: report it, with how this browser first
+      // arrived where that note was kept, then let the note go — it has
+      // done the one thing it was kept for.
+      if (made && kind === 'sign-up') {
+        let store: Storage | null = null;
+        try {
+          store = window.localStorage;
+        } catch {
+          store = null;
+        }
+        track('signup_completed', signupProps(recallFirstTouch(store, Date.now())));
+        forgetFirstTouch(store);
+      }
       if (!sessionId || !activate) {
         // Clerk said complete but handed back no session. Rather than sit on
         // a dead form, send them to where they were going — whatever state

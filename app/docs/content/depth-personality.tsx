@@ -5,7 +5,7 @@
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
-import { DemoControls } from '@/app/logos/LogosDemo';
+import { DemoControls } from '../demos';
 import { docPage } from '../registry';
 
 const page = docPage('depth-personality')!;
