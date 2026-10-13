@@ -24,12 +24,15 @@
 // lib/clerk-errors.ts above all, are used here too rather than reimplemented,
 // so the two screens cannot start disagreeing about what a Clerk refusal says.
 //
-// THE NEWSLETTER BOX. Sign-up carries one checkbox — the Socria newsletter,
-// ticked to begin with. Its answer cannot be recorded until there is an
-// account to record it against, so it is held here through the password and
-// code steps and written once the new session is active (land(), below),
-// through the same route the Data & Privacy switch uses. Unticked, nothing is
-// written: not subscribed is what an account starts as.
+// THE NEWSLETTER BOX. Sign-up carries one checkbox — the Socria newsletter.
+// Whether it starts ticked is the page's call, by the visitor's country
+// (lib/newsletter-consent.ts): ticked where the law allows a ticked box,
+// unticked where consent has to be the person's own act, as in the EU, the UK
+// and Canada. Its answer cannot be recorded until there is an account to
+// record it against, so it is held here through the password and code steps
+// and written once the new session is active (land(), below), through the
+// same route the Data & Privacy switch uses. Unticked, nothing is written:
+// not subscribed is what an account starts as.
 //
 // The branching lives in lib/auth-flow.ts, tested without a browser. This
 // file is the rendering and the calls.
@@ -81,10 +84,13 @@ async function subscribeToNewsletter(): Promise<void> {
 export function AuthForm({
   kind,
   redirectTo,
+  newsletterDefault = false,
 }: {
   kind: AuthKind;
   /** already validated by isSafeRedirect at the page */
   redirectTo?: string;
+  /** sign-up only: whether the newsletter box starts ticked (lib/newsletter-consent.ts) */
+  newsletterDefault?: boolean;
 }) {
   const router = useRouter();
   const { isLoaded: inLoaded, signIn, setActive: setInActive } = useSignIn();
@@ -109,8 +115,8 @@ export function AuthForm({
   /** when the current code was sent, for the resend hold */
   const [sentAt, setSentAt] = useState(0);
   const [hold, setHold] = useState(0);
-  /** sign-up only: the newsletter box, ticked to begin with */
-  const [newsletter, setNewsletter] = useState(true);
+  /** sign-up only: the newsletter box, ticked to begin with where that is allowed */
+  const [newsletter, setNewsletter] = useState(newsletterDefault);
 
   const box = useRef<HTMLInputElement>(null);
 

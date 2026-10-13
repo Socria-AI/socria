@@ -268,6 +268,7 @@ const MODULES = [
   'lib/email.ts',
   'lib/newsletter.ts',
   'lib/newsletter-issues.ts',
+  'lib/newsletter-consent.ts',
   'lib/socria-prompt.ts',
   'app/explore/scenarios.ts',
   'app/docs/registry.ts',

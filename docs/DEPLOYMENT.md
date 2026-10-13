@@ -269,10 +269,16 @@ off. Turn it on when it has.
 
 ## Newsletter
 
-The sign-up form carries one checkbox, **ticked by default**: "Send me the
-Socria newsletter". Left ticked, the new account is subscribed the moment
-it is signed in (`PUT /api/email/preferences {newsletter: true}`); unticked,
-nothing is written. The subscription is a row in the same ledger as the
+The sign-up form carries one checkbox: "Send me the Socria newsletter".
+It starts **ticked** in the US and most other countries, and **unticked**
+in the EU and the rest of the EEA, the UK (with Jersey, Guernsey, the Isle
+of Man and Gibraltar), Switzerland and Canada — and wherever the visitor's
+country is unknown, which includes a local run. The country is Vercel's
+`x-vercel-ip-country` header, read by the sign-up page; the list is
+`OPT_IN_COUNTRIES` in `lib/newsletter-consent.ts`. Ticked when the account
+is made, the new account is subscribed the moment it is signed in
+(`PUT /api/email/preferences {newsletter: true}`); unticked, nothing is
+written. The subscription is a row in the same ledger as the
 notes (`lifecycle_emails`, kind `newsletter`), so there is no migration to
 run. The switch under Data & Privacy writes and removes the same row, and
 so does every unsubscribe link: an issue's own link (`l=newsletter`) stops
@@ -321,13 +327,16 @@ An issue's id is permanent once it has gone to anyone — it is that
 once-ever key, so a changed id is a new issue and would go to everyone
 again.
 
-**The ticked box is a decision for the US.** CAN-SPAM allows it, so long
-as every issue carries the unsubscribe and the postal address, which the
-code enforces. The GDPR does not accept a pre-ticked box as consent
-(Recital 32; the UK's PECR uses the same standard), and Canada's CASL wants
-an opt-in the person makes themselves. If Socria is marketed to people in
-those places, the box should start unticked for them — the same open
-question as the day-N notes above.
+**Why the box depends on the country.** CAN-SPAM allows a ticked box, so
+long as every issue carries the unsubscribe and the postal address, which
+the code enforces. The GDPR does not accept a pre-ticked box as consent
+(Recital 32; the UK's PECR uses the same standard), Switzerland's UWG asks
+for consent to marketing email, and Canada's CASL wants an opt-in the person
+makes themselves — so in those places the box starts unticked. Other
+countries also expect an opt-in for marketing email (Australia, Brazil,
+Japan and South Korea among them); adding a country is adding its code to
+`OPT_IN_COUNTRIES`. The lookup is by IP address, so a visitor on a VPN is
+placed where the VPN is.
 
 ---
 

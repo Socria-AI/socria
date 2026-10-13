@@ -11,9 +11,9 @@
 //
 // WHO IS SUBSCRIBED is one row: the ledger (lib/lifecycle-store.ts) holds
 // `newsletter` for a person, or it does not. Three things write or remove it:
-// the box on the sign-up form (ticked by default; leaving it unticked writes
-// nothing), the switch under Data & Privacy, and the unsubscribe link in
-// every issue. The general "stop these emails" link removes it too — a
+// the box on the sign-up form (ticked to begin with only where the law
+// allows that — lib/newsletter-consent.ts; unticked writes nothing), the
+// switch under Data & Privacy, and the unsubscribe link in every issue. The general "stop these emails" link removes it too — a
 // person who presses unsubscribe on any Socria email wants Socria email to
 // stop, and only the newsletter's own link is narrower than that.
 //

@@ -1,9 +1,11 @@
 // app/sign-up/[[...sign-up]]/page.tsx
 import type { Metadata } from 'next';
+import { headers } from 'next/headers';
 import { AuthPlate } from '@/components/auth/AuthPlate';
 import { AuthForm } from '@/components/auth/AuthForm';
 import { isSafeRedirect } from '@/lib/auth-links';
 import { rewardsConfig } from '@/lib/rewards/rewards-config';
+import { newsletterTickedByDefault } from '@/lib/newsletter-consent';
 import '../../app-shell.css';
 
 export const metadata: Metadata = {
@@ -25,6 +27,11 @@ export default function SignUpPage({
   // promises what a new account receives and nothing on the friend's behalf.
   const cfg = rewardsConfig();
   const invited = searchParams?.invited === '1' && cfg.enabled;
+  // The newsletter box starts ticked only where the law allows a ticked box,
+  // and unticked in the EU, the UK, Canada and the rest of the list in
+  // lib/newsletter-consent.ts — by the country Vercel's edge reads from the
+  // visitor's IP. With no header (a local run) it starts unticked.
+  const newsletterDefault = newsletterTickedByDefault(headers().get('x-vercel-ip-country'));
   const days = cfg.referral.signupDays;
   return (
     <AuthPlate
@@ -43,7 +50,7 @@ export default function SignUpPage({
           Someone who came here from a specific page still goes back to it —
           an interrupted errand is not a first run. AuthForm makes that call;
           see `land()` there. */}
-      <AuthForm kind="sign-up" redirectTo={back} />
+      <AuthForm kind="sign-up" redirectTo={back} newsletterDefault={newsletterDefault} />
     </AuthPlate>
   );
 }
