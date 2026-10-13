@@ -64,6 +64,19 @@ export interface GuardInput {
    * failure mode that makes a cited answer worse than an uncited one.
    */
   sources?: { n: number }[];
+  /**
+   * Whether this turn ran a deterministic check (lib/accuracy). When it did,
+   * "this was checked numerically" is a true sentence about the turn; when it
+   * did not, it is a fabricated tool result and is stripped. A named tool —
+   * Python, Wolfram, a calculator — is never true here, either way.
+   */
+  computed?: boolean;
+  /**
+   * They pushed back and were right: the engine re-checked the previous reply
+   * and it was wrong. "You're right" is then an acknowledgement owed, not a
+   * sycophantic opener, and is not stripped.
+   */
+  theyAreRight?: boolean;
 }
 
 /** Deflection: talking about the question instead of answering it. */
@@ -138,6 +151,29 @@ export function leaksHidden(draft: string, hidden: string[]): string[] {
 
 /** Claims of tools Socria does not have in this path (council D7/D8). */
 const TOOL_CLAIM = /\bi(?:'ve| have)? (?:just )?(?:searched|googled|looked (?:it |this |that )?up|ran (?:the|your|this|that) (?:code|script|query|numbers)|browsed|checked (?:online|the web|the internet|(?:it|this|that) numerically|(?:it|this|that) in (?:python|code|a script)))\b/i;
+
+/**
+ * A verification the reply says it ran. "I verified it numerically", "I
+ * plugged it into Wolfram", "a quick check in Python confirms" — the model
+ * runs nothing, so each of these is a fabricated tool result unless the turn
+ * actually computed something (lib/accuracy). Even then, only the checks that
+ * happened may be claimed: the math engine evaluates and differentiates; it
+ * is not Python, Wolfram, Desmos or a calculator, and a reply may not say so.
+ */
+const VERIFY_CLAIM = /\b(?:i|we)(?:'ve| have)? (?:just |also )?(?:double-?checked|verified|confirmed|tested|checked) (?:it|this|that|the (?:result|answer|derivative|integral|calculation|math|arithmetic|algebra|working))\b|\b(?:has been|have been|was|were) (?:double-?checked|verified|confirmed|checked|tested) (?:numerically|computationally|symbolically)\b/i;
+const NAMED_TOOL = /\b(?:i|we)(?:'ve| have)? (?:just |also )?(?:plugged|typed|put|ran|entered|checked|verified|tested|confirmed) (?:it |this |that |them |the \w+ )?(?:into|in|with|using|on|through) (?:a |the |my )?(?:calculator|wolfram(?:alpha| alpha)?|desmos|python|mathematica|matlab|sympy|cas|computer algebra|geogebra|excel|code|a script)\b|\b(?:a quick|my) (?:check|run|calculation) (?:in|with|on) (?:python|wolfram|mathematica|desmos|matlab|code|a calculator)\b|\baccording to (?:wolfram(?:alpha| alpha)?|my calculator|python)\b/i;
+
+/**
+ * A sentence claiming a tool run or a verification that did not happen.
+ * Shared by the guard (held turns) and the sentence gate (streamed turns), so
+ * a fabricated "I checked it in Python" is removed whichever way the reply
+ * travels.
+ */
+export function fabricatedToolClaim(sentence: string, turn: { searched: boolean; computed: boolean }): boolean {
+  if (!turn.searched && TOOL_CLAIM.test(sentence) && !(turn.computed && /\bnumerically\b/i.test(sentence) && !/python|code|script/i.test(sentence))) return true;
+  if (!turn.computed && VERIFY_CLAIM.test(sentence)) return true;
+  return NAMED_TOOL.test(sentence);
+}
 
 /** An inference about the person stated as fact (council D8). */
 const TRAIT_AS_FACT = /\byou(?:'re| are) (?:clearly |obviously )?(?:a beginner|an expert|anxious|insecure|defensive|overwhelmed)\b|\byou tend to\b|\byou seem (?:anxious|stressed|upset|frustrated|overwhelmed)\b/i;
@@ -465,7 +501,10 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   }
 
   // ── VOICE ──
-  if (hasSycophanticOpener(draft)) {
+  // "You're right" flatters when it is reflexive, and is simply true when the
+  // engine has just confirmed they caught a mistake of Socria's.
+  const earned = !!input.theyAreRight && /^you(?:'re| are) (?:absolutely |completely |totally )?right\b/i.test(sentencesOf(draft.trim())[0]?.trim() ?? '');
+  if (!earned && hasSycophanticOpener(draft)) {
     findings.push({ side: 'voice', code: 'sycophancy', detail: 'Sycophantic opener.' });
     const rest = stripSycophanticOpener(draft);
     if (rest) {
@@ -506,7 +545,7 @@ export function guardStructure(input: GuardInput): GuardOutcome & { needsModel: 
   // carries sources, "I looked this up" is a true sentence and stripping it
   // would leave the reply quoting pages it refuses to admit reading.
   const searched = (input.sources?.length ?? 0) > 0;
-  const unbacked = sentencesOf(draft).filter((s) => (!searched && TOOL_CLAIM.test(s)) || TRAIT_AS_FACT.test(s));
+  const unbacked = sentencesOf(draft).filter((s) => fabricatedToolClaim(s, { searched, computed: !!input.computed }) || TRAIT_AS_FACT.test(s));
   if (unbacked.length && !retryNote) {
     const rest = deleteSentences(draft, unbacked.map((s) => s.trim()));
     findings.push({ side: 'voice', code: 'unbacked_claim', detail: 'A tool claim or a trait stated as fact.' });

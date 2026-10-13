@@ -44,6 +44,8 @@ import { calibrate, conceptKey, evidenceFromTurn, taskCompetence } from './capab
 import { buildProblem, entryInScope, renderProblem, type ProblemModel } from './problem';
 import { detectMissing, gateContributions, renderMissing, type MissingContribution } from './contribution';
 import { buildTrace } from './trace';
+import { planTurn, checkDraft, repairDraft, attemptVerdict, type AccuracyPlan } from '../accuracy/accuracy';
+import { describe } from '../accuracy/checker';
 import { questionLoad, stripInterrogatives, deleteSentences } from './questions';
 export { SentenceGate } from './stream-gate';
 // Re-exported for the suites: the off-the-record marker is asserted against the
@@ -167,6 +169,12 @@ export interface PreparedTurn {
   problem: ProblemModel;
   /** what the structure says is absent, novelty-gated and expertise-gated */
   missing: MissingContribution[];
+  /**
+   * What was computed for this turn and what the draft check needs
+   * (lib/accuracy): their problem solved by the engine, their claims checked,
+   * the previous reply re-checked when they push back.
+   */
+  accuracy: AccuracyPlan;
   /** the prompt blocks, in order: state, verify, move */
   blocks: { state: string; verify: string; move: string };
   ms: Record<string, number>;
@@ -374,6 +382,30 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
   };
   let { allocation, decision } = decide();
 
+  // ── WHAT CAN BE COMPUTED, COMPUTED (lib/accuracy) ───────────────
+  //
+  // Deterministic and model-free: the derivative they asked for, the claims in
+  // their message, and — when they push back — the claims in the reply they
+  // are pushing back on, each decided by the symbolic engine or by
+  // evaluation. Before this, a calculus question was answered from the reply
+  // model's memory and a challenge was answered from its mood.
+  const priorTurns = input.brief.length && input.brief[input.brief.length - 1].role === 'user' ? input.brief.slice(0, -1) : input.brief;
+  let accuracy = planTurn({ lastUserText: input.lastUserText, history: priorTurns, withhold: !!allocation.withhold });
+  // Verify Mode's exact path, extended from arithmetic to what the engine can
+  // decide: their derivative, integral, limit or solution, checked by
+  // computing it rather than by the cheap checker's opinion of it.
+  if (!verify && attempting) {
+    const a = attemptVerdict(accuracy);
+    if (a) {
+      verify = { verdict: a.correct ? 'correct' : 'incorrect', location: a.correct ? '' : 'the final result', errorType: a.slip, expected: a.expected, confidence: 1, method: 'exact' };
+      const judged = a.correct ? 'right' : 'wrong';
+      if (judged !== state.attempt) {
+        state.attempt = judged;
+        ({ allocation, decision } = decide());
+      }
+    }
+  }
+
   // Verify Mode, part two: when arithmetic could not settle it, a SEPARATE
   // checker call judges the attempt. Under a withhold its solution never
   // reaches the reply model (renderCheck, hiddenValues). A confident verdict
@@ -534,6 +566,18 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     decision = { ...decision, forced: true };
   }
 
+  // The plan was rendered for the withhold the first decision made; a
+  // re-decision can change it, and a computed answer must never reach a
+  // turn that is holding it back.
+  if (!!allocation.withhold !== accuracy.context.withhold) {
+    accuracy = planTurn({ lastUserText: input.lastUserText, history: priorTurns, withhold: !!allocation.withhold });
+  }
+  computed += accuracy.block;
+  // Mathematics, or a challenge to it, is read before it is sent: the draft
+  // is checked by computation and regenerated once if it is wrong. Every
+  // other turn streams exactly as before.
+  if (accuracy.check) decision = { ...decision, guardRequired: true };
+
   let move = renderDecision({ ...decision, avoid: allLines.slice(0, 12) }, allocation) + renderMissing(missingShown);
   if (signals.offRecord && !signals.onRecord) {
     // WHAT IS TRUE, not what sounds reassuring. "Socria will not keep anything
@@ -642,6 +686,7 @@ export async function prepareTurn(input: TurnInput): Promise<PreparedTurn> {
     superseded,
     verify,
     hidden,
+    accuracy,
     blocks: { state: renderStateBlock(state) + renderProblem(problem) + renderCounterfactual(counterfactual) + renderContradictions(contradictions) + renderHistory(historical) + lastTime(ledger, input, state.turn), verify: verifyBlock + computed, move },
     ms,
   };
@@ -719,12 +764,29 @@ export interface GuardedReply {
 
 /** Answer Guard 2.0 on a complete draft. */
 export async function guardReply(p: PreparedTurn, draft: string): Promise<GuardedReply> {
-  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden, target: targetOf(p), sources: p.research?.sources };
+  const input: GuardInput = { decision: p.decision, allocation: p.allocation, draft, considered: p.considered.items, hidden: p.hidden, target: targetOf(p), sources: p.research?.sources, computed: p.accuracy?.context.computed, theyAreRight: p.accuracy?.theyCaughtIt };
   const g = guardStructure(input);
   let text = g.revised ?? draft;
-  let outcome: GuardOutcome = { action: g.action, findings: g.findings, by: g.by, ...(g.revised ? { revised: g.revised } : {}), ...(g.retryNote ? { retryNote: g.retryNote } : {}) };
+  // THE MATHEMATICS IN THE DRAFT, CHECKED BY COMPUTING IT. Deterministic,
+  // and on the same single regeneration every other finding uses: a wrong
+  // derivative is a reason to rewrite exactly like a leaked answer is.
+  const math = p.accuracy ? checkDraft(text, p.accuracy.context) : null;
+  const mathFindings: GuardOutcome['findings'] = math
+    ? [
+        ...math.refuted.map((v) => ({ side: 'underhelp' as const, code: 'math_refuted', detail: `${describe(v.claim)}: ${v.why ?? 'does not check out'}` })),
+        ...math.leaked.map((v) => ({ side: 'overreach' as const, code: 'math_leak', detail: `states the answer they are working out: ${describe(v.claim)}` })),
+      ]
+    : [];
+  const retryAll = [g.retryNote, math?.retryNote].filter(Boolean).join('\n');
+  let outcome: GuardOutcome = {
+    action: g.retryNote ? g.action : math?.retryNote ? 'MODIFY_FOR_MORE_HELP' : g.action,
+    findings: [...g.findings, ...mathFindings],
+    by: g.by === 'none' && mathFindings.length ? 'structure' : g.by,
+    ...(g.revised ? { revised: g.revised } : {}),
+    ...(retryAll ? { retryNote: retryAll } : {}),
+  };
   let novelty = g.novelty;
-  if (g.retryNote) return { text, outcome, novelty, retryNote: g.retryNote };
+  if (retryAll) return { text, outcome, novelty, retryNote: retryAll };
 
   if (g.needsModel && p.input.apiKey) {
     const t = Date.now();
@@ -763,6 +825,15 @@ export async function guardReply(p: PreparedTurn, draft: string): Promise<Guarde
  * built from the verify verdict.
  */
 export function fallbackReply(p: PreparedTurn, first: string, retry: string | null): { text: string; codes: string[] } {
+  const fb = fallbackCore(p, first, retry);
+  // Still wrong after its one regeneration: the reply goes out with the
+  // correction stated plainly after it, never with the error standing alone.
+  if (!p.accuracy) return fb;
+  const fixed = repairDraft(fb.text, p.accuracy.context);
+  return fixed.corrected ? { text: fixed.text, codes: [...fb.codes, 'fallback:math_corrected'] } : fb;
+}
+
+function fallbackCore(p: PreparedTurn, first: string, retry: string | null): { text: string; codes: string[] } {
   const codes: string[] = [];
   for (const candidate of [retry, first]) {
     if (!candidate) continue;

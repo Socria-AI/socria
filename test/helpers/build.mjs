@@ -172,6 +172,13 @@ const MODULES = [
   'lib/core4/contribution.ts',
   'lib/core4/guard2.ts',
   'lib/core4/verify.ts',
+  // accuracy: notation, claims, the deterministic checker, pushback, the per-turn plan
+  'lib/accuracy/notation.ts',
+  'lib/accuracy/numeric-check.ts',
+  'lib/accuracy/claims.ts',
+  'lib/accuracy/checker.ts',
+  'lib/accuracy/pushback.ts',
+  'lib/accuracy/accuracy.ts',
   'lib/core4/ledger.ts',
   'lib/core4/capability.ts',
   'lib/core4/counterfactual.ts',

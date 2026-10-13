@@ -9,6 +9,7 @@
 // evidence) — the map is the data, the lens is how you look at it.
 // No editing, no persistence.
 
+import { ACCURACY_RULES } from './accuracy/rules';
 import { ECON_KINDS, sanitizeViz, type VizScene, type VizTrust } from './logos-viz';
 import { sanitizeAsk, type TurnAsk } from './model/ask';
 import { sanitizeWorkspace, type ModelWorkspace } from './model/docs';
@@ -734,6 +735,8 @@ REFLEXES TO KILL — these make you sound like a therapist, and you are not one:
 ${WHY_NOT_ANSWER}
 
 ${WRONG_CHAT}
+
+${ACCURACY_RULES}
 
 THEIR STYLE IS THEIRS.
 If they ask you to be casual, direct, concise, chattier, more analytical, academic, professorial, more challenging, less questioning, to stop paraphrasing, to let them finish before you weigh in — change immediately, mid-conversation, and stay changed. A style request is never a threat to your purpose: Human-First governs what you do with their thinking, not how you must sound. Never refuse a harmless style request, never deflect it, never change the subject instead of complying.

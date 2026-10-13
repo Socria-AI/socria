@@ -32,6 +32,8 @@ import { getProject } from '@/lib/mind/store';
 import { extractionContext, type ActivatedSubgraph } from '@/lib/mind/activate';
 import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
+import { checkDraft, correctionFor } from '@/lib/accuracy/accuracy';
+import { fabricatedToolClaim } from '@/lib/core4/guard2';
 import { boundaryNote } from '@/lib/entitlements';
 import { bumpUsage, chatAlreadyCounted, checkAllowance, markChatCounted } from '@/lib/usage';
 import { encodeActivity, type Activity } from '@/lib/core4/activity';
@@ -906,7 +908,11 @@ function core4Reply(x: {
           }
           controller.enqueue(encoder.encode(reply));
         } else {
-          const gate = new SentenceGate((chunk) => controller.enqueue(encoder.encode(chunk)), { passQuestions: p?.decision.questionsAreContent });
+          const gate = new SentenceGate((chunk) => controller.enqueue(encoder.encode(chunk)), {
+            passQuestions: p?.decision.questionsAreContent,
+            // A claimed tool run that did not happen never streams out.
+            drop: (sentence) => fabricatedToolClaim(sentence, { searched: (p?.research?.sources?.length ?? 0) > 0, computed: !!p?.accuracy?.context.computed }),
+          });
           for await (const d of deltas) gate.push(d);
           // Quiz items are the content: never dropped as "re-asked" (run 2,
           // learning-006 — the next drill item was deleted as a repeat).
@@ -916,6 +922,24 @@ function core4Reply(x: {
           served = done?.served ?? served;
           if (dropped.length) {
             guard = { action: 'MODIFY_FOR_MORE_HELP', findings: dropped.map(() => ({ side: 'underhelp' as const, code: 'stream_gate', detail: 'held-back question dropped' })), by: 'structure' };
+          }
+          // A TURN THAT WAS NOT HELD CAN STILL STATE MATHEMATICS. It streamed
+          // because nothing in their message was risky; if the finished reply
+          // turns out to contain a claim the engine refutes, the correction
+          // goes out now, in plain words, rather than the error standing.
+          if (p?.accuracy) {
+            const late = checkDraft(reply, p.accuracy.context);
+            const note = late.refuted.length ? correctionFor(late, p.accuracy.context.withhold) : '';
+            if (note) {
+              const add = `\n\n${note}`;
+              controller.enqueue(encoder.encode(add));
+              reply += add;
+              guard = {
+                action: 'MODIFY_FOR_MORE_HELP',
+                findings: [...(guard?.findings ?? []), ...late.refuted.map(() => ({ side: 'underhelp' as const, code: 'math_corrected_after', detail: 'a streamed claim the engine refuted, corrected after it' }))],
+                by: 'structure',
+              };
+            }
           }
           if (p) p.ms.generate = Date.now() - t0;
         }

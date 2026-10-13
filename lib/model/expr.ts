@@ -131,8 +131,13 @@ function implicitMul(toks: Tok[]): Tok[] {
  */
 export function parse(raw: string, names: readonly string[]): Expr | null {
   const set = new Set(names.map((n) => n.toLowerCase()));
-  const toks = lex(normalizeExpr(raw), set);
-  if (!toks || !toks.length) return null;
+  // implicitMul was written for exactly this call and never wired in, so
+  // "2x" and "csc(x)cot(x)" — which the evaluator has always read as
+  // products — failed to parse here, and every claim written that way went
+  // unchecked. Found by the accuracy checker (lib/accuracy/checker.ts).
+  const lexed = lex(normalizeExpr(raw), set);
+  if (!lexed || !lexed.length) return null;
+  const toks = implicitMul(lexed);
   let at = 0;
   const peek = () => toks[at];
   const eat = () => toks[at++];

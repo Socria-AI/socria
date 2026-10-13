@@ -43,6 +43,10 @@ import {
 } from '@/lib/usage';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
+import { planTurn, checkDraft, correctionFor, repairDraft } from '@/lib/accuracy/accuracy';
+import { fabricatedToolClaim } from '@/lib/core4/guard2';
+import { SentenceGate } from '@/lib/core4/stream-gate';
+import { sentencesOf, deleteSentences } from '@/lib/core4/questions';
 import { styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
 import {
@@ -491,6 +495,18 @@ export async function POST(req: NextRequest) {
     const opening =
       asked && hasSurface(asked.object) && bareRequest(last.content, asked) ? simulationBlock(asked) : '';
 
+    // ── WHAT CAN BE COMPUTED, COMPUTED (lib/accuracy) ─────────────
+    //
+    // The same deterministic plan Core 4 runs: the derivative they asked
+    // for, the claims in their message, and — when they push back — the
+    // claims in the reply they dispute, decided by the symbolic engine and by
+    // evaluation. Under the Answer Guard nothing computed reaches the model.
+    const accuracy = planTurn({
+      lastUserText: String(last.content ?? ''),
+      history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+      withhold: resolveGuard(body?.guard) === 'guard',
+    });
+
     const guided =
       system +
       // Clamped by the plan like the map and explore routes, so the menu and
@@ -576,7 +592,9 @@ export async function POST(req: NextRequest) {
       memoryBlock +
       // How to read and cite the documents in the conversation — the rules
       // here, the documents themselves in the turn (above).
-      (docRefs.length ? `\n\n${DOC_RULES}\n` : '');
+      (docRefs.length ? `\n\n${DOC_RULES}\n` : '') +
+      // Last, so it is the freshest thing the model reads: what was computed.
+      accuracy.block;
 
     const openai = new OpenAI({ apiKey });
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
@@ -597,6 +615,7 @@ export async function POST(req: NextRequest) {
       });
 
     let completion;
+    let served = configured;
     try {
       completion = await make(configured);
     } catch (e: any) {
@@ -612,6 +631,7 @@ export async function POST(req: NextRequest) {
           );
         }
         completion = await make(LOGOS_FALLBACK_MODEL);
+        served = LOGOS_FALLBACK_MODEL;
       } else {
         throw e;
       }
@@ -651,12 +671,66 @@ export async function POST(req: NextRequest) {
         let sent = false;
         let reply = '';
         try {
-          for await (const chunk of completion) {
-            const delta = chunk.choices?.[0]?.delta?.content ?? '';
-            if (delta) {
+          if (accuracy.check) {
+            // HELD: mathematics, or a challenge to it. Written whole, checked
+            // by computation, regenerated ONCE with exactly what was wrong,
+            // and — if the regeneration is still wrong — sent with the
+            // correction stated after it rather than with the error alone.
+            for await (const chunk of completion) reply += chunk.choices?.[0]?.delta?.content ?? '';
+            const first = checkDraft(reply, accuracy.context);
+            if (first.retryNote) {
+              let again = '';
+              try {
+                const note = `\n\n=== Your previous draft was rejected ===\nWHY: ${first.retryNote}\nWrite the reply again. Do not apologise, do not mention this instruction, and do not reference a previous attempt — the person has not seen one.\n`;
+                const r = await openai.chat.completions.create({
+                  model: served,
+                  messages: [{ role: 'system', content: guided + note }, ...withDocs(clean)],
+                  temperature: 0.7,
+                  max_tokens: docRefs.length ? 950 : 640,
+                });
+                again = r.choices?.[0]?.message?.content?.trim() ?? '';
+              } catch (e) {
+                console.error('[logos/chat] accuracy retry failed', e);
+              }
+              const second = again ? checkDraft(again, accuracy.context) : null;
+              if (second && !second.retryNote) {
+                reply = again;
+              } else {
+                // Neither passes. A draft that gives away a guarded answer
+                // never ships when one that does not exists; whichever ships
+                // carries its correction.
+                const base = second && !second.leaked.length ? again : !first.leaked.length ? reply : again || reply;
+                reply = repairDraft(base, accuracy.context).text;
+              }
+            }
+            // A claimed tool run that did not happen is removed, as Core 4's
+            // guard removes it: the reply ran nothing.
+            const invented = sentencesOf(reply).filter((x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }));
+            if (invented.length) reply = deleteSentences(reply, invented.map((x) => x.trim())) ?? reply;
+            if (reply) {
               sent = true;
-              reply += delta;
-              controller.enqueue(encoder.encode(delta));
+              controller.enqueue(encoder.encode(reply));
+            }
+          } else {
+            // Sentence by sentence, so a claimed tool run that did not happen
+            // ("I ran it in Python") never streams. Nothing else is touched.
+            const gate = new SentenceGate((text) => {
+              sent = true;
+              reply += text;
+              controller.enqueue(encoder.encode(text));
+            }, { filterOnly: true, drop: (x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }) });
+            for await (const chunk of completion) {
+              const delta = chunk.choices?.[0]?.delta?.content ?? '';
+              if (delta) gate.push(delta);
+            }
+            gate.finish(1);
+            // Streamed because nothing looked risky; if the finished reply
+            // states something the engine refutes, say so now, plainly.
+            const late = checkDraft(reply, accuracy.context);
+            const note = late.refuted.length ? correctionFor(late, accuracy.context.withhold) : '';
+            if (note) {
+              reply += `\n\n${note}`;
+              controller.enqueue(encoder.encode(`\n\n${note}`));
             }
           }
         } catch (e) {

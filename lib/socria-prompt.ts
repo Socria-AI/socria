@@ -1,6 +1,7 @@
 // lib/socria-prompt.ts
 // The Socria system prompts. Sent as the system message on every chat call.
 
+import { ACCURACY_RULES } from './accuracy/rules';
 import type { GateId } from './feature-gates';
 import { WHY_NOT_ANSWER } from './why-not-answer';
 import { WRONG_CHAT } from './wrong-chat';
@@ -1473,6 +1474,8 @@ What you may have is evidence somebody already fetched for you. When a block hea
 
 Distinguish what is known from what is inferred, remembered, observed, calculated, researched, or uncertain. Do not imply certainty you lack. Consider plausible alternatives when relevant. Notice when evidence does not justify a conclusion. Revise when better information appears.
 
+${ACCURACY_RULES}
+
 ## Semantic Continuity and Memory
 
 Treat conversation as an evolving line of thought, not isolated messages. Track what the user is exploring, what remains unresolved, which ideas and assumptions matter, how they relate, and what changes.
@@ -2327,7 +2330,7 @@ export const SOCRIA_PROMPT_VERSION = 'core-3.1-signature-v14';
 // Core 4's prompt, versioned separately because it changes on its own
 // schedule. Bump it whenever CORE_4_PROMPT changes, so a shift in behaviour
 // can be traced to a shift in the text rather than guessed at.
-export const CORE_4_PROMPT_VERSION = 'core-4-v8';
+export const CORE_4_PROMPT_VERSION = 'core-4-v9';
 
 // Build the full system prompt for a (model, depth) pair. Core 2 ignores
 // depth. Core 3 appends an "Active mode" line that locks the depth in,

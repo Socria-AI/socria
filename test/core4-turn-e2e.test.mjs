@@ -148,13 +148,15 @@ const m2 = U('ok so is it 2x cos x?');
 const t2 = await turn(c1, [m1, a1, m2], {
   // The reader has changed its mind about the goal. It does not get to.
   state: { taskKind: 'learn', work: 'verification', latest: 'attempt', attempt: 'wrong', currentFocus: 'differentiating x^2 sin x', learningGoal: { value: 'no', confidence: 0.9, evidence: 'asks to check' } },
-  check: { verdict: 'incorrect', location: 'you differentiated both factors and multiplied them', errorType: 'wrong rule', expected: '2x sin x + x^2 cos x', confidence: 0.9 },
+  // No scripted checker verdict: "2x cos x" for d/dx[x^2 sin x] is decided by
+  // computing it (lib/accuracy), which also names the slip — the product rule
+  // applied as f'g' — so the cheaper checker model is not consulted at all.
   replies: ['Not quite: you differentiated both factors and multiplied the results, which is the wrong rule for a product. Redo it with the product rule and send it over.'],
 });
 ok('the goal they stated survives the reader\'s contrary guess', t2.t?.state.learningGoal.source === 'explicit' && t2.t.state.learningGoal.value === 'yes');
 ok('so the redo stays with them: VERIFY', t2.move === 'VERIFY', t2.move);
-ok('the separate checker judged the attempt', t2.checkCalls === 1);
-ok('the reply model got WHERE and WHAT KIND…', /WHERE: you differentiated both factors/.test(t2.prompt) && /KIND OF ERROR: wrong rule/.test(t2.prompt));
+ok('the attempt was decided by computing it, not by the separate checker', t2.checkCalls === 0 && t2.t?.verify?.method === 'exact' && t2.t.verify.verdict === 'incorrect', JSON.stringify(t2.t?.verify));
+ok('the reply model got the computed verdict and the kind of slip…', /VERDICT: incorrect \(computed exactly\)/.test(t2.prompt) && /KIND OF ERROR: the product rule/.test(t2.prompt), t2.prompt.slice(-900));
 ok('…and never the expected answer', !t2.prompt.includes('x^2 cos x') || !/2x sin x \+ x\^2 cos x/.test(t2.prompt));
 ok('not announced a second time', !/say so once/.test(t2.prompt));
 ok('the turn count moved on', rows('core4_state').find((r) => r.conversation_id === c1)?.state.turn === 2);

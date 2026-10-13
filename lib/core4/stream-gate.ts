@@ -34,7 +34,19 @@ export class SentenceGate {
    * questions), so interrogatives are content and pass straight through;
    * closing offers are still held.
    */
-  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean } = {}) {}
+  /**
+   * drop: a sentence that must never ship at all — a claimed tool run that did
+   * not happen (guard2.ts fabricatedToolClaim). Dropped whole, as the guard's
+   * always-strip list does on a held turn; recorded in `stripped`.
+   */
+  stripped: string[] = [];
+
+  /**
+   * filterOnly: apply `drop` and nothing else — no held questions, no opener
+   * strip. For a surface (Logos) that has its own voice rules and only needs
+   * a claimed tool run kept out of the stream.
+   */
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -71,6 +83,14 @@ export class SentenceGate {
   }
 
   private consider(sentence: string) {
+    if (this.opts.drop && sentence.trim() && this.opts.drop(sentence)) {
+      this.stripped.push(sentence.trim());
+      return;
+    }
+    if (this.opts.filterOnly) {
+      this.send(sentence);
+      return;
+    }
     if (this.first && sentence.trim()) {
       this.first = false;
       // "Great question — the answer is 42." keeps "The answer is 42."
