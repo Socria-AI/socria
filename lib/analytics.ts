@@ -20,6 +20,7 @@
 // path that must succeed, and every call is wrapped anyway.
 
 import { track as vercelTrack } from '@vercel/analytics';
+import { countFirstParty } from './product-events';
 
 /** Events this product emits. Adding one is a deliberate act. */
 export const EVENTS = [
@@ -97,6 +98,11 @@ export const EVENTS = [
   // only (lib/first-touch.ts): `landing`, `referrer`, and the utm_* tags a
   // link of ours carried — or 'unknown' where no note could be kept.
   'signup_completed',
+  // One answer on the onboarding screen (components/onboarding/FirstRunIntro):
+  // `step` ('premise' | 'name' | 'who' | 'how' | 'thought' | 'example') and
+  // `kind` — a role id, a model id, a starting-point id, 'given' | 'skipped'
+  // for the name (never the name), or 'skip_all' for the Skip button.
+  'onboarding_answered',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -238,9 +244,13 @@ export function scrub(props: EventProps): Record<string, PropValue> {
  * ends the same way: nothing happens and the product carries on.
  */
 export function track(event: AnalyticsEvent, props: EventProps = {}): void {
+  const clean = scrub(props);
   try {
-    vercelTrack(event, scrub(props));
+    vercelTrack(event, clean);
   } catch {
     // An ad blocker, a server context, or analytics simply not configured.
   }
+  // A few events are also counted first-party, anonymously, so the developer
+  // dashboard can read them back (lib/product-events.ts). Same scrubbed props.
+  countFirstParty(event, clean);
 }

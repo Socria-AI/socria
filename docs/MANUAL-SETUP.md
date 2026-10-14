@@ -400,6 +400,23 @@ development works because `localhost:3000` is stable and registered above.
 
 ---
 
+## 7. The developer dashboard (optional, off until you name yourself)
+
+`/dev/dashboard` shows sign-ups, onboarding answers, who people are in kinds
+(never identities), where they came from, and whether they stay. It is a 404
+for everyone until both of these are done:
+
+1. **Vercel**: set `SOCRIA_DASHBOARD_ADMINS` on each environment you want it
+   on. Use your verified email address, or your Clerk user id; Production and
+   Preview each have their own Clerk ids. Then redeploy.
+2. **Supabase**: run the `product_events` part of `supabase/schema.sql`, then
+   `supabase/rls.sql`, in each project. Until then the onboarding answers are
+   not counted, and the page says so.
+
+What each number means, and what is and is not read: `docs/DASHBOARD.md`.
+
+---
+
 ## Afterwards
 
 Once §1 and §2 are done, this is the state you should be able to confirm:

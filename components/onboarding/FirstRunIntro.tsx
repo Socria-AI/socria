@@ -28,6 +28,7 @@ import { ObIcon } from './ObIcon';
 import { ROLES, readRole, roleOf, writeRole, type IntentId, type Role } from '@/lib/onboarding-roles';
 import { readName, sanitizeName, writeName } from '@/lib/onboarding-name';
 import { track } from '@/lib/analytics';
+import { INTENTS, type Intent, type StartModel } from '@/lib/onboarding-intents';
 import { isOffered } from '@/lib/socria-model-store';
 import '@/app/onboarding/onboarding.css';
 
@@ -50,30 +51,8 @@ function Rise({ text, from = 0 }: { text: string; from?: number }) {
   );
 }
 
-/**
- * Five ways in. Each changes the placeholder and the one example under the
- * field — never what the person may bring.
- */
-export interface Intent {
-  id: IntentId;
-  title: string;
-  /** when this is the way in, in a few words */
-  when: string;
-  placeholder: string;
-  /** one real example, pressable — it prefills, it never sends */
-  eg: string;
-}
-
-export const INTENTS: Intent[] = [
-  { id: 'decide', title: 'Make a decision', when: 'Both options keep pulling at you', placeholder: 'The decision you keep turning over…', eg: 'Offered a job. More money, bigger company. I keep going back and forth.' },
-  { id: 'understand', title: 'Understand something', when: 'It has not clicked yet', placeholder: 'The thing that will not sit still…', eg: 'I can do the chain rule fine but I genuinely do not know what a derivative is.' },
-  { id: 'develop', title: 'Develop an idea', when: 'It is only half-formed', placeholder: 'The idea, as far as it goes…', eg: 'A newsletter about how cities decide things. I have the name and nothing else.' },
-  { id: 'problem', title: 'Work through a problem', when: 'Something is stuck', placeholder: 'The problem, in your own words…', eg: 'Our churn doubled after the price change and I cannot tell which half caused it.' },
-  { id: 'research', title: 'Research something', when: 'The sources disagree', placeholder: 'What you are trying to find out…', eg: 'Two papers on whether remote work hurts junior developers. One says yes, one says no.' },
-];
-
 /** How they like to think — and so which model they start on. */
-export type StartModel = 'core-4' | 'logos-2' | 'logos-3';
+export type { StartModel, Intent } from '@/lib/onboarding-intents';
 type How = { model: StartModel; title: string; line: string; name: string };
 const TALK: How = { model: 'core-4', title: 'Talk it through', line: 'A conversation that asks the questions you would skip, and leaves the thinking to you.', name: 'Socria Core 4' };
 const HOW_2: How[] = [
@@ -154,13 +133,23 @@ export function FirstRunIntro({
     return 'thought';
   };
 
+  // Every answer on this screen, as a step and a kind — a role id, a model id,
+  // a starting point, or 'skipped' — counted anonymously (lib/product-events.ts)
+  // so the developer dashboard can say what people choose. Never their words,
+  // never their name: for the name, only whether they gave one.
+  const answer = (step: 'premise' | 'name' | 'who' | 'how' | 'thought' | 'example', kind: string) =>
+    track('onboarding_answered', { step, kind });
+
   const saveName = (v: string | null) => {
     const clean = writeName(v);
+    // what was kept, not what was typed: a name that cleans to nothing was not given
+    answer('name', clean ? 'given' : 'skipped');
     known.current.name = clean;
     setName(clean ?? '');
     setBeat(next('name'));
   };
   const pickRole = (r: Role | null) => {
+    answer('who', r?.id ?? 'skipped');
     writeRole(r?.id ?? null);
     setRole(r);
     if (r) track('onboarding_role_chosen', { kind: r.id });
@@ -168,6 +157,7 @@ export function FirstRunIntro({
     setBeat(next('who'));
   };
   const pickHow = (m: StartModel | null) => {
+    answer('how', m ?? 'skipped');
     setModel(m);
     if (m) track('onboarding_model_chosen', { kind: m });
     setBeat('thought');
@@ -175,6 +165,7 @@ export function FirstRunIntro({
   const begin = (v: string) => {
     const s = (v || '').replace(/\s+$/, '').slice(0, MAX);
     if (!s.trim()) return;
+    answer('thought', intent?.id ?? 'none');
     onStart(s, intent?.id ?? null, model);
   };
 
@@ -201,7 +192,14 @@ export function FirstRunIntro({
             ))}
           </span>
         )}
-        <button type="button" className="ob-skip" onClick={() => onSkip(model)}>
+        <button
+          type="button"
+          className="ob-skip"
+          onClick={() => {
+            answer(beat, 'skip_all');
+            onSkip(model);
+          }}
+        >
           Skip
         </button>
       </div>
@@ -218,7 +216,14 @@ export function FirstRunIntro({
               </span>
             </h1>
             <div className="ob-row ob-fade" style={{ '--d': '1.35s' } as React.CSSProperties}>
-              <button type="button" className="ob-primary" onClick={() => setBeat(next('premise'))}>
+              <button
+                type="button"
+                className="ob-primary"
+                onClick={() => {
+                  answer('premise', 'continued');
+                  setBeat(next('premise'));
+                }}
+              >
                 Start thinking
               </button>
             </div>
@@ -373,7 +378,7 @@ export function FirstRunIntro({
             {intent && !text.trim() ? (
               <p className="ob-eg-card ob-fade" style={{ '--d': '.05s' } as React.CSSProperties}>
                 <span className="ob-eg-k">For instance</span>
-                <button type="button" onClick={() => { setText(intent.eg); area.current?.focus(); }}>
+                <button type="button" onClick={() => { answer('example', intent.id); setText(intent.eg); area.current?.focus(); }}>
                   “{intent.eg}”
                 </button>
                 <span className="ob-eg-use">Press to use it</span>

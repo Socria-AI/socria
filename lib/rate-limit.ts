@@ -103,7 +103,13 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // usage passes also draw on. The room would have throttled itself into
 // silence and taken the rest of Logos with it — a self-inflicted outage, not
 // a protection.
-type Kind = 'chat' | 'aux' | 'room';
+// 'count' is the anonymous product counter (/api/events), for the same
+// reason: the onboarding sends a handful of beacons in its first minute,
+// exactly when the first conversation's memory and insight passes are drawing
+// on 'aux', and a count is never worth a thought. A person sends a few dozen
+// in their whole first week; a signed-out sign-up beacon is keyed by address,
+// and a campus network is many people behind one address.
+type Kind = 'chat' | 'aux' | 'room' | 'count';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -111,6 +117,7 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   // caller has no room to poll, so the anon budget only has to cover the
   // refusal itself.
   room: { authed: { minute: 120, day: 20_000 }, anon: { minute: 5, day: 50 } },
+  count: { authed: { minute: 30, day: 300 }, anon: { minute: 20, day: 200 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

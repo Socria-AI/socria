@@ -1,7 +1,7 @@
 // An in-memory stand-in for the Supabase client, for end-to-end route tests.
 //
 // It implements the slice of PostgREST the app actually uses — select with a
-// column list or *, eq / in / lt / not-is-null filters, order, limit, maybeSingle,
+// column list or *, eq / in / lt / gte / not-is-null filters, order, limit, range, maybeSingle,
 // head counts, insert / upsert / update / delete with exact counts (and gt /
 // lte, for the email ledger's paging) — and it
 // enforces the constraints that matter to the code under test: primary keys,
@@ -79,7 +79,7 @@ class Query {
     this.op = 'select';
     this.cols = '*';
     this.opts = {};
-    this._order = null;
+    this._orders = [];
     this._limit = null;
     this._single = false;
   }
@@ -93,13 +93,17 @@ class Query {
   lt(c, v) { this.filters.push((r) => r[c] < v); this._cols = [...(this._cols ?? []), c]; return this; }
   gt(c, v) { this.filters.push((r) => r[c] > v); this._cols = [...(this._cols ?? []), c]; return this; }
   lte(c, v) { this.filters.push((r) => r[c] <= v); this._cols = [...(this._cols ?? []), c]; return this; }
+  gte(c, v) { this.filters.push((r) => r[c] >= v); this._cols = [...(this._cols ?? []), c]; return this; }
+  // PostgREST paging: rows from..to inclusive, after ordering (the dashboard reads every table a page at a time).
+  range(from, to) { this._range = [from, to]; return this; }
   is(c, v) { this.filters.push((r) => (v === null ? r[c] === null || r[c] === undefined : r[c] === v)); this._cols = [...(this._cols ?? []), c]; return this; }
   not(c, op, v) {
     if (op === 'is' && v === null) this.filters.push((r) => r[c] !== null && r[c] !== undefined);
     this._cols = [...(this._cols ?? []), c];
     return this;
   }
-  order(c, { ascending = true } = {}) { this._order = { c, ascending }; return this; }
+  // Each call adds a key, as PostgREST's does: .order('a').order('b') sorts by a, then b.
+  order(c, { ascending = true } = {}) { this._orders.push({ c, ascending }); return this; }
   limit(n) { this._limit = n; return this; }
   maybeSingle() { this._single = true; return this; }
   single() { this._single = true; return this; }
@@ -116,11 +120,18 @@ class Query {
       const err = filterErr ?? checkCols(t, cols, false);
       if (err) return { data: null, error: err, count: null };
       let out = all.filter(match);
-      if (this._order) {
-        const { c, ascending } = this._order;
-        out = [...out].sort((a, b) => (a[c] > b[c] ? 1 : a[c] < b[c] ? -1 : 0) * (ascending ? 1 : -1));
+      if (this._orders.length) {
+        const by = (a, b) => {
+          for (const { c, ascending } of this._orders) {
+            const d = a[c] > b[c] ? 1 : a[c] < b[c] ? -1 : 0;
+            if (d) return ascending ? d : -d;
+          }
+          return 0;
+        };
+        out = [...out].sort(by);
       }
       if (this._limit != null) out = out.slice(0, this._limit);
+      if (this._range) out = out.slice(this._range[0], this._range[1] + 1);
       const project = (r) => {
         if (!cols.length) return { ...r };
         const o = {};

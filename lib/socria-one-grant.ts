@@ -16,8 +16,8 @@ import { clerkClient } from '@clerk/nextjs/server';
 import { entitledBy } from './entitlement-rule';
 import { readStudentMonth, studentStanding, type EmailLike, type StudentMonth } from './socria-edu';
 
-const GRANT_KEY = 'socriaOne';
-const GRANT_VALUE = 'comp';
+export const GRANT_KEY = 'socriaOne';
+export const GRANT_VALUE = 'comp';
 
 /**
  * Where a student's free month is recorded: the address it began with and
@@ -25,7 +25,7 @@ const GRANT_VALUE = 'comp';
  * whether it entitles anybody is decided on every read, from the date and the
  * addresses on the account, so it cannot outlive either.
  */
-const STUDENT_KEY = 'socriaStudent';
+export const STUDENT_KEY = 'socriaStudent';
 
 /**
  * Where a PAID subscription is mirrored, beside the comp grant.
@@ -43,7 +43,7 @@ const STUDENT_KEY = 'socriaStudent';
  * cancellation revokes it exactly as it revokes the table row — this is a
  * mirror of the subscription's state, NOT a permanent grant.
  */
-const STRIPE_KEY = 'socriaOneStripe';
+export const STRIPE_KEY = 'socriaOneStripe';
 
 export interface StripeMirror {
   status: string;
@@ -62,7 +62,7 @@ export function mirrorEntitles(m: StripeMirror | null | undefined): boolean {
   return entitledBy(m.status, m.periodEnd);
 }
 
-function readMirror(meta: Record<string, unknown> | null | undefined): StripeMirror | null {
+export function readMirror(meta: Record<string, unknown> | null | undefined): StripeMirror | null {
   const raw = meta?.[STRIPE_KEY];
   if (!raw || typeof raw !== 'object') return null;
   const m = raw as Record<string, unknown>;

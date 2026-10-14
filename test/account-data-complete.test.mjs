@@ -29,6 +29,24 @@ const tables = [...schema.matchAll(/create table if not exists (\w+)/g)].map((m)
 // shares someone owns); they are reached by purgeSharing instead.
 const SHARED = new Set(['shares', 'share_members', 'share_comments', 'share_activity', 'share_presence']);
 
+// Tables that hold nothing about any one person: no user id, no row that is
+// anyone's. product_events is one integer per (environment, day, event,
+// kind) — the developer dashboard's anonymous counts — so there is nothing in
+// it to delete with an account or to hand back in an export. The exemption is
+// pinned to the exact columns: a table listed here that grows a user_id, or
+// any column at all, stops being exempt and fails below until someone decides
+// again whether it is still nobody's.
+const ANONYMOUS = { product_events: ['env', 'day', 'event', 'kind', 'n'] };
+const columnsOf = (t) => {
+  const m = schema.match(new RegExp(`create table if not exists ${t} \\(([\\s\\S]*?)\\n\\);`));
+  if (!m) return null;
+  return m[1]
+    .split('\n')
+    .map((l) => l.trim())
+    .filter((l) => l && !l.startsWith('--') && !/^(primary key|constraint|unique|check|foreign key)\b/i.test(l))
+    .map((l) => l.split(/\s+/)[0]);
+};
+
 // The actual contents of the OWNED_TABLES literal, not just "the file
 // mentions this word". An earlier version of this test matched anywhere in
 // the source, so a table named only in a comment would have passed while
@@ -76,6 +94,10 @@ ok('the schema declares tables', tables.length > 0, `${tables.length}`);
 for (const t of tables) {
   if (SHARED.has(t)) {
     ok(`${t} — reached by the sharing purge`, /await purgeSharing\(userId\)/.test(del));
+  } else if (ANONYMOUS[t]) {
+    const cols = columnsOf(t);
+    ok(`${t} — nobody's: exactly its anonymous columns`, JSON.stringify(cols) === JSON.stringify(ANONYMOUS[t]), JSON.stringify(cols));
+    ok(`${t} — …and no column added to it later`, !new RegExp(`alter table (if exists )?${t}\\b[^;]*add column`, 'i').test(schema));
   } else {
     // Not merely "the name appears somewhere": it must appear inside the
     // OWNED_TABLES literal, which is the list the delete loop iterates. A
@@ -86,6 +108,7 @@ for (const t of tables) {
 
 console.log('\n=== every table is in the export ===');
 for (const t of tables) {
+  if (ANONYMOUS[t]) continue; // nobody's, checked above
   ok(`${t} — exported`, new RegExp(`from\\('${t}'\\)`).test(exp), 'no .from() for it');
 }
 

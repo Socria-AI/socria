@@ -711,3 +711,45 @@ create table if not exists referrals (
 );
 
 create index if not exists referrals_referrer_idx on referrals (referrer_id, created_at desc);
+
+-- First-party product counts (lib/product-events.ts): one integer per
+-- (environment, UTC day, event, kind) — "who:study", "how:logos-3",
+-- "ref:google". Anonymous by construction: no user id, no session, and every
+-- kind is a token from a fixed vocabulary (lib/product-event-kinds.ts), so
+-- nothing a person wrote can land here.
+--
+-- NO TIME FINER THAN THE DAY, and deliberately no updated_at: on a quiet day
+-- a row's count is 1, and the exact moment of its last increment, set beside
+-- the accounts' sign-up times, would say whose answer it was.
+--
+-- `env` keeps a preview's testers out of production's numbers when the two
+-- share a database. The primary key serves the dashboard's read (one env,
+-- days from a date). Read by the developer dashboard (app/dev/dashboard).
+-- Safe to re-run.
+create table if not exists product_events (
+  env text not null,
+  day text not null,
+  event text not null,
+  kind text not null default '',
+  n integer not null default 0,
+  primary key (env, day, event, kind)
+);
+
+-- Atomic increment, like bump_logos_usage: two beacons in the same second
+-- must not lose a count.
+create or replace function bump_product_event(
+  p_env text, p_day text, p_event text, p_kind text, p_by integer
+) returns integer
+language plpgsql
+as $$
+declare
+  out_n integer;
+begin
+  insert into product_events (env, day, event, kind, n)
+  values (p_env, p_day, p_event, p_kind, p_by)
+  on conflict (env, day, event, kind)
+  do update set n = product_events.n + p_by
+  returning n into out_n;
+  return out_n;
+end;
+$$;

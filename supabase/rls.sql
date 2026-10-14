@@ -132,3 +132,14 @@ revoke all on promo_accounts from anon, authenticated;
 revoke all on promo_ledger   from anon, authenticated;
 revoke all on referral_codes from anon, authenticated;
 revoke all on referrals      from anon, authenticated;
+
+-- First-party product counts (schema.sql product_events): anonymous, but
+-- still nobody's business but the service role's.
+alter table product_events enable row level security;
+alter table product_events force row level security;
+revoke all on product_events from anon, authenticated;
+-- A function is executable by PUBLIC unless that grant is taken away, and
+-- the anon key reaches every public function over RPC: only the service role
+-- (the Next.js server) may count.
+revoke execute on function bump_product_event(text, text, text, text, integer) from public, anon, authenticated;
+grant execute on function bump_product_event(text, text, text, text, integer) to service_role;

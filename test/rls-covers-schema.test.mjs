@@ -52,5 +52,34 @@ ok(
 );
 ok('nothing disables RLS', !/disable\s+row\s+level\s+security/i.test(rls));
 
+// A function is executable by PUBLIC unless rls.sql takes that away. Where
+// rls.sql does lock a function to the service role, it has to name one
+// schema.sql defines, argument types and all: a revoke written against an
+// old signature fails the migration, or — once both overloads exist in a
+// database, because `create or replace` with new argument types makes a
+// second function rather than replacing the first — locks the old one and
+// leaves the new one open.
+console.log('\n=== a function grant names a function that exists ===');
+{
+  const defined = new Map(
+    [...schema.matchAll(/create\s+or\s+replace\s+function\s+(\w+)\s*\(([^)]*)\)/gi)].map((m) => [
+      m[1],
+      m[2].split(',').map((p) => p.trim().split(/\s+/)[1]?.toLowerCase()).filter(Boolean).join(', '),
+    ])
+  );
+  const named = [...rls.matchAll(/(?:revoke|grant)\s+execute\s+on\s+function\s+(\w+)\s*\(([^)]*)\)/gi)].map((m) => [
+    m[1],
+    m[2].split(',').map((t) => t.trim().toLowerCase()).filter(Boolean).join(', '),
+  ]);
+  ok('rls.sql locks at least one function', named.length > 0);
+  for (const [fn, sig] of named) {
+    ok(`${fn}(${sig}) — the signature schema.sql defines`, defined.get(fn) === sig, `schema.sql: ${defined.has(fn) ? `${fn}(${defined.get(fn)})` : 'no such function'}`);
+  }
+  for (const fn of new Set(named.map(([f]) => f))) {
+    ok(`${fn} — taken from public, anon and authenticated`, new RegExp(`revoke\\s+execute\\s+on\\s+function\\s+${fn}\\s*\\([^)]*\\)\\s+from\\s+public,\\s*anon,\\s*authenticated`, 'i').test(rls));
+    ok(`${fn} — given to the service role`, new RegExp(`grant\\s+execute\\s+on\\s+function\\s+${fn}\\s*\\([^)]*\\)\\s+to\\s+service_role`, 'i').test(rls));
+  }
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

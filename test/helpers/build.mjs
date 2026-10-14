@@ -292,6 +292,8 @@ const MODULES = [
   'lib/rewards/popup-rule.ts',
   // documents in Logos: the readers, grounding, the document view and its context, in one bundle
   'test/helpers/docs-under-test.tsx',
+  // the developer dashboard: gate, counters, aggregation and the page body, in one bundle
+  'test/helpers/dashboard-under-test.tsx',
 ];
 
 export async function buildAll() {

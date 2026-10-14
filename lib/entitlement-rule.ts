@@ -44,8 +44,10 @@ export const LIVE_STATUSES: readonly string[] = [
  */
 export function entitledBy(
   status: unknown,
-  periodEnd: number | null | undefined
+  periodEnd: number | null | undefined,
+  // the moment to judge at: now, unless a caller is reading a snapshot taken at another time
+  now: number = Date.now()
 ): boolean {
   if (typeof status === 'string' && LIVE_STATUSES.includes(status)) return true;
-  return typeof periodEnd === 'number' && periodEnd * 1000 > Date.now();
+  return typeof periodEnd === 'number' && periodEnd * 1000 > now;
 }

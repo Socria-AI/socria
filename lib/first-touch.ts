@@ -91,6 +91,12 @@ const REFERRERS: [RegExp, string][] = [
   [/(^|\.)uta\.edu$/, 'uta'],
 ];
 
+/** Every kind a referrer can be, for anything that must check one (lib/product-event-kinds.ts). */
+export const REFERRER_KINDS: readonly string[] = [...new Set([...REFERRERS.map(([, k]) => k), 'direct', 'other', 'unknown'])];
+
+/** Every kind a landing page can be, likewise. */
+export const LANDING_KINDS: readonly string[] = [...new Set([...LANDINGS.map(([, k]) => k), 'invite', 'other', 'unknown'])];
+
 /** The kind of site a referrer is: 'direct' with none, 'other' when unlisted. */
 export function referrerBucket(referrer: string | null | undefined, selfHost: string): string {
   if (!referrer) return 'direct';
