@@ -155,8 +155,8 @@ export function Dashboard({ model }: { model: DashboardModel }) {
         <Card title="How they sign in" table={<BarsTable bars={c.methods} />}>
           <BarList bars={c.methods} label="Sign-in method" />
         </Card>
-        <Card title="Shared domains" sub="Only domains three or more accounts share" table={<BarsTable bars={c.domains} />}>
-          <BarList bars={c.domains} of={c.base} label="Email domains" empty="No domain is shared by three or more accounts in this range." />
+        <Card title="Shared domains" sub="Domains at least three accounts share, counting every account · the numbers are this range’s" table={<BarsTable bars={c.domains} />}>
+          <BarList bars={c.domains} of={c.base} label="Email domains" empty="Nobody in this range has an address at a domain three or more accounts share." />
         </Card>
       </div>
 
@@ -164,7 +164,7 @@ export function Dashboard({ model }: { model: DashboardModel }) {
       {model.sources ? (
         <>
           <p className="dash-lede">
-            {model.sources.total.toLocaleString('en-US')} sign-ups recorded with a first touch {model.rangeLabel.toLowerCase()}. Only kept where the visitor&rsquo;s country allows it, so &ldquo;not recorded&rdquo; is a consent outcome, not a gap.
+            {model.sources.total.toLocaleString('en-US')} sign-ups counted {model.rangeLabel.toLowerCase()}. &ldquo;Not recorded&rdquo; means the browser kept no note of how it first arrived: none is kept where the visitor&rsquo;s country needs their opt-in for one, and some browsers simply have none.
           </p>
           <div className="dash-grid">
             <Card title="The site that sent them" table={<BarsTable bars={model.sources.referrers} />}>

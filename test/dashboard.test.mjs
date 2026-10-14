@@ -195,7 +195,7 @@ console.log('=== the onboarding screen, from the counters ===');
 console.log('=== where they came from ===');
 {
   ok('referrers, landings and campaigns, named', bar(m.sources.referrers, 'google') === 2 && m.sources.referrers[0].label === 'Google' && bar(m.sources.landings, 'home') === 2 && bar(m.sources.campaigns, 'spring') === 1);
-  ok('2 sign-ups recorded with a first touch', m.sources.total === 2);
+  ok('2 sign-ups counted, recorded or not', m.sources.total === 2);
 }
 
 console.log('=== who they are ===');
