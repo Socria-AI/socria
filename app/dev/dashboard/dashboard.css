@@ -586,3 +586,61 @@
 @media (prefers-reduced-motion: reduce) {
   .dash * { transition: none !important; }
 }
+
+/* ── the two-step code (components/dashboard/DashboardCodeGate.tsx) ── */
+.dash.dash-gate {
+  min-height: 100vh;
+  display: grid;
+  place-items: center;
+  padding: 24px 16px;
+}
+.dash .dash-gate-card {
+  width: 100%;
+  max-width: 360px;
+  display: grid;
+  gap: 12px;
+  padding: 28px 24px;
+  background: var(--dash-surface);
+  border: 1px solid var(--dash-hair);
+  border-radius: 14px;
+}
+.dash .dash-gate-label {
+  font-family: var(--font-serif), Georgia, serif;
+  font-size: 28px;
+  line-height: 1.1;
+  color: var(--dash-ink);
+}
+.dash .dash-gate-input {
+  font: inherit;
+  font-size: 16px;
+  letter-spacing: 0.08em;
+  padding: 10px 12px;
+  border: 1px solid var(--dash-baseline);
+  border-radius: 8px;
+  background: #fff;
+  color: var(--dash-ink);
+}
+.dash .dash-gate-input:focus-visible {
+  outline: 2px solid var(--dash-mark);
+  outline-offset: 1px;
+}
+.dash .dash-gate-button {
+  font: inherit;
+  font-weight: 600;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 8px;
+  background: var(--dash-mark);
+  color: #fff;
+  cursor: pointer;
+}
+.dash .dash-gate-button:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.dash .dash-gate-msg {
+  min-height: 1.4em;
+  margin: 0;
+  font-size: 14px;
+  color: var(--dash-bad);
+}

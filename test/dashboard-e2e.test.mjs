@@ -46,11 +46,23 @@ const swap = {
     b.onResolve({ filter: /^server-only$/ }, () => ({ path: SHIM }));
     // Next 14 has no ESM exports map, so Node needs the file spelled out —
     // and the page's 404 is Next's own notFound(), not a stand-in.
-    b.onResolve({ filter: /^next\/(server|headers|navigation)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
+    b.onResolve({ filter: /^next\/server$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
+    // Two stand-ins, everything else real. cookies() needs a live request: under
+    // test the request's cookies are globalThis.__cookies. The code form's
+    // useRouter needs a mounted app router; notFound() stays Next's own.
+    b.onResolve({ filter: /^next\/(headers|navigation)$/ }, (a) => ({ path: a.path, namespace: 'shim' }));
+    b.onLoad({ filter: /.*/, namespace: 'shim' }, (a) => ({
+      contents:
+        a.path === 'next/headers'
+          ? 'export function cookies() { const c = globalThis.__cookies ?? {}; return { get: (n) => (n in c ? { name: n, value: c[n] } : undefined) }; }'
+          : "export { notFound } from 'next/navigation.js'; export const useRouter = () => ({ refresh() {}, push() {}, replace() {} });",
+      loader: 'js',
+      resolveDir: root,
+    }));
   },
 };
 await Promise.all(
-  Object.entries({ events: 'app/api/events/route.ts', page: 'app/dev/dashboard/page.tsx' }).map(([name, file]) =>
+  Object.entries({ events: 'app/api/events/route.ts', page: 'app/dev/dashboard/page.tsx', code: 'app/api/dev/dashboard-code/route.ts' }).map(([name, file]) =>
     build({
       entryPoints: [join(root, file)],
       bundle: true,
@@ -70,7 +82,7 @@ await Promise.all(
 
 // A real rate limit (the in-memory one), no admins until a test names one.
 process.env.CLERK_SECRET_KEY = 'sk_test_dashboard_e2e';
-for (const k of ['RATE_LIMIT_DISABLED', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'SOCRIA_DASHBOARD_ADMINS']) delete process.env[k];
+for (const k of ['RATE_LIMIT_DISABLED', 'UPSTASH_REDIS_REST_URL', 'UPSTASH_REDIS_REST_TOKEN', 'SOCRIA_DASHBOARD_ADMINS', 'SOCRIA_DASHBOARD_CODE_1', 'SOCRIA_DASHBOARD_CODE_2']) delete process.env[k];
 
 const { db, supabaseAdmin } = await import(pathToFileURL(FAKE_DB).href);
 const clerk = await import(pathToFileURL(FAKE_CLERK).href);
@@ -247,8 +259,9 @@ client.from = (t) => {
 };
 
 /** One request for the page, as Next would make it. */
-async function visit({ as = null, admins, range } = {}) {
+async function visit({ as = null, admins, range, cookies = {} } = {}) {
   globalThis.__uid = as;
+  globalThis.__cookies = cookies;
   if (admins === undefined) delete process.env.SOCRIA_DASHBOARD_ADMINS;
   else process.env.SOCRIA_DASHBOARD_ADMINS = admins;
   reads = 0;
@@ -335,6 +348,82 @@ console.log('=== /dev/dashboard: other ways in, other states ===');
   const noClerk = await visit({ as: 'user_admin', admins: 'user_admin' });
   ok('no directory key here: the page renders from the database alone', !!noClerk.html && noClerk.html.includes('Clerk could not be read'));
   process.env.CLERK_SECRET_KEY = 'sk_test_dashboard_e2e';
+}
+
+console.log('=== /dev/dashboard: the two-step code ===');
+{
+  const codeRoute = await import(pathToFileURL(join(OUT, 'code.mjs')).href);
+  let host = 10;
+  // a fresh address each try unless one is given, so only the rate-limit check below meets the limit
+  const tryCode = (step, code, { ip = `192.0.2.${host++}`, cookie = '' } = {}) =>
+    codeRoute.POST(
+      new NextRequest('http://localhost/api/dev/dashboard-code', {
+        method: 'POST',
+        body: JSON.stringify({ step, code }),
+        headers: { 'content-type': 'application/json', 'x-forwarded-for': ip, ...(cookie ? { cookie } : {}) },
+      })
+    );
+  const got = (r, name) => r.cookies.get(name)?.value;
+  const HALF = 'socria_dash_half';
+  const PASS = 'socria_dash_pass';
+  // test values only: the real codes live in the deployment's environment, never in this public repository
+  const setCodes = (a, b) => {
+    for (const [k, v] of [['SOCRIA_DASHBOARD_CODE_1', a], ['SOCRIA_DASHBOARD_CODE_2', b]]) v === undefined ? delete process.env[k] : (process.env[k] = v);
+  };
+
+  setCodes(undefined, undefined);
+  let r = await tryCode(1, 'anything-at-all');
+  ok('no codes set: no code is right', r.status === 400 && !got(r, HALF));
+  let v = await visit({ as: 'user_g1', admins: 'founder@example.com' });
+  ok('…and the page is still a 404 for the unlisted', v.notFound === true && v.reads === 0);
+  setCodes('first-test-code', undefined);
+  ok('one code set is not enough: still a 404', (await visit({})).notFound === true);
+  setCodes('abc', 'def');
+  ok('codes shorter than six characters are not codes', (await tryCode(1, 'abc')).status === 400 && (await visit({})).notFound === true);
+
+  setCodes('first-test-code', 'Second-Key');
+  v = await visit({});
+  ok('codes set: a stranger is asked for the first code', !!v.html && v.html.includes('First code') && v.html.includes('step 1 of 2'), v.error ? String(v.error?.stack) : '');
+  ok('…having read nothing, and shown nothing of the dashboard', v.reads === 0 && v.listed === 0 && !v.html.includes('Who is here'));
+  ok('…signed in but unlisted, the same', (await visit({ as: 'user_g1', admins: 'founder@example.com' })).html?.includes('First code'));
+  ok('the listed founder still walks straight in', (await visit({ as: 'user_admin', admins: 'founder@example.com' })).html?.includes('Who is here'));
+
+  r = await tryCode(1, 'wrong-guess');
+  ok('a wrong first code: 400, and no cookie', r.status === 400 && !got(r, HALF));
+  ok('the second code first: 400', (await tryCode(2, 'Second-Key')).status === 400);
+  r = await tryCode(1, '  FIRST-TEST-CODE ');
+  const half = got(r, HALF);
+  const setCookie = r.headers.get('set-cookie') ?? '';
+  ok('the first code, in any case and with spaces: step one done', r.status === 200 && !!half);
+  ok('…in a cookie script cannot read, sent only to this site', /HttpOnly/i.test(setCookie) && /SameSite=strict/i.test(setCookie));
+  ok('…which holds no code', !half.toUpperCase().includes('FIRST-TEST-CODE'));
+  v = await visit({ cookies: { [HALF]: half } });
+  ok('with step one done: the second code is asked for, still reading nothing', v.html?.includes('Second code') && v.reads === 0);
+
+  ok('a forged step one does not count', (await tryCode(2, 'Second-Key', { cookie: `${HALF}=half.99999999999999.AAAA` })).status === 400);
+  r = await tryCode(2, 'nope-nope', { cookie: `${HALF}=${half}` });
+  ok('a wrong second code: 400, and step one is cleared', r.status === 400 && got(r, HALF) === '' && !got(r, PASS));
+  r = await tryCode(2, 'second-key', { cookie: `${HALF}=${half}` });
+  const passValue = got(r, PASS);
+  ok('both codes right: a pass', r.status === 200 && !!passValue && got(r, HALF) === '');
+
+  v = await visit({ cookies: { [PASS]: passValue } });
+  ok('the pass opens the dashboard, signed out', v.html?.includes('Who is here, and what they chose'), v.error ? String(v.error?.stack) : '');
+  ok('…and it is the same page: no address, no id, no words', !v.html.includes('@') && Object.keys(USERS).every((id) => !v.html.includes(id)) && !v.html.includes('PRIVATE'));
+  const [kind, until, sig] = passValue.split('.');
+  ok('a pass with its end moved is refused', (await visit({ cookies: { [PASS]: `${kind}.${Number(until) + 1}.${sig}` } })).html?.includes('First code'));
+  ok('step one’s cookie is not a pass', (await visit({ cookies: { [PASS]: half } })).html?.includes('First code'));
+  setCodes('first-test-code', 'a-new-second');
+  ok('changing a code ends every pass already given', (await visit({ cookies: { [PASS]: passValue } })).html?.includes('First code'));
+  setCodes(undefined, undefined);
+  ok('removing the codes ends them too: a 404 again', (await visit({ cookies: { [PASS]: passValue } })).notFound === true);
+
+  setCodes('first-test-code', 'Second-Key');
+  const statuses = [];
+  for (let i = 0; i < 7; i++) statuses.push((await tryCode(1, `guess-${i}`, { ip: '198.51.100.77' })).status);
+  ok('six guesses a minute from one address, then 429', statuses.slice(0, 6).every((s) => s === 400) && statuses[6] === 429, statuses.join(','));
+  ok('…even for the right code', (await tryCode(1, 'first-test-code', { ip: '198.51.100.77' })).status === 429);
+  setCodes(undefined, undefined);
 }
 
 console.log('=== /api/events: its own rate-limit pool ===');

@@ -404,11 +404,16 @@ development works because `localhost:3000` is stable and registered above.
 
 `/dev/dashboard` shows sign-ups, onboarding answers, who people are in kinds
 (never identities), where they came from, and whether they stay. It is a 404
-for everyone until both of these are done:
+for everyone until step 1 is done:
 
-1. **Vercel**: set `SOCRIA_DASHBOARD_ADMINS` on each environment you want it
-   on. Use your verified email address, or your Clerk user id; Production and
-   Preview each have their own Clerk ids. Then redeploy.
+1. **Vercel**: on each environment you want it on, set one or both of these,
+   then redeploy:
+   - **the two-step code**: `SOCRIA_DASHBOARD_CODE_1` and
+     `SOCRIA_DASHBOARD_CODE_2`, at least six characters each. Never put them in
+     the repository; it is public.
+   - **the admin list**: `SOCRIA_DASHBOARD_ADMINS`, with your verified email
+     address or your Clerk user id. Production and Preview each have their own
+     Clerk ids.
 2. **Supabase**: run the `product_events` part of `supabase/schema.sql`, then
    `supabase/rls.sql`, in each project. Until then the onboarding answers are
    not counted, and the page says so.

@@ -16,18 +16,41 @@ identities), where they came from, and whether they stay.
 
 ## Turning it on: two steps, both yours
 
-Nothing below has been done for you. Until both are done, the page is a 404
-for everyone, and the onboarding counts are not kept.
+Nothing below has been done for you. Until step 1 is done, the page is a
+404 for everyone. Until step 2 is done, the onboarding counts are not kept.
 
-**1. Name who may see it: `SOCRIA_DASHBOARD_ADMINS`, per Vercel environment.**
+**1. Decide who may see it, per Vercel environment.** There are two ways in,
+and either is enough. Use one or both.
+
+**1a. The two-step code: `SOCRIA_DASHBOARD_CODE_1` and `SOCRIA_DASHBOARD_CODE_2`.**
+
+- Set both, and the page asks anyone not on the admin list for the first
+  code, then the second. Nothing is read until both are right.
+- Either one unset, or shorter than six characters, turns the codes off. The
+  page is then a 404 to everyone not on the list, as before.
+- Codes are compared without regard to case or surrounding spaces.
+- A right first code gives a signed cookie good for ten minutes. A right
+  second code, beside it, gives a pass good for twelve hours. Both are
+  httpOnly cookies and neither contains a code.
+- Changing either code ends every pass already given.
+- Guesses are limited to six a minute and forty a day per account, or per
+  address when signed out (`code` in `lib/rate-limit.ts`). This is per
+  serverless instance unless Upstash is configured.
+- The codes do not require signing in. Anyone who has both can open the page,
+  so treat them like a password: share them only in person or privately.
+- **Never write the codes into this repository.** It is public. They belong
+  only in Vercel's environment variables.
+
+**1b. The admin list: `SOCRIA_DASHBOARD_ADMINS`.**
 
 ```
 SOCRIA_DASHBOARD_ADMINS=you@yourdomain.com, user_2abc…
 ```
 
-- **Unset or empty means nobody**, including you. Everyone else, signed in
-  or not, gets the same 404 as a page that does not exist. The page reads
-  nothing for them: no table, and no account but their own.
+- With no codes set, **unset or empty means nobody**, including you. Everyone
+  else, signed in or not, gets the same 404 as a page that does not exist.
+  The page reads nothing for them: no table, and no account but their own.
+- A listed person goes straight in, without the codes.
 - An entry with an `@` matches only a **verified** address on the signed-in
   account. Clerk lets anyone add an address to their account before it is
   confirmed, so the string alone proves nothing.

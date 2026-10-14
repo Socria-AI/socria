@@ -109,7 +109,9 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // on 'aux', and a count is never worth a thought. A person sends a few dozen
 // in their whole first week; a signed-out sign-up beacon is keyed by address,
 // and a campus network is many people behind one address.
-type Kind = 'chat' | 'aux' | 'room' | 'count';
+// 'code' is the developer dashboard's two-step code (/api/dev/dashboard-code):
+// the one place those codes can be guessed, so a handful of tries a minute.
+type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -118,6 +120,7 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   // refusal itself.
   room: { authed: { minute: 120, day: 20_000 }, anon: { minute: 5, day: 50 } },
   count: { authed: { minute: 30, day: 300 }, anon: { minute: 20, day: 200 } },
+  code: { authed: { minute: 6, day: 40 }, anon: { minute: 6, day: 40 } },
 };
 
 function tooMany(r: RLResult): NextResponse {
