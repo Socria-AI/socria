@@ -298,6 +298,9 @@ const MODULES = [
   'test/helpers/dashboard-under-test.tsx',
   // Logos 4, Point & Ask: focus descriptions, the message's "about", the picker, in one bundle
   'test/helpers/point-ask-under-test.tsx',
+  // Logos 4: Instant Resume's view store, and the feature switches
+  'lib/logos4/resume.ts',
+  'lib/logos4/flags.ts',
 ];
 
 export async function buildAll() {

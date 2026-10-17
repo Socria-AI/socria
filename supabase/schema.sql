@@ -753,3 +753,23 @@ begin
   return out_n;
 end;
 $$;
+
+-- ── Quick Capture (Logos 4) ────────────────────────────────────────────
+--
+-- A private inbox: a thought, a note or a photo kept for later, in two taps.
+-- Nothing in it becomes a conversation, a card or a task by itself — the
+-- person turns a capture into one, or deletes it. `attachment` is the
+-- composer's own attachment shape (lib/logos-attachments.ts), cleaned by the
+-- same sanitiser and held to the same limits: an image is its reading, a
+-- small thumbnail and a preview, never the original file. Deleted with the
+-- account and included in its export. Safe to re-run.
+create table if not exists captures (
+  id text primary key,
+  user_id text not null,
+  text text not null default '',
+  attachment jsonb,
+  created_at bigint not null,
+  updated_at bigint not null
+);
+
+create index if not exists captures_user_idx on captures (user_id, created_at desc);

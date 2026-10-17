@@ -228,6 +228,12 @@ export async function GET(req: NextRequest) {
   const youInvitedErr = missingTable(youInvitedRaw) ? null : youInvitedRaw;
   out.friendsYouInvited = youInvited ?? [];
 
+  // Quick Capture (Logos 4): the private inbox, every note and photo in it.
+  const { data: captures, error: capturesRaw } = await db
+    .from('captures').select('id, text, attachment, created_at, updated_at').eq('user_id', userId).order('created_at', { ascending: false });
+  const capturesErr = missingTable(capturesRaw) ? null : capturesRaw;
+  out.captures = captures ?? [];
+
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
     'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
@@ -267,6 +273,7 @@ export async function GET(req: NextRequest) {
     ['referralCode', refCodeErr],
     ['howYouArrived', invitedYouErr],
     ['friendsYouInvited', youInvitedErr],
+    ['captures', capturesErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

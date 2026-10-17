@@ -26,6 +26,8 @@ import { DisplayShell, useDisplay, type Display } from './DisplayShell';
 import { useSelection } from './primitives';
 import { useDocs, type DocsApi } from './docs-context';
 import './document.css';
+import { LOGOS4 } from '@/lib/logos4/flags';
+import { browserStorage, readingAt, rememberReading } from '@/lib/logos4/resume';
 
 type D = Display<DocumentState>;
 
@@ -108,6 +110,53 @@ function Reading({ p, d, doc, docs }: { p: FigureProps; d: D; doc: SourceDoc; do
     const el = bodyRef.current?.querySelector(`[data-block="${CSS.escape(sel)}"]`);
     el?.scrollIntoView({ block: 'center', behavior: 'smooth' });
   }, [sel, s.view, limit]);
+
+  // INSTANT RESUME (Logos 4): a document opens where it was read to, on this
+  // device — unless a citation or a search asked for a passage of its own —
+  // and remembers how far it is read as it is scrolled.
+  const resumeAt = useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (!LOGOS4.resume || p.mode !== 'live' || s.view !== 'reading') return;
+    if (resumeAt.current === undefined) resumeAt.current = sel ? null : readingAt(browserStorage(), doc.id);
+    const at = resumeAt.current;
+    if (!at) return;
+    const i = visible.findIndex((b) => b.id === at);
+    if (i < 0) {
+      resumeAt.current = null;
+      return;
+    }
+    if (i >= limit) {
+      setLimit(i + MORE);
+      return;
+    }
+    resumeAt.current = null;
+    requestAnimationFrame(() => bodyRef.current?.querySelector(`[data-block="${CSS.escape(at)}"]`)?.scrollIntoView({ block: 'start' }));
+  }, [p.mode, s.view, limit, doc.id, visible, sel]);
+  useEffect(() => {
+    if (!LOGOS4.resume || p.mode !== 'live') return;
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const onScroll = (e: Event) => {
+      const root = bodyRef.current;
+      const target = e.target;
+      // only a scroll that moves this view: its own, or one of the boxes it sits in
+      if (!root || !(target instanceof Node) || !target.contains(root)) return;
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(() => {
+        const top = target instanceof Element ? target.getBoundingClientRect().top : 0;
+        for (const el of root.querySelectorAll<HTMLElement>('[data-block]')) {
+          if (el.getBoundingClientRect().bottom > top + 8) {
+            if (el.dataset.block) rememberReading(browserStorage(), doc.id, el.dataset.block);
+            break;
+          }
+        }
+      }, 500);
+    };
+    document.addEventListener('scroll', onScroll, { capture: true, passive: true });
+    return () => {
+      document.removeEventListener('scroll', onScroll, { capture: true });
+      if (timer) clearTimeout(timer);
+    };
+  }, [p.mode, doc.id]);
 
   const goTo = (id: string) => {
     if (s.view !== 'reading') d.act('view', { view: 'reading' });

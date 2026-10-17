@@ -170,7 +170,7 @@ console.log('\n=== wired: the app, the map, the route ===');
   const app = read('components/LogosApp.tsx');
   ok('the turn records what it was about, from the same brief the reply is told', /const askBrief = workspaceOn \? describeFocus\(focusRef\.current, mapRef\.current, docsRef\.current\)/.test(app) && /about: \{ kind: askBrief\.kind, label: askBrief\.label/.test(app) && /\.\.\.\(askBrief \? \{ focus: askBrief \} : \{\}\)/.test(app));
   ok('the composer is given the selection, and clearing it clears every trace', /about=\{focusBrief \?/.test(app) && /onClearAbout=\{clearAbout\}/.test(app) && /const clearAbout = \(\) => \{\s*setFocus\(null\);\s*setObjSel\(null\);/.test(app));
-  ok('the map offers "Ask Socria" on a card, and replies’ maths can be picked', /onAsk=\{workspaceOn \? askAboutNode : undefined\}/.test(app) && /onPickTex: askAboutExpression/.test(app));
+  ok('the map offers "Ask Socria" on a card, and replies’ maths can be picked', /onAsk=\{workspaceOn && LOGOS4\.pointAsk \? askAboutNode : undefined\}/.test(app) && /LOGOS4\.pointAsk \? \{ onPickTex: askAboutExpression \}/.test(app));
   ok('asking never types or sends anything for them', !/why is it what it is\?/.test(app));
   const tm = read('components/ThinkingMap.tsx');
   ok('the card menu leads with it', tm.indexOf('lg-act-ask') > 0 && tm.indexOf('lg-act-ask') < tm.indexOf('{NODE_MODES.map((m) => ('));

@@ -68,6 +68,8 @@ const OWNED_TABLES = [
   'promo_ledger',
   'referral_codes',
   'referrals',
+  // Quick Capture (Logos 4): their private inbox of notes and photos.
+  'captures',
 ] as const;
 
 /**
@@ -96,6 +98,7 @@ const LATE_TABLES = new Set<string>([
   'promo_ledger',
   'referral_codes',
   'referrals',
+  'captures',
 ]);
 
 /**

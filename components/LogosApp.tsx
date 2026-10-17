@@ -159,6 +159,8 @@ import {
 import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
+import { LOGOS4 } from '@/lib/logos4/flags';
+import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
 import { digestOf } from '@/lib/cognition/digest';
 import { briefOf } from '@/lib/representation';
 import {
@@ -220,6 +222,7 @@ import {
   sortSessions,
   titleFor,
   UNTITLED,
+  relTime,
   type LogosMsg as Msg,
   type LogosSession,
 } from '@/lib/logos-sessions';
@@ -391,6 +394,8 @@ export function LogosApp({
   // On a phone there is room for one surface at a time: the conversation by
   // default, the map when asked. Desktop ignores this entirely.
   const [mobileView, setMobileView] = useState<'chat' | 'map'>('chat');
+  const mobileViewRef = useRef(mobileView);
+  mobileViewRef.current = mobileView;
   // "How should Socria work with you?" — their standing instructions.
   const [styleText, setStyleText] = useState('');
   const [styleOpen, setStyleOpen] = useState(false);
@@ -482,8 +487,12 @@ export function LogosApp({
   const [revealedIds, setRevealedIds] = useState<Set<string>>(new Set());
 
   const [input, setInput] = useState('');
+  const inputRef = useRef(input);
+  inputRef.current = input;
   /** the message the next one answers — set by Reply, shown above the composer */
   const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
+  const replyToRef = useRef(replyTo);
+  replyToRef.current = replyTo;
 
   // Seeded once, and only while the composer is still untouched: someone who
   // has started typing their own sentence must never have it replaced.
@@ -1162,6 +1171,26 @@ export function LogosApp({
     const t = threadRef.current;
     if (t && atEndRef.current) t.scrollTop = t.scrollHeight;
   }, [streaming, busy]);
+  // INSTANT RESUME: a line of thinking opens where its thread was left — the
+  // message that was at the top, as far into it as it was — or at its end.
+  // Opening one with as many messages as the last no longer keeps the last
+  // one's scroll position by accident.
+  const pendingScrollRef = useRef<ScrollAt | null>(null);
+  /** the session whose view was just restored — its reply is not to be cleared */
+  const restoredForRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (hydrating) return;
+    const t = threadRef.current;
+    if (!t) return;
+    const want = pendingScrollRef.current;
+    pendingScrollRef.current = null;
+    requestAnimationFrame(() => {
+      const el = want && 'msg' in want ? t.querySelector<HTMLElement>(`[id="lg-m-${want.msg}"]`) : null;
+      if (el && want && 'msg' in want) t.scrollTop += el.getBoundingClientRect().top - t.getBoundingClientRect().top - want.offset;
+      else t.scrollTop = t.scrollHeight;
+      atEndRef.current = t.scrollHeight - t.scrollTop - t.clientHeight < 48;
+    });
+  }, [activeId, hydrating]);
 
   // On mobile the rail is an overlay, so it must not start open across the
   // whole screen. One check at mount; resizing a desktop window later is a
@@ -1847,8 +1876,10 @@ export function LogosApp({
     together.people.find((p) => p.you)?.name ||
     (room.active ? room.me.name : '') ||
     cleanName(user?.firstName || user?.username, 'Someone');
-  // a reply belongs to the conversation it was started in
+  // a reply belongs to the conversation it was started in — and comes back
+  // with it (Instant Resume restores it when the session opens)
   useEffect(() => {
+    if (restoredForRef.current === activeId) return;
     setReplyTo(null);
   }, [activeId]);
   const [shareOpen, setShareOpen] = useState(false);
@@ -1989,10 +2020,14 @@ export function LogosApp({
       }
       sessionsRef.current = sorted;
       setSessions(sorted);
-      const target = (wanted && sorted.find((s) => s.id === wanted)?.id) || sorted[0].id;
+      // INSTANT RESUME: the line of thinking that was open when they left, on
+      // this browser — unless a link or a first message chose another.
+      const left = LOGOS4.resume && !wanted && !pendingStart ? readResume(browserStorage()).last : null;
+      const target = (wanted && sorted.find((s) => s.id === wanted)?.id) || (left && sorted.find((s) => s.id === left)?.id) || sorted[0].id;
       setActiveId(target);
       activeIdRef.current = target;
       chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
+      if (!pendingStart) restoreView(target, 'load');
       setHydrating(false);
       // Applied, not consumed: the tree this runs in may be thrown away and
       // mounted again (see pendingStart), and the message has to survive
@@ -2039,6 +2074,7 @@ export function LogosApp({
   function switchSession(id: string) {
     setPicked(new Set());
     if (id === activeIdRef.current) return;
+    saveView();
     // The share note belongs to the map it was shown on.
     setFirstMapNote(false);
     shareNoteRef.current = false;
@@ -2063,6 +2099,8 @@ export function LogosApp({
     // were made in; carried over, the ops replayed onto the next surface.
     setBuildNote(null);
     setVizOps(null);
+    // ...and its own view comes back: its half-typed message, its selection, its place
+    restoreView(id, 'switch');
 
     // ── A CONVERSATION ARRIVING HERE WITH A HISTORY AND NO MAP ──────
     //
@@ -2190,6 +2228,7 @@ export function LogosApp({
     const next = remaining.length ? remaining : [emptySession()];
     applySessions(next);
     if (activeIdRef.current === id) switchSession(next[0].id);
+    forgetView(browserStorage(), id);
     if (cloud) {
       try {
         await fetch(`/api/conversations/${encodeURIComponent(id)}`, { method: 'DELETE' });
@@ -2971,6 +3010,60 @@ export function LogosApp({
         m.synthesis?.id === synId ? { ...m, synthesis: { ...m.synthesis, taken: { ...(m.synthesis.taken ?? {}), [key]: v } } } : m
       ),
     }));
+  }
+
+  /** what this screen shows of the open line of thinking, as Instant Resume keeps it */
+  function captureView(id: string): Omit<SessionView, 'at'> {
+    const t = threadRef.current;
+    let scroll: ScrollAt | undefined;
+    if (t && t.clientHeight > 0) {
+      const top = t.getBoundingClientRect().top;
+      const rects = [...t.querySelectorAll<HTMLElement>('.lg-msg[id^="lg-m-"]')].map((el) => {
+        const r = el.getBoundingClientRect();
+        return { id: el.id.slice(5), top: r.top - top, bottom: r.bottom - top };
+      });
+      scroll = anchorOf(rects, atEndRef.current);
+    } else {
+      // folded away, or behind the map on a phone: where it was last seen
+      scroll = readResume(browserStorage()).views[id]?.scroll;
+    }
+    const draft = inputRef.current;
+    return {
+      ...(scroll ? { scroll } : {}),
+      ...(draft.trim() ? { draft } : {}),
+      ...(replyToRef.current ? { replyTo: replyToRef.current } : {}),
+      ...(focusRef.current ? { focus: focusRef.current } : {}),
+      ...(objSelRef.current ? { sel: objSelRef.current } : {}),
+      ...(mobileViewRef.current === 'map' ? { surface: 'map' as const } : {}),
+    };
+  }
+
+  function saveView(id: string | null = activeIdRef.current) {
+    if (!LOGOS4.resume || !id) return;
+    if (viewTimer.current) clearTimeout(viewTimer.current);
+    writeView(browserStorage(), id, captureView(id));
+  }
+
+  /**
+   * A line of thinking opens as this screen left it. On a switch, the
+   * composer is its own (the one left kept its draft); on a reload, a draft
+   * comes back only into an empty composer — never over a sentence onboarding
+   * or a link just put there. Anything that no longer exists stays gone.
+   */
+  function restoreView(id: string, how: 'load' | 'switch') {
+    if (!LOGOS4.resume) return;
+    restoredForRef.current = id;
+    const v = readResume(browserStorage()).views[id];
+    const session = sessionsRef.current.find((x) => x.id === id);
+    const msgs = session?.messages ?? [];
+    if (how === 'switch') setInput(v?.draft ?? '');
+    else if (v?.draft && !inputRef.current.trim()) setInput(v.draft);
+    setReplyTo(v?.replyTo?.id && msgs.some((m) => m.id === v.replyTo!.id) ? v.replyTo : null);
+    const m = session?.map ?? null;
+    setFocus(v?.focus && m && workspaceOn && selectionStands(v.focus, m, msgs) ? v.focus : null);
+    setObjSel(v?.sel && m && partStands(v.sel, m) ? v.sel : null);
+    setMobileView(v?.surface === 'map' ? 'map' : 'chat');
+    pendingScrollRef.current = v?.scroll ?? null;
   }
 
   function focusComposer() {
@@ -3903,6 +3996,42 @@ export function LogosApp({
   const [focus, setFocus] = useState<Focus>(null);
   const focusRef = useRef<Focus>(null);
   focusRef.current = focus;
+
+  // ── INSTANT RESUME (Logos 4, lib/logos4/resume.ts) ───────────────
+  // This screen's view of each line of thinking — the thread's place, the
+  // half-typed message and what it replies to, the selection, the phone's
+  // surface — kept in this browser as it changes, written again when the page
+  // is hidden, and restored when the session opens. No database write.
+  const viewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveViewRef = useRef<() => void>(() => {});
+  saveViewRef.current = () => saveView();
+  useEffect(() => {
+    if (!LOGOS4.resume || hydrating) return;
+    if (viewTimer.current) clearTimeout(viewTimer.current);
+    viewTimer.current = setTimeout(() => saveViewRef.current(), 700);
+  }, [input, replyTo, focus, objSel, mobileView, hydrating]);
+  useEffect(() => {
+    if (!LOGOS4.resume) return;
+    const flush = () => saveViewRef.current();
+    const onVis = () => {
+      if (document.visibilityState === 'hidden') flush();
+    };
+    window.addEventListener('pagehide', flush);
+    document.addEventListener('visibilitychange', onVis);
+    return () => {
+      window.removeEventListener('pagehide', flush);
+      document.removeEventListener('visibilitychange', onVis);
+    };
+  }, []);
+  /** a new line of thinking offers the latest one still waiting on them */
+  const pickUpOffer = useMemo(
+    () =>
+      LOGOS4.resume && !hydrating && messages.length === 0
+        ? pickUp(sessions, readResume(browserStorage()), { except: activeId, skip: (id) => foreignIdsRef.current.has(id) || sharedIdsRef.current.has(id) })
+        : null,
+    [sessions, activeId, messages.length, hydrating]
+  );
+
   const [wsDismissed, setWsDismissed] = useState<Set<string>>(() => new Set());
   const wsFacts = useMemo(() => ({ ...factsFrom(map), mind: cloud }), [map, cloud]);
   // Something to look at besides the map: a built model, or a picture.
@@ -4569,6 +4698,11 @@ export function LogosApp({
             onScroll={(e) => {
               const t = e.currentTarget;
               atEndRef.current = t.scrollHeight - t.scrollTop - t.clientHeight < 48;
+              // Instant Resume: where they were reading, kept a moment after they stop
+              if (LOGOS4.resume) {
+                if (viewTimer.current) clearTimeout(viewTimer.current);
+                viewTimer.current = setTimeout(() => saveViewRef.current(), 700);
+              }
             }}
           >
             {messages.length === 0 && !streaming && (
@@ -4586,6 +4720,19 @@ export function LogosApp({
                     Type what you’re working through. Logos asks questions back,
                     and draws the shape of your reasoning on the right as you go.
                   </p>
+                )}
+                {/* INSTANT RESUME: the latest line of thinking still waiting on
+                    them — the question Socria left, or the message they began —
+                    one press away, quoted, never opened by itself. */}
+                {pickUpOffer && (
+                  <button type="button" className="lg-pickup" onClick={() => switchSession(pickUpOffer.id)}>
+                    <span className="lg-pickup-k">Pick up where you left off</span>
+                    <span className="lg-pickup-t">{pickUpOffer.title}</span>
+                    <span className="lg-pickup-q">
+                      {pickUpOffer.kind === 'question' ? 'Socria asked' : 'You had started'}: “{pickUpOffer.waiting}”
+                    </span>
+                    <span className="lg-pickup-when">{relTime(pickUpOffer.at)}</span>
+                  </button>
                 )}
                 {noSessions && !input ? (
                   // Nothing has ever been said here. The chips would send a
@@ -4661,7 +4808,7 @@ export function LogosApp({
                   onJump={jumpTo}
                   toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
                   docRefs={docRefs}
-                  {...(workspaceOn ? { onOpenCite: openCite, onOpenDoc: openDoc, onPickTex: askAboutExpression } : {})}
+                  {...(workspaceOn ? { onOpenCite: openCite, onOpenDoc: openDoc, ...(LOGOS4.pointAsk ? { onPickTex: askAboutExpression } : {}) } : {})}
                 />
               );
             })}
@@ -5098,7 +5245,7 @@ export function LogosApp({
             initialLens={lens as LensId | undefined}
             workspace={workspaceOn}
             onSelectNode={(id) => setFocus({ kind: 'node', id })}
-            onAsk={workspaceOn ? askAboutNode : undefined}
+            onAsk={workspaceOn && LOGOS4.pointAsk ? askAboutNode : undefined}
             map={map}
             onAction={(mode, node) => {
               signalFirstMap('action-taken');

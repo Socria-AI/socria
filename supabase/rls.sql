@@ -143,3 +143,9 @@ revoke all on product_events from anon, authenticated;
 -- (the Next.js server) may count.
 revoke execute on function bump_product_event(text, text, text, text, integer) from public, anon, authenticated;
 grant execute on function bump_product_event(text, text, text, text, integer) to service_role;
+
+-- Quick Capture (schema.sql captures): one person's private notes and photos,
+-- reached only through /api/captures with the service role.
+alter table captures enable row level security;
+alter table captures force row level security;
+revoke all on captures from anon, authenticated;
