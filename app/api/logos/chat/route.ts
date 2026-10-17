@@ -47,6 +47,9 @@ import { planTurn, checkDraft, correctionFor, repairDraft } from '@/lib/accuracy
 import { fabricatedToolClaim } from '@/lib/core4/guard2';
 import { SentenceGate } from '@/lib/core4/stream-gate';
 import { sentencesOf, deleteSentences } from '@/lib/core4/questions';
+import { readSignals } from '@/lib/core4/signals';
+import { chooseAssist, renderAssist, assistTrace, sanitizeDigest, constructAsk } from '@/lib/cognition/assist';
+import { readDisplayRequest } from '@/lib/objects/display-request';
 import { styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
 import {
@@ -266,7 +269,16 @@ export async function POST(req: NextRequest) {
 
     // Optional: this turn belongs to a node the person opened, not to the
     // main thread. Same prompt, narrower aperture.
-    const f = body?.focus;
+    //
+    // TWO THINGS ARRIVE AS `focus`, AND ONLY ONE OF THEM IS A NODE'S THREAD.
+    // A node's own thread sends { label, type, concept, framing, contexts };
+    // the workspace's selection on the MAIN thread sends a typed brief
+    // { kind, label, of, lines } (lib/workspace/focus.ts). Both carry a label,
+    // so reading any label as a thread turned every main-thread turn with
+    // something selected into a node thread: memory off, the selection's own
+    // facts never shown. The brief is told apart by its `kind`.
+    const focusIsBrief = !!body?.focus && typeof body.focus === 'object' && typeof (body.focus as { kind?: unknown }).kind === 'string';
+    const f = focusIsBrief ? null : body?.focus;
     const trim = (v: any, n: number) =>
       typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
     const plan = await resolvePlanForRequest(req, userId);
@@ -299,7 +311,7 @@ export async function POST(req: NextRequest) {
     // conversation id is thrown away — which meant a first message that
     // failed and was retried charged twice, and two sends of one conversation
     // could spend a whole free month. The marker below is what remembers.
-    const isNewChat = !body?.focus && userTurns <= 1;
+    const isNewChat = !f && userTurns <= 1;
     const alreadyCounted = isNewChat && (await chatAlreadyCounted(userId, sessionId));
     // Whether THIS request is the one that will pay for the conversation.
     // Checked here, charged further down — see the note at the charge itself.
@@ -507,6 +519,38 @@ export async function POST(req: NextRequest) {
       withhold: resolveGuard(body?.guard) === 'guard',
     });
 
+    // ── LOGOS 4: HOW TO HELP ON THIS TURN (lib/cognition/assist.ts) ──
+    //
+    // One deterministic decision, no model call: inform, explain, verify,
+    // construct, challenge, perspective, ask, or room — imposed only where the
+    // evidence settles it (their words, the math engine's findings, what they
+    // asked to have built, their own map), and always a question budget priced
+    // from the transcript, which the stream gate below enforces.
+    const signals = readSignals(String(last.content ?? ''));
+    const selected = focusLabel || !focusIsBrief ? null : sanitizeFocus(body?.focus);
+    const resumedAfterMs =
+      typeof body?.resumedAfterMs === 'number' && Number.isFinite(body.resumedAfterMs) && body.resumedAfterMs > 0
+        ? Math.min(body.resumedAfterMs, 400 * 86_400_000)
+        : null;
+    const assist = chooseAssist({
+      lastUserText: String(last.content ?? ''),
+      history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+      guard: resolveGuard(body?.guard) === 'guard',
+      accuracy: {
+        check: accuracy.check,
+        pushback: accuracy.pushback ? { kind: accuracy.pushback.kind } : null,
+        theirs: accuracy.theirs.map((v) => ({ status: v.status })),
+        computed: accuracy.computed.some((c) => !!c.result),
+        math: accuracy.reasons.includes('math'),
+      },
+      focus: selected ? { kind: selected.kind, label: selected.label } : focusLabel ? { kind: 'node', label: focusLabel } : null,
+      construct: focusLabel ? null : readDisplayRequest(last.content) ? 'display' : (asked ? 'simulation' : constructAsk(String(last.content ?? ''))),
+      map: sanitizeDigest(body?.mapDigest),
+      resumedAfterMs,
+      group: twoPeople,
+      signals,
+    });
+
     const guided =
       system +
       // Clamped by the plan like the map and explore routes, so the menu and
@@ -542,7 +586,7 @@ export async function POST(req: NextRequest) {
       // part of a model, an idea on the map — described from canonical state,
       // so "why is this negative?" is about the thing they are looking at.
       // Not on a focused node thread, which is already about one node.
-      (focusLabel ? '' : focusBlock(sanitizeFocus(body?.focus))) +
+      (focusLabel ? '' : focusBlock(selected)) +
       // what they mostly think about, from onboarding — examples, not assumptions
       roleBlock(body?.role) +
       nameBlock(body?.name) +
@@ -593,7 +637,9 @@ export async function POST(req: NextRequest) {
       // How to read and cite the documents in the conversation — the rules
       // here, the documents themselves in the turn (above).
       (docRefs.length ? `\n\n${DOC_RULES}\n` : '') +
-      // Last, so it is the freshest thing the model reads: what was computed.
+      // How to help on this turn — then, last, so it is the freshest thing the
+      // model reads: what was computed.
+      renderAssist(assist) +
       accuracy.block;
 
     const openai = new OpenAI({ apiKey });
@@ -707,23 +753,35 @@ export async function POST(req: NextRequest) {
             // guard removes it: the reply ran nothing.
             const invented = sentencesOf(reply).filter((x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }));
             if (invented.length) reply = deleteSentences(reply, invented.map((x) => x.trim())) ?? reply;
+            // The question budget and the opener rule hold on a held turn too —
+            // through the same gate the streamed path uses, so the two paths
+            // cannot drift. The opener yields only when the engine confirms
+            // they caught a real mistake of Socria's.
+            if (reply) {
+              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt });
+              held.push(reply);
+              held.finish(assist.questions);
+              if (held.out.trim()) reply = held.out;
+            }
             if (reply) {
               sent = true;
               controller.enqueue(encoder.encode(reply));
             }
           } else {
-            // Sentence by sentence, so a claimed tool run that did not happen
-            // ("I ran it in Python") never streams. Nothing else is touched.
+            // Sentence by sentence: a claimed tool run that did not happen ("I
+            // ran it in Python") never streams, a sycophantic opener is
+            // removed, and a trailing question ships only inside this turn's
+            // budget (Core 4's gate — Logos 4 no longer runs it filter-only).
             const gate = new SentenceGate((text) => {
               sent = true;
               reply += text;
               controller.enqueue(encoder.encode(text));
-            }, { filterOnly: true, drop: (x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }) });
+            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }) });
             for await (const chunk of completion) {
               const delta = chunk.choices?.[0]?.delta?.content ?? '';
               if (delta) gate.push(delta);
             }
-            gate.finish(1);
+            gate.finish(assist.questions);
             // Streamed because nothing looked risky; if the finished reply
             // states something the engine refutes, say so now, plainly.
             const late = checkDraft(reply, accuracy.context);
@@ -773,6 +831,8 @@ export async function POST(req: NextRequest) {
         'X-Content-Type-Options': 'nosniff',
         // onboarding's first thought, let through free — the client says so once
         ...(gifted ? { 'X-Socria-First-Thought': '1' } : {}),
+        // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
+        'X-Socria-Assist': assistTrace(assist),
       },
     });
   } catch (e: any) {

@@ -172,6 +172,8 @@ const MODULES = [
   'lib/core4/contribution.ts',
   'lib/core4/guard2.ts',
   'lib/core4/verify.ts',
+  // Logos 4: the Cognitive Interaction Engine
+  'lib/cognition/assist.ts',
   // accuracy: notation, claims, the deterministic checker, pushback, the per-turn plan
   'lib/accuracy/notation.ts',
   'lib/accuracy/numeric-check.ts',

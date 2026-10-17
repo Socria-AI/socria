@@ -218,7 +218,7 @@ const PRACTICE = new RegExp(
 );
 
 // Harm now: the safety gate (council D1). Only ever produces MORE help.
-const SAFETY = /\b(swallowed (?:a |an |some )?(?:button )?(?:battery|batteries|magnet|bleach|pills?|poison)|overdos\w*|poison(?:ed|ing)\b|chest pain|can'?t breathe|not breathing|unconscious|seizure|anaphyla\w*|severe allergic|bleeding (?:heavily|a lot|won'?t stop)|suicid\w*|kill (?:myself|himself|herself)|self-?harm|stroke symptoms|call (?:911|999|112)|emergency room|money (?:is )?being (?:stolen|taken) (?:right )?now|wire (?:the )?money (?:today|now) (?:or|before)|court deadline (?:is )?(?:today|tomorrow))/i;
+const SAFETY = /\b(swallowed (?:a |an |some )?(?:button )?(?:battery|batteries|magnet|bleach|pills?|poison)|overdos\w*|poison(?:ed|ing)\b|chest pain|can'?t breathe|not breathing|unconscious|seizure|anaphyla\w*|severe allergic|bleeding (?:heavily|a lot|won'?t stop)|suicid\w*|kill (?:myself|himself|herself)|self-?harm|end(?:ing)? (?:my (?:own )?life|it all)|want(?:ed)? to die|wish i (?:was|were) dead|better off (?:dead|without me)|(?:don'?t|do not) want to (?:live|be alive|exist) any ?more|no reason to (?:live|go on)|take my (?:own )?life|stroke symptoms|call (?:911|999|112)|emergency room|money (?:is )?being (?:stolen|taken) (?:right )?now|wire (?:the )?money (?:today|now) (?:or|before)|court deadline (?:is )?(?:today|tomorrow))/i;
 
 const RECOMMEND = /\b(what would you (?:do|pick|choose|go with)|which (?:one )?(?:should|would) (?:i|you) (?:pick|choose|take|go with)|(?:give me |what'?s )?your (?:pick|recommendation|call|vote)|if you were me|which would you (?:pick|choose))\b/i;
 

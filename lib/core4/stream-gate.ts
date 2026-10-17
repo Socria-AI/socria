@@ -46,7 +46,12 @@ export class SentenceGate {
    * strip. For a surface (Logos) that has its own voice rules and only needs
    * a claimed tool run kept out of the stream.
    */
-  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean } = {}) {}
+  /**
+   * keepOpener: leave the first sentence's opener alone — for a reply the
+   * math engine has confirmed answers a real mistake of Socria's, where "you're
+   * right" is the honest first word (lib/accuracy theyCaughtIt).
+   */
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -94,7 +99,7 @@ export class SentenceGate {
     if (this.first && sentence.trim()) {
       this.first = false;
       // "Great question — the answer is 42." keeps "The answer is 42."
-      if (hasSycophanticOpener(sentence)) {
+      if (!this.opts.keepOpener && hasSycophanticOpener(sentence)) {
         const rest = stripSycophanticOpener(sentence);
         if (rest === null) return;
         sentence = rest + (/\s*$/.exec(sentence)?.[0] ?? '');

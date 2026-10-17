@@ -252,7 +252,11 @@ console.log('\n=== the wiring ===');
   ok('the layout is kept in this browser, never in the session', /const WS_KEY = 'socria\.logos3\.workspace\.v2'/.test(app) && /localStorage\.setItem\(WS_KEY/.test(app) && !/workspace: wsLayout|layout: wsLayout,\s*\}/.test(app));
   ok('a layout change never touches a model', !/patchActive\([^)]*wsLayout/.test(app));
   ok('the turn carries the focus, described from canonical state', /describeFocus\(focusRef\.current, mapRef\.current\)/.test(app));
-  ok('the chat route reads it, cleaned', /focusBlock\(sanitizeFocus\(body\?\.focus\)\)/.test(read('app/api/logos/chat/route.ts')));
+  {
+    const route = read('app/api/logos/chat/route.ts');
+    // Logos 4: the selection brief is told apart from a node thread by its `kind`, then cleaned and shown.
+    ok('the chat route reads it, cleaned', /const selected = [^;]*sanitizeFocus\(body\?\.focus\)/.test(route) && /focusBlock\(selected\)/.test(route) && /focusIsBrief/.test(route));
+  }
   ok('only the first model panel takes the reply’s ops and reports the picture', /onRead=\{primary \? takeViz : undefined\}/.test(app) && /ops=\{primary \? vizOps : null\}/.test(app));
   ok('the workspace hooks sit above the access gate', app.indexOf('const [wsLayout, setWsLayout]') < app.indexOf('if (!hasAccess) {'));
   const ws = read('components/workspace/Workspace.tsx');

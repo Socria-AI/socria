@@ -159,6 +159,7 @@ import {
 import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
+import { digestOf } from '@/lib/cognition/digest';
 import { briefOf } from '@/lib/representation';
 import {
   canSynthesize,
@@ -3606,6 +3607,16 @@ export function LogosApp({
             return f ? { docFocus: f } : {};
           })(),
           ...guidance(),
+          // LOGOS 4 — the engine's two inputs from this screen (lib/cognition):
+          // a few facts about their own map, so a challenge is grounded in what
+          // it marks unexamined; and how long this line of thinking sat
+          // untouched before this turn (one recall question on return, only
+          // when they were learning).
+          ...(() => {
+            const dg = digestOf(mapRef.current);
+            return dg ? { mapDigest: dg } : {};
+          })(),
+          ...(s0?.messages.length && s0.updatedAt ? { resumedAfterMs: Math.max(0, Date.now() - s0.updatedAt) } : {}),
           // What Logos knows about this person, for accounts; the server
           // decides what the plan carries of it. The recurrence line is
           // owed until it has been injected once in this session.
