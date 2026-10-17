@@ -210,7 +210,8 @@ console.log('\n=== simple at rest, powerful on demand ===');
   const app = read('components/LogosApp.tsx');
   ok('Logos 3 starts on one surface — the model if there is one, else the map', /singleLayout\(wsHasModel \? 'model' : 'map'\)/.test(app));
   ok('the conversation is a composer beneath the stage until it is asked for', /className=\{`ws-dock lg-convo/.test(app) && /dock=\{wsDock\}/.test(app));
-  ok('the inspector appears for a selection, and only then', /focus && focus\.kind !== 'node'/.test(app) && /overlay=\{wsCard\}/.test(app));
+  // Logos 4: only what the inspector can describe opens it — a parameter, an input, a part of a model
+  ok('the inspector appears for a selection, and only then', /focus && \(focus\.kind === 'param' \|\| focus\.kind === 'input' \|\| focus\.kind === 'object'\)/.test(app) && /overlay=\{wsCard\}/.test(app));
   // by the count it used to keep, or by the build itself (lib/workspace/surfaces.ts afterBuild, tested in logos3-interface)
   ok('the one surface follows the work, but an arrangement of several never moves', /ps\.length === 1 \? ps\[0\] : null/.test(app) || /afterBuild\(/.test(app));
 }
@@ -251,11 +252,11 @@ console.log('\n=== the wiring ===');
   ok('undo and redo are the document’s own verbs', /undoDoc\(ws, docId\)/.test(app) && /redoDoc\(ws, docId\)/.test(app) && /restoreDoc\(ws, docId, op\)/.test(app));
   ok('the layout is kept in this browser, never in the session', /const WS_KEY = 'socria\.logos3\.workspace\.v2'/.test(app) && /localStorage\.setItem\(WS_KEY/.test(app) && !/workspace: wsLayout|layout: wsLayout,\s*\}/.test(app));
   ok('a layout change never touches a model', !/patchActive\([^)]*wsLayout/.test(app));
-  ok('the turn carries the focus, described from canonical state', /describeFocus\(focusRef\.current, mapRef\.current\)/.test(app));
+  ok('the turn carries the focus, described from canonical state', /describeFocus\(focusRef\.current, mapRef\.current, docsRef\.current\)/.test(app));
   {
     const route = read('app/api/logos/chat/route.ts');
     // Logos 4: the selection brief is told apart from a node thread by its `kind`, then cleaned and shown.
-    ok('the chat route reads it, cleaned', /const selected = [^;]*sanitizeFocus\(body\?\.focus\)/.test(route) && /focusBlock\(selected\)/.test(route) && /focusIsBrief/.test(route));
+    ok('the chat route reads it, cleaned', /const brief = [^;]*sanitizeFocus\(body\?\.focus\)/.test(route) && /const selected = brief/.test(route) && /focusBlock\(selected\)/.test(route) && /focusIsBrief/.test(route));
   }
   ok('only the first model panel takes the reply’s ops and reports the picture', /onRead=\{primary \? takeViz : undefined\}/.test(app) && /ops=\{primary \? vizOps : null\}/.test(app));
   ok('the workspace hooks sit above the access gate', app.indexOf('const [wsLayout, setWsLayout]') < app.indexOf('if (!hasAccess) {'));

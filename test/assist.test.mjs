@@ -106,7 +106,15 @@ console.log('=== Point & Ask: the question is about the thing they selected ==='
   let d = dec('why is this negative?', { focus: { kind: 'param', label: 'β₂' } });
   ok('a selection + why → explain about it', d.mode === 'explain' && d.target === 'β₂' && d.reasons.includes('focus:param'), show(d));
   d = dec('what is this?', { focus: { kind: 'part', label: 'Rent' } });
-  ok('a selection + what is → informed, about it', d.mode === 'inform', show(d));
+  ok('a selection + what is → informed, about it', d.mode === 'inform' && d.target === 'Rent' && d.reasons.includes('focus:part'), show(d));
+  d = dec('what does this mean?', { focus: { kind: 'passage', label: 'the passage they selected' } });
+  ok('a question of fact about the selection keeps the selection as its subject', d.mode === 'inform' && d.target === 'the passage they selected' && d.reasons.includes('fact') && d.reasons.includes('focus:passage'), show(d));
+  d = dec('I want to end it all', { focus: { kind: 'node', label: 'Rent is too high' } });
+  ok('in a crisis, the selection is put aside with everything else', d.reasons.includes('safety') && !d.target && !d.reasons.some((r) => r.startsWith('focus:')), show(d));
+  d = dec('that is wrong', { focus: { kind: 'node', label: 'Rent' }, accuracy: { check: false, pushback: { kind: 'disagree' }, theirs: [], computed: false, math: false } });
+  ok('pushback is about what Socria said, not the selection', d.mode === 'verify' && !d.target, show(d));
+  d = dec('Chart my spending: rent 1200, food 400', { focus: { kind: 'node', label: 'Rent' }, construct: 'display' });
+  ok('something built still knows what is selected', d.mode === 'construct' && d.target === 'Rent', show(d));
   const block = renderAssist(dec('tell me about this one', { focus: { kind: 'node', label: 'More money means progress' } }));
   ok('the block says never to ask which one they mean', /never ask which one they mean/.test(block) && /More money means progress/.test(block), block);
 }

@@ -70,7 +70,7 @@ import {
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
 import { GROUP_MAX, addressedBlock, collabBlock, type Seat } from '@/lib/collab';
-import { cleanReplyRef, quoteLine } from '@/lib/chat-thread';
+import { aboutLine, cleanAboutRef, cleanReplyRef, quoteLine } from '@/lib/chat-thread';
 import { focusBlock, sanitizeFocus } from '@/lib/workspace/focus';
 import { objectsBlock, sanitizeSpace } from '@/lib/objects';
 import { roleBlock } from '@/lib/onboarding-roles';
@@ -239,7 +239,11 @@ export async function POST(req: NextRequest) {
         // (lib/chat-thread.ts quoteLine), so it can never read as anything
         // but a quote.
         const ref = m.role === 'user' ? cleanReplyRef(m.replyTo) : undefined;
-        const said = ref && rendered ? `${quoteLine(ref)}\n${rendered}` : rendered;
+        // Point & Ask: an EARLIER turn keeps what it was about (the current
+        // turn's selection arrives as the focus brief, with its facts).
+        const about = m.role === 'user' && i < kept.length - 1 ? cleanAboutRef(m.about) : undefined;
+        const quoted = ref && rendered ? `${quoteLine(ref)}\n${rendered}` : rendered;
+        const said = about && quoted ? `${aboutLine(about)}\n${quoted}` : quoted;
         return {
           role: m.role as 'user' | 'assistant',
           content: name && said ? `${name}: ${said}` : said,
@@ -527,7 +531,11 @@ export async function POST(req: NextRequest) {
     // asked to have built, their own map), and always a question budget priced
     // from the transcript, which the stream gate below enforces.
     const signals = readSignals(String(last.content ?? ''));
-    const selected = focusLabel || !focusIsBrief ? null : sanitizeFocus(body?.focus);
+    // A selected passage counts only where its document came with the turn —
+    // its words are shown there, fenced as data; the brief's copy of them is
+    // never used (lib/workspace/focus.ts focusBlock).
+    const brief = focusLabel || !focusIsBrief ? null : sanitizeFocus(body?.focus);
+    const selected = brief?.kind === 'passage' && !docFocus ? null : brief;
     const resumedAfterMs =
       typeof body?.resumedAfterMs === 'number' && Number.isFinite(body.resumedAfterMs) && body.resumedAfterMs > 0
         ? Math.min(body.resumedAfterMs, 400 * 86_400_000)
@@ -543,7 +551,11 @@ export async function POST(req: NextRequest) {
         computed: accuracy.computed.some((c) => !!c.result),
         math: accuracy.reasons.includes('math'),
       },
-      focus: selected ? { kind: selected.kind, label: selected.label } : focusLabel ? { kind: 'node', label: focusLabel } : null,
+      focus: selected
+        ? { kind: selected.kind, label: selected.kind === 'passage' ? 'the passage they selected' : selected.label }
+        : focusLabel
+          ? { kind: 'node', label: focusLabel }
+          : null,
       construct: focusLabel ? null : readDisplayRequest(last.content) ? 'display' : (asked ? 'simulation' : constructAsk(String(last.content ?? ''))),
       map: sanitizeDigest(body?.mapDigest),
       resumedAfterMs,

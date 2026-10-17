@@ -243,6 +243,14 @@ export function chooseAssist(input: AssistInput): AssistDecision {
 
   const decide = (mode: AssistMode, forced: boolean, extra: Partial<AssistDecision> = {}): AssistDecision => {
     const q = extra.questions ?? (mode === 'inform' || mode === 'construct' || mode === 'space' ? 0 : questions);
+    const why = extra.reasons ?? [];
+    // What they selected is "this" whatever the move — a fact asked about it,
+    // their work on it checked — unless the move has a target of its own, is
+    // about what Socria said (pushback), puts everything aside (safety), or is
+    // only room.
+    const pointed =
+      !extra.target && input.focus && mode !== 'space' && !why.some((r) => r === 'safety' || r.startsWith('pushback:')) ? input.focus : null;
+    const target = extra.target ?? pointed?.label;
     return {
       mode,
       forced,
@@ -250,8 +258,8 @@ export function chooseAssist(input: AssistInput): AssistDecision {
       scaffold: extra.scaffold ?? 'none',
       selfExplain: extra.selfExplain ?? false,
       retrieval: extra.retrieval ?? false,
-      ...(extra.target ? { target: extra.target } : {}),
-      reasons: [...reasons, ...(extra.reasons ?? [])],
+      ...(target ? { target } : {}),
+      reasons: [...reasons, ...why, ...(pointed ? [`focus:${pointed.kind}`] : [])],
     };
   };
 

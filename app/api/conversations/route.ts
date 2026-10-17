@@ -5,7 +5,7 @@
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
-import { cleanAt, cleanMsgId, cleanReplyRef, type ReplyRef } from '@/lib/chat-thread';
+import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -61,12 +61,15 @@ function sanitizeMessages(raw: unknown): Msg[] {
       const id = cleanMsgId(m.id);
       const at = cleanAt(m.at);
       const replyTo = cleanReplyRef(m.replyTo);
+      // Point & Ask: what the turn was about, as selected when it was sent
+      const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
       return {
         ...(id ? { id } : {}),
         ...(at ? { at } : {}),
         role: m.role,
         content: m.content,
         ...(replyTo ? { replyTo } : {}),
+        ...(about ? { about } : {}),
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),

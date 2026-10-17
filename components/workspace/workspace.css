@@ -187,13 +187,6 @@
 .logos-root .ws-trace-list li button:not(:disabled):hover { color: var(--lg-primary); }
 .logos-root .ws-trace-list em { font-family: var(--serif); font-size: 12px; color: var(--lg-primary); }
 
-/* ── the conversation, as a panel ─────────────────────────────────────── */
-.logos-root .ws-chat-focus {
-  display: flex; align-items: baseline; gap: 8px; margin: 0 16px; padding: 6px 0;
-  border-bottom: 1px solid var(--lg-line); font-family: var(--lg-sans); font-size: 12px; color: var(--lg-ink-60);
-}
-.logos-root .ws-chat-focus strong { font-family: var(--serif); font-weight: 400; font-style: italic; font-size: 14px; color: var(--lg-ink); }
-.logos-root .ws-chat-focus button { margin-left: auto; background: none; border: 0; cursor: pointer; color: var(--lg-ink-40); font-size: 14px; }
 
 @media (prefers-reduced-motion: reduce) {
   .logos-root .ws-chip, .logos-root .ws-divider::after, .logos-root .ws-drop span { transition: none; }
@@ -233,7 +226,6 @@
 .logos-root .ws-dock .lg-guard, .logos-root .ws-dock .lg-one-note, .logos-root .ws-dock .lg-drift, .logos-root .ws-dock .lg-allow { margin-left: 0; margin-right: 0; }
 .logos-root .ws-dock:not(.is-open) .lg-thread { display: none; }
 .logos-root .ws-dock.is-open .lg-thread { flex: 0 1 auto; min-height: 0; max-height: 52vh; padding: 10px 4px 8px; border-top: 1px solid var(--lg-line); }
-.logos-root .ws-dock .ws-chat-focus { margin: 0 0 2px; }
 .logos-root .ws-dock-row { display: flex; align-items: flex-start; gap: 12px; }
 .logos-root .ws-peek-gap { flex: 1; }
 .logos-root .ws-dock-toggle {

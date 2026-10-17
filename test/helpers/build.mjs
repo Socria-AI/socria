@@ -296,6 +296,8 @@ const MODULES = [
   'test/helpers/docs-under-test.tsx',
   // the developer dashboard: gate, counters, aggregation and the page body, in one bundle
   'test/helpers/dashboard-under-test.tsx',
+  // Logos 4, Point & Ask: focus descriptions, the message's "about", the picker, in one bundle
+  'test/helpers/point-ask-under-test.tsx',
 ];
 
 export async function buildAll() {

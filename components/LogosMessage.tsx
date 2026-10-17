@@ -24,7 +24,7 @@ import { mentionParts } from '@/lib/chat-thread';
 import { copyText } from '@/lib/copy-text';
 import { initialOf } from '@/lib/collab';
 import { AttachmentList } from '@/components/LogosComposer';
-import { MathText } from '@/components/TeX';
+import { MathText, TeX, TexPick } from '@/components/TeX';
 import { Inline, RichText, type CiteRender } from '@/components/RichText';
 import { citeVerdicts, type CiteVerdict } from '@/lib/docs/ground';
 import type { DocRef } from '@/lib/docs/render';
@@ -151,6 +151,7 @@ export function LogosMessage({
   docRefs,
   onOpenCite,
   onOpenDoc,
+  onPickTex,
 }: {
   /** the conversation's documents, with their letters — a reply's citations are checked against them */
   docRefs?: DocRef[];
@@ -158,6 +159,8 @@ export function LogosMessage({
   onOpenCite?: (docId: string, blockId: string) => void;
   /** open a document attached to this message */
   onOpenDoc?: (docId: string) => void;
+  /** Point & Ask: an expression in this reply was picked — it becomes what the next message is about */
+  onPickTex?: (tex: string) => void;
   m: LogosMsg;
   side: Side;
   /** whom Socria is answering, as this screen says it ("You" for your own question) */
@@ -240,6 +243,14 @@ export function LogosMessage({
             <b>{quote.who}</b> <span>{quote.excerpt}</span>
           </button>
         )}
+        {/* Point & Ask: what was selected when this was sent, kept with it */}
+        {m.role === 'user' && m.about && (
+          <span className="lg-msg-about">
+            <span className="lg-msg-about-k">About</span>{' '}
+            {m.about.kind === 'expression' ? <TeX tex={m.about.label} /> : <b>{m.about.label}</b>}
+            {m.about.of ? <span className="lg-msg-about-of"> · {m.about.of}</span> : null}
+          </span>
+        )}
         <div className="lg-msg-stack">
           {!!m.attachments?.length && <AttachmentList items={m.attachments} onOpenDoc={onOpenDoc} />}
           {m.content && (
@@ -251,7 +262,9 @@ export function LogosMessage({
                 // arrived as literal asterisks and hyphens. What the
                 // person typed is never reinterpreted: their own
                 // asterisks stay asterisks; only @socria is drawn as itself.
-                <RichText text={m.content} math cite={cites ? cite : undefined} />
+                <TexPick.Provider value={onPickTex ?? null}>
+                  <RichText text={m.content} math cite={cites ? cite : undefined} />
+                </TexPick.Provider>
               ) : (
                 <SaidText text={m.content} />
               )}

@@ -127,6 +127,11 @@ export interface ObjectKind<S = unknown> {
   text: (state: S) => string;
   parts: (state: S) => Part[];
   partFacts: (state: S, part: string) => string[] | null;
+  /**
+   * The name of a part that `parts` does not list one by one — a table cell,
+   * a chart point (Logos 4, Point & Ask) — or null when there is no such part.
+   */
+  partLabel?: (state: S, part: string) => string | null;
   views: ViewDecl<S>[];
   /** the figure's footprint, for a layout to make room for: live, a step in a trail, or a card */
   size: (state: S, mode: 'live' | 'trail' | 'card') => { w: number; h: number };

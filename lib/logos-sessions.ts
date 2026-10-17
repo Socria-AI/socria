@@ -13,7 +13,7 @@ import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
-import type { ReplyRef } from './chat-thread';
+import type { AboutRef, ReplyRef } from './chat-thread';
 
 export interface LogosMsg {
   /**
@@ -28,6 +28,8 @@ export interface LogosMsg {
   content: string;
   /** the message this one answers — its own snapshot, so the quote outlives the original */
   replyTo?: ReplyRef;
+  /** Point & Ask: what was selected in the workspace when it was sent — a snapshot (lib/chat-thread.ts) */
+  about?: AboutRef;
   /** notes and images brought into the conversation with this turn */
   attachments?: Attachment[];
   /** who wrote it, when two people are thinking together — see lib/collab.ts */

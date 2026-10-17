@@ -27,6 +27,7 @@ import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, TEXT_EXTENSIONS, kindOfFile, ref
 /** What the attach button offers: pictures, documents (a zip is opened in Core) and anything that is text. */
 const DOC_ACCEPT = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e !== 'zip'), ...TEXT_EXTENSIONS].map((e) => `.${e}`).join(',');
 import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
+import { TeX } from './TeX';
 import './logos-thread.css';
 
 export interface Draft extends Attachment {
@@ -251,6 +252,8 @@ export function LogosComposer({
   replyTo,
   onCancelReply,
   group,
+  about,
+  onClearAbout,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -276,6 +279,13 @@ export function LogosComposer({
   /** the message this one will answer — Reply on a message puts it here */
   replyTo?: ReplyRef | null;
   onCancelReply?: () => void;
+  /**
+   * Logos 4, Point & Ask: what is selected in the workspace — the thing this
+   * message will be about. Shown on the box so it is never a surprise, and
+   * cleared with one press.
+   */
+  about?: { kind: string; label: string; of?: string } | null;
+  onClearAbout?: () => void;
   /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
@@ -486,6 +496,27 @@ export function LogosComposer({
           </div>
         )}
 
+        {about && (
+          <div className="lg-reply-chip lg-about-chip" role="status" aria-live="polite">
+            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="3" />
+              <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
+            </svg>
+            <span className="lg-reply-text">
+              <span className="lg-reply-k">Asking about</span>
+              <span className="lg-reply-x">
+                {about.kind === 'expression' ? <TeX tex={about.label} /> : about.label}
+                {about.of ? <span className="lg-about-of"> · {about.of}</span> : null}
+              </span>
+            </span>
+            {onClearAbout && (
+              <button type="button" className="lg-reply-cancel" aria-label={`Stop asking about ${about.label}`} title="Clear the selection" onClick={onClearAbout}>
+                ×
+              </button>
+            )}
+          </div>
+        )}
+
         {offering && (
           <button
             type="button"
@@ -556,7 +587,9 @@ export function LogosComposer({
             placeholder={
               replyTo
                 ? `Reply to ${replyTo.who}…`
-                : group
+                : about
+                  ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
+                  : group
                   ? 'Message everyone — @socria to ask Socria'
                   : busy
                     ? 'Keep writing — you can send once Socria has replied'

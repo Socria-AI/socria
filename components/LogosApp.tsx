@@ -2983,6 +2983,26 @@ export function LogosApp({
     });
   }
 
+  // ── POINT & ASK (Logos 4) ────────────────────────────────────────
+  // Anything selectable can be asked about: it becomes the workspace's focus,
+  // the composer's chip names it, and the cursor goes to the box. Nothing is
+  // typed or sent for them, and on a phone the conversation comes forward.
+
+  /** "Ask Socria" on a card of the map. */
+  function askAboutNode(node: { id: string }) {
+    setObjSel(null);
+    setFocus({ kind: 'node', id: node.id });
+    setMobileView('chat');
+    focusComposer();
+  }
+
+  /** An expression in one of Socria's replies, picked (click, tap or Enter). */
+  function askAboutExpression(tex: string) {
+    setObjSel(null);
+    setFocus({ kind: 'expression', tex, where: 'Socria’s reply' });
+    focusComposer();
+  }
+
   const synthProps = (syn: Synthesis, latest: boolean) => ({
     synthesis: syn,
     latest,
@@ -3511,6 +3531,11 @@ export function LogosApp({
     });
     setDrift(v.flag ? { ...v, text: content } : null);
 
+    // POINT & ASK: what is selected as it is sent — described from canonical
+    // state (lib/workspace/focus.ts), told to the reply, and kept on the
+    // message so the thread still says what "this" was after the selection
+    // has gone.
+    const askBrief = workspaceOn ? describeFocus(focusRef.current, mapRef.current, docsRef.current) : null;
     const turn: Msg = {
       id: newMsgId(),
       at: Date.now(),
@@ -3518,6 +3543,7 @@ export function LogosApp({
       content,
       ...(atts.length ? { attachments: atts } : {}),
       ...(replying ? { replyTo: replying } : {}),
+      ...(askBrief ? { about: { kind: askBrief.kind, label: askBrief.label, ...(askBrief.of ? { of: askBrief.of } : {}) } } : {}),
     };
     // In a shared room — and in the room's own session — the turn is stamped
     // with who wrote it and broadcast to the other person before anything
@@ -3650,10 +3676,7 @@ export function LogosApp({
           ...(objTurn.claims.length ? { objectClaims: objTurn.claims } : {}),
           // Logos 3: what they have selected in the workspace, described from
           // canonical state — so "why is this negative?" is about β₂.
-          ...(() => {
-            const brief = workspaceOn ? describeFocus(focusRef.current, mapRef.current) : null;
-            return brief ? { focus: brief } : {};
-          })(),
+          ...(askBrief ? { focus: askBrief } : {}),
           // What the map reads them as building, and its spine in order.
           ...(() => {
             const b = mapRef.current ? briefOf(mapRef.current) : null;
@@ -4049,9 +4072,9 @@ export function LogosApp({
   modelEditedRef.current = handleModelEdited;
 
   // ASK ABOUT THIS — from the map's plot lens or any model panel: the turn
-  // carries the object's identity, and the composer is seeded, never sent.
-  function handleAskAbout(id: string, label: string) {
-    setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
+  // carries the object's identity; the composer names it and is never sent.
+  function handleAskAbout(id: string, _label: string) {
+    focusComposer();
     // Selecting what is already selected is not an edit, and the
     // op's refusal ("… is already selected") is not news.
     const doc = mapRef.current.models ? activeDoc(mapRef.current.models) : null;
@@ -4072,17 +4095,11 @@ export function LogosApp({
       return next === ws ? s : { ...s, map: { ...mp, models: next } };
     });
   };
-  // "Ask about this" from the inspector: the composer is seeded, never sent,
-  // and the cursor goes to it — the composer is always on screen.
-  askLabelRef.current = (label) => {
-    setInput((cur) => (cur.trim() ? cur : `About ${label} — why is it what it is?`));
-    requestAnimationFrame(() => {
-      const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
-      if (ta) {
-        ta.focus();
-        ta.setSelectionRange(ta.value.length, ta.value.length);
-      }
-    });
+  // "Ask about this" from the inspector: what it describes is already the
+  // selection, so the cursor goes to the composer, whose chip names it.
+  // Nothing is typed for them.
+  askLabelRef.current = () => {
+    focusComposer();
   };
 
   // ── THE WORKSPACE'S PANELS ───────────────────────────────────────
@@ -4096,7 +4113,13 @@ export function LogosApp({
   const wsActiveDoc = map.models ? (activeDoc(map.models) ?? wsDocs[wsDocs.length - 1] ?? null) : null;
   const panelDoc = (p: PanelNode) => (p.config?.doc && map.models ? docOf(map.models, p.config.doc) : wsActiveDoc);
   const firstOf = (t: PanelNode['type']) => (wsLayout ? panelsOf(wsLayout).find((x) => x.type === t)?.id ?? null : null);
-  const focusBrief = workspaceOn ? describeFocus(focus, map) : null;
+  const focusBrief = workspaceOn ? describeFocus(focus, map, docs) : null;
+  // POINT & ASK, CLEARED: the selection goes everywhere at once — the chip,
+  // the highlighted part, the passage a document view holds.
+  const clearAbout = () => {
+    setFocus(null);
+    setObjSel(null);
+  };
 
   const sceneOf = (p: PanelNode): ThoughtObject | null => {
     const objs = map.objects?.objs ?? [];
@@ -4114,14 +4137,6 @@ export function LogosApp({
       case 'chat':
         return (
           <div className="lg-convo lg-convo-panel">
-            {focusBrief && (
-              <div className="ws-chat-focus" role="status">
-                <span>About</span>
-                <strong>{focusBrief.label}</strong>
-                <span>{focusBrief.of}</span>
-                <button type="button" aria-label="Clear what the conversation is about" onClick={() => setFocus(null)}>×</button>
-              </div>
-            )}
             {convoBody}
           </div>
         );
@@ -4646,7 +4661,7 @@ export function LogosApp({
                   onJump={jumpTo}
                   toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
                   docRefs={docRefs}
-                  {...(workspaceOn ? { onOpenCite: openCite, onOpenDoc: openDoc } : {})}
+                  {...(workspaceOn ? { onOpenCite: openCite, onOpenDoc: openDoc, onPickTex: askAboutExpression } : {})}
                 />
               );
             })}
@@ -4837,6 +4852,8 @@ export function LogosApp({
             replyTo={replyTo}
             onCancelReply={() => setReplyTo(null)}
             group={groupLive}
+            about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
+            onClearAbout={clearAbout}
           />
 
           {/* Which mind you're talking to, and how deep it goes — kept beside
@@ -5081,6 +5098,7 @@ export function LogosApp({
             initialLens={lens as LensId | undefined}
             workspace={workspaceOn}
             onSelectNode={(id) => setFocus({ kind: 'node', id })}
+            onAsk={workspaceOn ? askAboutNode : undefined}
             map={map}
             onAction={(mode, node) => {
               signalFirstMap('action-taken');
@@ -5219,14 +5237,6 @@ export function LogosApp({
         )}
         {/* folded, the notes sit under the reply's peek; open, in the thread */}
         {!dockShown && chatNotes}
-        {focusBrief && (
-          <div className="ws-chat-focus" role="status">
-            <span>About</span>
-            <strong>{focusBrief.label}</strong>
-            <span>{focusBrief.of}</span>
-            <button type="button" aria-label="Clear what the conversation is about" onClick={() => setFocus(null)}>×</button>
-          </div>
-        )}
         {convoBody}
       </div>
     ) : null;
@@ -5234,7 +5244,7 @@ export function LogosApp({
   // model, a parameter or an input brings a small card describing it; it
   // goes when the selection does. "Keep open" makes it a panel.
   const inspectorOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'inspector');
-  const cardFocus = focus && focus.kind !== 'node' && focus.kind !== 'part' ? focus : null;
+  const cardFocus = focus && (focus.kind === 'param' || focus.kind === 'input' || focus.kind === 'object') ? focus : null;
   const cardDoc = cardFocus && map.models ? (docOf(map.models, cardFocus.doc) ?? wsActiveDoc) : null;
   const wsCard =
     workspaceOn && cardFocus && cardDoc && !inspectorOpen ? (

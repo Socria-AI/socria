@@ -46,7 +46,7 @@ import { sanitizeContexts } from '@/lib/logos-sources';
 import { can, type Role } from '@/lib/share/roles';
 import { displayNameOf, isShared, noteChange, shareAccess } from '@/lib/share/server';
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
-import { cleanAt, cleanMsgId, cleanReplyRef } from '@/lib/chat-thread';
+import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef } from '@/lib/chat-thread';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -141,8 +141,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const id = cleanMsgId(r.id);
         const at = cleanAt(r.at);
         const replyTo = cleanReplyRef(r.replyTo);
+        const about = role === 'user' ? cleanAboutRef(r.about) : undefined;
         const synthesis = role === 'assistant' ? sanitizeSynthesis(r.synthesis) : undefined;
-        const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}) };
+        const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}), ...(about ? { about } : {}) };
         // a person's turn is theirs, named; Socria's answer is Socria's
         return role === 'user'
           ? { ...extra, role, content, by }

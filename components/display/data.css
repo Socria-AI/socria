@@ -35,7 +35,9 @@
 .dsp-data-slice.is-s1 path, .dsp-data-slice.is-s1 circle { fill: var(--dsp-accent); }
 .dsp-data-slice.is-s2 path, .dsp-data-slice.is-s2 circle { fill: var(--dsp-tension); }
 .dsp-data-slice.is-s3 path, .dsp-data-slice.is-s3 circle { fill: var(--dsp-60); }
-.dsp-data-slice.is-sel path { stroke: var(--dsp-ink); stroke-width: 2; }
+.dsp-data-slice.is-sel path, .dsp-data-slice.is-sel circle { stroke: var(--dsp-ink); stroke-width: 2; }
+.dsp-data-slice:focus { outline: none; }
+.dsp-data-slice:focus-visible path, .dsp-data-slice:focus-visible circle { stroke: var(--dsp-ink); stroke-width: 2.5; }
 .dsp-data-slice text { font-size: 11px; fill: #fff; pointer-events: none; }
 .dsp-data-key { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12.5px; }
 .dsp-data-key.is-row { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 4px; }
@@ -60,6 +62,9 @@
 .dsp-data-grid td .dsp-edit, .dsp-data-grid td .dsp-num { width: 100%; border-bottom-color: transparent; }
 .dsp-data-grid td .dsp-edit:focus, .dsp-data-grid td .dsp-num:focus, .dsp-data-grid td .dsp-edit:hover, .dsp-data-grid td .dsp-num:hover { border-bottom-color: var(--dsp-24); }
 .dsp-data-grid td.is-sel { background: var(--dsp-tint); }
+/* a still table's cells are pointed at, not edited (Point & Ask) */
+.dsp-data-grid td.is-pickable { cursor: pointer; }
+.dsp-data-grid td.is-pickable:focus-visible { outline: 2px solid var(--dsp-primary); outline-offset: -2px; }
 .dsp-data-grid tr.is-socria td { font-style: italic; }
 .dsp-data-colmeta { display: inline-flex; align-items: center; gap: 2px; font-weight: 400; text-transform: none; letter-spacing: 0; color: var(--dsp-40); }
 .dsp-data-colmeta .dsp-danger { border: 0; padding: 0 4px; font-size: 12px; color: var(--dsp-40); }

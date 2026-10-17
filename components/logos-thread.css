@@ -157,6 +157,32 @@
 }
 .logos-root .lg-reply-cancel:hover,
 .logos-root .lg-reply-cancel:focus-visible { color: var(--lg-ink); background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06); outline: none; }
+/* ── Point & Ask (Logos 4): what a message is, or was, about ─────────── */
+.logos-root .lg-about-chip .lg-about-of { color: var(--lg-ink-40); }
+.logos-root .lg-about-chip .lg-tex { font-size: 0.95em; }
+.logos-root .lg-msg-about {
+  display: block; max-width: 100%; margin: 0 0 6px; padding: 3px 10px;
+  overflow: hidden; white-space: nowrap; text-overflow: ellipsis;
+  font-size: 12px; line-height: 1.5; color: var(--lg-ink-60);
+  border-left: 2px solid var(--lg-primary); border-radius: 4px 8px 8px 4px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05);
+}
+.logos-root .lg-msg-about-k { color: var(--lg-primary); font-weight: 600; }
+.logos-root .lg-msg-about b { color: var(--lg-ink); font-weight: 600; }
+.logos-root .lg-msg-about-of { color: var(--lg-ink-40); }
+/* an expression in a reply can be pointed at: quiet until it is approached */
+.logos-root .lg-tex.is-pickable,
+.logos-root .lg-tex-raw.is-pickable {
+  cursor: pointer; border-radius: 4px; box-shadow: 0 0 0 0 transparent;
+  transition: background-color 120ms ease, box-shadow 120ms ease;
+}
+.logos-root .lg-tex.is-pickable:hover { background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08); box-shadow: 0 0 0 3px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08); }
+.logos-root .lg-tex.is-pickable:focus-visible,
+.logos-root .lg-tex-raw.is-pickable:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-tex.is-pickable { transition: none; }
+}
+
 .logos-root .lg-mention-offer {
   display: inline-flex; align-items: center; gap: 8px;
   margin: 0 0 6px 6px; padding: 5px 12px 5px 6px;

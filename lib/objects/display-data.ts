@@ -1409,6 +1409,15 @@ export function readDataOp(text: string, s: DataState, today: string): { op: str
 // ── the kind ─────────────────────────────────────────────────────────
 
 const unitSaid = (c: DataColumn) => (c.unit ? ` (${c.unit})` : '');
+/** A `cell:<row>|<column>` part, read against the table — or null. */
+const cellOf = (s: DataState, part: string): { row: number; col: DataColumn } | null => {
+  const m = /^cell:(\d+)\|(.+)$/.exec(part);
+  if (!m) return null;
+  const row = Number(m[1]);
+  const col = colOf(s, m[2]);
+  return s.rows[row] && col ? { row, col } : null;
+};
+
 const rowLabel = (s: DataState, i: number): string => {
   const lc = s.columns.findIndex(isLabel);
   const v = lc >= 0 ? s.rows[i]?.cells[lc] : null;
@@ -1514,7 +1523,36 @@ export const DATA = displayKind<DataState>({
   facts: (s, { guarded }) => factsOf(s, guarded),
   text: textOf,
   parts: (s): Part[] => [...s.columns.map((c) => ({ id: c.id, label: c.name })), ...s.rows.map((_, i) => ({ id: `r${i}`, label: rowLabel(s, i) }))],
+  // A CELL — a bar, a point, a slice, a table cell — is selected as
+  // `cell:<row>|<column>` (components/display/DataFigure.tsx). It is not listed
+  // in `parts` (a table holds hundreds), so it is named and described here; it
+  // used to be neither, which meant a selected bar never reached the
+  // conversation at all.
+  partLabel: (s, part) => {
+    const at = cellOf(s, part);
+    return at ? `${rowLabel(s, at.row)} · ${at.col.name}` : null;
+  },
   partFacts: (s, part) => {
+    const at = cellOf(s, part);
+    if (at) {
+      const row = s.rows[at.row];
+      const v = cellAt(s, row, at.col);
+      const unit = at.col.unit && typeof v === 'number' ? ` ${at.col.unit}` : '';
+      const lines = [`${rowLabel(s, at.row)} · ${at.col.name}: ${v === null ? 'empty' : labelOf(v)}${unit}`];
+      if (at.col.type === 'number' && typeof v === 'number') {
+        const vals = s.rows.map((r) => cellAt(s, r, at.col)).filter((x): x is number => typeof x === 'number');
+        const total = vals.reduce((a, b) => a + b, 0);
+        // computed here, from the cells, never by a model
+        if (vals.length > 1 && total > 0 && vals.every((x) => x >= 0)) lines.push(`${fmtNum(Math.round((1000 * v) / total) / 10)}% of the ${at.col.name} total of ${fmtNum(total)}${at.col.unit ? ` ${at.col.unit}` : ''} (computed from the table)`);
+        if (vals.length > 2) {
+          const rank = [...vals].sort((a, b) => b - a).indexOf(v) + 1;
+          lines.push(rank === 1 ? `the largest of the ${vals.length} values` : rank === vals.length ? `the smallest of the ${vals.length} values` : `number ${rank} of ${vals.length}, largest first`);
+        }
+      }
+      // where the number came from, as the table records it
+      lines.push(s.source && row.by !== 'person' ? `read from ${sourceSaid(s.source)}` : row.by === 'person' ? 'their own number' : 'from Socria');
+      return lines;
+    }
     const c = colOf(s, part);
     if (c) {
       const filled = s.rows.filter((r) => cellAt(s, r, c) !== null).length;

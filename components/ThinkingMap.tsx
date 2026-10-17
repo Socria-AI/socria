@@ -184,6 +184,7 @@ export function ThinkingMap({
   onAskAbout,
   onModelEdited,
   onSelectNode,
+  onAsk,
   picked,
   onPick,
   guarded,
@@ -244,6 +245,12 @@ export function ThinkingMap({
    * conversation means by "this". Single-player Logos 2 passes nothing.
    */
   onSelectNode?: (id: string) => void;
+  /**
+   * Logos 4, Point & Ask: "Ask Socria" on a card — the idea becomes what the
+   * next message in the main conversation is about. Offered where the host
+   * can carry a selection (the workspace).
+   */
+  onAsk?: (node: MapNodeRef) => void;
   /** objects picked for a synthesis of just those (shift- or ⌘-click) */
   picked?: ReadonlySet<string>;
   onPick?: (id: string) => void;
@@ -2101,6 +2108,25 @@ export function ThinkingMap({
                     ))}
                     <span className="lg-act-sep" role="separator" />
                   </div>
+                )}
+                {/* POINT & ASK: about this card, in the conversation itself —
+                    the four modes below open a thread of its own. */}
+                {onAsk && (
+                  <>
+                    <button
+                      type="button"
+                      role="menuitem"
+                      className="lg-act lg-act-ask"
+                      onClick={() => {
+                        setMenu(null);
+                        onAsk({ id: node.id, label: node.label, type: node.type });
+                      }}
+                    >
+                      <span className="lg-act-label">Ask Socria</span>
+                      <span className="lg-act-blurb">About this, in the conversation</span>
+                    </button>
+                    <span className="lg-act-sep" role="separator" />
+                  </>
                 )}
                 {NODE_MODES.map((m) => (
                   <button

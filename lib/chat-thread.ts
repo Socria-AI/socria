@@ -90,6 +90,44 @@ export function cleanReplyRef(v: unknown): ReplyRef | undefined {
   return { ...(id ? { id } : {}), role, who, excerpt };
 }
 
+// ── Point & Ask: what a message was about ─────────────────────────────
+
+/**
+ * WHAT A MESSAGE WAS ABOUT (Logos 4, Point & Ask): the thing selected in the
+ * workspace when it was sent — a node, a chart point, a table cell, a passage,
+ * an expression. A snapshot, like a reply's quote, so "why is this negative?"
+ * still reads correctly next week, after the selection is long gone. Display
+ * data: shaped and clipped, trusted for nothing.
+ */
+export interface AboutRef {
+  kind: AboutKind;
+  /** what it is called, as they saw it */
+  label: string;
+  /** the model, display, map or document it belongs to */
+  of?: string;
+}
+export const ABOUT_KINDS = ['node', 'part', 'param', 'input', 'object', 'passage', 'expression'] as const;
+export type AboutKind = (typeof ABOUT_KINDS)[number];
+
+export function cleanAboutRef(v: unknown): AboutRef | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = v as Record<string, unknown>;
+  const kind = (ABOUT_KINDS as readonly string[]).includes(r.kind as string) ? (r.kind as AboutKind) : null;
+  const label = typeof r.label === 'string' ? oneLine(r.label, 120) : '';
+  if (!kind || !label) return undefined;
+  const of = typeof r.of === 'string' ? oneLine(r.of, 90) : '';
+  return { kind, label, ...(of ? { of } : {}) };
+}
+
+/** The model's copy of an earlier turn carries this line, so the history keeps its "this". */
+export function aboutLine(a: AboutRef): string {
+  // a passage's words are the document's: they reach the model only inside the
+  // DOCUMENTS fence, never as a line of the person's own turn
+  if (a.kind === 'passage') return '[About a passage they had selected in one of their documents]';
+  const what = a.kind === 'expression' ? 'an expression they selected' : a.kind === 'node' ? 'an idea they selected on the map' : 'something they selected in the workspace';
+  return `[About ${what}: “${oneLine(a.label, 120).replace(/[“”]/g, '"')}”${a.of ? ` — in ${oneLine(a.of, 90)}` : ''}]`;
+}
+
 /** The snapshot a reply to this message carries. */
 export function replyRefOf(m: { id?: string; role: 'user' | 'assistant'; content: string }, who: string): ReplyRef {
   return cleanReplyRef({ id: m.id, role: m.role, who, excerpt: excerptOf(m.content) || '…' }) as ReplyRef;

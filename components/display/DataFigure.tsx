@@ -251,7 +251,16 @@ function Chart({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
             const whole = sl.a1 - sl.a0 > 0.9999;
             const [lx, ly] = pt((sl.a0 + sl.a1) / 2, R * 0.66);
             return (
-              <g key={sl.row} className={`dsp-data-slice ${SERIES[i % 4]}${isSel(sl.row, L.col) ? ' is-sel' : ''}`} onClick={() => pick(sl.row, L.col)}>
+              <g
+                key={sl.row}
+                className={`dsp-data-slice ${SERIES[i % 4]}${isSel(sl.row, L.col) ? ' is-sel' : ''}`}
+                onClick={() => pick(sl.row, L.col)}
+                tabIndex={0}
+                role="button"
+                aria-pressed={isSel(sl.row, L.col)}
+                aria-label={`${sl.label}: ${fmtNum(sl.value)}, ${Math.round(sl.share * 1000) / 10}%`}
+                onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), pick(sl.row, L.col))}
+              >
                 {whole ? <circle cx={C} cy={C} r={R} /> : <path d={`M${C},${C} L${x0},${y0} A${R},${R} 0 ${big} 1 ${x1},${y1} Z`} />}
                 {sl.share >= 0.06 && (
                   <text x={lx} y={ly} textAnchor="middle">
@@ -381,7 +390,24 @@ function Table({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
                 {s.columns.map((c, ci) => {
                   const v = row.cells[ci];
                   return (
-                    <td key={c.id} className={`${c.type === 'number' ? 'is-num' : ''}${sel === `cell:${ri}|${c.id}` ? ' is-sel' : ''}`}>
+                    <td
+                      key={c.id}
+                      className={`${c.type === 'number' ? 'is-num' : ''}${sel === `cell:${ri}|${c.id}` ? ' is-sel' : ''}${d.live ? '' : ' is-pickable'}`}
+                      // POINT & ASK: a cell worked in, or pointed at, is what "this" means next
+                      // (lib/objects/display-data.ts names and describes it from the table)
+                      {...(d.live
+                        ? { onFocus: () => sel !== `cell:${ri}|${c.id}` && select(`cell:${ri}|${c.id}`) }
+                        : {
+                            tabIndex: 0,
+                            'aria-pressed': sel === `cell:${ri}|${c.id}`,
+                            onClick: () => select(sel === `cell:${ri}|${c.id}` ? null : `cell:${ri}|${c.id}`),
+                            onKeyDown: (e: React.KeyboardEvent) => {
+                              if (e.key !== 'Enter' && e.key !== ' ') return;
+                              e.preventDefault();
+                              select(sel === `cell:${ri}|${c.id}` ? null : `cell:${ri}|${c.id}`);
+                            },
+                          })}
+                    >
                       {d.live ? (
                         c.type === 'number' ? (
                           <NumberEdit value={typeof v === 'number' ? v : null} label={`Row ${ri + 1}, ${c.name}`} onDone={(n) => d.act('cell', { row: ri, col: c.id, value: n === null ? '' : String(n), by: 'person' })} />
