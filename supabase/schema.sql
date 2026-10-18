@@ -842,6 +842,11 @@ create table if not exists event_registrations (
   constraint event_registrations_consent_has_time check (not marketing_consent or consent_at is not null)
 );
 
+-- The at-the-door check-in page (/events/<id>/checkin) takes check-ins only
+-- while an admin has it switched on. Added after the first release: safe to
+-- re-run on a database that already has the events tables.
+alter table events add column if not exists self_checkin boolean not null default false;
+
 create unique index if not exists event_registrations_event_email_idx on event_registrations (event_id, email_norm);
 create unique index if not exists event_registrations_event_code_idx on event_registrations (event_id, code);
 create index if not exists event_registrations_email_idx on event_registrations (email_norm);

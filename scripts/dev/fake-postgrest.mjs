@@ -30,6 +30,7 @@ const tables = {
       date_confirmed: false,
       tentative_note: 'Target: Wednesday, November 4, 2026 (tentative). Start time not set.',
       status: 'open',
+      self_checkin: false,
       capacity: null,
       expectations: [
         'A candid look at how Socria is being built, decisions and mistakes included',

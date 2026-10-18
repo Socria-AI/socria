@@ -54,6 +54,16 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 - `/events/admin/[id]`: the admin dashboard.
 - `/events/admin/[id]/door`: phone-first check-in.
 
+## Self check-in at the door
+
+`/events/<id>/checkin` is the page for the QR code at the venue. Make the QR code from that address; the admin dashboard's **Check-in** tab shows it with a copy button.
+
+- **What it asks:** name, a **personal** email (UTA addresses — `uta.edu` and any subdomain such as `mavs.uta.edu` — are refused with a clear message), the two optional questions, and the unticked marketing box.
+- **Matching:** if someone RSVP'd with that email, their RSVP is marked attended and any answers they left blank are filled in. Otherwise they're added and checked in as a walk-in. Either way the check-in is recorded as `self`.
+- **The switch:** the page takes check-ins only while an admin has **opened self check-in** (Check-in tab). Closed, it tells people check-in isn't open yet and to find the team. Open it when doors open, close it afterwards, so the link can't be used from home.
+- **Trade-off:** self check-in trusts the person at the form. Someone who RSVP'd with a UTA address and checks in with a personal one will appear twice (once registered, once as a walk-in).
+- **Database:** the switch is the `self_checkin` column, added by the `alter table events add column if not exists self_checkin …` line in the events block of `supabase/schema.sql`. If you already ran the block, run it again.
+
 ## How check-in works
 
 1. **The confirmation.** After RSVP the attendee sees their QR code and a six-character code without look-alike characters (no 0/O, 1/I/L). The QR encodes `/events/check#t=<secret>`: a random 256-bit secret, nothing personal. It is in the `#fragment`, which browsers never send to a server, so it never reaches logs or analytics. The page removes it from the address bar once read.

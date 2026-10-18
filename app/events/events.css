@@ -120,3 +120,15 @@
 .app-root .ev-spark{width:100%;height:auto;display:block}
 
 @media (prefers-reduced-motion: reduce){.app-root .ev-chip span{transition:none}}
+
+/* admin: tabs, and the one-sentence summary */
+.app-root .ev-tabs{display:flex;gap:4px;overflow-x:auto;border-bottom:1px solid var(--ink-12);scrollbar-width:none}
+.app-root .ev-tabs button{position:relative;padding:10px 14px;font-size:.95rem;color:var(--ink-70);white-space:nowrap;display:inline-flex;align-items:center;gap:6px}
+.app-root .ev-tabs button:hover{color:var(--ink)}
+.app-root .ev-tabs button.on{color:var(--ink);font-weight:600}
+.app-root .ev-tabs button.on::after{content:"";position:absolute;left:10px;right:10px;bottom:-1px;height:2px;background:var(--moss-700);border-radius:2px}
+.app-root .ev-tabs button:focus-visible{outline:2px solid var(--moss);outline-offset:-2px;border-radius:8px}
+.app-root .ev-count{font-size:.72rem;font-weight:600;padding:1px 7px;border-radius:999px;background:var(--moss-100);color:var(--moss-800)}
+.app-root .ev-summary{font-family:var(--font-serif, Georgia, serif);font-size:clamp(1.15rem,2.2vw,1.45rem);line-height:1.4;max-width:60ch}
+.app-root .ev-kpi > span:first-child{font-size:.8rem;font-weight:600;color:var(--ink)}
+.app-root .ev-kpi .ev-fine{font-size:.78rem}

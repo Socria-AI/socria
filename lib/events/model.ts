@@ -57,6 +57,8 @@ export interface EventRow {
   status: EventStatus;
   capacity: number | null;
   expectations: string[];
+  /** the at-the-door check-in page takes check-ins only while this is on (an admin opens it at the event) */
+  self_checkin: boolean;
   created_at: number;
   updated_at: number;
 }
@@ -71,6 +73,8 @@ export interface PublicEvent {
   when: { confirmed: true; startsAt: number; endsAt: number | null; timezone: string } | { confirmed: false };
   status: EventStatus;
   expectations: string[];
+  /** the check-in page is open right now */
+  selfCheckin: boolean;
 }
 
 export function publicEvent(e: EventRow): PublicEvent {
@@ -84,7 +88,24 @@ export function publicEvent(e: EventRow): PublicEvent {
     when: confirmed ? { confirmed: true, startsAt: e.starts_at as number, endsAt: e.ends_at ?? null, timezone: e.timezone } : { confirmed: false },
     status: e.status,
     expectations: Array.isArray(e.expectations) ? e.expectations.filter((x) => typeof x === 'string') : [],
+    selfCheckin: e.self_checkin === true,
   };
+}
+
+/** A UT Arlington address (uta.edu or any subdomain, e.g. mavs.uta.edu) — the check-in page asks for a personal one instead. */
+export function isUtaEmail(emailNorm: string): boolean {
+  const domain = emailNorm.split('@')[1] ?? '';
+  return domain === 'uta.edu' || domain.endsWith('.uta.edu');
+}
+
+/**
+ * The at-the-door check-in form: the RSVP's fields, with one more rule —
+ * the email must be a personal address, not a UTA one.
+ */
+export function checkCheckin(raw: unknown): RsvpCheck {
+  const r = checkRsvp(raw);
+  if (r.ok && isUtaEmail(r.value.emailNorm)) return { ok: false, field: 'email', error: 'Please use a personal email, not your UTA address.' };
+  return r;
 }
 
 /** "Tuesday, November 4, 2026" and "6:00 – 7:30 PM CST", in the event's own timezone. */
@@ -375,7 +396,7 @@ export function statsOf(rows: readonly RegistrationRow[], timezone = 'America/Ch
 
 // ── editing an event (admins) ─────────────────────────────────────────
 
-export type EventPatch = Partial<Pick<EventRow, 'title' | 'summary' | 'description' | 'location' | 'starts_at' | 'ends_at' | 'timezone' | 'date_confirmed' | 'tentative_note' | 'status' | 'capacity' | 'expectations'>>;
+export type EventPatch = Partial<Pick<EventRow, 'title' | 'summary' | 'description' | 'location' | 'starts_at' | 'ends_at' | 'timezone' | 'date_confirmed' | 'tentative_note' | 'status' | 'capacity' | 'expectations' | 'self_checkin'>>;
 
 /** An admin's edit, checked field by field. A date can be confirmed only with a start time. */
 export function checkEventPatch(raw: unknown, current?: Pick<EventRow, 'starts_at'>): { ok: true; patch: EventPatch } | { ok: false; error: string } {
@@ -411,6 +432,7 @@ export function checkEventPatch(raw: unknown, current?: Pick<EventRow, 'starts_a
     if (!(EVENT_STATUSES as readonly string[]).includes(String(r.status))) return { ok: false, error: 'Unknown status.' };
     p.status = r.status as EventStatus;
   }
+  if (r.self_checkin !== undefined) p.self_checkin = r.self_checkin === true;
   if (r.capacity !== undefined) p.capacity = typeof r.capacity === 'number' && r.capacity > 0 ? Math.floor(r.capacity) : null;
   if (r.expectations !== undefined) {
     if (!Array.isArray(r.expectations)) return { ok: false, error: 'Expectations must be a list.' };

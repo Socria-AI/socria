@@ -34,6 +34,15 @@ console.log('\n=== the RSVP, checked ===');
   ok('names are clipped and stripped of control characters', E.checkRsvp({ fullName: 'A\u0000B' + 'c'.repeat(300), email: 'a@b.com' }).value.fullName.length <= 100);
 }
 
+console.log('\n=== the check-in form: a personal email ===');
+{
+  for (const e of ['a@uta.edu', 'a@mavs.uta.edu', 'A@MAVS.UTA.EDU']) ok(`${e} is refused at check-in`, (() => { const r = E.checkCheckin({ fullName: 'A B', email: e }); return !r.ok && r.field === 'email' && /personal/.test(r.error); })());
+  for (const e of ['a@gmail.com', 'a@notuta.edu', 'a@uta.edu.example.com']) ok(`${e} is accepted at check-in`, E.checkCheckin({ fullName: 'A B', email: e }).ok);
+  ok('the RSVP itself still takes a UTA address', E.checkRsvp({ fullName: 'A B', email: 'a@mavs.uta.edu' }).ok);
+  ok('the switch reaches the public shape, and is off unless set', E.publicEvent({ id: 'x', title: 't', summary: '', description: '', location: '', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false, tentative_note: null, status: 'open', capacity: null, expectations: [], created_at: 1, updated_at: 1 }).selfCheckin === false);
+  ok('an admin can switch it', E.checkEventPatch({ self_checkin: true }).patch.self_checkin === true);
+}
+
 console.log('\n=== bots, screened quietly ===');
 {
   ok('a filled hidden field is a bot', E.spamSignal({ website: 'http://x', elapsedMs: 9000 }) === 'honeypot');

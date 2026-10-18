@@ -40,7 +40,7 @@ export function newCode(): string {
   return c;
 }
 
-const EVENT_COLS = 'id, title, summary, description, location, starts_at, ends_at, timezone, date_confirmed, tentative_note, status, capacity, expectations, created_at, updated_at';
+const EVENT_COLS = 'id, title, summary, description, location, starts_at, ends_at, timezone, date_confirmed, tentative_note, status, capacity, expectations, self_checkin, created_at, updated_at';
 const REG_COLS =
   'id, event_id, full_name, email, email_norm, interest, interest_other, source, utm_source, utm_medium, utm_campaign, ref, registered_at, registered_via, attendance, checked_in_at, checked_in_by, marketing_consent, consent_at, token_hash, code';
 
@@ -52,6 +52,7 @@ function toEvent(r: any): EventRow {
     created_at: Number(r.created_at),
     updated_at: Number(r.updated_at),
     expectations: Array.isArray(r.expectations) ? r.expectations : [],
+    self_checkin: r.self_checkin === true,
   };
 }
 function toReg(r: any): RegistrationRow {
@@ -89,7 +90,7 @@ export async function createEvent(id: string, title: string, now = Date.now()): 
     if (error.code === '23505') throw new EventStoreError('duplicate', 'An event with that id already exists.');
     fail(error);
   }
-  return toEvent({ ...row, starts_at: null, ends_at: null, tentative_note: null, capacity: null });
+  return toEvent({ ...row, starts_at: null, ends_at: null, tentative_note: null, capacity: null, self_checkin: false });
 }
 
 export async function updateEvent(id: string, patch: EventPatch, now = Date.now()): Promise<void> {
@@ -201,6 +202,61 @@ export async function registerWalkIn(event: EventRow, fullName: string, emailNor
     if (!error) return row;
     if (error.code !== '23505') fail(error);
     if (emailNorm && (await findByEmail(event.id, emailNorm))) throw new EventStoreError('duplicate');
+  }
+  throw new EventStoreError('unavailable');
+}
+
+/**
+ * Check in at the door, by the person themselves (the event's check-in page,
+ * open only while an admin has switched it on). Someone who RSVP'd with this
+ * email is marked attended — once — and any optional answers they left blank
+ * are filled in; consent is only ever added, never removed. Someone who did
+ * not RSVP is registered and checked in at once, recorded as a walk-in.
+ * Either way `checked_in_by` is 'self', so staff can tell these apart.
+ */
+export async function selfCheckIn(event: EventRow, input: RsvpInput, now = Date.now()): Promise<{ row: RegistrationRow; already: boolean; hadRsvp: boolean }> {
+  const existing = await findByEmail(event.id, input.emailNorm);
+  if (existing) {
+    if (existing.attendance === 'attended') return { row: existing, already: true, hadRsvp: existing.registered_via === 'web' };
+    const patch: Record<string, unknown> = { attendance: 'attended', checked_in_at: now, checked_in_by: 'self' };
+    if (!existing.interest && input.interest) Object.assign(patch, { interest: input.interest, interest_other: input.interestOther });
+    if (!existing.source && input.source) patch.source = input.source;
+    if (input.marketingConsent && !existing.marketing_consent) Object.assign(patch, { marketing_consent: true, consent_at: now });
+    const { error, count } = await supabaseAdmin().from('event_registrations').update(patch, { count: 'exact' }).eq('id', existing.id).eq('attendance', 'registered');
+    if (error) fail(error);
+    const row = (await findById(existing.id))!;
+    return { row, already: !count, hadRsvp: existing.registered_via === 'web' };
+  }
+  for (let attempt = 0; attempt < 4; attempt++) {
+    const row: RegistrationRow = {
+      id: newRegistrationId(),
+      event_id: event.id,
+      full_name: input.fullName,
+      email: input.email,
+      email_norm: input.emailNorm,
+      interest: input.interest,
+      interest_other: input.interestOther,
+      source: input.source,
+      utm_source: input.utm.source,
+      utm_medium: input.utm.medium,
+      utm_campaign: input.utm.campaign,
+      ref: input.ref,
+      registered_at: now,
+      registered_via: 'walk-in',
+      attendance: 'attended',
+      checked_in_at: now,
+      checked_in_by: 'self',
+      marketing_consent: input.marketingConsent,
+      consent_at: input.marketingConsent ? now : null,
+      token_hash: hashToken(newToken()),
+      code: newCode(),
+    };
+    const { error } = await supabaseAdmin().from('event_registrations').insert(row);
+    if (!error) return { row, already: false, hadRsvp: false };
+    if (error.code !== '23505') fail(error);
+    // the same email, a moment ago (a double tap): report that check-in
+    const again = await findByEmail(event.id, input.emailNorm);
+    if (again) return { row: again, already: true, hadRsvp: again.registered_via === 'web' };
   }
   throw new EventStoreError('unavailable');
 }

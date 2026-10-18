@@ -28,6 +28,7 @@ const FAKE_DB = join(here, 'helpers', 'fake-supabase.mjs');
 const ROUTES = {
   rsvp: 'app/api/events/rsvp/route.ts',
   ticket: 'app/api/events/ticket/route.ts',
+  checkin: 'app/api/events/checkin/route.ts',
   staff: 'app/api/events/staff/route.ts',
   admin: 'app/api/events/admin/route.ts',
   adminEvent: 'app/api/events/admin/[id]/route.ts',
@@ -158,7 +159,7 @@ const settle = async () => {
 const EVENT = {
   id: 'in-public-002', title: 'Socria: In Public 002', summary: 'An interactive event about building Socria in public.', description: 'About.',
   location: 'Maverick Hall, Room 1309, University of Texas at Arlington', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false,
-  tentative_note: 'Target: Wednesday, November 4, 2026 (tentative).', status: 'open', capacity: null, expectations: ['A candid look'], created_at: 1, updated_at: 1,
+  tentative_note: 'Target: Wednesday, November 4, 2026 (tentative).', status: 'open', capacity: null, expectations: ['A candid look'], self_checkin: false, created_at: 1, updated_at: 1,
 };
 const rsvp = (o = {}) => ({ eventId: 'in-public-002', fullName: 'Maya Patel', email: 'Maya@Gmail.com', interest: 'ai', source: 'instagram', marketingConsent: false, utm: { source: 'instagram', campaign: 'in-public-002' }, website: '', elapsedMs: 9000, ...o });
 
@@ -338,6 +339,43 @@ console.log('\n=== cancelling, and deleting an account, take people out of the s
   ok('deleting a Socria account removes RSVPs under its verified email', !db.rows('event_registrations').some((r) => r.email_norm === 'maya@gmail.com'), `${del.status} ${del.text.slice(0, 200)}`);
   await settle();
   ok('…from the sheet too', !google.tabs['in-public-002'].some((r) => r[2] === 'Maya Patel'));
+}
+
+console.log('\n=== self check-in at the door (the venue QR code) ===');
+{
+  as(null);
+  const form = (o = {}) => ({ eventId: 'in-public-002', fullName: 'Rita Moreno', email: 'rita.m@gmail.com', interest: 'business', source: 'campus', website: '', elapsedMs: 9000, ...o });
+  const shut = await call(R.checkin, '/api/events/checkin', 'POST', form());
+  ok('closed until an admin opens it — so the link can’t be used from home', shut.status === 403 && shut.j.code === 'not-open' && !db.rows('event_registrations').some((r) => r.email_norm === 'rita.m@gmail.com'));
+  as('user_door');
+  ok('door staff cannot open it', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' })).status === 403);
+  as('user_admin');
+  const opened = await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' });
+  ok('an admin opens it', opened.status === 200 && opened.j.event.self_checkin === true);
+  as(null);
+  const uta = await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'rita@mavs.uta.edu' }));
+  ok('a UTA address is refused, on the email field, with the reason', uta.status === 400 && uta.j.field === 'email' && /personal email/i.test(uta.j.error));
+  ok('…uta.edu itself too', (await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'r@uta.edu' }))).status === 400);
+  ok('…but a look-alike domain is not UTA', (await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'r@notuta.edu', fullName: 'Not Uta' }))).status === 200);
+  const walk = await call(R.checkin, '/api/events/checkin', 'POST', form({ marketingConsent: true }));
+  const rita = db.rows('event_registrations').find((r) => r.email_norm === 'rita.m@gmail.com');
+  ok('no RSVP: added and checked in at once, as a self check-in walk-in', walk.status === 200 && walk.j.firstName === 'Rita' && walk.j.already === false && rita.registered_via === 'walk-in' && rita.attendance === 'attended' && rita.checked_in_by === 'self');
+  ok('…with the same answers the RSVP asks, consent included', rita.interest === 'business' && rita.source === 'campus' && rita.marketing_consent === true && typeof rita.consent_at === 'number');
+  const again = await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'RITA.M@gmail.com' }));
+  ok('checking in twice says so, and adds no row', again.j.already === true && db.rows('event_registrations').filter((r) => r.email_norm === 'rita.m@gmail.com').length === 1);
+  const r1 = await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'pat@yahoo.com', fullName: 'Pat Kim', interest: undefined, source: undefined }));
+  ok('(someone RSVPs first)', r1.status === 201);
+  const pat = await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'pat@yahoo.com', fullName: 'Pat Kim', interest: 'ai', source: 'instagram' }));
+  const patRow = db.rows('event_registrations').filter((r) => r.email_norm === 'pat@yahoo.com');
+  ok('an RSVP’d email is matched to that RSVP — marked attended, not duplicated', pat.status === 200 && patRow.length === 1 && patRow[0].registered_via === 'web' && patRow[0].attendance === 'attended' && patRow[0].checked_in_by === 'self');
+  ok('…and answers they left blank are filled in', patRow[0].interest === 'ai' && patRow[0].source === 'instagram');
+  ok('a bot gets nowhere here either', (await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'b@x.com', website: 'spam' }))).status === 400);
+  ok('a missing name is refused', (await call(R.checkin, '/api/events/checkin', 'POST', form({ fullName: '', email: 'n@x.com' }))).j.field === 'fullName');
+  ok('the answer says nothing about anyone else', !JSON.stringify(pat.j).includes('@') && Object.keys(pat.j).sort().join() === 'already,firstName');
+  as('user_admin');
+  await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: false }, { id: 'in-public-002' });
+  as(null);
+  ok('closed again, it refuses again', (await call(R.checkin, '/api/events/checkin', 'POST', form({ email: 'late2@x.com', fullName: 'Late Two' }))).status === 403);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
