@@ -1,21 +1,20 @@
 // app/api/events/staff/route.ts — the door. Staff and admins only.
 //
 // POST { action, eventId, ... }
-//   resolve  { token }          → the person a scanned QR code belongs to (does NOT check them in)
 //   lookup   { q }              → matches by name, email or code
 //   checkin  { registrationId } → mark attended, once; a second time reports the first
 //   undo     { registrationId } → revert a mistaken check-in
 //   walkin   { fullName, email? } → register and check in at once
 //
-// A QR code only identifies; attendance is recorded by a signed-in member of
-// staff pressing Confirm. Answers carry what the door needs (a name, a masked
+// Attendees check themselves in at the venue (app/api/events/checkin); this is
+// the staff fallback. Answers carry what the door needs (a name, a masked
 // email, the code, the status) and nothing else.
 
 import type { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { clean, doorRow, EVENT_ID, LIMITS, normalizeEmail, REG_ID, searchRegistrations, TOKEN } from '@/lib/events/model';
-import { EventStoreError, checkIn, findById, findByToken, getEvent, listRegistrations, registerWalkIn, undoCheckIn } from '@/lib/events/store';
+import { clean, doorRow, EVENT_ID, LIMITS, normalizeEmail, REG_ID, searchRegistrations, } from '@/lib/events/model';
+import { EventStoreError, checkIn, findById, getEvent, listRegistrations, registerWalkIn, undoCheckIn } from '@/lib/events/store';
 import { currentRole } from '@/lib/events/staff';
 import { afterChange, json, sameOrigin, storeFailure } from '@/lib/events/http';
 
@@ -43,14 +42,6 @@ export async function POST(req: NextRequest) {
   const eventId = typeof body?.eventId === 'string' && EVENT_ID.test(body.eventId) ? body.eventId : null;
 
   try {
-    if (action === 'resolve') {
-      const token = typeof body?.token === 'string' && TOKEN.test(body.token) ? body.token : null;
-      const row = token ? await findByToken(token) : null;
-      if (!row) return json({ error: 'This code doesn’t match a registration. It may have been cancelled — look the person up by name.' }, 404);
-      const event = await getEvent(row.event_id);
-      return json({ person: doorRow(row), event: event ? { id: event.id, title: event.title } : null });
-    }
-
     if (!eventId) return json({ error: 'Unknown event.' }, 404);
     const event = await getEvent(eventId);
     if (!event) return json({ error: 'Unknown event.' }, 404);

@@ -174,7 +174,7 @@ export function DoorView({ eventId, title }: { eventId: string; title: string })
           </div>
         </form>
       )}
-      <p className="ev-fine">Scanning an attendee’s QR code with your phone camera opens their record here to confirm.</p>
+      <p className="ev-fine">Attendees normally check themselves in by scanning the QR code at the door. Use this list for anyone who can’t.</p>
     </div>
   );
 }

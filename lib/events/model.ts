@@ -92,20 +92,34 @@ export function publicEvent(e: EventRow): PublicEvent {
   };
 }
 
-/** A UT Arlington address (uta.edu or any subdomain, e.g. mavs.uta.edu) — the check-in page asks for a personal one instead. */
-export function isUtaEmail(emailNorm: string): boolean {
-  const domain = emailNorm.split('@')[1] ?? '';
-  return domain === 'uta.edu' || domain.endsWith('.uta.edu');
+/**
+ * What someone types at check-in: the email they RSVP'd with, or the name
+ * they RSVP'd under. Anything with an @ is read as an email.
+ */
+export type CheckinLookup = { by: 'email'; emailNorm: string } | { by: 'name'; name: string };
+
+export function checkCheckinLookup(raw: unknown): { ok: true; value: CheckinLookup } | { ok: false; error: string } {
+  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
+  const who = clean(r.who, LIMITS.email);
+  if (who.includes('@')) {
+    const emailNorm = normalizeEmail(who);
+    return emailNorm ? { ok: true, value: { by: 'email', emailNorm } } : { ok: false, error: 'That email doesn’t look right. Check it, or use your name instead.' };
+  }
+  if (who.length < 2) return { ok: false, error: 'Enter the name or email you RSVP’d with.' };
+  return { ok: true, value: { by: 'name', name: who } };
 }
 
+/** Names compared the way people type them: case, accents and extra spaces ignored. */
+export const foldName = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();
+
 /**
- * The at-the-door check-in form: the RSVP's fields, with one more rule —
- * the email must be a personal address, not a UTA one.
+ * The registrations a check-in entry points at: by email exactly, or by full
+ * name. Two people can share a name; then the caller asks for the email.
  */
-export function checkCheckin(raw: unknown): RsvpCheck {
-  const r = checkRsvp(raw);
-  if (r.ok && isUtaEmail(r.value.emailNorm)) return { ok: false, field: 'email', error: 'Please use a personal email, not your UTA address.' };
-  return r;
+export function matchCheckin(rows: readonly RegistrationRow[], q: CheckinLookup): RegistrationRow[] {
+  if (q.by === 'email') return rows.filter((r) => r.email_norm === q.emailNorm);
+  const want = foldName(q.name);
+  return rows.filter((r) => foldName(r.full_name) === want);
 }
 
 /** "Tuesday, November 4, 2026" and "6:00 – 7:30 PM CST", in the event's own timezone. */
@@ -228,11 +242,11 @@ export function checkRsvp(raw: unknown): RsvpCheck {
  * Bot signals, cheap and invisible to people: a filled hidden field, or a form
  * sent faster than anyone could read it. Returns why, or null.
  */
-export function spamSignal(raw: unknown): string | null {
+export function spamSignal(raw: unknown, minMs = 2500): string | null {
   const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
   if (typeof r.website === 'string' && r.website.trim()) return 'honeypot';
   const ms = typeof r.elapsedMs === 'number' ? r.elapsedMs : NaN;
-  if (!Number.isFinite(ms) || ms < 2500) return 'too-fast';
+  if (!Number.isFinite(ms) || ms < minMs) return 'too-fast';
   return null;
 }
 

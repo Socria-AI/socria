@@ -1,22 +1,15 @@
 'use client';
 
-// The attendee's confirmation: their QR code (the check-in link — a random
-// secret, nothing personal in it), the short code for anyone without a phone,
-// the event, and what they can do with it — keep it, add it to a calendar,
-// or cancel. Shared by the RSVP form's success state and the saved
-// confirmation page.
+// The attendee's confirmation: the event, how check-in works (scan the QR
+// code at the door, then type the name or email used here), and what they
+// can do with it — keep it, add it to a calendar, or cancel. Shared by the
+// RSVP form's success state and the saved confirmation page.
 
-import { useMemo, useState } from 'react';
-import { qrGrid } from '@/lib/qr';
+import { useState } from 'react';
 import { whenSaid, type Ticket } from '@/lib/events/model';
-
-export function checkInUrl(origin: string, token: string): string {
-  return `${origin}/events/check#t=${token}`;
-}
 
 export function TicketCard({ ticket, token, onCancelled }: { ticket: Ticket; token: string; onCancelled?: () => void }) {
   const origin = typeof window !== 'undefined' ? window.location.origin : 'https://socria.app';
-  const grid = useMemo(() => qrGrid(checkInUrl(origin, token)), [origin, token]);
   const when = whenSaid(ticket.event.when);
   const saveUrl = `${origin}/events/${ticket.event.id}/ticket#t=${token}`;
   const [copied, setCopied] = useState<string | null>(null);
@@ -61,19 +54,11 @@ export function TicketCard({ ticket, token, onCancelled }: { ticket: Ticket; tok
         <h2>{ticket.firstName ? `See you there, ${ticket.firstName}.` : 'See you there.'}</h2>
       </div>
 
-      {!attended && grid && (
-        <figure className="stack" style={{ gap: 10, margin: 0 }}>
-          <div className="ev-qr">
-            <svg viewBox={`-2 -2 ${grid.count + 4} ${grid.count + 4}`} role="img" aria-label="Your check-in QR code" shapeRendering="crispEdges">
-              <rect x="-2" y="-2" width={grid.count + 4} height={grid.count + 4} fill="#fff" />
-              <path d={grid.path} fill="#1f1f1f" />
-            </svg>
-          </div>
-          <figcaption className="ev-fine" style={{ textAlign: 'center' }}>
-            Show this at the door. No phone? Just tell us your name, or this code:
-          </figcaption>
-          <p className="ev-code" aria-label={`Check-in code ${ticket.code.split('').join(' ')}`}>{ticket.code}</p>
-        </figure>
+      {!attended && (
+        <div className="ev-note stack" style={{ gap: 4 }}>
+          <strong>Checking in at the event</strong>
+          <span>Scan the QR code at the door, then enter the name or the email you just used. That’s it.</span>
+        </div>
       )}
 
       <dl className="ev-facts">

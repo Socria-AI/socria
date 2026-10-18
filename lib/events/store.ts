@@ -8,7 +8,7 @@
 import 'server-only';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase';
-import { CODE_ALPHABET, EVENT_ID, REG_ID, TOKEN, type EventPatch, type EventRow, type RegistrationRow, type RsvpInput } from './model';
+import { CODE_ALPHABET, EVENT_ID, REG_ID, TOKEN, matchCheckin, type CheckinLookup, type EventPatch, type EventRow, type RegistrationRow, type RsvpInput } from './model';
 
 /** An error the routes turn into a status; never the database's own message. */
 export class EventStoreError extends Error {
@@ -207,58 +207,18 @@ export async function registerWalkIn(event: EventRow, fullName: string, emailNor
 }
 
 /**
- * Check in at the door, by the person themselves (the event's check-in page,
- * open only while an admin has switched it on). Someone who RSVP'd with this
- * email is marked attended — once — and any optional answers they left blank
- * are filled in; consent is only ever added, never removed. Someone who did
- * not RSVP is registered and checked in at once, recorded as a walk-in.
- * Either way `checked_in_by` is 'self', so staff can tell these apart.
+ * Check in at the venue, by the attendee: the QR code at the door opens the
+ * check-in page, where they type the name or the email they RSVP'd with.
+ * Only an existing RSVP can be checked in this way — once — and the
+ * check-in is recorded as 'self'. Open only while an admin has switched
+ * self check-in on.
  */
-export async function selfCheckIn(event: EventRow, input: RsvpInput, now = Date.now()): Promise<{ row: RegistrationRow; already: boolean; hadRsvp: boolean }> {
-  const existing = await findByEmail(event.id, input.emailNorm);
-  if (existing) {
-    if (existing.attendance === 'attended') return { row: existing, already: true, hadRsvp: existing.registered_via === 'web' };
-    const patch: Record<string, unknown> = { attendance: 'attended', checked_in_at: now, checked_in_by: 'self' };
-    if (!existing.interest && input.interest) Object.assign(patch, { interest: input.interest, interest_other: input.interestOther });
-    if (!existing.source && input.source) patch.source = input.source;
-    if (input.marketingConsent && !existing.marketing_consent) Object.assign(patch, { marketing_consent: true, consent_at: now });
-    const { error, count } = await supabaseAdmin().from('event_registrations').update(patch, { count: 'exact' }).eq('id', existing.id).eq('attendance', 'registered');
-    if (error) fail(error);
-    const row = (await findById(existing.id))!;
-    return { row, already: !count, hadRsvp: existing.registered_via === 'web' };
-  }
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const row: RegistrationRow = {
-      id: newRegistrationId(),
-      event_id: event.id,
-      full_name: input.fullName,
-      email: input.email,
-      email_norm: input.emailNorm,
-      interest: input.interest,
-      interest_other: input.interestOther,
-      source: input.source,
-      utm_source: input.utm.source,
-      utm_medium: input.utm.medium,
-      utm_campaign: input.utm.campaign,
-      ref: input.ref,
-      registered_at: now,
-      registered_via: 'walk-in',
-      attendance: 'attended',
-      checked_in_at: now,
-      checked_in_by: 'self',
-      marketing_consent: input.marketingConsent,
-      consent_at: input.marketingConsent ? now : null,
-      token_hash: hashToken(newToken()),
-      code: newCode(),
-    };
-    const { error } = await supabaseAdmin().from('event_registrations').insert(row);
-    if (!error) return { row, already: false, hadRsvp: false };
-    if (error.code !== '23505') fail(error);
-    // the same email, a moment ago (a double tap): report that check-in
-    const again = await findByEmail(event.id, input.emailNorm);
-    if (again) return { row: again, already: true, hadRsvp: again.registered_via === 'web' };
-  }
-  throw new EventStoreError('unavailable');
+export async function selfCheckIn(event: EventRow, q: CheckinLookup, now = Date.now()): Promise<{ status: 'checked-in' | 'already'; row: RegistrationRow } | { status: 'not-found' | 'ambiguous' }> {
+  const hits = matchCheckin(await listRegistrations(event.id), q);
+  if (!hits.length) return { status: 'not-found' };
+  if (hits.length > 1) return { status: 'ambiguous' };
+  const r = await checkIn(hits[0].id, 'self', now);
+  return r.ok ? { status: 'checked-in', row: r.row } : { status: 'already', row: r.already };
 }
 
 export async function findByEmail(eventId: string, emailNorm: string): Promise<RegistrationRow | null> {

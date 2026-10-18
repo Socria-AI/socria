@@ -1,7 +1,7 @@
 // lib/events/email.ts — the RSVP confirmation email.
 //
 // Transactional: sent once, because the person registered. It carries the
-// event details, their check-in code, and their personal confirmation link
+// event details, how to check in, and their personal confirmation link
 // (the secret travels in the link's #fragment, so it never reaches a server
 // log or an analytics tool when the link is opened). No marketing, no
 // unsubscribe list — consent to marketing is a separate choice and is not
@@ -31,9 +31,7 @@ export function confirmationEmail(o: { event: EventRow; firstName: string; code:
     `Where: ${e.location}`,
     'Admission: free',
     '',
-    `Your check-in code: ${o.code}`,
-    '',
-    'At the door, show the QR code on your confirmation page, or just tell us your name or this code.',
+    'Checking in: at the event, scan the QR code at the door and enter your name or this email address.',
     `Your confirmation: ${o.link}`,
     '',
     'Can’t make it? You can cancel from your confirmation page, which also deletes your registration.',
@@ -50,9 +48,7 @@ export function confirmationEmail(o: { event: EventRow; firstName: string; code:
 <p style="margin:0 0 6px"><strong>When</strong><br>${esc(whenLine)}</p>
 <p style="margin:0 0 6px"><strong>Where</strong><br>${esc(e.location)}</p>
 <p style="margin:0 0 18px"><strong>Admission</strong><br>Free</p>
-<p style="margin:0 0 6px">Your check-in code</p>
-<p style="margin:0 0 18px;font-family:ui-monospace,Menlo,monospace;font-size:26px;letter-spacing:.18em;color:#1F2420">${esc(o.code)}</p>
-<p style="margin:0 0 22px">At the door, show the QR code on your confirmation page — or just tell us your name or this code.</p>
+<p style="margin:0 0 22px"><strong>Checking in</strong><br>At the event, scan the QR code at the door and enter your name or this email address.</p>
 <p style="margin:0 0 22px"><a href="${esc(o.link)}" style="display:inline-block;background:#1F2420;color:#F5F3EB;text-decoration:none;padding:12px 20px;border-radius:999px;font-weight:600">Open my confirmation</a></p>
 <p style="margin:0;font-size:13px;color:#5c6159">Can’t make it? Cancel from your confirmation page; that also deletes your registration.</p>
 </td></tr></table></td></tr></table></body></html>`;

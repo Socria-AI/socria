@@ -34,15 +34,6 @@ console.log('\n=== the RSVP, checked ===');
   ok('names are clipped and stripped of control characters', E.checkRsvp({ fullName: 'A\u0000B' + 'c'.repeat(300), email: 'a@b.com' }).value.fullName.length <= 100);
 }
 
-console.log('\n=== the check-in form: a personal email ===');
-{
-  for (const e of ['a@uta.edu', 'a@mavs.uta.edu', 'A@MAVS.UTA.EDU']) ok(`${e} is refused at check-in`, (() => { const r = E.checkCheckin({ fullName: 'A B', email: e }); return !r.ok && r.field === 'email' && /personal/.test(r.error); })());
-  for (const e of ['a@gmail.com', 'a@notuta.edu', 'a@uta.edu.example.com']) ok(`${e} is accepted at check-in`, E.checkCheckin({ fullName: 'A B', email: e }).ok);
-  ok('the RSVP itself still takes a UTA address', E.checkRsvp({ fullName: 'A B', email: 'a@mavs.uta.edu' }).ok);
-  ok('the switch reaches the public shape, and is off unless set', E.publicEvent({ id: 'x', title: 't', summary: '', description: '', location: '', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false, tentative_note: null, status: 'open', capacity: null, expectations: [], created_at: 1, updated_at: 1 }).selfCheckin === false);
-  ok('an admin can switch it', E.checkEventPatch({ self_checkin: true }).patch.self_checkin === true);
-}
-
 console.log('\n=== bots, screened quietly ===');
 {
   ok('a filled hidden field is a bot', E.spamSignal({ website: 'http://x', elapsedMs: 9000 }) === 'honeypot');
@@ -99,6 +90,22 @@ console.log('\n=== the door ===');
   ok('a check-in code never looks like 0/O or 1/I/L', !/[01OIL]/.test(E.CODE_ALPHABET) && E.CODE.test('K7P4QX'));
 }
 
+console.log('\n=== check-in: the name or email used at RSVP ===');
+{
+  const rows = [row(), row({ id: 'rsvp_' + 'b'.repeat(24), full_name: 'José Álvarez', email_norm: 'jose@mavs.uta.edu' }), row({ id: 'rsvp_' + 'c'.repeat(24), full_name: 'Maya Patel', email_norm: 'maya.p2@yahoo.com' })];
+  const L = (who) => E.checkCheckinLookup({ who });
+  ok('an @ means an email, lowercased', J(L(' Maya@Gmail.com ').value) === J({ by: 'email', emailNorm: 'maya@gmail.com' }));
+  ok('anything else is a name', J(L('Jose Alvarez').value) === J({ by: 'name', name: 'Jose Alvarez' }));
+  ok('too short, or a broken email, is refused', !L('a').ok && !L('a@b').ok);
+  ok('a name matches however it is typed — case, accents, spaces', E.matchCheckin(rows, L('  jose   ALVAREZ').value).length === 1);
+  ok('two RSVPs under one name both match (the caller asks for the email)', E.matchCheckin(rows, L('maya patel').value).length === 2);
+  ok('an email matches exactly one', E.matchCheckin(rows, L('MAYA.P2@yahoo.com').value).length === 1);
+  ok('a UTA email works if that is what they RSVP’d with', E.matchCheckin(rows, L('jose@mavs.uta.edu').value).length === 1);
+  ok('a part of a name is not a match', E.matchCheckin(rows, L('Maya').value).length === 0);
+  ok('the check-in switch reaches the public shape, off unless set', E.publicEvent({ id: 'x', title: 't', summary: '', description: '', location: '', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false, tentative_note: null, status: 'open', capacity: null, expectations: [], created_at: 1, updated_at: 1 }).selfCheckin === false);
+  ok('an admin can switch it', E.checkEventPatch({ self_checkin: true }).patch.self_checkin === true);
+}
+
 console.log('\n=== the sheet and the export ===');
 {
   ok('the sheet has the agreed columns, in order', J(E.SHEET_HEADER.slice(0, 12)) === J(['Registration ID', 'Event', 'Full Name', 'Email', 'Interest', 'Other Interest', 'Acquisition Source', 'RSVP Timestamp', 'Attendance Status', 'Check-in Timestamp', 'Marketing Consent', 'Consent Timestamp']));
@@ -137,7 +144,7 @@ console.log('\n=== retention, and the email ===');
   ok('the confirmation link carries its secret in the #fragment, which no server or analytics tool sees', link === `https://socria.app/events/in-public-002/ticket#t=${'T'.repeat(43)}`);
   const m = E.confirmationEmail({ event: event(), firstName: 'Maya', code: 'K7P4QX', link });
   ok('an unconfirmed date is not in the email', /to be announced/i.test(m.text) && !/Nov|November/.test(m.text));
-  ok('it carries the place, the code, the link and how to cancel', m.text.includes('Maverick Hall, Room 1309') && m.text.includes('K7P4QX') && m.text.includes(link) && /cancel/i.test(m.text));
+  ok('it carries the place, how to check in, the link and how to cancel', m.text.includes('Maverick Hall, Room 1309') && /scan the QR code at the door and enter your name or this email/.test(m.text) && m.text.includes(link) && /cancel/i.test(m.text));
   ok('nothing about food or prizes', !/food|pizza|prize|giveaway|swag/i.test(m.text + m.html));
   const xss = E.confirmationEmail({ event: event({ title: '<img src=x onerror=alert(1)>' }), firstName: '<b>', code: 'K7P4QX', link });
   ok('the HTML is escaped', !xss.html.includes('<img src=x') && !xss.html.includes('<b>,'));

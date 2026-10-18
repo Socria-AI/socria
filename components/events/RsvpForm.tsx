@@ -27,14 +27,7 @@ function linkTags(): { utm: Record<string, string>; ref: string | null } {
   }
 }
 
-/**
- * `mode`: 'rsvp' on the event page; 'checkin' on the at-the-door check-in
- * page — the same questions, a personal (non-UTA) email, and a welcome
- * instead of a ticket.
- */
-export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; open: boolean; mode?: 'rsvp' | 'checkin' }) {
-  const checkin = mode === 'checkin';
-  const [arrived, setArrived] = useState<{ firstName: string; already: boolean } | null>(null);
+export function RsvpForm({ eventId, open }: { eventId: string; open: boolean }) {
   const [fullName, setFullName] = useState('');
   const [email, setEmail] = useState('');
   const [interest, setInterest] = useState('');
@@ -52,15 +45,14 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
 
   // Registered on this device before? Offer the confirmation instead of the form.
   useEffect(() => {
-    if (checkin) return;
     try {
       const t = localStorage.getItem(key);
       if (t && /^[A-Za-z0-9_-]{43}$/.test(t)) setSaved(t);
     } catch {}
-  }, [key, checkin]);
+  }, [key]);
 
   useEffect(() => {
-    if (!saved || checkin) return;
+    if (!saved) return;
     let off = false;
     void fetch('/api/events/ticket', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ token: saved }) })
       .then(async (r) => {
@@ -78,7 +70,7 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
     return () => {
       off = true;
     };
-  }, [saved, key, checkin]);
+  }, [saved, key]);
 
   async function submit(e: React.FormEvent) {
     e.preventDefault();
@@ -86,11 +78,10 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
     setError(null);
     if (fullName.trim().length < 2) return setError({ field: 'fullName', text: 'Please enter your full name.' });
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email.trim())) return setError({ field: 'email', text: 'Please enter a valid email address.' });
-    if (checkin && /@(?:[^@]+\.)?uta\.edu$/i.test(email.trim())) return setError({ field: 'email', text: 'Please use a personal email, not your UTA address.' });
     setBusy(true);
     const { utm, ref } = linkTags();
     try {
-      const res = await fetch(checkin ? '/api/events/checkin' : '/api/events/rsvp', {
+      const res = await fetch('/api/events/rsvp', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -112,10 +103,6 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
         setError({ field: (j.field as Field) || 'form', text: j.error || 'Something went wrong. Please try again.' });
         return;
       }
-      if (checkin) {
-        setArrived({ firstName: j.firstName, already: !!j.already });
-        return;
-      }
       try {
         localStorage.setItem(key, j.token);
       } catch {}
@@ -126,16 +113,6 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
     } finally {
       setBusy(false);
     }
-  }
-
-  if (arrived) {
-    return (
-      <section className="ev-card" id="rsvp" aria-live="polite">
-        <span className="ev-badge attended">{arrived.already ? 'Already checked in' : 'Checked in'}</span>
-        <h2>{arrived.already ? `You’re already checked in, ${arrived.firstName}.` : `Welcome, ${arrived.firstName}.`}</h2>
-        <p className="ev-fine">{arrived.already ? 'No need to do anything else — head on in.' : 'You’re checked in. Head on in, and enjoy it.'}</p>
-      </section>
-    );
   }
 
   if (done) {
@@ -157,8 +134,8 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
   if (!open) {
     return (
       <section className="ev-card" id="rsvp">
-        <h2>{checkin ? 'Check-in isn’t open yet' : 'Registration is closed'}</h2>
-        <p className="ev-fine">{checkin ? 'It opens at the door when the event starts. If you’re here now, find a member of the Socria team.' : 'Registration for this event isn’t open right now.'}</p>
+        <h2>Registration is closed</h2>
+        <p className="ev-fine">Registration for this event isn’t open right now.</p>
       </section>
     );
   }
@@ -167,8 +144,8 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
   return (
     <section className="ev-card" id="rsvp" aria-labelledby="rsvp-h">
       <div className="stack" style={{ gap: 6 }}>
-        <h2 id="rsvp-h">{checkin ? 'Check in' : 'Save your place'}</h2>
-        <p className="ev-fine">{checkin ? 'You’re here — tell us who you are. Takes under a minute.' : 'Free. Takes under a minute. No account needed.'}</p>
+        <h2 id="rsvp-h">Save your place</h2>
+        <p className="ev-fine">Free. Takes under a minute. No account needed.</p>
       </div>
       {cancelled && <p className="ev-note" role="status">Your registration was cancelled and deleted. You’re welcome to register again.</p>}
       <form onSubmit={submit} noValidate className="stack" style={{ gap: 16 }}>
@@ -177,9 +154,9 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
           <input id="rsvp-name" className="ev-input" autoComplete="name" value={fullName} onChange={(e) => setFullName(e.target.value)} maxLength={100} required aria-invalid={invalid('fullName')} aria-describedby={invalid('fullName') ? 'rsvp-err' : undefined} />
         </div>
         <div className="ev-field">
-          <label htmlFor="rsvp-email">{checkin ? 'Personal email' : 'Email'}</label>
+          <label htmlFor="rsvp-email">Email</label>
           <input id="rsvp-email" className="ev-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} required aria-invalid={invalid('email')} aria-describedby={invalid('email') ? 'rsvp-err' : 'rsvp-email-note'} />
-          <span id="rsvp-email-note" className="ev-fine">{checkin ? 'Not your UTA address — one you’ll keep after graduation. If you RSVP’d, use the same email.' : 'Any address works — personal or school.'}</span>
+          <span id="rsvp-email-note" className="ev-fine">Any address works — personal or school.</span>
         </div>
 
         <fieldset className="ev-field">
@@ -232,18 +209,9 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
           </p>
         )}
         <button type="submit" className="ev-btn ev-submit" disabled={busy}>
-          {checkin ? (busy ? 'Checking you in…' : 'Check in') : busy ? 'Saving your place…' : 'RSVP — it’s free'}
+          {busy ? 'Saving your place…' : 'RSVP — it’s free'}
         </button>
 
-        {checkin ? (
-          <p className="ev-fine">
-            <strong>How we use this:</strong> your name and email record that you attended and let us follow up about this event. Your answers to the optional
-            questions help us plan. Only Socria event staff can see them, and they may also be copied to a private spreadsheet only staff can open. If you have or
-            later create a Socria account with the same verified email, it may be counted in event totals, never shown individually. We don’t create an account
-            for you, sell your information, or email you about anything else unless you tick the box above. It’s deleted within a year of the event, or sooner if
-            you ask at hellosocria@gmail.com. <a href="/privacy">Privacy policy</a>
-          </p>
-        ) : (
         <p className="ev-fine">
           <strong>How we use this:</strong> your name and email are used to run this event — your confirmation, check-in, and updates about this
           event, such as its date and time. Your answers to the optional questions help us plan. Only Socria event staff can see your registration, which may also be
@@ -252,7 +220,6 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
           tick the box above. You can cancel and delete your registration from your confirmation at any time; otherwise it’s deleted within a year of
           the event. <a href="/privacy">Privacy policy</a>
         </p>
-        )}
       </form>
     </section>
   );

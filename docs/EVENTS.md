@@ -1,6 +1,6 @@
 # Socria events: RSVP and attendance
 
-A reusable system for Socria's in-person events. Each event has a public page, a free RSVP and a confirmation with a check-in QR code. Staff check people in at the door, admins get a dashboard, a private Google Sheet mirrors the registrations, and acquisition numbers keep confirmed results apart from estimates.
+A reusable system for Socria's in-person events. Each event has a public page and a free RSVP; at the event, attendees check themselves in by scanning a QR code at the door and typing the name or email they RSVP'd with. Staff have a door list as a fallback, admins get a dashboard, a private Google Sheet mirrors the registrations, and acquisition numbers keep confirmed results apart from estimates.
 
 The first event is **Socria: In Public 002**, at `/events/in-public-002`. Its date is not confirmed, so the page says "To be announced". The target date is kept as a staff-only planning note until an admin sets and confirms the date.
 
@@ -12,7 +12,6 @@ The first event is **Socria: In Public 002**, at `/events/in-public-002`. Its da
 | Admins | `SOCRIA_DASHBOARD_ADMINS`, the developer dashboard's allowlist, matched by verified email or Clerk id (`lib/dashboard/gate.ts`) |
 | Email | `lib/email.ts` (Resend) on a new transactional `event` stream behind `EVENT_EMAILS` |
 | Rate limiting | `lib/rate-limit.ts`, with new `rsvp` and `staff` pools |
-| QR codes | `lib/qr.ts` (`qrcode-generator`, already a dependency) |
 | Attribution | first-touch UTM tags (`lib/first-touch.ts`, plus an `events` landing kind) and the anonymous first-party counter (`product_events`, plus `event_page_viewed`) |
 | Crons | `vercel.json`, with a new daily `/api/cron/events` |
 | Design | the app register: `.app-root`, the paper, ink and moss tokens, the serif display, the `ds` Label (`app/events/events.css`) |
@@ -39,7 +38,8 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 | `POST /api/events/ticket` | holder of the secret | that one confirmation |
 | `DELETE /api/events/ticket` | holder of the secret | cancel; deletes the registration |
 | `GET /api/events/[id]/ics` | public | calendar file, only once the date is confirmed |
-| `POST /api/events/staff` | staff and admins | `resolve` a scanned code (identifies only), `lookup`, `checkin` (once), `undo`, `walkin` |
+| `POST /api/events/checkin` | public, while self check-in is open | check in by the name or email used at RSVP |
+| `POST /api/events/staff` | staff and admins | `lookup`, `checkin` (once), `undo`, `walkin` |
 | `POST /api/events/admin` | admins | create a draft event; run the retention sweep |
 | `PATCH`/`POST /api/events/admin/[id]` | admins | edit the event; `sync` the sheet; `delete` a registration |
 | `GET /api/events/admin/[id]/export` | admins | CSV, the same columns as the sheet |
@@ -49,28 +49,28 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 
 - `/events/[id]`: the public page and RSVP. Mobile-first, with a sticky RSVP button on phones and share metadata from `lib/og-cards.ts`.
 - `/events/[id]/ticket#t=…`: the saved confirmation.
-- `/events/check#t=…`: where a QR code opens.
+- `/events/[id]/checkin`: the check-in page the venue QR code opens.
 - `/events/admin`: the list of events. Staff get door links; admins also get a new-event form and the retention sweep.
 - `/events/admin/[id]`: the admin dashboard.
 - `/events/admin/[id]/door`: phone-first check-in.
 
-## Self check-in at the door
+## Check-in
 
-`/events/<id>/checkin` is the page for the QR code at the venue. Make the QR code from that address; the admin dashboard's **Check-in** tab shows it with a copy button.
+RSVP and check-in are separate steps. At the event, **attendees check themselves in**:
 
-- **What it asks:** name, a **personal** email (UTA addresses — `uta.edu` and any subdomain such as `mavs.uta.edu` — are refused with a clear message), the two optional questions, and the unticked marketing box.
-- **Matching:** if someone RSVP'd with that email, their RSVP is marked attended and any answers they left blank are filled in. Otherwise they're added and checked in as a walk-in. Either way the check-in is recorded as `self`.
-- **The switch:** the page takes check-ins only while an admin has **opened self check-in** (Check-in tab). Closed, it tells people check-in isn't open yet and to find the team. Open it when doors open, close it afterwards, so the link can't be used from home.
-- **Trade-off:** self check-in trusts the person at the form. Someone who RSVP'd with a UTA address and checks in with a personal one will appear twice (once registered, once as a walk-in).
-- **Database:** the switch is the `self_checkin` column, added by the `alter table events add column if not exists self_checkin …` line in the events block of `supabase/schema.sql`. If you already ran the block, run it again.
+1. An admin opens self check-in on the dashboard's **Check-in** tab when doors open, and closes it afterwards. While it is closed the page says check-in isn't open, so the link can't be used from home.
+2. A QR code at the venue points to `/events/<id>/checkin`. Make it from the link on the Check-in tab.
+3. The attendee types **the name or the email they RSVP'd with**: whatever they signed up with, UTA addresses included. Names match regardless of case, accents or spacing.
+   - **One match:** they are checked in, once, recorded as `self`. Doing it again says they're already checked in.
+   - **Two RSVPs share the name:** they're asked for their email instead.
+   - **No RSVP:** nothing is created, and they're told to find the team at the door.
+4. The RSVP confirmation and email tell people exactly this. There is no personal QR code.
 
-## How check-in works
+**Fallback for staff:** the door list (`/events/admin/<id>/door`) lets staff and admins find someone by name or email and check them in, or add a walk-in who never RSVP'd.
 
-1. **The confirmation.** After RSVP the attendee sees their QR code and a six-character code without look-alike characters (no 0/O, 1/I/L). The QR encodes `/events/check#t=<secret>`: a random 256-bit secret, nothing personal. It is in the `#fragment`, which browsers never send to a server, so it never reaches logs or analytics. The page removes it from the address bar once read.
-2. **At the door, with a QR code.** Staff scan it with their phone camera while signed in to their staff account. The page shows the person's name, masked email and code. **Nothing is recorded until staff press Confirm check-in.** Anyone else who scans it, including the attendee, is told to show it at the door and learns nothing.
-3. **Without a QR code or a phone.** On the door page, staff type the person's name, email or code and press Check in.
-4. **Walk-ins.** On the door page, enter a name and, only if they want to give one, an email. They are registered and checked in at once, never added to a mailing list.
-5. **Duplicates.** A check-in only updates a row that is still `registered`, so a second scan reports "already checked in at 6:04 PM" and keeps the first time. Undo exists for mistakes.
+**Trade-off:** checking in by name trusts the person at the form. Anyone who knows an attendee's name could check them in while check-in is open.
+
+**Database:** the switch is the `self_checkin` column, added by the `alter table events add column if not exists self_checkin …` line in the events block of `supabase/schema.sql`. If you ran the block before this column existed, run it again.
 
 ## Google Sheets
 
@@ -144,9 +144,9 @@ Automated:
 
 By hand, on a preview deployment with Supabase, Clerk and admin env set:
 
-1. Open `/events/in-public-002` on a phone. RSVP with a personal address. Check that you see the QR code and code, and that the consent box was unticked.
+1. Open `/events/in-public-002` on a phone. RSVP with a personal address. Check that the confirmation explains how to check in, and that the consent box was unticked.
 2. RSVP again with the same email; it is refused as already registered.
-3. On another phone, sign in as a staff account and scan the QR with the camera. Check that it shows the name and does not check in, then press **Confirm check-in**. Scan again; it says "already checked in".
+3. As an admin, open self check-in on the Check-in tab. Open `/events/in-public-002/checkin`, enter the name you RSVP'd under, and check that it says Welcome. Enter it again and check that it says already checked in.
 4. On `/events/admin/in-public-002/door`, find someone by name, and add a walk-in without an email.
 5. On `/events/admin/in-public-002`, check that the numbers, attendee list and search work, export the CSV, and set and confirm a date. Check that the public page shows it and the calendar file downloads.
 6. With the Google variables set, press **Resync now** and check that the tab has one row per person. Check someone in or out and watch their row change in place.
