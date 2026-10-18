@@ -67,7 +67,16 @@ export function kindsFor(event: unknown, props: unknown): string[] | null {
     const ref = typeof p.referrer === 'string' && REFERRERS.has(p.referrer) ? p.referrer : 'unknown';
     const land = typeof p.landing === 'string' && LANDINGS.has(p.landing) ? p.landing : 'unknown';
     const utm = typeof p.utm_source === 'string' && UTM.test(p.utm_source) ? p.utm_source : null;
-    return [`ref:${ref}`, `land:${land}`, ...(utm ? [`utm:${utm}`] : [])];
+    // the campaign tag too, so a sign-up that began on an event's link can be counted against that event
+    const camp = typeof p.utm_campaign === 'string' && UTM.test(p.utm_campaign) ? p.utm_campaign : null;
+    return [`ref:${ref}`, `land:${land}`, ...(utm ? [`utm:${utm}`] : []), ...(camp ? [`camp:${camp}`] : [])];
+  }
+  if (event === 'event_page_viewed') {
+    // an event id has the shape of one (lib/events/model.ts EVENT_ID); the dashboard reads only events that exist
+    const ev = typeof p.event === 'string' && /^[a-z0-9][a-z0-9-]{1,58}[a-z0-9]$/.test(p.event) ? p.event : null;
+    if (!ev) return null;
+    const src = typeof p.ref === 'string' && UTM.test(p.ref) ? `ref:${p.ref}` : typeof p.utm_source === 'string' && UTM.test(p.utm_source) ? `utm:${p.utm_source}` : 'direct';
+    return [`ev:${ev}`, `ev:${ev}|${src}`];
   }
   // A first-run milestone: counted by surface when it names one.
   const surface = typeof p.surface === 'string' && SURFACES.has(p.surface) ? p.surface : 'any';

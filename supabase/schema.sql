@@ -773,3 +773,104 @@ create table if not exists captures (
 );
 
 create index if not exists captures_user_idx on captures (user_id, created_at desc);
+
+-- ── Socria events: RSVP and attendance ─────────────────────────────────
+--
+-- events: one row per event, edited by Socria admins. A date is shown on the
+-- public page only when date_confirmed is true and starts_at is set;
+-- tentative_note is a planning note for staff and is never rendered publicly.
+--
+-- event_registrations: one row per person per event. RSVP and attendance are
+-- separate: `attendance` is 'registered' until staff confirm the person at the
+-- door. token_hash is the SHA-256 of the secret in the attendee's
+-- confirmation link and QR code (the secret itself is never stored); `code`
+-- is the short code staff can type for someone without a phone. One
+-- registration per event and email (walk-ins may come without an email).
+-- Attendees have no account here: rows are keyed by email, purged when the
+-- attendee cancels, when an admin deletes them, after the retention period,
+-- and when a Socria account with that verified email is deleted.
+--
+-- event_sheet_sync: per event, the Google Sheet mirror's state — a short
+-- lease so two syncs never write at once, a dirty flag for changes made while
+-- one ran, and the last success and error for the admin page. The database
+-- is the source of truth; the sheet is a copy.
+--
+-- Safe to re-run.
+create table if not exists events (
+  id text primary key,
+  title text not null,
+  summary text not null default '',
+  description text not null default '',
+  location text not null default '',
+  starts_at bigint,
+  ends_at bigint,
+  timezone text not null default 'America/Chicago',
+  date_confirmed boolean not null default false,
+  tentative_note text,
+  status text not null default 'draft' check (status in ('draft', 'open', 'closed', 'cancelled')),
+  capacity integer,
+  expectations jsonb not null default '[]'::jsonb,
+  created_at bigint not null,
+  updated_at bigint not null,
+  constraint events_confirmed_has_start check (not date_confirmed or starts_at is not null)
+);
+
+create table if not exists event_registrations (
+  id text primary key,
+  event_id text not null references events (id) on delete cascade,
+  full_name text not null,
+  email text,
+  email_norm text,
+  interest text check (interest in ('business', 'ai', 'networking', 'learning', 'other')),
+  interest_other text,
+  source text check (source in ('instagram', 'friend', 'campus', 'student-org', 'other')),
+  utm_source text,
+  utm_medium text,
+  utm_campaign text,
+  ref text,
+  registered_at bigint not null,
+  registered_via text not null default 'web' check (registered_via in ('web', 'walk-in')),
+  attendance text not null default 'registered' check (attendance in ('registered', 'attended')),
+  checked_in_at bigint,
+  checked_in_by text,
+  marketing_consent boolean not null default false,
+  consent_at bigint,
+  token_hash text not null unique,
+  code text not null,
+  constraint event_registrations_email_unless_walk_in check (registered_via = 'walk-in' or email_norm is not null),
+  constraint event_registrations_attended_has_time check (attendance = 'registered' or checked_in_at is not null),
+  constraint event_registrations_consent_has_time check (not marketing_consent or consent_at is not null)
+);
+
+create unique index if not exists event_registrations_event_email_idx on event_registrations (event_id, email_norm);
+create unique index if not exists event_registrations_event_code_idx on event_registrations (event_id, code);
+create index if not exists event_registrations_email_idx on event_registrations (email_norm);
+
+create table if not exists event_sheet_sync (
+  event_id text primary key references events (id) on delete cascade,
+  lease_until bigint not null default 0,
+  dirty boolean not null default true,
+  last_ok_at bigint,
+  last_rows integer,
+  last_error text,
+  last_error_at bigint
+);
+
+-- The first event. Its date is NOT confirmed: the page says the date and time
+-- are to be announced until an admin sets and confirms them.
+insert into events (id, title, summary, description, location, timezone, date_confirmed, tentative_note, status, expectations, created_at, updated_at)
+values (
+  'in-public-002',
+  'Socria: In Public 002',
+  'An interactive event about building Socria in public — entrepreneurship, business, AI, product development and community.',
+  'Socria is a Human-First AI company being built in the open at UT Arlington. In Public is where we show the work as it is: what we are building, what is working, what is not, and the decisions behind it.' || chr(10) || chr(10) || 'Come with questions. This is a conversation, not a lecture — about starting something, building a product people use, working with AI without handing it your thinking, and finding the people to do it with.',
+  'Maverick Hall, Room 1309, University of Texas at Arlington',
+  'America/Chicago',
+  false,
+  'Target: Wednesday, November 4, 2026 (tentative). Start time not set.',
+  'open',
+  '["A candid look at how Socria is being built, decisions and mistakes included", "Open conversation about entrepreneurship, business, AI and product development", "Your questions, answered by the people building it", "Time to meet other students who are building something, or want to"]'::jsonb,
+  (extract(epoch from now()) * 1000)::bigint,
+  (extract(epoch from now()) * 1000)::bigint
+)
+on conflict (id) do nothing;

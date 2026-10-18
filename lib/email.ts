@@ -66,11 +66,19 @@ export function newsletterPostalAddress(): string | null {
   return a || null;
 }
 
-/** Which kind of email a message is: a note (the default) or a newsletter issue. */
-export type EmailStream = 'lifecycle' | 'newsletter';
+/**
+ * Event emails (an RSVP's confirmation) are transactional: one message the
+ * person asked for by registering. Their own switch, unset is off.
+ */
+export function eventEmailsOn(): boolean {
+  return (process.env.EVENT_EMAILS || '').trim().toLowerCase() === 'on';
+}
+
+/** Which kind of email a message is: a note (the default), a newsletter issue, or an event confirmation. */
+export type EmailStream = 'lifecycle' | 'newsletter' | 'event';
 
 function streamOn(stream: EmailStream): boolean {
-  return stream === 'newsletter' ? newsletterEmailsOn() : lifecycleEmailsOn();
+  return stream === 'newsletter' ? newsletterEmailsOn() : stream === 'event' ? eventEmailsOn() : lifecycleEmailsOn();
 }
 
 export function emailFrom(): string {
@@ -133,7 +141,8 @@ const ADDRESS = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
  */
 export async function sendEmail(msg: EmailMessage): Promise<SendResult> {
   if (!streamOn(msg.stream ?? 'lifecycle')) return { ok: false, reason: 'off' };
-  if (!emailSecret()) return { ok: false, reason: 'unconfigured' };
+  // EMAIL_SECRET signs unsubscribe links; a transactional event confirmation carries none
+  if (msg.stream !== 'event' && !emailSecret()) return { ok: false, reason: 'unconfigured' };
 
   const key = (process.env.RESEND_API_KEY || '').trim();
   if (!key) {

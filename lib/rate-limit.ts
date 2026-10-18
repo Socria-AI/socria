@@ -111,7 +111,11 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // and a campus network is many people behind one address.
 // 'code' is the developer dashboard's two-step code (/api/dev/dashboard-code):
 // the one place those codes can be guessed, so a handful of tries a minute.
-type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code';
+// 'rsvp' is the public event registration and the attendee's own ticket
+// link: a person registers once, so a handful a minute per address is room
+// for a typo and a retry, and a campus network gets the day's headroom.
+// 'staff' is the door: check-ins come in bursts at the start of an event.
+type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -121,6 +125,8 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   room: { authed: { minute: 120, day: 20_000 }, anon: { minute: 5, day: 50 } },
   count: { authed: { minute: 30, day: 300 }, anon: { minute: 20, day: 200 } },
   code: { authed: { minute: 6, day: 40 }, anon: { minute: 6, day: 40 } },
+  rsvp: { authed: { minute: 10, day: 200 }, anon: { minute: 10, day: 200 } },
+  staff: { authed: { minute: 240, day: 10_000 }, anon: { minute: 5, day: 50 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

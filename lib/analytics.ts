@@ -103,6 +103,10 @@ export const EVENTS = [
   // `kind` — a role id, a model id, a starting-point id, 'given' | 'skipped'
   // for the name (never the name), or 'skip_all' for the Skip button.
   'onboarding_answered',
+  // A public event page was opened (app/events/[id]): `event` (its id) and
+  // `utm_source` / `ref` tokens from the link — never who, never a referrer
+  // address. Counted first-party by event (lib/product-event-kinds.ts).
+  'event_page_viewed',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -164,6 +168,10 @@ export interface EventProps {
   utm_source?: string;
   utm_medium?: string;
   utm_campaign?: string;
+  /** a public Socria event's id, e.g. 'in-public-002' (lib/events/model.ts) */
+  event?: string;
+  /** an event referral code from the link (?ref=), as a short token — never a person */
+  ref?: string;
 }
 
 const ALLOWED_KEYS = new Set<keyof EventProps>([
@@ -191,6 +199,8 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
   'utm_source',
   'utm_medium',
   'utm_campaign',
+  'event',
+  'ref',
 ]);
 
 /**

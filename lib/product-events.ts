@@ -36,6 +36,8 @@ export const COUNTED_EVENTS = [
   'logos_first_experience_completed',
   // where an account came from, as the kinds lib/first-touch.ts already keeps
   'signup_completed',
+  // a public event page opened: by event, and by the link's source tag
+  'event_page_viewed',
 ] as const;
 export type CountedEvent = (typeof COUNTED_EVENTS)[number];
 

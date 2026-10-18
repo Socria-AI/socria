@@ -422,6 +422,19 @@ What each number means, and what is and is not read: `docs/DASHBOARD.md`.
 
 ---
 
+## 8. Socria events: RSVP and attendance (optional)
+
+1. In the Supabase SQL editor, run the **Socria events** block at the end of
+   `supabase/schema.sql` (it creates `events`, `event_registrations` and
+   `event_sheet_sync`, and seeds *Socria: In Public 002* with its date **not**
+   confirmed), then the matching block at the end of `supabase/rls.sql`.
+2. Admins are the people in `SOCRIA_DASHBOARD_ADMINS` (section 7). Add door
+   volunteers to `SOCRIA_EVENT_STAFF`.
+3. Optional: `EVENT_EMAILS=on` for confirmation emails (needs Resend), and the
+   Google Sheet — the full steps are in `docs/EVENTS.md`.
+4. Sign in as an admin, open `/events/admin/in-public-002`, set the start and
+   end time, tick "confirmed" when they are, and save.
+
 ## Afterwards
 
 Once §1 and §2 are done, this is the state you should be able to confirm:

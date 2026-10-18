@@ -14,6 +14,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth, currentUser } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { exportRegistrationsForEmails } from '@/lib/events/privacy';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -234,6 +235,19 @@ export async function GET(req: NextRequest) {
   const capturesErr = missingTable(capturesRaw) ? null : capturesRaw;
   out.captures = captures ?? [];
 
+  // Event RSVPs under this account's verified addresses (attendees need no
+  // account, so these are found by email, not by user id). The secret behind
+  // their check-in link is not included — only its hash was ever stored.
+  let eventRegistrationsErr: unknown = null;
+  try {
+    const u = await currentUser();
+    const verified = (u?.emailAddresses ?? []).filter((e) => e.verification?.status === 'verified').map((e) => e.emailAddress);
+    out.eventRegistrations = await exportRegistrationsForEmails(verified);
+  } catch (e) {
+    eventRegistrationsErr = e;
+    out.eventRegistrations = [];
+  }
+
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
     'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
@@ -274,6 +288,7 @@ export async function GET(req: NextRequest) {
     ['howYouArrived', invitedYouErr],
     ['friendsYouInvited', youInvitedErr],
     ['captures', capturesErr],
+    ['eventRegistrations', eventRegistrationsErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

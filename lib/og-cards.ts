@@ -108,6 +108,14 @@ const FIXED: Record<string, OgCard> = {
   'sign-in': DEFAULT_CARD,
 };
 
+const EVENT_CARDS: Record<string, OgCard> = {
+  'in-public-002': {
+    kicker: 'Socria · Event · Free',
+    title: 'Socria: In Public 002.',
+    line: 'Building Socria in public — entrepreneurship, AI and product. Maverick Hall 1309, UT Arlington.',
+  },
+};
+
 const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen'];
 const days = (n: number) => (Number.isInteger(n) && n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
@@ -149,6 +157,9 @@ export function ogCardFor(key: readonly string[], ctx: OgContext): OgCard {
     const d = ctx.docs.find((x) => x.slug === k[1]);
     return d ? { kicker: 'Socria Docs', title: fit(d.title, 70), line: fit(d.blurb, 120) } : FIXED.docs;
   }
+  // An event's card: fixed text per event, never read from the address and
+  // never a date — a date on a share card outlives a change to it.
+  if (k.length === 2 && k[0] === 'events') return EVENT_CARDS[k[1]] ?? DEFAULT_CARD;
   if (k.length === 2 && k[0] === 'blog') {
     const p = ctx.post;
     return p?.title

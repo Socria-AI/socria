@@ -25,7 +25,16 @@ const PK = {
   capability_evidence: ['user_id', 'id'],
   share_presence: ['resource_type', 'resource_id', 'user_id'],
   lifecycle_emails: ['user_id', 'kind'],
+  event_sheet_sync: ['event_id'],
 };
+
+// Unique indexes beyond the primary key (supabase/schema.sql), as Postgres
+// applies them: a NULL never collides with anything.
+const UNIQUE = {
+  event_registrations: [['event_id', 'email_norm'], ['event_id', 'code'], ['token_hash']],
+};
+const collides = (t, row, all) =>
+  (UNIQUE[t] ?? []).some((cols) => cols.every((c) => row[c] !== null && row[c] !== undefined) && all.some((r) => cols.every((c) => r[c] === row[c])));
 
 export const db = {
   tables: {},
@@ -157,8 +166,11 @@ class Query {
           if (this.op === 'insert') {
             return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' }, count: null };
           }
+          // ON CONFLICT DO NOTHING
+          if (this.upsertOpts?.ignoreDuplicates) continue;
           all[i] = { ...all[i], ...row };
         } else {
+          if (collides(t, row, all)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' }, count: null };
           if (t === 'mind_projects' && all.some((r) => r.user_id === row.user_id && String(r.name).toLowerCase() === String(row.name).toLowerCase())) {
             return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "mind_projects_user_name_idx"' }, count: null };
           }

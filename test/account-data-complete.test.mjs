@@ -37,6 +37,15 @@ const SHARED = new Set(['shares', 'share_members', 'share_comments', 'share_acti
 // any column at all, stops being exempt and fails below until someone decides
 // again whether it is still nobody's.
 const ANONYMOUS = { product_events: ['env', 'day', 'event', 'kind', 'n'] };
+
+// Socria events. `events` and `event_sheet_sync` describe events, not people
+// (pinned to their columns, like ANONYMOUS). `event_registrations` holds
+// people who need no account, keyed by email: deleted with an account through
+// its VERIFIED addresses (lib/events/privacy.ts) and exported the same way.
+const EVENT_TABLES = {
+  events: ['id', 'title', 'summary', 'description', 'location', 'starts_at', 'ends_at', 'timezone', 'date_confirmed', 'tentative_note', 'status', 'capacity', 'expectations', 'created_at', 'updated_at'],
+  event_sheet_sync: ['event_id', 'lease_until', 'dirty', 'last_ok_at', 'last_rows', 'last_error', 'last_error_at'],
+};
 const columnsOf = (t) => {
   const m = schema.match(new RegExp(`create table if not exists ${t} \\(([\\s\\S]*?)\\n\\);`));
   if (!m) return null;
@@ -94,6 +103,10 @@ ok('the schema declares tables', tables.length > 0, `${tables.length}`);
 for (const t of tables) {
   if (SHARED.has(t)) {
     ok(`${t} — reached by the sharing purge`, /await purgeSharing\(userId\)/.test(del));
+  } else if (EVENT_TABLES[t]) {
+    ok(`${t} — about events, not people: exactly its columns`, JSON.stringify(columnsOf(t)) === JSON.stringify(EVENT_TABLES[t]), JSON.stringify(columnsOf(t)));
+  } else if (t === 'event_registrations') {
+    ok(`${t} — deleted with the account, by its verified addresses`, /await purgeRegistrationsForEmails\(verified\)/.test(del) && /verification\?\.status === 'verified'/.test(del));
   } else if (ANONYMOUS[t]) {
     const cols = columnsOf(t);
     ok(`${t} — nobody's: exactly its anonymous columns`, JSON.stringify(cols) === JSON.stringify(ANONYMOUS[t]), JSON.stringify(cols));
@@ -108,7 +121,11 @@ for (const t of tables) {
 
 console.log('\n=== every table is in the export ===');
 for (const t of tables) {
-  if (ANONYMOUS[t]) continue; // nobody's, checked above
+  if (ANONYMOUS[t] || EVENT_TABLES[t]) continue; // nobody's, checked above
+  if (t === 'event_registrations') {
+    ok(`${t} — exported, by verified address`, /exportRegistrationsForEmails\(verified\)/.test(exp));
+    continue;
+  }
   ok(`${t} — exported`, new RegExp(`from\\('${t}'\\)`).test(exp), 'no .from() for it');
 }
 

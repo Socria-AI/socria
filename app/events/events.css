@@ -1,0 +1,122 @@
+/* app/events/events.css — Socria events: the public page, the confirmation,
+ * the door and the admin view. Scoped under .app-root and built from the app
+ * register's own tokens (app-shell.css, globals.css): paper, ink, moss and
+ * the serif display — one design language, not a second one.
+ */
+
+.app-root .ev-page{min-height:100svh;padding-block:clamp(20px,4vh,40px) 96px;
+  padding-left:max(16px, env(safe-area-inset-left, 0px));padding-right:max(16px, env(safe-area-inset-right, 0px))}
+.app-root .ev-wrap{width:min(1080px,100%);margin:0 auto;display:flex;flex-direction:column;gap:clamp(28px,5vh,48px)}
+.app-root .ev-top{display:flex;align-items:center;justify-content:space-between;gap:12px}
+.app-root .ev-grid{display:grid;grid-template-columns:minmax(0,1.15fr) minmax(0,.85fr);gap:clamp(28px,5vw,64px);align-items:start}
+.app-root .ev-main{display:flex;flex-direction:column;gap:28px;min-width:0}
+.app-root .ev-side{position:sticky;top:24px;min-width:0}
+@media (max-width:880px){
+  .app-root .ev-grid{grid-template-columns:minmax(0,1fr)}
+  .app-root .ev-side{position:static}
+}
+
+.app-root .ev-h1{font-size:clamp(2.2rem,5.6vw,3.6rem);text-wrap:balance}
+.app-root .ev-h1 .em{font-style:italic;color:var(--moss-700)}
+.app-root .ev-lede{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:clamp(1.12rem,2vw,1.36rem);line-height:1.45;color:var(--ink-70);max-width:44ch}
+.app-root .ev-h2{font-size:clamp(1.3rem,2.4vw,1.6rem)}
+.app-root .ev-prose{display:flex;flex-direction:column;gap:12px;max-width:62ch;font-size:1rem;line-height:1.65;color:var(--ink)}
+
+/* the facts, as a ruled list */
+.app-root .ev-facts{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1fr);border-top:1px solid var(--ink-12)}
+.app-root .ev-fact{padding:14px 0;border-bottom:1px solid var(--ink-12);display:flex;flex-direction:column;gap:3px;min-width:0}
+.app-root .ev-fact:nth-child(odd){padding-right:16px}
+.app-root .ev-fact dt{font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label, .12em);text-transform:uppercase;color:var(--ink-70)}
+.app-root .ev-fact dd{margin:0;font-family:var(--font-serif, Georgia, serif);font-size:1.08rem;line-height:1.35}
+.app-root .ev-fact dd small{display:block;font-family:var(--font-sans, system-ui, sans-serif);font-size:.82rem;color:var(--ink-70);margin-top:2px}
+.app-root .ev-fact.wide{grid-column:1 / -1}
+@media (max-width:520px){.app-root .ev-facts{grid-template-columns:minmax(0,1fr)}.app-root .ev-fact:nth-child(odd){padding-right:0}}
+
+.app-root .ev-expect{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:10px}
+.app-root .ev-expect li{display:grid;grid-template-columns:18px minmax(0,1fr);gap:10px;line-height:1.5}
+.app-root .ev-expect li::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--moss);margin-top:.55em;justify-self:center}
+
+/* the card the RSVP lives in */
+.app-root .ev-card{background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:22px;padding:clamp(20px,3vw,28px);
+  box-shadow:0 1px 0 rgba(31,31,31,.03),0 18px 40px -28px rgba(31,31,31,.35);display:flex;flex-direction:column;gap:18px}
+.app-root .ev-card h2{font-size:1.5rem}
+.app-root .ev-field{display:flex;flex-direction:column;gap:7px}
+.app-root .ev-field > label, .app-root .ev-legend{font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label, .12em);text-transform:uppercase;color:var(--ink-70)}
+.app-root .ev-field .opt{font-weight:400;letter-spacing:0;text-transform:none;font-size:.78rem}
+.app-root .ev-input{width:100%;background:var(--app-paper);border:1px solid var(--app-border);border-radius:14px;padding:12px 14px;font-size:16px;line-height:1.3;color:var(--ink)}
+.app-root .ev-input:focus{outline:none;border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .14)}
+.app-root .ev-input[aria-invalid="true"]{border-color:#a5432f}
+.app-root .ev-err{font-size:.86rem;color:#9c3b28}
+.app-root fieldset.ev-field{border:0;margin:0;padding:0;min-width:0}
+.app-root .ev-chips{display:flex;flex-wrap:wrap;gap:8px}
+.app-root .ev-chip{position:relative}
+.app-root .ev-chip input{position:absolute;opacity:0;inset:0;margin:0;cursor:pointer}
+.app-root .ev-chip span{display:inline-flex;align-items:center;min-height:40px;padding:8px 14px;border:1px solid var(--app-border);border-radius:999px;font-size:.92rem;background:var(--app-paper);transition:border-color .15s,background .15s}
+.app-root .ev-chip input:checked + span{background:var(--ink);color:var(--app-paper);border-color:var(--ink)}
+.app-root .ev-chip input:focus-visible + span{outline:2px solid var(--moss);outline-offset:2px}
+.app-root .ev-check{display:grid;grid-template-columns:22px minmax(0,1fr);gap:10px;align-items:start;font-size:.92rem;line-height:1.45;color:var(--ink);cursor:pointer}
+.app-root .ev-check input{width:18px;height:18px;margin:2px 0 0;accent-color:var(--moss-700)}
+.app-root .ev-fine{font-size:.82rem;line-height:1.5;color:var(--ink-70)}
+.app-root .ev-fine a{text-decoration:underline;text-underline-offset:2px}
+.app-root .ev-hp{position:absolute;left:-10000px;width:1px;height:1px;overflow:hidden}
+.app-root .ev-submit{width:100%;justify-content:center}
+
+/* the confirmation */
+.app-root .ev-ticket{display:flex;flex-direction:column;gap:18px}
+.app-root .ev-qr{display:grid;place-items:center;padding:14px;background:#fff;border:1px solid var(--app-border);border-radius:18px;width:min(240px,100%);margin:0 auto}
+.app-root .ev-qr svg{width:100%;height:auto;display:block}
+.app-root .ev-code{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:1.7rem;letter-spacing:.24em;text-align:center}
+.app-root .ev-badge{display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:4px 10px;border-radius:999px;font-size:.78rem;font-weight:600;background:var(--moss-100);color:var(--moss-800)}
+.app-root .ev-badge.attended{background:var(--ink);color:var(--app-paper)}
+.app-root .ev-actions{display:flex;flex-wrap:wrap;gap:10px}
+.app-root .ev-link{font-family:var(--font-serif, Georgia, serif);font-style:italic;color:var(--moss-700);border-bottom:1px solid currentColor}
+.app-root .ev-link:hover{color:var(--ink)}
+.app-root .ev-ghost{display:inline-flex;align-items:center;gap:8px;min-height:40px;padding:8px 16px;border:1px solid var(--app-border);border-radius:999px;font-size:.92rem;background:var(--surface,#fff)}
+.app-root .ev-ghost:hover{border-color:var(--ink)}
+.app-root .ev-ghost.danger{color:#9c3b28}
+.app-root .ev-note{padding:12px 14px;border-radius:14px;background:var(--moss-50);border:1px solid var(--moss-100);font-size:.92rem;line-height:1.5}
+.app-root .ev-note.warn{background:#fbf3e4;border-color:#efdcb7}
+
+/* mobile: the call to action stays within reach */
+.app-root .ev-sticky{display:none}
+@media (max-width:880px){
+  .app-root .ev-sticky{display:flex;position:fixed;left:0;right:0;bottom:0;z-index:20;justify-content:center;
+    padding:12px max(16px, env(safe-area-inset-right, 0px)) calc(12px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+    background:linear-gradient(to top, var(--app-paper) 70%, transparent)}
+  .app-root .ev-sticky > *{width:min(480px,100%);justify-content:center}
+}
+
+/* staff and admin */
+.app-root .ev-admin{width:min(1180px,100%);margin:0 auto;display:flex;flex-direction:column;gap:24px}
+.app-root .ev-kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:12px}
+.app-root .ev-kpi{background:var(--surface,#fff);border:1px solid var(--app-border);border-radius:16px;padding:14px 16px;display:flex;flex-direction:column;gap:4px}
+.app-root .ev-kpi b{font-family:var(--font-serif, Georgia, serif);font-weight:400;font-size:1.9rem;line-height:1.1;font-variant-numeric:tabular-nums}
+.app-root .ev-kpi span{font-size:.8rem;color:var(--ink-70)}
+.app-root .ev-kpi em{font-style:normal;font-size:.7rem;font-weight:600;letter-spacing:.08em;text-transform:uppercase}
+.app-root .ev-kpi em.est{color:#8a5a14}
+.app-root .ev-kpi em.conf{color:var(--moss-700)}
+.app-root .ev-panel{background:var(--surface,#fff);border:1px solid var(--app-border);border-radius:18px;padding:18px;display:flex;flex-direction:column;gap:14px;min-width:0}
+.app-root .ev-panel h3{font-size:1.2rem}
+.app-root .ev-cols{display:grid;grid-template-columns:repeat(auto-fit,minmax(300px,1fr));gap:16px}
+.app-root .ev-bars{display:flex;flex-direction:column;gap:8px;margin:0;padding:0;list-style:none}
+.app-root .ev-bars li{display:grid;grid-template-columns:minmax(90px,140px) minmax(0,1fr) 40px;gap:10px;align-items:center;font-size:.86rem}
+.app-root .ev-bars i{display:block;height:10px;border-radius:5px;background:var(--moss)}
+.app-root .ev-bars b{font-variant-numeric:tabular-nums;text-align:right;font-weight:600}
+.app-root .ev-table-wrap{overflow-x:auto}
+.app-root .ev-table{width:100%;border-collapse:collapse;font-size:.88rem}
+.app-root .ev-table th{text-align:left;font-size:.66rem;font-weight:600;letter-spacing:.1em;text-transform:uppercase;color:var(--ink-70);padding:8px 10px;border-bottom:1px solid var(--ink-12);white-space:nowrap}
+.app-root .ev-table td{padding:10px;border-bottom:1px solid var(--ink-12);vertical-align:middle}
+.app-root .ev-table td.num{font-variant-numeric:tabular-nums;white-space:nowrap;color:var(--ink-70)}
+.app-root .ev-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.app-root .ev-toolbar .ev-input{width:auto;flex:1 1 220px;padding:10px 14px}
+.app-root .ev-select{background:var(--app-paper);border:1px solid var(--app-border);border-radius:12px;padding:10px 12px;font-size:.92rem}
+.app-root .ev-door-row{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--app-border);border-radius:16px;background:var(--surface,#fff)}
+.app-root .ev-door-row .who{flex:1;min-width:0}
+.app-root .ev-door-row .who strong{display:block;font-size:1.05rem}
+.app-root .ev-door-row .who span{font-size:.84rem;color:var(--ink-70)}
+.app-root .ev-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:999px;background:var(--ink);color:var(--app-paper);font-weight:600;font-size:.95rem}
+.app-root .ev-btn:disabled{opacity:.45;cursor:not-allowed}
+.app-root .ev-btn.moss{background:var(--moss-700)}
+.app-root .ev-spark{width:100%;height:auto;display:block}
+
+@media (prefers-reduced-motion: reduce){.app-root .ev-chip span{transition:none}}

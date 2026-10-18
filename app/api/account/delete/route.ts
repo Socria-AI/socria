@@ -17,6 +17,7 @@ import { readSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { stripe, stripeConfigured } from '@/lib/stripe';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { purgeSharing } from '@/lib/share/server';
+import { purgeRegistrationsForEmails } from '@/lib/events/privacy';
 import { purgeUploads } from '@/lib/upload-store';
 import { purgeReferrer } from '@/lib/rewards/supabase-rewards-store';
 
@@ -232,6 +233,27 @@ export async function DELETE(req: NextRequest) {
         error:
           'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
         failedAt: 'referrals',
+        deleted,
+      },
+      { status: 500 }
+    );
+  }
+
+  // Event registrations are keyed by email, not by account (attendees need no
+  // account): every RSVP under one of this account's VERIFIED addresses goes
+  // with it (lib/events/privacy.ts). Fails closed like the rest.
+  try {
+    const u = await clerkClient().users.getUser(userId);
+    const verified = (u.emailAddresses ?? []).filter((e) => e.verification?.status === 'verified').map((e) => e.emailAddress);
+    await purgeRegistrationsForEmails(verified);
+    deleted.push('event_registrations');
+  } catch (e) {
+    console.error('account delete: event registration purge failed', e);
+    return NextResponse.json(
+      {
+        error:
+          'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
+        failedAt: 'event_registrations',
         deleted,
       },
       { status: 500 }

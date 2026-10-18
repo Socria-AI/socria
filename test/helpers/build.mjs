@@ -301,6 +301,8 @@ const MODULES = [
   // Logos 4: Instant Resume's view store, and the feature switches
   'lib/logos4/resume.ts',
   'lib/logos4/flags.ts',
+  // Socria events: the rules (validation, sheet rows, stats, dates) and the confirmation email
+  'test/helpers/events-under-test.ts',
 ];
 
 export async function buildAll() {

@@ -44,6 +44,7 @@ const LANDINGS: [RegExp, string][] = [
   [/^\/one(\/|$)/, 'one'],
   [/^\/(logos|logos2|surfaces|core4model)(\/|$)/, 'logos'],
   [/^\/students(\/|$)/, 'students'],
+  [/^\/events(\/|$)/, 'events'],
   [/^\/support(\/|$)/, 'support'],
   [/^\/sign-up(\/|$)/, 'sign-up'],
   [/^\/sign-in(\/|$)/, 'sign-in'],

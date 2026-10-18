@@ -149,3 +149,17 @@ grant execute on function bump_product_event(text, text, text, text, integer) to
 alter table captures enable row level security;
 alter table captures force row level security;
 revoke all on captures from anon, authenticated;
+
+-- Socria events (schema.sql "Socria events"). Reached only through the
+-- event routes with the service role: the public RSVP route writes one row
+-- and reads nothing back but the attendee's own; everything else is staff- or
+-- admin-only (lib/events/staff.ts). No public attendee directory exists.
+alter table events               enable row level security;
+alter table events               force row level security;
+alter table event_registrations  enable row level security;
+alter table event_registrations  force row level security;
+alter table event_sheet_sync     enable row level security;
+alter table event_sheet_sync     force row level security;
+revoke all on events              from anon, authenticated;
+revoke all on event_registrations from anon, authenticated;
+revoke all on event_sheet_sync    from anon, authenticated;
