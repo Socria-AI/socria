@@ -31,7 +31,7 @@ const withEnv = (vars, fn) => {
 console.log('=== the model ===');
 {
   const m = SOCRIA_MODELS['logos-3'];
-  ok('Logos 3 is registered (now named Logos 4)', !!m && m.short === 'Logos 4');
+  ok('Logos 3 is registered (now named Logos 5)', !!m && m.short === 'Logos 5');
   ok('  as a Logos surface with the room in it', m.logosSurface && m.collab);
   ok('  that needs an account and has the four depth modes', m.requiresAuth && m.supportsDepth === true);
   ok('  and says what it is for', /Think together/.test(m.description));

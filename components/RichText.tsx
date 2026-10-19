@@ -17,7 +17,8 @@
 // KaTeX splitter over every sentence of a chat that will never contain a `$`
 // is work for nothing — so the surface says whether to look.
 
-import { Fragment, type ReactNode } from 'react';
+import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
+import { copyText } from '@/lib/copy-text';
 import { parseBlocks, splitInline, stripMarks, type Block } from '@/lib/rich-text';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
@@ -73,16 +74,20 @@ export function Inline({
   math,
   keyBase = 'i',
   cite,
+  code,
 }: {
   text: string;
   math?: boolean;
   keyBase?: string;
   cite?: CiteRender;
+  /** read `inline code` too (Logos 5's rich reading) */
+  code?: boolean;
 }) {
   return (
     <>
-      {splitInline(text).map((seg, i) => {
+      {splitInline(text, { code }).map((seg, i) => {
         const key = `${keyBase}-${i}`;
+        if (seg.kind === 'code') return <code key={key} className="socria-code">{seg.text}</code>;
         const body = <Body text={seg.text} math={math} cite={cite} />;
         if (seg.kind === 'text') return <span key={key}>{body}</span>;
         if (seg.kind === 'strong') {
@@ -108,17 +113,68 @@ export function Inline({
   );
 }
 
-function BlockNode({ block, math, k, cite }: { block: Block; math?: boolean; k: string; cite?: CiteRender }): ReactNode {
+/** A fenced block, with a way to copy it — the one thing a code block is for. */
+function CodeBlock({ lang, text, open }: { lang: string | null; text: string; open: boolean }) {
+  const [copied, setCopied] = useState(false);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  return (
+    <div className={`socria-codeblock${open ? ' is-open' : ''}`}>
+      <div className="socria-codeblock-head">
+        <span>{lang || 'text'}</span>
+        <button
+          type="button"
+          onClick={async () => {
+            if (await copyText(text)) {
+              setCopied(true);
+              if (timer.current) clearTimeout(timer.current);
+              timer.current = setTimeout(() => setCopied(false), 1500);
+            }
+          }}
+          aria-label={copied ? 'Copied' : 'Copy this block'}
+        >
+          {copied ? 'Copied' : 'Copy'}
+        </button>
+      </div>
+      <pre>
+        <code>{text}</code>
+      </pre>
+    </div>
+  );
+}
+
+function BlockNode({ block, math, k, cite, rich }: { block: Block; math?: boolean; k: string; cite?: CiteRender; rich?: boolean }): ReactNode {
   switch (block.kind) {
     case 'p':
-      return <p key={k}>{<Inline text={block.text} math={math} keyBase={k} cite={cite} />}</p>;
+      return <p key={k}>{<Inline text={block.text} math={math} keyBase={k} cite={cite} code={rich} />}</p>;
+
+    case 'h': {
+      const H = (`h${block.level + 2}` as 'h3' | 'h4' | 'h5');
+      return (
+        <H key={k} className={`socria-h socria-h${block.level}`}>
+          <Inline text={block.text} math={math} keyBase={k} code={rich} />
+        </H>
+      );
+    }
+
+    case 'code':
+      return <CodeBlock key={k} lang={block.lang} text={block.text} open={block.open} />;
+
+    case 'quote':
+      return (
+        <blockquote key={k} className="socria-quote">
+          <Inline text={block.text} math={math} keyBase={k} cite={cite} code={rich} />
+        </blockquote>
+      );
 
     case 'ul':
       return (
         <ul key={k}>
           {block.items.map((it, i) => (
             <li key={i}>
-              <Inline text={it} math={math} keyBase={`${k}-${i}`} cite={cite} />
+              <Inline text={it} math={math} keyBase={`${k}-${i}`} cite={cite} code={rich} />
             </li>
           ))}
         </ul>
@@ -197,7 +253,35 @@ function BlockNode({ block, math, k, cite }: { block: Block; math?: boolean; k: 
   }
 }
 
-/** A finished reply: paragraphs, lists, titled groups and small tables — and, where the surface draws them, its citations. */
-export function RichText({ text, math, cite }: { text: string; math?: boolean; cite?: CiteRender }) {
-  return <>{parseBlocks(text).map((b, i) => BlockNode({ block: b, math, k: `b${i}`, cite }))}</>;
+/**
+ * A finished reply: paragraphs, lists, titled groups and small tables — and,
+ * where the surface draws them, its citations. `rich` (Logos 5) also reads
+ * headings, fenced code, quotations and inline code (lib/rich-text.ts).
+ */
+export function RichText({ text, math, cite, rich }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean }) {
+  return <>{parseBlocks(text, { rich }).map((b, i) => BlockNode({ block: b, math, k: `b${i}`, cite, rich }))}</>;
+}
+
+/**
+ * A reply still arriving, read richly without jumping: every paragraph that
+ * has finished (a blank line after it) is drawn as the blocks it is, and only
+ * the paragraph still being written stays inline — so a list or a table forms
+ * once, when its paragraph ends, rather than flickering token by token.
+ */
+export function StreamingRichText({ text, math, rich }: { text: string; math?: boolean; rich?: boolean }) {
+  const cut = text.lastIndexOf('\n\n');
+  // inside an unclosed fence the whole tail is the block still being written
+  const fences = (text.match(/^\s*```/gm) ?? []).length;
+  const settled = fences % 2 === 1 ? text : cut > 0 ? text.slice(0, cut) : '';
+  const tail = fences % 2 === 1 ? '' : cut > 0 ? text.slice(cut + 2) : text;
+  return (
+    <>
+      {settled && <RichText text={settled} math={math} rich={rich} />}
+      {tail && (
+        <p className="is-tail">
+          <Inline text={tail} math={math} code={rich} />
+        </p>
+      )}
+    </>
+  );
 }

@@ -156,10 +156,15 @@ import {
   type PanelNode,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, openBeside, showLens, suggestLayout, suggestViews, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
+import { LOGOS5, DEFAULT_STAGE_SHARE, readStagePrefs, writeStagePrefs, type StagePrefs } from '@/lib/logos5/flags';
+import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
+import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
+import { L5Header, L5LinkBar, L5Outline, L5StageHead, type L5MenuItem } from './logos5/L5Chrome';
+import './logos5/l5.css';
 import { CaptureInbox } from './CaptureInbox';
 import { forComposer, forNode, type Capture } from '@/lib/logos4/captures';
 import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
@@ -3048,7 +3053,7 @@ export function LogosApp({
     let scroll: ScrollAt | undefined;
     if (t && t.clientHeight > 0) {
       const top = t.getBoundingClientRect().top;
-      const rects = [...t.querySelectorAll<HTMLElement>('.lg-msg[id^="lg-m-"]')].map((el) => {
+      const rects = [...t.querySelectorAll<HTMLElement>('[id^="lg-m-"]')].map((el) => {
         const r = el.getBoundingClientRect();
         return { id: el.id.slice(5), top: r.top - top, bottom: r.bottom - top };
       });
@@ -3436,6 +3441,7 @@ export function LogosApp({
         const pinned = there.config?.obj ? wsLayout : configurePanel(wsLayout, there.id, { obj: a.obj });
         changeLayout(ps.length > 1 ? maximize(pinned, there.id) : pinned);
       } else changeLayout(addPanel(wsLayout, { type: 'scene', config: { obj: a.obj } }, 1.6, 0.5).layout);
+      openStage();
       return;
     }
     if (a.type === 'view' && a.view === 'plane') {
@@ -3562,6 +3568,7 @@ export function LogosApp({
       const want = readViewRequest(content);
       if (want) {
         changeLayout(showLens(wsLayout, want.lens));
+        openStage();
         if (wsFacts.lenses.includes(want.lens)) {
           setError(null);
           setInput('');
@@ -3581,6 +3588,7 @@ export function LogosApp({
       const asked = readInterfaceRequest(content, interfaceContext(wsFacts));
       if (asked) {
         changeLayout(layoutForRequest(asked, wsLayout, wsFacts));
+        if (asked.op !== 'close') openStage();
         setError(null);
         setInput('');
         setReplyTo(null);
@@ -3731,9 +3739,22 @@ export function LogosApp({
     // body — so the extraction still overlaps the whole of the stream, which
     // is where the time actually goes, and a turn the server refuses is not
     // extracted from at all.
+    // Logos 5: the answer can be stopped. What has arrived stays; if nothing
+    // has, the turn goes back into the composer as if it was never sent.
+    const ctrl = new AbortController();
+    abortRef.current = ctrl;
+    /** stopped before a word arrived: the turn is taken back, unsent */
+    const takeBack = () => {
+      patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
+      chronRef.current = withoutTurn(chronRef.current, sent);
+      setInput(content);
+      setReplyTo(replying);
+      if (atts.length) setDrafts((prev) => [...prev, ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const }))]);
+    };
     try {
       const res = await fetch('/api/logos/chat', {
         method: 'POST',
+        signal: ctrl.signal,
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
         body: JSON.stringify({
           sessionId: activeIdRef.current,
@@ -3851,13 +3872,24 @@ export function LogosApp({
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
       let acc = '';
+      let stopped = false;
       if (reader) {
-        for (;;) {
-          const { done, value } = await reader.read();
-          if (done) break;
-          acc += decoder.decode(value, { stream: true });
-          setStreaming(visibleStream(acc));
+        try {
+          for (;;) {
+            const { done, value } = await reader.read();
+            if (done) break;
+            acc += decoder.decode(value, { stream: true });
+            setStreaming(visibleStream(acc));
+          }
+        } catch (e) {
+          if ((e as Error)?.name !== 'AbortError') throw e;
+          stopped = true;
         }
+      }
+      if (stopped && !visibleStream(acc).trim()) {
+        setStreaming('');
+        if (!group) takeBack();
+        return;
       }
       acc = absorbRemember(acc);
       // Changes to the picture, checked against the very state that was sent:
@@ -3932,6 +3964,11 @@ export function LogosApp({
       }
     } catch (e: any) {
       setStreaming('');
+      if (e?.name === 'AbortError') {
+        // stopped before the answer began: nothing to keep
+        if (!group) takeBack();
+        return;
+      }
       if (group) {
         // Said to everyone already; only Socria's answer failed. Ask again with @socria.
         setError(`${e?.message || 'Something went wrong.'} Your message is posted — mention @socria to ask again.`);
@@ -3954,7 +3991,48 @@ export function LogosApp({
     } finally {
       setBusy(false);
       togetherRef.current?.asking(false);
+      if (abortRef.current === ctrl) abortRef.current = null;
     }
+  }
+
+  /** Stop the answer that is arriving (Logos 5). */
+  function stopAnswer() {
+    abortRef.current?.abort();
+  }
+
+  /**
+   * Ask the latest question again (Logos 5): the reply and the question it
+   * answers are taken out, and the question is sent as it was — its words, its
+   * attachments, what it replied to.
+   */
+  function retryLast(reply: Msg) {
+    if (busy || togetherReadOnly || groupNow()) return;
+    const list = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [];
+    const at = list.findIndex((m) => m.id === reply.id);
+    if (at < 0 || at !== list.length - 1) return;
+    let q = at - 1;
+    while (q >= 0 && list[q].role !== 'user') q--;
+    if (q < 0) return;
+    const question = list[q];
+    patchActive((sn) => ({ ...sn, messages: sn.messages.slice(0, q) }), false);
+    chronRef.current = chronRef.current.filter((m) => m !== question && m !== reply);
+    void send(question.content, question.attachments ?? [], question.replyTo ?? null);
+  }
+
+  /**
+   * Edit something you sent and send it again (Logos 5): it and everything
+   * after it are replaced by the new turn. The person was told so in place,
+   * before pressing Send; the map keeps what it has.
+   */
+  function editTurn(turn: Msg, text: string) {
+    if (busy || togetherReadOnly || groupNow()) return;
+    const list = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [];
+    const at = list.findIndex((m) => m.id === turn.id);
+    if (at < 0) return;
+    const gone = new Set(list.slice(at));
+    patchActive((sn) => ({ ...sn, messages: sn.messages.slice(0, at) }), false);
+    chronRef.current = chronRef.current.filter((m) => !gone.has(m));
+    void send(text, turn.attachments ?? [], turn.replyTo ?? null);
   }
 
   // ── FOUND ALONG THE WAY ─────────────────────────────────────────
@@ -4027,6 +4105,98 @@ export function LogosApp({
   const focusRef = useRef<Focus>(null);
   focusRef.current = focus;
 
+  // ── LOGOS 5: CONVERSATION FIRST, A WORKSPACE BESIDE IT (docs/LOGOS-5.md) ──
+  //
+  // The same session, the same workspace machinery, a new screen. The stage
+  // (the workspace) is open or put away per line of thinking, in this browser;
+  // it opens when something is MADE or asked for, never because a map grew
+  // from ordinary talk. The links between the thread and the map are read
+  // from what the session already holds (lib/logos5/linking.ts).
+  const l5 = workspaceOn && LOGOS5.on;
+  const [stagePrefs, setStagePrefs] = useState<StagePrefs>({ open: {}, share: DEFAULT_STAGE_SHARE });
+  useEffect(() => {
+    if (l5) setStagePrefs(readStagePrefs(browserStorage()));
+  }, [l5]);
+  const stageOpen = l5 && !!activeId && !!stagePrefs.open[activeId];
+  /** something new landed on the stage while it was put away */
+  const [stageFresh, setStageFresh] = useState(false);
+  /** the card selected on the map whose turns are marked in the thread, and which of them is in view */
+  const [linkNode, setLinkNode] = useState<string | null>(null);
+  const [linkAt, setLinkAt] = useState(0);
+  /** cards the thread is pointing at: hovered (for a moment) or pressed (until let go) */
+  const [hoverNodes, setHoverNodes] = useState<string[] | null>(null);
+  const [litNodes, setLitNodes] = useState<string[] | null>(null);
+  const [revealNode, setRevealNode] = useState<{ id: string; n: number } | null>(null);
+  /** a display opened by a turn → the person's message it answered (this visit only; nothing stored) */
+  const [objMsg, setObjMsg] = useState<Record<string, string>>({});
+  /** the answer arriving can be stopped */
+  const abortRef = useRef<AbortController | null>(null);
+  /** the thread is scrolled away from its end: offer the way back */
+  const [awayFromEnd, setAwayFromEnd] = useState(false);
+  /** narrower than a desktop: the stage is a sheet over the conversation, not a column beside it */
+  const [narrow, setNarrow] = useState(false);
+  useEffect(() => {
+    if (!l5 || typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 1023px)');
+    const on = () => setNarrow(mq.matches);
+    on();
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, [l5]);
+  const links = useMemo(
+    () => (l5 ? linksOf(messages, map.nodes, map.history) : null),
+    [l5, messages, map.nodes, map.history]
+  );
+  useEffect(() => {
+    setLinkNode(null);
+    setLitNodes(null);
+    setHoverNodes(null);
+    setStageFresh(false);
+  }, [activeId]);
+  /** Open or put away the stage for this line of thinking, and remember it here. */
+  function setStage(open: boolean, id: string | null = activeIdRef.current) {
+    if (!l5 || !id) return;
+    setStagePrefs((p) => {
+      if (!!p.open[id] === open) return p;
+      const { [id]: _was, ...rest } = p.open;
+      const next = { ...p, open: { ...rest, [id]: open } };
+      writeStagePrefs(browserStorage(), next);
+      return next;
+    });
+    if (open) setStageFresh(false);
+  }
+  /**
+   * Something was made or asked for: the stage opens on it. On a phone it is
+   * a sheet over the conversation, so it is offered (the header's button
+   * marks it) rather than pulled over what the person is reading.
+   */
+  function openStage() {
+    setStage(true);
+    if (narrow && mobileViewRef.current !== 'map') setStageFresh(true);
+  }
+  // A map that grows from ordinary talk does not open the stage — the header says it is there.
+  const mapSize = map.nodes.length;
+  const mapSizeRef = useRef(mapSize);
+  useEffect(() => {
+    if (l5 && !stageOpen && mapSize > mapSizeRef.current) setStageFresh(true);
+    mapSizeRef.current = mapSize;
+  }, [l5, mapSize, stageOpen]);
+  /** A reply's effect pressed: the stage, on the map, with those cards lit and the first in view. */
+  function showNodes(ids: string[]) {
+    if (!ids.length) return;
+    openStage();
+    if (wsLayout && !panelsOf(wsLayout).some((p) => p.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
+    setLitNodes(ids);
+    setRevealNode((r) => ({ id: ids[0], n: (r?.n ?? 0) + 1 }));
+    setMobileView('map');
+  }
+  /** A display, document or model a turn opened: the stage, on it. */
+  function showObject(id: string) {
+    setStage(true);
+    setDisplayToOpen(id);
+    setMobileView('map');
+  }
+
   // ── INSTANT RESUME (Logos 4, lib/logos4/resume.ts) ───────────────
   // This screen's view of each line of thinking — the thread's place, the
   // half-typed message and what it replies to, the selection, the phone's
@@ -4066,6 +4236,34 @@ export function LogosApp({
   const wsFacts = useMemo(() => ({ ...factsFrom(map), mind: cloud }), [map, cloud]);
   // Something to look at besides the map: a built model, or a picture.
   const wsHasModel = wsFacts.docs.length > 0 || !!wsFacts.viz;
+  // LOGOS 5: what each reply did in the workspace — the cards its turn put on
+  // the map (from the map's own record) and the displays it opened (this
+  // visit) — said under the reply, so the conversation shows its effects.
+  const l5Effects = useMemo(() => {
+    const out = new Map<string, L5Effect>();
+    if (!l5) return out;
+    const live = new Set(map.nodes.map((n) => n.id));
+    const named = new Map((wsFacts.displays ?? []).map((d) => [d.id, d]));
+    let lastUser: string | null = null;
+    for (const m of messages) {
+      if (m.role === 'user') {
+        lastUser = m.id ?? null;
+        continue;
+      }
+      if (!m.id || m.synthesis) continue;
+      const fx = turnEffect(m.id, messages, map.history, live);
+      const said = effectSaid(fx.added.length, fx.renamed.length);
+      const objects = lastUser
+        ? Object.entries(objMsg)
+            .filter(([, u]) => u === lastUser)
+            .map(([id]) => named.get(id))
+            .filter((d): d is NonNullable<typeof d> => !!d)
+            .map((d) => ({ id: d.id, label: d.title || d.name, kind: d.noun }))
+        : [];
+      if (said || objects.length) out.set(m.id, { map: said ? { said, nodes: [...fx.added, ...fx.renamed] } : null, objects });
+    }
+    return out;
+  }, [l5, messages, map.nodes, map.history, wsFacts.displays, objMsg]);
   useEffect(() => {
     if (!workspaceOn || wsLayout) return;
     let saved: WorkspaceLayout | null = null;
@@ -4095,6 +4293,12 @@ export function LogosApp({
     if (!wsFacts.displays?.some((d) => d.id === displayToOpen)) return;
     const next = afterDisplay(wsLayout, wsFacts, displayToOpen);
     if (next) changeLayout(next);
+    if (l5) {
+      // the stage opens on what was made, and the turn that made it says so
+      openStage();
+      const asked = [...messages].reverse().find((m) => m.role === 'user' && m.id);
+      if (asked?.id) setObjMsg((o) => (o[displayToOpen] ? o : { ...o, [displayToOpen]: asked.id! }));
+    }
     setDisplayToOpen(null);
   }, [displayToOpen, workspaceOn, wsLayout, wsFacts, changeLayout]);
   const wsViews = useMemo(() => (wsLayout ? suggestViews(wsFacts, wsLayout) : []), [wsFacts, wsLayout]);
@@ -4104,6 +4308,9 @@ export function LogosApp({
   // what there is to look at; a line opened without a model shows its map.
   // An arrangement somebody made of several panels is theirs and never moves.
   const wsSeen = useRef<{ id: string | null; docs: number }>({ id: null, docs: 0 });
+  const wsWasSeen = (id: string | null, docs: number) => {
+    wsSeen.current = { id, docs };
+  };
   useEffect(() => {
     if (!workspaceOn || !wsLayout) return;
     const seen = wsSeen.current;
@@ -4115,7 +4322,9 @@ export function LogosApp({
       if (one.type === 'map' && wsHasModel && (switched || docs > seen.docs)) changeLayout(singleLayout('model'));
       else if (one.type === 'model' && !wsHasModel) changeLayout(singleLayout('map'));
     }
-    wsSeen.current = { id: activeId, docs };
+    // Logos 5: a model built this turn is something made — the stage opens on it
+    if (l5 && seen.id === activeId && docs > seen.docs) openStage();
+    wsWasSeen(activeId, docs);
   }, [workspaceOn, wsLayout, wsFacts, wsHasModel, activeId, changeLayout]);
   // The conversation, while it is not a panel: a composer and Socria's latest
   // reply beneath the stage, opened into its history only when asked.
@@ -4160,6 +4369,12 @@ export function LogosApp({
   const stableRestore = useCallback((docId: string, at: number) => docHistoryRef.current(docId, at), []);
   const askLabelRef = useRef<(label: string) => void>(() => {});
   const stableAskLabel = useCallback((label: string) => askLabelRef.current(label), []);
+
+  // Logos 5: a note landing under the latest reply stays in view for someone already at the end
+  useEffect(() => {
+    const t = threadRef.current;
+    if (l5 && t && atEndRef.current) requestAnimationFrame(() => (t.scrollTop = t.scrollHeight));
+  }, [l5, buildNote, firstMapNote, found, mapping]);
 
   if (!hasAccess) {
     // THE COVER IS THE GATE. The same card the chat opens from its pill —
@@ -4294,6 +4509,8 @@ export function LogosApp({
   function renderPanel(p: PanelNode) {
     switch (p.type) {
       case 'chat':
+        // Logos 5: the conversation is always beside the workspace, never inside it
+        if (l5) return <p className="l5-chatnote">The conversation is beside the workspace.</p>;
         return (
           <div className="lg-convo lg-convo-panel">
             {convoBody}
@@ -4445,6 +4662,39 @@ export function LogosApp({
   // exactly as before; Logos 3 hands them to the workspace as panels, beside
   // the model, its parameters, the inspector and the trace — all drawn over
   // the one session this component holds. Nothing here copies state.
+  // Who is here, the comments, and the one way to bring someone in — the same bar in Logos 4's header and Logos 5's.
+  const presenceBar = (
+    <>
+        {collab && room.active ? (
+          <CollabBar room={room} />
+        ) : isSignedIn && activeId && (SOCRIA_MODELS[model]?.workspace || together.active) ? (
+          <span className="tg-bar">
+            {together.active && together.people.length > 1 && (
+              <span className="tg-faces" aria-label={`${together.people.length} here now`}>
+                {together.people.slice(0, 5).map((p) => (
+                  <i key={p.id} style={{ background: hueOf(p.id) }} title={p.you ? 'You' : `${p.name} · ${p.role}`}>
+                    {p.name.trim()[0]?.toUpperCase() ?? '?'}
+                  </i>
+                ))}
+              </span>
+            )}
+            {together.active && (
+              <CommentsButton
+                state={comments}
+                active={commentsOpen}
+                onClick={() => {
+                  setCommentsOn(null);
+                  setCommentsOpen((o) => !o);
+                }}
+              />
+            )}
+            <button type="button" className="sh-open" onClick={() => setShareOpen(true)}>
+              Share
+            </button>
+          </span>
+        ) : null}
+    </>
+  );
   const convoHead = (
           <header className={`lg-head${collab ? ' lg-head-collab' : ''}`}>
             {/* The header measures itself; this row is what it arranges. They
@@ -4571,34 +4821,7 @@ export function LogosApp({
                 bring someone in — on Logos 3, and on any Logos surface once
                 the line of thinking is shared. A room joined by its old code
                 keeps its own bar. */}
-            {collab && room.active ? (
-              <CollabBar room={room} />
-            ) : isSignedIn && activeId && (SOCRIA_MODELS[model]?.workspace || together.active) ? (
-              <span className="tg-bar">
-                {together.active && together.people.length > 1 && (
-                  <span className="tg-faces" aria-label={`${together.people.length} here now`}>
-                    {together.people.slice(0, 5).map((p) => (
-                      <i key={p.id} style={{ background: hueOf(p.id) }} title={p.you ? 'You' : `${p.name} · ${p.role}`}>
-                        {p.name.trim()[0]?.toUpperCase() ?? '?'}
-                      </i>
-                    ))}
-                  </span>
-                )}
-                {together.active && (
-                  <CommentsButton
-                    state={comments}
-                    active={commentsOpen}
-                    onClick={() => {
-                      setCommentsOn(null);
-                      setCommentsOpen((o) => !o);
-                    }}
-                  />
-                )}
-                <button type="button" className="sh-open" onClick={() => setShareOpen(true)}>
-                  Share
-                </button>
-              </span>
-            ) : null}
+            {presenceBar}
             <button type="button" className="lg-back" onClick={leaveForChat} aria-label="Back to Socria chat">
               <span className="lg-lbl-long">Socria chat</span>
               <span className="lg-lbl-short" aria-hidden="true">Chat</span> <span aria-hidden="true">→</span>
@@ -4719,6 +4942,155 @@ export function LogosApp({
     window.setTimeout(() => el.classList.remove('is-flash'), 1400);
   }
 
+  // The notes under the conversation — the Answer Guard, One, the style note, the map's limit, the
+  // drift offer, a read-only share — shared by Logos 4's dock and Logos 5's column.
+  const convoNotes = (
+    <>
+          {/* Answer Guard: while learning math, Logos gives hints, not
+              answers — but never traps you. You can ask for another hint or
+              deliberately reveal the whole solution. */}
+          {guarded && (
+            <div className="lg-guard" role="note">
+              <span className="lg-guard-dot" aria-hidden="true" />
+              <span className="lg-guard-text">
+                Guiding, not solving — you&rsquo;re working this one out.
+              </span>
+              <button
+                type="button"
+                className="lg-guard-hint"
+                disabled={busy}
+                onClick={() => send('Can I have another hint?')}
+              >
+                Another hint
+              </button>
+              <button type="button" className="lg-guard-reveal" onClick={reveal}>
+                Show solution
+              </button>
+            </div>
+          )}
+
+          {/* Just back from checkout. Says the one thing worth saying and
+              then goes away — nobody needs a receipt read aloud. */}
+          {oneWelcome && (
+            <div className="lg-one-note" role="status">
+              <span className="lg-one-note-text">
+                {one ? (
+                  <>
+                    <b>Socria One is open.</b> Begin as many lines of thinking as you
+                    have, and Socria carries what it learns about how you reason from
+                    each one into the next.
+                  </>
+                ) : (
+                  <>
+                    <b>Thank you — setting up your subscription.</b> This takes a moment;
+                    the environment opens as soon as Stripe confirms.
+                  </>
+                )}
+              </span>
+              <button
+                type="button"
+                className="lg-one-note-x"
+                onClick={() => setOneWelcome(false)}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* The chat just updated the standing instructions on their ask. */}
+          {styleUpdatedNote && (
+            <div className="lg-one-note lg-style-note-bar" role="status">
+              <span className="lg-one-note-text">
+                <b>Noted.</b> Socria updated how it works with you — see it in
+                {' '}
+                <button
+                  type="button"
+                  className="lg-style-note-link"
+                  onClick={() => {
+                    setStyleDraftText(styleText);
+                    setStyleOpen(true);
+                    setStyleUpdatedNote(false);
+                  }}
+                >
+                  your instructions
+                </button>
+                .
+              </span>
+              <button
+                type="button"
+                className="lg-one-note-x"
+                onClick={() => setStyleUpdatedNote(false)}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* The free map has grown as far as it goes. Said plainly, once,
+              and dismissible — the map itself stays exactly as it is. */}
+          {!limitNoteOff && atMapBoundary && (
+            <div className="lg-one-note" role="note">
+              <span className="lg-one-note-text">
+                <b>Your free Thinking Map has reached its limit.</b> Everything here
+                stays open — Socria One lets it keep growing with your thinking.
+              </span>
+              <button
+                type="button"
+                className="lg-one-note-go"
+                onClick={() =>
+                  ask('map-full')
+                }
+              >
+                Socria One
+              </button>
+              <button
+                type="button"
+                className="lg-one-note-x"
+                onClick={() => setLimitNoteOff(true)}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {/* An offer, after the fact. The message was sent and answered;
+              this only asks whether it landed where it was meant to. */}
+          {drift && (
+            <div className="lg-drift" role="note">
+              <span className="lg-drift-text">
+                That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
+                and this line of thinking has been about something else. Did you mean it here?
+              </span>
+              <span className="lg-drift-acts">
+                <button type="button" className="lg-drift-stay" onClick={dismissDrift}>
+                  Keep it here
+                </button>
+                <button type="button" className="lg-drift-move" onClick={moveDriftToNewChat}>
+                  Move to a new chat
+                </button>
+              </span>
+              <button
+                type="button"
+                className="lg-drift-x"
+                onClick={dismissDrift}
+                aria-label="Dismiss"
+              >
+                ×
+              </button>
+            </div>
+          )}
+
+          {togetherReadOnly && (
+            <p className="tg-note" role="note">
+              {together.role === 'commenter' ? 'You can read and comment on this line of thinking.' : 'You can read this line of thinking.'}
+              {together.owner ? ` It is ${together.owner}’s.` : ''}
+            </p>
+          )}
+    </>
+  );
   const convoBody = (
     <>
 
@@ -4870,149 +5242,7 @@ export function LogosApp({
             <div ref={bottomRef} />
           </div>
 
-          {/* Answer Guard: while learning math, Logos gives hints, not
-              answers — but never traps you. You can ask for another hint or
-              deliberately reveal the whole solution. */}
-          {guarded && (
-            <div className="lg-guard" role="note">
-              <span className="lg-guard-dot" aria-hidden="true" />
-              <span className="lg-guard-text">
-                Guiding, not solving — you&rsquo;re working this one out.
-              </span>
-              <button
-                type="button"
-                className="lg-guard-hint"
-                disabled={busy}
-                onClick={() => send('Can I have another hint?')}
-              >
-                Another hint
-              </button>
-              <button type="button" className="lg-guard-reveal" onClick={reveal}>
-                Show solution
-              </button>
-            </div>
-          )}
-
-          {/* Just back from checkout. Says the one thing worth saying and
-              then goes away — nobody needs a receipt read aloud. */}
-          {oneWelcome && (
-            <div className="lg-one-note" role="status">
-              <span className="lg-one-note-text">
-                {one ? (
-                  <>
-                    <b>Socria One is open.</b> Begin as many lines of thinking as you
-                    have, and Socria carries what it learns about how you reason from
-                    each one into the next.
-                  </>
-                ) : (
-                  <>
-                    <b>Thank you — setting up your subscription.</b> This takes a moment;
-                    the environment opens as soon as Stripe confirms.
-                  </>
-                )}
-              </span>
-              <button
-                type="button"
-                className="lg-one-note-x"
-                onClick={() => setOneWelcome(false)}
-                aria-label="Dismiss"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* The chat just updated the standing instructions on their ask. */}
-          {styleUpdatedNote && (
-            <div className="lg-one-note lg-style-note-bar" role="status">
-              <span className="lg-one-note-text">
-                <b>Noted.</b> Socria updated how it works with you — see it in
-                {' '}
-                <button
-                  type="button"
-                  className="lg-style-note-link"
-                  onClick={() => {
-                    setStyleDraftText(styleText);
-                    setStyleOpen(true);
-                    setStyleUpdatedNote(false);
-                  }}
-                >
-                  your instructions
-                </button>
-                .
-              </span>
-              <button
-                type="button"
-                className="lg-one-note-x"
-                onClick={() => setStyleUpdatedNote(false)}
-                aria-label="Dismiss"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* The free map has grown as far as it goes. Said plainly, once,
-              and dismissible — the map itself stays exactly as it is. */}
-          {!limitNoteOff && atMapBoundary && (
-            <div className="lg-one-note" role="note">
-              <span className="lg-one-note-text">
-                <b>Your free Thinking Map has reached its limit.</b> Everything here
-                stays open — Socria One lets it keep growing with your thinking.
-              </span>
-              <button
-                type="button"
-                className="lg-one-note-go"
-                onClick={() =>
-                  ask('map-full')
-                }
-              >
-                Socria One
-              </button>
-              <button
-                type="button"
-                className="lg-one-note-x"
-                onClick={() => setLimitNoteOff(true)}
-                aria-label="Dismiss"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {/* An offer, after the fact. The message was sent and answered;
-              this only asks whether it landed where it was meant to. */}
-          {drift && (
-            <div className="lg-drift" role="note">
-              <span className="lg-drift-text">
-                That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
-                and this line of thinking has been about something else. Did you mean it here?
-              </span>
-              <span className="lg-drift-acts">
-                <button type="button" className="lg-drift-stay" onClick={dismissDrift}>
-                  Keep it here
-                </button>
-                <button type="button" className="lg-drift-move" onClick={moveDriftToNewChat}>
-                  Move to a new chat
-                </button>
-              </span>
-              <button
-                type="button"
-                className="lg-drift-x"
-                onClick={dismissDrift}
-                aria-label="Dismiss"
-              >
-                ×
-              </button>
-            </div>
-          )}
-
-          {togetherReadOnly && (
-            <p className="tg-note" role="note">
-              {together.role === 'commenter' ? 'You can read and comment on this line of thinking.' : 'You can read this line of thinking.'}
-              {together.owner ? ` It is ${together.owner}’s.` : ''}
-            </p>
-          )}
+          {convoNotes}
           <LogosComposer
             value={input}
             onChange={setInput}
@@ -5285,7 +5515,11 @@ export function LogosApp({
             })}
             initialLens={lens as LensId | undefined}
             workspace={workspaceOn}
-            onSelectNode={(id) => setFocus({ kind: 'node', id })}
+            onSelectNode={(id) => {
+              setFocus({ kind: 'node', id });
+              if (l5) selectLinked(id);
+            }}
+            {...(l5 ? { linked: mapLit, reveal: revealNode } : {})}
             onAsk={workspaceOn && LOGOS4.pointAsk ? askAboutNode : undefined}
             map={map}
             onAction={(mode, node) => {
@@ -5453,6 +5687,425 @@ export function LogosApp({
       </aside>
     ) : null;
 
+  // ── LOGOS 5 — THE SCREEN (docs/LOGOS-5.md) ────────────────────────────
+  // (no hooks here: this runs after the access gate's early return)
+  /** cards the conversation points at: a reply's effect hovered or pressed */
+  const mapLit: ReadonlySet<string> = new Set([...(hoverNodes ?? []), ...(litNodes ?? [])]);
+  /** the messages the selected card came from, in order */
+  const linkList = linkNode && links ? links.fromNode.get(linkNode) ?? [] : [];
+  const linkedMsgs = new Set(linkList);
+  const linkLabel = linkNode ? map.nodes.find((n) => n.id === linkNode)?.label ?? '' : '';
+  /** A card selected on the map: its turns are marked, and the first is brought into view. */
+  function selectLinked(id: string) {
+    setLinkNode(id);
+    setLinkAt(0);
+    setLitNodes(null);
+    const first = links?.fromNode.get(id)?.[0];
+    if (first) requestAnimationFrame(() => jumpTo(first));
+  }
+  function stepLinked(dir: 1 | -1) {
+    if (!linkList.length) return;
+    const at = (linkAt + dir + linkList.length) % linkList.length;
+    setLinkAt(at);
+    jumpTo(linkList[at]);
+  }
+  function clearLinked() {
+    setLinkNode(null);
+    setLitNodes(null);
+    setFocus((f) => (f?.kind === 'node' ? null : f));
+  }
+  /** what the stage holds besides the map */
+  const stageThings = (wsFacts.displays?.length ?? 0) + wsFacts.docs.length + wsFacts.scenes.length;
+  const stageHas = map.nodes.length > 0 || stageThings > 0 || !!wsFacts.viz;
+  const stagePanels = wsLayout ? panelsOf(wsLayout) : [];
+  const stageTitle = stagePanels.length === 1 ? panelTitle(stagePanels[0]) : { title: 'Workspace', sub: undefined as string | undefined };
+  const l5Title = active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : 'New line of thinking';
+  /** the stage on screen: beside the conversation, or (narrower) as the sheet over it */
+  const stageShown = stageOpen && (!narrow || mobileView === 'map');
+  const toggleStage = () => {
+    if (stageShown) {
+      if (narrow) setMobileView('chat');
+      else setStage(false);
+    } else {
+      setStage(true);
+      setMobileView('map');
+    }
+  };
+  const l5Menu: L5MenuItem[] = [
+    { label: synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize', hint: canSynthesize(map) ? 'Where your thinking stands' : 'Needs two things on the map', disabled: !canSynthesize(map) || !!synthBusy || busy, onSelect: () => void synthesize('workspace') },
+    { label: draftOpen ? 'Close the draft' : 'Draft', hint: limits.draftSpace ? 'A page only you write on' : 'Part of Socria One', onSelect: () => (limits.draftSpace ? setDraftOpen((v) => !v) : ask('draft-locked')) },
+    ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
+    ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
+    { label: 'What Logos does', sep: true, onSelect: () => setGuideOpen(true) },
+    {
+      label: 'How Socria works with you',
+      onSelect: () => {
+        setStyleDraftText(styleText);
+        setStyleOpen(true);
+      },
+    },
+    ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
+    { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
+    { label: 'Back to Socria chat', onSelect: leaveForChat },
+  ];
+  // The meter, only when it is about to matter: at three or fewer left, or at the limit.
+  const l5Meter = (() => {
+    if (one || !usage.chats) return null;
+    const chatsLeft = Math.max(0, (usage.chats.limit ?? 0) - usage.chats.used);
+    const msgsLeft = usage.messages?.limit != null ? Math.max(0, usage.messages.limit - usage.messages.used) : null;
+    const low = (msgsLeft !== null && msgsLeft <= 3) || (messages.length === 0 && chatsLeft <= 1);
+    if (!low) return null;
+    return (
+      <p className={`l5-meter${msgsLeft === 0 ? ' is-out' : ''}`} role="note">
+        {msgsLeft !== null && (msgsLeft === 0 ? 'No free messages left today.' : `${msgsLeft} free ${msgsLeft === 1 ? 'message' : 'messages'} left today.`)}
+        {messages.length === 0 && ` ${chatsLeft} of ${usage.chats.limit} new lines of thinking left this month.`}{' '}
+        <button type="button" className="l5-link" onClick={() => askOne()}>
+          Socria One
+        </button>
+      </p>
+    );
+  })();
+  const l5Thread = (
+    <section className={`l5-col${messages.length === 0 && !streaming && !busy ? ' is-empty' : ''}`} aria-label="Conversation">
+      {linkNode && <L5LinkBar label={linkLabel} count={linkList.length} at={linkAt} onStep={stepLinked} onClear={clearLinked} />}
+      <div
+        className="l5-thread"
+        ref={threadRef}
+        onScroll={(e) => {
+          const t = e.currentTarget;
+          const atEnd = t.scrollHeight - t.scrollTop - t.clientHeight < 48;
+          atEndRef.current = atEnd;
+          setAwayFromEnd(!atEnd);
+          if (LOGOS4.resume) {
+            if (viewTimer.current) clearTimeout(viewTimer.current);
+            viewTimer.current = setTimeout(() => saveViewRef.current(), 700);
+          }
+        }}
+      >
+        <div className="l5-thread-in">
+          {messages.length === 0 && !streaming && !busy && (
+            <div className="l5-hello">
+              <h2>What are you working through?</h2>
+              <p>
+                Think out loud. Socria asks back, and when there is something to see — the shape of your reasoning, a chart of your numbers, a model you can move — it
+                appears beside the conversation.
+              </p>
+              {pickUpOffer && (
+                <button type="button" className="l5-pickup" onClick={() => switchSession(pickUpOffer.id)}>
+                  <span className="l5-pickup-k">Pick up where you left off · {relTime(pickUpOffer.at)}</span>
+                  <span className="l5-pickup-t">{pickUpOffer.title}</span>
+                  <span className="l5-pickup-q">
+                    {pickUpOffer.kind === 'question' ? 'Socria asked' : 'You had started'}: “{pickUpOffer.waiting}”
+                  </span>
+                </button>
+              )}
+              <div className="l5-starts">
+                {(noSessions && !input ? openingsFor(true).map((o) => ({ key: o.id, label: o.label, fill: o.message, id: o.id })) : logosStarters.map((st) => ({ key: st.prompt, label: st.label, fill: st.prompt, id: null as string | null }))).map((o) => (
+                  <button
+                    key={o.key}
+                    type="button"
+                    className="l5-start"
+                    onClick={() => {
+                      // put into the composer to be made their own — never sent by itself
+                      setInput(o.fill);
+                      if (o.id) startIdRef.current = o.id;
+                      setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+                    }}
+                  >
+                    {o.label}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {messages.map((m, i) => {
+            if (m.synthesis) {
+              return (
+                <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="l5-synth">
+                  <LogosSynthesis {...synthProps(m.synthesis, i === lastSynthIndex && i === messages.length - 1)} />
+                  <MsgActions m={m} who="Socria" canReply={!togetherReadOnly} onReply={startReply} />
+                </div>
+              );
+            }
+            const prev = i > 0 ? messages[i - 1] : null;
+            const side: Side = m.role === 'assistant' ? 'socria' : isMine(m) ? 'mine' : 'other';
+            const latest = i === messages.length - 1 && m.role === 'assistant';
+            const solo = !groupView && !togetherReadOnly;
+            return (
+              <L5Message
+                key={m.id ?? i}
+                m={m}
+                side={side}
+                who={shownWho(m)}
+                group={groupView}
+                cont={!!prev && !prev.synthesis && authorKey(prev) === authorKey(m)}
+                hue={groupView && side === 'other' ? hueOf(authorKey(m)) : undefined}
+                showQuote={!!m.replyTo && (m.role === 'user' || !prev?.id || prev.id !== m.replyTo.id)}
+                toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
+                docRefs={docRefs}
+                onOpenCite={openCite}
+                onOpenDoc={openDoc}
+                {...(LOGOS4.pointAsk ? { onPickTex: askAboutExpression } : {})}
+                onJump={jumpTo}
+                canReply={!togetherReadOnly && (m.role === 'assistant' || (groupView && side === 'other'))}
+                onReply={startReply}
+                latest={latest}
+                {...(latest && solo && !busy && m.id ? { onRetry: retryLast } : {})}
+                {...(m.role === 'user' && side === 'mine' && solo && !busy && m.id ? { onEdit: editTurn, after: messages.length - i - 1 } : {})}
+                linked={!!m.id && linkedMsgs.has(m.id)}
+                effect={m.id ? l5Effects.get(m.id) ?? null : null}
+                onHoverNodes={setHoverNodes}
+                onShowNodes={showNodes}
+                onOpenObject={showObject}
+              />
+            );
+          })}
+
+          {chatNotes}
+          <SocriaAnswering names={answeringOthers} />
+          {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} />}
+          {synthBusy && <SynthesisPending scope={synthBusy} />}
+          {busy && !streaming && <L5Pending text="" group={groupView} to={groupView ? 'You' : null} mapping={mapping} onStop={groupView ? undefined : stopAnswer} />}
+          {gifted && !busy && !one && (
+            <p className="l5-note" role="note">
+              This one was on us.{' '}
+              {usage.chats?.limit != null
+                ? (() => {
+                    const left = Math.max(0, usage.chats.limit - usage.chats.used);
+                    return `You still have ${left} free Logos ${left === 1 ? 'chat' : 'chats'} this month.`;
+                  })()
+                : 'Your free Logos chats this month are all still there.'}
+            </p>
+          )}
+          {error && (
+            <p className="l5-error" role="alert">
+              {error}
+            </p>
+          )}
+          <div ref={bottomRef} />
+        </div>
+      </div>
+      {awayFromEnd && messages.length > 0 && (
+        <button
+          type="button"
+          className="l5-tolatest"
+          onClick={() => {
+            const t = threadRef.current;
+            if (t) t.scrollTo({ top: t.scrollHeight, behavior: 'smooth' });
+          }}
+          aria-label="To the latest message"
+        >
+          ↓ Latest
+        </button>
+      )}
+      <div className="l5-dock">
+        {convoNotes}
+        <LogosComposer
+          layout="stacked"
+          value={input}
+          onChange={setInput}
+          focusSignal={composerFocus}
+          mathAvailable={mathAvailable}
+          mathTopic={mathTopic}
+          drafts={drafts}
+          setDrafts={setDrafts}
+          onSend={sendFromComposer}
+          busy={busy}
+          onStop={stopAnswer}
+          readImage={readImage}
+          readDocument={readDocument}
+          onOpenDoc={openDoc}
+          replyTo={replyTo}
+          onCancelReply={() => setReplyTo(null)}
+          group={groupLive}
+          about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
+          onClearAbout={clearAbout}
+          voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
+          {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
+          idlePlaceholder={messages.length ? (stageOpen && !narrow ? 'Ask, or tell the workspace what to do…' : 'Reply to Socria…') : narrow ? 'What are you working through?' : 'Say what you’re working through…'}
+          footer={
+            <ModelPicker
+              value={model}
+              onChange={pickModel}
+              isSignedIn={!!isSignedIn || unlocked}
+              depth={depthOn ? depth : undefined}
+              onDepth={depthOn ? pickDepth : undefined}
+              plan={planKnown ? plan : undefined}
+            />
+          }
+        />
+        {l5Meter}
+      </div>
+    </section>
+  );
+  const l5Stage =
+    stageOpen && wsLayout ? (
+      <section className="l5-stage" aria-label="Workspace">
+        <Workspace
+          layout={wsLayout}
+          onLayout={changeLayout}
+          render={renderPanel}
+          titleOf={panelTitle}
+          views={wsViews}
+          arrangements={wsArrangements}
+          facts={wsFacts}
+          suggestion={wsSuggestion}
+          onAccept={acceptSuggestion}
+          onDismiss={(sg) => setWsDismissed((d) => new Set(d).add(sg.id))}
+          head={
+            <L5StageHead
+              title={stageTitle.title}
+              sub={stageTitle.sub}
+              onClose={() => {
+                if (!narrow) setStage(false);
+                setMobileView('chat');
+              }}
+              actions={
+                canSynthesize(map) ? (
+                  <button type="button" className="l5-btn is-quiet" onClick={() => void synthesize('workspace')} disabled={!!synthBusy || busy} title="See where your thinking stands">
+                    {synthBusy === 'workspace' ? 'Reading…' : 'Synthesize'}
+                  </button>
+                ) : null
+              }
+            />
+          }
+          onResetView={resetView}
+          overlay={wsCard}
+        />
+      </section>
+    ) : null;
+  const l5Head = (
+    <L5Header
+      railOpen={railOpen}
+      onToggleRail={() => setRailOpen((v) => !v)}
+      title={l5Title}
+      stage={
+        stageHas || stageOpen
+          ? {
+              label: stageThings ? 'Workspace' : 'Map',
+              count: stageThings ? stageThings + (map.nodes.length ? 1 : 0) : map.nodes.length,
+              open: stageShown,
+              fresh: stageFresh,
+              onToggle: toggleStage,
+            }
+          : null
+      }
+      presence={
+        <>
+          <L5Outline
+            items={messages.filter((m) => m.role === 'user' && m.id && m.content).map((m) => ({ id: m.id!, text: m.content.replace(/\s+/g, ' ').trim() }))}
+            onJump={jumpTo}
+          />
+          <ChallengeChip enabled={cloud} progress={!(railOpen && !chromeHidden)} onOpenAccount={() => setAcctOpen(true)} />
+          {presenceBar}
+        </>
+      }
+      menu={l5Menu}
+      account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
+    />
+  );
+
+  // shared by both screens: the rail, the draft column, and the bars' own show/hide
+  const railEl = (
+    <>
+      <div className="app-root lg-railhost">
+        <LogosRail
+          sessions={sessions}
+          rewards={cloud}
+          chats={chats}
+          onOpenChat={onOpenChat}
+          activeId={activeId}
+          open={railOpen && !chromeHidden}
+          syncing={hydrating}
+          onSelect={(id) => {
+            switchSession(id);
+            usedRail();
+          }}
+          onNew={() => {
+            newSession();
+            usedRail();
+          }}
+          onDelete={deleteSession}
+          onRename={renameSession}
+          onToggle={() => setRailOpen((v) => !v)}
+          projects={projects}
+          onOpenProject={onOpenProject}
+          onNewInProject={(pid) => {
+            newSession(pid);
+            usedRail();
+          }}
+          onProjectSettings={onProjectSettings}
+          onCreateProject={onCreateProject}
+          onMoveSession={(id, pid) => void moveSession(id, pid)}
+          onMoveChat={onMoveChat}
+        />
+      </div>
+    </>
+  );
+  const draftEl = (
+    <>
+      {/* ── Draft ──────────────────────────────────────── */}
+      {draftOpen && (
+        <div className="lg-draft-col">
+          <DraftSpace
+            ref={draftRef}
+            html={draft.html}
+            onChange={(html) => patchDraft({ html })}
+            title={draft.title}
+            onTitle={(title) => patchDraft({ title })}
+            focus={
+              draftFocus
+                ? { ...draftFocus, lineage: describeLineage(map, draftFocus.id) }
+                : null
+            }
+            onClearFocus={() => setDraftFocus(null)}
+            onSelect={onDraftSelect}
+            onAction={runDraftAction}
+            busy={dr.loading}
+            onClose={() => setDraftOpen(false)}
+          />
+          <DraftResponsePanel
+            open={dr.open}
+            loading={dr.loading}
+            error={dr.error}
+            action={dr.action}
+            selection={dr.selection}
+            data={dr.data}
+            onApply={(text) => {
+              draftRef.current?.applyProposal(text);
+              setDr((d) => ({ ...d, open: false }));
+            }}
+            onClose={() => setDr((d) => ({ ...d, open: false }))}
+          />
+        </div>
+      )}
+    </>
+  );
+  const chromeEls = (
+    <>
+      {/* mobile: the rail overlays; tapping the dimmed page puts it away.
+          These live at the split level so hiding one surface (chat or map)
+          never hides the controls that swap them. */}
+      {chromeHidden && (
+        <button
+          type="button"
+          className="lg-chrome-show"
+          onClick={() => hideChrome(false)}
+          aria-label="Show the chats bar and header"
+          title="Show the chats bar and header"
+        >
+          <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+            <path d="M3.5 9h17M9 9v10.5" />
+          </svg>
+        </button>
+      )}
+      {railOpen && !chromeHidden && (
+        <div className="lg-mscrim" onClick={() => setRailOpen(false)} aria-hidden="true" />
+      )}
+    </>
+  );
   return (
     <DocsContext.Provider value={docsApi}>
     <div
@@ -5641,161 +6294,95 @@ export function LogosApp({
           {connBanner}
         </div>
       )}
-      <div
-        className={`lg-split${workspaceOn ? ' is-ws' : ''}${railOpen && !chromeHidden ? '' : ' rail-closed'}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${
-          mobileView === 'map' ? ' mv-map' : ''
-        }`}
-      >
-        {/* The rail is the Core surface's rail, and app-shell.css scopes every
-            `.s-*` rule under `.app-root` — so it arrives inside one. The host
-            is a box in this grid and nothing more: `.app-root`'s own page
-            background and 100svh floor belong to a page, not to one column of
-            this one, and globals.css turns both off for `.lg-railhost`. */}
-        <div className="app-root lg-railhost">
-          <LogosRail
-            sessions={sessions}
-            rewards={cloud}
-            chats={chats}
-            onOpenChat={onOpenChat}
-            activeId={activeId}
-            open={railOpen && !chromeHidden}
-            syncing={hydrating}
-            onSelect={(id) => {
-              switchSession(id);
-              usedRail();
-            }}
-            onNew={() => {
-              newSession();
-              usedRail();
-            }}
-            onDelete={deleteSession}
-            onRename={renameSession}
-            onToggle={() => setRailOpen((v) => !v)}
-            projects={projects}
-            onOpenProject={onOpenProject}
-            onNewInProject={(pid) => {
-              newSession(pid);
-              usedRail();
-            }}
-            onProjectSettings={onProjectSettings}
-            onCreateProject={onCreateProject}
-            onMoveSession={(id, pid) => void moveSession(id, pid)}
-            onMoveChat={onMoveChat}
-          />
-        </div>
-
-        {workspaceOn && wsLayout ? (
-          <div className="lg-ws-col">
-            <Workspace
-              layout={wsLayout}
-              onLayout={changeLayout}
-              render={renderPanel}
-              titleOf={panelTitle}
-              views={wsViews}
-              arrangements={wsArrangements}
-              suggestion={wsSuggestion}
-              onAccept={acceptSuggestion}
-              onDismiss={(s) => setWsDismissed((d) => new Set(d).add(s.id))}
-              head={convoHead}
-              dock={wsDock}
-              dockSide={dockSide}
-              onDockSide={moveDock}
-              onResetView={resetView}
-              overlay={wsCard}
-            />
+      {l5 ? (
+        <div
+          className={`l5${railOpen && !chromeHidden ? '' : ' rail-closed'}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${stageOpen ? ' has-stage' : ''}${
+            mobileView === 'map' ? ' l5-sheet-on' : ''
+          }`}
+          style={{ ['--l5-stage' as string]: String(stagePrefs.share) }}
+        >
+          {railEl}
+          <div className="l5-main">
+            {!chromeHidden && l5Head}
+            <div className="l5-body">
+              {l5Thread}
+              {l5Stage}
+            </div>
           </div>
-        ) : (
-          <>
-            {/* ── Conversation ───────────────────────────────── */}
-            <section className="lg-convo" aria-label="Conversation">
-              {convoHead}
-              {convoBody}
-            </section>
-
-            {/* ── Thinking Map ───────────────────────────────── */}
-            <section className="lg-panel" aria-label="Thinking map">
-              {mapBody({ primary: true })}
-            </section>
-          </>
-        )}
-
-        {/* ── Draft ──────────────────────────────────────── */}
-        {draftOpen && (
-          <div className="lg-draft-col">
-            <DraftSpace
-              ref={draftRef}
-              html={draft.html}
-              onChange={(html) => patchDraft({ html })}
-              title={draft.title}
-              onTitle={(title) => patchDraft({ title })}
-              focus={
-                draftFocus
-                  ? { ...draftFocus, lineage: describeLineage(map, draftFocus.id) }
-                  : null
-              }
-              onClearFocus={() => setDraftFocus(null)}
-              onSelect={onDraftSelect}
-              onAction={runDraftAction}
-              busy={dr.loading}
-              onClose={() => setDraftOpen(false)}
-            />
-            <DraftResponsePanel
-              open={dr.open}
-              loading={dr.loading}
-              error={dr.error}
-              action={dr.action}
-              selection={dr.selection}
-              data={dr.data}
-              onApply={(text) => {
-                draftRef.current?.applyProposal(text);
-                setDr((d) => ({ ...d, open: false }));
-              }}
-              onClose={() => setDr((d) => ({ ...d, open: false }))}
-            />
-          </div>
-        )}
-
-        {/* mobile: the rail overlays; tapping the dimmed page puts it away.
-            These live at the split level so hiding one surface (chat or map)
-            never hides the controls that swap them. */}
-        {chromeHidden && (
-          <button
-            type="button"
-            className="lg-chrome-show"
-            onClick={() => hideChrome(false)}
-            aria-label="Show the chats bar and header"
-            title="Show the chats bar and header"
-          >
-            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
-              <path d="M3.5 9h17M9 9v10.5" />
-            </svg>
-          </button>
-        )}
-        {railOpen && !chromeHidden && (
-          <div className="lg-mscrim" onClick={() => setRailOpen(false)} aria-hidden="true" />
-        )}
-        <div className="lg-mswitch" role="tablist" aria-label="View">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileView === 'chat'}
-            className={`lg-mswitch-btn${mobileView === 'chat' ? ' is-on' : ''}`}
-            onClick={() => setMobileView('chat')}
-          >
-            Conversation
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={mobileView === 'map'}
-            className={`lg-mswitch-btn${mobileView === 'map' ? ' is-on' : ''}`}
-            onClick={() => setMobileView('map')}
-          >
-            Map
-          </button>
+          {draftEl}
+          {chromeEls}
         </div>
-      </div>
+      ) : (
+        <div
+          className={`lg-split${workspaceOn ? ' is-ws' : ''}${railOpen && !chromeHidden ? '' : ' rail-closed'}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${
+            mobileView === 'map' ? ' mv-map' : ''
+          }`}
+        >
+          {/* The rail is the Core surface's rail, and app-shell.css scopes every
+              `.s-*` rule under `.app-root` — so it arrives inside one. The host
+              is a box in this grid and nothing more: `.app-root`'s own page
+              background and 100svh floor belong to a page, not to one column of
+              this one, and globals.css turns both off for `.lg-railhost`. */}
+          {railEl}
+          {workspaceOn && wsLayout ? (
+            <div className="lg-ws-col">
+              <Workspace
+                layout={wsLayout}
+                onLayout={changeLayout}
+                render={renderPanel}
+                titleOf={panelTitle}
+                views={wsViews}
+                arrangements={wsArrangements}
+                suggestion={wsSuggestion}
+                onAccept={acceptSuggestion}
+                onDismiss={(s) => setWsDismissed((d) => new Set(d).add(s.id))}
+                head={convoHead}
+                dock={wsDock}
+                dockSide={dockSide}
+                onDockSide={moveDock}
+                onResetView={resetView}
+                overlay={wsCard}
+              />
+            </div>
+          ) : (
+            <>
+              {/* ── Conversation ───────────────────────────────── */}
+              <section className="lg-convo" aria-label="Conversation">
+                {convoHead}
+                {convoBody}
+              </section>
+
+              {/* ── Thinking Map ───────────────────────────────── */}
+              <section className="lg-panel" aria-label="Thinking map">
+                {mapBody({ primary: true })}
+              </section>
+            </>
+          )}
+
+          {draftEl}
+          {chromeEls}
+          <div className="lg-mswitch" role="tablist" aria-label="View">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileView === 'chat'}
+              className={`lg-mswitch-btn${mobileView === 'chat' ? ' is-on' : ''}`}
+              onClick={() => setMobileView('chat')}
+            >
+              Conversation
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={mobileView === 'map'}
+              className={`lg-mswitch-btn${mobileView === 'map' ? ' is-on' : ''}`}
+              onClick={() => setMobileView('map')}
+            >
+              Map
+            </button>
+          </div>
+        </div>
+      )}
     </div>
     </DocsContext.Provider>
   );

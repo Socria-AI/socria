@@ -303,6 +303,8 @@ const MODULES = [
   'lib/logos4/flags.ts',
   // Socria events: the rules (validation, sheet rows, stats, dates) and the confirmation email
   'test/helpers/events-under-test.ts',
+  // Logos 5: the turn, the chrome, rich reading and the stage preferences
+  'test/helpers/logos5-under-test.tsx',
 ];
 
 export async function buildAll() {

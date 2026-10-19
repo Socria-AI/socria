@@ -60,11 +60,11 @@ const EXAMPLES: DisplayExample[] = [
 export function Logos35() {
   return (
     <Article page={page} sections={sections}>
-      <Callout tag="Now Logos 4">
-        Logos 3.5 has been updated to <strong>Logos 4</strong>: everything on this page, plus Point &amp;
-        Ask (select a card, a bar, a cell or a passage and ask about that), Instant Resume (it opens where
-        you left it), Quick Capture (a private inbox for a thought or a photo) and Voice (speak into the
-        message box; nothing is sent by itself).
+      <Callout tag="Now Logos 5">
+        Logos 3.5 has been updated to <strong>Logos 5</strong>: everything on this page, in a new screen —
+        the conversation first, and the workspace (the map, these displays, your documents) beside it
+        when there is something to show. Plus Point &amp; Ask (select a card, a bar, a cell or a passage
+        and ask about that), Instant Resume, Quick Capture and Voice.
       </Callout>
       <p>
         Logos 3.5 is the next version of <Link href="/docs/logos-3">Logos 3</Link>, and it replaces it in

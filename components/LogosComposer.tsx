@@ -7,7 +7,8 @@
 // paste an image and it's read once, up front, so the reply and the map both
 // work from the same material.
 
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
+import { L5Menu } from './logos5/L5Chrome';
 import { MathKeypad } from './MathKeypad';
 import { DocPreview } from './DocPreview';
 import type { MathTopic } from '@/lib/math-context';
@@ -258,6 +259,11 @@ export function LogosComposer({
   about,
   onClearAbout,
   voice,
+  layout = 'inline',
+  onStop,
+  footer,
+  onCapture,
+  idlePlaceholder,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -295,6 +301,20 @@ export function LogosComposer({
    * browser can record and the server can transcribe (useVoiceInput).
    */
   voice?: boolean;
+  /**
+   * Logos 5: the box stacked — the words on top, one row of tools under them
+   * (attach and capture behind "+", the host's own controls, the mic, maths,
+   * and send — which becomes Stop while an answer is arriving).
+   */
+  layout?: 'inline' | 'stacked';
+  /** stop the answer that is arriving (shown in place of send while busy) */
+  onStop?: () => void;
+  /** the host's controls in the tool row — the model and depth */
+  footer?: ReactNode;
+  /** Quick Capture, offered under "+" beside attaching */
+  onCapture?: () => void;
+  /** what the empty box says when nothing else applies */
+  idlePlaceholder?: string;
   /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
@@ -596,140 +616,304 @@ export function LogosComposer({
           </div>
         )}
 
-        <div className="lg-composer-row">
-          <button
-            type="button"
-            className="lg-attach"
-            onClick={() => fileRef.current?.click()}
-            disabled={drafts.length >= MAX_ATTACHMENTS}
-            aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
-            title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
-            </svg>
-          </button>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept={readDocument ? DOC_ACCEPT : 'image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json'}
-            className="lg-file"
-            onChange={(e) => {
-              if (e.target.files?.length) void takeFiles(e.target.files);
-              e.target.value = '';
-            }}
-          />
-
-          <textarea
-            ref={taRef}
-            value={value}
-            rows={1}
-            // NEVER disabled. A disabled textarea drops focus and refuses the
-            // caret, so while Socria replied the person could not type — the
-            // "I have to fold the conversation away to type" report. Only
-            // sending waits for the reply (canSend); writing never does.
-            placeholder={
-              replyTo
-                ? `Reply to ${replyTo.who}…`
-                : about
-                  ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
-                  : group
-                  ? 'Message everyone — @socria to ask Socria'
-                  : busy
-                    ? 'Keep writing — you can send once Socria has replied'
-                    : 'What are you working through?'
-            }
-            aria-busy={busy || undefined}
-            onChange={(e) => {
-              onChange(e.target.value);
-              setCaret(e.target.selectionStart ?? e.target.value.length);
-              grow();
-            }}
-            onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
-            onPaste={onPaste}
-            onKeyDown={(e) => {
-              if (offering && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) {
-                e.preventDefault();
-                takeMention();
-                return;
+        {layout === 'stacked' ? (
+          <>
+            <textarea
+              ref={taRef}
+              value={value}
+              rows={1}
+              // NEVER disabled. A disabled textarea drops focus and refuses the
+              // caret, so while Socria replied the person could not type — the
+              // "I have to fold the conversation away to type" report. Only
+              // sending waits for the reply (canSend); writing never does.
+              placeholder={
+                replyTo
+                  ? `Reply to ${replyTo.who}…`
+                  : about
+                    ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
+                    : group
+                    ? 'Message everyone — @socria to ask Socria'
+                    : busy
+                      ? 'Keep writing — you can send once Socria has replied'
+                      : idlePlaceholder ?? 'What are you working through?'
               }
-              if (e.key === 'Escape') {
-                if (offering) {
+              aria-busy={busy || undefined}
+              onChange={(e) => {
+                onChange(e.target.value);
+                setCaret(e.target.selectionStart ?? e.target.value.length);
+                grow();
+              }}
+              onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+              onPaste={onPaste}
+              onKeyDown={(e) => {
+                if (offering && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) {
                   e.preventDefault();
-                  setMentionOff(mentionStart);
+                  takeMention();
                   return;
                 }
-                if (replyTo && onCancelReply) {
+                if (e.key === 'Escape') {
+                  if (offering) {
+                    e.preventDefault();
+                    setMentionOff(mentionStart);
+                    return;
+                  }
+                  if (replyTo && onCancelReply) {
+                    e.preventDefault();
+                    onCancelReply();
+                    return;
+                  }
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
                   e.preventDefault();
-                  onCancelReply();
-                  return;
+                  if (canSend) {
+                    onSend();
+                    if (taRef.current) taRef.current.style.height = 'auto';
+                  }
                 }
-              }
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault();
-                if (canSend) {
-                  onSend();
-                  if (taRef.current) taRef.current.style.height = 'auto';
+              }}
+            />
+            <div className="l5-ctools">
+            {onCapture ? (
+              <L5Menu
+                label="Add"
+                className="lg-plus"
+                align="start"
+                up
+                button={
+                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M12 5v14M5 12h14" />
+                  </svg>
                 }
-              }
-            }}
-          />
-
-          {micOn && (
-            <button
-              type="button"
-              className={`lg-mic${listening ? ' is-on' : ''}`}
-              onClick={() => (listening ? mic.stop() : mic.start())}
-              disabled={mic.state === 'transcribing'}
-              aria-pressed={listening}
-              aria-label={listening ? 'Stop and transcribe' : 'Speak instead of typing'}
-              title={listening ? 'Stop and transcribe' : 'Speak — the words land here for you to edit'}
-            >
-              {listening ? (
-                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                  <rect x="7" y="7" width="10" height="10" rx="2" />
+                items={[
+                  { label: readDocument ? 'Attach a document or a photo' : 'Attach an image or a text file', onSelect: () => fileRef.current?.click(), disabled: drafts.length >= MAX_ATTACHMENTS },
+                  { label: 'Quick capture', hint: 'Keep a thought for later', onSelect: onCapture },
+                ]}
+              />
+            ) : (
+              <button
+                type="button"
+                className="lg-attach"
+                onClick={() => fileRef.current?.click()}
+                disabled={drafts.length >= MAX_ATTACHMENTS}
+                aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
+                title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
+              >
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
                 </svg>
-              ) : (
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <rect x="9" y="3" width="6" height="11" rx="3" />
-                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-                </svg>
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept={readDocument ? DOC_ACCEPT : 'image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json'}
+              className="lg-file"
+              onChange={(e) => {
+                if (e.target.files?.length) void takeFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
+              {footer && <span className="l5-ctools-mid">{footer}</span>}
+              <span className="l5-ctools-end">
+              {micOn && (
+                <button
+                  type="button"
+                  className={`lg-mic${listening ? ' is-on' : ''}`}
+                  onClick={() => (listening ? mic.stop() : mic.start())}
+                  disabled={mic.state === 'transcribing'}
+                  aria-pressed={listening}
+                  aria-label={listening ? 'Stop and transcribe' : 'Speak instead of typing'}
+                  title={listening ? 'Stop and transcribe' : 'Speak — the words land here for you to edit'}
+                >
+                  {listening ? (
+                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                      <rect x="7" y="7" width="10" height="10" rx="2" />
+                    </svg>
+                  ) : (
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                      <rect x="9" y="3" width="6" height="11" rx="3" />
+                      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                    </svg>
+                  )}
+                </button>
               )}
-            </button>
-          )}
-
-          {/* Appears only when mathematics is in play, and stays put once it
-              has — see lib/math-context.ts for why that hysteresis matters. */}
-          {mathAvailable && (
+              {/* Appears only when mathematics is in play, and stays put once it
+                  has — see lib/math-context.ts for why that hysteresis matters. */}
+              {mathAvailable && (
+                <button
+                  type="button"
+                  className={`lg-mathbtn${keypad ? ' is-on' : ''}`}
+                  onClick={() => setKeypad((k) => !k)}
+                  aria-pressed={keypad}
+                  aria-label={keypad ? 'Hide mathematical symbols' : 'Mathematical symbols'}
+                  title={keypad ? 'Hide symbols' : 'Mathematical symbols'}
+                >
+                  ∑
+                </button>
+              )}
+              {onStop && busy && !group ? (
+                <button type="button" className="lg-send is-stop" onClick={onStop} aria-label="Stop the answer" title="Stop">
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="7" y="7" width="10" height="10" rx="2" />
+                  </svg>
+                </button>
+              ) : (
+                <button
+                  type="button"
+                  className="lg-send"
+                  onClick={() => {
+                    if (!canSend) return;
+                    onSend();
+                    if (taRef.current) taRef.current.style.height = 'auto';
+                  }}
+                  disabled={!canSend}
+                  aria-label="Send"
+                >
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  </svg>
+                </button>
+              )}
+              </span>
+            </div>
+          </>
+        ) : (
+          <div className="lg-composer-row">
             <button
               type="button"
-              className={`lg-mathbtn${keypad ? ' is-on' : ''}`}
-              onClick={() => setKeypad((k) => !k)}
-              aria-pressed={keypad}
-              aria-label={keypad ? 'Hide mathematical symbols' : 'Mathematical symbols'}
-              title={keypad ? 'Hide symbols' : 'Mathematical symbols'}
+              className="lg-attach"
+              onClick={() => fileRef.current?.click()}
+              disabled={drafts.length >= MAX_ATTACHMENTS}
+              aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
+              title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
             >
-              ∑
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
+              </svg>
             </button>
-          )}
+            <input
+              ref={fileRef}
+              type="file"
+              multiple
+              accept={readDocument ? DOC_ACCEPT : 'image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json'}
+              className="lg-file"
+              onChange={(e) => {
+                if (e.target.files?.length) void takeFiles(e.target.files);
+                e.target.value = '';
+              }}
+            />
 
-          <button
-            type="button"
-            className="lg-send"
-            onClick={() => {
-              if (!canSend) return;
-              onSend();
-              if (taRef.current) taRef.current.style.height = 'auto';
-            }}
-            disabled={!canSend}
-            aria-label="Send"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 19V5M5 12l7-7 7 7" />
-            </svg>
-          </button>
-        </div>
+            <textarea
+              ref={taRef}
+              value={value}
+              rows={1}
+              // NEVER disabled. A disabled textarea drops focus and refuses the
+              // caret, so while Socria replied the person could not type — the
+              // "I have to fold the conversation away to type" report. Only
+              // sending waits for the reply (canSend); writing never does.
+              placeholder={
+                replyTo
+                  ? `Reply to ${replyTo.who}…`
+                  : about
+                    ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
+                    : group
+                    ? 'Message everyone — @socria to ask Socria'
+                    : busy
+                      ? 'Keep writing — you can send once Socria has replied'
+                      : 'What are you working through?'
+              }
+              aria-busy={busy || undefined}
+              onChange={(e) => {
+                onChange(e.target.value);
+                setCaret(e.target.selectionStart ?? e.target.value.length);
+                grow();
+              }}
+              onSelect={(e) => setCaret(e.currentTarget.selectionStart ?? 0)}
+              onPaste={onPaste}
+              onKeyDown={(e) => {
+                if (offering && (e.key === 'Tab' || (e.key === 'Enter' && !e.shiftKey))) {
+                  e.preventDefault();
+                  takeMention();
+                  return;
+                }
+                if (e.key === 'Escape') {
+                  if (offering) {
+                    e.preventDefault();
+                    setMentionOff(mentionStart);
+                    return;
+                  }
+                  if (replyTo && onCancelReply) {
+                    e.preventDefault();
+                    onCancelReply();
+                    return;
+                  }
+                }
+                if (e.key === 'Enter' && !e.shiftKey) {
+                  e.preventDefault();
+                  if (canSend) {
+                    onSend();
+                    if (taRef.current) taRef.current.style.height = 'auto';
+                  }
+                }
+              }}
+            />
+
+            {micOn && (
+              <button
+                type="button"
+                className={`lg-mic${listening ? ' is-on' : ''}`}
+                onClick={() => (listening ? mic.stop() : mic.start())}
+                disabled={mic.state === 'transcribing'}
+                aria-pressed={listening}
+                aria-label={listening ? 'Stop and transcribe' : 'Speak instead of typing'}
+                title={listening ? 'Stop and transcribe' : 'Speak — the words land here for you to edit'}
+              >
+                {listening ? (
+                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                    <rect x="7" y="7" width="10" height="10" rx="2" />
+                  </svg>
+                ) : (
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <rect x="9" y="3" width="6" height="11" rx="3" />
+                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                  </svg>
+                )}
+              </button>
+            )}
+
+            {/* Appears only when mathematics is in play, and stays put once it
+                has — see lib/math-context.ts for why that hysteresis matters. */}
+            {mathAvailable && (
+              <button
+                type="button"
+                className={`lg-mathbtn${keypad ? ' is-on' : ''}`}
+                onClick={() => setKeypad((k) => !k)}
+                aria-pressed={keypad}
+                aria-label={keypad ? 'Hide mathematical symbols' : 'Mathematical symbols'}
+                title={keypad ? 'Hide symbols' : 'Mathematical symbols'}
+              >
+                ∑
+              </button>
+            )}
+
+            <button
+              type="button"
+              className="lg-send"
+              onClick={() => {
+                if (!canSend) return;
+                onSend();
+                if (taRef.current) taRef.current.style.height = 'auto';
+              }}
+              disabled={!canSend}
+              aria-label="Send"
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 19V5M5 12l7-7 7 7" />
+              </svg>
+            </button>
+          </div>
+        )}
 
         {dragging && <div className="lg-drop-hint">Drop it here</div>}
       </div>

@@ -205,7 +205,7 @@ function ViewMenu({
           {!confirming ? (
             <button type="button" role="menuitem" className="ws-menu-row ws-reset-row" onClick={() => setConfirming(true)}>
               <span className="ws-menu-l">Reset view</span>
-              <span className="ws-menu-w">back to how Logos 4 starts</span>
+              <span className="ws-menu-w">back to how Logos 5 starts</span>
             </button>
           ) : (
             <div className="ws-confirm" role="alertdialog" aria-label="Reset the view?">

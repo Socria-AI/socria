@@ -200,6 +200,8 @@ export function ThinkingMap({
   objectSel,
   objectSuggestions,
   workspace,
+  linked,
+  reveal,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -314,6 +316,13 @@ export function ThinkingMap({
    * whole panel (components/StructureView.tsx) rather than a canvas of cards.
    */
   workspace?: boolean;
+  /**
+   * Logos 5: cards the conversation is pointing at — a reply's "+3 on the
+   * map" hovered or pressed — lit until it lets go (lib/logos5/linking.ts).
+   */
+  linked?: ReadonlySet<string>;
+  /** Logos 5: bring this card into view; a new `n` asks again for the same card */
+  reveal?: { id: string; n: number } | null;
 }) {
   /** a canvas of cards, which pans, zooms and drags — every lens but those that draw themselves */
   const isCanvasLens = (l: LensId) => drawsCards(l) && !(workspace && l === 'structure');
@@ -643,6 +652,13 @@ export function ThinkingMap({
     else if (a.y + h > vpRef.current.h - m) dy = vpRef.current.h - m - (a.y + h);
     if (dx || dy) userCam(panBy(c, dx, dy), true);
   };
+  // Logos 5: the conversation asked to see a card — after the cards have been laid out
+  useEffect(() => {
+    if (!reveal) return;
+    const t = window.setTimeout(() => ensureVisible(reveal.id), 120);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [reveal?.id, reveal?.n]);
 
   /** A card's box in world coordinates, wherever it is right now. */
   function rectOf(id: string): Rect | null {
@@ -1937,7 +1953,7 @@ export function ThinkingMap({
                   p.node.flag ? ` lg-flag-${p.node.flag}` : ''
                 }${p.branch ? ' is-branch' : ''}${shapeLens && !p.loose ? ' is-shaped' : ''}${
                   picked?.has(p.id) ? ' is-picked' : ''
-                }${p.node.origin === 'socria' ? ' is-socria' : ''}`}
+                }${p.node.origin === 'socria' ? ' is-socria' : ''}${linked?.has(p.id) ? ' is-linked' : ''}`}
                 title={shapeLens && p.node.role ? `${p.node.role} · ${p.node.type}` : undefined}
                 aria-haspopup="menu"
                 aria-expanded={menuFor === p.id}
@@ -2010,7 +2026,7 @@ export function ThinkingMap({
                     id: p.id,
                     x: Math.min(Math.max(card.left - box.left + card.width / 2, 100), Math.max(100, box.width - 100)),
                     y: above
-                      ? Math.max(card.top - box.top - 8, MENU_H * 0.4)
+                      ? Math.max(card.top - box.top - 8, Math.min(MENU_H + 8, box.height - 8))
                       : Math.max(8, card.bottom - box.top + 8),
                     above,
                   });
@@ -2092,7 +2108,8 @@ export function ThinkingMap({
               <div
                 className={`lg-acts${menu.above ? ' is-above' : ''}`}
                 role="menu"
-                style={{ left: menu.x, top: menu.y }}
+                // never cut off by the panel's edge: as tall as the room it has, and scrolling past that
+                style={{ left: menu.x, top: menu.y, maxHeight: Math.max(140, menu.above ? menu.y - 8 : vpRef.current.h - menu.y - 8), overflowY: 'auto' }}
                 onClick={(ev) => ev.stopPropagation()}
               >
                 {/* WHAT HANGS FROM THIS PART OF THE SHAPE — the constraints,

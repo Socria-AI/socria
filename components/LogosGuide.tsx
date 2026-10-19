@@ -355,7 +355,7 @@ export function LogosGuide({ open, onClose, edition = 2 }: { open: boolean; onCl
   const last = i === STEPS_SHOWN.length - 1;
 
   return (
-    <div className="lgg-veil" role="dialog" aria-modal="true" aria-label={edition === 3 ? 'What Logos 4 does' : 'What Logos does'}>
+    <div className="lgg-veil" role="dialog" aria-modal="true" aria-label={edition === 3 ? 'What Logos 5 does' : 'What Logos does'}>
       <div className="lgg">
         <header className="lgg-head">
           <span className="lgg-kicker">{step.kicker}</span>

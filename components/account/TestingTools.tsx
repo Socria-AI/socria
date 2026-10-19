@@ -110,7 +110,7 @@ export function TestingTools({ onClose }: { onClose: () => void }) {
         {reached.length ? reached.join(' · ') : <em>nothing yet</em>}
       </p>
 
-      <p className="tt-sub">Logos 4</p>
+      <p className="tt-sub">Logos 5</p>
       <div className="acts">
         <Item
           id="layout"

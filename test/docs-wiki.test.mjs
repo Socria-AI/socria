@@ -153,7 +153,7 @@ console.log('\n=== Logos 3.5 is documented, and documented honestly ===');
 {
   const p = docPage('logos-3-5');
   ok('it is in the registry, right after Logos 3', !!p && DOC_PAGES[DOC_PAGES.findIndex((x) => x.slug === 'logos-3') + 1]?.slug === 'logos-3-5');
-  ok('  and the picker calls the model what the page says it now is (Logos 4)', SOCRIA_MODELS['logos-3'].short === 'Logos 4' && SOCRIA_MODELS['logos-3'].label === 'Socria Logos 4');
+  ok('  and the picker calls the model what the page says it now is (Logos 5)', SOCRIA_MODELS['logos-3'].short === 'Logos 5' && SOCRIA_MODELS['logos-3'].label === 'Socria Logos 5');
   const src = read('app/docs/content/logos-3-5.tsx');
   ok('  shows the displays live, made by the product’s own code', /<DisplaysShowcase items=\{EXAMPLES\} \/>/.test(src));
   ok('  says numbers are never made up', /does not make up revenue/.test(src) && /Make up your numbers/.test(src));

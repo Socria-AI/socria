@@ -59,6 +59,51 @@ function sayGround(g: Ground, why?: string): string {
 
 export type Side = 'mine' | 'other' | 'socria';
 
+/**
+ * A reply's citation chips: each key checked against the passage it names and
+ * drawn as a button that opens it. Shared by Logos 4's message and Logos 5's
+ * (components/logos5/L5Message.tsx), so a citation reads the same in both.
+ */
+export function useCiteRender(content: string, role: 'user' | 'assistant', docRefs?: DocRef[], onOpenCite?: (docId: string, blockId: string) => void): CiteRender | undefined {
+  const cites = useCites(role === 'assistant' ? content : '', docRefs);
+  const cite = useCallback<CiteRender>(
+    (keys, _raw, before) => (
+      <span className="lg-cites">
+        {keys.map((k) => {
+          const i = cites?.(k, before);
+          const letter = k[0];
+          // a document read on another device cannot be checked here — said, not called broken
+          if (!docRefs?.some((r) => r.letter === letter)) {
+            return (
+              <span key={k} className="lg-cite is-away" title="This document’s reading is not on this device, so the citation cannot be checked or opened here.">
+                {k}
+              </span>
+            );
+          }
+          const label = i?.ok ? `${letter} · p.${i.page}` : `${k}?`;
+          const say = !i?.ok ? 'This citation names a passage the document does not have.' : i.ground ? sayGround(i.ground, i.why) : 'Open the passage.';
+          return (
+            <button
+              key={k}
+              type="button"
+              className={`lg-cite${i?.ok ? '' : ' is-broken'}${i?.ground ? ` is-${i.ground}` : ''}`}
+              title={say}
+              aria-label={`${i?.ok ? `Document ${letter}, page ${i.page}` : `Citation ${k}`} — ${say}`}
+              disabled={!i?.ok || !onOpenCite}
+              onClick={() => i?.ok && i.doc && i.block && onOpenCite?.(i.doc, i.block)}
+            >
+              {label}
+              {i?.ground === 'unsupported' && <span aria-hidden="true"> ⚠</span>}
+            </button>
+          );
+        })}
+      </span>
+    ),
+    [cites, onOpenCite, docRefs]
+  );
+  return cites ? cite : undefined;
+}
+
 /** What a person typed, with each @socria drawn as a mention — never reinterpreted otherwise. */
 export function SaidText({ text }: { text: string }) {
   const parts = mentionParts(text);
@@ -182,42 +227,7 @@ export function LogosMessage({
   const style = hue ? ({ '--by': hue } as CSSProperties) : undefined;
   const to = group && side === 'socria' && m.replyTo?.role === 'user' ? toLabel ?? m.replyTo.who : null;
   const quote = showQuote ? m.replyTo : undefined;
-  const cites = useCites(m.role === 'assistant' ? m.content : '', docRefs);
-  const cite: CiteRender | undefined = useCallback<CiteRender>(
-    (keys, _raw, before) => (
-      <span className="lg-cites">
-        {keys.map((k) => {
-          const i = cites?.(k, before);
-          const letter = k[0];
-          // a document read on another device cannot be checked here — said, not called broken
-          if (!docRefs?.some((r) => r.letter === letter)) {
-            return (
-              <span key={k} className="lg-cite is-away" title="This document’s reading is not on this device, so the citation cannot be checked or opened here.">
-                {k}
-              </span>
-            );
-          }
-          const label = i?.ok ? `${letter} · p.${i.page}` : `${k}?`;
-          const say = !i?.ok ? 'This citation names a passage the document does not have.' : i.ground ? sayGround(i.ground, i.why) : 'Open the passage.';
-          return (
-            <button
-              key={k}
-              type="button"
-              className={`lg-cite${i?.ok ? '' : ' is-broken'}${i?.ground ? ` is-${i.ground}` : ''}`}
-              title={say}
-              aria-label={`${i?.ok ? `Document ${letter}, page ${i.page}` : `Citation ${k}`} — ${say}`}
-              disabled={!i?.ok || !onOpenCite}
-              onClick={() => i?.ok && i.doc && i.block && onOpenCite?.(i.doc, i.block)}
-            >
-              {label}
-              {i?.ground === 'unsupported' && <span aria-hidden="true"> ⚠</span>}
-            </button>
-          );
-        })}
-      </span>
-    ),
-    [cites, onOpenCite, docRefs]
-  );
+  const cite = useCiteRender(m.content, m.role, docRefs, onOpenCite);
   return (
     <div
       id={m.id ? `lg-m-${m.id}` : undefined}
@@ -263,7 +273,7 @@ export function LogosMessage({
                 // person typed is never reinterpreted: their own
                 // asterisks stay asterisks; only @socria is drawn as itself.
                 <TexPick.Provider value={onPickTex ?? null}>
-                  <RichText text={m.content} math cite={cites ? cite : undefined} />
+                  <RichText text={m.content} math cite={cite} />
                 </TexPick.Provider>
               ) : (
                 <SaidText text={m.content} />

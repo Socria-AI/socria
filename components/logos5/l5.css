@@ -1,0 +1,1258 @@
+/* components/logos5/l5.css — Logos 5: a calm conversation, a workspace beside it.
+ *
+ * Built on Logos's own tokens (.logos-root in app/globals.css): warm paper,
+ * olive, ink, Instrument Serif for display, Inter for reading. Everything is
+ * scoped under .logos-root .l5 so nothing leaks into Logos 2, the Logos 4
+ * layout behind the switch, or Core. Phones first: the conversation is the
+ * screen, the workspace is a sheet over it, every control is a thumb wide.
+ */
+
+.logos-root .l5 {
+  --l5-card: #ece7da;
+  --l5-card-ink: #262821;
+  --l5-surface: #fffdf8;
+  --l5-hair: rgba(53, 70, 32, 0.12);
+  --l5-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 8px 28px -14px rgba(35, 36, 31, 0.18);
+  --l5-serif: var(--serif, 'Instrument Serif', Georgia, serif);
+  --l5-measure: 720px;
+  position: absolute;
+  inset: 0;
+  /* explicit: with only the insets, a tall stage stretched this past the screen */
+  width: 100%;
+  height: 100%;
+  display: flex;
+  min-height: 0;
+  overflow: hidden;
+  background: var(--lg-paper);
+  color: var(--lg-ink);
+  font-family: var(--lg-sans);
+}
+
+/* ── the rail ─────────────────────────────────────────────────────── */
+.logos-root .l5 > .lg-railhost {
+  flex: 0 0 280px;
+  min-width: 0;
+  display: flex;
+  border-right: 1px solid var(--l5-hair);
+}
+.logos-root .l5.rail-closed > .lg-railhost {
+  display: none;
+}
+
+/* ── the main column ──────────────────────────────────────────────── */
+.logos-root .l5-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.logos-root .l5-head {
+  flex: 0 0 auto;
+  height: 56px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 10px 0 8px;
+}
+.logos-root .l5-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0 0 0 4px;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: 19px;
+  letter-spacing: -0.005em;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  color: var(--lg-ink);
+}
+.logos-root .l5-head-end {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex: 0 0 auto;
+}
+.logos-root .l5-head-end .tg-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.logos-root .l5-iconbtn {
+  display: inline-grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 18px;
+  line-height: 1;
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+.logos-root .l5-iconbtn:focus-visible,
+.logos-root .l5-act:focus-visible,
+.logos-root .l5-stagebtn:focus-visible,
+.logos-root .l5-fx-chip:focus-visible,
+.logos-root .l5-start:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
+}
+.logos-root .l5-iconbtn.is-sm {
+  width: 30px;
+  height: 30px;
+  font-size: 16px;
+}
+
+.logos-root .l5-stagebtn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+  position: relative;
+  transition: background 0.15s, border-color 0.15s, color 0.15s;
+}
+.logos-root .l5-stagebtn.is-on {
+  background: var(--lg-primary);
+  border-color: var(--lg-primary);
+  color: #f5f3eb;
+}
+.logos-root .l5-count {
+  min-width: 20px;
+  height: 20px;
+  padding: 0 6px;
+  border-radius: 999px;
+  background: rgba(53, 70, 32, 0.1);
+  color: var(--lg-primary);
+  font-size: 11.5px;
+  font-weight: 600;
+  display: inline-grid;
+  place-items: center;
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .l5-stagebtn.is-on .l5-count {
+  background: rgba(245, 243, 235, 0.2);
+  color: #f5f3eb;
+}
+.logos-root .l5-stagebtn.is-fresh::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  right: 2px;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #b8a26b;
+  box-shadow: 0 0 0 2px var(--lg-paper);
+}
+
+/* ── menus ────────────────────────────────────────────────────────── */
+.logos-root .l5-menu {
+  position: relative;
+}
+.logos-root .l5-menu-list {
+  position: absolute;
+  z-index: 90;
+  top: calc(100% + 6px);
+  min-width: 240px;
+  max-width: min(320px, calc(100vw - 24px));
+  max-height: min(70vh, 520px);
+  overflow-y: auto;
+  padding: 6px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 14px;
+  background: var(--l5-surface);
+  box-shadow: 0 18px 50px -20px rgba(35, 36, 31, 0.35);
+}
+.logos-root .l5-menu-list.is-end {
+  right: 0;
+}
+.logos-root .l5-menu-list.is-start {
+  left: 0;
+}
+.logos-root .l5-menu-list.is-up {
+  top: auto;
+  bottom: calc(100% + 6px);
+}
+.logos-root .l5-menu-list hr {
+  border: 0;
+  border-top: 1px solid var(--l5-hair);
+  margin: 6px 4px;
+}
+.logos-root .l5-menu-list [role='menuitem'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 1px;
+  width: 100%;
+  min-height: 40px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5-menu-list [role='menuitem'] small {
+  font-size: 12px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-menu-list [role='menuitem']:hover:not(:disabled),
+.logos-root .l5-menu-list [role='menuitem']:focus-visible {
+  background: rgba(53, 70, 32, 0.07);
+  outline: none;
+}
+.logos-root .l5-menu-list [role='menuitem']:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* ── the body: the conversation, and the stage beside it ──────────── */
+.logos-root .l5-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  overflow: hidden;
+}
+.logos-root .l5-col {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+.logos-root .l5.has-stage .l5-col {
+  flex: 0 0 calc((1 - var(--l5-stage, 0.58)) * 100%);
+  min-width: 360px;
+  max-width: 620px;
+  border-right: 1px solid var(--l5-hair);
+}
+.logos-root .l5-stage {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  background: var(--lg-panel);
+  animation: l5StageIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes l5StageIn {
+  from {
+    opacity: 0;
+    transform: translateX(12px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+.logos-root .l5-stage .ws-root {
+  flex: 1 1 auto;
+  min-height: 0;
+  height: auto;
+}
+/* every surface on the stage is bounded by it — a map measures the space it has, not its content */
+.logos-root .l5-stage .ws-body > .lg-panel-in,
+.logos-root .l5-stage .ws-body > .lg-convo-panel {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+.logos-root .l5-stage .ws-top {
+  min-height: 52px;
+  padding: 6px 10px 6px 14px;
+  border-bottom: 1px solid var(--l5-hair);
+  background: var(--lg-panel);
+}
+.logos-root .l5-stage .ws-top-head {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.logos-root .l5-stagehead {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.logos-root .l5-stagehead-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  font-family: var(--l5-serif);
+  font-size: 18px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logos-root .l5-stagehead-t small {
+  font-family: var(--lg-sans);
+  font-size: 12px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-stagehead-acts {
+  display: inline-flex;
+  gap: 6px;
+}
+.logos-root .l5-stage-back {
+  display: none;
+}
+.logos-root .l5-chatnote {
+  margin: 24px;
+  color: var(--lg-ink-40);
+  font-size: 13.5px;
+}
+
+/* ── the thread ───────────────────────────────────────────────────── */
+.logos-root .l5-thread {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scroll-padding-top: 16px;
+}
+.logos-root .l5-thread-in {
+  max-width: var(--l5-measure);
+  margin: 0 auto;
+  padding: 18px 28px 36px;
+}
+.logos-root .l5.has-stage .l5-thread-in {
+  padding: 16px 22px 28px;
+}
+
+/* an empty line of thinking: one question, a few ways in */
+.logos-root .l5-col.is-empty .l5-thread-in {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.logos-root .l5-hello {
+  padding: 4vh 0 2vh;
+}
+.logos-root .l5-hello h2 {
+  margin: 0 0 10px;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: clamp(30px, 4.2vw, 44px);
+  line-height: 1.08;
+  letter-spacing: -0.012em;
+  color: var(--lg-ink);
+}
+.logos-root .l5-hello > p {
+  margin: 0 0 22px;
+  max-width: 34em;
+  font-size: 15.5px;
+  line-height: 1.6;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-starts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.logos-root .l5-start {
+  min-height: 40px;
+  padding: 8px 15px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 14px;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.logos-root .l5-pickup {
+  display: grid;
+  gap: 3px;
+  width: 100%;
+  margin: 0 0 18px;
+  padding: 14px 16px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 16px;
+  background: var(--l5-surface);
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  box-shadow: var(--l5-shadow);
+}
+.logos-root .l5-pickup-k {
+  font-size: 11.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-primary);
+}
+.logos-root .l5-pickup-t {
+  font-family: var(--l5-serif);
+  font-size: 19px;
+  color: var(--lg-ink);
+}
+.logos-root .l5-pickup-q {
+  font-size: 13.5px;
+  color: var(--lg-ink-60);
+}
+
+/* ── one turn ─────────────────────────────────────────────────────── */
+.logos-root .l5-msg {
+  position: relative;
+  margin: 0 0 26px;
+  scroll-margin-top: 16px;
+}
+.logos-root .l5-msg.is-cont {
+  margin-top: -14px;
+}
+.logos-root .l5-u {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+}
+.logos-root .l5-u.is-other {
+  align-items: flex-start;
+}
+.logos-root .l5-said {
+  max-width: min(86%, 560px);
+  padding: 10px 15px 11px;
+  border-radius: 18px 18px 6px 18px;
+  background: var(--l5-card);
+  color: var(--l5-card-ink);
+  font-size: 15.5px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.logos-root .l5-u.is-other .l5-said {
+  border-radius: 18px 18px 18px 6px;
+  background: var(--l5-surface);
+  border: 1px solid var(--l5-hair);
+  box-shadow: inset 3px 0 0 var(--by, transparent);
+}
+.logos-root .l5-msg.is-linked .l5-said {
+  box-shadow: 0 0 0 2px var(--lg-primary);
+}
+.logos-root .l5-a.is-linked::before {
+  content: '';
+  position: absolute;
+  left: -14px;
+  top: 4px;
+  bottom: 30px;
+  width: 3px;
+  border-radius: 3px;
+  background: var(--lg-primary);
+}
+.logos-root .l5-msg.is-flash .l5-said,
+.logos-root .l5-msg.is-flash .l5-prose {
+  animation: l5Flash 1.3s ease;
+}
+@keyframes l5Flash {
+  0%,
+  40% {
+    background-color: rgba(184, 162, 107, 0.28);
+  }
+  100% {
+    background-color: transparent;
+  }
+}
+
+.logos-root .l5-who {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 0 0 5px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: var(--by, var(--lg-ink-60));
+}
+.logos-root .l5-to {
+  font-weight: 400;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-av {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  display: inline-grid;
+  place-items: center;
+  background: var(--by, rgba(53, 70, 32, 0.12));
+  color: #fff;
+  font-size: 11px;
+}
+.logos-root .l5-av.is-socria {
+  background: #fff;
+  border: 1px solid var(--l5-hair);
+}
+
+.logos-root .l5-quote {
+  display: block;
+  max-width: min(86%, 560px);
+  margin: 0 0 6px;
+  padding: 6px 10px;
+  border: 0;
+  border-left: 2px solid rgba(53, 70, 32, 0.3);
+  border-radius: 0 8px 8px 0;
+  background: rgba(53, 70, 32, 0.05);
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+.logos-root .l5-quote b {
+  font-weight: 600;
+  color: var(--lg-ink);
+}
+.logos-root .l5-about {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 5px;
+  max-width: min(86%, 560px);
+  margin: 0 0 6px;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: rgba(53, 70, 32, 0.08);
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-about-k {
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  color: var(--lg-primary);
+}
+.logos-root .l5-about b {
+  font-weight: 600;
+  color: var(--lg-ink);
+}
+.logos-root .l5-atts {
+  max-width: min(86%, 560px);
+  margin: 0 0 6px;
+}
+
+/* Socria's words: a reading measure, editorial */
+.logos-root .l5-prose {
+  font-size: 16.5px;
+  line-height: 1.72;
+  color: var(--lg-ink);
+  overflow-wrap: anywhere;
+}
+.logos-root .l5-prose > :first-child {
+  margin-top: 0;
+}
+.logos-root .l5-prose p {
+  margin: 0 0 0.85em;
+}
+.logos-root .l5-prose p:last-child {
+  margin-bottom: 0;
+}
+.logos-root .l5-prose ul,
+.logos-root .l5-prose ol {
+  margin: 0 0 0.9em;
+  padding-left: 1.3em;
+}
+.logos-root .l5-prose li {
+  margin: 0.25em 0;
+}
+.logos-root .l5-prose li::marker {
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose .socria-strong {
+  font-weight: 600;
+}
+.logos-root .l5-prose .socria-em {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 1.08em;
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose .socria-h {
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 1.1em 0 0.4em;
+  color: var(--lg-ink);
+}
+.logos-root .l5-prose .socria-h1 {
+  font-size: 1.6em;
+}
+.logos-root .l5-prose .socria-h2 {
+  font-size: 1.35em;
+}
+.logos-root .l5-prose .socria-h3 {
+  font-size: 1.15em;
+}
+.logos-root .l5-prose .socria-code {
+  padding: 0.08em 0.36em;
+  border-radius: 5px;
+  background: rgba(53, 70, 32, 0.08);
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 0.86em;
+}
+.logos-root .l5-prose .socria-codeblock {
+  margin: 0 0 1em;
+  border: 1px solid var(--l5-hair);
+  border-radius: 12px;
+  overflow: hidden;
+  background: #fbf9f3;
+}
+.logos-root .l5-prose .socria-codeblock-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 5px 8px 5px 12px;
+  border-bottom: 1px solid var(--l5-hair);
+  font-size: 12px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-prose .socria-codeblock-head button {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 7px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.logos-root .l5-prose .socria-codeblock pre {
+  margin: 0;
+  padding: 12px 14px;
+  overflow-x: auto;
+  font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
+  font-size: 13.5px;
+  line-height: 1.55;
+}
+.logos-root .l5-prose .socria-quote {
+  margin: 0 0 0.9em;
+  padding: 2px 0 2px 14px;
+  border-left: 2px solid rgba(53, 70, 32, 0.3);
+  color: var(--lg-ink-60);
+  font-style: italic;
+}
+.logos-root .l5-prose .socria-table-wrap {
+  margin: 0 0 1em;
+  overflow-x: auto;
+  border: 1px solid var(--l5-hair);
+  border-radius: 12px;
+}
+.logos-root .l5-prose table {
+  border-collapse: collapse;
+  width: 100%;
+  font-size: 14.5px;
+}
+.logos-root .l5-prose th,
+.logos-root .l5-prose td {
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--l5-hair);
+  text-align: left;
+  vertical-align: top;
+}
+.logos-root .l5-prose th {
+  font-weight: 600;
+  background: rgba(53, 70, 32, 0.04);
+}
+.logos-root .l5-prose tr:last-child td {
+  border-bottom: 0;
+}
+.logos-root .l5-prose .is-tail {
+  display: inline;
+}
+.logos-root .l5-caret {
+  display: inline-block;
+  width: 7px;
+  height: 1.05em;
+  margin-left: 2px;
+  vertical-align: -0.15em;
+  border-radius: 2px;
+  background: var(--lg-primary);
+  animation: l5Blink 1s steps(2, start) infinite;
+}
+@keyframes l5Blink {
+  to {
+    visibility: hidden;
+  }
+}
+
+/* what the turn did in the workspace */
+.logos-root .l5-fx {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 10px;
+}
+.logos-root .l5-fx-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px 4px 10px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  color: var(--lg-primary);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  transition: border-color 0.15s, background 0.15s;
+}
+.logos-root .l5-fx-kind {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+
+/* the actions under a turn */
+.logos-root .l5-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px;
+  margin-top: 6px;
+  opacity: 0;
+  transition: opacity 0.15s;
+}
+.logos-root .l5-u .l5-acts {
+  justify-content: flex-end;
+}
+.logos-root .l5-u.is-other .l5-acts {
+  justify-content: flex-start;
+}
+.logos-root .l5-msg:hover .l5-acts,
+.logos-root .l5-msg:focus-within .l5-acts,
+.logos-root .l5-msg.is-latest .l5-acts {
+  opacity: 1;
+}
+@media (hover: none) {
+  .logos-root .l5-acts {
+    opacity: 1;
+  }
+}
+.logos-root .l5-act {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 32px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lg-ink-40);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+
+/* editing what you sent */
+.logos-root .l5-edit {
+  width: min(100%, 560px);
+  padding: 10px;
+  border: 1px solid rgba(53, 70, 32, 0.3);
+  border-radius: 16px;
+  background: #fff;
+  box-shadow: var(--l5-shadow);
+}
+.logos-root .l5-edit textarea {
+  width: 100%;
+  min-height: 48px;
+  resize: none;
+  border: 0;
+  outline: none;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--lg-ink);
+}
+.logos-root .l5-edit-note {
+  margin: 6px 2px 0;
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-edit-acts {
+  display: flex;
+  justify-content: flex-end;
+  gap: 6px;
+  margin-top: 8px;
+}
+.logos-root .l5-btn {
+  min-height: 36px;
+  padding: 0 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.logos-root .l5-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.logos-root .l5-btn.is-primary {
+  background: var(--lg-primary);
+  border-color: var(--lg-primary);
+  color: #f5f3eb;
+}
+.logos-root .l5-btn.is-quiet {
+  min-height: 32px;
+  font-size: 13px;
+}
+
+/* still writing, or thinking */
+.logos-root .l5-thinking {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  font-size: 14px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-dots {
+  display: inline-flex;
+  gap: 4px;
+}
+.logos-root .l5-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+  opacity: 0.35;
+  animation: l5Dot 1.2s ease-in-out infinite;
+}
+.logos-root .l5-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+.logos-root .l5-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+@keyframes l5Dot {
+  0%,
+  100% {
+    opacity: 0.25;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 0.9;
+    transform: translateY(-2px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5-dots i,
+  .logos-root .l5-caret,
+  .logos-root .l5-stage,
+  .logos-root .l5-msg.is-flash .l5-said,
+  .logos-root .l5-msg.is-flash .l5-prose {
+    animation: none;
+  }
+}
+
+.logos-root .l5-link {
+  border: 0;
+  padding: 0;
+  background: none;
+  color: var(--lg-primary);
+  font: inherit;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+.logos-root .l5-note {
+  margin: 0 0 16px;
+  font-size: 13.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-error {
+  margin: 0 0 16px;
+  padding: 10px 14px;
+  border-radius: 12px;
+  background: rgba(156, 91, 60, 0.09);
+  color: #7d3f27;
+  font-size: 14px;
+}
+.logos-root .l5-empty {
+  margin: 0;
+  font-size: 14px;
+  font-style: italic;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-synth {
+  margin: 0 0 26px;
+}
+
+/* the card selected on the map, and its turns */
+.logos-root .l5-linkbar {
+  position: absolute;
+  z-index: 5;
+  top: 8px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  max-width: calc(100% - 24px);
+  padding: 4px 4px 4px 12px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  font-size: 13px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-linkbar-dot {
+  flex: 0 0 auto;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+}
+.logos-root .l5-linkbar-t {
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logos-root .l5-linkbar-t b {
+  font-weight: 600;
+  color: var(--lg-ink);
+}
+.logos-root .l5-linkbar-step {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  font-variant-numeric: tabular-nums;
+}
+
+/* back to the end */
+.logos-root .l5-tolatest {
+  position: absolute;
+  z-index: 4;
+  left: 50%;
+  bottom: calc(var(--l5-dock-h, 120px) + 10px);
+  transform: translateX(-50%);
+  min-height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+
+/* ── the composer ─────────────────────────────────────────────────── */
+.logos-root .l5-dock {
+  flex: 0 0 auto;
+  width: 100%;
+  max-width: calc(var(--l5-measure) + 56px);
+  margin: 0 auto;
+  padding: 0 28px 14px;
+}
+.logos-root .l5.has-stage .l5-dock {
+  padding: 0 18px 12px;
+}
+.logos-root .l5-dock .lg-composer {
+  margin: 0;
+}
+.logos-root .l5-dock .lg-composer-box {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 10px 10px 8px 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 22px;
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.logos-root .l5-dock .lg-composer-box:focus-within {
+  border-color: rgba(53, 70, 32, 0.34);
+  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.06), var(--l5-shadow);
+}
+.logos-root .l5-dock .lg-composer textarea {
+  width: 100%;
+  min-height: 26px;
+  padding: 4px 2px;
+  font-size: 16px;
+  line-height: 1.5;
+}
+.logos-root .l5-ctools {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-width: 0;
+}
+.logos-root .l5-ctools-mid {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+.logos-root .l5-ctools-mid .mp-btn {
+  max-width: 100%;
+}
+.logos-root .l5-ctools-end {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-left: auto;
+}
+.logos-root .l5-ctools .lg-plus .l5-iconbtn,
+.logos-root .l5-ctools .lg-attach {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.logos-root .l5-ctools .mp-btn {
+  height: 32px;
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+}
+.logos-root .l5-ctools .lg-send {
+  width: 36px;
+  height: 36px;
+}
+.logos-root .l5-ctools .lg-send.is-stop {
+  background: var(--lg-ink);
+  color: var(--lg-paper);
+  opacity: 1;
+}
+.logos-root .l5-ctools .lg-send.is-stop svg {
+  width: 14px;
+  height: 14px;
+}
+.logos-root .l5-meter {
+  margin: 8px 6px 0;
+  font-size: 12.5px;
+  color: var(--lg-ink-40);
+  text-align: center;
+}
+.logos-root .l5-meter.is-out {
+  color: var(--lg-tension);
+}
+
+/* the notes under the conversation, in Logos 5's register */
+.logos-root .l5-dock .lg-guard,
+.logos-root .l5-dock .lg-one-note,
+.logos-root .l5-dock .lg-drift,
+.logos-root .l5-dock .tg-note {
+  margin: 0 0 8px;
+}
+.logos-root .l5-thread .lg-annots {
+  margin: -12px 0 22px;
+}
+
+/* the map's cards the conversation points at */
+.logos-root .lg-node.is-linked {
+  box-shadow: 0 0 0 2px var(--lg-primary), 0 10px 26px -12px rgba(53, 70, 32, 0.55);
+  z-index: 3;
+}
+
+/* ── narrower: the stage is a sheet over the conversation ────────── */
+@media (max-width: 1023px) {
+  .logos-root .l5.has-stage .l5-col {
+    flex: 1 1 auto;
+    max-width: none;
+    min-width: 0;
+    border-right: 0;
+  }
+  .logos-root .l5-stage {
+    position: fixed;
+    inset: 0;
+    z-index: 75;
+    animation-name: l5SheetIn;
+    box-shadow: 0 -20px 60px -30px rgba(35, 36, 31, 0.4);
+  }
+  .logos-root .l5:not(.l5-sheet-on) .l5-stage {
+    display: none;
+  }
+  .logos-root .l5-stage-back {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    min-height: 40px;
+    padding: 0 10px 0 4px;
+    border: 0;
+    border-radius: 10px;
+    background: transparent;
+    color: var(--lg-primary);
+    font: inherit;
+    font-size: 14px;
+    cursor: pointer;
+  }
+  .logos-root .l5-stage-x {
+    display: none;
+  }
+  .logos-root .l5-stagehead-t {
+    font-size: 16px;
+  }
+  .logos-root .l5-stage .ws-top {
+    padding: 6px 8px;
+    padding-top: calc(6px + env(safe-area-inset-top, 0px));
+  }
+}
+@keyframes l5SheetIn {
+  from {
+    opacity: 0.4;
+    transform: translateY(24px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* the rail is a drawer from 900px down (globals.css places it); here it slides */
+@media (max-width: 900px) {
+  .logos-root .l5 > .lg-railhost {
+    border-right: 0;
+  }
+  .logos-root .l5.rail-closed > .lg-railhost {
+    display: flex;
+    transform: translateX(-105%);
+    box-shadow: none;
+  }
+}
+
+/* ── phones ───────────────────────────────────────────────────────── */
+@media (max-width: 640px) {
+  .logos-root .l5-head {
+    height: 52px;
+    padding: 0 6px;
+    padding-top: env(safe-area-inset-top, 0px);
+    box-sizing: content-box;
+  }
+  .logos-root .l5-title {
+    font-size: 17px;
+  }
+  .logos-root .l5-iconbtn {
+    width: 44px;
+    height: 44px;
+  }
+  .logos-root .l5-stagebtn {
+    height: 40px;
+    padding: 0 10px;
+  }
+  .logos-root .l5-stagebtn-l {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .logos-root .l5-head-end .sh-open,
+  .logos-root .l5-head-end .lg-challenge {
+    display: none;
+  }
+  .logos-root .l5-thread-in {
+    padding: 12px 16px 28px;
+  }
+  .logos-root .l5-dock {
+    padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .logos-root .l5-prose {
+    font-size: 16px;
+  }
+  .logos-root .l5-said {
+    max-width: 90%;
+  }
+  .logos-root .l5-act {
+    min-height: 40px;
+    min-width: 40px;
+    justify-content: center;
+    padding: 0 8px;
+  }
+  .logos-root .l5-act-l {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+  }
+  .logos-root .l5-fx-chip {
+    min-height: 40px;
+  }
+  .logos-root .l5-start {
+    min-height: 44px;
+  }
+  .logos-root .l5-ctools .lg-plus .l5-iconbtn,
+  .logos-root .l5-ctools .lg-attach,
+  .logos-root .l5-ctools .lg-send,
+  .logos-root .l5-ctools .lg-mic {
+    width: 44px;
+    height: 44px;
+  }
+  .logos-root .l5-hello {
+    padding-top: 2vh;
+  }
+  /* the picker says the model; its depth is one press away, in its sheet */
+  .logos-root .l5-ctools .mp-btn .sep,
+  .logos-root .l5-ctools .mp-btn .dp {
+    display: none;
+  }
+  .logos-root .l5-head-end .l5-outline {
+    display: none;
+  }
+  .logos-root .l5-linkbar {
+    top: 6px;
+  }
+}
+
+/* hover only where there is hovering: on a touch screen a tapped control would stay lit */
+@media (hover: hover) {
+  .logos-root .l5-iconbtn:hover {
+    background: rgba(53, 70, 32, 0.07);
+    color: var(--lg-ink);
+  }
+  .logos-root .l5-stagebtn:hover {
+    border-color: rgba(53, 70, 32, 0.3);
+  }
+  .logos-root .l5-start:hover {
+    border-color: rgba(53, 70, 32, 0.32);
+    background: #fff;
+  }
+  .logos-root .l5-prose .socria-codeblock-head button:hover {
+    background: rgba(53, 70, 32, 0.08);
+  }
+  .logos-root .l5-fx-chip:hover {
+    border-color: rgba(53, 70, 32, 0.35);
+    background: #fff;
+  }
+  .logos-root .l5-act:hover {
+    background: rgba(53, 70, 32, 0.07);
+    color: var(--lg-ink);
+  }
+  .logos-root .l5-ctools .mp-btn:hover {
+    background: rgba(53, 70, 32, 0.06);
+  }
+}

@@ -10,6 +10,9 @@
 // (a streamed reply, a map, a display, a transcription), never a judgement of
 // what the real model would say. It must never be pointed at by a deployment.
 //
+// FAKE_STREAM_MS=400 slows the stream (default 12ms a word), so a reply can be
+// watched arriving — and stopped — in a browser.
+//
 // What it answers:
 //   POST /v1/chat/completions      streamed text, or JSON when json_object is asked
 //   POST /v1/audio/transcriptions  {"text": …} — the voice composer's path
@@ -88,7 +91,7 @@ function streamText(res, text, model) {
     if (i < words.length) {
       res.write(`data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, delta: { content: words[i] }, finish_reason: null }] })}\n\n`);
       i++;
-      setTimeout(tick, 12);
+      setTimeout(tick, Number(process.env.FAKE_STREAM_MS || 12));
       return;
     }
     res.write(`data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);

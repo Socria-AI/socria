@@ -19,7 +19,7 @@
 
 /** One run of inline text, and what it is. */
 export interface Inline {
-  kind: 'text' | 'em' | 'strong' | 'strong-em';
+  kind: 'text' | 'em' | 'strong' | 'strong-em' | 'code';
   text: string;
 }
 
@@ -57,7 +57,29 @@ export type Block =
   | { kind: 'ol'; items: string[] }
   | GroupsBlock
   | TableBlock
-  | SourcesBlock;
+  | SourcesBlock
+  // ── RICH ONLY (Logos 5: parseBlocks(text, { rich: true })) ──
+  | { kind: 'h'; level: 1 | 2 | 3; text: string }
+  | { kind: 'code'; lang: string | null; text: string; open: boolean }
+  | { kind: 'quote'; text: string };
+
+/**
+ * RICH READING — Logos 5's thread, and nowhere else unless asked.
+ *
+ * The default stays what it always was: a stray `#` or a code fence is text.
+ * With `rich`, three more shapes are read, because a workspace reply that
+ * walks through a derivation or a plan uses them and printing the marks is
+ * worse than drawing them: a heading (`#`–`###`), a fenced block (```), and a
+ * quotation (`> `). Inline `code` is read too (splitInline with `code`). An
+ * unclosed fence — a reply still streaming — is a code block to the end,
+ * marked `open`, so the half-written block does not flash as prose.
+ */
+export interface ReadOptions {
+  rich?: boolean;
+}
+const FENCE_RE = /^\s*```\s*([\w+#.-]{0,20})\s*$/;
+const HEADING_RE = /^(#{1,3})\s+(\S.*)$/;
+const QUOTE_RE = /^\s*>\s?(.*)$/;
 
 // ── inline ───────────────────────────────────────────────────────────
 
@@ -107,8 +129,22 @@ function inlineRe(): RegExp {
  * with the one word that matters inside it — to be worth handling rather than
  * dropping.
  */
-export function splitInline(input: string): Inline[] {
+export function splitInline(input: string, opts: { code?: boolean } = {}): Inline[] {
   const text = typeof input === 'string' ? input : '';
+  // Inline code first, when asked: what is inside backticks is never read for marks.
+  if (opts.code && text.includes('`')) {
+    const parts: Inline[] = [];
+    const re = /`([^`\n]+)`/g;
+    let at = 0;
+    let m: RegExpExecArray | null;
+    while ((m = re.exec(text)) !== null) {
+      if (m.index > at) parts.push(...splitInline(text.slice(at, m.index)));
+      parts.push({ kind: 'code', text: m[1] });
+      at = m.index + m[0].length;
+    }
+    if (at < text.length) parts.push(...splitInline(text.slice(at)));
+    return parts;
+  }
   const out: Inline[] = [];
   const push = (kind: Inline['kind'], body: string) => {
     if (!body) return;
@@ -278,16 +314,44 @@ function sourcesAt(lines: string[], i: number): { block: SourcesBlock; next: num
   return { block: { kind: 'sources', query, items }, next: at };
 }
 
-export function parseBlocks(input: string): Block[] {
+export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
   const text = typeof input === 'string' ? input : '';
   const lines = text.replace(/\r/g, '').split('\n');
   const blocks: Block[] = [];
+  const rich = !!opts.rich;
+  /** a line that starts a rich block — a paragraph stops before it */
+  const richStart = (l: string) => rich && (FENCE_RE.test(l) || HEADING_RE.test(l) || QUOTE_RE.test(l));
   let i = 0;
 
   while (i < lines.length) {
     if (lines[i].trim() === '') {
       i++;
       continue;
+    }
+
+    if (rich) {
+      const fence = lines[i].match(FENCE_RE);
+      if (fence) {
+        const body: string[] = [];
+        i++;
+        while (i < lines.length && !FENCE_RE.test(lines[i])) body.push(lines[i++]);
+        const open = i >= lines.length;
+        if (!open) i++;
+        blocks.push({ kind: 'code', lang: fence[1] || null, text: body.join('\n'), open });
+        continue;
+      }
+      const h = lines[i].match(HEADING_RE);
+      if (h) {
+        blocks.push({ kind: 'h', level: h[1].length as 1 | 2 | 3, text: h[2].replace(/\s+#+\s*$/, '').trim() });
+        i++;
+        continue;
+      }
+      if (QUOTE_RE.test(lines[i])) {
+        const said: string[] = [];
+        while (i < lines.length && lines[i].trim() !== '' && QUOTE_RE.test(lines[i])) said.push(lines[i++].replace(QUOTE_RE, '$1'));
+        blocks.push({ kind: 'quote', text: said.join('\n') });
+        continue;
+      }
     }
 
     // Before everything else: the lines a turn's own machinery wrote. They
@@ -343,7 +407,8 @@ export function parseBlocks(input: string): Block[] {
       // A reply that ends "…here are the sources:" runs straight into the
       // list with no blank line, and a paragraph that swallowed it would
       // print the URLs it was supposed to draw.
-      !sourcesAt(lines, i)
+      !sourcesAt(lines, i) &&
+      !(para.length && richStart(lines[i]))
     ) {
       para.push(lines[i]);
       i++;
