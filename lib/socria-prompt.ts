@@ -1655,13 +1655,15 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
   // LOGOS 3.5 is this entry, updated in place: the everyday displays, the
   // experiences and the living memory shipped as the next version of Logos 3,
   // so the id stays `logos-3` and every saved line of thinking, link and
-  // preference that names it still opens it.
+  // preference that names it still opens it. LOGOS 4 is the same entry again
+  // (docs/LOGOS-4.md): Point & Ask, Instant Resume, Quick Capture and Voice
+  // on the same surface, so the id still does not change.
   'logos-3': {
     id: 'logos-3',
-    label: 'Socria Logos 3.5',
-    short: 'Logos 3.5',
+    label: 'Socria Logos 4',
+    short: 'Logos 4',
     description:
-      'Think together, or alone. Say what you are working through and it is built beside you — a map, models, and charts, plans, comparisons and decisions made from your own words.',
+      'Think together, or alone. Say what you are working through and it is built beside you — a map, models, and charts, plans, comparisons and decisions made from your own words. Point at anything to ask about it, capture a thought for later, or speak instead of typing.',
     defaultOpenAIModel: 'gpt-5.6-sol',
     supportsDepth: true,
     requiresAuth: true,

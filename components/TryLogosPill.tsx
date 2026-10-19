@@ -26,7 +26,7 @@ export function TryLogosPill({
 }) {
   // Nothing to invite somebody to when they are already there.
   if (!visible || SOCRIA_MODELS[currentModel].logosSurface) return null;
-  const name = version === 'logos-3' ? 'Logos 3.5' : 'Logos 2';
+  const name = version === 'logos-3' ? 'Logos 4' : 'Logos 2';
 
   return (
     <button

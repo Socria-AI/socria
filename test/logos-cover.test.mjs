@@ -123,7 +123,7 @@ console.log('=== rendered ===');
   ok('  with its title', /Watch it get built\./.test(g3.html));
   ok('  a request somebody could type, and its name', g3.html.includes(COVER_SHOWCASE[0].title) && /class="l2-said"/.test(g3.html));
   ok('  the terms', /Two lines of thinking a month and 10 messages a day, free\./.test(g3.html));
-  ok('  the way in, by name', /Sign in to open Logos 3/.test(g3.html) && /href="\/sign-in"/.test(g3.html) && !/Logos 2/.test(g3.html));
+  ok('  the way in, by name', /Sign in to open Logos 4/.test(g3.html) && /href="\/sign-in"/.test(g3.html) && !/Logos 2/.test(g3.html));
   ok('  the key, behind a disclosure', /Have an access key\?/.test(g3.html));
   ok('  and no sheet behind it', !/core3-modal-backdrop/.test(g3.html));
 
@@ -133,7 +133,7 @@ console.log('=== rendered ===');
   const m3 = render({ as: 'modal', version: 'logos-3', isSignedIn: true, onClose: () => {}, onStart: () => {} });
   ok('the sheet renders', !!m3.html, m3.threw?.message);
   ok('  over a backdrop, with a close and the checkbox', /core3-modal-backdrop/.test(m3.html) && /core3-modal-close/.test(m3.html) && /core3-modal-checkbox/.test(m3.html));
-  ok('  and opens Logos 3 for somebody with an account', /Open Logos 3/.test(m3.html) && !/Sign in to open/.test(m3.html));
+  ok('  and opens Logos 4 for somebody with an account', /Open Logos 4/.test(m3.html) && !/Sign in to open/.test(m3.html));
   ok('  with no key row for them', !/Have an access key/.test(m3.html));
   ok('  and “Another example”', /Another example/.test(m3.html));
   ok('closed, it is nothing', renderToStaticMarkup(h(LogosCover, { as: 'modal', open: false, isSignedIn: true })) === '');
