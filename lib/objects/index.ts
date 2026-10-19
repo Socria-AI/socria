@@ -23,6 +23,8 @@ import './display-venn';
 import './display-numberline';
 // a document the person attached, as it was read — opened only by attaching one (display-document.ts)
 import './display-document';
+// the person's files sorted into topics, and the practice made from them — made only by Logos 5's "Organize it" (display-study.ts)
+import './display-study';
 // the human-first experiences (Logos 3.5): objects of thought too, sharing one vocabulary of reasoning (reasoning.ts)
 import './display-crossroads';
 import './display-untangle';

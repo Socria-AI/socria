@@ -14,6 +14,7 @@
 //
 //   W=1440 H=900 STEPS=talk,talk2,chart,stage,card,fx,retry,edit,stop node scripts/dev/logos5-journey.mjs
 //   W=390 H=844 STEPS=talk,chart,stage,back node scripts/dev/logos5-journey.mjs
+//   STUDY_FILES=ch5.pdf,review.pdf STEPS=intake,board,topic,practice,fill,check,more,why,universe,reload node scripts/dev/logos5-journey.mjs
 //
 // Each step leaves a screenshot in OUT (default: the system temp folder) and
 // prints what it found; page errors are listed at the end. Chromium is found
@@ -36,14 +37,20 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
 page.on('console', (m) => m.type() === 'error' && !/clerk|Failed to load resource|net::ERR|Warning:/i.test(m.text()) && errors.push('console: ' + m.text().slice(0, 300)));
 await page.request.post(`${BASE}/api/access/unlock`, { data: { code: 'localdevcode1234567' } });
 await page.goto(`${BASE}/chat?model=logos-3`, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('.lg-composer textarea', { timeout: 90000 }).catch(() => console.log('no composer'));
+await page.waitForSelector('.lg-composer textarea, .l5s-ask textarea', { timeout: 90000 }).catch(() => console.log('no composer'));
 await page.waitForTimeout(1200);
 for (let i = 0; i < 3; i++) { const sk = page.getByRole('button', { name: /^skip/i }); if (await sk.count()) { await sk.first().click().catch(() => {}); await page.waitForTimeout(1000); } }
 await page.addStyleTag({ content: '.env-badge{display:none!important}' });
 const shot = (n) => page.screenshot({ path: `${SP}/${PFX}-${n}-${width}.png` });
 const say = async (text, wait = 7000) => {
-  await page.locator('.l5-dock .lg-composer textarea').fill(text);
-  await page.locator('.l5-dock .lg-send').click();
+  // a new line of thinking opens on the intake; a question asked there is the conversation's first turn
+  if (await page.locator('.l5s-ask textarea').count()) {
+    await page.locator('.l5s-ask textarea').fill(text);
+    await page.locator('.l5s-go').click();
+  } else {
+    await page.locator('.l5-dock .lg-composer textarea').fill(text);
+    await page.locator('.l5-dock .lg-send').click();
+  }
   await page.waitForTimeout(wait);
 };
 const log = (...a) => console.log(...a);
@@ -106,6 +113,119 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       if (await askBtn.count()) { await askBtn.click(); await page.waitForTimeout(700); }
       log('about chip', await page.locator('.l5-dock .lg-about-chip').innerText().catch(() => 'none'));
       log('placeholder', await page.locator('.l5-dock textarea').getAttribute('placeholder'));
+    }
+    // ── the study path (STUDY_FILES=a.pdf,b.pdf) ──
+    if (s === 'intake') {
+      const files = (process.env.STUDY_FILES || '').split(',').filter(Boolean);
+      await page.locator('.l5s-drop input[type="file"]').setInputFiles(files);
+      await page.locator('.l5s-ask textarea').fill('help me get ready for exam 2 on thursday');
+      await page.waitForFunction(() => document.querySelectorAll('.l5s-file.is-ready').length >= 1 && !document.querySelector('.l5s-file.is-reading'), null, { timeout: 60000 });
+      log('files', await page.locator('.l5s-file').allInnerTexts());
+      log('intent', await page.locator('.l5s-intent').innerText().catch(() => 'none'));
+      await page.waitForTimeout(800);
+      await shot('intake-in');
+      await page.locator('.l5s-go').click();
+      await page.waitForSelector('.l5s-card', { timeout: 60000 });
+      await page.waitForTimeout(800);
+    }
+    if (s === 'board') {
+      log('cards', await page.locator('.l5s-card').count(), 'links', await page.locator('.l5s-links path').count());
+      log('start', await page.locator('.l5s-card.is-start .l5s-card-title').innerText().catch(() => 'none'));
+      log('panel', await page.locator('.l5s-start-k').innerText().catch(() => 'none'));
+      log('steps', await page.locator('.l5s-steps').innerText().catch(() => 'none'));
+      await shot('board');
+    }
+    if (s === 'topic') {
+      await page.locator('.l5s-card').nth(Number(process.env.TOPIC || 2)).click();
+      await page.waitForTimeout(600);
+      log('inspector', (await page.locator('.l5s-insp').innerText().catch(() => 'none')).slice(0, 400));
+      log('dimmed', await page.locator('.l5s-card.is-dim').count());
+      log('about chip', await page.locator('.l5-dock .lg-about-chip').innerText().catch(() => 'none'));
+      await shot('topic');
+    }
+    if (s === 'practice') {
+      await page.locator('.l5s-act.is-primary').click();
+      await page.waitForSelector('.l5s-practice', { timeout: 30000 });
+      await page.waitForTimeout(600);
+      log('practice', await page.locator('.l5s-pr-t').innerText(), '|', await page.locator('.l5s-pr-count').innerText().catch(() => ''));
+      log('events', await page.locator('.l5s-jev-t > span:first-child').allInnerTexts());
+      await shot('practice');
+    }
+    if (s === 'fill') {
+      const put = async (label, v) => page.getByLabel(label).first().fill(v);
+      const ins = page.locator('.l5s-jtable input');
+      const n = await ins.count();
+      // first event right, second partly wrong
+      const vals = ['Wages Expense', '1200', '', 'Wages Payable', '', '1,200', 'Rent Expense', '1000', '', 'Prepaid Rent', '1000', ''];
+      for (let i = 0; i < Math.min(n, vals.length); i++) if (vals[i]) await ins.nth(i).fill(vals[i]);
+      void put;
+      if (await page.getByLabel('Liabilities').count()) {
+        await page.getByLabel('Liabilities').fill('10,300');
+        await page.getByLabel('Equity').fill('14,000');
+      }
+      await page.locator('.l5s-hintbtn').first().click();
+      await page.waitForTimeout(500);
+      log('hint', await page.locator('.l5s-hint').first().innerText().catch(() => 'none'));
+      log('count', await page.locator('.l5s-pr-count').innerText().catch(() => ''));
+      await shot('fill');
+      await page.locator('.l5s-hintbtn').first().click();
+    }
+    if (s === 'check') {
+      await page.locator('.l5s-go', { hasText: 'Check my answers' }).click();
+      await page.waitForTimeout(800);
+      log('result', await page.locator('.l5s-side-card.is-result').innerText().catch(() => 'none'));
+      log('gaps', (await page.locator('.l5s-gaps').innerText().catch(() => 'none')).slice(0, 500));
+      log('wrong rows', await page.locator('.l5s-jtable tr.is-no').count());
+      await shot('checked');
+    }
+    if (s === 'more') {
+      await page.locator('.l5s-btn', { hasText: 'Try 3 more' }).click();
+      await page.waitForTimeout(3000);
+      log('more', await page.locator('.l5s-pr-t').innerText().catch(() => ''), '|', await page.locator('.l5s-pr-count').innerText().catch(() => ''));
+      await shot('more');
+    }
+    if (s === 'why') {
+      await page.locator('.l5s-btn', { hasText: 'Why?' }).click();
+      await page.waitForTimeout(9000);
+      log('tab', await page.locator('.l5s-step.is-on').innerText().catch(() => ''));
+      log('stage', await page.locator('.l5-stage').count(), 'last user', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 140));
+      await shot('why');
+    }
+    if (s === 'tab1') { await page.locator('.l5s-step').first().click(); await page.waitForTimeout(700); await shot('tab1'); }
+    if (s === 'askwhy') {
+      await page.locator('.l5s-act', { hasText: 'Ask why' }).click();
+      await page.waitForTimeout(9000);
+      log('tab', await page.locator('.l5s-step.is-on').innerText().catch(() => ''), 'stage', await page.locator('.l5-stage').count(), 'cards on map', await page.locator('.l5-stage .lg-node').count());
+      log('asked', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 160));
+      log('reply', (await page.locator('.l5-a .l5-prose').last().innerText().catch(() => '')).slice(0, 160));
+    }
+    if (s === 'new') { await page.getByRole('button', { name: /new line of thinking/i }).first().click(); await page.waitForTimeout(1200); }
+    if (s === 'uniopen') { await page.locator('.l5-unibtn').click(); await page.waitForTimeout(1500); await shot('uniopen-in'); }
+    if (s === 'universe') {
+      await page.locator('.l5-unibtn').click();
+      await page.waitForTimeout(900);
+      log('universe', await page.locator('.l5s-uni-head p').innerText().catch(() => 'none'), 'clusters', await page.locator('.l5s-uni-c').count());
+      await shot('universe-in');
+      await page.locator('.l5s-uni .l5s-btn', { hasText: 'Close' }).click();
+      await page.waitForTimeout(400);
+    }
+    if (s === 'reload') {
+      await page.reload({ waitUntil: 'domcontentloaded' });
+      await page.waitForSelector('.l5s-card, .l5-thread, .l5s-ask', { timeout: 90000 });
+      await page.waitForTimeout(1500);
+      log('after reload: cards', await page.locator('.l5s-card').count(), 'steps', await page.locator('.l5s-steps').count());
+      await shot('reload');
+    }
+    if (s === 'probe') {
+      // PROBE=".sel1|.sel2" — what the browser computed for each, for chasing a layout fault
+      for (const sel of (process.env.PROBE || '').split('|').filter(Boolean)) {
+        log('probe', sel, JSON.stringify(await page.evaluate((q) => {
+          const el = document.querySelector(q);
+          if (!el) return null;
+          const c = getComputedStyle(el), r = el.getBoundingClientRect();
+          return { x: Math.round(r.x), y: Math.round(r.y), w: Math.round(r.width), h: Math.round(r.height), display: c.display, opacity: c.opacity, visibility: c.visibility, color: c.color, bg: c.backgroundColor, maxHeight: c.maxHeight, height: c.height, overflow: c.overflow, position: c.position, clip: c.webkitLineClamp };
+        }, sel)));
+      }
     }
     if (s === 'back') { await page.locator('.l5-stage-back').click(); await page.waitForTimeout(600); }
     if (s === 'rail') { await page.locator('.l5-railbtn').click(); await page.waitForTimeout(700); }

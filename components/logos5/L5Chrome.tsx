@@ -108,10 +108,16 @@ export function L5Header({
   presence,
   menu,
   account,
+  center,
+  extra,
 }: {
   railOpen: boolean;
   onToggleRail: () => void;
   title: string;
+  /** what sits in the middle of the bar — a study's steps */
+  center?: ReactNode;
+  /** a control before the rest at the end — the Universal Map */
+  extra?: ReactNode;
   /** the workspace's button: what is in it, and whether it is open */
   stage: { label: string; count: number; open: boolean; fresh: boolean; onToggle: () => void } | null;
   presence?: ReactNode;
@@ -119,7 +125,7 @@ export function L5Header({
   account?: ReactNode;
 }) {
   return (
-    <header className="l5-head">
+    <header className={`l5-head${center ? ' has-steps' : ''}`}>
       <button
         type="button"
         className="l5-iconbtn l5-railbtn"
@@ -135,7 +141,9 @@ export function L5Header({
       <h1 className="l5-title" title={title}>
         {title}
       </h1>
+      {center && <div className="l5-head-mid">{center}</div>}
       <div className="l5-head-end">
+        {extra}
         {stage && (
           <button
             type="button"

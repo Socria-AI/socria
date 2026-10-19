@@ -15,6 +15,7 @@
 //
 // What it answers:
 //   POST /v1/chat/completions      streamed text, or JSON when json_object is asked
+//                                  (a map, a study's topics, journal-entry practice)
 //   POST /v1/audio/transcriptions  {"text": …} — the voice composer's path
 //   GET  /v1/models                a short list
 
@@ -77,6 +78,53 @@ function mapReply(messages) {
   return { context: /offer|job|decide|should i/.test(lower) ? 'deciding' : 'reflecting', ask: { action: 'discuss', artifact: 'map' }, nodes, edges };
 }
 
+/** The study sort (lib/logos5/study-ask.ts sortAsk): topics from the keyed passages' own headings. */
+function sortReply(user) {
+  const lines = user.split('\n').map((l) => /^\[(\d+:p\d+\.\d+)\] (?:(heading|title|list|quote|table|caption): )?(.*)$/.exec(l)).filter(Boolean);
+  const topics = [];
+  let cur = null;
+  for (const [, key, kind, text] of lines) {
+    if (kind === 'heading' || kind === 'title' || !cur) {
+      cur = { title: (kind === 'heading' || kind === 'title' ? text : 'Overview').slice(0, 40), kind: /review|question|exam/i.test(text) ? 'review' : topics.length ? 'procedure' : 'foundation', summary: `What the files say about ${text.toLowerCase().slice(0, 40)}.`, blocks: [], quotes: [], after: topics.length ? [0] : [] };
+      topics.push(cur);
+    }
+    cur.blocks.push(key);
+    if (!kind && cur.quotes.length < 2) {
+      const first = (text.match(/[^.!?]+[.!?]/) || [text])[0].trim();
+      cur.quotes.push({ block: key, text: first });
+    }
+  }
+  const course = (/\b([A-Z]{3,4} ?\d{4})\b/.exec(user) || [])[1];
+  return { course: course ? `${course} · Exam 2` : '', topics: topics.filter((t) => t.blocks.length > 1 || t.quotes.length).slice(0, 8), start: 0, why: 'The other topics build on it.' };
+}
+
+/** Journal-entry practice (entriesAsk): events from the passages' own numbers. */
+function entriesReply(user) {
+  const money = (s) => Number(String(s).replace(/[$,]/g, ''));
+  const events = [];
+  let dA = 0, dL = 0, dE = 0;
+  for (const m of user.matchAll(/^\[(\d+:p\d+\.\d+)\] (.*)$/gm)) {
+    const [, key, text] = m;
+    const amt = /\$([\d,]+)/.exec(text);
+    if (!amt) continue;
+    const v = money(amt[1]);
+    if (/wages/i.test(text)) {
+      events.push({ block: key, text: `Mar 31 — wages earned but not yet paid, $${amt[1]}`, lines: [{ account: 'Wages Expense', also: ['Salaries Expense'], side: 'dr', amount: v, why: 'The work was done in March, so the expense belongs to March.' }, { account: 'Wages Payable', side: 'cr', amount: v, why: 'It is owed until payday — a liability.' }], hint: 'What does the business owe at the end of March that its books do not show yet?' });
+      dL += v; dE -= v;
+    } else if (/rent/i.test(text) && /six months/i.test(text)) {
+      const r = v / 6;
+      events.push({ block: key, text: 'Mar 31 — one month of the rent paid in advance is used up', lines: [{ account: 'Rent Expense', side: 'dr', amount: r, why: 'One month of the prepaid rent was used in March.' }, { account: 'Prepaid Rent', side: 'cr', amount: r, why: 'The asset shrinks by the month used.' }], hint: 'Something paid for in advance was partly used up. Which asset gets smaller?' });
+      dA -= r; dE -= r;
+    } else if (/services/i.test(text)) {
+      events.push({ block: key, text: `Services provided on account, not yet billed, $${amt[1]}`, lines: [{ account: 'Accounts Receivable', side: 'dr', amount: v, why: 'The customer owes for work already done.' }, { account: 'Service Revenue', side: 'cr', amount: v, why: 'Revenue is recorded when it is earned, billed or not.' }], hint: 'The work is done; nobody has paid. What does the business now have a right to?' });
+      dA += v; dE += v;
+    }
+  }
+  const bal = /total assets were \$([\d,]+), liabilities \$([\d,]+) and equity \$([\d,]+)/i.exec(user);
+  const balance = bal ? { assets: money(bal[1]) + dA, liabilities: money(bal[2]) + dL, equity: money(bal[3]) + dE } : null;
+  return { title: 'Record the adjustments for March 31', events: events.slice(0, 4), balance };
+}
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
@@ -127,7 +175,9 @@ const server = http.createServer((req, res) => {
       const system = String(messages[0]?.role === 'system' ? messages[0].content : '');
       if (body.response_format?.type === 'json_object') {
         const isMap = /"nodes": \[\{"id": "short_snake_case_id"/.test(system);
-        const content = JSON.stringify(isMap ? mapReply(messages.slice(1)) : {});
+        const isSort = /sort a student’s files into study topics/.test(system);
+        const isEntries = /journal-entry practice/.test(system);
+        const content = JSON.stringify(isMap ? mapReply(messages.slice(1)) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
       const text = chatReply(messages.slice(1));

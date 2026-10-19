@@ -186,7 +186,7 @@ console.log('\n=== where it is seen ===');
   ok('…and not without one', !suggestViews(facts, layout).some((v) => v.type === 'mind'));
   const app = read('components/LogosApp.tsx');
   ok('…drawn from the logos scope, on this chat', /case 'mind':[\s\S]{0,400}<MindAtlas\s+scope="logos"\s+embedded\s+focusChat=\{activeId\}/.test(app));
-  ok('…offered when there is an account', /factsFrom\(map\), mind: cloud/.test(app));
+  ok('…offered when there is an account', /factsFrom\(map\)[\s\S]{0,240}mind: cloud/.test(app));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
