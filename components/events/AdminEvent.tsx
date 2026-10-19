@@ -470,8 +470,8 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
           <section className="ev-panel">
             <h3>Self check-in</h3>
             <p className="ev-fine">
-              Attendees scan the QR code at the venue and enter the name or the email they RSVP’d with — that checks them in. Only people who RSVP’d can check
-              in this way; anyone who didn’t can RSVP on the spot, then check in.
+              Everyone checks in by scanning the QR code at the venue and answering the same questions as the RSVP. If they RSVP’d, their RSVP is matched by
+              email or name and checked in; if not, they’re added and checked in on the spot.
             </p>
             <div className={`ev-note${event.self_checkin ? '' : ' warn'}`} role="status">
               Self check-in is <strong>{event.self_checkin ? 'open' : 'closed'}</strong>.{' '}

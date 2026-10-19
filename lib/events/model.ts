@@ -92,22 +92,8 @@ export function publicEvent(e: EventRow): PublicEvent {
   };
 }
 
-/**
- * What someone types at check-in: the email they RSVP'd with, or the name
- * they RSVP'd under. Anything with an @ is read as an email.
- */
+/** How a check-in finds an RSVP: by email, or by full name. */
 export type CheckinLookup = { by: 'email'; emailNorm: string } | { by: 'name'; name: string };
-
-export function checkCheckinLookup(raw: unknown): { ok: true; value: CheckinLookup } | { ok: false; error: string } {
-  const r = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>;
-  const who = clean(r.who, LIMITS.email);
-  if (who.includes('@')) {
-    const emailNorm = normalizeEmail(who);
-    return emailNorm ? { ok: true, value: { by: 'email', emailNorm } } : { ok: false, error: 'That email doesn’t look right. Check it, or use your name instead.' };
-  }
-  if (who.length < 2) return { ok: false, error: 'Enter the name or email you RSVP’d with.' };
-  return { ok: true, value: { by: 'name', name: who } };
-}
 
 /** Names compared the way people type them: case, accents and extra spaces ignored. */
 export const foldName = (s: string) => s.normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim();

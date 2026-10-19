@@ -90,18 +90,13 @@ console.log('\n=== the door ===');
   ok('a check-in code never looks like 0/O or 1/I/L', !/[01OIL]/.test(E.CODE_ALPHABET) && E.CODE.test('K7P4QX'));
 }
 
-console.log('\n=== check-in: the name or email used at RSVP ===');
+console.log('\n=== check-in finds an RSVP by email or name ===');
 {
   const rows = [row(), row({ id: 'rsvp_' + 'b'.repeat(24), full_name: 'José Álvarez', email_norm: 'jose@mavs.uta.edu' }), row({ id: 'rsvp_' + 'c'.repeat(24), full_name: 'Maya Patel', email_norm: 'maya.p2@yahoo.com' })];
-  const L = (who) => E.checkCheckinLookup({ who });
-  ok('an @ means an email, lowercased', J(L(' Maya@Gmail.com ').value) === J({ by: 'email', emailNorm: 'maya@gmail.com' }));
-  ok('anything else is a name', J(L('Jose Alvarez').value) === J({ by: 'name', name: 'Jose Alvarez' }));
-  ok('too short, or a broken email, is refused', !L('a').ok && !L('a@b').ok);
-  ok('a name matches however it is typed — case, accents, spaces', E.matchCheckin(rows, L('  jose   ALVAREZ').value).length === 1);
-  ok('two RSVPs under one name both match (the caller asks for the email)', E.matchCheckin(rows, L('maya patel').value).length === 2);
-  ok('an email matches exactly one', E.matchCheckin(rows, L('MAYA.P2@yahoo.com').value).length === 1);
-  ok('a UTA email works if that is what they RSVP’d with', E.matchCheckin(rows, L('jose@mavs.uta.edu').value).length === 1);
-  ok('a part of a name is not a match', E.matchCheckin(rows, L('Maya').value).length === 0);
+  ok('a name matches however it is typed — case, accents, spaces', E.matchCheckin(rows, { by: 'name', name: '  jose   ALVAREZ' }).length === 1);
+  ok('two RSVPs under one name both match (so a name alone won’t pick one)', E.matchCheckin(rows, { by: 'name', name: 'maya patel' }).length === 2);
+  ok('an email matches exactly', E.matchCheckin(rows, { by: 'email', emailNorm: 'maya.p2@yahoo.com' }).length === 1);
+  ok('part of a name is not a match', E.matchCheckin(rows, { by: 'name', name: 'Maya' }).length === 0);
   ok('the check-in switch reaches the public shape, off unless set', E.publicEvent({ id: 'x', title: 't', summary: '', description: '', location: '', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false, tentative_note: null, status: 'open', capacity: null, expectations: [], created_at: 1, updated_at: 1 }).selfCheckin === false);
   ok('an admin can switch it', E.checkEventPatch({ self_checkin: true }).patch.self_checkin === true);
 }

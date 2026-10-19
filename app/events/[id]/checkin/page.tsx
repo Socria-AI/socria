@@ -1,9 +1,10 @@
 // app/events/[id]/checkin/page.tsx — check in at the door.
 //
-// Where the QR code at the venue points. The attendee types the name or the
-// email they RSVP'd with and is checked in. Takes check-ins only while an
-// admin has switched self check-in on; otherwise it says so and points them
-// to the team at the door.
+// Where the QR code at the venue points — how everyone comes in. The
+// attendee gives their name, email and the RSVP's optional answers. An RSVP
+// under that email (or that exact name) is checked in; anyone who didn't
+// RSVP is added and checked in there and then. Takes check-ins only while an
+// admin has switched self check-in on.
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
@@ -12,7 +13,7 @@ import { Label } from '@/components/journal/ds';
 import { NOINDEX } from '@/lib/seo';
 import { getEvent } from '@/lib/events/store';
 import { publicEvent, type PublicEvent } from '@/lib/events/model';
-import { CheckinForm } from '@/components/events/CheckinForm';
+import { RsvpForm } from '@/components/events/RsvpForm';
 import '../../../app-shell.css';
 import '../../events.css';
 
@@ -48,7 +49,7 @@ export default async function CheckinPage({ params }: { params: { id: string } }
             <h1 className="ev-h2" style={{ fontSize: 'clamp(1.8rem,5vw,2.4rem)' }}>{e.title}</h1>
             <p className="ev-fine">{e.location}</p>
           </div>
-          <CheckinForm eventId={e.id} open={e.selfCheckin && e.status !== 'cancelled'} />
+          <RsvpForm eventId={e.id} open={e.selfCheckin && e.status !== 'cancelled'} mode="checkin" />
         </div>
       </main>
     </div>

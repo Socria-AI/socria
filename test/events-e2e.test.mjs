@@ -335,41 +335,46 @@ console.log('\n=== cancelling, and deleting an account, take people out of the s
   ok('…from the sheet too', !google.tabs['in-public-002'].some((r) => r[2] === 'Maya Patel'));
 }
 
-console.log('\n=== check-in at the venue: the name or email used at RSVP, nothing else ===');
+console.log('\n=== check-in at the venue: how everyone comes in ===');
 {
   as(null);
-  const ck = (who, o = {}) => call(R.checkin, '/api/events/checkin', 'POST', { eventId: 'in-public-002', who, website: '', elapsedMs: 3000, ...o });
-  await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'jordan.lee@gmail.com', fullName: 'Jordan Lee' }));
+  const ck = (o = {}) => call(R.checkin, '/api/events/checkin', 'POST', { eventId: 'in-public-002', fullName: 'Rita Moreno', email: 'rita.m@gmail.com', interest: 'business', source: 'campus', website: '', elapsedMs: 9000, ...o });
+  await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'jordan.lee@gmail.com', fullName: 'Jordan Lee', interest: undefined, source: undefined }));
   await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'priya@mavs.uta.edu', fullName: 'Priya Nair' }));
   await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'alex.one@gmail.com', fullName: 'Alex Kim' }));
   await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'alex.two@gmail.com', fullName: 'Alex Kim' }));
-  const before = db.rows('event_registrations').length;
-  const shut = await ck('Jordan Lee');
+  const shut = await ck();
   ok('closed until an admin opens it, so the link can’t be used from home', shut.status === 403 && shut.j.code === 'not-open');
   as('user_door');
   ok('door staff cannot open it', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' })).status === 403);
   as('user_admin');
   ok('an admin opens it', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' })).j.event.self_checkin === true);
   as(null);
-  const byName = await ck('  jordan   LEE ');
+  const count = () => db.rows('event_registrations').length;
+  let n0 = count();
+  const j1 = await ck({ fullName: 'Jordan Lee', email: 'JORDAN.LEE@gmail.com', interest: 'ai', source: 'instagram' });
   const jordan = db.rows('event_registrations').find((r) => r.email_norm === 'jordan.lee@gmail.com');
-  ok('the name they RSVP’d under checks them in — case and spaces don’t matter', byName.status === 200 && byName.j.firstName === 'Jordan' && byName.j.already === false && jordan.attendance === 'attended' && jordan.checked_in_by === 'self');
-  ok('…a second time says they already are, and changes nothing', (await ck('Jordan Lee')).j.already === true);
-  const byEmail = await ck('PRIYA@MAVS.UTA.EDU');
-  ok('the email they RSVP’d with works too — whatever they signed up with, UTA included', byEmail.status === 200 && db.rows('event_registrations').find((r) => r.email_norm === 'priya@mavs.uta.edu').attendance === 'attended');
-  const twin = await ck('Alex Kim');
-  ok('two RSVPs under one name: asked for the email, no one checked in', twin.status === 409 && twin.j.code === 'ambiguous' && db.rows('event_registrations').filter((r) => r.full_name === 'Alex Kim').every((r) => r.attendance === 'registered'));
-  ok('…and the email settles it', (await ck('alex.two@gmail.com')).status === 200 && db.rows('event_registrations').find((r) => r.email_norm === 'alex.two@gmail.com').attendance === 'attended' && db.rows('event_registrations').find((r) => r.email_norm === 'alex.one@gmail.com').attendance === 'registered');
-  const nobody = await ck('Someone Else');
-  ok('no RSVP under that name: refused, and nothing is created', nobody.status === 404 && nobody.j.code === 'not-found' && db.rows('event_registrations').length === before);
-  ok('no RSVP with that email: the same', (await ck('stranger@x.com')).status === 404 && db.rows('event_registrations').length === before);
-  ok('a malformed email is refused', (await ck('not@an')).status === 400);
-  ok('a bot (hidden field) gets nowhere', (await ck('Priya Nair', { website: 'spam' })).status === 400);
-  ok('the answer names only the person, never an email', !JSON.stringify(byEmail.j).includes('@') && Object.keys(byEmail.j).sort().join() === 'already,firstName');
+  ok('the RSVP email finds their RSVP: checked in, not duplicated', j1.status === 200 && j1.j.firstName === 'Jordan' && count() === n0 && jordan.attendance === 'attended' && jordan.checked_in_by === 'self');
+  ok('…and the questions they skipped at RSVP are filled in', jordan.interest === 'ai' && jordan.source === 'instagram');
+  ok('a second check-in says they already are', (await ck({ fullName: 'Jordan Lee', email: 'jordan.lee@gmail.com' })).j.already === true && count() === n0);
+  const p1 = await ck({ fullName: 'priya NAIR', email: 'priya.personal@gmail.com' });
+  ok('a different email but their RSVP name: matched to that RSVP', p1.status === 200 && count() === n0 && db.rows('event_registrations').find((r) => r.email_norm === 'priya@mavs.uta.edu').attendance === 'attended');
+  const a1 = await ck({ fullName: 'Alex Kim', email: 'alex.new@gmail.com' });
+  ok('a shared name and a new email can’t pick an RSVP: they’re added instead, nobody else is checked in', a1.status === 200 && count() === n0 + 1 && db.rows('event_registrations').filter((r) => r.email_norm?.startsWith('alex.') && r.email_norm !== 'alex.new@gmail.com').every((r) => r.attendance === 'registered'));
+  n0 = count();
+  const w = await ck({ marketingConsent: true });
+  const rita = db.rows('event_registrations').find((r) => r.email_norm === 'rita.m@gmail.com');
+  ok('no RSVP at all: added and checked in on the spot — everyone walks in', w.status === 200 && w.j.firstName === 'Rita' && count() === n0 + 1 && rita.attendance === 'attended' && rita.checked_in_by === 'self');
+  ok('…with the same answers the RSVP asks, consent included', rita.interest === 'business' && rita.source === 'campus' && rita.marketing_consent === true && typeof rita.consent_at === 'number');
+  ok('any email works, UTA included', (await ck({ fullName: 'Uta Student', email: 'new.person@mavs.uta.edu' })).status === 200);
+  ok('a name is required', (await ck({ fullName: '', email: 'n@x.com' })).j.field === 'fullName');
+  ok('an email is required', (await ck({ email: 'nope' })).j.field === 'email');
+  ok('a bot gets nowhere', (await ck({ email: 'b@x.com', website: 'spam' })).status === 400);
+  ok('the answer names only the person', Object.keys(w.j).sort().join() === 'already,firstName');
   as('user_admin');
   await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: false }, { id: 'in-public-002' });
   as(null);
-  ok('closed again, it refuses again', (await ck('Alex Kim')).status === 403);
+  ok('closed again, it refuses again', (await ck({ email: 'late2@x.com', fullName: 'Late Two' })).status === 403);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

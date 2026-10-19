@@ -113,7 +113,7 @@ export function DoorView({ eventId, title }: { eventId: string; title: string })
         ))}
         {q.trim().length >= 2 && people.length === 0 && (
           <li className="ev-fine">
-            No RSVP by that name, email or code. They can RSVP on the spot at <a className="ev-link" href={`/events/${eventId}`}>the event page</a>, then check in.
+            No RSVP by that name, email or code. They can check themselves in with the QR code at the door — it adds anyone who didn’t RSVP.
           </li>
         )}
       </ul>
