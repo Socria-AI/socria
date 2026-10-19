@@ -10,8 +10,8 @@
 // confirmation once; a second RSVP with the same email is refused, not
 // duplicated; nothing public lists attendees; attendees check themselves in
 // at the venue by the name or email they RSVP'd with, while it is open;
-// staff check people in from the door list, once; walk-ins work
-// without an email; admins alone edit, export and delete; the sheet holds one
+// staff check people in from the door list, once; there are no walk-ins
+// (someone without an RSVP RSVPs, then checks in); admins alone edit, export and delete; the sheet holds one
 // row per registration, updated in place, and a deleted person leaves it;
 // the database stays the source of truth when Google fails.
 
@@ -244,13 +244,8 @@ console.log('\n=== the door list: staff only ===');
   ok('a second check-in is reported, not repeated — the first time stands', second.j.already === true && db.rows('event_registrations').find((r) => r.id === regId).checked_in_at === at);
   ok('a registration from another event is refused', (await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'other-event-x', registrationId: regId })).status === 404);
 
-  const walk = await call(R.staff, '/api/events/staff', 'POST', { action: 'walkin', eventId: 'in-public-002', fullName: 'Walk In', email: '' });
-  const w = db.rows('event_registrations').find((r) => r.full_name === 'Walk In');
-  ok('a walk-in with no email is registered and checked in at once', walk.status === 201 && w.registered_via === 'walk-in' && w.attendance === 'attended' && w.email_norm === null && w.marketing_consent === false);
-  const walk2 = await call(R.staff, '/api/events/staff', 'POST', { action: 'walkin', eventId: 'in-public-002', fullName: 'Second Walker' });
-  ok('two walk-ins without email do not collide', walk2.status === 201);
-  const dupWalk = await call(R.staff, '/api/events/staff', 'POST', { action: 'walkin', eventId: 'in-public-002', fullName: 'Sam', email: 'SAM@mavs.uta.edu' });
-  ok('a walk-in who already RSVP’d is pointed to their registration', dupWalk.status === 409 && dupWalk.j.person?.name === 'Sam Lee');
+  const before = db.rows('event_registrations').length;
+  ok('there are no walk-ins: staff can’t create registrations at the door', (await call(R.staff, '/api/events/staff', 'POST', { action: 'walkin', eventId: 'in-public-002', fullName: 'Walk In' })).status === 400 && db.rows('event_registrations').length === before);
   const undo = await call(R.staff, '/api/events/staff', 'POST', { action: 'undo', eventId: 'in-public-002', registrationId: regId });
   ok('a mistaken check-in can be undone', undo.status === 200 && db.rows('event_registrations').find((r) => r.id === regId).attendance === 'registered');
   await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'in-public-002', registrationId: regId });

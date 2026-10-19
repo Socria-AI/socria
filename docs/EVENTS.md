@@ -39,7 +39,7 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 | `DELETE /api/events/ticket` | holder of the secret | cancel; deletes the registration |
 | `GET /api/events/[id]/ics` | public | calendar file, only once the date is confirmed |
 | `POST /api/events/checkin` | public, while self check-in is open | check in by the name or email used at RSVP |
-| `POST /api/events/staff` | staff and admins | `lookup`, `checkin` (once), `undo`, `walkin` |
+| `POST /api/events/staff` | staff and admins | `lookup`, `checkin` (once), `undo` |
 | `POST /api/events/admin` | admins | create a draft event; run the retention sweep |
 | `PATCH`/`POST /api/events/admin/[id]` | admins | edit the event; `sync` the sheet; `delete` a registration |
 | `GET /api/events/admin/[id]/export` | admins | CSV, the same columns as the sheet |
@@ -66,7 +66,9 @@ RSVP and check-in are separate steps. At the event, **attendees check themselves
    - **No RSVP:** nothing is created, and they're told to find the team at the door.
 4. The RSVP confirmation and email tell people exactly this. There is no personal QR code.
 
-**Fallback for staff:** the door list (`/events/admin/<id>/door`) lets staff and admins find someone by name or email and check them in, or add a walk-in who never RSVP'd.
+**No walk-ins:** checking in is how everyone comes in. Someone who never RSVP'd RSVPs on the spot (the check-in page links to the RSVP), then checks in.
+
+**Fallback for staff:** the door list (`/events/admin/<id>/door`) lets staff and admins find someone by name or email and check them in.
 
 **Trade-off:** checking in by name trusts the person at the form. Anyone who knows an attendee's name could check them in while check-in is open.
 
@@ -77,12 +79,12 @@ RSVP and check-in are separate steps. At the event, **attendees check themselves
 The database is the source of truth; the sheet is a private copy for the team.
 
 - **The tab.** Each event gets one tab, named by its id (`in-public-002`).
-- **The columns.** Registration ID, Event, Full Name, Email, Interest, Other Interest, Acquisition Source, RSVP Timestamp, Attendance Status, Check-in Timestamp, Marketing Consent, Consent Timestamp, Registered Via.
-- **How it syncs.** Every change (RSVP, check-in, undo, walk-in, cancellation, deletion, title edit) rewrites the tab from the database, after the response has gone. So a person always has exactly one row, a check-in updates that row in place, and deleted people disappear from the sheet.
+- **The columns.** Registration ID, Event, Full Name, Email, Interest, Other Interest, Acquisition Source, RSVP Timestamp, Attendance Status, Check-in Timestamp, Marketing Consent, Consent Timestamp.
+- **How it syncs.** Every change (RSVP, check-in, undo, cancellation, deletion, title edit) rewrites the tab from the database, after the response has gone. So a person always has exactly one row, a check-in updates that row in place, and deleted people disappear from the sheet.
 - **Formula safety.** A cell that would start a formula is prefixed with `'`.
 - **Concurrency.** A 90-second lease keeps two syncs from writing at once. A change made during a sync marks the event dirty, and the running sync goes round again.
 - **Failures.** Google calls retry on 429 and 5xx. A failure is recorded and shown on the admin page, the change stays pending, and the daily cron, the next change or **Resync now** catches up. RSVPs never fail because of the sheet.
-- **Your own notes.** Don't add your own columns to the event's tab: sync manages columns A–M and rewrites them. Put notes on a separate tab.
+- **Your own notes.** Don't add your own columns to the event's tab: sync manages columns A–L and rewrites them. Put notes on a separate tab.
 
 ### Connecting it
 
@@ -121,8 +123,8 @@ The database is the source of truth; the sheet is a private copy for the team.
 On the admin page every number is labelled **Confirmed** or **Estimate**.
 
 - **Confirmed:**
-  - RSVPs, check-ins, walk-ins and opt-ins, from the registrations.
-  - RSVP → attended: attended RSVPs ÷ RSVPs; walk-ins excluded.
+  - RSVPs, check-ins and opt-ins, from the registrations.
+  - Show-up rate: check-ins ÷ RSVPs.
   - Registrants whose email matches a **verified** email on a Socria account (Clerk), computed at read time and shown only in aggregate. The RSVP privacy note discloses this.
   - Of those accounts: how many were created after the RSVP, how many saved at least one conversation (first meaningful use), and how many were active again seven or more days after creation (counted only over accounts at least seven days old).
 - **Estimate:**
@@ -147,7 +149,7 @@ By hand, on a preview deployment with Supabase, Clerk and admin env set:
 1. Open `/events/in-public-002` on a phone. RSVP with a personal address. Check that the confirmation explains how to check in, and that the consent box was unticked.
 2. RSVP again with the same email; it is refused as already registered.
 3. As an admin, open self check-in on the Check-in tab. Open `/events/in-public-002/checkin`, enter the name you RSVP'd under, and check that it says Welcome. Enter it again and check that it says already checked in.
-4. On `/events/admin/in-public-002/door`, find someone by name, and add a walk-in without an email.
+4. On `/events/admin/in-public-002/door`, find someone by name and check them in.
 5. On `/events/admin/in-public-002`, check that the numbers, attendee list and search work, export the CSV, and set and confirm a date. Check that the public page shows it and the calendar file downloads.
 6. With the Google variables set, press **Resync now** and check that the tab has one row per person. Check someone in or out and watch their row change in place.
 7. From the attendee's confirmation, cancel. Check that the row leaves the admin list and the sheet.

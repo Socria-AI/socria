@@ -21,7 +21,7 @@ import type { SyncState } from '@/lib/events/sheets';
 
 export type AdminRow = Omit<RegistrationRow, 'token_hash'>;
 type Tab = 'overview' | 'attendees' | 'checkin' | 'share' | 'settings';
-type Filter = 'all' | 'attended' | 'registered' | 'walk-in' | 'consented';
+type Filter = 'all' | 'attended' | 'registered' | 'consented';
 
 const TABS: { id: Tab; label: string }[] = [
   { id: 'overview', label: 'Overview' },
@@ -164,30 +164,26 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
 
   // ── the numbers, from the rows as they stand now ──
   const n = useMemo(() => {
-    const online = rows.filter((r) => r.registered_via === 'web');
     const attended = rows.filter((r) => r.attendance === 'attended');
-    const rsvpAttended = online.filter((r) => r.attendance === 'attended').length;
     return {
-      rsvps: online.length,
+      rsvps: rows.length,
       attended: attended.length,
-      walkIns: rows.filter((r) => r.registered_via === 'walk-in').length,
       self: attended.filter((r) => r.checked_in_by === 'self').length,
-      notYet: online.length - rsvpAttended,
-      showRate: online.length ? rsvpAttended / online.length : null,
+      notYet: rows.length - attended.length,
+      showRate: rows.length ? attended.length / rows.length : null,
       consented: rows.filter((r) => r.marketing_consent).length,
     };
   }, [rows]);
   const topSource = stats.bySource.filter((s) => s.id !== 'none').sort((a, b) => b.n - a.n)[0];
   const summary = [
     `${plural(n.rsvps, 'person has', 'people have')} RSVP’d`,
-    n.attended ? `${n.attended} checked in${n.walkIns ? ` (${plural(n.walkIns, 'walk-in')})` : ''}` : 'no one has checked in yet',
+    n.attended ? `${n.attended} checked in` : 'no one has checked in yet',
   ].join(' and ') + '.' + (topSource ? ` Most heard about it through ${topSource.label.toLowerCase()}.` : '') + (n.showRate !== null && n.attended ? ` ${pct(n.showRate)} of people who RSVP’d showed up.` : '');
 
   const counts: Record<Filter, number> = {
     all: rows.length,
     attended: n.attended,
     registered: rows.filter((r) => r.attendance === 'registered').length,
-    'walk-in': n.walkIns,
     consented: n.consented,
   };
   const shown = useMemo(() => {
@@ -195,7 +191,6 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
     return rows.filter((r) => {
       if (filter === 'registered' && r.attendance !== 'registered') return false;
       if (filter === 'attended' && r.attendance !== 'attended') return false;
-      if (filter === 'walk-in' && r.registered_via !== 'walk-in') return false;
       if (filter === 'consented' && !r.marketing_consent) return false;
       const hay = `${r.full_name} ${r.email ?? ''} ${r.code}`.toLowerCase();
       return words.every((w) => hay.includes(w));
@@ -321,7 +316,7 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
           <p className="ev-summary">{summary}</p>
           <section className="ev-kpis" aria-label="Headline numbers">
             <Stat tag="conf" label="RSVPs" value={String(n.rsvps)} help="registered online" />
-            <Stat tag="conf" label="Checked in" value={String(n.attended)} help={n.walkIns ? `incl. ${plural(n.walkIns, 'walk-in')}` : 'at the door'} />
+            <Stat tag="conf" label="Checked in" value={String(n.attended)} help="at the door" />
             <Stat tag="conf" label="Show-up rate" value={pct(n.showRate)} help="of RSVPs who came" />
             <Stat tag="est" label="Page visits" value={num(acq.estimated.pageViews)} help={acq.estimated.rsvpPerView !== null ? `${pct(acq.estimated.rsvpPerView)} went on to RSVP` : 'views of the event page'} />
           </section>
@@ -384,7 +379,6 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
                 ['all', 'Everyone'],
                 ['attended', 'Checked in'],
                 ['registered', 'Not here yet'],
-                ['walk-in', 'Walk-ins'],
                 ['consented', 'Emails OK'],
               ] as [Filter, string][]
             ).map(([id, label]) => (
@@ -428,17 +422,14 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
                       ) : (
                         <span className="ev-badge">Registered</span>
                       )}
-                      {r.registered_via === 'walk-in' && <div className="ev-fine">walk-in</div>}
                     </td>
                     <td>{r.interest === 'other' && r.interest_other ? r.interest_other : labelOf(INTERESTS, r.interest)}</td>
                     <td>{labelOf(SOURCES, r.source)}</td>
                     <td style={{ whiteSpace: 'nowrap', textAlign: 'right' }}>
                       {r.attendance === 'attended' ? (
-                        r.registered_via === 'web' && (
-                          <button type="button" className="ev-ghost" onClick={() => checkIn(r, true)}>
-                            Undo
-                          </button>
-                        )
+                        <button type="button" className="ev-ghost" onClick={() => checkIn(r, true)}>
+                          Undo
+                        </button>
                       ) : (
                         <button type="button" className="ev-btn moss" style={{ minHeight: 36, padding: '6px 14px' }} onClick={() => checkIn(r)}>
                           Check in
@@ -480,7 +471,7 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
             <h3>Self check-in</h3>
             <p className="ev-fine">
               Attendees scan the QR code at the venue and enter the name or the email they RSVP’d with — that checks them in. Only people who RSVP’d can check
-              in this way; anyone else, add from the door list.
+              in this way; anyone who didn’t can RSVP on the spot, then check in.
             </p>
             <div className={`ev-note${event.self_checkin ? '' : ' warn'}`} role="status">
               Self check-in is <strong>{event.self_checkin ? 'open' : 'closed'}</strong>.{' '}

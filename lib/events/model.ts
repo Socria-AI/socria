@@ -274,7 +274,6 @@ export interface DoorRow {
   code: string;
   attendance: Attendance;
   checkedInAt: number | null;
-  via: 'web' | 'walk-in';
 }
 
 export function emailHint(email: string | null): string {
@@ -284,7 +283,7 @@ export function emailHint(email: string | null): string {
 }
 
 export function doorRow(r: RegistrationRow): DoorRow {
-  return { id: r.id, name: r.full_name, emailHint: emailHint(r.email_norm ?? r.email), code: r.code, attendance: r.attendance, checkedInAt: r.checked_in_at, via: r.registered_via };
+  return { id: r.id, name: r.full_name, emailHint: emailHint(r.email_norm ?? r.email), code: r.code, attendance: r.attendance, checkedInAt: r.checked_in_at };
 }
 
 /** Lookup at the door: by code, or by name or email words. Case- and accent-insensitive. */
@@ -322,7 +321,6 @@ export const SHEET_HEADER = [
   'Check-in Timestamp',
   'Marketing Consent',
   'Consent Timestamp',
-  'Registered Via',
 ] as const;
 
 const iso = (ms: number | null) => (typeof ms === 'number' && ms > 0 ? new Date(ms).toISOString() : '');
@@ -343,7 +341,6 @@ export function sheetRow(r: RegistrationRow, eventTitle: string): string[] {
     iso(r.checked_in_at),
     r.marketing_consent ? 'Yes' : 'No',
     iso(r.consent_at),
-    r.registered_via === 'walk-in' ? 'Walk-in' : 'Online',
   ];
   return cells.map(defuse);
 }
@@ -363,43 +360,38 @@ export function toCsv(rows: readonly RegistrationRow[], eventTitle: string): str
 
 export interface EventStats {
   rsvps: number;
-  online: number;
-  walkIns: number;
   attended: number;
-  /** attended RSVPs ÷ online RSVPs — walk-ins never RSVP'd, so they are not in it */
+  /** attended ÷ RSVPs */
   showRate: number | null;
   consented: number;
   bySource: { id: string; label: string; n: number }[];
   byInterest: { id: string; label: string; n: number }[];
   byCampaign: { id: string; n: number }[];
-  /** registrations per day, on the event's clock */
+  /** RSVPs per day, on the event's clock */
   daily: { day: string; n: number }[];
 }
 
 export function statsOf(rows: readonly RegistrationRow[], timezone = 'America/Chicago'): EventStats {
-  const online = rows.filter((r) => r.registered_via === 'web');
-  const attendedOnline = online.filter((r) => r.attendance === 'attended').length;
+  const attended = rows.filter((r) => r.attendance === 'attended').length;
   const count = <T extends { id: string; label: string }>(list: readonly T[], key: (r: RegistrationRow) => string | null) =>
     [
-      ...list.map((x) => ({ id: x.id, label: x.label, n: online.filter((r) => key(r) === x.id).length })),
-      { id: 'none', label: 'Not answered', n: online.filter((r) => !key(r)).length },
+      ...list.map((x) => ({ id: x.id, label: x.label, n: rows.filter((r) => key(r) === x.id).length })),
+      { id: 'none', label: 'Not answered', n: rows.filter((r) => !key(r)).length },
     ].filter((x) => x.n > 0);
   const camp = new Map<string, number>();
-  for (const r of online) {
+  for (const r of rows) {
     const k = r.ref ? `ref:${r.ref}` : r.utm_campaign || r.utm_source ? `${r.utm_source ?? '—'} / ${r.utm_campaign ?? '—'}` : 'direct';
     camp.set(k, (camp.get(k) ?? 0) + 1);
   }
   const days = new Map<string, number>();
-  for (const r of online) {
+  for (const r of rows) {
     const d = new Date(r.registered_at).toLocaleDateString('en-CA', { timeZone: timezone });
     days.set(d, (days.get(d) ?? 0) + 1);
   }
   return {
-    rsvps: online.length,
-    online: online.length,
-    walkIns: rows.length - online.length,
-    attended: rows.filter((r) => r.attendance === 'attended').length,
-    showRate: online.length ? attendedOnline / online.length : null,
+    rsvps: rows.length,
+    attended,
+    showRate: rows.length ? attended / rows.length : null,
     consented: rows.filter((r) => r.marketing_consent).length,
     bySource: count(SOURCES, (r) => r.source),
     byInterest: count(INTERESTS, (r) => r.interest),

@@ -4,7 +4,6 @@
 //   lookup   { q }              → matches by name, email or code
 //   checkin  { registrationId } → mark attended, once; a second time reports the first
 //   undo     { registrationId } → revert a mistaken check-in
-//   walkin   { fullName, email? } → register and check in at once
 //
 // Attendees check themselves in at the venue (app/api/events/checkin); this is
 // the staff fallback. Answers carry what the door needs (a name, a masked
@@ -14,7 +13,7 @@ import type { NextRequest } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { clean, doorRow, EVENT_ID, LIMITS, normalizeEmail, REG_ID, searchRegistrations, } from '@/lib/events/model';
-import { EventStoreError, checkIn, findById, getEvent, listRegistrations, registerWalkIn, undoCheckIn } from '@/lib/events/store';
+import { checkIn, findById, getEvent, listRegistrations, undoCheckIn } from '@/lib/events/store';
 import { currentRole } from '@/lib/events/staff';
 import { afterChange, json, sameOrigin, storeFailure } from '@/lib/events/http';
 
@@ -64,25 +63,6 @@ export async function POST(req: NextRequest) {
       const r = await checkIn(row.id, who.by);
       afterChange(eventId);
       return r.ok ? json({ person: doorRow(r.row), checkedIn: true }) : json({ person: doorRow(r.already), checkedIn: false, already: true });
-    }
-
-    if (action === 'walkin') {
-      const fullName = clean(body?.fullName, LIMITS.name);
-      if (fullName.length < 2) return json({ error: 'Enter their full name.', field: 'fullName' }, 400);
-      const rawEmail = clean(body?.email, LIMITS.email);
-      const emailNorm = rawEmail ? normalizeEmail(rawEmail) : null;
-      if (rawEmail && !emailNorm) return json({ error: 'That email address doesn’t look right. Leave it empty if they’d rather not give one.', field: 'email' }, 400);
-      try {
-        const row = await registerWalkIn(event, fullName, emailNorm, emailNorm ? rawEmail : null, who.by);
-        afterChange(eventId);
-        return json({ person: doorRow(row), checkedIn: true }, 201);
-      } catch (e) {
-        if (e instanceof EventStoreError && e.kind === 'duplicate') {
-          const existing = emailNorm ? (await listRegistrations(eventId)).find((r) => r.email_norm === emailNorm) : null;
-          return json({ error: 'They already registered — check them in instead.', code: 'duplicate', person: existing ? doorRow(existing) : null }, 409);
-        }
-        throw e;
-      }
     }
 
     return json({ error: 'Unknown action.' }, 400);

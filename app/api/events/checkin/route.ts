@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
     if (!event.self_checkin || event.status === 'cancelled') return json({ error: 'Check-in isn’t open right now. Please find a member of the Socria team at the door.', code: 'not-open' }, 403);
     const r = await selfCheckIn(event, checked.value);
     if (r.status === 'not-found')
-      return json({ error: checked.value.by === 'email' ? 'We couldn’t find an RSVP with that email. Check the spelling, or try the name you RSVP’d under.' : 'We couldn’t find an RSVP under that name. Check the spelling, or try the email you RSVP’d with.', code: 'not-found' }, 404);
+      return json({ error: checked.value.by === 'email' ? 'We couldn’t find an RSVP with that email. Check the spelling, try the name you RSVP’d under — or RSVP now and come back.' : 'We couldn’t find an RSVP under that name. Check the spelling, try the email you RSVP’d with — or RSVP now and come back.', code: 'not-found' }, 404);
     if (r.status === 'ambiguous') return json({ error: 'More than one person RSVP’d under that name. Please use the email you RSVP’d with.', code: 'ambiguous' }, 409);
     if (!('row' in r)) return json({ error: 'Something went wrong. Please try again.' }, 500);
     if (r.status === 'checked-in') afterChange(event.id);

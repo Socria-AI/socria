@@ -127,7 +127,7 @@ export async function acquisitionFor(eventId: string, regs: readonly Registratio
   const notes: string[] = [];
   const c = await counters(eventId);
   if (!c) notes.push('Page views are unavailable: the product_events counter could not be read.');
-  const online = regs.filter((r) => r.registered_via === 'web').length;
+  const online = regs.length;
   const emails = [...new Set(regs.map((r) => r.email_norm).filter((e): e is string => !!e))];
   const accounts = emails.length ? await accountsFor(emails) : [];
   let confirmed: Acquisition['confirmed'] = { matchedAccounts: null, signedUpAfterRsvp: null, attendeesSignedUp: null, firstUse: null, returnedAfter7d: null, eligibleFor7d: null };

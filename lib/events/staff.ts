@@ -7,7 +7,7 @@
 //           developer dashboard. Sees the attendee list, edits events,
 //           exports, deletes, resyncs the sheet.
 //   staff — admins, plus SOCRIA_EVENT_STAFF: the people working the door.
-//           They can look someone up, check them in and add walk-ins, and see
+//           They can look someone up and check them in, and see
 //           only what that needs (a name, a masked email, the code).
 //
 // Both lists take verified email addresses or Clerk user ids

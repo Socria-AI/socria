@@ -77,7 +77,9 @@ export function CheckinForm({ eventId, open }: { eventId: string; open: boolean 
         <button type="submit" className="ev-btn ev-submit" disabled={busy}>
           {busy ? 'Checking you in…' : 'Check in'}
         </button>
-        <p className="ev-fine">Didn’t RSVP? Find a member of the Socria team at the door.</p>
+        <p className="ev-fine">
+          Didn’t RSVP? <a className="ev-link" href={`/events/${eventId}`}>RSVP now</a> — it takes a minute — then check in here.
+        </p>
       </form>
     </section>
   );

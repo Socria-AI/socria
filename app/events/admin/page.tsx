@@ -30,7 +30,7 @@ export default async function Page() {
         dateConfirmed: e.date_confirmed,
         startsAt: e.starts_at,
         timezone: e.timezone,
-        rsvps: regs ? regs.filter((r) => r.registered_via === 'web').length : null,
+        rsvps: regs ? regs.length : null,
         attended: regs ? regs.filter((r) => r.attendance === 'attended').length : null,
       };
     })

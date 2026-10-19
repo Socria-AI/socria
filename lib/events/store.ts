@@ -167,45 +167,6 @@ export async function register(event: EventRow, input: RsvpInput, now = Date.now
   throw new EventStoreError('unavailable');
 }
 
-/** A walk-in, registered and checked in at once by staff. Email optional. */
-export async function registerWalkIn(event: EventRow, fullName: string, emailNorm: string | null, email: string | null, staff: string, now = Date.now()): Promise<RegistrationRow> {
-  if (emailNorm) {
-    const existing = await findByEmail(event.id, emailNorm);
-    if (existing) throw new EventStoreError('duplicate', existing.id);
-  }
-  for (let attempt = 0; attempt < 4; attempt++) {
-    const row: RegistrationRow = {
-      id: newRegistrationId(),
-      event_id: event.id,
-      full_name: fullName,
-      email,
-      email_norm: emailNorm,
-      interest: null,
-      interest_other: null,
-      source: null,
-      utm_source: null,
-      utm_medium: null,
-      utm_campaign: null,
-      ref: null,
-      registered_at: now,
-      registered_via: 'walk-in',
-      attendance: 'attended',
-      checked_in_at: now,
-      checked_in_by: staff,
-      marketing_consent: false,
-      consent_at: null,
-      // a walk-in gets no link, so no usable token: a hash of fresh random bytes nobody holds
-      token_hash: hashToken(newToken()),
-      code: newCode(),
-    };
-    const { error } = await supabaseAdmin().from('event_registrations').insert(row);
-    if (!error) return row;
-    if (error.code !== '23505') fail(error);
-    if (emailNorm && (await findByEmail(event.id, emailNorm))) throw new EventStoreError('duplicate');
-  }
-  throw new EventStoreError('unavailable');
-}
-
 /**
  * Check in at the venue, by the attendee: the QR code at the door opens the
  * check-in page, where they type the name or the email they RSVP'd with.
@@ -264,8 +225,7 @@ export async function undoCheckIn(id: string): Promise<void> {
     .from('event_registrations')
     .update({ attendance: 'registered', checked_in_at: null, checked_in_by: null }, { count: 'exact' })
     .eq('id', id)
-    .eq('attendance', 'attended')
-    .eq('registered_via', 'web');
+    .eq('attendance', 'attended');
   if (error) fail(error);
   if (!count) throw new EventStoreError('conflict');
 }

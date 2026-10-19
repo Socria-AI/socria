@@ -6,7 +6,7 @@
 // an unconfirmed date is never shown; a staff-only note never reaches the
 // public shape; a date cannot be "confirmed" without a start; the door finds
 // people by code or name; sheet and CSV rows are in the agreed columns and
-// cannot smuggle in a formula; the numbers count walk-ins apart from RSVPs.
+// cannot smuggle in a formula; the numbers count RSVPs and check-ins.
 
 import * as E from './.tmp/events-under-test.mjs';
 
@@ -124,11 +124,10 @@ console.log('\n=== the numbers ===');
     row({ attendance: 'attended', checked_in_at: 1 }),
     row({ id: 'rsvp_' + 'b'.repeat(24), source: 'friend', email_norm: 'b@x.com', utm_source: null, utm_campaign: null, ref: 'acm' }),
     row({ id: 'rsvp_' + 'c'.repeat(24), source: null, email_norm: 'c@x.com', registered_at: Date.UTC(2026, 9, 22, 15), marketing_consent: true, consent_at: 1 }),
-    row({ id: 'rsvp_' + 'd'.repeat(24), registered_via: 'walk-in', email: null, email_norm: null, attendance: 'attended', checked_in_at: 1, source: null }),
   ];
   const s = E.statsOf(rows);
-  ok('RSVPs exclude walk-ins; check-ins include them', s.rsvps === 3 && s.walkIns === 1 && s.attended === 2);
-  ok('the show rate is attended RSVPs over RSVPs (1 of 3)', Math.abs(s.showRate - 1 / 3) < 1e-9);
+  ok('RSVPs and check-ins counted', s.rsvps === 3 && s.attended === 1 && !('walkIns' in s));
+  ok('the show rate is check-ins over RSVPs (1 of 3)', Math.abs(s.showRate - 1 / 3) < 1e-9);
   ok('sources, with "not answered" said', J(s.bySource.map((x) => [x.id, x.n])) === J([['instagram', 1], ['friend', 1], ['none', 1]]));
   ok('links: referral codes and campaigns kept apart', s.byCampaign.some((c) => c.id === 'ref:acm') && s.byCampaign.some((c) => c.id === 'instagram / in-public-002'));
   ok('registrations by day, on the event clock', J(s.daily) === J([{ day: '2026-10-20', n: 2 }, { day: '2026-10-22', n: 1 }]));

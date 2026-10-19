@@ -2,8 +2,7 @@
 
 // The door: built to check someone in within a few seconds on a phone.
 // Type a name, an email or a code; tap Check in. No smartphone? The code or
-// the name is enough. Someone who never registered? Add them as a walk-in —
-// a name, and an email only if they want to give one.
+// the name is enough. Someone who never RSVP'd RSVPs on the spot, then checks in.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DoorRow } from '@/lib/events/model';
@@ -20,10 +19,6 @@ export function DoorView({ eventId, title }: { eventId: string; title: string })
   const [counts, setCounts] = useState<{ total: number; attended: number } | null>(null);
   const [msg, setMsg] = useState<{ text: string; tone: 'ok' | 'warn' } | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
-  const [walk, setWalk] = useState(false);
-  const [wName, setWName] = useState('');
-  const [wEmail, setWEmail] = useState('');
-  const [wErr, setWErr] = useState('');
   const seq = useRef(0);
   const input = useRef<HTMLInputElement>(null);
 
@@ -70,29 +65,6 @@ export function DoorView({ eventId, title }: { eventId: string; title: string })
     setMsg({ text: `Check-in undone for ${p.name}.`, tone: 'ok' });
   }
 
-  async function addWalkIn(e: React.FormEvent) {
-    e.preventDefault();
-    setWErr('');
-    setBusy('walkin');
-    const { status, j } = await post({ action: 'walkin', eventId, fullName: wName, email: wEmail }).catch(() => ({ status: 0, j: {} as any }));
-    setBusy(null);
-    if (status === 201) {
-      setMsg({ text: `${j.person.name} added and checked in.`, tone: 'ok' });
-      setCounts((c) => (c ? { total: c.total + 1, attended: c.attended + 1 } : c));
-      setWName('');
-      setWEmail('');
-      setWalk(false);
-      return;
-    }
-    if (j.code === 'duplicate' && j.person) {
-      setWalk(false);
-      setPeople([j.person]);
-      setMsg({ text: 'They already registered — check them in below.', tone: 'warn' });
-      return;
-    }
-    setWErr(j.error || 'Could not add them.');
-  }
-
   return (
     <div className="stack" style={{ gap: 16 }}>
       <div className="stack" style={{ gap: 6 }}>
@@ -123,17 +95,14 @@ export function DoorView({ eventId, title }: { eventId: string; title: string })
               <strong>{p.name}</strong>
               <span>
                 {p.emailHint} · {p.code}
-                {p.via === 'walk-in' ? ' · walk-in' : ''}
               </span>
             </div>
             {p.attendance === 'attended' ? (
               <div className="stack" style={{ gap: 4, alignItems: 'flex-end' }}>
                 <span className="ev-badge attended">In · {time(p.checkedInAt)}</span>
-                {p.via === 'web' && (
-                  <button type="button" className="ev-fine" style={{ textDecoration: 'underline' }} onClick={() => undo(p)} disabled={busy === p.id}>
-                    Undo
-                  </button>
-                )}
+                <button type="button" className="ev-fine" style={{ textDecoration: 'underline' }} onClick={() => undo(p)} disabled={busy === p.id}>
+                  Undo
+                </button>
               </div>
             ) : (
               <button type="button" className="ev-btn moss" onClick={() => checkIn(p)} disabled={busy === p.id}>
@@ -142,38 +111,13 @@ export function DoorView({ eventId, title }: { eventId: string; title: string })
             )}
           </li>
         ))}
-        {q.trim().length >= 2 && people.length === 0 && <li className="ev-fine">No one by that name, email or code. Add them as a walk-in below.</li>}
+        {q.trim().length >= 2 && people.length === 0 && (
+          <li className="ev-fine">
+            No RSVP by that name, email or code. They can RSVP on the spot at <a className="ev-link" href={`/events/${eventId}`}>the event page</a>, then check in.
+          </li>
+        )}
       </ul>
 
-      {!walk ? (
-        <button type="button" className="ev-ghost" style={{ width: 'fit-content' }} onClick={() => setWalk(true)}>
-          + Add a walk-in
-        </button>
-      ) : (
-        <form className="ev-panel" onSubmit={addWalkIn}>
-          <h3>Walk-in</h3>
-          <div className="ev-field">
-            <label htmlFor="walk-name">Full name</label>
-            <input id="walk-name" className="ev-input" value={wName} onChange={(e) => setWName(e.target.value)} autoFocus required maxLength={100} />
-          </div>
-          <div className="ev-field">
-            <label htmlFor="walk-email">
-              Email <span className="opt">(optional)</span>
-            </label>
-            <input id="walk-email" className="ev-input" type="email" inputMode="email" autoCapitalize="off" value={wEmail} onChange={(e) => setWEmail(e.target.value)} maxLength={254} />
-          </div>
-          {wErr && <p className="ev-err">{wErr}</p>}
-          <p className="ev-fine">Walk-ins aren’t added to any mailing list.</p>
-          <div className="ev-actions">
-            <button type="submit" className="ev-btn moss" disabled={busy === 'walkin'}>
-              {busy === 'walkin' ? 'Adding…' : 'Add and check in'}
-            </button>
-            <button type="button" className="ev-ghost" onClick={() => setWalk(false)}>
-              Cancel
-            </button>
-          </div>
-        </form>
-      )}
       <p className="ev-fine">Attendees normally check themselves in by scanning the QR code at the door. Use this list for anyone who can’t.</p>
     </div>
   );
