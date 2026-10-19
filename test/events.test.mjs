@@ -4,8 +4,8 @@
 // any valid address is accepted (personal or .edu); marketing consent is true
 // only when the box was ticked; bots are screened without bothering people;
 // an unconfirmed date is never shown; a staff-only note never reaches the
-// public shape; a date cannot be "confirmed" without a start; the door finds
-// people by code or name; sheet and CSV rows are in the agreed columns and
+// public shape; a date cannot be "confirmed" without a start; check-in finds
+// an RSVP by email or full name; sheet and CSV rows are in the agreed columns and
 // cannot smuggle in a formula; the numbers count RSVPs and check-ins.
 
 import * as E from './.tmp/events-under-test.mjs';
@@ -77,17 +77,9 @@ console.log('\n=== the date, only when confirmed ===');
   ok('route words cannot be event addresses', E.checkNewEventId('admin') === null && E.checkNewEventId('in-public-003') === 'in-public-003' && E.checkNewEventId('In Public!') === null);
 }
 
-console.log('\n=== the door ===');
+console.log('\n=== confirmation codes ===');
 {
-  const rows = [row(), row({ id: 'rsvp_' + 'b'.repeat(24), full_name: 'José Álvarez', email: 'jose@mavs.uta.edu', email_norm: 'jose@mavs.uta.edu', code: 'M3N8PA' }), row({ id: 'rsvp_' + 'c'.repeat(24), full_name: 'Maya Chen', email: 'mchen@x.com', email_norm: 'mchen@x.com', code: 'Q2W3E4' })];
-  ok('a code finds exactly one person, typed any way', J(E.searchRegistrations(rows, 'k7p-4qx').map((r) => r.full_name)) === J(['Maya Patel']));
-  ok('a first name finds everyone with it', E.searchRegistrations(rows, 'maya').length === 2);
-  ok('accents do not get in the way', E.searchRegistrations(rows, 'jose alvarez').length === 1);
-  ok('an email finds them', E.searchRegistrations(rows, 'mavs.uta').length === 1);
-  ok('nothing typed, nothing shown', E.searchRegistrations(rows, '  ').length === 0);
-  const d = E.doorRow(rows[0]);
-  ok('the door sees a name, a masked email and the code — not the address, not the answers', d.emailHint === 'm•••@gmail.com' && !('email' in d) && !('interest' in d) && d.code === 'K7P4QX');
-  ok('a check-in code never looks like 0/O or 1/I/L', !/[01OIL]/.test(E.CODE_ALPHABET) && E.CODE.test('K7P4QX'));
+  ok('a confirmation code never looks like 0/O or 1/I/L', !/[01OIL]/.test(E.CODE_ALPHABET) && E.CODE.test('K7P4QX'));
 }
 
 console.log('\n=== check-in finds an RSVP by email or name ===');

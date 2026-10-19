@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
 /**
  * Already registered. If email is on, their confirmation link is sent again —
  * with a fresh secret, since only its hash was kept — to the address itself,
- * never to this screen. Without email, the door can still find them by name.
+ * never to this screen. Without email, they check in at the event by name.
  */
 async function duplicate(eventId: string, emailNorm: string) {
   const emailOn = (process.env.EVENT_EMAILS || '').trim().toLowerCase() === 'on' && !!process.env.RESEND_API_KEY;
@@ -79,7 +79,7 @@ async function duplicate(eventId: string, emailNorm: string) {
     {
       error: emailOn
         ? 'This email is already registered. We’ve sent your confirmation link to it again.'
-        : 'This email is already registered. At the door, just tell us your name.',
+        : 'This email is already registered. At the event, check in with your name or this email.',
       code: 'duplicate',
     },
     409

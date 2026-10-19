@@ -1,5 +1,5 @@
 /* app/events/events.css — Socria events: the public page, the confirmation,
- * the door and the admin view. Scoped under .app-root and built from the app
+ * the check-in page and the admin view. Scoped under .app-root and built from the app
  * register's own tokens (app-shell.css, globals.css): paper, ink, moss and
  * the serif display — one design language, not a second one.
  */
@@ -110,10 +110,6 @@
 .app-root .ev-toolbar{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
 .app-root .ev-toolbar .ev-input{width:auto;flex:1 1 220px;padding:10px 14px}
 .app-root .ev-select{background:var(--app-paper);border:1px solid var(--app-border);border-radius:12px;padding:10px 12px;font-size:.92rem}
-.app-root .ev-door-row{display:flex;align-items:center;gap:12px;padding:14px;border:1px solid var(--app-border);border-radius:16px;background:var(--surface,#fff)}
-.app-root .ev-door-row .who{flex:1;min-width:0}
-.app-root .ev-door-row .who strong{display:block;font-size:1.05rem}
-.app-root .ev-door-row .who span{font-size:.84rem;color:var(--ink-70)}
 .app-root .ev-btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:44px;padding:10px 18px;border-radius:999px;background:var(--ink);color:var(--app-paper);font-weight:600;font-size:.95rem}
 .app-root .ev-btn:disabled{opacity:.45;cursor:not-allowed}
 .app-root .ev-btn.moss{background:var(--moss-700)}

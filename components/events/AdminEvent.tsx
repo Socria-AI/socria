@@ -199,9 +199,9 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
 
   // ── actions ──
   async function checkIn(r: AdminRow, undo = false) {
-    const { ok, j } = await call('/api/events/staff', 'POST', { action: undo ? 'undo' : 'checkin', eventId: event.id, registrationId: r.id });
+    const { ok, j } = await call(`/api/events/admin/${event.id}`, 'POST', { action: undo ? 'undo' : 'checkin', registrationId: r.id });
     if (!ok) return setMsg(j.error || 'That did not work.');
-    setRows((list) => list.map((x) => (x.id === r.id ? { ...x, attendance: j.person.attendance, checked_in_at: j.person.checkedInAt } : x)));
+    setRows((list) => list.map((x) => (x.id === r.id ? { ...x, attendance: j.attendance, checked_in_at: j.checkedInAt } : x)));
     setMsg(undo ? `Check-in undone for ${r.full_name}.` : j.already ? `${r.full_name} was already checked in.` : `${r.full_name} checked in.`);
   }
   async function remove(r: AdminRow) {
@@ -292,7 +292,7 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
           </div>
           <div className="ev-actions">
             <Link className="ev-ghost" href={`/events/${event.id}`} target="_blank">View public page ↗</Link>
-            <Link className="ev-btn moss" href={`/events/admin/${event.id}/door`}>Door check-in</Link>
+            <Link className="ev-btn moss" href={`/events/${event.id}/checkin`} target="_blank">Check-in page ↗</Link>
           </div>
         </div>
         <nav className="ev-tabs" role="tablist" aria-label="Event sections">
@@ -316,7 +316,7 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
           <p className="ev-summary">{summary}</p>
           <section className="ev-kpis" aria-label="Headline numbers">
             <Stat tag="conf" label="RSVPs" value={String(n.rsvps)} help="registered online" />
-            <Stat tag="conf" label="Checked in" value={String(n.attended)} help="at the door" />
+            <Stat tag="conf" label="Checked in" value={String(n.attended)} help="at the event" />
             <Stat tag="conf" label="Show-up rate" value={pct(n.showRate)} help="of RSVPs who came" />
             <Stat tag="est" label="Page visits" value={num(acq.estimated.pageViews)} help={acq.estimated.rsvpPerView !== null ? `${pct(acq.estimated.rsvpPerView)} went on to RSVP` : 'views of the event page'} />
           </section>
@@ -491,12 +491,13 @@ export function AdminEvent({ event: initial, rows: initialRows, stats, acq, sync
             </div>
           </section>
           <section className="ev-panel">
-            <h3>At the door right now</h3>
+            <h3>Who’s here</h3>
             <div className="ev-kpis">
               <Stat tag="conf" label="Checked in" value={String(n.attended)} help={`${n.self} by themselves`} />
               <Stat tag="conf" label="Not here yet" value={String(n.notYet)} help="RSVP’d, not checked in" />
             </div>
-            <Link className="ev-ghost" style={{ width: 'fit-content' }} href={`/events/admin/${event.id}/door`}>Open the door list</Link>
+            <p className="ev-fine">Someone can’t use their phone? Check them in from the Attendees tab.</p>
+            <button type="button" className="ev-ghost" style={{ width: 'fit-content' }} onClick={() => go('attendees')}>Open attendees</button>
           </section>
         </div>
       )}

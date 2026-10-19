@@ -1,6 +1,6 @@
 # Socria events: RSVP and attendance
 
-A reusable system for Socria's in-person events. Each event has a public page and a free RSVP; at the event, everyone checks in by scanning a QR code at the door and answering the RSVP's questions. Staff have a door list as a fallback, admins get a dashboard, a private Google Sheet mirrors the registrations, and acquisition numbers keep confirmed results apart from estimates.
+A reusable system for Socria's in-person events. Each event has a public page and a free RSVP; at the event, everyone checks in by scanning a QR code at the door and answering the RSVP's questions. Admins get a dashboard (where they can also check someone in by hand), a private Google Sheet mirrors the registrations, and acquisition numbers keep confirmed results apart from estimates.
 
 The first event is **Socria: In Public 002**, at `/events/in-public-002`. Its date is not confirmed, so the page says "To be announced". The target date is kept as a staff-only planning note until an admin sets and confirms the date.
 
@@ -39,9 +39,8 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 | `DELETE /api/events/ticket` | holder of the secret | cancel; deletes the registration |
 | `GET /api/events/[id]/ics` | public | calendar file, only once the date is confirmed |
 | `POST /api/events/checkin` | public, while self check-in is open | `{ who }` finds an RSVP by name or email; the full form matches an RSVP or adds the person |
-| `POST /api/events/staff` | staff and admins | `lookup`, `checkin` (once), `undo` |
 | `POST /api/events/admin` | admins | create a draft event; run the retention sweep |
-| `PATCH`/`POST /api/events/admin/[id]` | admins | edit the event; `sync` the sheet; `delete` a registration |
+| `PATCH`/`POST /api/events/admin/[id]` | admins | edit the event; `sync` the sheet; `delete` a registration; `checkin` (once) or `undo` one by hand |
 | `GET /api/events/admin/[id]/export` | admins | CSV, the same columns as the sheet |
 | `GET /api/cron/events` | Vercel cron (`CRON_SECRET`) | retention purge and sheet catch-up, daily |
 
@@ -50,9 +49,8 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 - `/events/[id]`: the public page and RSVP. Mobile-first, with a sticky RSVP button on phones and share metadata from `lib/og-cards.ts`.
 - `/events/[id]/ticket#t=…`: the saved confirmation.
 - `/events/[id]/checkin`: the check-in page the venue QR code opens.
-- `/events/admin`: the list of events. Staff get door links; admins also get a new-event form and the retention sweep.
+- `/events/admin`: the list of events, each with its dashboard and check-in page, a new-event form and the retention sweep. Admins only.
 - `/events/admin/[id]`: the admin dashboard.
-- `/events/admin/[id]/door`: phone-first check-in.
 
 ## Check-in
 
@@ -65,7 +63,7 @@ RSVP and check-in are separate steps, and **checking in is how everyone comes in
    - **Didn't RSVP? Check in here:** the RSVP's questions (name, email, interests, how they heard, the unticked email-updates box). Answering them checks the person in. If that email or exact name matches an RSVP after all, that RSVP is checked in and blank answers are filled in. Otherwise they are added and checked in on the spot.
    - **Every check-in is recorded as `self`.** Checking in twice says they already are.
 
-**Fallback for staff:** the door list (`/events/admin/<id>/door`) lets staff and admins find someone by name or email and check them in.
+**There is no separate door list.** The check-in page is how everyone comes in. If someone can't use their phone, an admin finds them in the dashboard's **Attendees** tab and checks them in there (or hands them the admin's phone on the check-in page).
 
 **Trade-off:** the form trusts the person filling it in. Someone who knows an attendee's name could check them in while check-in is open.
 
@@ -103,7 +101,6 @@ The database is the source of truth; the sheet is a private copy for the team.
 - **Spam.** RSVPs are rate limited per address. A hidden field and a minimum fill time screen out bots. Cross-site posts are refused.
 - **Nothing public lists attendees.**
   - **The attendee's link:** shows only their own registration.
-  - **Door staff:** see a name, a masked email and the code.
   - **Admins:** see everything, read fresh and never cached or indexed.
   - **Everyone else:** gets a 404 or 403.
 - **Analytics.** Analytics carry only the event id and link tags, never a person. Tokens live in fragments, never in URLs that are logged.
@@ -113,7 +110,7 @@ The database is the source of truth; the sheet is a private copy for the team.
   - **Retention:** registrations are deleted `EVENT_RETENTION_DAYS` (default 365) after the event.
   - **Account deletion:** deleting a Socria account deletes RSVPs under its verified emails. Account export includes them.
   - **The sheet:** every deletion also removes the row from the sheet.
-- **Roles.** Staff access requires a signed-in Clerk identity with a verified email or user id in the allowlist. The developer dashboard's two-step code does not open event data.
+- **Roles.** One role, admin: a signed-in Clerk identity with a verified email or user id in `SOCRIA_DASHBOARD_ADMINS`. There is no door or staff role. The developer dashboard's two-step code does not open event data.
 
 ## Acquisition analytics
 
@@ -146,7 +143,7 @@ By hand, on a preview deployment with Supabase, Clerk and admin env set:
 1. Open `/events/in-public-002` on a phone. RSVP with a personal address. Check that the confirmation explains how to check in, and that the consent box was unticked.
 2. RSVP again with the same email; it is refused as already registered.
 3. As an admin, open self check-in on the Check-in tab. Open `/events/in-public-002/checkin`, fill in the form with the name you RSVP'd under, and check that it says Welcome. Enter it again and check that it says already checked in.
-4. On `/events/admin/in-public-002/door`, find someone by name and check them in.
+4. On the dashboard's **Attendees** tab, check someone in by hand, then undo it.
 5. On `/events/admin/in-public-002`, check that the numbers, attendee list and search work, export the CSV, and set and confirm a date. Check that the public page shows it and the calendar file downloads.
 6. With the Google variables set, press **Resync now** and check that the tab has one row per person. Check someone in or out and watch their row change in place.
 7. From the attendee's confirmation, cancel. Check that the row leaves the admin list and the sheet.

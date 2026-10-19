@@ -428,8 +428,8 @@ What each number means, and what is and is not read: `docs/DASHBOARD.md`.
    `supabase/schema.sql` (it creates `events`, `event_registrations` and
    `event_sheet_sync`, and seeds *Socria: In Public 002* with its date **not**
    confirmed), then the matching block at the end of `supabase/rls.sql`.
-2. Admins are the people in `SOCRIA_DASHBOARD_ADMINS` (section 7). Add door
-   volunteers to `SOCRIA_EVENT_STAFF`.
+2. Admins are the people in `SOCRIA_DASHBOARD_ADMINS` (section 7). There is
+   no separate door role: attendees check themselves in at the venue.
 3. Optional: `EVENT_EMAILS=on` for confirmation emails (needs Resend), and the
    Google Sheet — the full steps are in `docs/EVENTS.md`.
 4. Sign in as an admin, open `/events/admin/in-public-002`, set the start and

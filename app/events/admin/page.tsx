@@ -1,4 +1,4 @@
-// app/events/admin/page.tsx — Socria events, for staff and admins only.
+// app/events/admin/page.tsx — Socria events, for admins only.
 // Anyone else gets the same 404 as a page that does not exist.
 
 import type { Metadata } from 'next';
@@ -17,12 +17,11 @@ export const metadata: Metadata = { ...NOINDEX, title: 'Events admin' };
 
 export default async function Page() {
   const who = await currentRole();
-  if (!who) notFound();
-  const admin = who.role === 'admin';
+  if (who?.role !== 'admin') notFound();
   const events = await listEvents().catch(() => []);
   const listed: ListedEvent[] = await Promise.all(
     events.map(async (e) => {
-      const regs = admin ? await listRegistrations(e.id).catch(() => null) : null;
+      const regs = await listRegistrations(e.id).catch(() => null);
       return {
         id: e.id,
         title: e.title,
@@ -38,7 +37,7 @@ export default async function Page() {
   return (
     <div className="app-root">
       <main className="ev-page">
-        <AdminList events={listed} admin={admin} retention={retentionDays()} />
+        <AdminList events={listed} retention={retentionDays()} />
       </main>
     </div>
   );

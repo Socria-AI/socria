@@ -265,48 +265,6 @@ export function ticketOf(r: RegistrationRow, e: EventRow): Ticket {
   return { event: publicEvent(e), firstName: r.full_name.split(' ')[0] ?? r.full_name, code: r.code, attendance: r.attendance, checkedInAt: r.checked_in_at };
 }
 
-// ── what staff see at the door ────────────────────────────────────────
-
-export interface DoorRow {
-  id: string;
-  name: string;
-  /** "m•••@gmail.com" — enough to tell two people with one name apart */
-  emailHint: string;
-  code: string;
-  attendance: Attendance;
-  checkedInAt: number | null;
-}
-
-export function emailHint(email: string | null): string {
-  if (!email) return '—';
-  const [local, domain] = email.split('@');
-  return `${local.slice(0, 1)}•••@${domain ?? ''}`;
-}
-
-export function doorRow(r: RegistrationRow): DoorRow {
-  return { id: r.id, name: r.full_name, emailHint: emailHint(r.email_norm ?? r.email), code: r.code, attendance: r.attendance, checkedInAt: r.checked_in_at };
-}
-
-/** Lookup at the door: by code, or by name or email words. Case- and accent-insensitive. */
-export function searchRegistrations(rows: readonly RegistrationRow[], q: string, limit = 12): RegistrationRow[] {
-  const fold = (s: string) => s.normalize('NFKD').replace(/[̀-ͯ]/g, '').toLowerCase();
-  const query = fold(clean(q, 120));
-  if (!query) return [];
-  const code = query.toUpperCase().replace(/[^A-Z0-9]/g, '');
-  if (CODE.test(code)) {
-    const hit = rows.find((r) => r.code === code);
-    if (hit) return [hit];
-  }
-  const words = query.split(' ').filter(Boolean);
-  return rows
-    .filter((r) => {
-      const hay = fold(`${r.full_name} ${r.email ?? ''}`);
-      return words.every((w) => hay.includes(w));
-    })
-    .sort((a, b) => a.full_name.localeCompare(b.full_name))
-    .slice(0, limit);
-}
-
 // ── the sheet ─────────────────────────────────────────────────────────
 
 export const SHEET_HEADER = [

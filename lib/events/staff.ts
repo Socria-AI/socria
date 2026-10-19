@@ -1,29 +1,26 @@
-// lib/events/staff.ts — WHO MAY SEE ATTENDEES, AND WHO MAY CHANGE THINGS.
+// lib/events/staff.ts — WHO MAY SEE ATTENDEES AND CHANGE THINGS.
 //
-// Two roles, both default-deny, both by signed-in Clerk identity (never by a
-// shared code — the developer dashboard's two-step code does not open this):
+// One role, default-deny, by signed-in Clerk identity (never by a shared
+// code — the developer dashboard's two-step code does not open this):
 //
 //   admin — everyone in SOCRIA_DASHBOARD_ADMINS, the same list that opens the
 //           developer dashboard. Sees the attendee list, edits events,
-//           exports, deletes, resyncs the sheet.
-//   staff — admins, plus SOCRIA_EVENT_STAFF: the people working the door.
-//           They can look someone up and check them in, and see
-//           only what that needs (a name, a masked email, the code).
+//           checks people in by hand, exports, deletes, resyncs the sheet.
 //
-// Both lists take verified email addresses or Clerk user ids
-// (lib/dashboard/gate.ts parseAdmins).
+// There is no separate door role: attendees check themselves in at the venue
+// (app/events/[id]/checkin), and an admin can check someone in from the
+// dashboard's attendee list. The list takes verified email addresses or
+// Clerk user ids (lib/dashboard/gate.ts parseAdmins).
 
 import 'server-only';
 import { currentUser } from '@clerk/nextjs/server';
 import { mayViewDashboard, type Viewer } from '@/lib/dashboard/gate';
 
-export type Role = 'admin' | 'staff';
+export type Role = 'admin';
 
-export function roleOf(viewer: Viewer | null, admins = process.env.SOCRIA_DASHBOARD_ADMINS, staff = process.env.SOCRIA_EVENT_STAFF): Role | null {
+export function roleOf(viewer: Viewer | null, admins = process.env.SOCRIA_DASHBOARD_ADMINS): Role | null {
   if (!viewer) return null;
-  if (mayViewDashboard(viewer, admins)) return 'admin';
-  if (mayViewDashboard(viewer, staff)) return 'staff';
-  return null;
+  return mayViewDashboard(viewer, admins) ? 'admin' : null;
 }
 
 export async function currentViewer(): Promise<Viewer | null> {

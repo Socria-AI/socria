@@ -1,6 +1,6 @@
 'use client';
 
-// All events, for staff (door links) and admins (plus a new event and the retention sweep).
+// All events, for admins: each one's dashboard and check-in page, a new event, and the retention sweep.
 
 import { useState } from 'react';
 import Link from 'next/link';
@@ -16,7 +16,7 @@ export interface ListedEvent {
   attended: number | null;
 }
 
-export function AdminList({ events, admin, retention }: { events: ListedEvent[]; admin: boolean; retention: number }) {
+export function AdminList({ events, retention }: { events: ListedEvent[]; retention: number }) {
   const [id, setId] = useState('');
   const [title, setTitle] = useState('');
   const [msg, setMsg] = useState<string | null>(null);
@@ -37,7 +37,7 @@ export function AdminList({ events, admin, retention }: { events: ListedEvent[];
   return (
     <div className="ev-admin">
       <header className="stack" style={{ gap: 6 }}>
-        <span className="ev-fine">Socria · {admin ? 'Admin' : 'Event staff'}</span>
+        <span className="ev-fine">Socria · Admin</span>
         <h1 className="ev-h2" style={{ fontSize: 'clamp(1.6rem,3vw,2.2rem)' }}>Events</h1>
       </header>
       {msg && <p className="ev-note" role="status">{msg}</p>}
@@ -48,8 +48,8 @@ export function AdminList({ events, admin, retention }: { events: ListedEvent[];
               <th>Event</th>
               <th>Date</th>
               <th>Status</th>
-              {admin && <th>RSVPs</th>}
-              {admin && <th>Checked in</th>}
+              <th>RSVPs</th>
+              <th>Checked in</th>
               <th aria-label="Open" />
             </tr>
           </thead>
@@ -62,16 +62,14 @@ export function AdminList({ events, admin, retention }: { events: ListedEvent[];
                 </td>
                 <td className="num">{e.startsAt && e.dateConfirmed ? new Date(e.startsAt).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric', timeZone: e.timezone }) : 'Not confirmed'}</td>
                 <td>{e.status}</td>
-                {admin && <td className="num">{e.rsvps ?? '—'}</td>}
-                {admin && <td className="num">{e.attended ?? '—'}</td>}
+                <td className="num">{e.rsvps ?? '—'}</td>
+                <td className="num">{e.attended ?? '—'}</td>
                 <td style={{ whiteSpace: 'nowrap' }}>
-                  {admin && (
-                    <Link className="ev-ghost" href={`/events/admin/${e.id}`}>
-                      Manage
-                    </Link>
-                  )}{' '}
-                  <Link className="ev-ghost" href={`/events/admin/${e.id}/door`}>
-                    Door
+                  <Link className="ev-ghost" href={`/events/admin/${e.id}`}>
+                    Manage
+                  </Link>{' '}
+                  <Link className="ev-ghost" href={`/events/${e.id}/checkin`} target="_blank">
+                    Check-in ↗
                   </Link>
                 </td>
               </tr>
@@ -86,34 +84,32 @@ export function AdminList({ events, admin, retention }: { events: ListedEvent[];
           </tbody>
         </table>
       </div>
-      {admin && (
-        <div className="ev-cols">
-          <form className="ev-panel" onSubmit={create}>
-            <h3>New event</h3>
-            <div className="ev-field">
-              <label htmlFor="new-title">Title</label>
-              <input id="new-title" className="ev-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Socria: In Public 003" />
-            </div>
-            <div className="ev-field">
-              <label htmlFor="new-id">Address</label>
-              <input id="new-id" className="ev-input" value={id} onChange={(e) => setId(e.target.value.toLowerCase())} placeholder="in-public-003" />
-              <span className="ev-fine">/events/{id || 'in-public-003'} — starts as a draft, not public.</span>
-            </div>
-            <button type="submit" className="ev-btn" style={{ width: 'fit-content' }}>
-              Create draft
-            </button>
-          </form>
-          <section className="ev-panel">
-            <h3>Retention</h3>
-            <p className="ev-fine">
-              Registrations are deleted {retention} days after their event ends, automatically each day. Run the sweep now if you need to.
-            </p>
-            <button type="button" className="ev-ghost" style={{ width: 'fit-content' }} onClick={purge}>
-              Run retention sweep
-            </button>
-          </section>
-        </div>
-      )}
+      <div className="ev-cols">
+        <form className="ev-panel" onSubmit={create}>
+          <h3>New event</h3>
+          <div className="ev-field">
+            <label htmlFor="new-title">Title</label>
+            <input id="new-title" className="ev-input" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Socria: In Public 003" />
+          </div>
+          <div className="ev-field">
+            <label htmlFor="new-id">Address</label>
+            <input id="new-id" className="ev-input" value={id} onChange={(e) => setId(e.target.value.toLowerCase())} placeholder="in-public-003" />
+            <span className="ev-fine">/events/{id || 'in-public-003'} — starts as a draft, not public.</span>
+          </div>
+          <button type="submit" className="ev-btn" style={{ width: 'fit-content' }}>
+            Create draft
+          </button>
+        </form>
+        <section className="ev-panel">
+          <h3>Retention</h3>
+          <p className="ev-fine">
+            Registrations are deleted {retention} days after their event ends, automatically each day. Run the sweep now if you need to.
+          </p>
+          <button type="button" className="ev-ghost" style={{ width: 'fit-content' }} onClick={purge}>
+            Run retention sweep
+          </button>
+        </section>
+      </div>
     </div>
   );
 }

@@ -10,8 +10,9 @@
 // confirmation once; a second RSVP with the same email is refused, not
 // duplicated; nothing public lists attendees; attendees check themselves in
 // at the venue by the name or email they RSVP'd with, while it is open;
-// staff check people in from the door list, once; there are no walk-ins
-// (someone without an RSVP RSVPs, then checks in); admins alone edit, export and delete; the sheet holds one
+// there is no door list or staff role — an admin can check someone in by
+// hand from the dashboard, once; there are no walk-ins (someone without an
+// RSVP checks in with the RSVP's questions); admins alone edit, export and delete; the sheet holds one
 // row per registration, updated in place, and a deleted person leaves it;
 // the database stays the source of truth when Google fails.
 
@@ -30,7 +31,6 @@ const ROUTES = {
   rsvp: 'app/api/events/rsvp/route.ts',
   ticket: 'app/api/events/ticket/route.ts',
   checkin: 'app/api/events/checkin/route.ts',
-  staff: 'app/api/events/staff/route.ts',
   admin: 'app/api/events/admin/route.ts',
   adminEvent: 'app/api/events/admin/[id]/route.ts',
   exportCsv: 'app/api/events/admin/[id]/export/route.ts',
@@ -217,41 +217,36 @@ console.log('\n=== the attendee’s own link, and only theirs ===');
   ok('a malformed one neither', (await call(R.ticket, '/api/events/ticket', 'POST', { token: '../../etc' })).status === 404);
 }
 
-console.log('\n=== the door list: staff only ===');
+console.log('\n=== checking in by hand: admins only, no door list ===');
 {
+  const hand = (action, registrationId = regId, id = 'in-public-002') => call(R.adminEvent, `/api/events/admin/${id}`, 'POST', { action, registrationId }, { id });
   as(null);
-  ok('signed out: no lookup', (await call(R.staff, '/api/events/staff', 'POST', { action: 'lookup', eventId: 'in-public-002', q: 'maya' })).status === 403);
+  ok('signed out: no check-in by hand', (await hand('checkin')).status === 403);
   as('user_rando');
-  ok('a signed-in non-staff account: no lookup', (await call(R.staff, '/api/events/staff', 'POST', { action: 'lookup', eventId: 'in-public-002', q: 'maya' })).status === 403);
-  ok('…and no check-in', (await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'in-public-002', registrationId: regId })).status === 403);
+  ok('a signed-in non-admin account: none', (await hand('checkin')).status === 403);
   as('user_sneaky');
-  ok('an admin address that is not verified is nobody', (await call(R.staff, '/api/events/staff', 'POST', { action: 'lookup', eventId: 'in-public-002', q: 'maya' })).status === 403);
-
+  ok('an admin address that is not verified is nobody', (await hand('checkin')).status === 403);
   as('user_door');
-  ok('there is no QR-scan lookup any more: check-in is by name or email at the venue', (await call(R.staff, '/api/events/staff', 'POST', { action: 'resolve', token })).status === 404);
-  const look = await call(R.staff, '/api/events/staff', 'POST', { action: 'lookup', eventId: 'in-public-002', q: 'maya' });
-  ok('lookup by name finds them, with counts', look.j.people.length === 1 && look.j.total === 2 && look.j.attended === 0);
-  ok('the door never sees full emails or answers', !look.text.includes('Gmail.com') && !look.text.includes('instagram'));
-  const code = db.rows('event_registrations').find((r) => r.id === regId).code;
-  ok('lookup by code finds them (no phone needed)', (await call(R.staff, '/api/events/staff', 'POST', { action: 'lookup', eventId: 'in-public-002', q: code.toLowerCase() })).j.people[0]?.id === regId);
+  ok('SOCRIA_EVENT_STAFF no longer opens anything: there is no staff role', (await hand('checkin')).status === 403 && (await hand('undo')).status === 403);
+  ok('…not export', (await R.exportCsv.GET(req('/api/events/admin/in-public-002/export', 'GET'), { params: { id: 'in-public-002' } })).status === 404);
+  ok('…not edits', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { title: 'x' }, { id: 'in-public-002' })).status === 403);
+  ok('…not deletes', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'POST', { action: 'delete', registrationId: regId }, { id: 'in-public-002' })).status === 403);
 
-  const first = await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'in-public-002', registrationId: regId });
+  as('user_admin');
+  const first = await hand('checkin');
   const row = db.rows('event_registrations').find((r) => r.id === regId);
-  ok('staff confirm: attended, with the time and who', first.j.checkedIn === true && row.attendance === 'attended' && typeof row.checked_in_at === 'number' && row.checked_in_by === 'user_door');
+  ok('an admin checks someone in: attended, with the time and who', first.status === 200 && first.j.attendance === 'attended' && row.attendance === 'attended' && typeof row.checked_in_at === 'number' && row.checked_in_by === 'user_admin', J(first.j));
+  ok('the answer carries the state, not the person', !first.text.includes('Gmail.com') && !first.text.includes('instagram'));
   const at = row.checked_in_at;
   await settle();
-  const second = await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'in-public-002', registrationId: regId });
+  const second = await hand('checkin');
   ok('a second check-in is reported, not repeated — the first time stands', second.j.already === true && db.rows('event_registrations').find((r) => r.id === regId).checked_in_at === at);
-  ok('a registration from another event is refused', (await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'other-event-x', registrationId: regId })).status === 404);
-
+  ok('a registration from another event is refused', (await hand('checkin', regId, 'other-event-x')).status === 404);
   const before = db.rows('event_registrations').length;
-  ok('there are no walk-ins: staff can’t create registrations at the door', (await call(R.staff, '/api/events/staff', 'POST', { action: 'walkin', eventId: 'in-public-002', fullName: 'Walk In' })).status === 400 && db.rows('event_registrations').length === before);
-  const undo = await call(R.staff, '/api/events/staff', 'POST', { action: 'undo', eventId: 'in-public-002', registrationId: regId });
-  ok('a mistaken check-in can be undone', undo.status === 200 && db.rows('event_registrations').find((r) => r.id === regId).attendance === 'registered');
-  await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'in-public-002', registrationId: regId });
-  ok('door staff cannot export', (await R.exportCsv.GET(req('/api/events/admin/in-public-002/export', 'GET'), { params: { id: 'in-public-002' } })).status === 404);
-  ok('door staff cannot edit the event', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { title: 'x' }, { id: 'in-public-002' })).status === 403);
-  ok('door staff cannot delete', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'POST', { action: 'delete', registrationId: regId }, { id: 'in-public-002' })).status === 403);
+  ok('there are no walk-ins here either', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'POST', { action: 'walkin', fullName: 'Walk In' }, { id: 'in-public-002' })).status === 400 && db.rows('event_registrations').length === before);
+  const undo = await hand('undo');
+  ok('a mistaken check-in can be undone', undo.status === 200 && undo.j.attendance === 'registered' && db.rows('event_registrations').find((r) => r.id === regId).attendance === 'registered');
+  await hand('checkin');
 }
 
 console.log('\n=== admins: edit, export, delete ===');
@@ -293,11 +288,11 @@ console.log('\n=== the Google Sheet: one row per registration, updated in place 
   const mayaRow = () => grid.findIndex((r) => r[2] === 'Maya Patel');
   const before = mayaRow();
   ok('Maya is attended in the sheet', grid[before][8] === 'Attended' && grid[before][9] !== '');
-  as('user_door');
-  await call(R.staff, '/api/events/staff', 'POST', { action: 'undo', eventId: 'in-public-002', registrationId: regId });
+  as('user_admin');
+  await call(R.adminEvent, '/api/events/admin/in-public-002', 'POST', { action: 'undo', registrationId: regId }, { id: 'in-public-002' });
   await settle();
   ok('a change updates her existing row — no second row', grid.filter((r) => r[2] === 'Maya Patel').length === 1 && grid[mayaRow()][8] === 'Registered' && mayaRow() === before);
-  await call(R.staff, '/api/events/staff', 'POST', { action: 'checkin', eventId: 'in-public-002', registrationId: regId });
+  await call(R.adminEvent, '/api/events/admin/in-public-002', 'POST', { action: 'checkin', registrationId: regId }, { id: 'in-public-002' });
   await settle();
   ok('…and back to attended, still one row', grid.filter((r) => r[2] === 'Maya Patel').length === 1 && grid[mayaRow()][8] === 'Attended');
   const rowsBefore = grid.length;
@@ -346,7 +341,7 @@ console.log('\n=== check-in at the venue: how everyone comes in ===');
   const shut = await ck();
   ok('closed until an admin opens it, so the link can’t be used from home', shut.status === 403 && shut.j.code === 'not-open');
   as('user_door');
-  ok('door staff cannot open it', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' })).status === 403);
+  ok('a former door-staff address cannot open it', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' })).status === 403);
   as('user_admin');
   ok('an admin opens it', (await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' })).j.event.self_checkin === true);
   as(null);
