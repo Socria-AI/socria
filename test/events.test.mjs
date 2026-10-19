@@ -97,6 +97,8 @@ console.log('\n=== check-in finds an RSVP by email or name ===');
   ok('two RSVPs under one name both match (so a name alone won’t pick one)', E.matchCheckin(rows, { by: 'name', name: 'maya patel' }).length === 2);
   ok('an email matches exactly', E.matchCheckin(rows, { by: 'email', emailNorm: 'maya.p2@yahoo.com' }).length === 1);
   ok('part of a name is not a match', E.matchCheckin(rows, { by: 'name', name: 'Maya' }).length === 0);
+  ok('a lookup with an @ is an email, lowercased', JSON.stringify(E.checkCheckinLookup({ who: ' Maya@Gmail.com ' }).value) === JSON.stringify({ by: 'email', emailNorm: 'maya@gmail.com' }));
+  ok('anything else is a name; too short or a broken email is refused', E.checkCheckinLookup({ who: 'Jose Alvarez' }).value.by === 'name' && !E.checkCheckinLookup({ who: 'a' }).ok && !E.checkCheckinLookup({ who: 'a@b' }).ok);
   ok('the check-in switch reaches the public shape, off unless set', E.publicEvent({ id: 'x', title: 't', summary: '', description: '', location: '', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false, tentative_note: null, status: 'open', capacity: null, expectations: [], created_at: 1, updated_at: 1 }).selfCheckin === false);
   ok('an admin can switch it', E.checkEventPatch({ self_checkin: true }).patch.self_checkin === true);
 }

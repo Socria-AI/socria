@@ -374,7 +374,26 @@ console.log('\n=== check-in at the venue: how everyone comes in ===');
   as('user_admin');
   await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: false }, { id: 'in-public-002' });
   as(null);
-  ok('closed again, it refuses again', (await ck({ email: 'late2@x.com', fullName: 'Late Two' })).status === 403);
+  // the first way in: just the name or email the RSVP was made with
+  as('user_admin');
+  await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: true }, { id: 'in-public-002' });
+  as(null);
+  await call(R.rsvp, '/api/events/rsvp', 'POST', rsvp({ email: 'sam.look@gmail.com', fullName: 'Sam Lookup' }));
+  const find = (who, o = {}) => call(R.checkin, '/api/events/checkin', 'POST', { eventId: 'in-public-002', who, website: '', elapsedMs: 1500, ...o });
+  const before = db.rows('event_registrations').length;
+  const f1 = await find('  sam LOOKUP ');
+  ok('lookup by the RSVP name checks them in, with nothing else asked', f1.status === 200 && f1.j.firstName === 'Sam' && db.rows('event_registrations').find((r) => r.email_norm === 'sam.look@gmail.com').attendance === 'attended');
+  ok('…again says already', (await find('SAM.LOOK@gmail.com')).j.already === true);
+  const f2 = await find('Nobody Here');
+  ok('no RSVP under that name: not found — the page offers the full form — and nothing is created', f2.status === 404 && f2.j.code === 'not-found' && db.rows('event_registrations').length === before);
+  ok('no RSVP with that email: the same', (await find('stranger@x.com')).status === 404);
+  ok('a name two RSVPs share asks for the email, and checks no one in', (await find('Alex Kim')).status === 409 && db.rows('event_registrations').find((r) => r.email_norm === 'alex.one@gmail.com').attendance === 'registered');
+  ok('a broken email is refused', (await find('a@b')).status === 400);
+  ok('a bot gets nowhere', (await find('Sam Lookup', { website: 'x' })).status === 400);
+  as('user_admin');
+  await call(R.adminEvent, '/api/events/admin/in-public-002', 'PATCH', { self_checkin: false }, { id: 'in-public-002' });
+  as(null);
+  ok('closed again, it refuses again', (await ck({ email: 'late2@x.com', fullName: 'Late Two' })).status === 403 && (await find('Sam Lookup')).status === 403);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

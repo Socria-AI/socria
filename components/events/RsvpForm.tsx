@@ -168,7 +168,7 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
     <section className="ev-card" id="rsvp" aria-labelledby="rsvp-h">
       <div className="stack" style={{ gap: 6 }}>
         <h2 id="rsvp-h">{checkin ? 'Check in' : 'Save your place'}</h2>
-        <p className="ev-fine">{checkin ? 'You’re here — tell us who you are. If you RSVP’d, use the same name or email.' : 'Free. Takes under a minute. No account needed.'}</p>
+        <p className="ev-fine">{checkin ? 'No RSVP needed — answer a few quick questions and you’re checked in.' : 'Free. Takes under a minute. No account needed.'}</p>
       </div>
       {cancelled && <p className="ev-note" role="status">Your registration was cancelled and deleted. You’re welcome to register again.</p>}
       <form onSubmit={submit} noValidate className="stack" style={{ gap: 16 }}>
@@ -179,7 +179,7 @@ export function RsvpForm({ eventId, open, mode = 'rsvp' }: { eventId: string; op
         <div className="ev-field">
           <label htmlFor="rsvp-email">Email</label>
           <input id="rsvp-email" className="ev-input" type="email" inputMode="email" autoComplete="email" autoCapitalize="off" spellCheck={false} value={email} onChange={(e) => setEmail(e.target.value)} maxLength={254} required aria-invalid={invalid('email')} aria-describedby={invalid('email') ? 'rsvp-err' : 'rsvp-email-note'} />
-          <span id="rsvp-email-note" className="ev-fine">{checkin ? 'The one you RSVP’d with, if you did. Didn’t RSVP? No problem — any email works.' : 'Any address works — personal or school.'}</span>
+          <span id="rsvp-email-note" className="ev-fine">Any address works — personal or school.</span>
         </div>
 
         <fieldset className="ev-field">

@@ -8,7 +8,7 @@
 import 'server-only';
 import { createHash, randomBytes, randomInt } from 'node:crypto';
 import { supabaseAdmin } from '@/lib/supabase';
-import { CODE_ALPHABET, EVENT_ID, REG_ID, TOKEN, matchCheckin, type EventPatch, type EventRow, type RegistrationRow, type RsvpInput } from './model';
+import { CODE_ALPHABET, EVENT_ID, REG_ID, TOKEN, matchCheckin, type CheckinLookup, type EventPatch, type EventRow, type RegistrationRow, type RsvpInput } from './model';
 
 /** An error the routes turn into a status; never the database's own message. */
 export class EventStoreError extends Error {
@@ -165,6 +165,19 @@ export async function register(event: EventRow, input: RsvpInput, now = Date.now
     if (await findByEmail(event.id, input.emailNorm)) throw new EventStoreError('duplicate');
   }
   throw new EventStoreError('unavailable');
+}
+
+/**
+ * Check in by finding an RSVP: the name or the email it was made with. Only
+ * an existing RSVP is checked in, once; a name two RSVPs share is ambiguous,
+ * and the caller asks for the email. Recorded as 'self'.
+ */
+export async function lookupCheckIn(event: EventRow, q: CheckinLookup, now = Date.now()): Promise<{ status: 'checked-in' | 'already'; row: RegistrationRow } | { status: 'not-found' | 'ambiguous' }> {
+  const hits = matchCheckin(await listRegistrations(event.id), q);
+  if (!hits.length) return { status: 'not-found' };
+  if (hits.length > 1) return { status: 'ambiguous' };
+  const r = await checkIn(hits[0].id, 'self', now);
+  return r.ok ? { status: 'checked-in', row: r.row } : { status: 'already', row: r.already };
 }
 
 /**

@@ -38,7 +38,7 @@ No new npm dependency. Google Sheets is called over its REST API with a service-
 | `POST /api/events/ticket` | holder of the secret | that one confirmation |
 | `DELETE /api/events/ticket` | holder of the secret | cancel; deletes the registration |
 | `GET /api/events/[id]/ics` | public | calendar file, only once the date is confirmed |
-| `POST /api/events/checkin` | public, while self check-in is open | check in: matches an RSVP by email or name, or adds the person |
+| `POST /api/events/checkin` | public, while self check-in is open | `{ who }` finds an RSVP by name or email; the full form matches an RSVP or adds the person |
 | `POST /api/events/staff` | staff and admins | `lookup`, `checkin` (once), `undo` |
 | `POST /api/events/admin` | admins | create a draft event; run the retention sweep |
 | `PATCH`/`POST /api/events/admin/[id]` | admins | edit the event; `sync` the sheet; `delete` a registration |
@@ -60,13 +60,10 @@ RSVP and check-in are separate steps, and **checking in is how everyone comes in
 
 1. An admin opens self check-in on the dashboard's **Check-in** tab when doors open, and closes it afterwards. While it is closed the page says check-in isn't open, so the link can't be used from home.
 2. A QR code at the venue points to `/events/<id>/checkin`. Make it from the link on the Check-in tab.
-3. The attendee gives their name, email and the same optional questions as the RSVP, plus the unticked email-updates box.
-   - **Email matches an RSVP:** that RSVP is checked in.
-   - **Otherwise, the exact name matches exactly one RSVP:** that RSVP is checked in. Name matching ignores case, accents and spacing.
-   - **Answers left blank at RSVP** are filled in. Consent is only ever added.
-   - **No RSVP:** they are added and checked in on the spot. There are no separate walk-ins.
-   - **Checking in twice** says they already are.
-   - Every check-in is recorded as `self`.
+3. The page has two ways in:
+   - **RSVP'd:** type the name or email used at RSVP and tap Check in. Names match regardless of case, accents or spacing. A name two RSVPs share asks for the email instead. If nothing matches, the page says so and points to the second way.
+   - **Didn't RSVP? Check in here:** the RSVP's questions (name, email, interests, how they heard, the unticked email-updates box). Answering them checks the person in. If that email or exact name matches an RSVP after all, that RSVP is checked in and blank answers are filled in. Otherwise they are added and checked in on the spot.
+   - **Every check-in is recorded as `self`.** Checking in twice says they already are.
 
 **Fallback for staff:** the door list (`/events/admin/<id>/door`) lets staff and admins find someone by name or email and check them in.
 
