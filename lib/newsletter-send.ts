@@ -17,7 +17,7 @@ import { addressesFor } from '@/lib/email-recipients';
 import { emailBaseUrl, emailSecret, newsletterEmailsOn, newsletterPostalAddress, sendEmail } from '@/lib/email';
 import { unsubscribeToken } from '@/lib/lifecycle';
 import { claimLifecycle, idsWithKind, markSent, releaseClaim } from '@/lib/lifecycle-store';
-import { NEWSLETTER_KIND, decideNewsletter, issueKind, issueProblems, newsletterCopy, newsletterUnsubscribeUrl, type NewsletterIssue } from '@/lib/newsletter';
+import { NEWSLETTER_KIND, decideNewsletter, issueKind, issueProblems, newsletterCopy, newsletterUnsubscribeUrl, postalLooksComplete, type NewsletterIssue } from '@/lib/newsletter';
 
 /** Clerk's page size, and the size of each look-up of addresses. */
 const CHUNK = 100;
@@ -38,7 +38,9 @@ export function missingForSend(issue: NewsletterIssue): string[] {
   if (!newsletterEmailsOn()) missing.push('NEWSLETTER_EMAILS=on');
   if (!emailSecret()) missing.push('EMAIL_SECRET');
   if (!(process.env.RESEND_API_KEY || '').trim()) missing.push('RESEND_API_KEY');
-  if (!newsletterPostalAddress()) missing.push('NEWSLETTER_POSTAL_ADDRESS');
+  const postal = newsletterPostalAddress();
+  if (!postal) missing.push('NEWSLETTER_POSTAL_ADDRESS');
+  else if (!postalLooksComplete(postal)) missing.push('NEWSLETTER_POSTAL_ADDRESS with a street address or PO box (a city and ZIP alone is not enough)');
   return missing;
 }
 

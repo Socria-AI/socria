@@ -93,6 +93,9 @@ console.log('\n=== the rule ===');
   const after = plan([A, B, { id: 'd', subject: 'D', paragraphs: ['d'] }], { a: t0, d: t0 + 3 * DAY }, t0 + 5 * DAY);
   ok('…then picks up the earliest one nobody has had, in list order', after.action === 'start' && after.issue.id === 'b', J(after));
 
+  ok('a postal address with a street passes', L.postalLooksComplete('Socria, 1 Test Way, Austin, TX 78701') && L.postalLooksComplete('701 S Nedderman Dr, Arlington, TX 76019'));
+  ok('a PO box passes', L.postalLooksComplete('Socria, PO Box 1234, Arlington, TX 76010') && L.postalLooksComplete('P.O. Box 55, Arlington TX 76010'));
+  ok('a city, state and ZIP alone does not', !L.postalLooksComplete('Arlington, TX 76010') && !L.postalLooksComplete('76010') && !L.postalLooksComplete('Arlington TX 76010 USA') && !L.postalLooksComplete(''));
   ok('NEWSLETTER_EVERY_DAYS: unset → 2', L.everyDays(undefined) === 2);
   ok('NEWSLETTER_EVERY_DAYS: "3" → 3, "0"/"x"/"1.5"/"99" → 2', L.everyDays('3') === 3 && ['0', 'x', '1.5', '99'].every((v) => L.everyDays(v) === 2));
 
@@ -167,6 +170,9 @@ const got = (id) => db.rows('lifecycle_emails').filter((r) => r.kind === `newsle
   delete process.env.NEWSLETTER_POSTAL_ADDRESS;
   const noPostal = await run();
   ok('a missing setting stops the send, named, before anyone is claimed', noPostal.status === 409 && noPostal.j.missing?.includes('NEWSLETTER_POSTAL_ADDRESS') && got('issue-a').length === 0, J(noPostal));
+  process.env.NEWSLETTER_POSTAL_ADDRESS = 'Arlington, TX 76010';
+  const zipOnly = await run();
+  ok('a postal address that is only a city and ZIP stops the send, named', zipOnly.status === 409 && zipOnly.j.missing?.some((m) => /street address or PO box/.test(m)) && got('issue-a').length === 0, J(zipOnly));
   process.env.NEWSLETTER_POSTAL_ADDRESS = 'Socria, 1 Test St, Arlington, TX 76019, USA';
 
   const first = await run();

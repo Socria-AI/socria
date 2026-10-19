@@ -163,6 +163,20 @@ export function decideNewsletter(input: {
   return { send: true, to: input.address };
 }
 
+/**
+ * Whether a postal address is a full one. CAN-SPAM asks for a valid physical
+ * postal address: a street address, or a PO box or private mailbox registered
+ * for mail. A city, state and ZIP alone ("Arlington, TX 76010") is not one,
+ * so it is refused before a send rather than printed at the foot of every
+ * issue. Looks for a street number followed by a name, or a box number.
+ */
+export function postalLooksComplete(address: string | null | undefined): boolean {
+  // the ZIP (and a country after it) is not a street number: "Arlington TX 76010 USA"
+  const a = (address ?? '').trim().replace(/\b\d{5}(?:-\d{4})?(?:[,\s]+(?:usa|us|u\.s\.a?\.?|united states(?: of america)?))?[\s.,]*$/i, '').trim();
+  if (!a) return false;
+  return /\b(?:p\.?\s*o\.?\s*)?box\s*#?\s*\d+/i.test(a) || /(?:^|[,\s])\d{1,6}[a-z]?\s+[a-z]/i.test(a);
+}
+
 // ── the copy ────────────────────────────────────────────────────────
 
 export interface NewsletterContext {
