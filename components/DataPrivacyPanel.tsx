@@ -27,7 +27,7 @@ export function DataPrivacyPanel() {
   // shown as off when the store cannot say.
   const [notes, setNotes] = useState<boolean | null>(null);
   const [notesBusy, setNotesBusy] = useState(false);
-  // The newsletter: what is new in Socria, now and then. Its own switch and
+  // The newsletter: what is new in Socria, at most every other day. Its own switch and
   // its own row — the sign-up box writes it, every issue's unsubscribe link
   // removes it. Same rule: null until known, off when unknowable.
   const [letter, setLetter] = useState<boolean | null>(null);
@@ -217,7 +217,7 @@ export function DataPrivacyPanel() {
         <div>
           <h3>The newsletter</h3>
           <p>
-            What is new in Socria, now and then. About Socria, never about
+            What is new in Socria, at most every other day. About Socria, never about
             you, and never sent to a university address added for student
             access. Every issue has a one-click unsubscribe.
           </p>

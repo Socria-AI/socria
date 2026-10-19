@@ -6,8 +6,15 @@
 // HOW IT DIFFERS FROM THE NOTES. lib/lifecycle.ts sends a handful of notes
 // about a person's own thinking here, on a schedule of its own. The
 // newsletter is the other kind of email: an issue about Socria — what is new,
-// what changed — written by a person, sent to everyone who asked for it, when
-// that person decides to send it. Nothing sends an issue on a timer.
+// what changed — written by a person, reviewed and committed, and sent to
+// everyone who asked for it.
+//
+// WHEN AN ISSUE GOES. Approved issues (not `draft`) go out in the order they
+// are listed, one every NEWSLETTER_EVERY_DAYS days (two by default), from a
+// daily cron (app/api/cron/newsletter, the rule is planNewsletter below). The
+// schedule only ever picks from issues a person wrote and approved; with
+// none waiting, nothing goes. One can still be sent by hand
+// (app/api/email/newsletter).
 //
 // WHO IS SUBSCRIBED is one row: the ledger (lib/lifecycle-store.ts) holds
 // `newsletter` for a person, or it does not. Three things write or remove it:
@@ -215,4 +222,63 @@ export function newsletterCopy(issue: NewsletterIssue, ctx: NewsletterContext): 
     '</body></html>';
 
   return { subject, text, html };
+}
+
+// ── the schedule ────────────────────────────────────────────────────
+//
+// One issue every few days, from the approved ones, in the order they are
+// written in lib/newsletter-issues.ts. The cron runs daily; each run either
+// keeps delivering the issue that is going out now (a batch is bounded, and
+// someone who subscribed yesterday still gets this one), or — once its days
+// are up — starts the next approved issue nobody has had yet, or does
+// nothing. Never two issues in one window, never an issue twice to anyone
+// (the per-person ledger claim), and never anything that was not approved.
+
+export const DEFAULT_EVERY_DAYS = 2;
+const DAY = 86_400_000;
+/** A daily cron lands a little early or late; three hours of slack keeps "every other day" on its day. */
+const SLACK = 3 * 3_600_000;
+
+/** NEWSLETTER_EVERY_DAYS, as a whole number of days from 1 to 30; anything else is the default. */
+export function everyDays(raw: string | undefined): number {
+  const n = Number((raw ?? '').trim());
+  return Number.isInteger(n) && n >= 1 && n <= 30 ? n : DEFAULT_EVERY_DAYS;
+}
+
+/** An issue that may go: approved, and with nothing wrong with it. */
+export const isReady = (i: NewsletterIssue) => !i.draft && issueProblems(i).length === 0;
+
+export type NewsletterStep =
+  | { action: 'continue'; issue: NewsletterIssue; startedAt: number }
+  | { action: 'start'; issue: NewsletterIssue }
+  | { action: 'wait'; current: NewsletterIssue; nextAt: number }
+  | { action: 'nothing'; reason: 'no-ready-issue' | 'all-sent' };
+
+/**
+ * What today's run does. `startedAt` holds, by issue id, when each issue that
+ * has begun going out began (the ledger's first claim); an issue absent from
+ * it has gone to nobody.
+ */
+export function planNewsletter(input: {
+  issues: readonly NewsletterIssue[];
+  startedAt: ReadonlyMap<string, number>;
+  now: number;
+  everyDays: number;
+}): NewsletterStep {
+  const { issues, startedAt, now } = input;
+  const window = Math.max(1, input.everyDays) * DAY;
+  let current: { issue: NewsletterIssue; at: number } | null = null;
+  for (const i of issues) {
+    const at = startedAt.get(i.id);
+    if (at !== undefined && (!current || at > current.at)) current = { issue: i, at };
+  }
+  // the issue going out now keeps going out until its days are up
+  if (current && now - current.at < window - SLACK) {
+    return isReady(current.issue)
+      ? { action: 'continue', issue: current.issue, startedAt: current.at }
+      : { action: 'wait', current: current.issue, nextAt: current.at + window - SLACK };
+  }
+  const next = issues.find((i) => isReady(i) && !startedAt.has(i.id));
+  if (next) return { action: 'start', issue: next };
+  return { action: 'nothing', reason: issues.some(isReady) ? 'all-sent' : 'no-ready-issue' };
 }

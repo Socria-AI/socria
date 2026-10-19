@@ -298,14 +298,38 @@ for student access.
 | `NEWSLETTER_EMAILS` | `on` — its own kill switch; unset is off. Turning on `LIFECYCLE_EMAILS` does not send a newsletter, and this does not start the notes. |
 | `NEWSLETTER_POSTAL_ADDRESS` | The sender's postal address, printed in every issue. US law (CAN-SPAM) requires one in a commercial email; an issue does not render without it. |
 | `EMAIL_SECRET`, `RESEND_API_KEY` | As for the notes. |
-| `CRON_SECRET` | The bearer token for the send route. |
+| `CRON_SECRET` | The bearer token for the send route and the cron. |
+| `NEWSLETTER_EVERY_DAYS` | Optional. Days between issues, 1–30; unset is 2. |
 
 Set them on **Production only**, as with the notes.
 
-**Sending an issue**, which only a person does — there is no cron for it:
+**The schedule: one approved issue every other day.** A daily cron
+(`/api/cron/newsletter`, 16:00 UTC, in `vercel.json`) sends the approved
+issues — those in `lib/newsletter-issues.ts` without `draft` — one every
+`NEWSLETTER_EVERY_DAYS` days (unset is 2), in the order they are listed.
+Each run either keeps delivering the issue that is going out (to whoever has
+not had it, including anyone who subscribed since), starts the next approved
+issue once the current one's days are up, or does nothing when no approved
+issue is waiting. **It never writes an issue**: with the queue empty, no
+email goes. Every-other-day means about fifteen issues a month to keep it
+going.
+
+A run sends as many as fit in its 45-second budget (about 80 at the
+provider's pace). With more subscribers than that, the rest get the issue on
+the next day's run, inside the same two days; past ~160 subscribers an issue
+would not reach everyone before the next starts. Run the cron more often then
+(hourly needs a paid Vercel plan) — the ledger makes repeated runs safe.
+
+Rehearse the schedule without sending anything (works with the switch off):
+
+```
+curl "https://<deployment>/api/cron/newsletter?dry=1" -H "Authorization: Bearer $CRON_SECRET"
+```
+
+**Approving an issue:**
 
 1. Write the issue in `lib/newsletter-issues.ts` with `draft: true`, and deploy.
-2. Rehearse. Nothing is sent or claimed; the answer has the counts
+2. Rehearse it. Nothing is sent or claimed; the answer has the counts
    (`would-send`, `no-address`), what a real send still needs (`missing`)
    and the rendered issue (`preview`):
 
@@ -315,13 +339,17 @@ Set them on **Production only**, as with the notes.
      -d '{"issue":"<id>"}'
    ```
 
-3. Take `draft` off, deploy, and send it to yourself first:
-   `-d '{"issue":"<id>","send":true,"only":["<your user id>"]}'`.
-4. Send it: `-d '{"issue":"<id>","send":true}'`. Each call sends a batch
-   (40 by default, at most 50, paced under Resend's default two requests a
-   second); call again until the answer says `"done": true`. Every person's
-   copy is claimed in the ledger before it goes (`newsletter:<id>`), so a
-   repeated or overlapping call never sends anyone a second copy.
+3. Take `draft` off and deploy. It goes out on its turn.
+
+**Sending one by hand**, now instead of on its turn (the issue must be
+approved): `-d '{"issue":"<id>","send":true}'`, or to yourself first with
+`"only":["<your user id>"]`. Each call sends a batch (40 by default, at most
+50, paced under Resend's default two requests a second); call again until the
+answer says `"done": true`. A hand send — even to yourself — starts that
+issue's turn, and the schedule carries on from it. Every person's copy is
+claimed in the ledger before it goes (`newsletter:<id>`), so a repeated or
+overlapping call, or a hand send and the schedule together, never send anyone
+a second copy.
 
 An issue's id is permanent once it has gone to anyone — it is that
 once-ever key, so a changed id is a new issue and would go to everyone

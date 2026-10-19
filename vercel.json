@@ -2,6 +2,7 @@
   "crons": [
     { "path": "/api/cron/lifecycle", "schedule": "0 15 * * *" },
     { "path": "/api/cron/rewards", "schedule": "30 15 * * *" },
-    { "path": "/api/cron/events", "schedule": "45 15 * * *" }
+    { "path": "/api/cron/events", "schedule": "45 15 * * *" },
+    { "path": "/api/cron/newsletter", "schedule": "0 16 * * *" }
   ]
 }

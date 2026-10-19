@@ -266,6 +266,28 @@ export async function idsWithKind(kind: string): Promise<{ ids: string[]; capped
   }
 }
 
+/**
+ * When the first row of a kind was claimed — for an issue of the newsletter
+ * (`newsletter:<id>`), when it began going out. `{ at: null }` when nobody
+ * has it yet; null when the store cannot say, and a scheduler then starts
+ * nothing rather than guess.
+ */
+export async function firstClaimedAt(kind: string): Promise<{ at: number | null } | null> {
+  try {
+    const { data, error } = await supabaseAdmin().from(TABLE).select('created_at').eq('kind', kind).order('created_at', { ascending: true }).limit(1);
+    if (error) {
+      if (unavailable(error)) warnOnce('first', error);
+      else console.warn('lifecycle store: first failed', error.code);
+      return null;
+    }
+    const at = Number((data ?? [])[0]?.created_at);
+    return { at: Number.isFinite(at) && at > 0 ? at : null };
+  } catch (e) {
+    warnOnce('first', e);
+    return null;
+  }
+}
+
 export interface DueRow {
   userId: string;
   /** when the row was claimed — for limit-chats, the refusal itself */

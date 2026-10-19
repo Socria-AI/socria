@@ -469,7 +469,7 @@ export function AuthForm({
                 />
                 <span>
                   Send me the Socria newsletter
-                  <small>What&rsquo;s new, now and then. Unsubscribe from any issue in one click.</small>
+                  <small>What&rsquo;s new, at most every other day. Unsubscribe from any issue in one click.</small>
                 </span>
               </label>
             )}

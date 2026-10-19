@@ -254,8 +254,8 @@ export default function PrivacyPage() {
         </li>
         <li>
           <strong>The newsletter</strong> &mdash; the sign-up form has a box
-          for Socria&rsquo;s newsletter: what is new in the product, now and
-          then. In the EU and the rest of the EEA, the UK, Switzerland and
+          for Socria&rsquo;s newsletter: what is new in the product, at most
+          every other day. In the EU and the rest of the EEA, the UK, Switzerland and
           Canada the box starts unticked, and you are subscribed only if you
           tick it; elsewhere it starts ticked, and unticking it means you are
           not subscribed. Which applies is decided by the country your
