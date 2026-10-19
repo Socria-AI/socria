@@ -3096,10 +3096,10 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
      written before it is a bump the cascade throws away. */
   .logos-root .lg-head-note, .logos-root .lg-back { display: none; }
 
-  /* breathing room follows the phone, and the composer clears the switcher */
+  /* breathing room follows the phone. The control row's own phone rule
+     (clearing the switcher) lives beside its base rule, further down — this
+     one used to be overridden by it, so the switcher sat on Synthesize. */
   .logos-root .lg-guard { margin: 0 14px; }
-  .logos-root .lg-tools { margin: 0 14px; padding-bottom: 56px; }
-  .logos-root .lg-one-note { margin: 0 14px 10px; }
 }
 @media (min-width: 901px) {
   /* `.lg-mrail` is NOT in this list any more. It was the phone's hamburger;
@@ -6710,7 +6710,19 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-allow-go:focus-visible { outline: 2px solid var(--one-pale); outline-offset: 2px; }
 
 @media (max-width: 640px) {
-  .logos-root .lg-allow { font-size: 11px; padding: 5px 8px; }
+  /* one line on a phone: it scrolls sideways rather than taking three rows of the screen */
+  .logos-root .lg-allow {
+    font-size: 11px;
+    padding: 5px 8px;
+    flex-wrap: nowrap;
+    align-items: center;
+    white-space: nowrap;
+    overflow-x: auto;
+    scrollbar-width: none;
+  }
+  .logos-root .lg-allow::-webkit-scrollbar { display: none; }
+  .logos-root .lg-allow-items { flex-wrap: nowrap; }
+  .logos-root .lg-allow-go { flex: 0 0 auto; }
 }
 
 /* Logos 3's Mind view: the atlas in the map's place (components/mind/MindAtlas) */
@@ -7202,7 +7214,23 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   display: flex; align-items: center; justify-content: flex-end; gap: 8px;
   margin: 0 40px; padding: 0 2px 4px;
 }
-@media (max-width: 900px) { .logos-root .lg-tools { margin: 0 22px; } }
+/* Phones and narrow tablets: the row clears the floating Conversation/Map
+   switch (and the home indicator) instead of sitting under it, and wraps
+   rather than running off the left edge. AFTER the base rule, deliberately:
+   the old phone rule came before it and lost every property it set. */
+@media (max-width: 900px) {
+  .logos-root .lg-tools {
+    margin: 0 14px;
+    padding-bottom: calc(58px + env(safe-area-inset-bottom, 0px));
+    flex-wrap: wrap;
+    row-gap: 6px;
+  }
+}
+@media (max-width: 640px) {
+  /* Capture says itself with its icon on a phone; the label is for the screen reader */
+  .logos-root .lg-tools .lg-capture { width: 40px; height: 40px; padding: 0; justify-content: center; font-size: 0; gap: 0; }
+  .logos-root .lg-tools .lg-capture svg { width: 16px; height: 16px; }
+}
 
 .logos-root .lg-model { position: relative; }
 /* Of the two controls this is the one you actually reach for, so it reads as
@@ -9057,4 +9085,17 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
   border-radius: 10px; background: var(--surface, #fff); border: 1px solid var(--lg-line); box-shadow: var(--shadow-node-hover);
   font-family: var(--font-serif, Georgia, serif); font-style: italic; font-size: 12.5px; line-height: 1.45;
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.78);
+}
+
+/* ── Logos 4: phones ─────────────────────────────────────────────────
+   iOS zooms the page when a field under 16px takes focus, and never zooms
+   back. The composer is the field everyone touches first. */
+@media (max-width: 640px) {
+  .logos-root .lg-composer textarea { font-size: 16px; }
+  /* The map's zoom control was a 150px bar sitting on the content. A phone
+     zooms with two fingers, so only "show all of it" stays: one small square
+     in the corner, a thumb's size. */
+  .logos-root .lg-zoom { right: 10px; bottom: 10px; }
+  .logos-root .lg-zoom button:not(.lg-zoom-fit) { display: none; }
+  .logos-root .lg-zoom .lg-zoom-fit { min-width: 40px; min-height: 40px; border-left: none; }
 }

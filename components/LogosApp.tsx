@@ -113,7 +113,7 @@ import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
-import { MAX_NOTE_CHARS, type Attachment, type AttachmentOrigin } from '@/lib/logos-attachments';
+import { MAX_ATTACHMENTS, MAX_NOTE_CHARS, type Attachment, type AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
 import { boundaryNote, DIRECT_UPLOAD_BYTES, limitsFor, type Counter } from '@/lib/entitlements';
@@ -160,6 +160,8 @@ import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRe
 import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
+import { CaptureInbox } from './CaptureInbox';
+import { forComposer, forNode, type Capture } from '@/lib/logos4/captures';
 import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
 import { digestOf } from '@/lib/cognition/digest';
 import { briefOf } from '@/lib/representation';
@@ -582,6 +584,8 @@ export function LogosApp({
   const sceneLastRef = useRef<string | null>(null);
   // asks the composer to take focus, with the caret where a filled-in form wants it
   const [composerFocus, setComposerFocus] = useState<{ n: number; caret?: number } | null>(null);
+  // Logos 4, Quick Capture: the inbox is open
+  const [captureOpen, setCaptureOpen] = useState(false);
   const draftToComposer = (text: string, caret?: number) => {
     setInput(text);
     setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1, ...(caret !== undefined ? { caret } : {}) }));
@@ -2120,14 +2124,14 @@ export function LogosApp({
     }
   }
 
-  function newSession(projectId: string | null = null) {
+  function newSession(projectId: string | null = null): boolean {
     // The month's count is the server's, and it is spent when a line of
     // thinking BEGINS rather than when an empty one is created — so opening
     // Logos and closing it again costs nothing. Everything already open stays
     // open and stays usable; what runs out is starting another.
     if (!one && chatsSpent) {
       ask('chats-spent');
-      return;
+      return false;
     }
     // Begun inside a folder, it is filed there from its first save: the
     // session carries its Project and persist() sends it with everything else.
@@ -2135,6 +2139,32 @@ export function LogosApp({
     applySessions([fresh, ...sessionsRef.current]);
     switchSession(fresh.id);
     // A brand-new empty session isn't worth a round trip until it has content.
+    return true;
+  }
+
+  // ── QUICK CAPTURE (Logos 4, components/CaptureInbox.tsx) ─────────
+  // A capture goes where the person sends it, and no further: into the
+  // composer (a new line of thinking's, or this one's) or onto the map as a
+  // card. Nothing is sent and nothing is filed by itself.
+  function captureToComposer(c: Capture, fresh: boolean) {
+    const { text, attachments } = forComposer(c);
+    if (fresh && !newSession()) return setCaptureOpen(false);
+    const room = Math.max(0, MAX_ATTACHMENTS - (fresh ? 0 : drafts.length));
+    const extra: Draft[] = attachments.slice(0, room).map((a, i) => ({ ...a, id: `cap_${c.id}_${i}_${Date.now().toString(36)}`, status: 'ready' as const }));
+    if (fresh) setDrafts(extra);
+    else if (extra.length) setDrafts((prev) => [...prev, ...extra]);
+    const joined = fresh || !inputRef.current.trim() ? text : text ? `${inputRef.current.trimEnd()}\n\n${text}` : inputRef.current;
+    draftToComposer(joined);
+    setMobileView('chat');
+    setCaptureOpen(false);
+  }
+
+  function captureToMap(c: Capture) {
+    const said = editMap([{ op: 'add', node: { label: forNode(c), type: 'idea' } }]);
+    if (said) {
+      setMobileView('map');
+      setCaptureOpen(false);
+    }
   }
 
   /**
@@ -5001,6 +5031,7 @@ export function LogosApp({
             group={groupLive}
             about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
             onClearAbout={clearAbout}
+            voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
           />
 
           {/* Which mind you're talking to, and how deep it goes — kept beside
@@ -5069,6 +5100,16 @@ export function LogosApp({
                 different button, a different list order, glyphs instead of
                 the "how it answers" sheet. Picking another model navigates
                 there; Logos 2 has no axes of its own to show beneath it. */}
+            {/* QUICK CAPTURE — a thought kept for later without starting a
+                conversation about it (Logos 4). */}
+            {LOGOS4.capture && (
+              <button type="button" className="lg-synth lg-capture" onClick={() => setCaptureOpen(true)} title="Keep a thought, a note or a photo for later" aria-haspopup="dialog">
+                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M3 2.5h10v11l-5-3-5 3z" />
+                </svg>
+                Capture
+              </button>
+            )}
             {/* SYNTHESIZE — the payoff after externalising: Socria reads what
                 the map has become. Quiet until there is enough to read. */}
             <button
@@ -5425,6 +5466,17 @@ export function LogosApp({
             void send(text);
           }}
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
+        />
+      )}
+      {LOGOS4.capture && (
+        <CaptureInbox
+          open={captureOpen}
+          onClose={() => setCaptureOpen(false)}
+          signedIn={!!isSignedIn}
+          readImage={readImage}
+          onNewThread={(c) => captureToComposer(c, true)}
+          onToComposer={(c) => captureToComposer(c, false)}
+          {...(!togetherReadOnly ? { onAddToMap: captureToMap } : {})}
         />
       )}
       <LogosGuide open={guideOpen} onClose={closeGuide} edition={workspaceOn ? 3 : 2} />

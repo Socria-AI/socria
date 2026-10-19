@@ -103,14 +103,72 @@ mic is not drawn without it.
 
 ## 5. Phones
 
-- Fix the toolbar override bug.
-- Fit canvas displays to the screen's width.
-- Keep the zoom control off content.
-- Make the usage bar a single line.
-- Composer at 16px so iOS does not zoom on focus; keyboard-safe layout.
-- Touch targets of at least 44px for new controls.
-- Point & Ask as a bottom sheet.
+- **Toolbar override, fixed.** The control row's phone padding was written
+  before its base rule and lost to it, so the floating Conversation/Map switch
+  sat on Synthesize and the model picker. The phone rule now follows the base
+  rule, clears the switch and the home indicator, and wraps instead of running
+  off the left edge (`app/globals.css`, "the control row beside the composer").
+- **Zoom control off content.** On a phone the map's 150px zoom bar sat over
+  the chart it was zooming. Phones pinch to zoom, so only "show all of it"
+  stays: one 40px square in the corner.
+- **Usage bar on one line.** It wrapped to three rows on a 390px screen; it now
+  scrolls sideways on one.
+- **Composer at 16px**, so iOS does not zoom the page on focus.
+- **Touch targets of at least 44px** for the mic, the capture inbox and the
+  Point & Ask sheet's actions.
+- **Point & Ask as a bottom sheet.** On a phone the workspace inspector (what
+  is selected, "Ask about this", "Clear selection") docks to the bottom edge,
+  full width, with thumb-sized actions.
+- **Quick Capture as a bottom sheet** (88% of the screen), the Capture button
+  as an icon in the control row.
+- **Not changed:** a display on the map canvas is laid out at the canvas's
+  width and can be wider than a phone at the default zoom. "Show all of it",
+  a pinch, or the display's own tab (which draws it at the screen's width)
+  bring it into view. Re-laying the canvas per screen width was not worth the
+  risk to the desktop layout.
 
-## 6. Results
+## 6. Everyday reliability
 
-*(Filled in after Phase 7: tests, build, browser journeys, comparison.)*
+The words→chart path is deterministic, so each fix is held by a test
+(`test/logos4-reliability.test.mjs`):
+
+- **`$1,200` and "pie chart"** (the two audit bugs) were already fixed when
+  this phase started; they are now held by tests in five phrasings.
+- **A question before the numbers.** "Can you make a pie chart? Rent $1,200 /
+  food $400" read "Rent" into the title and dropped its number. A sentence that
+  ends before the numbers is now the request, and a spaced slash separates list
+  items (`lib/objects/display-words.ts`).
+- **"Show my spending as a pie: …"** was not recognised as a chart request at
+  all without a chart verb. A form named for the numbers ("as a pie", "in a bar
+  chart") now is, and "pie" in passing still is not
+  (`lib/objects/display-request.ts`).
+
+## 7. Memory
+
+The engine reads a small digest of the map the client sends with each turn
+(`lib/cognition/digest.ts`: unexamined assumptions, conflicts) and challenges
+a message that leans on one, once (`challengeTarget` in
+`lib/cognition/assist.ts`). The Mind Graph's recall is unchanged. Captures are
+not memory: nothing in the inbox reaches the model until the person sends it.
+
+## 8. Results
+
+Measured on this branch, not intended:
+
+| What | Result |
+|---|---|
+| Quick Capture route, store, cleaners | `test/logos4-capture-voice.test.mjs`: every capture is per-person (another account cannot read, edit, delete or overwrite one by id); retried saves and repeat device moves never duplicate; a remote image URL is refused; the 200-capture ceiling holds; a database without the table reads as "unavailable", not 500 |
+| Voice route | Same suite: no key or flag → the mic is not offered; signed out without an access key → 401; non-audio, empty or over-4 MB recordings refused before any paid call; an unknown model name falls back to `whisper-1`; nothing about the audio is written |
+| Chart from words | `test/logos4-reliability.test.mjs`: 29 checks, every number kept under its own label |
+| Browser, 390×844 phone | Capture saved → "Think it through" opened a new line of thinking with it in the composer, unsent; the mic recorded a fake device, transcribed through the local stand-in, and put the words after "Compare" at the caret; no page errors; no horizontal page scroll |
+| Not verified | A signed-in account inbox in a browser (the local harness has no real Clerk session; the route suite covers it), and transcription against the real provider (needs the deployment's key) |
+
+## 9. Feature status
+
+| Feature | Status |
+|---|---|
+| Cognitive Interaction Engine | Shipped (dev) |
+| Point & Ask | Shipped (dev); phone bottom sheet |
+| Instant Resume | Shipped (dev) |
+| Quick Capture | Shipped (dev): `app/api/captures`, `components/CaptureInbox.tsx`. Accounts need the `captures` table from `supabase/schema.sql` + `rls.sql`; until it exists the inbox keeps captures on the device and says so |
+| Voice to Text | Shipped (dev): `app/api/transcribe`, `components/useVoiceInput.ts`, the composer's mic. Uses `OPENAI_API_KEY`; `OPENAI_TRANSCRIBE_MODEL` optional |

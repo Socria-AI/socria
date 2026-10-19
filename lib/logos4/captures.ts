@@ -63,6 +63,8 @@ export function cleanCaptureAttachment(v: unknown): Attachment | undefined {
   if (kind !== 'note' && kind !== 'image') return undefined;
   const [a] = sanitizeAttachments([v]);
   if (!a) return undefined;
+  // a picture with neither a thumbnail nor a reading is nothing to keep
+  if (a.kind === 'image' && !a.thumb && !a.reading) return undefined;
   // a capture keeps the thumbnail, never the larger preview
   const { preview: _p, ...kept } = a;
   return kept;

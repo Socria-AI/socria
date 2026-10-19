@@ -115,7 +115,12 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // link: a person registers once, so a handful a minute per address is room
 // for a typo and a retry, and a campus network gets the day's headroom.
 // 'staff' is the door: check-ins come in bursts at the start of an event.
-type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff';
+// 'voice' is speech to text (Logos 4): each call is a paid transcription, so
+// room for a few recordings a minute and a long day of them, and nothing
+// for a caller with no account or key.
+// 'capture' is the Quick Capture inbox: cheap database writes, in bursts
+// when a browser's local captures move to the account.
+type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -127,6 +132,8 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   code: { authed: { minute: 6, day: 40 }, anon: { minute: 6, day: 40 } },
   rsvp: { authed: { minute: 10, day: 200 }, anon: { minute: 10, day: 200 } },
   staff: { authed: { minute: 240, day: 10_000 }, anon: { minute: 5, day: 50 } },
+  voice: { authed: { minute: 12, day: 300 }, anon: { minute: 6, day: 60 } },
+  capture: { authed: { minute: 60, day: 2000 }, anon: { minute: 10, day: 100 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

@@ -26,6 +26,7 @@ const PK = {
   share_presence: ['resource_type', 'resource_id', 'user_id'],
   lifecycle_emails: ['user_id', 'kind'],
   event_sheet_sync: ['event_id'],
+  captures: ['id'],
 };
 
 // Unique indexes beyond the primary key (supabase/schema.sql), as Postgres

@@ -272,9 +272,15 @@
 
 @media (max-width: 900px) {
   .logos-root .lg-split.is-ws .ws-dock { display: flex !important; width: calc(100% - 24px); }
-  .logos-root .lg-split.is-ws .ws-dock .lg-tools { padding-bottom: 10px; }
+  .logos-root .lg-split.is-ws .ws-dock .lg-tools { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
   .logos-root .ws-top { padding-right: 10px; }
   .logos-root .ws-card { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; max-height: 60%; }
+}
+/* Point & Ask on a phone: the inspector is the bottom sheet, and its two
+   actions are thumb-sized and share the row. */
+@media (max-width: 640px) {
+  .logos-root .ws-card { left: 0; right: 0; bottom: 0; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .logos-root .ws-card .ws-insp-acts button { flex: 1 1 0; min-height: 44px; }
 }
 /* among several panels, the card clears the corner chip */
 .logos-root .ws-panel.has-chip > .ws-card { top: 44px; max-height: min(560px, calc(100% - 58px)); }

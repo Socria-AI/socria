@@ -124,7 +124,10 @@ function labelAfter(raw: string): string | null {
 /** Split on the commas, semicolons, new lines and "and"s between pairs — never inside "1,200". */
 function segmentsOf(text: string): string[] {
   return text
-    .split(/(?:,(?!\d{3}(?!\d)))|;|\n|\s+and\s+|\s+&\s+|\s+plus\s+|\.\s+/i)
+    // a spaced slash lists ("rent $1,200 / food $400"), and a question or exclamation ends a
+    // sentence as a full stop does ("Can you chart this? Rent $1,200…") — without these the label
+    // after them was read as part of the request, and its number dropped
+    .split(/(?:,(?!\d{3}(?!\d)))|;|\n|\s+and\s+|\s+&\s+|\s+plus\s+|\s+\/\s+|[.?!]\s+/i)
     .map((s) => s.trim())
     .filter(Boolean);
 }
@@ -145,6 +148,9 @@ function dataPart(text: string): { request: string; data: string } {
   const head = text.slice(0, first.start);
   const nl = head.indexOf('\n');
   if (nl >= 0) return { request: head.slice(0, nl), data: text };
+  // a sentence that ends before the numbers is the request: "Can you make a pie chart? Rent $1,200…"
+  const ends = [...head.matchAll(/[.?!]\s+/g)].pop();
+  if (ends && ends.index !== undefined) return { request: head.slice(0, ends.index), data: text.slice(ends.index + ends[0].length) };
   const label = labelBefore(head);
   const bare = head.replace(/[\s:=\-–—]+$/, '');
   const request = label && bare.toLowerCase().endsWith(label.toLowerCase()) ? bare.slice(0, -label.length) : head;

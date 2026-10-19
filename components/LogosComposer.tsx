@@ -28,7 +28,10 @@ import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, TEXT_EXTENSIONS, kindOfFile, ref
 const DOC_ACCEPT = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e !== 'zip'), ...TEXT_EXTENSIONS].map((e) => `.${e}`).join(',');
 import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
 import { TeX } from './TeX';
+import { useVoiceInput } from './useVoiceInput';
+import { MAX_RECORD_SECONDS, clock, insertSpoken } from '@/lib/logos4/voice';
 import './logos-thread.css';
+import './logos4.css';
 
 export interface Draft extends Attachment {
   id: string;
@@ -254,6 +257,7 @@ export function LogosComposer({
   group,
   about,
   onClearAbout,
+  voice,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -287,6 +291,11 @@ export function LogosComposer({
   about?: { kind: string; label: string; of?: string } | null;
   onClearAbout?: () => void;
   /**
+   * Logos 4, Voice to Text: offer the mic. It is still drawn only where the
+   * browser can record and the server can transcribe (useVoiceInput).
+   */
+  voice?: boolean;
+  /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
    * on Socria, so sending stays open while it answers someone.
@@ -302,6 +311,20 @@ export function LogosComposer({
     if (!mathAvailable) setKeypad(false);
   }, [mathAvailable]);
   const dragDepth = useRef(0);
+
+  // Spoken words land where the caret was, as if typed there; never sent.
+  const mic = useVoiceInput((words) => {
+    const el = taRef.current;
+    const at = insertSpoken(value, words, el?.selectionStart ?? value.length, el?.selectionEnd ?? value.length);
+    onChange(at.text);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(at.caret, at.caret);
+      grow();
+    });
+  });
+  const micOn = !!voice && mic.available;
+  const listening = mic.state === 'recording' || mic.state === 'asking';
 
   const readying = drafts.some((d) => d.status === 'reading');
   const canSend = (!!value.trim() || drafts.some((d) => d.status === 'ready')) && (!busy || !!group) && !readying;
@@ -551,6 +574,28 @@ export function LogosComposer({
           />
         )}
 
+        {micOn && (listening || mic.state === 'transcribing') && (
+          <div className="lg-voice" role="status" aria-live="polite">
+            <span className={`lg-voice-dot${mic.state === 'recording' ? ' is-live' : ''}`} aria-hidden="true" />
+            <span className="lg-voice-k">
+              {mic.state === 'asking' ? 'Waiting for the microphone…' : mic.state === 'transcribing' ? 'Turning that into text…' : `Listening ${clock(mic.seconds)}`}
+              {mic.state === 'recording' && <span className="lg-voice-cap"> / {clock(MAX_RECORD_SECONDS)}</span>}
+            </span>
+            {mic.state !== 'transcribing' && (
+              <>
+                <button type="button" className="lg-voice-btn" onClick={mic.cancel}>
+                  Cancel
+                </button>
+                {mic.state === 'recording' && (
+                  <button type="button" className="lg-voice-btn is-done" onClick={mic.stop}>
+                    Done
+                  </button>
+                )}
+              </>
+            )}
+          </div>
+        )}
+
         <div className="lg-composer-row">
           <button
             type="button"
@@ -631,6 +676,29 @@ export function LogosComposer({
             }}
           />
 
+          {micOn && (
+            <button
+              type="button"
+              className={`lg-mic${listening ? ' is-on' : ''}`}
+              onClick={() => (listening ? mic.stop() : mic.start())}
+              disabled={mic.state === 'transcribing'}
+              aria-pressed={listening}
+              aria-label={listening ? 'Stop and transcribe' : 'Speak instead of typing'}
+              title={listening ? 'Stop and transcribe' : 'Speak — the words land here for you to edit'}
+            >
+              {listening ? (
+                <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
+                  <rect x="7" y="7" width="10" height="10" rx="2" />
+                </svg>
+              ) : (
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <rect x="9" y="3" width="6" height="11" rx="3" />
+                  <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+                </svg>
+              )}
+            </button>
+          )}
+
           {/* Appears only when mathematics is in play, and stays put once it
               has — see lib/math-context.ts for why that hysteresis matters. */}
           {mathAvailable && (
@@ -665,6 +733,19 @@ export function LogosComposer({
 
         {dragging && <div className="lg-drop-hint">Drop it here</div>}
       </div>
+
+      {micOn && mic.state === 'error' && mic.error && (
+        <p className="lg-composer-note lg-voice-err" role="alert">
+          {mic.error}{' '}
+          <button type="button" className="lg-voice-link" onClick={mic.retry}>
+            {mic.canRetryAudio ? 'Retry' : 'Try again'}
+          </button>{' '}
+          <button type="button" className="lg-voice-link" onClick={mic.dismiss}>
+            Dismiss
+          </button>
+        </p>
+      )}
+      {mic.capped && mic.state === 'transcribing' && <p className="lg-composer-note">Stopped at two minutes — transcribing what was said.</p>}
 
       {(notice || readying) && (
         <p className="lg-composer-note">

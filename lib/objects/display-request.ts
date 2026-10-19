@@ -237,7 +237,11 @@ function chartRequest(text: string, words: Word[]): DisplayRequest | null {
   const t = norm(raw);
   const verb = CHART_VERB.exec(raw);
   const named = words.find((w) => w.kind === 'data' && w.view && new RegExp(String.raw`^(?:(?:please|pls|a|an|quick|simple)\s+)*${esc(w.word)}\b`).test(t));
-  if (!verb && !named) return null;
+  // "show my spending as a pie: rent 1200…", "put these in a bar chart": the chart type named
+  // as the form the numbers should take, whatever verb comes first
+  // ("as a pie" alone is a form; "in a pie" or "on a bar" is not without "chart")
+  const shaped = /\bas\s+(?:a\s+)?(?:pie|donut)(?:\s+(?:chart|graph))?(?![\w-])/.test(t) || /\b(?:as|in|into)\s+(?:a\s+|an\s+)?(?:pie|donut|bar|line|area|scatter)\s+(?:chart|graph|plot)\b/.test(t);
+  if (!verb && !named && !shaped) return null;
   const numbers = (raw.match(/(?<![\p{L}\p{N}.])\d/gu) ?? []).length;
   // their own records, or records kept over time: "plot my revenue", "plot revenue over six months"
   const own = /\b(?:my|our|monthly|weekly|daily|yearly|annual)\b|\b(?:over|for|by|per|each|every|last|past|this)\s+(?:the\s+)?(?:\w+\s+)?(?:months?|weeks?|days?|years?|quarters?)\b/i;
