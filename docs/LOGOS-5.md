@@ -11,7 +11,8 @@ chat.**
 And for studying: **drop your files, say what for, and Socria sorts them into
 topics in their own words, makes practice from them when asked, and checks
 it — with the conversation and its Logic Map one step away.** Every line of
-thinking is also one map: the **Universal Map**.
+thinking is also one map — and that map is home: the **Universal Map**, every
+conversation merged into one mind map, with the old list of chats put away.
 
 ## 1. What was wrong with Logos 4's screen
 
@@ -42,7 +43,8 @@ Measured on dev before the rebuild (390×844 and 1440×900):
    ("show the map", "open the chart"), or by something being *made* — a
    display, a document, a model. A map that grows from ordinary talk does not
    open it: the header's **Map · N** says it is there.
-3. **The rail** — lines of thinking and projects (`LogosRail`), a drawer on
+3. **The rail** — put away in Logos 5 (§5): home is the Universal Map, and the
+   rail is under "List". Lines of thinking and projects (`LogosRail`), a drawer on
    narrow screens.
 
 **Progressive disclosure, specifically:**
@@ -120,17 +122,38 @@ and files, then what Socria did), so the documents belong to it and every
 later question carries them. The reply model is told the topics, and never
 the answers to practice not yet submitted.
 
-## 5. The Universal Map
+## 5. Home: the Universal Map
 
-Every line of thinking, each drawn as its mind graph — the topics its files
-were sorted into and the ideas its Thinking Map grew — on one map, with the
-ideas two conversations share drawn as bridges between them. A conversation
-with no map is shown as itself and says "no map yet"; nothing is made up for
-it. Press one to go there, or a card to go to it on its map. Drag to move,
-wheel or buttons to zoom. Signed in, "Everything remembered" shows the Mind
-Atlas (every chat, Core's too) in the same place. Pure layout:
-`lib/logos5/universe.ts`. From the header (in the menu on a phone with a
-study open).
+Logos 5 opens on the **Universal Map**, not on a list of chats. Every
+conversation is merged into one mind map: each line of thinking drawn as its
+own small graph — the topics its files were sorted into and the ideas its
+Thinking Map grew — and each Core chat as a point of its own. The ideas two
+conversations share are drawn as bridges, and the bridges pull what they join
+together, so related thinking sits near itself and the whole reads as one map.
+
+- **Open** a conversation by pressing it, or a card on it to open it there.
+  **+ New** begins a line of thinking (the empty one already waiting, if there
+  is one). The Socria mark, top left, always comes back here; so does
+  "Universal Map" on a wide screen.
+- **Find** an idea or a chat: what does not match dims; Enter opens the first.
+  **All projects** narrows it to a Project. Drag to move; wheel, pinch or the
+  buttons zoom; **Fit** brings everything back. Signed in, **Everything
+  remembered** shows the Mind Atlas in the same place.
+- **The chats on the left are put away.** The rail is still there, under
+  **List** (and the menu), for renaming, deleting and filing in a Project — a
+  drawer on a phone.
+- Nothing is made up: a conversation with no map is drawn as itself and says
+  "no map yet"; a line of thinking with nothing said in it is not drawn.
+- It opens here unless a link, a Project or a first message chose a line of
+  thinking, or there is nothing on the map yet (then it opens on "What are you
+  working on?").
+- Every position is computed, deterministically (`lib/logos5/universe.ts`):
+  a spiral to start, a small fixed simulation — bridges pull, boxes that
+  overlap push apart, a weak pull to the middle — then parting until nothing
+  overlaps, the names under each cluster included.
+
+"Organize it" and "Practice this" write into the line of thinking they began
+in, even if another is opened while they work.
 
 ## 6. Data
 
@@ -173,7 +196,7 @@ code. Logos 2 is unchanged.
 | Sorting and practice, server side | `app/api/logos/organize/route.ts`, `app/api/logos/practice/route.ts` |
 | The study as a display in the map | `lib/objects/display-study.ts` |
 | Intake, board, topic, practice, steps | `components/logos5/Study.tsx`, `components/logos5/study.css` |
-| The Universal Map | `lib/logos5/universe.ts`, `components/logos5/Universe.tsx` |
+| Home: the Universal Map (layout, search; the view, the List) | `lib/logos5/universe.ts`, `components/logos5/Universe.tsx`, `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`) |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (study steps: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,universe,reload`) |
 
 Core chat (`app/chat/page.tsx`) is not part of this change. Logos 2 keeps its
@@ -219,16 +242,27 @@ sheet.pdf", 2 pages), at 1440×900 and 390×844:
 | Journey | Result |
 |---|---|
 | Drop both, "help me get ready for exam 2 on thursday" | Both read ("5 pages · read", "2 pages · read"); "Looks like: studying for an exam"; **Organize it**. |
-| Organize it | "Socria · sorted 2 files into 7 topics"; seven cards in three columns with their quotes and pages; one **Recommended start**; the conversation holds the turn and what was done. |
+| Organize it | "Socria · sorted 2 files into 7 topics"; the lead row — the start in the middle with its tab, the two topics with most sources beside it — and the rest as smaller cards beneath, linked; chips name pages, or a review's questions ("Review Q3", "Review Q5–Q6"); the conversation holds the turn and what was done. |
 | A topic pressed | The others dim; its panel lists the quote with "Ch5_Adjusting_Entries.pdf · p.3" and the four actions; the composer says "Asking about Accrued expenses". |
 | Practice this | "Record the adjustments for March 31", made from ◇ Ch5 · p.3 and ◇ Exam 2 review sheet · p.1: two events, ten blanks, the equation from $26,850. |
 | Filled (one entry right, one wrong, equity wrong), checked | 5 of 10; "Debits equal credits ✗", "The equation holds ✗"; two gaps, each with the whole entry, why, and its page; wrong rows tinted. |
 | Try 3 more like these | A new set of three; the events already practised are sent along to be left out. |
 | Ask why → Logic Map | Step 3 opens: the question asked about the topic (Point & Ask), the map beside it. |
-| Universal Map, three lines of thinking | Each drawn as its graph — a study's topics, a conversation's ideas — and "no map yet" for the empty one. |
+| Home, three lines of thinking | The Universal Map: three clusters — a study's topics, a conversation's ideas, a chart's one card — "3 lines of thinking"; no rail. |
+| Find "team" | 1 found, 2 dimmed. |
+| List | The rail as a column (a drawer on a phone); put away again by its button, or a tap beside it. |
+| A cluster pressed | That line of thinking opens; the map is gone until the mark is pressed. |
+| Reload | Opens on the Universal Map. |
 | Reload | The study is still there: seven cards, the steps. |
-| Phone | The board a list, a topic a sheet, the journal table a stack (account, then debit and credit); the steps name only the open one; no horizontal scroll. |
+| Phone | Home fills the screen (mark, List, +, menu); the board a list, a topic a sheet, the journal table a stack (account, then debit and credit); the steps name only the open one; no horizontal scroll. |
 | Page errors | None. |
+
+Found and fixed on the way to the Universal Map as home: clusters and their
+names overlapped (spacing now keeps a box for each name); the List button
+stayed marked after a tap beside the drawer put it away; and, once, on a cold
+development server, a study was filed into the line of thinking open before
+it — not reproduced since, but "Organize it" and "Practice this" now write
+only into the one they began in.
 
 Found and fixed on the way: class names that collided with the shared
 thread's stylesheet (`.st-act` was hidden there), renamed `l5s-`; a cell
@@ -237,10 +271,10 @@ table off the screen; links that jumped a column ran behind the cards
 between, so only neighbouring columns are linked.
 
 Tests: `test/logos5-linking.test.mjs` (20), `test/logos5-ui.test.mjs` (49),
-`test/logos5-study.test.mjs` (78), `test/logos5-study-ui.test.mjs` (32), and
+`test/logos5-study.test.mjs` (90), `test/logos5-study-ui.test.mjs` (34), and
 the existing suites, unchanged in what they hold.
 
-**Not verified here:** a real model's sorting and journal entries (the stand-in's are canned from the files' headings and amounts — the code that keeps only what the files bear out is tested, the model's judgement is not), a signed-in Universal Map's "Everything remembered" (the Mind Atlas needs an account), a real model's streaming (the stand-in streams
+**Not verified here:** a real model's sorting and journal entries (the stand-in's are canned from the files' headings and amounts — the code that keeps only what the files bear out is tested, the model's judgement is not), a signed-in Universal Map's "Everything remembered" (the Mind Atlas needs an account), Core chats on the Universal Map in a browser (the local stand-in has none; their layout and bridges are tested), a real model's streaming (the stand-in streams
 canned text), a signed-in shared line of thinking (group view) on the new
 screen, a reply's citation chips opening their passage (the stand-in does not
 cite), and Live 3D in the stage. Each reuses code that was not

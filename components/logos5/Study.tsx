@@ -21,7 +21,9 @@ import {
   clozeHint,
   filledOf,
   intentOf,
-  layoutTopics,
+  boardRows,
+  kindSaid,
+  questionsSaid,
   money,
   shortName,
   sortedSaid,
@@ -44,19 +46,19 @@ export type StudyTab = 'components' | 'practice' | 'logic';
 
 // ── where you are ────────────────────────────────────────────────────
 
-export function StudySteps({ tab, onTab, practiced, logicSeen }: { tab: StudyTab; onTab: (t: StudyTab) => void; practiced: boolean; logicSeen: boolean }) {
-  const steps: { id: StudyTab; n: number; label: string; sub?: string }[] = [
+export function StudySteps({ tab, onTab, logicSeen }: { tab: StudyTab; onTab: (t: StudyTab) => void; practiced?: boolean; logicSeen: boolean }) {
+  const steps: { id: StudyTab; n: number; label: string; tag?: string }[] = [
     { id: 'components', n: 1, label: 'Components' },
-    { id: 'practice', n: 2, label: 'Practice', ...(practiced ? {} : { sub: 'pick a topic' }) },
-    { id: 'logic', n: 3, label: 'Logic Map', ...(logicSeen ? {} : { sub: 'on request' }) },
+    { id: 'practice', n: 2, label: 'Practice' },
+    { id: 'logic', n: 3, label: 'Logic Map', ...(logicSeen ? {} : { tag: 'on request' }) },
   ];
   return (
     <nav className="l5s-steps" aria-label="Study">
       {steps.map((s) => (
-        <button key={s.id} type="button" className={`l5s-step${tab === s.id ? ' is-on' : ''}`} aria-current={tab === s.id ? 'page' : undefined} aria-label={`${s.n}. ${s.label}`} title={s.label} onClick={() => onTab(s.id)}>
+        <button key={s.id} type="button" className={`l5s-step${tab === s.id ? ' is-on' : ''}${s.tag ? ' is-quiet' : ''}`} aria-current={tab === s.id ? 'page' : undefined} aria-label={`${s.n}. ${s.label}`} title={s.label} onClick={() => onTab(s.id)}>
           <span className="l5s-step-n">{s.n}</span>
           <span className="l5s-step-l">{s.label}</span>
-          {s.sub && <span className="l5s-step-sub">({s.sub})</span>}
+          {s.tag && <span className="l5s-step-tag">{s.tag}</span>}
         </button>
       ))}
     </nav>
@@ -92,6 +94,17 @@ interface IntakeFile {
 const ACCEPT = '.pdf,.docx,.pptx,.xlsx,.odt,.odp,.ods,.rtf,.md,.txt,.csv,.tsv,.html,.htm,.tex,.ipynb,.png,.jpg,.jpeg,.webp';
 
 const STEPS = ['Drop or ask', 'Socria sorts it', 'Pick a starting point', 'Study or dig in'];
+
+/** The badge on a file: what kind of file it is, in three letters. */
+function fileType(name: string): string {
+  const ext = (/\.([a-z0-9]{1,5})$/i.exec(name)?.[1] ?? '').toLowerCase();
+  if (ext === 'pdf') return 'PDF';
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return 'DOC';
+  if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'PPT';
+  if (['xls', 'xlsx', 'ods', 'csv', 'tsv'].includes(ext)) return 'XLS';
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'].includes(ext)) return 'IMG';
+  return 'TXT';
+}
 
 export function StudyIntake({
   readDocument,
@@ -175,8 +188,8 @@ export function StudyIntake({
             <ul className="l5s-files" aria-label="Files">
               {files.map((f) => (
                 <li key={f.id} className={`l5s-file is-${f.status}`}>
-                  <span className="l5s-file-ic" aria-hidden="true">
-                    {f.status === 'reading' ? <span className="l5s-spin" /> : f.status === 'error' ? '!' : '▤'}
+                  <span className={`l5s-ftype is-${fileType(f.name).toLowerCase()}`} aria-hidden="true">
+                    <span>{fileType(f.name)}</span>
                   </span>
                   <span className="l5s-file-t">
                     <span className="l5s-file-n">{f.name}</span>
@@ -188,6 +201,9 @@ export function StudyIntake({
                           : f.att?.kind === 'doc'
                             ? `${f.att.pages ?? 1} ${(f.att.pages ?? 1) === 1 ? 'page' : 'pages'} · read`
                             : 'read'}
+                    </span>
+                    <span className="l5s-file-bar" aria-hidden="true">
+                      <span />
                     </span>
                   </span>
                   <button type="button" className="l5s-x" aria-label={`Remove ${f.name}`} onClick={() => setFiles((fs) => fs.filter((x) => x.id !== f.id))}>
@@ -231,15 +247,17 @@ export function StudyIntake({
           </div>
           <div className="l5s-drop-foot">
             {(text.trim() || files.length > 0) && (
-              <div className="l5s-intent">
-                <span className="l5s-intent-dot" aria-hidden="true" />
-                <span>
-                  Looks like: <b>{INTENTS[goal]}</b>
+              <div className="l5s-intentrow">
+                <span className="l5s-intent">
+                  <span className="l5s-intent-dot" aria-hidden="true" />
+                  Looks like: {INTENTS[goal]}
                 </span>
-                <span className="l5s-intent-sub">· nothing to set up —</span>
-                <button type="button" className="l5s-link" onClick={() => setChoosing((v) => !v)} aria-expanded={choosing}>
-                  change it any time
-                </button>
+                <span className="l5s-intent-sub">
+                  · nothing to set up —{' '}
+                  <button type="button" className="l5s-link" onClick={() => setChoosing((v) => !v)} aria-expanded={choosing}>
+                    change it any time
+                  </button>
+                </span>
                 {choosing && (
                   <div className="l5s-intent-menu" role="menu">
                     {INTENT_KEYS.map((k) => (
@@ -299,12 +317,35 @@ export function StudyIntake({
 
 // ── the board ────────────────────────────────────────────────────────
 
+/** What a card says about where it comes from and what it holds: places in the files, questions, counts. */
+function chipsOf(t: StudyTopic, files: StudyFile[]): { key: string; label: string; src: boolean }[] {
+  const out: { key: string; label: string; src: boolean }[] = [];
+  const asked = new Map((t.questions ?? []).map((q) => [q.doc, q.ns]));
+  const seen = new Set<string>();
+  for (const q of t.quotes) {
+    const f = files.find((x) => x.doc === q.doc);
+    const name = f ? shortName(f.name) : 'File';
+    const ns = asked.get(q.doc);
+    // a file of questions is named by its questions, not its pages
+    const key = ns ? q.doc : `${q.doc}:${q.page}`;
+    if (seen.has(key)) continue;
+    seen.add(key);
+    out.push({ key, label: ns ? `${name} ${questionsSaid(ns)}` : `${name} · p.${q.page}`, src: true });
+  }
+  if (t.quotes.length > 1) out.push({ key: 'quotes', label: `${t.quotes.length} quotes`, src: false });
+  if (t.tables) out.push({ key: 'tables', label: t.tables === 1 ? '1 table' : `${t.tables} tables`, src: false });
+  if (t.formulas) out.push({ key: 'formulas', label: t.formulas === 1 ? '1 formula' : `${t.formulas} formulas`, src: false });
+  if (t.terms) out.push({ key: 'terms', label: `${t.terms} ${t.terms === 1 ? 'term' : 'terms'}`, src: false });
+  return out;
+}
+
 function TopicCard({
   t,
   files,
   start,
   dim,
   on,
+  compact,
   onPick,
   cardRef,
 }: {
@@ -313,37 +354,48 @@ function TopicCard({
   start: boolean;
   dim: boolean;
   on: boolean;
+  /** beneath the lead row: its name, its count and two chips */
+  compact: boolean;
   onPick: () => void;
   cardRef: (el: HTMLButtonElement | null) => void;
 }) {
-  const places = useMemo(() => {
-    const seen = new Set<string>();
-    return t.quotes.filter((q) => {
-      const k = `${q.doc}:${q.page}`;
-      if (seen.has(k)) return false;
-      seen.add(k);
-      return true;
-    });
-  }, [t.quotes]);
+  const chips = chipsOf(t, files);
   const n = sourcesOf(t);
+  // a compact card keeps one place and what it holds besides
+  const shown = compact ? [...chips.filter((c) => c.src).slice(0, 2), ...chips.filter((c) => !c.src && c.key !== 'quotes')].slice(0, 2) : chips.slice(0, 4);
+  const chipEls = shown.map((c) => (
+    <span key={c.key} className={`l5s-chip${c.src ? ' is-src' : ''}`}>
+      {c.src && <span aria-hidden="true">◇</span>} {c.label}
+    </span>
+  ));
   return (
-    <button ref={cardRef} type="button" className={`l5s-card is-${t.kind}${start ? ' is-start' : ''}${dim ? ' is-dim' : ''}${on ? ' is-on' : ''}`} onClick={onPick} aria-pressed={on}>
-      <span className="l5s-card-top">
-        <span className="l5s-kind">{TOPIC_KIND_LABEL[t.kind]}</span>
-        {start && <span className="l5s-badge">Recommended start</span>}
-      </span>
-      <span className="l5s-card-title">{t.title}</span>
-      <span className="l5s-card-quote">“{t.quotes[0]?.text}”</span>
-      <span className="l5s-card-foot">
-        {places.slice(0, 2).map((q) => (
-          <SourceChip key={`${q.doc}:${q.page}`} q={q} files={files} />
-        ))}
-        {t.tables > 0 && <span className="l5s-chip">{t.tables === 1 ? '1 table' : `${t.tables} tables`}</span>}
-        {t.quotes.length > 1 && <span className="l5s-chip">{t.quotes.length} quotes</span>}
-        <span className="l5s-card-n">
-          {n} {n === 1 ? 'source' : 'sources'}
+    <button
+      ref={cardRef}
+      type="button"
+      className={`l5s-card is-${t.kind}${compact ? ' is-compact' : ''}${start ? ' is-start' : ''}${dim ? ' is-dim' : ''}${on ? ' is-on' : ''}`}
+      onClick={onPick}
+      aria-pressed={on}
+      aria-label={`${t.title}, ${kindSaid(t).toLowerCase()}, ${n} ${n === 1 ? 'source' : 'sources'}${start ? ', recommended start' : ''}`}
+    >
+      {start && <span className="l5s-tab">Recommended start</span>}
+      {compact ? (
+        <span className="l5s-card-top">
+          <span className="l5s-card-title">{t.title}</span>
+          <span className="l5s-card-n">{n}</span>
         </span>
-      </span>
+      ) : (
+        <>
+          <span className="l5s-card-top">
+            <span className="l5s-kind">{kindSaid(t)}</span>
+            <span className="l5s-card-n">
+              {n} {n === 1 ? 'source' : 'sources'}
+            </span>
+          </span>
+          <span className="l5s-card-title">{t.title}</span>
+          {t.quotes[0] && <span className="l5s-card-quote">“{t.quotes[0].text}”</span>}
+        </>
+      )}
+      {chipEls.length > 0 && <span className="l5s-card-foot">{chipEls}</span>}
     </button>
   );
 }
@@ -365,24 +417,12 @@ export function StudyBoard({
   start?: ReactNode;
   narrow: boolean;
 }) {
-  const placed = useMemo(() => layoutTopics(study.topics, narrow ? 1 : 3), [study.topics, narrow]);
-  const cols = useMemo(() => {
-    const out: StudyTopic[][] = [];
-    for (const p of placed) {
-      const t = study.topics.find((x) => x.id === p.id);
-      if (!t) continue;
-      (out[p.col] ??= []).push(t);
-    }
-    return out.filter(Boolean);
-  }, [placed, study.topics]);
+  const rows = useMemo(() => boardRows(study.topics, study.start), [study.topics, study.start]);
+  const byId = useMemo(() => new Map(study.topics.map((t) => [t.id, t])), [study.topics]);
   const box = useRef<HTMLDivElement>(null);
   const cards = useRef(new Map<string, HTMLButtonElement>());
   const [paths, setPaths] = useState<{ id: string; d: string; lit: boolean }[]>([]);
-  // a link is drawn between neighbouring columns only: one that jumped a column would run behind the cards between
-  const links = useMemo(() => {
-    const col = new Map(placed.map((p) => [p.id, p.col]));
-    return study.topics.flatMap((t) => t.after.filter((a) => Math.abs((col.get(a) ?? 0) - (col.get(t.id) ?? 0)) <= 1).map((a) => ({ from: a, to: t.id })));
-  }, [study.topics, placed]);
+  const links = useMemo(() => study.topics.flatMap((t) => t.after.map((a) => ({ from: a, to: t.id }))), [study.topics]);
 
   // the links between cards are drawn from where the cards actually are
   useBrowserLayoutEffect(() => {
@@ -395,21 +435,26 @@ export function StudyBoard({
       const o = el.getBoundingClientRect();
       const out: { id: string; d: string; lit: boolean }[] = [];
       for (const l of links) {
-        const a = cards.current.get(l.from)?.getBoundingClientRect();
-        const b = cards.current.get(l.to)?.getBoundingClientRect();
+        let a = cards.current.get(l.from)?.getBoundingClientRect();
+        let b = cards.current.get(l.to)?.getBoundingClientRect();
         if (!a || !b) continue;
-        const sameCol = Math.abs(a.left - b.left) < 20;
         let d: string;
-        if (sameCol) {
-          const x = a.left - o.left + a.width - 18 + el.scrollLeft;
-          const y1 = a.bottom - o.top + el.scrollTop;
-          const y2 = b.top - o.top + el.scrollTop;
-          d = `M${x},${y1} C${x + 22},${y1 + (y2 - y1) / 2} ${x + 22},${y1 + (y2 - y1) / 2} ${x},${y2}`;
+        if (b.top > a.bottom - 4 || a.top > b.bottom - 4) {
+          // one row to the next: from the bottom of the upper card to the top of the lower
+          if (a.top > b.top) [a, b] = [b, a];
+          const x1 = a.left + a.width / 2 - o.left;
+          const y1 = a.bottom - o.top;
+          const x2 = b.left + b.width / 2 - o.left;
+          const y2 = b.top - o.top;
+          const my = (y1 + y2) / 2;
+          d = `M${x1},${y1} C${x1},${my} ${x2},${my} ${x2},${y2}`;
         } else {
-          const x1 = a.right - o.left + el.scrollLeft;
-          const y1 = a.top + a.height / 2 - o.top + el.scrollTop;
-          const x2 = b.left - o.left + el.scrollLeft;
-          const y2 = b.top + b.height / 2 - o.top + el.scrollTop;
+          // side by side in a row
+          if (a.left > b.left) [a, b] = [b, a];
+          const x1 = a.right - o.left;
+          const y1 = a.top + a.height / 2 - o.top;
+          const x2 = b.left - o.left;
+          const y2 = b.top + b.height / 2 - o.top;
           const mx = (x1 + x2) / 2;
           d = `M${x1},${y1} C${mx},${y1} ${mx},${y2} ${x2},${y2}`;
         }
@@ -422,7 +467,28 @@ export function StudyBoard({
     ro?.observe(el);
     for (const c of cards.current.values()) ro?.observe(c);
     return () => ro?.disconnect();
-  }, [links, selected, narrow, cols, inspector]);
+  }, [links, selected, narrow, rows, inspector]);
+
+  const card = (id: string, compact: boolean) => {
+    const t = byId.get(id);
+    if (!t) return null;
+    return (
+      <TopicCard
+        key={t.id}
+        t={t}
+        files={study.files}
+        start={t.id === study.start}
+        dim={!!selected && selected !== t.id}
+        on={selected === t.id}
+        compact={compact}
+        onPick={() => onSelect(selected === t.id ? null : t.id)}
+        cardRef={(el) => {
+          if (el) cards.current.set(t.id, el);
+          else cards.current.delete(t.id);
+        }}
+      />
+    );
+  };
 
   return (
     <div className={`l5s-boardwrap${inspector ? ' has-inspector' : ''}`}>
@@ -433,27 +499,14 @@ export function StudyBoard({
               <path key={p.id} d={p.d} className={p.lit ? 'is-lit' : ''} />
             ))}
           </svg>
-          <div className="l5s-cols" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
-            {cols.map((col, i) => (
-              <div key={i} className="l5s-col">
-                {col.map((t) => (
-                  <TopicCard
-                    key={t.id}
-                    t={t}
-                    files={study.files}
-                    start={t.id === study.start}
-                    dim={!!selected && selected !== t.id}
-                    on={selected === t.id}
-                    onPick={() => onSelect(selected === t.id ? null : t.id)}
-                    cardRef={(el) => {
-                      if (el) cards.current.set(t.id, el);
-                      else cards.current.delete(t.id);
-                    }}
-                  />
-                ))}
-              </div>
-            ))}
+          <div className={`l5s-lead is-${rows.lead.length}`} onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+            {rows.lead.map((id) => card(id, false))}
           </div>
+          {rows.rest.length > 0 && (
+            <div className="l5s-rest" onClick={(e) => e.target === e.currentTarget && onSelect(null)}>
+              {rows.rest.map((id) => card(id, true))}
+            </div>
+          )}
         </div>
         {start}
       </div>

@@ -11,7 +11,8 @@
 //     from the answer key is in the page before it is checked;
 //   • a checked set shows the score, the rules, and each gap with its page;
 //   • the steps say which screen is open, and that the Logic Map is on request;
-//   • the Universal Map draws every line of thinking.
+//   • the Universal Map is the home: every conversation counted, searchable,
+//     and a way to begin when there is nothing yet.
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as h } from 'react';
@@ -38,7 +39,7 @@ const study = {
 console.log('\n=== the steps ===');
 {
   const s = html(h(U.StudySteps, { tab: 'components', onTab: none, practiced: false, logicSeen: false }));
-  ok('three steps, the open one marked', (s.match(/class="l5s-step( is-on)?"/g) ?? []).length === 3 && /aria-current="page"[^>]*>.*Components/.test(s), s);
+  ok('three steps, the open one marked', (s.match(/<button[^>]*class="l5s-step[ "]/g) ?? []).length === 3 && /aria-current="page"[^>]*>.*Components/.test(s), s);
   ok('the Logic Map is on request until it has been asked for', s.includes('on request') && !html(h(U.StudySteps, { tab: 'logic', onTab: none, practiced: true, logicSeen: true })).includes('on request'));
 }
 
@@ -56,9 +57,11 @@ console.log('\n=== the board ===');
   const s = html(h(U.StudyBoard, { study, selected: null, onSelect: none, narrow: false }));
   ok('every topic is a card', (s.match(/class="l5s-card /g) ?? []).length === 3);
   ok('a card says its kind, its title and its quote', s.includes('Foundation') && s.includes('Accruals vs. deferrals') && s.includes('“Revenues are recorded when earned.”'));
-  ok('a card says where it is in the files, short', s.includes('Ch5 · p.2') && s.includes('Exam 2 review sheet · p.1'));
+  ok('a card says where it is in the files, short', s.includes('Ch5 · p.2') && s.includes('Review · p.1'));
+  const asked = html(h(U.StudyBoard, { study: { ...study, topics: study.topics.map((t) => (t.id === 't3' ? { ...t, questions: [{ doc: B, ns: [3, 4, 5, 6] }] } : t)) }, selected: null, onSelect: none, narrow: false }));
+  ok('a set of questions is counted, and named by its numbers', asked.includes('4 review questions') && asked.includes('Review Q3–Q6'));
   ok('tables, quotes and sources are counted', s.includes('1 table') && s.includes('2 quotes') && s.includes('2 sources'));
-  ok('where to start is marked, once', (s.match(/Recommended start/g) ?? []).length === 1);
+  ok('where to start is marked, once', (s.match(/>Recommended start</g) ?? []).length === 1);
   const sel = html(h(U.StudyBoard, { study, selected: 't2', onSelect: none, narrow: false }));
   ok('a topic selected dims the others', (sel.match(/is-dim/g) ?? []).length === 2 && sel.includes('aria-pressed="true"'));
   const start = html(h(U.StartPanel, { study, onStudy: none, onDeep: none, onRecommend: none, onClose: none }));
@@ -110,14 +113,18 @@ console.log('\n=== practice ===');
 
 console.log('\n=== the Universal Map ===');
 {
-  const sessions = [
+  const conversations = [
     { id: 'a', title: 'Two job offers', updatedAt: 2, messages: [{ role: 'user' }], map: { nodes: [{ id: 'n1', label: 'Better team' }, { id: 'n2', label: 'Higher pay' }], edges: [{ from: 'n1', to: 'n2' }] } },
-    { id: 'b', title: 'A plain chat', updatedAt: 1, messages: [], map: { nodes: [], edges: [] } },
+    { id: 'b', title: 'A plain chat', updatedAt: 1, messages: [{ role: 'user' }], map: { nodes: [], edges: [] } },
+    { id: 'c', title: 'Tax questions', updatedAt: 3, kind: 'core' },
   ];
-  const s = html(h(U.UniverseMap, { sessions, activeId: 'a', onOpen: none, onClose: none }));
-  ok('every line of thinking, each as its mind graph', s.includes('2 lines of thinking, each as its mind graph') && s.includes('Two job offers') && s.includes('A plain chat'));
-  ok('one with no map says so', s.includes('no map yet'));
-  ok('the open one is marked', s.includes('is-here'));
+  const s = html(h(U.UniverseView, { conversations, activeId: 'a', onOpen: none, onNew: none }));
+  ok('it is the home: every conversation, counted', s.includes('Your Universal Map') && s.includes('2 lines of thinking · 1 chat'));
+  ok('it can be searched', s.includes('Find an idea or a chat'));
+  const empty = html(h(U.UniverseView, { conversations: [], activeId: null, onOpen: none, onNew: none }));
+  ok('with nothing yet, it says what it will be and how to begin', empty.includes('appears here as its own mind graph') && empty.includes('What are you working on?'));
+  const atlas = html(h(U.UniverseView, { conversations, activeId: 'a', onOpen: none, onNew: none, atlas: h('div', null, 'ATLAS') }));
+  ok('signed in, everything remembered is one press away', atlas.includes('Everything remembered'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

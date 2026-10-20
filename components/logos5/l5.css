@@ -56,18 +56,44 @@
   gap: 6px;
   padding: 0 10px 0 8px;
 }
+/* the mark and the word: home, the Universal Map */
+.logos-root .l5-brand {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: 0 0 auto;
+  min-height: 40px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: var(--lg-ink);
+  cursor: pointer;
+}
+.logos-root .l5-brand img {
+  width: 22px;
+  height: auto;
+}
+.logos-root .l5-brand-w {
+  font-family: var(--l5-serif);
+  font-size: 24px;
+  line-height: 1;
+  letter-spacing: -0.01em;
+}
+/* where you are, in small capitals beside the mark */
 .logos-root .l5-title {
   flex: 1 1 auto;
   min-width: 0;
-  margin: 0 0 0 4px;
-  font-family: var(--l5-serif);
-  font-weight: 400;
-  font-size: 19px;
-  letter-spacing: -0.005em;
+  margin: 2px 0 0 8px;
+  font-family: var(--lg-sans);
+  font-weight: 500;
+  font-size: 12.5px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  color: var(--lg-ink);
+  color: var(--lg-ink-40);
 }
 .logos-root .l5-head-end {
   display: flex;

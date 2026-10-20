@@ -165,7 +165,8 @@ import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { L5Header, L5LinkBar, L5Outline, L5StageHead, type L5MenuItem } from './logos5/L5Chrome';
 import { PracticeEmpty, StartPanel, StudyBoard, StudyIntake, StudyPractice, StudySteps, TopicInspector, type StudyTab } from './logos5/Study';
-import { UniverseMap } from './logos5/Universe';
+import { UniverseView } from './logos5/Universe';
+import type { UniverseIn } from '@/lib/logos5/universe';
 import { checkPractice, clozeFrom, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
 import { restudy, studyIn, type StudyState } from '@/lib/objects/display-study';
 import './logos5/l5.css';
@@ -2039,6 +2040,9 @@ export function LogosApp({
       const target = (wanted && sorted.find((s) => s.id === wanted)?.id) || (left && sorted.find((s) => s.id === left)?.id) || sorted[0].id;
       setActiveId(target);
       activeIdRef.current = target;
+      // LOGOS 5 opens on the Universal Map — unless a link, a Project or a
+      // first message chose a line of thinking, or there is nothing on it yet
+      if (SOCRIA_MODELS[model]?.workspace && LOGOS5.on && !wanted && !pendingStart && sorted.some((x) => x.messages.length > 0)) setL5Home(true);
       chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
       if (!pendingStart) restoreView(target, 'load');
       setHydrating(false);
@@ -4222,7 +4226,23 @@ export function LogosApp({
   const [studyNote, setStudyNote] = useState<string | null>(null);
   /** the topic opened by "Recommend for me", whose reason is shown with it */
   const [studyWhy, setStudyWhy] = useState<string | null>(null);
-  const [universeOpen, setUniverseOpen] = useState(false);
+  // HOME IS THE UNIVERSAL MAP (lib/logos5/universe.ts). Logos 5 opens on every
+  // conversation merged into one mind map, not on a list: a line of thinking is
+  // opened from the map, and a new one begun from it. The rail is put away; it
+  // is still there ("List") for renaming, deleting and filing.
+  const [l5Home, setL5Home] = useState(false);
+  const [l5List, setL5List] = useState(false);
+  /** what the Universal Map draws: every line of thinking, and the Core chats */
+  const universeIn = useMemo<UniverseIn[]>(
+    () =>
+      l5
+        ? [
+            ...sessions.map((x) => ({ id: x.id, title: x.title, updatedAt: x.updatedAt, projectId: x.projectId ?? null, map: x.map, messages: x.messages })),
+            ...(chats ?? []).map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, projectId: c.projectId ?? null, kind: 'core' as const })),
+          ]
+        : [],
+    [l5, sessions, chats]
+  );
   useEffect(() => {
     setStudyTopic(null);
     setStudyStartOpen(true);
@@ -4238,12 +4258,26 @@ export function LogosApp({
   function studyDocs(st: StudyCore): SourceDoc[] {
     return st.files.map((f) => docsRef.current.get(f.doc) ?? docNow(f.doc)).filter((d): d is SourceDoc => !!d);
   }
-  /** The study changed as a whole — saved with the line of thinking like any display. */
-  function commitStudy(next: StudyState) {
-    const space = spaceOf(mapRef.current);
-    const cur = studyIn(space);
-    const after = cur ? restudy(space, cur.obj.id, next) : null;
-    if (after) commitObjects(after);
+  /**
+   * The study changed as a whole — saved with the line of thinking it belongs
+   * to, like any display. That is the one it was begun in: if another was
+   * opened while practice was being made, it goes to its own, not the open one.
+   */
+  function commitStudy(next: StudyState, sid: string | null = activeIdRef.current) {
+    if (!sid) return;
+    if (sid === activeIdRef.current) {
+      const space = spaceOf(mapRef.current);
+      const cur = studyIn(space);
+      const after = cur ? restudy(space, cur.obj.id, next) : null;
+      if (after) commitObjects(after);
+      return;
+    }
+    patchSession(sid, (x) => {
+      const space = spaceOf(x.map ?? EMPTY_MAP);
+      const cur = studyIn(space);
+      const after = cur ? restudy(space, cur.obj.id, next) : null;
+      return after ? { ...x, map: { ...(x.map ?? EMPTY_MAP), objects: after } } : x;
+    });
   }
   /**
    * "Organize it": the files read on this device, sorted into topics
@@ -4253,7 +4287,8 @@ export function LogosApp({
    * later question carries them.
    */
   async function organize(atts: Attachment[], said: string, goal: Intent) {
-    if (!activeIdRef.current || organizing || busy) return;
+    const sid = activeIdRef.current;
+    if (!sid || organizing || busy) return;
     if (togetherReadOnly) return setStudyNote('You can read this line of thinking, but not add to it.');
     const fresh = atts.flatMap((a) => (a.kind === 'doc' && a.doc ? [docsRef.current.get(a.doc) ?? docNow(a.doc)] : [])).filter((d): d is SourceDoc => !!d);
     if (!fresh.length) return void send(said, atts);
@@ -4311,18 +4346,29 @@ export function LogosApp({
     ]
       .filter(Boolean)
       .join(' ');
-    postPair(
-      { id: newMsgId(), at: Date.now(), role: 'user', content: said || (held.length === 1 ? 'Sort this file into topics.' : 'Sort these files into topics.'), attachments: atts },
-      { id: newMsgId(), at: Date.now() + 1, role: 'assistant', content: reply }
-    );
-    const space0 = spaceOf(mapRef.current);
-    const cur = studyIn(space0);
-    const made = cur ? restudy(space0, cur.obj.id, state) : (() => {
-      const m = makeDisplay(space0, 'study', state, 'source');
-      return m.ok ? m.space : null;
-    })();
-    if (made) commitObjects(made);
-    else note = `This line of thinking already holds as many things as it keeps, so the topics are in the conversation only.`;
+    const turn: Msg = { id: newMsgId(), at: Date.now(), role: 'user', content: said || (held.length === 1 ? 'Sort this file into topics.' : 'Sort these files into topics.'), attachments: atts };
+    const answer: Msg = { id: newMsgId(), at: Date.now() + 1, role: 'assistant', content: reply };
+    const studied = (m: TMap) => {
+      const space0 = spaceOf(m);
+      const cur = studyIn(space0);
+      if (cur) return restudy(space0, cur.obj.id, state);
+      const made = makeDisplay(space0, 'study', state, 'source');
+      return made.ok ? made.space : null;
+    };
+    // the sorting is written into the line of thinking it began in, even if another was opened meanwhile
+    if (sid === activeIdRef.current) {
+      postPair(turn, answer);
+      const made = studied(mapRef.current);
+      if (made) commitObjects(made);
+      else note = `This line of thinking already holds as many things as it keeps, so the topics are in the conversation only.`;
+    } else {
+      patchSession(sid, (x) => {
+        const made = studied(x.map ?? EMPTY_MAP);
+        return { ...x, messages: [...x.messages, turn, answer], ...(made ? { map: { ...(x.map ?? EMPTY_MAP), objects: made } } : {}) };
+      });
+      setOrganizing(false);
+      return;
+    }
     setStudyTab('components');
     setStudyTopic(null);
     setStudyStartOpen(true);
@@ -4335,6 +4381,7 @@ export function LogosApp({
    * sentences here, with no model. `more` makes new ones like the last.
    */
   async function makePractice(topicId: string, more = false) {
+    const sid = activeIdRef.current;
     const cur = studyIn(mapRef.current.objects);
     if (!cur || makingFor) return;
     const st = cur.state;
@@ -4386,7 +4433,10 @@ export function LogosApp({
     }
     setMakingFor(null);
     if (!made) return setStudyNote('There isn’t enough in this topic’s pages to practise from yet.');
-    commitStudy({ ...st, practice: [...st.practice, made] } as StudyState);
+    // what the study is now, in the line of thinking it belongs to — kept, if another was opened meanwhile
+    const now = sid === activeIdRef.current ? studyIn(mapRef.current.objects)?.state : studyIn(sessionsRef.current.find((x) => x.id === sid)?.map?.objects)?.state;
+    commitStudy({ ...(now ?? st), practice: [...(now ?? st).practice, made] } as StudyState, sid);
+    if (sid !== activeIdRef.current) return;
     setStudyPracticeId(id);
     setStudyTab('practice');
     setStudyNote(note);
@@ -5941,7 +5991,7 @@ export function LogosApp({
   const stageHas = map.nodes.length > 0 || stageThings > 0 || !!wsFacts.viz;
   const stagePanels = wsLayout ? panelsOf(wsLayout) : [];
   const stageTitle = stagePanels.length === 1 ? panelTitle(stagePanels[0]) : { title: 'Workspace', sub: undefined as string | undefined };
-  const l5Title = study ? study.state.course || study.state.title : active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : 'New line of thinking';
+  const l5Title = study ? study.state.course || study.state.title : active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : 'Logos';
   /** the stage on screen: beside the conversation, or (narrower) as the sheet over it */
   const stageShown = stageOpen && (!narrow || mobileView === 'map');
   const toggleStage = () => {
@@ -5953,8 +6003,11 @@ export function LogosApp({
       setMobileView('map');
     }
   };
+  /** the list is open when it was asked for and the rail is out (a tap beside it on a phone puts the rail away) */
+  const listOpen = l5List && railOpen && !chromeHidden;
   const l5Menu: L5MenuItem[] = [
-    { label: 'Universal Map', hint: 'Every line of thinking, as one map', onSelect: () => setUniverseOpen(true) },
+    { label: 'Universal Map', hint: 'Every conversation, as one map', onSelect: goHome },
+    { label: listOpen ? 'Hide the list' : 'List every conversation', hint: 'Rename, delete, file in a Project', onSelect: () => toggleList() },
     { label: synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize', hint: canSynthesize(map) ? 'Where your thinking stands' : 'Needs two things on the map', disabled: !canSynthesize(map) || !!synthBusy || busy, onSelect: () => void synthesize('workspace') },
     { label: draftOpen ? 'Close the draft' : 'Draft', hint: limits.draftSpace ? 'A page only you write on' : 'Part of Socria One', onSelect: () => (limits.draftSpace ? setDraftOpen((v) => !v) : ask('draft-locked')) },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
@@ -6361,8 +6414,7 @@ export function LogosApp({
     ) : null;
   const l5Head = (
     <L5Header
-      railOpen={railOpen}
-      onToggleRail={() => setRailOpen((v) => !v)}
+      onHome={goHome}
       title={l5Title}
       stage={
         stageHas || stageOpen
@@ -6389,7 +6441,7 @@ export function LogosApp({
       account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
       center={study ? <StudySteps tab={studyTab} onTab={setStudyTab} practiced={study.state.practice.length > 0} logicSeen={messages.filter((m) => m.role === 'user').length > 1} /> : undefined}
       extra={
-        <button type="button" className="l5-unibtn" onClick={() => setUniverseOpen(true)} title="Every line of thinking, as one map">
+        <button type="button" className="l5-unibtn" onClick={goHome} title="Every conversation, as one map">
           <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
             <circle cx="6" cy="7" r="2.2" />
             <circle cx="18" cy="6" r="2.2" />
@@ -6401,6 +6453,81 @@ export function LogosApp({
       }
     />
   );
+
+  // ── LOGOS 5: HOME, THE UNIVERSAL MAP ──
+  const homeShown = l5 && l5Home && !hydrating && !room.active;
+  function goHome() {
+    setL5Home(true);
+    setL5List(false);
+  }
+  function toggleList() {
+    if (listOpen) return setL5List(false);
+    setL5List(true);
+    setRailOpen(true);
+  }
+  /** a conversation pressed on the map: opened — at the card pressed, when one was */
+  function openFromHome(id: string, node?: string) {
+    setL5Home(false);
+    setL5List(false);
+    switchSession(id);
+    if (node)
+      setTimeout(() => {
+        setStudyTab('logic');
+        showNodes([node]);
+      }, 80);
+  }
+  /** a new line of thinking — the empty one already waiting, if there is one */
+  function newFromHome() {
+    const waiting = sessionsRef.current.find((x) => !x.messages.length && !(x.map?.nodes ?? []).length && !foreignIdsRef.current.has(x.id) && !(x.map?.objects?.objs ?? []).length);
+    if (waiting) switchSession(waiting.id);
+    else if (!newSession()) return;
+    setL5Home(false);
+    setL5List(false);
+  }
+  const l5HomeHead = (
+    <L5Header
+      onHome={goHome}
+      title="Logos"
+      stage={null}
+      menu={l5Menu}
+      account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
+      extra={
+        <>
+          <button type="button" className={`l5-unibtn is-list${listOpen ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={listOpen} title="Every conversation as a list: rename, delete, file in a Project">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+              <path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01" />
+            </svg>
+            <span className="l5-unibtn-l">List</span>
+          </button>
+          <button type="button" className="l5-unibtn is-new" onClick={newFromHome}>
+            <span aria-hidden="true">+</span>
+            <span className="l5-unibtn-l">New</span>
+          </button>
+        </>
+      }
+    />
+  );
+  const l5HomeView = homeShown ? (
+    <UniverseView
+      conversations={universeIn}
+      activeId={activeId}
+      onOpen={openFromHome}
+      onOpenChat={(id) => onOpenChat?.(id)}
+      onNew={newFromHome}
+      projects={projects?.map((p) => ({ id: p.id, name: p.name }))}
+      atlas={
+        cloud ? (
+          <MindAtlas
+            scope="logos"
+            onOpenChat={(id, surface) => {
+              if (surface === 'logos') openFromHome(id);
+              else onOpenChat?.(id);
+            }}
+          />
+        ) : undefined
+      }
+    />
+  ) : null;
 
   // shared by both screens: the rail, the draft column, and the bars' own show/hide
   const railEl = (
@@ -6417,14 +6544,21 @@ export function LogosApp({
           onSelect={(id) => {
             switchSession(id);
             usedRail();
+            setL5Home(false);
+            setL5List(false);
           }}
           onNew={() => {
             newSession();
             usedRail();
+            setL5Home(false);
+            setL5List(false);
           }}
           onDelete={deleteSession}
           onRename={renameSession}
-          onToggle={() => setRailOpen((v) => !v)}
+          onToggle={() => {
+            setRailOpen((v) => !v);
+            setL5List(false);
+          }}
           projects={projects}
           onOpenProject={onOpenProject}
           onNewInProject={(pid) => {
@@ -6692,49 +6826,27 @@ export function LogosApp({
       )}
       {l5 ? (
         <div
-          className={`l5${railOpen && !chromeHidden ? '' : ' rail-closed'}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${stageOpen ? ' has-stage' : ''}${
+          className={`l5${listOpen ? ' list-open' : ' rail-closed'}${homeShown ? ' is-home' : ''}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${stageOpen && !homeShown ? ' has-stage' : ''}${
             mobileView === 'map' ? ' l5-sheet-on' : ''
           }`}
           style={{ ['--l5-stage' as string]: String(stagePrefs.share) }}
         >
           {railEl}
           <div className="l5-main">
-            {!chromeHidden && l5Head}
+            {!chromeHidden && (homeShown ? l5HomeHead : l5Head)}
             <div className="l5-body">
-              {l5Intake ?? studyMain ?? l5Thread}
-              {l5Stage}
+              {homeShown ? (
+                l5HomeView
+              ) : (
+                <>
+                  {l5Intake ?? studyMain ?? l5Thread}
+                  {l5Stage}
+                </>
+              )}
             </div>
           </div>
           {draftEl}
           {chromeEls}
-          {universeOpen && (
-            <UniverseMap
-              sessions={sessions}
-              activeId={activeId}
-              onClose={() => setUniverseOpen(false)}
-              onOpen={(id, node) => {
-                setUniverseOpen(false);
-                switchSession(id);
-                if (node)
-                  setTimeout(() => {
-                    setStudyTab('logic');
-                    showNodes([node]);
-                  }, 80);
-              }}
-              atlas={
-                cloud ? (
-                  <MindAtlas
-                    scope="logos"
-                    onOpenChat={(id, surface) => {
-                      setUniverseOpen(false);
-                      if (surface === 'logos') switchSession(id);
-                      else onOpenChat?.(id);
-                    }}
-                  />
-                ) : undefined
-              }
-            />
-          )}
         </div>
       ) : (
         <div

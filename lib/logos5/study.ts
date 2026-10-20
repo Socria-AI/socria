@@ -216,6 +216,12 @@ export interface StudyTopic {
   /** every passage it rests on, "docIndex:block" resolved to doc + block */
   blocks: { doc: string; block: string }[];
   tables: number;
+  /** the questions its passages number, by file — "Q3–Q6" on the board */
+  questions?: { doc: string; ns: number[] }[];
+  /** equations among its passages */
+  formulas?: number;
+  /** the terms it defines, when it is a list of terms */
+  terms?: number;
   /** the topics it builds on */
   after: string[];
 }
@@ -269,6 +275,21 @@ export function sanitizeSorted(raw: unknown, docs: SourceDoc[]): Sorted | null {
     if (!title) return;
     const blocks: { doc: string; block: string }[] = [];
     let tables = 0;
+    let formulas = 0;
+    let terms = 0;
+    const qs = new Map<string, Set<number>>();
+    const isTerms = /\b(terms?|glossary|vocabulary|definitions?|key words)\b/i.test(title);
+    /** what a passage adds to the counts on its card */
+    const tally = (doc: SourceDoc, b: DocBlock) => {
+      if (b.kind === 'table') tables += 1;
+      if (b.kind === 'equation' || b.tex) formulas += 1;
+      if (isTerms && (b.kind === 'list' || /^[A-Z][^.:—–-]{1,40}\s[—–:-]\s/.test(b.text))) terms += 1;
+      for (const m of b.text.matchAll(/\bQ(?:uestion)?\s?(\d{1,3})\b/g)) {
+        const set = qs.get(doc.id) ?? new Set<number>();
+        set.add(Number(m[1]));
+        qs.set(doc.id, set);
+      }
+    };
     const seen = new Set<string>();
     for (const key of Array.isArray(t.blocks) ? t.blocks.slice(0, MAX_BLOCKS * 2) : []) {
       const f = findBlock(docs, key);
@@ -277,7 +298,7 @@ export function sanitizeSorted(raw: unknown, docs: SourceDoc[]): Sorted | null {
       if (seen.has(id) || blocks.length >= MAX_BLOCKS) continue;
       seen.add(id);
       blocks.push({ doc: f.doc.id, block: f.block.id });
-      if (f.block.kind === 'table') tables += 1;
+      tally(f.doc, f.block);
     }
     const quotes: StudyQuote[] = [];
     const quoted = new Set<string>();
@@ -294,6 +315,7 @@ export function sanitizeSorted(raw: unknown, docs: SourceDoc[]): Sorted | null {
       if (!seen.has(`${f.doc.id}:${f.block.id}`) && blocks.length < MAX_BLOCKS) {
         seen.add(`${f.doc.id}:${f.block.id}`);
         blocks.push({ doc: f.doc.id, block: f.block.id });
+        tally(f.doc, f.block);
       }
     }
     // a topic with passages but no quote shows its first passage's own first sentence
@@ -314,7 +336,20 @@ export function sanitizeSorted(raw: unknown, docs: SourceDoc[]): Sorted | null {
     const kind = (TOPIC_KINDS as readonly string[]).includes(String(t.kind)) ? (t.kind as TopicKind) : 'concept';
     const id = `t${topics.length + 1}`;
     indexToId.set(i, id);
-    topics.push({ id, title, kind, summary: cleanText(t.summary, 180), quotes, blocks, tables, after: [] });
+    const questions = [...qs].map(([doc, ns]) => ({ doc, ns: [...ns].sort((x, y) => x - y).slice(0, 30) }));
+    topics.push({
+      id,
+      title,
+      kind,
+      summary: cleanText(t.summary, 180),
+      quotes,
+      blocks,
+      tables,
+      ...(questions.length ? { questions } : {}),
+      ...(formulas ? { formulas } : {}),
+      ...(terms ? { terms } : {}),
+      after: [],
+    });
     // links are read after every topic is known
     rawAfter.push(t.after);
   });
@@ -387,38 +422,32 @@ export function plainSort(docs: SourceDoc[]): Sorted | null {
 
 // ── the board ────────────────────────────────────────────────────────
 
-export interface Placed {
-  id: string;
-  /** column: how many topics it builds on, in a chain */
-  col: number;
-  /** its place in that column */
-  row: number;
+/**
+ * The board as the mockup draws it: the lead row — where to start, in the
+ * middle, and the two topics the files say most about either side of it —
+ * then the rest, smaller, beneath. Three or fewer topics are all lead.
+ */
+export function boardRows(topics: StudyTopic[], start: string | null): { lead: string[]; rest: string[] } {
+  if (topics.length <= 3) return { lead: topics.map((t) => t.id), rest: [] };
+  const first = start && topics.some((t) => t.id === start) ? start : null;
+  const others = topics
+    .filter((t) => t.id !== first)
+    .sort((a, b) => sourcesOf(b) - sourcesOf(a) || topics.indexOf(a) - topics.indexOf(b))
+    .slice(0, first ? 2 : 3);
+  const chosen = new Set([...(first ? [first] : []), ...others.map((t) => t.id)]);
+  let lead = topics.filter((t) => chosen.has(t.id)).map((t) => t.id);
+  if (first && lead.length === 3) {
+    const sides = lead.filter((id) => id !== first);
+    lead = [sides[0], first, sides[1]];
+  }
+  return { lead, rest: topics.filter((t) => !chosen.has(t.id)).map((t) => t.id) };
 }
 
-/**
- * Where each card goes: a column for each step along what builds on what, so
- * foundations sit left and what rests on them to the right — the board reads
- * the way the course does. Columns hold about the same number of cards: a
- * full one passes the next card on to the column after it. At most three.
- */
-export function layoutTopics(topics: StudyTopic[], maxCols = 3): Placed[] {
-  const depth = new Map<string, number>();
-  for (const t of topics) {
-    const d = t.after.reduce((m, a) => Math.max(m, (depth.get(a) ?? 0) + 1), 0);
-    depth.set(t.id, d);
-  }
-  const cols = Math.max(1, Math.min(maxCols, Math.ceil(topics.length / 2)));
-  const cap = Math.ceil(topics.length / cols);
-  const rows = new Map<number, number>();
-  const linked = topics.some((x) => x.after.length);
-  return topics.map((t, i) => {
-    // no links at all: fill the columns in reading order
-    let col = linked ? Math.min(cols - 1, depth.get(t.id) ?? 0) : Math.floor(i / cap);
-    while ((rows.get(col) ?? 0) >= cap && col < cols - 1) col += 1;
-    const row = rows.get(col) ?? 0;
-    rows.set(col, row + 1);
-    return { id: t.id, col, row };
-  });
+/** "4 review questions" for a set of questions; the kind's own name otherwise. */
+export function kindSaid(t: Pick<StudyTopic, 'kind' | 'questions'>): string {
+  const n = (t.questions ?? []).reduce((sum, q) => sum + q.ns.length, 0);
+  if (t.kind === 'review' && n) return `${n} review ${n === 1 ? 'question' : 'questions'}`;
+  return TOPIC_KIND_LABEL[t.kind];
 }
 
 // ── practice ─────────────────────────────────────────────────────────
@@ -902,6 +931,16 @@ export function sanitizeStudy(v: unknown): StudyState | null {
       quotes,
       blocks,
       tables: Math.max(0, Math.min(99, Math.round(Number(t.tables) || 0))),
+      ...(() => {
+        const questions = (Array.isArray(t.questions) ? t.questions.slice(0, 6) : [])
+          .map((q) => (q && typeof q === 'object' ? (q as Record<string, unknown>) : {}))
+          .filter((q) => typeof q.doc === 'string' && DOC_ID.test(q.doc) && Array.isArray(q.ns))
+          .map((q) => ({ doc: String(q.doc), ns: (q.ns as unknown[]).map(Number).filter((n) => Number.isInteger(n) && n > 0 && n < 1000).slice(0, 30) }))
+          .filter((q) => q.ns.length);
+        const formulas = Math.max(0, Math.min(99, Math.round(Number(t.formulas) || 0)));
+        const terms = Math.max(0, Math.min(999, Math.round(Number(t.terms) || 0)));
+        return { ...(questions.length ? { questions } : {}), ...(formulas ? { formulas } : {}), ...(terms ? { terms } : {}) };
+      })(),
       after: (Array.isArray(t.after) ? t.after : []).filter((a): a is string => typeof a === 'string' && /^t\d{1,2}$/.test(a)).slice(0, 4),
     });
   }
@@ -991,5 +1030,25 @@ export function shortName(name: string): string {
   const base = name.replace(/\.[a-z0-9]{2,5}$/i, '').replace(/[_]+/g, ' ').trim();
   const ch = /\b(ch(?:apter)?\.?\s*\d+)\b/i.exec(base);
   if (ch) return ch[1].replace(/chapter\s*/i, 'Ch').replace(/\s+/g, '');
+  const lecture = /\b(lecture|week|unit|module|lab)\s*(\d+)\b/i.exec(base);
+  if (lecture) return `${lecture[1][0].toUpperCase()}${lecture[1].slice(1).toLowerCase()} ${lecture[2]}`;
+  if (/\breview\b/i.test(base)) return 'Review';
   return cleanText(base.split(/\s*[-–—:]\s*/)[0], 22);
+}
+
+/** "Q3–Q6", "Q2, Q5" — the questions a topic's passages number, said shortly. */
+export function questionsSaid(ns: number[]): string {
+  if (!ns.length) return '';
+  const runs: string[] = [];
+  let a = ns[0];
+  let b = ns[0];
+  for (const n of [...ns.slice(1), Infinity]) {
+    if (n === b + 1) {
+      b = n;
+      continue;
+    }
+    runs.push(a === b ? `Q${a}` : `Q${a}–Q${b}`);
+    a = b = n;
+  }
+  return runs.slice(0, 2).join(', ') + (runs.length > 2 ? '…' : '');
 }

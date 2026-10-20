@@ -103,6 +103,7 @@ export function L5Menu({
 export function L5Header({
   railOpen,
   onToggleRail,
+  onHome,
   title,
   stage,
   presence,
@@ -111,8 +112,12 @@ export function L5Header({
   center,
   extra,
 }: {
-  railOpen: boolean;
-  onToggleRail: () => void;
+  railOpen?: boolean;
+  /** the rail's button — Logos 5 keeps the rail put away, so it may be absent */
+  onToggleRail?: () => void;
+  /** the mark: home, the Universal Map */
+  onHome?: () => void;
+  /** where you are, in small capitals beside the mark: LOGOS, a course, a line of thinking */
   title: string;
   /** what sits in the middle of the bar — a study's steps */
   center?: ReactNode;
@@ -126,18 +131,27 @@ export function L5Header({
 }) {
   return (
     <header className={`l5-head${center ? ' has-steps' : ''}`}>
-      <button
-        type="button"
-        className="l5-iconbtn l5-railbtn"
-        onClick={onToggleRail}
-        aria-expanded={railOpen}
-        aria-label={railOpen ? 'Hide your lines of thinking' : 'Your lines of thinking'}
-        title={railOpen ? 'Hide the rail' : 'Your lines of thinking'}
-      >
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-          <path d="M4 7h16M4 12h16M4 17h10" />
-        </svg>
-      </button>
+      {onToggleRail && (
+        <button
+          type="button"
+          className="l5-iconbtn l5-railbtn"
+          onClick={onToggleRail}
+          aria-expanded={railOpen}
+          aria-label={railOpen ? 'Hide your lines of thinking' : 'Your lines of thinking'}
+          title={railOpen ? 'Hide the rail' : 'Your lines of thinking'}
+        >
+          <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+            <path d="M4 7h16M4 12h16M4 17h10" />
+          </svg>
+        </button>
+      )}
+      {onHome && (
+        <button type="button" className="l5-brand" onClick={onHome} aria-label="Socria Logos — your Universal Map" title="Your Universal Map">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/socria-mark.png" alt="" width={22} height={22} />
+          <span className="l5-brand-w">Socria</span>
+        </button>
+      )}
       <h1 className="l5-title" title={title}>
         {title}
       </h1>

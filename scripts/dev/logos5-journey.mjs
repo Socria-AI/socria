@@ -37,7 +37,7 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
 page.on('console', (m) => m.type() === 'error' && !/clerk|Failed to load resource|net::ERR|Warning:/i.test(m.text()) && errors.push('console: ' + m.text().slice(0, 300)));
 await page.request.post(`${BASE}/api/access/unlock`, { data: { code: 'localdevcode1234567' } });
 await page.goto(`${BASE}/chat?model=logos-3`, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('.lg-composer textarea, .l5s-ask textarea', { timeout: 90000 }).catch(() => console.log('no composer'));
+await page.waitForSelector('.lg-composer textarea, .l5s-ask textarea, .l5u', { timeout: 90000 }).catch(() => console.log('no composer'));
 await page.waitForTimeout(1200);
 for (let i = 0; i < 3; i++) { const sk = page.getByRole('button', { name: /^skip/i }); if (await sk.count()) { await sk.first().click().catch(() => {}); await page.waitForTimeout(1000); } }
 await page.addStyleTag({ content: '.env-badge{display:none!important}' });
@@ -199,7 +199,39 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       log('asked', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 160));
       log('reply', (await page.locator('.l5-a .l5-prose').last().innerText().catch(() => '')).slice(0, 160));
     }
-    if (s === 'new') { await page.getByRole('button', { name: /new line of thinking/i }).first().click(); await page.waitForTimeout(1200); }
+    // a new line of thinking is begun from home, the Universal Map
+    if (s === 'new') { await page.locator('.l5-brand').click(); await page.waitForTimeout(600); await page.locator('.l5-unibtn.is-new').click(); await page.waitForTimeout(1000); }
+    if (s === 'state') {
+      log('state: title', await page.locator('.l5-title').innerText().catch(() => ''), '| intake', await page.locator('.l5s-drop').count(), '| home', await page.locator('.l5u').count(), '| rail', JSON.stringify((await page.locator('.lg-railhost').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)));
+    }
+    if (s === 'home') {
+      await page.locator('.l5-brand').click();
+      await page.waitForTimeout(1200);
+      log('home', await page.locator('.l5u-title p').innerText().catch(() => 'none'), 'clusters', await page.locator('.l5u-c').count(), 'bridges', await page.locator('.l5u-bridges path').count(), 'rail shown', await page.locator('.l5:not(.rail-closed) > .lg-railhost').count());
+    }
+    if (s === 'find') {
+      await page.locator('.l5u-search input').fill(process.env.FIND || 'team');
+      await page.waitForTimeout(500);
+      log('find', await page.locator('.l5u-found').innerText().catch(() => ''), 'dimmed', await page.locator('.l5u-c.is-dim').count());
+      await shot('find-in');
+      await page.locator('.l5u-search input').fill('');
+    }
+    if (s === 'list') {
+      await page.locator('.l5-unibtn.is-list').click();
+      await page.waitForTimeout(700);
+      log('list open', await page.locator('.l5.list-open > .lg-railhost').count());
+      await shot('list-in');
+      // put away: the button beside it on a desktop, a tap beside the drawer on a phone
+      if (width < 700) await page.mouse.click(width - 12, Math.round(height / 2));
+      else await page.locator('.l5-unibtn.is-list').click();
+      await page.waitForTimeout(500);
+      log('list closed', await page.locator('.l5.list-open').count() === 0);
+    }
+    if (s === 'openmap') {
+      await page.locator('.l5u-c.is-logos .l5u-halo').first().click({ force: true });
+      await page.waitForTimeout(1500);
+      log('opened', await page.locator('.l5-title').innerText().catch(() => ''), 'home gone', (await page.locator('.l5u').count()) === 0);
+    }
     if (s === 'uniopen') { await page.locator('.l5-unibtn').click(); await page.waitForTimeout(1500); await shot('uniopen-in'); }
     if (s === 'universe') {
       await page.locator('.l5-unibtn').click();
@@ -211,7 +243,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     }
     if (s === 'reload') {
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.l5s-card, .l5-thread, .l5s-ask', { timeout: 90000 });
+      await page.waitForSelector('.l5s-card, .l5-thread, .l5s-ask, .l5u', { timeout: 90000 });
       await page.waitForTimeout(1500);
       log('after reload: cards', await page.locator('.l5s-card').count(), 'steps', await page.locator('.l5s-steps').count());
       await shot('reload');

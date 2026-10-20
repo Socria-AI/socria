@@ -8,5 +8,5 @@ export { parseBlocks, splitInline } from '@/lib/rich-text';
 export { readStagePrefs, writeStagePrefs, logos5On, DEFAULT_STAGE_SHARE, STAGE_KEY } from '@/lib/logos5/flags';
 // the study path: intake, board, a topic, practice, the steps — and the Universal Map
 export { StudyIntake, StudyBoard, StartPanel, TopicInspector, StudyPractice, StudySteps, PracticeEmpty } from '@/components/logos5/Study';
-export { UniverseMap } from '@/components/logos5/Universe';
+export { UniverseView } from '@/components/logos5/Universe';
 export { checkPractice } from '@/lib/logos5/study';
