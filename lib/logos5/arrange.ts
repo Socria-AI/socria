@@ -1,12 +1,13 @@
 // lib/logos5/arrange.ts — HOW THE PERSON HAS ARRANGED THEIR UNIVERSAL MAP.
 //
-// Everything here is the person's own choice, and nothing else: where they put
-// a conversation, the order they gave a Project's conversations and the order
-// of the Projects themselves, which they starred and which they put out of
-// sight, the links and the notes they drew, how the map is shown, and the
-// views they saved. Nothing about a conversation is kept here — its words,
-// its map and its Project stay where they are; a Project's name and colour
-// stay with the Project.
+// Everything here is the person's own choice, and nothing else: which way the
+// map is grouped (Today's learning, By week, By subject), where they put a
+// conversation, the subject they gave one by dragging it there, the order of
+// the clusters, which they starred and which they put out of sight, the links
+// and the notes they drew, how the map is shown, and the views they saved.
+// Nothing about a conversation is kept here — its words, its map and its
+// Project stay where they are; a Project's name and colour stay with the
+// Project.
 //
 // It travels: kept in this browser and — signed in — in the account
 // (user_profiles.universal_map, through /api/profile), the newer copy winning.
@@ -14,12 +15,16 @@
 // and bounds everything, so a copy from another version, or a damaged one,
 // can never break the map.
 //
-// Groups are named by key: `p:<project id>` for a Project, `loose` for the
-// lines of thinking in none, `chats` for the Core chats in none.
+// Clusters are named by key: `p:<project id>` for a Project, `c:…` a course and
+// `f:…` a field read from the conversations (subjects.ts), `other` for
+// everything else; `w:…` and `m:…` are weeks and months. An arrangement kept
+// before the map was grouped this way still reads: its pins in a Project still
+// hold, and `map` or `columns` is By subject, `timeline` By week.
 //
 // PURE.
 
-export type HomeMode = 'map' | 'columns' | 'timeline';
+/** How the Universal Map is grouped: today's learning and what it builds on, by week, or by subject. */
+export type HomeMode = 'today' | 'week' | 'subject';
 export type LabelLevel = 'minimal' | 'titles' | 'ideas';
 export type ColorBy = 'project' | 'kind' | 'recency';
 export type SizeBy = 'ideas' | 'recency' | 'same';
@@ -38,7 +43,7 @@ export interface Display {
   size: SizeBy;
 }
 
-/** A conversation put somewhere by hand: relative to its group's corner, and only while it is in that group. */
+/** A conversation put somewhere by hand: relative to its cluster's origin, and only while it is in that cluster. */
 export interface Pin {
   x: number;
   y: number;
@@ -90,6 +95,8 @@ export interface Arrangement {
   display: Display;
   pins: Record<string, Pin>;
   frames: Record<string, FrameSet>;
+  /** conversation id → the subject the person put it in by hand (a course or field key, or `other`) */
+  subjectOf: Record<string, string>;
   /** the groups in the order the person put them; the rest follow in their own order */
   groupOrder: string[];
   /** group key → its conversations in the person's order */
@@ -107,7 +114,10 @@ export interface Arrangement {
 
 export const HOME_KEY = 'socria.logos5.home.v1';
 
-export const MODES: readonly HomeMode[] = ['map', 'columns', 'timeline'];
+export const MODES: readonly HomeMode[] = ['today', 'week', 'subject'];
+/** How an arrangement kept before the lenses reads: a map of Projects is By subject, a timeline By week. */
+const OLD_MODES: Record<string, HomeMode> = { map: 'subject', columns: 'subject', timeline: 'week' };
+const modeOf = (v: unknown, or: HomeMode): HomeMode => (typeof v === 'string' && OLD_MODES[v] ? OLD_MODES[v] : oneOf(v, MODES, or));
 export const LABELS: readonly LabelLevel[] = ['minimal', 'titles', 'ideas'];
 export const COLOR_BY: readonly ColorBy[] = ['project', 'kind', 'recency'];
 export const SIZE_BY: readonly SizeBy[] = ['ideas', 'recency', 'same'];
@@ -120,11 +130,12 @@ export function emptyArrangement(): Arrangement {
   return {
     v: 1,
     at: 0,
-    mode: 'map',
+    mode: 'today',
     sort: 'started',
     display: { ...DEFAULT_DISPLAY },
     pins: {},
     frames: {},
+    subjectOf: {},
     groupOrder: [],
     order: {},
     starred: [],
@@ -140,6 +151,7 @@ export function emptyArrangement(): Arrangement {
 // ── bounds ───────────────────────────────────────────────────────────
 
 const MAX_PINS = 600;
+const MAX_SUBJECTS = 600;
 const MAX_FRAMES = 120;
 const MAX_GROUPS = 120;
 const MAX_IN_ORDER = 600;
@@ -199,7 +211,7 @@ export function parseArrangement(raw: unknown): Arrangement {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return out;
   const r = raw as Record<string, unknown>;
   out.at = num(r.at) !== null && (r.at as number) > 0 ? Math.round(r.at as number) : 0;
-  out.mode = oneOf(r.mode, MODES, out.mode);
+  out.mode = modeOf(r.mode, out.mode);
   out.sort = oneOf(r.sort, SORTS, out.sort);
   out.display = displayOf(r.display);
   if (r.pins && typeof r.pins === 'object' && !Array.isArray(r.pins)) {
@@ -220,6 +232,9 @@ export function parseArrangement(raw: unknown): Arrangement {
       if (q.collapsed === true) set.collapsed = true;
       out.frames[g] = set;
     }
+  }
+  if (r.subjectOf && typeof r.subjectOf === 'object' && !Array.isArray(r.subjectOf)) {
+    for (const [id, k] of Object.entries(r.subjectOf as Record<string, unknown>).slice(0, MAX_SUBJECTS)) if (isId(id) && isId(k)) out.subjectOf[id] = k;
   }
   out.groupOrder = ids(r.groupOrder, MAX_GROUPS);
   if (r.order && typeof r.order === 'object' && !Array.isArray(r.order)) {
@@ -249,7 +264,7 @@ export function parseArrangement(raw: unknown): Arrangement {
       const q = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
       const name = line(q.name, VIEW_NAME_MAX);
       if (!isId(q.id) || !name) continue;
-      out.views.push({ id: q.id, name, mode: oneOf(q.mode, MODES, 'map'), sort: oneOf(q.sort, SORTS, 'started'), display: displayOf(q.display), projects: groupsList(q.projects), query: line(q.query, 80) });
+      out.views.push({ id: q.id, name, mode: modeOf(q.mode, 'subject'), sort: oneOf(q.sort, SORTS, 'started'), display: displayOf(q.display), projects: groupsList(q.projects), query: line(q.query, 80) });
     }
   }
   out.projects = groupsList(r.projects);
@@ -279,7 +294,22 @@ export function pinTile(a: Arrangement, id: string, g: string, x: number, y: num
   return { ...a, pins };
 }
 
-/** Put back in their group's order. */
+/**
+ * The subject the person gave conversations by putting them there — a course
+ * or field key, or `other` — or, with null, the subject read from them again.
+ */
+export function setSubject(a: Arrangement, idList: readonly string[], key: string | null): Arrangement {
+  const subjectOf = { ...a.subjectOf };
+  for (const id of idList) {
+    if (key && isId(key)) subjectOf[id] = key;
+    else delete subjectOf[id];
+  }
+  const keys = Object.keys(subjectOf);
+  if (keys.length > MAX_SUBJECTS) for (const k of keys.slice(0, keys.length - MAX_SUBJECTS)) delete subjectOf[k];
+  return { ...a, subjectOf };
+}
+
+/** Put back in their cluster's order. */
 export function unpinTiles(a: Arrangement, idList: readonly string[]): Arrangement {
   if (!idList.some((id) => id in a.pins)) return a;
   const pins = { ...a.pins };

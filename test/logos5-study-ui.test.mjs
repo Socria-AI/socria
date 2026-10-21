@@ -13,10 +13,11 @@
 //   • the three views (Components, Artifacts, Logic Map) are counted, and
 //     each says what it holds — or how it comes to hold something;
 //   • a card asked about says which card, its last answer and where it came from;
-//   • the Universal Map is the home: a few conversations as cards, more as
-//     Project frames of tiles — with what they share, the person's stars,
-//     notes and links — or as columns, or a timeline; and a way to begin when
-//     there is nothing yet.
+//   • the Universal Map is the home: every conversation a node — a hub with
+//     its name, a quick question a dot — grouped as today's learning, by week
+//     or by subject (Projects first, then the subjects read from the
+//     conversations), with what they share, the person's stars, notes and
+//     links; and a way to begin when there is nothing yet.
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as h } from 'react';
@@ -151,7 +152,8 @@ console.log('\n=== practice ===');
 
 console.log('\n=== the Universal Map ===');
 {
-  const NOW = Date.now();
+  // a fixed afternoon, so what is "today" does not depend on when the test runs
+  const NOW = new Date(2026, 9, 21, 15, 0).getTime();
   const DAY = 86_400_000;
   const say = (role, content, d) => ({ role, content, at: NOW - d * DAY });
   const conv = (id, title, o = {}) => ({
@@ -159,56 +161,59 @@ console.log('\n=== the Universal Map ===');
     title,
     updatedAt: NOW - (o.last ?? 1) * DAY,
     projectId: o.project ?? null,
-    messages: [say('user', title, (o.last ?? 1) + 2), say('assistant', `Where it stands: ${title.toLowerCase()} is narrowing.${o.ask ? ' ' + o.ask : ''}`, o.last ?? 1)],
+    messages: Array.from({ length: o.turns ?? 1 }).flatMap((_, i) => [say('user', i ? 'and then?' : title, (o.last ?? 1) + 2 - i * 0.01), say('assistant', `Where it stands: ${title.toLowerCase()} is narrowing.${o.ask && i === (o.turns ?? 1) - 1 ? ' ' + o.ask : ''}`, (o.last ?? 1) - i * 0.001)]),
     map: { nodes: (o.ideas ?? []).map((label, i) => ({ id: `${id}${i}`, label })), edges: [] },
   });
   const head = (center, count) => h('header', { className: 'test-head' }, `COUNT:${count}`, center);
-  const base = { activeId: null, onOpen: none, onStart: none, head };
+  const base = { activeId: null, onOpen: none, onStart: none, head, now: NOW };
 
   const empty = html(h(U.UniverseView, { ...base, conversations: [] }));
-  ok('with nothing yet, it says what it will be and how to begin', empty.includes('appears here — by Project, as a map you can arrange') && empty.includes('What are you working on?') && empty.includes('Find or start…'));
+  ok('with nothing yet, it says what it will be and how to begin', empty.includes('a map of what you have learned, by day, by week and by subject') && empty.includes('What are you working on?') && empty.includes('Find or start…'));
 
-  const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2 }), conv('c', 'Exam 2', { last: 3 })] }));
-  ok('a few conversations are large cards, a press from going on', (few.match(/class="l5h-card is-big/g) ?? []).length === 3 && few.includes('Continue') && few.includes('Where it stands: two job offers is narrowing.'));
+  const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
+  ok('a few conversations are stars with their names', (few.match(/class="l5n-node is-hub/g) ?? []).length === 3 && few.includes('Two job offers') && few.includes('Rent or buy'));
   ok('the header is given the find-or-start box and how many there are', few.includes('COUNT:3') && few.includes('placeholder="Find or start…"'));
-  ok('where to pick up is a press away', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few));
-  ok('three ways to see it, the map first', /role="radio" aria-checked="true" class="is-on">Map/.test(few) && few.includes('>Columns<') && few.includes('>Timeline<'));
+  ok('where to pick up is a press away, and ringed on the map', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few) && few.includes('l5n-ring') && few.includes('last here'));
+  ok('three ways to group it, today’s learning first', /role="radio" aria-checked="true" class="is-on"><span class="l5h-long">Today’s learning/.test(few) && few.includes('By week') && few.includes('By subject'));
+  ok('today: what was worked on today, by the day', few.includes('Today’s learning') && few.includes('Today · Wed Oct 21'));
 
   const projects = [{ id: 'P1', name: 'ACCT 2301', color: 'clay', createdAt: 1 }, { id: 'P2', name: 'Job hunt', createdAt: 2 }, { id: 'P3', name: 'Someday', createdAt: 3 }];
   const conversations = [
-    conv('a1', 'Accruals', { project: 'P1', ideas: ['Accrual basis'] }),
-    conv('a2', 'Exam 2', { project: 'P1', last: 0.1, ideas: ['Accrual basis', 'Adjusting entries'] }),
-    conv('j1', 'Two job offers', { project: 'P2', ideas: ['Monthly runway', 'Better team'], ask: 'Which would you leave for?' }),
-    conv('j2', 'Negotiating', { project: 'P2', ideas: ['Salary band'] }),
-    conv('l1', 'Rent or buy', { ideas: ['Monthly runway'] }),
-    conv('l2', 'Startup idea', { ideas: ['The monthly runway'] }),
+    conv('a1', 'Accruals', { project: 'P1', ideas: ['Accrual basis'], turns: 3 }),
+    conv('a2', 'Exam 2', { project: 'P1', last: 0.1, ideas: ['Accrual basis', 'Adjusting entries'], turns: 4 }),
+    conv('j1', 'Two job offers', { project: 'P2', ideas: ['Monthly runway', 'Better team'], ask: 'Which would you leave for?', turns: 3 }),
+    conv('j2', 'Negotiating', { project: 'P2', ideas: ['Salary band'], turns: 3 }),
+    conv('l1', 'Rent or buy a flat', { ideas: ['Monthly runway'], turns: 3 }),
+    conv('l2', 'Monthly budget', { ideas: ['The monthly runway'], turns: 3 }),
     conv('l3', 'Secret plans', {}),
     { id: 'k1', title: 'Tax questions', updatedAt: NOW - 5 * DAY, kind: 'core' },
   ];
   const E = U.emptyArrangement();
-  const arranged = { ...E, starred: ['j1'], hidden: ['l3'], notes: [{ id: 'n1', x: 40, y: 900, text: 'decide by Friday' }], links: [{ id: 'k', a: 'j1', b: 'a2', label: 'same deadline' }], seen: { hint: true } };
+  const arranged = { ...E, mode: 'subject', starred: ['j1'], hidden: ['l3'], notes: [{ id: 'n1', x: 40, y: 900, text: 'decide by Friday' }], links: [{ id: 'k', a: 'j1', b: 'a2', label: 'same deadline' }], seen: { hint: true } };
   const map = html(h(U.UniverseView, { ...base, conversations, projects, initial: arranged }));
-  ok('every Project a frame, an empty one too; then the rest; then Core chats', ['ACCT 2301', 'Job hunt', 'Someday', 'In no Project', 'Chats'].every((n) => map.includes(`>${n}<`)) && map.indexOf('>ACCT 2301<') < map.indexOf('>Job hunt<') && map.includes('Drag a line of thinking here to file it'));
-  ok('every conversation a tile, hidden ones left out', (map.match(/class="l5h-tile /g) ?? []).length === 7 && !map.includes('Secret plans'));
+  const names = [...map.matchAll(/class="l5n-name"[^>]*>([^<]*)</g)].map((m) => m[1]);
+  ok('by subject: every Project, an empty one too, then the subjects read from the conversations', names.slice(0, 3).join() === 'ACCT 2301,Job hunt,Someday' && names.includes('Money') && map.includes('Drag a conversation here to file it'), names.join(' | '));
+  ok('every conversation a node, hidden ones left out', (map.match(/class="l5n-node /g) ?? []).length === 7 && !map.includes('Secret plans'));
+  ok('a hub for a major session, a dot for a Core chat', (map.match(/class="l5n-node is-hub/g) ?? []).length === 6 && /class="l5n-node is-dot is-chat/.test(map));
   ok('the header counts what is on the map', map.includes('COUNT:7'));
-  ok('what three of them share is named between them, a theme', map.includes('Monthly runway') && /l5h-idea is-theme/.test(map));
+  ok('what three of them share is named between them, a theme — across a Project and a subject', /l5n-idea is-theme/.test(map) && map.includes('Monthly runway'));
   ok('starred is a press away, and marked', map.includes('l5h-starchip') && /l5h-starchip[^>]*title="Two job offers"/.test(map));
   ok('the person’s notes and links are on the map', map.includes('decide by Friday') && map.includes('same deadline'));
-  ok('a question waiting is marked; the place to pick up glows', map.includes('a question is waiting for you') && /class="l5h-tile [^"]*is-resume/.test(map));
-  ok('a tile says what it is to a screen reader', /aria-label="Two job offers, [^"]*Job hunt/.test(map));
+  ok('a question waiting is marked; the place to pick up is ringed', map.includes('a question is waiting for you') && map.includes('l5n-ring'));
+  ok('a node says what it is to a screen reader', /aria-label="Two job offers, [^"]*Job hunt/.test(map));
+  ok('a Project’s cluster says what it is and how many', map.includes('Project · 2') && map.includes('Subject · '));
 
-  const cols = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, mode: 'columns' } }));
-  const acct = cols.slice(cols.indexOf('data-col="p:P1"'));
-  ok('columns: one for each Project, its conversations in the order they were begun', (cols.match(/class="l5h-col /g) ?? []).length === 5 && acct.indexOf('Accruals') < acct.indexOf('Exam 2') && cols.includes('Drag a line of thinking here to file it.'));
+  const week = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, mode: 'week' } }));
+  ok('by week: this week, then last week, by their dates', week.includes('>This week<') && week.includes('Oct 19 – 25') && week.indexOf('>This week<') < (week.indexOf('>Last week<') === -1 ? Infinity : week.indexOf('>Last week<')));
 
-  const tl = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, mode: 'timeline' } }));
-  ok('a timeline: a lane for each group with something in it, ending at today', tl.includes('l5h-tl-lane') && tl.includes('>Today<') && !/l5h-tl-lane"[^>]*>[^<]*<span[^>]*><\/span>Someday/.test(tl) && tl.includes('>Yesterday<'));
+  const today = html(h(U.UniverseView, { ...base, conversations, projects, initial: E }));
+  ok('today’s learning: today in the middle, and why each earlier one is beside it', today.includes('Today’s learning') && /l5n-why">(shares|also)/.test(today));
 
-  const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, display: { ...E.display, chats: false }, seen: { hint: true } } }));
-  ok('Core chats can be left off the map', !noChats.includes('>Chats<') && !noChats.includes('Tax questions'));
+  const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, display: { ...E.display, chats: false } } }));
+  ok('Core chats can be left off the map', !noChats.includes('Tax questions'));
 
   const list = html(h(U.UniverseView, { ...base, conversations, projects, contents: true, initial: arranged }));
-  ok('the list: starred first, then each Project, counting what is hidden', list.includes('>Starred<') && list.indexOf('>Starred<') < list.indexOf('>ACCT 2301<') && list.includes('7 conversations · 1 hidden'));
+  ok('the list: starred first, then each subject, counting what is hidden', list.includes('>Starred<') && list.indexOf('>Starred<') < list.indexOf('l5c-k">ACCT 2301<') && list.includes('7 conversations · 1 hidden'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

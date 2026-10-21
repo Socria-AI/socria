@@ -2,9 +2,11 @@
 //
 // THE THEMES A PERSON CAN READ SOCRIA IN.
 //
-// Paper is the product's own ground and stays the default. Dark is for
-// everyone. White and the Socria One blue are part of One — choosing them is
-// one of the things membership opens, the same way every depth is.
+// Paper is the product's own ground and stays the default. Dark and Night are
+// for everyone — Night is the dark ground the Universal Map draws as a sky,
+// its conversations as stars. White and the Socria One blue are part of One —
+// choosing them is one of the things membership opens, the same way every
+// depth is.
 //
 // A theme is a set of colour variables (app/themes.css re-declares the ones
 // the app surfaces already read) and nothing else: no surface knows which
@@ -20,7 +22,7 @@
 // the plan, so a One theme on a browser whose membership has lapsed is put
 // back to paper the moment the app knows (`effectiveTheme`).
 
-export const THEME_IDS = ['paper', 'white', 'dark', 'one'] as const;
+export const THEME_IDS = ['paper', 'white', 'dark', 'night', 'one'] as const;
 export type ThemeId = (typeof THEME_IDS)[number];
 
 export interface Theme {
@@ -40,6 +42,7 @@ export const THEMES: Record<ThemeId, Theme> = {
   paper: { id: 'paper', label: 'Paper', says: 'Socria’s own ground', one: false, swatch: ['#F5F3EB', '#1F1F1F', '#5e7633'], scheme: 'light' },
   white: { id: 'white', label: 'White', says: 'Clean and bright', one: true, swatch: ['#FFFFFF', '#1A1A1A', '#4f6a2a'], scheme: 'light' },
   dark: { id: 'dark', label: 'Dark', says: 'Easy on the eyes at night', one: false, swatch: ['#191A17', '#ECE9DF', '#A9C27A'], scheme: 'dark' },
+  night: { id: 'night', label: 'Night', says: 'Your thinking as a night sky', one: false, swatch: ['#0B1222', '#E9E6F2', '#E7CF92'], scheme: 'dark' },
   one: { id: 'one', label: 'Socria One', says: 'The One blue', one: true, swatch: ['#13293A', '#F0EAD8', '#B8CDD9'], scheme: 'dark' },
 };
 

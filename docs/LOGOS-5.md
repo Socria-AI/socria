@@ -12,8 +12,9 @@ And for studying: **drop your files, say what for, and Socria sorts them into
 topics in their own words, makes practice from them when asked, and checks
 it — with the conversation and its Logic Map one step away.** Every line of
 thinking is also on one map — and that map is home: the **Universal Map**,
-every conversation in its Project's frame, arranged the way the person wants
-it, with the old list of chats put away.
+every past conversation as a node (a major session a hub, a quick question
+an ambient dot), grouped as today's learning, by week or by subject, with the
+old list of chats put away. On the **Night** theme it is a night sky.
 
 The redesign (§6–7) turns the line of thinking around: **the map is the
 screen.** Components, Artifacts and the Logic Map are three views of one line
@@ -135,111 +136,145 @@ the answers to practice not yet submitted.
 
 ## 5. Home: the Universal Map
 
-Logos 5 opens on the **Universal Map**: every conversation, where the person
-can see it and arrange it. The first version merged everything into one
-force-laid-out mind map. It was rebuilt because a single conversation sat
-lost in an empty canvas, a cluster's place said nothing and moved when
-anything changed, every label was drawn at every zoom, and a title bar
-repeated the header.
+Logos 5 opens on the **Universal Map**. Its shape follows the PRD "Clearer
+Structures and UI" (Workspace Navigation & History): instead of hiding past
+conversations in a sidebar list, every past study session is on one spatial
+map —
 
-**Where things are means something, and stays put** (`lib/logos5/universe.ts`).
-- Each Project is a frame — its own territory, in its own colour (the
-  Project's colour, the one Project Home shows). An empty Project is a frame
-  too, to drop into. Lines of thinking in no Project share a frame, and Core
-  chats in none have their own, quieter one.
-- Frames sit in the order the Projects were made, or the order the person
-  put them in. Inside a frame, conversations sit in the order they were
-  begun, so a new one joins the end and nothing already there moves. The
-  person can also choose their own order, or last active, name, or size.
-- Recency is not a place, because a place that changes with every message is
-  not one: it is a soft fade on older tiles, the **Pick up where you left
-  off** chip, and the Timeline.
+- past topics are **visual nodes**, grouped intuitively: **Today's
+  learning**, **By week**, **By subject**;
+- **major study sessions are larger "Hubs"**, while **quick one-off
+  questions stay smaller ambient dots**;
+- it shows **how topics connect across courses over time**.
 
-**A tile says more the closer you are.**
-- Far off: a conversation's name.
-- Nearer: its kind (Deciding, Planning, Study…), how long ago, and its key
-  ideas.
-- Up close: where it stands (the first line of its latest synthesis or reply)
-  and the small graph its map grew.
+And the PRD's rules for the whole app hold here: **zero mandatory homework**
+(nothing has to be filed or categorised to be placed — everything is
+organised passively first), and **shape consistency** (a conversation is
+always a round node; the Logic Map keeps its squares, hexagons, spiky nodes
+and rhombuses for what is inside one).
 
-Marks on a tile:
-- a gold dot when Socria asked something that has not been answered;
-- a count of what was made in it (charts, plans, practice);
-- a star when the person starred it.
+The earlier versions — one force-laid-out mind map, then Project frames of
+cards with Columns and a Timeline — are replaced. What the person arranged in
+them still reads (below).
 
-Nothing is made up. A conversation with no map is just its name, and a line
-of thinking with nothing in it is not drawn.
+**A node** (`lib/logos5/spatial.ts`):
+- **A hub** is a major session: a study, something made in it, three turns or
+  more, or a map that grew. It is a star with its name, its kind and how long
+  ago beside it. Its size is how much it holds (View can make it recency, or
+  all alike).
+- **A dot** is a quick one-off question — a Core chat is always one, since
+  the map knows a chat only by its name. Beside hubs a dot is ambient: named
+  when pointed at, found, chosen or seen up close. In a cluster of only a few
+  dots, each is named.
+- Marks: a gold **?** when Socria asked something unanswered; a count of
+  what was made in it; a star when starred; a gold ring and "last here" on
+  the one to pick up; a dashed ring on one shown in a Project for its subject
+  but not filed there (below).
+- Nothing is made up. A line of thinking with nothing in it is not drawn.
+- Closer, it says more: far off, the hubs' names; nearer, their kind and when;
+  up close, where each stands and the dots' names.
 
-**What conversations share** is drawn between them, by name, in their own
-words ("Monthly runway"). An idea in three or more is a **theme**, drawn
-stronger. Pressing one chooses the conversations that share it. View can
-turn this off.
+**By subject** — the map the person arranges.
+- **Projects first**, each a cluster in its own colour (the one Project Home
+  shows), in the order they were made or the person's own; an empty one too,
+  to drop into.
+- **Then the subjects read from the conversations** (`lib/logos5/subjects.ts`)
+  — no filing needed. The surest reading wins: the course a study was sorted
+  under ("ACCT 2301 · Exam 2"); a course code in a conversation's name, first
+  question or topic; the field Socria's map named while it thought
+  (`map.ask.domain`); the kind of picture it drew (supply and demand is
+  economics); its words against a short list of fields. A field with exactly
+  one course in it joins that course.
+- **A conversation about a Project's subject but not filed in it** is shown in
+  that Project with a dashed ring and counted in "+ 1 about it · File it" —
+  never filed without the person.
+- **Everything else** last: what nothing places clearly, and a lone quick
+  question (one dot is not a subject yet). Never a wrong subject because one
+  had to be chosen.
+- Inside a cluster the hubs are a **constellation** joined in the order they
+  were begun; the dots sit below them. A new conversation joins the end of
+  its cluster; nothing already there moves.
 
-**Arranging** (`lib/logos5/arrange.ts`):
-- **Drag a conversation** anywhere in its frame. With **Snap to the grid**
-  (on by default) it lands on a place, and trades places with whatever was
-  there; nothing else moves. Drag it into another Project's frame to file it
-  there.
-- **Drag a frame by its name** to move it with everything in it. Its **corner**
-  makes it wider or narrower. The chevron folds it to one line, and a
-  double-click renames it.
-- **The dot** changes a Project's colour; both changes are the Project's own.
-- **Shift-drag** (or **Select**) chooses several: make a **New Project from
-  these**, move them, star them, hide them, or put them back in order.
-- **Double-click the map** to write a note on it.
-- **Link to…** on a conversation's card draws your own link to another,
-  which you can name.
-- **Star** puts a conversation in the strip at the top. **Hide** takes it off
-  the map (View → Hidden brings it back, and search still finds it).
-- **Undo** and **Redo** (⌘Z, ⇧⌘Z) cover all of this, filing included.
-  Which view is showing, and how it looks, are preferences, not undoable
-  changes.
+**By week** — newest first: This week, Last week, then weeks back by their
+dates; after eight weeks, months. Each cluster's hubs are joined in the order
+they were worked on.
 
-**Three ways to see it**:
-- **Map**: the frames.
-- **Columns**: a column per Project. Drag a card to reorder it, or into
-  another column to file it, and a column by its name to move the column.
-  On a touch screen, press and hold first.
-- **Timeline**: a lane per Project, a column per stretch of time (before
-  this month … today).
+**Today's learning** — what was worked on today in the middle (or, before
+anything today, the last day something was: "Where you left off"); round it,
+**the earlier conversations it builds on** — an idea in common first, then the
+same subject or Project — each joined to the one of today's it leads to, with
+why under its name ("shares 'Accrual basis'", "also in ACCT 2301"); beyond
+them, everything else as an ambient field, a sector to each subject, named at
+its edge. On a phone the three are read top to bottom.
 
-While there are fewer than five conversations and nothing has been arranged,
-the Map shows them as large cards instead, one press from going on.
+**What conversations share** is named between them in their own words
+("Monthly runway"), with a dotted line to each — across Projects and subjects
+too, which is how a topic is seen connecting courses. An idea in three or
+more is a **theme**. Pressing one chooses the conversations that share it.
+(Today's learning leaves them out: its ring already says why each is there.)
 
-**View** holds the rest:
-- the order;
-- Core chats on or off, the shared ideas, snap to the grid;
-- labels (minimal, titles or ideas), colour (by Project, kind or recency)
-  and size (by ideas, recency, or the same);
-- which Projects are shown;
-- **saved views** — a name for how the map is shown, with its search;
-- Hidden, Add a note, Tidy up (put back in order whatever was placed by
-  hand), Reset layout;
-- signed in, **Everything remembered** (the Mind Atlas).
+Changing the lens moves the stars to their new places rather than redrawing
+them, so it can be seen where each went. Today's learning is the default; the
+lens chosen is remembered.
+
+**Arranging** (By subject; `lib/logos5/arrange.ts`):
+- **Drag a star** anywhere in its cluster; with **Snap into place** (on by
+  default) it lands on a place, trading with whatever was there, and nothing
+  else moves. **Into another subject**, it is given that subject (kept with
+  the arrangement; "Its own subject" on its card gives it back). **Into a
+  Project**, it is filed there.
+- **Drag a cluster by its name** to move it with everything in it. Pointed
+  at, its name offers **Fold**, and for a subject read from the
+  conversations, **Make it a Project** (made, with them filed in it, in one
+  undoable step). A Project's dot changes its colour and a double-click
+  renames it — both the Project's own.
+- **Shift-drag** (or **Select**) chooses several: **New Project from these**,
+  move them, star them, hide them, or put them back in order.
+- **Double-click the map** to write a note on it. **Link to…** on a card draws
+  your own link to another, which you can name.
+- **Star** puts a conversation in the strip at the top; **Hide** takes it off
+  the map (View → Hidden brings it back; search still finds it).
+- **Undo** and **Redo** (⌘Z, ⇧⌘Z) cover all of it, filing included. The
+  lens, and how the map looks, are preferences, not undoable steps.
+- Today's learning and By week are arranged by time; there a drag moves the
+  map.
+
+**View** holds the rest: the order inside a subject; Core chats on or off,
+the shared ideas, snapping; labels (minimal, titles or ideas), colour (by
+subject, kind or recency) and size (by depth, recency, or the same); which
+subjects are shown; **saved views**; Hidden, Add a note, Tidy up, Reset layout;
+and, signed in, **Everything remembered** (the Mind Atlas).
 
 **One box finds or starts.** "Find or start…" in the header (press `/`)
-searches names, ideas and where conversations stand. What does not match
+searches names, ideas and where conversations stand; what does not match
 dims, and Enter opens the first match. Otherwise its last choice begins a new
-line of thinking with the typed words as the first question. Empty, it
-offers to pick up where you left off.
+line of thinking with the typed words as the first question.
 
 **Getting around.**
-- Pressing a conversation opens its card: where it stands, Socria's open
-  question, its ideas, and Continue, Star, Move to…, Link to…, Back in order,
-  Hide.
-- Pressing again, a double-click, or Enter opens the conversation.
-- Arrow keys go to the nearest conversation that way.
-- Scroll moves the map, and pinch or ⌘/Ctrl-scroll zooms, as on the Logic
-  Map (`lib/canvas.ts`).
-- **List** in the header opens a column of every conversation, starred
-  first, in the same order. The menu's "Manage conversations" brings back the
-  rail for renaming and deleting.
+- Pressing a star opens its card: where it stands, Socria's open question,
+  its ideas, and Continue, Star, Move to…, Link to…, Hide — and File it there
+  when it is suggested for a Project. Pressing again, or Enter, opens it.
+- Pointing at a star lights what it is joined to.
+- Arrow keys go to the nearest star that way. Scroll moves the map, and pinch
+  or ⌘/Ctrl-scroll zooms (`lib/canvas.ts`). The map refits when its room
+  changes, unless it has been moved by hand.
+- **List** in the header opens a column of every conversation by subject,
+  starred first. The menu's "Manage conversations" brings back the rail.
 - The Socria mark always comes back here.
+
+**Night.** On the Night theme (Settings → Theme; everyone's, like Dark) the
+map is a night sky: drifting star dust a little slower than the map, now and
+then a shooting star, each cluster a nebula in its subject's colour, each hub
+a glinting star, each dot a faint far one, constellations in faint light and
+what conversations share in gold. Paper, White, Dark and One draw the same map
+in their own colours.
 
 **It travels.** The arrangement is kept in this browser and, signed in, in
 the account (`user_profiles.universal_map` through `/api/profile`, the newer
 copy winning). It holds only the person's choices — never a conversation's
-words — and is bounded and checked on every read.
+words — and is bounded and checked on every read. One kept before the lenses
+reads as By subject (a Project map or Columns) or By week (a Timeline); its
+pins in a Project still hold.
 
 "Organize it" and "Practice this" write into the line of thinking they began
 in, even if another is opened while they work.
@@ -337,7 +372,8 @@ New for the Universal Map (§5): how the person arranged it, in
 read and written whole by `/api/profile` (`?only=universalMap`, and
 `universalMap` in a PUT). Without the column the route says so (`null`, or
 `unsaved: ['universalMap']`) and the browser's copy is the arrangement. It
-holds places, frames, orders, stars, hidden ones, links, notes, display
+holds the lens, places, cluster positions, orders, the subject given to a
+conversation by hand (`subjectOf`), stars, hidden ones, links, notes, display
 choices and saved views — no conversation's words — each bounded by
 `parseArrangement`. Filing in a Project and a Project's name and colour are
 the Project's own (`/api/conversations`, `/api/projects/[id]`); the Projects
@@ -354,7 +390,11 @@ foot — a grip, "Conversation · N turns ▴", the last reply as one line, and 
 composer; pulled up, it is two thirds of the screen with the map still in
 sight above it. A card asked about opens its popover over the map. The Mind
 Graph is a scrolling column. The composer keeps the safe area; text is 16px;
-every control is at least 44px.
+every control is at least 44px. The Universal Map reads top to bottom: the
+lenses by their short names (Today · Week · Subject), clusters one under
+another two hubs across, today's learning before what it builds on (its lines
+faint until a star is pressed) and everything else; a star's card is a sheet
+from the foot.
 
 ## 10. Switch
 
@@ -381,11 +421,14 @@ code. Logos 2 is unchanged.
 | Sorting and practice, server side | `app/api/logos/organize/route.ts`, `app/api/logos/practice/route.ts` |
 | The study as a display in the map | `lib/objects/display-study.ts` |
 | Intake, board, topic, practice; an empty Components; Artifacts | `components/logos5/Study.tsx`, `components/logos5/study.css` |
-| Home: the Universal Map — tiles, groups, the map's layout, shared ideas, the timeline, search (pure) | `lib/logos5/universe.ts` |
+| Home: each conversation read for the map — its kind, where it stands, what it is about; shared ideas; search (pure) | `lib/logos5/universe.ts` |
+| What a conversation is about, without asking: courses, codes, fields (pure) | `lib/logos5/subjects.ts` |
+| The Universal Spatial Map: hubs and dots, subjects' homes, Today's learning, By week, By subject, placing and snapping (pure) | `lib/logos5/spatial.ts` |
 | How the person arranged it: the model, its bounds, every change (pure); kept in the browser and the account | `lib/logos5/arrange.ts`, `components/logos5/useArrangement.ts`, `app/api/profile/route.ts` |
-| The view, the map, the columns and timeline, the pieces | `components/logos5/Universe.tsx`, `UniverseMap.tsx`, `UniverseBoards.tsx`, `UniverseParts.tsx`, `universe.css` |
+| The view, the map, the pieces; the map's look on every theme, and the sky on Night | `components/logos5/Universe.tsx`, `UniverseSky.tsx`, `UniverseParts.tsx`, `universe.css` |
+| The themes, Night among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
 | Where home is wired in (start, file, a Project renamed or recoloured) | `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`), `app/chat/page.tsx` (`updateProject`) |
-| Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list`) |
+| Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Subject`; any of them on a theme with `THEME=night`) |
 
 Core chat (`app/chat/page.tsx`) is not part of this change. Logos 2 keeps its
 two columns. Everything Logos 3–4 could do is still reached from Logos 5: the
@@ -581,3 +624,57 @@ chats left off, and the List.
   the rail and Project Home already use.
 - Touch dragging on a real phone. Press-and-hold to pick up, and a touch
   that moves first scrolling instead, were checked only by reading the code.
+
+### The Universal Spatial Map, and Night
+
+The map rebuilt to the PRD "Clearer Structures and UI" (§5), and the Night
+theme. Browser runs at 1440×900 and 390×844, on Paper and on Night:
+- **The real app**, with the stand-ins, signed out (so no Projects or Core
+  chats): five lines of thinking begun from the find box.
+- **A harness**: the real component on the real page's styles, with four
+  Projects (one empty), twenty-three conversations over seven weeks — studies,
+  decisions, quick questions, Core chats, one suggested for a Project — and a
+  host that logs filing and making a Project.
+
+| Journey | Result |
+|---|---|
+| Real app, five begun today | Today's learning, "Universal Map · 5"; all five today's, as hubs. |
+| Real app, By subject | Business, Money, Computer science — read from the conversations, nothing filed; Everything else once a subject is down to one quick question. |
+| Real app, find "rent"; List; a star pressed; Star, Hide, Undo; View; arrow keys; Select across two; Continue | 2 found, 3 dimmed; the List by subject; the card; the star in the strip, 5 → 4 → 5; View by lens; the nearest star chosen; "2 chosen"; the line of thinking opened. No horizontal scroll at 390. |
+| Harness, By subject | ACCT 2301 (with "+ 1 about it · File it" for a Core chat about debits), Job hunt, Thesis, the empty Side ideas, then Money, Economics, Mathematics, Biology, Everything else; "Monthly runway · 5" and "Accrual basis · 3" as themes, the first across a Project and Money. |
+| Harness, By week | This week, Last week, then weeks by their dates; a topic coming back drawn across weeks. |
+| Harness, Today's learning | Today's three in the middle; seven earlier ones round them, each with why ("shares 'Accrual basis'", "also in Thesis"); the rest a field by subject beyond. |
+| Harness, a star dragged to Economics | Given that subject; "Its own subject" on its card would give it back. |
+| Harness, a star dragged into Side ideas; "File it"; "Make it a Project" on Economics | Filed (the host's log); the suggested chat filed in ACCT 2301; "Economics" made with its four in it. |
+| Harness, a star moved inside Job hunt, then Undo | It stayed where it was put; Undo put it back. |
+| Harness, Fold on Thesis | "3 conversations, folded away". |
+| Harness, a lens changed | The stars travel to their new places (543px for Exam 2, Subject → Week). |
+| Night | The sky, nebulae in each subject's colour, glinting hubs, gold shared ideas; the header, the find box, the card and the phone's sheet in Night's colours. |
+| Page errors | None. |
+
+Found and fixed on the way:
+- Today's learning drew the shared ideas as well as why each earlier one was
+  there — the same thing twice, and the ring's own heading sat on a star's
+  name. Today's lens now draws only what each builds on.
+- "last here" floated over the cluster's name; it is in the star's caption.
+- A cluster's buttons, though hidden, still took room and squeezed "Biology"
+  to "B…"; they float over the name now, when it is pointed at.
+- Far off, shared ideas on Night had dark boxes behind their marks, and the
+  empty Project's hint sat on its name.
+- Opening the List did not refit the map, cutting a subject off; it refits
+  when its room changes, unless moved by hand.
+- A finger's press counted as a hover on a phone and dimmed the rest.
+- A link's words could sit on a star's name; they now go along its curve
+  where they are clear.
+
+Tests: `test/logos5-spatial.test.mjs` holds the subjects, the homes, hubs and
+dots, the three lenses, shared ideas and putting a star down;
+`test/logos5-home.test.mjs` the reading and the arrangement;
+`test/logos5-study-ui.test.mjs` renders the three lenses;
+`test/themes.test.mjs` the five themes and the sky.
+
+**Not verified here:** what a real account's conversations are read as — the
+fields come from what the map model wrote (`map.ask.domain`) and a word list,
+so some will land in Everything else or a neighbouring field until moved by
+hand; the account's copy of the arrangement against a real database; and
+dragging on a real phone.

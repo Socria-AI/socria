@@ -1,9 +1,9 @@
 'use client';
 // components/account/ThemePicker.tsx
 //
-// Four grounds to read Socria on. Paper and Dark are everyone's; White and the
-// Socria One blue are part of One, shown to everyone so the choice is visible,
-// and offered as the way in for someone who is not a member yet.
+// Five grounds to read Socria on. Paper, Dark and Night are everyone's; White
+// and the Socria One blue are part of One, shown to everyone so the choice is
+// visible, and offered as the way in for someone who is not a member yet.
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';

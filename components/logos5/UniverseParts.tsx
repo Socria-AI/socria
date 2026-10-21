@@ -1,71 +1,15 @@
 'use client';
 // components/logos5/UniverseParts.tsx — the pieces the Universal Map is made of.
 //
-// A conversation drawn as a tile (on the map, at three distances), as a card
-// (in Columns, and when there are only a few) and as a chip (on the
-// timeline); its small graph; the card that opens when one is pressed; the
-// box that finds or starts; the View menu; the tray of hidden ones; and the
-// bar for several chosen at once. The map itself is UniverseMap.tsx, the
-// boards UniverseBoards.tsx, and the whole is Universe.tsx.
+// A conversation's kind as a glyph, and its marks; the card that
+// opens when one is pressed; the box that finds or starts; the View menu; the
+// tray of hidden ones; and the bar for several chosen at once. The map itself
+// is UniverseSky.tsx, and the whole is Universe.tsx.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { relTime } from '@/lib/logos-sessions';
-import { freshness, type Detail, type Group, type Look, type Match, type Tile } from '@/lib/logos5/universe';
-import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type LabelLevel, type SizeBy, type SortBy } from '@/lib/logos5/arrange';
-
-// ── colour ───────────────────────────────────────────────────────────
-
-/** A Project's colours, as Project Home draws them (lib/project-home.ts PROJECT_COLORS). */
-export const PROJECT_HEX: Record<string, string> = {
-  moss: '#354620',
-  clay: '#B4694A',
-  slate: '#5C6B7A',
-  ochre: '#A9822A',
-  plum: '#7D5A86',
-  ink: '#3a3b33',
-};
-export const PALETTE = ['moss', 'clay', 'slate', 'ochre', 'plum', 'ink'] as const;
-
-/** A colour for each kind of thinking, when the map is coloured by kind. */
-export const LOOK_HEX: Record<Look, string> = {
-  study: '#A9822A',
-  deciding: '#B4694A',
-  planning: '#8d7a43',
-  learning: '#354620',
-  writing: '#7D5A86',
-  thinking: '#8b8f82',
-  chat: '#b9b3a3',
-};
-
-const hashOf = (s: string) => {
-  let h = 0;
-  for (let i = 0; i < s.length; i++) h = (h * 31 + s.charCodeAt(i)) | 0;
-  return Math.abs(h);
-};
-
-/** A group's colour key: the Project's own, or one of the six chosen by its id so it never changes. */
-export function colorKeyOf(g: Pick<Group, 'kind' | 'color' | 'projectId'>): string | null {
-  if (g.kind !== 'project') return null;
-  if (g.color && PROJECT_HEX[g.color]) return g.color;
-  return PALETTE[hashOf(g.projectId ?? '') % PALETTE.length];
-}
-
-export function groupHex(g: Pick<Group, 'kind' | 'color' | 'projectId'>): string {
-  const k = colorKeyOf(g);
-  return k ? PROJECT_HEX[k] : g.kind === 'chats' ? '#b9b3a3' : '#8b8f82';
-}
-
-/** The colour on a conversation's edge, by what the person asked colour to mean. */
-export function accentOf(t: Tile, g: Pick<Group, 'kind' | 'color' | 'projectId'>, by: ColorBy, now: number): string {
-  if (by === 'kind') return LOOK_HEX[t.look];
-  if (by === 'recency') {
-    const f = freshness(t.at, now);
-    return f > 0.85 ? '#354620' : f > 0.6 ? '#6f7f4f' : f > 0.3 ? '#a9ae95' : '#cdc8b9';
-  }
-  return groupHex(g);
-}
-
-export const cssVars = (vars: Record<string, string | number>): CSSProperties => vars as unknown as CSSProperties;
+import type { Look, Match, Tile } from '@/lib/logos5/universe';
+import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type HomeMode, type LabelLevel, type SizeBy, type SortBy } from '@/lib/logos5/arrange';
 
 // ── a kind of thinking, as a glyph ───────────────────────────────────
 
@@ -101,58 +45,10 @@ export function MadeMark({ n }: { n: number }) {
   );
 }
 
-/** The marks in a conversation's corner: what was made, a question waiting, a star. */
-function Badges({ tile, starred, corner = false }: { tile: Tile; starred: boolean; corner?: boolean }) {
-  if (!tile.made && !tile.open && !starred) return null;
-  return (
-    <span className={`l5h-badges${corner ? ' is-corner' : ''}`} aria-hidden="true">
-      {tile.made > 0 && <MadeMark n={tile.made} />}
-      {tile.open && <span className="l5h-open" title="Socria asked something and is waiting for you" />}
-      {starred && <StarMark />}
-    </span>
-  );
-}
 export function StarMark({ on = true }: { on?: boolean }) {
   return (
     <svg className="l5h-star" viewBox="0 0 24 24" width="13" height="13" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
       <path d={STAR} />
-    </svg>
-  );
-}
-
-// ── its small graph ──────────────────────────────────────────────────
-
-/** The graph a conversation grew, small: its most connected few named. */
-export function MiniGraph({ tile, named = 3 }: { tile: Tile; named?: number }) {
-  if (tile.ideas.length < 2) return null;
-  const at = new Map(tile.ideas.map((n) => [n.id, n]));
-  const names = new Set(
-    [...tile.ideas]
-      .sort((a, b) => b.degree - a.degree)
-      .slice(0, named)
-      .map((n) => n.id)
-  );
-  return (
-    <svg className="l5h-graph" viewBox="-150 -116 300 232" aria-hidden="true">
-      {tile.edges.map((e, i) => {
-        const a = at.get(e.from);
-        const b = at.get(e.to);
-        return a && b ? <line key={i} x1={a.x * 104} y1={a.y * 92} x2={b.x * 104} y2={b.y * 92} /> : null;
-      })}
-      {tile.ideas.map((n) => {
-        const r = 5 + Math.min(5, n.degree * 1.4);
-        const side = Math.abs(n.x) < 0.12 ? 'middle' : n.x > 0 ? 'start' : 'end';
-        return (
-          <g key={n.id} transform={`translate(${n.x * 104},${n.y * 92})`} className={`is-${n.from}`}>
-            <circle r={r} />
-            {names.has(n.id) && (
-              <text x={side === 'start' ? r + 5 : side === 'end' ? -r - 5 : 0} y={side === 'middle' ? (n.y > 0 || n.y === 0 ? r + 16 : -r - 7) : 5} textAnchor={side}>
-                {n.label.length > 18 ? n.label.slice(0, 17) + '…' : n.label}
-              </text>
-            )}
-          </g>
-        );
-      })}
     </svg>
   );
 }
@@ -172,164 +68,6 @@ export function tileSaid(t: Tile, groupName?: string): string {
   return parts.join(', ');
 }
 
-// ── a conversation on the map ────────────────────────────────────────
-
-export interface TileLook {
-  detail: Detail;
-  labels: LabelLevel;
-  accent: string;
-  /** 0–1: how recently it was worked in */
-  fresh: number;
-  scale: number;
-  starred: boolean;
-  /** the conversation last open */
-  here: boolean;
-  /** where to pick up */
-  resume: boolean;
-  selected: boolean;
-  dim: boolean;
-  /** the idea or words a search found in it */
-  found?: string;
-}
-
-/** A conversation as a tile: far, its name; mid, its kind and key ideas; near, where it stands and its graph. */
-export function MapTile({ tile, look, style, groupName, handlers, lifted = false }: { tile: Tile; look: TileLook; style: CSSProperties; groupName?: string; handlers?: Record<string, unknown>; lifted?: boolean }) {
-  const d = look.labels === 'minimal' ? 'far' : look.detail;
-  const chat = tile.kind === 'core';
-  const ideas = look.labels === 'ideas';
-  return (
-    <div
-      className={`l5h-tile d-${d}${chat ? ' is-chat' : ''}${look.selected ? ' is-sel' : ''}${look.here ? ' is-here' : ''}${look.resume ? ' is-resume' : ''}${look.dim ? ' is-dim' : ''}${lifted ? ' is-lifted' : ''}`}
-      style={{ ...style, ...cssVars({ '--acc': look.accent, '--fresh': look.fresh.toFixed(2) }) }}
-      data-tile={tile.id}
-      role="button"
-      tabIndex={look.dim ? -1 : 0}
-      aria-pressed={look.selected}
-      aria-label={tileSaid(tile, groupName)}
-      {...(handlers ?? {})}
-    >
-      <div className="l5h-tile-in" style={look.scale !== 1 ? { transform: `scale(${look.scale})` } : undefined}>
-        <span className="l5h-acc" aria-hidden="true" />
-        {d !== 'far' ? (
-          <div className="l5h-tile-k">
-            <Glyph look={tile.look} size={13} />
-            {look.resume ? (
-              <span className="l5h-k-t">
-                {tile.lookSaid} · <b className="l5h-lasthere">last here</b>
-              </span>
-            ) : (
-              <span className="l5h-k-t">{kindLine(tile)}</span>
-            )}
-            <Badges tile={tile} starred={look.starred} />
-          </div>
-        ) : (
-          <Badges tile={tile} starred={look.starred} corner />
-        )}
-        <div className="l5h-tile-t">{tile.title}</div>
-        {d === 'mid' && !chat && (look.found ? <p className="l5h-tile-found">{look.found}</p> : ideas && tile.key.length ? (
-          <div className="l5h-chips">
-            {tile.key.map((k) => (
-              <span key={k} className="l5h-chip">
-                {k}
-              </span>
-            ))}
-          </div>
-        ) : tile.stands ? (
-          <p className="l5h-tile-s">{tile.stands}</p>
-        ) : null)}
-        {d === 'near' && !chat && (
-          <div className="l5h-tile-near">
-            <div className="l5h-tile-near-l">
-              {look.found ? <p className="l5h-tile-found">{look.found}</p> : tile.stands && <p className="l5h-tile-s">{tile.stands}</p>}
-              {ideas && tile.ideas.length < 2 && tile.key.length > 0 && (
-                <div className="l5h-chips">
-                  {tile.key.map((k) => (
-                    <span key={k} className="l5h-chip">
-                      {k}
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-            {ideas && <MiniGraph tile={tile} named={2} />}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-// ── a conversation as a card: in Columns, and when there are only a few ──
-
-export function TileCard({
-  tile,
-  accent,
-  starred,
-  here,
-  big = false,
-  labels = 'ideas',
-  onOpen,
-  onPreview,
-  handlers,
-  dragging,
-}: {
-  tile: Tile;
-  accent: string;
-  starred: boolean;
-  here?: boolean;
-  big?: boolean;
-  labels?: LabelLevel;
-  onOpen: () => void;
-  onPreview?: (el: HTMLElement) => void;
-  handlers?: Record<string, unknown>;
-  dragging?: boolean;
-}) {
-  const chat = tile.kind === 'core';
-  return (
-    <div className={`l5h-card${big ? ' is-big' : ''}${chat ? ' is-chat' : ''}${here ? ' is-here' : ''}${dragging ? ' is-dragging' : ''}`} style={cssVars({ '--acc': accent })} data-card={tile.id} {...(handlers ?? {})}>
-      <span className="l5h-acc" aria-hidden="true" />
-      <button
-        type="button"
-        className="l5h-card-main"
-        // a large card is a press from going on; a small one shows its card first
-        onClick={(e) => (onPreview && !big ? onPreview(e.currentTarget.closest('.l5h-card') as HTMLElement) : onOpen())}
-        onDoubleClick={onOpen}
-        aria-label={tileSaid(tile)}
-      >
-        <span className="l5h-tile-k">
-          <Glyph look={tile.look} size={13} />
-          <span className="l5h-k-t">{kindLine(tile)}</span>
-          <Badges tile={tile} starred={starred} />
-        </span>
-        <span className="l5h-card-t">{tile.title}</span>
-        {labels !== 'minimal' && (big || labels === 'titles') && tile.stands && <span className="l5h-card-s">{tile.stands}</span>}
-        {labels === 'ideas' && !chat && tile.key.length > 0 && (
-          <span className="l5h-chips">
-            {tile.key.map((k) => (
-              <span key={k} className="l5h-chip">
-                {k}
-              </span>
-            ))}
-          </span>
-        )}
-      </button>
-      {big && labels === 'ideas' && <MiniGraph tile={tile} />}
-      {big && (
-        <div className="l5h-card-foot">
-          <button type="button" className="l5h-go" onClick={onOpen}>
-            {chat ? 'Open' : 'Continue'} <span aria-hidden="true">→</span>
-          </button>
-          {onPreview && (
-            <button type="button" className="l5h-more" aria-label={`More for “${tile.title}”`} onClick={(e) => onPreview(e.currentTarget.closest('.l5h-card') as HTMLElement)}>
-              ⋯
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  );
-}
-
 // ── the card that opens when one is pressed ──────────────────────────
 
 export interface PreviewActs {
@@ -341,12 +79,17 @@ export interface PreviewActs {
   /** filed: a Project's id, or null for none */
   onMove?: (projectId: string | null) => void;
   onNewProject?: (name: string) => void;
+  /** shown in a Project for its subject: filed there */
+  onFileHere?: () => void;
+  /** put in a subject by hand: back to the one it was read as */
+  onUnsubject?: () => void;
   onClose: () => void;
 }
 
 export function PreviewCard({
   tile,
-  group,
+  home,
+  suggested,
   starred,
   pinned,
   projects,
@@ -356,7 +99,10 @@ export function PreviewCard({
   sheet,
 }: {
   tile: Tile;
-  group: Group | null;
+  /** where it is on the map by subject */
+  home: { name: string } | null;
+  /** shown in this Project for its subject, not filed there */
+  suggested?: string | null;
   starred: boolean;
   pinned: boolean;
   projects: { id: string; name: string }[];
@@ -375,7 +121,7 @@ export function PreviewCard({
         <span className="l5h-tile-k">
           <Glyph look={tile.look} size={13} />
           <span>{kindLine(tile)}</span>
-          {group && <span className="l5h-pv-g">· {group.name}</span>}
+          {home && <span className="l5h-pv-g">· {home.name}</span>}
         </span>
         <button type="button" className="l5h-x" aria-label="Close" onClick={acts.onClose}>
           ×
@@ -393,11 +139,21 @@ export function PreviewCard({
           <span className="l5h-open" aria-hidden="true" /> Socria asked: <em>{tile.open}</em>
         </p>
       )}
+      {suggested && acts.onFileHere && (
+        <p className="l5h-pv-sugg">
+          It is about {suggested}, but not filed in it.{' '}
+          <button type="button" className="l5h-link" onClick={acts.onFileHere}>
+            File it there
+          </button>
+        </p>
+      )}
       {tile.key.length > 0 && (
         <div className="l5h-chips">
           {tile.ideas
             .slice()
             .sort((a, b) => b.degree - a.degree)
+            // a study's topic and an idea of the same name are one idea
+            .filter((n, i, all) => all.findIndex((m) => m.label.trim().toLowerCase() === n.label.trim().toLowerCase()) === i)
             .slice(0, 6)
             .map((n) => (
               <span key={n.id} className={`l5h-chip${n.from === 'topic' ? ' is-topic' : ''}`}>
@@ -436,6 +192,11 @@ export function PreviewCard({
         {pinned && acts.onUnpin && (
           <button type="button" className="l5h-btn" onClick={acts.onUnpin}>
             Back in order
+          </button>
+        )}
+        {acts.onUnsubject && (
+          <button type="button" className="l5h-btn" onClick={acts.onUnsubject} title="You put it in this subject; this puts it back where it was read as belonging">
+            Its own subject
           </button>
         )}
         <button type="button" className="l5h-btn is-quiet" onClick={acts.onHide}>
@@ -650,8 +411,9 @@ export function FindOrStart({
 
 const SORT_SAID: Record<SortBy, string> = { manual: 'Your order', recent: 'Last active', started: 'First started', name: 'Name', size: 'Size' };
 const LABEL_SAID: Record<LabelLevel, string> = { minimal: 'Minimal', titles: 'Titles', ideas: 'Ideas' };
-const COLOR_SAID: Record<ColorBy, string> = { project: 'Project', kind: 'Kind', recency: 'Recency' };
-const SIZE_SAID: Record<SizeBy, string> = { ideas: 'Ideas', recency: 'Recency', same: 'Same' };
+const COLOR_SAID: Record<ColorBy, string> = { project: 'Subject', kind: 'Kind', recency: 'Recency' };
+/** a hub's size: how much it holds, how recent it is, or all alike */
+const SIZE_SAID: Record<SizeBy, string> = { ideas: 'Depth', recency: 'Recency', same: 'Same' };
 
 function Seg<T extends string>({ label, value, options, said, onPick }: { label: string; value: T; options: readonly T[]; said: Record<T, string>; onPick: (v: T) => void }) {
   return (
@@ -680,6 +442,7 @@ function Check({ label, on, onFlip, hint }: { label: string; on: boolean; onFlip
 
 export function ViewMenu({
   arr,
+  lens,
   groups,
   hiddenCount,
   onDisplay,
@@ -696,7 +459,8 @@ export function ViewMenu({
   onClose,
 }: {
   arr: Arrangement;
-  /** every group there is, to choose which are shown */
+  lens: HomeMode;
+  /** every subject there is — Projects, courses, fields — to choose which are shown */
   groups: { key: string; name: string }[];
   hiddenCount: number;
   onDisplay: (patch: Partial<Display>) => void;
@@ -731,21 +495,23 @@ export function ViewMenu({
   const shown = (k: string) => !arr.projects || arr.projects.includes(k);
   return (
     <div className="l5h-vm" ref={ref} role="dialog" aria-label="How the map is shown">
-      <section>
-        <h4>Order</h4>
-        <div className="l5h-seg is-wrap" role="radiogroup" aria-label="Order">
-          {(['started', 'recent', 'manual', 'name', 'size'] as SortBy[]).map((s) => (
-            <button key={s} type="button" role="radio" aria-checked={arr.sort === s} className={arr.sort === s ? 'is-on' : ''} onClick={() => onSort(s)}>
-              {SORT_SAID[s]}
-            </button>
-          ))}
-        </div>
-      </section>
+      {lens === 'subject' && (
+        <section>
+          <h4>Order in a subject</h4>
+          <div className="l5h-seg is-wrap" role="radiogroup" aria-label="Order in a subject">
+            {(['started', 'recent', 'manual', 'name', 'size'] as SortBy[]).map((s) => (
+              <button key={s} type="button" role="radio" aria-checked={arr.sort === s} className={arr.sort === s ? 'is-on' : ''} onClick={() => onSort(s)}>
+                {SORT_SAID[s]}
+              </button>
+            ))}
+          </div>
+        </section>
+      )}
       <section>
         <h4>Show</h4>
         <Check label="Core chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />
         <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />
-        <Check label="Snap to the grid" hint="when you put one down" on={arr.display.snap} onFlip={() => onDisplay({ snap: !arr.display.snap })} />
+        {lens === 'subject' && <Check label="Snap into place" hint="when you put one down" on={arr.display.snap} onFlip={() => onDisplay({ snap: !arr.display.snap })} />}
         <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />
         <Seg label="Colour by" value={arr.display.color} options={COLOR_BY} said={COLOR_SAID} onPick={(v) => onDisplay({ color: v })} />
         <Seg label="Size by" value={arr.display.size} options={SIZE_BY} said={SIZE_SAID} onPick={(v) => onDisplay({ size: v })} />
@@ -753,7 +519,7 @@ export function ViewMenu({
       {groups.length > 1 && (
         <section>
           <h4>
-            Projects{' '}
+            Subjects{' '}
             {arr.projects && (
               <button type="button" className="l5h-link" onClick={() => onProjects(null)}>
                 show all
@@ -813,7 +579,7 @@ export function ViewMenu({
           </button>
         )}
         {onTidy && (
-          <button type="button" className="l5h-btn" onClick={onTidy} title="Everything you put somewhere by hand goes back in its Project's order">
+          <button type="button" className="l5h-btn" onClick={onTidy} title="Everything you put somewhere by hand goes back in its subject's order">
             Tidy up
           </button>
         )}

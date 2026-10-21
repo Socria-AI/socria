@@ -72,31 +72,60 @@ html[data-theme="one"] :is(.logos-root, .lg-tokens) {
 }
 html[data-theme="one"] .app-root { --app-paper: #13293A; --app-border: #2A4A5E; }
 
-/* ── what both dark grounds need besides variables ─────────────────── */
-html:is([data-theme="dark"], [data-theme="one"]) body { background-color: var(--paper); color: var(--ink); }
-html:is([data-theme="dark"], [data-theme="one"]) .paper-bg { background-image: none; }
-html:is([data-theme="dark"], [data-theme="one"]) .app-root:not(.app-inline) { background: var(--app-paper); }
-html:is([data-theme="dark"], [data-theme="one"]) :is(input, textarea, select)::placeholder { color: var(--ink-40); }
+/* ── Night: a deep navy sky, starlight ink, gold for what is lit ─────────
+   The Universal Map draws itself as a night sky on it (components/logos5/
+   universe.css): conversations as stars, Projects and subjects as
+   constellations. Everywhere else it is a dark ground like the others.
+   Buttons the rest of the app fills with moss keep white words, so their
+   gold is the deeper one; Logos's own lit gold is the bright one. */
+html[data-theme="night"] {
+  --paper: #0B1222; --paper-2: #101A2E; --border: #24314B;
+  --ink: #E9E6F2;
+  --ink-rgb: 233, 230, 242; --lg-ink-rgb: 233, 230, 242; --lg-primary-rgb: 231, 207, 146; --moss-rgb: 196, 164, 86; --shadow-rgb: 2, 6, 16;
+  --ink-70: rgba(233, 230, 242, 0.7); --ink-60: rgba(233, 230, 242, 0.6); --ink-45: rgba(233, 230, 242, 0.45);
+  --ink-40: rgba(233, 230, 242, 0.4); --ink-25: rgba(233, 230, 242, 0.25); --ink-16: rgba(233, 230, 242, 0.16); --ink-12: rgba(233, 230, 242, 0.12);
+  --moss: #C4A456; --moss-50: #161D30; --moss-100: #1C2437; --moss-200: #2E2F38; --moss-600: #A88637; --moss-700: #C4A456; --moss-800: #E2C27A;
+  --accent: #C4A456; --accent-700: #E2C27A;
+  --app-paper: #0B1222; --app-border: #24314B;
+  --surface: #131D33;
+  --c-paper: 11 18 34; --c-paper-2: 16 26 46; --c-ink: 233 230 242; --c-surface: 19 29 51; --c-border: 36 49 75;
+  --c-moss-50: 22 29 48; --c-moss-100: 28 36 55; --c-moss-200: 46 47 56; --c-moss-600: 168 134 55; --c-moss-700: 196 164 86; --c-moss-800: 226 194 122;
+}
+html[data-theme="night"] :is(.logos-root, .lg-tokens) {
+  --lg-paper: #0B1222; --lg-panel: #0F182B;
+  --lg-primary: #E7CF92; --lg-accent: #9DB4E3; --lg-secondary: #C3B1E1; --lg-tension: #E8998A;
+  --lg-ink: #E9E6F2; --lg-ink-60: rgba(233, 230, 242, 0.62); --lg-ink-40: rgba(233, 230, 242, 0.42); --lg-ink-24: rgba(233, 230, 242, 0.26);
+  --lg-line: rgba(200, 212, 255, 0.13);
+  --lg-one: #9DB4E3; --lg-one-soft: rgba(157, 180, 227, 0.12); --lg-one-line: rgba(157, 180, 227, 0.35);
+  --node-idea-bg: rgba(231, 207, 146, 0.1);
+}
+html[data-theme="night"] .app-root { --app-paper: #0B1222; --app-border: #24314B; }
+
+/* ── what every dark ground needs besides variables ────────────────── */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) body { background-color: var(--paper); color: var(--ink); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .paper-bg { background-image: none; }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root:not(.app-inline) { background: var(--app-paper); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(input, textarea, select)::placeholder { color: var(--ink-40); }
 
 /* The map's cards carry a pale tint per type on paper; on a dark ground every
    card is the raised surface, and the type keeps its glyph, its label and its
    border style. A decision stays the one filled card. */
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node:not(.lg-node-decision) {
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node:not(.lg-node-decision) {
   background: var(--surface); border-color: var(--lg-line); color: var(--lg-ink);
 }
 
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.is-focused { border-color: var(--lg-primary); }
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-zoom { background: var(--surface); border-color: var(--lg-line); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.is-focused { border-color: var(--lg-primary); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-zoom { background: var(--surface); border-color: var(--lg-line); }
 /* the rail and the sheets laid a white veil over paper; on a dark ground, none */
-html:is([data-theme="dark"], [data-theme="one"]) .app-root .s-bar { background: rgba(255, 255, 255, 0.02); }
-html:is([data-theme="dark"], [data-theme="one"]) .acct-sheet .footbar { background: rgba(255, 255, 255, 0.03); }
-html:is([data-theme="dark"], [data-theme="one"]) .acct-sheet .scrim { background: rgba(0, 0, 0, 0.55); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root .s-bar { background: rgba(255, 255, 255, 0.02); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .acct-sheet .footbar { background: rgba(255, 255, 255, 0.03); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .acct-sheet .scrim { background: rgba(0, 0, 0, 0.55); }
 /* The mark is a dark drawing on a transparent ground; on a dark one it is drawn light. */
-html:is([data-theme="dark"], [data-theme="one"]) :is(.app-root, .logos-root, .acct-sheet) img[src*="socria-mark"] { filter: invert(1) brightness(0.92); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.app-root, .logos-root, .acct-sheet) img[src*="socria-mark"] { filter: invert(1) brightness(0.92); }
 /* A decision is the one filled card. On a dark ground it is filled with a wash
    of the accent and keeps light ink, so its words stay readable. */
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.lg-node-decision {
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.lg-node-decision {
   background: rgba(var(--lg-primary-rgb), 0.22); border-color: rgba(var(--lg-primary-rgb), 0.6); color: var(--lg-ink);
 }
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.lg-node-decision :is(.lg-node-label, .lg-node-type) { color: var(--lg-ink); }
-html:is([data-theme="dark"], [data-theme="one"]) .logos-root .lg-node.lg-node-decision .lg-node-attached { background: rgba(255, 255, 255, 0.1); color: var(--lg-ink-60); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.lg-node-decision :is(.lg-node-label, .lg-node-type) { color: var(--lg-ink); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.lg-node-decision .lg-node-attached { background: rgba(255, 255, 255, 0.1); color: var(--lg-ink-60); }

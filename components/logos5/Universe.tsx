@@ -1,22 +1,24 @@
 'use client';
 // components/logos5/Universe.tsx — the Universal Map, Logos 5's home.
 //
-// Every conversation, where the person can see and arrange it
-// (lib/logos5/universe.ts lays it out; lib/logos5/arrange.ts keeps how they
-// arranged it). Three ways to see it — a Map of Project frames, Columns, a
-// Timeline — and, while there are only a few, large cards. One box finds or
-// starts. Pressing a conversation opens its card; pressing again, or
-// Continue, opens it. Everything arranged can be undone.
+// Every past conversation as a node on one map ("Clearer Structures and UI"):
+// a major session a hub, a quick question an ambient dot. Three ways to group
+// them — Today's learning, By week, By subject (lib/logos5/spatial.ts lays
+// each out; nothing has to be filed for By subject, lib/logos5/subjects.ts
+// reads what each is about) — and lib/logos5/arrange.ts keeps how the person
+// arranged it. One box finds or starts. Pressing a star opens its card;
+// pressing again, or Continue, opens it. Everything arranged can be undone.
 //
-// The pieces: UniverseParts.tsx (tiles, cards, the box, menus),
-// UniverseMap.tsx (the map), UniverseBoards.tsx (columns, timeline, cards).
+// The pieces: UniverseSky.tsx (the map), UniverseParts.tsx (the card, the box,
+// the menus).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { CHATS, LOOSE, groupKeyOf, groupsOf, resumeOf, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
+import { resumeOf, sharedIdeas, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
+import { homesOf, type Home } from '@/lib/logos5/spatial';
+import { OTHER } from '@/lib/logos5/subjects';
 import * as A from '@/lib/logos5/arrange';
 import { useArrangement } from './useArrangement';
-import { MapCanvas, type MapActs } from './UniverseMap';
-import { ColumnsBoard, FewCards, TimelineBoard } from './UniverseBoards';
+import { SkyCanvas, type SkyActs } from './UniverseSky';
 import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, type Found } from './UniverseParts';
 import './universe.css';
 
@@ -35,9 +37,18 @@ interface Step {
   files: Filing[];
 }
 
-const MODE_SAID: Record<A.HomeMode, string> = { map: 'Map', columns: 'Columns', timeline: 'Timeline' };
-/** fewer than this, and no arranging done yet: large cards rather than a map */
-const FEW = 5;
+/** The three lenses, in the words the PRD gives them; short on a phone. */
+const LENS_SAID: Record<A.HomeMode, { long: string; short: string }> = {
+  today: { long: 'Today’s learning', short: 'Today' },
+  week: { long: 'By week', short: 'Week' },
+  subject: { long: 'By subject', short: 'Subject' },
+};
+
+const HINT: Record<A.HomeMode, string> = {
+  today: 'Today in the middle, what it builds on round it, everything else further out · press a star to see it, twice to open it',
+  week: 'Newest first; a dotted line is an idea coming back · press a star to see it, twice to open it',
+  subject: 'Subjects are read from your conversations — drag a star to another to move it, into a Project to file it · double-click to write a note',
+};
 
 export function UniverseView({
   conversations,
@@ -80,32 +91,35 @@ export function UniverseView({
   onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
   /** the Mind Graph, for a signed-in person */
   onMind?: () => void;
-  /** the contents column: every conversation, by Project */
+  /** the contents column: every conversation, by subject */
   contents?: boolean;
   /** the Mind Atlas, for a signed-in person */
   atlas?: ReactNode;
   /** start from this arrangement (a test; otherwise it is read from where it is kept) */
   initial?: A.Arrangement;
-  /** the time to read "recent" against (a test; otherwise now) */
+  /** the time to read "recent" and "today" against (a test; otherwise now) */
   now?: number;
 }) {
   const { arr, put } = useArrangement(signedIn, initial);
   const arrRef = useRef(arr);
   arrRef.current = arr;
+  const lens = arr.mode;
   const tiles = useMemo(() => tilesOf(conversations), [conversations]);
   // eslint-disable-next-line react-hooks/exhaustive-deps
   const now = useMemo(() => nowGiven ?? Date.now(), [nowGiven, tiles]);
   const tileById = useMemo(() => new Map(tiles.map((t) => [t.id, t])), [tiles]);
-  const projectIds = useMemo(() => new Set((projects ?? []).map((p) => p.id)), [projects]);
-  const groups = useMemo(() => groupsOf(tiles, projects, arr), [tiles, projects, arr]);
-  /** every group, whatever is filtered: for choosing which are shown */
-  const allGroups = useMemo(() => groupsOf(tiles, projects, { ...arr, projects: null }), [tiles, projects, arr]);
-  const groupByKey = useMemo(() => new Map(allGroups.map((g) => [g.key, g])), [allGroups]);
   const hidden = useMemo(() => new Set(arr.hidden), [arr.hidden]);
   const starredSet = useMemo(() => new Set(arr.starred), [arr.starred]);
-  const keyOf = useCallback((t: Tile) => groupKeyOf(t, projectIds), [projectIds]);
-  const shownCount = groups.reduce((n, g) => n + g.tiles.length, 0);
-  const onMapCount = tiles.filter((t) => !hidden.has(t.id) && (arr.display.chats || t.kind !== 'core')).length;
+  /** on the map at all: not hidden, and not a Core chat when those are put away */
+  const visible = useMemo(() => tiles.filter((t) => !hidden.has(t.id) && (arr.display.chats || t.kind !== 'core')), [tiles, hidden, arr.display.chats]);
+  const homes = useMemo(() => homesOf(visible, projects, arr), [visible, projects, arr]);
+  /** where every conversation would be, hidden ones too: for naming what a search finds */
+  const allHomes = useMemo(() => homesOf(tiles, projects, arr), [tiles, projects, arr]);
+  const only = useMemo(() => (arr.projects ? new Set(arr.projects) : null), [arr.projects]);
+  const shown = useMemo(() => (only ? visible.filter((t) => only.has(homes.of.get(t.id)?.key ?? OTHER)) : visible), [visible, only, homes]);
+  const shownHomes = useMemo(() => (only ? { ...homes, list: homes.list.filter((h) => only.has(h.key)) } : homes), [homes, only]);
+  const ideas = useMemo(() => sharedIdeas(shown), [shown]);
+  const homeByKey = useMemo(() => new Map(homes.list.map((h) => [h.key, h])), [homes]);
 
   const [query, setQuery] = useState('');
   const q = query.trim();
@@ -116,10 +130,10 @@ export function UniverseView({
       matches
         ? tiles
             .filter((t) => matches.get(t.id))
-            .map((t) => ({ tile: t, match: matches.get(t.id)!, hidden: hidden.has(t.id), group: groupByKey.get(keyOf(t))?.name ?? (t.kind === 'core' ? 'Chats' : 'Lines of thinking') }))
+            .map((t) => ({ tile: t, match: matches.get(t.id)!, hidden: hidden.has(t.id), group: allHomes.of.get(t.id)?.name ?? 'Everything else' }))
             .sort((x, y) => (x.match.why === 'title' ? 0 : 1) - (y.match.why === 'title' ? 0 : 1) || y.tile.at - x.tile.at)
         : [],
-    [matches, tiles, hidden, groupByKey, keyOf]
+    [matches, tiles, hidden, allHomes]
   );
   const resume = useMemo(() => resumeOf(tiles.filter((t) => !hidden.has(t.id))), [tiles, hidden]);
   const starredTiles = useMemo(() => arr.starred.map((id) => tileById.get(id)).filter((t): t is Tile => !!t), [arr.starred, tileById]);
@@ -162,12 +176,15 @@ export function UniverseView({
     },
     [put, onFile]
   );
-  /** How the map is shown — which view, labels, colour, order, which Projects — kept, but not among what Undo takes back. */
-  const prefer = useCallback((change: (a: A.Arrangement) => A.Arrangement) => {
-    const before = arrRef.current;
-    const after = change(before);
-    if (after !== before) put(after);
-  }, [put]);
+  /** How the map is shown — the lens, labels, colour, order, which subjects — kept, but not among what Undo takes back. */
+  const prefer = useCallback(
+    (change: (a: A.Arrangement) => A.Arrangement) => {
+      const before = arrRef.current;
+      const after = change(before);
+      if (after !== before) put(after);
+    },
+    [put]
+  );
   const undo = useCallback(() => {
     const s = past.current.pop();
     if (!s) return;
@@ -198,25 +215,14 @@ export function UniverseView({
     if (t) open(t);
   };
 
-  /** Whether a conversation may live in a group, and the filing that puts it there (null: it is there already). */
-  const filingTo = (t: Tile, to: string): { ok: boolean; file: Filing | null } => {
-    const from = keyOf(t);
-    if (to === from) return { ok: true, file: null };
-    const g = groupByKey.get(to);
-    if (!g) return { ok: false, file: null };
-    if (g.kind === 'project') return onFile && g.projectId ? { ok: true, file: { id: t.id, kind: t.kind, from: t.projectId, to: g.projectId } } : { ok: false, file: null };
-    // out of a Project: a line of thinking to the rest of them, a chat to the chats
-    if ((g.key === LOOSE && t.kind === 'logos') || (g.key === CHATS && t.kind === 'core')) return onFile && t.projectId ? { ok: true, file: { id: t.id, kind: t.kind, from: t.projectId, to: null } } : { ok: true, file: null };
-    return { ok: false, file: null };
-  };
-
+  /** Filed in a Project — which is then its subject, so any subject it was given by hand is let go. */
   const fileTo = (ids: readonly string[], projectId: string | null) => {
     const files: Filing[] = [];
     for (const id of ids) {
       const t = tileById.get(id);
       if (t && (t.projectId ?? null) !== projectId) files.push({ id, kind: t.kind, from: t.projectId, to: projectId });
     }
-    if (files.length) commit((a) => A.unpinTiles(a, ids), files, true);
+    if (files.length) commit((a) => A.setSubject(A.unpinTiles(a, ids), ids, null), files, true);
   };
 
   const newProjectWith = async (ids: readonly string[], name: string) => {
@@ -228,10 +234,12 @@ export function UniverseView({
     setSaid(`“${name}” made, with ${ids.length === 1 ? 'it' : `these ${ids.length}`} in it.`);
   };
 
-  const projectOf = (key: string) => groupByKey.get(key)?.projectId ?? null;
+  const membersOf = (key: string) => shown.filter((t) => homes.of.get(t.id)?.key === key).map((t) => t.id);
+  const projectOf = (key: string) => homeByKey.get(key)?.projectId ?? null;
+  const refuseSay = () => setSaid(signedIn ? 'That could not be moved there.' : 'Sign in to file conversations in Projects.');
 
   // ── the map's hands ──
-  const mapActs: MapActs = {
+  const skyActs: SkyActs = {
     onSelect: (ids, add) => {
       setSel((cur) => (add ? [...cur.filter((x) => !ids.includes(x)), ...ids.filter((x) => !cur.includes(x))] : ids));
       if (!add && ids.length !== 1) setPreview(null);
@@ -242,39 +250,59 @@ export function UniverseView({
       const files: Filing[] = [];
       const pins: { id: string; g: string; x: number; y: number }[] = [];
       const unpin: string[] = [];
+      const given: { id: string; key: string | null }[] = [];
       let refused = false;
       const within: typeof moves = [];
       for (const m of moves) {
         const t = tileById.get(m.id);
         if (!t) continue;
-        const f = filingTo(t, m.to);
-        if (!f.ok) {
-          refused = true;
-          continue;
-        }
-        // put down in its own frame, it stays where it was put; filed elsewhere, it joins that frame's order
-        if (m.to === keyOf(t)) {
+        const from = homes.of.get(m.id)?.key;
+        if (m.to === from) {
+          // put down in its own cluster, it stays where it was put
           pins.push({ id: m.id, g: m.to, x: m.x, y: m.y });
           within.push(m);
-        } else unpin.push(m.id);
-        if (f.file) files.push(f.file);
+          continue;
+        }
+        const target: Home | undefined = homeByKey.get(m.to);
+        if (!target) continue;
+        if (target.kind === 'project') {
+          // into a Project: filed there, and the Project is its subject
+          if (!onFile || !target.projectId) {
+            refused = true;
+            continue;
+          }
+          files.push({ id: m.id, kind: t.kind, from: t.projectId, to: target.projectId });
+          given.push({ id: m.id, key: null });
+        } else {
+          // into a course, a field or everything else: that is its subject now — out of its Project, if it was in one
+          if (t.projectId) {
+            if (!onFile) {
+              refused = true;
+              continue;
+            }
+            files.push({ id: m.id, kind: t.kind, from: t.projectId, to: null });
+          }
+          given.push({ id: m.id, key: target.key === OTHER ? OTHER : target.key });
+        }
+        unpin.push(m.id);
       }
-      // once a frame is arranged by hand, the others in it stay where they are rather than closing the gap
+      // once a cluster is arranged by hand, the others in it stay where they are rather than closing the gap
       const arranged = new Set(within.map((m) => m.to));
       const placed = [...pins];
       for (const o of others) if (arranged.has(o.g)) pins.unshift({ id: o.id, g: o.g, x: o.x, y: o.y });
-      // on the grid, one put down on another's place trades places with it
+      // snapping into place, one put down on another's place trades places with it
       if (arrRef.current.display.snap && within.length === 1) {
         const m = within[0];
         const at = [...others.filter((o) => o.g === m.to), ...Object.entries(arrRef.current.pins).filter(([, p]) => p.g === m.to).map(([id, p]) => ({ id, g: p.g, x: p.x, y: p.y }))];
-        const there = at.find((o) => o.id !== m.id && o.x === m.x && o.y === m.y);
+        const there = at.find((o) => o.id !== m.id && Math.abs(o.x - m.x) < 26 && Math.abs(o.y - m.y) < 26);
         if (there && !placed.some((p) => p.id === there.id)) pins.push({ id: there.id, g: m.to, x: m.fx, y: m.fy });
       }
-      if (refused) setSaid(signedIn ? 'A Core chat lives in Chats or a Project; a line of thinking in a Project or with the rest.' : 'Sign in to file conversations in Projects.');
+      if (refused) refuseSay();
       if (!pins.length && !unpin.length) return;
       commit(
         (a) => {
           let next = A.unpinTiles(a, unpin);
+          for (const g of given) next = A.setSubject(next, [g.id], g.key);
           for (const p of pins) next = A.pinTile(next, p.id, p.g, p.x, p.y);
           return next;
         },
@@ -282,8 +310,7 @@ export function UniverseView({
         true
       );
     },
-    onMoveFrame: (key, dx, dy) => (dx || dy) && commit((a) => A.moveFrame(a, key, dx, dy), [], true),
-    onFrameCols: (key, cols) => commit((a) => A.setFrame(a, key, { cols }), [], true),
+    onMoveCluster: (key, dx, dy) => (dx || dy) && commit((a) => A.moveFrame(a, key, dx, dy), [], true),
     onFold: (key, folded) => commit((a) => A.setFrame(a, key, { collapsed: folded }), [], true),
     onRename: onUpdateProject
       ? (key, name) => {
@@ -295,6 +322,22 @@ export function UniverseView({
       ? (key, color) => {
           const pid = projectOf(key);
           if (pid) void onUpdateProject(pid, { color }).then((err) => err && setSaid(err));
+        }
+      : undefined,
+    onMakeProject:
+      onFile && onCreateProject && projects
+        ? (key) => {
+            const h = homeByKey.get(key);
+            if (h) void newProjectWith(membersOf(key), h.name);
+          }
+        : undefined,
+    onFileSuggested: onFile
+      ? (key) => {
+          const pid = projectOf(key);
+          const ids = shown.filter((t) => homes.of.get(t.id)?.key === key && homes.suggested.has(t.id)).map((t) => t.id);
+          if (!pid || !ids.length) return;
+          fileTo(ids, pid);
+          setSaid(`${ids.length === 1 ? 'Filed' : `${ids.length} filed`} in “${homeByKey.get(key)?.name ?? 'the Project'}”.`);
         }
       : undefined,
     onNote: (x, y) => {
@@ -312,25 +355,6 @@ export function UniverseView({
       setSaid('Linked. Press the ⟷ on the line to say what joins them.');
     },
     onLinkEdit: (id, label) => commit((a) => (label === null ? A.removeLink(a, id) : A.relabelLink(a, id, label))),
-  };
-
-  // ── the columns' hands ──
-  const showing = () => Object.fromEntries(allGroups.map((g) => [g.key, g.tiles.map((t) => t.id)]));
-  const moveCard = (id: string, to: string, at: number) => {
-    const t = tileById.get(id);
-    if (!t) return;
-    const f = filingTo(t, to);
-    if (!f.ok) return setSaid(signedIn ? 'A Core chat lives in Chats or a Project; a line of thinking in a Project or with the rest.' : 'Sign in to file conversations in Projects.');
-    const list = (groupByKey.get(to)?.tiles ?? []).map((x) => x.id);
-    const next = A.placeInOrder(list, id, at);
-    commit((a) => A.unpinTiles(A.setOrder(a, { [to]: next }, showing()), [id]), f.file ? [f.file] : [], true);
-  };
-  const moveColumn = (key: string, at: number) => {
-    const all = allGroups.map((g) => g.key);
-    const others = groups.map((g) => g.key).filter((k) => k !== key);
-    const before = others[at];
-    const rest = all.filter((k) => k !== key);
-    commit((a) => A.moveGroup(a, all, key, before ? rest.indexOf(before) : rest.length), [], true);
   };
 
   // ── keys anywhere on the map: / finds, ⌘Z undoes, Escape lets go ──
@@ -367,15 +391,6 @@ export function UniverseView({
     setSel((cur) => (cur.every((id) => tileById.has(id) && !hidden.has(id)) ? cur : cur.filter((id) => tileById.has(id) && !hidden.has(id))));
   }, [tileById, hidden]);
 
-  const few =
-    arr.mode === 'map' &&
-    shownCount > 0 &&
-    shownCount < FEW &&
-    !Object.keys(arr.pins).length &&
-    !arr.notes.length &&
-    !arr.links.length &&
-    !Object.values(arr.frames).some((f) => f.dx || f.dy || f.cols || f.collapsed);
-
   // ── the card beside a pressed conversation ──
   const previewTile = preview ? tileById.get(preview.id) ?? null : null;
   const pvStyle = (() => {
@@ -385,16 +400,19 @@ export function UniverseView({
     const a = preview.at;
     const right = a.right + 12 + W <= box.right - 8;
     const left = right ? a.right - box.left + 12 : Math.max(8, a.left - box.left - W - 12);
-    const top = Math.max(64, Math.min(a.top - box.top, box.height - 420));
+    const top = Math.max(64, Math.min(a.top - box.top, box.height - 440));
     return { left, top, width: W };
   })();
+  const previewHome = previewTile ? homes.of.get(previewTile.id) ?? allHomes.of.get(previewTile.id) ?? null : null;
+  const previewSuggested = previewTile && homes.suggested.has(previewTile.id) && previewHome?.projectId ? previewHome : null;
   const previewEl =
     previewTile && preview ? (
       <PreviewCard
         tile={previewTile}
-        group={groupByKey.get(keyOf(previewTile)) ?? null}
+        home={previewHome}
+        suggested={previewSuggested?.name ?? null}
         starred={starredSet.has(previewTile.id)}
-        pinned={arr.mode === 'map' && !!arr.pins[previewTile.id]}
+        pinned={lens === 'subject' && !!arr.pins[previewTile.id]}
         projects={(projects ?? []).filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name }))}
         links={arr.links
           .filter((l) => l.a === previewTile.id || l.b === previewTile.id)
@@ -409,16 +427,15 @@ export function UniverseView({
             setPreview(null);
             setSaid(`“${previewTile.title}” is hidden — View, then Hidden, brings it back.`);
           },
-          onLink:
-            arr.mode === 'map' && !few
-              ? () => {
-                  setLinkFrom(previewTile.id);
-                  setPreview(null);
-                }
-              : undefined,
+          onLink: () => {
+            setLinkFrom(previewTile.id);
+            setPreview(null);
+          },
           onUnpin: () => commit((a) => A.unpinTiles(a, [previewTile.id]), [], true),
           onMove: onFile && projects?.length ? (pid) => fileTo([previewTile.id], pid) : undefined,
           onNewProject: onFile && onCreateProject && projects ? (name) => void newProjectWith([previewTile.id], name) : undefined,
+          onFileHere: previewSuggested && onFile ? () => fileTo([previewTile.id], previewSuggested.projectId) : undefined,
+          onUnsubject: arr.subjectOf[previewTile.id] ? () => commit((a) => A.setSubject(A.unpinTiles(a, [previewTile.id]), [previewTile.id], null), [], true) : undefined,
           onClose: () => setPreview(null),
         }}
       />
@@ -443,14 +460,14 @@ export function UniverseView({
     />
   );
 
-  // ── the list column ──
+  // ── the list column: every conversation, by subject ──
   const contentsEl = contents ? (
     <aside className="l5c" aria-label="Contents">
       <div className="l5c-head">
         <span className="l5c-k">Contents</span>
         <h2>Your Universal Map</h2>
         <p>
-          {onMapCount} {onMapCount === 1 ? 'conversation' : 'conversations'}
+          {visible.length} {visible.length === 1 ? 'conversation' : 'conversations'}
           {arr.hidden.length ? ` · ${arr.hidden.length} hidden` : ''}
         </p>
       </div>
@@ -466,12 +483,12 @@ export function UniverseView({
             ))}
           </div>
         )}
-        {groups.map((g) => {
-          const list = matchOf ? g.tiles.filter((t) => matchOf(t.id)) : g.tiles;
+        {shownHomes.list.map((h) => {
+          const list = shown.filter((t) => homes.of.get(t.id)?.key === h.key && (!matchOf || matchOf(t.id))).sort((a, b) => b.at - a.at);
           if (!list.length) return null;
           return (
-            <div key={g.key} className="l5c-group">
-              <span className="l5c-k">{g.name}</span>
+            <div key={h.key} className="l5c-group">
+              <span className="l5c-k">{h.name}</span>
               {list.map((t) => (
                 <button key={t.id} type="button" className={`l5c-item${t.id === activeId ? ' is-here' : ''}`} onClick={() => open(t)}>
                   <span className="l5c-t">{t.title}</span>
@@ -481,7 +498,7 @@ export function UniverseView({
             </div>
           );
         })}
-        {!groups.some((g) => (matchOf ? g.tiles.some((t) => matchOf(t.id)) : g.tiles.length)) && <p className="l5c-none">{tiles.length ? 'Nothing matches.' : 'Nothing here yet — each line of thinking you begin is listed here.'}</p>}
+        {!shown.some((t) => !matchOf || matchOf(t.id)) && <p className="l5c-none">{tiles.length ? 'Nothing matches.' : 'Nothing here yet — every conversation you have is listed here.'}</p>}
       </div>
       {onMind && (
         <button type="button" className="l5c-mind" onClick={onMind}>
@@ -505,13 +522,13 @@ export function UniverseView({
   else if (!tiles.length)
     body = (
       <div className="l5h-empty">
-        <p>Every line of thinking you start appears here — by Project, as a map you can arrange.</p>
+        <p>Every conversation you have appears here — a map of what you have learned, by day, by week and by subject.</p>
         <button type="button" className="l5h-go" onClick={() => onStart('')}>
           What are you working on? <span aria-hidden="true">→</span>
         </button>
       </div>
     );
-  else if (!shownCount)
+  else if (!shown.length)
     body = (
       <div className="l5h-empty">
         <p>Nothing is shown with the map set this way.</p>
@@ -520,28 +537,14 @@ export function UniverseView({
         </button>
       </div>
     );
-  else if (few) body = <FewCards groups={groups} arr={arr} now={now} activeId={activeId} matchOf={matchOf} onOpen={openId} onPreview={(id, el) => setPreview({ id, at: el.getBoundingClientRect() })} />;
-  else if (arr.mode === 'columns')
-    body = (
-      <ColumnsBoard
-        groups={groups}
-        arr={arr}
-        now={now}
-        activeId={activeId}
-        matchOf={matchOf}
-        onOpen={openId}
-        onPreview={(id, el) => setPreview({ id, at: el.getBoundingClientRect() })}
-        onMoveCard={moveCard}
-        onMoveColumn={moveColumn}
-        onFold={(key, folded) => commit((a) => A.setFrame(a, key, { collapsed: folded }))}
-      />
-    );
-  else if (arr.mode === 'timeline') body = <TimelineBoard groups={groups} arr={arr} now={now} matchOf={matchOf} onOpen={openId} onPreview={(id, el) => setPreview({ id, at: el.getBoundingClientRect() })} />;
   else
     body = (
-      <MapCanvas
-        groups={groups}
+      <SkyCanvas
+        lens={lens}
+        tiles={shown}
         tileById={tileById}
+        homes={shownHomes}
+        ideas={ideas}
         arr={arr}
         now={now}
         activeId={activeId}
@@ -556,38 +559,39 @@ export function UniverseView({
         centerRef={center}
         top={narrow ? (resume || starredTiles.length ? 104 : 58) : 64}
         narrow={narrow}
-        acts={mapActs}
+        acts={skyActs}
       />
     );
 
-  const isMap = arr.mode === 'map' && !few && !atlasOn && shownCount > 0;
+  const isMap = !atlasOn && shown.length > 0;
   const selPinned = sel.some((id) => !!arr.pins[id]);
 
   return (
     <section className={`l5h${narrow ? ' is-narrow' : ''}${contents ? ' has-contents' : ''}`} aria-label="Universal Map">
-      {head?.(narrow ? null : findEl, onMapCount)}
+      {head?.(narrow ? null : findEl, visible.length)}
       {narrow && <div className="l5h-findrow">{findEl}</div>}
       <div className="l5h-body">
         {contentsEl}
         <div className="l5h-main" ref={mainRef}>
           {tiles.length > 0 && !atlasOn && (
             <div className="l5h-bar">
-              <div className="l5h-seg is-modes" role="radiogroup" aria-label="Show as">
+              <div className="l5h-seg is-modes" role="radiogroup" aria-label="Group the map">
                 {A.MODES.map((m) => (
                   <button
                     key={m}
                     type="button"
                     role="radio"
-                    aria-checked={arr.mode === m}
-                    className={arr.mode === m ? 'is-on' : ''}
+                    aria-checked={lens === m}
+                    className={lens === m ? 'is-on' : ''}
                     onClick={() => {
+                      if (m === lens) return setFitKey((k) => k + 1);
                       setPreview(null);
                       setSel([]);
                       prefer((a) => A.setMode(a, m));
-                      if (m === 'map') setFitKey((k) => k + 1);
                     }}
                   >
-                    {MODE_SAID[m]}
+                    <span className="l5h-long">{LENS_SAID[m].long}</span>
+                    <span className="l5h-short">{LENS_SAID[m].short}</span>
                   </button>
                 ))}
               </div>
@@ -641,7 +645,8 @@ export function UniverseView({
           {viewOpen && (
             <ViewMenu
               arr={arr}
-              groups={allGroups.map((g) => ({ key: g.key, name: g.name }))}
+              lens={lens}
+              groups={homes.list.map((h) => ({ key: h.key, name: h.name }))}
               hiddenCount={arr.hidden.filter((id) => tileById.has(id)).length}
               onDisplay={(patch) => prefer((a) => A.setDisplay(a, patch))}
               onSort={(s) => prefer((a) => A.setSort(a, s))}
@@ -663,14 +668,14 @@ export function UniverseView({
                 setViewOpen(false);
               }}
               onNote={
-                isMap
+                isMap && lens === 'subject'
                   ? () => {
                       setViewOpen(false);
-                      mapActs.onNote(center.current.x, center.current.y);
+                      skyActs.onNote(center.current.x, center.current.y);
                     }
                   : undefined
               }
-              onTidy={isMap && Object.keys(arr.pins).length ? () => commit((a) => A.tidy(a), [], true) : undefined}
+              onTidy={isMap && lens === 'subject' && Object.keys(arr.pins).length ? () => commit((a) => A.tidy(a), [], true) : undefined}
               onReset={() => {
                 commit((a) => A.resetLayout(a), [], true);
                 setFitKey((k) => k + 1);
@@ -725,7 +730,7 @@ export function UniverseView({
           )}
           {isMap && !arr.seen.hint && !linkFrom && sel.length < 2 && (
             <p className="l5h-hint">
-              Drag to arrange — into another Project to file it · double-click to write a note · pinch or ⌘-scroll to zoom
+              {HINT[lens]}
               <button type="button" className="l5h-x" aria-label="Got it" onClick={() => prefer((a) => A.markSeen(a, 'hint'))}>
                 ×
               </button>
