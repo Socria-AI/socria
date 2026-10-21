@@ -5,14 +5,35 @@
  * scoped under .logos-root .l5 so nothing leaks into Logos 2, the Logos 4
  * layout behind the switch, or Core. Phones first: the conversation is the
  * screen, the workspace is a sheet over it, every control is a thumb wide.
+ *
+ * Every colour here is a token whose value is paper's. A dark ground (Dark,
+ * Night, the One blue) gives the tokens its own values in app/themes.css, so
+ * nothing below knows which theme it is in. A wash, a rule or a hover is the
+ * olive at an alpha (--l5-tint-rgb); what is lit — a count, a selection, a
+ * focus — is the primary at an alpha (--lg-primary-rgb); a shadow is
+ * --shadow-rgb, and the ink's own greys are --lg-ink-rgb.
  */
 
 .logos-root .l5 {
   --l5-card: #ece7da;
   --l5-card-ink: #262821;
   --l5-surface: #fffdf8;
+  /* the surface as a triple, for the veils the canvas shows through */
+  --l5-surface-rgb: 255, 253, 248;
+  /* a step above the surface: a hovered chip, an open editor, the mark's own disc */
+  --l5-raise: #fff;
   --l5-hair: rgba(53, 70, 32, 0.12);
+  /* the olive every wash, rule and hover is drawn in */
+  --l5-tint-rgb: 53, 70, 32;
   --l5-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 8px 28px -14px rgba(35, 36, 31, 0.18);
+  /* words on a primary fill — a pressed switch, a send — and the veil a count wears there */
+  --l5-on-primary: #f5f3eb;
+  --l5-on-primary-rgb: 245, 243, 235;
+  /* a block of code, set into the reading */
+  --l5-code-bg: #fbf9f3;
+  /* what went wrong: its wash and edges, and its words */
+  --l5-no-rgb: 156, 91, 60;
+  --l5-no-ink: #7d3f27;
   --l5-serif: var(--serif, 'Instrument Serif', Georgia, serif);
   --l5-measure: 720px;
   position: absolute;
@@ -155,14 +176,14 @@
 .logos-root .l5-stagebtn.is-on {
   background: var(--lg-primary);
   border-color: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
 }
 .logos-root .l5-count {
   min-width: 20px;
   height: 20px;
   padding: 0 6px;
   border-radius: 999px;
-  background: rgba(53, 70, 32, 0.1);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
   color: var(--lg-primary);
   font-size: 11.5px;
   font-weight: 600;
@@ -171,8 +192,8 @@
   font-variant-numeric: tabular-nums;
 }
 .logos-root .l5-stagebtn.is-on .l5-count {
-  background: rgba(245, 243, 235, 0.2);
-  color: #f5f3eb;
+  background: rgba(var(--l5-on-primary-rgb), 0.2);
+  color: var(--l5-on-primary);
 }
 .logos-root .l5-stagebtn.is-fresh::after {
   content: '';
@@ -182,7 +203,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: #b8a26b;
+  background: var(--lg-secondary, #b8a26b);
   box-shadow: 0 0 0 2px var(--lg-paper);
 }
 
@@ -202,7 +223,7 @@
   border: 1px solid var(--l5-hair);
   border-radius: 14px;
   background: var(--l5-surface);
-  box-shadow: 0 18px 50px -20px rgba(35, 36, 31, 0.35);
+  box-shadow: 0 18px 50px -20px rgba(var(--shadow-rgb, 35, 36, 31), 0.35);
 }
 .logos-root .l5-menu-list.is-end {
   right: 0;
@@ -242,7 +263,7 @@
 }
 .logos-root .l5-menu-list [role='menuitem']:hover:not(:disabled),
 .logos-root .l5-menu-list [role='menuitem']:focus-visible {
-  background: rgba(53, 70, 32, 0.07);
+  background: rgba(var(--l5-tint-rgb), 0.07);
   outline: none;
 }
 .logos-root .l5-menu-list [role='menuitem']:disabled {
@@ -522,12 +543,12 @@
   border-radius: 50%;
   display: inline-grid;
   place-items: center;
-  background: var(--by, rgba(53, 70, 32, 0.12));
+  background: var(--by, rgba(var(--l5-tint-rgb), 0.12));
   color: #fff;
   font-size: 11px;
 }
 .logos-root .l5-av.is-socria {
-  background: #fff;
+  background: var(--l5-raise);
   border: 1px solid var(--l5-hair);
 }
 
@@ -537,9 +558,9 @@
   margin: 0 0 6px;
   padding: 6px 10px;
   border: 0;
-  border-left: 2px solid rgba(53, 70, 32, 0.3);
+  border-left: 2px solid rgba(var(--l5-tint-rgb), 0.3);
   border-radius: 0 8px 8px 0;
-  background: rgba(53, 70, 32, 0.05);
+  background: rgba(var(--l5-tint-rgb), 0.05);
   color: var(--lg-ink-60);
   font: inherit;
   font-size: 13px;
@@ -561,7 +582,7 @@
   margin: 0 0 6px;
   padding: 4px 10px;
   border-radius: 999px;
-  background: rgba(53, 70, 32, 0.08);
+  background: rgba(var(--l5-tint-rgb), 0.08);
   font-size: 12.5px;
   color: var(--lg-ink-60);
 }
@@ -635,7 +656,7 @@
 .logos-root .l5-prose .socria-code {
   padding: 0.08em 0.36em;
   border-radius: 5px;
-  background: rgba(53, 70, 32, 0.08);
+  background: rgba(var(--l5-tint-rgb), 0.08);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.86em;
 }
@@ -644,7 +665,7 @@
   border: 1px solid var(--l5-hair);
   border-radius: 12px;
   overflow: hidden;
-  background: #fbf9f3;
+  background: var(--l5-code-bg);
 }
 .logos-root .l5-prose .socria-codeblock-head {
   display: flex;
@@ -677,7 +698,7 @@
 .logos-root .l5-prose .socria-quote {
   margin: 0 0 0.9em;
   padding: 2px 0 2px 14px;
-  border-left: 2px solid rgba(53, 70, 32, 0.3);
+  border-left: 2px solid rgba(var(--l5-tint-rgb), 0.3);
   color: var(--lg-ink-60);
   font-style: italic;
 }
@@ -701,7 +722,7 @@
 }
 .logos-root .l5-prose th {
   font-weight: 600;
-  background: rgba(53, 70, 32, 0.04);
+  background: rgba(var(--l5-tint-rgb), 0.04);
 }
 .logos-root .l5-prose tr:last-child td {
   border-bottom: 0;
@@ -798,9 +819,9 @@
 .logos-root .l5-edit {
   width: min(100%, 560px);
   padding: 10px;
-  border: 1px solid rgba(53, 70, 32, 0.3);
+  border: 1px solid rgba(var(--l5-tint-rgb), 0.3);
   border-radius: 16px;
-  background: #fff;
+  background: var(--l5-raise);
   box-shadow: var(--l5-shadow);
 }
 .logos-root .l5-edit textarea {
@@ -844,7 +865,7 @@
 .logos-root .l5-btn.is-primary {
   background: var(--lg-primary);
   border-color: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
 }
 .logos-root .l5-btn.is-quiet {
   min-height: 32px;
@@ -917,8 +938,8 @@
   margin: 0 0 16px;
   padding: 10px 14px;
   border-radius: 12px;
-  background: rgba(156, 91, 60, 0.09);
-  color: #7d3f27;
+  background: rgba(var(--l5-no-rgb), 0.09);
+  color: var(--l5-no-ink);
   font-size: 14px;
 }
 .logos-root .l5-empty {
@@ -1020,8 +1041,8 @@
   transition: border-color 0.15s, box-shadow 0.15s;
 }
 .logos-root .l5-dock .lg-composer-box:focus-within {
-  border-color: rgba(53, 70, 32, 0.34);
-  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.06), var(--l5-shadow);
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.34);
+  box-shadow: 0 0 0 4px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06), var(--l5-shadow);
 }
 .logos-root .l5-dock .lg-composer textarea {
   width: 100%;
@@ -1100,7 +1121,7 @@
 
 /* the map's cards the conversation points at */
 .logos-root .lg-node.is-linked {
-  box-shadow: 0 0 0 2px var(--lg-primary), 0 10px 26px -12px rgba(53, 70, 32, 0.55);
+  box-shadow: 0 0 0 2px var(--lg-primary), 0 10px 26px -12px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.55);
   z-index: 3;
 }
 
@@ -1117,7 +1138,7 @@
     inset: 0;
     z-index: 75;
     animation-name: l5SheetIn;
-    box-shadow: 0 -20px 60px -30px rgba(35, 36, 31, 0.4);
+    box-shadow: 0 -20px 60px -30px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
   }
   .logos-root .l5:not(.l5-sheet-on) .l5-stage {
     display: none;
@@ -1257,28 +1278,28 @@
 /* hover only where there is hovering: on a touch screen a tapped control would stay lit */
 @media (hover: hover) {
   .logos-root .l5-iconbtn:hover {
-    background: rgba(53, 70, 32, 0.07);
+    background: rgba(var(--l5-tint-rgb), 0.07);
     color: var(--lg-ink);
   }
   .logos-root .l5-stagebtn:hover {
-    border-color: rgba(53, 70, 32, 0.3);
+    border-color: rgba(var(--l5-tint-rgb), 0.3);
   }
   .logos-root .l5-start:hover {
-    border-color: rgba(53, 70, 32, 0.32);
-    background: #fff;
+    border-color: rgba(var(--l5-tint-rgb), 0.32);
+    background: var(--l5-raise);
   }
   .logos-root .l5-prose .socria-codeblock-head button:hover {
-    background: rgba(53, 70, 32, 0.08);
+    background: rgba(var(--l5-tint-rgb), 0.08);
   }
   .logos-root .l5-fx-chip:hover {
-    border-color: rgba(53, 70, 32, 0.35);
-    background: #fff;
+    border-color: rgba(var(--l5-tint-rgb), 0.35);
+    background: var(--l5-raise);
   }
   .logos-root .l5-act:hover {
-    background: rgba(53, 70, 32, 0.07);
+    background: rgba(var(--l5-tint-rgb), 0.07);
     color: var(--lg-ink);
   }
   .logos-root .l5-ctools .mp-btn:hover {
-    background: rgba(53, 70, 32, 0.06);
+    background: rgba(var(--l5-tint-rgb), 0.06);
   }
 }

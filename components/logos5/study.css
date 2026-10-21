@@ -8,9 +8,19 @@
 .logos-root .l5 {
   --l5s-ok: #4d6b2e;
   --l5s-ok-soft: rgba(77, 107, 46, 0.1);
+  --l5s-ok-rgb: 77, 107, 46;
   --l5s-no: var(--lg-tension, #9c5b3c);
   --l5s-no-soft: rgba(156, 91, 60, 0.09);
+  /* a blank answered wrong, and a sentence with one in it */
+  --l5s-no-fill: #f8ece4;
+  --l5s-no-wash: #fbf3ee;
   --l5s-gold: var(--lg-secondary, #b8a26b);
+  /* why a topic is the place to start — a gold note — and a review topic's label */
+  --l5s-gold-rgb: 184, 162, 107;
+  --l5s-gold-ink: #5b4d27;
+  --l5s-review-ink: #7a6a3e;
+  /* a drop zone with files held over it */
+  --l5s-drop-over: #fbfaf3;
 }
 
 /* ── shared bits ──────────────────────────────────────────────────── */
@@ -82,7 +92,7 @@
   border: 0;
   border-radius: 999px;
   background: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
   font: inherit;
   font-size: 15px;
   font-weight: 500;
@@ -158,7 +168,7 @@
 }
 .logos-root .l5 .l5s-step.is-on {
   background: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
 }
 .logos-root .l5 .l5s-step-n {
   font-size: 12px;
@@ -210,7 +220,7 @@
 .logos-root .l5 .l5-unibtn.is-new {
   background: var(--lg-primary);
   border-color: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
   font-weight: 500;
 }
 .logos-root .l5 .l5-unibtn.is-new span[aria-hidden] {
@@ -218,8 +228,8 @@
   line-height: 1;
 }
 .logos-root .l5 .l5-unibtn.is-list.is-on {
-  background: rgba(53, 70, 32, 0.08);
-  border-color: rgba(53, 70, 32, 0.3);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.3);
 }
 
 /* ── the study's own screen ───────────────────────────────────────── */
@@ -278,7 +288,7 @@
 .logos-root .l5 .l5s-drop {
   position: relative;
   padding: 14px;
-  border: 1.5px dashed rgba(53, 70, 32, 0.28);
+  border: 1.5px dashed rgba(var(--l5-tint-rgb), 0.28);
   border-radius: 22px;
   background: var(--l5-surface);
   box-shadow: var(--l5-shadow);
@@ -286,7 +296,7 @@
 }
 .logos-root .l5 .l5s-drop.is-over {
   border-color: var(--lg-primary);
-  background: #fbfaf3;
+  background: var(--l5s-drop-over);
 }
 .logos-root .l5 .l5s-drop-cta {
   display: flex;
@@ -345,7 +355,7 @@
   height: 40px;
   border: 1px solid var(--l5-hair);
   border-radius: 5px;
-  background: #fff;
+  background: var(--l5-raise);
 }
 .logos-root .l5 .l5s-ftype > span {
   position: absolute;
@@ -377,7 +387,7 @@
   height: 3px;
   margin-top: 6px;
   border-radius: 3px;
-  background: rgba(53, 70, 32, 0.12);
+  background: var(--l5-hair);
   overflow: hidden;
 }
 .logos-root .l5 .l5s-file-bar > span {
@@ -392,7 +402,7 @@
   animation: l5s-reading 1.2s ease-in-out infinite;
 }
 .logos-root .l5 .l5s-file.is-error .l5s-file-bar > span {
-  background: var(--st-no);
+  background: var(--l5s-no);
 }
 @keyframes l5s-reading {
   from {
@@ -467,7 +477,7 @@
   gap: 8px;
   padding: 7px 13px;
   border-radius: 999px;
-  background: rgba(53, 70, 32, 0.08);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
   color: var(--lg-primary);
   font-weight: 500;
 }
@@ -511,7 +521,7 @@
   cursor: pointer;
 }
 .logos-root .l5 .l5s-intent-menu button[aria-checked='true'] {
-  background: rgba(53, 70, 32, 0.08);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
   font-weight: 500;
 }
 .logos-root .l5 .l5s-intake-foot {
@@ -561,7 +571,7 @@
 .logos-root .l5 .l5s-path li.is-on .l5s-path-n {
   border-color: var(--lg-primary);
   background: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
 }
 
 /* ── the board ────────────────────────────────────────────────────── */
@@ -598,7 +608,7 @@
   position: relative;
   flex: 1 1 auto;
   padding: 22px 22px 18px;
-  background-image: radial-gradient(rgba(53, 70, 32, 0.08) 1px, transparent 1px);
+  background-image: radial-gradient(rgba(var(--l5-tint-rgb), 0.08) 1px, transparent 1px);
   background-size: 22px 22px;
 }
 .logos-root .l5 .l5s-links {
@@ -611,7 +621,7 @@
 }
 .logos-root .l5 .l5s-links path {
   fill: none;
-  stroke: rgba(53, 70, 32, 0.28);
+  stroke: rgba(var(--l5-tint-rgb), 0.28);
   stroke-width: 1.5;
   transition: stroke 0.15s, opacity 0.15s;
 }
@@ -679,7 +689,7 @@
 }
 .logos-root .l5 .l5s-card.is-on {
   border-color: var(--lg-primary);
-  box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.14), var(--l5-shadow);
+  box-shadow: 0 0 0 3px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14), var(--l5-shadow);
 }
 .logos-root .l5 .l5s-card.is-dim {
   opacity: 0.38;
@@ -701,7 +711,7 @@
   color: var(--lg-primary);
 }
 .logos-root .l5 .l5s-card.is-review .l5s-kind {
-  color: #7a6a3e;
+  color: var(--l5s-review-ink);
 }
 .logos-root .l5 .l5s-tab {
   position: absolute;
@@ -710,7 +720,7 @@
   padding: 3px 11px;
   border-radius: 999px;
   background: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
   font-size: 12px;
   font-weight: 500;
   white-space: nowrap;
@@ -718,7 +728,7 @@
 .logos-root .l5 .l5s-card.is-start {
   margin-top: 0;
   border-color: var(--lg-primary);
-  box-shadow: 0 0 0 1px var(--lg-primary), 0 18px 38px -22px rgba(35, 36, 31, 0.4);
+  box-shadow: 0 0 0 1px var(--lg-primary), 0 18px 38px -22px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
 }
 .logos-root .l5 .l5s-card-title {
   font-family: var(--l5-serif);
@@ -732,7 +742,7 @@
   -webkit-box-orient: vertical;
   overflow: hidden;
   padding-left: 14px;
-  border-left: 1.5px solid rgba(53, 70, 32, 0.22);
+  border-left: 1.5px solid rgba(var(--l5-tint-rgb), 0.22);
   font-family: var(--l5-serif);
   font-style: italic;
   font-size: 16px;
@@ -892,10 +902,10 @@
   margin: 8px 0 0;
   padding: 8px 10px;
   border-radius: 10px;
-  background: rgba(184, 162, 107, 0.16);
+  background: rgba(var(--l5s-gold-rgb), 0.16);
   font-size: 13px;
   line-height: 1.45;
-  color: #5b4d27;
+  color: var(--l5s-gold-ink);
 }
 .logos-root .l5 .l5s-quotes {
   display: flex;
@@ -941,7 +951,7 @@
 .logos-root .l5 .l5s-act.is-primary {
   background: var(--lg-primary);
   border-color: var(--lg-primary);
-  color: #f5f3eb;
+  color: var(--l5-on-primary);
 }
 
 /* ── practice ─────────────────────────────────────────────────────── */
@@ -1046,21 +1056,21 @@
   font-size: 16px;
 }
 .logos-root .l5 .l5s-in:focus {
-  outline: 2px solid rgba(53, 70, 32, 0.35);
+  outline: 2px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35);
   outline-offset: 0;
-  background: #fff;
+  background: var(--l5-raise);
 }
 .logos-root .l5 .l5s-in.is-num {
   text-align: right;
   font-variant-numeric: tabular-nums;
 }
 .logos-root .l5 .l5s-in.is-ok {
-  border-color: rgba(77, 107, 46, 0.5);
+  border-color: rgba(var(--l5s-ok-rgb), 0.5);
   background: var(--l5s-ok-soft);
 }
 .logos-root .l5 .l5s-in.is-no {
-  border-color: rgba(156, 91, 60, 0.55);
-  background: #f8ece4;
+  border-color: rgba(var(--l5-no-rgb), 0.55);
+  background: var(--l5s-no-fill);
 }
 .logos-root .l5 .l5s-in[readonly] {
   cursor: default;
@@ -1111,7 +1121,7 @@
   border: 1px solid var(--l5-hair);
   border-radius: 14px;
   background: var(--l5-surface);
-  box-shadow: 0 12px 34px -12px rgba(35, 36, 31, 0.32);
+  box-shadow: 0 12px 34px -12px rgba(var(--shadow-rgb, 35, 36, 31), 0.32);
   font-size: 14px;
   line-height: 1.45;
   font-weight: 400;
@@ -1152,7 +1162,7 @@
   background: var(--l5-surface);
 }
 .logos-root .l5 .l5s-cloze li.is-no {
-  background: #fbf3ee;
+  background: var(--l5s-no-wash);
 }
 .logos-root .l5 .l5s-cloze p {
   margin: 0 0 8px;
@@ -1265,7 +1275,7 @@
 }
 .logos-root .l5 .l5s-gap {
   padding: 12px 14px;
-  border: 1px solid rgba(156, 91, 60, 0.25);
+  border: 1px solid rgba(var(--l5-no-rgb), 0.25);
   border-left: 3px solid var(--l5s-no);
   border-radius: 14px;
   background: var(--l5-surface);
@@ -1315,7 +1325,7 @@
     border-left: 0;
     border-top: 1px solid var(--l5-hair);
     border-radius: 22px 22px 0 0;
-    box-shadow: 0 -18px 50px -20px rgba(35, 36, 31, 0.35);
+    box-shadow: 0 -18px 50px -20px rgba(var(--shadow-rgb, 35, 36, 31), 0.35);
     padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   }
   .logos-root .l5 .l5s-practice {
@@ -1461,7 +1471,7 @@
     background: none;
   }
   .logos-root .l5 .l5s-jtable tr.is-no {
-    background: var(--st-no-soft);
+    background: var(--l5s-no-soft);
   }
   .logos-root .l5 .l5s-jtable td.is-num {
     width: auto;
@@ -1473,7 +1483,7 @@
 @media (hover: hover) {
   .logos-root .l5 .l5s-card:hover {
     transform: translateY(-1px);
-    border-color: rgba(53, 70, 32, 0.32);
+    border-color: rgba(var(--l5-tint-rgb), 0.32);
   }
   .logos-root .l5 .l5s-card.is-dim:hover {
     opacity: 0.7;
@@ -1481,7 +1491,7 @@
   .logos-root .l5 .l5s-opt:hover,
   .logos-root .l5 .l5s-act:not(.is-primary):hover,
   .logos-root .l5 .l5s-btn:hover {
-    border-color: rgba(53, 70, 32, 0.35);
+    border-color: rgba(var(--l5-tint-rgb), 0.35);
   }
 }
 @media (prefers-reduced-motion: reduce) {

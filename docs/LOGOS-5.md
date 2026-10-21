@@ -667,6 +667,26 @@ Found and fixed on the way:
 - A link's words could sit on a star's name; they now go along its curve
   where they are clear.
 
+**Logos 5 on every dark ground.** Logos 5 had been drawn for paper: its own
+surfaces (`--l5-*`) and some fifty colours were written out as paper's, so on
+Dark and One the words went light while the cards stayed cream. Every such
+colour is now a token whose default is exactly paper's value
+(`components/logos5/l5.css`, `redesign.css`, `study.css`; the Mind Graph's
+neurons in `MindGraph.tsx`), and `app/themes.css` gives Dark, One and Night
+their own ("Logos 5 on every dark ground"). Checked:
+- Paper: the computed colours of every element in 25 states — a line of
+  thinking (graph, "Asking about", the menu, editing, the folded composer, a
+  chart, Artifacts, Components), the whole study path, and the phone — the
+  same before and after; screenshots identical.
+- Night, Dark and One: the conversation and its Logic Map, the study path from
+  intake to a checked set, the menus and sheets, the Mind Graph, the phone.
+  Words on a lit fill take the ground's colour; right and wrong are turned up
+  to be read.
+- Also fixed: two of the study's colours (`--st-no`, `--st-no-soft`) were
+  named nowhere, so a failed file's bar and a wrong row on a phone had none;
+  and on a dark ground a map card lifted on hover glowed with the ink's light
+  instead of casting a shadow.
+
 Tests: `test/logos5-spatial.test.mjs` holds the subjects, the homes, hubs and
 dots, the three lenses, shared ideas and putting a star down;
 `test/logos5-home.test.mjs` the reading and the arrangement;
@@ -676,5 +696,9 @@ dots, the three lenses, shared ideas and putting a star down;
 **Not verified here:** what a real account's conversations are read as — the
 fields come from what the map model wrote (`map.ask.domain`) and a word list,
 so some will land in Everything else or a neighbouring field until moved by
-hand; the account's copy of the arrangement against a real database; and
-dragging on a real phone.
+hand; the account's copy of the arrangement against a real database; dragging
+on a real phone; One only by setting its attribute (the app puts a browser
+without membership back on paper); the Mind Graph on Night only with neurons
+drawn from its own markup (it needs a signed-in account). Left as they were:
+a pie chart's white percentages sit on its light slices on a dark ground (the
+display's renderer), and Logos 4's map legend keeps its cream strip there.

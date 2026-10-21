@@ -17,7 +17,8 @@ import { L5Switch } from './L5Chrome';
 const BRANCH = 'M0,-30 C4,-46 12,-54 16,-70 M12,-54 C20,-56 26,-64 34,-64 M16,-70 C14,-80 20,-86 20,-94';
 /** the cell body, at radius 30 */
 const SOMA = 'M0,-30 C16,-33 31,-20 30,-3 C32,15 17,31 0,29 C-17,31 -32,15 -30,-3 C-32,-20 -16,-33 0,-30Z';
-const FILL: Record<MindGroup, string> = { habit: '#EDF3E8', fact: '#fffdf8', project: '#FAF3E3' };
+/** each region's cell body: paper's, unless a dark ground gives its own (app/themes.css), as it does the ink a neuron is drawn in */
+const FILL: Record<MindGroup, string> = { habit: 'var(--l5m-habit, #EDF3E8)', fact: 'var(--l5m-fact, #fffdf8)', project: 'var(--l5m-project, #FAF3E3)' };
 
 function ago(at: number): string {
   if (!at) return '';
@@ -162,7 +163,7 @@ export function MindGraphView({
   const most = narrow ? 30 : 46;
   const neuron = (n: Neuron) => {
     const s = n.r / 30;
-    const stroke = n.lead ? '#354620' : 'rgba(53,70,32,.55)';
+    const stroke = n.lead ? 'var(--l5m-lead, #354620)' : 'var(--l5m-line, rgba(53,70,32,.55))';
     return (
       <g
         key={n.id}
@@ -175,10 +176,10 @@ export function MindGraphView({
         onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), setSel(n.id))}
       >
         {n.dendrites.map((a, i) => (
-          <path key={i} d={BRANCH} transform={`rotate(${a}) scale(${s})`} fill="none" stroke={stroke} strokeWidth={1.2 / s} opacity={0.7} />
+          <path key={i} d={BRANCH} transform={`rotate(${a}) scale(${s})`} fill="none" style={{ stroke }} strokeWidth={1.2 / s} opacity={0.7} />
         ))}
-        <path d={SOMA} transform={`scale(${s})`} fill={FILL[n.group]} stroke={stroke} strokeWidth={(n.lead ? 1.8 : 1.4) / s} />
-        <circle r={n.lead ? 7 : 5.5} fill={stroke} />
+        <path d={SOMA} transform={`scale(${s})`} style={{ fill: FILL[n.group], stroke }} strokeWidth={(n.lead ? 1.8 : 1.4) / s} />
+        <circle r={n.lead ? 7 : 5.5} style={{ fill: stroke }} />
         <text className="l5m-t" x={n.left ? -n.r - 10 : n.r + 12} y={4} textAnchor={n.left ? 'end' : 'start'}>
           {n.label.length > most ? n.label.slice(0, most - 1) + '…' : n.label}
         </text>

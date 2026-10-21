@@ -115,6 +115,9 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.is-focused { border-color: var(--lg-primary); }
+/* a card lifted on hover, or focused, casts a shadow — on a dark ground in the ground's dark, not a glow of the ink */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node:hover { box-shadow: 0 2px 4px rgba(var(--shadow-rgb), 0.3), 0 14px 28px -16px rgba(var(--shadow-rgb), 0.75); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.is-focused { box-shadow: 0 3px 6px rgba(var(--shadow-rgb), 0.3), 0 18px 36px -18px rgba(var(--shadow-rgb), 0.8); }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-zoom { background: var(--surface); border-color: var(--lg-line); }
 /* the rail and the sheets laid a white veil over paper; on a dark ground, none */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root .s-bar { background: rgba(255, 255, 255, 0.02); }
@@ -129,3 +132,69 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.lg-node-decision :is(.lg-node-label, .lg-node-type) { color: var(--lg-ink); }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.lg-node-decision .lg-node-attached { background: rgba(255, 255, 255, 0.1); color: var(--lg-ink-60); }
+
+/* ── Logos 5 on every dark ground ─────────────────────────────────────
+   components/logos5/ (l5.css, redesign.css, study.css) draws in its own
+   --l5-* tokens, each declared with its paper value on .logos-root .l5, and
+   in the Logos tokens above. A dark ground gives those tokens its own: the
+   raised fills a step lighter than the ground instead of cream, hairlines
+   and washes in the ground's own light, the words on a lit (primary) fill in
+   the ground's colour, and right and wrong turned up to be read on it. The
+   shared half reads each theme's Logos tokens; the fills, the triples and
+   the shadows are each theme's own, below. */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 {
+  --l5-card-ink: var(--lg-ink);
+  --l5-on-primary: var(--lg-paper);
+  --l5-no-ink: var(--lg-tension);
+  --l5s-gold-ink: var(--lg-secondary);
+  --l5s-review-ink: var(--lg-secondary);
+  /* the Mind Graph's neurons: the lead one in the lit colour, the rest in the ink */
+  --l5m-lead: var(--lg-primary);
+  --l5m-line: rgba(var(--lg-ink-rgb), 0.45);
+}
+html[data-theme="dark"] .logos-root .l5 {
+  --l5-surface: #25261F; --l5-surface-rgb: 37, 38, 31; --l5-paper-hi: #25261F; --l5-raise: #2E2F28;
+  --l5-card: #2E2F28; --l5-bubble: #33342C; --l5-code-bg: #1E1F1B; --l5s-drop-over: #2E2F28;
+  --l5-hair: rgba(236, 233, 223, 0.12); --l5-tint-rgb: 236, 233, 223;
+  --l5-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px -14px rgba(0, 0, 0, 0.5);
+  --l5-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 50px -20px rgba(0, 0, 0, 0.6);
+  --l5-on-primary-rgb: 25, 26, 23;
+  --l5-no-rgb: 209, 138, 104;
+  --l5s-ok: #A9C27A; --l5s-ok-rgb: 169, 194, 122; --l5s-ok-soft: rgba(169, 194, 122, 0.14);
+  --l5s-no-soft: rgba(209, 138, 104, 0.14); --l5s-no-fill: rgba(209, 138, 104, 0.16); --l5s-no-wash: rgba(209, 138, 104, 0.08);
+  --l5s-gold-rgb: 201, 180, 126;
+  --l5m-habit: #283121; --l5m-fact: #25261F; --l5m-project: #302B20;
+}
+html[data-theme="one"] .logos-root .l5 {
+  --l5-surface: #1B3749; --l5-surface-rgb: 27, 55, 73; --l5-paper-hi: #1B3749; --l5-raise: #22415A;
+  --l5-card: #22415A; --l5-bubble: #264660; --l5-code-bg: #16303F; --l5s-drop-over: #22415A;
+  --l5-hair: rgba(240, 234, 216, 0.13); --l5-tint-rgb: 240, 234, 216;
+  --l5-shadow: 0 1px 2px rgba(3, 12, 18, 0.3), 0 8px 28px -14px rgba(3, 12, 18, 0.5);
+  --l5-shadow-up: 0 1px 2px rgba(3, 12, 18, 0.3), 0 18px 50px -20px rgba(3, 12, 18, 0.6);
+  --l5-on-primary-rgb: 19, 41, 58;
+  --l5-no-rgb: 227, 154, 122;
+  --l5s-ok: #A6D6A9; --l5s-ok-rgb: 166, 214, 169; --l5s-ok-soft: rgba(166, 214, 169, 0.14);
+  --l5s-no-soft: rgba(227, 154, 122, 0.14); --l5s-no-fill: rgba(227, 154, 122, 0.16); --l5s-no-wash: rgba(227, 154, 122, 0.08);
+  --l5s-gold-rgb: 229, 211, 161;
+  --l5m-habit: #1D3E48; --l5m-fact: #1B3749; --l5m-project: #2D3B46;
+}
+html[data-theme="night"] .logos-root .l5 {
+  --l5-surface: #131D33; --l5-surface-rgb: 19, 29, 51; --l5-paper-hi: #131D33; --l5-raise: #1A2642;
+  --l5-card: #1A2642; --l5-bubble: #1F2C4A; --l5-code-bg: #0F182B; --l5s-drop-over: #16213A;
+  --l5-hair: rgba(200, 212, 255, 0.12); --l5-tint-rgb: 200, 212, 255;
+  --l5-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px -14px rgba(0, 0, 0, 0.45);
+  --l5-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 50px -20px rgba(0, 0, 0, 0.6);
+  --l5-on-primary-rgb: 11, 18, 34;
+  --l5-no-rgb: 232, 153, 138;
+  --l5s-ok: #93D3A2; --l5s-ok-rgb: 147, 211, 162; --l5s-ok-soft: rgba(147, 211, 162, 0.13);
+  --l5s-no-soft: rgba(232, 153, 138, 0.13); --l5s-no-fill: rgba(232, 153, 138, 0.16); --l5s-no-wash: rgba(232, 153, 138, 0.08);
+  --l5s-gold-rgb: 195, 177, 225;
+  --l5m-habit: #142838; --l5m-fact: #131D33; --l5m-project: #262438;
+  /* the ground is a sky: a faint glow from the top, and no stars behind words */
+  background: radial-gradient(ellipse 120% 70% at 50% -12%, rgba(80, 110, 190, 0.16), transparent 72%), var(--lg-paper);
+}
+/* the bars over the sky let it through */
+html[data-theme="night"] .logos-root .l5 :is(.l5-head, .l5x-tabs) { background: transparent; }
+/* the map's foot, where its legend sits (.mp-bot, globals.css), is a cream veil
+   over the map on paper; under Logos 5 on a dark ground it is the surface's */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .mp-bot { background: rgba(var(--l5-surface-rgb), 0.86); }
