@@ -59,6 +59,10 @@ export interface RailProject {
   name: string;
   archived: boolean;
   updatedAt: number;
+  /** when it was made: the order Projects sit in on the Universal Map */
+  createdAt?: number;
+  /** Project Home's colour key (lib/project-home.ts) */
+  color?: string | null;
 }
 
 const FOLDER_ICON = (

@@ -58,6 +58,9 @@ export async function GET(req: NextRequest) {
       name: p.name,
       description: p.description,
       archived: p.archived,
+      // Project Home's mark, so every place a Project is drawn draws it alike
+      color: p.color ?? null,
+      icon: p.icon ?? null,
       createdAt: p.createdAt,
       updatedAt: p.updatedAt,
       conversations: convoCount.get(p.id) ?? 0,

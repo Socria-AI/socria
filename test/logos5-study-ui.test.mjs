@@ -13,8 +13,10 @@
 //   • the three views (Components, Artifacts, Logic Map) are counted, and
 //     each says what it holds — or how it comes to hold something;
 //   • a card asked about says which card, its last answer and where it came from;
-//   • the Universal Map is the home: every conversation counted, searchable,
-//     and a way to begin when there is nothing yet.
+//   • the Universal Map is the home: a few conversations as cards, more as
+//     Project frames of tiles — with what they share, the person's stars,
+//     notes and links — or as columns, or a timeline; and a way to begin when
+//     there is nothing yet.
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as h } from 'react';
@@ -149,18 +151,64 @@ console.log('\n=== practice ===');
 
 console.log('\n=== the Universal Map ===');
 {
+  const NOW = Date.now();
+  const DAY = 86_400_000;
+  const say = (role, content, d) => ({ role, content, at: NOW - d * DAY });
+  const conv = (id, title, o = {}) => ({
+    id,
+    title,
+    updatedAt: NOW - (o.last ?? 1) * DAY,
+    projectId: o.project ?? null,
+    messages: [say('user', title, (o.last ?? 1) + 2), say('assistant', `Where it stands: ${title.toLowerCase()} is narrowing.${o.ask ? ' ' + o.ask : ''}`, o.last ?? 1)],
+    map: { nodes: (o.ideas ?? []).map((label, i) => ({ id: `${id}${i}`, label })), edges: [] },
+  });
+  const head = (center, count) => h('header', { className: 'test-head' }, `COUNT:${count}`, center);
+  const base = { activeId: null, onOpen: none, onStart: none, head };
+
+  const empty = html(h(U.UniverseView, { ...base, conversations: [] }));
+  ok('with nothing yet, it says what it will be and how to begin', empty.includes('appears here — by Project, as a map you can arrange') && empty.includes('What are you working on?') && empty.includes('Find or start…'));
+
+  const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2 }), conv('c', 'Exam 2', { last: 3 })] }));
+  ok('a few conversations are large cards, a press from going on', (few.match(/class="l5h-card is-big/g) ?? []).length === 3 && few.includes('Continue') && few.includes('Where it stands: two job offers is narrowing.'));
+  ok('the header is given the find-or-start box and how many there are', few.includes('COUNT:3') && few.includes('placeholder="Find or start…"'));
+  ok('where to pick up is a press away', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few));
+  ok('three ways to see it, the map first', /role="radio" aria-checked="true" class="is-on">Map/.test(few) && few.includes('>Columns<') && few.includes('>Timeline<'));
+
+  const projects = [{ id: 'P1', name: 'ACCT 2301', color: 'clay', createdAt: 1 }, { id: 'P2', name: 'Job hunt', createdAt: 2 }, { id: 'P3', name: 'Someday', createdAt: 3 }];
   const conversations = [
-    { id: 'a', title: 'Two job offers', updatedAt: 2, messages: [{ role: 'user' }], map: { nodes: [{ id: 'n1', label: 'Better team' }, { id: 'n2', label: 'Higher pay' }], edges: [{ from: 'n1', to: 'n2' }] } },
-    { id: 'b', title: 'A plain chat', updatedAt: 1, messages: [{ role: 'user' }], map: { nodes: [], edges: [] } },
-    { id: 'c', title: 'Tax questions', updatedAt: 3, kind: 'core' },
+    conv('a1', 'Accruals', { project: 'P1', ideas: ['Accrual basis'] }),
+    conv('a2', 'Exam 2', { project: 'P1', last: 0.1, ideas: ['Accrual basis', 'Adjusting entries'] }),
+    conv('j1', 'Two job offers', { project: 'P2', ideas: ['Monthly runway', 'Better team'], ask: 'Which would you leave for?' }),
+    conv('j2', 'Negotiating', { project: 'P2', ideas: ['Salary band'] }),
+    conv('l1', 'Rent or buy', { ideas: ['Monthly runway'] }),
+    conv('l2', 'Startup idea', { ideas: ['The monthly runway'] }),
+    conv('l3', 'Secret plans', {}),
+    { id: 'k1', title: 'Tax questions', updatedAt: NOW - 5 * DAY, kind: 'core' },
   ];
-  const s = html(h(U.UniverseView, { conversations, activeId: 'a', onOpen: none, onNew: none }));
-  ok('it is the home: every conversation, counted', s.includes('Your Universal Map') && s.includes('2 lines of thinking · 1 chat'));
-  ok('it can be searched', s.includes('Find an idea or a chat'));
-  const empty = html(h(U.UniverseView, { conversations: [], activeId: null, onOpen: none, onNew: none }));
-  ok('with nothing yet, it says what it will be and how to begin', empty.includes('appears here as its own mind graph') && empty.includes('What are you working on?'));
-  const atlas = html(h(U.UniverseView, { conversations, activeId: 'a', onOpen: none, onNew: none, atlas: h('div', null, 'ATLAS') }));
-  ok('signed in, everything remembered is one press away', atlas.includes('Everything remembered'));
+  const E = U.emptyArrangement();
+  const arranged = { ...E, starred: ['j1'], hidden: ['l3'], notes: [{ id: 'n1', x: 40, y: 900, text: 'decide by Friday' }], links: [{ id: 'k', a: 'j1', b: 'a2', label: 'same deadline' }], seen: { hint: true } };
+  const map = html(h(U.UniverseView, { ...base, conversations, projects, initial: arranged }));
+  ok('every Project a frame, an empty one too; then the rest; then Core chats', ['ACCT 2301', 'Job hunt', 'Someday', 'In no Project', 'Chats'].every((n) => map.includes(`>${n}<`)) && map.indexOf('>ACCT 2301<') < map.indexOf('>Job hunt<') && map.includes('Drag a line of thinking here to file it'));
+  ok('every conversation a tile, hidden ones left out', (map.match(/class="l5h-tile /g) ?? []).length === 7 && !map.includes('Secret plans'));
+  ok('the header counts what is on the map', map.includes('COUNT:7'));
+  ok('what three of them share is named between them, a theme', map.includes('Monthly runway') && /l5h-idea is-theme/.test(map));
+  ok('starred is a press away, and marked', map.includes('l5h-starchip') && /l5h-starchip[^>]*title="Two job offers"/.test(map));
+  ok('the person’s notes and links are on the map', map.includes('decide by Friday') && map.includes('same deadline'));
+  ok('a question waiting is marked; the place to pick up glows', map.includes('a question is waiting for you') && /class="l5h-tile [^"]*is-resume/.test(map));
+  ok('a tile says what it is to a screen reader', /aria-label="Two job offers, [^"]*Job hunt/.test(map));
+
+  const cols = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, mode: 'columns' } }));
+  const acct = cols.slice(cols.indexOf('data-col="p:P1"'));
+  ok('columns: one for each Project, its conversations in the order they were begun', (cols.match(/class="l5h-col /g) ?? []).length === 5 && acct.indexOf('Accruals') < acct.indexOf('Exam 2') && cols.includes('Drag a line of thinking here to file it.'));
+
+  const tl = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, mode: 'timeline' } }));
+  ok('a timeline: a lane for each group with something in it, ending at today', tl.includes('l5h-tl-lane') && tl.includes('>Today<') && !/l5h-tl-lane"[^>]*>[^<]*<span[^>]*><\/span>Someday/.test(tl) && tl.includes('>Yesterday<'));
+
+  const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...E, display: { ...E.display, chats: false }, seen: { hint: true } } }));
+  ok('Core chats can be left off the map', !noChats.includes('>Chats<') && !noChats.includes('Tax questions'));
+
+  const list = html(h(U.UniverseView, { ...base, conversations, projects, contents: true, initial: arranged }));
+  ok('the list: starred first, then each Project, counting what is hidden', list.includes('>Starred<') && list.indexOf('>Starred<') < list.indexOf('>ACCT 2301<') && list.includes('7 conversations · 1 hidden'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

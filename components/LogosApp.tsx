@@ -352,6 +352,7 @@ export function LogosApp({
   projects,
   onProjectSettings,
   onCreateProject,
+  onUpdateProject,
   onMoveChat,
   autoSend = false,
   tourAfter = false,
@@ -372,6 +373,8 @@ export function LogosApp({
   onProjectSettings?: (id: string) => void;
   /** make a Project; resolves to its id, or null if it could not be made */
   onCreateProject?: (name: string) => Promise<string | null>;
+  /** rename a Project or change its colour; what went wrong, or null */
+  onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
   onMoveChat?: (id: string, projectId: string | null) => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
@@ -6732,13 +6735,25 @@ export function LogosApp({
       }, 80);
   }
   /** a new line of thinking — the empty one already waiting, if there is one */
-  function newFromHome() {
+  function newFromHome(): boolean {
     const waiting = sessionsRef.current.find((x) => !x.messages.length && !(x.map?.nodes ?? []).length && !foreignIdsRef.current.has(x.id) && !(x.map?.objects?.objs ?? []).length);
     if (waiting) switchSession(waiting.id);
-    else if (!newSession()) return;
+    else if (!newSession()) return false;
     setL5Home(false);
     setL5Mind(false);
     setL5List(false);
+    return true;
+  }
+  /** "Find or start…": a new line of thinking, its first question the words typed there, if any */
+  function startFromHome(text: string) {
+    if (!newFromHome()) return;
+    const said = text.trim();
+    if (said) void send(said);
+  }
+  /** filed from the map: a line of thinking as the rail files it, a Core chat by its host */
+  function fileFromHome(id: string, kind: 'logos' | 'core', projectId: string | null) {
+    if (kind === 'logos') void moveSession(id, projectId);
+    else onMoveChat?.(id, projectId);
   }
   const l5MindView = mindShown ? (
     <MindGraphView
@@ -6768,40 +6783,45 @@ export function LogosApp({
       }
     />
   ) : null;
-  const l5HomeHead = (
-    <L5Header
-      onHome={goHome}
-      eyebrow="Universal Map"
-      title=""
-      stage={null}
-      menu={l5Menu}
-      account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
-      extra={
-        <>
-          <button type="button" className={`l5-unibtn is-list${l5List ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={l5List} title="Every line of thinking, by Project">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-              <path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01" />
-            </svg>
-            <span className="l5-unibtn-l">List</span>
-          </button>
-          <button type="button" className="l5-unibtn is-new" onClick={newFromHome}>
-            <span aria-hidden="true">+</span>
-            <span className="l5-unibtn-l">New</span>
-          </button>
-        </>
-      }
-    />
-  );
   const l5HomeView = homeShown ? (
     <UniverseView
       conversations={universeIn}
+      projects={projects?.map((p) => ({ id: p.id, name: p.name, color: p.color ?? null, createdAt: p.createdAt, archived: p.archived }))}
       activeId={activeId}
-      onOpen={openFromHome}
+      signedIn={!!isSignedIn}
+      narrow={narrow}
+      onOpen={(id) => openFromHome(id)}
       onOpenChat={(id) => onOpenChat?.(id)}
-      onNew={newFromHome}
+      onStart={startFromHome}
+      onFile={cloud ? fileFromHome : undefined}
+      onCreateProject={onCreateProject}
+      onUpdateProject={onUpdateProject}
       onMind={cloud ? () => setL5Mind(true) : undefined}
       contents={l5List}
-      projects={projects?.map((p) => ({ id: p.id, name: p.name }))}
+      head={(center, count) =>
+        chromeHidden ? null : (
+          <L5Header
+            onHome={goHome}
+            eyebrow={count ? `Universal Map · ${count}` : 'Universal Map'}
+            title=""
+            stage={null}
+            center={center}
+            menu={l5Menu}
+            account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
+            extra={
+              <>
+                <button type="button" className={`l5-unibtn is-list${l5List ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={l5List} title="Every conversation, as a list">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                    <path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01" />
+                  </svg>
+                  <span className="l5-unibtn-l">List</span>
+                </button>
+                {cloud && <MindButton onOpen={() => setL5Mind(true)} />}
+              </>
+            }
+          />
+        )
+      }
       atlas={
         cloud ? (
           <MindAtlas
@@ -7119,7 +7139,7 @@ export function LogosApp({
         >
           {railEl}
           <div className="l5-main">
-            {!chromeHidden && !mindShown && (homeShown ? l5HomeHead : l5Head)}
+            {!chromeHidden && !mindShown && !homeShown && l5Head}
             {!chromeHidden && !homeShown && !mindShown && !l5Intake && narrow && <div className="l5x-tabs">{switchEl(true)}</div>}
             <div className="l5-body">{mindShown ? l5MindView : homeShown ? l5HomeView : l5Intake ?? l5Line}</div>
           </div>

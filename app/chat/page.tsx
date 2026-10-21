@@ -185,6 +185,9 @@ interface RailProject {
   name: string;
   archived: boolean;
   updatedAt: number;
+  /** when it was made, and Project Home's colour — how the Universal Map places and draws it */
+  createdAt?: number;
+  color?: string | null;
 }
 
 const FOLDER_ICON = (
@@ -2284,6 +2287,23 @@ export default function ChatPage() {
     }
   }
 
+  /** Rename a Project or change its colour (the Universal Map does both); what went wrong, or null. */
+  async function updateProject(id: string, patch: { name?: string; color?: string | null }): Promise<string | null> {
+    try {
+      const res = await fetch(`/api/projects/${encodeURIComponent(id)}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(patch),
+      });
+      const j = await res.json().catch(() => null);
+      if (!res.ok) return j?.error || 'That Project could not be changed.';
+      await loadProjects();
+      return null;
+    } catch {
+      return 'That Project could not be changed.';
+    }
+  }
+
   async function createFolder() {
     const name = (folderDraft ?? '').replace(/\s+/g, ' ').trim();
     setFolderDraft(null);
@@ -2600,6 +2620,7 @@ export default function ChatPage() {
         projects={isSignedIn && projectsLoaded ? projects : undefined}
         onProjectSettings={(id) => setSheet(id)}
         onCreateProject={createProject}
+        onUpdateProject={updateProject}
         onMoveChat={(id, pid) => void moveChat(id, pid)}
         // Opening one is the same swap the "Socria chat" button makes, with a
         // destination: back to whichever Core model they came from, on that

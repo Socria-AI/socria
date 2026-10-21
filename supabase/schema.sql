@@ -70,6 +70,15 @@ alter table user_profiles
 alter table user_profiles
   add column if not exists conversation_style text;
 
+-- How the person arranged their Universal Map (lib/logos5/arrange.ts): where
+-- they put conversations, the order of each Project, stars, hidden ones, the
+-- links and notes they drew, how the map is shown, and saved views. Only
+-- their choices — never a conversation's words. Read and written whole by
+-- /api/profile, bounded by parseArrangement on the way in and out; the newer
+-- of the browser's copy and this one wins. Safe to re-run.
+alter table user_profiles
+  add column if not exists universal_map jsonb;
+
 
 -- Per-user OAuth connections for Logos "Add context" (Google, Notion).
 -- The token bundle is stored encrypted in `secret` (AES-256-GCM via

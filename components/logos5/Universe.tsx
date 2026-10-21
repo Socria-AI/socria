@@ -1,181 +1,487 @@
 'use client';
 // components/logos5/Universe.tsx — the Universal Map, Logos 5's home.
 //
-// Every conversation merged into one mind map (lib/logos5/universe.ts): each
-// line of thinking drawn as its own small graph, each Core chat as a point,
-// the ideas they share drawn as bridges. Press one to open it, or a card on
-// it to open it there. Drag to move about; the wheel, a pinch or the buttons
-// zoom; "Fit" brings everything back into view. Search dims what does not
-// match. For a signed-in person, "Everything remembered" shows the Mind
-// Atlas in the same place.
+// Every conversation, where the person can see and arrange it
+// (lib/logos5/universe.ts lays it out; lib/logos5/arrange.ts keeps how they
+// arranged it). Three ways to see it — a Map of Project frames, Columns, a
+// Timeline — and, while there are only a few, large cards. One box finds or
+// starts. Pressing a conversation opens its card; pressing again, or
+// Continue, opens it. Everything arranged can be undone.
+//
+// The pieces: UniverseParts.tsx (tiles, cards, the box, menus),
+// UniverseMap.tsx (the map), UniverseBoards.tsx (columns, timeline, cards).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { clusterMatches, universeOf, type Cluster, type UniverseIn } from '@/lib/logos5/universe';
-import { relTime } from '@/lib/logos-sessions';
+import { CHATS, LOOSE, groupKeyOf, groupsOf, resumeOf, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
+import * as A from '@/lib/logos5/arrange';
+import { useArrangement } from './useArrangement';
+import { MapCanvas, type MapActs } from './UniverseMap';
+import { ColumnsBoard, FewCards, TimelineBoard } from './UniverseBoards';
+import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, type Found } from './UniverseParts';
+import './universe.css';
 
-/** "7 topics · 6 ideas" */
-function countSaid(c: Cluster): string {
-  if (c.kind === 'core') return 'Core chat';
-  const topics = c.nodes.filter((n) => n.from === 'topic').length;
-  const ideas = c.nodes.length - topics + c.more;
-  const said = [topics ? `${topics} ${topics === 1 ? 'topic' : 'topics'}` : '', ideas ? `${ideas} ${ideas === 1 ? 'idea' : 'ideas'}` : ''].filter(Boolean).join(' · ');
-  return said || 'no map yet';
+const newId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
+
+/** A change that also filed conversations: undoing it files them back. */
+interface Filing {
+  id: string;
+  kind: 'logos' | 'core';
+  from: string | null;
+  to: string | null;
+}
+interface Step {
+  before: A.Arrangement;
+  after: A.Arrangement;
+  files: Filing[];
 }
 
-/** The cards named on a cluster: the most connected few, so the names never crowd. */
-function labelled(c: Cluster): Set<string> {
-  return new Set(
-    [...c.nodes]
-      .sort((a, b) => b.degree - a.degree || c.nodes.indexOf(a) - c.nodes.indexOf(b))
-      .slice(0, c.r > 70 ? 3 : 2)
-      .map((n) => n.id)
-  );
-}
-
-const clip = (s: string, n: number) => (s.length > n ? s.slice(0, n - 1) + '…' : s);
-
-interface View {
-  x: number;
-  y: number;
-  k: number;
-}
+const MODE_SAID: Record<A.HomeMode, string> = { map: 'Map', columns: 'Columns', timeline: 'Timeline' };
+/** fewer than this, and no arranging done yet: large cards rather than a map */
+const FEW = 5;
 
 export function UniverseView({
   conversations,
+  projects,
   activeId,
+  signedIn = false,
+  narrow = false,
+  head,
   onOpen,
   onOpenChat,
-  onNew,
+  onStart,
+  onFile,
+  onCreateProject,
+  onUpdateProject,
   onMind,
   contents = false,
   atlas,
-  projects,
-  notice,
+  initial,
+  now: nowGiven,
 }: {
   conversations: readonly UniverseIn[];
+  /** the person's Projects; undefined when there are none to have (signed out, or not loaded) */
+  projects?: readonly ProjectIn[];
   activeId: string | null;
-  /** open a line of thinking — and, when a card on it was pressed, that card */
-  onOpen: (id: string, nodeId?: string) => void;
+  signedIn?: boolean;
+  narrow?: boolean;
+  /** the screen's header, given the find-or-start box for its middle and how many conversations are on the map */
+  head?: (center: ReactNode, count: number) => ReactNode;
+  /** open a line of thinking */
+  onOpen: (id: string) => void;
   /** open a Core chat */
   onOpenChat?: (id: string) => void;
-  /** begin a new line of thinking */
-  onNew: () => void;
+  /** begin a new line of thinking — with these words as its first question, when there are any */
+  onStart: (text: string) => void;
+  /** file a conversation in a Project, or take it out of one (null) */
+  onFile?: (id: string, kind: 'logos' | 'core', projectId: string | null) => void;
+  /** make a Project; its id, or null if it could not be made */
+  onCreateProject?: (name: string) => Promise<string | null>;
+  /** rename a Project or give it a colour; what went wrong, or null */
+  onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
   /** the Mind Graph, for a signed-in person */
   onMind?: () => void;
-  /** the contents column: every line of thinking by Project, a press from each */
+  /** the contents column: every conversation, by Project */
   contents?: boolean;
   /** the Mind Atlas, for a signed-in person */
   atlas?: ReactNode;
-  projects?: { id: string; name: string }[];
-  /** above the map: picking up where they left off */
-  notice?: ReactNode;
+  /** start from this arrangement (a test; otherwise it is read from where it is kept) */
+  initial?: A.Arrangement;
+  /** the time to read "recent" against (a test; otherwise now) */
+  now?: number;
 }) {
-  const u = useMemo(() => universeOf(conversations), [conversations]);
-  const [mode, setMode] = useState<'map' | 'atlas'>('map');
+  const { arr, put } = useArrangement(signedIn, initial);
+  const arrRef = useRef(arr);
+  arrRef.current = arr;
+  const tiles = useMemo(() => tilesOf(conversations), [conversations]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  const now = useMemo(() => nowGiven ?? Date.now(), [nowGiven, tiles]);
+  const tileById = useMemo(() => new Map(tiles.map((t) => [t.id, t])), [tiles]);
+  const projectIds = useMemo(() => new Set((projects ?? []).map((p) => p.id)), [projects]);
+  const groups = useMemo(() => groupsOf(tiles, projects, arr), [tiles, projects, arr]);
+  /** every group, whatever is filtered: for choosing which are shown */
+  const allGroups = useMemo(() => groupsOf(tiles, projects, { ...arr, projects: null }), [tiles, projects, arr]);
+  const groupByKey = useMemo(() => new Map(allGroups.map((g) => [g.key, g])), [allGroups]);
+  const hidden = useMemo(() => new Set(arr.hidden), [arr.hidden]);
+  const starredSet = useMemo(() => new Set(arr.starred), [arr.starred]);
+  const keyOf = useCallback((t: Tile) => groupKeyOf(t, projectIds), [projectIds]);
+  const shownCount = groups.reduce((n, g) => n + g.tiles.length, 0);
+  const onMapCount = tiles.filter((t) => !hidden.has(t.id) && (arr.display.chats || t.kind !== 'core')).length;
+
   const [query, setQuery] = useState('');
-  const [project, setProject] = useState<string>('');
-  const [hover, setHover] = useState<string | null>(null);
-  const box = useRef<HTMLDivElement>(null);
-  const [size, setSize] = useState({ w: 0, h: 0 });
-  const [view, setView] = useState<View | null>(null);
-  const fitted = useRef(false);
+  const q = query.trim();
+  const matches = useMemo(() => (q ? new Map(tiles.map((t) => [t.id, tileMatch(t, q)])) : null), [tiles, q]);
+  const matchOf = useMemo(() => (matches ? (id: string) => matches.get(id) ?? null : null), [matches]);
+  const found: Found[] = useMemo(
+    () =>
+      matches
+        ? tiles
+            .filter((t) => matches.get(t.id))
+            .map((t) => ({ tile: t, match: matches.get(t.id)!, hidden: hidden.has(t.id), group: groupByKey.get(keyOf(t))?.name ?? (t.kind === 'core' ? 'Chats' : 'Lines of thinking') }))
+            .sort((x, y) => (x.match.why === 'title' ? 0 : 1) - (y.match.why === 'title' ? 0 : 1) || y.tile.at - x.tile.at)
+        : [],
+    [matches, tiles, hidden, groupByKey, keyOf]
+  );
+  const resume = useMemo(() => resumeOf(tiles.filter((t) => !hidden.has(t.id))), [tiles, hidden]);
+  const starredTiles = useMemo(() => arr.starred.map((id) => tileById.get(id)).filter((t): t is Tile => !!t), [arr.starred, tileById]);
+
+  const [sel, setSel] = useState<string[]>([]);
+  const [preview, setPreview] = useState<{ id: string; at: DOMRect | null } | null>(null);
+  const [linkFrom, setLinkFrom] = useState<string | null>(null);
+  const [editNote, setEditNote] = useState<string | null>(null);
+  const [viewOpen, setViewOpen] = useState(false);
+  const [trayOpen, setTrayOpen] = useState(false);
+  const [atlasOn, setAtlasOn] = useState(false);
+  const [selectMode, setSelectMode] = useState(false);
+  const [fitKey, setFitKey] = useState(0);
+  const [said, setSaid] = useState<string | null>(null);
+  const past = useRef<Step[]>([]);
+  const future = useRef<Step[]>([]);
+  const [, bump] = useState(0);
+  const findRef = useRef<HTMLInputElement>(null);
+  const mainRef = useRef<HTMLDivElement>(null);
+  const center = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
-    const el = box.current;
-    if (!el) return;
-    const measure = () => setSize({ w: el.clientWidth, h: el.clientHeight });
-    measure();
-    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
-    ro?.observe(el);
-    return () => ro?.disconnect();
-  }, [mode]);
+    if (!said) return;
+    const t = setTimeout(() => setSaid(null), 4200);
+    return () => clearTimeout(t);
+  }, [said]);
 
-  /** Everything in view: the scale that fits it, centred. */
-  const fit = useCallback((): View | null => {
-    if (!size.w || !size.h || !u.width) return null;
-    const k = Math.max(0.25, Math.min(1.15, Math.min(size.w / u.width, size.h / u.height) * 0.94));
-    return { k, x: (size.w - u.width * k) / 2, y: (size.h - u.height * k) / 2 };
-  }, [size.w, size.h, u.width, u.height]);
-  useEffect(() => {
-    if (fitted.current && view) return;
-    const f = fit();
-    if (f) {
-      setView(f);
-      fitted.current = true;
+  // ── changes, kept, and undone ──
+  const commit = useCallback(
+    (change: (a: A.Arrangement) => A.Arrangement, files: Filing[] = [], arranged = false) => {
+      const before = arrRef.current;
+      let after = change(before);
+      if (arranged) after = A.markSeen(after, 'hint');
+      if (after === before && !files.length) return;
+      past.current = [...past.current.slice(-59), { before, after, files }];
+      future.current = [];
+      put(after);
+      for (const f of files) onFile?.(f.id, f.kind, f.to);
+      bump((n) => n + 1);
+    },
+    [put, onFile]
+  );
+  /** How the map is shown — which view, labels, colour, order, which Projects — kept, but not among what Undo takes back. */
+  const prefer = useCallback((change: (a: A.Arrangement) => A.Arrangement) => {
+    const before = arrRef.current;
+    const after = change(before);
+    if (after !== before) put(after);
+  }, [put]);
+  const undo = useCallback(() => {
+    const s = past.current.pop();
+    if (!s) return;
+    future.current.push(s);
+    put(s.before);
+    for (const f of [...s.files].reverse()) onFile?.(f.id, f.kind, f.from);
+    bump((n) => n + 1);
+  }, [put, onFile]);
+  const redo = useCallback(() => {
+    const s = future.current.pop();
+    if (!s) return;
+    past.current.push(s);
+    put(s.after);
+    for (const f of s.files) onFile?.(f.id, f.kind, f.to);
+    bump((n) => n + 1);
+  }, [put, onFile]);
+
+  const open = useCallback(
+    (t: Tile) => {
+      setPreview(null);
+      if (t.kind === 'core') onOpenChat?.(t.id);
+      else onOpen(t.id);
+    },
+    [onOpen, onOpenChat]
+  );
+  const openId = (id: string) => {
+    const t = tileById.get(id);
+    if (t) open(t);
+  };
+
+  /** Whether a conversation may live in a group, and the filing that puts it there (null: it is there already). */
+  const filingTo = (t: Tile, to: string): { ok: boolean; file: Filing | null } => {
+    const from = keyOf(t);
+    if (to === from) return { ok: true, file: null };
+    const g = groupByKey.get(to);
+    if (!g) return { ok: false, file: null };
+    if (g.kind === 'project') return onFile && g.projectId ? { ok: true, file: { id: t.id, kind: t.kind, from: t.projectId, to: g.projectId } } : { ok: false, file: null };
+    // out of a Project: a line of thinking to the rest of them, a chat to the chats
+    if ((g.key === LOOSE && t.kind === 'logos') || (g.key === CHATS && t.kind === 'core')) return onFile && t.projectId ? { ok: true, file: { id: t.id, kind: t.kind, from: t.projectId, to: null } } : { ok: true, file: null };
+    return { ok: false, file: null };
+  };
+
+  const fileTo = (ids: readonly string[], projectId: string | null) => {
+    const files: Filing[] = [];
+    for (const id of ids) {
+      const t = tileById.get(id);
+      if (t && (t.projectId ?? null) !== projectId) files.push({ id, kind: t.kind, from: t.projectId, to: projectId });
     }
-  }, [fit, view]);
-  // a new set of conversations (one opened, one added) is fitted again
+    if (files.length) commit((a) => A.unpinTiles(a, ids), files, true);
+  };
+
+  const newProjectWith = async (ids: readonly string[], name: string) => {
+    if (!onCreateProject) return;
+    const pid = await onCreateProject(name);
+    if (!pid) return setSaid('That Project could not be made.');
+    fileTo(ids, pid);
+    setSel([]);
+    setSaid(`“${name}” made, with ${ids.length === 1 ? 'it' : `these ${ids.length}`} in it.`);
+  };
+
+  const projectOf = (key: string) => groupByKey.get(key)?.projectId ?? null;
+
+  // ── the map's hands ──
+  const mapActs: MapActs = {
+    onSelect: (ids, add) => {
+      setSel((cur) => (add ? [...cur.filter((x) => !ids.includes(x)), ...ids.filter((x) => !cur.includes(x))] : ids));
+      if (!add && ids.length !== 1) setPreview(null);
+    },
+    onPreview: (id, at) => setPreview(id ? { id, at } : null),
+    onOpen: openId,
+    onDrop: (moves, others) => {
+      const files: Filing[] = [];
+      const pins: { id: string; g: string; x: number; y: number }[] = [];
+      const unpin: string[] = [];
+      let refused = false;
+      const within: typeof moves = [];
+      for (const m of moves) {
+        const t = tileById.get(m.id);
+        if (!t) continue;
+        const f = filingTo(t, m.to);
+        if (!f.ok) {
+          refused = true;
+          continue;
+        }
+        // put down in its own frame, it stays where it was put; filed elsewhere, it joins that frame's order
+        if (m.to === keyOf(t)) {
+          pins.push({ id: m.id, g: m.to, x: m.x, y: m.y });
+          within.push(m);
+        } else unpin.push(m.id);
+        if (f.file) files.push(f.file);
+      }
+      // once a frame is arranged by hand, the others in it stay where they are rather than closing the gap
+      const arranged = new Set(within.map((m) => m.to));
+      const placed = [...pins];
+      for (const o of others) if (arranged.has(o.g)) pins.unshift({ id: o.id, g: o.g, x: o.x, y: o.y });
+      // on the grid, one put down on another's place trades places with it
+      if (arrRef.current.display.snap && within.length === 1) {
+        const m = within[0];
+        const at = [...others.filter((o) => o.g === m.to), ...Object.entries(arrRef.current.pins).filter(([, p]) => p.g === m.to).map(([id, p]) => ({ id, g: p.g, x: p.x, y: p.y }))];
+        const there = at.find((o) => o.id !== m.id && o.x === m.x && o.y === m.y);
+        if (there && !placed.some((p) => p.id === there.id)) pins.push({ id: there.id, g: m.to, x: m.fx, y: m.fy });
+      }
+      if (refused) setSaid(signedIn ? 'A Core chat lives in Chats or a Project; a line of thinking in a Project or with the rest.' : 'Sign in to file conversations in Projects.');
+      if (!pins.length && !unpin.length) return;
+      commit(
+        (a) => {
+          let next = A.unpinTiles(a, unpin);
+          for (const p of pins) next = A.pinTile(next, p.id, p.g, p.x, p.y);
+          return next;
+        },
+        files,
+        true
+      );
+    },
+    onMoveFrame: (key, dx, dy) => (dx || dy) && commit((a) => A.moveFrame(a, key, dx, dy), [], true),
+    onFrameCols: (key, cols) => commit((a) => A.setFrame(a, key, { cols }), [], true),
+    onFold: (key, folded) => commit((a) => A.setFrame(a, key, { collapsed: folded }), [], true),
+    onRename: onUpdateProject
+      ? (key, name) => {
+          const pid = projectOf(key);
+          if (pid) void onUpdateProject(pid, { name }).then((err) => err && setSaid(err));
+        }
+      : undefined,
+    onColor: onUpdateProject
+      ? (key, color) => {
+          const pid = projectOf(key);
+          if (pid) void onUpdateProject(pid, { color }).then((err) => err && setSaid(err));
+        }
+      : undefined,
+    onNote: (x, y) => {
+      const id = newId('n');
+      commit((a) => A.addNote(a, { id, x: x - 40, y: y - 20, text: 'A note' }), [], true);
+      setEditNote(id);
+    },
+    onNoteEdit: (id, text) => commit((a) => A.editNote(a, id, text)),
+    onNoteMove: (id, x, y) => commit((a) => A.moveNote(a, id, x, y), [], true),
+    onLinkTo: (id) => {
+      const from = linkFrom;
+      setLinkFrom(null);
+      if (!from || from === id) return;
+      commit((a) => A.addLink(a, { id: newId('l'), a: from, b: id, label: '' }), [], true);
+      setSaid('Linked. Press the ⟷ on the line to say what joins them.');
+    },
+    onLinkEdit: (id, label) => commit((a) => (label === null ? A.removeLink(a, id) : A.relabelLink(a, id, label))),
+  };
+
+  // ── the columns' hands ──
+  const showing = () => Object.fromEntries(allGroups.map((g) => [g.key, g.tiles.map((t) => t.id)]));
+  const moveCard = (id: string, to: string, at: number) => {
+    const t = tileById.get(id);
+    if (!t) return;
+    const f = filingTo(t, to);
+    if (!f.ok) return setSaid(signedIn ? 'A Core chat lives in Chats or a Project; a line of thinking in a Project or with the rest.' : 'Sign in to file conversations in Projects.');
+    const list = (groupByKey.get(to)?.tiles ?? []).map((x) => x.id);
+    const next = A.placeInOrder(list, id, at);
+    commit((a) => A.unpinTiles(A.setOrder(a, { [to]: next }, showing()), [id]), f.file ? [f.file] : [], true);
+  };
+  const moveColumn = (key: string, at: number) => {
+    const all = allGroups.map((g) => g.key);
+    const others = groups.map((g) => g.key).filter((k) => k !== key);
+    const before = others[at];
+    const rest = all.filter((k) => k !== key);
+    commit((a) => A.moveGroup(a, all, key, before ? rest.indexOf(before) : rest.length), [], true);
+  };
+
+  // ── keys anywhere on the map: / finds, ⌘Z undoes, Escape lets go ──
   useEffect(() => {
-    fitted.current = false;
-    setView(null);
-  }, [u.width, u.height]);
-
-  const zoomAt = (f: number, px = size.w / 2, py = size.h / 2) =>
-    setView((v) => {
-      if (!v) return v;
-      const k = Math.max(0.2, Math.min(3, v.k * f));
-      return { k, x: px - ((px - v.x) * k) / v.k, y: py - ((py - v.y) * k) / v.k };
-    });
-
-  // dragging moves the map; two fingers pinch it
-  const pointers = useRef(new Map<number, { x: number; y: number }>());
-  const drag = useRef<{ x: number; y: number; vx: number; vy: number; pinch?: number } | null>(null);
-
-  const shown = (c: Cluster) => clusterMatches(c, query) && (!project || c.projectId === project);
-  const found = u.clusters.filter(shown);
-  const byId = useMemo(() => new Map(u.clusters.map((c) => [c.id, c])), [u.clusters]);
-  const lines = u.clusters.filter((c) => c.kind === 'logos').length;
-  const chats = u.clusters.length - lines;
-  const open = (c: Cluster, node?: string) => (c.kind === 'core' ? onOpenChat?.(c.id) : onOpen(c.id, node));
-
-  // the contents column: every conversation by its Project, chats last, newest first in each
-  const groups = (() => {
-    const named = new Map((projects ?? []).map((p) => [p.id, p.name]));
-    const out: { key: string; name: string; items: Cluster[] }[] = [];
-    const add = (key: string, name: string, c: Cluster) => {
-      let g = out.find((x) => x.key === key);
-      if (!g) out.push((g = { key, name, items: [] }));
-      g.items.push(c);
+    const onKey = (e: KeyboardEvent) => {
+      const el = e.target as HTMLElement | null;
+      const typing = !!el?.closest?.('input, textarea, [contenteditable="true"]');
+      if (e.key === 'Escape') {
+        if (linkFrom) setLinkFrom(null);
+        else if (preview) setPreview(null);
+        else if (sel.length) setSel([]);
+        else if (selectMode) setSelectMode(false);
+        return;
+      }
+      if (typing) return;
+      if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
+        e.preventDefault();
+        findRef.current?.focus();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+      } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'y') {
+        e.preventDefault();
+        redo();
+      }
     };
-    for (const c of u.clusters) {
-      if (!shown(c)) continue;
-      if (c.kind === 'core') add('core', 'Chats', c);
-      else if (c.projectId && named.has(c.projectId)) add(`p:${c.projectId}`, named.get(c.projectId)!, c);
-      else add('none', 'Lines of thinking', c);
-    }
-    const rank = (k: string) => (k === 'none' ? 1 : k === 'core' ? 2 : 0);
-    return out.sort((a, b) => rank(a.key) - rank(b.key));
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [linkFrom, preview, sel.length, selectMode, undo, redo]);
+
+  // a conversation gone from the map is no longer chosen
+  useEffect(() => {
+    setSel((cur) => (cur.every((id) => tileById.has(id) && !hidden.has(id)) ? cur : cur.filter((id) => tileById.has(id) && !hidden.has(id))));
+  }, [tileById, hidden]);
+
+  const few =
+    arr.mode === 'map' &&
+    shownCount > 0 &&
+    shownCount < FEW &&
+    !Object.keys(arr.pins).length &&
+    !arr.notes.length &&
+    !arr.links.length &&
+    !Object.values(arr.frames).some((f) => f.dx || f.dy || f.cols || f.collapsed);
+
+  // ── the card beside a pressed conversation ──
+  const previewTile = preview ? tileById.get(preview.id) ?? null : null;
+  const pvStyle = (() => {
+    if (!preview?.at || narrow || !mainRef.current) return undefined;
+    const box = mainRef.current.getBoundingClientRect();
+    const W = 344;
+    const a = preview.at;
+    const right = a.right + 12 + W <= box.right - 8;
+    const left = right ? a.right - box.left + 12 : Math.max(8, a.left - box.left - W - 12);
+    const top = Math.max(64, Math.min(a.top - box.top, box.height - 420));
+    return { left, top, width: W };
   })();
+  const previewEl =
+    previewTile && preview ? (
+      <PreviewCard
+        tile={previewTile}
+        group={groupByKey.get(keyOf(previewTile)) ?? null}
+        starred={starredSet.has(previewTile.id)}
+        pinned={arr.mode === 'map' && !!arr.pins[previewTile.id]}
+        projects={(projects ?? []).filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name }))}
+        links={arr.links
+          .filter((l) => l.a === previewTile.id || l.b === previewTile.id)
+          .map((l) => ({ id: l.id, title: tileById.get(l.a === previewTile.id ? l.b : l.a)?.title ?? 'a conversation no longer here', label: l.label }))}
+        style={pvStyle}
+        sheet={narrow}
+        acts={{
+          onOpen: () => open(previewTile),
+          onStar: () => commit((a) => A.setIn(a, 'starred', [previewTile.id], !starredSet.has(previewTile.id))),
+          onHide: () => {
+            commit((a) => A.setIn(a, 'hidden', [previewTile.id], true));
+            setPreview(null);
+            setSaid(`“${previewTile.title}” is hidden — View, then Hidden, brings it back.`);
+          },
+          onLink:
+            arr.mode === 'map' && !few
+              ? () => {
+                  setLinkFrom(previewTile.id);
+                  setPreview(null);
+                }
+              : undefined,
+          onUnpin: () => commit((a) => A.unpinTiles(a, [previewTile.id]), [], true),
+          onMove: onFile && projects?.length ? (pid) => fileTo([previewTile.id], pid) : undefined,
+          onNewProject: onFile && onCreateProject && projects ? (name) => void newProjectWith([previewTile.id], name) : undefined,
+          onClose: () => setPreview(null),
+        }}
+      />
+    ) : null;
+
+  // ── the box that finds or starts ──
+  const findEl = (
+    <FindOrStart
+      query={query}
+      onQuery={setQuery}
+      found={found}
+      resume={resume}
+      inputRef={findRef}
+      onPick={(t) => {
+        setQuery('');
+        open(t);
+      }}
+      onStart={(text) => {
+        setQuery('');
+        onStart(text);
+      }}
+    />
+  );
+
+  // ── the list column ──
   const contentsEl = contents ? (
     <aside className="l5c" aria-label="Contents">
       <div className="l5c-head">
         <span className="l5c-k">Contents</span>
         <h2>Your Universal Map</h2>
-        <p>{lines} {lines === 1 ? 'line of thinking' : 'lines of thinking'}{u.bridges.length ? ` · ${u.bridges.length} shared ${u.bridges.length === 1 ? 'idea' : 'ideas'}` : ''}</p>
+        <p>
+          {onMapCount} {onMapCount === 1 ? 'conversation' : 'conversations'}
+          {arr.hidden.length ? ` · ${arr.hidden.length} hidden` : ''}
+        </p>
       </div>
-      <label className="l5c-find">
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-          <circle cx="11" cy="11" r="6.5" />
-          <path d="M16 16l4 4" />
-        </svg>
-        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find an idea or a chat" aria-label="Find an idea or a chat" />
-      </label>
       <div className="l5c-list">
-        {groups.map((g) => (
-          <div key={g.key} className="l5c-group">
-            <span className="l5c-k">{g.name}</span>
-            {g.items.map((c) => (
-              <button key={c.id} type="button" className={`l5c-item${c.id === activeId ? ' is-here' : ''}`} onClick={() => open(c)} onMouseEnter={() => setHover(c.id)} onMouseLeave={() => setHover((h) => (h === c.id ? null : h))}>
-                <span className="l5c-t">{c.title}</span>
-                <span className="l5c-s">
-                  {countSaid(c)}
-                  {c.at ? ` · ${relTime(c.at)}` : ''}
-                </span>
+        {starredTiles.length > 0 && !q && (
+          <div className="l5c-group">
+            <span className="l5c-k">Starred</span>
+            {starredTiles.map((t) => (
+              <button key={t.id} type="button" className={`l5c-item${t.id === activeId ? ' is-here' : ''}`} onClick={() => open(t)}>
+                <span className="l5c-t">{t.title}</span>
+                <span className="l5c-s">{kindLine(t)}</span>
               </button>
             ))}
           </div>
-        ))}
-        {!groups.length && <p className="l5c-none">{u.clusters.length ? 'Nothing matches.' : 'Nothing here yet — each line of thinking you begin is listed here.'}</p>}
+        )}
+        {groups.map((g) => {
+          const list = matchOf ? g.tiles.filter((t) => matchOf(t.id)) : g.tiles;
+          if (!list.length) return null;
+          return (
+            <div key={g.key} className="l5c-group">
+              <span className="l5c-k">{g.name}</span>
+              {list.map((t) => (
+                <button key={t.id} type="button" className={`l5c-item${t.id === activeId ? ' is-here' : ''}`} onClick={() => open(t)}>
+                  <span className="l5c-t">{t.title}</span>
+                  <span className="l5c-s">{kindLine(t)}</span>
+                </button>
+              ))}
+            </div>
+          );
+        })}
+        {!groups.some((g) => (matchOf ? g.tiles.some((t) => matchOf(t.id)) : g.tiles.length)) && <p className="l5c-none">{tiles.length ? 'Nothing matches.' : 'Nothing here yet — each line of thinking you begin is listed here.'}</p>}
       </div>
       {onMind && (
         <button type="button" className="l5c-mind" onClick={onMind}>
@@ -185,231 +491,252 @@ export function UniverseView({
     </aside>
   ) : null;
 
+  // ── what the map shows ──
+  let body: ReactNode;
+  if (atlasOn && atlas)
+    body = (
+      <div className="l5h-atlas">
+        <button type="button" className="l5h-btn l5h-back" onClick={() => setAtlasOn(false)}>
+          ← Back to the map
+        </button>
+        {atlas}
+      </div>
+    );
+  else if (!tiles.length)
+    body = (
+      <div className="l5h-empty">
+        <p>Every line of thinking you start appears here — by Project, as a map you can arrange.</p>
+        <button type="button" className="l5h-go" onClick={() => onStart('')}>
+          What are you working on? <span aria-hidden="true">→</span>
+        </button>
+      </div>
+    );
+  else if (!shownCount)
+    body = (
+      <div className="l5h-empty">
+        <p>Nothing is shown with the map set this way.</p>
+        <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setDisplay(A.setProjects(a, null), { chats: true }))}>
+          Show everything
+        </button>
+      </div>
+    );
+  else if (few) body = <FewCards groups={groups} arr={arr} now={now} activeId={activeId} matchOf={matchOf} onOpen={openId} onPreview={(id, el) => setPreview({ id, at: el.getBoundingClientRect() })} />;
+  else if (arr.mode === 'columns')
+    body = (
+      <ColumnsBoard
+        groups={groups}
+        arr={arr}
+        now={now}
+        activeId={activeId}
+        matchOf={matchOf}
+        onOpen={openId}
+        onPreview={(id, el) => setPreview({ id, at: el.getBoundingClientRect() })}
+        onMoveCard={moveCard}
+        onMoveColumn={moveColumn}
+        onFold={(key, folded) => commit((a) => A.setFrame(a, key, { collapsed: folded }))}
+      />
+    );
+  else if (arr.mode === 'timeline') body = <TimelineBoard groups={groups} arr={arr} now={now} matchOf={matchOf} onOpen={openId} onPreview={(id, el) => setPreview({ id, at: el.getBoundingClientRect() })} />;
+  else
+    body = (
+      <MapCanvas
+        groups={groups}
+        tileById={tileById}
+        arr={arr}
+        now={now}
+        activeId={activeId}
+        resumeId={resume?.id ?? null}
+        selected={sel}
+        matchOf={matchOf}
+        linkFrom={linkFrom}
+        editNote={editNote}
+        setEditNote={setEditNote}
+        selectMode={selectMode}
+        fitKey={fitKey}
+        centerRef={center}
+        top={narrow ? (resume || starredTiles.length ? 104 : 58) : 64}
+        narrow={narrow}
+        acts={mapActs}
+      />
+    );
+
+  const isMap = arr.mode === 'map' && !few && !atlasOn && shownCount > 0;
+  const selPinned = sel.some((id) => !!arr.pins[id]);
+
   return (
-    <section className={`l5u${contents ? ' has-contents' : ''}`} aria-label="Universal Map">
-      {contentsEl}
-      <div className="l5u-main">
-      {/* with the contents open, the bar keeps only what the contents do not have */}
-      {(!contents || (mode === 'map' && !!projects?.length) || !!onMind || !!atlas) && (
-      <div className={`l5u-bar${contents ? ' is-slim' : ''}`}>
-        <div className="l5u-title">
-          <h2>Your Universal Map</h2>
-          <p>
-            {mode === 'atlas'
-              ? 'Everything Socria remembers, across every chat'
-              : u.clusters.length
-                ? [`${lines} ${lines === 1 ? 'line of thinking' : 'lines of thinking'}`, chats ? `${chats} ${chats === 1 ? 'chat' : 'chats'}` : '', u.bridges.length ? `${u.bridges.length} shared ${u.bridges.length === 1 ? 'idea' : 'ideas'}` : ''].filter(Boolean).join(' · ')
-                : 'Everything you think through here becomes part of one map'}
-          </p>
-        </div>
-        <div className="l5u-tools">
-          {mode === 'map' && u.clusters.length > 0 && !contents && (
-            <label className="l5u-search">
-              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="6.5" />
-                <path d="M16 16l4 4" />
-              </svg>
-              <input
-                type="search"
-                value={query}
-                placeholder="Find an idea or a chat"
-                aria-label="Find an idea or a chat"
-                onChange={(e) => setQuery(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && query.trim() && found[0]) open(found[0]);
-                }}
-              />
-              {query.trim() && <span className="l5u-found">{found.length}</span>}
-            </label>
+    <section className={`l5h${narrow ? ' is-narrow' : ''}${contents ? ' has-contents' : ''}`} aria-label="Universal Map">
+      {head?.(narrow ? null : findEl, onMapCount)}
+      {narrow && <div className="l5h-findrow">{findEl}</div>}
+      <div className="l5h-body">
+        {contentsEl}
+        <div className="l5h-main" ref={mainRef}>
+          {tiles.length > 0 && !atlasOn && (
+            <div className="l5h-bar">
+              <div className="l5h-seg is-modes" role="radiogroup" aria-label="Show as">
+                {A.MODES.map((m) => (
+                  <button
+                    key={m}
+                    type="button"
+                    role="radio"
+                    aria-checked={arr.mode === m}
+                    className={arr.mode === m ? 'is-on' : ''}
+                    onClick={() => {
+                      setPreview(null);
+                      setSel([]);
+                      prefer((a) => A.setMode(a, m));
+                      if (m === 'map') setFitKey((k) => k + 1);
+                    }}
+                  >
+                    {MODE_SAID[m]}
+                  </button>
+                ))}
+              </div>
+              {(resume || starredTiles.length > 0) && (
+                <div className="l5h-strip" aria-label="Pick up, and starred">
+                  {resume && (
+                    <button type="button" className="l5h-pick" onClick={() => open(resume)} title={`Pick up where you left off: ${resume.title}`}>
+                      <Glyph look={resume.look} size={13} />
+                      <span className="l5h-pick-k">Pick up where you left off</span>
+                      <span className="l5h-pick-t">{resume.title}</span>
+                      <span aria-hidden="true">→</span>
+                    </button>
+                  )}
+                  {starredTiles.map((t) => (
+                    <button key={t.id} type="button" className="l5h-starchip" onClick={() => open(t)} title={t.title}>
+                      <StarMark />
+                      <span>{t.title}</span>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="l5h-bar-r">
+                {isMap && (
+                  <button type="button" className={`l5h-tool is-select${selectMode ? ' is-on' : ''}`} aria-pressed={selectMode} onClick={() => setSelectMode((v) => !v)} title="Choose several: drag across them (or hold Shift and drag)">
+                    <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeDasharray="3 2.4" aria-hidden="true">
+                      <rect x="4" y="4" width="16" height="16" rx="2" />
+                    </svg>
+                    <span className="l5h-tool-l">Select</span>
+                  </button>
+                )}
+                <button type="button" className="l5h-tool" onClick={undo} disabled={!past.current.length} aria-label="Undo" title="Undo (⌘Z)">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M9 14L4 9l5-5M4 9h10a6 6 0 0 1 0 12h-3" />
+                  </svg>
+                </button>
+                <button type="button" className="l5h-tool is-redo" onClick={redo} disabled={!future.current.length} aria-label="Redo" title="Redo (⇧⌘Z)">
+                  <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />
+                  </svg>
+                </button>
+                <button type="button" className={`l5h-tool l5h-viewbtn${viewOpen ? ' is-on' : ''}`} aria-expanded={viewOpen} onClick={() => setViewOpen((v) => !v)}>
+                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+                    <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4.5v5M8 14.5v5" />
+                  </svg>
+                  <span className="l5h-tool-l">View</span>
+                </button>
+              </div>
+            </div>
           )}
-          {mode === 'map' && projects && projects.length > 0 && (
-            <select className="l5u-select" value={project} onChange={(e) => setProject(e.target.value)} aria-label="Project">
-              <option value="">All projects</option>
-              {projects.map((p) => (
-                <option key={p.id} value={p.id}>
-                  {p.name}
-                </option>
-              ))}
-            </select>
+          {body}
+          {viewOpen && (
+            <ViewMenu
+              arr={arr}
+              groups={allGroups.map((g) => ({ key: g.key, name: g.name }))}
+              hiddenCount={arr.hidden.filter((id) => tileById.has(id)).length}
+              onDisplay={(patch) => prefer((a) => A.setDisplay(a, patch))}
+              onSort={(s) => prefer((a) => A.setSort(a, s))}
+              onProjects={(keys) => prefer((a) => A.setProjects(a, keys))}
+              onSaveView={(name) => {
+                commit((a) => A.saveView(a, newId('v'), name, query));
+                setSaid(`Saved “${name}”.`);
+              }}
+              onApplyView={(id) => {
+                const v = arr.views.find((x) => x.id === id);
+                prefer((a) => A.applyView(a, id));
+                setQuery(v?.query ?? '');
+                setFitKey((k) => k + 1);
+                setViewOpen(false);
+              }}
+              onRemoveView={(id) => commit((a) => A.removeView(a, id))}
+              onTray={() => {
+                setTrayOpen(true);
+                setViewOpen(false);
+              }}
+              onNote={
+                isMap
+                  ? () => {
+                      setViewOpen(false);
+                      mapActs.onNote(center.current.x, center.current.y);
+                    }
+                  : undefined
+              }
+              onTidy={isMap && Object.keys(arr.pins).length ? () => commit((a) => A.tidy(a), [], true) : undefined}
+              onReset={() => {
+                commit((a) => A.resetLayout(a), [], true);
+                setFitKey((k) => k + 1);
+              }}
+              onAtlas={
+                atlas
+                  ? () => {
+                      setAtlasOn(true);
+                      setViewOpen(false);
+                    }
+                  : undefined
+              }
+              onClose={() => setViewOpen(false)}
+            />
           )}
-          {onMind && (
-            <button type="button" className="l5u-mind" onClick={onMind}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="12" cy="12.5" r="3.2" />
-                <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8M12 4.5l-2.2-1.6M12 4.5l2.2-1.6M5.1 17l-1.9.2M18.9 17l1.9.2" />
-              </svg>
-              Mind Graph
-            </button>
+          {trayOpen && (
+            <HiddenTray
+              tiles={arr.hidden.map((id) => tileById.get(id)).filter((t): t is Tile => !!t)}
+              onShow={(id) => commit((a) => A.setIn(a, 'hidden', [id], false))}
+              onShowAll={() => {
+                commit((a) => A.setIn(a, 'hidden', a.hidden, false));
+                setTrayOpen(false);
+              }}
+              onClose={() => setTrayOpen(false)}
+            />
           )}
-          {atlas && (
-            <div className="l5u-seg" role="tablist" aria-label="Show">
-              <button type="button" role="tab" aria-selected={mode === 'map'} className={mode === 'map' ? 'is-on' : ''} onClick={() => setMode('map')}>
-                Map
-              </button>
-              <button type="button" role="tab" aria-selected={mode === 'atlas'} className={mode === 'atlas' ? 'is-on' : ''} onClick={() => setMode('atlas')}>
-                Everything remembered
+          {previewEl}
+          {sel.length > 1 && (
+            <ActionBar
+              count={sel.length}
+              pinned={selPinned}
+              projects={(projects ?? []).filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name }))}
+              onNewProject={onFile && onCreateProject && projects ? (name) => void newProjectWith(sel, name) : undefined}
+              onMove={onFile && projects ? (pid) => fileTo(sel, pid) : undefined}
+              onStar={() => commit((a) => A.setIn(a, 'starred', sel, true))}
+              onHide={() => {
+                commit((a) => A.setIn(a, 'hidden', sel, true));
+                setSaid(`${sel.length} hidden — View, then Hidden, brings them back.`);
+                setSel([]);
+              }}
+              onUnpin={() => commit((a) => A.unpinTiles(a, sel), [], true)}
+              onClear={() => setSel([])}
+            />
+          )}
+          {linkFrom && (
+            <div className="l5h-banner" role="status">
+              Press the conversation to link “{tileById.get(linkFrom)?.title}” to.{' '}
+              <button type="button" className="l5h-link" onClick={() => setLinkFrom(null)}>
+                Cancel
               </button>
             </div>
           )}
-        </div>
-      </div>
-      )}
-      {notice}
-      {mode === 'atlas' && atlas ? (
-        <div className="l5u-atlas">{atlas}</div>
-      ) : u.clusters.length === 0 ? (
-        <div className="l5u-empty">
-          <p>Every line of thinking you start appears here as its own mind graph, and what they share joins them into one map.</p>
-          <button type="button" className="l5s-go" onClick={onNew}>
-            What are you working on? <span aria-hidden="true">→</span>
-          </button>
-        </div>
-      ) : (
-        <div
-          className="l5u-canvas"
-          ref={box}
-          onPointerDown={(e) => {
-            pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            if ((e.target as Element).closest('[data-open]') && pointers.current.size === 1) return;
-            const pts = [...pointers.current.values()];
-            drag.current = { x: e.clientX, y: e.clientY, vx: view?.x ?? 0, vy: view?.y ?? 0, ...(pts.length === 2 ? { pinch: Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y) } : {}) };
-            (e.currentTarget as HTMLElement).setPointerCapture?.(e.pointerId);
-          }}
-          onPointerMove={(e) => {
-            if (!pointers.current.has(e.pointerId)) return;
-            pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-            const d = drag.current;
-            if (!d) return;
-            const pts = [...pointers.current.values()];
-            if (pts.length === 2 && d.pinch) {
-              const now = Math.hypot(pts[0].x - pts[1].x, pts[0].y - pts[1].y);
-              const r = box.current?.getBoundingClientRect();
-              zoomAt(now / d.pinch, (pts[0].x + pts[1].x) / 2 - (r?.left ?? 0), (pts[0].y + pts[1].y) / 2 - (r?.top ?? 0));
-              d.pinch = now;
-              return;
-            }
-            setView((v) => (v ? { ...v, x: d.vx + e.clientX - d.x, y: d.vy + e.clientY - d.y } : v));
-          }}
-          onPointerUp={(e) => {
-            pointers.current.delete(e.pointerId);
-            if (!pointers.current.size) drag.current = null;
-          }}
-          onPointerCancel={(e) => {
-            pointers.current.delete(e.pointerId);
-            drag.current = null;
-          }}
-          onWheel={(e) => {
-            const r = box.current?.getBoundingClientRect();
-            zoomAt(e.deltaY > 0 ? 1 / 1.12 : 1.12, e.clientX - (r?.left ?? 0), e.clientY - (r?.top ?? 0));
-          }}
-        >
-          {view && (
-            <svg className="l5u-svg" width="100%" height="100%" role="list" aria-label="Your conversations">
-              <g transform={`translate(${view.x},${view.y}) scale(${view.k})`}>
-                <g className="l5u-bridges">
-                  {u.bridges.map((b, i) => {
-                    const A = byId.get(b.a.cluster);
-                    const B = byId.get(b.b.cluster);
-                    if (!A || !B) return null;
-                    const na = b.a.node ? A.nodes.find((n) => n.id === b.a.node) : null;
-                    const nb = b.b.node ? B.nodes.find((n) => n.id === b.b.node) : null;
-                    const x1 = A.x + (na?.x ?? 0);
-                    const y1 = A.y + (na?.y ?? 0);
-                    const x2 = B.x + (nb?.x ?? 0);
-                    const y2 = B.y + (nb?.y ?? 0);
-                    const lit = hover === A.id || hover === B.id;
-                    const dim = !shown(A) || !shown(B);
-                    const cy = (y1 + y2) / 2 - Math.min(80, Math.abs(x2 - x1) * 0.18);
-                    return (
-                      <g key={i} className={`l5u-bridge${lit ? ' is-lit' : ''}${dim ? ' is-dim' : ''}`}>
-                        <path d={`M${x1},${y1} Q${(x1 + x2) / 2},${cy} ${x2},${y2}`}>
-                          <title>Both talk about “{b.says}”</title>
-                        </path>
-                        {i < 8 && (
-                          <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - Math.min(80, Math.abs(x2 - x1) * 0.18) / 2 - 8} textAnchor="middle">
-                            both talk about “{b.says.length > 24 ? b.says.slice(0, 23) + '…' : b.says}”
-                          </text>
-                        )}
-                      </g>
-                    );
-                  })}
-                </g>
-                {u.clusters.map((c) => {
-                  const on = c.id === activeId;
-                  const dim = !shown(c);
-                  const names = labelled(c);
-                  return (
-                    <g
-                      key={c.id}
-                      role="listitem"
-                      className={`l5u-c is-${c.kind}${on ? ' is-here' : ''}${!c.nodes.length ? ' is-bare' : ''}${dim ? ' is-dim' : ''}`}
-                      transform={`translate(${c.x},${c.y})`}
-                      onPointerEnter={() => setHover(c.id)}
-                      onPointerLeave={() => setHover((h) => (h === c.id ? null : h))}
-                    >
-                      <circle
-                        r={c.r + (c.nodes.length ? 16 : 10)}
-                        className="l5u-halo"
-                        data-open
-                        role="button"
-                        tabIndex={dim ? -1 : 0}
-                        aria-label={`Open “${c.title}” — ${countSaid(c)}`}
-                        onClick={() => open(c)}
-                        onKeyDown={(e) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), open(c))}
-                      >
-                        <title>{`${c.title} — ${countSaid(c)}${c.at ? `, ${relTime(c.at)}` : ''}`}</title>
-                      </circle>
-                      {c.edges.map((e, i) => {
-                        const a = c.nodes.find((n) => n.id === e.from);
-                        const b = c.nodes.find((n) => n.id === e.to);
-                        return a && b ? <line key={i} x1={a.x} y1={a.y} x2={b.x} y2={b.y} /> : null;
-                      })}
-                      {c.nodes.map((n) => {
-                        // a few names, set outward from the middle so they never sit on each other; the rest on hover
-                        const r = 3.5 + Math.min(4.5, n.degree);
-                        const side = Math.abs(n.x) < 12 ? 'middle' : n.x > 0 ? 'start' : 'end';
-                        return (
-                          <g key={n.id} transform={`translate(${n.x},${n.y})`} className={`l5u-n is-${n.from}`} data-open onClick={() => open(c, n.from === 'idea' ? n.id : undefined)}>
-                            <circle r={r} />
-                            {names.has(n.id) && (
-                              <text x={side === 'start' ? r + 4 : side === 'end' ? -r - 4 : 0} y={side === 'middle' ? (n.y > 0 || (n.x === 0 && n.y === 0) ? r + 12 : -r - 5) : 3.5} textAnchor={side}>
-                                {clip(n.label, 20)}
-                              </text>
-                            )}
-                            <title>{n.label}</title>
-                          </g>
-                        );
-                      })}
-                      {!c.nodes.length && <circle r={c.kind === 'core' ? 5 : 7} className="l5u-seed" />}
-                      <text className="l5u-t" y={c.r + (c.nodes.length ? 32 : 24)} textAnchor="middle">
-                        {clip(c.title, c.kind === 'core' ? 26 : 32)}
-                      </text>
-                      <text className="l5u-s" y={c.r + (c.nodes.length ? 47 : 38)} textAnchor="middle">
-                        {countSaid(c)}
-                        {c.at ? ` · ${relTime(c.at)}` : ''}
-                      </text>
-                    </g>
-                  );
-                })}
-              </g>
-            </svg>
+          {isMap && !arr.seen.hint && !linkFrom && sel.length < 2 && (
+            <p className="l5h-hint">
+              Drag to arrange — into another Project to file it · double-click to write a note · pinch or ⌘-scroll to zoom
+              <button type="button" className="l5h-x" aria-label="Got it" onClick={() => prefer((a) => A.markSeen(a, 'hint'))}>
+                ×
+              </button>
+            </p>
           )}
-          <div className="l5u-zoom">
-            <button type="button" aria-label="Zoom out" onClick={() => zoomAt(1 / 1.25)}>
-              −
-            </button>
-            <button type="button" aria-label="Zoom in" onClick={() => zoomAt(1.25)}>
-              +
-            </button>
-            <button type="button" className="is-fit" onClick={() => setView(fit())}>
-              Fit
-            </button>
-          </div>
-          <p className="l5u-hint" aria-hidden="true">
-            Press a map to open it · drag to move
-          </p>
+          {said && (
+            <p className="l5h-said" role="status">
+              {said}
+            </p>
+          )}
         </div>
-      )}
       </div>
     </section>
   );

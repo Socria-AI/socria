@@ -37,7 +37,7 @@ page.on('pageerror', (e) => errors.push(String(e).slice(0, 300)));
 page.on('console', (m) => m.type() === 'error' && !/clerk|Failed to load resource|net::ERR|Warning:/i.test(m.text()) && errors.push('console: ' + m.text().slice(0, 300)));
 await page.request.post(`${BASE}/api/access/unlock`, { data: { code: 'localdevcode1234567' } });
 await page.goto(`${BASE}/chat?model=logos-3`, { waitUntil: 'domcontentloaded' });
-await page.waitForSelector('.lg-composer textarea, .l5s-ask textarea, .l5u', { timeout: 90000 }).catch(() => console.log('no composer'));
+await page.waitForSelector('.lg-composer textarea, .l5s-ask textarea, .l5h', { timeout: 90000 }).catch(() => console.log('no composer'));
 await page.waitForTimeout(1200);
 for (let i = 0; i < 3; i++) { const sk = page.getByRole('button', { name: /^skip/i }); if (await sk.count()) { await sk.first().click().catch(() => {}); await page.waitForTimeout(1000); } }
 await page.addStyleTag({ content: '.env-badge{display:none!important}' });
@@ -92,7 +92,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     }
     if (s === 'esc') { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
     if (s === 'mind') {
-      await page.locator('.l5-mindbtn, .l5u-mind').first().click();
+      await page.locator('.l5-mindbtn').first().click();
       await page.waitForTimeout(1500);
       log('mind', (await page.locator('.l5m').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 300));
     }
@@ -224,22 +224,62 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       log('asked', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 160));
       log('reply', (await page.locator('.l5-a .l5-prose').last().innerText().catch(() => '')).slice(0, 160));
     }
-    // a new line of thinking is begun from home, the Universal Map
-    if (s === 'new') { await page.locator('.l5-brand').click(); await page.waitForTimeout(600); await page.locator('.l5-unibtn.is-new').click(); await page.waitForTimeout(1000); }
-    if (s === 'state') {
-      log('state: title', await page.locator('.l5-title').innerText().catch(() => ''), '| intake', await page.locator('.l5s-drop').count(), '| home', await page.locator('.l5u').count(), '| rail', JSON.stringify((await page.locator('.lg-railhost').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)));
+    // home, the Universal Map: the mark brings it back; "Find or start…" finds, or begins a line of thinking
+    const goHome = async () => {
+      if (!(await page.locator('.l5h').count())) {
+        await page.locator('.l5-brand').click();
+        await page.waitForTimeout(900);
+      }
+    };
+    const findBox = () => page.locator('.l5h-find input').first();
+    const startWith = async (text) => {
+      await goHome();
+      await findBox().click();
+      await findBox().fill(text);
+      await page.waitForTimeout(250);
+      await page.locator('.l5h-o.is-start').first().click();
+    };
+    if (s === 'new') {
+      await goHome();
+      await findBox().click();
+      await page.locator('.l5h-o.is-start').first().click();
+      await page.waitForTimeout(1000);
     }
+    if (s === 'start') await (async () => { await startWith(process.env.START || 'Should I take the job in Austin?'); await page.waitForTimeout(Number(process.env.TALK_WAIT || 7000)); })();
+    // SEED="a|b|c" — a line of thinking begun with each, from the find box
+    if (s === 'seed') {
+      for (const text of (process.env.SEED || 'Should I rent or buy a flat?|Plan a launch for the new app|Is my startup idea any good?|Rent or buy, again: the monthly runway|Should I learn Rust or Go next?').split('|')) {
+        await startWith(text);
+        await page.waitForTimeout(Number(process.env.TALK_WAIT || 6500));
+      }
+    }
+    if (s === 'state') {
+      log('state: title', await page.locator('.l5-title').innerText().catch(() => ''), '| intake', await page.locator('.l5s-drop').count(), '| home', await page.locator('.l5h').count(), '| rail', JSON.stringify((await page.locator('.lg-railhost').innerText().catch(() => '')).replace(/\s+/g, ' ').slice(0, 300)));
+    }
+    const homeSays = async () =>
+      JSON.stringify({
+        eyebrow: await page.locator('.l5-eyebrow').first().innerText().catch(() => ''),
+        frames: await page.locator('.l5h-frame').count(),
+        tiles: await page.locator('.l5h-tile').count(),
+        cards: await page.locator('.l5h-card').count(),
+        ideas: await page.locator('.l5h-idea').allInnerTexts(),
+        resume: await page.locator('.l5h-pick-t').innerText().catch(() => ''),
+        starred: await page.locator('.l5h-starchip').count(),
+        notes: await page.locator('.l5h-note').count(),
+        rail: await page.locator('.l5:not(.rail-closed) > .lg-railhost').count(),
+      });
     if (s === 'home') {
       await page.locator('.l5-brand').click();
-      await page.waitForTimeout(1200);
-      log('home', await page.locator('.l5u-title p').innerText().catch(() => 'none'), 'clusters', await page.locator('.l5u-c').count(), 'bridges', await page.locator('.l5u-bridges path').count(), 'rail shown', await page.locator('.l5:not(.rail-closed) > .lg-railhost').count());
+      await page.waitForTimeout(1400);
+      log('home', await homeSays());
     }
     if (s === 'find') {
-      await page.locator('.l5u-search input').fill(process.env.FIND || 'team');
+      await findBox().fill(process.env.FIND || 'rent');
       await page.waitForTimeout(500);
-      log('find', await page.locator('.l5u-found').innerText().catch(() => ''), 'dimmed', await page.locator('.l5u-c.is-dim').count());
+      log('find', await page.locator('.l5h-find-n').innerText().catch(() => ''), 'options', JSON.stringify(await page.locator('.l5h-o').allInnerTexts()), 'dimmed', await page.locator('.l5h-tile.is-dim').count());
       await shot('find-in');
-      await page.locator('.l5u-search input').fill('');
+      await findBox().fill('');
+      await page.keyboard.press('Escape');
     }
     if (s === 'list') {
       await page.locator('.l5-unibtn.is-list').click();
@@ -250,23 +290,83 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       await page.waitForTimeout(500);
       log('contents closed', await page.locator('.l5c').count() === 0);
     }
-    if (s === 'openmap') {
-      await page.locator('.l5u-c.is-logos .l5u-halo').first().click({ force: true });
-      await page.waitForTimeout(1500);
-      log('opened', await page.locator('.l5-title').innerText().catch(() => ''), 'home gone', (await page.locator('.l5u').count()) === 0);
-    }
-    if (s === 'uniopen') { await page.locator('.l5-unibtn').click(); await page.waitForTimeout(1500); await shot('uniopen-in'); }
-    if (s === 'universe') {
-      await page.locator('.l5-unibtn').click();
+    // the three ways to see it: MODE=Map|Columns|Timeline
+    if (s === 'mode') {
+      await page.locator('.l5h-seg.is-modes button', { hasText: process.env.MODE || 'Columns' }).click();
       await page.waitForTimeout(900);
-      log('universe', await page.locator('.l5s-uni-head p').innerText().catch(() => 'none'), 'clusters', await page.locator('.l5s-uni-c').count());
-      await shot('universe-in');
-      await page.locator('.l5s-uni .l5s-btn', { hasText: 'Close' }).click();
+      log('mode', process.env.MODE || 'Columns', await homeSays(), 'columns', await page.locator('.l5h-col').count(), 'lanes', await page.locator('.l5h-tl-lane').count());
+    }
+    if (s === 'press') {
+      const tile = page.locator('.l5h-tile, .l5h-card').nth(Number(process.env.NTH || 0));
+      // a large card opens when pressed; its ⋯ shows its card
+      if (await tile.locator('.l5h-more').count()) await tile.locator('.l5h-more').click();
+      else await tile.click();
+      await page.waitForTimeout(700);
+      log('card', (await page.locator('.l5h-pv').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 300));
+    }
+    if (s === 'star') { await page.locator('.l5h-pv .l5h-btn', { hasText: 'Star' }).click(); await page.waitForTimeout(500); log('starred chips', await page.locator('.l5h-starchip').allInnerTexts()); }
+    if (s === 'hide') { await page.locator('.l5h-pv .l5h-btn', { hasText: 'Hide' }).click(); await page.waitForTimeout(500); log('after hide', await homeSays(), 'said', await page.locator('.l5h-said').innerText().catch(() => '')); }
+    if (s === 'undo') { await page.locator('.l5h-tool[aria-label="Undo"]').click(); await page.waitForTimeout(500); log('after undo', await homeSays()); }
+    if (s === 'viewmenu') {
+      await page.locator('.l5h-viewbtn').click();
+      await page.waitForTimeout(500);
+      log('view menu', (await page.locator('.l5h-vm').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 400));
+      await shot('view-in');
+      await page.keyboard.press('Escape');
+    }
+    if (s === 'note') {
+      const box = await page.locator('.l5h-map').boundingBox();
+      await page.mouse.dblclick(box.x + box.width * 0.72, box.y + box.height * 0.82);
       await page.waitForTimeout(400);
+      await page.keyboard.type(process.env.NOTE || 'decide by Friday');
+      await page.keyboard.press('Enter');
+      await page.waitForTimeout(500);
+      log('notes', await page.locator('.l5h-note').allInnerTexts());
+    }
+    // DRAG=from index; a tile carried 280px right and 60px down
+    if (s === 'drag') {
+      const t = page.locator('.l5h-tile').nth(Number(process.env.NTH || 0));
+      const b = await t.boundingBox();
+      await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
+      await page.mouse.down();
+      for (let i = 1; i <= 12; i++) await page.mouse.move(b.x + b.width / 2 + i * 24, b.y + b.height / 2 + i * 5);
+      await page.mouse.up();
+      await page.waitForTimeout(600);
+      const after = await t.boundingBox();
+      log('dragged', JSON.stringify({ from: [Math.round(b.x), Math.round(b.y)], to: [Math.round(after.x), Math.round(after.y)] }));
+    }
+    // Select, then drag across the first two conversations from inside their frame
+    if (s === 'lasso') {
+      await page.locator('.l5h-tool', { hasText: 'Select' }).click();
+      const a = await page.locator('.l5h-tile').nth(0).boundingBox();
+      const b = await page.locator('.l5h-tile').nth(1).boundingBox();
+      await page.mouse.move(a.x - 8, a.y + 10);
+      await page.mouse.down();
+      for (let i = 1; i <= 10; i++) await page.mouse.move(a.x - 8 + ((b.x + b.width - 10 - (a.x - 8)) * i) / 10, a.y + 10 + ((b.y + b.height - 10 - (a.y + 10)) * i) / 10);
+      await page.mouse.up();
+      await page.waitForTimeout(500);
+      log('chosen', (await page.locator('.l5h-bar-sel').innerText().catch(() => 'none')).replace(/\s+/g, ' '));
+      await shot('lasso-in');
+      await page.keyboard.press('Escape');
+      await page.locator('.l5h-tool', { hasText: 'Select' }).click();
+    }
+    if (s === 'arrows') {
+      await page.locator('.l5h-map').focus();
+      for (const k of ['ArrowRight', 'ArrowRight', 'ArrowDown']) await page.keyboard.press(k);
+      await page.waitForTimeout(300);
+      log('chosen by keys', await page.locator('.l5h-tile.is-sel .l5h-tile-t').allInnerTexts());
+    }
+    if (s === 'openmap') {
+      const first = page.locator('.l5h-tile, .l5h-card').first();
+      await first.click();
+      await page.waitForTimeout(500);
+      await page.locator('.l5h-pv .l5h-go').click();
+      await page.waitForTimeout(1500);
+      log('opened', await page.locator('.l5-title').innerText().catch(() => ''), 'home gone', (await page.locator('.l5h').count()) === 0);
     }
     if (s === 'reload') {
       await page.reload({ waitUntil: 'domcontentloaded' });
-      await page.waitForSelector('.l5s-card, .l5-thread, .l5s-ask, .l5u', { timeout: 90000 });
+      await page.waitForSelector('.l5s-card, .l5-thread, .l5s-ask, .l5h', { timeout: 90000 });
       await page.waitForTimeout(1500);
       log('after reload: cards', await page.locator('.l5s-card').count(), 'view', await page.locator('.l5-switch-i.is-on').innerText().catch(() => 'none'));
       await shot('reload');

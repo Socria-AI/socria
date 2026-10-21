@@ -30,7 +30,6 @@ writeFileSync(
     `export { create, sanitizeSpace } from ${JSON.stringify(join(root, 'lib/objects/index.ts'))};`,
     `export { restudy, studyIn, STUDY } from ${JSON.stringify(join(root, 'lib/objects/display-study.ts'))};`,
     `export { objectsBlock } from ${JSON.stringify(join(root, 'lib/objects/index.ts'))};`,
-    `export { universeOf, clusterMatches } from ${JSON.stringify(join(root, 'lib/logos5/universe.ts'))};`,
   ].join('\n')
 );
 await build({ entryPoints: { study: entry }, bundle: true, format: 'esm', platform: 'node', outdir: OUT, outExtension: { '.js': '.mjs' }, tsconfig: join(root, 'tsconfig.json'), logLevel: 'error', alias: { '@': root } });
@@ -216,40 +215,8 @@ ok('the sorting ask shows keyed passages and says quotes are copied', ask.user.i
 const ea = S.entriesAsk(t2, docs, [sorted.topics[2]], ['Mar 31 — wages']);
 ok('the entries ask holds the topic’s passages and the review’s numbers', ea.user.includes('[1:p4.2]') && ea.user.includes('[2:p1.2]') && ea.user.includes('already practised'));
 
-// ── the Universal Map ────────────────────────────────────────────────
-const sessions = [
-  { id: 'a', title: 'Two job offers', updatedAt: 300, messages: [{ role: 'user' }, { role: 'assistant' }, { role: 'user' }], map: { nodes: [{ id: 'n1', label: 'Two job offers' }, { id: 'n2', label: 'Learning from a better team' }, { id: 'n3', label: 'Higher salary' }], edges: [{ from: 'n1', to: 'n2' }, { from: 'n1', to: 'n3' }, { from: 'n9', to: 'n1' }] } },
-  { id: 'b', title: 'Exam 2', updatedAt: 200, messages: [{ role: 'user' }], map: { nodes: [{ id: 'n1', label: 'Exam stress' }], edges: [], objects: JSON.parse(JSON.stringify(withPractice)) } },
-  { id: 'c', title: 'Plain chat', updatedAt: 100, messages: [{ role: 'user' }], map: { nodes: [], edges: [] } },
-  { id: 'd', title: 'Team culture', updatedAt: 50, messages: [{ role: 'user' }], map: { nodes: [{ id: 'x', label: 'Better team culture' }], edges: [] } },
-  { id: 'e', title: 'New line of thinking', updatedAt: 400, messages: [], map: { nodes: [], edges: [] } },
-  { id: 'k', title: 'Salary negotiation tips', updatedAt: 10, kind: 'core' },
-  { id: 'k2', title: 'Higher salary research', updatedAt: 9, kind: 'core' },
-];
-const u = S.universeOf(sessions);
-const C = new Map(u.clusters.map((c) => [c.id, c]));
-ok('every conversation is on one map, newest first; an empty line of thinking is not', J(u.clusters.map((c) => c.id)) === J(['a', 'b', 'c', 'd', 'k', 'k2']));
-ok('Core chats are on it too, as points of their own', C.get('k').kind === 'core' && C.get('k').nodes.length === 0);
-ok('a map’s ideas are its graph, and an edge to a card not there is dropped', C.get('a').nodes.length === 3 && C.get('a').edges.length === 2);
-ok('a study’s topics and its map’s ideas are both its graph, topics first', C.get('b').nodes[0].from === 'topic' && C.get('b').nodes.some((n) => n.from === 'idea') && C.get('b').edges.some((e) => e.from.startsWith('topic:')));
-ok('a conversation with no map is drawn as itself, with nothing made up', C.get('c').nodes.length === 0 && C.get('c').r < C.get('a').r);
-ok('the most connected idea sits at the middle of its cluster', (() => { const hub = C.get('a').nodes.find((n) => n.id === 'n1'); return hub.x === 0 && hub.y === 0; })());
-ok('an idea two conversations share is a bridge between them', u.bridges.some((b) => b.a.cluster === 'a' && b.b.cluster === 'd'), J(u.bridges));
-ok('a chat’s name can bridge it to an idea', u.bridges.some((b) => b.b.cluster === 'k2' && b.b.node === null && b.a.cluster === 'a'), J(u.bridges));
-ok('two chats are not bridged by their names alone', !u.bridges.some((b) => [b.a.cluster, b.b.cluster].every((x) => x.startsWith('k'))));
-ok('one common short word is not a bridge', !u.bridges.some((b) => b.a.cluster === 'b' || b.b.cluster === 'b'));
-const overlap = u.clusters.some((p, i) => u.clusters.some((q, j) => j > i && Math.hypot(p.x - q.x, p.y - q.y) < p.r + q.r + 30));
-ok('no two clusters sit on each other, or on each other’s names', !overlap, J(u.clusters.map((c) => [c.id, c.x, c.y, c.r])));
-const many = S.universeOf(Array.from({ length: 40 }, (_, i) => ({ id: `s${i}`, title: `Line ${i}`, updatedAt: i, messages: [{ role: 'user' }], map: { nodes: Array.from({ length: i % 9 }, (_, k) => ({ id: `n${k}`, label: `Idea ${i}-${k}` })), edges: [] } })));
-const crowd = many.clusters.some((p, i) => many.clusters.some((q, j) => j > i && Math.abs(p.x - q.x) < 180 && Math.abs(p.y - q.y) < p.r + q.r + 40));
-ok('forty conversations: still nothing on top of anything else', !crowd);
-const dist = (x, y) => Math.hypot(C.get(x).x - C.get(y).x, C.get(x).y - C.get(y).y);
-const unbridged = ['b', 'c'].map((x) => dist(x, 'd'));
-ok('what a bridge joins is drawn nearer than what nothing joins', unbridged.every((x) => dist('a', 'd') < x), J({ ad: dist('a', 'd'), unbridged }));
-ok('everything is on the page', u.clusters.every((c) => c.x - c.r >= 0 && c.y - c.r >= 0 && c.x + c.r <= u.width && c.y + c.r <= u.height));
-ok('the same conversations draw the same map', J(S.universeOf(sessions)) === J(u));
-ok('nothing at all is an empty map', S.universeOf([]).clusters.length === 0 && S.universeOf([sessions[4]]).clusters.length === 0);
-ok('search finds a conversation by its name or any idea in it', S.clusterMatches(C.get('a'), 'better team') && S.clusterMatches(C.get('k'), 'negotiation') && !S.clusterMatches(C.get('c'), 'team'));
+// The Universal Map — every conversation as tiles in Project frames — is
+// held down in test/logos5-home.test.mjs.
 
 console.log(`\nlogos5-study: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

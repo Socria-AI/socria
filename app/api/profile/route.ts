@@ -1,7 +1,8 @@
 // app/api/profile/route.ts
 // GET /api/profile → { profile, understanding, firstRun, conversationStyle } for the signed-in user
 // GET /api/profile?only=conversationStyle → { conversationStyle } (the cheap one a tab re-checks)
-// PUT /api/profile → save any of { profile, understanding, firstRun, conversationStyle } (partial)
+// GET /api/profile?only=universalMap → { universalMap } (how they arranged the Universal Map)
+// PUT /api/profile → save any of { profile, understanding, firstRun, conversationStyle, universalMap } (partial)
 //
 // Backs the "import your history from other AIs" feature: the pasted profile
 // is stored per user so it follows them across devices. Anonymous users keep
@@ -19,6 +20,7 @@ import {
 import { EMPTY_FIRST_RUN, mergeFirstRun, parseFirstRun } from '@/lib/first-run';
 import { isProduction } from '@/lib/environment';
 import { resolveConversationStyle } from '@/lib/conversation-style';
+import { parseArrangement } from '@/lib/logos5/arrange';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -61,6 +63,22 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({ error: error.message }, { status: 500 });
       }
       return NextResponse.json({ conversationStyle: styleFrom(data, !error) });
+    }
+
+    // How they arranged their Universal Map (lib/logos5/arrange.ts): asked for
+    // only by the map, so the profile read stays as it was. null when the
+    // account cannot hold it yet (no column) — the browser keeps its own.
+    if (req.nextUrl.searchParams.get('only') === 'universalMap') {
+      const { data, error } = await supabaseAdmin()
+        .from('user_profiles')
+        .select('universal_map')
+        .eq('user_id', userId)
+        .maybeSingle();
+      if (error && !missingColumn(error)) {
+        console.error('GET profile (universal map) error:', error);
+        return NextResponse.json({ error: error.message }, { status: 500 });
+      }
+      return NextResponse.json({ universalMap: error ? null : parseArrangement((data as { universal_map?: unknown } | null)?.universal_map) });
     }
 
     // Deploy-order tolerance: a column that hasn't been added to the database
@@ -191,6 +209,12 @@ export async function PUT(req: NextRequest) {
     if ('conversationStyle' in b) {
       row.conversation_style = resolveConversationStyle(b.conversationStyle);
     }
+    // How they arranged their Universal Map: the whole of it, newest wins on
+    // the browser's side; kept to what parseArrangement understands, so only
+    // their choices are stored and every part is bounded.
+    if ('universalMap' in b) {
+      row.universal_map = parseArrangement(b.universalMap);
+    }
     let { error } = await supabaseAdmin()
       .from('user_profiles')
       .upsert(row, { onConflict: 'user_id' });
@@ -198,6 +222,7 @@ export async function PUT(req: NextRequest) {
     // which part the account could not keep — the browser holds that one.
     // The column the error names goes first; newest first otherwise.
     const optional: [string, string][] = [
+      ['universal_map', 'universalMap'],
       ['conversation_style', 'conversationStyle'],
       ['first_run', 'firstRun'],
     ];
