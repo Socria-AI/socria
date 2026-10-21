@@ -2493,6 +2493,48 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   background: color-mix(in srgb, var(--lg-primary) 7%, transparent);
   pointer-events: none;
 }
+/* round the day, every one is named, however far off: each is there for a reason, and says it */
+.logos-root .l5 .l5h-map.d-far .l5n-node.is-dot.is-named.is-ring:not(.is-dim) .l5n-label {
+  visibility: visible;
+}
+/* the day's name stays readable where the lines to what it builds on cross it */
+.logos-root .l5 .l5n-head.k-today :is(.l5n-name, .l5n-kick) {
+  text-shadow: 0 0 6px var(--lg-paper), 0 0 14px var(--lg-paper), 0 0 22px var(--lg-paper);
+}
+/* Today: how many more there are, in order — one press away */
+.logos-root .l5 .l5h-rest {
+  position: absolute;
+  z-index: 9;
+  left: 50%;
+  bottom: 18px;
+  transform: translateX(-50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 36px;
+  padding: 0 16px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--l5-surface) 94%, transparent);
+  box-shadow: var(--l5-shadow);
+  font: inherit;
+  font-size: 13px;
+  color: var(--lg-ink-60);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logos-root .l5 .l5h-rest b {
+  font-weight: 500;
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5h-main.has-hint .l5h-rest {
+  bottom: 64px;
+}
+.logos-root .l5 .l5h.is-narrow .l5h-rest {
+  left: 12px;
+  bottom: 14px;
+  transform: none;
+}
 /* what is said at the foot sits over the history, not on it */
 .logos-root .l5 .l5h-main.is-time .l5h-hint {
   bottom: 104px;

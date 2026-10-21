@@ -18,7 +18,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { resumeOf, sharedIdeas, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
-import { dayName, homesOf, weekStart, type Home } from '@/lib/logos5/spatial';
+import { dayName, homesOf, todayOf, weekStart, type Home } from '@/lib/logos5/spatial';
 import { monthStart } from '@/lib/logos5/timeline';
 import { OTHER } from '@/lib/logos5/subjects';
 import * as A from '@/lib/logos5/arrange';
@@ -166,6 +166,8 @@ export function UniverseView({
   useEffect(() => {
     setFitKey((k) => k + 1);
   }, [weekAt]);
+  /** Today draws the day and what it builds on, nothing else: how many more there are, one press away in order */
+  const todayRest = useMemo(() => (lens === 'today' ? todayOf(shown, shownHomes, ideas, now).rest.length : 0), [lens, shown, shownHomes, ideas, now]);
   /** go to one on the line — a ↩ on the week's map, "Find it in time" — once per press */
   const [timeFocus, setTimeFocus] = useState<{ id: string; n: number } | null>(null);
   const [endKey, setEndKey] = useState(0);
@@ -726,7 +728,7 @@ export function UniverseView({
       {narrow && <div className="l5h-findrow">{findEl}</div>}
       <div className="l5h-body">
         {contentsEl}
-        <div className={`l5h-main${inTime(lens) ? ' is-time' : ''}`} ref={mainRef}>
+        <div className={`l5h-main${inTime(lens) ? ' is-time' : ''}${isMap && !arr.seen.hint ? ' has-hint' : ''}`} ref={mainRef}>
           {tiles.length > 0 && !atlasOn && (
             <div className="l5h-bar">
               <div className="l5h-seg is-modes" role="radiogroup" aria-label="How much of it">
@@ -881,6 +883,11 @@ export function UniverseView({
               onUnpin={() => commit((a) => A.unpinTiles(a, sel), [], true)}
               onClear={() => setSel([])}
             />
+          )}
+          {lens === 'today' && isMap && todayRest > 0 && (
+            <button type="button" className="l5h-rest" onClick={() => prefer((a) => A.setMode(a, 'all'))} title="Every conversation, in order — the oldest on the left">
+              {todayRest} more, in order <span aria-hidden="true">·</span> <b>All time →</b>
+            </button>
           )}
           {drawing && drawing.total > 0 && !linkFrom && (
             <p className="l5h-drawing" role="status" title="Your chats from Core are here now. Each one's map is being drawn from what was said in it — nothing of this month's allowance is spent.">

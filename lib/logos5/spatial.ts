@@ -6,8 +6,9 @@
 // quick one-off question stays a small ambient dot. The same nodes can be
 // grouped three ways, and the map moves them between the three:
 //   • Today's learning — what today was about, in the middle; around it the
-//     earlier conversations it builds on, each joined to the one it leads to;
-//     everything else an ambient field further out, by subject;
+//     earlier conversations it builds on, each joined to the one it leads to,
+//     each named — and nothing else: the rest of it is a week away (This
+//     week) or in order (This month, All time, timeline.ts);
 //   • By week — this week, last week, and back, a cluster for each, newest
 //     first; the ideas they share drawn across, so a topic is seen coming
 //     back over time;
@@ -688,8 +689,6 @@ function chainsOf(clusters: readonly ClusterIn[], by: 'started' | 'at'): [string
   return out;
 }
 
-const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
-
 /** By subject: every Project, then the subjects read from the conversations, then everything else. */
 function bySubject(input: SkyIn): SkyLayout {
   const { tiles, homes, arr, now } = input;
@@ -735,8 +734,13 @@ function byWeek(input: SkyIn): SkyLayout {
 /**
  * Today's learning. On a wide screen: today's conversations in the middle;
  * the earlier ones they build on in a ring round them, each joined to its
- * own; everything else an ambient field beyond, a sector to each subject.
- * On a phone the three are read one under another.
+ * own and named. On a phone the two are read one under the other.
+ *
+ * NOTHING ELSE. It used to draw every other conversation too, as an ambient
+ * field round the ring with a sector to each subject — and with a real
+ * history that was the whole history again, a ring of dots under a dozen
+ * subjects' names, and zoomed out far enough to hold it the ring's own names
+ * were lost. A day is a day: the rest is in This week and in order.
  */
 function byToday(input: SkyIn): SkyLayout {
   const { tiles, homes, ideas, arr, now } = input;
@@ -760,21 +764,18 @@ function byToday(input: SkyIn): SkyLayout {
     cols: narrow ? hubCols(plan.today.length, true) : plan.today.length <= 3 ? Math.max(1, plan.today.length) : plan.today.length <= 6 ? 3 : 4,
   };
   const ringMembers: Member[] = plan.ring.map((r) => ({ tile: r.tile, hub: isHub(r.tile), suggested: false, via: { id: r.via, why: r.why } }));
-  const restMembers: Member[] = plan.rest.map((t) => ({ tile: t, hub: isHub(t), suggested: false }));
 
   if (narrow) {
     const list: ClusterIn[] = [todayIn];
     if (ringMembers.length) list.push({ key: 't:ring', kind: 'ring', name: 'What it builds on', kicker: `Earlier · ${ringMembers.length}`, color: null, projectId: null, subject: null, archived: false, members: ringMembers, movable: false });
-    if (restMembers.length) list.push({ key: 't:rest', kind: 'rest', name: 'Everything else', kicker: `${plural(restMembers.length, 'conversation', 'conversations')}`, color: null, projectId: null, subject: null, archived: false, members: restMembers.map((m) => ({ ...m, hub: false })), movable: false });
     const { clusters, nodes } = rows(list, { ...arr, frames: {} }, { narrow, pins: false, now });
     for (const n of nodes) {
       if (n.g === 't:today') n.focus = true;
-      // the field of everything else is ambient: named only when pointed at
-      if (n.g === 't:rest') n.named = false;
+      // what it builds on is the reason for the view: named, dots too
+      if (n.g === 't:ring') n.named = true;
     }
     const bounds = boxAround(clusters);
-    const top = clusters.filter((c) => c.key !== 't:rest');
-    return { lens: 'today', nodes, byId: new Map(nodes.map((n) => [n.id, n])), clusters, chains: [], sectors: [], bounds, focus: boxAround(top.length ? top : clusters), today: { when: plan.when, day: plan.day } };
+    return { lens: 'today', nodes, byId: new Map(nodes.map((n) => [n.id, n])), clusters, chains: [], sectors: [], bounds, focus: bounds, today: { when: plan.when, day: plan.day } };
   }
 
   // the middle: today's, a few across, centred on the origin
@@ -835,80 +836,8 @@ function byToday(input: SkyIn): SkyLayout {
       ...ringBox,
     });
 
-  // everything else: a field beyond the ring, a sector to each subject, the newest nearest
-  const sectors: Sector[] = [];
-  if (restMembers.length) {
-    const bySubjectKey = new Map<string, Member[]>();
-    for (const m of restMembers) {
-      const key = homes.of.get(m.tile.id)?.key ?? OTHER;
-      bySubjectKey.set(key, [...(bySubjectKey.get(key) ?? []), m]);
-    }
-    const order = homes.list.map((h) => h.key).filter((key) => bySubjectKey.has(key));
-    const total = restMembers.length;
-    const minShare = Math.min(0.12, 1 / order.length);
-    const shares = order.map((key) => Math.max(minShare, bySubjectKey.get(key)!.length / total));
-    const sum = shares.reduce((s, v) => s + v, 0);
-    const rx0 = rx + 280;
-    const ry0 = ry + 200;
-    let ang0 = -Math.PI / 2;
-    const restNodes: SkyNode[] = [];
-    order.forEach((key, si) => {
-      const span = (shares[si] / sum) * 2 * Math.PI;
-      const list = bySubjectKey.get(key)!;
-      // inner arcs first; on each, as many as fit with room between them
-      let ring = 0;
-      let placedN = 0;
-      while (placedN < list.length && ring < 40) {
-        const a = rx0 + ring * 34;
-        const b = ry0 + ring * 26;
-        const arc = span * Math.sqrt((a * a + b * b) / 2);
-        const fit = Math.max(1, Math.floor(arc / 30));
-        const here = list.slice(placedN, placedN + fit);
-        here.forEach((m, j) => {
-          const ang = ang0 + ((j + 0.5) / Math.max(here.length, fit)) * span;
-          const jt = jitter(m.tile.id, false);
-          const x = Math.round(mid.x + Math.cos(ang) * a + jt.x);
-          const y = Math.round(mid.y + Math.sin(ang) * b + jt.y);
-          const r = m.hub ? 5 : 3;
-          const side: 'right' | 'left' = x < mid.x - 40 ? 'left' : 'right';
-          restNodes.push({ id: m.tile.id, g: 't:rest', hub: m.hub, named: false, x, y, r, side, label: labelOf(x, y, r, false, side), pinned: false, suggested: false, folded: false });
-        });
-        placedN += here.length;
-        ring++;
-      }
-      const h = homes.list.find((x) => x.key === key)!;
-      const la = ang0 + span / 2;
-      const ra = rx0 + ring * 34 + 40;
-      const rb = ry0 + ring * 26 + 34;
-      sectors.push({ key, name: h.name, color: h.color, x: Math.round(mid.x + Math.cos(la) * ra), y: Math.round(mid.y + Math.sin(la) * rb) });
-      ang0 += span;
-    });
-    nodes.push(...restNodes);
-    const restBox = boxAround(restNodes.map((n) => nodeBox(n)));
-    clusters.push({
-      key: 't:rest',
-      kind: 'rest',
-      name: 'Everything else',
-      kicker: plural(restNodes.length, 'conversation', 'conversations'),
-      count: restNodes.length,
-      color: null,
-      projectId: null,
-      subject: null,
-      archived: false,
-      origin: { x: restBox.x, y: restBox.y },
-      head: { x: 0, y: 0, w: 0, h: 0 },
-      cells: { hub: [], dot: [] },
-      suggested: [],
-      collapsed: false,
-      movable: false,
-      open: true,
-      empty: false,
-      ...restBox,
-    });
-  }
-  const focus = boxAround([middle.cluster, ...(ringNodes.length ? [ringBox] : []), ...clusters.filter((c) => c.key === 't:ring').map((c) => c.head)]);
-  const bounds = boxAround([...clusters, ...sectors.map((s) => ({ x: s.x - 80, y: s.y - 12, w: 160, h: 24 }))]);
-  return { lens: 'today', nodes, byId: new Map(nodes.map((n) => [n.id, n])), clusters, chains: [], sectors, bounds, focus, today: { when: plan.when, day: plan.day } };
+  const focus = boxAround([middle.cluster, ...(ringNodes.length ? [ringBox] : [])]);
+  return { lens: 'today', nodes, byId: new Map(nodes.map((n) => [n.id, n])), clusters, chains: [], sectors: [], bounds: focus, focus, today: { when: plan.when, day: plan.day } };
 }
 
 /** The whole map, for a lens. */

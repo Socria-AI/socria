@@ -233,7 +233,28 @@ const DOMAIN_SAYS: Record<string, string> = {
   careers: 'careers', career: 'careers', 'job search': 'careers', employment: 'careers',
   business: 'business', entrepreneurship: 'business', startups: 'business', marketing: 'business', management: 'business',
   travel: 'life', cooking: 'life', fitness: 'life', lifestyle: 'life', 'personal life': 'life',
+  // the names the map gives that are a field already here by another name: one subject, not two
+  astrophysics: 'physics', astronomy: 'physics', cosmology: 'physics', mechanics: 'physics', 'quantum mechanics': 'physics',
+  econometrics: 'statistics', 'data science': 'statistics', analytics: 'statistics', 'data analytics': 'statistics',
+  'artificial intelligence': 'computing', ai: 'computing', robotics: 'computing', technology: 'computing', tech: 'computing', 'information technology': 'computing', cybersecurity: 'computing',
+  'user experience design': 'computing', 'user experience': 'computing', 'ux design': 'computing', ux: 'computing', 'ui design': 'computing', 'technical issue': 'computing', 'technical support': 'computing', troubleshooting: 'computing',
+  journalism: 'writing', copywriting: 'writing', editing: 'writing', blogging: 'writing',
+  creativity: 'arts', 'graphic design': 'arts', photography: 'arts', 'visual arts': 'arts',
+  'career development': 'careers', 'professional development': 'careers', 'job hunting': 'careers', interviewing: 'careers',
+  'daily routine': 'life', routine: 'life', habits: 'life', 'personal development': 'life', 'self improvement': 'life', 'self-improvement': 'life', productivity: 'life', relationships: 'life', family: 'life', parenting: 'life',
 };
+
+/**
+ * Names the map gives a conversation that say nothing about its subject: a
+ * way of thinking, or nothing at all. They make no subject of their own — the
+ * conversation's words decide, or it is in everything else.
+ */
+const VAGUE = new Set([
+  'general', 'general knowledge', 'misc', 'miscellaneous', 'other', 'others', 'various', 'everyday', 'personal', 'none', 'unknown',
+  'personal decision', 'personal decisions', 'personal decision-making', 'personal decision making', 'decision making', 'decision-making', 'decisions', 'life decisions',
+  'planning', 'problem solving', 'problem-solving', 'reasoning', 'critical thinking', 'thinking', 'reflection', 'self-reflection', 'brainstorming', 'ideas',
+  'advice', 'help', 'question', 'questions', 'conversation', 'chat', 'education', 'learning', 'studying', 'study skills', 'school', 'homework',
+]);
 
 /** The field a picture belongs to: supply and demand is economics; a derivative is mathematics. */
 const VIZ_FIELD: Record<string, string> = {
@@ -248,7 +269,7 @@ const titleCase = (s: string) => s.replace(/\b([a-z])/g, (c) => c.toUpperCase())
 /** The field the map named, as one the map knows, or as itself when it is a plain short name. */
 export function fieldOfDomain(domain: string): Subject | null {
   const d = (domain || '').trim().toLowerCase().replace(/\s+/g, ' ');
-  if (!d) return null;
+  if (!d || VAGUE.has(d)) return null;
   const known = DOMAIN_SAYS[d] ?? fieldOfWords([{ text: d, weight: 3 }], 3);
   if (known) return fieldSubject(known);
   if (d.length < 3 || d.length > 28 || !/^[a-z][a-z &'-]*$/.test(d) || d.split(' ').length > 3) return null;

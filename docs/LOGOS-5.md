@@ -196,7 +196,11 @@ how many are written over it.
   question or topic; the field Socria's map named while it thought
   (`map.ask.domain`); the kind of picture it drew (supply and demand is
   economics); its words against a short list of fields. A field with exactly
-  one course in it joins that course.
+  one course in it joins that course. A name the map gives that is a field
+  here already by another name is that field (Astrophysics is Physics,
+  Econometrics Statistics, AI or UX design Computer science, Journalism
+  Writing); a vague one ("General", "Personal decision-making", "Education")
+  makes no subject of its own — the conversation's words decide.
 - **A conversation about a Project's subject but not filed in it** is shown in
   that Project with a dashed ring and counted in "+ 1 about it · File it" —
   never filed without the person.
@@ -213,9 +217,12 @@ how many are written over it.
 anything today, the last day something was: "Where you left off"); round it,
 **the earlier conversations it builds on** — an idea in common first, then the
 same subject or Project — each joined to the one of today's it leads to, with
-why under its name ("shares 'Accrual basis'", "also in ACCT 2301"); beyond
-them, everything else as an ambient field, a sector to each subject, named at
-its edge. On a phone the three are read top to bottom.
+why under its name ("shares 'Accrual basis'", "also in ACCT 2301") — every
+one named, a quick question too — and nothing else. The rest is one press away
+under it ("37 more, in order · All time →"); it used to be drawn round the
+ring as a field with a sector to each subject, which on a real history was the
+whole history again under a dozen subjects' names. On a phone the two are read
+top to bottom.
 
 **What conversations share** is named between them in their own words
 ("Monthly runway"), with a dotted line to each — across Projects and subjects
@@ -893,4 +900,27 @@ the words above it.
 **Not verified here:** a real account's years of conversations (the map keeps
 the newest 150, as everywhere); dragging and the wheel on a real trackpad and
 phone; screen readers on the line.
+
+### Today, on a real history
+
+Today kept drawing the whole history round the day: every other conversation
+an ambient field outside the ring, a sector to each subject — and the map's
+own free-form names made a subject each ("General", "Technical issue",
+"Personal decision" and "Personal decision-making"), so a real account had two
+dozen sectors over an ellipse of dots, and the view, zoomed out to hold them,
+lost the names of the day's own quick questions.
+
+- Today is the day and what it builds on, every one named, and nothing else;
+  "37 more, in order · All time →" under it (`spatial.ts` byToday).
+- A name the map gives that is a field already (Astrophysics, Econometrics,
+  AI, UX design, Journalism…) is that field; a vague one makes no subject
+  (`subjects.ts`). This also keeps This week's clusters and the line's
+  threads to the subjects that are really there.
+- Checked with a history shaped like the one reported (the last day worked,
+  quick maths questions round it, forty more under twenty-five of the map's
+  names), at 1440×900 on Paper and Night and at 390×844: twelve conversations,
+  all twelve named, no subjects drawn round them; the line's threads under
+  Physics, Computer science, Writing, Life, Mathematics rather than one each.
+  `test/logos5-spatial.test.mjs` (79) holds both, and the screens' test the
+  count under Today.
 

@@ -173,7 +173,7 @@ console.log('\n=== the Universal Map ===');
   ok('with nothing yet, it says what it will be and how to begin', empty.includes('a map of what you have learned, by day, by week and by subject') && empty.includes('What are you working on?') && empty.includes('Find or start…'));
 
   const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
-  ok('a few conversations are stars with their names', (few.match(/class="l5n-node is-hub/g) ?? []).length === 3 && few.includes('Two job offers') && few.includes('Rent or buy'));
+  ok('today: the day’s conversation a star with its name — the two from before, unrelated, not drawn but counted, in order a press away', (few.match(/class="l5n-node is-hub/g) ?? []).length === 1 && few.includes('Two job offers') && !few.includes('data-node="b"') && /class="l5h-rest"[^>]*>2 more, in order/.test(few));
   ok('the header is given the find-or-start box and how many there are', few.includes('COUNT:3') && few.includes('placeholder="Find or start…"'));
   ok('where to pick up is a press away, and ringed on the map', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few) && few.includes('l5n-ring') && few.includes('last here'));
   ok('four ways to see it, Today first — then This week, This month, All time', /role="radio" aria-checked="true" class="is-on"><span class="l5h-long">Today</.test(few) && few.includes('>This week<') && few.includes('>This month<') && few.includes('>All time<'));

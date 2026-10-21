@@ -660,7 +660,7 @@ export function SkyCanvas({
           return (
             <div
               key={n.id}
-              className={`l5n-node ${n.hub ? 'is-hub' : 'is-dot'}${tile.kind === 'core' ? ' is-chat' : ''}${n.named ? ' is-named' : ''}${n.suggested ? ' is-sugg' : ''}${n.side === 'left' ? ' side-left' : ''}${n.g === 't:rest' ? ' is-rest' : ''}${sel.has(n.id) ? ' is-sel' : ''}${n.id === activeId ? ' is-here' : ''}${matchOf && !m ? ' is-dim' : ''}${m && matchOf ? ' is-found' : ''}${litSet?.has(n.id) && !sel.has(n.id) ? ' is-lit' : ''}${drag?.kind === 'nodes' && drag.ids.includes(n.id) ? ' is-lifted' : ''}`}
+              className={`l5n-node ${n.hub ? 'is-hub' : 'is-dot'}${tile.kind === 'core' ? ' is-chat' : ''}${n.named ? ' is-named' : ''}${n.suggested ? ' is-sugg' : ''}${n.side === 'left' ? ' side-left' : ''}${n.g === 't:rest' ? ' is-rest' : ''}${n.g === 't:ring' ? ' is-ring' : ''}${sel.has(n.id) ? ' is-sel' : ''}${n.id === activeId ? ' is-here' : ''}${matchOf && !m ? ' is-dim' : ''}${m && matchOf ? ' is-found' : ''}${litSet?.has(n.id) && !sel.has(n.id) ? ' is-lit' : ''}${drag?.kind === 'nodes' && drag.ids.includes(n.id) ? ' is-lifted' : ''}`}
               style={{ transform: `translate(${n.x + s.x}px, ${n.y + s.y}px)`, ...css({ '--c': colorOf(tile), '--r': `${n.r}px`, '--fresh': freshness(tile.at, now).toFixed(2), '--tw': ((hashOf(n.id) % 100) / 100).toFixed(2) }) }}
               data-node={n.id}
               role="button"

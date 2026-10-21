@@ -17,8 +17,10 @@
 //   • By week is newest first, this week and last week by name; months take
 //     over after eight weeks;
 //   • Today's learning: today's in the middle, the earlier ones they build on
-//     round them (an idea in common first), everything else beyond; with
-//     nothing today yet, the last day worked on;
+//     round them (an idea in common first), each named — and nothing else
+//     drawn; with nothing today yet, the last day worked on;
+//   • a name the map gives that is a field already here is that field, and a
+//     vague one is no subject at all;
 //   • the same conversations draw the same map, and no two stars sit on
 //     each other's words.
 
@@ -68,7 +70,10 @@ console.log('\n=== what a conversation is about ===');
   ok('a study’s course: its code, or else its name; an exam is when, not what', S.courseOfStudy('ACCT 2301 · Exam 2')?.key === 'c:acct2301' && S.courseOfStudy('Intro to Psychology · Midterm')?.name === 'Intro to Psychology' && S.courseOfStudy('Intro to Psychology · Midterm')?.field === 'psychology' && S.courseOfStudy('Midterm 2') === null && S.courseOfStudy('') === null);
   ok('  a study sorted under a plain field is that field', S.courseOfStudy('Biology · Final')?.key === 'f:biology');
   ok('the field the map named, as a field the map knows — or as itself, when it is a plain name', S.fieldOfDomain('Microeconomics')?.key === 'f:economics' && S.fieldOfDomain('personal finance')?.key === 'f:money' && S.fieldOfDomain('Music theory')?.key === 'f:arts' && S.fieldOfDomain('Urban planning')?.name === 'Urban Planning' && S.fieldOfDomain('a very long and rambling description of a domain') === null && S.fieldOfDomain('') === null);
+  ok('a name the map gives that is a field here already is that field — not a subject of its own', S.fieldOfDomain('Astrophysics')?.key === 'f:physics' && S.fieldOfDomain('Astronomy')?.key === 'f:physics' && S.fieldOfDomain('Econometrics')?.key === 'f:statistics' && S.fieldOfDomain('Artificial intelligence')?.key === 'f:computing' && S.fieldOfDomain('User experience design')?.key === 'f:computing' && S.fieldOfDomain('Journalism')?.key === 'f:writing' && S.fieldOfDomain('Daily routine')?.key === 'f:life');
+  ok('  and a vague one is no subject at all: the words decide', ['General', 'Personal decision', 'Personal decision-making', 'Decision making', 'Education', 'Other'].every((d) => S.fieldOfDomain(d) === null));
   const of = (o) => S.subjectOf(about(o));
+  ok('  a vague name, and words that say: the words', of({ domain: 'Personal decision-making', title: 'Two job offers', asked: 'Which offer should I take — the salary or the team?' })?.key === 'f:careers' && of({ domain: 'General', title: 'Hello' }) === null);
   ok('the surest reading first: a study’s course over everything', of({ course: 'ACCT 2301 · Exam 2', domain: 'Economics', title: 'Supply' })?.key === 'c:acct2301');
   ok('  then a course code in its name or first question', of({ title: 'HIST 1301 essay plan', domain: 'Writing' })?.key === 'c:hist1301' && of({ asked: 'Can you explain chapter 3 of BIOL 1406?' })?.key === 'c:biol1406');
   ok('  then the field the map named, then the picture it drew', of({ domain: 'Accounting', viz: 'derivative' })?.key === 'f:accounting' && of({ viz: 'supply-demand' })?.key === 'f:economics' && of({ viz: 'distribution' })?.key === 'f:statistics');
@@ -213,16 +218,17 @@ console.log('\n=== Today’s learning ===');
   const mid = L.clusters.find((c) => c.key === 't:today');
   ok('today’s in the middle, all named as stars', L.nodes.filter((n) => n.g === 't:today').every((n) => n.focus && n.named && n.hub) && mid.x < 0 && mid.x + mid.w > 0);
   ok('the ring round it: each joined to the one of today’s it leads to, named, its words on the outer side', L.nodes.filter((n) => n.g === 't:ring').every((n) => n.via && n.named && (n.side === 'left' ? n.x < mid.x + mid.w / 2 : true)));
-  ok('the rest an ambient field further out, unnamed till pointed at, and each subject named where it lies', L.nodes.filter((n) => n.g === 't:rest').every((n) => !n.named) && L.sectors.length > 0 && L.sectors.every((s) => typeof s.name === 'string'));
-  ok('the view is fitted to today and its ring, not the whole field', L.focus.w < L.bounds.w && L.focus.h <= L.bounds.h);
+  ok('nothing else is drawn: no field of everything else, no subjects round it — a day is a day', plan.rest.length > 0 && L.nodes.every((n) => n.g === 't:today' || n.g === 't:ring') && L.nodes.length === plan.today.length + plan.ring.length && L.sectors.length === 0 && !L.clusters.some((c) => c.key === 't:rest'));
+  ok('the view is fitted to today and its ring, all of it', J(L.focus) === J(L.bounds) && L.nodes.every((n) => n.x >= L.bounds.x && n.x <= L.bounds.x + L.bounds.w));
   ok('no named star on another’s words', named(L).every((a, i, all) => all.every((b, j) => j <= i || !overlap(a, b))), J(named(L).filter((a, i, all) => all.some((b, j) => j > i && overlap(a, b))).map((a) => a.id)));
   const N = lay('today', A0, { narrow: true });
-  ok('on a phone, read top to bottom: today, what it builds on, everything else', J(N.clusters.map((c) => c.key)) === J(['t:today', 't:ring', 't:rest']) && N.clusters.every((c, i) => i === 0 || c.y > N.clusters[i - 1].y));
+  ok('on a phone, read top to bottom: today, then what it builds on — every one of those named', J(N.clusters.map((c) => c.key)) === J(['t:today', 't:ring']) && N.clusters.every((c, i) => i === 0 || c.y > N.clusters[i - 1].y) && N.nodes.filter((n) => n.g === 't:ring').every((n) => n.named));
 }
 
 console.log('\n=== what they share, named between them ===');
 {
-  for (const lens of ['subject', 'week', 'today']) {
+  // (Today draws none: its ring already says why each is there)
+  for (const lens of ['subject', 'week']) {
     const L = lay(lens);
     const placed = S.placeSkyIdeas(ideas, L);
     const solid = [...L.nodes.filter((n) => !n.folded).map((n) => S.nodeBox(n)), ...L.clusters.filter((c) => !c.open).map((c) => c.head)];
