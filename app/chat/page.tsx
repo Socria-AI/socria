@@ -2239,12 +2239,20 @@ export default function ChatPage() {
     void loadShared();
   }, [loadShared]);
 
+  /**
+   * The Logos a conversation opens on from here: Logos 5 wherever it is
+   * offered — where every conversation lives now, the Core chats brought in
+   * included (lib/logos5/merge.ts). The plain 'logos' choice resolves to
+   * Logos 2 while Logos 1 is held back (lib/socria-model-store.ts withdrawnTo).
+   */
+  const logosToOpen = (): SocriaModel => (isOffered('logos-3') ? 'logos-3' : 'logos-2');
+
   /** Into a conversation from Project Home: Core here, Logos on its own surface. */
   function openFromHome(id: string, kind: 'chat' | 'logos') {
     // Not one of theirs: it is a shared Project's conversation, opened together.
     const mine = kind === 'logos' ? logosSessions.some((x) => x.id === id) : conversations.some((c) => c.id === id);
     if (kind === 'logos') {
-      chooseModel('logos');
+      chooseModel(logosToOpen());
       window.location.assign(mine ? `/chat?s=${encodeURIComponent(id)}` : `/chat?model=logos-3&s=${encodeURIComponent(id)}&shared=1`);
       return;
     }
@@ -2645,6 +2653,19 @@ export default function ChatPage() {
           setModel(next);
           chooseModel(next);
         }}
+        // The Core chats brought into Logos 5 (lib/logos5/merge.ts): moved in
+        // this list too, so the rail opens them there from now on. The Core
+        // screen lets go of the one it had open — it lives in Logos 5 now, and
+        // a message sent to it from Core would land nowhere.
+        onConversationsMoved={(moved) => {
+          const ids = new Set(moved.map((m) => m.id));
+          setConversations((cs) => cs.filter((c) => !ids.has(c.id)));
+          setLogosSessions((ls) => [
+            ...moved.filter((m) => !ls.some((l) => l.id === m.id)).map((m) => ({ ...m, nodes: 0 })),
+            ...ls,
+          ]);
+          setActiveId((a) => (a && ids.has(a) ? null : a));
+        }}
       />
       </>
     );
@@ -2716,7 +2737,7 @@ export default function ChatPage() {
             // a navigation: record it before leaving, or coming
             // back to /chat would land on whatever was active
             // before and contradict where they just were.
-            onClick={() => chooseModel('logos')}
+            onClick={() => chooseModel(logosToOpen())}
             // NO onDoubleClick HERE, deliberately. A Logos row
             // is a link, and a link navigates on the FIRST
             // click — by the time a second arrives the page is

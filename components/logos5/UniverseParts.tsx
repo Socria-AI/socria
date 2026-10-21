@@ -444,6 +444,7 @@ export function ViewMenu({
   arr,
   lens,
   groups,
+  hasChats = true,
   hiddenCount,
   onDisplay,
   onSort,
@@ -462,6 +463,8 @@ export function ViewMenu({
   lens: HomeMode;
   /** every subject there is — Projects, courses, fields — to choose which are shown */
   groups: { key: string; name: string }[];
+  /** any Core chat drawn by its name alone (signed out); signed in, every chat is a conversation here and there is nothing to put away */
+  hasChats?: boolean;
   hiddenCount: number;
   onDisplay: (patch: Partial<Display>) => void;
   onSort: (s: SortBy) => void;
@@ -509,7 +512,7 @@ export function ViewMenu({
       )}
       <section>
         <h4>Show</h4>
-        <Check label="Core chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />
+        {hasChats && <Check label="Core chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />}
         <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />
         {lens === 'subject' && <Check label="Snap into place" hint="when you put one down" on={arr.display.snap} onFlip={() => onDisplay({ snap: !arr.display.snap })} />}
         <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />

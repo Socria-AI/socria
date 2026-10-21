@@ -55,6 +55,13 @@ export const MILESTONES = [
   'logos.asked',
   /** the sequence released them */
   'logos.aha',
+  /**
+   * their Core chats were brought into Logos 5 — moved there, every message
+   * kept — the first time Logos 5 opened after the two histories became one
+   * (app/api/conversations/merge). Not something taught: recorded here so it
+   * happens once per account, on every device.
+   */
+  'logos.merged',
   // ── found along the way, each once, when its value was legible ──
   'found.trace',
   'found.views',
@@ -101,7 +108,8 @@ export const FIRST_RUN_KEYS = [
  * browser flags that would otherwise put them straight back (legacyMilestones).
  */
 export const REPLAYS = {
-  all: { milestones: [...MILESTONES] as Milestone[], keys: [...FIRST_RUN_KEYS] as string[] },
+  // the merge is not onboarding: starting again does not bring the chats in twice
+  all: { milestones: MILESTONES.filter((m) => m !== 'logos.merged') as Milestone[], keys: [...FIRST_RUN_KEYS] as string[] },
   core: { milestones: ['core.first', 'core.aha'] as Milestone[], keys: ['socria.core4IntroDontShowAgain.v1'] },
   found: { milestones: MILESTONES.filter((m) => m.startsWith('found.')) as Milestone[], keys: ['socria.hints.seen.v1'] },
 } as const;

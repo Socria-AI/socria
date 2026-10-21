@@ -12,6 +12,7 @@
 
 const PK = {
   conversations: ['id'],
+  user_profiles: ['user_id'],
   mind_nodes: ['user_id', 'id'],
   mind_edges: ['user_id', 'id'],
   mind_tombstones: ['user_id', 'fingerprint'],

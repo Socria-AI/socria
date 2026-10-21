@@ -305,6 +305,15 @@ export interface ThinkingMap {
    */
   history?: MapHistory;
   /**
+   * DRAWN IN THE BACKGROUND, AND NOT OPENED HERE SINCE — the map of a Core
+   * chat brought into Logos 5 (lib/logos5/merge.ts). It is on the Universal
+   * Map like any other. It is not yet something the person made in Logos, so
+   * the 5-Node Challenge does not read it (lib/rewards/challenge-rule.ts)
+   * until they open the conversation here — which is when such a chat's map
+   * used to be drawn at all. Opening it takes the mark away.
+   */
+  unopened?: true;
+  /**
    * A STRUCTURED MODEL THIS TURN PROPOSED, raw and unjudged.
    *
    * At the top level rather than inside `viz`, because a model is not a
@@ -630,6 +639,9 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     edges,
     ...(removed.length ? { removed } : {}),
     ...(history ? { history } : {}),
+    // read back from storage only: no extractor, and no client save, can set it
+    // (the background's own write does, app/api/conversations PATCH)
+    ...(raw.unopened === true && opts?.trust === 'stored' ? { unopened: true as const } : {}),
     ...(named ? { context: named } : {}),
     ...(building ? { building } : {}),
     ...(intent && named === 'math' ? { intent } : {}),

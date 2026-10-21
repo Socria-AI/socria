@@ -1131,6 +1131,50 @@ span.l5n-dotc {
 .logos-root .l5 .l5h-banner .l5h-link {
   color: var(--l5-on-primary, #f5f3eb);
 }
+/* the Core chats brought in, their maps being drawn: quiet, and gone when it is done */
+.logos-root .l5 .l5h-drawing {
+  position: absolute;
+  top: 64px;
+  left: 50%;
+  z-index: 14;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  max-width: calc(100% - 32px);
+  margin: 0;
+  padding: 7px 14px 7px 12px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--l5-surface) 94%, transparent);
+  box-shadow: var(--l5-shadow);
+  color: var(--lg-ink-60);
+  font-size: 12.5px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  pointer-events: auto;
+}
+.logos-root .l5 .l5h-drawing-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+  animation: l5h-drawing 1.6s ease-in-out infinite;
+}
+@keyframes l5h-drawing {
+  0%,
+  100% {
+    opacity: 0.35;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 .l5h-drawing-dot {
+    animation: none;
+  }
+}
 
 /* ── buttons ──────────────────────────────────────────────────────── */
 .logos-root .l5 .l5h-go {
@@ -1699,6 +1743,11 @@ span.l5n-dotc {
   .logos-root .l5 .l5h-said {
     bottom: 120px;
     border-radius: 16px;
+  }
+  /* below the lenses and the strip there is no room at the top: it sits above the zoom */
+  .logos-root .l5 .l5h-drawing {
+    top: auto;
+    bottom: 64px;
   }
 }
 @media (max-width: 640px) {

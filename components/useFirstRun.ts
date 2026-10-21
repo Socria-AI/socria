@@ -55,14 +55,20 @@ async function putRemote(s: FirstRun): Promise<void> {
  * then navigates with a full page load, so every hook starts from nothing.
  */
 export async function replayFirstRun(): Promise<void> {
-  forgetFirstRunLocal(typeof window !== 'undefined' ? window.localStorage : null);
+  const store = typeof window !== 'undefined' ? window.localStorage : null;
+  // What was done rather than taught stays done: starting again does not
+  // bring the Core chats into Logos 5 a second time (REPLAYS.all).
+  const kept = withoutMilestones(readFirstRun(store), REPLAYS.all.milestones);
+  const keeps = Object.keys(kept.at).length > 0;
+  forgetFirstRunLocal(store);
+  if (keeps) writeFirstRun(store, kept);
   mergedForAccount = false;
   try {
     // Signed out, this is a 401 and there is nothing on an account to clear.
     await fetch('/api/profile', {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ firstRunReset: true }),
+      body: JSON.stringify(keeps ? { firstRunReplace: kept } : { firstRunReset: true }),
     });
   } catch {}
   if (typeof window !== 'undefined') window.dispatchEvent(new Event(FIRST_RUN_CHANGED));

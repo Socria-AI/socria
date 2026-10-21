@@ -62,7 +62,7 @@ console.log('=== seeing it: the Mind view and the Memory page ===');
   const app = read('components/LogosApp.tsx');
   ok('Logos 3, with an account, gets a Mind button on the map', /primary && workspaceOn && cloud && \(\s*<button[\s\S]{0,200}lg-panel-mind/.test(app));
   ok('  it shows the atlas centred on this chat, through the logos scope', /<MindAtlas\s+scope="logos"\s+embedded\s+focusChat=\{activeId\}/.test(app));
-  ok('  a connected Logos chat opens here, a Core chat in Core', /if \(surface === 'logos'\) switchSession\(id\);\s*else onOpenChat\?\.\(id\);/.test(app));
+  ok('  a connected Logos chat opens here — on Logos 5 a Core chat it holds does too — and any other Core chat in Core', /if \(surface === 'logos' \|\| heldHere\(id\)\) switchSession\(id\);\s*else onOpenChat\?\.\(id\);/.test(app) && /const heldHere = \(id: string\) => l5 && sessionsRef\.current\.some\(\(x\) => x\.id === id\);/.test(app));
   ok('  and it reads again after a turn lands', /refreshKey=\{`\$\{activeId\}:\$\{messages\.length\}/.test(app));
   const atlasView = read('components/mind/MindAtlas.tsx');
   ok('the atlas view is read-only — it writes nothing', !/method: '(POST|PATCH|PUT|DELETE)'/.test(atlasView));

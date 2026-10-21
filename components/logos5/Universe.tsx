@@ -66,6 +66,7 @@ export function UniverseView({
   onMind,
   contents = false,
   atlas,
+  drawing = null,
   initial,
   now: nowGiven,
 }: {
@@ -95,6 +96,8 @@ export function UniverseView({
   contents?: boolean;
   /** the Mind Atlas, for a signed-in person */
   atlas?: ReactNode;
+  /** the Core chats brought in having their maps drawn: how many of how many, while it lasts */
+  drawing?: { done: number; total: number } | null;
   /** start from this arrangement (a test; otherwise it is read from where it is kept) */
   initial?: A.Arrangement;
   /** the time to read "recent" and "today" against (a test; otherwise now) */
@@ -647,6 +650,7 @@ export function UniverseView({
               arr={arr}
               lens={lens}
               groups={homes.list.map((h) => ({ key: h.key, name: h.name }))}
+              hasChats={tiles.some((t) => t.kind === 'core')}
               hiddenCount={arr.hidden.filter((id) => tileById.has(id)).length}
               onDisplay={(patch) => prefer((a) => A.setDisplay(a, patch))}
               onSort={(s) => prefer((a) => A.setSort(a, s))}
@@ -719,6 +723,12 @@ export function UniverseView({
               onUnpin={() => commit((a) => A.unpinTiles(a, sel), [], true)}
               onClear={() => setSel([])}
             />
+          )}
+          {drawing && drawing.total > 0 && !linkFrom && (
+            <p className="l5h-drawing" role="status" title="Your chats from Core are here now. Each one's map is being drawn from what was said in it — nothing of this month's allowance is spent.">
+              <span className="l5h-drawing-dot" aria-hidden="true" />
+              Drawing maps for your chats · {Math.min(drawing.done + 1, drawing.total)} of {drawing.total}
+            </p>
           )}
           {linkFrom && (
             <div className="l5h-banner" role="status">

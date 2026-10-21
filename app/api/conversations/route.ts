@@ -301,6 +301,10 @@ export async function PATCH(req: NextRequest) {
   if (typeof id === 'string' && id && body && 'projectId' in body && body.title === undefined) {
     return moveToProject(userId, id, body.projectId);
   }
+  // ── A MAP DRAWN IN THE BACKGROUND, AND ONE OPENED (lib/logos5/merge.ts) ──
+  if (typeof id === 'string' && id && body && body.title === undefined && (body.firstMap !== undefined || body.opened === true)) {
+    return mapOnly(userId, id, body.firstMap, body.opened === true);
+  }
   // ── MOVING A CONVERSATION BETWEEN SURFACES ──────────────────────
   //
   // `kind` is where a conversation was last left, not a wall around it
@@ -374,6 +378,74 @@ export async function PATCH(req: NextRequest) {
   } catch (e: any) {
     console.error('PATCH conversation threw:', e);
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
+  }
+}
+
+/**
+ * The map of one conversation, and nothing else about it.
+ *
+ * The Core chats brought into Logos 5 have their maps drawn afterwards, one
+ * at a time, while the person may be anywhere — on this device or another. A
+ * PUT carries the whole conversation, so a browser holding its copy from when
+ * the page loaded would write those messages back over anything said since.
+ * This writes the map alone, and only:
+ *   • onto a conversation that still has none — a map drawn meanwhile, by
+ *     opening it or by hand, is never written over;
+ *   • never onto a shared one, whose map moves through the share routes that
+ *     keep everyone's in step (a version this write would not move).
+ * What it writes is marked `unopened` (lib/logos.ts) — here, and nowhere
+ * else. `opened` takes the mark away when the person opens the conversation
+ * in Logos. `updated_at` is left alone both times: drawing a map, or opening
+ * a conversation, is not working on it, and the history keeps its order.
+ */
+async function mapOnly(userId: string, id: string, raw: unknown, opened: boolean) {
+  try {
+    const db = supabaseAdmin();
+    const { data: row, error: readErr } = await db.from('conversations').select('map').eq('id', id).eq('user_id', userId).maybeSingle();
+    if (readErr) {
+      // the older database keeps maps in the memory sidecar; the move that leads here needs `kind` first
+      if (missingColumn(readErr)) {
+        return NextResponse.json({ error: 'This database has no `map` column — run supabase/schema.sql.' }, { status: 409 });
+      }
+      console.error('PATCH conversation map: could not read it', readErr);
+      return NextResponse.json({ error: 'Could not read it' }, { status: 500 });
+    }
+    if (!row) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    const held = (row as { map?: unknown }).map;
+    const stored = held && typeof held === 'object' && !Array.isArray(held) ? (held as Record<string, unknown>) : null;
+
+    if (opened) {
+      if (!stored || stored.unopened !== true) return NextResponse.json({ ok: true, changed: false });
+      const { unopened: _mark, ...map } = stored;
+      const { error } = await db.from('conversations').update({ map }).eq('id', id).eq('user_id', userId);
+      if (error) {
+        console.error('PATCH conversation map: could not mark it opened', error);
+        return NextResponse.json({ error: 'Could not save it' }, { status: 500 });
+      }
+      return NextResponse.json({ ok: true, changed: true });
+    }
+
+    const nodes = stored?.nodes;
+    if (Array.isArray(nodes) && nodes.length > 0) return NextResponse.json({ ok: true, kept: true });
+    let shared = true;
+    try {
+      shared = await isShared('conversation', id);
+    } catch {
+      /* unreadable: treated as shared, and left to the share routes */
+    }
+    if (shared) return NextResponse.json({ ok: true, kept: true });
+    const map = { ...sanitizeMap(raw), unopened: true as const };
+    if (!map.nodes.length) return NextResponse.json({ error: 'Nothing to draw' }, { status: 400 });
+    const { error, count } = await db.from('conversations').update({ map }, { count: 'exact' }).eq('id', id).eq('user_id', userId);
+    if (error) {
+      console.error('PATCH conversation map: could not save it', error);
+      return NextResponse.json({ error: 'Could not save it' }, { status: 500 });
+    }
+    if (!count) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+    return NextResponse.json({ ok: true, kept: false });
+  } catch (e) {
+    console.error('PATCH conversation map threw:', e);
+    return NextResponse.json({ error: 'Could not save it' }, { status: 500 });
   }
 }
 
@@ -481,14 +553,40 @@ export async function PUT(req: NextRequest) {
       draft: sanitizeDraft(c.draft),
       contexts: sanitizeContexts(c.contexts),
     };
+    // A CONVERSATION'S MEMORY IS THE CORE CHAT'S, and only a client that
+    // sends it may change it. Logos never reads it and so never sends it —
+    // which, while this wrote `c.memory ?? EMPTY_MEMORY`, meant a Core chat
+    // opened in Logos 5 and saved there (a reply, a map drawn, a move) had
+    // its memory wiped. A save without one now leaves the stored memory as
+    // it is; a new row starts empty.
+    const memoryGiven = c.memory !== undefined && c.memory !== null;
+    const memory = sanitizeMemory(memoryGiven ? c.memory : EMPTY_MEMORY);
     const base = {
       id: c.id,
       user_id: userId,
       title: c.title.slice(0, MAX_TITLE),
       messages: sanitizeMessages(c.messages),
-      memory: sanitizeMemory(c.memory ?? EMPTY_MEMORY),
+      ...(memoryGiven ? { memory } : {}),
       updated_at: Number(c.updatedAt) || Date.now(),
     };
+    /** The memory a degraded write folds the sidecar into: what was sent, else what is stored (without its old sidecar). */
+    const memoryForSidecar = async (): Promise<Record<string, unknown>> => {
+      if (memoryGiven) return memory as unknown as Record<string, unknown>;
+      try {
+        const { data } = await supabaseAdmin().from('conversations').select('memory').eq('id', c.id).eq('user_id', userId).maybeSingle();
+        const held = (data as { memory?: unknown } | null)?.memory;
+        if (held && typeof held === 'object' && !Array.isArray(held)) {
+          const clean = { ...(held as Record<string, unknown>) };
+          delete clean[SIDECAR];
+          return clean;
+        }
+      } catch {
+        /* unreadable: an empty memory, as a new row would have */
+      }
+      return EMPTY_MEMORY as unknown as Record<string, unknown>;
+    };
+    /** A new row's memory: what was sent, or empty. */
+    const fresh = { memory };
     // NOT an upsert. `conversations.id` is the primary key on its own, so an
     // upsert conflicts on the id alone — and a caller who supplied someone
     // else's conversation id would overwrite that row and take ownership of
@@ -546,7 +644,7 @@ export async function PUT(req: NextRequest) {
       legacy = true;
       ({ error, count } = await supabaseAdmin()
         .from('conversations')
-        .update({ ...base, memory: { ...base.memory, [SIDECAR]: sidecar } }, { count: 'exact' })
+        .update({ ...base, memory: { ...(await memoryForSidecar()), [SIDECAR]: sidecar } }, { count: 'exact' })
         .eq('id', c.id)
         .eq('user_id', userId));
     }
@@ -554,19 +652,19 @@ export async function PUT(req: NextRequest) {
     if (!error && !count) {
       // Annotated, or the ternary infers a union the client's generics reject.
       const row: Record<string, unknown> = legacy
-        ? { ...base, memory: { ...base.memory, [SIDECAR]: sidecar } }
-        : { ...base, ...extras, ...(projectColumn ? { project_id: projectId } : {}) };
+        ? { ...base, memory: { ...fresh.memory, [SIDECAR]: sidecar } }
+        : { ...base, ...fresh, ...extras, ...(projectColumn ? { project_id: projectId } : {}) };
       ({ error } = await supabaseAdmin().from('conversations').insert(row));
 
       if (error && missingColumn(error) && !legacy && projectColumn) {
-        ({ error } = await supabaseAdmin().from('conversations').insert({ ...base, ...extras }));
+        ({ error } = await supabaseAdmin().from('conversations').insert({ ...base, ...fresh, ...extras }));
         if (!error) warnProjectColumn();
       }
       if (error && missingColumn(error)) {
         warnLegacy('PUT');
         ({ error } = await supabaseAdmin()
           .from('conversations')
-          .insert({ ...base, memory: { ...base.memory, [SIDECAR]: sidecar } }));
+          .insert({ ...base, memory: { ...fresh.memory, [SIDECAR]: sidecar } }));
       }
 
       // A primary-key collision here means the id exists and is not yours.

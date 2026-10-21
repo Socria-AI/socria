@@ -162,10 +162,12 @@ them still reads (below).
   more, or a map that grew. It is a star with its name, its kind and how long
   ago beside it. Its size is how much it holds (View can make it recency, or
   all alike).
-- **A dot** is a quick one-off question — a Core chat is always one, since
-  the map knows a chat only by its name. Beside hubs a dot is ambient: named
+- **A dot** is a quick one-off question. Beside hubs a dot is ambient: named
   when pointed at, found, chosen or seen up close. In a cluster of only a few
-  dots, each is named.
+  dots, each is named. A Core chat this surface does not hold — signed out,
+  where the two histories are kept apart — is known only by its name and is
+  always a dot; signed in, a Core chat is a conversation here like any other
+  (below).
 - Marks: a gold **?** when Socria asked something unanswered; a count of
   what was made in it; a star when starred; a gold ring and "last here" on
   the one to pick up; a dashed ring on one shown in a Project for its subject
@@ -279,6 +281,45 @@ pins in a Project still hold.
 "Organize it" and "Practice this" write into the line of thinking they began
 in, even if another is opened while they work.
 
+### Core 4 and Logos 5: one history
+
+Signed in, every conversation is a conversation of Logos 5, the ones begun in
+Core 4 included (`lib/logos5/merge.ts`):
+- **On the map, in the List, in search, once.** A Core chat is drawn from its
+  words and its map, as a line of thinking is — no second tile beside it with
+  its name alone, and no "Core chats" switch in View while there are none to
+  put away.
+- **Opened here.** Pressed on the map, in the List, in the Mind Atlas or the
+  Mind Graph, it opens inside Logos 5 — and from Core 4's rail or a Project's
+  home too, which used to choose the plain "Logos" and so landed on Logos 2
+  while Logos 1 is held back. A map it never had is drawn when it is opened,
+  as before (`owesExtraction`).
+- **The ones from before, brought in once.** The first time Logos 5 opens on
+  an account, every Core chat is moved here (`POST /api/conversations/merge`):
+  its `kind` and nothing else — not its words, title, memory, map, draft,
+  Project or when it was last worked on. Never an incognito one. Once per
+  account, recorded as the `logos.merged` milestone (`lib/first-run.ts`), so
+  a second device does not do it again and starting onboarding over does not
+  either. The Core 4 screen stays for whoever picks it; a chat begun there
+  afterwards opens there from its rail and is on this map all the same.
+- **Their maps, drawn in the background.** One at a time, newest first, paced
+  (2.5s apart) and at most 150 a day per browser, through the ordinary map
+  pass — which spends nothing of the month's allowance; "Drawing maps for your
+  chats · 3 of 12" shows while it runs. Each is written alone (`PATCH
+  /api/conversations` with `firstMap`): never the messages, never over a map
+  already there, never onto a shared conversation. A visit cut short carries
+  on the next time; one the pass cannot draw is drawn when it is opened.
+- **Not for a chat kept quiet.** One the person took off the record or kept to
+  itself (Core 4's `persistPolicy`), or one a private memory came from — a
+  weighty conversation, whose memories never reach Logos (invariant 3,
+  `lib/mind/types.ts`) — is brought in like the rest, and its map is drawn
+  only if they open it here. When the server cannot tell, none are drawn in
+  the background.
+- **Not a way into a reward.** A map drawn in the background is marked
+  `unopened`, and the 5-Node Challenge does not read it until the person opens
+  the conversation in Logos (`lib/rewards/challenge-rule.ts`) — which is when
+  a Core chat's map used to be drawn at all — so who qualifies is as before.
+
 ## 6. The map is the screen
 
 A line of thinking is three views of the same material, switched in the
@@ -382,6 +423,25 @@ list now returns each Project's colour.
 Editing a sent message removes the messages after it, after an explicit
 confirmation in place; the map is not rolled back and says so.
 
+New for one history (§5): `POST /api/conversations/merge` → `{ moved, draw,
+already, recorded }`, moving the `kind` of every non-incognito conversation not
+already in Logos, once per account (`user_profiles.first_run`, milestone
+`logos.merged`; without that column it still moves them and says
+`recorded: false`; without `kind` it moves nothing, 409). `PATCH
+/api/conversations` takes `{ id, firstMap }` — the map alone, onto a
+conversation without one and not shared, stored with `unopened: true` — and
+`{ id, opened: true }`, which takes the mark away; neither touches
+`updated_at`. `unopened` is kept only when a map is read back from storage
+(`sanitizeMap(…, { trust: 'stored' })`), so no extractor and no whole save can
+set it. Per browser: `socria.logos5.mapsOwed.v1` (the ids whose maps are still
+to be drawn) and `socria.logos5.mapsOwed.day.v1` (how many were drawn today).
+
+And a fix the merge needed: a `PUT /api/conversations` without a `memory` now
+leaves the stored memory as it is. Logos never sends one, so a Core chat
+opened in Logos and saved there used to have its Core memory replaced by an
+empty one; a client that sends a memory still replaces it, and a new row
+starts empty. The older database's sidecar keeps it the same way.
+
 ## 9. Phones
 
 The view is the screen: the header, then **Components · Artifacts · Logic
@@ -428,10 +488,16 @@ code. Logos 2 is unchanged.
 | The view, the map, the pieces; the map's look on every theme, and the sky on Night | `components/logos5/Universe.tsx`, `UniverseSky.tsx`, `UniverseParts.tsx`, `universe.css` |
 | The themes, Night among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
 | Where home is wired in (start, file, a Project renamed or recoloured) | `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`), `app/chat/page.tsx` (`updateProject`) |
+| One history: which chats to bring in, the maps owed, the chats kept quiet, today's count (pure, and two storage helpers) | `lib/logos5/merge.ts` |
+| Bringing them in, once | `app/api/conversations/merge/route.ts` |
+| A map written alone, and the mark taken away (`firstMap`, `opened`); a save that leaves the memory | `app/api/conversations/route.ts` (`mapOnly`, PUT) |
+| The move, the drawing, the chip, opening a Core chat here | `components/LogosApp.tsx` (search `THE CORE CHATS, BROUGHT IN`), `components/logos5/Universe.tsx` (`drawing`), `app/chat/page.tsx` (`onConversationsMoved`) |
+| The challenge leaving an unopened map alone | `lib/rewards/challenge-rule.ts` |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Subject`; any of them on a theme with `THEME=night`) |
 
-Core chat (`app/chat/page.tsx`) is not part of this change. Logos 2 keeps its
-two columns. Everything Logos 3–4 could do is still reached from Logos 5: the
+Core chat (`app/chat/page.tsx`) keeps its screen; its list lets go of the
+chats brought into Logos 5, and its rail and a Project's home open them there
+(`logosToOpen`). Logos 2 keeps its two columns. Everything Logos 3–4 could do is still reached from Logos 5: the
 workspace panels, "+ View", every lens, displays, documents, models, Live 3D,
 Synthesize, Draft, Capture, Voice, sharing and comments.
 
@@ -702,3 +768,40 @@ without membership back on paper); the Mind Graph on Night only with neurons
 drawn from its own markup (it needs a signed-in account). Left as they were:
 a pie chart's white percentages sit on its light slices on a dark ground (the
 display's renderer), and Logos 4's map legend keeps its cream strip there.
+
+### One history: the Core chats in Logos 5
+
+The two histories made one (§5, "Core 4 and Logos 5: one history").
+
+- **The routes, end to end** (`test/merge-chats-e2e.test.mjs`, 53 checks, the
+  real handlers on the stand-in database): a save without a memory keeps it,
+  on the newer database and the older one's sidecar; the move takes every Core
+  chat (an unmarked one too), newest first, and changes nothing else about any
+  of them — words, memory, title, map, when; never an incognito one or someone
+  else's; once per account, a first-run record added to and not replaced; the
+  chats kept quiet (off the record, kept to itself, a private memory's source
+  in the Mind graph or the person's memory) left out of what is drawn, and all
+  of them when that cannot be read; a map written alone, never over one,
+  never onto a shared conversation, never someone else's; the challenge not
+  reading it until it is opened, and reading it after.
+- **In a browser, signed in** (the real LogosApp with a stand-in for the
+  sign-in and every request answered and recorded; 1440×900 and 390×844): the
+  move asked for once; the host told which moved; maps drawn for the two
+  allowed, newest first, never the quiet one; each saved as its map alone, no
+  whole save while drawing; one tile per conversation; the chip, "Drawing maps
+  for your chats · 1 of 2", gone when done; opened from the map inside Logos 5
+  with its messages, and the mark taken away; a second visit asks for nothing
+  again. No page errors.
+- `test/logos5-home.test.mjs`: one tile per conversation when a chat is both
+  held here and handed down by name. Full suite: 237 of 237. Typecheck and the
+  production build pass.
+
+Found and fixed on the way: Logos saved without a memory, which reset a Core
+chat's memory every time it was opened and saved in Logos (above, §8).
+
+**Not verified here:** against a real database and a real account — the move,
+the first-run record and the background drawing were driven against stand-ins;
+how long the background takes with years of chats (paced and capped by design,
+not measured); the Universal Map's Today lens draws an older conversation not
+tied to today's work as a dot, so a newly drawn chat may show as a hub only
+under By week or By subject.

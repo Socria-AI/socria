@@ -79,6 +79,13 @@ console.log('\n=== a conversation, as a tile ===');
   const said = H.tilesOf([conv('z', 'Why prices rise', { map: { context: 'learning', nodes: [], edges: [], ask: { topic: 'prices', domain: 'Microeconomics' }, viz: { kind: 'supply-demand' }, objects: { objs: [{ kind: 'study', at: 0, states: [{ course: 'ECON 1301 · Midterm', topics: [] }] }] } } })])[0];
   ok('  and what the map read: the field it named, the picture it drew, the course its study was sorted under', said.about.domain === 'Microeconomics' && said.about.viz === 'supply-demand' && said.about.topic === 'prices' && said.about.course === 'ECON 1301 · Midterm', JSON.stringify(said.about));
   ok('  a Core chat is known by its name alone', T.get('k').about.course === '' && T.get('k').about.asked === '' && T.get('k').about.title === 'Salary negotiation tips');
+  // the same conversation twice: held here with its words, and handed down by Core by its name
+  const once = H.tilesOf([
+    { id: 'm', title: 'Salary negotiation tips', updatedAt: NOW - 2 * DAY, kind: 'core' },
+    conv('m', 'Salary negotiation tips', { last: 2, ideas: ['Salary negotiation tips', 'Anchor high'] }),
+    { id: 'n', title: 'Only on Core', updatedAt: NOW - 3 * DAY, kind: 'core' },
+  ]);
+  ok('one tile per conversation: a Core chat held here is that conversation, its words and its map', once.length === 2 && once[0].id === 'm' && once[0].kind === 'logos' && once[0].count === 2 && once[0].stands === 'It comes down to one thing.' && once[1].kind === 'core', J(once.map((t) => [t.id, t.kind, t.count])));
 }
 
 console.log('\n=== what conversations share ===');

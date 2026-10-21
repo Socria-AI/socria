@@ -31,6 +31,12 @@
 // No minimum of branches, counterarguments or length; no waiting period; no
 // model call. A historical map qualifies exactly as a new one does.
 //
+// One map is not read yet: a Core chat's, drawn in the background when the
+// chats were brought into Logos 5 and not opened there since (`unopened`).
+// Before that move, a Core chat had a map only once it was opened in Logos;
+// it still counts from that moment, and not before — so the move changes
+// nothing about who qualifies.
+//
 // PURE.
 
 import { OPENINGS, MODEL_OPENING, SCENARIO_STARTS } from '../first-session';
@@ -52,7 +58,7 @@ export interface ChallengeMsg {
 }
 export interface ChallengeSession {
   id: string;
-  map: { nodes?: ChallengeNode[]; edges?: ChallengeEdge[] } | null;
+  map: { nodes?: ChallengeNode[]; edges?: ChallengeEdge[]; unopened?: boolean } | null;
   messages: ChallengeMsg[];
 }
 
@@ -201,6 +207,10 @@ export function evaluateChallenge(
   let blockedBest = 0;
   for (const s of sessions ?? []) {
     if (!s || !s.map) continue;
+    // A Core chat's map drawn in the background, never opened in Logos, is not
+    // one the person made there (lib/logos.ts `unopened`). Opening it counts it,
+    // as opening a Core chat in Logos always did.
+    if (s.map.unopened === true) continue;
     const n = connectedCount(s.map);
     if (n === 0) continue;
     if (ownWords(s.messages) >= cfg.minOwnWords) {

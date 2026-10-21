@@ -217,6 +217,7 @@ import {
   type ThinkingMap as TMap,
 } from '@/lib/logos';
 import { owesExtraction } from '@/lib/conversation-surface';
+import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { LogosCover } from '@/components/LogosCover';
 import { useFirstRun } from '@/components/useFirstRun';
@@ -354,6 +355,9 @@ export function LogosApp({
   onCreateProject,
   onUpdateProject,
   onMoveChat,
+  // The Core chats brought into Logos 5 (lib/logos5/merge.ts), told to the
+  // host so its own list moves them too: from then on its rail opens them here.
+  onConversationsMoved,
   autoSend = false,
   tourAfter = false,
 }: {
@@ -376,6 +380,7 @@ export function LogosApp({
   /** rename a Project or change its colour; what went wrong, or null */
   onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
   onMoveChat?: (id: string, projectId: string | null) => void;
+  onConversationsMoved?: (moved: { id: string; title: string; updatedAt: number; projectId: string | null }[]) => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
   // The account's Conversation Style (Manage Account → Personalization):
@@ -4299,17 +4304,195 @@ export function LogosApp({
   const [l5List, setL5List] = useState(false);
   /** the rail, asked for to rename, delete or file conversations */
   const [l5Manage, setL5Manage] = useState(false);
-  /** what the Universal Map draws: every line of thinking, and the Core chats */
-  const universeIn = useMemo<UniverseIn[]>(
-    () =>
-      l5
-        ? [
-            ...sessions.map((x) => ({ id: x.id, title: x.title, updatedAt: x.updatedAt, projectId: x.projectId ?? null, map: x.map, messages: x.messages })),
-            ...(chats ?? []).map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, projectId: c.projectId ?? null, kind: 'core' as const })),
-          ]
-        : [],
-    [l5, sessions, chats]
-  );
+  /**
+   * What the Universal Map draws: every conversation. Signed in, that is all
+   * of them as conversations of this surface, Core chats included — their
+   * words and their maps, not their names alone (lib/logos5/merge.ts). A Core
+   * chat this surface does not hold (signed out, where the two are kept
+   * apart) is drawn by its name and opens on Core.
+   */
+  const universeIn = useMemo<UniverseIn[]>(() => {
+    if (!l5) return [];
+    const here = new Set(sessions.map((x) => x.id));
+    return [
+      ...sessions.map((x) => ({ id: x.id, title: x.title, updatedAt: x.updatedAt, projectId: x.projectId ?? null, map: x.map, messages: x.messages })),
+      ...(chats ?? []).filter((c) => !here.has(c.id)).map((c) => ({ id: c.id, title: c.title, updatedAt: c.updatedAt, projectId: c.projectId ?? null, kind: 'core' as const })),
+    ];
+  }, [l5, sessions, chats]);
+
+  /** A conversation this surface holds — on Logos 5 a Core chat is one too — opens here, wherever it was pressed. */
+  const heldHere = (id: string) => l5 && sessionsRef.current.some((x) => x.id === id);
+
+  // ── THE CORE CHATS, BROUGHT IN — ONCE (lib/logos5/merge.ts) ──────────
+  //
+  // The first time Logos 5 opens on an account after the two histories became
+  // one, every Core chat is moved here (app/api/conversations/merge): its kind
+  // and nothing else. Then each one's map is drawn — once, in the background,
+  // one at a time and paced — through the ordinary map pass, which spends
+  // nothing of the month's allowance. A visit cut short carries on the next
+  // time; one that cannot be drawn now is drawn when it is opened.
+  /** the maps being drawn for them: how many of how many, while it lasts */
+  const [drawing, setDrawing] = useState<{ done: number; total: number } | null>(null);
+  const mergeAskedRef = useRef(false);
+  const drawingRef = useRef(false);
+  /** the conversation whose map is being drawn in the background right now */
+  const drawingIdRef = useRef<string | null>(null);
+  /** on the Universal Map or the Mind Graph, the open line of thinking is not on screen */
+  const offStageRef = useRef(false);
+  offStageRef.current = l5Home || l5Mind;
+  const movedRef = useRef(onConversationsMoved);
+  movedRef.current = onConversationsMoved;
+
+  /**
+   * A map the pass drew for a conversation that had none: what refreshMap
+   * keeps of one, without the news it gives the screen — there was nothing on
+   * it to protect, no workspace, no scene, nothing moved by hand.
+   */
+  function firstDrawn(s: LogosSession, got: TMap): TMap {
+    const objects = mergeSpaces(s.map?.objects, got.objects);
+    const unbound = { ...got, ...(objects ? { objects } : {}) };
+    if (!objects) delete (unbound as { objects?: unknown }).objects;
+    const map = bindNodes(unbound as TMap, s.messages.filter((m) => m.role === 'user').map((m) => m.content).join('\n'));
+    const kept = dropRemoved(map, s.map?.removed);
+    const words = [...s.messages].reverse().find((m) => m.role === 'user')?.content;
+    const history = recordChange(s.map?.history, s.map?.nodes ?? [], kept.nodes, Date.now(), 'turn', typeof words === 'string' ? words : undefined);
+    return history ? { ...kept, history } : kept;
+  }
+
+  /** Draw the maps still owed, one at a time, until none are left or the pass says to stop. */
+  async function drawOwed() {
+    if (drawingRef.current) return;
+    drawingRef.current = true;
+    const store = browserStorage();
+    let done = 0;
+    try {
+      for (;;) {
+        const owed = readOwed(store);
+        // never one that is shared or someone else's: this browser does not save those as a whole
+        const skip = new Set([...sharedIdsRef.current, ...foreignIdsRef.current]);
+        const { id, drop } = nextOwed(owed, sessionsRef.current, skip, offStageRef.current ? null : activeIdRef.current);
+        if (drop.length) writeOwed(store, owed.filter((x) => !drop.includes(x)));
+        // enough for one day: the rest tomorrow, or each when it is opened
+        if (!id || drawnOn(store, localDay()) >= OWED_PER_DAY) break;
+        setDrawing({ done, total: done + readOwed(store).length });
+        const s = sessionsRef.current.find((x) => x.id === id)!;
+        drawingIdRef.current = id;
+        let stop = false;
+        try {
+          const res = await fetch('/api/logos/map', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+            body: JSON.stringify({
+              messages: s.messages,
+              map: s.map ?? { ...EMPTY_MAP },
+              contexts: s.contexts ?? {},
+              today: localDay(),
+              ...guidance(),
+              // its own guard, not the open one's: on whenever its map is one the guard watches
+              guard: guardWatches(s.map ?? EMPTY_MAP) ? 'guard' : '',
+            }),
+          });
+          // too many at once, or no longer signed in: the rest wait for the next visit
+          if (res.status === 429 || res.status === 401 || res.status === 403) stop = true;
+          else countDrawn(store, localDay());
+          if (!stop && res.ok) {
+            const json = await res.json().catch(() => null);
+            const cur = sessionsRef.current.find((x) => x.id === id);
+            // still without one — not drawn by opening it, or by hand, meanwhile
+            if (json?.map?.nodes?.length && cur && !(cur.map?.nodes ?? []).length) {
+              const drawn = firstDrawn(cur, json.map as TMap);
+              // THE MAP ALONE, and only onto a conversation still without one:
+              // this browser's copy of its messages is from when the page
+              // loaded, and saving the whole of it would write that back over
+              // anything said since, here or on another device.
+              const put = await fetch('/api/conversations', {
+                method: 'PATCH',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ id, firstMap: drawn }),
+              });
+              const said = put.ok ? await put.json().catch(() => null) : null;
+              const now = sessionsRef.current.find((x) => x.id === id);
+              // when it was last worked on is unchanged: drawing its map is not working on it
+              if (said?.ok && said.kept === false && now && !(now.map?.nodes ?? []).length) {
+                applySessions(sessionsRef.current.map((x) => (x.id === id ? { ...now, map: { ...drawn, unopened: true } } : x)));
+              }
+            }
+          }
+        } catch {
+          // offline: the rest wait
+          stop = true;
+        } finally {
+          drawingIdRef.current = null;
+        }
+        if (stop) break;
+        // asked for once, drawn or not: one the pass could not draw is drawn when it is opened
+        writeOwed(store, readOwed(store).filter((x) => x !== id));
+        done++;
+        await new Promise((r) => setTimeout(r, OWED_PACE_MS));
+      }
+    } finally {
+      drawingRef.current = false;
+      setDrawing(null);
+    }
+  }
+
+  // OPENED HERE, IT IS THEIRS. A map drawn in the background is marked
+  // `unopened` until the person opens its conversation in Logos — on screen,
+  // not merely the one last open behind the Universal Map (lib/logos.ts).
+  const activeUnopened = !!active?.map?.unopened;
+  useEffect(() => {
+    if (hydrating || !activeId || !activeUnopened || l5Home || l5Mind) return;
+    const id = activeId;
+    const s = sessionsRef.current.find((x) => x.id === id);
+    if (!s?.map?.unopened) return;
+    const { unopened: _mark, ...map } = s.map;
+    applySessions(sessionsRef.current.map((x) => (x.id === id ? { ...x, map } : x)));
+    if (!cloud) return;
+    void fetch('/api/conversations', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ id, opened: true }),
+    })
+      // the stored map changed: Socria Rewards reads progress from it, as from any save
+      .then((r) => r.ok && window.dispatchEvent(new Event(SESSION_SAVED)))
+      .catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, activeUnopened, hydrating, l5Home, l5Mind, cloud]);
+
+  useEffect(() => {
+    if (!l5 || !cloud || hydrating || !firstRun.ready) return;
+    // what a visit cut short left owed
+    if (readOwed(browserStorage()).length) void drawOwed();
+    if (mergeAskedRef.current || firstRun.has('logos.merged')) return;
+    mergeAskedRef.current = true;
+    void (async () => {
+      try {
+        const res = await fetch('/api/conversations/merge', { method: 'POST' });
+        // refused or unreachable: asked again on the next visit
+        if (!res.ok) return;
+        const json = await res.json().catch(() => null);
+        if (!json) return;
+        firstRun.reach('logos.merged');
+        const strings = (v: unknown): string[] => (Array.isArray(v) ? v.filter((x: unknown): x is string => typeof x === 'string') : []);
+        const ids = strings(json.moved);
+        if (!ids.length) return;
+        const moved = new Set(ids);
+        movedRef.current?.(
+          sessionsRef.current
+            .filter((x) => moved.has(x.id))
+            .map((x) => ({ id: x.id, title: x.title, updatedAt: x.updatedAt, projectId: x.projectId ?? null }))
+        );
+        // only the ones the server says may be drawn: never one kept quiet
+        const draw = strings(json.draw).filter((x) => moved.has(x));
+        if (!draw.length) return;
+        writeOwed(browserStorage(), [...readOwed(browserStorage()), ...draw]);
+        void drawOwed();
+      } catch {
+        /* offline: asked again on the next visit */
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [l5, cloud, hydrating, firstRun.ready]);
   useEffect(() => {
     setStudyTopic(null);
     setStudyStartOpen(true);
@@ -4940,7 +5123,7 @@ export function LogosApp({
               focusChat={activeId}
               refreshKey={`${activeId}:${messages.length}:${busy ? 1 : 0}`}
               onOpenChat={(id, surface) => {
-                if (surface === 'logos') switchSession(id);
+                if (surface === 'logos' || heldHere(id)) switchSession(id);
                 else onOpenChat?.(id);
               }}
             />
@@ -5819,7 +6002,7 @@ export function LogosApp({
                 focusChat={activeId}
                 refreshKey={`${activeId}:${messages.length}:${busy ? 1 : 0}`}
                 onOpenChat={(id, surface) => {
-                  if (surface === 'logos') switchSession(id);
+                  if (surface === 'logos' || heldHere(id)) switchSession(id);
                   else onOpenChat?.(id);
                 }}
               />
@@ -6727,6 +6910,10 @@ export function LogosApp({
     setL5Home(false);
     setL5Mind(false);
     setL5List(false);
+    // The one already open when the map was shown is not switched to, so it
+    // draws the map it is owed here — unless the background is drawing it now.
+    const same = sessionsRef.current.find((x) => x.id === id && x.id === activeIdRef.current);
+    if (same && drawingIdRef.current !== id && owesExtraction({ messages: same.messages, map: same.map }, { logosSurface: true })) refreshMap();
     switchSession(id);
     if (node)
       setTimeout(() => {
@@ -6760,8 +6947,8 @@ export function LogosApp({
       signedIn={!!isSignedIn}
       narrow={narrow}
       onOpen={(place) => {
-        if (place.surface === 'core') onOpenChat?.(place.id);
-        else if (sessionsRef.current.some((x) => x.id === place.id)) openFromHome(place.id);
+        if (heldHere(place.id)) openFromHome(place.id);
+        else if (place.surface === 'core') onOpenChat?.(place.id);
       }}
       head={(center) =>
         chromeHidden ? null : (
@@ -6798,6 +6985,7 @@ export function LogosApp({
       onUpdateProject={onUpdateProject}
       onMind={cloud ? () => setL5Mind(true) : undefined}
       contents={l5List}
+      drawing={drawing}
       head={(center, count) =>
         chromeHidden ? null : (
           <L5Header
@@ -6827,7 +7015,7 @@ export function LogosApp({
           <MindAtlas
             scope="logos"
             onOpenChat={(id, surface) => {
-              if (surface === 'logos') openFromHome(id);
+              if (surface === 'logos' || heldHere(id)) openFromHome(id);
               else onOpenChat?.(id);
             }}
           />

@@ -281,8 +281,16 @@ export function tileOf(s: UniverseIn): Tile {
  * Core chats, at most a hundred and fifty, the most recently active kept.
  */
 export function tilesOf(conversations: readonly UniverseIn[]): Tile[] {
-  return [...conversations]
-    .filter((s) => s && typeof s.id === 'string')
+  // ONE TILE PER CONVERSATION. A Core chat this surface also holds as a
+  // conversation of its own is that conversation — its words and its map —
+  // not a second tile beside it with only its name (lib/logos5/merge.ts).
+  const byId = new Map<string, UniverseIn>();
+  for (const s of conversations) {
+    if (!s || typeof s.id !== 'string') continue;
+    const had = byId.get(s.id);
+    if (!had || (had.kind === 'core' && s.kind !== 'core')) byId.set(s.id, s);
+  }
+  return [...byId.values()]
     // a line of thinking with nothing said in it holds nothing to show
     .filter((s) => s.kind === 'core' || (s.messages ?? []).length > 0 || (s.map?.nodes ?? []).length > 0)
     .sort((a, b) => (b.updatedAt || 0) - (a.updatedAt || 0) || (a.id < b.id ? -1 : 1))
