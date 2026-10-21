@@ -14,6 +14,12 @@ it — with the conversation and its Logic Map one step away.** Every line of
 thinking is also one map — and that map is home: the **Universal Map**, every
 conversation merged into one mind map, with the old list of chats put away.
 
+The redesign (§6–7) turns the line of thinking around: **the map is the
+screen.** Components, Artifacts and the Logic Map are three views of one line
+of thinking, switched in the header; the conversation folds away to a
+composer floating over the map, and a card is asked about where it is. What
+Socria remembers has a place of its own, drawn as a mind: the **Mind Graph**.
+
 ## 1. What was wrong with Logos 4's screen
 
 Measured on dev before the rebuild (390×844 and 1440×900):
@@ -30,6 +36,10 @@ Measured on dev before the rebuild (390×844 and 1440×900):
 | On a phone, an empty map filled the screen; the composer sat under it. | narrow `Workspace` |
 
 ## 2. The model
+
+*The line of thinking described here — thread first, the stage beside it — is
+how Logos 5 first shipped. The redesign in §6 makes the map the screen; the
+thread, the composer and every turn's actions are the same pieces.*
 
 **Three regions, shown only when they have something to hold.**
 
@@ -155,36 +165,125 @@ together, so related thinking sits near itself and the whole reads as one map.
 "Organize it" and "Practice this" write into the line of thinking they began
 in, even if another is opened while they work.
 
-## 6. Data
+## 6. The map is the screen
+
+A line of thinking is three views of the same material, switched in the
+header — **Components · Artifacts · Logic Map**, each counted:
+
+- **Components** — the topics the files were sorted into (§4's board and
+  topic panel). With no files yet: "Nothing to sort yet.", a place to drop
+  them (they are sorted straight away), and what was said in the conversation,
+  each a press from its message.
+- **Artifacts** — everything made in the conversation: displays (charts,
+  plans, comparisons, documents' figures) and practice sets, one at a time at
+  full size, the others in a strip above it. Each says "made from the
+  conversation". Something new arriving opens it here.
+- **Logic Map** — the workspace (§2's stage, every panel and lens, "+ View",
+  Synthesize), the Thinking Map in it.
+
+It opens on Components while there is little on the map, on the Logic Map
+after that; a new artifact switches to Artifacts.
+
+**The conversation folds away.** Beside the view is the conversation — "4
+turns · fold it away ›" — or, folded, a composer floating over the bottom of
+the view. A reply that arrives while it is folded is shown over the composer
+as it streams ("Open the conversation", or × to put it away), with its effects
+("+2 on the map", "Chart · Spending") a press from what they made. Whether it
+is open is kept per line of thinking, in this browser
+(`socria.logos5.stage.v1`, `convo`); a visit with nothing on the map yet opens
+it. The header's **Conversation · N** pill does the same.
+
+**Asking about a card.** Pressing a card on the Logic Map opens "Asking
+about" beside it — never under the composer, never past the map's edge: the
+card's name, the last thing asked about it and Socria's answer (streaming, if
+it is on its way), "Came from 2 messages ›" (the thread marks them), and
+**Challenge it**, **What rests on this?**, "Why does this one matter?", or a
+question of one's own. What is asked there is an ordinary turn of the
+conversation with the card as its Point & Ask subject — nothing new is
+stored — and its answer is read in the popover, not again over the composer.
+The card's other actions are under "More about this card".
+
+**A reply's closing question** is set apart in the serif italic, so the
+question Socria asks back reads as one (`closingQuestion`; only when the cut
+leaves bold, code, maths and links whole).
+
+The header: the Socria mark (home), a small-caps eyebrow — the course, the
+Project, or "Logos" — and the title in the serif; the switch in the middle;
+the Conversation pill, the Mind Graph, the menu and the account on the right.
+"Manage conversations" in the menu brings back the rail.
+
+## 7. The Mind Graph
+
+What Socria remembers about the person (the Mind Graph store, `lib/mind`,
+read through `/api/mind?scope=logos` — nothing private) is its own place,
+drawn as a mind (`lib/logos5/mindgraph.ts`, `components/logos5/MindGraph.tsx`).
+The brain icon in a line of thinking's header, or **Mind Graph** on home,
+opens it.
+
+- **A neuron per memory**: its cell sized by how much it matters (importance,
+  how often seen, confidence), a dendrite for each conversation it was learned
+  in, an axon to each memory it informs. The weightiest of each region leads
+  it, larger and darker.
+- **Three regions**, by the kind the store gave it: **How you decide**
+  (habits: preferences, beliefs, decisions, insights, values, patterns…),
+  **What you are holding** (facts: people, places, events, givens) and **What
+  you are working on** (projects, goals, plans). The store's own bookkeeping
+  (conversations) is not drawn; nor is anything archived.
+- Under each name, how it is known: "set by you", "seen in 3 lines of
+  thinking", the one conversation it came from, or "since March".
+- **All · Habits · Facts · Projects**, and **Find a memory**, which reaches the
+  memories past the drawing's cap (36) as well.
+- **A memory pressed**: "Habit · remembered", its words, *Learned from* (each
+  conversation a press away), *Informs*, *First noticed*; **Edit**
+  (`PATCH /api/mind/node`), **Show where** (opens the conversation it was
+  learned in), **Forget this** (asks once more, then `DELETE`).
+- Signed out it says memory lives with an account; if the store cannot be
+  reached it says so, and nothing else changes.
+- Every position is computed, deterministically. On a phone the regions are
+  one under another, a memory to a row at the phone's own size, and the page
+  scrolls.
+
+**Home** (§5) has a contents column under **List** — every line of thinking
+by its Project, then the rest, then chats; searchable; "Mind Graph →" at its
+foot — and the shared ideas between two lines of thinking are named on their
+bridges ("both talk about “runway”").
+
+## 8. Data
 
 Unchanged: the session and message shapes (`lib/logos-sessions.ts`), the
 `/api/conversations` contract, ids (`lg_…`, `m_…`), every localStorage key
 Logos 4 reads, the `#lg-m-<id>` anchors and `.lg-composer textarea` the
 resume and jump code look for. New, per browser only:
-`socria.logos5.stage.v1` (stage open per line of thinking, and its width).
+`socria.logos5.stage.v1` (stage open per line of thinking, its width, and
+whether the conversation is open beside the map).
 
 Editing a sent message removes the messages after it, after an explicit
 confirmation in place; the map is not rolled back and says so.
 
-## 7. Phones
+## 9. Phones
 
-The thread is the screen. The stage is a full-screen sheet over it, opened
-from the header's **Map · N** or from an effect chip, closed with
-"Conversation". The composer is sticky with the safe area; the text is 16px;
+The view is the screen: the header, then **Components · Artifacts · Logic
+Map** across the full width, then the view. The conversation is a sheet at the
+foot — a grip, "Conversation · N turns ▴", the last reply as one line, and the
+composer; pulled up, it is two thirds of the screen with the map still in
+sight above it. A card asked about opens its popover over the map. The Mind
+Graph is a scrolling column. The composer keeps the safe area; text is 16px;
 every control is at least 44px.
 
-## 8. Switch
+## 10. Switch
 
 `NEXT_PUBLIC_LOGOS5=off` brings back the Logos 4 layout without a deploy of
 code. Logos 2 is unchanged.
 
-## 9. What is where
+## 11. What is where
 
 | Piece | File |
 |---|---|
 | The turn, the pending reply | `components/logos5/L5Message.tsx` |
-| Header, menu, link bar, stage head, outline | `components/logos5/L5Chrome.tsx` |
-| The screen's styles | `components/logos5/l5.css` |
+| Header, menu, link bar, stage head, outline, the view switch, the Mind Graph button | `components/logos5/L5Chrome.tsx` |
+| "Asking about": a card asked about on the map | `components/logos5/L5Ask.tsx`, `components/ThinkingMap.tsx` (`askCard`) |
+| The Mind Graph (drawing; the view) | `lib/logos5/mindgraph.ts`, `components/logos5/MindGraph.tsx` |
+| The screen's styles (the redesign last, over the others) | `components/logos5/l5.css`, `components/logos5/study.css`, `components/logos5/redesign.css` |
 | Linking the thread and the map | `lib/logos5/linking.ts` |
 | The switch and the stage's per-browser memory | `lib/logos5/flags.ts` |
 | Rich reading (headings, code, quotes) and streaming formatting | `lib/rich-text.ts` (`{ rich: true }`), `components/RichText.tsx` (`rich`, `StreamingRichText`) |
@@ -195,16 +294,16 @@ code. Logos 2 is unchanged.
 | What the model is asked for a study | `lib/logos5/study-ask.ts`, `lib/logos5/ask-json.ts` |
 | Sorting and practice, server side | `app/api/logos/organize/route.ts`, `app/api/logos/practice/route.ts` |
 | The study as a display in the map | `lib/objects/display-study.ts` |
-| Intake, board, topic, practice, steps | `components/logos5/Study.tsx`, `components/logos5/study.css` |
+| Intake, board, topic, practice; an empty Components; Artifacts | `components/logos5/Study.tsx`, `components/logos5/study.css` |
 | Home: the Universal Map (layout, search; the view, the List) | `lib/logos5/universe.ts`, `components/logos5/Universe.tsx`, `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`) |
-| Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (study steps: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,universe,reload`) |
+| Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=home,list,find,mind`) |
 
 Core chat (`app/chat/page.tsx`) is not part of this change. Logos 2 keeps its
 two columns. Everything Logos 3–4 could do is still reached from Logos 5: the
 workspace panels, "+ View", every lens, displays, documents, models, Live 3D,
 Synthesize, Draft, Capture, Voice, sharing and comments.
 
-## 10. Results
+## 12. Results
 
 Measured on dev before shipping, not intended. Browser runs used the local
 stand-ins (fake model, fake database), at 1440×900 and 390×844:
@@ -271,11 +370,50 @@ table off the screen; links that jumped a column ran behind the cards
 between, so only neighbouring columns are linked.
 
 Tests: `test/logos5-linking.test.mjs` (20), `test/logos5-ui.test.mjs` (49),
-`test/logos5-study.test.mjs` (90), `test/logos5-study-ui.test.mjs` (34), and
-the existing suites, unchanged in what they hold.
+`test/logos5-study.test.mjs` (90), `test/logos5-study-ui.test.mjs` (49),
+`test/logos5-mindgraph.test.mjs` (28), and the existing suites, unchanged in
+what they hold.
 
 **Not verified here:** a real model's sorting and journal entries (the stand-in's are canned from the files' headings and amounts — the code that keeps only what the files bear out is tested, the model's judgement is not), a signed-in Universal Map's "Everything remembered" (the Mind Atlas needs an account), Core chats on the Universal Map in a browser (the local stand-in has none; their layout and bridges are tested), a real model's streaming (the stand-in streams
 canned text), a signed-in shared line of thinking (group view) on the new
 screen, a reply's citation chips opening their passage (the stand-in does not
 cite), and Live 3D in the stage. Each reuses code that was not
 changed, but has not been watched working in Logos 5.
+
+### The redesign: the map is the screen
+
+Browser runs with the stand-ins, at 1440×900 and 390×844. The Mind Graph
+needs an account, so it was watched with its two reads (`/api/mind`,
+`/api/mind/atlas`) answered by a fixture of fourteen memories — the real
+component, on the real page's styles.
+
+| Journey | Result |
+|---|---|
+| Two turns about two job offers | The Logic Map, counted 6, with the conversation open beside it ("2 turns · fold it away ›"); the reply's closing question set in the serif italic. |
+| Conversation folded | The composer floats over the foot of the map; the header pill reads **Conversation · 3**. |
+| A card pressed, then "Why does this one matter?" asked in it | "Asking about" opened beside the card, whole, above the composer: the question, the answer as it streamed, "Came from one message ›", the chips; the composer stayed "Reply to Socria…", and the answer was not shown again over it. |
+| "Chart my spending as a pie: …" | **Artifacts · 1**: "Artifact · Chart · made from the conversation". |
+| Two PDFs dropped, organized, a topic, practice, checked | Components · 7 (the board, the topic panel); the checked set in Artifacts ("Artifact · Practice · made from the conversation", 0 of 2, two gaps with their pages). |
+| Reload | Home, the Universal Map. |
+| Home, List | The contents column: "Your Universal Map · 1 line of thinking", the line of thinking under "Lines of thinking", 6 ideas · now. |
+| Mind Graph, fourteen memories | Three regions named and apart; leads larger; axons between what informs what; a memory pressed: "Habit · remembered", Learned from three conversations, Informs, First noticed 6 weeks ago, Edit · Show where · Forget this. Habits: 6; "rent": 1. |
+| Phone | The tabs across the width; the conversation a sheet at the foot (the last reply as one line, the composer); pulled up, two thirds of the screen; a card's popover over the map; the Mind Graph a scrolling column; no horizontal scroll. |
+| Page errors | None. |
+
+Found and fixed on the way: the popover opened under a card near the foot
+and was cut off by the map's edge, under the floating composer (it now goes
+beside the card, kept above the composer — the map is told how much room the
+composer takes, `--lg-menu-reserve`); pressing a card also made it the composer's subject, so it was asked
+about in two places; the answer to a card's question was shown in the
+popover and again over the composer; a phone's open sheet stopped 59px short
+of the screen's foot (top and maximum height fought); the workspace's caption
+ran under its own buttons; the home header's buttons sat in the middle when
+there was no switch; a memory-heavy region's outer ring left the Mind Graph's
+drawing (rings now draw in past the second); the name of the lower region sat
+on a memory of the upper one; on a phone the Mind Graph was the desktop
+drawing shrunk to unreadable — it has its own layout now.
+
+**Not verified here:** the Mind Graph against a real account's memory (the
+store's reads and writes are unchanged and their routes tested; the view was
+watched with a fixture), Edit and Forget against the store, and a signed-in
+home's "Mind Graph" pill.

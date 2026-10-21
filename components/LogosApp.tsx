@@ -100,7 +100,7 @@ import {
   type Plan,
 } from '@/lib/socria-one';
 import { MathText } from '@/components/TeX';
-import { Inline, RichText } from '@/components/RichText';
+import { Inline, RichText, StreamingRichText } from '@/components/RichText';
 import {
   SOCRIA_MODELS,
   type SocriaModel,
@@ -163,13 +163,16 @@ import { LOGOS4 } from '@/lib/logos4/flags';
 import { LOGOS5, DEFAULT_STAGE_SHARE, readStagePrefs, writeStagePrefs, type StagePrefs } from '@/lib/logos5/flags';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
-import { L5Header, L5LinkBar, L5Outline, L5StageHead, type L5MenuItem } from './logos5/L5Chrome';
-import { PracticeEmpty, StartPanel, StudyBoard, StudyIntake, StudyPractice, StudySteps, TopicInspector, type StudyTab } from './logos5/Study';
+import { L5Header, L5LinkBar, L5Outline, L5Switch, MindButton, type L5MenuItem, type L5SwitchItem } from './logos5/L5Chrome';
+import { ArtifactsView, ComponentsEmpty, StartPanel, StudyBoard, StudyIntake, StudyPractice, TopicInspector, type ArtifactItem, type StudyTab } from './logos5/Study';
+import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView } from './logos5/Universe';
+import { MindGraphView } from './logos5/MindGraph';
 import type { UniverseIn } from '@/lib/logos5/universe';
-import { checkPractice, clozeFrom, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
+import { checkPractice, clozeFrom, intentOf, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
 import { restudy, studyIn, type StudyState } from '@/lib/objects/display-study';
 import './logos5/l5.css';
+import './logos5/redesign.css';
 import { CaptureInbox } from './CaptureInbox';
 import { forComposer, forNode, type Capture } from '@/lib/logos4/captures';
 import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
@@ -4125,7 +4128,82 @@ export function LogosApp({
   useEffect(() => {
     if (l5) setStagePrefs(readStagePrefs(browserStorage()));
   }, [l5]);
-  const stageOpen = l5 && !!activeId && !!stagePrefs.open[activeId];
+  // THE MAP IS THE SCREEN (docs/LOGOS-5.md §6). A line of thinking shows one
+  // of three things — its Components (the files as topics), its Artifacts
+  // (what was made: charts, plans, documents, practice) or its Logic Map (the
+  // workspace, the Thinking Map in it) — with a switch in the header. The
+  // conversation is a panel folded away beside it until it is asked for.
+  // Which view, and which artifact, belong to this visit only.
+  const study = useMemo(() => (l5 ? studyIn(map.objects) : null), [l5, map.objects]);
+  const [studyTabs, setStudyTabs] = useState<Record<string, StudyTab>>({});
+  const studyTab: StudyTab = studyTabs[activeId ?? ''] ?? (study && map.nodes.length < 3 ? 'components' : 'logic');
+  /** the artifact open in Artifacts, per line of thinking */
+  const [artSel, setArtSel] = useState<Record<string, string>>({});
+  function setStudyTab(t: StudyTab) {
+    const id = activeIdRef.current;
+    if (id) setStudyTabs((m) => (m[id] === t ? m : { ...m, [id]: t }));
+  }
+  /** An artifact, at full size: "d:<display>" or "p:<practice set>". */
+  function showArtifact(key: string) {
+    const id = activeIdRef.current;
+    if (!id) return;
+    setArtSel((m) => ({ ...m, [id]: key }));
+    setStudyTab('artifacts');
+  }
+  /**
+   * The conversation, unfolded or not: as the person last left it here, else
+   * as the line of thinking was when it was opened — folded away when there is
+   * a map worth the screen, unfolded when there is only talk. Decided once a
+   * visit, so it never folds itself in the middle of a conversation.
+   */
+  const [convoVisit, setConvoVisit] = useState<Record<string, boolean>>({});
+  const convoChosen = l5 && activeId ? stagePrefs.convo?.[activeId] : undefined;
+  const convoOpen = l5 && !!activeId && (convoChosen ?? convoVisit[activeId] ?? true);
+  useEffect(() => {
+    if (!l5 || !activeId || hydrating) return;
+    setConvoVisit((v) => (activeId in v ? v : { ...v, [activeId]: map.nodes.length < 3 }));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [l5, activeId, hydrating]);
+  function setConvo(open: boolean) {
+    const id = activeIdRef.current;
+    if (!l5 || !id) return;
+    setStagePrefs((p) => {
+      const next = { ...p, convo: { ...(p.convo ?? {}), [id]: open } };
+      writeStagePrefs(browserStorage(), next);
+      return next;
+    });
+  }
+  /** the workspace — the Logic Map — is what the screen shows */
+  const stageOpen = l5 && !!activeId && studyTab === 'logic';
+  /**
+   * With the conversation folded away, a reply still has to be read: it is
+   * shown over the composer as it arrives, until it is put away or the
+   * conversation is opened. Only replies that arrive on this visit.
+   */
+  const [peekFor, setPeekFor] = useState<string | null>(null);
+  const peekSeenRef = useRef<string | null>(null);
+  /** a question asked from a card's popover: its answer is read there, not over the composer */
+  const [cardAsking, setCardAsking] = useState(false);
+  useEffect(() => {
+    if (error) setCardAsking(false);
+  }, [error]);
+  useEffect(() => {
+    setPeekFor(null);
+    setCardAsking(false);
+    peekSeenRef.current = [...(sessionsRef.current.find((x) => x.id === activeId)?.messages ?? [])].reverse().find((m) => m.role === 'assistant')?.id ?? null;
+  }, [activeId]);
+  useEffect(() => {
+    const last = messages[messages.length - 1];
+    if (!l5 || !last || last.role !== 'assistant' || !last.id || last.id === peekSeenRef.current) return;
+    peekSeenRef.current = last.id;
+    if (cardAsking) return setCardAsking(false);
+    if (!convoOpen) setPeekFor(last.id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [l5, messages]);
+  /** files dropped on an empty Components, being read */
+  const [readingFiles, setReadingFiles] = useState<string | null>(null);
+  /** the Mind Graph: what Socria remembers, as its own place */
+  const [l5Mind, setL5Mind] = useState(false);
   /** something new landed on the stage while it was put away */
   const [stageFresh, setStageFresh] = useState(false);
   /** the card selected on the map whose turns are marked in the thread, and which of them is in view */
@@ -4161,51 +4239,38 @@ export function LogosApp({
     setHoverNodes(null);
     setStageFresh(false);
   }, [activeId]);
-  /** Open or put away the stage for this line of thinking, and remember it here. */
-  function setStage(open: boolean, id: string | null = activeIdRef.current) {
-    if (!l5 || !id) return;
-    setStagePrefs((p) => {
-      if (!!p.open[id] === open) return p;
-      const { [id]: _was, ...rest } = p.open;
-      const next = { ...p, open: { ...rest, [id]: open } };
-      writeStagePrefs(browserStorage(), next);
-      return next;
-    });
-    if (open) setStageFresh(false);
+  /** The Logic Map on screen (or not — there is nothing else to put away now: the views are the screen). */
+  function setStage(open: boolean) {
+    if (!l5 || !open) return;
+    setStudyTab('logic');
+    setStageFresh(false);
   }
-  /**
-   * Something was made or asked for: the stage opens on it. On a phone it is
-   * a sheet over the conversation, so it is offered (the header's button
-   * marks it) rather than pulled over what the person is reading.
-   */
+  /** Something was made or asked for in the workspace: the screen goes to the Logic Map. */
   function openStage() {
     setStage(true);
-    if (narrow && mobileViewRef.current !== 'map') setStageFresh(true);
   }
-  // A map that grows from ordinary talk does not open the stage — the header says it is there.
+  // A map that grows while another view is up does not take the screen — the switch marks it.
   const mapSize = map.nodes.length;
   const mapSizeRef = useRef(mapSize);
   useEffect(() => {
     if (l5 && !stageOpen && mapSize > mapSizeRef.current) setStageFresh(true);
+    if (stageOpen) setStageFresh(false);
     mapSizeRef.current = mapSize;
   }, [l5, mapSize, stageOpen]);
-  /** A reply's effect pressed: the stage, on the map, with those cards lit and the first in view. */
+  /** A reply's effect pressed: the Logic Map, with those cards lit and the first in view. */
   function showNodes(ids: string[]) {
     if (!ids.length) return;
     openStage();
     if (wsLayout && !panelsOf(wsLayout).some((p) => p.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
     setLitNodes(ids);
     setRevealNode((r) => ({ id: ids[0], n: (r?.n ?? 0) + 1 }));
-    setMobileView('map');
   }
-  /** A display, document or model a turn opened: the stage, on it. */
+  /** A display or document a turn opened: Artifacts, on it. */
   function showObject(id: string) {
-    setStage(true);
-    setDisplayToOpen(id);
-    setMobileView('map');
+    showArtifact(`d:${id}`);
   }
 
-  // ── LOGOS 5: STUDY (lib/logos5/study.ts, docs/LOGOS-5.md §9) ──────────
+  // ── LOGOS 5: STUDY (lib/logos5/study.ts, docs/LOGOS-5.md §4) ──────────
   //
   // Files and a sentence become topics (Components), practice made from the
   // files (Practice) and — only when asked for — the conversation and its
@@ -4213,14 +4278,10 @@ export function LogosApp({
   // (lib/objects/display-study.ts), saved and shared with it; which of its
   // three screens is showing belongs to this visit only. A line of thinking
   // with no study is the conversation, exactly as before.
-  const study = useMemo(() => (l5 ? studyIn(map.objects) : null), [l5, map.objects]);
-  const [studyTabs, setStudyTabs] = useState<Record<string, StudyTab>>({});
-  const studyTab: StudyTab = study ? studyTabs[activeId ?? ''] ?? 'components' : 'logic';
   /** the topic open on the board */
   const [studyTopic, setStudyTopic] = useState<string | null>(null);
   /** "where do you want to start?" — shown until a start is picked or it is put away */
   const [studyStartOpen, setStudyStartOpen] = useState(true);
-  const [studyPracticeId, setStudyPracticeId] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState(false);
   const [makingFor, setMakingFor] = useState<string | null>(null);
   const [studyNote, setStudyNote] = useState<string | null>(null);
@@ -4231,7 +4292,10 @@ export function LogosApp({
   // opened from the map, and a new one begun from it. The rail is put away; it
   // is still there ("List") for renaming, deleting and filing.
   const [l5Home, setL5Home] = useState(false);
+  /** home's contents column: every line of thinking, by Project */
   const [l5List, setL5List] = useState(false);
+  /** the rail, asked for to rename, delete or file conversations */
+  const [l5Manage, setL5Manage] = useState(false);
   /** what the Universal Map draws: every line of thinking, and the Core chats */
   const universeIn = useMemo<UniverseIn[]>(
     () =>
@@ -4246,14 +4310,9 @@ export function LogosApp({
   useEffect(() => {
     setStudyTopic(null);
     setStudyStartOpen(true);
-    setStudyPracticeId(null);
     setStudyNote(null);
     setStudyWhy(null);
   }, [activeId]);
-  function setStudyTab(t: StudyTab) {
-    const id = activeIdRef.current;
-    if (id) setStudyTabs((m) => (m[id] === t ? m : { ...m, [id]: t }));
-  }
   /** The documents a study was made from, as this device holds them. */
   function studyDocs(st: StudyCore): SourceDoc[] {
     return st.files.map((f) => docsRef.current.get(f.doc) ?? docNow(f.doc)).filter((d): d is SourceDoc => !!d);
@@ -4437,8 +4496,7 @@ export function LogosApp({
     const now = sid === activeIdRef.current ? studyIn(mapRef.current.objects)?.state : studyIn(sessionsRef.current.find((x) => x.id === sid)?.map?.objects)?.state;
     commitStudy({ ...(now ?? st), practice: [...(now ?? st).practice, made] } as StudyState, sid);
     if (sid !== activeIdRef.current) return;
-    setStudyPracticeId(id);
-    setStudyTab('practice');
+    showArtifact(`p:${id}`);
     setStudyNote(note);
   }
   function editPractice(pid: string, fn: (p: Practice) => Practice) {
@@ -4563,13 +4621,14 @@ export function LogosApp({
     if (!displayToOpen) return;
     if (!workspaceOn || !wsLayout) return setDisplayToOpen(null);
     if (!wsFacts.displays?.some((d) => d.id === displayToOpen)) return;
-    const next = afterDisplay(wsLayout, wsFacts, displayToOpen);
-    if (next) changeLayout(next);
     if (l5) {
-      // the stage opens on what was made, and the turn that made it says so
-      openStage();
+      // what was made is shown in Artifacts, at full size, and the turn that made it says so
+      showArtifact(`d:${displayToOpen}`);
       const asked = [...messages].reverse().find((m) => m.role === 'user' && m.id);
       if (asked?.id) setObjMsg((o) => (o[displayToOpen] ? o : { ...o, [displayToOpen]: asked.id! }));
+    } else {
+      const next = afterDisplay(wsLayout, wsFacts, displayToOpen);
+      if (next) changeLayout(next);
     }
     setDisplayToOpen(null);
   }, [displayToOpen, workspaceOn, wsLayout, wsFacts, changeLayout]);
@@ -5788,11 +5847,13 @@ export function LogosApp({
             initialLens={lens as LensId | undefined}
             workspace={workspaceOn}
             onSelectNode={(id) => {
-              setFocus({ kind: 'node', id });
+              // in Logos 5 a pressed card is asked about in its own popover, not in the composer
+              if (!(l5 && !togetherReadOnly)) setFocus({ kind: 'node', id });
               if (l5) selectLinked(id);
             }}
             {...(l5 ? { linked: mapLit, reveal: revealNode } : {})}
             onAsk={workspaceOn && LOGOS4.pointAsk ? askAboutNode : undefined}
+            {...(l5 && !togetherReadOnly ? { askCard: askCardFor } : {})}
             map={map}
             onAction={(mode, node) => {
               signalFirstMap('action-taken');
@@ -5986,28 +6047,12 @@ export function LogosApp({
     setLitNodes(null);
     setFocus((f) => (f?.kind === 'node' ? null : f));
   }
-  /** what the stage holds besides the map */
-  const stageThings = (wsFacts.displays?.length ?? 0) + wsFacts.docs.length + wsFacts.scenes.length;
-  const stageHas = map.nodes.length > 0 || stageThings > 0 || !!wsFacts.viz;
-  const stagePanels = wsLayout ? panelsOf(wsLayout) : [];
-  const stageTitle = stagePanels.length === 1 ? panelTitle(stagePanels[0]) : { title: 'Workspace', sub: undefined as string | undefined };
   const l5Title = study ? study.state.course || study.state.title : active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : 'Logos';
-  /** the stage on screen: beside the conversation, or (narrower) as the sheet over it */
-  const stageShown = stageOpen && (!narrow || mobileView === 'map');
-  const toggleStage = () => {
-    if (stageShown) {
-      if (narrow) setMobileView('chat');
-      else setStage(false);
-    } else {
-      setStage(true);
-      setMobileView('map');
-    }
-  };
   /** the list is open when it was asked for and the rail is out (a tap beside it on a phone puts the rail away) */
-  const listOpen = l5List && railOpen && !chromeHidden;
+  const listOpen = l5Manage && railOpen && !chromeHidden;
   const l5Menu: L5MenuItem[] = [
     { label: 'Universal Map', hint: 'Every conversation, as one map', onSelect: goHome },
-    { label: listOpen ? 'Hide the list' : 'List every conversation', hint: 'Rename, delete, file in a Project', onSelect: () => toggleList() },
+    { label: listOpen ? 'Put the list away' : 'Manage conversations', hint: 'Rename, delete, file in a Project', onSelect: () => toggleManage() },
     { label: synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize', hint: canSynthesize(map) ? 'Where your thinking stands' : 'Needs two things on the map', disabled: !canSynthesize(map) || !!synthBusy || busy, onSelect: () => void synthesize('workspace') },
     { label: draftOpen ? 'Close the draft' : 'Draft', hint: limits.draftSpace ? 'A page only you write on' : 'Part of Socria One', onSelect: () => (limits.draftSpace ? setDraftOpen((v) => !v) : ask('draft-locked')) },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
@@ -6043,33 +6088,46 @@ export function LogosApp({
   })();
   // ── the study's screens (components/logos5/Study.tsx) ──
   const studyTopicObj = study && studyTopic ? study.state.topics.find((t) => t.id === studyTopic) ?? null : null;
-  const studyPractice = study ? study.state.practice.find((p) => p.id === studyPracticeId) ?? study.state.practice[study.state.practice.length - 1] ?? null : null;
-  const studyPlaceholder: string | null = !study || studyTab === 'logic'
-    ? null
-    : studyTab === 'components'
+  const artKey = artSel[activeId ?? ''] ?? null;
+  const studyPlaceholder: string | null =
+    studyTab === 'components' && study
       ? studyTopicObj
         ? `Ask about ${studyTopicObj.title}…`
         : narrow
           ? 'Ask about these notes…'
           : 'Ask about these notes, or drop more files…'
-      : studyPractice?.checked
-        ? 'Ask about what you missed…'
-        : narrow
+      : studyTab === 'artifacts' && artKey?.startsWith('p:')
+        ? narrow
           ? 'Ask about a blank…'
-          : 'Ask about any blank, or type here…';
-  /** Sent from a study's screen: more files are sorted in; anything else is asked in the conversation. */
+          : 'Ask about any blank, or type here…'
+        : null;
+  /** Sent from the composer: files dropped on Components are sorted in; anything else is asked in the conversation, where the screen is. */
   function sendFromStudy() {
-    if (!study || studyTab === 'logic') return sendFromComposer();
     const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, ...rest }) => rest);
     if (studyTab === 'components' && ready.some((a) => a.kind === 'doc')) {
       setDrafts([]);
       const said = input.trim();
       setInput('');
-      void organize(ready, said || study.state.said, study.state.goal);
+      void organize(ready, said || study?.state.said || '', study?.state.goal ?? intentOf(said, ready.length));
       return;
     }
-    setStudyTab('logic');
     sendFromComposer();
+  }
+  /** Files dropped on an empty Components: read on this device, then sorted. */
+  async function organizeFiles(files: File[]) {
+    if (readingFiles || organizing) return;
+    const atts: Attachment[] = [];
+    for (const [i, f] of files.slice(0, 6).entries()) {
+      setReadingFiles(`Reading ${f.name}${files.length > 1 ? ` · ${i + 1} of ${Math.min(files.length, 6)}` : ''}…`);
+      try {
+        atts.push(await readDocument(f));
+      } catch {
+        /* a file that cannot be read is left out; the rest are sorted */
+      }
+    }
+    setReadingFiles(atts.length ? 'Sorting…' : null);
+    if (atts.length) await organize(atts, '', intentOf('', atts.length));
+    setReadingFiles(null);
   }
   const pickTopic = (id: string | null) => {
     setStudyTopic(id);
@@ -6080,6 +6138,68 @@ export function LogosApp({
     else setFocus((f) => (f?.kind === 'part' && f.obj === study?.obj.id ? null : f));
   };
   const studyStartId = study ? study.state.start ?? study.state.topics[0]?.id ?? null : null;
+  /** a question about a card on the map, asked where the card is */
+  function askCardQuestion(node: MapNodeRef, text: string) {
+    // the card is the subject of this one turn — send reads it before its first await —
+    // and the composer goes back to whatever it was asking about
+    const before = focusRef.current;
+    focusRef.current = { kind: 'node', id: node.id };
+    setCardAsking(true);
+    setPeekFor(null);
+    void send(text);
+    focusRef.current = before;
+  }
+  /** The last thing asked about a card, and Socria's answer to it (or what has arrived of it). */
+  function exchangeAbout(label: string): AskExchange | null {
+    let qi = -1;
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === 'user' && m.about?.kind === 'node' && m.about.label === label) {
+        qi = i;
+        break;
+      }
+    }
+    if (qi < 0) return null;
+    const answer = messages.slice(qi + 1).find((m) => m.role === 'assistant');
+    const waiting = !answer && qi === messages.length - 1 && (busy || !!streaming);
+    const plain = (t: string) => t.replace(/\[[A-Z]\d+\.\d+\]/g, '').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
+    return { q: messages[qi].content, a: plain(answer ? answer.content : streaming || ''), streaming: waiting };
+  }
+  /** "Asking about": what a pressed card opens with, on the Logic Map (components/logos5/L5Ask.tsx). */
+  const askCardFor = (node: MapNodeRef, close: () => void) => {
+    const full = map.nodes.find((x) => x.id === node.id);
+    const n = links?.fromNode.get(node.id)?.length ?? 0;
+    const came = n
+      ? {
+          said: n === 1 ? 'Came from one message' : `Came from ${n} messages`,
+          onShow: () => {
+            close();
+            setConvo(true);
+            selectLinked(node.id);
+          },
+        }
+      : full?.origin === 'socria'
+        ? { said: 'Socria’s suggestion, kept by you' }
+        : full?.origin === 'source'
+          ? { said: 'From your files' }
+          : null;
+    return (
+      <L5Ask
+        label={node.label}
+        exchange={exchangeAbout(node.label)}
+        came={came}
+        busy={busy}
+        onClose={close}
+        onAsk={(text) => askCardQuestion(node, text)}
+        quick={[
+          { label: 'Why does this one matter?', text: 'Why does this one matter?' },
+          { label: 'Challenge it', text: `Challenge this — is “${node.label}” really so?` },
+          { label: 'What rests on this?', text: `What rests on “${node.label}”?` },
+        ]}
+      />
+    );
+  };
+  const userTurns = messages.filter((m) => m.role === 'user').length;
   const l5Dock = (
       <div className="l5-dock">
       {convoNotes}
@@ -6105,7 +6225,7 @@ export function LogosApp({
         onClearAbout={clearAbout}
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
-        idlePlaceholder={studyPlaceholder ?? (messages.length ? (stageOpen && !narrow ? 'Ask, or tell the workspace what to do…' : 'Reply to Socria…') : narrow ? 'What are you working through?' : 'Say what you’re working through…')}
+        idlePlaceholder={focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?')}
         footer={
           <ModelPicker
             value={model}
@@ -6120,88 +6240,119 @@ export function LogosApp({
       {l5Meter}
     </div>
   );
-  const studyMain =
-    study && studyTab !== 'logic' ? (
-      <section className="l5-col l5s-main" aria-label={studyTab === 'components' ? 'Topics' : 'Practice'}>
-        <div className={`l5s-scroll${studyTab === 'components' ? ' is-board' : ''}`}>
-          {studyTab === 'components' ? (
-            <StudyBoard
-              study={study.state}
-              selected={studyTopic}
-              onSelect={pickTopic}
-              narrow={narrow && (typeof window === 'undefined' || window.innerWidth <= 640)}
-              inspector={
-                studyTopicObj && !stageShown ? (
-                  <TopicInspector
-                    topic={studyTopicObj}
-                    study={study.state}
-                    why={studyWhy}
-                    making={makingFor === studyTopicObj.id}
-                    onClose={() => pickTopic(null)}
-                    onOpen={openQuote}
-                    onPractice={() => void makePractice(studyTopicObj.id)}
-                    onExplain={() => askInLogic(`Explain “${studyTopicObj.title}” simply, from my files.`, { topic: studyTopicObj.id })}
-                    onChallenge={() => askInLogic(`Challenge me on “${studyTopicObj.title}” — one question at a time, from my files, and let me try before you tell me.`, { topic: studyTopicObj.id })}
-                    onWhy={() => askInLogic(`Why does “${studyTopicObj.title}” work the way it does? Show me its anchors, the evidence in my files, and the traps.`, { topic: studyTopicObj.id, map: true })}
-                  />
-                ) : null
-              }
-              start={
-                studyStartOpen && !studyTopic ? (
-                  <StartPanel
-                    study={study.state}
-                    note={studyNote}
-                    onClose={() => setStudyStartOpen(false)}
-                    onStudy={() => studyStartId && void makePractice(studyStartId)}
-                    onDeep={() => {
-                      setStudyTab('logic');
-                      openStage();
-                      if (wsLayout && !panelsOf(wsLayout).some((p) => p.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
-                      const st = study.state.topics.find((t) => t.id === studyStartId);
-                      // put into the composer to be made their own — never sent by itself
-                      setInput(st ? `What is the hardest question in “${st.title}”, and what are its traps?` : 'What is the hardest question in these files, and what are its traps?');
-                      setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
-                    }}
-                    onRecommend={() => {
-                      if (!studyStartId) return;
-                      pickTopic(studyStartId);
-                      setStudyWhy(study.state.why || null);
-                    }}
-                  />
-                ) : studyNote ? (
-                  <p className="l5s-note l5s-main-note" role="status">
-                    {studyNote}
-                  </p>
-                ) : null
-              }
-            />
-          ) : studyPractice ? (
+  // ── the three views ──
+  const componentsView = study ? (
+    <StudyBoard
+      study={study.state}
+      selected={studyTopic}
+      onSelect={pickTopic}
+      narrow={narrow && (typeof window === 'undefined' || window.innerWidth <= 640)}
+      inspector={
+        studyTopicObj ? (
+          <TopicInspector
+            topic={studyTopicObj}
+            study={study.state}
+            why={studyWhy}
+            making={makingFor === studyTopicObj.id}
+            onClose={() => pickTopic(null)}
+            onOpen={openQuote}
+            onPractice={() => void makePractice(studyTopicObj.id)}
+            onExplain={() => askInLogic(`Explain “${studyTopicObj.title}” simply, from my files.`, { topic: studyTopicObj.id })}
+            onChallenge={() => askInLogic(`Challenge me on “${studyTopicObj.title}” — one question at a time, from my files, and let me try before you tell me.`, { topic: studyTopicObj.id })}
+            onWhy={() => askInLogic(`Why does “${studyTopicObj.title}” work the way it does? Show me its anchors, the evidence in my files, and the traps.`, { topic: studyTopicObj.id, map: true })}
+          />
+        ) : null
+      }
+      start={
+        studyStartOpen && !studyTopic ? (
+          <StartPanel
+            study={study.state}
+            note={studyNote}
+            onClose={() => setStudyStartOpen(false)}
+            onStudy={() => studyStartId && void makePractice(studyStartId)}
+            onDeep={() => {
+              setStudyTab('logic');
+              if (wsLayout && !panelsOf(wsLayout).some((p) => p.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
+              const st = study.state.topics.find((t) => t.id === studyStartId);
+              // put into the composer to be made their own — never sent by itself
+              setInput(st ? `What is the hardest question in “${st.title}”, and what are its traps?` : 'What is the hardest question in these files, and what are its traps?');
+              setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+            }}
+            onRecommend={() => {
+              if (!studyStartId) return;
+              pickTopic(studyStartId);
+              setStudyWhy(study.state.why || null);
+            }}
+          />
+        ) : studyNote ? (
+          <p className="l5s-note l5s-main-note" role="status">
+            {studyNote}
+          </p>
+        ) : null
+      }
+    />
+  ) : (
+    <ComponentsEmpty
+      narrow={narrow}
+      said={messages.filter((m) => m.role === 'user' && m.id && m.content.trim()).map((m) => ({ id: m.id!, text: m.content.replace(/\s+/g, ' ').trim() }))}
+      reading={readingFiles ?? (organizing ? 'Sorting…' : null)}
+      onFiles={(files) => void organizeFiles(files)}
+      onShow={(id) => {
+        setConvo(true);
+        requestAnimationFrame(() => jumpTo(id));
+      }}
+    />
+  );
+  const artifactItems: ArtifactItem[] = [
+    ...displaysHere.map((o) => {
+      const noun = displayMeta(o.kind)?.noun ?? o.kind;
+      return {
+        key: `d:${o.id}`,
+        kind: noun[0].toUpperCase() + noun.slice(1),
+        title: String((o.states[o.at] as { title?: unknown } | undefined)?.title ?? o.name),
+        render: () => renderPanel({ kind: 'panel', id: `art-${o.id}`, type: 'display', config: { obj: o.id } }),
+      };
+    }),
+    ...(study
+      ? study.state.practice.map((pr) => ({
+          key: `p:${pr.id}`,
+          kind: 'Practice',
+          title: pr.title,
+          render: () => (
             <StudyPractice
               study={study.state}
-              practice={studyPractice}
-              making={makingFor === studyPractice.topic}
-              onAnswers={(answers) => editPractice(studyPractice.id, (p) => ({ ...p, answers }))}
-              onCheck={(answers) => editPractice(studyPractice.id, (p) => ({ ...p, answers, checked: checkPractice({ ...p, answers }) }))}
-              onAgain={() => editPractice(studyPractice.id, (p) => ({ ...p, checked: null }))}
-              onMore={() => void makePractice(studyPractice.topic, true)}
+              practice={pr}
+              making={makingFor === pr.topic}
+              onAnswers={(answers) => editPractice(pr.id, (x) => ({ ...x, answers }))}
+              onCheck={(answers) => editPractice(pr.id, (x) => ({ ...x, answers, checked: checkPractice({ ...x, answers }) }))}
+              onAgain={() => editPractice(pr.id, (x) => ({ ...x, checked: null }))}
+              onMore={() => void makePractice(pr.topic, true)}
               onWhy={(gap: Gap | null) =>
-                askInLogic(gap ? `Why is it “${gap.answer}” for “${gap.label}”? Walk me through the logic, from my files.` : 'Why do these answers work? Walk me through the logic, from my files.', { topic: studyPractice.topic, map: true })
+                askInLogic(gap ? `Why is it “${gap.answer}” for “${gap.label}”? Walk me through the logic, from my files.` : 'Why do these answers work? Walk me through the logic, from my files.', { topic: pr.topic, map: true })
               }
               onOpen={openQuote}
-              onPick={setStudyPracticeId}
+              onPick={(id) => showArtifact(`p:${id}`)}
             />
-          ) : (
-            <PracticeEmpty study={study.state} making={makingFor} onPractice={(id) => void makePractice(id)} />
-          )}
-          {studyNote && studyTab === 'practice' && (
-            <p className="l5s-note l5s-main-note" role="status">
-              {studyNote}
-            </p>
-          )}
-        </div>
-        {l5Dock}
-      </section>
-    ) : null;
+          ),
+        }))
+      : []),
+  ];
+  const artifactsView = (
+    <>
+      <ArtifactsView items={artifactItems} selected={artKey} onSelect={showArtifact} narrow={narrow} />
+      {studyNote && studyTab === 'artifacts' && (
+        <p className="l5s-note l5s-main-note" role="status">
+          {studyNote}
+        </p>
+      )}
+    </>
+  );
+  const switchItems: L5SwitchItem[] = [
+    { id: 'components', label: 'Components', count: study?.state.topics.length ?? 0 },
+    { id: 'artifacts', label: 'Artifacts', count: artifactItems.length },
+    { id: 'logic', label: 'Logic Map', count: map.nodes.length, fresh: stageFresh },
+  ];
+  const switchEl = (wide = false) => <L5Switch items={switchItems} value={studyTab} onChange={(id) => setStudyTab(id as StudyTab)} label="What this shows" wide={wide} />;
   /** A new line of thinking: what are you working on? (Logos 5's intake) */
   const intakeShown = messages.length === 0 && !busy && !streaming && !organizing ? !groupView && !togetherReadOnly : organizing && messages.length === 0;
   const l5Intake = intakeShown ? (
@@ -6376,62 +6527,155 @@ export function LogosApp({
       {l5Dock}
     </section>
   );
-  const l5Stage =
-    stageOpen && wsLayout ? (
-      <section className="l5-stage" aria-label="Workspace">
-        <Workspace
-          layout={wsLayout}
-          onLayout={changeLayout}
-          render={renderPanel}
-          titleOf={panelTitle}
-          views={wsViews}
-          arrangements={wsArrangements}
-          facts={wsFacts}
-          suggestion={wsSuggestion}
-          onAccept={acceptSuggestion}
-          onDismiss={(sg) => setWsDismissed((d) => new Set(d).add(sg.id))}
-          head={
-            <L5StageHead
-              title={stageTitle.title}
-              sub={stageTitle.sub}
-              onClose={() => {
-                if (!narrow) setStage(false);
-                setMobileView('chat');
+  // the Logic Map: the workspace with the Thinking Map in it — "+ View" opens more beside it
+  const logicView = wsLayout ? (
+    <Workspace
+      layout={wsLayout}
+      onLayout={changeLayout}
+      render={renderPanel}
+      titleOf={panelTitle}
+      views={wsViews}
+      arrangements={wsArrangements}
+      facts={wsFacts}
+      suggestion={wsSuggestion}
+      onAccept={acceptSuggestion}
+      onDismiss={(sg) => setWsDismissed((d) => new Set(d).add(sg.id))}
+      head={
+        canSynthesize(map) ? (
+          <button type="button" className="l5-btn is-quiet" onClick={() => void synthesize('workspace')} disabled={!!synthBusy || busy} title="See where your thinking stands">
+            {synthBusy === 'workspace' ? 'Reading…' : 'Synthesize'}
+          </button>
+        ) : null
+      }
+      onResetView={resetView}
+      overlay={wsCard}
+    />
+  ) : null;
+  const viewEl = studyTab === 'components' ? componentsView : studyTab === 'artifacts' ? artifactsView : logicView;
+
+  // what arrives while the conversation is folded away: the reply, over the composer
+  const l5PeekMsg = peekFor ? messages.find((m) => m.id === peekFor) ?? null : null;
+  const peekFx = l5PeekMsg?.id ? l5Effects.get(l5PeekMsg.id) ?? null : null;
+  const peekEl =
+    !convoOpen && (((busy || !!streaming) && !cardAsking) || l5PeekMsg) ? (
+      <div className="l5x-peek" role="status" aria-live="polite">
+        <div className="l5x-peek-head">
+          <span className="l5x-who">Socria</span>
+          <span className="l5x-peek-acts">
+            <button
+              type="button"
+              className="l5x-link"
+              onClick={() => {
+                setConvo(true);
+                setPeekFor(null);
               }}
-              actions={
-                canSynthesize(map) ? (
-                  <button type="button" className="l5-btn is-quiet" onClick={() => void synthesize('workspace')} disabled={!!synthBusy || busy} title="See where your thinking stands">
-                    {synthBusy === 'workspace' ? 'Reading…' : 'Synthesize'}
-                  </button>
-                ) : null
-              }
-            />
-          }
-          onResetView={resetView}
-          overlay={wsCard}
-        />
-      </section>
+            >
+              Open the conversation
+            </button>
+            {!busy && !streaming && (
+              <button type="button" className="l5x-x" aria-label="Put this away" onClick={() => setPeekFor(null)}>
+                ×
+              </button>
+            )}
+          </span>
+        </div>
+        <div className="l5x-peek-body l5-prose">
+          {busy || streaming ? streaming ? <StreamingRichText text={streaming} math rich /> : <p className="l5x-thinking">{mapping ? 'Drawing it on the map…' : 'Thinking…'}</p> : <RichText text={l5PeekMsg!.content} math rich askLast />}
+        </div>
+        {!busy && !streaming && peekFx && (
+          <div className="l5x-peek-fx">
+            {peekFx.map && (
+              <button type="button" className="l5x-fx" onClick={() => showNodes(peekFx.map!.nodes)} onMouseEnter={() => setHoverNodes(peekFx.map!.nodes)} onMouseLeave={() => setHoverNodes(null)}>
+                {peekFx.map.said}
+              </button>
+            )}
+            {(peekFx.objects ?? []).map((o) => (
+              <button key={o.id} type="button" className="l5x-fx" onClick={() => showObject(o.id)}>
+                {o.kind} · {o.label}
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
     ) : null;
+
+  const turnsSaid = userTurns ? `${userTurns} ${userTurns === 1 ? 'turn' : 'turns'}` : 'nothing yet';
+  const l5LastSaid = (() => {
+    const last = [...messages].reverse().find((m) => m.role === 'assistant' && m.content);
+    const t = streaming || last?.content || '';
+    return t.replace(/\[[A-Z]\d+\.\d+\]/g, '').replace(/[*_`#>]+/g, '').replace(/\s+/g, ' ').trim();
+  })();
+  // the line of thinking: its view is the screen; the conversation beside it, or folded away
+  const l5Line = narrow ? (
+    <div className={`l5x is-narrow${convoOpen ? ' has-convo' : ''}`}>
+      <section className={`l5x-canvas is-${studyTab}`}>
+        <div className="l5x-view">{viewEl}</div>
+      </section>
+      <div className={`l5x-sheet${convoOpen ? ' is-open' : ''}`}>
+        <button type="button" className="l5x-sheet-grip" aria-label={convoOpen ? 'Fold the conversation down' : 'Open the conversation'} onClick={() => setConvo(!convoOpen)} />
+        <div className="l5x-sheet-row">
+          <span className="l5x-who">Socria</span>
+          <button type="button" className="l5x-link" onClick={() => setConvo(!convoOpen)} aria-expanded={convoOpen}>
+            Conversation · {turnsSaid} {convoOpen ? '▾' : '▴'}
+          </button>
+        </div>
+        {convoOpen ? (
+          l5Thread
+        ) : (
+          <>
+            {l5LastSaid && <p className="l5x-sheet-last">{l5LastSaid}</p>}
+            {l5Dock}
+          </>
+        )}
+      </div>
+    </div>
+  ) : (
+    <div className={`l5x${convoOpen ? ' has-convo' : ''}`}>
+      {convoOpen && (
+        <aside className="l5x-convo" aria-label="Conversation">
+          <div className="l5x-convo-head">
+            <span className="l5x-convo-t">
+              Conversation{' '}
+              <button type="button" className="l5x-convo-fold" onClick={() => setConvo(false)}>
+                {turnsSaid} · fold it away ›
+              </button>
+            </span>
+            <button type="button" className="l5-iconbtn" aria-label="Fold the conversation away" title="Fold the conversation away" onClick={() => setConvo(false)}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M15 6l-6 6 6 6" />
+              </svg>
+            </button>
+          </div>
+          {l5Thread}
+        </aside>
+      )}
+      <section className={`l5x-canvas is-${studyTab}`}>
+        <div className="l5x-view">{viewEl}</div>
+        {!convoOpen && (
+          <div className="l5x-omni">
+            {peekEl}
+            {l5Dock}
+          </div>
+        )}
+      </section>
+    </div>
+  );
+  const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   const l5Head = (
     <L5Header
       onHome={goHome}
-      title={l5Title}
-      stage={
-        stageHas || stageOpen
-          ? {
-              label: stageThings ? 'Workspace' : 'Map',
-              count: stageThings ? stageThings + (map.nodes.length ? 1 : 0) : map.nodes.length,
-              open: stageShown,
-              fresh: stageFresh,
-              onToggle: toggleStage,
-            }
-          : null
-      }
+      eyebrow={study?.state.course || projectName || (messages.length ? undefined : 'Logos')}
+      title={active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : ''}
+      stage={null}
+      center={!narrow && !l5Intake ? switchEl() : undefined}
       presence={
         <>
           <L5Outline
             items={messages.filter((m) => m.role === 'user' && m.id && m.content).map((m) => ({ id: m.id!, text: m.content.replace(/\s+/g, ' ').trim() }))}
-            onJump={jumpTo}
+            onJump={(id) => {
+              setConvo(true);
+              requestAnimationFrame(() => jumpTo(id));
+            }}
           />
           <ChallengeChip enabled={cloud} progress={!(railOpen && !chromeHidden)} onOpenAccount={() => setAcctOpen(true)} />
           {presenceBar}
@@ -6439,35 +6683,46 @@ export function LogosApp({
       }
       menu={l5Menu}
       account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
-      center={study ? <StudySteps tab={studyTab} onTab={setStudyTab} practiced={study.state.practice.length > 0} logicSeen={messages.filter((m) => m.role === 'user').length > 1} /> : undefined}
       extra={
-        <button type="button" className="l5-unibtn" onClick={goHome} title="Every conversation, as one map">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-            <circle cx="6" cy="7" r="2.2" />
-            <circle cx="18" cy="6" r="2.2" />
-            <circle cx="12" cy="17" r="2.6" />
-            <path d="M8 8l2.6 7M16.4 7.6L13.4 15M8.2 7h7.6" />
-          </svg>
-          <span className="l5-unibtn-l">Universal Map</span>
-        </button>
+        <>
+          {!narrow && !l5Intake && (
+            <button type="button" className={`l5-unibtn is-convo${convoOpen ? ' is-on' : ''}`} onClick={() => setConvo(!convoOpen)} aria-pressed={convoOpen} title={convoOpen ? 'Fold the conversation away' : 'Open the conversation'}>
+              <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4 5h16v11H9l-5 4z" />
+              </svg>
+              <span className="l5-unibtn-l">Conversation</span>
+              {userTurns > 0 && <span className="l5-count">{userTurns}</span>}
+            </button>
+          )}
+          {cloud && <MindButton onOpen={() => setL5Mind(true)} />}
+        </>
       }
     />
   );
 
   // ── LOGOS 5: HOME, THE UNIVERSAL MAP ──
-  const homeShown = l5 && l5Home && !hydrating && !room.active;
+  const homeShown = l5 && l5Home && !l5Mind && !hydrating && !room.active;
+  /** the Mind Graph is its own place: over home and over a line of thinking alike */
+  const mindShown = l5 && l5Mind && !hydrating && !room.active;
   function goHome() {
     setL5Home(true);
-    setL5List(false);
+    setL5Mind(false);
+    setL5Manage(false);
   }
+  /** the contents column, on home */
   function toggleList() {
-    if (listOpen) return setL5List(false);
-    setL5List(true);
+    setL5List((v) => !v);
+  }
+  /** the rail: every conversation as a list, to rename, delete or file */
+  function toggleManage() {
+    if (listOpen) return setL5Manage(false);
+    setL5Manage(true);
     setRailOpen(true);
   }
   /** a conversation pressed on the map: opened — at the card pressed, when one was */
   function openFromHome(id: string, node?: string) {
     setL5Home(false);
+    setL5Mind(false);
     setL5List(false);
     switchSession(id);
     if (node)
@@ -6482,18 +6737,48 @@ export function LogosApp({
     if (waiting) switchSession(waiting.id);
     else if (!newSession()) return;
     setL5Home(false);
+    setL5Mind(false);
     setL5List(false);
   }
+  const l5MindView = mindShown ? (
+    <MindGraphView
+      signedIn={!!isSignedIn}
+      narrow={narrow}
+      onOpen={(place) => {
+        if (place.surface === 'core') onOpenChat?.(place.id);
+        else if (sessionsRef.current.some((x) => x.id === place.id)) openFromHome(place.id);
+      }}
+      head={(center) =>
+        chromeHidden ? null : (
+          <L5Header
+            onHome={goHome}
+            eyebrow="Mind Graph"
+            title="How you think, so far"
+            stage={null}
+            center={center}
+            menu={l5Menu}
+            account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
+            extra={
+              <button type="button" className="l5-unibtn" onClick={() => (l5Home || !activeId ? goHome() : setL5Mind(false))}>
+                <span className="l5-unibtn-l">{l5Home || !activeId ? 'Universal Map' : 'Back'}</span>
+              </button>
+            }
+          />
+        )
+      }
+    />
+  ) : null;
   const l5HomeHead = (
     <L5Header
       onHome={goHome}
-      title="Logos"
+      eyebrow="Universal Map"
+      title=""
       stage={null}
       menu={l5Menu}
       account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
       extra={
         <>
-          <button type="button" className={`l5-unibtn is-list${listOpen ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={listOpen} title="Every conversation as a list: rename, delete, file in a Project">
+          <button type="button" className={`l5-unibtn is-list${l5List ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={l5List} title="Every line of thinking, by Project">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
               <path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01" />
             </svg>
@@ -6514,6 +6799,8 @@ export function LogosApp({
       onOpen={openFromHome}
       onOpenChat={(id) => onOpenChat?.(id)}
       onNew={newFromHome}
+      onMind={cloud ? () => setL5Mind(true) : undefined}
+      contents={l5List}
       projects={projects?.map((p) => ({ id: p.id, name: p.name }))}
       atlas={
         cloud ? (
@@ -6545,19 +6832,21 @@ export function LogosApp({
             switchSession(id);
             usedRail();
             setL5Home(false);
-            setL5List(false);
+            setL5Mind(false);
+            setL5Manage(false);
           }}
           onNew={() => {
             newSession();
             usedRail();
             setL5Home(false);
-            setL5List(false);
+            setL5Mind(false);
+            setL5Manage(false);
           }}
           onDelete={deleteSession}
           onRename={renameSession}
           onToggle={() => {
             setRailOpen((v) => !v);
-            setL5List(false);
+            setL5Manage(false);
           }}
           projects={projects}
           onOpenProject={onOpenProject}
@@ -6826,24 +7115,13 @@ export function LogosApp({
       )}
       {l5 ? (
         <div
-          className={`l5${listOpen ? ' list-open' : ' rail-closed'}${homeShown ? ' is-home' : ''}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${stageOpen && !homeShown ? ' has-stage' : ''}${
-            mobileView === 'map' ? ' l5-sheet-on' : ''
-          }`}
-          style={{ ['--l5-stage' as string]: String(stagePrefs.share) }}
+          className={`l5${listOpen ? ' list-open' : ' rail-closed'}${homeShown ? ' is-home' : ''}${mindShown ? ' is-mind' : ''}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}`}
         >
           {railEl}
           <div className="l5-main">
-            {!chromeHidden && (homeShown ? l5HomeHead : l5Head)}
-            <div className="l5-body">
-              {homeShown ? (
-                l5HomeView
-              ) : (
-                <>
-                  {l5Intake ?? studyMain ?? l5Thread}
-                  {l5Stage}
-                </>
-              )}
-            </div>
+            {!chromeHidden && !mindShown && (homeShown ? l5HomeHead : l5Head)}
+            {!chromeHidden && !homeShown && !mindShown && !l5Intake && narrow && <div className="l5x-tabs">{switchEl(true)}</div>}
+            <div className="l5-body">{mindShown ? l5MindView : homeShown ? l5HomeView : l5Intake ?? l5Line}</div>
           </div>
           {draftEl}
           {chromeEls}

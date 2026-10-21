@@ -42,28 +42,8 @@ import './study.css';
 /** a layout effect in the browser; on the server (which renders first) an ordinary one, so nothing warns */
 const useBrowserLayoutEffect = typeof window === 'undefined' ? useEffect : useLayoutEffect;
 
-export type StudyTab = 'components' | 'practice' | 'logic';
-
-// ── where you are ────────────────────────────────────────────────────
-
-export function StudySteps({ tab, onTab, logicSeen }: { tab: StudyTab; onTab: (t: StudyTab) => void; practiced?: boolean; logicSeen: boolean }) {
-  const steps: { id: StudyTab; n: number; label: string; tag?: string }[] = [
-    { id: 'components', n: 1, label: 'Components' },
-    { id: 'practice', n: 2, label: 'Practice' },
-    { id: 'logic', n: 3, label: 'Logic Map', ...(logicSeen ? {} : { tag: 'on request' }) },
-  ];
-  return (
-    <nav className="l5s-steps" aria-label="Study">
-      {steps.map((s) => (
-        <button key={s.id} type="button" className={`l5s-step${tab === s.id ? ' is-on' : ''}${s.tag ? ' is-quiet' : ''}`} aria-current={tab === s.id ? 'page' : undefined} aria-label={`${s.n}. ${s.label}`} title={s.label} onClick={() => onTab(s.id)}>
-          <span className="l5s-step-n">{s.n}</span>
-          <span className="l5s-step-l">{s.label}</span>
-          {s.tag && <span className="l5s-step-tag">{s.tag}</span>}
-        </button>
-      ))}
-    </nav>
-  );
-}
+/** What a line of thinking's screen shows: its files as topics, what was made from it, or its Logic Map. */
+export type StudyTab = 'components' | 'artifacts' | 'logic';
 
 // ── a file's place, as a chip ────────────────────────────────────────
 
@@ -1008,6 +988,121 @@ export function StudyPractice({
 
 const WORDS = ['No gaps', 'One gap', 'Two gaps', 'Three gaps', 'Four gaps'];
 const gapsSaid = (n: number) => WORDS[n] ?? `${n} gaps`;
+
+// ── components, before there are any ─────────────────────────────────
+
+/**
+ * A line of thinking with no files yet: where they go, and what was said so
+ * far, each a press away from where it is in the conversation.
+ */
+export function ComponentsEmpty({
+  said,
+  onFiles,
+  reading,
+  onShow,
+  narrow,
+}: {
+  said: { id: string; text: string }[];
+  onFiles: (files: File[]) => void;
+  /** files being read now, said in their place */
+  reading: string | null;
+  onShow: (messageId: string) => void;
+  narrow: boolean;
+}) {
+  const ref = useRef<HTMLInputElement>(null);
+  const [over, setOver] = useState(false);
+  return (
+    <div className="l5s-cempty">
+      <div className="l5s-cempty-head">
+        {!narrow && <span className="l5s-eyebrow">Components</span>}
+        <h2>Nothing to sort yet.</h2>
+        <p>{narrow ? 'Drop notes, slides or a PDF and Socria sorts them into topics here.' : 'Drop notes, slides or a PDF and Socria sorts them into topics here, in the files’ own words. The map and the artifacts read the same material.'}</p>
+      </div>
+      <button
+        type="button"
+        className={`l5s-cdrop${over ? ' is-over' : ''}`}
+        disabled={!!reading}
+        onClick={() => ref.current?.click()}
+        onDragOver={(e) => (e.preventDefault(), setOver(true))}
+        onDragLeave={() => setOver(false)}
+        onDrop={(e) => {
+          e.preventDefault();
+          setOver(false);
+          if (e.dataTransfer?.files?.length) onFiles(Array.from(e.dataTransfer.files));
+        }}
+      >
+        <span className="l5s-cdrop-t">{reading ?? (narrow ? 'Choose files' : <>Drop files here, or <u>choose them</u></>)}</span>
+        {!narrow && !reading && <span className="l5s-cdrop-s">PDF, Word, PowerPoint, Excel, notes, a photo of a page</span>}
+      </button>
+      <input
+        ref={ref}
+        type="file"
+        multiple
+        accept={ACCEPT}
+        hidden
+        onChange={(e) => {
+          if (e.target.files?.length) onFiles(Array.from(e.target.files));
+          e.target.value = '';
+        }}
+      />
+      {said.length > 0 && (
+        <div className="l5s-csaid">
+          <span className="l5s-eyebrow">Said in this conversation · {said.length}</span>
+          {said.slice(-4).map((x) => (
+            <button key={x.id} type="button" className="l5s-csaid-i" onClick={() => onShow(x.id)}>
+              {x.text}
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ── artifacts: what was made ─────────────────────────────────────────
+
+export interface ArtifactItem {
+  key: string;
+  /** what it is: Chart, Plan, Document, Practice… */
+  kind: string;
+  title: string;
+  render: () => ReactNode;
+}
+
+/** Everything made in a line of thinking, one at a time: a strip to choose, the one chosen at full size. */
+export function ArtifactsView({ items, selected, onSelect, narrow }: { items: ArtifactItem[]; selected: string | null; onSelect: (key: string) => void; narrow: boolean }) {
+  if (!items.length)
+    return (
+      <div className="l5s-cempty is-arts">
+        <div className="l5s-cempty-head">
+          {!narrow && <span className="l5s-eyebrow">Artifacts</span>}
+          <h2>Nothing made yet.</h2>
+          <p>Ask for a chart of your numbers, a plan, a comparison or a worksheet — or practise a topic from your files — and it is kept here, made from the conversation.</p>
+        </div>
+      </div>
+    );
+  const cur = items.find((i) => i.key === selected) ?? items[items.length - 1];
+  return (
+    <div className="l5s-arts">
+      {items.length > 1 && (
+        <div className="l5s-arts-strip" role="tablist" aria-label="Artifacts">
+          {items.map((it) => (
+            <button key={it.key} type="button" role="tab" aria-selected={it.key === cur.key} className={`l5s-art-pill${it.key === cur.key ? ' is-on' : ''}`} onClick={() => onSelect(it.key)}>
+              <span className="l5s-art-k">{it.kind}</span>
+              <span className="l5s-art-t">{it.title}</span>
+            </button>
+          ))}
+        </div>
+      )}
+      <section className="l5s-art" aria-label={cur.title}>
+        <p className="l5s-art-eyebrow">
+          Artifact · {cur.kind} · made from the conversation
+        </p>
+        <div className="l5s-art-body">{cur.render()}</div>
+      </section>
+    </div>
+  );
+}
 
 /** Nothing practised yet: the way to the first. */
 export function PracticeEmpty({ study, onPractice, making }: { study: StudyState; onPractice: (topic: string) => void; making: string | null }) {

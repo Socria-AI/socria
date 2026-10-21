@@ -253,7 +253,7 @@ export function L5Message(p: L5MessageProps) {
           <div className={m.role === 'assistant' ? 'l5-prose' : 'l5-said'}>
             {m.role === 'assistant' ? (
               <TexPick.Provider value={p.onPickTex ?? null}>
-                <RichText text={m.content} math rich cite={cite} />
+                <RichText text={m.content} math rich cite={cite} askLast />
               </TexPick.Provider>
             ) : (
               <SaidText text={m.content} />

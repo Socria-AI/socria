@@ -12,8 +12,8 @@
 //   OPENAI_BASE_URL=http://127.0.0.1:3999/v1 SOCRIA_ACCESS_CODE=localdevcode1234567 \
 //   RATE_LIMIT_DISABLED=1 npx next dev -p 3312
 //
-//   W=1440 H=900 STEPS=talk,talk2,chart,stage,card,fx,retry,edit,stop node scripts/dev/logos5-journey.mjs
-//   W=390 H=844 STEPS=talk,chart,stage,back node scripts/dev/logos5-journey.mjs
+//   W=1440 H=900 STEPS=talk,talk2,chart,stage,card,cardask,esc,convo,retry,edit,stop node scripts/dev/logos5-journey.mjs
+//   W=390 H=844 STEPS=talk,chart,stage,convo,card node scripts/dev/logos5-journey.mjs
 //   STUDY_FILES=ch5.pdf,review.pdf STEPS=intake,board,topic,practice,fill,check,more,why,universe,reload node scripts/dev/logos5-journey.mjs
 //
 // Each step leaves a screenshot in OUT (default: the system temp folder) and
@@ -61,15 +61,40 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     if (s === 'talk') await say('I have two job offers and I keep going back and forth. One pays more, the other has a better team.', Number(process.env.TALK_WAIT || 7000));
     if (s === 'talk2') await say('Honestly the team matters more. I learn fastest around people who are better than me.');
     if (s === 'chart') await say('Chart my spending as a pie: rent $1,200, food $400, transport $150', 9000);
-    if (s === 'stage') { await page.locator('.l5-stagebtn').click(); await page.waitForTimeout(1500); }
-    if (s === 'unstage') { await page.locator('.l5-stagebtn').click(); await page.waitForTimeout(800); }
+    // the views, by name (VIEW=Components|Artifacts|Logic Map): the switch in the header, or the tabs on a phone
+    const view = async (name) => {
+      await page.locator('.l5-switch-i', { hasText: name }).first().click();
+      await page.waitForTimeout(1000);
+    };
+    if (s === 'stage') await view('Logic Map');
+    if (s === 'view') await view(process.env.VIEW || 'Components');
+    if (s === 'arts') { await view('Artifacts'); log('artifacts', await page.locator('.l5s-art-pill').allInnerTexts(), '|', await page.locator('.l5s-art-eyebrow').innerText().catch(() => 'none')); }
+    // the conversation: folded away to the map's composer, or open beside it
+    if (s === 'convo') {
+      if (width < 700) await page.locator('.l5x-sheet-row .l5x-link').click();
+      else await page.locator('.l5-unibtn.is-convo').click();
+      await page.waitForTimeout(800);
+      log('convo open', await page.locator('.l5x.has-convo').count() === 1, 'omni', await page.locator('.l5x-omni').count(), 'peek', await page.locator('.l5x-peek').count());
+    }
     if (s === 'card') {
-      const card = page.locator('.l5-stage .lg-node').first();
-      log('cards', await page.locator('.l5-stage .lg-node').count());
+      const card = page.locator('.l5x-canvas .lg-node').first();
+      log('cards', await page.locator('.l5x-canvas .lg-node').count());
       await card.click(); await page.waitForTimeout(900);
-      log('linkbar', await page.locator('.l5-linkbar').innerText().catch(() => 'none'));
+      log('ask', (await page.locator('.l5-ask').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 300));
       log('linked msgs', await page.locator('.l5-msg.is-linked').count());
-      await page.keyboard.press('Escape');
+    }
+    if (s === 'cardask') {
+      await page.locator('.l5-ask-in input').fill(process.env.ASK || 'Why does this one matter?');
+      await page.locator('.l5-ask-go').click();
+      await page.waitForTimeout(Number(process.env.TALK_WAIT || 8000));
+      log('ask after', (await page.locator('.l5-ask').innerText().catch(() => 'closed')).replace(/\s+/g, ' ').slice(0, 300));
+      log('last user', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 140));
+    }
+    if (s === 'esc') { await page.keyboard.press('Escape'); await page.waitForTimeout(500); }
+    if (s === 'mind') {
+      await page.locator('.l5-mindbtn, .l5u-mind').first().click();
+      await page.waitForTimeout(1500);
+      log('mind', (await page.locator('.l5m').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 300));
     }
     if (s === 'fx') {
       const chip = page.locator('.l5-fx-chip').first();
@@ -106,7 +131,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       log('last reply after stop', JSON.stringify((await page.locator('.l5-a .l5-prose').last().innerText().catch(() => '')).slice(0, 120)));
     }
     if (s === 'ask') {
-      const card = page.locator('.l5-stage .lg-node').first();
+      const card = page.locator('.l5x-canvas .lg-node').first();
       await card.click({ force: true }); await page.waitForTimeout(700);
       const askBtn = page.getByRole('menuitem', { name: /ask socria/i }).first();
       log('ask item', await askBtn.count());
@@ -132,7 +157,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       log('cards', await page.locator('.l5s-card').count(), 'links', await page.locator('.l5s-links path').count());
       log('start', await page.locator('.l5s-card.is-start .l5s-card-title').innerText().catch(() => 'none'));
       log('panel', await page.locator('.l5s-start-k').innerText().catch(() => 'none'));
-      log('steps', await page.locator('.l5s-steps').innerText().catch(() => 'none'));
+      log('view', await page.locator('.l5-switch-i.is-on').innerText().catch(() => 'none'));
       await shot('board');
     }
     if (s === 'topic') {
@@ -187,15 +212,15 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     if (s === 'why') {
       await page.locator('.l5s-btn', { hasText: 'Why?' }).click();
       await page.waitForTimeout(9000);
-      log('tab', await page.locator('.l5s-step.is-on').innerText().catch(() => ''));
-      log('stage', await page.locator('.l5-stage').count(), 'last user', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 140));
+      log('view', await page.locator('.l5-switch-i.is-on').innerText().catch(() => ''));
+      log('map', await page.locator('.l5x-canvas .lg-map').count(), 'last user', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 140));
       await shot('why');
     }
-    if (s === 'tab1') { await page.locator('.l5s-step').first().click(); await page.waitForTimeout(700); await shot('tab1'); }
+    if (s === 'tab1') { await page.locator('.l5-switch-i').first().click(); await page.waitForTimeout(700); }
     if (s === 'askwhy') {
       await page.locator('.l5s-act', { hasText: 'Ask why' }).click();
       await page.waitForTimeout(9000);
-      log('tab', await page.locator('.l5s-step.is-on').innerText().catch(() => ''), 'stage', await page.locator('.l5-stage').count(), 'cards on map', await page.locator('.l5-stage .lg-node').count());
+      log('view', await page.locator('.l5-switch-i.is-on').innerText().catch(() => ''), 'cards on map', await page.locator('.l5x-canvas .lg-node').count());
       log('asked', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 160));
       log('reply', (await page.locator('.l5-a .l5-prose').last().innerText().catch(() => '')).slice(0, 160));
     }
@@ -219,13 +244,11 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     if (s === 'list') {
       await page.locator('.l5-unibtn.is-list').click();
       await page.waitForTimeout(700);
-      log('list open', await page.locator('.l5.list-open > .lg-railhost').count());
+      log('contents', (await page.locator('.l5c').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 300));
       await shot('list-in');
-      // put away: the button beside it on a desktop, a tap beside the drawer on a phone
-      if (width < 700) await page.mouse.click(width - 12, Math.round(height / 2));
-      else await page.locator('.l5-unibtn.is-list').click();
+      await page.locator('.l5-unibtn.is-list').click();
       await page.waitForTimeout(500);
-      log('list closed', await page.locator('.l5.list-open').count() === 0);
+      log('contents closed', await page.locator('.l5c').count() === 0);
     }
     if (s === 'openmap') {
       await page.locator('.l5u-c.is-logos .l5u-halo').first().click({ force: true });
@@ -245,7 +268,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       await page.reload({ waitUntil: 'domcontentloaded' });
       await page.waitForSelector('.l5s-card, .l5-thread, .l5s-ask, .l5u', { timeout: 90000 });
       await page.waitForTimeout(1500);
-      log('after reload: cards', await page.locator('.l5s-card').count(), 'steps', await page.locator('.l5s-steps').count());
+      log('after reload: cards', await page.locator('.l5s-card').count(), 'view', await page.locator('.l5-switch-i.is-on').innerText().catch(() => 'none'));
       await shot('reload');
     }
     if (s === 'probe') {
@@ -259,7 +282,6 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
         }, sel)));
       }
     }
-    if (s === 'back') { await page.locator('.l5-stage-back').click(); await page.waitForTimeout(600); }
     if (s === 'rail') { await page.locator('.l5-railbtn').click(); await page.waitForTimeout(700); }
     if (s === 'doc') {
       // DOC=path/to/file.pdf — attached, asked about, and opened beside the conversation
@@ -267,7 +289,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       await page.waitForTimeout(6000);
       log('attachment', await page.locator('.l5-dock .lg-att').allInnerTexts());
       await say('What does this report say about costs?', Number(process.env.TALK_WAIT || 9000));
-      log('stage open', await page.locator('.l5-stage').count(), 'doc panel', await page.locator('.l5-stage .doc-key, .l5-stage [data-block]').count());
+      log('view', await page.locator('.l5-switch-i.is-on').innerText().catch(() => ''), 'doc panel', await page.locator('.l5x-canvas .doc-key, .l5x-canvas [data-block]').count());
       log('fx', await page.locator('.l5-fx-chip').allInnerTexts());
     }
     if (s === 'menu') { await page.locator('.l5-head [aria-label="More"]').click(); await page.waitForTimeout(400); }

@@ -19,6 +19,7 @@ import {
   useMemo,
   useRef,
   useState,
+  type ReactNode,
 } from 'react';
 import type { ThinkingMap as TMap, LogosRelation, LogosNode } from '@/lib/logos';
 import { MODE_META, NODE_MODES, type NodeMode } from '@/lib/logos-explore';
@@ -134,6 +135,9 @@ const GAP = 16;
 const SEPARATION_PASSES = 3;
 // Roughly the action menu's height — only used to decide which side to open on.
 const MENU_H = 330;
+/** the ask popover (Logos 5): its width, and the height it is placed to have room for */
+const ASK_W = 300;
+const ASK_H = 400;
 
 /** How far along a centre-to-centre line a card's edge lies, for a card of this size. */
 function boxExit(dx: number, dy: number, d?: { w: number; h: number }): number {
@@ -167,6 +171,17 @@ function rerouted(conns: Connector[], placed: Placed[], pins: Record<string, [nu
 
 export type MapNodeRef = { id: string; label: string; type: TMap['nodes'][number]['type'] };
 
+/** A card's actions, as they are — or folded under "More about this card" when its ask comes first. */
+function MoreActs({ folded, children }: { folded: boolean; children: ReactNode }) {
+  if (!folded) return <>{children}</>;
+  return (
+    <details className="lg-acts-more">
+      <summary>More about this card</summary>
+      {children}
+    </details>
+  );
+}
+
 export function ThinkingMap({
   map,
   initialLens: askedLens,
@@ -185,6 +200,7 @@ export function ThinkingMap({
   onModelEdited,
   onSelectNode,
   onAsk,
+  askCard,
   picked,
   onPick,
   guarded,
@@ -253,6 +269,12 @@ export function ThinkingMap({
    * can carry a selection (the workspace).
    */
   onAsk?: (node: MapNodeRef) => void;
+  /**
+   * Logos 5: what a pressed card opens with — "Asking about" it, there on the
+   * map (components/logos5/L5Ask.tsx). The card's other actions are folded
+   * beneath it. `close` puts the menu away.
+   */
+  askCard?: (node: MapNodeRef, close: () => void) => ReactNode;
   /** objects picked for a synthesis of just those (shift- or ⌘-click) */
   picked?: ReadonlySet<string>;
   onPick?: (id: string) => void;
@@ -417,6 +439,10 @@ export function ThinkingMap({
     x: number;
     y: number;
     above: boolean;
+    /** the ask popover, beside the card: x is its left edge, not its centre */
+    beside?: boolean;
+    /** as tall as the room it has */
+    maxH: number;
   } | null>(null);
   const menuFor = menu?.id ?? null;
   const menuRef = useRef(menu);
@@ -2017,18 +2043,34 @@ export function ThinkingMap({
                   const el = wrapRef.current;
                   const box = el?.getBoundingClientRect();
                   if (!el || !box) return;
+                  // What floats over the map's foot (a composer) is room the menu
+                  // does not have: the screen around the map says how much.
+                  const reserve = parseFloat(getComputedStyle(el).getPropertyValue('--lg-menu-reserve')) || 0;
+                  const room = box.height - reserve;
+                  onNodePress?.();
+                  // The ask popover goes beside the card, where it covers least of the
+                  // map — when the map is wide enough to have a beside.
+                  if (askCard && box.width >= 640) {
+                    const right = card.right - box.left + 12;
+                    const left = card.left - box.left - 12 - ASK_W;
+                    const x = right + ASK_W <= box.width - 8 ? right : left >= 8 ? left : null;
+                    if (x != null) {
+                      const y = Math.max(8, Math.min(card.top - box.top - 6, room - ASK_H - 8));
+                      setMenu({ id: p.id, x, y, above: false, beside: true, maxH: Math.max(160, room - y - 8) });
+                      return;
+                    }
+                  }
                   // Flip above the card when there isn't room beneath it.
-                  const above = card.bottom - box.top + MENU_H > box.height;
+                  const above = card.bottom - box.top + MENU_H > room;
                   // The menu is in the viewport, not the world: placed in the
                   // panel's own pixels, kept inside it, the same size at any zoom.
-                  onNodePress?.();
+                  const y = above ? Math.max(card.top - box.top - 8, Math.min(MENU_H + 8, room - 8)) : Math.max(8, card.bottom - box.top + 8);
                   setMenu({
                     id: p.id,
                     x: Math.min(Math.max(card.left - box.left + card.width / 2, 100), Math.max(100, box.width - 100)),
-                    y: above
-                      ? Math.max(card.top - box.top - 8, Math.min(MENU_H + 8, box.height - 8))
-                      : Math.max(8, card.bottom - box.top + 8),
+                    y,
                     above,
+                    maxH: Math.max(140, above ? y - 8 : room - y - 8),
                   });
                 }}
               >
@@ -2106,12 +2148,15 @@ export function ThinkingMap({
             if (!node) return null;
             return (
               <div
-                className={`lg-acts${menu.above ? ' is-above' : ''}`}
+                className={`lg-acts${menu.above ? ' is-above' : ''}${menu.beside ? ' is-beside' : ''}${askCard ? ' is-ask' : ''}`}
                 role="menu"
                 // never cut off by the panel's edge: as tall as the room it has, and scrolling past that
-                style={{ left: menu.x, top: menu.y, maxHeight: Math.max(140, menu.above ? menu.y - 8 : vpRef.current.h - menu.y - 8), overflowY: 'auto' }}
+                style={{ left: menu.x, top: menu.y, maxHeight: menu.maxH, overflowY: 'auto' }}
                 onClick={(ev) => ev.stopPropagation()}
               >
+                {askCard?.({ id: node.id, label: node.label, type: node.type }, () => setMenu(null))}
+                {/* with the ask first, the card's other actions are a press away beneath it */}
+                <MoreActs folded={!!askCard}>
                 {/* WHAT HANGS FROM THIS PART OF THE SHAPE — the constraints,
                     values and questions that apply to it, under it rather
                     than beside it on the canvas. */}
@@ -2128,7 +2173,7 @@ export function ThinkingMap({
                 )}
                 {/* POINT & ASK: about this card, in the conversation itself —
                     the four modes below open a thread of its own. */}
-                {onAsk && (
+                {onAsk && !askCard && (
                   <>
                     <button
                       type="button"
@@ -2246,6 +2291,7 @@ export function ThinkingMap({
                     </button>
                   </>
                 )}
+                </MoreActs>
               </div>
             );
           })()}

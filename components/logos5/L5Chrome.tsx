@@ -105,6 +105,7 @@ export function L5Header({
   onToggleRail,
   onHome,
   title,
+  eyebrow,
   stage,
   presence,
   menu,
@@ -117,8 +118,10 @@ export function L5Header({
   onToggleRail?: () => void;
   /** the mark: home, the Universal Map */
   onHome?: () => void;
-  /** where you are, in small capitals beside the mark: LOGOS, a course, a line of thinking */
+  /** where you are, beside the mark: the line of thinking's name, in italic */
   title: string;
+  /** above-the-title words in small capitals: its Project, its course, "Universal Map" */
+  eyebrow?: string;
   /** what sits in the middle of the bar — a study's steps */
   center?: ReactNode;
   /** a control before the rest at the end — the Universal Map */
@@ -130,7 +133,7 @@ export function L5Header({
   account?: ReactNode;
 }) {
   return (
-    <header className={`l5-head${center ? ' has-steps' : ''}`}>
+    <header className={`l5-head${center ? ' has-center' : ''}`}>
       {onToggleRail && (
         <button
           type="button"
@@ -145,16 +148,20 @@ export function L5Header({
           </svg>
         </button>
       )}
-      {onHome && (
-        <button type="button" className="l5-brand" onClick={onHome} aria-label="Socria Logos — your Universal Map" title="Your Universal Map">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/socria-mark.png" alt="" width={22} height={22} />
-          <span className="l5-brand-w">Socria</span>
-        </button>
-      )}
-      <h1 className="l5-title" title={title}>
-        {title}
-      </h1>
+      <div className="l5-head-start">
+        {onHome && (
+          <button type="button" className="l5-brand" onClick={onHome} aria-label="Socria Logos — your Universal Map" title="Your Universal Map">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img src="/socria-mark.png" alt="" width={22} height={22} />
+            <span className="l5-brand-w">Socria</span>
+          </button>
+        )}
+        {onHome && (eyebrow || title) && <span className="l5-head-rule" aria-hidden="true" />}
+        <h1 className="l5-where" title={[eyebrow, title].filter(Boolean).join(' · ')}>
+          {eyebrow && <span className="l5-eyebrow">{eyebrow}</span>}
+          {title && <span className="l5-title">{title}</span>}
+        </h1>
+      </div>
       {center && <div className="l5-head-mid">{center}</div>}
       <div className="l5-head-end">
         {extra}
@@ -189,6 +196,45 @@ export function L5Header({
         {account}
       </div>
     </header>
+  );
+}
+
+// ── the Mind Graph's door ──
+
+/** A neuron: what Socria remembers, as its own place. */
+export function MindButton({ onOpen }: { onOpen: () => void }) {
+  return (
+    <button type="button" className="l5-iconbtn l5-mindbtn" onClick={onOpen} aria-label="Mind Graph — what Socria remembers" title="Mind Graph — what Socria remembers">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <circle cx="12" cy="12.5" r="3.2" />
+        <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8M12 4.5l-2.2-1.6M12 4.5l2.2-1.6M5.1 17l-1.9.2M18.9 17l1.9.2" />
+      </svg>
+    </button>
+  );
+}
+
+// ── the switch: what the screen shows ──
+
+export interface L5SwitchItem {
+  id: string;
+  label: string;
+  /** how many it holds — said beside it, and left off at none */
+  count?: number;
+  /** something new in it while another was showing */
+  fresh?: boolean;
+}
+
+export function L5Switch({ items, value, onChange, label, wide = false }: { items: L5SwitchItem[]; value: string; onChange: (id: string) => void; label: string; wide?: boolean }) {
+  return (
+    <div className={`l5-switch${wide ? ' is-wide' : ''}`} role="tablist" aria-label={label}>
+      {items.map((it) => (
+        <button key={it.id} type="button" role="tab" aria-selected={value === it.id} className={`l5-switch-i${value === it.id ? ' is-on' : ''}`} onClick={() => onChange(it.id)}>
+          {it.label}
+          {!!it.count && <span className="l5-switch-n">{it.count}</span>}
+          {it.fresh && value !== it.id && <span className="l5-switch-dot" aria-label="something new" />}
+        </button>
+      ))}
+    </div>
   );
 }
 

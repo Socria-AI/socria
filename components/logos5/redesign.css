@@ -1,0 +1,1393 @@
+/* components/logos5/redesign.css — Logos 5, the map is the screen.
+ *
+ * The redesign (docs/LOGOS-5.md §2): a header of the mark, where you are and
+ * a switch of three views; the view is the screen; the conversation a panel
+ * folded away beside it, or (folded) a composer floating on the canvas; on a
+ * phone the conversation is a sheet. Also the card's "Asking about", the
+ * Mind Graph, home's contents column, and the conversation's own restyle.
+ * Loaded after l5.css and study.css, and scoped under .logos-root .l5.
+ */
+
+.logos-root .l5 {
+  --l5-paper-hi: #fffdf8;
+  --l5-bubble: #efeadd;
+}
+
+/* ── the header ──────────────────────────────────────────────────── */
+.logos-root .l5 .l5-head {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: center;
+  gap: 12px;
+  height: 56px;
+  padding: 0 18px;
+  border-bottom: 1px solid var(--l5-hair);
+  background: var(--lg-paper);
+  position: relative;
+  z-index: 7;
+}
+.logos-root .l5 .l5-head-start {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  min-width: 0;
+  justify-self: start;
+}
+.logos-root .l5 .l5-head > .l5-railbtn {
+  position: absolute;
+  left: 6px;
+}
+.logos-root .l5 .l5-head-rule {
+  flex: 0 0 auto;
+  width: 1px;
+  height: 20px;
+  background: var(--l5-hair);
+}
+.logos-root .l5 .l5-where {
+  display: flex;
+  align-items: baseline;
+  gap: 9px;
+  min-width: 0;
+  margin: 0;
+  font-weight: 400;
+  white-space: nowrap;
+  overflow: hidden;
+}
+.logos-root .l5 .l5-eyebrow {
+  flex: 0 0 auto;
+  font-family: var(--lg-sans);
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5-where .l5-title,
+.logos-root .l5 .l5-head.has-center .l5-where .l5-title {
+  flex: 0 1 auto;
+  max-width: none;
+  margin: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 18px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5-head:not(.has-center) {
+  grid-template-columns: minmax(0, 1fr) auto;
+}
+.logos-root .l5 .l5-head-mid {
+  justify-self: center;
+}
+.logos-root .l5 .l5-head-end {
+  justify-self: end;
+  gap: 10px;
+}
+.logos-root .l5 .l5-unibtn {
+  height: 36px;
+  min-height: 36px;
+  background: var(--l5-paper-hi);
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5-unibtn.is-on,
+.logos-root .l5 .l5-unibtn.is-list.is-on {
+  background: var(--lg-primary);
+  border-color: var(--lg-primary);
+  color: #f5f3eb;
+}
+.logos-root .l5 .l5-unibtn .l5-count {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(53, 70, 32, 0.1);
+  color: var(--lg-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.logos-root .l5 .l5-unibtn.is-on .l5-count {
+  background: rgba(245, 243, 235, 0.22);
+  color: #f5f3eb;
+}
+.logos-root .l5 .l5-mindbtn {
+  width: 38px;
+  height: 38px;
+  border-radius: 10px;
+  color: var(--lg-ink-60);
+}
+
+/* ── the switch ──────────────────────────────────────────────────── */
+.logos-root .l5 .l5-switch {
+  display: inline-flex;
+  align-items: center;
+  height: 40px;
+  padding: 3px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-paper-hi);
+  font-size: 13.5px;
+}
+.logos-root .l5 .l5-switch-i {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background 0.2s, color 0.2s;
+}
+.logos-root .l5 .l5-switch-i.is-on {
+  background: var(--lg-primary);
+  color: #f5f3eb;
+}
+.logos-root .l5 .l5-switch-n {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: rgba(53, 70, 32, 0.1);
+  color: var(--lg-primary);
+  font-size: 11px;
+  font-weight: 600;
+}
+.logos-root .l5 .l5-switch-i.is-on .l5-switch-n {
+  background: rgba(245, 243, 235, 0.22);
+  color: #f5f3eb;
+}
+.logos-root .l5 .l5-switch-dot {
+  position: absolute;
+  top: 5px;
+  right: 6px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lg-secondary, #b8a26b);
+}
+.logos-root .l5 .l5-switch.is-wide {
+  display: flex;
+  width: 100%;
+  height: 44px;
+}
+.logos-root .l5 .l5-switch.is-wide .l5-switch-i {
+  flex: 1 1 0;
+  height: 36px;
+  padding: 0 6px;
+}
+.logos-root .l5 .l5x-tabs {
+  flex: 0 0 auto;
+  padding: 6px 16px 4px;
+  background: var(--lg-paper);
+}
+
+/* ── the line of thinking: the view is the screen ─────────────────── */
+.logos-root .l5 .l5x {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  position: relative;
+  overflow: hidden;
+}
+.logos-root .l5 .l5x-canvas {
+  --omni: 0px;
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background-image: radial-gradient(circle, rgba(53, 70, 32, 0.09) 1px, transparent 1px);
+  background-size: 26px 26px;
+}
+.logos-root .l5 .l5x:not(.has-convo):not(.is-narrow) .l5x-canvas {
+  --omni: 150px;
+}
+/* the map places its card menus out of the composer's way (components/ThinkingMap.tsx) */
+.logos-root .l5 .l5x-canvas {
+  --lg-menu-reserve: var(--omni);
+}
+/* what a card is joined to, said along the map's foot: above the composer */
+.logos-root .l5 .l5x-canvas .lg-legend {
+  bottom: calc(var(--omni) + 16px);
+}
+.logos-root .l5 .l5x-canvas:has(.l5x-peek) .lg-legend,
+.logos-root .l5 .lg-map-wrap:has(.lg-acts.is-ask) .lg-legend {
+  display: none;
+}
+.logos-root .l5 .l5x-view {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: auto;
+}
+.logos-root .l5 .l5x-canvas.is-logic .l5x-view,
+.logos-root .l5 .l5x-canvas.is-components .l5x-view {
+  overflow: hidden;
+}
+.logos-root .l5 .l5x-view > .ws-root {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.logos-root .l5 .l5x-canvas.is-artifacts .l5x-view {
+  padding-bottom: var(--omni);
+}
+/* the board under a floating composer: its foot keeps clear of it */
+.logos-root .l5 .l5x-canvas .l5s-boardcol {
+  padding-bottom: calc(var(--omni) * 0.2);
+}
+.logos-root .l5 .l5x-canvas .l5s-start {
+  bottom: calc(var(--omni) + 12px);
+}
+.logos-root .l5 .l5x-canvas .l5s-board {
+  padding-bottom: calc(var(--omni) + 24px);
+}
+
+/* the Logic Map: the workspace's own bar floats over the map, top right */
+.logos-root .l5 .l5x-canvas.is-logic .ws-top {
+  position: absolute;
+  top: 12px;
+  right: 14px;
+  z-index: 4;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  gap: 8px;
+}
+.logos-root .l5 .l5x-canvas.is-logic .ws-top-head:empty {
+  display: none;
+}
+.logos-root .l5 .l5x-canvas.is-logic .lg-panel-head {
+  display: none;
+}
+/* the map's own name and caption: the switch in the header already says which view this is,
+   and the workspace's bar floats where the caption ran */
+.logos-root .l5 .l5x-canvas.is-logic .mp-top {
+  padding-right: 240px;
+}
+.logos-root .l5 .l5x-canvas.is-logic .mp-top .st {
+  display: none;
+}
+
+/* the conversation, unfolded */
+.logos-root .l5 .l5x-convo {
+  flex: 0 0 460px;
+  max-width: 46%;
+  min-width: 340px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  border-right: 1px solid var(--l5-hair);
+  background: var(--l5-paper-hi);
+  box-shadow: 24px 0 60px -40px rgba(35, 36, 31, 0.25);
+  z-index: 5;
+}
+.logos-root .l5 .l5x-convo-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  padding: 10px 10px 10px 20px;
+  border-bottom: 1px solid var(--l5-hair);
+}
+.logos-root .l5 .l5x-convo-t {
+  font-family: var(--l5-serif);
+  font-size: 17px;
+}
+.logos-root .l5 .l5x-convo-fold {
+  margin-left: 6px;
+  padding: 0;
+  border: 0;
+  background: none;
+  font-family: var(--lg-sans);
+  font-size: 12px;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+}
+.logos-root .l5 .l5x-convo .l5-col {
+  flex: 1 1 auto;
+}
+.logos-root .l5 .l5x-convo .l5-thread-in {
+  max-width: none;
+  padding: 18px 20px 20px;
+}
+.logos-root .l5 .l5x-convo .l5-dock {
+  max-width: none;
+  padding: 0 18px 18px;
+}
+
+/* the conversation, folded: a composer floating on the canvas, and what arrives over it */
+.logos-root .l5 .l5x-omni {
+  position: absolute;
+  left: 50%;
+  bottom: 22px;
+  z-index: 6;
+  width: min(680px, calc(100% - 48px));
+  transform: translateX(-50%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  pointer-events: none;
+}
+.logos-root .l5 .l5x-omni > * {
+  pointer-events: auto;
+}
+.logos-root .l5 .l5x-omni .l5-dock {
+  max-width: none;
+  padding: 0;
+}
+.logos-root .l5 .l5x-omni .lg-composer-box,
+.logos-root .l5 .l5x-convo .lg-composer-box {
+  border: 1px solid rgba(53, 70, 32, 0.16);
+  border-radius: 22px;
+  background: rgba(255, 253, 248, 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 18px 50px -20px rgba(35, 36, 31, 0.35);
+}
+.logos-root .l5 .lg-composer textarea::placeholder {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 18px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5x-peek {
+  display: flex;
+  flex-direction: column;
+  max-height: 42vh;
+  padding: 12px 16px 12px;
+  border: 1px solid rgba(53, 70, 32, 0.16);
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.97);
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 18px 50px -20px rgba(35, 36, 31, 0.35);
+}
+.logos-root .l5 .l5x-peek-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  margin-bottom: 4px;
+}
+.logos-root .l5 .l5x-peek-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.logos-root .l5 .l5x-peek-body {
+  min-height: 0;
+  overflow-y: auto;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.logos-root .l5 .l5x-thinking {
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-style: italic;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5x-peek-fx {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 8px;
+}
+.logos-root .l5 .l5x-fx {
+  min-height: 28px;
+  padding: 0 10px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--lg-paper);
+  color: var(--lg-primary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5x-who {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 13.5px;
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5x-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lg-primary);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5x-x {
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ── the conversation, restyled ──────────────────────────────────── */
+.logos-root .l5 .l5-said {
+  max-width: 88%;
+  padding: 9px 13px 10px;
+  border-radius: 14px 14px 5px 14px;
+  background: var(--l5-bubble);
+  color: #262821;
+  font-size: 14.5px;
+  line-height: 1.5;
+}
+.logos-root .l5 .l5-a .l5-who {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 14px;
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5x-convo .l5-prose,
+.logos-root .l5 .l5x-sheet .l5-prose {
+  font-size: 15px;
+  line-height: 1.62;
+}
+.logos-root .l5 .socria-ask {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 1.06em;
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5-fx-chip {
+  min-height: 26px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--lg-ink-40);
+  font-size: 12.5px;
+}
+.logos-root .l5 .l5-fx-chip:hover,
+.logos-root .l5 .l5-fx-chip:focus-visible {
+  color: var(--lg-primary);
+}
+
+/* ── "Asking about": a card, asked about on the map ───────────────── */
+.logos-root .l5 .lg-acts.is-ask {
+  width: 300px;
+  padding: 14px 14px 10px;
+  border: 1px solid rgba(53, 70, 32, 0.16);
+  border-radius: 16px;
+  background: var(--l5-paper-hi);
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 18px 50px -20px rgba(35, 36, 31, 0.35);
+}
+/* beside the card it asks about: placed by its own edge, not its centre */
+.logos-root .l5 .lg-acts.is-beside {
+  transform: none;
+  animation-name: lgRise;
+}
+.logos-root .l5 .l5-ask {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.logos-root .l5 .l5-ask-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 8px;
+}
+.logos-root .l5 .l5-ask-what {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.logos-root .l5 .l5-ask-k {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5-ask-t {
+  font-family: var(--l5-serif);
+  font-size: 16px;
+  line-height: 1.2;
+}
+.logos-root .l5 .l5-ask-x {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font-size: 15px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5-ask-q {
+  align-self: flex-end;
+  max-width: 88%;
+  margin: 0;
+  padding: 7px 11px 8px;
+  border-radius: 12px 12px 4px 12px;
+  background: var(--l5-bubble);
+  font-size: 13.5px;
+  line-height: 1.45;
+}
+.logos-root .l5 .l5-ask-a {
+  max-height: 9.4em;
+  margin: 0;
+  overflow-y: auto;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5-ask-a.is-streaming {
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5-ask-from {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lg-ink-40);
+  font: inherit;
+  cursor: pointer;
+}
+.logos-root .l5 .l5-ask-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.logos-root .l5 .l5-ask-chip {
+  height: 28px;
+  padding: 0 11px;
+  border: 1px solid rgba(53, 70, 32, 0.12);
+  border-radius: 999px;
+  background: var(--lg-paper);
+  color: var(--lg-primary);
+  font: inherit;
+  font-size: 12.5px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logos-root .l5 .l5-ask-chip:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.logos-root .l5 .l5-ask-in {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding-top: 8px;
+  border-top: 1px solid rgba(53, 70, 32, 0.12);
+}
+.logos-root .l5 .l5-ask-in input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lg-ink);
+  font-family: var(--l5-serif);
+  font-style: italic;
+}
+.logos-root .l5 .l5-ask-go {
+  flex: 0 0 auto;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: var(--lg-primary);
+  color: #f5f3eb;
+  cursor: pointer;
+}
+.logos-root .l5 .l5-ask-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.logos-root .l5 .lg-acts-more {
+  margin-top: 8px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(53, 70, 32, 0.12);
+}
+.logos-root .l5 .lg-acts-more > summary {
+  padding: 6px 2px;
+  list-style: none;
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+  cursor: pointer;
+}
+.logos-root .l5 .lg-acts-more > summary::-webkit-details-marker {
+  display: none;
+}
+
+/* ── components, before there are any; artifacts ──────────────────── */
+.logos-root .l5 .l5s-cempty {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 24px;
+  padding: 40px 24px calc(var(--omni, 0px) + 40px);
+  overflow: auto;
+}
+.logos-root .l5 .l5s-cempty-head {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: 46ch;
+  text-align: center;
+}
+.logos-root .l5 .l5s-cempty-head h2 {
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: clamp(30px, 3.4vw, 38px);
+  line-height: 1.05;
+  letter-spacing: -0.015em;
+}
+.logos-root .l5 .l5s-cempty-head p {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5s-eyebrow {
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5s-cdrop {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  padding: 34px;
+  border: 1.5px dashed rgba(53, 70, 32, 0.3);
+  border-radius: 18px;
+  background: rgba(255, 253, 248, 0.7);
+  color: var(--lg-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.logos-root .l5 .l5s-cdrop.is-over {
+  border-color: var(--lg-primary);
+  background: #fbfaf3;
+}
+.logos-root .l5 .l5s-cdrop-t {
+  font-family: var(--l5-serif);
+  font-size: 19px;
+}
+.logos-root .l5 .l5s-cdrop-t u {
+  text-decoration-color: rgba(53, 70, 32, 0.4);
+  text-underline-offset: 3px;
+}
+.logos-root .l5 .l5s-cdrop-s {
+  font-size: 12.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5s-csaid {
+  width: min(560px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.logos-root .l5 .l5s-csaid-i {
+  padding: 12px 16px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 12px;
+  background: var(--l5-paper-hi);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.5;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5 .l5s-arts {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 16px;
+  padding: 28px 28px 32px;
+}
+.logos-root .l5 .l5s-arts-strip {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 960px;
+}
+.logos-root .l5 .l5s-art-pill {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 8px;
+  max-width: 320px;
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-paper-hi);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5s-art-pill.is-on {
+  border-color: var(--lg-primary);
+  box-shadow: 0 0 0 1px var(--lg-primary);
+}
+.logos-root .l5 .l5s-art-k {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5s-art-t {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.logos-root .l5 .l5s-art {
+  width: min(960px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 22px 24px 24px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 18px;
+  background: var(--l5-paper-hi);
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 18px 50px -24px rgba(35, 36, 31, 0.3);
+}
+.logos-root .l5 .l5s-art-eyebrow {
+  margin: 0;
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5s-art-body {
+  min-height: 360px;
+  display: flex;
+  flex-direction: column;
+}
+.logos-root .l5 .l5s-art-body > * {
+  flex: 1 1 auto;
+}
+.logos-root .l5 .l5s-art-body .l5s-practice {
+  padding: 4px 0 0;
+}
+
+/* ── home: the contents column, the Mind Graph's door, the bridges' words ── */
+.logos-root .l5 .l5u {
+  flex-direction: row;
+}
+.logos-root .l5 .l5u-main {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+.logos-root .l5 .l5u-bar.is-slim {
+  min-height: 0;
+  padding-top: 10px;
+  padding-bottom: 10px;
+}
+.logos-root .l5 .l5u-bar.is-slim .l5u-title {
+  display: none;
+}
+.logos-root .l5 .l5u-bar.is-slim .l5u-tools {
+  margin-left: auto;
+}
+.logos-root .l5 .l5u-mind {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 38px;
+  padding: 0 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-paper-hi);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5u-bridge path {
+  fill: none;
+  stroke: rgba(70, 90, 38, 0.55);
+  stroke-width: 1.3;
+  stroke-dasharray: 4 5;
+}
+.logos-root .l5 .l5u-bridge text {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 13px;
+  fill: var(--lg-primary);
+  paint-order: stroke;
+  stroke: var(--lg-paper);
+  stroke-width: 4px;
+}
+.logos-root .l5 .l5u-bridge.is-lit path {
+  stroke: var(--lg-primary);
+  stroke-width: 2;
+  stroke-dasharray: none;
+}
+.logos-root .l5 .l5u-bridge.is-dim {
+  opacity: 0.15;
+}
+.logos-root .l5 .l5c {
+  flex: 0 0 334px;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 28px 34px 24px 40px;
+  border-right: 1px solid var(--l5-hair);
+  overflow-y: auto;
+}
+.logos-root .l5 .l5c-head h2 {
+  margin: 8px 0 6px;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: 34px;
+  line-height: 1.05;
+  letter-spacing: -0.01em;
+}
+.logos-root .l5 .l5c-head p {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5c-k {
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5c-find {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 0 8px;
+  border-bottom: 1px solid var(--l5-hair);
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5c-find input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lg-ink);
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 18px;
+}
+.logos-root .l5 .l5c-list {
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+}
+.logos-root .l5 .l5c-group {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.logos-root .l5 .l5c-item {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 4px 0 4px 14px;
+  border: 0;
+  background: none;
+  color: var(--lg-ink-60);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5 .l5c-item.is-here {
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5c-item.is-here::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 13px;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+}
+.logos-root .l5 .l5c-t {
+  font-family: var(--l5-serif);
+  font-size: 19px;
+  line-height: 1.2;
+}
+.logos-root .l5 .l5c-s {
+  font-size: 12.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5c-none {
+  margin: 0;
+  font-size: 13.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5c-mind {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lg-primary);
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* ── the Mind Graph ──────────────────────────────────────────────── */
+.logos-root .l5 .l5m {
+  position: relative;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+.logos-root .l5 .l5m-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+.logos-root .l5 .l5m-region {
+  font-family: var(--lg-sans);
+  font-size: 11.5px;
+  letter-spacing: 2px;
+  fill: rgba(35, 36, 31, 0.35);
+}
+.logos-root .l5 .l5m-axon path {
+  fill: none;
+  stroke: rgba(35, 36, 31, 0.28);
+  stroke-width: 1.3;
+}
+.logos-root .l5 .l5m-axon circle {
+  fill: rgba(184, 162, 107, 0.7);
+  stroke: var(--lg-paper);
+  stroke-width: 1.5;
+}
+.logos-root .l5 .l5m-axon.is-strong path {
+  stroke: #354620;
+  stroke-width: 1.6;
+}
+.logos-root .l5 .l5m-axon.is-strong circle {
+  fill: #b8a26b;
+}
+.logos-root .l5 .l5m-n {
+  cursor: pointer;
+  outline: none;
+}
+.logos-root .l5 .l5m-n:focus-visible > path:not([d^='M0,-30 C4']) {
+  stroke-width: 3;
+}
+.logos-root .l5 .l5m-t {
+  font-family: var(--l5-serif);
+  font-size: 17px;
+  fill: rgba(35, 36, 31, 0.8);
+}
+.logos-root .l5 .l5m-n.is-on .l5m-t {
+  fill: var(--lg-ink);
+}
+.logos-root .l5 .l5m-s {
+  font-family: var(--lg-sans);
+  font-size: 11.5px;
+  fill: rgba(35, 36, 31, 0.42);
+}
+.logos-root .l5 .l5m-empty {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  margin: 0;
+  padding: 24px;
+  text-align: center;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5m-empty h2 {
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: 32px;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5m-empty p {
+  max-width: 52ch;
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.6;
+}
+.logos-root .l5 .l5m-card {
+  position: absolute;
+  top: 24px;
+  right: 24px;
+  z-index: 3;
+  width: 320px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  padding: 18px 18px 16px;
+  border: 1px solid rgba(53, 70, 32, 0.16);
+  border-radius: 16px;
+  background: var(--l5-paper-hi);
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 18px 50px -20px rgba(35, 36, 31, 0.35);
+}
+.logos-root .l5 .l5m-card-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 8px;
+}
+.logos-root .l5 .l5m-card-what {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  min-width: 0;
+}
+.logos-root .l5 .l5m-card-k {
+  font-size: 10.5px;
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5m-card-t {
+  font-family: var(--l5-serif);
+  font-size: 20px;
+  line-height: 1.15;
+}
+.logos-root .l5 .l5m-card-p {
+  margin: 0;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: rgba(35, 36, 31, 0.75);
+}
+.logos-root .l5 .l5m-card-facts {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5m-link {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lg-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5 .l5m-card-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding-top: 10px;
+  border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5 .l5m-btn {
+  display: inline-flex;
+  align-items: center;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5m-btn.is-primary {
+  border-color: var(--lg-primary);
+  background: var(--lg-primary);
+  color: #f5f3eb;
+}
+.logos-root .l5 .l5m-btn.is-danger {
+  border-color: rgba(156, 91, 60, 0.35);
+  color: #9c5b3c;
+}
+.logos-root .l5 .l5m-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.logos-root .l5 .l5m-sure {
+  font-size: 12.5px;
+  color: #9c5b3c;
+}
+.logos-root .l5 .l5m-note {
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5m-x {
+  flex: 0 0 auto;
+  width: 26px;
+  height: 26px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font-size: 15px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5m-in {
+  width: 100%;
+  padding: 6px 8px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 8px;
+  background: var(--lg-paper);
+  color: var(--lg-ink);
+  font-family: var(--l5-serif);
+  font-size: 18px;
+}
+.logos-root .l5 .l5m-in.is-area {
+  font-family: var(--lg-sans);
+  font-size: 15px;
+  line-height: 1.5;
+  resize: vertical;
+}
+.logos-root .l5 .l5m-foot {
+  position: absolute;
+  left: 28px;
+  bottom: 22px;
+  margin: 0;
+  max-width: calc(100% - 360px);
+  font-size: 12.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5m-foot a {
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5m-find {
+  position: absolute;
+  right: 24px;
+  bottom: 18px;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  width: 280px;
+  height: 40px;
+  padding: 0 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-paper-hi);
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5m-find input {
+  flex: 1 1 auto;
+  min-width: 0;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: var(--lg-ink);
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 16px;
+}
+
+/* ── narrower: the view is the screen, the conversation a sheet ────── */
+@media (max-width: 1023px) {
+  .logos-root .l5 .l5-head {
+    grid-template-columns: minmax(0, 1fr) auto;
+    column-gap: 8px;
+    padding: 0 10px 0 16px;
+  }
+  .logos-root .l5 .l5-head-mid {
+    display: none;
+  }
+  .logos-root .l5 .l5x.is-narrow {
+    flex-direction: column;
+  }
+  .logos-root .l5 .l5x.is-narrow .l5x-canvas {
+    padding-bottom: 150px;
+  }
+  .logos-root .l5 .l5x-sheet {
+    position: absolute;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 8;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    max-height: 82%;
+    padding: 4px 16px calc(12px + env(safe-area-inset-bottom, 0px));
+    border-top: 1px solid var(--l5-hair);
+    border-radius: 22px 22px 0 0;
+    background: var(--l5-paper-hi);
+    box-shadow: 0 -20px 60px -30px rgba(35, 36, 31, 0.4);
+  }
+  /* open: two thirds of the screen, from the foot — the map still in sight above it */
+  .logos-root .l5 .l5x-sheet.is-open {
+    height: 68%;
+    max-height: none;
+  }
+  .logos-root .l5 .l5x-sheet-grip {
+    align-self: center;
+    width: 64px;
+    min-height: 22px;
+    padding: 8px 12px;
+    border: 0;
+    background: rgba(35, 36, 31, 0.2);
+    background-clip: content-box;
+    border-radius: 999px;
+    cursor: pointer;
+  }
+  .logos-root .l5 .l5x-sheet-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 8px;
+    min-height: 32px;
+  }
+  .logos-root .l5 .l5x-sheet-row .l5x-link {
+    min-height: 44px;
+  }
+  .logos-root .l5 .l5x-sheet-last {
+    display: -webkit-box;
+    margin: 0;
+    overflow: hidden;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    font-size: 15px;
+    line-height: 1.5;
+  }
+  .logos-root .l5 .l5x-sheet .l5-col {
+    flex: 1 1 auto;
+    min-height: 0;
+  }
+  .logos-root .l5 .l5x-sheet .l5-thread-in {
+    max-width: none;
+    padding: 4px 0 12px;
+  }
+  .logos-root .l5 .l5x-sheet .l5-dock {
+    max-width: none;
+    padding: 0;
+  }
+  .logos-root .l5 .l5x-sheet .lg-composer-box {
+    background: var(--lg-paper);
+    box-shadow: none;
+    border-color: rgba(53, 70, 32, 0.16);
+  }
+  .logos-root .l5 .l5x-canvas .l5s-start {
+    bottom: 160px;
+  }
+  .logos-root .l5 .l5c {
+    position: absolute;
+    inset: 0 auto 0 0;
+    z-index: 9;
+    width: min(340px, 88vw);
+    background: var(--lg-paper);
+    box-shadow: 24px 0 60px -30px rgba(35, 36, 31, 0.35);
+  }
+  .logos-root .l5 .l5m-card {
+    top: auto;
+    left: 12px;
+    right: 12px;
+    bottom: 12px;
+    width: auto;
+    max-height: 70%;
+    overflow-y: auto;
+  }
+  .logos-root .l5 .l5m-foot {
+    display: none;
+  }
+  .logos-root .l5 .l5m-find {
+    left: 16px;
+    right: 16px;
+    top: 10px;
+    bottom: auto;
+    width: auto;
+  }
+  /* a phone: the drawing at its own size, the page scrolling under the search */
+  .logos-root .l5 .l5m.is-narrow {
+    display: flex;
+    flex-direction: column;
+    overflow-x: hidden;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+  }
+  .logos-root .l5 .l5m.is-narrow .l5m-find {
+    order: -1;
+    position: sticky;
+    top: 0;
+    z-index: 3;
+    flex: 0 0 auto;
+    margin: 10px 16px 4px;
+    left: auto;
+    right: auto;
+  }
+  .logos-root .l5 .l5m.is-narrow .l5m-svg {
+    position: static;
+    flex: 0 0 auto;
+    display: block;
+    width: 100%;
+    height: auto;
+  }
+  .logos-root .l5 .l5m.is-narrow .l5m-empty {
+    position: static;
+    flex: 1 1 auto;
+  }
+  .logos-root .l5 .l5m.is-narrow .l5m-card {
+    position: fixed;
+    z-index: 9;
+    bottom: calc(12px + env(safe-area-inset-bottom, 0px));
+  }
+}
+@media (max-width: 640px) {
+  .logos-root .l5 .l5-head-rule,
+  .logos-root .l5 .l5-eyebrow {
+    display: none;
+  }
+  .logos-root .l5 .l5-where .l5-title {
+    font-size: 17px;
+  }
+  .logos-root .l5 .lg-acts.is-ask {
+    width: min(300px, calc(100vw - 32px));
+  }
+  .logos-root .l5 .l5s-arts {
+    padding: 16px 12px 24px;
+  }
+  .logos-root .l5 .l5s-art {
+    padding: 16px 14px 18px;
+  }
+}

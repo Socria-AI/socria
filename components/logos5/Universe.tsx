@@ -46,6 +46,8 @@ export function UniverseView({
   onOpen,
   onOpenChat,
   onNew,
+  onMind,
+  contents = false,
   atlas,
   projects,
   notice,
@@ -58,6 +60,10 @@ export function UniverseView({
   onOpenChat?: (id: string) => void;
   /** begin a new line of thinking */
   onNew: () => void;
+  /** the Mind Graph, for a signed-in person */
+  onMind?: () => void;
+  /** the contents column: every line of thinking by Project, a press from each */
+  contents?: boolean;
   /** the Mind Atlas, for a signed-in person */
   atlas?: ReactNode;
   projects?: { id: string; name: string }[];
@@ -122,9 +128,70 @@ export function UniverseView({
   const chats = u.clusters.length - lines;
   const open = (c: Cluster, node?: string) => (c.kind === 'core' ? onOpenChat?.(c.id) : onOpen(c.id, node));
 
+  // the contents column: every conversation by its Project, chats last, newest first in each
+  const groups = (() => {
+    const named = new Map((projects ?? []).map((p) => [p.id, p.name]));
+    const out: { key: string; name: string; items: Cluster[] }[] = [];
+    const add = (key: string, name: string, c: Cluster) => {
+      let g = out.find((x) => x.key === key);
+      if (!g) out.push((g = { key, name, items: [] }));
+      g.items.push(c);
+    };
+    for (const c of u.clusters) {
+      if (!shown(c)) continue;
+      if (c.kind === 'core') add('core', 'Chats', c);
+      else if (c.projectId && named.has(c.projectId)) add(`p:${c.projectId}`, named.get(c.projectId)!, c);
+      else add('none', 'Lines of thinking', c);
+    }
+    const rank = (k: string) => (k === 'none' ? 1 : k === 'core' ? 2 : 0);
+    return out.sort((a, b) => rank(a.key) - rank(b.key));
+  })();
+  const contentsEl = contents ? (
+    <aside className="l5c" aria-label="Contents">
+      <div className="l5c-head">
+        <span className="l5c-k">Contents</span>
+        <h2>Your Universal Map</h2>
+        <p>{lines} {lines === 1 ? 'line of thinking' : 'lines of thinking'}{u.bridges.length ? ` · ${u.bridges.length} shared ${u.bridges.length === 1 ? 'idea' : 'ideas'}` : ''}</p>
+      </div>
+      <label className="l5c-find">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+          <circle cx="11" cy="11" r="6.5" />
+          <path d="M16 16l4 4" />
+        </svg>
+        <input type="search" value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Find an idea or a chat" aria-label="Find an idea or a chat" />
+      </label>
+      <div className="l5c-list">
+        {groups.map((g) => (
+          <div key={g.key} className="l5c-group">
+            <span className="l5c-k">{g.name}</span>
+            {g.items.map((c) => (
+              <button key={c.id} type="button" className={`l5c-item${c.id === activeId ? ' is-here' : ''}`} onClick={() => open(c)} onMouseEnter={() => setHover(c.id)} onMouseLeave={() => setHover((h) => (h === c.id ? null : h))}>
+                <span className="l5c-t">{c.title}</span>
+                <span className="l5c-s">
+                  {countSaid(c)}
+                  {c.at ? ` · ${relTime(c.at)}` : ''}
+                </span>
+              </button>
+            ))}
+          </div>
+        ))}
+        {!groups.length && <p className="l5c-none">{u.clusters.length ? 'Nothing matches.' : 'Nothing here yet — each line of thinking you begin is listed here.'}</p>}
+      </div>
+      {onMind && (
+        <button type="button" className="l5c-mind" onClick={onMind}>
+          Mind Graph <span aria-hidden="true">→</span>
+        </button>
+      )}
+    </aside>
+  ) : null;
+
   return (
-    <section className="l5u" aria-label="Universal Map">
-      <div className="l5u-bar">
+    <section className={`l5u${contents ? ' has-contents' : ''}`} aria-label="Universal Map">
+      {contentsEl}
+      <div className="l5u-main">
+      {/* with the contents open, the bar keeps only what the contents do not have */}
+      {(!contents || (mode === 'map' && !!projects?.length) || !!onMind || !!atlas) && (
+      <div className={`l5u-bar${contents ? ' is-slim' : ''}`}>
         <div className="l5u-title">
           <h2>Your Universal Map</h2>
           <p>
@@ -136,7 +203,7 @@ export function UniverseView({
           </p>
         </div>
         <div className="l5u-tools">
-          {mode === 'map' && u.clusters.length > 0 && (
+          {mode === 'map' && u.clusters.length > 0 && !contents && (
             <label className="l5u-search">
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                 <circle cx="11" cy="11" r="6.5" />
@@ -165,6 +232,15 @@ export function UniverseView({
               ))}
             </select>
           )}
+          {onMind && (
+            <button type="button" className="l5u-mind" onClick={onMind}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <circle cx="12" cy="12.5" r="3.2" />
+                <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8M12 4.5l-2.2-1.6M12 4.5l2.2-1.6M5.1 17l-1.9.2M18.9 17l1.9.2" />
+              </svg>
+              Mind Graph
+            </button>
+          )}
           {atlas && (
             <div className="l5u-seg" role="tablist" aria-label="Show">
               <button type="button" role="tab" aria-selected={mode === 'map'} className={mode === 'map' ? 'is-on' : ''} onClick={() => setMode('map')}>
@@ -177,6 +253,7 @@ export function UniverseView({
           )}
         </div>
       </div>
+      )}
       {notice}
       {mode === 'atlas' && atlas ? (
         <div className="l5u-atlas">{atlas}</div>
@@ -242,10 +319,18 @@ export function UniverseView({
                     const y2 = B.y + (nb?.y ?? 0);
                     const lit = hover === A.id || hover === B.id;
                     const dim = !shown(A) || !shown(B);
+                    const cy = (y1 + y2) / 2 - Math.min(80, Math.abs(x2 - x1) * 0.18);
                     return (
-                      <path key={i} d={`M${x1},${y1} Q${(x1 + x2) / 2},${(y1 + y2) / 2 - Math.min(80, Math.abs(x2 - x1) * 0.18)} ${x2},${y2}`} className={`${lit ? 'is-lit' : ''}${dim ? ' is-dim' : ''}`}>
-                        <title>Both talk about “{b.says}”</title>
-                      </path>
+                      <g key={i} className={`l5u-bridge${lit ? ' is-lit' : ''}${dim ? ' is-dim' : ''}`}>
+                        <path d={`M${x1},${y1} Q${(x1 + x2) / 2},${cy} ${x2},${y2}`}>
+                          <title>Both talk about “{b.says}”</title>
+                        </path>
+                        {i < 8 && (
+                          <text x={(x1 + x2) / 2} y={(y1 + y2) / 2 - Math.min(80, Math.abs(x2 - x1) * 0.18) / 2 - 8} textAnchor="middle">
+                            both talk about “{b.says.length > 24 ? b.says.slice(0, 23) + '…' : b.says}”
+                          </text>
+                        )}
+                      </g>
                     );
                   })}
                 </g>
@@ -325,6 +410,7 @@ export function UniverseView({
           </p>
         </div>
       )}
+      </div>
     </section>
   );
 }

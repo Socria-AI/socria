@@ -258,8 +258,47 @@ function BlockNode({ block, math, k, cite, rich }: { block: Block; math?: boolea
  * where the surface draws them, its citations. `rich` (Logos 5) also reads
  * headings, fenced code, quotations and inline code (lib/rich-text.ts).
  */
-export function RichText({ text, math, cite, rich }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean }) {
-  return <>{parseBlocks(text, { rich }).map((b, i) => BlockNode({ block: b, math, k: `b${i}`, cite, rich }))}</>;
+export function RichText({ text, math, cite, rich, askLast }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean }) {
+  const blocks = parseBlocks(text, { rich });
+  const last = blocks.length - 1;
+  return (
+    <>
+      {blocks.map((b, i) => {
+        // Logos 5: a reply that ends by asking, asks in its own voice — the closing question set apart
+        const split = askLast && i === last && b.kind === 'p' ? closingQuestion(b.text) : null;
+        if (!split) return BlockNode({ block: b, math, k: `b${i}`, cite, rich });
+        return (
+          <p key={`b${i}`}>
+            {split.body && (
+              <>
+                <Inline text={split.body} math={math} keyBase={`b${i}a`} cite={cite} code={rich} />{' '}
+              </>
+            )}
+            <em className="socria-ask">
+              <Inline text={split.question} math={math} keyBase={`b${i}q`} cite={cite} code={rich} />
+            </em>
+          </p>
+        );
+      })}
+    </>
+  );
+}
+
+/**
+ * A paragraph's closing question, apart from what comes before it — only
+ * when it ends with one, and only when the cut leaves no bold, code, link or
+ * maths open on either side of it.
+ */
+export function closingQuestion(text: string): { body: string; question: string } | null {
+  const t = text.trim();
+  if (!t.endsWith('?')) return null;
+  const m = /^([\s\S]*[.!?:;…])\s+([^.!?]*\?)$/.exec(t);
+  const body = m ? m[1].trim() : '';
+  const question = m ? m[2].trim() : t;
+  if (question.length < 4) return null;
+  const balanced = (x: string) => (x.match(/\*\*/g) ?? []).length % 2 === 0 && (x.match(/`/g) ?? []).length % 2 === 0 && (x.match(/\$/g) ?? []).length % 2 === 0 && (x.match(/\[/g) ?? []).length === (x.match(/\]/g) ?? []).length;
+  if (!balanced(body) || !balanced(question)) return null;
+  return { body, question };
 }
 
 /**

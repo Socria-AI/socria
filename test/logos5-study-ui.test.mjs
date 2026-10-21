@@ -10,7 +10,9 @@
 //   • practice shows blanks, not answers — no account side, amount or reason
 //     from the answer key is in the page before it is checked;
 //   • a checked set shows the score, the rules, and each gap with its page;
-//   • the steps say which screen is open, and that the Logic Map is on request;
+//   • the three views (Components, Artifacts, Logic Map) are counted, and
+//     each says what it holds — or how it comes to hold something;
+//   • a card asked about says which card, its last answer and where it came from;
 //   • the Universal Map is the home: every conversation counted, searchable,
 //     and a way to begin when there is nothing yet.
 
@@ -36,11 +38,45 @@ const study = {
   start: 't1', why: 'Everything rests on it.', practice: [], at: 1,
 };
 
-console.log('\n=== the steps ===');
+console.log('\n=== the three views ===');
 {
-  const s = html(h(U.StudySteps, { tab: 'components', onTab: none, practiced: false, logicSeen: false }));
-  ok('three steps, the open one marked', (s.match(/<button[^>]*class="l5s-step[ "]/g) ?? []).length === 3 && /aria-current="page"[^>]*>.*Components/.test(s), s);
-  ok('the Logic Map is on request until it has been asked for', s.includes('on request') && !html(h(U.StudySteps, { tab: 'logic', onTab: none, practiced: true, logicSeen: true })).includes('on request'));
+  const items = [{ id: 'components', label: 'Components', count: 3 }, { id: 'artifacts', label: 'Artifacts', count: 0, fresh: true }, { id: 'logic', label: 'Logic Map', count: 7 }];
+  const s = html(h(U.L5Switch, { items, value: 'components', onChange: none, label: 'Views' }));
+  ok('three views, the open one selected', (s.match(/role="tab"/g) ?? []).length === 3 && /aria-selected="true"[^>]*>Components/.test(s), s);
+  ok('each counted, and nothing said when there is nothing', s.includes('l5-switch-n">3<') && s.includes('l5-switch-n">7<') && !s.includes('l5-switch-n">0<'));
+  ok('something new in a view not open is marked', s.includes('l5-switch-dot') && !html(h(U.L5Switch, { items, value: 'artifacts', onChange: none, label: 'Views' })).includes('l5-switch-dot'));
+
+  const c = html(h(U.ComponentsEmpty, { said: [{ id: 'm1', text: 'I have an exam on adjusting entries' }], onFiles: none, reading: null, onShow: none, narrow: false }));
+  ok('components, empty: nothing to sort, and where to drop files', c.includes('Nothing to sort yet.') && c.includes('Drop files here') && c.includes('type="file"'));
+  ok('components, empty: what was said here, a press from each', c.includes('Said in this conversation · 1') && c.includes('I have an exam on adjusting entries'));
+  ok('components, reading: the drop zone says so and waits', html(h(U.ComponentsEmpty, { said: [], onFiles: none, reading: 'Reading 2 files…', onShow: none, narrow: false })).includes('Reading 2 files…'));
+
+  const none0 = html(h(U.ArtifactsView, { items: [], selected: null, onSelect: none, narrow: false }));
+  ok('artifacts, empty: nothing made yet, and how something is', none0.includes('Nothing made yet.') && none0.includes('practise a topic'));
+  const arts = [{ key: 'd:1', kind: 'Chart', title: 'Runway by month', render: () => h('div', null, 'CHART-BODY') }, { key: 'p:2', kind: 'Practice', title: 'Adjusting entries', render: () => h('div', null, 'PRACTICE-BODY') }];
+  const a = html(h(U.ArtifactsView, { items: arts, selected: null, onSelect: none, narrow: false }));
+  ok('artifacts: the newest is shown at full size, said to be made from the conversation', a.includes('PRACTICE-BODY') && !a.includes('CHART-BODY') && a.includes('Artifact · Practice · made from the conversation'));
+  ok('artifacts: the others a press away', (a.match(/class="l5s-art-pill/g) ?? []).length === 2 && a.includes('Runway by month'));
+  ok('artifacts: the one chosen is the one shown', html(h(U.ArtifactsView, { items: arts, selected: 'd:1', onSelect: none, narrow: false })).includes('CHART-BODY'));
+}
+
+console.log('\n=== asking about a card ===');
+{
+  const quick = [{ label: 'Challenge it', text: 'Challenge this' }, { label: 'What rests on this?', text: 'What rests on it?' }];
+  const s = html(h(U.L5Ask, { label: 'Runway', exchange: { q: 'Why does this matter?', a: 'It sets how long you can wait.', streaming: false }, came: { said: 'Came from 2 messages', onShow: none }, quick, onAsk: none, onClose: none, busy: false }));
+  ok('it says which card is asked about', s.includes('Asking about') && s.includes('Runway'));
+  ok('the last question and its answer, and where the card came from', s.includes('Why does this matter?') && s.includes('It sets how long you can wait.') && s.includes('Came from 2 messages ›'));
+  ok('the quick questions, and a place to ask the next', s.includes('Challenge it') && s.includes('What rests on this?') && s.includes('Ask about this card…'));
+  const streaming = html(h(U.L5Ask, { label: 'Runway', exchange: { q: 'Why?', a: '', streaming: true }, came: { said: 'Came from 2 messages' }, quick, onAsk: none, onClose: none, busy: true }));
+  ok('while the answer is on its way: thinking, and nothing else to press', streaming.includes('Thinking…') && !streaming.includes('Came from') && /class="l5-ask-chip"[^>]*disabled/.test(streaming));
+}
+
+console.log('\n=== the question a reply ends on ===');
+{
+  const q = U.closingQuestion('Runway is the months you can wait. What would you do with six more?');
+  ok('the closing question is cut from the rest', q && q.body === 'Runway is the months you can wait.' && q.question === 'What would you do with six more?', JSON.stringify(q));
+  ok('a reply that does not end on a question has none', U.closingQuestion('Runway is the months you can wait.') === null);
+  ok('a cut that would split bold or code is not made', U.closingQuestion('It is **six. Or** is it `x. y`?') === null);
 }
 
 console.log('\n=== the intake ===');

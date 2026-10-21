@@ -21,6 +21,12 @@ export interface StagePrefs {
   open: Record<string, boolean>;
   /** the stage's share of the width beside the thread, 0.35–0.75 */
   share: number;
+  /**
+   * session id → the conversation unfolded beside the map (the map is the
+   * screen; the conversation is folded away until asked for). Absent: not
+   * chosen yet, and the screen decides by what the line of thinking holds.
+   */
+  convo?: Record<string, boolean>;
 }
 
 export const DEFAULT_STAGE_SHARE = 0.58;
@@ -36,7 +42,11 @@ export function readStagePrefs(storage: StorageLike | null | undefined): StagePr
       for (const [k, v] of Object.entries(raw.open).slice(-60)) if (typeof v === 'boolean' && /^[\w-]{1,80}$/.test(k)) open[k] = v;
     }
     const share = typeof raw?.share === 'number' && raw.share >= 0.35 && raw.share <= 0.75 ? raw.share : DEFAULT_STAGE_SHARE;
-    return { open, share };
+    const convo: Record<string, boolean> = {};
+    if (raw && typeof raw.convo === 'object' && raw.convo) {
+      for (const [k, v] of Object.entries(raw.convo).slice(-60)) if (typeof v === 'boolean' && /^[\w-]{1,80}$/.test(k)) convo[k] = v;
+    }
+    return Object.keys(convo).length ? { open, share, convo } : { open, share };
   } catch {
     return { open: {}, share: DEFAULT_STAGE_SHARE };
   }
@@ -45,7 +55,8 @@ export function readStagePrefs(storage: StorageLike | null | undefined): StagePr
 export function writeStagePrefs(storage: StorageLike | null | undefined, prefs: StagePrefs): void {
   try {
     const entries = Object.entries(prefs.open).slice(-60);
-    storage?.setItem(STAGE_KEY, JSON.stringify({ open: Object.fromEntries(entries), share: prefs.share }));
+    const convo = Object.entries(prefs.convo ?? {}).slice(-60);
+    storage?.setItem(STAGE_KEY, JSON.stringify({ open: Object.fromEntries(entries), share: prefs.share, ...(convo.length ? { convo: Object.fromEntries(convo) } : {}) }));
   } catch {
     /* a full or blocked store: the stage still opens and closes, it is just not remembered */
   }
