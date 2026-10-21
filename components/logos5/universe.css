@@ -1990,3 +1990,628 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
     animation: none;
   }
 }
+
+/* ── in order: This month and All time (UniverseTime.tsx, lib/logos5/timeline.ts) ──
+ * The oldest on the left, the newest on the right. The line scrolls; what
+ * stays put over it — a thread's name held at the left edge, the days along
+ * the foot, the whole history under them — is drawn over it, in screen units. */
+.logos-root .l5 .l5t {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 1;
+}
+.logos-root .l5 .l5t-scroll {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 96px;
+  overflow: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  cursor: grab;
+  outline: none;
+}
+.logos-root .l5 .l5t-scroll::-webkit-scrollbar {
+  display: none;
+}
+.logos-root .l5 .l5t-scroll:active {
+  cursor: grabbing;
+}
+.logos-root .l5 .l5t-scroll:focus-visible {
+  box-shadow: inset 0 0 0 2px rgba(var(--l5h-gold-rgb), 0.5);
+}
+.logos-root .l5 .l5t-track {
+  position: relative;
+}
+/* weeks, months, this week, now, a folded stretch */
+.logos-root .l5 .l5t-wk {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1px dashed color-mix(in srgb, var(--lg-ink) 13%, transparent);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-wk span {
+  position: absolute;
+  top: 10px;
+  left: 9px;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5t-wk.is-month {
+  border-left-style: solid;
+  border-left-color: color-mix(in srgb, var(--lg-ink) 20%, transparent);
+}
+.logos-root .l5 .l5t-wk.is-month span {
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5t-thisweek {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  background: linear-gradient(180deg, rgba(var(--l5h-gold-rgb), 0.08), rgba(var(--l5h-gold-rgb), 0.03));
+  border-left: 1px solid rgba(var(--l5h-gold-rgb), 0.38);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-thisweek span {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  white-space: nowrap;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--l5h-gold-ink);
+}
+.logos-root .l5 .l5t-now {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  border-left: 1.5px dashed rgba(var(--l5h-gold-rgb), 0.55);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-now span {
+  position: absolute;
+  top: 7px;
+  left: -24px;
+  padding: 2px 9px;
+  border-radius: 999px;
+  background: var(--l5h-gold);
+  color: var(--l5h-gold-on);
+  font-size: 11px;
+  font-weight: 600;
+}
+.logos-root .l5 .l5t-gap {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 3px;
+  border-left: 1px dashed color-mix(in srgb, var(--lg-ink) 16%, transparent);
+  border-right: 1px dashed color-mix(in srgb, var(--lg-ink) 16%, transparent);
+  background: repeating-linear-gradient(135deg, transparent 0 10px, color-mix(in srgb, var(--lg-ink) 3%, transparent) 10px 11px);
+  text-align: center;
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-gap-mark {
+  font-size: 18px;
+  letter-spacing: 0.2em;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5t-gap-t {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 15px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5t-gap-s {
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+}
+/* the threads */
+.logos-root .l5 .l5t-lines {
+  position: absolute;
+  left: 0;
+  top: 0;
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-line {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 2.4;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.logos-root .l5 .l5t-halo {
+  fill: none;
+  stroke: var(--c);
+  stroke-width: 9;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+  opacity: 0.12;
+}
+.logos-root .l5 .l5t-lines .is-dim {
+  opacity: 0.28;
+}
+.logos-root .l5 .l5t-name {
+  position: absolute;
+  transform: translateY(-50%);
+  white-space: nowrap;
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.15em;
+  text-transform: uppercase;
+  color: var(--c);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-name.is-dim {
+  opacity: 0.3;
+}
+.logos-root .l5 .l5t-back {
+  position: absolute;
+  z-index: 2;
+  transform: translate(-100%, -50%);
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 22px;
+  padding: 0 9px;
+  border: 1px dashed color-mix(in srgb, var(--c) 55%, transparent);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  font: inherit;
+  font-size: 11px;
+  color: var(--lg-ink-60);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logos-root .l5 .l5t-back b {
+  font-weight: 500;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5t-back:hover,
+.logos-root .l5 .l5t-back:focus-visible {
+  border-style: solid;
+  border-color: var(--c);
+  outline: none;
+}
+.logos-root .l5 .l5t-back.is-dim {
+  opacity: 0.3;
+}
+/* a conversation: its star, and its words under or over it */
+.logos-root .l5 .l5t-bead {
+  position: absolute;
+  z-index: 1;
+  width: 0;
+  height: 0;
+  cursor: pointer;
+  outline: none;
+}
+.logos-root .l5 .l5t-hit {
+  position: absolute;
+  left: -18px;
+  top: -18px;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+}
+.logos-root .l5 .l5t-star {
+  position: absolute;
+  left: calc(var(--r) * -1);
+  top: calc(var(--r) * -1);
+  width: calc(var(--r) * 2);
+  height: calc(var(--r) * 2);
+  border-radius: 50%;
+  background: var(--c);
+  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 calc(2.5px + var(--r) * 0.55) color-mix(in srgb, var(--c) 14%, transparent);
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+.logos-root .l5 .l5t-bead.is-hub .l5t-star::after {
+  content: '';
+  position: absolute;
+  inset: 32%;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lg-paper) 72%, transparent);
+}
+.logos-root .l5 .l5t-bead.is-dot .l5t-star {
+  box-shadow: 0 0 0 2px var(--lg-paper);
+  opacity: 0.8;
+}
+.logos-root .l5 .l5t-bead.is-chat .l5t-star {
+  background: var(--lg-paper);
+  box-shadow: inset 0 0 0 1.6px var(--c), 0 0 0 2px var(--lg-paper);
+}
+.logos-root .l5 .l5t-bead:hover .l5t-star {
+  transform: scale(1.15);
+}
+.logos-root .l5 .l5t-bead:focus-visible .l5t-star,
+.logos-root .l5 .l5t-bead.is-sel .l5t-star {
+  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 5px var(--lg-primary);
+}
+.logos-root .l5 .l5t-bead.is-here .l5t-star {
+  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 6px rgba(var(--l5h-gold-rgb), 0.55);
+}
+.logos-root .l5 .l5t-bead.is-found .l5t-star {
+  box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 6px rgba(var(--l5h-gold-rgb), 0.6), 0 0 22px 8px rgba(var(--l5h-gold-rgb), 0.3);
+  opacity: 1;
+}
+.logos-root .l5 .l5t-bead.is-dim {
+  opacity: 0.3;
+}
+.logos-root .l5 .l5t-bead.is-flash .l5t-star {
+  animation: l5t-flash 1.1s ease-out 2;
+}
+@keyframes l5t-flash {
+  0% {
+    box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 4px rgba(var(--l5h-gold-rgb), 0.9), 0 0 0 0 rgba(var(--l5h-gold-rgb), 0.5);
+  }
+  100% {
+    box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 4px rgba(var(--l5h-gold-rgb), 0), 0 0 0 26px rgba(var(--l5h-gold-rgb), 0);
+  }
+}
+.logos-root .l5 .l5t-words {
+  position: absolute;
+  left: calc(var(--lw) / -2);
+  width: var(--lw);
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  text-align: center;
+}
+.logos-root .l5 .l5t-bead.is-below .l5t-words {
+  top: calc(var(--r) + 8px);
+}
+.logos-root .l5 .l5t-bead.is-above .l5t-words {
+  bottom: calc(var(--r) + 8px);
+}
+.logos-root .l5 .l5t-bead.is-bare .l5t-words {
+  display: none;
+}
+.logos-root .l5 .l5t-t {
+  display: -webkit-box;
+  overflow: hidden;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  font-family: var(--l5-serif);
+  font-size: 16px;
+  line-height: 1.08;
+  color: var(--lg-ink);
+  text-wrap: balance;
+  text-shadow: 0 0 3px var(--lg-paper), 0 0 8px var(--lg-paper);
+}
+.logos-root .l5 .l5t-last {
+  white-space: nowrap;
+}
+.logos-root .l5 .l5t-starred {
+  font-family: system-ui, sans-serif;
+  font-size: 0.78em;
+  color: #c9a24a;
+}
+.logos-root .l5 .l5t-bead.is-dot .l5t-t {
+  font-style: italic;
+  font-size: 14.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5t-k {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  max-width: 100%;
+  white-space: nowrap;
+  font-size: 9.5px;
+  font-weight: 500;
+  letter-spacing: 0.11em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+  text-shadow: 0 0 3px var(--lg-paper), 0 0 8px var(--lg-paper);
+}
+/* over the line, in screen units */
+.logos-root .l5 .l5t-pins {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 96px;
+  z-index: 3;
+  overflow: hidden;
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-pins::before {
+  content: '';
+  position: absolute;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  width: 64px;
+  background: linear-gradient(90deg, var(--lg-paper) 15%, transparent);
+}
+.logos-root .l5 .l5t-name.is-pinned {
+  left: 16px;
+}
+.logos-root .l5 .l5t-name.is-pinned::before {
+  content: '← ';
+  letter-spacing: 0;
+  font-weight: 400;
+}
+.logos-root .l5 .l5t-name.is-floor {
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5t-name.is-floor::before {
+  content: none;
+}
+.logos-root .l5 .l5t-axis {
+  position: absolute;
+  left: 0;
+  right: 0;
+  bottom: 64px;
+  z-index: 3;
+  height: 32px;
+  border-top: 1px solid color-mix(in srgb, var(--lg-ink) 12%, transparent);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-day {
+  position: absolute;
+  top: 9px;
+  transform: translateX(-50%);
+  white-space: nowrap;
+  font-size: 11px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5t-day.is-week,
+.logos-root .l5 .l5t-day.is-month {
+  font-weight: 600;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5t-day.is-today {
+  font-weight: 700;
+  color: var(--l5h-gold-ink);
+}
+.logos-root .l5 .l5t-more,
+.logos-root .l5 .l5t-today {
+  position: absolute;
+  z-index: 5;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  padding: 0 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--lg-primary);
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logos-root .l5 .l5t-more small,
+.logos-root .l5 .l5t-today small {
+  font-size: 11.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5t-more.is-l {
+  left: 14px;
+  top: calc(50% - 48px);
+  transform: translateY(-50%);
+}
+.logos-root .l5 .l5t-today {
+  right: 16px;
+  top: calc(50% - 48px);
+  transform: translateY(-50%);
+}
+/* the whole history, at the foot */
+.logos-root .l5 .l5t-scrub {
+  position: absolute;
+  left: 16px;
+  right: 16px;
+  bottom: 14px;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+.logos-root .l5 .l5t-scrub-say {
+  flex: none;
+  width: 150px;
+  font-size: 11.5px;
+  line-height: 1.3;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5t-scrub-bar {
+  position: relative;
+  flex: 1 1 auto;
+  min-width: 0;
+  height: 32px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 10px;
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  cursor: pointer;
+  touch-action: none;
+}
+.logos-root .l5 .l5t-scrub-m {
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  padding: 3px 0 0 5px;
+  border-left: 1px solid color-mix(in srgb, var(--lg-ink) 10%, transparent);
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-scrub-gap {
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  background: repeating-linear-gradient(135deg, transparent 0 3px, color-mix(in srgb, var(--lg-ink) 12%, transparent) 3px 4px);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-scrub-t {
+  position: absolute;
+  bottom: 5px;
+  width: 3px;
+  height: 13px;
+  margin-left: -1.5px;
+  border-radius: 2px;
+  background: var(--c);
+  pointer-events: none;
+}
+.logos-root .l5 .l5t-scrub-t.is-dot {
+  width: 2px;
+  height: 8px;
+  opacity: 0.6;
+}
+.logos-root .l5 .l5t-scrub-t.is-hit {
+  background: #c9a24a;
+  box-shadow: 0 0 0 2px rgba(var(--l5h-gold-rgb), 0.35);
+  opacity: 1;
+}
+.logos-root .l5 .l5t-scrub-win {
+  position: absolute;
+  top: -4px;
+  height: 38px;
+  border: 2px solid var(--lg-primary);
+  border-radius: 10px;
+  background: color-mix(in srgb, var(--lg-primary) 7%, transparent);
+  pointer-events: none;
+}
+/* what is said at the foot sits over the history, not on it */
+.logos-root .l5 .l5h-main.is-time .l5h-hint {
+  bottom: 104px;
+}
+.logos-root .l5 .l5h-main.is-time .l5h-said {
+  bottom: 120px;
+}
+/* the week, as a map: its name over it, and a way back to other weeks */
+.logos-root .l5 .l5h-weektitle {
+  position: absolute;
+  z-index: 6;
+  left: 26px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  pointer-events: none;
+}
+.logos-root .l5 .l5h-weektitle > * {
+  pointer-events: auto;
+}
+.logos-root .l5 .l5h-weektitle .l5h-wt-k {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--l5h-gold-ink);
+}
+.logos-root .l5 .l5h-weektitle .l5h-wt-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.logos-root .l5 .l5h-weektitle h2 {
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: 38px;
+  line-height: 1;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5h-wt-step {
+  width: 30px;
+  height: 30px;
+  display: inline-grid;
+  place-items: center;
+  border: 1px solid var(--l5-hair);
+  border-radius: 50%;
+  background: var(--l5-surface);
+  font: inherit;
+  font-size: 15px;
+  color: var(--lg-ink);
+  cursor: pointer;
+}
+.logos-root .l5 .l5h-wt-step:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.logos-root .l5 .l5n-backrow {
+  display: block;
+  margin-top: 5px;
+}
+.logos-root .l5 .l5n-back {
+  display: inline-flex;
+  align-items: center;
+  height: 20px;
+  padding: 0 8px;
+  border: 1px dashed color-mix(in srgb, var(--c) 55%, transparent);
+  border-radius: 999px;
+  background: var(--l5-surface);
+  font: inherit;
+  font-size: 10.5px;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--lg-ink-60);
+  white-space: nowrap;
+  cursor: pointer;
+  pointer-events: auto;
+}
+.logos-root .l5 .l5n-back:hover {
+  border-style: solid;
+}
+.logos-root .l5 .l5h-vm-note {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 1.4;
+  color: var(--lg-ink-60);
+}
+@media (max-width: 640px) {
+  .logos-root .l5 .l5t-scroll,
+  .logos-root .l5 .l5t-pins {
+    bottom: 100px;
+  }
+  .logos-root .l5 .l5t-axis {
+    bottom: 68px;
+  }
+  .logos-root .l5 .l5t-scrub {
+    left: 12px;
+    right: 12px;
+    bottom: 22px;
+  }
+  .logos-root .l5 .l5t-t {
+    font-size: 14.5px;
+  }
+  .logos-root .l5 .l5t-more.is-l {
+    left: 10px;
+  }
+  .logos-root .l5 .l5t-today {
+    right: 10px;
+  }
+  .logos-root .l5 .l5h-weektitle h2 {
+    font-size: 30px;
+  }
+  .logos-root .l5 .l5h-weektitle {
+    left: 16px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 .l5t-bead.is-flash .l5t-star {
+    animation: none;
+    box-shadow: 0 0 0 2.5px var(--lg-paper), 0 0 0 5px rgba(var(--l5h-gold-rgb), 0.8);
+  }
+}

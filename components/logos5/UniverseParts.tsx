@@ -83,6 +83,10 @@ export interface PreviewActs {
   onFileHere?: () => void;
   /** put in a subject by hand: back to the one it was read as */
   onUnsubject?: () => void;
+  /** in order: the week it began in, as a map */
+  onWeek?: () => void;
+  /** on a map: where it is in time */
+  onTime?: () => void;
   onClose: () => void;
 }
 
@@ -187,6 +191,16 @@ export function PreviewCard({
         {acts.onLink && (
           <button type="button" className="l5h-btn" onClick={acts.onLink}>
             Link to…
+          </button>
+        )}
+        {acts.onWeek && (
+          <button type="button" className="l5h-btn" onClick={acts.onWeek}>
+            See that week as a map
+          </button>
+        )}
+        {acts.onTime && (
+          <button type="button" className="l5h-btn" onClick={acts.onTime} title="All time, at the day it began">
+            Find it in time
           </button>
         )}
         {pinned && acts.onUnpin && (
@@ -496,9 +510,11 @@ export function ViewMenu({
     };
   }, [onClose]);
   const shown = (k: string) => !arr.projects || arr.projects.includes(k);
+  // in order (This month, All time) the line itself is the picture: nothing is placed, coloured or sized another way
+  const inTime = lens === 'month' || lens === 'all';
   return (
     <div className="l5h-vm" ref={ref} role="dialog" aria-label="How the map is shown">
-      {lens === 'subject' && (
+      {lens === 'week' && (
         <section>
           <h4>Order in a subject</h4>
           <div className="l5h-seg is-wrap" role="radiogroup" aria-label="Order in a subject">
@@ -513,11 +529,16 @@ export function ViewMenu({
       <section>
         <h4>Show</h4>
         {hasChats && <Check label="Core chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />}
-        <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />
-        {lens === 'subject' && <Check label="Snap into place" hint="when you put one down" on={arr.display.snap} onFlip={() => onDisplay({ snap: !arr.display.snap })} />}
-        <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />
-        <Seg label="Colour by" value={arr.display.color} options={COLOR_BY} said={COLOR_SAID} onPick={(v) => onDisplay({ color: v })} />
-        <Seg label="Size by" value={arr.display.size} options={SIZE_BY} said={SIZE_SAID} onPick={(v) => onDisplay({ size: v })} />
+        {!inTime && <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />}
+        {lens === 'week' && <Check label="Snap into place" hint="when you put one down" on={arr.display.snap} onFlip={() => onDisplay({ snap: !arr.display.snap })} />}
+        {!inTime && (
+          <>
+            <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />
+            <Seg label="Colour by" value={arr.display.color} options={COLOR_BY} said={COLOR_SAID} onPick={(v) => onDisplay({ color: v })} />
+            <Seg label="Size by" value={arr.display.size} options={SIZE_BY} said={SIZE_SAID} onPick={(v) => onDisplay({ size: v })} />
+          </>
+        )}
+        {inTime && <p className="l5h-vm-note">In order: each where it began, joined when it followed on within a week.</p>}
       </section>
       {groups.length > 1 && (
         <section>

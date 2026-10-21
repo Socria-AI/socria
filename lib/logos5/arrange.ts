@@ -1,7 +1,8 @@
 // lib/logos5/arrange.ts — HOW THE PERSON HAS ARRANGED THEIR UNIVERSAL MAP.
 //
-// Everything here is the person's own choice, and nothing else: which way the
-// map is grouped (Today's learning, By week, By subject), where they put a
+// Everything here is the person's own choice, and nothing else: how much of
+// it the map shows (Today, This week — the map — or This month, All time —
+// in order, timeline.ts), where they put a
 // conversation, the subject they gave one by dragging it there, the order of
 // the clusters, which they starred and which they put out of sight, the links
 // and the notes they drew, how the map is shown, and the views they saved.
@@ -19,12 +20,17 @@
 // `f:…` a field read from the conversations (subjects.ts), `other` for
 // everything else; `w:…` and `m:…` are weeks and months. An arrangement kept
 // before the map was grouped this way still reads: its pins in a Project still
-// hold, and `map` or `columns` is By subject, `timeline` By week.
+// hold (This week is drawn by subject), and an older way of grouping all of it
+// — by subject, by week, `map`, `columns`, `timeline` — is All time.
 //
 // PURE.
 
-/** How the Universal Map is grouped: today's learning and what it builds on, by week, or by subject. */
-export type HomeMode = 'today' | 'week' | 'subject';
+/**
+ * How much of it the Universal Map shows: today's learning and what it builds
+ * on, or this week by subject — each a map — or this month, or all of it, in
+ * order (timeline.ts).
+ */
+export type HomeMode = 'today' | 'week' | 'month' | 'all';
 export type LabelLevel = 'minimal' | 'titles' | 'ideas';
 export type ColorBy = 'project' | 'kind' | 'recency';
 export type SizeBy = 'ideas' | 'recency' | 'same';
@@ -114,9 +120,9 @@ export interface Arrangement {
 
 export const HOME_KEY = 'socria.logos5.home.v1';
 
-export const MODES: readonly HomeMode[] = ['today', 'week', 'subject'];
-/** How an arrangement kept before the lenses reads: a map of Projects is By subject, a timeline By week. */
-const OLD_MODES: Record<string, HomeMode> = { map: 'subject', columns: 'subject', timeline: 'week' };
+export const MODES: readonly HomeMode[] = ['today', 'week', 'month', 'all'];
+/** How an arrangement kept before reads: every older way of grouping all of it is All time. */
+const OLD_MODES: Record<string, HomeMode> = { map: 'all', columns: 'all', timeline: 'all', subject: 'all' };
 const modeOf = (v: unknown, or: HomeMode): HomeMode => (typeof v === 'string' && OLD_MODES[v] ? OLD_MODES[v] : oneOf(v, MODES, or));
 export const LABELS: readonly LabelLevel[] = ['minimal', 'titles', 'ideas'];
 export const COLOR_BY: readonly ColorBy[] = ['project', 'kind', 'recency'];
@@ -264,7 +270,7 @@ export function parseArrangement(raw: unknown): Arrangement {
       const q = (v && typeof v === 'object' ? v : {}) as Record<string, unknown>;
       const name = line(q.name, VIEW_NAME_MAX);
       if (!isId(q.id) || !name) continue;
-      out.views.push({ id: q.id, name, mode: modeOf(q.mode, 'subject'), sort: oneOf(q.sort, SORTS, 'started'), display: displayOf(q.display), projects: groupsList(q.projects), query: line(q.query, 80) });
+      out.views.push({ id: q.id, name, mode: modeOf(q.mode, 'all'), sort: oneOf(q.sort, SORTS, 'started'), display: displayOf(q.display), projects: groupsList(q.projects), query: line(q.query, 80) });
     }
   }
   out.projects = groupsList(r.projects);

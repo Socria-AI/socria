@@ -1,24 +1,30 @@
 'use client';
 // components/logos5/Universe.tsx — the Universal Map, Logos 5's home.
 //
-// Every past conversation as a node on one map ("Clearer Structures and UI"):
-// a major session a hub, a quick question an ambient dot. Three ways to group
-// them — Today's learning, By week, By subject (lib/logos5/spatial.ts lays
-// each out; nothing has to be filed for By subject, lib/logos5/subjects.ts
-// reads what each is about) — and lib/logos5/arrange.ts keeps how the person
-// arranged it. One box finds or starts. Pressing a star opens its card;
-// pressing again, or Continue, opens it. Everything arranged can be undone.
+// Every past conversation, on one map ("Clearer Structures and UI"): a major
+// session a hub, a quick question an ambient dot. How much of it, chosen
+// above it: Today and This week are a map — what joins up and what stands
+// alone (lib/logos5/spatial.ts; a week is drawn by subject, and nothing has
+// to be filed for that, lib/logos5/subjects.ts reads what each is about) —
+// and This month and All time are a line through time, the oldest on the
+// left and the newest on the right (lib/logos5/timeline.ts), where something
+// half-remembered is found by scrolling back. lib/logos5/arrange.ts keeps how
+// the person arranged it. One box finds or starts. Pressing a star opens its
+// card; pressing again, or Continue, opens it. Everything arranged can be
+// undone.
 //
-// The pieces: UniverseSky.tsx (the map), UniverseParts.tsx (the card, the box,
-// the menus).
+// The pieces: UniverseSky.tsx (the map), UniverseTime.tsx (the line),
+// UniverseParts.tsx (the card, the box, the menus).
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { resumeOf, sharedIdeas, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
-import { homesOf, type Home } from '@/lib/logos5/spatial';
+import { dayName, homesOf, weekStart, type Home } from '@/lib/logos5/spatial';
+import { monthStart } from '@/lib/logos5/timeline';
 import { OTHER } from '@/lib/logos5/subjects';
 import * as A from '@/lib/logos5/arrange';
 import { useArrangement } from './useArrangement';
-import { SkyCanvas, type SkyActs } from './UniverseSky';
+import { SkyCanvas, shortDate, type SkyActs } from './UniverseSky';
+import { TimeView } from './UniverseTime';
 import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, type Found } from './UniverseParts';
 import './universe.css';
 
@@ -37,18 +43,24 @@ interface Step {
   files: Filing[];
 }
 
-/** The three lenses, in the words the PRD gives them; short on a phone. */
+/** How much of it is shown; short on a phone. Today and This week are a map, the other two a line through time. */
 const LENS_SAID: Record<A.HomeMode, { long: string; short: string }> = {
-  today: { long: 'Today’s learning', short: 'Today' },
-  week: { long: 'By week', short: 'Week' },
-  subject: { long: 'By subject', short: 'Subject' },
+  today: { long: 'Today', short: 'Today' },
+  week: { long: 'This week', short: 'Week' },
+  month: { long: 'This month', short: 'Month' },
+  all: { long: 'All time', short: 'All' },
 };
 
 const HINT: Record<A.HomeMode, string> = {
   today: 'Today in the middle, what it builds on round it, everything else further out · press a star to see it, twice to open it',
-  week: 'Newest first; a dotted line is an idea coming back · press a star to see it, twice to open it',
-  subject: 'Subjects are read from your conversations — drag a star to another to move it, into a Project to file it · double-click to write a note',
+  week: 'This week as a map: what joins up, and what stands alone — drag a star into a Project to file it · ↩ finds where a subject was before',
+  month: 'Oldest on the left, newest on the right — each where it began; joined when it followed on within a week · ↩ goes back to where a subject was before',
+  all: 'Oldest on the left, newest on the right — each where it began; joined when it followed on within a week · ↩ goes back to where a subject was before',
 };
+
+const DAY = 86_400_000;
+/** In order (This month, All time) rather than a map. */
+const inTime = (m: A.HomeMode) => m === 'month' || m === 'all';
 
 export function UniverseView({
   conversations,
@@ -121,7 +133,42 @@ export function UniverseView({
   const only = useMemo(() => (arr.projects ? new Set(arr.projects) : null), [arr.projects]);
   const shown = useMemo(() => (only ? visible.filter((t) => only.has(homes.of.get(t.id)?.key ?? OTHER)) : visible), [visible, only, homes]);
   const shownHomes = useMemo(() => (only ? { ...homes, list: homes.list.filter((h) => only.has(h.key)) } : homes), [homes, only]);
-  const ideas = useMemo(() => sharedIdeas(shown), [shown]);
+  // ── how much of it: a week (this one, or one chosen from the line), this month, or all of it ──
+  /** the week shown as a map, when it is not this one — chosen from the line; not kept */
+  const [weekAt, setWeekAt] = useState<number | null>(null);
+  const weekFrom = weekStart(weekAt ?? now);
+  const weekTo = weekStart(weekFrom + 8 * DAY);
+  const scoped = useMemo(() => {
+    // this week: what was worked on in it; a week before: what was begun in it, as the line shows it
+    if (lens === 'week') return shown.filter((t) => (weekAt === null ? t.at >= weekFrom || t.started >= weekFrom : t.started >= weekFrom && t.started < weekTo));
+    if (lens === 'month') return shown.filter((t) => t.started >= monthStart(now));
+    return shown;
+  }, [lens, shown, weekAt, weekFrom, weekTo, now]);
+  const ideas = useMemo(() => sharedIdeas(lens === 'week' ? scoped : shown), [lens, scoped, shown]);
+  /** on the week's map: beside the first of each subject there, the last of that subject before the week */
+  const backOf = useMemo(() => {
+    if (lens !== 'week') return undefined;
+    const inWeek = new Set(scoped.map((t) => t.id));
+    const firstOf = new Map<string, Tile>();
+    for (const t of [...scoped].sort((a, b) => a.started - b.started)) {
+      const key = homes.of.get(t.id)?.key;
+      if (key && key !== OTHER && !firstOf.has(key)) firstOf.set(key, t);
+    }
+    const out = new Map<string, { id: string; at: number }>();
+    for (const [key, t] of firstOf) {
+      let best: Tile | null = null;
+      for (const u of visible) if (!inWeek.has(u.id) && u.started < weekFrom && homes.of.get(u.id)?.key === key && (!best || u.started > best.started)) best = u;
+      if (best) out.set(t.id, { id: best.id, at: best.started });
+    }
+    return out;
+  }, [lens, scoped, homes, visible, weekFrom]);
+  // another week is another map: fitted to it
+  useEffect(() => {
+    setFitKey((k) => k + 1);
+  }, [weekAt]);
+  /** go to one on the line — a ↩ on the week's map, "Find it in time" — once per press */
+  const [timeFocus, setTimeFocus] = useState<{ id: string; n: number } | null>(null);
+  const [endKey, setEndKey] = useState(0);
   const homeByKey = useMemo(() => new Map(homes.list.map((h) => [h.key, h])), [homes]);
 
   const [query, setQuery] = useState('');
@@ -216,6 +263,23 @@ export function UniverseView({
   const openId = (id: string) => {
     const t = tileById.get(id);
     if (t) open(t);
+  };
+
+  // ── between the map and the line ──
+  /** the week a conversation began in, as a map */
+  const seeWeek = (t: Tile) => {
+    setPreview(null);
+    setSel([]);
+    const w = weekStart(t.started);
+    setWeekAt(w >= weekStart(now) ? null : w);
+    prefer((a) => A.setMode(a, 'week'));
+  };
+  /** where a conversation is in time: All time, brought to it */
+  const findInTime = (id: string) => {
+    setPreview(null);
+    setSel([]);
+    if (lens !== 'all') prefer((a) => A.setMode(a, 'all'));
+    setTimeFocus({ id, n: Date.now() });
   };
 
   /** Filed in a Project — which is then its subject, so any subject it was given by hand is let go. */
@@ -358,6 +422,7 @@ export function UniverseView({
       setSaid('Linked. Press the ⟷ on the line to say what joins them.');
     },
     onLinkEdit: (id, label) => commit((a) => (label === null ? A.removeLink(a, id) : A.relabelLink(a, id, label))),
+    onBack: (id) => findInTime(id),
   };
 
   // ── keys anywhere on the map: / finds, ⌘Z undoes, Escape lets go ──
@@ -415,7 +480,7 @@ export function UniverseView({
         home={previewHome}
         suggested={previewSuggested?.name ?? null}
         starred={starredSet.has(previewTile.id)}
-        pinned={lens === 'subject' && !!arr.pins[previewTile.id]}
+        pinned={lens === 'week' && !!arr.pins[previewTile.id]}
         projects={(projects ?? []).filter((p) => !p.archived).map((p) => ({ id: p.id, name: p.name }))}
         links={arr.links
           .filter((l) => l.a === previewTile.id || l.b === previewTile.id)
@@ -430,10 +495,15 @@ export function UniverseView({
             setPreview(null);
             setSaid(`“${previewTile.title}” is hidden — View, then Hidden, brings it back.`);
           },
-          onLink: () => {
-            setLinkFrom(previewTile.id);
-            setPreview(null);
-          },
+          // a link is drawn on the map; the line through time draws only what followed on
+          onLink: inTime(lens)
+            ? undefined
+            : () => {
+                setLinkFrom(previewTile.id);
+                setPreview(null);
+              },
+          onWeek: inTime(lens) ? () => seeWeek(previewTile) : undefined,
+          onTime: inTime(lens) ? undefined : () => findInTime(previewTile.id),
           onUnpin: () => commit((a) => A.unpinTiles(a, [previewTile.id]), [], true),
           onMove: onFile && projects?.length ? (pid) => fileTo([previewTile.id], pid) : undefined,
           onNewProject: onFile && onCreateProject && projects ? (name) => void newProjectWith([previewTile.id], name) : undefined,
@@ -512,6 +582,36 @@ export function UniverseView({
   ) : null;
 
   // ── what the map shows ──
+  const barTop = narrow ? (resume || starredTiles.length ? 104 : 58) : 64;
+  const plural = (n: number) => `${n} ${n === 1 ? 'conversation' : 'conversations'}`;
+  const stepWeek = (by: -1 | 1) => {
+    setPreview(null);
+    setSel([]);
+    const next = weekStart(by < 0 ? weekFrom - 3 * DAY : weekFrom + 8 * DAY);
+    setWeekAt(next >= weekStart(now) ? null : next);
+  };
+  const weekTitle = (
+    <div className="l5h-weektitle" style={{ top: barTop + 4 }}>
+      <span className="l5h-wt-k">
+        {weekAt === null ? `${dayName(weekFrom)} – today` : `${shortDate(weekFrom)} – ${shortDate(weekTo - DAY)}`} · {plural(scoped.length)}
+      </span>
+      <div className="l5h-wt-row">
+        <button type="button" className="l5h-wt-step" aria-label="The week before" onClick={() => stepWeek(-1)}>
+          ‹
+        </button>
+        <h2>{weekAt === null ? 'This week' : `Week of ${shortDate(weekFrom)}`}</h2>
+        <button type="button" className="l5h-wt-step" aria-label="The week after" disabled={weekAt === null} onClick={() => stepWeek(1)}>
+          ›
+        </button>
+        {weekAt !== null && (
+          <button type="button" className="l5h-btn" onClick={() => setWeekAt(null)}>
+            Back to this week
+          </button>
+        )}
+      </div>
+    </div>
+  );
+
   let body: ReactNode;
   if (atlasOn && atlas)
     body = (
@@ -540,33 +640,84 @@ export function UniverseView({
         </button>
       </div>
     );
+  else if (inTime(lens))
+    body = scoped.length ? (
+      <TimeView
+        tiles={scoped}
+        tileById={tileById}
+        homes={homes}
+        now={now}
+        from={lens === 'month' ? monthStart(now) : null}
+        narrow={narrow}
+        activeId={activeId}
+        selected={sel}
+        starred={starredSet}
+        matchOf={matchOf}
+        focus={timeFocus}
+        endKey={endKey}
+        top={barTop}
+        acts={{
+          onPreview: skyActs.onPreview,
+          onOpen: openId,
+          onSelect: (ids) => setSel(ids),
+        }}
+      />
+    ) : (
+      <div className="l5h-empty">
+        <p>Nothing begun this month yet — the rest is all still here, in order.</p>
+        <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, 'all'))}>
+          All time →
+        </button>
+      </div>
+    );
+  else if (lens === 'week' && !scoped.length)
+    body = (
+      <>
+        {weekTitle}
+        <div className="l5h-empty">
+          <p>{weekAt === null ? 'Nothing yet this week.' : 'Nothing was begun that week.'}</p>
+          <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, 'all'))}>
+            All time →
+          </button>
+        </div>
+      </>
+    );
   else
     body = (
-      <SkyCanvas
-        lens={lens}
-        tiles={shown}
-        tileById={tileById}
-        homes={shownHomes}
-        ideas={ideas}
-        arr={arr}
-        now={now}
-        activeId={activeId}
-        resumeId={resume?.id ?? null}
-        selected={sel}
-        matchOf={matchOf}
-        linkFrom={linkFrom}
-        editNote={editNote}
-        setEditNote={setEditNote}
-        selectMode={selectMode}
-        fitKey={fitKey}
-        centerRef={center}
-        top={narrow ? (resume || starredTiles.length ? 104 : 58) : 64}
-        narrow={narrow}
-        acts={skyActs}
-      />
+      <>
+        {lens === 'week' && weekTitle}
+        <SkyCanvas
+          lens={lens === 'today' ? 'today' : 'subject'}
+          tiles={lens === 'week' ? scoped : shown}
+          tileById={tileById}
+          homes={shownHomes}
+          ideas={ideas}
+          arr={arr}
+          now={now}
+          activeId={activeId}
+          resumeId={resume?.id ?? null}
+          selected={sel}
+          matchOf={matchOf}
+          linkFrom={linkFrom}
+          editNote={editNote}
+          setEditNote={setEditNote}
+          selectMode={selectMode}
+          fitKey={fitKey}
+          centerRef={center}
+          // a week's name is written over its map
+          top={lens === 'week' ? barTop + (narrow ? 74 : 92) : barTop}
+          narrow={narrow}
+          keepEmpty={lens !== 'week'}
+          backOf={backOf}
+          fromTop={lens === 'week'}
+          acts={skyActs}
+        />
+      </>
     );
 
   const isMap = !atlasOn && shown.length > 0;
+  /** a map, not the line: what can be chosen several at once, linked, noted */
+  const isSky = isMap && !inTime(lens);
   const selPinned = sel.some((id) => !!arr.pins[id]);
 
   return (
@@ -575,10 +726,10 @@ export function UniverseView({
       {narrow && <div className="l5h-findrow">{findEl}</div>}
       <div className="l5h-body">
         {contentsEl}
-        <div className="l5h-main" ref={mainRef}>
+        <div className={`l5h-main${inTime(lens) ? ' is-time' : ''}`} ref={mainRef}>
           {tiles.length > 0 && !atlasOn && (
             <div className="l5h-bar">
-              <div className="l5h-seg is-modes" role="radiogroup" aria-label="Group the map">
+              <div className="l5h-seg is-modes" role="radiogroup" aria-label="How much of it">
                 {A.MODES.map((m) => (
                   <button
                     key={m}
@@ -587,8 +738,10 @@ export function UniverseView({
                     aria-checked={lens === m}
                     className={lens === m ? 'is-on' : ''}
                     onClick={() => {
-                      if (m === lens) return setFitKey((k) => k + 1);
                       setPreview(null);
+                      setWeekAt(null);
+                      // pressed again: back to today on the line, the whole of it on a map
+                      if (m === lens) return inTime(m) ? setEndKey((k) => k + 1) : setFitKey((k) => k + 1);
                       setSel([]);
                       prefer((a) => A.setMode(a, m));
                     }}
@@ -617,7 +770,7 @@ export function UniverseView({
                 </div>
               )}
               <div className="l5h-bar-r">
-                {isMap && (
+                {isSky && (
                   <button type="button" className={`l5h-tool is-select${selectMode ? ' is-on' : ''}`} aria-pressed={selectMode} onClick={() => setSelectMode((v) => !v)} title="Choose several: drag across them (or hold Shift and drag)">
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeDasharray="3 2.4" aria-hidden="true">
                       <rect x="4" y="4" width="16" height="16" rx="2" />
@@ -635,6 +788,11 @@ export function UniverseView({
                     <path d="M15 14l5-5-5-5M20 9H10a6 6 0 0 0 0 12h3" />
                   </svg>
                 </button>
+                {!narrow && homes.list.length > 1 && (
+                  <button type="button" className={`l5h-tool l5h-viewbtn is-subjects${arr.projects ? ' is-on' : ''}`} aria-expanded={viewOpen} onClick={() => setViewOpen((v) => !v)} title="Which subjects are shown">
+                    <span className="l5h-tool-l">{arr.projects ? `${arr.projects.length} of ${homes.list.length} subjects` : 'All subjects'} ▾</span>
+                  </button>
+                )}
                 <button type="button" className={`l5h-tool l5h-viewbtn${viewOpen ? ' is-on' : ''}`} aria-expanded={viewOpen} onClick={() => setViewOpen((v) => !v)}>
                   <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                     <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4.5v5M8 14.5v5" />
@@ -672,14 +830,14 @@ export function UniverseView({
                 setViewOpen(false);
               }}
               onNote={
-                isMap && lens === 'subject'
+                isMap && lens === 'week'
                   ? () => {
                       setViewOpen(false);
                       skyActs.onNote(center.current.x, center.current.y);
                     }
                   : undefined
               }
-              onTidy={isMap && lens === 'subject' && Object.keys(arr.pins).length ? () => commit((a) => A.tidy(a), [], true) : undefined}
+              onTidy={isMap && lens === 'week' && Object.keys(arr.pins).length ? () => commit((a) => A.tidy(a), [], true) : undefined}
               onReset={() => {
                 commit((a) => A.resetLayout(a), [], true);
                 setFitKey((k) => k + 1);

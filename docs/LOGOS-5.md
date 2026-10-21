@@ -176,10 +176,20 @@ them still reads (below).
 - Closer, it says more: far off, the hubs' names; nearer, their kind and when;
   up close, where each stands and the dots' names.
 
-**By subject** — the map the person arranges.
+**How much of it: Today · This week · This month · All time.** The two
+short stretches are a map — what joins up and what stands alone. The two long
+ones are a line through time, the oldest on the left and the newest on the
+right, where something half-remembered is found by scrolling back towards the
+left ("In order", below). Pressing the lens shown again fits the map, or goes
+back to today on the line.
+
+**This week** — the week's conversations by subject: the map the person
+arranges. What was worked on this week; ‹ and › step to the weeks before,
+which show what began in them, and "Back to this week" returns. Its name and
+how many are written over it.
 - **Projects first**, each a cluster in its own colour (the one Project Home
-  shows), in the order they were made or the person's own; an empty one too,
-  to drop into.
+  shows), in the order they were made or the person's own — a Project with
+  nothing that week is left out.
 - **Then the subjects read from the conversations** (`lib/logos5/subjects.ts`)
   — no filing needed. The surest reading wins: the course a study was sorted
   under ("ACCT 2301 · Exam 2"); a course code in a conversation's name, first
@@ -196,12 +206,10 @@ them still reads (below).
 - Inside a cluster the hubs are a **constellation** joined in the order they
   were begun; the dots sit below them. A new conversation joins the end of
   its cluster; nothing already there moves.
+- **↩ and a date** beside the first of a subject that week: the last of that
+  subject before it. Pressed, All time opens there, and lights it.
 
-**By week** — newest first: This week, Last week, then weeks back by their
-dates; after eight weeks, months. Each cluster's hubs are joined in the order
-they were worked on.
-
-**Today's learning** — what was worked on today in the middle (or, before
+**Today** — what was worked on today in the middle (or, before
 anything today, the last day something was: "Where you left off"); round it,
 **the earlier conversations it builds on** — an idea in common first, then the
 same subject or Project — each joined to the one of today's it leads to, with
@@ -213,13 +221,47 @@ its edge. On a phone the three are read top to bottom.
 ("Monthly runway"), with a dotted line to each — across Projects and subjects
 too, which is how a topic is seen connecting courses. An idea in three or
 more is a **theme**. Pressing one chooses the conversations that share it.
-(Today's learning leaves them out: its ring already says why each is there.)
+(Today leaves them out: its ring already says why each is there.)
 
-Changing the lens moves the stars to their new places rather than redrawing
-them, so it can be seen where each went. Today's learning is the default; the
-lens chosen is remembered.
+**In order: This month and All time** (`lib/logos5/timeline.ts`,
+`components/logos5/UniverseTime.tsx`) — the long stretches as a line through
+time, so a conversation is remembered by roughly when it was.
+- **Each stays where it began.** A conversation is placed at its first
+  message and never moves; opening it again does not carry it to the end.
+  Under its name, as everywhere, is when it was last worked on.
+- **What followed on is joined.** Conversations about the same subject (a
+  Project, or the course or field read from them), each begun within a week of
+  the one before, are one thread — beads on a line, named at its start, the
+  name held at the left edge while the thread runs on past it.
+- **Recent and old stay apart.** After a longer gap a subject starts a new
+  thread; no line is drawn across the gap. Before it, **↩ and a date** — the
+  last of that subject before it: pressed, the line goes there and lights it.
+- **Quick questions** on their own sit along the floor, under the threads.
+- **Rows that stay put.** Lanes are worked out over the whole history, in
+  order, so nothing that came before is moved by what comes after, and a
+  subject keeps to the row it had when that row is free.
+- **Quiet stretches folded.** More than two weeks with nothing begun is
+  folded down to one mark that names the dates.
+- **Names never sit on each other**: under a star, over it, or only on its
+  card — given out by what matters most, a long conversation before a quick
+  one and then the one worked on last, so what was being done today is named.
+- **Getting along it.** It opens at today. Trackpad, finger, wheel and arrow
+  keys move it; so does dragging the empty line; "‹ Earlier 21" and "Later ·
+  Today →" go a screen at a time and back to today. The whole history is a bar
+  at the foot — every conversation a tick in its colour, the window looked
+  through — that can be dragged or pressed. Weeks and months are marked over
+  it, this week is shaded, and now is a line.
+- **Searching** lights what was found (the rest dims, the bar marks it in
+  gold) and brings the newest of it into view.
+- **Its card** has "See that week as a map"; a card on the map has "Find it
+  in time".
+- **This month** is the same line from the first: what began this month.
 
-**Arranging** (By subject; `lib/logos5/arrange.ts`):
+Changing between Today and This week moves the stars to their new places
+rather than redrawing them, so it can be seen where each went. Today is the
+default; the lens chosen is remembered.
+
+**Arranging** (This week; `lib/logos5/arrange.ts`):
 - **Drag a star** anywhere in its cluster; with **Snap into place** (on by
   default) it lands on a place, trading with whatever was there, and nothing
   else moves. **Into another subject**, it is given that subject (kept with
@@ -238,14 +280,15 @@ lens chosen is remembered.
   the map (View → Hidden brings it back; search still finds it).
 - **Undo** and **Redo** (⌘Z, ⇧⌘Z) cover all of it, filing included. The
   lens, and how the map looks, are preferences, not undoable steps.
-- Today's learning and By week are arranged by time; there a drag moves the
-  map.
+- Today is arranged by time; there a drag moves the map. On the line time
+  places everything, so nothing on it is moved by hand.
 
 **View** holds the rest: the order inside a subject; Core chats on or off,
 the shared ideas, snapping; labels (minimal, titles or ideas), colour (by
 subject, kind or recency) and size (by depth, recency, or the same); which
-subjects are shown; **saved views**; Hidden, Add a note, Tidy up, Reset layout;
-and, signed in, **Everything remembered** (the Mind Atlas).
+subjects are shown (also "All subjects ▾" in the bar); **saved views**;
+Hidden, Add a note, Tidy up, Reset layout; and, signed in, **Everything
+remembered** (the Mind Atlas). On the line it holds only what applies there.
 
 **One box finds or starts.** "Find or start…" in the header (press `/`)
 searches names, ideas and where conversations stand; what does not match
@@ -274,9 +317,10 @@ in their own colours.
 **It travels.** The arrangement is kept in this browser and, signed in, in
 the account (`user_profiles.universal_map` through `/api/profile`, the newer
 copy winning). It holds only the person's choices — never a conversation's
-words — and is bounded and checked on every read. One kept before the lenses
-reads as By subject (a Project map or Columns) or By week (a Timeline); its
-pins in a Project still hold.
+words — and is bounded and checked on every read. One kept before reads as
+All time when it grouped all of it some older way (by subject, by week, a
+Project map, Columns, a Timeline); its pins in a Project still hold, in This
+week.
 
 "Organize it" and "Practice this" write into the line of thinking they began
 in, even if another is opened while they work.
@@ -483,7 +527,9 @@ code. Logos 2 is unchanged.
 | Intake, board, topic, practice; an empty Components; Artifacts | `components/logos5/Study.tsx`, `components/logos5/study.css` |
 | Home: each conversation read for the map — its kind, where it stands, what it is about; shared ideas; search (pure) | `lib/logos5/universe.ts` |
 | What a conversation is about, without asking: courses, codes, fields (pure) | `lib/logos5/subjects.ts` |
-| The Universal Spatial Map: hubs and dots, subjects' homes, Today's learning, By week, By subject, placing and snapping (pure) | `lib/logos5/spatial.ts` |
+| The Universal Spatial Map: hubs and dots, subjects' homes, Today, a week by subject, placing and snapping (pure) | `lib/logos5/spatial.ts` |
+| In order: where each began, threads, lanes, the floor, quiet stretches, names, days (pure) | `lib/logos5/timeline.ts` |
+| The line drawn: scrolling, ↩, the whole history at the foot, search, the card | `components/logos5/UniverseTime.tsx`, `universe.css` (search `in order`) |
 | How the person arranged it: the model, its bounds, every change (pure); kept in the browser and the account | `lib/logos5/arrange.ts`, `components/logos5/useArrangement.ts`, `app/api/profile/route.ts` |
 | The view, the map, the pieces; the map's look on every theme, and the sky on Night | `components/logos5/Universe.tsx`, `UniverseSky.tsx`, `UniverseParts.tsx`, `universe.css` |
 | The themes, Night among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
@@ -803,5 +849,48 @@ chat's memory every time it was opened and saved in Logos (above, §8).
 the first-run record and the background drawing were driven against stand-ins;
 how long the background takes with years of chats (paced and capped by design,
 not measured); the Universal Map's Today lens draws an older conversation not
-tied to today's work as a dot, so a newly drawn chat may show as a hub only
-under By week or By subject.
+tied to today's work as a dot, so a newly drawn chat may show as a hub only in
+This week or on the line.
+
+### In order: the Universal Map as a line through time
+
+How much of the map is shown is now Today · This week · This month · All
+time: the short stretches a map, the long ones a line through time (§5, "In
+order"). By week and By subject as lenses are gone — the line is all of it in
+time, and This week is the subject map, for one week at a time.
+
+- **The layout** (`test/logos5-timeline.test.mjs`, 26 checks): oldest left,
+  newest right; opening one again moves nothing; a subject's conversations
+  within a week joined, a longer gap a new thread with ↩ to the last before
+  it; quick ones on the floor; a new conversation at the end moves nothing
+  that came before; a long quiet stretch folded and named; the days named;
+  This month from the first; names never on top of each other, and the one
+  worked on last named first.
+- **The screens, rendered** (`test/logos5-study-ui.test.mjs`): the four
+  lenses; This week by subject with its name, its count and a ↩ to where a
+  subject was before, an empty Project left out; All time with every
+  conversation on it, a Project's threads named, a Core chat as a ring joined
+  to its subject, this week and now marked, the history at the foot, no
+  Select; This month the same line. `test/logos5-home.test.mjs`: every older
+  way of grouping all of it reads as All time.
+- **In a browser** (the real component over the app's own styles, 35
+  conversations from Aug 24 to today; 1440×900 and 390×844, Paper and Night):
+  All time opens at today; a ↩ goes back to the last of its subject and lights
+  it; the bar at the foot, pressed near its start, goes there; a search finds
+  three, lights them and brings the newest into view; a card's "See that week
+  as a map" opens the week of Sep 28 (its two Biology conversations joined by
+  "Meiosis"); "Back to this week"; a ↩ on this week's map opens All time at
+  that conversation; This month; Today. No page errors; no page wider than
+  the screen.
+
+Found and fixed on the way: the conversation worked on last went unnamed when
+one begun a day before it took the place under the line — names are now given
+out by importance; a starred one's star fell to a line of its own; a week
+stepped to was not fitted, and its map sat low and cut off at the side — each
+week is fitted from its name down; on a phone the quick questions' name sat on
+the words above it.
+
+**Not verified here:** a real account's years of conversations (the map keeps
+the newest 150, as everywhere); dragging and the wheel on a real trackpad and
+phone; screen readers on the line.
+

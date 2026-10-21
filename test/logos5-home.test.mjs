@@ -13,9 +13,9 @@
 //     named in the conversations' own words; three or more is a theme;
 //   • arrows go to the nearest conversation that way; search reads names,
 //     ideas and where it stands;
-//   • an arrangement from anywhere is bounded and never breaks the map — one
-//     kept before the lenses reads as By subject or By week — and every change
-//     to it is exact.
+//   • an arrangement from anywhere is bounded and never breaks the map — any
+//     older way of grouping all of it reads as All time — and every change to
+//     it is exact.
 
 import { build } from 'esbuild';
 import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
@@ -140,15 +140,16 @@ console.log('\n=== an arrangement, kept ===');
     seen: { hint: true },
     extra: 'ignored',
   });
-  ok('what is understood is kept; the rest is not there — and Columns, kept before the lenses, is By subject', a.at === 7 && a.mode === 'subject' && a.sort === 'started' && !('extra' in a));
+  ok('what is understood is kept; the rest is not there — and Columns, kept before the lenses, is All time', a.at === 7 && a.mode === 'all' && a.sort === 'started' && !('extra' in a));
   ok('the display: what was set, the rest as it starts', a.display.chats === false && a.display.labels === 'titles' && a.display.color === 'project' && a.display.snap === true);
   ok('pins: numbers bounded and whole, damaged ones dropped', J(a.pins.ok) === J({ x: 10, y: -3, g: 'p:P1' }) && a.pins.far.x === 60000 && !a.pins.bad && !a.pins['bad id!']);
   ok('frames: a width of one to six, folded only when it says so', J(a.frames['p:P1']) === J({ dx: 5, dy: 6, cols: 6, collapsed: true }) && J(a.frames.loose) === J({ dx: 0, dy: 0 }));
   ok('lists: names only, once each, bounded', J(a.order['p:P1']) === J(['b', 'a']) && J(a.starred) === J(['a']) && a.hidden.length === 600);
   ok('links: never to itself; words on one line', a.links.length === 1 && a.links[0].label === 'same deadline');
   ok('notes: a few lines, no empty ones; a note with no words is not kept', a.notes.length === 1 && a.notes[0].text === 'Line one\nline two');
-  ok('views: named ones only, their settings read the same way — a timeline view is By week', a.views.length === 1 && a.views[0].mode === 'week' && J(a.views[0].projects) === J(['p:P1']) && a.views[0].query === 'exam');
-  ok('a new map opens on today’s learning; an old map of Projects reads as By subject', H.emptyArrangement().mode === 'today' && H.parseArrangement({ mode: 'map' }).mode === 'subject' && H.parseArrangement({ mode: 'week' }).mode === 'week' && H.parseArrangement({ mode: 'nope' }).mode === 'today');
+  ok('views: named ones only, their settings read the same way — an old timeline view is All time', a.views.length === 1 && a.views[0].mode === 'all' && J(a.views[0].projects) === J(['p:P1']) && a.views[0].query === 'exam');
+  ok('a new map opens on Today; every older way of grouping all of it reads as All time', H.emptyArrangement().mode === 'today' && ['map', 'subject', 'columns', 'timeline'].every((m) => H.parseArrangement({ mode: m }).mode === 'all') && H.parseArrangement({ mode: 'week' }).mode === 'week' && H.parseArrangement({ mode: 'month' }).mode === 'month' && H.parseArrangement({ mode: 'nope' }).mode === 'today');
+  ok('the four, in order: Today, This week, This month, All time', J(H.MODES) === J(['today', 'week', 'month', 'all']));
   const subj = H.parseArrangement({ subjectOf: { a: 'f:economics', b: 'other', 'bad id!': 'f:x', c: '<script>' } });
   ok('subjects given by hand: names only', J(subj.subjectOf) === J({ a: 'f:economics', b: 'other' }));
   ok('anything at all reads as an arrangement', J(H.parseArrangement(null)) === J(H.emptyArrangement()) && J(H.parseArrangement('{"x":1}')) === J(H.emptyArrangement()) && J(H.parseArrangement([1, 2])) === J(H.emptyArrangement()) && a.projects === null && a.seen.hint === true);
@@ -178,7 +179,7 @@ console.log('\n=== changes ===');
   const V = H.saveView({ ...E, mode: 'week', projects: ['p:P1'] }, 'v1', 'Exam season', 'exam');
   ok('a view kept under a name, with how it looks and what it searched', V.views[0].mode === 'week' && J(V.views[0].projects) === J(['p:P1']) && V.views[0].query === 'exam');
   ok('the same name again replaces it', H.saveView(V, 'v2', 'exam SEASON', '').views.length === 1);
-  const back = H.applyView({ ...V, mode: 'subject', projects: null }, 'v1');
+  const back = H.applyView({ ...V, mode: 'all', projects: null }, 'v1');
   ok('a view put back', back.mode === 'week' && J(back.projects) === J(['p:P1']) && H.applyView(V, 'nope') === V);
   ok('and forgotten', H.removeView(V, 'v1').views.length === 0);
   const pinned = H.pinTile(H.pinTile(E, 'a', 'g1', 1, 1), 'b', 'g2', 1, 1);

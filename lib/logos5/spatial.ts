@@ -31,7 +31,7 @@
 //
 // PURE.
 
-import type { Arrangement, HomeMode, SizeBy } from './arrange';
+import type { Arrangement, SizeBy } from './arrange';
 import { boxAround, freshness, type Box, type ProjectIn, type SharedIdea, type Tile } from './universe';
 import { OTHER, sameSubject, subjectOf, subjectOfProject, type Subject } from './subjects';
 
@@ -437,8 +437,16 @@ export interface Sector {
   y: number;
 }
 
+/**
+ * The three ways the map can be drawn: today's learning, by week, by subject.
+ * The Universal Map draws Today with the first and This week with the last,
+ * over that week's conversations; This month and All time are a line through
+ * time instead (timeline.ts).
+ */
+export type SkyLens = 'today' | 'week' | 'subject';
+
 export interface SkyLayout {
-  lens: HomeMode;
+  lens: SkyLens;
   nodes: SkyNode[];
   byId: Map<string, SkyNode>;
   clusters: SkyCluster[];
@@ -454,7 +462,7 @@ export interface SkyLayout {
 }
 
 export interface SkyIn {
-  lens: HomeMode;
+  lens: SkyLens;
   /** the conversations shown: hidden ones and filtered ones already left out */
   tiles: readonly Tile[];
   homes: Homes;
@@ -462,6 +470,8 @@ export interface SkyIn {
   arr: Pick<Arrangement, 'pins' | 'frames' | 'order' | 'sort' | 'display'>;
   now: number;
   narrow?: boolean;
+  /** by subject: a Project with nothing in it is drawn too (all of it), or left out (one week) */
+  keepEmpty?: boolean;
 }
 
 const overlaps = (a: Box, b: Box, air = 0) => a.x < b.x + b.w + air && b.x < a.x + a.w + air && a.y < b.y + b.h + air && b.y < a.y + a.h + air;
@@ -691,7 +701,7 @@ function bySubject(input: SkyIn): SkyLayout {
     members.set(h.key, [...(members.get(h.key) ?? []), { tile: t, hub: isHub(t), suggested: homes.suggested.has(t.id) }]);
   }
   const list: ClusterIn[] = homes.list
-    .filter((h) => h.kind === 'project' || members.get(h.key)?.length)
+    .filter((h) => (h.kind === 'project' && input.keepEmpty !== false) || members.get(h.key)?.length)
     .map((h) => {
       const ms = ordered(members.get(h.key) ?? [], arr.sort, arr.order[h.key]);
       const n = ms.length;

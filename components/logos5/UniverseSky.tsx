@@ -20,8 +20,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { cameraTransform, fitCamera, isDrag, keepInView, pinchCamera, readWheel, toWorld, zoomAt, KEY_PAN, type Camera } from '@/lib/canvas';
 import { boxAround, detailAt, freshness, nearestWay, noteBox, type Box, type Match, type SharedIdea, type Tile } from '@/lib/logos5/universe';
-import { clusterAt, hashOf, nodeBox, placeSkyIdeas, skyLayout, snapToCell, PROJECT_COLOR_KEYS, type Homes, type SkyCluster, type SkyNode } from '@/lib/logos5/spatial';
-import type { Arrangement, HomeMode } from '@/lib/logos5/arrange';
+import { clusterAt, hashOf, nodeBox, placeSkyIdeas, skyLayout, snapToCell, PROJECT_COLOR_KEYS, type Homes, type SkyCluster, type SkyLens, type SkyNode } from '@/lib/logos5/spatial';
+import type { Arrangement } from '@/lib/logos5/arrange';
 import { MadeMark, StarMark, kindLine, tileSaid } from './UniverseParts';
 
 export interface SkyActs {
@@ -50,6 +50,8 @@ export interface SkyActs {
   onNoteMove: (id: string, x: number, y: number) => void;
   /** in link mode: the star pressed is the other end */
   onLinkTo: (id: string) => void;
+  /** a ↩ pressed: the conversation of its subject from before, found in time */
+  onBack?: (id: string) => void;
   /** a link's words changed; null takes the link away */
   onLinkEdit: (id: string, label: string | null) => void;
 }
@@ -99,6 +101,13 @@ const css = (vars: Record<string, string | number>): CSSProperties => vars as un
 /** A colour key as the theme draws it. */
 export const colorVar = (key: string | null | undefined) => (key ? `var(--sc-${key})` : 'var(--sc-none)');
 
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "Oct 5" */
+export const shortDate = (at: number) => {
+  const d = new Date(at);
+  return `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
+};
+
 export function SkyCanvas({
   lens,
   tiles,
@@ -119,9 +128,12 @@ export function SkyCanvas({
   centerRef,
   top = BAR,
   narrow = false,
+  keepEmpty = true,
+  backOf,
+  fromTop = false,
   acts,
 }: {
-  lens: HomeMode;
+  lens: SkyLens;
   /** the conversations shown */
   tiles: readonly Tile[];
   tileById: Map<string, Tile>;
@@ -147,6 +159,12 @@ export function SkyCanvas({
   /** how much of the top the bar over the map covers */
   top?: number;
   narrow?: boolean;
+  /** by subject: an empty Project drawn too (all of it), or left out (one week) */
+  keepEmpty?: boolean;
+  /** a conversation's subject from before this stretch: the last of it, for a ↩ beside its first here */
+  backOf?: ReadonlyMap<string, { id: string; at: number }>;
+  /** fitted under the bar rather than in the middle: a week's map is read from its name down */
+  fromTop?: boolean;
   acts: SkyActs;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -171,8 +189,8 @@ export function SkyCanvas({
   const subject = lens === 'subject';
 
   const layout = useMemo(
-    () => skyLayout({ lens, tiles, homes, ideas, arr: { pins: arr.pins, frames: arr.frames, order: arr.order, sort: arr.sort, display: arr.display }, now, narrow }),
-    [lens, tiles, homes, ideas, arr.pins, arr.frames, arr.order, arr.sort, arr.display, now, narrow]
+    () => skyLayout({ lens, tiles, homes, ideas, arr: { pins: arr.pins, frames: arr.frames, order: arr.order, sort: arr.sort, display: arr.display }, now, narrow, keepEmpty }),
+    [lens, tiles, homes, ideas, arr.pins, arr.frames, arr.order, arr.sort, arr.display, now, narrow, keepEmpty]
   );
   // today's ring already says why each is there, so the shared ideas are drawn on the other two
   const placed = useMemo(() => (arr.display.ideas && lens !== 'today' ? placeSkyIdeas(ideas, layout) : []), [arr.display.ideas, lens, ideas, layout]);
@@ -218,9 +236,9 @@ export function SkyCanvas({
     if (!size.w || !size.h || !target.w) return;
     const few = layout.nodes.length <= 4;
     const c = fitCamera(target, size.w, size.h, { pad: narrow ? 14 : 40, insets: { top, right: 0, bottom: 12, left: 0 }, maxK: few ? 1.3 : 1.1, minK: narrow ? 0.46 : 0.3, align: narrow ? 'start' : 'center' });
-    // a phone reads from the top
-    setCam(narrow ? { ...c, y: top + 12 - target.y * c.k } : c);
-  }, [size.w, size.h, layout.focus, layout.nodes.length, content, setCam, top, narrow]);
+    // a phone reads from the top; so does a week, from its name down
+    setCam(narrow || fromTop ? { ...c, y: top + (narrow ? 12 : 24) - target.y * c.k } : c);
+  }, [size.w, size.h, layout.focus, layout.nodes.length, content, setCam, top, narrow, fromTop]);
   const fitted = useRef<string>('');
   /** the person has moved or zoomed the map since it was last fitted */
   const touched = useRef(false);
@@ -549,7 +567,7 @@ export function SkyCanvas({
       style={css({ '--cx': `${Math.round(cam.x)}px`, '--cy': `${Math.round(cam.y)}px` })}
       tabIndex={0}
       role="group"
-      aria-label={`Your conversations, ${lens === 'today' ? 'today’s and what they build on' : lens === 'week' ? 'by week' : 'by subject'}. Arrow keys go from one to the next; Enter opens it.`}
+      aria-label={`Your conversations, ${lens === 'today' ? 'today’s and what they build on' : lens === 'week' ? 'by week' : keepEmpty ? 'by subject' : 'this week’s, by subject'}. Arrow keys go from one to the next; Enter opens it.`}
       onPointerDown={onPointerDown}
       onPointerMove={onPointerMove}
       onPointerUp={onPointerUp}
@@ -675,6 +693,22 @@ export function SkyCanvas({
                     </span>
                   )}
                 </span>
+                {backOf?.get(n.id) && acts.onBack && (
+                  <span className="l5n-backrow">
+                    <button
+                      type="button"
+                      data-control
+                      className="l5n-back"
+                      title={`Where this subject was before: “${tileById.get(backOf.get(n.id)!.id)?.title ?? 'a conversation'}” — find it in time`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        acts.onBack?.(backOf.get(n.id)!.id);
+                      }}
+                    >
+                      ↩ {shortDate(backOf.get(n.id)!.at)}
+                    </button>
+                  </span>
+                )}
                 {n.via ? <span className="l5n-why">{n.via.why}</span> : m && m.why !== 'title' ? <span className="l5n-found">{m.said}</span> : tile.stands ? <span className="l5n-s">{tile.stands}</span> : null}
               </span>
             </div>
@@ -824,7 +858,7 @@ function ClusterHead({
 }: {
   c: SkyCluster;
   shift: { x: number; y: number } | null;
-  lens: HomeMode;
+  lens: SkyLens;
   acts: SkyActs;
   palette: string | null;
   setPalette: (key: string | null) => void;
