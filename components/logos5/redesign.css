@@ -229,7 +229,7 @@
 .logos-root .l5 .l5x-canvas .lg-legend {
   bottom: calc(var(--omni) + 16px);
 }
-.logos-root .l5 .l5x-canvas:has(.l5x-peek) .lg-legend,
+.logos-root .l5 .l5x:has(.l5x-peek) .lg-legend,
 .logos-root .l5 .lg-map-wrap:has(.lg-acts.is-ask) .lg-legend {
   display: none;
 }
@@ -389,6 +389,158 @@
   -webkit-backdrop-filter: blur(10px);
   backdrop-filter: blur(10px);
   box-shadow: var(--l5-shadow-up);
+}
+/* ── THE CONVERSATION BOX, MOVED (components/logos5/L5Line.tsx) ───────
+   Its head — or, folded, the grip over the composer — is its handle. Docked,
+   it is where it has always been; floating, it is where it was left, over
+   the views; with the views hidden, it is the conversation alone. */
+.logos-root .l5 .l5x-convo-head {
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+}
+.logos-root .l5 .l5x-convo-head:active {
+  cursor: grabbing;
+}
+.logos-root .l5 .l5x-convo-head:focus-visible,
+.logos-root .l5 .l5x-omni-bar:focus-visible {
+  outline: 2px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45);
+  outline-offset: -2px;
+}
+.logos-root .l5 .l5x-convo-acts,
+.logos-root .l5 .l5x-box-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+}
+.logos-root .l5 .l5x-box-tool {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: none;
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.15s, background 0.15s;
+}
+.logos-root .l5 .l5x-box-tool svg {
+  width: 16px;
+  height: 16px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.logos-root .l5 .l5x-box-tool:hover {
+  color: var(--lg-ink);
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06);
+}
+.logos-root .l5 .l5x-box-tool[aria-pressed='true'] {
+  color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+}
+
+/* folded: a grip over the composer, shown when it is wanted */
+.logos-root .l5 .l5x-omni-bar {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 8px);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 4px 2px 12px;
+  border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
+  border-radius: 999px;
+  background: rgba(var(--l5-surface-rgb), 0.94);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+  box-shadow: var(--l5-shadow-up);
+  cursor: grab;
+  user-select: none;
+  touch-action: none;
+  opacity: 0;
+  transform: translate(-50%, 4px);
+  transition: opacity 0.18s, transform 0.18s;
+}
+.logos-root .l5 .l5x-omni-bar:active {
+  cursor: grabbing;
+}
+.logos-root .l5 .l5x-omni:hover .l5x-omni-bar,
+.logos-root .l5 .l5x-omni:focus-within .l5x-omni-bar {
+  opacity: 1;
+  transform: translate(-50%, 0);
+}
+.logos-root .l5 .l5x-grip {
+  display: grid;
+  grid-template-columns: repeat(3, 3px);
+  gap: 3px;
+  margin-right: 4px;
+}
+.logos-root .l5 .l5x-grip i {
+  width: 3px;
+  height: 3px;
+  border-radius: 50%;
+  background: var(--lg-ink-40);
+}
+
+/* floating: out of the flow, over the views, where it was left */
+.logos-root .l5 .l5x.is-floating .l5x-canvas {
+  --omni: 0px;
+}
+.logos-root .l5 .l5x.is-floating .l5x-convo {
+  position: absolute;
+  z-index: 7;
+  flex: none;
+  width: min(440px, calc(100% - 32px));
+  height: min(680px, calc(100% - 32px));
+  min-width: 0;
+  max-width: none;
+  border: 1px solid var(--l5-hair);
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow:
+    0 2px 6px rgba(var(--shadow-rgb, 35, 36, 31), 0.06),
+    0 34px 80px -30px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
+}
+.logos-root .l5 .l5x.is-floating .l5x-omni {
+  bottom: auto;
+  transform: none;
+  z-index: 7;
+}
+/* there, the grip is part of it, always shown, so the box can always be taken hold of */
+.logos-root .l5 .l5x.is-floating .l5x-omni-bar {
+  position: static;
+  align-self: center;
+  opacity: 1;
+  transform: none;
+}
+/* placed before it is shown, never flashed in a corner first */
+.logos-root .l5 .l5x.is-floating.is-placing :is(.l5x-convo, .l5x-omni) {
+  visibility: hidden;
+}
+
+/* the views hidden: the conversation alone, centred, and given room */
+.logos-root .l5 .l5x.is-focus .l5x-convo {
+  width: min(780px, calc(100% - 48px));
+  height: calc(100% - 48px);
+}
+.logos-root .l5 .l5x.is-focus .l5x-view {
+  visibility: hidden;
+}
+.logos-root .l5 .l5x.is-focus .l5x-canvas {
+  background-image: none;
+}
+.logos-root .l5:has(.l5x.is-focus) .l5-head-mid {
+  visibility: hidden;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 .l5x-omni-bar {
+    transition: none;
+  }
 }
 .logos-root .l5 .lg-composer textarea::placeholder {
   font-family: var(--l5-serif);

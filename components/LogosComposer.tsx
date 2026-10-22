@@ -371,7 +371,11 @@ export function LogosComposer({
     if (!el) return;
     el.style.height = 'auto';
     // Room for a real paragraph, but never so tall it eats the conversation.
-    el.style.height = Math.min(el.scrollHeight, Math.round(window.innerHeight * 0.34)) + 'px';
+    const cap = Math.round(window.innerHeight * 0.34);
+    el.style.height = Math.min(el.scrollHeight, cap) + 'px';
+    // A scrollbar only once there is more than the cap to scroll: an empty
+    // box showed one, its italic placeholder a little taller than a line.
+    el.style.overflowY = el.scrollHeight > cap ? 'auto' : 'hidden';
   }
 
   // Text also arrives without a keystroke — a failed send hands the message

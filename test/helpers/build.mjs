@@ -49,6 +49,7 @@ const MODULES = [
   'lib/onboarding-name.ts',
   'lib/theme.ts',
   'lib/new-socria.ts',
+  'lib/logos5/box.ts',
   // Celestial: the sky, generated and painted (lib/celestial.ts)
   'lib/celestial.ts',
   'lib/entitlements.ts',

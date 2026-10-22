@@ -611,6 +611,7 @@ everyone has.
 | Celestial's sky: generated, painted in idle time, behind the whole app | `lib/celestial.ts`, `components/CelestialSky.tsx`, `app/celestial.css` |
 | A model, looked at: the frame (header, figure, the bar under it, the side), the figure drawn, the views and the side's sections | `components/surfaces/Surface3D.tsx`, `surfaces.css`; `components/model/ModelView.tsx`, `model-view.css`; `components/model/Understand.tsx`, `understand.css` |
 | A solid's faces and where its dimensions are drawn (`FACING`) | `lib/model/solid.ts` |
+| The conversation box on a desktop: docked, floating where it was dragged, centred, the views hidden (pure geometry; the screen) | `lib/logos5/box.ts`, `components/logos5/L5Line.tsx` |
 | The new Socria behind its code: the gate, the name, the hook every screen reads | `lib/new-socria.ts`, `lib/feature-gates.ts`, `lib/feature-gates-server.ts`, `components/useNewSocria.ts`, `components/account/AccessCode.tsx` |
 | Where home is wired in (start, file, a Project renamed or recoloured) | `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`), `app/chat/page.tsx` (`updateProject`) |
 | One history: which chats to bring in, the maps owed, the chats kept quiet, today's count (pure, and two storage helpers) | `lib/logos5/merge.ts` |
@@ -1265,3 +1266,30 @@ dev".
   entered while Logos was open, a wrong code refused and the right one (in
   lower case) opening the map; the model menu and the invitation saying
   Logos 4 or Logos 5 accordingly. `test/new-socria.test.mjs` holds the wiring.
+
+### The conversation box, where you want it
+
+Asked for: "let's make the omnibox / conversation box draggable — you can
+center it and hide the views, etc."
+
+- **One box, two shapes** (`components/logos5/L5Line.tsx`): unfolded, the
+  conversation with its composer; folded, the composer over the views. Docked,
+  it is where it always was. Its head — or, folded, the grip that shows over
+  the composer — drags it anywhere over the views, where it stays, per browser.
+  One anchor (its bottom-centre, `lib/logos5/box.ts`) serves both shapes, so
+  unfolding a composer left in a corner opens the conversation upward from the
+  same place.
+- **Its tools**, in its head and on the grip: *Put it in the middle* (and it
+  stays in the middle as it changes size), *Hide the views* — the map,
+  components or artifacts behind it, and their switch, go; the conversation is
+  alone, centred and given room; Esc or *Show the views* brings them back, as
+  folding it does — and *Float* / *Dock*.
+- Never off the screen, however it was left or the window resized; placed
+  before it is shown; the arrow keys move it from its handle (Shift further).
+  A phone keeps its sheet.
+- Fixed on the way: the empty composer showed a scrollbar (its italic
+  placeholder a little taller than a line); it shows one now only past its cap.
+- Checked in the real app at 1440×900 in Paper and Celestial: docked, floated,
+  dragged, reloaded (still there), moved by the keys, the views hidden and
+  brought back with Esc, folded where it floated, the composer dragged, docked
+  again. `test/logos5-box.test.mjs`.

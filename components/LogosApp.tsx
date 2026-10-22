@@ -163,6 +163,7 @@ import { LOGOS4 } from '@/lib/logos4/flags';
 import { DEFAULT_STAGE_SHARE, readStagePrefs, writeStagePrefs, type StagePrefs } from '@/lib/logos5/flags';
 import { logosName, newSocriaOpen } from '@/lib/new-socria';
 import { useNewSocria } from '@/components/useNewSocria';
+import { L5Line } from '@/components/logos5/L5Line';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { L5Header, L5LinkBar, L5Outline, L5Switch, MindButton, type L5MenuItem, type L5SwitchItem } from './logos5/L5Chrome';
@@ -6829,35 +6830,17 @@ export function LogosApp({
       </div>
     </div>
   ) : (
-    <div className={`l5x${convoOpen ? ' has-convo' : ''}`}>
-      {convoOpen && (
-        <aside className="l5x-convo" aria-label="Conversation">
-          <div className="l5x-convo-head">
-            <span className="l5x-convo-t">
-              Conversation{' '}
-              <button type="button" className="l5x-convo-fold" onClick={() => setConvo(false)}>
-                {turnsSaid} · fold it away ›
-              </button>
-            </span>
-            <button type="button" className="l5-iconbtn" aria-label="Fold the conversation away" title="Fold the conversation away" onClick={() => setConvo(false)}>
-              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M15 6l-6 6 6 6" />
-              </svg>
-            </button>
-          </div>
-          {l5Thread}
-        </aside>
-      )}
-      <section className={`l5x-canvas is-${studyTab}`}>
-        <div className="l5x-view">{viewEl}</div>
-        {!convoOpen && (
-          <div className="l5x-omni">
-            {peekEl}
-            {l5Dock}
-          </div>
-        )}
-      </section>
-    </div>
+    // a desktop: the view, and the conversation box — docked, or floating over it (components/logos5/L5Line.tsx)
+    <L5Line
+      convoOpen={convoOpen}
+      setConvo={setConvo}
+      turnsSaid={turnsSaid}
+      thread={l5Thread}
+      dock={l5Dock}
+      peek={peekEl}
+      view={viewEl}
+      studyTab={studyTab}
+    />
   );
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   const l5Head = (
