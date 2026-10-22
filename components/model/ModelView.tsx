@@ -23,18 +23,20 @@
 
 import './model-view.css';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Surface3D, snap, type RenderArgs, type SurfaceRender } from '@/components/surfaces/Surface3D';
-import { boxLines, place, type Camera, type Frame3, type Pt2 } from '@/lib/logos-viz3d';
+import { DEFAULT_PALETTE, Surface3D, snap, type RenderArgs, type SurfaceRender } from '@/components/surfaces/Surface3D';
+import { place, project3, toUnit, type Camera, type Frame3, type Pt2 } from '@/lib/logos-viz3d';
 import { niceTicks, tickLabel } from '@/lib/model/units';
 import { contour } from '@/lib/model/sample';
 import type { P3, Primitive } from '@/lib/model/primitives';
 import { buildSlice } from '@/lib/model/compile';
 import { inputsAwaiting, inputsOf } from '@/lib/model/derive';
-import { Understand } from './Understand';
+import { ModelAside, ViewSwitch } from './Understand';
+import { inspectModel } from '@/lib/model/inspect';
 import { panelMarks } from './panelMarks';
 import { frameFor, panelFor, viewById } from '@/lib/model/viewdata';
 import { unpack } from '@/lib/model/unpack';
 import { buildSpec, type VisualizationSpec } from '@/lib/model/spec';
+import { FACING } from '@/lib/model/solid';
 import { modelStateFrom, applyOps, type ViewState } from '@/lib/model/state';
 import { objectOf, setParam, setTime, type Model } from '@/lib/model/schema';
 import type { VizEntity, VizModelState, VizOp } from '@/lib/viz-model';
@@ -53,6 +55,13 @@ const TONE: Record<string, string> = {
 };
 const strokeOf = (prim: Primitive) => prim.color || TONE[prim.tone ?? 'primary'] || TONE.primary;
 
+/**
+ * Where a figure in space is first seen from: a little round from the front,
+ * a little above. Its yaw is the one a solid's dimension lines are drawn to
+ * face (lib/model/solid.ts FACING), so they open on the near side of the part.
+ */
+const CAM3 = { yaw: FACING, pitch: 0.5, dist: 3.4 };
+
 /** A frame that maps the spec's box onto the unit cube the projection uses. */
 function frameOf(spec: VisualizationSpec): Frame3 {
   return {
@@ -60,6 +69,22 @@ function frameOf(spec: VisualizationSpec): Frame3 {
     y: { min: spec.box.y[0], max: spec.box.y[1] },
     z: { min: spec.box.z[0], max: spec.box.z[1] },
   };
+}
+
+/**
+ * IN SPACE, THE ROOM IS A LITTLE BIGGER THAN WHAT IT HOLDS — a tenth each
+ * way across the floor and above — so the walls, the floor's grid and the
+ * numbers along its edges stand clear of the thing rather than under it. Not
+ * below: a solid stands on its floor. The flat view keeps its box exact, since
+ * there the box IS the plotted range.
+ */
+function roomOf(spec: VisualizationSpec): VisualizationSpec['box'] {
+  if (spec.dimensionality !== 3) return spec.box;
+  const pad = (r: [number, number], lo: number, hi: number): [number, number] => {
+    const span = r[1] - r[0] || 1;
+    return [r[0] - span * lo, r[1] + span * hi];
+  };
+  return { x: pad(spec.box.x, 0.1, 0.1), y: pad(spec.box.y, 0.1, 0.1), z: pad(spec.box.z, 0, 0.08) };
 }
 
 const d2 = (pts: { x: number; y: number }[]) =>
@@ -189,6 +214,44 @@ function heatImage(prim: Extract<Primitive, { p: 'mesh' }>): HeatImage | null {
   return made;
 }
 
+// ── COLOUR, MIXED ─────────────────────────────────────────────────────
+//
+// A shaded face is arithmetic on a colour, so the theme's colours arrive
+// resolved (RenderArgs.palette) and are mixed here. Any CSS colour the page
+// can hold comes back as numbers; anything else falls back to the moss.
+
+type RGB = [number, number, number];
+function rgbOfCss(css: string | undefined): RGB {
+  const c = (css ?? '').trim();
+  let m = /^#([0-9a-f]{3})$/i.exec(c);
+  if (m) return [0, 1, 2].map((i) => parseInt(m![1][i] + m![1][i], 16)) as RGB;
+  m = /^#([0-9a-f]{6})/i.exec(c);
+  if (m) return [0, 2, 4].map((i) => parseInt(m![1].slice(i, i + 2), 16)) as RGB;
+  m = /^rgba?\(\s*([\d.]+)[\s,]+([\d.]+)[\s,]+([\d.]+)/i.exec(c);
+  if (m) return [+m[1], +m[2], +m[3]];
+  return [53, 70, 32];
+}
+const mixRGB = (a: RGB, b: RGB, t: number): RGB => [a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t];
+const css = (c: RGB) => `rgb(${Math.round(c[0])},${Math.round(c[1])},${Math.round(c[2])})`;
+/** How light a colour is, 0–1: whether the ground is paper or night. */
+const lightness = (c: RGB) => (0.2126 * c[0] + 0.7152 * c[1] + 0.0722 * c[2]) / 255;
+
+/**
+ * The light, fixed to the viewer — up and to the left, a little in front —
+ * so the lit side of a thing is the same side however it is turned.
+ */
+const LIGHT = (() => {
+  const l = [-0.38, 0.6, 0.7];
+  const n = Math.hypot(l[0], l[1], l[2]);
+  return l.map((v) => v / n) as [number, number, number];
+})();
+
+/** A normal (in the box's unit space) as the viewer sees it, by the projection's own rotation. */
+function viewNormal(n: { x: number; y: number; z: number }, cam: Camera): [number, number, number] {
+  const q = project3(n, cam);
+  return [q.x, q.y, q.depth];
+}
+
 export function ModelView({
   model: initial,
   edits,
@@ -315,7 +378,9 @@ export function ModelView({
     }
     return buildSpec(model, { view: view.as ?? 'auto' });
   }, [model, full, view.as, openv]);
-  const frame = useMemo(() => frameOf(spec), [spec]);
+  // the room's box: the spec's own, with a margin round it in space (roomOf)
+  const room = useMemo(() => roomOf(spec), [spec]);
+  const frame = useMemo(() => frameOf({ ...spec, box: room }), [spec, room]);
 
   // A cross-section, computed from the definition rather than read off the
   // mesh — see lib/model/compile.ts buildSlice for why that distinction is
@@ -594,7 +659,8 @@ export function ModelView({
         return {
           content: set.content,
           left: set.left ?? openv?.label ?? '',
-          right: set.right ?? '',
+          // the columns, the count of edges: the view itself already says them
+          right: '',
           note: `${openv?.label ?? 'This view'} — ${set.note}`,
           label: `${openv?.label ?? 'A view'}. ${set.label}`,
           live: {},
@@ -602,7 +668,15 @@ export function ModelView({
       }
 
       const flat = spec.dimensionality === 2;
-      const nodes: { z: number; node: React.ReactNode }[] = [];
+      // WHAT IS DRAWN, IN WHAT ORDER. Three layers — the room (walls, floor,
+      // grid), the model, and what is read over it (labels, ticks, insets, a
+      // cut) — and within the model, far to near by `depth`, which grows
+      // toward the viewer (lib/logos-viz3d project3). Shaded faces need that
+      // to be right; wireframes never showed that it was not.
+      const nodes: { layer: number; z: number; node: React.ReactNode }[] = [];
+      const pal = a.palette ?? DEFAULT_PALETTE;
+      const paper = rgbOfCss(pal.paper);
+      const night = lightness(paper) < 0.45;
       const on = (prim: Primitive) => !prim.layer || a.layers[prim.layer] !== false;
 
       // ── where a model point lands on the page ──
@@ -621,7 +695,7 @@ export function ModelView({
       // their strip is known here so nothing with numbers on it is put under it.
       const panels = spec.panels ?? [];
       const panelGap = 10;
-      const panelH = panels.length ? Math.min(96, Math.max(54, a.H * 0.24)) : 0;
+      const panelH = panels.length ? Math.min(96, Math.max(54, a.H * 0.22)) : 0;
       const panelTop = panels.length ? a.H - panelH - panelGap : a.H;
       // Flat, the floor of the plot is the bottom of the frame — or the top of
       // the panel strip, so the x axis and its numbers are not under it.
@@ -636,8 +710,18 @@ export function ModelView({
       const offY = spec.toScale ? (floor - pad - k1 * spanY) / 2 : 0;
       const sx = (x: number) => pad + offX + (x - spec.box.x[0]) * (spec.toScale ? k1 : kx);
       const sy = (y: number) => floor - offY - (y - spec.box.y[0]) * (spec.toScale ? k1 : ky);
-      const centre = { x: a.W / 2, y: a.H / 2 };
-      const spread = Math.min(a.W, a.H) * 0.42 * zoom;
+      // FITTED TO THE STAGE, numbers and names included. The room's widest
+      // reach on the page, whichever way it is turned, is √2 of its unit box;
+      // its tallest is measured at the pitch it opens at, not the current one,
+      // so the figure does not swell and shrink as it is tilted. It sits clear
+      // of the hint above it and of the panel strip below; zoom is the
+      // reader's, on top.
+      const roomTop = Math.min(38, a.H * 0.1);
+      const roomBottom = (panels.length ? panelTop - 8 : a.H) - Math.min(26, a.H * 0.08);
+      const reachY = Math.cos(CAM3.pitch) + Math.SQRT2 * Math.sin(CAM3.pitch);
+      const fit = Math.min((a.W - 2 * Math.min(56, a.W * 0.12)) / (2 * Math.SQRT2), (roomBottom - roomTop) / (2 * reachY));
+      const centre = { x: a.W / 2, y: (roomTop + roomBottom) / 2 };
+      const spread = Math.max(36, fit) * zoom;
       const at = (p: P3): Pt2 & { depth: number } => {
         if (flat) return { x: sx(p.x), y: sy(p.y), depth: 0 };
         // place() returns the unit box projected into [-1, 1]; the view puts
@@ -647,7 +731,7 @@ export function ModelView({
         return { x: centre.x + q.x * spread, y: centre.y - q.y * spread, depth: q.depth };
       };
 
-      const put = (depth: number, node: React.ReactNode) => nodes.push({ z: depth, node });
+      const put = (depth: number, node: React.ReactNode, layer = 1) => nodes.push({ layer, z: depth, node });
 
       // The box. In three dimensions it is the cube the projection implies;
       // flat, it is two rules, because a rectangle around a plot is furniture.
@@ -660,19 +744,49 @@ export function ModelView({
       // rules carry the same ticks and names.
       const nameOf = (i: 0 | 1 | 2) => spec.axisNames[i] ?? '';
       if (!flat) {
-        const box = boxLines(frame, cam).map((line) =>
-          line.map((q) => ({ x: centre.x + q.x * spread, y: centre.y - q.y * spread }))
-        );
-        put(1e9, (
-          <g key="box" className="eng-box">
-            {box.map((line, i) => (
-              <path key={i} d={d2(line)} />
-            ))}
+        // THE ROOM, NOT A CAGE. Twelve edges drawn whole read as wire around
+        // the model; a figure reads by its back walls and its floor, each with
+        // a light grid at the round numbers, so the eye has a ground and two
+        // planes to measure against, and nothing is drawn in front of the
+        // thing. Which walls are at the back depends on the turn: for each
+        // axis, the side further from the viewer.
+        const bx0 = room;
+        const mid3 = { x: (bx0.x[0] + bx0.x[1]) / 2, y: (bx0.y[0] + bx0.y[1]) / 2, z: (bx0.z[0] + bx0.z[1]) / 2 };
+        const farSide = (ax: 'x' | 'y' | 'z'): number => {
+          const lo = at({ ...mid3, [ax]: bx0[ax][0] });
+          const hi = at({ ...mid3, [ax]: bx0[ax][1] });
+          return lo.depth < hi.depth ? bx0[ax][0] : bx0[ax][1];
+        };
+        const pane = (ax: 'x' | 'y' | 'z', key: string, tone: 'floor' | 'wall') => {
+          const at0 = farSide(ax);
+          const [u, v] = (['x', 'y', 'z'] as const).filter((k) => k !== ax);
+          const P = (uu: number, vv: number) => at({ [ax]: at0, [u]: uu, [v]: vv } as unknown as P3);
+          const [u0, u1] = bx0[u];
+          const [v0, v1] = bx0[v];
+          const ring = [P(u0, v0), P(u1, v0), P(u1, v1), P(u0, v1)];
+          const grid: string[] = [];
+          for (const t of niceTicks(u0, u1, 4)) if (t > u0 && t < u1) grid.push(d2([P(t, v0), P(t, v1)]));
+          for (const t of niceTicks(v0, v1, 4)) if (t > v0 && t < v1) grid.push(d2([P(u0, t), P(u1, t)]));
+          return (
+            <g key={key} className={`eng-pane is-${tone}`}>
+              <path className="eng-pane-fill" d={`${d2(ring)} Z`} />
+              {grid.map((dd, i) => (
+                <path key={i} className="eng-pane-grid" d={dd} />
+              ))}
+              <path className="eng-pane-edge" d={`${d2(ring)} Z`} />
+            </g>
+          );
+        };
+        put(0, (
+          <g key="room" className="eng-room">
+            {pane('x', 'wx', 'wall')}
+            {pane('y', 'wy', 'wall')}
+            {pane('z', 'fz', 'floor')}
           </g>
-        ));
+        ), 0);
         // The edge each axis is read along, chosen on the page rather than in
         // the model: x and y along their lowest edge, z along the leftmost.
-        const bx = spec.box;
+        const bx = room;
         const corners = (ax: 'x' | 'y' | 'z'): [P3, P3][] => {
           const lo = { x: bx.x[0], y: bx.y[0], z: bx.z[0] };
           const hi = { x: bx.x[1], y: bx.y[1], z: bx.z[1] };
@@ -758,22 +872,33 @@ export function ModelView({
             );
           }
         });
-        put(1e9 - 1, <g key="scale">{marks}</g>);
+        put(0, <g key="scale">{marks}</g>, 2);
       } else {
         // the rules run along the box's own edges — the frame's edges, unless a plane is drawn to scale
         const left = sx(spec.box.x[0]);
         const right = sx(spec.box.x[1]);
         const base = sy(spec.box.y[0]);
         const top = sy(spec.box.y[1]);
-        put(1e9, (
+        const xt = niceTicks(spec.box.x[0], spec.box.x[1], a.W > 420 ? 5 : 3);
+        const yt = niceTicks(spec.box.y[0], spec.box.y[1], a.H > 260 ? 4 : 2);
+        // a light grid at the round numbers: the plane has a scale to read against
+        put(0, (
+          <g key="grid" className="eng-grid">
+            {xt.filter((v) => sx(v) > left + 0.5 && sx(v) < right - 0.5).map((v) => (
+              <path key={`gx${v}`} d={`M${sx(v).toFixed(1)},${top.toFixed(1)} L${sx(v).toFixed(1)},${base.toFixed(1)}`} />
+            ))}
+            {yt.filter((v) => sy(v) < base - 0.5 && sy(v) > top + 0.5).map((v) => (
+              <path key={`gy${v}`} d={`M${left.toFixed(1)},${sy(v).toFixed(1)} L${right.toFixed(1)},${sy(v).toFixed(1)}`} />
+            ))}
+          </g>
+        ), 0);
+        put(1, (
           <g key="axes" className="eng-box">
             <path d={`M${left.toFixed(1)},${base.toFixed(1)} L${right.toFixed(1)},${base.toFixed(1)}`} />
             <path d={`M${left.toFixed(1)},${top.toFixed(1)} L${left.toFixed(1)},${base.toFixed(1)}`} />
           </g>
-        ));
-        const xt = niceTicks(spec.box.x[0], spec.box.x[1], a.W > 420 ? 5 : 3);
-        const yt = niceTicks(spec.box.y[0], spec.box.y[1], a.H > 260 ? 4 : 2);
-        put(1e9 - 1, (
+        ), 0);
+        put(0, (
           <g key="scale">
             {xt.map((v) => (
               <g key={`x${v}`} className="eng-tick">
@@ -794,7 +919,7 @@ export function ModelView({
               <text className="eng-axis" x={(left + 6).toFixed(1)} y={(top - 8).toFixed(1)} textAnchor="start">{nameOf(1)}</text>
             )}
           </g>
-        ));
+        ), 2);
       }
 
       // INDEXED, BECAUSE ONE OBJECT MAY DRAW SEVERAL MARKS OF THE SAME KIND.
@@ -820,7 +945,7 @@ export function ModelView({
               if (img) {
                 const tl = at({ x: img.x[0], y: img.y[1], z: 0 });
                 const br = at({ x: img.x[1], y: img.y[0], z: 0 });
-                put(-1, (
+                put(-Infinity, (
                   <g key={`m${pi}`} data-obj={prim.of} opacity={dim ? 0.4 : 1}>
                     <image href={img.href} x={tl.x.toFixed(1)} y={tl.y.toFixed(1)} width={Math.max(1, br.x - tl.x).toFixed(1)} height={Math.max(1, br.y - tl.y).toFixed(1)} preserveAspectRatio="none" />
                   </g>
@@ -836,7 +961,7 @@ export function ModelView({
                 const xLo = barL - 4;
                 const xName = xLo - loT.length * 5.2 - 9;
                 const stops = (img.diverging ? DIVERGING : VIRIDIS).map((c, i, all) => <stop key={i} offset={`${(100 * i) / (all.length - 1)}%`} stopColor={c} />);
-                put(-1e9, (
+                put(0, (
                   <g key={`cb${pi}`} className="eng-colorbar" style={{ pointerEvents: 'none' }}>
                     <defs>
                       <linearGradient id={`${frameId}-cbg-${pi}`} x1="0" x2="1" y1="0" y2="0">{stops}</linearGradient>
@@ -846,7 +971,7 @@ export function ModelView({
                     <rect x={barL} y={cy - 4} width={bw} height={8} fill={`url(#${frameId}-cbg-${pi})`} />
                     <text x={barR + 5} y={cy + 3} textAnchor="start" className="eng-tick-label">{hiT}</text>
                   </g>
-                ));
+                ), 2);
                 break;
               }
             }
@@ -877,43 +1002,70 @@ export function ModelView({
               ));
               break;
             }
-            // In space: a wireframe, both families, broken at holes so a line
-            // is never drawn across something the function does not contain.
-            const paths: string[] = [];
-            const runs = (pts: (P3 | null)[]) => {
-              let run: (Pt2 & { depth: number })[] = [];
-              for (const p of pts) {
-                if (!p) {
-                  if (run.length > 1) paths.push(d2(run));
-                  run = [];
-                  continue;
-                }
-                run.push(at(p));
+            // IN SPACE: SHADED FACES, LIT FROM THE VIEWER'S UPPER LEFT, DRAWN
+            // FAR TO NEAR — and each face carries its own edge, so the grid is
+            // still there and is hidden where the surface hides it. A surface
+            // is tinted by its height, primary at the bottom to accent at the
+            // top, so a rise reads before a number does; a closed solid (`fill`)
+            // is one colour, with no grid on it, its outline left to its edges.
+            // A hole in the function is a face that is not drawn, never a face
+            // stretched across it.
+            const R = prim.rows.length;
+            const C = prim.rows[0]?.length ?? 0;
+            if (R < 2 || C < 2) break;
+            // At most ~3600 faces: past that a turn would redraw thousands of
+            // paths a frame, and the eye cannot tell the difference.
+            const step = Math.max(1, Math.ceil(Math.sqrt(((R - 1) * (C - 1)) / 3600)));
+            const ri: number[] = [];
+            for (let r = 0; r < R; r += step) ri.push(r);
+            if (ri[ri.length - 1] !== R - 1) ri.push(R - 1);
+            const ci: number[] = [];
+            for (let c = 0; c < C; c += step) ci.push(c);
+            if (ci[ci.length - 1] !== C - 1) ci.push(C - 1);
+            const solid = !!prim.fill;
+            const base = rgbOfCss(prim.color ? resolveColor(prim.color) : (pal as unknown as Record<string, string>)[prim.tone ?? 'primary'] ?? pal.primary);
+            const accent = rgbOfCss(pal.accent);
+            const white: RGB = [255, 255, 255];
+            const black: RGB = [0, 0, 0];
+            const proj = ri.map((r) => ci.map((c) => {
+              const p = prim.rows[r]?.[c];
+              return p ? { q: at(p), u: toUnit(p, frame) } : null;
+            }));
+            const faces: { z: number; d: string; fill: string; edge: string }[] = [];
+            for (let i = 0; i + 1 < ri.length; i++) {
+              for (let j = 0; j + 1 < ci.length; j++) {
+                const A = proj[i][j], B = proj[i][j + 1], Cc = proj[i + 1][j + 1], D = proj[i + 1][j];
+                if (!A || !B || !Cc || !D) continue;
+                // the face's normal, from its diagonals, in the box's own space
+                const e1 = { x: Cc.u.x - A.u.x, y: Cc.u.y - A.u.y, z: Cc.u.z - A.u.z };
+                const e2 = { x: D.u.x - B.u.x, y: D.u.y - B.u.y, z: D.u.z - B.u.z };
+                const n = { x: e1.y * e2.z - e1.z * e2.y, y: e1.z * e2.x - e1.x * e2.z, z: e1.x * e2.y - e1.y * e2.x };
+                const len = Math.hypot(n.x, n.y, n.z);
+                if (!(len > 1e-12)) continue;
+                const v = viewNormal({ x: n.x / len, y: n.y / len, z: n.z / len }, cam);
+                const lit = Math.abs(v[0] * LIGHT[0] + v[1] * LIGHT[1] + v[2] * LIGHT[2]);
+                const k = 0.38 + 0.62 * lit;
+                // a surface rises from primary to accent; a solid is its own colour
+                const h = solid ? 0 : Math.min(1, Math.max(0, ((A.u.z + B.u.z + Cc.u.z + D.u.z) / 4 + 1) / 2));
+                const tint = solid ? base : mixRGB(base, accent, h * 0.75);
+                const light = night ? mixRGB(tint, white, 0.18) : mixRGB(tint, white, 0.62);
+                const dark = night ? mixRGB(tint, black, 0.55) : mixRGB(tint, black, 0.12);
+                const col = mixRGB(dark, light, k);
+                faces.push({
+                  z: (A.q.depth + B.q.depth + Cc.q.depth + D.q.depth) / 4,
+                  d: `M${A.q.x.toFixed(1)},${A.q.y.toFixed(1)} L${B.q.x.toFixed(1)},${B.q.y.toFixed(1)} L${Cc.q.x.toFixed(1)},${Cc.q.y.toFixed(1)} L${D.q.x.toFixed(1)},${D.q.y.toFixed(1)} Z`,
+                  fill: css(col),
+                  edge: solid ? css(col) : css(mixRGB(col, night ? white : black, night ? 0.22 : 0.2)),
+                });
               }
-              if (run.length > 1) paths.push(d2(run));
-            };
-            for (const row of prim.rows) runs(row);
-            const cols = prim.rows[0]?.length ?? 0;
-            for (let i = 0; i < cols; i++) runs(prim.rows.map((r) => r[i]));
-            const mid = prim.rows[Math.floor(prim.rows.length / 2)]?.[Math.floor(cols / 2)];
-            // A WIREFRAME IS ALMOST UNCLICKABLE, and selection is how "what
-            // is this?" gets an antecedent. A stroke-only path is only hit
-            // ON the stroke, so each line is drawn twice: once at its own
-            // weight, and once transparent and wide, which is the hit area.
-            // The visible copy takes no pointer events, so the two never
-            // fight over a click.
-            put(mid ? at(mid).depth : 0, (
-              <g key={`m${pi}`} data-obj={prim.of} opacity={dim ? 0.3 : 1}>
-                <g className="eng-hit">
-                  {paths.map((dd, i) => (
-                    <path key={i} d={dd} />
-                  ))}
-                </g>
-                <g style={{ pointerEvents: 'none' }}>
-                  {paths.map((dd, i) => (
-                    <path key={i} d={dd} fill="none" stroke={stroke} strokeWidth={0.8} vectorEffect="non-scaling-stroke" />
-                  ))}
-                </g>
+            }
+            faces.sort((f, g) => f.z - g.z);
+            const mid = prim.rows[Math.floor(R / 2)]?.[Math.floor(C / 2)];
+            put(mid ? at(mid).depth : faces.length ? faces[faces.length >> 1].z : 0, (
+              <g key={`m${pi}`} data-obj={prim.of} className={`eng-faces${solid ? ' is-solid' : ''}`} opacity={dim ? 0.3 : 1}>
+                {faces.map((f, i) => (
+                  <path key={i} d={f.d} fill={f.fill} stroke={f.edge} strokeWidth={solid ? 0.6 : 0.55} strokeLinejoin="round" />
+                ))}
               </g>
             ));
             break;
@@ -924,6 +1076,10 @@ export function ModelView({
             if (pts.length < 2) break;
             const depth = pts.reduce((s, p) => s + p.depth, 0) / pts.length;
             const dd = d2(pts);
+            // A MUTED LINE IS AN ANNOTATION — a dimension, a guide — and is read
+            // over the model, the way a drawing's dimensions are, rather than
+            // hidden behind the body it measures.
+            const note = prim.tone === 'muted' && !flat;
             put(depth, (
               <g key={`l${pi}`} data-obj={prim.of}>
                 <path className="eng-hit" d={dd} />
@@ -932,13 +1088,15 @@ export function ModelView({
                   fill="none"
                   stroke={stroke}
                   strokeWidth={prim.width ?? 1.6}
-                  strokeDasharray={prim.dashed ? '4 3' : undefined}
+                  strokeDasharray={prim.dashed ? '4 4' : undefined}
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
                   opacity={dim ? 0.3 : (prim.alpha ?? 1)}
                   vectorEffect="non-scaling-stroke"
                   style={{ pointerEvents: 'none' }}
                 />
               </g>
-            ));
+            ), note ? 2 : 1);
             break;
           }
 
@@ -1018,11 +1176,20 @@ export function ModelView({
 
           case 'label': {
             const q = at(prim.at);
-            put(-1e9, (
-              <text key={`t${pi}`} data-obj={prim.of} className="sfx-l" x={snap(q.x)} y={snap(q.y)} textAnchor={prim.anchor ?? 'middle'}>
-                {prim.text}
-              </text>
-            ));
+            // ON A TAG, so it reads over a face, a grid or a line alike: a
+            // plate sized from the words (about 6.6 px a character at this
+            // size), anchored where the words are.
+            const tw = prim.text.length * 6.6 + 14;
+            const anchor = prim.anchor ?? 'middle';
+            const tx = anchor === 'middle' ? q.x - tw / 2 : anchor === 'end' ? q.x - tw + 7 : q.x - 7;
+            put(0, (
+              <g key={`t${pi}`} data-obj={prim.of} className={`eng-tag${prim.tone === 'muted' ? ' is-quiet' : ''}`}>
+                <rect x={snap(tx)} y={snap(q.y - 13)} width={snap(tw)} height={18} rx={9} />
+                <text className="eng-label" x={snap(q.x)} y={snap(q.y)} textAnchor={anchor}>
+                  {prim.text}
+                </text>
+              </g>
+            ), 2);
             break;
           }
 
@@ -1037,7 +1204,7 @@ export function ModelView({
           if (prim.p !== 'polyline') continue;
           const pts = prim.at.map(at);
           if (pts.length < 2) continue;
-          put(-1e8, (
+          put(1, (
             <path
               key={`s${pts.length}${pts[0].x}`}
               data-obj={slice.of}
@@ -1047,7 +1214,7 @@ export function ModelView({
               strokeWidth={2.2}
               vectorEffect="non-scaling-stroke"
             />
-          ));
+          ), 2);
         }
       }
 
@@ -1072,40 +1239,44 @@ export function ModelView({
           const [xa, xb] = panel.range.x;
           const [ya, yb] = panel.range.y;
           const spanY = Math.max(1e-9, yb - ya);
-          const px = (v: number) => x0 + ((v - xa) / Math.max(1e-9, xb - xa)) * pw;
-          const py = (v: number) => top + ph - ((v - ya) / spanY) * ph;
+          // the series inside the plate rather than along its edges: clear of its name at the top
+          const inX = 10, inTop = 24, inBottom = 10;
+          const px = (v: number) => x0 + inX + ((v - xa) / Math.max(1e-9, xb - xa)) * (pw - inX * 2);
+          const py = (v: number) => top + ph - inBottom - ((v - ya) / spanY) * (ph - inTop - inBottom);
           const dd = panel.at
             .map((q, k) => `${k ? 'L' : 'M'}${px(q.x).toFixed(1)},${py(q.y).toFixed(1)}`)
             .join(' ');
           const tNow = spec.time?.t ?? null;
           const chosen = view.selected === panel.of;
-          put(-1e9, (
+          put(2, (
             <g key={`panel${panel.id}`} data-obj={panel.of} className="eng-panel">
-              <rect x={x0} y={top} width={pw} height={ph} className="eng-panel-plate" />
+              <rect x={x0} y={top} width={pw} height={ph} rx={10} className="eng-panel-plate" />
               {/* zero, where the series crosses it — a displacement's sign is the
                   thing a reader is looking for */}
               {ya < 0 && yb > 0 && (
-                <path d={`M${x0},${py(0).toFixed(1)} L${(x0 + pw).toFixed(1)},${py(0).toFixed(1)}`} className="eng-panel-zero" />
+                <path d={`M${x0 + inX},${py(0).toFixed(1)} L${(x0 + pw - inX).toFixed(1)},${py(0).toFixed(1)}`} className="eng-panel-zero" />
               )}
               <path d={dd} className={`eng-panel-line${chosen ? ' on' : ''}`} />
               {tNow !== null && tNow >= xa && tNow <= xb && (
-                <path d={`M${px(tNow).toFixed(1)},${top} L${px(tNow).toFixed(1)},${(top + ph).toFixed(1)}`} className="eng-panel-cursor" />
+                <path d={`M${px(tNow).toFixed(1)},${top + inTop - 6} L${px(tNow).toFixed(1)},${(top + ph - inBottom + 4).toFixed(1)}`} className="eng-panel-cursor" />
               )}
-              <text x={x0 + 4} y={top + 11} className="eng-panel-label">{panel.label}</text>
-              <text x={x0 + pw - 4} y={top + ph - 4} className="eng-panel-axis" textAnchor="end">{panel.x}</text>
+              <text x={x0 + 10} y={top + 16} className="eng-panel-label">{panel.label}</text>
+              <text x={x0 + pw - 10} y={top + ph - 8} className="eng-panel-axis" textAnchor="end">{panel.x}</text>
             </g>
-          ));
+          ), 2);
         });
       }
 
-      nodes.sort((p, q) => q.z - p.z);
+      nodes.sort((p, q) => p.layer - q.layer || p.z - q.z);
 
       const chosen = spec.notes.find((n) => n.of === (view.selected ?? ''));
-      const selectedLabel = view.selected ? objectOf(model, view.selected)?.label : null;
       return {
         content: nodes.map((n) => n.node),
-        left: `${spec.dimensionality}D · ${spec.coordinateSystem}${view.slice ? ` · cut at ${view.slice.axis} = ${Number(view.slice.at.toPrecision(3))}` : ''}`,
-        right: selectedLabel ? `selected: ${selectedLabel}` : spec.title,
+        left: `${spec.dimensionality}D · ${spec.coordinateSystem.charAt(0).toUpperCase()}${spec.coordinateSystem.slice(1)}${view.slice ? ` · cut at ${view.slice.axis} = ${Number(view.slice.at.toPrecision(3))}` : ''}`,
+        // The name is in the header and the selection is its chip there; the
+        // figure is left to the figure. (The conversation is told both apart:
+        // its state carries the title and the selection by name.)
+        right: '',
         note:
           (slice ? `${slice.note}. ` : '') +
           // THE REASON A THING IS NOT THERE REACHES THE PLATE, and until now it
@@ -1137,7 +1308,7 @@ export function ModelView({
               );
             }
             if (drewNothing.length) {
-              bits.push(`${drewNothing.length} are read rather than looked at`);
+              bits.push(`${drewNothing.length} ${drewNothing.length === 1 ? 'is a value' : 'are values'} rather than a shape, listed rather than drawn`);
             }
             return bits.length ? `${bits.join('; ')}. ` : '';
           })() +
@@ -1168,20 +1339,32 @@ export function ModelView({
     [spec, frame, slice, view.selected, view.slice, model, sync, panel, openv, select, inputs]
   );
 
-  // ── THE PICTURE AND THE UNDERSTAND LAYER, STACKED ──────────────────
+  // ── WHAT THE HEADER SAYS UNDER THE NAME ────────────────────────────
+  // How far the model got and what computed it, in the inspection's own words,
+  // and its field first when it has one: "Mechanics · Dynamic · Numerically
+  // computed". The reason after the dash is kept for the tooltip.
+  const grade = useMemo(() => inspectModel(full).grade ?? '', [full]);
+  const subtitle = [model.domain ? model.domain.charAt(0).toUpperCase() + model.domain.slice(1) : '', grade.split(' — ')[0]].filter(Boolean).join(' · ');
+  // the views and the account read the model as the panel shows it
+  const shownModel = useMemo(() => (pinnedView !== undefined ? { ...full, view: pinnedView ?? undefined } : full), [full, pinnedView]);
+
+  // ── ONE FRAME: THE NAME, THE PICTURE, AND THE SIDE ──────────────────
   //
-  // A WRAPPER, AND IT HAD TO BE ONE. The hole this is mounted in
-  // (.lg-viz-surface) is a ROW flex expecting a single child, so returning the
-  // surface and the panel as siblings put them side by side: the panel took its
-  // content width, the surface was squeezed to nothing, and the 3D view
-  // disappeared. Reported, and correctly — the picture is the thing.
+  // The picture, the ways of looking at it and the account of it used to be
+  // stacked — the frame, then a strip under it with a sentence, a row of
+  // views and a toggle — and a floating composer covered the strip. They are
+  // the frame's own places now: the views in its header beside the name, the
+  // controls, the values the model computes and its account in its side panel
+  // (components/surfaces/Surface3D.tsx), so nothing about the model sits
+  // anywhere the picture or the conversation can cover it.
   //
-  // So they stack, the surface takes the room, and the panel is a strip at the
-  // bottom that only opens when somebody opens it.
+  // A WRAPPER STILL, AND IT HAS TO BE ONE. The hole this is mounted in
+  // (.lg-viz-surface) is a ROW flex expecting a single child.
   return (
     <div className="eng-stack">
     <Surface3D
       title={model.title}
+      subtitle={subtitle || undefined}
       // At most 32 characters, which is what sanitizeModelState accepts: a longer
       // id made the whole picture state unreadable to the chat, which then fell
       // back to describing the old scene and offered no edit verbs.
@@ -1206,19 +1389,20 @@ export function ModelView({
       groups={groups}
       layers={layers}
       initial={initialVals}
-      initialCam={spec.dimensionality === 3 ? { yaw: 0.6, pitch: 0.5, dist: 3.4 } : { yaw: 0, pitch: 0, dist: 3 }}
+      initialCam={spec.dimensionality === 3 ? CAM3 : { yaw: 0, pitch: 0, dist: 3 }}
       distRange={[1.4, 14]}
       animated={!!model.time}
+      // a flat figure is not turned or zoomed, so it is not offered the camera's tools
+      turnable={spec.dimensionality === 3 && !panel}
       render={render}
       fill={fill}
+      // THE UNDERSTAND LAYER, in the frame's own places. It adds no renderer
+      // and knows no domain — it is the surface of lib/model/views.ts and
+      // lib/model/inspect.ts. A panel pinned to one representation leaves it
+      // out: that panel IS one of the views.
+      headExtra={understand ? <ViewSwitch model={shownModel} onView={openView} /> : undefined}
+      aside={understand ? <ModelAside model={shownModel} onSelect={select} onAsk={onAsk} /> : undefined}
     />
-    {/* THE UNDERSTAND LAYER, beneath the picture rather than inside it.
-        The picture is one view of the model; so is this. It adds no renderer and
-        knows no domain — it is the surface of lib/model/views.ts and
-        lib/model/inspect.ts, and its whole job is to put what the model already
-        knows within reach. Closed by default: the figure is what somebody came
-        to look at. */}
-    {understand && <Understand model={pinnedView !== undefined ? { ...full, view: pinnedView ?? undefined } : full} onSelect={select} onView={openView} onAsk={onAsk} />}
     </div>
   );
 }

@@ -263,6 +263,22 @@ export function Workspace(props: WorkspaceProps) {
   const layoutRef = useRef(layout);
   layoutRef.current = layout;
 
+  // THE BAR'S OWN WIDTH, FOR WHATEVER IT FLOATS OVER. Where a host floats this
+  // row over the stage (Logos 5's Logic Map), what is under its corner — a
+  // model's header, with its own views at its right — keeps that much clear
+  // (--ws-top-w), however many buttons the row holds today.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    const top = topRef.current;
+    const root = rootRef.current;
+    if (!top || !root || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => root.style.setProperty('--ws-top-w', `${Math.ceil(top.getBoundingClientRect().width)}px`));
+    ro.observe(top);
+    return () => ro.disconnect();
+    // the narrow and wide layouts are different elements; nothing else moves them
+  }, [narrow]);
+
   // Escape gives back the rest of the workspace.
   useEffect(() => {
     if (!layout.maximized) return;
@@ -480,7 +496,7 @@ export function Workspace(props: WorkspaceProps) {
     </span>
   );
   const top = (
-    <div className="ws-top">
+    <div className="ws-top" ref={topRef}>
       <div className="ws-top-head">{props.head}</div>
       {props.suggestion && (
         <div className="ws-suggest" role="status">
@@ -497,7 +513,7 @@ export function Workspace(props: WorkspaceProps) {
   if (narrow) {
     const active = panels.find((p) => p.id === (layout.maximized ?? tab)) ?? panels[0] ?? null;
     return (
-      <div className="ws-root is-narrow">
+      <div className="ws-root is-narrow" ref={rootRef}>
         {top}
         {several && (
           <div className="ws-tabs" role="tablist">
@@ -561,7 +577,7 @@ export function Workspace(props: WorkspaceProps) {
     </div>
   ) : null;
   return (
-    <div className={`ws-root${dragging ? ' is-dragging' : ''}${several ? ' is-several' : ''}`}>
+    <div ref={rootRef} className={`ws-root${dragging ? ' is-dragging' : ''}${several ? ' is-several' : ''}`}>
       {top}
       <div ref={mainRef} className={`ws-main dock-${side}${dockDrag ? ' is-moving-dock' : ''}`}>
       <div className="ws-stage">

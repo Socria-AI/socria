@@ -595,6 +595,8 @@ code. Logos 2 is unchanged.
 | The page (its name, the lenses, the legend, the box at its foot), the map drawn, the pieces; every theme, and the star chart on Celestial; coming in | `components/logos5/Universe.tsx`, `UniverseBubbles.tsx`, `UniverseParts.tsx`, `universe.css` |
 | The themes, Celestial among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
 | Celestial's sky: generated, painted in idle time, behind the whole app | `lib/celestial.ts`, `components/CelestialSky.tsx`, `app/celestial.css` |
+| A model, looked at: the frame (header, figure, the bar under it, the side), the figure drawn, the views and the side's sections | `components/surfaces/Surface3D.tsx`, `surfaces.css`; `components/model/ModelView.tsx`, `model-view.css`; `components/model/Understand.tsx`, `understand.css` |
+| A solid's faces and where its dimensions are drawn (`FACING`) | `lib/model/solid.ts` |
 | Where home is wired in (start, file, a Project renamed or recoloured) | `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`), `app/chat/page.tsx` (`updateProject`) |
 | One history: which chats to bring in, the maps owed, the chats kept quiet, today's count (pure, and two storage helpers) | `lib/logos5/merge.ts` |
 | Bringing them in, once | `app/api/conversations/merge/route.ts` |
@@ -1149,3 +1151,68 @@ awestruck and amazed".
   it) and reduced motion (nothing turns, twinkles or falls).
   `test/celestial.test.mjs` holds the sky's shape, its painting, where it is
   shown and the star chart; `test/themes.test.mjs` the name.
+
+### Looking at a model
+
+Asked for, over a screenshot of the cube model: "i would completely redesign
+the layout for viewing models like this, etc. make it more beautiful and
+adjust it so its more user friendly to use".
+
+What the screenshot showed: the model's name ran under the workspace's own
+"Full screen" and "+ View"; the composer covered the foot of the figure; the
+cube was a wire cage with its measurements behind it and the floor's numbers
+printed through it; the views were a row of names ("The relationships",
+"8 not available"); and the controls were somewhere else again.
+
+- **One frame, three places** (`components/surfaces/Surface3D.tsx`): a
+  header — the name, its field and grade, and the ways of looking; the figure;
+  and a side — *Adjust* (the controls, grouped), *Show* (layers), the clock,
+  then whatever the model adds. Under the figure, a bar of its own: the
+  readouts at the left, as written (they carry units — mK is not MK), and the
+  camera's tools at the right: put the view back, zoom out, zoom in, full
+  screen. Nothing lies over the picture except a hint that fades: *Drag to turn
+  · scroll to zoom*, or *pinch* on a phone, where two fingers now zoom. On the
+  Logic Map the header leaves the workspace's buttons their corner
+  (`--ws-top-w`, measured) and the composer gets a band of its own.
+- **The ways of looking** (`components/model/Understand.tsx`, `ViewSwitch`):
+  the main subject's views as one segmented control — *Solid · Measures*,
+  *Surface · Level sets · Cross-section · Values* — and everything else one
+  menu away, grouped, with what is not available and what it would need.
+- **The side** (`ModelAside`): what the model computes, as tiles in their
+  units (8 m³, 24 m²); what is selected — what it is, where it came from, how
+  much to trust it, why it is what it is, *Ask about this*; and *About*: its
+  equations, what it holds fixed, and *Everything* for the full account. The
+  engine's own words are shown without its source paths or capitals.
+- **The figure** (`components/model/ModelView.tsx`): a room — two back walls
+  and a floor with a grid at round numbers — instead of a cage, fitted to its
+  stage so nothing runs off it, at a scale that does not swell as it turns.
+  Solids are bodies (`lib/model/solid.ts` closes every one), shaded by the
+  light at the reader's shoulder in the theme's own colours, and stand on
+  their floor (`equalise(…, { floor: true })`). Their dimensions are drawn on
+  the side that faces the reader (`FACING`), labelled on tags, and stay
+  readable when it is turned. Insets sit in plates of their own; a table or
+  a list of equations is set in a centred reading column with units as
+  written (m³).
+- **Narrow and on a phone**: one column that scrolls — the figure nearly
+  square, the side under it — and on a phone the view above the folded
+  conversation keeps clear of it by the sheet's measured height
+  (`components/LogosApp.tsx`, `--sheet`), so no control is ever under the
+  composer. A flat figure lets a finger scroll past it.
+- **Fixed on the way**: a ring or a torus read from words lost its second
+  radius — `R` and `r` are one name to the evaluator — so the ring drew
+  nothing and the torus computed with the wrong tube (`lib/model/solid-words.ts`
+  names the smaller `r_inner`, `r_tube`); the figure's ink was the paper
+  theme's on every ground, and its tables followed the computer's dark mode
+  rather than the theme; the map's empty-state words showed through behind a
+  model; full screen on a dark theme was a black page with a grey lamp in it;
+  and the physics demo page's eyebrow style capitalised every control's name.
+- Checked in the real app, driven in Chromium: the cube from the screenshot,
+  a box, cylinder, cone, sphere, ring and torus read from words, and the
+  saddle, torus, point charge, volatility surface, oscillator, Lorenz system,
+  linear model and epidemic from the library — at 1600×900, at 1280 with the
+  conversation open and at 390×844, in Paper, Dark and Celestial; the views
+  menu, the Measures table, a part selected, a turn, full screen; and the
+  black hole, Big Bang and gravity frames on `/surfaces`.
+  `test/model-viewer.test.mjs` holds the frame, the figure's fit, the solids'
+  faces, floor and dimensions, the radii read from words, the plain words and
+  the stylesheets.

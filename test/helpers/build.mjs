@@ -246,6 +246,9 @@ const MODULES = [
   'lib/science/records.ts',
   'lib/science/bundle.ts',
   'components/workspace/panels.tsx',
+  // the model viewer: the frame, the figure and its side (test/model-viewer)
+  'components/model/ModelView.tsx',
+  'components/model/Understand.tsx',
   // Logos 3.5 — the everyday displays (objects of thought)
   'lib/objects/display-base.ts',
   'lib/objects/display-plan.ts',

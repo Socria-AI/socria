@@ -91,7 +91,16 @@ export function solidFromWords(said: string | null | undefined): SolidReading | 
     const cube = shape === 'box' && ['w', 'd', 'h'].every((x) => value(x) !== null) && value('w') === value('d') && value('d') === value('h');
     const id = `${cube ? 'cube' : shape}${many ? `_${i + 1}` : ''}`;
     const word = cube ? 'Cube' : `${shape[0].toUpperCase()}${shape.slice(1)}`;
-    const control = (key: string) => (many ? `${id}_${key}` : key);
+    // `R` and `r` are ONE NAME to the evaluator, which keeps one control per
+    // name, case aside (lib/model/schema.ts) — so a ring lost its bore and a
+    // torus its tube, and their measures read the one for the other. The
+    // lower-case one of such a pair is named by what it is: r_inner, r_tube.
+    const named = (key: string) => {
+      const twin = SOLID_DIMS[shape].some((x) => x.key !== key && x.key.toLowerCase() === key.toLowerCase() && x.key < key);
+      const label = SOLID_DIMS[shape].find((x) => x.key === key)?.label ?? '';
+      return twin ? `${key}_${label.split(' ')[0]}` : key;
+    };
+    const control = (key: string) => (many ? `${id}_${named(key)}` : named(key));
     const defs: Record<string, string> = {};
     const dims = cube ? [{ key: 's', label: 'side' }] : SOLID_DIMS[shape];
     for (const d of dims) {

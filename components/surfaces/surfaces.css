@@ -16,15 +16,23 @@
 
 .sfx {
   --sfx-h: 560px;
+  --sfx-aside-w: clamp(268px, 26%, 340px);
+  --sfx-hair: var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
+  --sfx-soft: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
+  --sfx-faint: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.44);
+  --sfx-glass: color-mix(in srgb, var(--lg-panel, #faf8f2) 82%, transparent);
+  --sfx-ease: cubic-bezier(0.2, 0.8, 0.2, 1);
+  container: sfx / inline-size;
+  position: relative;
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr) auto auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   min-height: 0;
   height: var(--sfx-h);
-  background: var(--lg-panel, #FAF8F2);
-  border: 1px solid var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
-  border-radius: 12px;
+  background: var(--lg-panel, #faf8f2);
+  border: 1px solid var(--sfx-hair);
+  border-radius: 14px;
   overflow: hidden;
-  color: var(--lg-ink, #23241F);
+  color: var(--lg-ink, #23241f);
   font-family: var(--sans);
 }
 
@@ -40,63 +48,433 @@
   border: 0;
 }
 .sfx:fullscreen { height: 100vh; border-radius: 0; }
+/* full screen is a ground of its own, whatever the frame was lying on: a
+   transparent one is painted black by the browser */
+.sfx.is-full,
+.sfx.is-full.is-fill,
+.sfx:fullscreen { background: var(--lg-paper, var(--lg-panel, #faf8f2)); }
 
+/* ── the header: what this is, and the ways of looking at it ──────── */
 .sfx-head {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  padding: 10px 14px;
-  border-bottom: 1px solid var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
+  gap: 16px;
+  min-width: 0;
+  padding: 14px 18px 12px;
+  border-bottom: 1px solid var(--sfx-hair);
+}
+.sfx-titles {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
 }
 .sfx-title {
-  font-size: 11px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--lg-ink-60, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6));
-}
-.sfx-icon {
-  font: inherit;
-  font-size: 10.5px;
-  padding: 3px 10px;
-  border-radius: 999px;
-  border: 1px solid var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
-  background: var(--surface, #fff);
-  color: var(--lg-ink-60, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6));
-  cursor: pointer;
+  margin: 0;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-weight: 400;
+  font-size: 22px;
+  line-height: 1.1;
+  letter-spacing: -0.005em;
+  color: var(--lg-ink, #23241f);
   white-space: nowrap;
-  transition: border-color 0.18s, color 0.18s;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
-.sfx-icon:hover { border-color: var(--lg-primary, #354620); color: var(--lg-primary, #354620); }
-.sfx-icon[aria-pressed='true'] {
-  background: var(--lg-primary, #354620);
-  border-color: var(--lg-primary, #354620);
-  color: var(--lg-panel, #FAF8F2);
+.sfx-sub {
+  margin: 0;
+  font-size: 12.5px;
+  line-height: 1.35;
+  color: var(--sfx-soft);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.sfx-head-r {
+  flex: none;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
 }
 
+/* ── the body: the figure, and the side ───────────────────────────── */
+.sfx-body {
+  /* a size container: the frame's height is always set (its own --sfx-h, its
+     hole's, or the screen's), so the figure can be sized against it when stacked */
+  container: sfxbody / size;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) var(--sfx-aside-w);
+}
+.sfx-figure {
+  position: relative;
+  min-width: 0;
+  min-height: 0;
+  display: grid;
+  /* the picture, and under it a bar of its own: what it reads out, and the camera's tools */
+  grid-template-rows: minmax(0, 1fr) auto;
+  /* a soft light behind the thing, so it sits in a space rather than on a sheet */
+  background:
+    radial-gradient(70% 62% at 50% 44%, var(--sfx-glow, color-mix(in srgb, var(--lg-panel, #faf8f2) 55%, #fff)) 0%, transparent 72%),
+    var(--sfx-figure-bg, transparent);
+}
 .sfx-stage {
   min-height: 0;
+  min-width: 0;
   display: grid;
   grid-template-rows: minmax(0, 1fr);
   grid-template-columns: minmax(0, 1fr);
-  padding: 6px 8px;
+  padding: 8px 10px var(--sfx-stage-pb, 8px);
   overflow: hidden;
-  cursor: grab;
   touch-action: none;
 }
-.sfx-stage:active { cursor: grabbing; }
-.sfx-stage:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: -3px; }
+.sfx.is-turnable .sfx-stage { cursor: grab; }
+/* a flat figure is not turned, so a finger moving up it scrolls what it is in */
+.sfx:not(.is-turnable) .sfx-stage { touch-action: pan-x pan-y; }
+.sfx.is-turnable .sfx-stage:active { cursor: grabbing; }
+.sfx-stage:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: -4px; border-radius: 10px; }
 .sfx-svg { display: block; width: 100%; height: 100%; overflow: hidden; }
 
-/* the handle the reader drags to make the panel taller */
+/* ── UNDER THE PICTURE, NOT OVER IT ───────────────────────────────────
+   The readouts at the left and the camera's tools at the right, in a bar of
+   their own: laid over the figure they covered its axes, its insets and the
+   labels a surface draws along its own foot, and a long readout was cut to
+   fit beside the tools. Here a readout wraps to a second line instead. */
+.sfx-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  padding: 0 12px 10px 14px;
+}
+.sfx-caps {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  min-width: 0;
+  pointer-events: none;
+}
+.sfx-cap {
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: var(--sfx-glass);
+  border: 1px solid var(--sfx-hair);
+  /* AS WRITTEN, NEVER CAPITALISED: these carry units, and mK is not MK */
+  font-size: 11.5px;
+  font-weight: 500;
+  letter-spacing: 0.01em;
+  font-variant-numeric: tabular-nums;
+  color: var(--sfx-soft);
+}
+
+/* the camera's own tools */
+.sfx-tools {
+  margin-left: auto;
+  flex: none;
+  display: flex;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: var(--sfx-glass);
+  border: 1px solid var(--sfx-hair);
+  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.05), 0 10px 26px -16px rgba(var(--shadow-rgb, 35, 36, 31), 0.35);
+  -webkit-backdrop-filter: blur(10px);
+  backdrop-filter: blur(10px);
+}
+.sfx-tool {
+  display: grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--sfx-soft);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.sfx-tool svg {
+  width: 17px;
+  height: 17px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.sfx-tool:hover { color: var(--lg-ink, #23241f); background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06); }
+.sfx-tool[aria-pressed='true'] { color: var(--lg-panel, #faf8f2); background: var(--lg-primary, #354620); }
+.sfx-tool:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: 1px; }
+
+/* how to hold it, once: until the first turn or zoom, and gone on its own */
+.sfx-hint {
+  position: absolute;
+  left: 50%;
+  top: 14px;
+  margin: 0;
+  transform: translateX(-50%);
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: var(--sfx-glass);
+  border: 1px solid var(--sfx-hair);
+  font-family: var(--serif, Georgia, serif);
+  font-style: italic;
+  font-size: 13px;
+  color: var(--sfx-soft);
+  white-space: nowrap;
+  pointer-events: none;
+  -webkit-backdrop-filter: blur(8px);
+  backdrop-filter: blur(8px);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sfx-hint { animation: sfx-hint 7s var(--sfx-ease) both; }
+}
+@keyframes sfx-hint {
+  0% { opacity: 0; transform: translate(-50%, -6px); }
+  8%, 78% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, 0); }
+}
+/* a wheel's words, or a finger's */
+.sfx-hint-touch { display: none; }
+@media (pointer: coarse) {
+  .sfx-hint-fine { display: none; }
+  .sfx-hint-touch { display: inline; }
+}
+
+/* ── the side: what can be moved, what can be shown, what it all is ── */
+.sfx-aside {
+  min-width: 0;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 18px;
+  padding: 16px 18px 18px;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  border-left: 1px solid var(--sfx-hair);
+  background: color-mix(in srgb, var(--lg-panel, #faf8f2) 72%, var(--surface, #fff));
+}
+.sfx-sec {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+.sfx-sec-h {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 10px;
+}
+.sfx-sec-k {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--sfx-faint);
+}
+.sfx-reset {
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--lg-primary, #354620);
+  cursor: pointer;
+  opacity: 0.85;
+}
+.sfx-reset:hover { opacity: 1; text-decoration: underline; text-underline-offset: 3px; }
+
+/* the control groups: one segmented choice */
+.sfx-groups {
+  display: inline-flex;
+  align-self: flex-start;
+  gap: 2px;
+  padding: 3px;
+  border-radius: 999px;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.055);
+}
+.sfx-groups button {
+  font: inherit;
+  font-size: 12px;
+  padding: 4px 12px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--sfx-soft);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+.sfx-groups button[aria-selected='true'] {
+  background: var(--surface, #fff);
+  color: var(--lg-ink, #23241f);
+  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.12);
+}
+
+/* a control: its name and its value, then the track */
+.sfx-ctls { display: flex; flex-direction: column; gap: 14px; }
+.sfx-ctl { display: flex; flex-direction: column; gap: 7px; min-width: 0; }
+.sfx-ctl-row { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; min-width: 0; }
+.sfx-ctl .k {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  color: var(--lg-ink, #23241f);
+}
+.sfx-ctl .v {
+  flex: none;
+  max-width: 62%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 500;
+  font-variant-numeric: tabular-nums;
+  color: var(--lg-ink, #23241f);
+}
+.sfx-ctl input[type='range'] {
+  --p: 50%;
+  width: 100%;
+  height: 18px;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  background: transparent;
+  cursor: pointer;
+}
+.sfx-ctl input[type='range']::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 4px;
+  background: linear-gradient(90deg, var(--lg-primary, #354620) 0 var(--p), rgba(var(--lg-ink-rgb, 35, 36, 31), 0.13) var(--p) 100%);
+}
+.sfx-ctl input[type='range']::-moz-range-track {
+  height: 4px;
+  border-radius: 4px;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.13);
+}
+.sfx-ctl input[type='range']::-moz-range-progress {
+  height: 4px;
+  border-radius: 4px;
+  background: var(--lg-primary, #354620);
+}
+.sfx-ctl input[type='range']::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 16px;
+  height: 16px;
+  margin-top: -6px;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 2px solid var(--lg-primary, #354620);
+  box-shadow: 0 1px 3px rgba(var(--shadow-rgb, 35, 36, 31), 0.25);
+  transition: transform 0.15s var(--sfx-ease);
+}
+.sfx-ctl input[type='range']::-moz-range-thumb {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  background: var(--surface, #fff);
+  border: 2px solid var(--lg-primary, #354620);
+  box-shadow: 0 1px 3px rgba(var(--shadow-rgb, 35, 36, 31), 0.25);
+}
+.sfx-ctl input[type='range']:hover::-webkit-slider-thumb,
+.sfx-ctl input[type='range']:focus-visible::-webkit-slider-thumb { transform: scale(1.15); }
+.sfx-ctl input[type='range']:focus-visible { outline: none; }
+.sfx-ctl input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.18); }
+.sfx-ctl input[type='range']:disabled { cursor: default; opacity: 0.55; }
+/* what moving it does: said when the control is being used, not before */
+.sfx-ctl-help {
+  display: none;
+  font-size: 11.5px;
+  line-height: 1.4;
+  color: var(--sfx-faint);
+}
+.sfx-ctl:focus-within .sfx-ctl-help,
+.sfx-ctl:hover .sfx-ctl-help { display: block; }
+
+/* what can be shown: toggles */
+.sfx-layers { display: flex; flex-wrap: wrap; gap: 6px; }
+.sfx-layers button {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 11px 5px 9px;
+  border-radius: 999px;
+  border: 1px solid var(--sfx-hair);
+  background: var(--surface, #fff);
+  color: var(--sfx-soft);
+  cursor: pointer;
+  transition: border-color 0.18s, color 0.18s, background 0.18s;
+}
+.sfx-layers button i {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  border: 1.5px solid currentColor;
+}
+.sfx-layers button[aria-pressed='true'] { color: var(--lg-ink, #23241f); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4); }
+.sfx-layers button[aria-pressed='true'] i { background: var(--lg-primary, #354620); border-color: var(--lg-primary, #354620); }
+
+/* the clock */
+.sfx-transport { flex-direction: row; align-items: center; justify-content: space-between; }
+.sfx-seg { display: flex; align-items: center; gap: 6px; }
+.sfx-seg button {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font: inherit;
+  font-size: 12px;
+  padding: 5px 12px;
+  border-radius: 999px;
+  white-space: nowrap;
+  color: var(--sfx-soft);
+  border: 1px solid var(--sfx-hair);
+  background: var(--surface, #fff);
+  cursor: pointer;
+  transition: all 0.18s;
+}
+.sfx-seg button:hover { border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); color: var(--lg-ink, #23241f); }
+.sfx-seg button.sfx-pp {
+  border-color: var(--lg-primary, #354620);
+  background: var(--lg-primary, #354620);
+  color: var(--lg-panel, #faf8f2);
+}
+.sfx-seg button.sfx-pp svg { width: 13px; height: 13px; fill: currentColor; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.sfx-clock {
+  font-size: 12px;
+  color: var(--sfx-soft);
+  font-variant-numeric: tabular-nums;
+}
+
+.sfx-note {
+  margin: auto 0 0;
+  padding-top: 12px;
+  border-top: 1px solid var(--sfx-hair);
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--sfx-faint);
+}
+
+/* the handle the reader drags to make a card taller (a card on its own page only) */
 .sfx-grip {
   height: 11px;
   display: grid;
   place-items: center;
   cursor: ns-resize;
   background: transparent;
-  border-top: 1px solid var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
+  border-top: 1px solid var(--sfx-hair);
 }
 .sfx-grip i {
   display: block;
@@ -110,97 +488,40 @@
 .sfx-grip:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: -2px; }
 .sfx.is-full .sfx-grip { display: none; }
 
-.sfx-foot {
-  padding: 8px 14px 11px;
-  border-top: 1px solid var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
-  overflow-y: auto;
-  min-height: 0;
+/* ── narrower: the side goes under the figure ─────────────────────── */
+/* ONE COLUMN THAT SCROLLS. Squeezed into the frame's height, a phone gave the
+   figure a strip a finger tall and the controls everything else; the figure
+   now has a height of its own, nearly square, and the controls follow it. */
+@container sfx (max-width: 760px) {
+  .sfx-body {
+    grid-template-columns: minmax(0, 1fr);
+    grid-template-rows: auto auto;
+    align-content: start;
+    overflow-y: auto;
+    overscroll-behavior: contain;
+    scrollbar-width: thin;
+  }
+  /* nearly square, but never so tall that the controls start out of sight:
+     at most two thirds of a card's own height (the body is a size container),
+     four fifths of a screen it fills — there the controls are a scroll away */
+  .sfx-figure { height: clamp(220px, min(92cqw, 66cqh), 62svh); }
+  .sfx.is-fill .sfx-figure { height: clamp(240px, min(92cqw, 80cqh), 62svh); }
+  .sfx-aside {
+    max-height: none;
+    overflow: visible;
+    border-left: 0;
+    border-top: 1px solid var(--sfx-hair);
+    gap: 14px;
+    padding: 12px 16px 18px;
+  }
+  .sfx-head { padding: 12px 14px 10px; flex-wrap: wrap; }
+  .sfx-title { font-size: 19px; }
 }
-.sfx-bar { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
-.sfx-clock {
-  font-size: 11px;
-  color: var(--lg-ink-60, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6));
-  font-variant-numeric: tabular-nums;
-}
-.sfx-seg { display: flex; gap: 2px; }
-.sfx-seg button, .sfx-groups button, .sfx-layers button {
-  font: inherit;
-  font-size: 10.5px;
-  padding: 3px 9px;
-  border-radius: 999px;
-  white-space: nowrap;
-  color: var(--lg-ink-60, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6));
-  border: 1px solid var(--lg-line, rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14));
-  background: var(--surface, #fff);
-  cursor: pointer;
-  transition: all 0.18s;
-}
-.sfx-seg button:hover, .sfx-groups button:hover, .sfx-layers button:hover {
-  border-color: var(--lg-primary, #354620);
-  color: var(--lg-primary, #354620);
-}
-.sfx-seg button[aria-pressed='true'],
-.sfx-groups button[aria-selected='true'],
-.sfx-layers button[aria-pressed='true'] {
-  background: var(--lg-primary, #354620);
-  border-color: var(--lg-primary, #354620);
-  color: var(--lg-panel, #FAF8F2);
-}
-.sfx-groups { display: flex; gap: 2px; margin: 9px 0 8px; flex-wrap: wrap; }
-.sfx-layers { display: flex; gap: 3px; flex-wrap: wrap; margin-top: 3px; }
-
-.sfx-ctls { display: flex; flex-direction: column; gap: 6px; }
-.sfx-ctl { display: flex; align-items: center; gap: 9px; }
-.sfx-ctl .k {
-  font-size: 9.5px;
-  font-weight: 600;
-  letter-spacing: 0.16em;
-  text-transform: uppercase;
-  color: var(--lg-ink-60, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6));
-  flex: 0 0 3.4em;
-}
-.sfx-ctl .v {
-  font-size: 11px;
-  color: var(--lg-ink, #23241F);
-  font-variant-numeric: tabular-nums;
-  flex: 0 0 auto;
-  min-width: 7.2em;
-  text-align: right;
-}
-.sfx-ctl input[type='range'] {
-  flex: 1;
-  min-width: 0;
-  height: 2px;
-  appearance: none;
-  -webkit-appearance: none;
-  background: var(--lg-ink-24, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.24));
-  border-radius: 2px;
-}
-.sfx-ctl input[type='range']::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--lg-primary, #354620);
-  border: 2px solid var(--lg-panel, #FAF8F2);
-  cursor: pointer;
-}
-.sfx-ctl input[type='range']::-moz-range-thumb {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  background: var(--lg-primary, #354620);
-  border: 2px solid var(--lg-panel, #FAF8F2);
-  cursor: pointer;
-}
-
-.sfx-note {
-  margin: 9px 0 0;
-  font-family: var(--serif);
-  font-style: italic;
-  font-size: 12px;
-  line-height: 1.45;
-  color: var(--lg-ink-60, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6));
+@container sfx (max-width: 520px) {
+  .sfx-head-r { width: 100%; overflow-x: auto; scrollbar-width: none; }
+  .sfx-head-r::-webkit-scrollbar { display: none; }
+  .sfx-sub { white-space: normal; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; }
+  .sfx-tool { width: 36px; height: 36px; }
 }
 
 /* the surface's own ink */
@@ -242,7 +563,7 @@
 .gvx-com { fill: none; stroke: var(--lg-ink-40, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.4)); stroke-width: 1; vector-effect: non-scaling-stroke; }
 
 @media (prefers-reduced-motion: reduce) {
-  .sfx-icon, .sfx-seg button, .sfx-groups button, .sfx-layers button, .sfx-grip i { transition: none; }
+  .sfx-tool, .sfx-seg button, .sfx-groups button, .sfx-layers button, .sfx-grip i { transition: none; }
 }
 
 /* ── filling a panel instead of standing on its own ──────────────── */
@@ -257,30 +578,9 @@
   border: 0;
   border-radius: 0;
   background: transparent;
+  grid-template-rows: auto minmax(0, 1fr);
 }
-.sfx.is-fill .sfx-grip { display: none; }
 .sfx.is-fill .sfx-head { background: transparent; }
-
-/* IN A PANE, THE DRAWING KEEPS THE ROOM.
- *
- * A surface mounted in the Logos map lens gets whatever height the pane has,
- * and the controls below it do not shrink — so on a short pane the stage was
- * squeezed to a sliver and a black hole read as a smudge between two rows of
- * sliders. The stage takes a floor of the panel's height (a percentage row
- * resolves against it, which is definite here because `is-fill` is 100% of a
- * box that has one), the foot tightens, and the running note gives up its
- * third line rather than the picture giving up its last third. Nothing is
- * removed: the foot scrolls, and full screen restores every line of it.
- */
-.sfx.is-fill { grid-template-rows: auto minmax(45%, 1fr) auto auto; }
-.sfx.is-fill .sfx-foot { padding: 6px 12px 8px; }
-.sfx.is-fill .sfx-note {
-  margin-top: 6px;
-  display: -webkit-box;
-  -webkit-line-clamp: 2;
-  -webkit-box-orient: vertical;
-  overflow: hidden;
-}
 
 /* ── what is selected ─────────────────────────────────────────────────
  *
@@ -307,7 +607,6 @@
 }
 .sfx-sel:hover { background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.12); }
 .sfx-sel i { font-style: normal; opacity: 0.6; }
-.sfx-head-r { display: flex; align-items: center; gap: 8px; }
 
 /* Said for a screen reader, which cannot see the chip or the dimming. Off
    the page rather than hidden: display:none is not announced. */

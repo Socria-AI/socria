@@ -1688,7 +1688,8 @@ export function ThinkingMap({
           setMenu(null);
         }}
       >
-        {map.nodes.length === 0 && (
+        {/* not behind a model the plot lens is drawing: it would show through */}
+        {map.nodes.length === 0 && !(lens === 'plot' && (map.viz || doc)) && (
           <div className="lg-map-empty">
             <span className="lg-map-empty-mark" aria-hidden="true">
               <LogosMark size={46} />
@@ -1697,7 +1698,7 @@ export function ThinkingMap({
           </div>
         )}
 
-        {map.nodes.length > 0 && staticLayout?.empty && (
+        {map.nodes.length > 0 && staticLayout?.empty && !(lens === 'plot' && (map.viz || doc)) && (
           <div className="lg-map-empty">
             <p>{staticLayout.empty}</p>
           </div>
@@ -1738,6 +1739,8 @@ export function ThinkingMap({
               <div className="lg-viz-surface lg-tokens">
                 <ModelView
                   model={modelFor(doc)}
+                  // the lens has already sized it: no card inside the panel, no grip
+                  fill
                   edits={editsState(map.models ?? EMPTY_WORKSPACE) ?? undefined}
                   onRead={onVizRead}
                   ops={vizOps}
@@ -1754,7 +1757,7 @@ export function ThinkingMap({
               </div>
             ) : map.viz?.built ? (
               <div className="lg-viz-surface lg-tokens">
-                <ModelView model={map.viz.built} onRead={onVizRead} ops={vizOps} />
+                <ModelView model={map.viz.built} fill onRead={onVizRead} ops={vizOps} />
               </div>
             ) : map.viz && isSimulation(map.viz) ? (
               <div className="lg-viz-surface">

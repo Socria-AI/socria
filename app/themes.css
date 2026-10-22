@@ -40,6 +40,8 @@ html[data-theme="dark"] {
 }
 html[data-theme="dark"] :is(.logos-root, .lg-tokens) {
   --lg-paper: #191A17; --lg-panel: #1E1F1B;
+  /* the light a model's figure sits in (components/surfaces/surfaces.css): a breath, not a lamp */
+  --sfx-glow: rgba(236, 233, 223, 0.045);
   --lg-primary: #A9C27A; --lg-accent: #8FB3C4; --lg-secondary: #C9B47E; --lg-tension: #D18A68;
   --lg-ink: #ECE9DF; --lg-ink-60: rgba(236, 233, 223, 0.6); --lg-ink-40: rgba(236, 233, 223, 0.4); --lg-ink-24: rgba(236, 233, 223, 0.24);
   --lg-line: rgba(236, 233, 223, 0.12);
@@ -64,6 +66,7 @@ html[data-theme="one"] {
 }
 html[data-theme="one"] :is(.logos-root, .lg-tokens) {
   --lg-paper: #13293A; --lg-panel: #16303F;
+  --sfx-glow: rgba(240, 234, 216, 0.045);
   --lg-primary: #B8CDD9; --lg-accent: #E5D3A1; --lg-secondary: #E5D3A1; --lg-tension: #E39A7A;
   --lg-ink: #F0EAD8; --lg-ink-60: rgba(240, 234, 216, 0.62); --lg-ink-40: rgba(240, 234, 216, 0.42); --lg-ink-24: rgba(240, 234, 216, 0.26);
   --lg-line: rgba(240, 234, 216, 0.13);
@@ -93,6 +96,7 @@ html[data-theme="night"] {
 }
 html[data-theme="night"] :is(.logos-root, .lg-tokens) {
   --lg-paper: #0B1222; --lg-panel: #0F182B;
+  --sfx-glow: rgba(200, 212, 255, 0.05);
   --lg-primary: #E7CF92; --lg-accent: #9DB4E3; --lg-secondary: #C3B1E1; --lg-tension: #E8998A;
   --lg-ink: #E9E6F2; --lg-ink-60: rgba(233, 230, 242, 0.62); --lg-ink-40: rgba(233, 230, 242, 0.42); --lg-ink-24: rgba(233, 230, 242, 0.26);
   --lg-line: rgba(200, 212, 255, 0.13);

@@ -27,14 +27,15 @@
 }
 .eng-tick text {
   font-family: var(--sans, system-ui);
-  font-size: 8.5px;
+  font-size: 10px;
   font-variant-numeric: tabular-nums;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5);
   pointer-events: none;
 }
 .eng-axis {
   font-family: var(--sans, system-ui);
-  font-size: 9px;
+  font-size: 11px;
+  font-weight: 500;
   letter-spacing: 0.02em;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
   pointer-events: none;
@@ -46,11 +47,10 @@
   font-variant-numeric: tabular-nums;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
 }
-@media (prefers-color-scheme: dark) {
-  .eng-tick text { fill: rgba(240, 238, 232, 0.5); }
-  .eng-axis { fill: rgba(240, 238, 232, 0.62); }
-  .eng-tick-label { fill: rgba(240, 238, 232, 0.62); }
-}
+/* THE THEME, NOT THE SYSTEM. These used to follow prefers-color-scheme,
+   which turned the numbers light on a paper page whenever the computer was
+   in dark mode; the ink above is the theme's own (--lg-ink-rgb), so they
+   follow the page they are on. */
 
 /* The hit area for a stroke-only mark: wide, transparent, behind the visible
    line. Selection is how a question gets an antecedent, and a wireframe
@@ -69,8 +69,9 @@ path.eng-hit {
    run as the main view (buildPanels in lib/model/spec.ts), and the vertical
    rule in each is the clock. Editorial weights, because this is a figure and
    not a dashboard: a hairline plate, one line, no fill, no legend. */
+/* glass in the theme's own panel colour: a fixed paper fill was a pale slab on every dark ground */
 .eng-panel-plate {
-  fill: rgba(250, 248, 242, 0.82);
+  fill: color-mix(in srgb, var(--lg-panel, #faf8f2) 84%, transparent);
   stroke: var(--eng-line, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.14));
   stroke-width: 0.8;
 }
@@ -93,13 +94,14 @@ path.eng-hit {
 }
 .eng-panel-label {
   font-family: var(--sans, system-ui);
-  font-size: 8.5px;
+  font-size: 10.5px;
+  font-weight: 500;
   letter-spacing: 0.04em;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
 }
 .eng-panel-axis {
   font-family: var(--sans, system-ui);
-  font-size: 7.5px;
+  font-size: 9.5px;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.38);
 }
 .eng-panel { cursor: pointer; }
@@ -170,13 +172,7 @@ path.eng-hit {
   fill: var(--eng-tension, #9c5b3c);
 }
 
-@media (prefers-color-scheme: dark) {
-  .eng-read-head, .eng-read-key { fill: rgba(240, 238, 232, 0.5); }
-  .eng-read-cell, .eng-read-node { fill: rgba(240, 238, 232, 0.86); }
-  .eng-read-none { fill: rgba(240, 238, 232, 0.52); }
-  .eng-read-edge { stroke: rgba(240, 238, 232, 0.26); }
-  .eng-read text.is-link { text-decoration-color: rgba(240, 238, 232, 0.24); }
-}
+/* (no dark-mode block: these follow the theme's ink, not the computer's setting — see THE THEME, NOT THE SYSTEM above) */
 
 /* ── THE READ VIEWS, AS HTML INSIDE THE FRAME ─────────────────────────
    Set by components/model/panelMarks.tsx through a <foreignObject>, so a
@@ -188,14 +184,15 @@ path.eng-hit {
 .eng-read-html {
   box-sizing: border-box;
   overflow: auto;
-  padding: 18px 22px 20px;
+  padding: 26px clamp(16px, 4%, 40px) 22px;
   font-family: var(--sans, system-ui);
-  font-size: 12.5px;
-  line-height: 1.45;
+  font-size: 13.5px;
+  line-height: 1.5;
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.86);
   -webkit-font-smoothing: antialiased;
   scrollbar-width: thin;
 }
+.eng-read-col { max-width: 880px; margin: 0 auto; }
 .eng-read-html.is-none { display: flex; align-items: center; justify-content: center; text-align: center; }
 .eng-read-html .eng-read-none {
   margin: 0; max-width: 34em; font-family: var(--serif, Georgia, serif); font-style: italic;
@@ -206,13 +203,15 @@ path.eng-hit {
 /* As wide as its contents: a column of three numbers spread across the
    whole frame reads as three unrelated things. A grouped table of words
    takes the width, because its last column is a remark that wants the edge. */
-.eng-read-table { border-collapse: collapse; width: auto; min-width: 46%; }
+.eng-read-table { border-collapse: collapse; width: auto; min-width: min(560px, 100%); margin: 0 auto; }
 .eng-read-table.is-grouped { width: 100%; }
 .eng-read-table.is-numeric th, .eng-read-table.is-numeric td { padding-right: 34px; }
-.eng-read-table th, .eng-read-table td { padding: 5px 22px 5px 0; vertical-align: top; text-align: left; }
+.eng-read-table th, .eng-read-table td { padding: 8px 24px 8px 0; vertical-align: top; text-align: left; }
+/* a hairline between rows, so a long row is read across rather than lost */
+.eng-read-table tbody tr + tr td, .eng-read-table tbody tr + tr th { border-top: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.07); }
 .eng-read-table th:last-child, .eng-read-table td:last-child { padding-right: 0; }
 .eng-read-table thead th {
-  font-family: var(--sans, system-ui); font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  font-family: var(--sans, system-ui); font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em;
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5); padding-top: 0; padding-bottom: 7px;
   border-bottom: 1px solid var(--eng-line, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16)); white-space: nowrap;
 }
@@ -233,8 +232,8 @@ path.eng-hit {
 .eng-read-table td.is-number, .eng-read-table th.is-number {
   text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap;
 }
-.eng-read-table td.is-number { font-family: var(--mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 12px; }
-.eng-read-table td.is-note { color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5); font-style: italic; font-family: var(--serif, Georgia, serif); font-size: 12.5px; white-space: nowrap; }
+.eng-read-table td.is-number { font-family: var(--mono, ui-monospace, "SFMono-Regular", Menlo, monospace); font-size: 13px; color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.92); }
+.eng-read-table td.is-note { color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.56); font-style: italic; font-family: var(--serif, Georgia, serif); font-size: 13.5px; white-space: nowrap; }
 .eng-read-table tr.is-link { cursor: pointer; }
 .eng-read-table tr.is-link:hover td, .eng-read-table tr.is-link:hover th { color: var(--eng-tension, #9c5b3c); }
 
@@ -267,9 +266,50 @@ path.eng-hit {
 .eng-read-fact.is-link dt, .eng-read-fact.is-link dd { cursor: pointer; }
 .eng-read-fact.is-link:hover dt, .eng-read-fact.is-link:hover dd { color: var(--eng-tension, #9c5b3c); }
 
-@media (prefers-color-scheme: dark) {
-  .eng-read-html { color: rgba(240, 238, 232, 0.86); }
-  .eng-read-html .eng-read-none, .eng-read-table thead th, .eng-read-html .eng-read-head, .eng-read-fact dt,
-  .eng-read-table td.is-note { color: rgba(240, 238, 232, 0.52); }
-  .eng-read-table .eng-read-group, .eng-read-eqs .eng-read-key { color: rgba(240, 238, 232, 0.92); }
+
+/* ── the room: two back walls and the floor, with a grid at the round numbers ──
+   Quiet enough that the model is what the eye lands on; there enough that it
+   stands somewhere and can be measured against. */
+.eng-pane-fill { stroke: none; fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.022); }
+.eng-pane.is-floor .eng-pane-fill { fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.04); }
+.eng-pane-grid {
+  fill: none;
+  stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.075);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
 }
+.eng-pane-edge {
+  fill: none;
+  stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16);
+  stroke-width: 1;
+  stroke-linejoin: round;
+  vector-effect: non-scaling-stroke;
+}
+/* flat: the same grid, on the plane */
+.eng-grid path {
+  fill: none;
+  stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.07);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+
+/* a shaded surface or solid: its faces are its own; clicking any of them is clicking it */
+.eng-faces path { vector-effect: non-scaling-stroke; cursor: pointer; }
+
+/* the model's own words in the scene — a dimension, a name — on a small tag,
+   in the case they were written in, read over whatever they sit on */
+.eng-tag rect {
+  fill: color-mix(in srgb, var(--surface, #fff) 92%, transparent);
+  stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.14);
+  stroke-width: 1;
+  vector-effect: non-scaling-stroke;
+}
+.eng-label {
+  font-family: var(--sans, system-ui);
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  fill: var(--lg-ink, #23241f);
+  font-variant-numeric: tabular-nums;
+}
+.eng-tag.is-quiet .eng-label { fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.78); font-weight: 500; }

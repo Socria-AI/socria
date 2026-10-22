@@ -235,15 +235,20 @@ export function aspectOf(model: Model): 'equal' | 'fit' {
   return graph || relations || history ? 'fit' : 'equal';
 }
 
-/** The box made cubic about its own centre, for geometry. */
-export function equalise(box: VisualizationSpec['box']): VisualizationSpec['box'] {
+/**
+ * The box made cubic about its own centre, for geometry — or, for a part that
+ * STANDS (`floor`), cubic above its own base: a 4 × 2 × 1 slab centred in a
+ * cube four high floated two below the floor's grid, a shape hanging in the
+ * room instead of sitting in it.
+ */
+export function equalise(box: VisualizationSpec['box'], opts?: { floor?: boolean }): VisualizationSpec['box'] {
   const span = Math.max(box.x[1] - box.x[0], box.y[1] - box.y[0], box.z[1] - box.z[0]);
   const half = span / 2;
   const mid = (r: [number, number]): [number, number] => {
     const c = (r[0] + r[1]) / 2;
     return [c - half, c + half];
   };
-  return { x: mid(box.x), y: mid(box.y), z: mid(box.z) };
+  return { x: mid(box.x), y: mid(box.y), z: opts?.floor ? [box.z[0], box.z[0] + span] : mid(box.z) };
 }
 
 /** The box that holds everything drawn, with a little air. */
@@ -314,7 +319,8 @@ export function buildSpec(
     dimensionality,
     coordinateSystem: system,
     primitives,
-    box: aspect === 'equal' ? equalise(box) : box,
+    // a solid stands on its base, so its cube rises from there
+    box: aspect === 'equal' ? equalise(box, { floor: model.objects.some((o) => o.kind === 'solid' && !!o.solid) }) : box,
     aspect,
     ...(dimensionality === 2 && model.objects.some((o) => !!o.pde?.y && (!opts?.only || opts.only.includes(o.id))) ? { toScale: true } : {}),
     axisNames: axisNamesFor(model),

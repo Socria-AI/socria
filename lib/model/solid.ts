@@ -422,9 +422,20 @@ function circle(cx: number, cy: number, z: number, r: number, n: number, phase =
   return out;
 }
 
-/** A body of revolution about the z axis: rings at each (z, r) of the profile, joined by generators. */
+/**
+ * A body of revolution about the z axis: rings at each (z, r) of the profile,
+ * joined by generators — CLOSED, and drawn as faces. An end of the profile
+ * that is not already a point (a cylinder's base, a frustum's top) gets a ring
+ * of radius nought beyond it, so the end is a disc of faces rather than a hole
+ * a reader could see into.
+ */
 function revolved(of: string, profile: [number, number][], cx: number, cy: number, z0: number, seg: number): Primitive {
-  return { p: 'mesh', of, rows: profile.map(([z, r]) => circle(cx, cy, z0 + z, Math.max(0, r), seg)), tone: 'primary' };
+  const rows = profile.map(([z, r]) => circle(cx, cy, z0 + z, Math.max(0, r), seg));
+  const [zA, rA] = profile[0];
+  const [zB, rB] = profile[profile.length - 1];
+  if (rA > 0) rows.unshift(circle(cx, cy, z0 + zA, 0, seg));
+  if (rB > 0) rows.push(circle(cx, cy, z0 + zB, 0, seg));
+  return { p: 'mesh', of, rows, tone: 'primary', fill: true };
 }
 
 /** A number for a label: a few significant figures, no trailing noise. */
@@ -436,21 +447,41 @@ export function fmt(v: number): string {
 }
 
 /**
+ * THE SIDE A PART IS FIRST SEEN FROM. A figure in space opens turned this far
+ * about z (components/model/ModelView.tsx), and a solid's dimension lines are
+ * drawn on the side that faces it — along its near edges, up the left of its
+ * outline, a diameter across the front of its base — so they open in front of
+ * the part and beside it, never behind it where the body would hide them.
+ */
+export const FACING = 0.6;
+/** Across the floor toward the viewer, and to the viewer's right. */
+const NEAR = { x: Math.sin(FACING), y: Math.cos(FACING) };
+const ACROSS = { x: Math.cos(FACING), y: -Math.sin(FACING) };
+/** A point by a round body's axis: `out` toward the viewer, `side` to their right, at height z. */
+const facing = (cx: number, cy: number, out: number, side: number, z: number): P3 =>
+  pt(cx + NEAR.x * out + ACROSS.x * side, cy + NEAR.y * out + ACROSS.y * side, z);
+/** A dimension line's end ticks, `g` long, pointing toward the viewer or to their left. */
+const towardNear = (g: number): P3 => pt(NEAR.x * g, NEAR.y * g, 0);
+const towardLeft = (g: number): P3 => pt(-ACROSS.x * g, -ACROSS.y * g, 0);
+
+/**
  * A DIMENSION LINE: dashed, offset from the body, with end ticks and a label
  * reading what the dimension IS — "h = 40 cm", "⌀ 20 cm" — computed from the
  * current parameters, so it moves when a slider does. The label is the
  * control's own name when the dimension is a control, so it reads like the
  * slider that drives it.
  */
-function dimension(of: string, a: P3, b: P3, tick: P3, text: string): Primitive[] {
+function dimension(of: string, a: P3, b: P3, tick: P3, text: string, anchor: 'middle' | 'end' = 'middle'): Primitive[] {
   const t = (q: P3, s: number): P3 => pt(q.x + tick.x * s, q.y + tick.y * s, q.z + tick.z * s);
   return [
     { p: 'polyline', of, at: [a, b], dashed: true, width: 1, tone: 'muted' },
     { p: 'polyline', of, at: [t(a, -1), t(a, 1)], width: 1, tone: 'muted' },
     { p: 'polyline', of, at: [t(b, -1), t(b, 1)], width: 1, tone: 'muted' },
-    { p: 'label', of, at: pt((a.x + b.x) / 2 + tick.x * 1.6, (a.y + b.y) / 2 + tick.y * 1.6, (a.z + b.z) / 2 + tick.z * 1.6), text, anchor: 'middle', tone: 'muted' },
+    { p: 'label', of, at: pt((a.x + b.x) / 2 + tick.x * 1.6, (a.y + b.y) / 2 + tick.y * 1.6, (a.z + b.z) / 2 + tick.z * 1.6), text, anchor, tone: 'muted' },
   ];
 }
+/** A height up the left of the outline, its label ending beside it rather than lying across the body. */
+const upLeft = (of: string, a: P3, b: P3, g: number, text: string) => dimension(of, a, b, towardLeft(g), text, 'end');
 
 /** "h = 40 cm" when the dimension is a control, "h 40 cm" otherwise — what the line measures. */
 function dimLabel(model: Model, expr: string | undefined, symbol: string, value: number, unit: string | null, diameter = false): string {
@@ -486,13 +517,21 @@ export function solidPrimitives(model: Model, o: ModelObject, v: Record<string, 
       const w = n('w'), d = n('d'), h = n('h');
       const c = (sx: number, sy: number, z: number) => pt(cx + (sx * w) / 2, cy + (sy * d) / 2, z0 + z);
       const loop = (z: number) => [c(-1, -1, z), c(1, -1, z), c(1, 1, z), c(-1, 1, z), c(-1, -1, z)];
+      // the six faces, as one closed mesh — the base, the four sides, the top —
+      // so it is drawn as a body with a lit side and a shaded side; its edges
+      // are drawn over them, crisp, as the outline a part reads by
+      const at = (z: number) => Array.from({ length: 5 }, () => pt(cx, cy, z0 + z));
+      out.push({ p: 'mesh', of, rows: [at(0), loop(0), loop(h), at(h)], tone: 'primary', fill: true });
       out.push({ p: 'polyline', of, at: loop(0), width: 1.6, tone: 'primary' });
       out.push({ p: 'polyline', of, at: loop(h), width: 1.6, tone: 'primary' });
       for (const [sx, sy] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) out.push({ p: 'polyline', of, at: [c(sx, sy, 0), c(sx, sy, h)], width: 1.6, tone: 'primary' });
       const g = Math.max(w, d, h) * 0.12;
-      out.push(...dimension(of, pt(cx - w / 2, cy - d / 2 - g, z0), pt(cx + w / 2, cy - d / 2 - g, z0), pt(0, -g * 0.25, 0), dimLabel(model, e.w, 'w', w, unit)));
-      out.push(...dimension(of, pt(cx + w / 2 + g, cy - d / 2, z0), pt(cx + w / 2 + g, cy + d / 2, z0), pt(g * 0.25, 0, 0), dimLabel(model, e.d, 'd', d, unit)));
-      out.push(...dimension(of, pt(cx - w / 2 - g, cy - d / 2, z0), pt(cx - w / 2 - g, cy - d / 2, z0 + h), pt(-g * 0.25, 0, 0), dimLabel(model, e.h, 'h', h, unit)));
+      // the faces toward the viewer (sx, sy), and the corner at the left of the outline (lx, ly)
+      const sx = Math.sign(NEAR.x) || 1, sy = Math.sign(NEAR.y) || 1;
+      const lx = -(Math.sign(ACROSS.x) || 1), ly = -(Math.sign(ACROSS.y) || 1);
+      out.push(...dimension(of, pt(cx - w / 2, cy + sy * (d / 2 + g), z0), pt(cx + w / 2, cy + sy * (d / 2 + g), z0), pt(0, sy * g * 0.25, 0), dimLabel(model, e.w, 'w', w, unit)));
+      out.push(...dimension(of, pt(cx + sx * (w / 2 + g), cy - d / 2, z0), pt(cx + sx * (w / 2 + g), cy + d / 2, z0), pt(sx * g * 0.25, 0, 0), dimLabel(model, e.d, 'd', d, unit)));
+      out.push(...dimension(of, pt(cx + lx * (w / 2 + g), cy + (ly * d) / 2, z0), pt(cx + lx * (w / 2 + g), cy + (ly * d) / 2, z0 + h), pt(lx * g * 0.25, 0, 0), dimLabel(model, e.h, 'h', h, unit), 'end'));
       break;
     }
     case 'cylinder':
@@ -504,10 +543,11 @@ export function solidPrimitives(model: Model, o: ModelObject, v: Record<string, 
       out.push(revolved(of, [[0, r1], [h, r2]], cx, cy, z0, SEG));
       const R = Math.max(r1, r2);
       const g = Math.max(R, h) * 0.14;
-      out.push(...dimension(of, pt(cx - R - g, cy, z0), pt(cx - R - g, cy, z0 + h), pt(-g * 0.25, 0, 0), dimLabel(model, e.h, 'h', h, unit)));
-      out.push(...dimension(of, pt(cx - r1, cy - R - g, z0), pt(cx + r1, cy - R - g, z0), pt(0, -g * 0.25, 0), dimLabel(model, shape === 'frustum' ? e.r1 : e.r, '⌀', r1, unit, true)));
+      out.push(...upLeft(of, facing(cx, cy, 0, -R - g, z0), facing(cx, cy, 0, -R - g, z0 + h), g * 0.25, dimLabel(model, e.h, 'h', h, unit)));
+      out.push(...dimension(of, facing(cx, cy, R + g, -r1, z0), facing(cx, cy, R + g, r1, z0), towardNear(g * 0.25), dimLabel(model, shape === 'frustum' ? e.r1 : e.r, '⌀', r1, unit, true)));
+      // the top's across the back of it, where it is seen above the body rather than across it
       if (shape === 'frustum' && r2 > 0) {
-        out.push(...dimension(of, pt(cx - r2, cy - R - g, z0 + h), pt(cx + r2, cy - R - g, z0 + h), pt(0, -g * 0.25, 0), dimLabel(model, e.r2, '⌀', r2, unit, true)));
+        out.push(...dimension(of, facing(cx, cy, -R - g, -r2, z0 + h), facing(cx, cy, -R - g, r2, z0 + h), towardNear(-g * 0.25), dimLabel(model, e.r2, '⌀', r2, unit, true)));
       }
       break;
     }
@@ -525,8 +565,8 @@ export function solidPrimitives(model: Model, o: ModelObject, v: Record<string, 
       }
       out.push(revolved(of, prof, cx, cy, z0, 16));
       const g = Math.max(r, h) * 0.14;
-      out.push(...dimension(of, pt(cx - r - g, cy, z0), pt(cx - r - g, cy, z0 + h), pt(-g * 0.25, 0, 0), dimLabel(model, e.h, 'h', h, unit)));
-      out.push(...dimension(of, pt(cx - r, cy - r - g, z0 + h / 2), pt(cx + r, cy - r - g, z0 + h / 2), pt(0, -g * 0.25, 0), dimLabel(model, e.r, '⌀', r, unit, true)));
+      out.push(...upLeft(of, facing(cx, cy, 0, -r - g, z0), facing(cx, cy, 0, -r - g, z0 + h), g * 0.25, dimLabel(model, e.h, 'h', h, unit)));
+      out.push(...dimension(of, facing(cx, cy, r + g, -r, z0), facing(cx, cy, r + g, r, z0), towardNear(g * 0.25), dimLabel(model, e.r, '⌀', r, unit, true)));
       break;
     }
     case 'sphere': {
@@ -538,7 +578,7 @@ export function solidPrimitives(model: Model, o: ModelObject, v: Record<string, 
       }
       out.push(revolved(of, prof, cx, cy, z0, 24));
       const g = r * 0.14;
-      out.push(...dimension(of, pt(cx - r - g, cy, z0), pt(cx - r - g, cy, z0 + 2 * r), pt(-g * 0.25, 0, 0), dimLabel(model, e.r, '⌀', r, unit, true)));
+      out.push(...upLeft(of, facing(cx, cy, 0, -r - g, z0), facing(cx, cy, 0, -r - g, z0 + 2 * r), g * 0.25, dimLabel(model, e.r, '⌀', r, unit, true)));
       break;
     }
     case 'torus': {
@@ -554,25 +594,35 @@ export function solidPrimitives(model: Model, o: ModelObject, v: Record<string, 
         }
         rows.push(row);
       }
-      out.push({ p: 'mesh', of, rows, tone: 'primary' });
+      out.push({ p: 'mesh', of, rows, tone: 'primary', fill: true });
       const g = (R + r) * 0.14;
-      out.push(...dimension(of, pt(cx - R - r, cy - R - r - g, z0), pt(cx + R + r, cy - R - r - g, z0), pt(0, -g * 0.25, 0), `⌀ ${fmt(2 * (R + r))}${unit ? ` ${unit}` : ''}`));
+      out.push(...dimension(of, facing(cx, cy, R + r + g, -R - r, z0), facing(cx, cy, R + r + g, R + r, z0), towardNear(g * 0.25), `⌀ ${fmt(2 * (R + r))}${unit ? ` ${unit}` : ''}`));
       break;
     }
     case 'prism': {
       const sides = Math.max(3, Math.round(n('n'))), r = n('r'), h = n('h');
-      out.push({ p: 'mesh', of, rows: [circle(cx, cy, z0, r, sides, Math.PI / 2), circle(cx, cy, z0 + h, r, sides, Math.PI / 2)], tone: 'primary' });
+      out.push({
+        p: 'mesh',
+        of,
+        // closed at both ends, like every body here
+        rows: [circle(cx, cy, z0, 0, sides, Math.PI / 2), circle(cx, cy, z0, r, sides, Math.PI / 2), circle(cx, cy, z0 + h, r, sides, Math.PI / 2), circle(cx, cy, z0 + h, 0, sides, Math.PI / 2)],
+        tone: 'primary',
+        fill: true,
+      });
       const g = Math.max(r, h) * 0.14;
-      out.push(...dimension(of, pt(cx - r - g, cy, z0), pt(cx - r - g, cy, z0 + h), pt(-g * 0.25, 0, 0), dimLabel(model, e.h, 'h', h, unit)));
+      out.push(...upLeft(of, facing(cx, cy, 0, -r - g, z0), facing(cx, cy, 0, -r - g, z0 + h), g * 0.25, dimLabel(model, e.h, 'h', h, unit)));
       break;
     }
     case 'ring': {
       const R = n('R'), r = n('r'), h = n('h');
-      out.push(revolved(of, [[0, R], [h, R]], cx, cy, z0, SEG));
-      out.push(revolved(of, [[0, r], [h, r]], cx, cy, z0, SEG));
+      // the outer wall, the bore, and the two flat rings that close it between them
+      const wall = (rr: number): Primitive => ({ p: 'mesh', of, rows: [circle(cx, cy, z0, rr, SEG), circle(cx, cy, z0 + h, rr, SEG)], tone: 'primary', fill: true });
+      out.push(wall(R), wall(r));
+      out.push({ p: 'mesh', of, rows: [circle(cx, cy, z0, R, SEG), circle(cx, cy, z0, r, SEG)], tone: 'primary', fill: true });
+      out.push({ p: 'mesh', of, rows: [circle(cx, cy, z0 + h, R, SEG), circle(cx, cy, z0 + h, r, SEG)], tone: 'primary', fill: true });
       const g = Math.max(R, h) * 0.14;
-      out.push(...dimension(of, pt(cx - R, cy - R - g, z0), pt(cx + R, cy - R - g, z0), pt(0, -g * 0.25, 0), dimLabel(model, e.R, '⌀', R, unit, true)));
-      out.push(...dimension(of, pt(cx - R - g, cy, z0), pt(cx - R - g, cy, z0 + h), pt(-g * 0.25, 0, 0), dimLabel(model, e.h, 'h', h, unit)));
+      out.push(...dimension(of, facing(cx, cy, R + g, -R, z0), facing(cx, cy, R + g, R, z0), towardNear(g * 0.25), dimLabel(model, e.R, '⌀', R, unit, true)));
+      out.push(...upLeft(of, facing(cx, cy, 0, -R - g, z0), facing(cx, cy, 0, -R - g, z0 + h), g * 0.25, dimLabel(model, e.h, 'h', h, unit)));
       break;
     }
   }

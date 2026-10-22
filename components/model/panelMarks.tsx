@@ -24,6 +24,7 @@
 
 import type { ReactNode } from 'react';
 import type { PanelContent } from '@/lib/model/viewdata';
+import { unitText } from './Understand';
 
 const PAD = 22;
 const LINE = 20;
@@ -51,7 +52,8 @@ function Island({ a, kind, children }: { a: { W: number; H: number }; kind: stri
         className={`eng-read eng-read-html is-${kind}`}
         style={{ width: `${a.W}px`, height: `${h}px` }}
       >
-        {children}
+        {/* one reading column, centred: a short table in the corner of a wide frame read as something left behind */}
+        <div className="eng-read-col">{children}</div>
       </div>
     </foreignObject>
   );
@@ -159,7 +161,7 @@ export function panelMarks(
                       </th>
                     )}
                     {r.cells.map((cell, j) => (
-                      <td key={j} className={`is-${headKinds[j] ?? 'text'}`}>{cell}</td>
+                      <td key={j} className={`is-${headKinds[j] ?? 'text'}`}>{heads[j] === 'units' ? unitText(cell) : cell}</td>
                     ))}
                   </tr>
                 ))}

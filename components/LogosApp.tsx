@@ -4240,6 +4240,23 @@ export function LogosApp({
     mq.addEventListener?.('change', on);
     return () => mq.removeEventListener?.('change', on);
   }, [l5]);
+  /** THE FOLDED SHEET'S OWN HEIGHT, so the view above it keeps its foot clear
+   *  of it — a fixed allowance left a model's last controls under the composer,
+   *  where no scrolling could bring them. Read only while folded: open, the
+   *  sheet is meant to lie over the view. */
+  const [sheetH, setSheetH] = useState(0);
+  const sheetSeen = useRef<ResizeObserver | null>(null);
+  const sheetRef = useCallback((el: HTMLDivElement | null) => {
+    sheetSeen.current?.disconnect();
+    sheetSeen.current = null;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const read = () => {
+      if (!el.classList.contains('is-open')) setSheetH(Math.round(el.getBoundingClientRect().height));
+    };
+    read();
+    sheetSeen.current = new ResizeObserver(read);
+    sheetSeen.current.observe(el);
+  }, []);
   const links = useMemo(
     () => (l5 ? linksOf(messages, map.nodes, map.history) : null),
     [l5, messages, map.nodes, map.history]
@@ -6773,11 +6790,11 @@ export function LogosApp({
   })();
   // the line of thinking: its view is the screen; the conversation beside it, or folded away
   const l5Line = narrow ? (
-    <div className={`l5x is-narrow${convoOpen ? ' has-convo' : ''}`}>
+    <div className={`l5x is-narrow${convoOpen ? ' has-convo' : ''}`} style={sheetH ? ({ ['--sheet' as string]: `${sheetH}px` }) : undefined}>
       <section className={`l5x-canvas is-${studyTab}`}>
         <div className="l5x-view">{viewEl}</div>
       </section>
-      <div className={`l5x-sheet${convoOpen ? ' is-open' : ''}`}>
+      <div ref={sheetRef} className={`l5x-sheet${convoOpen ? ' is-open' : ''}`}>
         <button type="button" className="l5x-sheet-grip" aria-label={convoOpen ? 'Fold the conversation down' : 'Open the conversation'} onClick={() => setConvo(!convoOpen)} />
         <div className="l5x-sheet-row">
           <span className="l5x-who">Socria</span>

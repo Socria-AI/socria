@@ -32,6 +32,9 @@ import {
   type ReactNode,
 } from 'react';
 
+/** before paint in a browser; nothing on the server */
+const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+
 export interface Cam {
   yaw: number;
   pitch: number;
@@ -72,7 +75,26 @@ export interface RenderArgs {
   t: number;
   vals: Record<string, number>;
   layers: Record<string, boolean>;
+  /**
+   * The theme's colours as the page resolves them, for a surface that has to
+   * mix its own — a shaded face is arithmetic on a colour, and a CSS variable
+   * cannot be multiplied. Read from the frame itself, so a surface inside
+   * `.lg-tokens` gets the tokens it is drawn among, and read again when the
+   * theme changes. Absent on the server.
+   */
+  palette?: Palette;
 }
+
+/** The colours a surface may mix, resolved: `rgb(…)` or `#rrggbb`. */
+export interface Palette {
+  primary: string;
+  accent: string;
+  tension: string;
+  ink: string;
+  paper: string;
+}
+
+export const DEFAULT_PALETTE: Palette = { primary: '#354620', accent: '#264653', tension: '#9c5b3c', ink: '#23241f', paper: '#faf8f2' };
 
 export interface SurfaceRender {
   /** everything inside the <svg> */
@@ -202,6 +224,19 @@ export interface Surface3DProps {
   time?: number;
   /** what the model says about itself that the picture's own captions do not — placeholders, assumed ranges, what is not estimated */
   notes?: string[];
+  /** a line under the title: what kind of thing this is */
+  subtitle?: string;
+  /** at the right of the header, before the selection: the host's own controls — a model's views */
+  headExtra?: ReactNode;
+  /** the side panel's first section, before the controls — what is selected */
+  asideTop?: ReactNode;
+  /** the side panel's own sections, after the controls — a model's results and its account */
+  aside?: ReactNode;
+  /**
+   * Whether dragging turns it and the wheel zooms it. A flat figure is neither,
+   * so it is not offered the hint or the camera's tools.
+   */
+  turnable?: boolean;
 }
 
 // THE VIEWBOX IS THE PIXEL BOX, 1:1, and that is not a detail.
@@ -235,6 +270,11 @@ export function Surface3D({
   onSelect,
   time: timeProp,
   notes = [],
+  subtitle,
+  headExtra,
+  asideTop,
+  aside,
+  turnable = true,
   onOps,
   onRead,
   ops = null,
@@ -302,6 +342,13 @@ export function Surface3D({
 
   const stage = useRef<HTMLDivElement>(null);
   const shell = useRef<HTMLDivElement>(null);
+  // ── two fingers: a pinch is the zoom a phone has, where there is no wheel ──
+  const fingers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d0: number; dist0: number } | null>(null);
+  const spread2 = () => {
+    const [p, q] = [...fingers.current.values()];
+    return Math.hypot(p.x - q.x, p.y - q.y) || 1;
+  };
   const orbit = useRef<{
     x: number;
     y: number;
@@ -315,7 +362,7 @@ export function Surface3D({
   const [box, setBox] = useState({ w: 600, h: 320 });
 
   // ── the stage's true size, so the viewBox keeps its aspect ──
-  useLayoutEffect(() => {
+  useBeforePaint(() => {
     const el = stage.current;
     if (!el) return;
     const read = () => {
@@ -331,6 +378,36 @@ export function Surface3D({
     ro.observe(el);
     return () => ro.disconnect();
   }, [full, tall]);
+
+  // ── the theme's colours, for a surface that mixes its own ──
+  // Read off the frame, where the tokens it is drawn among are in force, and
+  // again whenever the theme changes. Only a change is a new state, so a
+  // render that reads the same colours is not made twice.
+  const [palette, setPalette] = useState<Palette>(DEFAULT_PALETTE);
+  useBeforePaint(() => {
+    const el = shell.current;
+    if (!el || typeof getComputedStyle !== 'function') return;
+    const read = () => {
+      const cs = getComputedStyle(el);
+      const v = (name: string, fb: string) => cs.getPropertyValue(name).trim() || fb;
+      const next: Palette = {
+        primary: v('--lg-primary', DEFAULT_PALETTE.primary),
+        accent: v('--lg-accent', DEFAULT_PALETTE.accent),
+        tension: v('--lg-tension', DEFAULT_PALETTE.tension),
+        ink: v('--lg-ink', DEFAULT_PALETTE.ink),
+        paper: v('--lg-paper', v('--lg-panel', DEFAULT_PALETTE.paper)),
+      };
+      setPalette((p) => ((Object.keys(next) as (keyof Palette)[]).every((k) => p[k] === next[k]) ? p : next));
+    };
+    read();
+    if (typeof MutationObserver === 'undefined') return;
+    const watch = new MutationObserver(read);
+    watch.observe(document.documentElement, { attributes: true, attributeFilter: ['data-theme'] });
+    return () => watch.disconnect();
+  }, []);
+
+  // ── how to hold it, said once: until the first turn or zoom ──
+  const [handled, setHandled] = useState(false);
 
   // ── the clock ──
   // Stopped under reduced motion, not merely slowed: a surface that keeps
@@ -393,6 +470,14 @@ export function Surface3D({
       // click event arrives its target is the stage div and the mark under
       // the finger is gone. Pointerdown is the one event that still knows.
       const hit = (e.target as Element | null)?.closest?.('[data-obj]') ?? null;
+      setHandled(true);
+      fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+      if (turnable && fingers.current.size === 2) {
+        // the second finger down: what follows is a pinch, not a turn and not a pick
+        pinch.current = { d0: spread2(), dist0: cam.dist };
+        orbit.current = null;
+        return;
+      }
       orbit.current = {
         x: e.clientX,
         y: e.clientY,
@@ -407,13 +492,22 @@ export function Surface3D({
         /* a pointer that cannot be captured still drags; it just may escape */
       }
     },
-    [cam.yaw, cam.pitch]
+    [cam.yaw, cam.pitch, cam.dist, turnable]
   );
   const move = useCallback((e: React.PointerEvent) => {
+    if (fingers.current.has(e.pointerId)) fingers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const pz = pinch.current;
+    if (pz && fingers.current.size >= 2) {
+      const k = pz.d0 / spread2();
+      setCam((c) => ({ ...c, dist: Math.min(distRange[1], Math.max(distRange[0], pz.dist0 * k)) }));
+      return;
+    }
     const d = orbit.current;
     if (!d) return;
     // How far this press has travelled, so a turn is not also a selection.
     d.moved = Math.max(d.moved, Math.hypot(e.clientX - d.x, e.clientY - d.y));
+    // a flat figure is not turned: the press is only ever a pick
+    if (!turnable) return;
     setCam((c) => ({
       ...c,
       yaw: d.yaw + (e.clientX - d.x) * 0.008,
@@ -421,14 +515,21 @@ export function Surface3D({
       // object vanishes, which reads as a bug however correct it is.
       pitch: Math.min(1.45, Math.max(-1.45, d.pitch - (e.clientY - d.y) * 0.006)),
     }));
-  }, []);
+  }, [distRange, turnable]);
   // ── letting go: a press that did not travel is a click on a thing ──
   //
   // Every surface tags its marks with `data-obj="<entity id>"`, so this is the
   // whole of the picking logic and it is the same for all of them. A press
   // that turned the camera is not a selection, and a press on empty paper
   // clears it, which is what empty paper should do.
-  const up = useCallback(() => {
+  const up = useCallback((e: React.PointerEvent) => {
+    fingers.current.delete(e.pointerId);
+    if (pinch.current) {
+      // a pinch ends when it is down to one finger, and that finger turns nothing until it is lifted
+      if (fingers.current.size < 2) pinch.current = null;
+      orbit.current = null;
+      return;
+    }
     const d = orbit.current;
     orbit.current = null;
     if (!d || d.moved > 4) return;
@@ -449,6 +550,7 @@ export function Surface3D({
       // nothing to look at.
       if ((e.target as Element | null)?.closest?.('.eng-read-html')) return;
       e.preventDefault();
+      setHandled(true);
       setCam((c) => ({
         ...c,
         dist: Math.min(distRange[1], Math.max(distRange[0], c.dist * (e.deltaY > 0 ? 1.09 : 0.917))),
@@ -499,6 +601,13 @@ export function Surface3D({
     sizing.current = null;
   }, []);
 
+  /** the camera's own tools: a nudge in or out, and the view it started with */
+  const zoomBy = useCallback(
+    (k: number) => setCam((c) => ({ ...c, dist: Math.min(distRange[1], Math.max(distRange[0], c.dist * k)) })),
+    [distRange]
+  );
+  const resetView = useCallback(() => setCam(initialCam), [initialCam]);
+
   const reset = useCallback(() => {
     setVals(initial);
     setCam(initialCam);
@@ -548,8 +657,8 @@ export function Surface3D({
   const W = Math.max(140, Math.round(box.w));
   const H = Math.max(90, Math.round(box.h));
   const out = useMemo(
-    () => render({ W, H, cam, t, vals, layers: on }),
-    [render, W, H, cam, t, vals, on]
+    () => render({ W, H, cam, t, vals, layers: on, palette }),
+    [render, W, H, cam, t, vals, on, palette]
   );
   const active = groups.find((g) => g.id === group) ?? groups[0];
   const sel = selected ? entities.find((e) => e.id === selected) ?? null : null;
@@ -629,15 +738,29 @@ export function Surface3D({
     return () => onRead?.(null);
   }, [onRead, read]);
 
+  const ctls = active?.ctls ?? [];
+  const hasCtls = groups.some((g) => g.ctls.length > 0);
+  // the share of its range a control is at, for the filled part of its track
+  const share = (c: SurfaceCtl, v: number) => `${Math.round(Math.min(1, Math.max(0, (v - c.min) / (c.max - c.min || 1))) * 1000) / 10}%`;
+
   return (
     <div
       ref={shell}
-      className={`sfx${full ? ' is-full' : ''}${fill ? ' is-fill' : ''}`}
+      className={`sfx${full ? ' is-full' : ''}${fill ? ' is-fill' : ''}${turnable ? ' is-turnable' : ''}`}
       style={full || fill ? undefined : ({ ['--sfx-h' as string]: `${tall}px` })}
     >
+      {/* ── THE HEADER: what this is, and the ways of looking at it ── */}
       <div className="sfx-head">
-        <span className="sfx-title">{title}</span>
+        <div className="sfx-titles">
+          <h3 className="sfx-title">{title}</h3>
+          {subtitle && (
+            <p className="sfx-sub" title={subtitle}>
+              {subtitle}
+            </p>
+          )}
+        </div>
         <span className="sfx-head-r">
+          {headExtra}
           {/* What "this" means, if they have clicked something. Said out loud
               rather than left as a highlight, because a highlight tells you
               something is selected and not what it is — and the whole point of
@@ -653,152 +776,226 @@ export function Surface3D({
               <i aria-hidden="true">×</i>
             </button>
           )}
-          <button type="button" className="sfx-icon" onClick={toggleFull} aria-pressed={full}>
-            {full ? 'Exit full screen' : 'Full screen'}
-          </button>
         </span>
       </div>
       <p className="sfx-live" aria-live="polite">
         {sel ? `Selected: ${sel.label}. ${sel.meaning}` : ''}
       </p>
 
-      <div
-        ref={stage}
-        className="sfx-stage"
-        onPointerDown={down}
-        onPointerMove={move}
-        onPointerUp={up}
-        onPointerCancel={up}
-        onKeyDown={onKey}
-        tabIndex={0}
-        role="img"
-        aria-label={out.label}
-      >
-        <svg
-          viewBox={`0 0 ${W} ${H}`}
-          preserveAspectRatio="xMidYMid meet"
-          className="sfx-svg"
-          // The selection is marked in one attribute and drawn by one CSS rule
-          // (`[data-sel="x"] [data-obj="x"]`), so no surface has to know that
-          // selection exists — it only has to say what its marks are.
-          data-sel={selected ?? undefined}
-        >
-          {/* WHY A STYLE TAG AND NOT A CLASS. CSS cannot say "the mark whose
-              id matches the one on the svg" — it has no way to compare two
-              attributes — and the alternative is for the frame to reach into
-              every surface's rendered nodes and add a class, which would make
-              selection something each surface has to know about. One rule,
-              written for the id that is actually selected, keeps it the
-              frame's business alone. The id comes from this surface's own
-              entity list and is checked against it, so there is nothing here
-              a page could inject into. */}
-          {selected && /^[\w-]+$/.test(selected) && (
-            <style>{`.sfx-svg[data-sel="${selected}"] [data-obj]:not([data-obj="${selected}"]){opacity:.42}`}</style>
-          )}
-          {out.content}
-          {out.left && (
-            <text className="sfx-l evidence" x="8" y={H - 7}>
-              {out.left}
-            </text>
-          )}
-          {out.right && (
-            <text className="sfx-l" x={W - 8} y={H - 7} textAnchor="end">
-              {out.right}
-            </text>
-          )}
-        </svg>
-      </div>
-
-      <div
-        className="sfx-grip"
-        onPointerDown={sizeDown}
-        onPointerMove={sizeMove}
-        onPointerUp={sizeUp}
-        onPointerCancel={sizeUp}
-        role="separator"
-        aria-label="Drag to resize, or use the arrow keys"
-        aria-orientation="horizontal"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          const s = e.shiftKey ? 80 : 24;
-          if (e.key === 'ArrowUp') setTall((h) => Math.max(240, h - s));
-          else if (e.key === 'ArrowDown') setTall((h) => Math.min(1400, h + s));
-          else return;
-          e.preventDefault();
-        }}
-      >
-        <i />
-      </div>
-
-      <div className="sfx-foot">
-        <div className="sfx-bar">
-          <span className="sfx-seg">
-            {animated && (
-              <button type="button" aria-pressed={playing} onClick={() => setPlaying((p) => !p)}>
-                {playing ? 'Pause' : 'Play'}
-              </button>
-            )}
-            {animated && (
-              <button type="button" onClick={() => setT(0)}>
-                Restart
-              </button>
-            )}
-            <button type="button" onClick={reset}>
-              Reset all
-            </button>
-          </span>
-          {animated && <span className="sfx-clock">{t.toFixed(1)} s</span>}
-        </div>
-
-        {groups.length > 1 && (
-          <div className="sfx-groups" role="tablist" aria-label="Control group">
-            {groups.map((g) => (
-              <button
-                key={g.id}
-                type="button"
-                role="tab"
-                aria-selected={active?.id === g.id}
-                onClick={() => setGroup(g.id)}
-              >
-                {g.label}
-              </button>
-            ))}
+      <div className="sfx-body">
+        {/* ── THE FIGURE: the picture, and the camera's own tools over it ── */}
+        <div className="sfx-figure">
+          <div
+            ref={stage}
+            className="sfx-stage"
+            onPointerDown={down}
+            onPointerMove={move}
+            onPointerUp={up}
+            onPointerCancel={up}
+            onKeyDown={onKey}
+            tabIndex={0}
+            role="img"
+            aria-label={out.label}
+          >
+            <svg
+              viewBox={`0 0 ${W} ${H}`}
+              preserveAspectRatio="xMidYMid meet"
+              className="sfx-svg"
+              // The selection is marked in one attribute and drawn by one CSS rule
+              // (`[data-sel="x"] [data-obj="x"]`), so no surface has to know that
+              // selection exists — it only has to say what its marks are.
+              data-sel={selected ?? undefined}
+            >
+              {/* WHY A STYLE TAG AND NOT A CLASS. CSS cannot say "the mark whose
+                  id matches the one on the svg" — it has no way to compare two
+                  attributes — and the alternative is for the frame to reach into
+                  every surface's rendered nodes and add a class, which would make
+                  selection something each surface has to know about. One rule,
+                  written for the id that is actually selected, keeps it the
+                  frame's business alone. The id comes from this surface's own
+                  entity list and is checked against it, so there is nothing here
+                  a page could inject into. */}
+              {selected && /^[\w-]+$/.test(selected) && (
+                <style>{`.sfx-svg[data-sel="${selected}"] [data-obj]:not([data-obj="${selected}"]){opacity:.42}`}</style>
+              )}
+              {out.content}
+            </svg>
           </div>
-        )}
-
-        <div className="sfx-ctls">
-          {active?.ctls.map((c) => (
-            <label key={c.id} className="sfx-ctl" title={c.help}>
-              <span className="k">{c.label}</span>
-              <input
-                type="range"
-                min={c.min}
-                max={c.max}
-                step={c.step}
-                value={vals[c.id] ?? initial[c.id] ?? c.min}
-                onChange={(e) => setVals((v) => ({ ...v, [c.id]: +e.target.value }))}
-              />
-              <span className="v">{c.read(vals[c.id] ?? initial[c.id] ?? c.min)}</span>
-            </label>
-          ))}
-          {layers.length > 0 && active?.id === groups[groups.length - 1]?.id && (
-            <div className="sfx-layers">
-              {layers.map((l) => (
-                <button
-                  key={l.id}
-                  type="button"
-                  aria-pressed={!!on[l.id]}
-                  onClick={() => setOn((o) => ({ ...o, [l.id]: !o[l.id] }))}
-                >
-                  {l.label}
-                </button>
-              ))}
-            </div>
+          {turnable && !handled && (
+            <p className="sfx-hint" aria-hidden="true">
+              <span className="sfx-hint-fine">Drag to turn · scroll to zoom</span>
+              <span className="sfx-hint-touch">Drag to turn · pinch to zoom</span>
+            </p>
           )}
+          {/* under the picture rather than over it: the readouts, and the camera's tools */}
+          <div className="sfx-bar">
+            {(out.left || out.right) && (
+              <div className="sfx-caps" aria-hidden="true">
+                {out.left && <span className="sfx-cap">{out.left}</span>}
+                {out.right && <span className="sfx-cap">{out.right}</span>}
+              </div>
+            )}
+            <div className="sfx-tools" role="toolbar" aria-label="The view">
+              {turnable && (
+                <>
+                  <button type="button" className="sfx-tool" onClick={resetView} aria-label="Put the view back" title="Put the view back">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M4.5 9a5.6 5.6 0 1 1 1.6 4.3" />
+                      <path d="M3.6 4.8v4.6h4.6" />
+                    </svg>
+                  </button>
+                  <button type="button" className="sfx-tool" onClick={() => zoomBy(1.18)} aria-label="Zoom out" title="Zoom out (−)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M5 10h10" />
+                    </svg>
+                  </button>
+                  <button type="button" className="sfx-tool" onClick={() => zoomBy(0.85)} aria-label="Zoom in" title="Zoom in (+)">
+                    <svg viewBox="0 0 20 20" aria-hidden="true">
+                      <path d="M5 10h10M10 5v10" />
+                    </svg>
+                  </button>
+                </>
+              )}
+              <button
+                type="button"
+                className="sfx-tool"
+                onClick={toggleFull}
+                aria-pressed={full}
+                aria-label={full ? 'Exit full screen' : 'Full screen'}
+                title={full ? 'Exit full screen (f)' : 'Full screen (f)'}
+              >
+                <svg viewBox="0 0 20 20" aria-hidden="true">
+                  {full ? <path d="M8 3.5V8H3.5M12 3.5V8h4.5M8 16.5V12H3.5M12 16.5V12h4.5" /> : <path d="M3.5 7.5v-4h4M12.5 3.5h4v4M16.5 12.5v4h-4M7.5 16.5h-4v-4" />}
+                </svg>
+              </button>
+            </div>
+          </div>
         </div>
 
-        <p className="sfx-note">{out.note}</p>
+        {/* ── THE SIDE: what can be moved, what can be shown, and what it all is ── */}
+        <aside className="sfx-aside" aria-label="Controls">
+          {asideTop}
+
+          {hasCtls && (
+            <section className="sfx-sec sfx-adjust">
+              <div className="sfx-sec-h">
+                <span className="sfx-sec-k">Adjust</span>
+                <button type="button" className="sfx-reset" onClick={reset} title="Every control, the view and the clock back to where they started">
+                  Reset all
+                </button>
+              </div>
+              {groups.length > 1 && (
+                <div className="sfx-groups" role="tablist" aria-label="Control group">
+                  {groups.map((g) => (
+                    <button
+                      key={g.id}
+                      type="button"
+                      role="tab"
+                      aria-selected={active?.id === g.id}
+                      onClick={() => setGroup(g.id)}
+                    >
+                      {g.label}
+                    </button>
+                  ))}
+                </div>
+              )}
+              <div className="sfx-ctls">
+                {ctls.map((c) => {
+                  const v = vals[c.id] ?? initial[c.id] ?? c.min;
+                  return (
+                    <label key={c.id} className="sfx-ctl" title={c.help}>
+                      <span className="sfx-ctl-row">
+                        <span className="k">{c.label}</span>
+                        <span className="v">{c.read(v)}</span>
+                      </span>
+                      <input
+                        type="range"
+                        min={c.min}
+                        max={c.max}
+                        step={c.step}
+                        value={v}
+                        style={{ ['--p' as string]: share(c, v) }}
+                        onChange={(e) => setVals((x) => ({ ...x, [c.id]: +e.target.value }))}
+                      />
+                      {c.help && <span className="sfx-ctl-help">{c.help}</span>}
+                    </label>
+                  );
+                })}
+              </div>
+            </section>
+          )}
+
+          {layers.length > 0 && (
+            <section className="sfx-sec">
+              <div className="sfx-sec-h">
+                <span className="sfx-sec-k">Show</span>
+              </div>
+              <div className="sfx-layers">
+                {layers.map((l) => (
+                  <button
+                    key={l.id}
+                    type="button"
+                    aria-pressed={!!on[l.id]}
+                    onClick={() => setOn((o) => ({ ...o, [l.id]: !o[l.id] }))}
+                  >
+                    <i aria-hidden="true" />
+                    {l.label}
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {animated && (
+            <section className="sfx-sec sfx-transport">
+              <div className="sfx-seg">
+                <button type="button" className="sfx-pp" aria-pressed={playing} onClick={() => setPlaying((p) => !p)} aria-label={playing ? 'Pause' : 'Play'}>
+                  <svg viewBox="0 0 20 20" aria-hidden="true">
+                    {playing ? <path d="M7 5v10M13 5v10" /> : <path d="M7 4.8l8.2 5.2L7 15.2z" />}
+                  </svg>
+                  <span>{playing ? 'Pause' : 'Play'}</span>
+                </button>
+                <button type="button" onClick={() => setT(0)}>
+                  Restart
+                </button>
+                {!hasCtls && (
+                  <button type="button" onClick={reset}>
+                    Reset all
+                  </button>
+                )}
+              </div>
+              <span className="sfx-clock">t = {t.toFixed(1)} s</span>
+            </section>
+          )}
+
+          {aside}
+
+          {out.note && <p className="sfx-note">{out.note}</p>}
+        </aside>
       </div>
+
+      {!fill && (
+        <div
+          className="sfx-grip"
+          onPointerDown={sizeDown}
+          onPointerMove={sizeMove}
+          onPointerUp={sizeUp}
+          onPointerCancel={sizeUp}
+          role="separator"
+          aria-label="Drag to resize, or use the arrow keys"
+          aria-orientation="horizontal"
+          tabIndex={0}
+          onKeyDown={(e) => {
+            const s = e.shiftKey ? 80 : 24;
+            if (e.key === 'ArrowUp') setTall((h) => Math.max(240, h - s));
+            else if (e.key === 'ArrowDown') setTall((h) => Math.min(1400, h + s));
+            else return;
+            e.preventDefault();
+          }}
+        >
+          <i />
+        </div>
+      )}
     </div>
   );
 }

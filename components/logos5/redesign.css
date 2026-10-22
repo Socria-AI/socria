@@ -290,6 +290,26 @@
   display: none;
 }
 
+/* A MODEL ON THE LOGIC MAP: its header leaves the floating bar its corner,
+   and while the composer floats it has a band of its own under the model —
+   nothing of the model, its controls or its views is ever under either.
+   (components/surfaces/Surface3D.tsx is the frame; --ws-top-w is measured by
+   components/workspace/Workspace.tsx.) */
+.logos-root .l5 .l5x-canvas.is-logic .sfx-head {
+  padding-right: calc(var(--ws-top-w, 140px) + 28px);
+}
+@container sfx (max-width: 520px) {
+  .logos-root .l5 .l5x-canvas.is-logic .sfx-head {
+    padding-right: 14px;
+  }
+  .logos-root .l5 .l5x-canvas.is-logic .sfx-titles {
+    padding-right: calc(var(--ws-top-w, 140px) + 10px);
+  }
+}
+.logos-root .l5 .l5x-canvas.is-logic :is(.lg-viz-surface, .ws-model) {
+  padding-bottom: var(--omni);
+}
+
 /* the conversation, unfolded */
 .logos-root .l5 .l5x-convo {
   flex: 0 0 460px;
@@ -1182,7 +1202,8 @@
     flex-direction: column;
   }
   .logos-root .l5 .l5x.is-narrow .l5x-canvas {
-    padding-bottom: 150px;
+    /* the folded sheet's measured height (components/LogosApp.tsx) */
+    padding-bottom: var(--sheet, 150px);
   }
   .logos-root .l5 .l5x-sheet {
     position: absolute;
