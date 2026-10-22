@@ -1,0 +1,94 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<title>Logos 5 Memory boards</title>
+<link rel="stylesheet" href="memory.css">
+<style>
+  body { background: #e9e5d9; margin: 0; }
+  .board { display: inline-block; padding: 56px 60px 60px; background: #efebdf; }
+  .board h1 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 46px; line-height: 1; letter-spacing: -0.01em; color: var(--ink); }
+  .board .lede { margin: 10px 0 0; font-size: 15px; color: var(--ink-60); max-width: 980px; }
+  .grid { display: grid; gap: 34px 36px; margin-top: 34px; }
+  .grid.desk { grid-template-columns: repeat(2, 720px); }
+  .grid.phone { grid-template-columns: repeat(5, 300px); gap: 30px; }
+  figure { margin: 0; }
+  .shot { display: block; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 18px 44px -24px rgba(35, 36, 31, 0.38); background: var(--paper); }
+  .desk .shot img { display: block; width: 720px; height: 450px; }
+  .phone .shot { border-radius: 30px; border: 6px solid #23241f; }
+  .phone .shot img { display: block; width: 288px; height: 623px; }
+  figcaption { margin-top: 14px; display: grid; grid-template-columns: 28px 1fr; gap: 0 10px; }
+  figcaption .n { grid-column: 1; grid-row: 1 / span 2; width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; font-weight: 600; color: var(--paper); background: var(--primary); }
+  figcaption b { grid-column: 2; display: block; font-family: var(--serif); font-weight: 400; font-size: 21px; line-height: 1.15; color: var(--ink); padding-top: 1px; }
+  figcaption span:not(.n) { grid-column: 2; font-size: 13px; line-height: 1.45; color: var(--ink-60); margin-top: 3px; }
+  .key { border-radius: 12px; border: 1px solid var(--hair); background: rgba(255, 253, 248, 0.6); padding: 26px 28px; display: flex; flex-direction: column; gap: 14px; }
+  .key h2 { margin: 0; font-family: var(--serif); font-weight: 400; font-size: 24px; }
+  .key ul { list-style: none; margin: 0; padding: 0; display: grid; grid-template-columns: 1fr 1fr; gap: 12px 24px; }
+  .key li { display: grid; grid-template-columns: 22px 1fr; gap: 10px; align-items: start; font-size: 13px; color: var(--ink-80); }
+  .key li svg { width: 20px; height: 20px; overflow: visible; }
+  .key li b { display: block; font-weight: 600; color: var(--ink); }
+  .key p { margin: 0; font-size: 12.5px; color: var(--ink-45); line-height: 1.5; }
+</style>
+</head>
+<body>
+<script>
+  const device = new URLSearchParams(location.search).get('device') || 'desktop';
+  const STATES = [
+    ['1-overview', 'Overview', 'Eight regions with fixed homes, Identity at the centre. Every line is a relationship Socria actually holds.'],
+    ['2-expanded-cluster', 'An open region', 'Projects & Work opens in place. The other regions stay at the edges, in the direction they lie, showing only what connects here.'],
+    ['3-selected-memory', 'A selected memory', 'Its relationships light up. The inspector says what it is, why Socria keeps it, what it connects to, and how it changed.'],
+    ['4-changes', 'Changes', 'How memory evolved, newest first — each change shows where it came from and what it reached.'],
+    ['5-review', 'Review', 'Proposed updates and a possible contradiction, each decided in one tap. Nothing settles until you say so.'],
+  ];
+  const PHONE = {
+    '1-overview': 'Regions first: names, counts and what needs review. Pinch to zoom into memories.',
+    '2-expanded-cluster': 'The region full-screen above a searchable list — the fallback for large collections.',
+    '3-selected-memory': 'Tap a memory: its links light up and a bottom sheet holds the inspector.',
+    '4-changes': 'The same history, one card per change, thumb-sized.',
+    '5-review': 'Decide contradictions and proposed changes with large, plain buttons.',
+  };
+  const G = {
+    confirmed: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="#fffdf8" stroke="#354620" stroke-width="1.6"/><circle cx="8" cy="8" r="2.6" fill="rgba(53,70,32,.55)"/></svg>',
+    proposed: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="5.6" fill="#fffdf8" stroke="#354620" stroke-width="1.6" stroke-dasharray="2.6 2.1"/><circle cx="8" cy="8" r="2.6" fill="rgba(53,70,32,.4)"/></svg>',
+    recent: '<svg viewBox="0 0 16 16"><circle cx="8" cy="8" r="7.6" fill="none" stroke="rgba(184,162,107,.75)" stroke-width="2"/><circle cx="8" cy="8" r="4.2" fill="#fffdf8" stroke="#354620" stroke-width="1.4"/><circle cx="8" cy="8" r="1.8" fill="rgba(53,70,32,.55)"/></svg>',
+    warn: '<svg viewBox="0 0 16 16"><path d="M8 1.8l6.6 11.6H1.4z" fill="#9c5b3c"/><path d="M8 6.2v3.4M8 11.3v.2" stroke="#fffdf8" stroke-width="1.5" stroke-linecap="round"/></svg>',
+    older: '<svg viewBox="0 0 16 16" style="opacity:.42"><circle cx="8" cy="8" r="5.6" fill="#fffdf8" stroke="#354620" stroke-width="1.6"/><circle cx="8" cy="8" r="2.6" fill="rgba(53,70,32,.5)"/></svg>',
+    pin: '<svg viewBox="0 0 16 16"><path d="M8 9.6v5" stroke="#8a7230" stroke-width="1.5" stroke-linecap="round"/><circle cx="8" cy="5.8" r="4" fill="#b8a26b" stroke="#8a7230" stroke-width="1.2"/></svg>',
+  };
+  const fig = (file, i, title, text, dir) => `<figure><div class="shot"><img src="../${dir}/${file}.png" alt="${title}"></div>
+    <figcaption><span class="n">${i + 1}</span><b>${title}</b><span>${text}</span></figcaption></figure>`;
+  let html;
+  if (device === 'desktop') {
+    html = `<div class="board">
+      <h1>Logos 5 · Memory</h1>
+      <p class="lede">A living memory network for desktop (1440 × 900). Regions sit like the lobes of one mind; memories are neurons; relationships are the fibres between them. Illustrative data for one person, Alex Rivera.</p>
+      <div class="grid desk">
+        ${STATES.map(([f, t, d], i) => fig(f, i, t, d, 'desktop')).join('')}
+        <div class="key">
+          <h2>How a memory shows its state</h2>
+          <ul>
+            <li>${G.confirmed}<span><b>Solid outline</b>Confirmed</span></li>
+            <li>${G.proposed}<span><b>Dashed outline</b>Proposed — waiting for you</span></li>
+            <li>${G.recent}<span><b>Soft gold ring</b>Updated this week</span></li>
+            <li>${G.warn}<span><b>Triangle</b>Possible contradiction</span></li>
+            <li>${G.older}<span><b>Faded</b>Older, or replaced</span></li>
+            <li>${G.pin}<span><b>Pin</b>Important</span></li>
+          </ul>
+          <p>Every mark has a shape and a word as well as a colour. A gold pulse runs once along the relationships a change reaches; with reduced motion it is a still highlight.</p>
+        </div>
+      </div>
+    </div>`;
+  } else {
+    html = `<div class="board">
+      <h1>Logos 5 · Memory on a phone</h1>
+      <p class="lede">Designed for the hand, not shrunk from the desktop (390 × 844): regions before memories, a full-screen network, a bottom-sheet inspector and a searchable list.</p>
+      <div class="grid phone">
+        ${STATES.map(([f, t], i) => fig(f, i, t, PHONE[f], 'mobile')).join('')}
+      </div>
+    </div>`;
+  }
+  document.body.innerHTML = html;
+  Promise.all([document.fonts.ready, ...[...document.images].map((im) => im.decode().catch(() => null))]).then(() => document.body.setAttribute('data-ready', '1'));
+</script>
+</body>
+</html>
