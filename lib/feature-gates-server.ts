@@ -16,7 +16,8 @@ import { normalizeCode, type GateId } from './feature-gates';
  * to the people let in early, and this repository is public — so the code is
  * not written here, only the SHA-256 of it as compared (normalizeCode: upper
  * case, no spaces). Whoever types it matches the fingerprint; nobody reads the
- * code off it. NEW_SOCRIA_ACCESS_CODE replaces it without a deploy.
+ * code off it. NEW_SOCRIA_ACCESS_CODE replaces it without a code change (on
+ * Vercel, from the next deployment).
  */
 const NEW_SOCRIA_FINGERPRINT = '8e4cbc698ab2557bab0fb8c97170c6d380f70db8cb698c3892a071d972fc2355';
 

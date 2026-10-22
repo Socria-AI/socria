@@ -573,7 +573,7 @@ account so it follows them to another device. Everybody else gets exactly what
 `NEXT_PUBLIC_LOGOS5=off` gives, and is called Logos 4. The code is handed out
 and the repository is public, so the server keeps only its fingerprint
 (`lib/feature-gates-server.ts`); `NEW_SOCRIA_ACCESS_CODE` replaces it without a
-deploy. Behind the gate: the screen, opening on the Universal Map, a first
+code change (on Vercel, from the next deployment). Behind the gate: the screen, opening on the Universal Map, a first
 message put in its box, the Core chats brought in, "We killed the chatbot." on
 either surface, and the moment the record says the new Socria opened. A gate
 decides a screen, not access to the engine: every route behind it is the Logos
