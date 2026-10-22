@@ -15,6 +15,12 @@
 // idea both come back to. On Today, a subject worked on lately but not today
 // is folded to its name and a few dots; pressed, it opens.
 //
+// The person's own Projects are always on the map, whichever lens: a Project
+// with conversations here is a circle like a subject's (drawn as theirs, in its
+// own colour); one with nothing here is folded to its name and how many it
+// holds, pressed to open; an empty one waits to be dragged into. Room is kept
+// at the end for a new one.
+//
 // Every position is computed here, deterministically — no randomness, no
 // clock (the time is passed in) — so the same conversations draw the same
 // map on every screen.
@@ -60,6 +66,10 @@ export interface BubbleIn {
   size?: SizeBy;
   /** the ideas two subjects share drawn between them (the default); the person's own links always are */
   ideaLinks?: boolean;
+  /** every conversation shown, whatever the lens: for how many a Project holds, and its newest when opened (default: tiles) */
+  all?: readonly Tile[];
+  /** room kept for a new Project, at the end of the folded row */
+  canMake?: boolean;
 }
 
 export interface BubbleHub {
@@ -125,8 +135,10 @@ export interface BubbleCluster {
   pips: { x: number; y: number; r: number }[];
   /** how many conversations it has here (folded: how many it would open to) */
   count: number;
-  /** on Today, one of the subjects not worked on today */
+  /** not what this lens is about — a subject worked on lately but not today, or a Project with nothing here — so its opening is not kept */
   far: boolean;
+  /** a Project with nothing in it yet: there to be dragged into */
+  empty: boolean;
   /** shown in a Project for their subject, not filed in it */
   suggested: string[];
   /** what is drawn in it */
@@ -175,6 +187,8 @@ export interface BubbleLayout {
   links: BubbleLink[];
   /** the card over the link that matters most; null when nothing joins two subjects */
   card: BubbleCard | null;
+  /** where a new Project is made, at the end of the folded row; null when there is no room asked for */
+  make: Box | null;
   /** every conversation drawn: where, how big, which subject */
   byId: Map<string, { x: number; y: number; r: number; g: string; hub: boolean }>;
   bounds: Box;
@@ -222,6 +236,13 @@ const FAR_MAX = 3;
 const FAR_DAYS = 21;
 /** a folded subject's dots under its name */
 const PIPS = 3;
+/** between two folded ones, and from one row of them to the next */
+const FOLD_GAP = 56;
+const FOLD_ROW = 84;
+/** an empty Project: its name, and "Empty — drag one here" under it */
+const EMPTY_W = 172;
+/** "+ New project" */
+export const MAKE_W = 150;
 /** a folded subject opened on Today shows its newest few */
 const OPENED_MAX = 8;
 /** on Today, round each subject drawn, its quick questions of lately: this many at most */
@@ -587,7 +608,11 @@ interface Group {
   count: number;
 }
 
-/** What each lens draws, subject by subject: Today, the day and what it builds on, and a few folded; This week, the week. */
+/**
+ * What each lens draws, subject by subject: Today, the day and what it builds
+ * on, and a few subjects folded; This week, the week — and, either way, every
+ * Project of the person's, folded when it has nothing here.
+ */
 function groupsOf(input: BubbleIn): { groups: Group[]; today?: BubbleLayout['today'] } {
   const { tiles, homes, now } = input;
   const homeOf = (id: string): Home => homes.of.get(id) ?? homes.list.find((h) => h.key === OTHER) ?? { key: OTHER, kind: 'other', name: 'Everything else', color: null, projectId: null, subject: null, archived: false };
@@ -599,12 +624,28 @@ function groupsOf(input: BubbleIn): { groups: Group[]; today?: BubbleLayout['tod
     g.count = g.members.length;
     groups.set(home.key, g);
   };
+  const newestFirst = (a: Tile, b: Tile) => b.at - a.at || byId(a, b);
+  /** one not otherwise drawn here: folded, saying how many it holds — or, opened by the person, its newest few */
+  const elsewhere = (home: Home, list: readonly Tile[]): Group => {
+    const mine = [...list].sort(newestFirst);
+    const open = !!input.opened?.has(home.key) && mine.length > 0;
+    const g: Group = { home, members: [], folded: !open, far: true, count: mine.length };
+    for (const t of mine.slice(0, open ? OPENED_MAX : PIPS + 2)) g.members.push({ tile: t, hub: isHub(t), focus: false, halo: false });
+    if (open && !g.members.some((m) => m.hub)) g.members[0].hub = true;
+    return g;
+  };
+  /** every Project of the person's not drawn already — an empty one too — in their order */
+  const projectsAway = (): Group[] => {
+    const pool = input.all ?? tiles;
+    return homes.list.filter((h) => h.kind === 'project' && !h.archived && !groups.has(h.key)).map((h) => elsewhere(h, pool.filter((t) => homeOf(t.id).key === h.key)));
+  };
 
   if (input.lens === 'week') {
     const haloId = input.resumeId && tiles.some((t) => t.id === input.resumeId) ? input.resumeId : null;
-    for (const t of [...tiles].sort((a, b) => b.at - a.at || byId(a, b))) add(t, false, t.id === haloId, isHub(t) || t.id === haloId);
+    for (const t of [...tiles].sort(newestFirst)) add(t, false, t.id === haloId, isHub(t) || t.id === haloId);
     for (const g of groups.values()) g.folded = !!input.folded?.has(g.home.key);
-    return { groups: order([...groups.values()]) };
+    const away = projectsAway();
+    return { groups: [...order([...groups.values()]), ...away] };
   }
 
   const plan = todayOf(tiles, homes, input.ideas, now, input.links);
@@ -626,29 +667,22 @@ function groupsOf(input: BubbleIn): { groups: Group[]; today?: BubbleLayout['tod
   // a subject of the day's with no session in it: its newest of the day is one
   for (const g of groups.values())
     if (!g.members.some((m) => m.hub)) {
-      const first = g.members.filter((m) => day.has(m.tile.id)).sort((a, b) => b.tile.at - a.tile.at || byId(a.tile, b.tile))[0];
+      const first = g.members.filter((m) => day.has(m.tile.id)).sort((a, b) => newestFirst(a.tile, b.tile))[0];
       if (first) first.hub = true;
     }
-  // the subjects worked on lately but not today: folded, the newest first — or opened by the person
+  const away = projectsAway();
+  // the subjects (not Projects: those are all there already) worked on lately but not today, the newest first
   const later = new Map<string, Tile[]>();
   for (const t of plan.rest) {
     const h = homeOf(t.id);
-    if (h.key === OTHER || groups.has(h.key) || t.at < now - FAR_DAYS * DAY) continue;
+    if (h.key === OTHER || h.kind === 'project' || groups.has(h.key) || t.at < now - FAR_DAYS * DAY) continue;
     later.set(h.key, [...(later.get(h.key) ?? []), t]);
   }
   const far = [...later.entries()]
     .sort((a, b) => Math.max(...b[1].map((t) => t.at)) - Math.max(...a[1].map((t) => t.at)) || (a[0] < b[0] ? -1 : 1))
-    .slice(0, FAR_MAX);
-  const ordered = order([...groups.values()]);
-  for (const [key, list] of far) {
-    const all = plan.rest.filter((t) => homeOf(t.id).key === key);
-    const open = !!input.opened?.has(key);
-    const g: Group = { home: homeOf(list[0].id), members: [], folded: !open, far: true, count: all.length };
-    for (const t of all.sort((a, b) => b.at - a.at || byId(a, b)).slice(0, open ? OPENED_MAX : 5)) g.members.push({ tile: t, hub: isHub(t), focus: false, halo: false });
-    if (open && !g.members.some((m) => m.hub) && g.members.length) g.members[0].hub = true;
-    ordered.push(g);
-  }
-  return { groups: ordered, today: { when: plan.when, day: plan.day } };
+    .slice(0, FAR_MAX)
+    .map(([key]) => elsewhere(homeOf(later.get(key)![0].id), plan.rest.filter((t) => homeOf(t.id).key === key)));
+  return { groups: [...order([...groups.values()]), ...away, ...far], today: { when: plan.when, day: plan.day } };
 }
 
 /** The subjects in the order they are packed: the one with the halo first, then the fullest, then the newest. */
@@ -717,51 +751,72 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
       pips: [],
       count: g.members.length,
       far: g.far,
+      empty: false,
       suggested: g.members.filter((m) => input.homes.suggested.has(m.tile.id)).map((m) => m.tile.id),
       ids: g.members.map((m) => m.tile.id),
     });
   });
 
-  // the folded subjects, in a row under the rest
+  // the folded ones in rows under the rest — the Projects first, in the person's order — and room for a new Project after them
   const openBox = boxAround(clusters.map((c) => ({ x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r })));
-  const rooms = folded.map((g) => {
+  type Room = { g: Group | null; words: { field: string | null; name: string } | null; n: number; w: number; lw: number };
+  const rooms: Room[] = folded.map((g) => {
     const words = subjectWords(g.home);
-    const said = `${words.field ? `${words.field} · ${words.name}` : words.name} →`;
-    const n = Math.min(PIPS, Math.max(1, g.members.length));
-    return { g, words, n, w: Math.max(capsW(said), 26 + (n - 1) * 36 + 20), lw: capsW(said) };
+    const n = Math.min(PIPS, g.members.length);
+    // a Project's name has its colour's dot before it; one with something in it, an arrow after
+    const lw = capsW(`${words.field ? `${words.field} · ${words.name}` : words.name}${n ? ' →' : ''}`) + (g.home.kind === 'project' ? 16 : 0);
+    return { g, words, n, lw, w: Math.max(lw, n ? 26 + (n - 1) * 36 + 20 : EMPTY_W) };
   });
-  const rowW = rooms.reduce((s, f) => s + f.w, 0) + Math.max(0, rooms.length - 1) * 56;
-  let fx = Math.round((clusters.length ? openBox.x + openBox.w / 2 : 0) - rowW / 2);
-  const fy = clusters.length ? Math.round(openBox.y + openBox.h + (narrow ? 26 : 34)) : 0;
-  for (const f of rooms) {
-    // a few dots under its name: its newest session in the middle, larger and a little lower, as drawn
-    const newest = [...f.g.members].sort((a, b) => Number(b.hub) - Number(a.hub) || b.tile.at - a.tile.at || byId(a.tile, b.tile));
-    const ms = newest.slice(0, f.n);
-    const row = f.n === 3 ? [ms[1], ms[0], ms[2]] : f.n === 2 ? [ms[1], ms[0]] : ms;
-    const pips = row.map((m, k) => {
-      const big = m === ms[0] && m.hub;
-      return { x: fx + 26 + k * 36, y: fy + NAME_H + 22 + (big ? 16 : 0), r: big ? 9.5 : 5.5 };
-    });
-    clusters.push({
-      key: f.g.home.key,
-      kind: f.g.home.kind,
-      field: f.words.field,
-      name: f.words.name,
-      color: f.g.home.color,
-      projectId: f.g.home.projectId,
-      x: Math.round(fx + f.w / 2),
-      y: Math.round(fy + 30),
-      r: Math.round(f.w / 2),
-      label: { x: fx, y: fy, w: f.lw, h: NAME_H },
-      folded: true,
-      pips,
-      count: f.g.count,
-      far: f.g.far,
-      suggested: [],
-      ids: [],
-    });
-    fx += f.w + 56;
+  if (input.canMake) rooms.push({ g: null, words: null, n: 0, lw: MAKE_W, w: MAKE_W });
+  const rowMax = narrow ? 340 : Math.max(900, openBox.w);
+  const lines: Room[][] = [];
+  for (const r of rooms) {
+    const line = lines[lines.length - 1];
+    if (line && line.reduce((sum, x) => sum + x.w + FOLD_GAP, 0) + r.w <= rowMax) line.push(r);
+    else lines.push([r]);
   }
+  let make: Box | null = null;
+  const top = clusters.length ? Math.round(openBox.y + openBox.h + (narrow ? 26 : 34)) : 0;
+  const mid = clusters.length ? openBox.x + openBox.w / 2 : 0;
+  lines.forEach((line, li) => {
+    const fy = top + li * FOLD_ROW;
+    let fx = Math.round(mid - (line.reduce((sum, x) => sum + x.w, 0) + (line.length - 1) * FOLD_GAP) / 2);
+    for (const f of line) {
+      if (!f.g || !f.words) {
+        make = { x: fx, y: fy, w: f.w, h: NAME_H + 40 };
+        fx += f.w + FOLD_GAP;
+        continue;
+      }
+      // a few dots under its name: its newest session in the middle, larger and a little lower, as drawn
+      const newest = [...f.g.members].sort((a, b) => Number(b.hub) - Number(a.hub) || b.tile.at - a.tile.at || byId(a.tile, b.tile));
+      const ms = newest.slice(0, f.n);
+      const row = f.n === 3 ? [ms[1], ms[0], ms[2]] : f.n === 2 ? [ms[1], ms[0]] : ms;
+      const pips = row.map((m, k) => {
+        const big = m === ms[0] && m.hub;
+        return { x: fx + 26 + k * 36, y: fy + NAME_H + 22 + (big ? 16 : 0), r: big ? 9.5 : 5.5 };
+      });
+      clusters.push({
+        key: f.g.home.key,
+        kind: f.g.home.kind,
+        field: f.words.field,
+        name: f.words.name,
+        color: f.g.home.color,
+        projectId: f.g.home.projectId,
+        x: Math.round(fx + f.w / 2),
+        y: Math.round(fy + 30),
+        r: Math.round(f.w / 2),
+        label: { x: fx, y: fy, w: f.lw, h: NAME_H },
+        folded: true,
+        pips,
+        count: f.g.count,
+        far: f.g.far,
+        empty: f.g.home.kind === 'project' && f.g.count === 0,
+        suggested: [],
+        ids: [],
+      });
+      fx += f.w + FOLD_GAP;
+    }
+  });
 
   const placed = new Map<string, { x: number; y: number; r: number; g: string; hub: boolean }>();
   for (const h of hubs) placed.set(h.id, { x: h.x, y: h.y, r: h.r + (h.halo ? HALO : 0), g: h.g, hub: true });
@@ -814,10 +869,16 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   }
 
   const bounds = boxAround([
-    ...clusters.map((c) => (c.folded ? boxAround([c.label, ...c.pips.map((p) => ({ x: p.x - p.r, y: p.y - p.r, w: 2 * p.r, h: 2 * p.r }))]) : { x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r })),
+    ...clusters.map((c) => (c.folded ? foldedBox(c) : { x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r })),
     ...(card ? [card] : []),
+    ...(make ? [make] : []),
   ]);
-  return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
+  return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, make, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
+}
+
+/** A folded one's room: its name and the dots under it — or, empty, the words that say so. */
+export function foldedBox(c: Pick<BubbleCluster, 'label' | 'pips' | 'empty'>): Box {
+  return boxAround([c.label, ...c.pips.map((p) => ({ x: p.x - p.r, y: p.y - p.r, w: 2 * p.r, h: 2 * p.r })), ...(c.empty ? [{ x: c.label.x, y: c.label.y, w: EMPTY_W, h: NAME_H + 26 }] : [])]);
 }
 
 /** From one disc's edge to the other's, bent over the line between them — or, one over the other, out to the right. */

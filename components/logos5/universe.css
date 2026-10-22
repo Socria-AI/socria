@@ -2310,6 +2310,141 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 60%, transparent);
 }
 
+/* ── the person's Projects, drawn as theirs ─────────────────────────────
+ * A Project's circle is a solid ring in its own colour with the faintest wash
+ * inside; its name has its colour's dot before it and "Project" after. One
+ * with nothing here is folded like a subject; an empty one says to drag one
+ * in; "+ New project" waits at the end of the row. */
+.logos-root .l5 .l5b-ring.is-project {
+  stroke: color-mix(in srgb, var(--c) 42%, transparent);
+  stroke-width: 1.4;
+  stroke-dasharray: none;
+  fill: color-mix(in srgb, var(--c) 2%, transparent);
+}
+.logos-root .l5 .l5b-ring.is-project.is-over {
+  stroke-width: 2.2;
+  fill: color-mix(in srgb, var(--c) 9%, transparent);
+}
+.logos-root .l5 :is(.l5b-name, .l5b-fold, .l5b-make).is-project .l5b-name-t,
+.logos-root .l5 .l5b-name.is-project .l5b-name-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  color: color-mix(in srgb, var(--c) 72%, var(--lg-ink));
+}
+.logos-root .l5 .l5b-name-t .l5b-dotc {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border: 0;
+  box-shadow: 0 0 0 2.5px color-mix(in srgb, var(--c) 18%, transparent);
+}
+.logos-root .l5 .l5b-name-t span.l5b-dotc {
+  display: inline-block;
+  border-radius: 50%;
+  background: var(--c);
+}
+.logos-root .l5 .l5b-tag {
+  padding: 1px 7px;
+  border: 1px solid color-mix(in srgb, var(--c) 42%, transparent);
+  border-radius: 999px;
+  font-size: 9.5px;
+  letter-spacing: 0.14em;
+  line-height: 13px;
+  color: color-mix(in srgb, var(--c) 82%, var(--lg-ink));
+}
+.logos-root .l5 .l5b-fold.is-empty {
+  cursor: default;
+}
+.logos-root .l5 .l5b-fold-empty {
+  margin-top: 10px;
+  padding: 7px 13px;
+  border: 1.5px dashed color-mix(in srgb, var(--c) 48%, transparent);
+  border-radius: 999px;
+  font-size: 11.5px;
+  color: var(--lg-ink-60);
+  white-space: nowrap;
+  transition: background 0.2s, border-color 0.2s, color 0.2s;
+}
+.logos-root .l5 .l5b-fold.is-empty.is-over .l5b-fold-empty {
+  border-style: solid;
+  border-color: var(--c);
+  background: color-mix(in srgb, var(--c) 9%, transparent);
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5b-fold.is-project.is-over .l5b-name-t {
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--c) 60%, transparent);
+}
+.logos-root .l5 .l5b-make {
+  position: absolute;
+  z-index: 3;
+  white-space: nowrap;
+}
+.logos-root .l5 .l5b-make > button {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 11px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  font: inherit;
+  cursor: pointer;
+}
+.logos-root .l5 .l5b-make .l5b-name-t {
+  color: var(--lg-ink-40);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.logos-root .l5 .l5b-make > button:hover .l5b-name-t,
+.logos-root .l5 .l5b-make.is-over .l5b-name-t {
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5b-make-pip {
+  width: 30px;
+  height: 30px;
+  margin-left: 18px;
+  border: 1.5px dashed color-mix(in srgb, var(--lg-ink) 32%, transparent);
+  border-radius: 50%;
+  transition: transform 0.25s cubic-bezier(0.3, 1.4, 0.5, 1), border-color 0.2s, background 0.2s;
+}
+.logos-root .l5 .l5b-make > button:hover .l5b-make-pip,
+.logos-root .l5 .l5b-make.is-over .l5b-make-pip {
+  transform: scale(1.14);
+  border-style: solid;
+  border-color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
+}
+.logos-root .l5 .l5b-make form {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.logos-root .l5 .l5b-make input {
+  width: 230px;
+  height: 36px;
+  padding: 0 12px;
+  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.36);
+  border-radius: 10px;
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  font: inherit;
+  font-size: 14px;
+  color: var(--lg-ink);
+  outline: none;
+}
+.logos-root .l5 .l5b-make-s {
+  font-size: 11px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5h-lg-proj {
+  width: 18px;
+  height: 18px;
+  border: 1.5px solid color-mix(in srgb, var(--sc-clay) 70%, transparent);
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--sc-clay) 8%, transparent);
+}
+
 /* a real study session: a disc in its subject's colour, its name inside */
 .logos-root .l5 .l5b-hub {
   position: absolute;
@@ -2712,7 +2847,8 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   animation: l5b-open 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms) both;
 }
 .logos-root .l5 .l5b-name,
-.logos-root .l5 .l5b-fold {
+.logos-root .l5 .l5b-fold,
+.logos-root .l5 .l5b-make {
   animation: l5b-words 0.55s ease-out var(--d, 0ms) both;
 }
 .logos-root .l5 .l5b-hub-in {
@@ -2767,7 +2903,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   animation: l5b-fade 0.6s ease-out 0.15s both;
 }
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .l5 :is(.l5b-ring, .l5b-name, .l5b-fold, .l5b-hub-in, .l5b-pip, .l5b-dot-t, .l5b-fold-pip, .l5b-card, .l5t, .l5h-title, .l5h-right, .l5h-foot),
+  .logos-root .l5 :is(.l5b-ring, .l5b-name, .l5b-fold, .l5b-make, .l5b-hub-in, .l5b-pip, .l5b-dot-t, .l5b-fold-pip, .l5b-card, .l5t, .l5h-title, .l5h-right, .l5h-foot),
   .logos-root .l5 .l5t-bead > :is(.l5t-star, .l5t-words),
   .logos-root .l5 .l5h-find-list {
     animation: none;

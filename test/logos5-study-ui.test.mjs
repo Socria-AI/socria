@@ -18,8 +18,8 @@
 //     course, a real study session a disc with its name inside, a quick
 //     question a dot, the person's links and the ideas subjects share as
 //     curves with a card that says why, their stars and notes on it, and a ↩
-//     to where a subject was before; Today folds the subjects worked on lately
-//     but not today; This month and All time are a line through time, the
+//     to where a subject was before; every Project of theirs is on it, an
+//     empty one too; Today folds the subjects worked on lately but not today; This month and All time are a line through time, the
 //     oldest on the left, joined where one followed on; the lenses are at the
 //     top, what the marks mean and the box that searches or starts at the
 //     foot; and there is a way to begin when there is nothing yet.
@@ -198,8 +198,8 @@ console.log('\n=== the Universal Map ===');
   const E = U.emptyArrangement();
   const arranged = { ...E, mode: 'week', starred: ['j1'], hidden: ['l3'], notes: [{ id: 'n1', x: 40, y: 900, text: 'decide by Friday' }], links: [{ id: 'k', a: 'j1', b: 'a2', label: 'same deadline' }], seen: { hint: true } };
   const map = html(h(U.UniverseView, { ...base, conversations, projects, initial: arranged }));
-  const names = [...map.matchAll(/class="l5b-name-t"[^>]*>([^<]*)</g)].map((m) => m[1]);
-  ok('this week, by subject: a circle for each — its field and its course — a Project with nothing this week left out', names.includes('Accounting · ACCT 2301') && names.includes('Careers · Job hunt') && names.includes('Money') && names.length === 3 && !map.includes('Someday'), names.join(' | '));
+  ok('this week, by subject: a circle for each — its field and its course', map.includes('Accounting · ACCT 2301') && map.includes('Careers · Job hunt') && /class="l5b-name-t"[^>]*>Money</.test(map));
+  ok('  every Project of the person’s is on it, said to be theirs — an empty one waiting to be dragged into', (map.match(/class="l5b-tag">Project</g) ?? []).length === 2 && /class="l5b-fold is-project is-empty"[^>]*aria-label="Someday: a Project with nothing in it yet. Drag a conversation here to file it."/.test(map) && map.includes('Empty — drag one here'));
   ok('  under the page’s name: the week, how many, and the weeks either side', map.includes('This week · Mon Oct 19 – today · 6 conversations') && map.includes('aria-label="The week before"') && map.includes('aria-label="The week after"'));
   ok('every conversation of the week drawn, hidden ones left out', (map.match(/class="l5b-(hub|dot)[ "]/g) ?? []).length === 6 && !map.includes('Secret plans') && !map.includes('data-node="k1"'));
   ok('  by a subject’s name this week, a ↩ to where it was before — found in time', /class="l5b-back" title="Where this subject was before: “Tax questions” — find it in time">↩ Oct 16</.test(map));
@@ -223,7 +223,7 @@ console.log('\n=== the Universal Map ===');
 
   const today = html(h(U.UniverseView, { ...base, conversations, projects, initial: E }));
   ok('today: the day, and why each earlier one is beside it', today.includes('Today · Wed Oct 21') && /title="Accruals — shares “Accrual basis”"/.test(today) && /aria-label="Accruals, [^"]*shares “Accrual basis”"/.test(today));
-  ok('  the subjects worked on lately but not today, folded to their names, each a press from opening', /class="l5b-fold"[^>]*aria-label="Careers, Job hunt: 2 conversations, folded. Open it."/.test(today));
+  ok('  a Project not worked on today, folded to its name, a press from opening', /class="l5b-fold is-project"[^>]*aria-label="Careers, Job hunt, a Project of yours: 2 conversations, folded. Open it."/.test(today));
   ok('  on the line, what the marks mean says what follows on', all.includes('Followed on within a week') && !all.includes('Connects across courses'));
 
   const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, mode: 'all', display: { ...E.display, chats: false } } }));

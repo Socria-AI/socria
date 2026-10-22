@@ -8,13 +8,18 @@
 // on a spoke from its session, its words beside it; what joins two subjects a
 // dashed curve, and over the one that matters most a card that says why. On
 // Today a subject not worked on today is folded to its name and a few dots;
-// pressed, it opens.
+// pressed, it opens. The person's Projects are always there, drawn as theirs —
+// a solid ring in the Project's own colour — folded when nothing in one is
+// here, waiting to be dragged into when it is empty; "+ New project" makes
+// one, named there, or with whatever is dropped on it.
 //
 // Moving about is the Logic Map's (lib/canvas.ts): drag the empty map, pinch
 // or ⌘/Ctrl-scroll to zoom, scroll to move. Pressing a conversation opens its
 // card; pressing it again opens it. Dragged into another subject's circle —
 // on a touch screen, held a moment first — a conversation is given that
-// subject, or filed in that Project. Shift-drag (or Select) chooses several.
+// subject, or filed in that Project, folded or empty ones too; dropped on
+// "+ New project", a Project is made with it in it. Shift-drag (or Select)
+// chooses several.
 // On This week, double-click the map to write a note.
 //
 // Each lens, and each week, comes in drawn: the circles open, the sessions
@@ -24,7 +29,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { cameraTransform, fitCamera, isDrag, keepInView, pinchCamera, readWheel, toWorld, zoomAt, KEY_PAN, type Camera } from '@/lib/canvas';
 import { boxAround, freshness, nearestWay, noteBox, type Box, type Match, type SharedIdea, type Tile } from '@/lib/logos5/universe';
-import { bubbleLayout, type BubbleCluster, type BubbleLens, type BubbleLink } from '@/lib/logos5/bubbles';
+import { bubbleLayout, foldedBox, type BubbleCluster, type BubbleLens, type BubbleLink } from '@/lib/logos5/bubbles';
 import { PROJECT_COLOR_KEYS, type Homes } from '@/lib/logos5/spatial';
 import type { Arrangement } from '@/lib/logos5/arrange';
 import { MadeMark, StarMark, colorVar, shortDate, tileSaid } from './UniverseParts';
@@ -38,8 +43,10 @@ export interface BubbleActs {
   onRefile: (ids: string[], to: string) => void;
   /** This week: a subject folded away, or opened again */
   onFold: (key: string, folded: boolean) => void;
-  /** Today: a folded subject opened, or folded again */
+  /** a subject or Project not this lens's own, opened here, or folded again */
   onOpenFar: (key: string, open: boolean) => void;
+  /** a new Project, named — with these conversations filed in it, when some were dropped on it */
+  onNewProject?: (name: string, ids: string[]) => void;
   onRename?: (key: string, name: string) => void;
   onColor?: (key: string, color: string) => void;
   /** a subject read from the conversations, made a Project with them in it */
@@ -81,6 +88,8 @@ interface Gesture {
 const css = (vars: Record<string, string | number>): CSSProperties => vars as unknown as CSSProperties;
 /** before paint in a browser — the map is fitted before it is first seen; nothing on the server */
 const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffect;
+/** what a drag is over when it is over "+ New project" */
+const NEW_PROJECT = '+new';
 /** when each thing arrives as the map comes in, in ms */
 const ARRIVE = { circle: 0, circleStep: 70, hub: 140, hubStep: 70, line: 240, dot: 380, dotStep: 34, link: 760, linkStep: 90, card: 980 } as const;
 
@@ -105,6 +114,7 @@ export function BubbleMap({
   top,
   bottom,
   narrow = false,
+  all,
   opened,
   backOf,
   acts,
@@ -135,7 +145,9 @@ export function BubbleMap({
   top: number;
   bottom: number;
   narrow?: boolean;
-  /** Today: the folded subjects the person opened */
+  /** every conversation shown, whatever the lens: for how many a Project holds, and its newest when opened */
+  all?: readonly Tile[];
+  /** the folded subjects and Projects the person opened here */
   opened?: ReadonlySet<string>;
   /** a conversation's subject from before this week: the last of it, for a ↩ by its subject's name */
   backOf?: ReadonlyMap<string, { id: string; at: number }>;
@@ -156,14 +168,16 @@ export function BubbleMap({
   const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null);
   const [linkEdit, setLinkEdit] = useState<{ id: string; label: string } | null>(null);
   const [noteText, setNoteText] = useState('');
+  /** a new Project being named — with what was dropped on it */
+  const [making, setMaking] = useState<{ ids: string[]; name: string } | null>(null);
   const pointers = useRef(new Map<number, { x: number; y: number }>());
   const gesture = useRef<Gesture | null>(null);
   const lastTap = useRef<{ id: string; t: number } | null>(null);
 
   const folded = useMemo(() => new Set(Object.entries(arr.frames).filter(([, f]) => f.collapsed).map(([k]) => k)), [arr.frames]);
   const L = useMemo(
-    () => bubbleLayout({ lens, tiles, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas }),
-    [lens, tiles, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas]
+    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject }),
+    [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject]
   );
   const notes = lens === 'week' ? arr.notes : [];
   const content = useMemo<Box>(() => boxAround([L.bounds, ...notes.map(noteBox)]), [L.bounds, notes]);
@@ -269,15 +283,11 @@ export function BubbleMap({
     if (sx >= margin && sy >= top + margin / 2 && sx <= size.w - margin && sy <= size.h - bottom - margin / 2) return;
     setCam({ ...c, x: size.w / 2 - n.x * c.k, y: (size.h + top - bottom) / 2 - n.y * c.k });
   };
-  /** The subject a point on the map is in: inside a circle, or on a folded one's name and dots. */
-  const clusterAt = (x: number, y: number): BubbleCluster | null => {
-    for (const c of L.clusters) {
-      if (c.folded) {
-        const b = boxAround([c.label, ...c.pips.map((p) => ({ x: p.x - p.r, y: p.y - p.r, w: 2 * p.r, h: 2 * p.r }))]);
-        if (x >= b.x - 12 && x <= b.x + b.w + 12 && y >= b.y - 12 && y <= b.y + b.h + 12) return c;
-      } else if (Math.hypot(x - c.x, y - c.y) <= c.r) return c;
-    }
-    return null;
+  /** What a point on the map is in: a circle, a folded one's name and dots (an empty Project's too), or "+ New project". */
+  const dropAt = (x: number, y: number): string | null => {
+    const near = (b: { x: number; y: number; w: number; h: number }) => x >= b.x - 12 && x <= b.x + b.w + 12 && y >= b.y - 12 && y <= b.y + b.h + 12;
+    for (const c of L.clusters) if (c.folded ? near(foldedBox(c)) : Math.hypot(x - c.x, y - c.y) <= c.r) return c.key;
+    return L.make && acts.onNewProject && near(L.make) ? NEW_PROJECT : null;
   };
 
   // ── pressing, dragging, letting go ──
@@ -362,8 +372,8 @@ export function BubbleMap({
     } else if (t.kind === 'node') {
       const ids = sel.has(t.id) ? selected.filter((id) => L.byId.has(id)) : [t.id];
       const w = world(e);
-      const over = clusterAt(w.x, w.y);
-      setDrag({ kind: 'nodes', ids, dx: dx / k, dy: dy / k, over: over && over.key !== L.byId.get(t.id)?.g ? over.key : null });
+      const over = dropAt(w.x, w.y);
+      setDrag({ kind: 'nodes', ids, dx: dx / k, dy: dy / k, over: over && over !== L.byId.get(t.id)?.g ? over : null });
     } else setDrag({ kind: 'note', id: t.id, dx: dx / k, dy: dy / k });
   };
 
@@ -388,7 +398,8 @@ export function BubbleMap({
       return;
     }
     if (!d) return;
-    if (d.kind === 'nodes' && d.over) acts.onRefile(d.ids, d.over);
+    if (d.kind === 'nodes' && d.over === NEW_PROJECT) setMaking({ ids: d.ids, name: '' });
+    else if (d.kind === 'nodes' && d.over) acts.onRefile(d.ids, d.over);
     else if (d.kind === 'note') {
       const n = arr.notes.find((x) => x.id === d.id);
       if (n) acts.onNoteMove(n.id, n.x + d.dx, n.y + d.dy);
@@ -532,7 +543,7 @@ export function BubbleMap({
             .map((c, i) => (
               <circle
                 key={c.key}
-                className={`l5b-ring${over === c.key ? ' is-over' : ''}${c.ids.every(dimmed) ? ' is-dim' : ''}`}
+                className={`l5b-ring${c.kind === 'project' ? ' is-project' : ''}${over === c.key ? ' is-over' : ''}${c.ids.every(dimmed) ? ' is-dim' : ''}`}
                 cx={c.x}
                 cy={c.y}
                 r={c.r}
@@ -572,23 +583,41 @@ export function BubbleMap({
 
         {L.clusters.map((c) =>
           c.folded ? (
-            <button
-              key={`f:${c.key}`}
-              type="button"
-              data-control
-              className={`l5b-fold${over === c.key ? ' is-over' : ''}`}
-              style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${ARRIVE.circle + (clusterIndex.get(c.key) ?? 0) * ARRIVE.circleStep + 200}ms` }) }}
-              onClick={() => (c.far ? acts.onOpenFar(c.key, true) : acts.onFold(c.key, false))}
-              title={`${c.count === 1 ? 'One conversation' : `${c.count} conversations`} — press to open`}
-              aria-label={`${c.field ? `${c.field}, ` : ''}${c.name}: ${c.count === 1 ? 'one conversation' : `${c.count} conversations`}, folded. Open it.`}
-            >
-              <span className="l5b-name-t">
-                {c.field ? `${c.field} · ${c.name}` : c.name} <span aria-hidden="true">→</span>
-              </span>
-              {c.pips.map((p, i) => (
-                <span key={i} className="l5b-fold-pip" aria-hidden="true" style={{ left: p.x - c.label.x - p.r, top: p.y - c.label.y - p.r, width: 2 * p.r, height: 2 * p.r }} />
-              ))}
-            </button>
+            c.empty ? (
+              <div
+                key={`f:${c.key}`}
+                className={`l5b-fold is-project is-empty${over === c.key ? ' is-over' : ''}`}
+                style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${ARRIVE.circle + (clusterIndex.get(c.key) ?? 0) * ARRIVE.circleStep + 200}ms` }) }}
+                data-control
+                role="group"
+                aria-label={`${c.name}: a Project with nothing in it yet. Drag a conversation here to file it.`}
+              >
+                <span className="l5b-name-t">
+                  <span className="l5b-dotc" aria-hidden="true" />
+                  {c.name}
+                </span>
+                <span className="l5b-fold-empty">Empty — drag one here</span>
+              </div>
+            ) : (
+              <button
+                key={`f:${c.key}`}
+                type="button"
+                data-control
+                className={`l5b-fold${c.kind === 'project' ? ' is-project' : ''}${over === c.key ? ' is-over' : ''}`}
+                style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${ARRIVE.circle + (clusterIndex.get(c.key) ?? 0) * ARRIVE.circleStep + 200}ms` }) }}
+                onClick={() => (c.far ? acts.onOpenFar(c.key, true) : acts.onFold(c.key, false))}
+                title={`${c.kind === 'project' ? 'Your Project · ' : ''}${c.count === 1 ? 'One conversation' : `${c.count} conversations`} — press to open`}
+                aria-label={`${c.field ? `${c.field}, ` : ''}${c.name}${c.kind === 'project' ? ', a Project of yours' : ''}: ${c.count === 1 ? 'one conversation' : `${c.count} conversations`}, folded. Open it.`}
+              >
+                <span className="l5b-name-t">
+                  {c.kind === 'project' && <span className="l5b-dotc" aria-hidden="true" />}
+                  {c.field ? `${c.field} · ${c.name}` : c.name} <span aria-hidden="true">→</span>
+                </span>
+                {c.pips.map((p, i) => (
+                  <span key={i} className="l5b-fold-pip" aria-hidden="true" style={{ left: p.x - c.label.x - p.r, top: p.y - c.label.y - p.r, width: 2 * p.r, height: 2 * p.r }} />
+                ))}
+              </button>
+            )
           ) : (
             <SubjectName
               key={`n:${c.key}`}
@@ -604,6 +633,29 @@ export function BubbleMap({
               setRenaming={setRenaming}
             />
           )
+        )}
+
+        {L.make && acts.onNewProject && (
+          <div className={`l5b-make${making ? ' is-naming' : ''}${over === NEW_PROJECT ? ' is-over' : ''}`} style={{ left: L.make.x, top: L.make.y, ...css({ '--d': `${ARRIVE.circle + L.clusters.length * ARRIVE.circleStep + 260}ms` }) }} data-control>
+            {making ? (
+              <form
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const name = making.name.trim();
+                  if (name) acts.onNewProject?.(name, making.ids);
+                  setMaking(null);
+                }}
+              >
+                <input autoFocus value={making.name} maxLength={80} placeholder="Name the project" aria-label="Name the new Project" onChange={(e) => setMaking({ ...making, name: e.target.value })} onKeyDown={(e) => e.key === 'Escape' && setMaking(null)} onBlur={(e) => !e.currentTarget.value.trim() && setMaking(null)} />
+                <span className="l5b-make-s">{making.ids.length ? `with ${making.ids.length === 1 ? 'it' : `these ${making.ids.length}`} in it · Enter to make it` : 'Enter to make it'}</span>
+              </form>
+            ) : (
+              <button type="button" onClick={() => setMaking({ ids: [], name: '' })} title="Make a Project — or drop conversations here to make one with them in it">
+                <span className="l5b-name-t">+ New project</span>
+                <span className="l5b-make-pip" aria-hidden="true" />
+              </button>
+            )}
+          </div>
         )}
 
         {L.hubs.map((h) => {
@@ -862,7 +914,7 @@ function SubjectName({
   const read = c.kind === 'course' || c.kind === 'field';
   const canFold = lens === 'week' || c.far;
   return (
-    <div className="l5b-name" style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${arrives}ms` }) }} data-control>
+    <div className={`l5b-name${project ? ' is-project' : ''}`} style={{ left: c.label.x, top: c.label.y, ...css({ '--c': colorVar(c.color), '--d': `${arrives}ms` }) }} data-control>
       {renaming?.key === c.key ? (
         <form
           className="l5n-frename"
@@ -878,9 +930,11 @@ function SubjectName({
         <span
           className="l5b-name-t"
           onDoubleClick={() => project && acts.onRename && setRenaming({ key: c.key, name: c.name })}
-          title={project && acts.onRename ? 'Double-click to rename' : undefined}
+          title={project && acts.onRename ? 'Your Project — double-click to rename' : undefined}
         >
+          {project && (acts.onColor ? <button type="button" className="l5b-dotc" aria-label={`Colour of ${c.name}`} onClick={() => setPalette(palette === c.key ? null : c.key)} /> : <span className="l5b-dotc" aria-hidden="true" />)}
           {c.field ? `${c.field} · ${c.name}` : c.name}
+          {project && <span className="l5b-tag">Project</span>}
         </span>
       )}
       {back && (
@@ -889,7 +943,6 @@ function SubjectName({
         </button>
       )}
       <span className="l5b-tools">
-        {project && acts.onColor && <button type="button" className="l5b-dotc" aria-label={`Colour of ${c.name}`} onClick={() => setPalette(palette === c.key ? null : c.key)} />}
         {project && c.suggested.length > 0 && acts.onFileSuggested && (
           <button type="button" className="l5b-tool" onClick={() => acts.onFileSuggested!(c.key)} title={`${c.suggested.length === 1 ? 'One conversation is' : `${c.suggested.length} conversations are`} about ${c.name} but not filed in it`}>
             + {c.suggested.length} about it · File {c.suggested.length === 1 ? 'it' : 'them'}

@@ -197,6 +197,15 @@ mark, the count, List and the account — the box is no longer in it.
   both come back to: **"One idea, two subjects** — Accounting and Economics both
   come back to *present value*." Each card says when the two were opened.
   Pressing another curve brings its card.
+- **Your Projects are always on it**, whichever lens: a Project with
+  conversations here is a circle drawn as yours — a solid ring in its own
+  colour, its colour's dot before its name and "Project" after it; one with
+  nothing here is folded under the rest, its name, how many it holds and a few
+  dots, and pressed it opens with its newest; an empty one says "Empty — drag
+  one here". They come first in the folded rows, in your order, and **+ New
+  project** waits at the end: pressed, it asks for a name; with conversations
+  dropped on it, it makes the Project with them in it. An archived Project is
+  not drawn.
 - The circles are packed side by side, wider than tall; on a phone one under
   another, read from the top. Nothing sits on anything: no two discs touch, no
   dot or words are on a disc, no two words cross, everything of a subject is
@@ -297,7 +306,8 @@ Today is the default; the lens chosen is remembered.
 - **Drag a conversation into another subject's circle** (on a touch screen,
   hold it a moment first) and it is given that subject (kept with the
   arrangement; "Its own subject" on its card gives it back) — **into a
-  Project's**, it is filed there.
+  Project's**, folded or empty ones too, it is filed there; onto **+ New
+  project**, a Project is made with it in it.
 - Pointed at, a subject's name offers **Fold** (This week; on Today, a subject
   opened from folded), and for a subject read from the conversations, **Make
   it a Project** (made, with them filed in it, in one undoable step). A
@@ -1004,3 +1014,25 @@ more, in order" was), and more animation switching tabs.
   nothing on anything, everything inside its circle, the card clear, the same
   conversations drawing the same map; `test/logos5-study-ui.test.mjs` the
   page; `test/logos5-spatial.test.mjs` the link first in Today.
+
+### Projects, back on the map
+
+Asked for: "add project organizations to the map too. add projects back." The
+redraw had made a Project look like any subject, and one with nothing in
+Today or This week was not on the map at all.
+
+- Every Project (not archived) is on the map in both lenses
+  (`lib/logos5/bubbles.ts`): a circle drawn as the person's — a solid ring in
+  its own colour, its dot, "Project" — when something in it is here; folded
+  under the rest with how many it holds when not (pressed, it opens with its
+  newest, until the lens changes); "Empty — drag one here" when it has
+  nothing. The folded rows take the Projects first, in the person's order,
+  then the subjects worked on lately, and wrap rather than run off.
+- **+ New project** at the end of them makes one by name, or — with
+  conversations dropped on it — with them in it. Dropping onto a folded or
+  empty Project files into it. "Your project" is in what the marks mean.
+- Checked in a browser (Today and This week, Paper): a linked Project open, two
+  folded, an empty one; a quick question dropped on "+ New project" made
+  "Exam prep" with it in it, and one dropped on the empty Thesis was filed
+  there. `test/logos5-bubbles.test.mjs` (63) holds where each goes and that
+  nothing in the rows sits on anything.

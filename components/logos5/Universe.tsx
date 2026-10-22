@@ -68,7 +68,7 @@ const inTime = (m: A.HomeMode) => m === 'month' || m === 'all';
 const TOP = { wide: 150, narrow: 140 } as const;
 const FOOT = { wide: 92, narrow: 78 } as const;
 /** the foot's width that holds what the marks mean beside the box */
-const LEGEND_ROOM = 1120;
+const LEGEND_ROOM = 1240;
 
 export function UniverseView({
   conversations,
@@ -172,7 +172,7 @@ export function UniverseView({
   }, [lens, scoped, homes, visible, weekFrom]);
   /** Today: the day it is about — today, or the last day anything was worked on */
   const todayPlan = useMemo(() => (lens === 'today' ? todayOf(shown, shownHomes, ideas, now, arr.links) : null), [lens, shown, shownHomes, ideas, now, arr.links]);
-  /** Today: the folded subjects opened; let go on leaving Today */
+  /** the folded subjects and Projects opened on the map; let go on another lens */
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
   /** go to one on the line — a ↩ on the week's map, "Find it in time" — once per press */
   const [timeFocus, setTimeFocus] = useState<{ id: string; n: number } | null>(null);
@@ -245,7 +245,7 @@ export function UniverseView({
   // another week is another map, fitted to it; leaving Today folds again what was opened there
   useEffect(() => setFitKey((k) => k + 1), [weekAt]);
   useEffect(() => {
-    if (lens !== 'today') setOpened((o) => (o.size ? new Set() : o));
+    setOpened((o) => (o.size ? new Set() : o));
   }, [lens]);
 
   // ── changes, kept, and undone ──
@@ -407,6 +407,13 @@ export function UniverseView({
     onOpen: openId,
     onRefile: refile,
     onFold: (key, folded) => commit((a) => A.setFrame(a, key, { collapsed: folded }), [], true),
+    onNewProject:
+      onCreateProject && projects
+        ? (name, ids) => {
+            if (ids.length && onFile) return void newProjectWith(ids, name);
+            void onCreateProject(name).then((pid) => setSaid(pid ? `“${name}” made — drag conversations into it.` : 'That Project could not be made.'));
+          }
+        : undefined,
     onOpenFar: (key, on) =>
       setOpened((cur) => {
         const next = new Set(cur);
@@ -775,6 +782,7 @@ export function UniverseView({
         top={top}
         bottom={foot}
         narrow={narrow}
+        all={shown}
         opened={opened}
         backOf={backOf}
         acts={mapActs}
@@ -994,6 +1002,12 @@ function Legend({ lens }: { lens: A.HomeMode }) {
         <span className="l5h-lg-dot" aria-hidden="true" />
         Quick question
       </li>
+      {!inTime(lens) && (
+        <li>
+          <span className="l5h-lg-proj" aria-hidden="true" />
+          Your project
+        </li>
+      )}
       {inTime(lens) ? (
         <li>
           <span className="l5h-lg-line" aria-hidden="true" />

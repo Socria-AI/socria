@@ -17,6 +17,10 @@
 //     and the curve rises to it from each disc's edge;
 //   • This week draws every one of the week's, a subject folded by the
 //     person folded;
+//   • every Project of the person's is on the map, whichever lens: a circle
+//     when something in it is here, folded with how many it holds when not,
+//     an empty one waiting to be dragged into — the Projects first, in the
+//     person's order — and room for a new one at the end;
 //   • on a phone the subjects are one under another;
 //   • the same conversations draw the same map.
 
@@ -61,6 +65,8 @@ const projects = [
   { id: 'acct', name: 'ACCT 2301', color: 'moss', createdAt: 1 },
   { id: 'econ', name: 'ECON 2302', color: 'slate', createdAt: 2 },
   { id: 'biol', name: 'BIOL 1306', color: 'ochre', createdAt: 3 },
+  { id: 'thesis', name: 'Thesis', color: 'clay', createdAt: 4 },
+  { id: 'gone', name: 'Old club', createdAt: 5, archived: true },
 ];
 const CONVS = [
   conv('exam', 'Exam 2 review', 0.1, { p: 'acct', study: 'ACCT 2301 · Exam 2', turns: 6 }),
@@ -80,7 +86,7 @@ const layoutOf = (o = {}) => {
   const tiles = B.tilesOf(o.convs ?? CONVS);
   const homes = B.homesOf(tiles, projects, B.emptyArrangement());
   const scoped = o.week ? tiles.filter((t) => t.at >= NOW - 2.6 * DAY) : tiles;
-  return B.bubbleLayout({ lens: o.week ? 'week' : 'today', tiles: scoped, homes, ideas: o.ideas ?? B.sharedIdeas(scoped), links: o.links ?? [LINK], now: NOW, narrow: !!o.narrow, folded: o.folded, opened: o.opened, resumeId: o.resume ?? 'exam', size: o.size, ideaLinks: o.ideaLinks, cardFor: o.cardFor });
+  return B.bubbleLayout({ lens: o.week ? 'week' : 'today', tiles: scoped, all: tiles, homes, ideas: o.ideas ?? B.sharedIdeas(scoped), links: o.links ?? [LINK], now: NOW, narrow: !!o.narrow, folded: o.folded, opened: o.opened, resumeId: o.resume ?? 'exam', size: o.size, ideaLinks: o.ideaLinks, cardFor: o.cardFor, canMake: o.canMake });
 };
 const overlap = (a, b, air = 0) => a.x < b.x + b.w + air && b.x < a.x + a.w + air && a.y < b.y + b.h + air && b.y < a.y + a.h + air;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -121,7 +127,7 @@ for (const [name, o] of [['today', {}], ['today, on a phone', { narrow: true }],
 console.log('\n=== Today: the day, what it builds on, and a few folded ===');
 {
   const L = layoutOf();
-  const folded = L.clusters.filter((c) => c.folded);
+  const folded = L.clusters.filter((c) => c.folded && !c.empty);
   ok('a subject worked on lately but not today is folded: its name and a few dots', folded.length === 1 && folded[0].key === 'p:biol' && folded[0].far && folded[0].pips.length === 3 && folded[0].count === 3 && folded[0].ids.length === 0, J(folded.map((c) => [c.key, c.pips.length, c.count])));
   ok('  its newest session the larger dot, in the middle, a little lower — as drawn', folded[0].pips[1].r > folded[0].pips[0].r && folded[0].pips[1].y > folded[0].pips[0].y);
   ok('  under the others; and one long done is not there at all', folded[0].label.y > Math.max(...L.clusters.filter((c) => !c.folded).map((c) => c.y + c.r)) && !L.clusters.some((c) => c.key === 'f:history') && !L.byId.has('old'));
@@ -156,11 +162,37 @@ console.log('\n=== what joins two subjects ===');
   ok('a link within one subject is drawn; its card, when it is the only one, names both', same.links.some((l) => l.own === 'l2' && !l.across) && same.card?.says[0].text === '“Exam 2 review” and “Adjusting entries”.');
 }
 
+console.log('\n=== the person’s Projects, always on the map ===');
+{
+  const L = layoutOf();
+  const C = new Map(L.clusters.map((c) => [c.key, c]));
+  ok('today: a Project with something here is a circle; one with nothing today folded, saying how many it holds', !C.get('p:acct').folded && C.get('p:biol').folded && C.get('p:biol').count === 3 && C.get('p:biol').far);
+  ok('  an empty one is there too, waiting to be dragged into: no dots, room for its words', C.get('p:thesis')?.folded && C.get('p:thesis').empty && C.get('p:thesis').pips.length === 0 && C.get('p:thesis').count === 0 && B.foldedBox(C.get('p:thesis')).w >= 160);
+  ok('  an archived one is not', !C.has('p:gone'));
+  const W = layoutOf({ week: true });
+  const WC = new Map(W.clusters.map((c) => [c.key, c]));
+  ok('this week: every Project too — one with nothing this week folded with all it holds, not just the week’s', WC.get('p:econ')?.folded && WC.get('p:econ').count === 3 && WC.get('p:biol')?.folded && WC.get('p:thesis')?.empty);
+  const O = layoutOf({ week: true, opened: new Set(['p:econ']) });
+  ok('  pressed, a folded one opens here with its newest', !O.clusters.find((c) => c.key === 'p:econ').folded && O.byId.has('tvm') && O.byId.has('pv'));
+  const row = L.clusters.filter((c) => c.folded);
+  const firstSubject = row.findIndex((c) => c.kind !== 'project');
+  ok('folded, the Projects first, in the person’s order, then the subjects', row.slice(0, 2).map((c) => c.key).join() === 'p:biol,p:thesis' && (firstSubject === -1 || row.slice(firstSubject).every((c) => c.kind !== 'project')));
+  const M = layoutOf({ canMake: true });
+  ok('room for a new Project at the end of the row, when one can be made; none when not', M.make && M.make.x >= Math.max(...M.clusters.filter((c) => c.folded && c.label.y === M.make.y).map((c) => c.label.x)) && L.make === null);
+  // eight Projects, a narrow screen: the folded ones go on in rows, none on another, none on a circle
+  const many = [...projects, ...Array.from({ length: 8 }, (_, i) => ({ id: `x${i}`, name: `Club number ${i + 1}`, createdAt: 10 + i }))];
+  const tiles = B.tilesOf(CONVS);
+  const R = B.bubbleLayout({ lens: 'today', tiles, all: tiles, homes: B.homesOf(tiles, many, B.emptyArrangement()), ideas: [], links: [LINK], now: NOW, narrow: true, canMake: true, resumeId: 'exam' });
+  const boxes = [...R.clusters.filter((c) => c.folded).map((c) => B.foldedBox(c)), R.make];
+  const rings = R.clusters.filter((c) => !c.folded);
+  ok('  many of them: in rows, none on another, none on a circle', new Set(boxes.map((b) => b.y)).size > 1 && boxes.every((a, i) => boxes.every((b, j) => j <= i || !overlap(a, b))) && boxes.every((b) => rings.every((c) => b.y > c.y + c.r)));
+}
+
 console.log('\n=== This week, a phone, the sizes, the words ===');
 {
   const W = layoutOf({ week: true });
   const week = B.tilesOf(CONVS).filter((t) => t.at >= NOW - 2.6 * DAY).map((t) => t.id);
-  ok('this week: every one of the week’s, once', week.every((id) => W.byId.has(id)) && W.byId.size === week.length && !W.clusters.some((c) => c.folded));
+  ok('this week: every one of the week’s, once — and nothing else drawn open', week.every((id) => W.byId.has(id)) && W.byId.size === week.length && W.clusters.filter((c) => c.folded).every((c) => c.kind === 'project' && c.far));
   const F = layoutOf({ week: true, folded: new Set(['p:acct']) });
   ok('  a subject the person folded: folded, saying how many', F.clusters.find((c) => c.key === 'p:acct').folded && F.clusters.find((c) => c.key === 'p:acct').count === 4 && !F.byId.has('exam'));
   const N = layoutOf({ narrow: true });
