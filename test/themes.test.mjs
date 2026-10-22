@@ -1,11 +1,12 @@
-// Themes — Paper, White, Dark, Night and the Socria One blue (lib/theme.ts, app/themes.css).
+// Themes — Paper, White, Dark, Celestial and the Socria One blue (lib/theme.ts, app/themes.css).
 //
-// Paper is the default and the absence of a theme; Dark and Night are
-// everyone's — Night is the dark ground the Universal Map draws as a sky;
+// Paper is the default and the absence of a theme; Dark and Celestial are
+// everyone's — Celestial (stored as 'night', its first name) is deep space,
+// the whole app under a sky and the Universal Map a star chart;
 // White and the One blue come with Socria One and are refused, not just
 // hidden, for anyone else. A theme is variables only, on the app's own routes.
 // Logos 5 reads them too: its surfaces' own tokens are given for every dark
-// ground, and the map becomes a sky on Night.
+// ground, and the map becomes a star chart on Celestial (test/celestial.test.mjs).
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -19,7 +20,7 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 
 ok('five themes: paper, white, dark, night, one', THEME_IDS.join(',') === 'paper,white,dark,night,one');
 ok('paper, dark and night are everyone’s; white and the One blue are One’s', !THEMES.paper.one && !THEMES.dark.one && !THEMES.night.one && THEMES.white.one && THEMES.one.one);
-ok('night is a dark ground, with a sky of a swatch', THEMES.night.scheme === 'dark' && THEMES.night.label === 'Night' && THEMES.night.swatch[0] === '#0B1222');
+ok('night is Celestial now — the key kept, so a choice made under the old name holds — a dark ground with a sky of a swatch', THEMES.night.id === 'night' && THEMES.night.scheme === 'dark' && THEMES.night.label === 'Celestial' && THEMES.night.swatch[0] === '#060A1A');
 ok('the default is paper', effectiveTheme(undefined, false) === 'paper' && effectiveTheme('nonsense', true) === 'paper');
 ok('a member gets what they chose', effectiveTheme('one', true) === 'one' && effectiveTheme('white', true) === 'white');
 ok('a free account choosing a One theme is shown paper', effectiveTheme('one', false) === 'paper' && effectiveTheme('white', false) === 'paper');
@@ -47,7 +48,7 @@ const css = read('app/themes.css');
 for (const t of ['white', 'dark', 'night', 'one']) ok(`${t} is defined as variables`, new RegExp(`html\\[data-theme="${t}"\\]\\s*\\{`).test(css));
 ok('what every dark ground needs is given to night too', /html:is\(\[data-theme="dark"\], \[data-theme="one"\], \[data-theme="night"\]\) body/.test(css));
 const uni = read('components/logos5/universe.css');
-ok('on night the Universal Map hangs in a sky: its dust, its glowing sessions, its gold names', /html\[data-theme="night"\] \.logos-root \.l5 \.l5n-sky \{\s*display: block/.test(uni) && /html\[data-theme="night"\] \.logos-root \.l5 \.l5b-disc \{[^}]*box-shadow/.test(uni) && /html\[data-theme="night"\] \.logos-root \.l5 \.l5h \{[^}]*--l5b-name: rgba\(231, 207, 146/.test(uni));
+ok('on Celestial the Universal Map is a star chart: its own dust drifting at depth, glowing sessions, gold names', /html\[data-theme="night"\] \.logos-root \.l5 \.l5n-sky \{\s*display: block;[^}]*var\(--cel-dust/.test(uni) && /html\[data-theme="night"\] \.logos-root \.l5 \.l5b-disc \{[^}]*box-shadow/.test(uni) && /html\[data-theme="night"\] \.logos-root \.l5 \.l5h \{[^}]*--l5b-name: rgba\(240, 216, 158/.test(uni));
 ok('on every dark ground a session is a light disc with dark words', /html:is\(\[data-theme="dark"\], \[data-theme="one"\], \[data-theme="night"\]\) \.logos-root \.l5 \.l5h \{[^}]*--l5b-on: #141b2b/.test(uni));
 ok('the map’s colours are variables every dark ground turns up', /html:is\(\[data-theme="dark"\], \[data-theme="one"\], \[data-theme="night"\]\) \.logos-root \.l5 \.l5h \{[^}]*--sc-clay/.test(uni));
 ok('the picker offers five, a little sky for night', /\.theme\[data-theme-id="night"\] \.theme-swatch/.test(read('app/account-sheet.css')) && /repeat\(5,/.test(read('app/account-sheet.css')));

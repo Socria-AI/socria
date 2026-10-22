@@ -567,6 +567,8 @@ export function BubbleMap({
           {L.links.map((l) => (
             <g key={l.key} className={`l5b-link is-${l.kind}${L.card?.link === l.key ? ' is-carded' : ''}${lineLit([l.a, l.b])}${dimmed(l.a) && dimmed(l.b) ? ' is-dim' : ''}`}>
               <path className="l5b-link-line" d={pathOf(l)} mask={`url(#l5b-m-${maskId(l.key)})`} />
+              {/* a comet along it, once it is drawn — shown on Celestial alone (universe.css) */}
+              <path className="l5b-link-comet" d={pathOf(l)} pathLength={1} style={css({ '--d': `${ARRIVE.link + L.links.indexOf(l) * ARRIVE.linkStep}ms` })} />
               <path
                 className="l5b-link-hit"
                 d={pathOf(l)}

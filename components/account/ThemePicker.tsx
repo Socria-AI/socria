@@ -1,7 +1,7 @@
 'use client';
 // components/account/ThemePicker.tsx
 //
-// Five grounds to read Socria on. Paper, Dark and Night are everyone's; White
+// Five grounds to read Socria on. Paper, Dark and Celestial are everyone's; White
 // and the Socria One blue are part of One, shown to everyone so the choice is
 // visible, and offered as the way in for someone who is not a member yet.
 
@@ -39,7 +39,9 @@ export function ThemePicker({ isOne, onUpgrade }: { isOne: boolean; onUpgrade?: 
             }}
             title={locked ? `${t.says} — comes with Socria One` : t.says}
           >
-            <span className="theme-swatch" style={{ background: ground }} aria-hidden="true">
+            {/* the colour alone, so a theme's own picture (Celestial's sky,
+                app/account-sheet.css) can lie over it */}
+            <span className="theme-swatch" style={{ backgroundColor: ground }} aria-hidden="true">
               <span className="theme-line" style={{ background: ink }} />
               <span className="theme-line is-short" style={{ background: ink, opacity: 0.45 }} />
               <span className="theme-dot" style={{ background: accent }} />

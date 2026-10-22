@@ -48,6 +48,8 @@ const MODULES = [
   'lib/onboarding-roles.ts',
   'lib/onboarding-name.ts',
   'lib/theme.ts',
+  // Celestial: the sky, generated and painted (lib/celestial.ts)
+  'lib/celestial.ts',
   'lib/entitlements.ts',
   'lib/usage-scope.ts',
   'lib/logos-flow.ts',

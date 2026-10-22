@@ -7,8 +7,10 @@ import './globals.css';
 import './tour.css';
 import './account-sheet.css';
 import './themes.css';
+import './celestial.css';
 import { THEME_BOOT } from '@/lib/theme';
 import { ThemeScope } from '@/components/ThemeScope';
+import { CelestialSky } from '@/components/CelestialSky';
 import {
   clerkConfigured,
   clerkKeyMismatch,
@@ -187,6 +189,8 @@ export default function RootLayout({
         </head>
         <body className="paper-bg antialiased">
           <ThemeScope />
+          {/* Celestial's sky, behind everything — nothing at all on any other theme */}
+          <CelestialSky />
           {children}
           {/* Non-production only, so the real site never carries it. */}
           {!isProduction() && (

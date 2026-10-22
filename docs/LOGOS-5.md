@@ -360,12 +360,19 @@ it to be made the person's own. Empty, it offers where to pick up.
   starred first. The menu's "Manage conversations" brings back the rail.
 - The Socria mark always comes back here.
 
-**Night.** On the Night theme (Settings → Theme; everyone's, like Dark) the
-map hangs in a night sky: drifting star dust a little slower than the map, now
-and then a shooting star; the sessions are discs of light in their subjects'
-colours, glowing, with dark words; the subjects' names and the curves across
-them are gold. Dark and One draw light discs with dark words on their own
-grounds; Paper and White as designed.
+**Celestial.** On the Celestial theme (Settings → Theme; everyone's, like
+Dark — it was called Night, and keeps that key, so a choice made under the old
+name holds) the whole app is read under a sky (`components/CelestialSky.tsx`,
+`lib/celestial.ts`, `app/celestial.css`): a deep field generated the same
+every time — thousands of faint stars, the Milky Way as a band of grain and
+light with dust lanes through it, violet and teal nebulae — wheeling once an
+hour, its brightest stars twinkling, now and then a shooting star. The map is a
+star chart over it: two layers of nearer dust drift at their own depths as it
+is moved; sessions are stars lit from inside, where to pick up has a corona and
+a cross of light; subjects are orbits whose dashes slowly turn, quick questions
+twinkle, a link you made is a gold trail with a comet running along it; the
+words sit on glass. Dark and One draw light discs with dark words on their own
+grounds; Paper and White as designed. Under reduced motion it all holds still.
 
 **It travels.** The arrangement is kept in this browser and, signed in, in
 the account (`user_profiles.universal_map` through `/api/profile`, the newer
@@ -585,8 +592,9 @@ code. Logos 2 is unchanged.
 | In order: where each began, threads, lanes, the floor, quiet stretches, names, days (pure) | `lib/logos5/timeline.ts` |
 | The line drawn: scrolling, ↩, the whole history at the foot, search, the card | `components/logos5/UniverseTime.tsx`, `universe.css` (search `in order`) |
 | How the person arranged it: the model, its bounds, every change (pure); kept in the browser and the account | `lib/logos5/arrange.ts`, `components/logos5/useArrangement.ts`, `app/api/profile/route.ts` |
-| The page (its name, the lenses, the legend, the box at its foot), the map drawn, the pieces; every theme, and the sky on Night; coming in | `components/logos5/Universe.tsx`, `UniverseBubbles.tsx`, `UniverseParts.tsx`, `universe.css` |
-| The themes, Night among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
+| The page (its name, the lenses, the legend, the box at its foot), the map drawn, the pieces; every theme, and the star chart on Celestial; coming in | `components/logos5/Universe.tsx`, `UniverseBubbles.tsx`, `UniverseParts.tsx`, `universe.css` |
+| The themes, Celestial among them, and the picker | `lib/theme.ts`, `app/themes.css`, `components/account/ThemePicker.tsx` |
+| Celestial's sky: generated, painted in idle time, behind the whole app | `lib/celestial.ts`, `components/CelestialSky.tsx`, `app/celestial.css` |
 | Where home is wired in (start, file, a Project renamed or recoloured) | `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`), `app/chat/page.tsx` (`updateProject`) |
 | One history: which chats to bring in, the maps owed, the chats kept quiet, today's count (pure, and two storage helpers) | `lib/logos5/merge.ts` |
 | Bringing them in, once | `app/api/conversations/merge/route.ts` |
@@ -1091,3 +1099,53 @@ socria briefly for users who log back in 'we killed the chatbot'".
   browser harness, every beat in Paper, Night and Dark at 1440 and 390, with
   the animations stepped frame by frame. `test/whats-new.test.mjs` holds who,
   when, where and what.
+
+### Celestial
+
+Asked for: "rename / modify the night theme a bit as well. make it celestial
+and make it all space themed, stars, genuinely beautiful and it has to make me
+awestruck and amazed".
+
+- Night is **Celestial** now (`lib/theme.ts`; the key stays `night`). The
+  whole app is read under a sky, not just the map: `components/CelestialSky.tsx`
+  is mounted once at the root, watches the theme on `<html>`, and is nothing on
+  any other theme.
+- **The sky** (`lib/celestial.ts`) is generated from a seed, so it is the same
+  on every visit and every machine: ~2,400 field stars in the colours stars come
+  in, the Milky Way as ~12,000 grains gathered into clouds along a bent band,
+  brightest and warmest at its core, two ragged dust lanes winding through it,
+  rose knots of glowing gas, four nebulae drawn along filaments, and 34 bright
+  stars lifted out of the picture to twinkle — eight crossed with light.
+  Counts follow the screen's area; a phone sees the galaxy closer.
+- **Painted once, never a stutter.** The light goes on a half-resolution canvas
+  the browser scales up; the stars on a full-resolution one over it, in steps of
+  a few milliseconds run while the page is idle (`skySteps`), shown with a fade
+  when whole. Timed in headless Chromium: 60–300 ms in all, no step over ~40 ms
+  (the largest is allocating the canvas). A blur pass cost 280 ms on its own and
+  was taken out. Canvases are capped (2048 px on a phone, 3072 on a desktop).
+- **It moves, gently.** The sky wheels once an hour; the bright stars twinkle on
+  their own beats; three shooting stars fall on prime intervals. Under reduced
+  motion it is the same sky, still.
+- **The map is a star chart** (`components/logos5/universe.css`): its own ground
+  steps aside; two layers of nearer dust (`--cel-dust`, a seamless tile the sky
+  paints) drift at depth as the map moves; sessions are stars with a bright
+  core and a bloom; where to pick up has a corona and a cross of light; the one
+  you are in, chosen or found is ringed with light; subjects are orbits whose
+  dashes turn; quick questions twinkle; a link carries a comet
+  (`UniverseBubbles.tsx`, `.l5b-link-comet`); the card, the box, the lenses and
+  the timeline's history strip are glass; the lens's pill is gold.
+- **Everywhere else** (`app/celestial.css`): the grounds step aside, a
+  conversation's column is glass, the logic map's notebook grid is quieter,
+  the sky dims a little behind reading. "We killed the chatbot." and the
+  premise float on the live sky with the app out of sight behind them.
+- Fixed on the way, for every dark ground: the onboarding's rules and Skip were
+  paper's dark ink on the night (now drawn from the theme's ink), the offer to
+  see it drawn under Core's chat was a pale slab, and the theme picker's
+  swatches could never show a picture (an inline `background` hid it) — so
+  Celestial's swatch is now a small galaxy.
+- Checked in the browser at 1440×900 and 390×844: the four lenses of the map,
+  a conversation, Core's chat, the premise and the welcome back, the bare sky,
+  switching the theme on and off live (the sky comes and goes, the dust with
+  it) and reduced motion (nothing turns, twinkles or falls).
+  `test/celestial.test.mjs` holds the sky's shape, its painting, where it is
+  shown and the star chart; `test/themes.test.mjs` the name.

@@ -1,0 +1,236 @@
+/* app/celestial.css — CELESTIAL: the sky, and what the app lets show through it.
+ *
+ * The theme's colours are in app/themes.css (html[data-theme="night"]: the key
+ * keeps its first name, so a choice made when it was called Night holds); the
+ * Universal Map as a star chart is in components/logos5/universe.css. This
+ * sheet is the sky itself (components/CelestialSky.tsx paints it) and the
+ * grounds that step aside for it.
+ *
+ * THE SKY IS BEHIND EVERYTHING, AND ONLY THERE. It is fixed at z-index -1, so
+ * it paints above the page's canvas and below every word; the grounds that
+ * used to be a flat navy are cleared to let it through, and the surfaces you
+ * read on become glass — dark enough to read on, clear enough to see the sky
+ * moving behind. Under reduced motion it is the same sky, still.
+ */
+
+.cel-sky {
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  overflow: hidden;
+  pointer-events: none;
+  contain: strict;
+  /* what shows before the paint lands, and if it never does */
+  background:
+    radial-gradient(70% 55% at 62% 30%, rgba(63, 102, 255, 0.12), transparent 70%),
+    radial-gradient(60% 50% at 24% 72%, rgba(124, 92, 255, 0.1), transparent 70%),
+    radial-gradient(120% 95% at 55% 42%, #0c1438 0%, #070c24 45%, #020309 100%);
+}
+.cel-wheel {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  will-change: transform;
+}
+/* the light at half resolution, scaled up as it is shown; the stars over it at full */
+.cel-soft,
+.cel-deep {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  transition: opacity 1.6s ease;
+}
+.cel-soft.is-in,
+.cel-deep.is-in {
+  opacity: 1;
+}
+
+/* the bright ones, lifted out of the paint to twinkle; the brightest cross with light */
+.cel-star {
+  position: absolute;
+  width: var(--s);
+  height: var(--s);
+  margin: calc(var(--s) / -2) 0 0 calc(var(--s) / -2);
+  border-radius: 50%;
+  background: radial-gradient(circle, #fff 0%, #fff 22%, var(--c) 48%, transparent 72%);
+  box-shadow:
+    0 0 calc(var(--s) * 1.6) calc(var(--s) * 0.35) color-mix(in srgb, var(--c) 55%, transparent),
+    0 0 calc(var(--s) * 5) calc(var(--s) * 1.2) color-mix(in srgb, var(--c) 16%, transparent);
+  opacity: var(--a);
+}
+.cel-star.is-spike::before,
+.cel-star.is-spike::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--s) * 11);
+  height: 1px;
+  margin: -0.5px 0 0 calc(var(--s) * -5.5);
+  background: linear-gradient(90deg, transparent, color-mix(in srgb, var(--c) 60%, #fff) 50%, transparent);
+  opacity: 0.8;
+}
+.cel-star.is-spike::after {
+  transform: rotate(90deg);
+}
+
+/* now and then, a shooting star — three, on primes, so they never fall in step */
+.cel-shoot {
+  position: absolute;
+  width: 180px;
+  height: 1.6px;
+  border-radius: 2px;
+  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(214, 226, 255, 0.55) 60%, #fff);
+  box-shadow: 0 0 6px rgba(200, 220, 255, 0.7);
+  transform-origin: 100% 50%;
+  opacity: 0;
+}
+.cel-shoot::after {
+  content: '';
+  position: absolute;
+  right: -2px;
+  top: 50%;
+  width: 5px;
+  height: 5px;
+  margin-top: -2.5px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 10px 3px rgba(220, 232, 255, 0.85);
+}
+.cel-shoot.s1 {
+  left: 14%;
+  top: 18%;
+  --rot: 158deg;
+}
+.cel-shoot.s2 {
+  left: 64%;
+  top: 8%;
+  --rot: 148deg;
+}
+.cel-shoot.s3 {
+  left: 30%;
+  top: 46%;
+  --rot: 164deg;
+}
+
+/* the edges fall away into the dark, so the middle is where the eye rests */
+.cel-veil {
+  position: absolute;
+  inset: 0;
+  background: radial-gradient(135% 105% at 50% 40%, transparent 52%, rgba(2, 3, 9, 0.58) 100%);
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  .cel-wheel {
+    animation: cel-turn 3600s linear infinite;
+  }
+  .cel-star {
+    animation: cel-twinkle var(--d, 5s) ease-in-out var(--dl, 0s) infinite;
+  }
+  .cel-shoot.s1 {
+    animation: cel-shoot 23s linear 7s infinite;
+  }
+  .cel-shoot.s2 {
+    animation: cel-shoot 37s linear 18s infinite;
+  }
+  .cel-shoot.s3 {
+    animation: cel-shoot 53s linear 31s infinite;
+  }
+}
+@keyframes cel-turn {
+  to {
+    transform: rotate(360deg);
+  }
+}
+@keyframes cel-twinkle {
+  0%,
+  100% {
+    opacity: var(--a, 1);
+    transform: scale(1);
+  }
+  50% {
+    opacity: calc(var(--a, 1) * 0.4);
+    transform: scale(0.72);
+  }
+}
+@keyframes cel-shoot {
+  0%,
+  94% {
+    opacity: 0;
+    transform: rotate(var(--rot)) translateX(0) scaleX(0.2);
+  }
+  95% {
+    opacity: 1;
+  }
+  98.5% {
+    opacity: 0.9;
+    transform: rotate(var(--rot)) translateX(340px) scaleX(1);
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(var(--rot)) translateX(420px) scaleX(0.6);
+  }
+}
+
+/* ── the grounds step aside ───────────────────────────────────────── */
+html[data-theme='night'] body {
+  background: #03050d;
+}
+html[data-theme='night'] :is(.logos-root, .logos-root .l5, .logos-root .l5 .l5h-main, .app-root:not(.app-inline)) {
+  background: transparent;
+}
+/* a conversation's workspace: the logic map floats in the sky too */
+html[data-theme='night'] .logos-root :is(.ws-panel, .ws-body, .lg-panel) {
+  background: transparent;
+}
+
+/* ── the surfaces you read on are glass ───────────────────────────── */
+html[data-theme='night'] {
+  --cel-glass: rgba(9, 14, 34, 0.66);
+  --cel-glass-deep: rgba(7, 11, 27, 0.86);
+  --cel-glass-line: rgba(170, 190, 255, 0.14);
+  --cel-blur: blur(18px) saturate(150%);
+}
+/* the notebook grid under a map is quieter: the stars are a grid of their own */
+html[data-theme='night'] .logos-root :is(.lg-map, .l5x-canvas) {
+  background-image: radial-gradient(circle, rgba(200, 212, 255, 0.045) 1px, transparent 1px);
+}
+html[data-theme='night'] .app-root .logos-offer {
+  border-color: var(--cel-glass-line);
+  background: var(--cel-glass);
+  -webkit-backdrop-filter: var(--cel-blur);
+  backdrop-filter: var(--cel-blur);
+}
+html[data-theme='night'] .logos-root .l5x-convo {
+  background: var(--cel-glass);
+  -webkit-backdrop-filter: var(--cel-blur);
+  backdrop-filter: var(--cel-blur);
+  border-color: var(--cel-glass-line);
+}
+
+/* the sky at its full on the map, a little quieter behind reading */
+html[data-theme='night'] body:not(:has(.l5.is-home)) .cel-sky {
+  filter: brightness(0.82) saturate(0.9);
+}
+
+/* "We killed the chatbot." floats on the sky: while it is up, the app steps
+   out of sight behind it (and cannot be tabbed to); as it lifts away, the app
+   is there again underneath (components/onboarding/WhatsNew.tsx) */
+html[data-theme='night'] body:has(> .wn:not(.is-leaving)) > :not(.wn, .cel-sky) {
+  visibility: hidden;
+}
+
+/* the premise, for somebody new, floats on the sky in the same way: the app
+   behind it steps out of sight (components/onboarding/FirstRunIntro.tsx is
+   mounted inside the surface it introduces) */
+html[data-theme='night'] .ob-first {
+  background: transparent;
+}
+html[data-theme='night'] .ob-first .ob-grain {
+  display: none;
+}
+html[data-theme='night'] :is(.logos-root, .flex.h-dvh):has(> .ob-first) > :not(.ob-first) {
+  visibility: hidden;
+}

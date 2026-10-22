@@ -1303,71 +1303,38 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   background-image: radial-gradient(circle, rgba(var(--lg-ink-rgb), 0.055) 1px, transparent 1px);
 }
 
-/* ── Night: the map is a sky ──────────────────────────────────────── */
-/* deep navy, lighter toward the top, the way a sky is */
+/* ── Celestial: the map is a star chart ──────────────────────────── *
+ * (THEMES.night — the key keeps its first name.) The sky itself is behind
+ * the whole app (app/celestial.css, components/CelestialSky.tsx), so the map's
+ * own ground steps aside for it; what the map adds is the nearer dust, two
+ * layers of it that drift at their own depths as the map is moved — the far
+ * one slower, the near one faster and larger — so moving the map is moving
+ * through space. The dust is a tile the sky paints (--cel-dust). */
 html[data-theme="night"] .logos-root .l5 .l5h-main {
-  background: radial-gradient(130% 90% at 72% -12%, #1b2a52 0%, #111c38 34%, #0b1222 68%), #0b1222;
+  background: transparent;
 }
-/* the stars no conversation is: three layers of dust that drift a little slower than the map, and a milky way */
 html[data-theme="night"] .logos-root .l5 .l5n-sky {
   display: block;
-  background-image:
-    radial-gradient(1px 1px at 12% 18%, rgba(255, 255, 255, 0.7), transparent 60%),
-    radial-gradient(1px 1px at 37% 63%, rgba(255, 255, 255, 0.5), transparent 60%),
-    radial-gradient(1px 1px at 71% 29%, rgba(220, 228, 255, 0.6), transparent 60%),
-    radial-gradient(1px 1px at 88% 81%, rgba(255, 255, 255, 0.45), transparent 60%),
-    radial-gradient(1px 1px at 54% 92%, rgba(255, 255, 255, 0.4), transparent 60%),
-    radial-gradient(1.4px 1.4px at 23% 47%, rgba(255, 248, 230, 0.75), transparent 60%),
-    radial-gradient(1.4px 1.4px at 66% 74%, rgba(230, 236, 255, 0.65), transparent 60%),
-    radial-gradient(1.4px 1.4px at 91% 12%, rgba(255, 255, 255, 0.6), transparent 60%),
-    radial-gradient(1.8px 1.8px at 45% 22%, rgba(255, 240, 210, 0.85), transparent 60%),
-    radial-gradient(1.8px 1.8px at 8% 76%, rgba(214, 226, 255, 0.75), transparent 60%),
-    linear-gradient(118deg, transparent 28%, rgba(130, 150, 255, 0.05) 42%, rgba(210, 190, 255, 0.06) 50%, rgba(130, 150, 255, 0.04) 58%, transparent 70%);
-  background-size: 233px 233px, 233px 233px, 233px 233px, 233px 233px, 233px 233px, 389px 389px, 389px 389px, 389px 389px, 547px 547px, 547px 547px, 100% 100%;
-  background-position:
-    calc(var(--cx, 0px) * 0.05) calc(var(--cy, 0px) * 0.05), calc(var(--cx, 0px) * 0.05) calc(var(--cy, 0px) * 0.05), calc(var(--cx, 0px) * 0.05) calc(var(--cy, 0px) * 0.05),
-    calc(var(--cx, 0px) * 0.05) calc(var(--cy, 0px) * 0.05), calc(var(--cx, 0px) * 0.05) calc(var(--cy, 0px) * 0.05),
-    calc(var(--cx, 0px) * 0.1) calc(var(--cy, 0px) * 0.1), calc(var(--cx, 0px) * 0.1) calc(var(--cy, 0px) * 0.1), calc(var(--cx, 0px) * 0.1) calc(var(--cy, 0px) * 0.1),
-    calc(var(--cx, 0px) * 0.16) calc(var(--cy, 0px) * 0.16), calc(var(--cx, 0px) * 0.16) calc(var(--cy, 0px) * 0.16),
-    0 0;
+  opacity: 0.55;
+  background-image: var(--cel-dust, none);
+  background-size: 1024px 1024px;
+  background-position: calc(var(--cx, 0px) * 0.06) calc(var(--cy, 0px) * 0.06);
 }
-/* now and then, a shooting star */
 html[data-theme="night"] .logos-root .l5 .l5n-sky::after {
   content: '';
   position: absolute;
-  left: 12%;
-  top: 22%;
-  width: 130px;
-  height: 1.5px;
-  border-radius: 2px;
-  background: linear-gradient(90deg, rgba(255, 255, 255, 0), rgba(255, 255, 255, 0.85));
-  transform: rotate(-18deg);
-  opacity: 0;
-  animation: l5n-shoot 17s linear 4s infinite;
+  inset: 0;
+  opacity: 0.9;
+  background-image: var(--cel-dust, none);
+  background-size: 1700px 1700px;
+  background-position: calc(var(--cx, 0px) * 0.16 + 410px) calc(var(--cy, 0px) * 0.16 + 230px);
 }
-@keyframes l5n-shoot {
-  0%, 92% { opacity: 0; transform: translate(0, 0) rotate(-18deg); }
-  93% { opacity: 1; }
-  97% { opacity: 0; transform: translate(240px, -78px) rotate(-18deg); }
-  100% { opacity: 0; }
-}
-
-/* a hub glints: a thin cross of light through it */
-
-
-/* the lines: constellations faint and fine, what they share in gold */
 
 html[data-theme="night"] .logos-root .l5 .l5h-note {
   color: rgba(239, 220, 171, 0.82);
 }
 html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   background: rgba(255, 255, 255, 0.04);
-}
-
-@media (prefers-reduced-motion: reduce) {
-  html[data-theme="night"] .logos-root .l5 .l5n-sky::after {
-    animation: none;
-  }
 }
 
 /* ── in order: This month and All time (UniverseTime.tsx, lib/logos5/timeline.ts) ──
@@ -2321,6 +2288,10 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 .logos-root .l5 .l5b-link.is-dim .l5b-link-line {
   opacity: 0.35;
 }
+/* the comet that runs along a link: Celestial's alone (below) */
+.logos-root .l5 .l5b-link-comet {
+  display: none;
+}
 .logos-root .l5 .l5b-link-hit {
   fill: none;
   stroke: transparent;
@@ -3105,49 +3076,243 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5b-hub-t .l5h-star {
   color: #7a5c12;
 }
-/* Night: the subjects hang in the sky — the discs glow, the names are gold */
+/* ── Celestial: the subjects hang in the sky ───────────────────────── *
+ * A session is a star: lit from inside, its colour brightest at the core and
+ * deepening to the rim, with a bloom round it that fades into the dark. Where
+ * to pick up has a corona and a cross of light, like the brightest star in a
+ * photograph. A subject is an orbit, its dashes turning slowly; the lines are
+ * constellation lines; the quick questions are small stars that twinkle,
+ * each on its own beat; a link you made is a trail of gold with a comet
+ * running along it. The words float on glass. */
 html[data-theme="night"] .logos-root .l5 .l5h {
-  --l5b-link: #e7cf92;
-  --l5b-line: rgba(214, 222, 255, 0.3);
-  --l5b-ring: rgba(214, 222, 255, 0.24);
-  --l5b-name: rgba(231, 207, 146, 0.86);
+  --l5b-link: #f0d79b;
+  --l5b-line: rgba(196, 212, 255, 0.34);
+  --l5b-ring: rgba(196, 212, 255, 0.3);
+  --l5b-name: rgba(240, 216, 158, 0.92);
+}
+html[data-theme="night"] .logos-root .l5 .l5b-lines {
+  filter: drop-shadow(0 0 2.5px rgba(150, 180, 255, 0.4));
+}
+html[data-theme="night"] .logos-root .l5 .l5b-ring {
+  stroke-width: 1.2;
+}
+html[data-theme="night"] .logos-root .l5 .l5b-ring.is-project {
+  stroke: color-mix(in srgb, var(--c) 72%, #fff);
+}
+html[data-theme="night"] .logos-root .l5 .l5b-link-line {
+  stroke-width: 1.8;
+  filter: drop-shadow(0 0 3px rgba(240, 215, 155, 0.75));
+}
+/* the comet: one bright dash, running the length of the link */
+html[data-theme="night"] .logos-root .l5 .l5b-link-comet {
+  display: inline;
+  fill: none;
+  stroke: #fff7e0;
+  stroke-width: 3;
+  stroke-linecap: round;
+  stroke-dasharray: 0.035 0.965;
+  stroke-dashoffset: 1;
+  filter: drop-shadow(0 0 4px rgba(255, 236, 190, 0.95)) drop-shadow(0 0 10px rgba(255, 210, 140, 0.6));
+  pointer-events: none;
+}
+html[data-theme="night"] .logos-root .l5 .l5b-link:is(.is-quiet, .is-dim) .l5b-link-comet {
+  display: none;
 }
 html[data-theme="night"] .logos-root .l5 .l5b-name-t {
   background: transparent;
-  text-shadow: 0 0 8px #0b1222, 0 0 16px #0b1222;
+  letter-spacing: 0.17em;
+  text-shadow: 0 0 10px rgba(231, 207, 146, 0.35), 0 0 2px rgba(3, 5, 13, 0.9), 0 0 14px rgba(3, 5, 13, 0.85);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-disc {
-  box-shadow: 0 0 calc(var(--r) * 0.5) calc(var(--r) * 0.06) color-mix(in srgb, var(--c) 45%, transparent), 0 0 calc(var(--r) * 1.4) calc(var(--r) * 0.2) color-mix(in srgb, var(--c) 14%, transparent);
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.5) 0%, rgba(255, 255, 255, 0) 44%),
+    radial-gradient(circle, color-mix(in srgb, var(--c) 86%, #fff) 0%, var(--c) 62%, color-mix(in srgb, var(--c) 80%, #1c2556) 100%);
+  box-shadow:
+    inset 0 0 calc(var(--r) * 0.3) rgba(255, 255, 255, 0.22),
+    0 0 calc(var(--r) * 0.42) calc(var(--r) * 0.06) color-mix(in srgb, var(--c) 62%, transparent),
+    0 0 calc(var(--r) * 1.3) calc(var(--r) * 0.26) color-mix(in srgb, var(--c) 20%, transparent),
+    0 0 calc(var(--r) * 3) calc(var(--r) * 0.5) color-mix(in srgb, var(--c) 7%, transparent);
 }
+html[data-theme="night"] .logos-root .l5 .l5b-hub.is-shade .l5b-disc {
+  background:
+    radial-gradient(circle at 34% 28%, rgba(255, 255, 255, 0.4) 0%, rgba(255, 255, 255, 0) 44%),
+    radial-gradient(circle, color-mix(in srgb, var(--c) 74%, #fff) 0%, color-mix(in srgb, var(--c) 84%, #b7c3ff) 70%, color-mix(in srgb, var(--c) 70%, #26306a) 100%);
+}
+/* where you are, chosen, or found: a ring of light, not a hole cut round it */
+html[data-theme="night"] .logos-root .l5 .l5b-hub.is-here .l5b-disc {
+  box-shadow:
+    0 0 0 2px rgba(3, 5, 13, 0.5),
+    0 0 0 3.5px color-mix(in srgb, var(--c) 70%, #fff),
+    0 0 calc(var(--r) * 0.42) calc(var(--r) * 0.08) color-mix(in srgb, var(--c) 62%, transparent),
+    0 0 calc(var(--r) * 1.3) calc(var(--r) * 0.26) color-mix(in srgb, var(--c) 20%, transparent);
+}
+html[data-theme="night"] .logos-root .l5 :is(.l5b-hub:focus-visible, .l5b-hub.is-sel) .l5b-disc {
+  box-shadow:
+    0 0 0 2px rgba(3, 5, 13, 0.5),
+    0 0 0 4px rgba(240, 216, 158, 0.95),
+    0 0 26px 4px rgba(240, 216, 158, 0.35),
+    0 0 calc(var(--r) * 1.3) calc(var(--r) * 0.26) color-mix(in srgb, var(--c) 20%, transparent);
+}
+html[data-theme="night"] .logos-root .l5 .l5b-hub.is-found .l5b-disc {
+  box-shadow:
+    0 0 0 2px rgba(3, 5, 13, 0.5),
+    0 0 0 4.5px rgba(240, 216, 158, 0.9),
+    0 0 40px 10px rgba(240, 216, 158, 0.4);
+}
+/* where to pick up: a corona, and a cross of light */
 html[data-theme="night"] .logos-root .l5 .l5b-halo {
-  background: radial-gradient(circle, transparent 60%, rgba(231, 207, 146, 0.22) 70%, rgba(231, 207, 146, 0.06) 100%);
+  inset: -16px;
+  background: radial-gradient(circle, transparent 50%, rgba(240, 216, 158, 0.3) 61%, rgba(240, 216, 158, 0.09) 78%, transparent 100%);
+}
+html[data-theme="night"] .logos-root .l5 .l5b-halo::before,
+html[data-theme="night"] .logos-root .l5 .l5b-halo::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: calc(var(--r) * 2.7 + 26px);
+  height: 1.5px;
+  margin: -0.75px 0 0 calc((var(--r) * 2.7 + 26px) / -2);
+  background: linear-gradient(90deg, transparent 0%, rgba(255, 244, 214, 0.08) 12%, rgba(255, 244, 214, 0.5) 50%, rgba(255, 244, 214, 0.08) 88%, transparent 100%);
+  pointer-events: none;
+}
+html[data-theme="night"] .logos-root .l5 .l5b-halo::after {
+  transform: rotate(90deg);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-pip {
-  box-shadow: 0 0 calc(var(--r) * 2) calc(var(--r) * 0.4) color-mix(in srgb, var(--c) 45%, transparent);
+  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--c) 55%, #fff) 38%, var(--c) 72%);
+  box-shadow: 0 0 calc(var(--r) * 2.2) calc(var(--r) * 0.5) color-mix(in srgb, var(--c) 58%, transparent);
+}
+html[data-theme="night"] .logos-root .l5 .l5b-dot.is-chat .l5b-pip {
+  background: rgba(7, 11, 27, 0.9);
+  box-shadow: inset 0 0 0 1.6px var(--c), 0 0 calc(var(--r) * 2) calc(var(--r) * 0.3) color-mix(in srgb, var(--c) 40%, transparent);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-dot-t {
-  color: rgba(225, 228, 245, 0.8);
+  color: rgba(228, 232, 250, 0.84);
+  text-shadow: 0 0 3px rgba(3, 5, 13, 0.95), 0 0 10px rgba(3, 5, 13, 0.8);
+}
+/* the words on glass */
+html[data-theme="night"] .logos-root .l5 :is(.l5b-card, .l5h-find, .l5h-lens, .l5t-scrub-bar) {
+  background: rgba(10, 16, 38, 0.6);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  border-color: rgba(170, 190, 255, 0.16);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-card {
-  border-color: rgba(231, 207, 146, 0.3);
-  background: rgba(15, 24, 48, 0.94);
-  box-shadow: 0 0 40px rgba(231, 207, 146, 0.1), 0 20px 50px -24px rgba(0, 0, 0, 0.7);
+  border-color: rgba(240, 216, 158, 0.32);
+  box-shadow: 0 0 44px rgba(231, 207, 146, 0.1), 0 20px 50px -24px rgba(0, 0, 0, 0.7);
+}
+html[data-theme="night"] .logos-root .l5 .l5h-find:focus-within {
+  border-color: rgba(240, 216, 158, 0.42);
+  box-shadow: 0 0 0 4px rgba(240, 216, 158, 0.08), 0 0 40px -6px rgba(140, 170, 255, 0.25);
+}
+html[data-theme="night"] .logos-root .l5 .l5h-lens-pill {
+  background: linear-gradient(180deg, #f6e4b4, #e2c483);
+  box-shadow: 0 0 18px rgba(240, 216, 158, 0.45), 0 6px 16px -8px rgba(0, 0, 0, 0.6);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-card-t {
-  color: #f1eef8;
+  color: #f3f0fa;
 }
 html[data-theme="night"] .logos-root .l5 .l5b-card-s {
-  color: rgba(225, 228, 245, 0.72);
+  color: rgba(225, 228, 245, 0.74);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-card-s em {
-  color: #efdcab;
+  color: #f0d79b;
 }
 html[data-theme="night"] .logos-root .l5 .l5h-h,
 html[data-theme="night"] .logos-root .l5 .l5h-kicker {
-  text-shadow: 0 0 24px rgba(11, 18, 34, 0.9);
+  text-shadow: 0 0 24px rgba(3, 5, 13, 0.95), 0 0 2px rgba(3, 5, 13, 0.9);
 }
 html[data-theme="night"] .logos-root .l5 .l5h-h em {
-  color: #e7cf92;
+  color: #f0d79b;
+  text-shadow: 0 0 22px rgba(240, 216, 158, 0.35), 0 0 24px rgba(3, 5, 13, 0.95);
+}
+/* the line through time: each session a star on the plane of the galaxy */
+html[data-theme="night"] .logos-root .l5 .l5t-star {
+  background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--c) 70%, #fff) 30%, var(--c) 66%);
+  box-shadow: 0 0 calc(var(--r) * 1.2) calc(var(--r) * 0.2) color-mix(in srgb, var(--c) 55%, transparent), 0 0 calc(var(--r) * 3) calc(var(--r) * 0.5) color-mix(in srgb, var(--c) 14%, transparent);
+}
+html[data-theme="night"] .logos-root .l5 .l5t-bead.is-hub .l5t-star::after {
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 70%);
+}
+html[data-theme="night"] .logos-root .l5 .l5t-line {
+  filter: drop-shadow(0 0 3px color-mix(in srgb, var(--c) 70%, transparent));
+}
+
+@media (prefers-reduced-motion: no-preference) {
+  /* the orbits turn, each at its own pace */
+  html[data-theme="night"] .logos-root .l5 .l5b-ring {
+    animation: l5b-open 0.9s cubic-bezier(0.2, 0.8, 0.2, 1) var(--d, 0ms) both, cel-orbit 48s linear infinite;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-ring:nth-of-type(2n) {
+    animation-duration: 0.9s, 64s;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-ring:nth-of-type(3n) {
+    animation-duration: 0.9s, 82s;
+    animation-direction: normal, reverse;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-link-comet {
+    animation: cel-comet 6.5s cubic-bezier(0.45, 0.05, 0.55, 0.95) calc(var(--d, 0ms) + 1.2s) infinite;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-halo {
+    animation: cel-corona 5.2s ease-in-out infinite;
+  }
+  /* the quick questions twinkle, never together */
+  html[data-theme="night"] .logos-root .l5 .l5b-pip {
+    animation: l5b-settle 0.5s cubic-bezier(0.3, 1.2, 0.5, 1) var(--d, 0ms) both, cel-twinkle-pip 4.4s ease-in-out calc(var(--d, 0ms) + 700ms) infinite;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-dot:nth-child(3n) .l5b-pip {
+    animation-duration: 0.5s, 5.8s;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-dot:nth-child(4n + 1) .l5b-pip {
+    animation-duration: 0.5s, 3.3s;
+  }
+  html[data-theme="night"] .logos-root .l5 .l5b-dot:nth-child(5n + 2) .l5b-pip {
+    animation-duration: 0.5s, 7.1s;
+  }
+}
+@keyframes cel-orbit {
+  to {
+    stroke-dashoffset: -96;
+  }
+}
+@keyframes cel-comet {
+  0% {
+    stroke-dashoffset: 1;
+    opacity: 0;
+  }
+  8% {
+    opacity: 1;
+  }
+  60% {
+    stroke-dashoffset: 0.035;
+    opacity: 1;
+  }
+  64%,
+  100% {
+    stroke-dashoffset: 0.035;
+    opacity: 0;
+  }
+}
+@keyframes cel-corona {
+  0%,
+  100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(1.08);
+  }
+}
+@keyframes cel-twinkle-pip {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 /* ── on a phone: the name and the lenses over the map, the box at the foot ── */

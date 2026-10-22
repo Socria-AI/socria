@@ -75,7 +75,11 @@ html[data-theme='one'] .wn {
   --wn-cta-ink: #13293a;
   --wn-accent: #c8dae4;
 }
+/* Celestial: the live sky is behind it (app/celestial.css), and the app has
+   stepped out of sight — so it is nearly clear; where :has() is not there to
+   hide the app, it stays dark enough to read on */
 html[data-theme='night'] .wn {
+  background: rgba(3, 5, 13, 0.86);
   --wn-c1: #e7cf92;
   --wn-c2: #9cc3f0;
   --wn-on: #0b1222;
@@ -124,6 +128,14 @@ html[data-theme='night'] .wn {
   background:
     radial-gradient(900px 560px at 78% 42%, color-mix(in srgb, var(--wn-cta) 9%, transparent), transparent 70%),
     radial-gradient(700px 480px at 8% 96%, color-mix(in srgb, var(--wn-c2) 6%, transparent), transparent 70%);
+}
+@supports selector(body:has(> .wn)) {
+  html[data-theme='night'] .wn {
+    background: rgba(3, 5, 13, 0.22);
+  }
+  html[data-theme='night'] .wn-sky {
+    display: none;
+  }
 }
 html[data-theme='night'] .wn-sky {
   background:

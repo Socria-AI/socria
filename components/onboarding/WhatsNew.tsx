@@ -20,6 +20,7 @@
 // either way it is never shown again, on any device (`socria.new`).
 
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { readName } from '@/lib/onboarding-name';
 import { track } from '@/lib/analytics';
 import './whats-new.css';
@@ -115,7 +116,9 @@ export function WhatsNew({
     return () => window.removeEventListener('keydown', key);
   }, [leaving, next, back, onSkip]);
 
-  return (
+  // On <body> itself, beside the sky: on Celestial the app steps out of sight
+  // behind it (app/celestial.css) and it floats on the live sky.
+  const page = (
     <div
       ref={root}
       tabIndex={-1}
@@ -214,6 +217,7 @@ export function WhatsNew({
       </div>
     </div>
   );
+  return typeof document === 'undefined' ? page : createPortal(page, document.body);
 }
 
 // ── the drawings ──────────────────────────────────────────────────────

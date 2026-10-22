@@ -123,6 +123,8 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root .s-bar { background: rgba(255, 255, 255, 0.02); }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .acct-sheet .footbar { background: rgba(255, 255, 255, 0.03); }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .acct-sheet .scrim { background: rgba(0, 0, 0, 0.55); }
+/* the offer to see it drawn, under a chat: paper's pale card was a grey slab on a dark ground */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root .logos-offer { border-color: var(--ink-12); background: rgba(255, 255, 255, 0.035); }
 /* The mark is a dark drawing on a transparent ground; on a dark one it is drawn light. */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.app-root, .logos-root, .acct-sheet) img[src*="socria-mark"] { filter: invert(1) brightness(0.92); }
 /* A decision is the one filled card. On a dark ground it is filled with a wash

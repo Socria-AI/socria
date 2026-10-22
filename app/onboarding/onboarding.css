@@ -26,10 +26,12 @@
  * the full stack rather than the bare family.
  */
 .ob {
-  --ink-12: rgba(32, 32, 27, .12);
-  --ink-25: rgba(32, 32, 27, .25);
-  --ink-45: rgba(32, 32, 27, .45);
-  --ink-70: rgba(32, 32, 27, .70);
+  /* from the ink itself, so a dark ground (Dark, Celestial, One) gets light
+     rules and words, not paper's dark ones on its night */
+  --ink-12: color-mix(in srgb, var(--ink, #20201b) 12%, transparent);
+  --ink-25: color-mix(in srgb, var(--ink, #20201b) 25%, transparent);
+  --ink-45: color-mix(in srgb, var(--ink, #20201b) 45%, transparent);
+  --ink-70: color-mix(in srgb, var(--ink, #20201b) 70%, transparent);
   --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
   --font-serif-stack: var(--serif), "Instrument Serif", Georgia, serif;
 }
@@ -99,7 +101,7 @@
 @media(max-width:640px){.ob-cards{grid-template-columns:1fr}}
 .ob-card{background:var(--paper);padding:clamp(20px,2.6vw,30px);text-align:left;display:flex;flex-direction:column;gap:7px;
   min-height:126px;transition:background .22s,transform .22s}
-.ob-card:hover{background:#fff;transform:translateY(-2px)}
+.ob-card:hover{background:var(--surface,#fff);transform:translateY(-2px)}
 .ob-card .rn{font-family:var(--serif);font-style:italic;font-size:.98rem;color:var(--moss-700)}
 .ob-card .t{font-family:var(--serif);font-size:clamp(1.25rem,2.1vw,1.65rem);line-height:1.1;color:var(--ink)}
 .ob-card .d{font-size:.94rem;line-height:1.45;color:var(--ink-60);margin-top:auto}
@@ -127,7 +129,7 @@
 .ob-eg{display:flex;flex-wrap:wrap;gap:9px;margin-top:20px}
 .ob-eg button{padding:8px 15px;border-radius:999px;border:1px solid var(--ink-16);background:var(--paper);
   font-size:.9rem;color:var(--ink-60);text-align:left;transition:border-color .2s,color .2s,background .2s}
-.ob-eg button:hover{border-color:var(--moss);color:var(--moss-700);background:#fff}
+.ob-eg button:hover{border-color:var(--moss);color:var(--moss-700);background:var(--surface,#fff)}
 
 /* beat iii — the exchange */
 .ob-said{padding:0 0 clamp(18px,3vh,28px);border-bottom:1px solid var(--ink-12)}
