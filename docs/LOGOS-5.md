@@ -1068,3 +1068,26 @@ opened on.
   added with the clip were sorted into four topics with Accruals and deferrals
   as the start. `test/logos5-study-ui.test.mjs` holds the box (its clip, what
   it accepts, the picker, a Project's start).
+
+### "We killed the chatbot."
+
+Asked for: "create a onboarding system for existing users explaining the new
+socria briefly for users who log back in 'we killed the chatbot'".
+
+- Three short beats over the map (`components/onboarding/WhatsNew.tsx`): *We
+  killed the chatbot. Socria is a map of your thinking now.* — with every
+  conversation they had counted and on it; *Your map, not a list.* — circles,
+  discs, links, the four lenses; *Everything starts in one box.* — ask or drop
+  notes in, Projects on the map. Each with a drawing that does what it says.
+- Shown once, to whoever did something in Socria before the new one first
+  opened for them (`lib/first-run.ts` `socria.opened`, `usedBefore`,
+  `wantsWhatsNew`), on the map — and on Core's chat for an account, where its
+  last button opens the map. Rules and failure states: `docs/ONBOARDING.md`.
+- Checked in the real app (signed out, through the dev stand-ins): a history
+  from before was told over the map ("All 3 of your conversations are on it —
+  nothing was lost."), *Show me my map* lifted it to show the map, a reload did
+  not bring it back, the testing replay did, Esc skipped it; a history begun on
+  the new Socria was never told; a stranger got the premise instead. In the
+  browser harness, every beat in Paper, Night and Dark at 1440 and 390, with
+  the animations stepped frame by frame. `test/whats-new.test.mjs` holds who,
+  when, where and what.

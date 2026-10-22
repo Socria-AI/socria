@@ -219,9 +219,10 @@ import {
 import { owesExtraction } from '@/lib/conversation-surface';
 import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
+import { WhatsNew } from '@/components/onboarding/WhatsNew';
 import { LogosCover } from '@/components/LogosCover';
 import { useFirstRun } from '@/components/useFirstRun';
-import { wantsIntro } from '@/lib/first-run';
+import { wantsIntro, wantsWhatsNew } from '@/lib/first-run';
 import { computationFacts, whatChanged } from '@/lib/model/inspect';
 import { viewsFor } from '@/lib/model/views';
 import { affectedBy } from '@/lib/model/deps';
@@ -6872,6 +6873,23 @@ export function LogosApp({
   // stays, saying so, until the topics are there).
   const emptyHere = messages.length === 0 && !busy && !streaming && !groupView && !togetherReadOnly;
   const homeShown = l5 && (l5Home || emptyHere) && !l5Mind && !hydrating && !room.active;
+  // WHAT CHANGED, once, to somebody who used the Socria before the map — told
+  // on the map, because the map is what changed (lib/first-run.ts
+  // wantsWhatsNew). Every conversation they had counts as having been here,
+  // the Core chats listed beside these included.
+  const withWork = sessions.filter((x) => x.messages.length > 0 || !!x.map?.nodes?.length);
+  const workHere = new Set(withWork.map((x) => x.id));
+  const chatsBeside = (chats ?? []).filter((c) => !workHere.has(c.id));
+  const whatsNewShown =
+    homeShown &&
+    !togetherReadOnly &&
+    wantsWhatsNew(firstRun.state, {
+      work: [...withWork.map((x) => x.updatedAt), ...chatsBeside.map((c) => c.updatedAt)],
+      hydrated: !hydrating,
+      synced: firstRun.synced,
+      introShowing: introWanted,
+      busy: busy || !!streaming || organizing || sortPending,
+    });
   /** the Mind Graph is its own place: over home and over a line of thinking alike */
   const mindShown = l5 && l5Mind && !hydrating && !room.active;
   function goHome() {
@@ -7156,6 +7174,15 @@ export function LogosApp({
             void send(text);
           }}
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
+        />
+      )}
+      {whatsNewShown && (
+        <WhatsNew
+          surface="logos"
+          kept={withWork.length + chatsBeside.length}
+          // the map is underneath: it lifts away to show it
+          onDone={() => firstRun.reach('socria.new')}
+          onSkip={() => firstRun.reach('socria.new', { skipped: true })}
         />
       )}
       {LOGOS4.capture && (

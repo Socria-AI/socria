@@ -62,6 +62,15 @@ export const MILESTONES = [
    * happens once per account, on every device.
    */
   'logos.merged',
+  // ── the new Socria, once ──
+  /**
+   * the Socria of the map — not the chatbot — was first opened, on any device
+   * of theirs. The line between before and after: whatever they did earlier
+   * was done in the old one. Recorded, not taught, like 'logos.merged'.
+   */
+  'socria.opened',
+  /** what changed was shown — "We killed the chatbot." — to someone who used the old Socria, or skipped */
+  'socria.new',
   // ── found along the way, each once, when its value was legible ──
   'found.trace',
   'found.views',
@@ -108,10 +117,14 @@ export const FIRST_RUN_KEYS = [
  * browser flags that would otherwise put them straight back (legacyMilestones).
  */
 export const REPLAYS = {
-  // the merge is not onboarding: starting again does not bring the chats in twice
-  all: { milestones: MILESTONES.filter((m) => m !== 'logos.merged') as Milestone[], keys: [...FIRST_RUN_KEYS] as string[] },
+  // the merge is not onboarding: starting again does not bring the chats in
+  // twice — and when the new Socria first opened stays when it first opened
+  all: { milestones: MILESTONES.filter((m) => m !== 'logos.merged' && m !== 'socria.opened') as Milestone[], keys: [...FIRST_RUN_KEYS] as string[] },
   core: { milestones: ['core.first', 'core.aha'] as Milestone[], keys: ['socria.core4IntroDontShowAgain.v1'] },
   found: { milestones: MILESTONES.filter((m) => m.startsWith('found.')) as Milestone[], keys: ['socria.hints.seen.v1'] },
+  // "We killed the chatbot." again — and the line moved to now, so everything
+  // already here, a test account's included, counts as the old Socria's
+  new: { milestones: ['socria.new', 'socria.opened'] as Milestone[], keys: [] },
 } as const;
 export type ReplayPart = keyof typeof REPLAYS;
 
@@ -299,6 +312,46 @@ export function wantsCoreLine(s: FirstRun, ctx: { replies: number; streaming: bo
   return ctx.replies >= 1;
 }
 
+/** Recorded rather than done: none of these says somebody used Socria. */
+const RECORDED: readonly Milestone[] = ['socria.opened', 'socria.new', 'logos.merged'];
+
+/**
+ * Were they here before the new Socria?
+ *
+ * Something they did — a milestone in the record, a conversation they last
+ * touched (`work`, the times) — earlier than the first time the new Socria
+ * opened for them. That moment is per person rather than a launch date: it
+ * is whenever one of their devices first ran it, so the answer does not
+ * depend on when this reached them. Strictly earlier, so nothing the new
+ * Socria itself records can count; and with no moment yet, nobody can be
+ * told apart, so nobody is.
+ */
+export function usedBefore(s: FirstRun, work: readonly number[]): boolean {
+  const opened = s.at['socria.opened'];
+  if (typeof opened !== 'number') return false;
+  for (const [m, t] of Object.entries(s.at) as [Milestone, number][]) {
+    if (!RECORDED.includes(m) && t < opened) return true;
+  }
+  return work.some((t) => Number.isFinite(t) && t > 0 && t < opened);
+}
+
+/**
+ * Tell them what changed — "We killed the chatbot."?
+ *
+ * Only to somebody who used the Socria before this one (`usedBefore`), once,
+ * and never on top of the premise. Not until the account's copy of the record
+ * has been merged in (`synced`): a second device must not flash it at somebody
+ * who read it on the first. Not while something is in flight.
+ */
+export function wantsWhatsNew(
+  s: FirstRun,
+  ctx: { work: readonly number[]; hydrated: boolean; synced: boolean; introShowing: boolean; busy?: boolean }
+): boolean {
+  if (!ctx.hydrated || !ctx.synced || ctx.introShowing || ctx.busy) return false;
+  if (has(s, 'socria.new')) return false;
+  return usedBefore(s, ctx.work);
+}
+
 /** Which milestone a surface's own flag maps to, for the surfaces that keep one. */
 export const ANALYTICS_FOR: Partial<Record<Milestone, string>> = {
   'socria.intro': 'socria_intro_completed',
@@ -311,6 +364,7 @@ export const ANALYTICS_FOR: Partial<Record<Milestone, string>> = {
   'logos.inspected': 'logos_first_object_inspected',
   'logos.asked': 'logos_first_ask_this',
   'logos.aha': 'logos_first_experience_completed',
+  'socria.new': 'whats_new_completed',
   'found.trace': 'progressive_trace_discovered',
   'found.views': 'progressive_view_discovered',
   'found.dependencies': 'progressive_dependencies_discovered',

@@ -63,6 +63,11 @@ export const EVENTS = [
   'logos_first_ask_this',
   'logos_first_experience_completed',
   'logos_aha_reached',
+  // "We killed the chatbot." (components/onboarding/WhatsNew.tsx): shown to
+  // somebody who used the Socria before the map, then finished — or skipped,
+  // which is also 'onboarding_skipped' with step 'socria.new'. 'surface' says where.
+  'whats_new_started',
+  'whats_new_completed',
   'onboarding_skipped',
   // which broad kind of thinking they picked in onboarding — an id from
   // lib/onboarding-roles.ts, never their words

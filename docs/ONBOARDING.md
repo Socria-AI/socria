@@ -19,6 +19,17 @@ ONE ONBOARDING, FOR ALL OF SOCRIA (components/onboarding/FirstRunIntro.tsx)
             ordered and worded for what they think about
 
 CORE        one line, once, after the first real reply
+
+WHAT CHANGED, ONCE, FOR WHOEVER USED SOCRIA BEFORE THE MAP
+(components/onboarding/WhatsNew.tsx)
+
+  killed    "We killed the chatbot. Socria is a map of your thinking now."
+            — every conversation they had is on it, counted; nothing was lost
+  map       "Your map, not a list." — subjects as circles, conversations as
+            discs, a link they made as a dashed line; the lenses: Today and
+            This week as a map, This month and All time as a line through time
+  box       "Everything starts in one box." — ask, or drop notes in and they
+            are sorted onto the map; Projects are on it too
 ```
 
 Every step is skippable, and anything already answered on this browser is not
@@ -79,6 +90,9 @@ One record, keyed by **milestone** rather than by screen:
 | `logos.asked` | they asked about an object by its identity |
 | `logos.aha` | the sequence released them (or they skipped it) |
 | `found.trace` `found.views` `found.dependencies` `found.compare` `found.evidence` | a capability was said once, when legible |
+| `logos.merged` | their Core chats were brought into Logos 5 (recorded, not taught) |
+| `socria.opened` | the new Socria — the map, not the chatbot — first opened, on any device (recorded, not taught) |
+| `socria.new` | "We killed the chatbot." was shown to someone who used the old Socria (or skipped) |
 
 - `reach()` is idempotent and reports `fresh`; **only a fresh milestone sends
   an analytics event**, so a refresh double-counts nothing.
@@ -96,9 +110,48 @@ One record, keyed by **milestone** rather than by screen:
   visit is the worse failure. A corrupt value reads as *nothing learned* and is
   overwritten on the next write.
 
-Decisions live beside the record: `wantsIntro`, `wantsCoreLine`; the Logos
-sequence's own planner is `lib/onboarding.ts` (`planFor`, `advance`,
-`shouldStart`).
+Decisions live beside the record: `wantsIntro`, `wantsCoreLine`,
+`usedBefore` and `wantsWhatsNew`; the Logos sequence's own planner is
+`lib/onboarding.ts` (`planFor`, `advance`, `shouldStart`).
+
+## "We killed the chatbot." — for whoever used Socria before the map
+
+Told once, to the people it changed for, and to nobody else.
+
+- **Who.** Somebody who did something before the new Socria first opened for
+  them: a milestone in the record, or a conversation last touched, earlier
+  than `socria.opened` (`usedBefore`). That moment is per person, not a launch
+  date — `useFirstRun` reaches it the first time any page that reads the
+  record is ready, and the account merge keeps the earliest across devices —
+  so whenever this reaches somebody, everything they did before it was the old
+  Socria's, and everything after it is the new one's. Strictly earlier, so
+  nothing the new Socria records counts; `logos.merged`, `socria.opened` and
+  `socria.new` are recorded rather than done and never count. A person who
+  began on the new Socria is never told, however much they do later; a
+  stranger with nothing gets the premise instead.
+- **When.** Not before their conversations have loaded, not before the
+  account's copy of the record is in (`synced` from `useFirstRun`, computed in
+  render so the frame where sign-in lands is already not synced — a second
+  device never flashes it at somebody who read it on the first), never over
+  the premise, never while a reply or a sort is under way, never twice.
+- **Where.** On Logos 5, over the Universal Map and only there (not over an
+  open conversation, a shared one or a room): the last button, *Show me my
+  map*, lifts it away to show the real map underneath. On Core's chat, for an
+  account (the map is an account's): *Take me to my map* is the picker's own
+  switch (`pickModel`), so the open chat comes along and Logos opens on the
+  map.
+- **What.** Three beats, each a sentence and a drawing that does what the
+  sentence says: a chat folding bubble by bubble into the map; the map read,
+  the lens walking Today → This week → This month → All time and the map
+  becoming a line through time; the box typed into, a file dropped in, sent,
+  and landing on the map sorted into topics. Skip (or Esc) at any point —
+  either way it is never shown again, on any device. Arrow keys step; focus
+  comes in with it. Every drawing rests at the end of its story without motion.
+  Themed by the root variables, with its own colours per dark ground.
+- **Testing.** Manage Account → Testing → *Replay "We killed the chatbot."*
+  takes back `socria.new` and `socria.opened` (`REPLAYS.new`), so on the next
+  load the line moves to now and everything already there counts as before.
+  Replaying everything keeps `socria.opened`, like the merge.
 
 ## Routing, and who sees what
 
@@ -115,6 +168,8 @@ sequence's own planner is `lib/onboarding.ts` (`planFor`, `advance`,
   Logos-first person is not re-introduced to Socria by the chat.
 - Nobody is asked "Core or Logos?". The surface you are on is the surface you
   start in.
+- **Somebody who used Socria before the map** → "We killed the chatbot.",
+  once, over the map (or over Core's chat, leading to it) — see above.
 
 ## Core
 
@@ -138,7 +193,10 @@ branch — nothing is taught that does not exist.
 Vocabulary in `lib/analytics.ts`; shape only (`surface`, `step`, `object` —
 kinds, never labels or words). Each first-run event fires once per person, on
 a fresh milestone. `socria_intro_started` fires once per showing (component
-mount), `onboarding_skipped` on any skip with the step.
+mount), `onboarding_skipped` on any skip with the step. "We killed the
+chatbot." has `whats_new_started` (once per showing) and `whats_new_completed`
+(the fresh `socria.new`, finished or skipped; a skip is also
+`onboarding_skipped` with step `socria.new`).
 
 ## Guests, and claiming a guest's record
 

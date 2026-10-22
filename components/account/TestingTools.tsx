@@ -88,6 +88,12 @@ export function TestingTools({ onClose }: { onClose: () => void }) {
           <span className="d">As a new person — name, what you think about, how you like to think, then the first thought</span>
         </a>
         <Item
+          id="new"
+          t="Replay “We killed the chatbot.”"
+          d="What changed, as somebody who used Socria before the map sees it — once, on the map"
+          onClick={() => void run('new', () => replayPart('new'), () => window.location.assign('/chat'))}
+        />
+        <Item
           id="core"
           t="Replay Core’s first line"
           d="Shows again under the next reply in the chat"

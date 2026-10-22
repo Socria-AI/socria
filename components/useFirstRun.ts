@@ -33,8 +33,11 @@ import { track, type AnalyticsEvent } from '@/lib/analytics';
 /** Fired in this tab whenever the record changes, so every mounted hook agrees. */
 export const FIRST_RUN_CHANGED = 'socria:firstrun';
 
-/** The account merge happens once per page life, whichever hook gets there first. */
-let mergedForAccount = false;
+/**
+ * The account merge happens once per page life, whichever hook gets there
+ * first; every hook waits on the same one (`synced`).
+ */
+let accountMerge: Promise<void> | null = null;
 
 async function putRemote(s: FirstRun): Promise<void> {
   try {
@@ -42,6 +45,9 @@ async function putRemote(s: FirstRun): Promise<void> {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ firstRun: s }),
+      // a milestone is often the last thing a page does before it goes
+      // (a button that switches surface): the account still hears of it
+      keepalive: true,
     });
   } catch {
     // The browser's copy is the record of truth until the next sync.
@@ -62,7 +68,7 @@ export async function replayFirstRun(): Promise<void> {
   const keeps = Object.keys(kept.at).length > 0;
   forgetFirstRunLocal(store);
   if (keeps) writeFirstRun(store, kept);
-  mergedForAccount = false;
+  accountMerge = null;
   try {
     // Signed out, this is a 401 and there is nothing on an account to clear.
     await fetch('/api/profile', {
@@ -90,7 +96,7 @@ export async function replayPart(part: ReplayPart): Promise<void> {
   }
   const next = withoutMilestones(readFirstRun(window.localStorage), milestones);
   writeFirstRun(window.localStorage, next);
-  mergedForAccount = false;
+  accountMerge = null;
   try {
     await fetch('/api/profile', {
       method: 'PUT',
@@ -101,11 +107,43 @@ export async function replayPart(part: ReplayPart): Promise<void> {
   window.dispatchEvent(new Event(FIRST_RUN_CHANGED));
 }
 
+/**
+ * The account's copy, merged in. A union, so neither side can un-teach the
+ * other; the browser is then told, and the account is told if the browser
+ * knew something it did not — which is how a guest's record is claimed by the
+ * account they go on to make. Resolves either way: offline, the browser's
+ * copy stands.
+ */
+async function mergeAccount(): Promise<void> {
+  try {
+    const res = await fetch('/api/profile', { cache: 'no-store' });
+    if (!res.ok) return;
+    const j = await res.json().catch(() => null);
+    const local = readFirstRun(window.localStorage);
+    if (!j || j.firstRun === undefined || j.firstRun === null) {
+      // No row, or the column is not there yet: nothing to merge. Offer
+      // what this browser knows; the route ignores it if it cannot keep it.
+      if (Object.keys(local.at).length) await putRemote(local);
+      return;
+    }
+    const remote = parseFirstRun(j.firstRun);
+    const merged = mergeFirstRun(local, remote);
+    writeFirstRun(window.localStorage, merged);
+    window.dispatchEvent(new Event(FIRST_RUN_CHANGED));
+    if (aheadOf(local, remote)) await putRemote(merged);
+  } catch {
+    // Offline, or the route is unhappy. The browser's copy stands.
+  }
+}
+
 export function useFirstRun(opts: { signedIn: boolean; surface: 'core' | 'logos' }) {
   const [state, setState] = useState<FirstRun>(EMPTY_FIRST_RUN);
   // False until the browser's record has been read — a decision made on the
   // empty default would teach everybody the premise for one frame.
   const [ready, setReady] = useState(false);
+  // True once the account's copy has been merged in (or tried): what one
+  // device has shown, another must not show again for a moment.
+  const [merged, setMerged] = useState(false);
   const surface = opts.surface;
 
   useEffect(() => {
@@ -120,34 +158,13 @@ export function useFirstRun(opts: { signedIn: boolean; surface: 'core' | 'logos'
     };
   }, []);
 
-  // The account's copy, merged in once. A union, so neither side can
-  // un-teach the other; the browser is then told, and the account is told if
-  // the browser knew something it did not — which is how a guest's record is
-  // claimed by the account they go on to make.
   useEffect(() => {
-    if (!opts.signedIn || mergedForAccount) return;
-    mergedForAccount = true;
-    (async () => {
-      try {
-        const res = await fetch('/api/profile', { cache: 'no-store' });
-        if (!res.ok) return;
-        const j = await res.json().catch(() => null);
-        const local = readFirstRun(window.localStorage);
-        if (!j || j.firstRun === undefined || j.firstRun === null) {
-          // No row, or the column is not there yet: nothing to merge. Offer
-          // what this browser knows; the route ignores it if it cannot keep it.
-          if (Object.keys(local.at).length) await putRemote(local);
-          return;
-        }
-        const remote = parseFirstRun(j.firstRun);
-        const merged = mergeFirstRun(local, remote);
-        writeFirstRun(window.localStorage, merged);
-        window.dispatchEvent(new Event(FIRST_RUN_CHANGED));
-        if (aheadOf(local, remote)) await putRemote(merged);
-      } catch {
-        // Offline, or the route is unhappy. The browser's copy stands.
-      }
-    })();
+    if (!opts.signedIn) return;
+    let live = true;
+    void (accountMerge ??= mergeAccount()).then(() => live && setMerged(true));
+    return () => {
+      live = false;
+    };
   }, [opts.signedIn]);
 
   const signedInRef = useRef(opts.signedIn);
@@ -174,7 +191,18 @@ export function useFirstRun(opts: { signedIn: boolean; surface: 'core' | 'logos'
     [surface]
   );
 
+  // THE NEW SOCRIA OPENED HERE (lib/first-run.ts usedBefore): the first time
+  // on any device, which the account merge keeps as the earliest. Whatever
+  // the record or the history holds from before it was the old Socria's.
+  useEffect(() => {
+    if (ready) reach('socria.opened');
+  }, [ready, reach]);
+
   const hasReached = useCallback((m: Milestone) => has(state, m), [state]);
 
-  return { state, ready, reach, has: hasReached };
+  // Computed rather than stored, so the render where sign-in lands is already
+  // not synced — no frame decides on the browser's copy alone.
+  const synced = ready && (!opts.signedIn || merged);
+
+  return { state, ready, synced, reach, has: hasReached };
 }

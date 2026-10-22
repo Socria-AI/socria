@@ -63,7 +63,8 @@ import { readStart, startMessage } from '@/lib/first-session';
 import { takeCarried } from '@/lib/onboarding-script';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { useFirstRun } from '@/components/useFirstRun';
-import { wantsCoreLine, wantsIntro } from '@/lib/first-run';
+import { WhatsNew } from '@/components/onboarding/WhatsNew';
+import { wantsCoreLine, wantsIntro, wantsWhatsNew } from '@/lib/first-run';
 import { Tour } from '@/components/Tour';
 import { FindPanel } from '@/components/FindPanel';
 import { Hint, useSeenHints } from '@/components/Hint';
@@ -2942,8 +2943,40 @@ export default function ChatPage() {
       hydrated: !hydrating,
     });
 
+  // WHAT CHANGED, to somebody who used the Socria before the map and has
+  // landed back in a chat (lib/first-run.ts wantsWhatsNew): the last beat is
+  // the way to the map. Signed in only — the map is an account's, and a
+  // stranger is told the premise instead.
+  const coreWork = conversations.filter((c) => c.messages.length > 0);
+  const showWhatsNew =
+    !!isSignedIn &&
+    authSettled &&
+    !homeProject &&
+    !sharedOpen &&
+    !tourOpen &&
+    wantsWhatsNew(firstRun.state, {
+      work: [...coreWork.map((c) => c.updatedAt), ...logosSessions.map((x) => x.updatedAt)],
+      hydrated: !hydrating,
+      synced: firstRun.synced,
+      introShowing: showIntro,
+      busy: sending,
+    });
+
   return (
     <div className="flex h-dvh">
+      {showWhatsNew && (
+        <WhatsNew
+          surface="core"
+          kept={coreWork.length + logosSessions.length}
+          onDone={() => {
+            firstRun.reach('socria.new');
+            // the same switch as the picker's: the open chat comes along, and
+            // Logos opens on the map
+            pickModel(logosToOpen());
+          }}
+          onSkip={() => firstRun.reach('socria.new', { skipped: true })}
+        />
+      )}
       {showIntro && (
         <IntroOnce
           onStart={(text) => {
