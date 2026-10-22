@@ -9,14 +9,15 @@
 // empty line, "Earlier", or the whole history at the foot, whose window can
 // be dragged. A ↩ before a thread goes back to where its subject was before.
 // A search lights what it found and brings the newest of it into view.
-// Pressing a conversation opens its card; pressing it again opens it.
+// Pressing a conversation opens its card; pressing it again opens it. It
+// comes in from today backwards: the newest rise first, and each thread is
+// drawn out along its line.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import { timeLayout, TIME_NARROW, TIME_WIDE, type TimeBead } from '@/lib/logos5/timeline';
 import type { Homes } from '@/lib/logos5/spatial';
 import type { Match, Tile } from '@/lib/logos5/universe';
-import { colorVar, shortDate } from './UniverseSky';
-import { kindLine, tileSaid } from './UniverseParts';
+import { colorVar, kindLine, shortDate, tileSaid } from './UniverseParts';
 
 const css = (vars: Record<string, string | number>): CSSProperties => vars as unknown as CSSProperties;
 /** before paint in a browser; nothing on the server, where there is nothing to scroll */
@@ -44,6 +45,7 @@ export function TimeView({
   focus,
   endKey = 0,
   top,
+  bottom = 0,
   acts,
 }: {
   /** the conversations shown: hidden and filtered ones already left out */
@@ -63,8 +65,9 @@ export function TimeView({
   focus?: { id: string; n: number } | null;
   /** changes when the line should go back to today */
   endKey?: number;
-  /** how much of the top the bar covers */
+  /** how much of the top the page's own words cover, and of the foot the box that finds or starts */
   top: number;
+  bottom?: number;
   acts: TimeActs;
 }) {
   const L = useMemo(() => timeLayout({ tiles, homes, now, from, narrow }), [tiles, homes, now, from, narrow]);
@@ -233,7 +236,7 @@ export function TimeView({
       <div
         key={b.id}
         className={cls}
-        style={{ left: b.x, top: b.y, ...css({ '--c': colorOf(b.id), '--r': `${b.r}px`, '--lw': `${S.label}px` }) }}
+        style={{ left: b.x, top: b.y, ...css({ '--c': colorOf(b.id), '--r': `${b.r}px`, '--lw': `${S.label}px`, '--in': `${Math.round(Math.min(640, Math.max(0, L.width - b.x) * 0.42))}ms` }) }}
         data-bead={b.id}
         role="button"
         tabIndex={matchOf && !m ? -1 : 0}
@@ -274,7 +277,7 @@ export function TimeView({
   };
 
   return (
-    <div className={`l5t${narrow ? ' is-narrow' : ''}`} style={{ top }}>
+    <div className={`l5t${narrow ? ' is-narrow' : ''}`} style={{ top, bottom }}>
       <div
         className="l5t-scroll"
         ref={scroller}
@@ -317,8 +320,8 @@ export function TimeView({
                 const quiet = matchOf && !t.ids.some((id) => matchOf(id));
                 return (
                   <g key={t.key} className={quiet ? 'is-dim' : ''} style={css({ '--c': colorVar(t.color) })}>
-                    <path className="l5t-halo" d={d} />
-                    <path className="l5t-line" d={d} />
+                    <path className="l5t-halo" d={d} pathLength={1} />
+                    <path className="l5t-line" d={d} pathLength={1} />
                   </g>
                 );
               })}

@@ -4,12 +4,23 @@
 // A conversation's kind as a glyph, and its marks; the card that
 // opens when one is pressed; the box that finds or starts; the View menu; the
 // tray of hidden ones; and the bar for several chosen at once. The map itself
-// is UniverseSky.tsx, and the whole is Universe.tsx.
+// is UniverseBubbles.tsx, the line through time UniverseTime.tsx, and the
+// whole is Universe.tsx.
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { relTime } from '@/lib/logos-sessions';
 import type { Look, Match, Tile } from '@/lib/logos5/universe';
-import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type HomeMode, type LabelLevel, type SizeBy, type SortBy } from '@/lib/logos5/arrange';
+import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type HomeMode, type LabelLevel, type SizeBy } from '@/lib/logos5/arrange';
+
+/** A colour key as the theme draws it. */
+export const colorVar = (key: string | null | undefined) => (key ? `var(--sc-${key})` : 'var(--sc-none)');
+
+const MONTH_SHORT = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+/** "Oct 5" */
+export const shortDate = (at: number) => {
+  const d = new Date(at);
+  return `${MONTH_SHORT[d.getMonth()]} ${d.getDate()}`;
+};
 
 // ── a kind of thinking, as a glyph ───────────────────────────────────
 
@@ -266,9 +277,10 @@ export interface Found {
 }
 
 /**
- * One box: what is typed is looked for on the map — what does not match dims —
- * and the first answer is a press of Enter away; or, if nothing is right, it
- * begins a new line of thinking with those words as its first question.
+ * One box, at the map's foot: what is typed is looked for on the map — what
+ * does not match dims — and the first answer is a press of Enter away; or, if
+ * nothing is right, its round ↑ begins a new line of thinking with those
+ * words as its first question. Its list opens upward, over the map.
  */
 export function FindOrStart({
   query,
@@ -342,15 +354,11 @@ export function FindOrStart({
   };
   return (
     <div className={`l5h-find${open ? ' is-open' : ''}`} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOpen(false)}>
-      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-        <circle cx="11" cy="11" r="6.5" />
-        <path d="M16 16l4 4" />
-      </svg>
       <input
         ref={inputRef}
         type="search"
         value={query}
-        placeholder="Find or start…"
+        placeholder="Search or start something new…"
         aria-label="Find a conversation or an idea, or start a new line of thinking"
         role="combobox"
         aria-expanded={open}
@@ -395,9 +403,18 @@ export function FindOrStart({
           ×
         </button>
       )}
-      <kbd className="l5h-kbd" aria-hidden="true">
-        /
-      </kbd>
+      <button
+        type="button"
+        className="l5h-find-go"
+        aria-label={q ? `Start a new line of thinking: ${q}` : 'Start a new line of thinking'}
+        title={q ? 'Start something new with this' : 'Start something new'}
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => pick(options.length - 1)}
+      >
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <path d="M12 19V5M6 11l6-6 6 6" />
+        </svg>
+      </button>
       {open && (
         <div className="l5h-find-list" id="l5h-find-list" role="listbox" aria-label="Found, or start">
           {options.map((o, i) => (
@@ -423,7 +440,6 @@ export function FindOrStart({
 
 // ── the View menu ────────────────────────────────────────────────────
 
-const SORT_SAID: Record<SortBy, string> = { manual: 'Your order', recent: 'Last active', started: 'First started', name: 'Name', size: 'Size' };
 const LABEL_SAID: Record<LabelLevel, string> = { minimal: 'Minimal', titles: 'Titles', ideas: 'Ideas' };
 const COLOR_SAID: Record<ColorBy, string> = { project: 'Subject', kind: 'Kind', recency: 'Recency' };
 /** a hub's size: how much it holds, how recent it is, or all alike */
@@ -461,14 +477,12 @@ export function ViewMenu({
   hasChats = true,
   hiddenCount,
   onDisplay,
-  onSort,
   onProjects,
   onSaveView,
   onApplyView,
   onRemoveView,
   onTray,
   onNote,
-  onTidy,
   onReset,
   onAtlas,
   onClose,
@@ -481,14 +495,12 @@ export function ViewMenu({
   hasChats?: boolean;
   hiddenCount: number;
   onDisplay: (patch: Partial<Display>) => void;
-  onSort: (s: SortBy) => void;
   onProjects: (keys: string[] | null) => void;
   onSaveView: (name: string) => void;
   onApplyView: (id: string) => void;
   onRemoveView: (id: string) => void;
   onTray: () => void;
   onNote?: () => void;
-  onTidy?: () => void;
   onReset: () => void;
   onAtlas?: () => void;
   onClose: () => void;
@@ -514,23 +526,10 @@ export function ViewMenu({
   const inTime = lens === 'month' || lens === 'all';
   return (
     <div className="l5h-vm" ref={ref} role="dialog" aria-label="How the map is shown">
-      {lens === 'week' && (
-        <section>
-          <h4>Order in a subject</h4>
-          <div className="l5h-seg is-wrap" role="radiogroup" aria-label="Order in a subject">
-            {(['started', 'recent', 'manual', 'name', 'size'] as SortBy[]).map((s) => (
-              <button key={s} type="button" role="radio" aria-checked={arr.sort === s} className={arr.sort === s ? 'is-on' : ''} onClick={() => onSort(s)}>
-                {SORT_SAID[s]}
-              </button>
-            ))}
-          </div>
-        </section>
-      )}
       <section>
         <h4>Show</h4>
         {hasChats && <Check label="Core chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />}
         {!inTime && <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />}
-        {lens === 'week' && <Check label="Snap into place" hint="when you put one down" on={arr.display.snap} onFlip={() => onDisplay({ snap: !arr.display.snap })} />}
         {!inTime && (
           <>
             <Seg label="Labels" value={arr.display.labels} options={LABELS} said={LABEL_SAID} onPick={(v) => onDisplay({ labels: v })} />
@@ -602,14 +601,9 @@ export function ViewMenu({
             Add a note
           </button>
         )}
-        {onTidy && (
-          <button type="button" className="l5h-btn" onClick={onTidy} title="Everything you put somewhere by hand goes back in its subject's order">
-            Tidy up
-          </button>
-        )}
         {sure ? (
           <span className="l5h-sure">
-            Put every place and order back?{' '}
+            Open every folded subject again?{' '}
             <button type="button" className="l5h-btn is-danger" onClick={() => (onReset(), setSure(false))}>
               Reset
             </button>{' '}

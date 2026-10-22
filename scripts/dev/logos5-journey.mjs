@@ -227,7 +227,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       log('asked', (await page.locator('.l5-u.is-mine .l5-said').last().innerText().catch(() => '')).slice(0, 160));
       log('reply', (await page.locator('.l5-a .l5-prose').last().innerText().catch(() => '')).slice(0, 160));
     }
-    // home, the Universal Map: the mark brings it back; "Find or start…" finds, or begins a line of thinking
+    // home, the Universal Map: the mark brings it back; the box at its foot finds, or begins a line of thinking
     const goHome = async () => {
       if (!(await page.locator('.l5h').count())) {
         await page.locator('.l5-brand').click();
@@ -262,11 +262,11 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     const homeSays = async () =>
       JSON.stringify({
         eyebrow: await page.locator('.l5-eyebrow').first().innerText().catch(() => ''),
-        lens: await page.locator('.l5h-seg.is-modes button.is-on .l5h-long').innerText().catch(() => ''),
-        clusters: await page.locator('.l5n-head .l5n-name').allInnerTexts(),
-        hubs: await page.locator('.l5n-node.is-hub').count(),
-        dots: await page.locator('.l5n-node.is-dot').count(),
-        ideas: await page.locator('.l5n-idea').allInnerTexts(),
+        lens: await page.locator('.l5h-lens button.is-on .l5h-long').innerText().catch(() => ''),
+        subjects: await page.locator('.l5b-name-t').allInnerTexts(),
+        hubs: await page.locator('.l5b-hub').count(),
+        dots: await page.locator('.l5b-dot').count(),
+        card: (await page.locator('.l5b-card').innerText().catch(() => '')).replace(/\s+/g, ' '),
         resume: await page.locator('.l5h-pick-t').innerText().catch(() => ''),
         starred: await page.locator('.l5h-starchip').count(),
         notes: await page.locator('.l5h-note').count(),
@@ -280,7 +280,7 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
     if (s === 'find') {
       await findBox().fill(process.env.FIND || 'rent');
       await page.waitForTimeout(500);
-      log('find', await page.locator('.l5h-find-n').innerText().catch(() => ''), 'options', JSON.stringify(await page.locator('.l5h-o').allInnerTexts()), 'dimmed', await page.locator('.l5n-node.is-dim').count());
+      log('find', await page.locator('.l5h-find-n').innerText().catch(() => ''), 'options', JSON.stringify(await page.locator('.l5h-o').allInnerTexts()), 'dimmed', await page.locator(':is(.l5b-hub, .l5b-dot).is-dim').count());
       await shot('find-in');
       await findBox().fill('');
       await page.keyboard.press('Escape');
@@ -294,14 +294,14 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       await page.waitForTimeout(500);
       log('contents closed', await page.locator('.l5c').count() === 0);
     }
-    // the three ways to group it: MODE=Today|Week|Subject
+    // how much of it: MODE=Today|Week|Month|All
     if (s === 'mode') {
-      await page.locator('.l5h-seg.is-modes button', { hasText: new RegExp(process.env.MODE || 'Subject', 'i') }).first().click();
-      await page.waitForTimeout(1100);
-      log('mode', process.env.MODE || 'Subject', await homeSays());
+      await page.locator('.l5h-lens button', { hasText: new RegExp(process.env.MODE || 'Week', 'i') }).first().click();
+      await page.waitForTimeout(1600);
+      log('mode', process.env.MODE || 'Week', await homeSays());
     }
     if (s === 'press') {
-      await page.locator('.l5n-node .l5n-star').nth(Number(process.env.NTH || 0)).click();
+      await page.locator(':is(.l5b-hub .l5b-disc, .l5b-dot .l5b-pip)').nth(Number(process.env.NTH || 0)).click();
       await page.waitForTimeout(700);
       log('card', (await page.locator('.l5h-pv').innerText().catch(() => 'none')).replace(/\s+/g, ' ').slice(0, 300));
     }
@@ -324,9 +324,9 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       await page.waitForTimeout(500);
       log('notes', await page.locator('.l5h-note').allInnerTexts());
     }
-    // DRAG=from index; a star carried 120px right and 60px down (By subject)
+    // NTH=which one; carried 120px right and 60px down — into another subject's circle, if one is there
     if (s === 'drag') {
-      const t = page.locator('.l5n-node .l5n-star').nth(Number(process.env.NTH || 0));
+      const t = page.locator(':is(.l5b-hub .l5b-disc, .l5b-dot .l5b-pip)').nth(Number(process.env.NTH || 0));
       const b = await t.boundingBox();
       await page.mouse.move(b.x + b.width / 2, b.y + b.height / 2);
       await page.mouse.down();
@@ -336,11 +336,11 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       const after = await t.boundingBox();
       log('dragged', JSON.stringify({ from: [Math.round(b.x), Math.round(b.y)], to: [Math.round(after.x), Math.round(after.y)] }));
     }
-    // Select, then drag across the first two stars, from the empty map below and beyond them
+    // Select, then drag across the first two, from the empty map below and beyond them
     if (s === 'lasso') {
       await page.locator('.l5h-tool', { hasText: 'Select' }).click();
-      const a = await page.locator('.l5n-node .l5n-star').nth(0).boundingBox();
-      const b = await page.locator('.l5n-node .l5n-star').nth(1).boundingBox();
+      const a = await page.locator(':is(.l5b-hub .l5b-disc, .l5b-dot .l5b-pip)').nth(0).boundingBox();
+      const b = await page.locator(':is(.l5b-hub .l5b-disc, .l5b-dot .l5b-pip)').nth(1).boundingBox();
       const x0 = Math.max(a.x, b.x) + 40, y0 = Math.max(a.y, b.y) + 60, x1 = Math.min(a.x, b.x) - 20, y1 = Math.min(a.y, b.y) - 14;
       await page.mouse.move(x0, y0);
       await page.mouse.down();
@@ -356,10 +356,10 @@ for (const s of (process.env.STEPS || '').split(',').filter(Boolean)) {
       await page.locator('.l5h-map').focus();
       for (const k of ['ArrowRight', 'ArrowRight', 'ArrowDown']) await page.keyboard.press(k);
       await page.waitForTimeout(300);
-      log('chosen by keys', await page.locator('.l5n-node.is-sel .l5n-t').allInnerTexts());
+      log('chosen by keys', await page.locator(':is(.l5b-hub.is-sel .l5b-hub-t, .l5b-dot.is-sel .l5b-dot-t)').allInnerTexts());
     }
     if (s === 'openmap') {
-      const first = page.locator('.l5n-node .l5n-star').first();
+      const first = page.locator(':is(.l5b-hub .l5b-disc, .l5b-dot .l5b-pip)').first();
       await first.click();
       await page.waitForTimeout(500);
       await page.locator('.l5h-pv .l5h-go').click();

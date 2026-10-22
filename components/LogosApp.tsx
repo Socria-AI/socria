@@ -6931,7 +6931,7 @@ export function LogosApp({
     setL5List(false);
     return true;
   }
-  /** "Find or start…": a new line of thinking, its first question the words typed there, if any */
+  /** The box at the map's foot: a new line of thinking, its first question the words typed there, if any */
   function startFromHome(text: string) {
     if (!newFromHome()) return;
     const said = text.trim();

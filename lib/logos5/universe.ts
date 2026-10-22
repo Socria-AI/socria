@@ -99,6 +99,9 @@ export interface Tile {
   turns: number;
   /** what Socria made in it: charts, plans, practice… */
   made: number;
+  /** a study's files, and the topics they were sorted into; 0 for anything else */
+  files: number;
+  topics: number;
   /** what it says about what it is about, for its subject (subjects.ts) */
   about: About;
 }
@@ -110,9 +113,9 @@ const MAX_IDEAS = 12;
  * What a line of thinking holds to draw: the topics its files were sorted
  * into, then the ideas its map grew — both are its thinking, a study's lead.
  */
-function studyOf(s: UniverseIn): { course?: unknown; topics?: { id: string; title: string; after?: string[] }[] } | undefined {
+function studyOf(s: UniverseIn): { course?: unknown; files?: unknown[]; topics?: { id: string; title: string; after?: string[] }[] } | undefined {
   const study = s.map?.objects?.objs?.find((o) => o.kind === 'study');
-  return study?.states?.[study.at] as { course?: unknown; topics?: { id: string; title: string; after?: string[] }[] } | undefined;
+  return study?.states?.[study.at] as { course?: unknown; files?: unknown[]; topics?: { id: string; title: string; after?: string[] }[] } | undefined;
 }
 
 function graphOf(s: UniverseIn): { nodes: { id: string; label: string; from: TileIdea['from'] }[]; edges: { from: string; to: string }[] } {
@@ -245,9 +248,10 @@ export function tileOf(s: UniverseIn): Tile {
     .map((n) => clip(n.label.trim(), 40));
   const text = (v: unknown, max: number) => (typeof v === 'string' ? clip(plain(v), max) : '');
   const asked = msgs.find((m) => m.role === 'user' && (m.content ?? '').trim());
+  const st = kind === 'core' ? undefined : studyOf(s);
   const about: About = {
     title,
-    course: kind === 'core' ? '' : text(studyOf(s)?.course, 60),
+    course: text(st?.course, 60),
     domain: text(s.map?.ask?.domain, 40),
     topic: text(s.map?.ask?.topic, 120),
     viz: text(s.map?.viz?.kind, 30),
@@ -272,6 +276,8 @@ export function tileOf(s: UniverseIn): Tile {
     open,
     turns: msgs.filter((m) => m.role === 'user').length,
     made,
+    files: Array.isArray(st?.files) ? st.files.length : 0,
+    topics: Array.isArray(st?.topics) ? st.topics.filter((t) => t && typeof t.title === 'string').length : 0,
     about,
   };
 }
