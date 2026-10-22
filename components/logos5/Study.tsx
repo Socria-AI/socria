@@ -293,8 +293,8 @@ export function StartPanel({
             ✎
           </span>
           <span>
-            <b>Study &amp; review</b>
-            <small>Fill-in-the-blank practice made from your files — checked when you submit</small>
+            <b>Test yourself</b>
+            <small>Fill-in-the-blank questions made from your files — checked when you submit</small>
           </span>
         </button>
         <button type="button" className="l5s-opt" onClick={onDeep}>

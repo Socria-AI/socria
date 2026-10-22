@@ -60,7 +60,7 @@ const LENS_SAID: Record<A.HomeMode, { long: string; short: string }> = {
 
 const HINT: Record<A.HomeMode, string> = {
   today: 'Today’s sessions, what they build on, and what links them across subjects · press one to see it, twice to open it · drag one into another subject to file it there',
-  week: 'This week by subject — a disc is a real study session, a dot a quick question · drag one into another subject to file it there · ↩ finds where a subject was before',
+  week: 'This week by subject — a disc is a conversation you went deep in, a dot a quick question · drag one into another subject to file it there · ↩ finds where a subject was before',
   month: 'Oldest on the left, newest on the right — each where it began; joined when it followed on within a week · ↩ goes back to where a subject was before',
   all: 'Oldest on the left, newest on the right — each where it began; joined when it followed on within a week · ↩ goes back to where a subject was before',
 };
@@ -744,9 +744,9 @@ export function UniverseView({
   else if (!tiles.length)
     body = (
       <div className="l5h-empty">
-        <p>Every conversation you have appears here — a map of what you have learned, by day, by week and by subject.</p>
+        <p>Every conversation you have appears here — a map of your thinking, by day, by week and by subject.</p>
         <button type="button" className="l5h-go" onClick={() => findRef.current?.focus()}>
-          Ask anything, or drop your notes in the box below <span aria-hidden="true">↓</span>
+          Ask anything, or drop your files in the box below <span aria-hidden="true">↓</span>
         </button>
       </div>
     );
@@ -854,7 +854,7 @@ export function UniverseView({
           {hasTop && (
             <div className="l5h-top" ref={topRef}>
               <div className="l5h-title">
-                <p className="l5h-kicker">Everything you’ve studied</p>
+                <p className="l5h-kicker">Everything you’ve thought through</p>
                 <h1 className="l5h-h">
                   Your map, <em>not a list</em>
                 </h1>
@@ -980,7 +980,7 @@ export function UniverseView({
           )}
           {dropping && (
             <div className="l5h-dropzone" aria-hidden="true">
-              <span>Drop your notes, slides or an exam review — Socria sorts them into topics</span>
+              <span>Drop your files — notes, documents, slides, PDFs — and Socria sorts them into topics</span>
             </div>
           )}
           {working && (
@@ -1062,7 +1062,7 @@ function Legend({ lens }: { lens: A.HomeMode }) {
     <ul className="l5h-legend" aria-label="What the marks mean">
       <li>
         <span className="l5h-lg-hub" aria-hidden="true" />
-        Hub — a real study session
+        Hub — a conversation you went deep in
       </li>
       <li>
         <span className="l5h-lg-dot" aria-hidden="true" />
@@ -1082,7 +1082,7 @@ function Legend({ lens }: { lens: A.HomeMode }) {
       ) : (
         <li>
           <span className="l5h-lg-link" aria-hidden="true" />
-          Connects across courses
+          Connects across subjects
         </li>
       )}
     </ul>

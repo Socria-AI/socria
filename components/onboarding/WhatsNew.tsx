@@ -164,7 +164,7 @@ export function WhatsNew({
                 </span>
               </h1>
               <p className="wn-sf wn-fade" style={{ '--d': '.75s' } as React.CSSProperties}>
-                No more chat window and a list of old threads — one map of everything you’ve studied. {keptLine(kept)}
+                No more chat window and a list of old threads — one map of everything you’ve thought through. {keptLine(kept)}
               </p>
             </>
           )}
@@ -223,26 +223,26 @@ export function WhatsNew({
 // ── the drawings ──────────────────────────────────────────────────────
 //
 // One small map, drawn the way the real one is (components/logos5/
-// UniverseBubbles.tsx): subjects as dashed circles named FIELD · COURSE, the
+// UniverseBubbles.tsx): subjects as dashed circles named AREA · SUBJECT, the
 // conversation you would pick up again haloed, quick questions as dots on
 // spokes, and one link you made across subjects with its card. The first
 // drawing ends on it; the second reads it.
 
-const BIO = { x: 124, y: 170, r: 80, label: 'BIOLOGY · BIOL 1306' };
-const CHEM = { x: 276, y: 150, r: 58, label: 'CHEMISTRY · CHEM 1311' };
+const BIO = { x: 124, y: 170, r: 80, label: 'WORK · LAUNCH PLAN' };
+const CHEM = { x: 276, y: 150, r: 58, label: 'LIFE · MOVING' };
 type Hub = { id: string; x: number; y: number; r: number; c: 1 | 2; title: string[]; halo?: boolean };
 const HUBS: Hub[] = [
-  { id: 'enz', x: 114, y: 160, r: 31, c: 1, title: ['Enzymes'], halo: true },
-  { id: 'mit', x: 160, y: 214, r: 17, c: 1, title: ['Mitosis'] },
-  { id: 'rat', x: 276, y: 146, r: 24, c: 2, title: ['Reaction', 'rates'] },
+  { id: 'enz', x: 114, y: 160, r: 31, c: 1, title: ['Pricing'], halo: true },
+  { id: 'mit', x: 160, y: 214, r: 17, c: 1, title: ['Hiring'] },
+  { id: 'rat', x: 276, y: 146, r: 24, c: 2, title: ['Which', 'city?'] },
 ];
 /** A quick question: a dot on a spoke, its words on the side away from the ring. */
 type Dot = { x: number; y: number; from: string; label?: string; side?: 'l' | 'r' };
 const DOTS: Dot[] = [
-  { x: 64, y: 198, from: 'enz', label: 'What’s ATP?', side: 'r' },
+  { x: 64, y: 198, from: 'enz', label: 'Fair price?', side: 'r' },
   { x: 78, y: 114, from: 'enz' },
   { x: 302, y: 110, from: 'rat' },
-  { x: 306, y: 186, from: 'rat', label: 'Why heat?', side: 'l' },
+  { x: 306, y: 186, from: 'rat', label: 'Rent or buy?', side: 'l' },
 ];
 const LINK = 'M 144 150 C 168 116, 226 112, 252 140';
 
@@ -418,7 +418,7 @@ function ArtRead() {
           </g>
         ))}
         <text className="wn-dotl" x={224} y={148}>
-          Enzymes
+          Pricing
         </text>
       </g>
     </svg>
@@ -426,11 +426,11 @@ function ArtRead() {
 }
 
 /** The box at the foot: typed into, a file dropped in, sent — and it lands on the map. */
-const TYPED = 'Make sense of my lab notes';
+const TYPED = 'Make sense of this lease';
 const TOPICS: { x: number; y: number; t: string }[] = [
-  { x: 230, y: 134, t: 'Titration' },
-  { x: 294, y: 134, t: 'Molarity' },
-  { x: 262, y: 152, t: 'Error' },
+  { x: 230, y: 134, t: 'Rent' },
+  { x: 294, y: 134, t: 'Deposit' },
+  { x: 262, y: 152, t: 'Exit' },
 ];
 
 function ArtBox() {
@@ -440,24 +440,24 @@ function ArtBox() {
       <g className="wn-in" style={{ '--i': 0, '--b': '.05s' } as React.CSSProperties}>
         <circle className="wn-ring still" cx={100} cy={100} r={64} />
         <text className="wn-name" x={100} y={26}>
-          BIOLOGY · BIOL 1306
+          WORK · LAUNCH PLAN
         </text>
         <line className="wn-spoke" x1={74} y1={110} x2={56} y2={132} />
         <circle className="wn-dot c1" cx={54} cy={134} r={4.5} />
         <circle className="wn-disc c1" cx={96} cy={92} r={25} />
         <text className="wn-hubt" x={96} y={95.5} fontSize={10}>
-          Enzymes
+          Pricing
         </text>
         <circle className="wn-disc c1 soft" cx={134} cy={134} r={14} />
         <text className="wn-hubt" x={134} y={136.5} fontSize={7.5}>
-          Cells
+          Hiring
         </text>
       </g>
       <g className="wn-in wn-fold-chip" style={{ '--i': 1, '--b': '.05s' } as React.CSSProperties}>
         <rect x={214} y={14} width={124} height={30} rx={15} />
         <circle className="wn-pdot" cx={232} cy={29} r={4.5} />
         <text className="wn-chipt" x={244} y={33}>
-          Thesis
+          Novel
         </text>
         <text className="wn-tag" x={286} y={32}>
           PROJECT
@@ -468,7 +468,7 @@ function ArtBox() {
       <g className="wn-arrive">
         <circle className="wn-ring" cx={262} cy={124} r={52} />
         <text className="wn-name wn-late" x={262} y={62}>
-          CHEMISTRY · LAB
+          LEGAL · LEASE
         </text>
         {TOPICS.map((p, k) => (
           <g key={p.t} className="wn-topic" style={{ '--i': k } as React.CSSProperties}>
@@ -481,7 +481,7 @@ function ArtBox() {
         <g className="wn-fly">
           <circle className="wn-disc c2" cx={262} cy={112} r={20} />
           <text className="wn-hubt" x={262} y={115.5} fontSize={9}>
-            Lab 4
+            Lease
           </text>
         </g>
       </g>
@@ -491,7 +491,7 @@ function ArtBox() {
         <rect x={40} y={176} width={110} height={22} rx={11} />
         <path className="wn-doc" d="M 52 181 h 7 l 4 4 v 9 h -11 z" />
         <text x={68} y={191}>
-          lab-04.pdf
+          lease-draft.pdf
         </text>
       </g>
       <g className="wn-in" style={{ '--i': 2, '--b': '.05s' } as React.CSSProperties}>

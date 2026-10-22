@@ -522,7 +522,7 @@ export function FindOrStart({
         )}
         {picker && <span className="l5h-find-pick">{picker}</span>}
         {canFiles && (
-          <button type="button" className="l5h-find-att" aria-label="Add files — notes, slides, an exam review" title="Add files — notes, slides, an exam review. Or drop them anywhere on the map." onMouseDown={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}>
+          <button type="button" className="l5h-find-att" aria-label="Add files — notes, documents, slides, PDFs" title="Add files — notes, documents, slides, PDFs. Or drop them anywhere on the map." onMouseDown={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
               <path d="M20.5 11.5l-8.3 8.3a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9" />
             </svg>

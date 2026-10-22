@@ -98,7 +98,7 @@ console.log('\n=== the board ===');
   const sel = html(h(U.StudyBoard, { study, selected: 't2', onSelect: none, narrow: false }));
   ok('a topic selected dims the others', (sel.match(/is-dim/g) ?? []).length === 2 && sel.includes('aria-pressed="true"'));
   const start = html(h(U.StartPanel, { study, onStudy: none, onDeep: none, onRecommend: none, onClose: none }));
-  ok('the start panel says what was done and offers the two ways in', start.includes('sorted 2 files into 3 topics') && start.includes('Study &amp; review') && start.includes('Deep analysis') && start.includes('Recommend for me'));
+  ok('the start panel says what was done and offers the two ways in', start.includes('sorted 2 files into 3 topics') && start.includes('Test yourself') && start.includes('Deep analysis') && start.includes('Recommend for me'));
 }
 
 console.log('\n=== a topic ===');
@@ -162,16 +162,16 @@ console.log('\n=== the Universal Map ===');
   const base = { activeId: null, onOpen: none, onStart: none, head, now: NOW };
 
   const empty = html(h(U.UniverseView, { ...base, conversations: [] }));
-  ok('with nothing yet, it says what it will be, and that the box below is where to begin', empty.includes('a map of what you have learned, by day, by week and by subject') && empty.includes('Ask anything, or drop your notes in the box below') && empty.includes('placeholder="Search or start something new…"'));
+  ok('with nothing yet, it says what it will be, and that the box below is where to begin', empty.includes('a map of your thinking, by day, by week and by subject') && empty.includes('Ask anything, or drop your files in the box below') && empty.includes('placeholder="Search or start something new…"'));
   const boxed = html(h(U.UniverseView, { ...base, conversations: [], readDocument: async () => ({}), picker: h('span', { className: 'PICKER' }, 'Logos 5 · Balanced'), startIn: 'ACCT 2301' }));
-  ok('the box takes files — its clip, every kind it reads — and carries the model and how far it goes', boxed.includes('aria-label="Add files — notes, slides, an exam review"') && boxed.includes('accept=".pdf,.docx,.pptx') && boxed.includes('class="l5h-find-pick"><span class="PICKER">Logos 5 · Balanced</span>'));
+  ok('the box takes files — its clip, every kind it reads — and carries the model and how far it goes', boxed.includes('aria-label="Add files — notes, documents, slides, PDFs"') && boxed.includes('accept=".pdf,.docx,.pptx') && boxed.includes('class="l5h-find-pick"><span class="PICKER">Logos 5 · Balanced</span>'));
   ok('  begun in a Project, it says so', boxed.includes('placeholder="Search, or start something new in “ACCT 2301”…"'));
 
   const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
-  ok('the page says what it is: everything studied — your map, not a list', few.includes('Everything you’ve studied') && few.includes('Your map, <em>not a list</em>'));
+  ok('the page says what it is: everything thought through — your map, not a list', few.includes('Everything you’ve thought through') && few.includes('Your map, <em>not a list</em>'));
   ok('today: the day’s session a disc with its name inside — one before, of another subject, folded to its name; one about nothing in particular, not drawn', (few.match(/class="l5b-hub[ "]/g) ?? []).length === 1 && /class="l5b-hub[^"]*"[^>]*data-node="a"/.test(few) && few.includes('Two job offers') && !few.includes('data-node="b"') && /class="l5b-fold"[^>]*aria-label="Money: one conversation, folded. Open it."/.test(few) && !few.includes('data-node="c"'));
   ok('the header is told how many there are; the box that finds or starts is at the foot, not in it', few.includes('COUNT:3') && few.includes('<header class="test-head">COUNT:3</header>') && /class="l5h-foot"[^]*placeholder="Search or start something new…"/.test(few));
-  ok('what the marks mean, at the foot', few.includes('Hub — a real study session') && few.includes('Quick question') && few.includes('Connects across courses'));
+  ok('what the marks mean, at the foot', few.includes('Hub — a conversation you went deep in') && few.includes('Quick question') && few.includes('Connects across subjects'));
   ok('where to pick up is a press away, and haloed on the map', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few) && few.includes('l5b-halo') && few.includes('where you left off'));
   ok('four ways to see it, Today first — then This week, This month, All time', /role="radio" aria-checked="true" class="is-on"><span class="l5h-long">Today</.test(few) && few.includes('>This week<') && few.includes('>This month<') && few.includes('>All time<'));
   ok('today: by the day', few.includes('Today · Wed Oct 21'));
@@ -195,7 +195,7 @@ console.log('\n=== the Universal Map ===');
   ok('  under the page’s name: the week, how many, and the weeks either side', map.includes('This week · Mon Oct 19 – today · 6 conversations') && map.includes('aria-label="The week before"') && map.includes('aria-label="The week after"'));
   ok('every conversation of the week drawn, hidden ones left out', (map.match(/class="l5b-(hub|dot)[ "]/g) ?? []).length === 6 && !map.includes('Secret plans') && !map.includes('data-node="k1"'));
   ok('  by a subject’s name this week, a ↩ to where it was before — found in time', /class="l5b-back" title="Where this subject was before: “Tax questions” — find it in time">↩ Oct 16</.test(map));
-  ok('a real study session is a disc', (map.match(/class="l5b-hub[ "]/g) ?? []).length === 6);
+  ok('a conversation gone deep into is a disc', (map.match(/class="l5b-hub[ "]/g) ?? []).length === 6);
   ok('the header counts every conversation there is', map.includes('COUNT:7'));
   ok('the person’s link across two subjects is a curve, and the card over it says why, in their words', /class="l5b-link is-own is-carded"/.test(map) && /class="l5b-card is-own"[^]*You linked these[^]*same deadline\./.test(map));
   ok('  an idea two other subjects come back to is a curve too, named', /class="l5b-link is-idea"/.test(map) && map.includes('An idea both come back to: Monthly runway'));
@@ -216,7 +216,7 @@ console.log('\n=== the Universal Map ===');
   const today = html(h(U.UniverseView, { ...base, conversations, projects, initial: E }));
   ok('today: the day, and why each earlier one is beside it', today.includes('Today · Wed Oct 21') && /title="Accruals — shares “Accrual basis”"/.test(today) && /aria-label="Accruals, [^"]*shares “Accrual basis”"/.test(today));
   ok('  a Project not worked on today, folded to its name, a press from opening', /class="l5b-fold is-project"[^>]*aria-label="Careers, Job hunt, a Project of yours: 2 conversations, folded. Open it."/.test(today));
-  ok('  on the line, what the marks mean says what follows on', all.includes('Followed on within a week') && !all.includes('Connects across courses'));
+  ok('  on the line, what the marks mean says what follows on', all.includes('Followed on within a week') && !all.includes('Connects across subjects'));
 
   const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, mode: 'all', display: { ...E.display, chats: false } } }));
   ok('Core chats can be left off it', all.includes('Tax questions') && !noChats.includes('Tax questions'));

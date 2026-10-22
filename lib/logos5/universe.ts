@@ -52,7 +52,7 @@ export interface ProjectIn {
 export type Look = 'study' | 'deciding' | 'planning' | 'learning' | 'writing' | 'thinking' | 'chat';
 
 export const LOOK_SAID: Record<Look, string> = {
-  study: 'Study',
+  study: 'Files',
   deciding: 'Deciding',
   planning: 'Planning',
   learning: 'Learning',
