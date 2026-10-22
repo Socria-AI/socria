@@ -5,6 +5,8 @@ import { readRole } from '@/lib/onboarding-roles';
 import { readName } from '@/lib/onboarding-name';
 import { useThemeGuard } from '@/components/account/ThemePicker';
 import { useGateSync } from '@/components/account/AccessCode';
+import { useNewSocria } from '@/components/useNewSocria';
+import { logosName } from '@/lib/new-socria';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
@@ -408,7 +410,10 @@ export default function ChatPage() {
   const [autoSend, setAutoSend] = useState<{ text: string; logos: boolean } | null>(null);
   const [tourAfter, setTourAfter] = useState(false);
   // What this person has already been taught, on every surface (lib/first-run.ts).
-  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'core' });
+  // The new Socria, behind its code (lib/new-socria.ts): whether what changed
+  // is told here, and what the Logos on offer is called.
+  const newSocria = useNewSocria();
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'core', opened: newSocria });
   /** the conversation Core's one line is shown under, if any */
   const [coreLine, setCoreLine] = useState<string | null>(null);
 
@@ -2949,6 +2954,8 @@ export default function ChatPage() {
   // stranger is told the premise instead.
   const coreWork = conversations.filter((c) => c.messages.length > 0);
   const showWhatsNew =
+    // only where the map it points to opens for them
+    newSocria &&
     !!isSignedIn &&
     authSettled &&
     !homeProject &&
@@ -3031,6 +3038,7 @@ export default function ChatPage() {
       <LogosCover
         as="modal"
         version={coverVersion}
+        name={logosName(newSocria)}
         open={logosModalOpen}
         onClose={handleLogosModalClose}
         onStart={handleLogosModalTry}
@@ -3429,6 +3437,7 @@ export default function ChatPage() {
                   the picker. */}
               <TryLogosPill
                 version={coverVersion}
+                name={logosName(newSocria)}
                 currentModel={model}
                 visible={!logosDismissed}
                 onOpen={() => setLogosModalOpen(true)}

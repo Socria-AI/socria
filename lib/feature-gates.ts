@@ -14,11 +14,17 @@
 //
 // A gate is about what a menu offers, not a security boundary: every route
 // behind Logos 3 is the Logos 2 engine, gated as Logos 2 is.
+//
+// THE NEW SOCRIA is the second (lib/new-socria.ts): Logos 5's screen — the
+// Universal Map, the map as the screen, the Core chats brought into it and the
+// welcome that tells somebody so — shipped to production for whoever has its
+// code, while everybody else keeps the Logos they had. Like the first, it
+// decides which screen is drawn, not who may call the engine behind it.
 
-export const GATE_IDS = ['logos3'] as const;
+export const GATE_IDS = ['logos3', 'socria'] as const;
 export type GateId = (typeof GATE_IDS)[number];
 
-export const GATE_LABEL: Record<GateId, string> = { logos3: 'Logos 3' };
+export const GATE_LABEL: Record<GateId, string> = { logos3: 'Logos 3', socria: 'The new Socria' };
 
 export const GATE_KEY = 'socria.access.v1';
 /** Fired on window when a gate opens, so open menus re-read what they offer. */

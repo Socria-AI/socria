@@ -99,7 +99,7 @@ console.log('=== the record ===');
 console.log('=== where it is shown ===');
 {
   const hook = read('components/useFirstRun.ts');
-  ok('the hook records the new Socria opening, once the record is read', /if \(ready\) reach\('socria\.opened'\)/.test(hook));
+  ok('the hook records the new Socria opening, once the record is read and it has opened for them (its code: lib/new-socria.ts)', /if \(ready && opened\) reach\('socria\.opened'\)/.test(hook));
   ok('  and says when the account copy is in, computed so no frame decides early', /const synced = ready && \(!opts\.signedIn \|\| merged\)/.test(hook) && /accountMerge \?\?= mergeAccount\(\)/.test(hook));
   ok('  every replay asks the account again', (hook.match(/accountMerge = null;/g) ?? []).length === 2);
   ok('  and a milestone a page leaves on still reaches the account', /keepalive: true/.test(hook));
@@ -109,7 +109,7 @@ console.log('=== where it is shown ===');
   ok('  not over the premise, nor while anything is under way', /introShowing: introWanted/.test(app) && /busy: busy \|\| !!streaming \|\| organizing \|\| sortPending/.test(app));
   ok('  finishing or skipping is reached once', /onDone=\{\(\) => firstRun\.reach\('socria\.new'\)\}/.test(app) && /onSkip=\{\(\) => firstRun\.reach\('socria\.new', \{ skipped: true \}\)\}/.test(app));
   const chat = read('app/chat/page.tsx');
-  ok('Core\'s chat tells an account, and its last beat opens the map', /const showWhatsNew =\s*!!isSignedIn &&/.test(chat) && /firstRun\.reach\('socria\.new'\);[\s\S]{0,200}pickModel\(logosToOpen\(\)\)/.test(chat));
+  ok('Core\'s chat tells an account the map opens for, and its last beat opens the map', /const showWhatsNew =[\s\S]{0,120}?newSocria &&\s*!!isSignedIn &&/.test(chat) && /firstRun\.reach\('socria\.new'\);[\s\S]{0,200}pickModel\(logosToOpen\(\)\)/.test(chat));
   ok('  not over a Project, a shared conversation or the tour', /!homeProject &&\s*!sharedOpen &&\s*!tourOpen &&/.test(chat));
   const tools = read('components/account/TestingTools.tsx');
   ok('Manage Account → Testing can replay it', /replayPart\('new'\)/.test(tools) && /We killed the chatbot/.test(tools));

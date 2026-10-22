@@ -160,7 +160,9 @@ import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRe
 import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
-import { LOGOS5, DEFAULT_STAGE_SHARE, readStagePrefs, writeStagePrefs, type StagePrefs } from '@/lib/logos5/flags';
+import { DEFAULT_STAGE_SHARE, readStagePrefs, writeStagePrefs, type StagePrefs } from '@/lib/logos5/flags';
+import { logosName, newSocriaOpen } from '@/lib/new-socria';
+import { useNewSocria } from '@/components/useNewSocria';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { L5Header, L5LinkBar, L5Outline, L5Switch, MindButton, type L5MenuItem, type L5SwitchItem } from './logos5/L5Chrome';
@@ -828,7 +830,12 @@ export function LogosApp({
   // What this person has already been taught, on every surface (lib/first-run.ts):
   // the Logos sequence runs once per person, on their own first map or model,
   // and never again on any device the record has been merged with.
-  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'logos' });
+  // THE NEW SOCRIA, BEHIND ITS CODE (lib/new-socria.ts): Logos 5's screen for
+  // whoever has entered it, the Logos 4 layout for everybody else. Read at
+  // once — this is never rendered on the server — so the first frame is
+  // already the right screen.
+  const newSocria = useNewSocria(true);
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'logos', opened: newSocria });
   // THERE IS NO LOGOS-ONLY ONBOARDING. The three-beat sequence that used to
   // open over a first map is gone: onboarding is one sequence for all of
   // Socria (components/onboarding/FirstRunIntro.tsx). What remains here is
@@ -2054,7 +2061,7 @@ export function LogosApp({
       activeIdRef.current = target;
       // LOGOS 5 opens on the Universal Map — unless a link, a Project or a
       // first message chose a line of thinking, or there is nothing on it yet
-      if (SOCRIA_MODELS[model]?.workspace && LOGOS5.on && !wanted && !pendingStart && sorted.some((x) => x.messages.length > 0)) setL5Home(true);
+      if (SOCRIA_MODELS[model]?.workspace && newSocriaOpen() && !wanted && !pendingStart && sorted.some((x) => x.messages.length > 0)) setL5Home(true);
       chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
       if (!pendingStart) restoreView(target, 'load');
       setHydrating(false);
@@ -2065,7 +2072,7 @@ export function LogosApp({
       if (pendingStart) {
         const { id, message } = pendingStart;
         // Logos 5 begins on the Universal Map: the opening goes into the box at its foot
-        if (SOCRIA_MODELS[model]?.workspace && LOGOS5.on) setHomeStart(message);
+        if (SOCRIA_MODELS[model]?.workspace && newSocriaOpen()) setHomeStart(message);
         else setInput(message);
         startIdRef.current = id;
         requestAnimationFrame(() => {
@@ -4134,7 +4141,7 @@ export function LogosApp({
   // it opens when something is MADE or asked for, never because a map grew
   // from ordinary talk. The links between the thread and the map are read
   // from what the session already holds (lib/logos5/linking.ts).
-  const l5 = workspaceOn && LOGOS5.on;
+  const l5 = workspaceOn && newSocria;
   const [stagePrefs, setStagePrefs] = useState<StagePrefs>({ open: {}, share: DEFAULT_STAGE_SHARE });
   useEffect(() => {
     if (l5) setStagePrefs(readStagePrefs(browserStorage()));
@@ -4320,6 +4327,15 @@ export function LogosApp({
   // opened from the map, and a new one begun from it. The rail is put away; it
   // is still there ("List") for renaming, deleting and filing.
   const [l5Home, setL5Home] = useState(false);
+  // THE CODE ENTERED WHILE THIS IS OPEN — under Manage Account, in another
+  // tab, or brought from another device by the account: the new Socria opens
+  // where it begins, on its map. (Still loading, the loader decides that
+  // itself, reading the gate when it lands.)
+  const hadNewSocria = useRef(newSocria);
+  useEffect(() => {
+    if (newSocria && !hadNewSocria.current && !hydrating && workspaceOn) setL5Home(true);
+    hadNewSocria.current = newSocria;
+  }, [newSocria, hydrating, workspaceOn]);
   /** an opening chosen elsewhere, put in the map's box to be made their own before it is sent */
   const [homeStart, setHomeStart] = useState<string | null>(null);
   /** files sent from the map's box: sorted once the new line of thinking they begin is the one open */
@@ -4935,7 +4951,7 @@ export function LogosApp({
     return (
       <div className="logos-root">
         {authSettled && (
-          <LogosCover as="gate" version={model === 'logos-3' ? 'logos-3' : 'logos-2'} isSignedIn={false} primaryHref={gateHref} onUnlock={unlockWith} />
+          <LogosCover as="gate" version={model === 'logos-3' ? 'logos-3' : 'logos-2'} name={logosName(newSocria)} isSignedIn={false} primaryHref={gateHref} onUnlock={unlockWith} />
         )}
       </div>
     );
@@ -7213,7 +7229,7 @@ export function LogosApp({
           {...(!togetherReadOnly ? { onAddToMap: captureToMap } : {})}
         />
       )}
-      <LogosGuide open={guideOpen} onClose={closeGuide} edition={workspaceOn ? 3 : 2} />
+      <LogosGuide open={guideOpen} onClose={closeGuide} edition={workspaceOn ? 3 : 2} name={logosName(newSocria)} />
       {shareOpen && activeId && (
         <ShareDialog
           type="conversation"

@@ -101,7 +101,7 @@ console.log('=== one card, two doors, the right name on each ===');
   ok('  from the pill', /TryLogosPill/.test(chat) && /onOpen=\{\(\) => setLogosModalOpen\(true\)\}/.test(chat));
   ok('  and from a gated pick of Logos', /else setLogosModalOpen\(true\)/.test(chat));
   ok('  and its way in is the newest Logos', /openNewestLogos\(\);\s*return;/.test(chat) && /router\.push\(`\/sign-in\?redirect_url=%2Fchat%3Fmodel%3D\$\{coverVersion\}`\)/.test(chat));
-  ok('the Logos surface is it, as the gate, naming itself', /<LogosCover as="gate" version=\{model === 'logos-3' \? 'logos-3' : 'logos-2'\} isSignedIn=\{false\} primaryHref=\{gateHref\} onUnlock=\{unlockWith\} \/>/.test(logos));
+  ok('the Logos surface is it, as the gate, naming itself — Logos 5 or Logos 4 by the new Socria\'s code', /<LogosCover as="gate" version=\{model === 'logos-3' \? 'logos-3' : 'logos-2'\} name=\{logosName\(newSocria\)\} isSignedIn=\{false\} primaryHref=\{gateHref\} onUnlock=\{unlockWith\} \/>/.test(logos));
   ok('  and sends sign-in back to the same Logos', /model%3D\$\{model === 'logos-3' \? 'logos-3' : 'logos-2'\}/.test(logos));
   ok('  which no longer carries its own plain card', !/lg-gate-card/.test(logos));
   ok('the old film and the Core 4 pill are gone', !/TryLogosModal|TryCore4Pill/.test(chat));

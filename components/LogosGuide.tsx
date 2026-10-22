@@ -330,7 +330,18 @@ const STEPS_3: Step[] = [
   at('Turn it into something.'),
 ];
 
-export function LogosGuide({ open, onClose, edition = 2 }: { open: boolean; onClose: () => void; edition?: 2 | 3 }) {
+export function LogosGuide({
+  open,
+  onClose,
+  edition = 2,
+  name = 'Logos 5',
+}: {
+  open: boolean;
+  onClose: () => void;
+  edition?: 2 | 3;
+  /** what the current Logos is called for them (lib/new-socria.ts logosName) */
+  name?: string;
+}) {
   const STEPS_SHOWN = edition === 3 ? STEPS_3 : STEPS;
   const [i, setI] = useState(0);
 
@@ -355,7 +366,7 @@ export function LogosGuide({ open, onClose, edition = 2 }: { open: boolean; onCl
   const last = i === STEPS_SHOWN.length - 1;
 
   return (
-    <div className="lgg-veil" role="dialog" aria-modal="true" aria-label={edition === 3 ? 'What Logos 5 does' : 'What Logos does'}>
+    <div className="lgg-veil" role="dialog" aria-modal="true" aria-label={edition === 3 ? `What ${name} does` : 'What Logos does'}>
       <div className="lgg">
         <header className="lgg-head">
           <span className="lgg-kicker">{step.kicker}</span>

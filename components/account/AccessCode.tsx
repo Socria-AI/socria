@@ -11,7 +11,9 @@ import { useUser } from '@clerk/nextjs';
 import { accountGates, GATE_CHANGED, GATE_LABEL, openGates, rememberGate, type GateId } from '@/lib/feature-gates';
 
 const OPENS: Record<GateId, { href: string; says: string }> = {
-  logos3: { href: '/chat?model=logos-3', says: 'Open Logos 5 →' },
+  logos3: { href: '/chat?model=logos-3', says: 'Open Logos →' },
+  // the new Socria opens on its map (lib/new-socria.ts)
+  socria: { href: '/chat?model=logos-3', says: 'Open the new Socria →' },
 };
 
 export function AccessCode({ onOpened }: { onOpened?: () => void }) {

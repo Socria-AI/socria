@@ -29,6 +29,8 @@
 // server about what you can pick is worse than no menu.
 
 import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useNewSocria } from './useNewSocria';
+import { logosName } from '@/lib/new-socria';
 import {
   SOCRIA_MODELS,
   THINKING_DEPTHS,
@@ -149,7 +151,12 @@ export function ModelPicker({
     }
   }, [open]);
 
-  const current = SOCRIA_MODELS[value];
+  // THE CURRENT LOGOS IS NAMED FOR WHAT IT OPENS: Logos 5 behind the new
+  // Socria's code, Logos 4 without it (lib/new-socria.ts) — the same entry
+  // either way, so only the name is read differently.
+  const newSocria = useNewSocria();
+  const short = (id: SocriaModel) => (id === 'logos-3' ? logosName(newSocria) : SOCRIA_MODELS[id].short);
+  const current = { ...SOCRIA_MODELS[value], short: short(value) };
   // The depth axis exists when the model has one AND the caller gave us the
   // state for it. Both, because the docs demo shows the model axis alone.
   const hasDepth = current.supportsDepth && !!depth && !!onDepth;
@@ -177,7 +184,7 @@ export function ModelPicker({
     // already says why, so a press does nothing rather than lying.
     if (SOCRIA_MODELS[id].soon) return;
     if (SOCRIA_MODELS[id].requiresAuth && !isSignedIn) {
-      setNeeds(SOCRIA_MODELS[id].short);
+      setNeeds(short(id));
       onLockedAttempt?.(id);
       return;
     }
@@ -223,7 +230,7 @@ export function ModelPicker({
             already writes the description that way, so nothing is invented
             here and nothing is said twice. */}
         <span className="meta">
-          <span className="nm">{m.short}</span>
+          <span className="nm">{short(id)}</span>
           {/* "no depth modes" is the footnote for a model that answers at one
               register. It is the wrong footnote for one that sets its own —
               and that model's description already says so, so this says
@@ -302,7 +309,7 @@ export function ModelPicker({
                       className={`mp-other${value === id ? ' on' : ''}`}
                       onClick={() => pick(id)}
                     >
-                      {SOCRIA_MODELS[id].id === 'logos' ? 'Logos 1' : SOCRIA_MODELS[id].short}
+                      {SOCRIA_MODELS[id].id === 'logos' ? 'Logos 1' : short(id)}
                     </button>
                   ))}
                 </div>

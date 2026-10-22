@@ -45,5 +45,5 @@ export const START_MODELS: readonly StartModel[] = ['core-4', 'logos-2', 'logos-
 export const START_MODEL_LABELS: Record<StartModel, string> = {
   'core-4': 'Talk it through (Core 4)',
   'logos-2': 'See it laid out (Logos 2)',
-  'logos-3': 'See it laid out (Logos 5)',
+  'logos-3': 'See it laid out (Logos)',
 };

@@ -17,6 +17,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { FirstRunIntro, type StartModel } from '@/components/onboarding/FirstRunIntro';
 import { replayFirstRun, useFirstRun } from '@/components/useFirstRun';
+import { useNewSocria } from '@/components/useNewSocria';
 import { isProduction } from '@/lib/environment';
 import { chooseModel } from '@/lib/socria-model-store';
 import { carry } from '@/lib/onboarding-script';
@@ -28,7 +29,9 @@ export function Onboarding() {
   const { isSignedIn, user } = useUser();
   const toLogos = params?.get('to') === 'logos';
   const surface = toLogos ? 'logos' : 'core';
-  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface });
+  // the new Socria has opened for them only once its code is entered (lib/new-socria.ts)
+  const newSocria = useNewSocria();
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface, opened: newSocria });
 
   // REPLAY (off production only): forget everything the first run has shown,
   // on this browser and on the account, then load this page again cleanly —

@@ -565,6 +565,20 @@ from the foot.
 `NEXT_PUBLIC_LOGOS5=off` brings back the Logos 4 layout without a deploy of
 code. Logos 2 is unchanged.
 
+**Per person, behind a code.** On a deployment that offers it, Logos 5 — the
+new Socria — opens only for whoever has entered its access code under Manage
+Account → Access code (the `socria` feature gate, `lib/new-socria.ts`): checked
+on the server (`app/api/access/gate`), remembered in the browser and on the
+account so it follows them to another device. Everybody else gets exactly what
+`NEXT_PUBLIC_LOGOS5=off` gives, and is called Logos 4. The code is handed out
+and the repository is public, so the server keeps only its fingerprint
+(`lib/feature-gates-server.ts`); `NEW_SOCRIA_ACCESS_CODE` replaces it without a
+deploy. Behind the gate: the screen, opening on the Universal Map, a first
+message put in its box, the Core chats brought in, "We killed the chatbot." on
+either surface, and the moment the record says the new Socria opened. A gate
+decides a screen, not access to the engine: every route behind it is the Logos
+everyone has.
+
 ## 11. What is where
 
 | Piece | File |
@@ -597,6 +611,7 @@ code. Logos 2 is unchanged.
 | Celestial's sky: generated, painted in idle time, behind the whole app | `lib/celestial.ts`, `components/CelestialSky.tsx`, `app/celestial.css` |
 | A model, looked at: the frame (header, figure, the bar under it, the side), the figure drawn, the views and the side's sections | `components/surfaces/Surface3D.tsx`, `surfaces.css`; `components/model/ModelView.tsx`, `model-view.css`; `components/model/Understand.tsx`, `understand.css` |
 | A solid's faces and where its dimensions are drawn (`FACING`) | `lib/model/solid.ts` |
+| The new Socria behind its code: the gate, the name, the hook every screen reads | `lib/new-socria.ts`, `lib/feature-gates.ts`, `lib/feature-gates-server.ts`, `components/useNewSocria.ts`, `components/account/AccessCode.tsx` |
 | Where home is wired in (start, file, a Project renamed or recoloured) | `components/LogosApp.tsx` (search `HOME, THE UNIVERSAL MAP`), `app/chat/page.tsx` (`updateProject`) |
 | One history: which chats to bring in, the maps owed, the chats kept quiet, today's count (pure, and two storage helpers) | `lib/logos5/merge.ts` |
 | Bringing them in, once | `app/api/conversations/merge/route.ts` |
@@ -1216,3 +1231,37 @@ printed through it; the views were a row of names ("The relationships",
   `test/model-viewer.test.mjs` holds the frame, the figure's fit, the solids'
   faces, floor and dimensions, the radii read from words, the plain words and
   the stylesheets.
+
+### The new Socria, behind its code
+
+Asked for: "push to main but add a code to access the new socria … and include
+dev".
+
+- **One gate, read everywhere the new Socria switches on.** `lib/new-socria.ts`
+  says what it is (Logos 5's screen, on a deployment that offers it) and
+  `components/useNewSocria.ts` keeps every screen following it — the code
+  entered here, in another tab, or on another device and brought by the
+  account. LogosApp reads it for the screen, for opening on the Universal Map
+  and for a first message put in its box; the Core chats are brought in, and
+  "We killed the chatbot." is told, only behind it; `useFirstRun` records the
+  moment it opened only then, so somebody who kept using the old Socria and
+  enters the code later is still told what changed.
+- **Called what it opens.** Logos 5 with the code, Logos 4 without, in the
+  model menu, the invitation on Core, the cover and the guide; a new person's
+  start names no version (`See it laid out (Logos)`).
+- **Where it is entered.** Manage Account → Access code, shown wherever the new
+  Socria is offered; opened, it says "The new Socria is open on this account"
+  and leads there. Entered while Logos is open, the screen becomes the new
+  Socria on its map.
+- **Nothing moves for anybody else.** Without the code no conversation is
+  moved, no list changes, nothing is recorded — they keep the Logos they had.
+- **The code is not in this repository** — it is public, and the code is
+  handed out: the server compares against its fingerprint
+  (`NEW_SOCRIA_FINGERPRINT`); `NEW_SOCRIA_ACCESS_CODE` replaces it, and
+  `test/feature-gates.test.mjs` fingerprints every word of the source, docs and
+  tests to keep the code out of them.
+- Checked in the real app at 1440×900 and 390×844: without the code, the Logos 4
+  screen, no welcome and nothing recorded; with it, the map and the welcome;
+  entered while Logos was open, a wrong code refused and the right one (in
+  lower case) opening the map; the model menu and the invitation saying
+  Logos 4 or Logos 5 accordingly. `test/new-socria.test.mjs` holds the wiring.

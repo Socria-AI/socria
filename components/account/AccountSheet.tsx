@@ -34,6 +34,7 @@ import { FEEDBACK_URL } from '@/lib/feedback';
 import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
 import { anyModelGated } from '@/lib/socria-model-store';
+import { LOGOS5 } from '@/lib/logos5/flags';
 import { PLANS } from '@/lib/entitlements';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
@@ -153,9 +154,11 @@ export function AccountSheet({
             {/* Socria Rewards: the 5-Node Challenge, Give 7 / Get 7, and what each reward did. */}
             <RewardsPanel enabled={!!user} />
 
-            {/* Only while a model waits behind a code: with none gated, a
-                code has nothing to open (lib/feature-gates.ts). */}
-            {anyModelGated() && (
+            {/* Only while something waits behind a code — a model, or the
+                new Socria wherever this deployment offers it
+                (lib/new-socria.ts): with nothing gated, a code has nothing
+                to open (lib/feature-gates.ts). */}
+            {(anyModelGated() || LOGOS5.on) && (
               <div className="sec">
                 <span className="lbl">Access code</span>
                 <AccessCode onOpened={onClose} />

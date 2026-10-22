@@ -122,7 +122,9 @@ Told once, to the people it changed for, and to nobody else.
   them: a milestone in the record, or a conversation last touched, earlier
   than `socria.opened` (`usedBefore`). That moment is per person, not a launch
   date — `useFirstRun` reaches it the first time any page that reads the
-  record is ready, and the account merge keeps the earliest across devices —
+  record is ready *with the new Socria open for them* (its access code entered:
+  `lib/new-socria.ts`; until then nothing is recorded, and nothing is told),
+  and the account merge keeps the earliest across devices —
   so whenever this reaches somebody, everything they did before it was the old
   Socria's, and everything after it is the new one's. Strictly earlier, so
   nothing the new Socria records counts; `logos.merged`, `socria.opened` and

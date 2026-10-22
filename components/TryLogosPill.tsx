@@ -18,15 +18,18 @@ export function TryLogosPill({
   currentModel,
   visible,
   version = 'logos-3',
+  name: named,
 }: {
   onOpen: () => void;
   currentModel: SocriaModel;
   visible: boolean;
   version?: CoverVersion;
+  /** what the current Logos is called for them (lib/new-socria.ts logosName) */
+  name?: string;
 }) {
   // Nothing to invite somebody to when they are already there.
   if (!visible || SOCRIA_MODELS[currentModel].logosSurface) return null;
-  const name = version === 'logos-3' ? 'Logos 5' : 'Logos 2';
+  const name = version === 'logos-3' ? named ?? 'Logos 5' : 'Logos 2';
 
   return (
     <button

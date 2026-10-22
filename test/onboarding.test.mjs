@@ -44,7 +44,7 @@ console.log('=== one onboarding, no Logos-only sequence ===');
   ok('  which the chat opens, while it is still offered — else Logos 2', /carried\.model === 'logos-3' && isOffered\('logos-3'\) \? 'logos-3' : 'logos-2'/.test(chatPage));
   ok('the account\'s first name starts the name field', /defaultName=\{user\?\.firstName \?\? null\}/.test(ob));
   const guide = read('components/LogosGuide.tsx');
-  ok('the "?" guide has a Logos 3 walk, and Logos 3 opens it', /edition === 3 \? STEPS_3 : STEPS/.test(guide) && /<LogosGuide open=\{guideOpen\} onClose=\{closeGuide\} edition=\{workspaceOn \? 3 : 2\} \/>/.test(read('components/LogosApp.tsx')));
+  ok('the "?" guide has a Logos 3 walk, and Logos 3 opens it', /edition === 3 \? STEPS_3 : STEPS/.test(guide) && /<LogosGuide open=\{guideOpen\} onClose=\{closeGuide\} edition=\{workspaceOn \? 3 : 2\} name=\{logosName\(newSocria\)\} \/>/.test(read('components/LogosApp.tsx')));
   ok('  saying what Logos 3 adds, each shown in miniature', ['Describe it, and it’s built.', 'The chat works everything.', 'Open what you need beside it.', 'Think it through with someone.'].every((t) => guide.includes(`title: '${t}'`)) && /demo: Built/.test(guide) && /demo: OneBox/.test(guide) && /demo: Views/.test(guide) && /demo: Together/.test(guide));
   ok('  sharing Logos 2\'s steps as the same objects', /const at = \(title: string\) => STEPS\.find/.test(guide) && (guide.match(/\bat\('/g) || []).length >= 5);
   ok('  and honest that Live 3D is a preview', /a geometric preview with exact sizes and masses, not a physical simulation/.test(guide));
