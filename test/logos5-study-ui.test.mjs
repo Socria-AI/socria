@@ -1,8 +1,6 @@
 // LOGOS 5 — THE STUDY PATH'S SCREENS, RENDERED.
 //
 // What is held down:
-//   • the intake asks what you are working on, takes files, and offers to
-//     ask when there is nothing to sort;
 //   • the board draws every topic with its kind, its quote, where in the
 //     files it is and how many sources back it, and marks where to start;
 //   • a topic shows its quotes with their file and page, and the four things
@@ -87,15 +85,6 @@ console.log('\n=== the question a reply ends on ===');
   ok('a cut that would split bold or code is not made', U.closingQuestion('It is **six. Or** is it `x. y`?') === null);
 }
 
-console.log('\n=== the intake ===');
-{
-  const s = html(h(U.StudyIntake, { readDocument: async () => ({}), onOrganize: none, onAsk: none, busy: false, narrow: false }));
-  ok('it asks what you are working on', s.includes('What are you <em>working on</em>?'));
-  ok('it takes files', s.includes('Drop files here') && s.includes('type="file"'));
-  ok('with nothing written and no files, there is nothing to send', /<button[^>]*class="l5s-go"[^>]*disabled/.test(s) && s.includes('Ask'));
-  ok('it says how it goes, in four steps', ['Drop or ask', 'Socria sorts it', 'Pick a starting point', 'Study or dig in'].every((t) => s.includes(t)));
-}
-
 console.log('\n=== the board ===');
 {
   const s = html(h(U.StudyBoard, { study, selected: null, onSelect: none, narrow: false }));
@@ -173,7 +162,10 @@ console.log('\n=== the Universal Map ===');
   const base = { activeId: null, onOpen: none, onStart: none, head, now: NOW };
 
   const empty = html(h(U.UniverseView, { ...base, conversations: [] }));
-  ok('with nothing yet, it says what it will be and how to begin', empty.includes('a map of what you have learned, by day, by week and by subject') && empty.includes('What are you working on?') && empty.includes('placeholder="Search or start something new…"'));
+  ok('with nothing yet, it says what it will be, and that the box below is where to begin', empty.includes('a map of what you have learned, by day, by week and by subject') && empty.includes('Ask anything, or drop your notes in the box below') && empty.includes('placeholder="Search or start something new…"'));
+  const boxed = html(h(U.UniverseView, { ...base, conversations: [], readDocument: async () => ({}), picker: h('span', { className: 'PICKER' }, 'Logos 5 · Balanced'), startIn: 'ACCT 2301' }));
+  ok('the box takes files — its clip, every kind it reads — and carries the model and how far it goes', boxed.includes('aria-label="Add files — notes, slides, an exam review"') && boxed.includes('accept=".pdf,.docx,.pptx') && boxed.includes('class="l5h-find-pick"><span class="PICKER">Logos 5 · Balanced</span>'));
+  ok('  begun in a Project, it says so', boxed.includes('placeholder="Search, or start something new in “ACCT 2301”…"'));
 
   const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
   ok('the page says what it is: everything studied — your map, not a list', few.includes('Everything you’ve studied') && few.includes('Your map, <em>not a list</em>'));

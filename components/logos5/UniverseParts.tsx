@@ -9,7 +9,9 @@
 
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { relTime } from '@/lib/logos-sessions';
+import type { Attachment } from '@/lib/logos-attachments';
 import type { Look, Match, Tile } from '@/lib/logos5/universe';
+import { STUDY_ACCEPT, intentOf, type Intent } from '@/lib/logos5/study';
 import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type HomeMode, type LabelLevel, type SizeBy } from '@/lib/logos5/arrange';
 
 /** A colour key as the theme draws it. */
@@ -276,11 +278,37 @@ export interface Found {
   group: string;
 }
 
+/** A file put in the box: read here, in the browser, before anything is sent. */
+interface BoxFile {
+  id: string;
+  name: string;
+  status: 'reading' | 'ready' | 'error';
+  att?: Attachment;
+  error?: string;
+}
+
+/** at most this many files at once */
+const BOX_MAX = 6;
+
+/** The badge on a file: what kind of file it is, in three letters. */
+export function fileType(name: string): string {
+  const ext = (/\.([a-z0-9]{1,5})$/i.exec(name)?.[1] ?? '').toLowerCase();
+  if (ext === 'pdf') return 'PDF';
+  if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return 'DOC';
+  if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'PPT';
+  if (['xls', 'xlsx', 'ods', 'csv', 'tsv'].includes(ext)) return 'XLS';
+  if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'].includes(ext)) return 'IMG';
+  return 'TXT';
+}
+
 /**
- * One box, at the map's foot: what is typed is looked for on the map — what
- * does not match dims — and the first answer is a press of Enter away; or, if
- * nothing is right, its round ↑ begins a new line of thinking with those
- * words as its first question. Its list opens upward, over the map.
+ * One box, at the map's foot — where everything begins now that there is no
+ * start screen. What is typed is looked for on the map (what does not match
+ * dims) and the first answer is a press of Enter away; or, if nothing is
+ * right, its round ↑ begins a new line of thinking with those words as its
+ * first question. Files dropped on it (or on the map), or added with its
+ * clip, are read here first; sent, Socria sorts them into topics. Its list
+ * opens upward, over the map.
  */
 export function FindOrStart({
   query,
@@ -290,6 +318,11 @@ export function FindOrStart({
   onPick,
   onStart,
   inputRef,
+  readDocument,
+  onStartFiles,
+  picker,
+  placeholder,
+  takeRef,
 }: {
   query: string;
   onQuery: (q: string) => void;
@@ -298,12 +331,62 @@ export function FindOrStart({
   onPick: (t: Tile) => void;
   onStart: (text: string) => void;
   inputRef: React.RefObject<HTMLInputElement>;
+  /** files can be put in it: each read here before it is sent */
+  readDocument?: (file: File) => Promise<Attachment>;
+  /** begun with files: Socria sorts them, with what was said about them */
+  onStartFiles?: (text: string, atts: Attachment[], goal: Intent) => void;
+  /** the model and how far it goes, in the box */
+  picker?: ReactNode;
+  /** what the empty box says (it says something else with files in it) */
+  placeholder?: string;
+  /** told how to take files dropped anywhere on the map */
+  takeRef?: React.MutableRefObject<((files: File[]) => void) | null>;
 }) {
   const [open, setOpen] = useState(false);
   const [at, setAt] = useState(0);
+  const [files, setFiles] = useState<BoxFile[]>([]);
+  const [over, setOver] = useState(false);
+  const [notice, setNotice] = useState<string | null>(null);
+  const fileRef = useRef<HTMLInputElement>(null);
+  const seq = useRef(0);
   const q = query.trim();
+  const ready = files.filter((f) => f.status === 'ready' && f.att);
+  const reading = files.some((f) => f.status === 'reading');
+  const canFiles = !!readDocument && !!onStartFiles;
+
+  async function take(list: FileList | File[]) {
+    if (!readDocument) return;
+    setNotice(null);
+    const all = Array.from(list).slice(0, Math.max(0, BOX_MAX - files.length));
+    if (list.length > all.length) setNotice(`Up to ${BOX_MAX} files at a time.`);
+    for (const file of all) {
+      const id = `f${++seq.current}`;
+      setFiles((fs) => [...fs, { id, name: file.name, status: 'reading' }]);
+      try {
+        const att = await readDocument(file);
+        setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'ready', att } : f)));
+      } catch (e: unknown) {
+        setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'error', error: (e as Error)?.message || 'could not be read' } : f)));
+      }
+    }
+  }
+  if (takeRef) takeRef.current = canFiles ? (list) => void take(list) : null;
+
+  /** begin: with the files, if there are any; else with the words; with neither, the box asks for them */
+  const begin = () => {
+    if (reading) return;
+    if (ready.length && onStartFiles) {
+      onStartFiles(q, ready.map((f) => f.att!), intentOf(q, ready.length));
+      setFiles([]);
+      onQuery('');
+      return;
+    }
+    if (q) return onStart(q);
+    inputRef.current?.focus();
+  };
+
   const options: { key: string; run: () => void; el: ReactNode }[] = [];
-  if (!q && resume)
+  if (!q && resume && !files.length)
     options.push({
       key: 'resume',
       run: () => onPick(resume),
@@ -314,36 +397,33 @@ export function FindOrStart({
         </>
       ),
     });
-  for (const f of found.slice(0, 6))
+  if (!files.length)
+    for (const f of found.slice(0, 6))
+      options.push({
+        key: f.tile.id,
+        run: () => onPick(f.tile),
+        el: (
+          <>
+            <span className="l5h-o-k">
+              <Glyph look={f.tile.look} size={12} /> {f.group}
+              {f.hidden ? ' · hidden' : ''}
+            </span>
+            <span className="l5h-o-t">{f.tile.title}</span>
+            {f.match.why !== 'title' && <span className="l5h-o-s">{f.match.why === 'idea' ? `idea: ${f.match.said}` : f.match.said}</span>}
+          </>
+        ),
+      });
+  if (q && !files.length)
     options.push({
-      key: f.tile.id,
-      run: () => onPick(f.tile),
+      key: 'start',
+      run: () => onStart(q),
       el: (
         <>
-          <span className="l5h-o-k">
-            <Glyph look={f.tile.look} size={12} /> {f.group}
-            {f.hidden ? ' · hidden' : ''}
-          </span>
-          <span className="l5h-o-t">{f.tile.title}</span>
-          {f.match.why !== 'title' && <span className="l5h-o-s">{f.match.why === 'idea' ? `idea: ${f.match.said}` : f.match.said}</span>}
+          <span className="l5h-o-k">Start a new line of thinking</span>
+          <span className="l5h-o-t">“{q}”</span>
         </>
       ),
     });
-  options.push({
-    key: 'start',
-    run: () => onStart(q),
-    el: q ? (
-      <>
-        <span className="l5h-o-k">Start a new line of thinking</span>
-        <span className="l5h-o-t">“{q}”</span>
-      </>
-    ) : (
-      <>
-        <span className="l5h-o-k">New</span>
-        <span className="l5h-o-t">Start a new line of thinking</span>
-      </>
-    ),
-  });
   useEffect(() => setAt(0), [query]);
   const pick = (i: number) => {
     const o = options[i];
@@ -352,70 +432,131 @@ export function FindOrStart({
     inputRef.current?.blur();
     o.run();
   };
+  const said = files.length ? (reading ? 'Reading…' : 'Say what you are doing with these — or just press ↑') : placeholder ?? 'Search or start something new…';
   return (
-    <div className={`l5h-find${open ? ' is-open' : ''}`} onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOpen(false)}>
-      <input
-        ref={inputRef}
-        type="search"
-        value={query}
-        placeholder="Search or start something new…"
-        aria-label="Find a conversation or an idea, or start a new line of thinking"
-        role="combobox"
-        aria-expanded={open}
-        aria-controls="l5h-find-list"
-        aria-activedescendant={open ? `l5h-o-${at}` : undefined}
-        onFocus={() => setOpen(true)}
-        onChange={(e) => {
-          onQuery(e.target.value);
-          setOpen(true);
-        }}
-        onKeyDown={(e) => {
-          if (e.key === 'ArrowDown') {
-            e.preventDefault();
+    <div
+      className={`l5h-find${open && options.length ? ' is-open' : ''}${files.length ? ' has-files' : ''}${over ? ' is-drop' : ''}`}
+      onBlur={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOpen(false)}
+      onDragEnter={(e) => canFiles && e.dataTransfer?.types?.includes('Files') && (e.preventDefault(), setOver(true))}
+      onDragOver={(e) => canFiles && e.dataTransfer?.types?.includes('Files') && e.preventDefault()}
+      onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setOver(false)}
+      onDrop={(e) => {
+        if (!canFiles || !e.dataTransfer?.files?.length) return;
+        e.preventDefault();
+        e.stopPropagation();
+        setOver(false);
+        void take(e.dataTransfer.files);
+      }}
+    >
+      {files.length > 0 && (
+        <ul className="l5h-files" aria-label="Files to sort">
+          {files.map((f) => (
+            <li key={f.id} className={`l5h-file is-${f.status}`} title={f.status === 'error' ? f.error : f.name}>
+              <span className={`l5h-ftype is-${fileType(f.name).toLowerCase()}`} aria-hidden="true">
+                {fileType(f.name)}
+              </span>
+              <span className="l5h-file-t">
+                <span className="l5h-file-n">{f.name}</span>
+                <span className="l5h-file-s">{f.status === 'reading' ? 'reading…' : f.status === 'error' ? f.error : f.att?.kind === 'doc' ? `${f.att.pages ?? 1} ${(f.att.pages ?? 1) === 1 ? 'page' : 'pages'}` : 'read'}</span>
+              </span>
+              <button type="button" className="l5h-file-x" aria-label={`Remove ${f.name}`} onClick={() => setFiles((fs) => fs.filter((x) => x.id !== f.id))}>
+                ×
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <div className="l5h-find-row">
+        <input
+          ref={inputRef}
+          type="search"
+          value={query}
+          placeholder={said}
+          aria-label="Find a conversation or an idea, or start a new line of thinking"
+          role="combobox"
+          aria-expanded={open && options.length > 0}
+          aria-controls="l5h-find-list"
+          aria-activedescendant={open && options.length ? `l5h-o-${at}` : undefined}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            onQuery(e.target.value);
             setOpen(true);
-            setAt((i) => Math.min(options.length - 1, i + 1));
-          } else if (e.key === 'ArrowUp') {
-            e.preventDefault();
-            setAt((i) => Math.max(0, i - 1));
-          } else if (e.key === 'Enter') {
-            e.preventDefault();
-            pick(open ? at : q && found[0] ? options.findIndex((o) => o.key === found[0].tile.id) : options.length - 1);
-          } else if (e.key === 'Escape') {
-            if (query) onQuery('');
-            else inputRef.current?.blur();
-            setOpen(false);
-          }
-        }}
-        style={{ fontSize: 16 }}
-      />
-      {q && <span className="l5h-find-n">{found.length}</span>}
-      {query && (
+          }}
+          onKeyDown={(e) => {
+            if (e.key === 'ArrowDown' && options.length) {
+              e.preventDefault();
+              setOpen(true);
+              setAt((i) => Math.min(options.length - 1, i + 1));
+            } else if (e.key === 'ArrowUp' && options.length) {
+              e.preventDefault();
+              setAt((i) => Math.max(0, i - 1));
+            } else if (e.key === 'Enter' && !e.nativeEvent.isComposing) {
+              e.preventDefault();
+              if (files.length) return begin();
+              if (open && options[at]) return pick(at);
+              const first = q && found[0] ? options.findIndex((o) => o.key === found[0].tile.id) : -1;
+              if (first >= 0) pick(first);
+              else begin();
+            } else if (e.key === 'Escape') {
+              if (query) onQuery('');
+              else inputRef.current?.blur();
+              setOpen(false);
+            }
+          }}
+          style={{ fontSize: 16 }}
+        />
+        {q && !files.length && <span className="l5h-find-n">{found.length}</span>}
+        {query && (
+          <button
+            type="button"
+            className="l5h-find-x"
+            aria-label="Clear"
+            onMouseDown={(e) => e.preventDefault()}
+            onClick={() => {
+              onQuery('');
+              inputRef.current?.focus();
+            }}
+          >
+            ×
+          </button>
+        )}
+        {picker && <span className="l5h-find-pick">{picker}</span>}
+        {canFiles && (
+          <button type="button" className="l5h-find-att" aria-label="Add files — notes, slides, an exam review" title="Add files — notes, slides, an exam review. Or drop them anywhere on the map." onMouseDown={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}>
+            <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M20.5 11.5l-8.3 8.3a5 5 0 0 1-7.1-7.1l8.6-8.6a3.4 3.4 0 0 1 4.8 4.8l-8.6 8.6a1.7 1.7 0 0 1-2.4-2.4l7.9-7.9" />
+            </svg>
+          </button>
+        )}
         <button
           type="button"
-          className="l5h-find-x"
-          aria-label="Clear"
+          className="l5h-find-go"
+          disabled={reading}
+          aria-label={ready.length ? `Sort ${ready.length === 1 ? 'this file' : `these ${ready.length} files`} into topics` : q ? `Start a new line of thinking: ${q}` : 'Start a new line of thinking'}
+          title={ready.length ? 'Sort them into topics' : q ? 'Start something new with this' : 'Type what you are working on, or add your notes'}
           onMouseDown={(e) => e.preventDefault()}
-          onClick={() => {
-            onQuery('');
-            inputRef.current?.focus();
-          }}
+          onClick={begin}
         >
-          ×
+          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M12 19V5M6 11l6-6 6 6" />
+          </svg>
         </button>
+      </div>
+      {canFiles && (
+        <input
+          ref={fileRef}
+          type="file"
+          multiple
+          accept={STUDY_ACCEPT}
+          hidden
+          onChange={(e) => {
+            if (e.target.files?.length) void take(e.target.files);
+            e.target.value = '';
+          }}
+        />
       )}
-      <button
-        type="button"
-        className="l5h-find-go"
-        aria-label={q ? `Start a new line of thinking: ${q}` : 'Start a new line of thinking'}
-        title={q ? 'Start something new with this' : 'Start something new'}
-        onMouseDown={(e) => e.preventDefault()}
-        onClick={() => pick(options.length - 1)}
-      >
-        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M12 19V5M6 11l6-6 6 6" />
-        </svg>
-      </button>
-      {open && (
+      {notice && <p className="l5h-find-note">{notice}</p>}
+      {open && options.length > 0 && (
         <div className="l5h-find-list" id="l5h-find-list" role="listbox" aria-label="Found, or start">
           {options.map((o, i) => (
             <button

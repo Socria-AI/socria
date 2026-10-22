@@ -232,6 +232,9 @@ export interface StudyFile {
   pages: number;
 }
 
+/** What can be given to be sorted: documents, slides, sheets, notes, photos of a page. */
+export const STUDY_ACCEPT = '.pdf,.docx,.pptx,.xlsx,.odt,.odp,.ods,.rtf,.md,.txt,.csv,.tsv,.html,.htm,.tex,.ipynb,.png,.jpg,.jpeg,.webp';
+
 export const MAX_TOPICS = 9;
 const MAX_QUOTES = 6;
 const MAX_BLOCKS = 40;

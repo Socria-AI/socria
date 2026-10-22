@@ -10,8 +10,10 @@
 // and This month and All time are a line through time, the oldest on the
 // left and the newest on the right (lib/logos5/timeline.ts), where something
 // half-remembered is found by scrolling back. lib/logos5/arrange.ts keeps how
-// the person arranged it. One box at the foot finds or starts. Pressing a
-// conversation opens its card; pressing again, or Continue, opens it.
+// the person arranged it. It is where Logos 5 opens, and where everything
+// begins: one box at the foot finds, starts, or takes files to be sorted —
+// dropped on it, or anywhere on the map. Pressing a conversation opens its
+// card; pressing again, or Continue, opens it.
 // Everything arranged can be undone. Each lens comes in drawn.
 //
 // The pieces: UniverseBubbles.tsx (the map), UniverseTime.tsx (the line),
@@ -26,6 +28,8 @@ import * as A from '@/lib/logos5/arrange';
 import { useArrangement } from './useArrangement';
 import { BubbleMap, type BubbleActs } from './UniverseBubbles';
 import { TimeView } from './UniverseTime';
+import type { Attachment } from '@/lib/logos-attachments';
+import type { Intent } from '@/lib/logos5/study';
 import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, shortDate, type Found } from './UniverseParts';
 import './universe.css';
 
@@ -87,6 +91,12 @@ export function UniverseView({
   contents = false,
   atlas,
   drawing = null,
+  readDocument,
+  picker,
+  startWith = null,
+  startIn = null,
+  working = null,
+  notice = null,
   initial,
   now: nowGiven,
 }: {
@@ -102,8 +112,8 @@ export function UniverseView({
   onOpen: (id: string) => void;
   /** open a Core chat */
   onOpenChat?: (id: string) => void;
-  /** begin a new line of thinking — with these words as its first question, when there are any */
-  onStart: (text: string) => void;
+  /** begin a new line of thinking — with these words as its first question; with files, sorted into topics first */
+  onStart: (text: string, files?: { atts: Attachment[]; goal: Intent }) => void;
   /** file a conversation in a Project, or take it out of one (null) */
   onFile?: (id: string, kind: 'logos' | 'core', projectId: string | null) => void;
   /** make a Project; its id, or null if it could not be made */
@@ -118,6 +128,18 @@ export function UniverseView({
   atlas?: ReactNode;
   /** the Core chats brought in having their maps drawn: how many of how many, while it lasts */
   drawing?: { done: number; total: number } | null;
+  /** files can be put in the box: each read in the browser before it is sent */
+  readDocument?: (file: File) => Promise<Attachment>;
+  /** the model and how far it goes, in the box */
+  picker?: ReactNode;
+  /** words to begin with, put in the box (an opening chosen elsewhere) */
+  startWith?: string | null;
+  /** the Project a new line of thinking will be begun in, by name */
+  startIn?: string | null;
+  /** what is under way after the box was sent — "Sorting your files into topics…" */
+  working?: string | null;
+  /** something to say about what was begun (it could not be done) */
+  notice?: string | null;
   /** start from this arrangement (a test; otherwise it is read from where it is kept) */
   initial?: A.Arrangement;
   /** the time to read "recent" and "today" against (a test; otherwise now) */
@@ -210,6 +232,9 @@ export function UniverseView({
   const future = useRef<Step[]>([]);
   const [, bump] = useState(0);
   const findRef = useRef<HTMLInputElement>(null);
+  /** the box's hands for files dropped anywhere on the map */
+  const takeRef = useRef<((files: File[]) => void) | null>(null);
+  const [dropping, setDropping] = useState(false);
   const mainRef = useRef<HTMLDivElement>(null);
   const topRef = useRef<HTMLDivElement>(null);
   const footRef = useRef<HTMLDivElement>(null);
@@ -242,6 +267,15 @@ export function UniverseView({
     const t = setTimeout(() => setSaid(null), 4200);
     return () => clearTimeout(t);
   }, [said]);
+  // an opening chosen elsewhere: in the box, to be made the person's own before it is sent
+  useEffect(() => {
+    if (!startWith) return;
+    setQuery(startWith);
+    requestAnimationFrame(() => findRef.current?.focus());
+  }, [startWith]);
+  useEffect(() => {
+    if (notice) setSaid(notice);
+  }, [notice]);
   // another week is another map, fitted to it; leaving Today folds again what was opened there
   useEffect(() => setFitKey((k) => k + 1), [weekAt]);
   useEffect(() => {
@@ -564,6 +598,10 @@ export function UniverseView({
       found={found}
       resume={resume}
       inputRef={findRef}
+      readDocument={readDocument}
+      picker={picker}
+      placeholder={startIn ? `Search, or start something new in “${startIn}”…` : undefined}
+      takeRef={takeRef}
       onPick={(t) => {
         setQuery('');
         open(t);
@@ -571,6 +609,10 @@ export function UniverseView({
       onStart={(text) => {
         setQuery('');
         onStart(text);
+      }}
+      onStartFiles={(text, atts, goal) => {
+        setQuery('');
+        onStart(text, { atts, goal });
       }}
     />
   );
@@ -703,8 +745,8 @@ export function UniverseView({
     body = (
       <div className="l5h-empty">
         <p>Every conversation you have appears here — a map of what you have learned, by day, by week and by subject.</p>
-        <button type="button" className="l5h-go" onClick={() => onStart('')}>
-          What are you working on? <span aria-hidden="true">→</span>
+        <button type="button" className="l5h-go" onClick={() => findRef.current?.focus()}>
+          Ask anything, or drop your notes in the box below <span aria-hidden="true">↓</span>
         </button>
       </div>
     );
@@ -794,7 +836,20 @@ export function UniverseView({
       {head?.(null, visible.length)}
       <div className="l5h-body">
         {contentsEl}
-        <div className={`l5h-main lens-${lens}${inTime(lens) ? ' is-time' : ''}${isMap && !arr.seen.hint ? ' has-hint' : ''}`} ref={mainRef} style={{ ['--l5h-foot' as string]: `${foot}px` }}>
+        <div
+          className={`l5h-main lens-${lens}${inTime(lens) ? ' is-time' : ''}${isMap && !arr.seen.hint ? ' has-hint' : ''}${dropping ? ' is-dropping' : ''}`}
+          ref={mainRef}
+          style={{ ['--l5h-foot' as string]: `${foot}px` }}
+          onDragEnter={(e) => takeRef.current && e.dataTransfer?.types?.includes('Files') && (e.preventDefault(), setDropping(true))}
+          onDragOver={(e) => takeRef.current && e.dataTransfer?.types?.includes('Files') && e.preventDefault()}
+          onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropping(false)}
+          onDrop={(e) => {
+            setDropping(false);
+            if (!takeRef.current || !e.dataTransfer?.files?.length) return;
+            e.preventDefault();
+            takeRef.current(Array.from(e.dataTransfer.files));
+          }}
+        >
           {body}
           {hasTop && (
             <div className="l5h-top" ref={topRef}>
@@ -923,7 +978,18 @@ export function UniverseView({
               onClear={() => setSel([])}
             />
           )}
-          {drawing && drawing.total > 0 && !linkFrom && (
+          {dropping && (
+            <div className="l5h-dropzone" aria-hidden="true">
+              <span>Drop your notes, slides or an exam review — Socria sorts them into topics</span>
+            </div>
+          )}
+          {working && (
+            <p className="l5h-drawing is-working" role="status">
+              <span className="l5h-drawing-dot" aria-hidden="true" />
+              {working}
+            </p>
+          )}
+          {drawing && drawing.total > 0 && !linkFrom && !working && (
             <p className="l5h-drawing" role="status" title="Your chats from Core are here now. Each one's map is being drawn from what was said in it — nothing of this month's allowance is spent.">
               <span className="l5h-drawing-dot" aria-hidden="true" />
               Drawing maps for your chats · {Math.min(drawing.done + 1, drawing.total)} of {drawing.total}

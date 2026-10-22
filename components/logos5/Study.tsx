@@ -1,7 +1,6 @@
 'use client';
 // components/logos5/Study.tsx — Logos 5's study path, drawn.
 //
-//   StudyIntake     "What are you working on?" — files and a sentence; Socria sorts it
 //   StudyBoard      the files as topics, with the files' own words and pages
 //   TopicInspector  one topic: every quote, and what to do with it
 //   StudyPractice   practice made from the files, checked when submitted
@@ -9,18 +8,17 @@
 //
 // Nothing here talks to a model or a database. It draws a study
 // (lib/logos5/study.ts) and says what the person did; LogosApp does the rest.
+// A study is begun from the Universal Map's box (UniverseParts.tsx
+// FindOrStart): files dropped there are sorted into the topics drawn here.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import type { Attachment } from '@/lib/logos-attachments';
 import {
-  INTENT_KEYS,
-  INTENTS,
+  STUDY_ACCEPT,
   TOPIC_KIND_LABEL,
   blanksOf,
   checkPractice,
   clozeHint,
   filledOf,
-  intentOf,
   boardRows,
   kindSaid,
   questionsSaid,
@@ -30,7 +28,6 @@ import {
   sourcesOf,
   whereSaid,
   type Gap,
-  type Intent,
   type Practice,
   type StudyFile,
   type StudyQuote,
@@ -58,240 +55,6 @@ export function SourceChip({ q, files, long = false, onOpen }: { q: StudyQuote; 
     <span className="l5s-chip is-src">
       <span aria-hidden="true">◇</span> {said}
     </span>
-  );
-}
-
-// ── the intake ───────────────────────────────────────────────────────
-
-interface IntakeFile {
-  id: string;
-  name: string;
-  status: 'reading' | 'ready' | 'error';
-  att?: Attachment;
-  error?: string;
-}
-
-const ACCEPT = '.pdf,.docx,.pptx,.xlsx,.odt,.odp,.ods,.rtf,.md,.txt,.csv,.tsv,.html,.htm,.tex,.ipynb,.png,.jpg,.jpeg,.webp';
-
-const STEPS = ['Drop or ask', 'Socria sorts it', 'Pick a starting point', 'Study or dig in'];
-
-/** The badge on a file: what kind of file it is, in three letters. */
-function fileType(name: string): string {
-  const ext = (/\.([a-z0-9]{1,5})$/i.exec(name)?.[1] ?? '').toLowerCase();
-  if (ext === 'pdf') return 'PDF';
-  if (['doc', 'docx', 'odt', 'rtf'].includes(ext)) return 'DOC';
-  if (['ppt', 'pptx', 'odp', 'key'].includes(ext)) return 'PPT';
-  if (['xls', 'xlsx', 'ods', 'csv', 'tsv'].includes(ext)) return 'XLS';
-  if (['png', 'jpg', 'jpeg', 'webp', 'gif', 'heic'].includes(ext)) return 'IMG';
-  return 'TXT';
-}
-
-export function StudyIntake({
-  readDocument,
-  onOrganize,
-  onAsk,
-  busy,
-  error,
-  footer,
-  below,
-  narrow,
-}: {
-  readDocument: (file: File) => Promise<Attachment>;
-  onOrganize: (atts: Attachment[], said: string, goal: Intent) => void;
-  onAsk: (text: string) => void;
-  busy: boolean;
-  error?: string | null;
-  /** the model picker, and anything else the composer would carry */
-  footer?: ReactNode;
-  /** under the card: picking up where they left off */
-  below?: ReactNode;
-  narrow: boolean;
-}) {
-  const [files, setFiles] = useState<IntakeFile[]>([]);
-  const [text, setText] = useState('');
-  const [picked, setPicked] = useState<Intent | null>(null);
-  const [choosing, setChoosing] = useState(false);
-  const [dragging, setDragging] = useState(false);
-  const [notice, setNotice] = useState<string | null>(null);
-  const fileRef = useRef<HTMLInputElement>(null);
-  const seq = useRef(0);
-  const ready = files.filter((f) => f.status === 'ready' && f.att);
-  const reading = files.some((f) => f.status === 'reading');
-  const goal = picked ?? intentOf(text, ready.length + (reading ? 1 : 0));
-  const docs = ready.filter((f) => f.att?.kind === 'doc');
-
-  async function take(list: FileList | File[]) {
-    setNotice(null);
-    const all = Array.from(list).slice(0, Math.max(0, 6 - files.length));
-    if (list.length > all.length) setNotice('Up to six files at a time.');
-    for (const file of all) {
-      const id = `f${++seq.current}`;
-      setFiles((fs) => [...fs, { id, name: file.name, status: 'reading' }]);
-      try {
-        const att = await readDocument(file);
-        setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'ready', att } : f)));
-      } catch (e: any) {
-        setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'error', error: e?.message || 'could not be read' } : f)));
-      }
-    }
-  }
-
-  const go = () => {
-    if (busy || reading) return;
-    if (docs.length) onOrganize(ready.map((f) => f.att!), text.trim(), goal);
-    else if (text.trim() || ready.length) onAsk(text.trim());
-  };
-  const can = !busy && !reading && (docs.length > 0 || !!text.trim());
-  const step = busy ? 1 : 0;
-
-  return (
-    <div className="l5s-intake">
-      <div className="l5s-intake-in">
-        <h2 className="l5s-hello">
-          What are you <em>working on</em>?
-        </h2>
-        <p className="l5s-hello-sub">Drop your notes, slides or an exam review — or just ask. Socria sorts it; you pick where to go.</p>
-        <div
-          className={`l5s-drop${dragging ? ' is-over' : ''}${files.length ? ' has-files' : ''}`}
-          onDragEnter={(e) => (e.preventDefault(), setDragging(true))}
-          onDragOver={(e) => e.preventDefault()}
-          onDragLeave={(e) => {
-            if (!e.currentTarget.contains(e.relatedTarget as Node)) setDragging(false);
-          }}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDragging(false);
-            if (e.dataTransfer?.files?.length) void take(e.dataTransfer.files);
-          }}
-        >
-          {files.length > 0 && (
-            <ul className="l5s-files" aria-label="Files">
-              {files.map((f) => (
-                <li key={f.id} className={`l5s-file is-${f.status}`}>
-                  <span className={`l5s-ftype is-${fileType(f.name).toLowerCase()}`} aria-hidden="true">
-                    <span>{fileType(f.name)}</span>
-                  </span>
-                  <span className="l5s-file-t">
-                    <span className="l5s-file-n">{f.name}</span>
-                    <span className="l5s-file-s">
-                      {f.status === 'reading'
-                        ? 'reading…'
-                        : f.status === 'error'
-                          ? f.error
-                          : f.att?.kind === 'doc'
-                            ? `${f.att.pages ?? 1} ${(f.att.pages ?? 1) === 1 ? 'page' : 'pages'} · read`
-                            : 'read'}
-                    </span>
-                    <span className="l5s-file-bar" aria-hidden="true">
-                      <span />
-                    </span>
-                  </span>
-                  <button type="button" className="l5s-x" aria-label={`Remove ${f.name}`} onClick={() => setFiles((fs) => fs.filter((x) => x.id !== f.id))}>
-                    ×
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {!files.length && (
-            <button type="button" className="l5s-drop-cta" onClick={() => fileRef.current?.click()}>
-              <span className="l5s-drop-ic" aria-hidden="true">
-                ⇪
-              </span>
-              <span>
-                <b>Drop files here</b> or <u>choose them</u>
-                <small>PDF, Word, PowerPoint, Excel, notes, photos of a page</small>
-              </span>
-            </button>
-          )}
-          <div className="l5s-ask">
-            <textarea
-              value={text}
-              rows={narrow ? 2 : 1}
-              placeholder={files.length ? 'What should Socria help with? e.g. “get me ready for exam 2 on Thursday”' : narrow ? 'Or just ask…' : 'Or just ask — “help me get ready for exam 2 on Thursday”'}
-              onChange={(e) => setText(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey && !e.nativeEvent.isComposing) {
-                  e.preventDefault();
-                  go();
-                }
-              }}
-              aria-label="What you are working on"
-              style={{ fontSize: 16 }}
-            />
-            {files.length > 0 && (
-              <button type="button" className="l5s-iconbtn" onClick={() => fileRef.current?.click()} aria-label="Add another file" title="Add another file">
-                +
-              </button>
-            )}
-          </div>
-          <div className="l5s-drop-foot">
-            {(text.trim() || files.length > 0) && (
-              <div className="l5s-intentrow">
-                <span className="l5s-intent">
-                  <span className="l5s-intent-dot" aria-hidden="true" />
-                  Looks like: {INTENTS[goal]}
-                </span>
-                <span className="l5s-intent-sub">
-                  · nothing to set up —{' '}
-                  <button type="button" className="l5s-link" onClick={() => setChoosing((v) => !v)} aria-expanded={choosing}>
-                    change it any time
-                  </button>
-                </span>
-                {choosing && (
-                  <div className="l5s-intent-menu" role="menu">
-                    {INTENT_KEYS.map((k) => (
-                      <button
-                        key={k}
-                        type="button"
-                        role="menuitemradio"
-                        aria-checked={goal === k}
-                        onClick={() => {
-                          setPicked(k);
-                          setChoosing(false);
-                        }}
-                      >
-                        {INTENTS[k]}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-            <button type="button" className="l5s-go" disabled={!can} onClick={go}>
-              {busy ? 'Sorting…' : docs.length ? 'Organize it' : 'Ask'} <span aria-hidden="true">→</span>
-            </button>
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            multiple
-            accept={ACCEPT}
-            hidden
-            onChange={(e) => {
-              if (e.target.files?.length) void take(e.target.files);
-              e.target.value = '';
-            }}
-          />
-        </div>
-        {notice && <p className="l5s-note">{notice}</p>}
-        {error && (
-          <p className="l5s-error" role="alert">
-            {error}
-          </p>
-        )}
-        {footer && <div className="l5s-intake-foot">{footer}</div>}
-        {below}
-      </div>
-      <ol className="l5s-path" aria-label="How it works">
-        {STEPS.map((s, i) => (
-          <li key={s} className={i === step ? 'is-on' : i < step ? 'is-done' : ''}>
-            <span className="l5s-path-n">{i + 1}</span>
-            {s}
-          </li>
-        ))}
-      </ol>
-    </div>
   );
 }
 
@@ -1038,7 +801,7 @@ export function ComponentsEmpty({
         ref={ref}
         type="file"
         multiple
-        accept={ACCEPT}
+        accept={STUDY_ACCEPT}
         hidden
         onChange={(e) => {
           if (e.target.files?.length) onFiles(Array.from(e.target.files));

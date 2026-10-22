@@ -92,11 +92,13 @@ shape, so every existing conversation reads exactly as before.
 
 ## 4. Study: files into topics, practice, and the Logic Map on request
 
-A new line of thinking opens on one question — **What are you working on?**
-— with a place to drop notes, slides or an exam review and a line to say
-what for. Socria reads the words back ("Looks like: studying for an exam ·
-nothing to set up — change it any time"). With files, **Organize it** sorts
-them; with only words, **Ask** starts the conversation exactly as before.
+A study is begun from the Universal Map's box (§5) — there is no start
+screen any more: notes, slides or an exam review are dropped on the box (or
+anywhere on the map) or added with its clip, read in the browser and shown
+as chips, and sent with ↑, with a line to say what for if there is one. What
+they are for is read from those words and the files (`intentOf`). The map
+says "Sorting your files into topics…" until the board is there; with only
+words, ↑ starts the conversation exactly as before.
 
 | Screen | What it holds |
 |---|---|
@@ -333,12 +335,18 @@ subjects ▾" under the lenses); **saved views**; Hidden, Add a note, Reset
 layout (every folded subject open again); and, signed in, **Everything
 remembered** (the Mind Atlas). On the line it holds only what applies there.
 
-**One box finds or starts**, at the foot of the map: "Search or start
-something new…" (press `/`) searches names, ideas and where conversations
-stand; what does not match dims, its list opens upward, and Enter opens the
-first match. Its round ↑, or its last choice, begins a new line of thinking
-with the typed words as the first question. Empty, it offers where to pick
-up.
+**One box finds or starts**, at the foot of the map — and it is where every
+line of thinking begins: **Logos 5 opens on the map**, whatever there is, and
+there is no "What are you working on?" screen. "Search or start something
+new…" (press `/`) searches names, ideas and where conversations stand; what
+does not match dims, its list opens upward, and Enter opens the first match.
+Its round ↑, or its last choice, begins a new line of thinking with the typed
+words as the first question; with nothing typed and nothing added, ↑ asks for
+words rather than opening an empty one. Files dropped on it, or anywhere on
+the map, or added with its clip are sorted into topics (§4). It carries the
+model and how far it goes, as the composer does; begun from a Project's home
+it says it will start in that Project; an opening chosen elsewhere waits in
+it to be made the person's own. Empty, it offers where to pick up.
 
 **Getting around.**
 - Pressing a conversation opens its card: where it stands, Socria's open question,
@@ -1036,3 +1044,27 @@ Today or This week was not on the map at all.
   "Exam prep" with it in it, and one dropped on the empty Thesis was filed
   there. `test/logos5-bubbles.test.mjs` (63) holds where each goes and that
   nothing in the rows sits on anything.
+
+### The map is where it starts
+
+Asked for: "i would remove this screen lol, integrate the universal map as the
+default view" — the "What are you working on?" screen a new line of thinking
+opened on.
+
+- Logos 5 shows the Universal Map whenever the line of thinking open has
+  nothing in it and nothing under way (`components/LogosApp.tsx`,
+  `emptyHere`), so it opens there for everyone — a new account included — and
+  never on an empty conversation. The screen itself is gone
+  (`StudyIntake` and its styles).
+- Everything it did is in the map's box: words begin a line of thinking; files
+  (dropped on the box or anywhere on the map, or added with the clip) are read
+  there and sorted when sent — the map says "Sorting your files into topics…",
+  waiting for an answer still coming if there is one, then the board opens —
+  and the model picker rides in it. An opening chosen elsewhere goes into it;
+  a Project's "new line of thinking" says it will start there.
+- Checked in the real app (signed out, through the dev stand-ins): it opened
+  on the map; "What is accrual accounting?" from the box opened that
+  conversation answering; back on the map it was there; a chapter's notes
+  added with the clip were sorted into four topics with Accruals and deferrals
+  as the start. `test/logos5-study-ui.test.mjs` holds the box (its clip, what
+  it accepts, the picker, a Project's start).

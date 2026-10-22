@@ -164,7 +164,7 @@ import { LOGOS5, DEFAULT_STAGE_SHARE, readStagePrefs, writeStagePrefs, type Stag
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { L5Header, L5LinkBar, L5Outline, L5Switch, MindButton, type L5MenuItem, type L5SwitchItem } from './logos5/L5Chrome';
-import { ArtifactsView, ComponentsEmpty, StartPanel, StudyBoard, StudyIntake, StudyPractice, TopicInspector, type ArtifactItem, type StudyTab } from './logos5/Study';
+import { ArtifactsView, ComponentsEmpty, StartPanel, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem, type StudyTab } from './logos5/Study';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView } from './logos5/Universe';
 import { MindGraphView } from './logos5/MindGraph';
@@ -2063,7 +2063,9 @@ export function LogosApp({
       // means it has left the composer.
       if (pendingStart) {
         const { id, message } = pendingStart;
-        setInput(message);
+        // Logos 5 begins on the Universal Map: the opening goes into the box at its foot
+        if (SOCRIA_MODELS[model]?.workspace && LOGOS5.on) setHomeStart(message);
+        else setInput(message);
         startIdRef.current = id;
         requestAnimationFrame(() => {
           const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
@@ -4300,6 +4302,20 @@ export function LogosApp({
   // opened from the map, and a new one begun from it. The rail is put away; it
   // is still there ("List") for renaming, deleting and filing.
   const [l5Home, setL5Home] = useState(false);
+  /** an opening chosen elsewhere, put in the map's box to be made their own before it is sent */
+  const [homeStart, setHomeStart] = useState<string | null>(null);
+  /** files sent from the map's box: sorted once the new line of thinking they begin is the one open */
+  const sortNextRef = useRef<{ id: string; atts: Attachment[]; said: string; goal: Intent } | null>(null);
+  /** files sent from the map are waiting to be sorted — for the line of thinking to open, or for an answer still coming to finish */
+  const [sortPending, setSortPending] = useState(false);
+  useEffect(() => {
+    const job = sortNextRef.current;
+    if (!job || job.id !== activeId || busy || organizing) return;
+    sortNextRef.current = null;
+    setSortPending(false);
+    void organize(job.atts, job.said, job.goal);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, sortPending, busy, organizing]);
   /** home's contents column: every line of thinking, by Project */
   const [l5List, setL5List] = useState(false);
   /** the rail, asked for to rename, delete or file conversations */
@@ -4339,7 +4355,7 @@ export function LogosApp({
   const drawingIdRef = useRef<string | null>(null);
   /** on the Universal Map or the Mind Graph, the open line of thinking is not on screen */
   const offStageRef = useRef(false);
-  offStageRef.current = l5Home || l5Mind;
+  offStageRef.current = l5Home || l5Mind || (messages.length === 0 && !busy && !streaming);
   const movedRef = useRef(onConversationsMoved);
   movedRef.current = onConversationsMoved;
 
@@ -6539,43 +6555,6 @@ export function LogosApp({
     { id: 'logic', label: 'Logic Map', count: map.nodes.length, fresh: stageFresh },
   ];
   const switchEl = (wide = false) => <L5Switch items={switchItems} value={studyTab} onChange={(id) => setStudyTab(id as StudyTab)} label="What this shows" wide={wide} />;
-  /** A new line of thinking: what are you working on? (Logos 5's intake) */
-  const intakeShown = messages.length === 0 && !busy && !streaming && !organizing ? !groupView && !togetherReadOnly : organizing && messages.length === 0;
-  const l5Intake = intakeShown ? (
-    <section className="l5-col l5s-main" aria-label="Start">
-      <div className="l5s-scroll">
-        <StudyIntake
-          readDocument={readDocument}
-          narrow={narrow}
-          busy={organizing}
-          error={studyNote}
-          onOrganize={(atts, said, goal) => void organize(atts, said, goal)}
-          onAsk={(text) => void send(text)}
-          footer={
-            <ModelPicker
-              value={model}
-              onChange={pickModel}
-              isSignedIn={!!isSignedIn || unlocked}
-              depth={depthOn ? depth : undefined}
-              onDepth={depthOn ? pickDepth : undefined}
-              plan={planKnown ? plan : undefined}
-            />
-          }
-          below={
-            pickUpOffer ? (
-              <button type="button" className="l5-pickup" onClick={() => switchSession(pickUpOffer.id)}>
-                <span className="l5-pickup-k">Pick up where you left off · {relTime(pickUpOffer.at)}</span>
-                <span className="l5-pickup-t">{pickUpOffer.title}</span>
-                <span className="l5-pickup-q">
-                  {pickUpOffer.kind === 'question' ? 'Socria asked' : 'You had started'}: “{pickUpOffer.waiting}”
-                </span>
-              </button>
-            ) : null
-          }
-        />
-      </div>
-    </section>
-  ) : null;
   const l5Thread = (
     <section className={`l5-col${messages.length === 0 && !streaming && !busy ? ' is-empty' : ''}`} aria-label="Conversation">
       {linkNode && <L5LinkBar label={linkLabel} count={linkList.length} at={linkAt} onStep={stepLinked} onClear={clearLinked} />}
@@ -6853,7 +6832,7 @@ export function LogosApp({
       eyebrow={study?.state.course || projectName || (messages.length ? undefined : 'Logos')}
       title={active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : ''}
       stage={null}
-      center={!narrow && !l5Intake ? switchEl() : undefined}
+      center={!narrow ? switchEl() : undefined}
       presence={
         <>
           <L5Outline
@@ -6871,7 +6850,7 @@ export function LogosApp({
       account={isSignedIn ? <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} /> : null}
       extra={
         <>
-          {!narrow && !l5Intake && (
+          {!narrow && (
             <button type="button" className={`l5-unibtn is-convo${convoOpen ? ' is-on' : ''}`} onClick={() => setConvo(!convoOpen)} aria-pressed={convoOpen} title={convoOpen ? 'Fold the conversation away' : 'Open the conversation'}>
               <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <path d="M4 5h16v11H9l-5 4z" />
@@ -6887,7 +6866,12 @@ export function LogosApp({
   );
 
   // ── LOGOS 5: HOME, THE UNIVERSAL MAP ──
-  const homeShown = l5 && l5Home && !l5Mind && !hydrating && !room.active;
+  // There is no start screen: a line of thinking with nothing in it yet, and
+  // nothing under way in it, is not a place to be — the map is, and its box
+  // is where everything begins (files being sorted from it included: the map
+  // stays, saying so, until the topics are there).
+  const emptyHere = messages.length === 0 && !busy && !streaming && !groupView && !togetherReadOnly;
+  const homeShown = l5 && (l5Home || emptyHere) && !l5Mind && !hydrating && !room.active;
   /** the Mind Graph is its own place: over home and over a line of thinking alike */
   const mindShown = l5 && l5Mind && !hydrating && !room.active;
   function goHome() {
@@ -6931,11 +6915,22 @@ export function LogosApp({
     setL5List(false);
     return true;
   }
-  /** The box at the map's foot: a new line of thinking, its first question the words typed there, if any */
-  function startFromHome(text: string) {
-    if (!newFromHome()) return;
+  /**
+   * The box at the map's foot — where every line of thinking begins now: its
+   * first question the words typed there; or, with files, those sorted into
+   * topics first (once the new line of thinking is the one open, so the
+   * sorting is written into it). Nothing typed and nothing added begins
+   * nothing: an empty line of thinking is never opened.
+   */
+  function startFromHome(text: string, files?: { atts: Attachment[]; goal: Intent }) {
     const said = text.trim();
-    if (said) void send(said);
+    if (!said && !files?.atts.length) return;
+    if (!newFromHome()) return;
+    setHomeStart(null);
+    if (files?.atts.length && activeIdRef.current) {
+      sortNextRef.current = { id: activeIdRef.current, atts: files.atts, said, goal: files.goal };
+      setSortPending(true);
+    } else void send(said);
   }
   /** filed from the map: a line of thinking as the rail files it, a Core chat by its host */
   function fileFromHome(id: string, kind: 'logos' | 'core', projectId: string | null) {
@@ -6986,6 +6981,21 @@ export function LogosApp({
       onMind={cloud ? () => setL5Mind(true) : undefined}
       contents={l5List}
       drawing={drawing}
+      readDocument={readDocument}
+      picker={
+        <ModelPicker
+          value={model}
+          onChange={pickModel}
+          isSignedIn={!!isSignedIn || unlocked}
+          depth={depthOn ? depth : undefined}
+          onDepth={depthOn ? pickDepth : undefined}
+          plan={planKnown ? plan : undefined}
+        />
+      }
+      startWith={homeStart}
+      startIn={emptyHere && active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name ?? null : null}
+      working={(organizing || sortPending) && messages.length === 0 ? 'Sorting your files into topics…' : null}
+      notice={messages.length === 0 ? studyNote : null}
       head={(center, count) =>
         chromeHidden ? null : (
           <L5Header
@@ -7328,8 +7338,8 @@ export function LogosApp({
           {railEl}
           <div className="l5-main">
             {!chromeHidden && !mindShown && !homeShown && l5Head}
-            {!chromeHidden && !homeShown && !mindShown && !l5Intake && narrow && <div className="l5x-tabs">{switchEl(true)}</div>}
-            <div className="l5-body">{mindShown ? l5MindView : homeShown ? l5HomeView : l5Intake ?? l5Line}</div>
+            {!chromeHidden && !homeShown && !mindShown && narrow && <div className="l5x-tabs">{switchEl(true)}</div>}
+            <div className="l5-body">{mindShown ? l5MindView : homeShown ? l5HomeView : l5Line}</div>
           </div>
           {draftEl}
           {chromeEls}

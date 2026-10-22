@@ -8,7 +8,7 @@ export { RichText, StreamingRichText, closingQuestion } from '@/components/RichT
 export { parseBlocks, splitInline } from '@/lib/rich-text';
 export { readStagePrefs, writeStagePrefs, logos5On, DEFAULT_STAGE_SHARE, STAGE_KEY } from '@/lib/logos5/flags';
 // the study path: intake, board, a topic, practice, the three views — and the Universal Map
-export { StudyIntake, StudyBoard, StartPanel, TopicInspector, StudyPractice, PracticeEmpty, ComponentsEmpty, ArtifactsView } from '@/components/logos5/Study';
+export { StudyBoard, StartPanel, TopicInspector, StudyPractice, PracticeEmpty, ComponentsEmpty, ArtifactsView } from '@/components/logos5/Study';
 export { UniverseView } from '@/components/logos5/Universe';
 export { emptyArrangement } from '@/lib/logos5/arrange';
 // the Mind Graph: what Socria remembers, drawn as a mind
