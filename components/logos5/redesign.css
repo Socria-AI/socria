@@ -264,12 +264,15 @@
   padding-bottom: calc(var(--omni) + 24px);
 }
 
-/* the Logic Map: the workspace's own bar floats over the map, top right */
+/* the Logic Map: the workspace's own bar floats over the map, top right —
+   above a model's header too, which is raised so its views menu drops over
+   the figure (components/model/understand.css), and would otherwise take the
+   clicks meant for + View and Synthesize */
 .logos-root .l5 .l5x-canvas.is-logic .ws-top {
   position: absolute;
   top: 12px;
   right: 14px;
-  z-index: 4;
+  z-index: 6;
   border: 0;
   background: transparent;
   padding: 0;

@@ -210,6 +210,13 @@ console.log('=== the stylesheets ===');
   ok('the bar is laid out under the figure, not floated over it', /\.sfx-bar \{/.test(sx) && !/\.sfx-tools \{[^}]*position: absolute/.test(sx));
   ok('the frame is one scrolling column when narrow', /@container sfx \(max-width: 760px\)[\s\S]*?\.sfx-body \{[^}]*overflow-y: auto/.test(sx));
   ok('full screen is a ground of its own', /\.sfx\.is-full\.is-fill,[\s\S]*?background: var\(--lg-paper/.test(sx));
+  // the frame's header is raised so its views menu drops over the figure; the
+  // workspace's floating row (+ View, Synthesize) must stay above it, or the
+  // header takes the clicks meant for those buttons
+  const rd = read('components/logos5/redesign.css');
+  const rowZ = Number((rd.match(/\.l5x-canvas\.is-logic \.ws-top \{[^}]*z-index:\s*(\d+)/) || [])[1]);
+  const headZ = Number((und.match(/\.sfx-head \{[^}]*z-index:\s*(\d+)/) || [])[1]);
+  ok('+ View and Synthesize stay above a model\'s header', rowZ > headZ, `${rowZ} vs ${headZ}`);
   const tm = read('components/ThinkingMap.tsx');
   ok('the empty map\'s words are not drawn behind a model', /map\.nodes\.length === 0 && !\(lens === 'plot' && \(map\.viz \|\| doc\)\)/.test(tm));
 }
