@@ -78,7 +78,7 @@ export function CheckinFlow({ eventId, open }: { eventId: string; open: boolean 
       <form onSubmit={find} noValidate className="stack" style={{ gap: 14 }}>
         <div className="ev-field">
           <label htmlFor="ck-who">Name or email you RSVP’d with</label>
-          <input id="ck-who" className="ev-input" autoComplete="email" autoCapitalize="words" spellCheck={false} value={who} onChange={(e) => setWho(e.target.value)} maxLength={254} aria-invalid={!!error} aria-describedby={error ? 'ck-err' : undefined} placeholder="e.g. Maya Patel or maya@gmail.com" />
+          <input id="ck-who" className="ev-input" autoComplete="email" autoCapitalize="words" spellCheck={false} value={who} onChange={(e) => setWho(e.target.value)} maxLength={254} aria-invalid={!!error} aria-describedby={error ? 'ck-err' : undefined} placeholder="e.g. Madison Carby or madison@gmail.com" />
         </div>
         <div className="ev-hp" aria-hidden="true">
           <label htmlFor="ck-website">Website</label>
