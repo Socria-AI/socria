@@ -721,8 +721,11 @@ export const Editor = forwardRef<
       if (!raf) raf = requestAnimationFrame(read);
     };
     document.addEventListener('selectionchange', on);
+    // the selection's tools follow its words when the page scrolls under them
+    document.addEventListener('scroll', on, true);
     return () => {
       document.removeEventListener('selectionchange', on);
+      document.removeEventListener('scroll', on, true);
       if (raf) cancelAnimationFrame(raf);
     };
     // the callbacks are read fresh through the closure each frame

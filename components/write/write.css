@@ -26,7 +26,7 @@
   color: var(--lg-ink);
   font-family: var(--lg-sans);
 }
-/* as the Document artifact (Logos 5): one long page the canvas scrolls, its bar held at the top */
+/* as the Writing artifact (Logos 5): one long page the canvas scrolls, its bar held at the top */
 .logos-root .w-space.in-artifact { height: auto; min-height: min(76vh, 900px); background: transparent; }
 .logos-root .w-space.in-artifact .w-bar { position: sticky; top: 0; border-radius: 18px 18px 0 0; }
 .logos-root .w-space.in-artifact .w-body,

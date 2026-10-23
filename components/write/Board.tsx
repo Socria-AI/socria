@@ -179,7 +179,8 @@ export function Board({
   }
 
   function onCardKey(e: React.KeyboardEvent, c: Card) {
-    if (editing === c.id) return;
+    // the card's own keys, when the card itself has focus — not a key pressed on a button or box inside it
+    if (editing === c.id || e.target !== e.currentTarget) return;
     const moveKeys = isMac() ? e.ctrlKey && e.shiftKey && !e.metaKey : e.altKey && e.shiftKey;
     if (moveKeys && e.key.startsWith('Arrow')) {
       e.preventDefault();

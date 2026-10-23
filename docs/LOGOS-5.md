@@ -545,7 +545,7 @@ three-region Mind Graph drawing; the design is in `mockups/logos-5-memory/`.
 
 The person's own writing — one document with two faces, saved with the line of
 thinking (`draft.doc`, `lib/write/doc.ts`), shown as the first of its
-**Artifacts** (`components/write/WriteSpace.tsx`). It replaced the old Draft
+**Artifacts**, called Writing (`components/write/WriteSpace.tsx`). It replaced the old Draft
 Space (`components/DraftSpace.tsx`, `DraftResponsePanel.tsx`, `lib/logos-draft.ts`
 and `/api/logos/draft`), which are gone rather than kept beside it. Before
 Logos 5 the same component is the column the header's **Write** opens.
@@ -738,7 +738,7 @@ everyone has.
 | Writing: the rules that proofread on the device; the board's hints and outline; Point & Ask's brief; the map lit while writing | `lib/write/checks.ts`, `board.ts`, `focus.ts`, `links.ts` |
 | Writing: what Socria may be asked, and how its answers are checked; the route | `lib/write/assist.ts`, `app/api/logos/write/route.ts` |
 | Writing: the space, the page, the board, the panels, the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Board.tsx`, `parts.tsx`, `write.css` |
-| Writing: where it is wired in (the Document artifact, the column, saving, Point & Ask, Add to draft) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`) |
+| Writing: where it is wired in (the Writing artifact, the column, saving, Point & Ask, Add to draft) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`) |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Month|All`; any of them on a theme with `THEME=night`) |
 
 Core chat (`app/chat/page.tsx`) keeps its screen; its list lets go of the
@@ -1511,7 +1511,10 @@ Word in and out, and the old draft replaced. Built as §8 describes.
   lines — said), a version kept and restored (what it replaced kept too), a
   LibreOffice .docx added after the writing when asked, a paragraph moved with
   Alt+Shift+↑ and undone, bold with Ctrl+B, the bar reached with Tab and its
-  menu closed with Escape. No page errors in any of them.
+  menu closed with Escape; a Markdown file attached in the conversation, a
+  passage of it linked from a card (which arrived in the outline as a
+  citation) and another cited from a paragraph's handle — both in the Word
+  file's Sources, quoted as read. No page errors in any of them.
 - **No model calls while writing**: typing six paragraphs, a brain-dump and
   an outline made no request to any model route; the 23 findings shown came
   from the rules on the device. Socria is asked only from a button.
@@ -1535,7 +1538,12 @@ Word in and out, and the old draft replaced. Built as §8 describes.
   words the document no longer held (the editor now tracks what each element
   shows); the toast and the side panel sat under the floating composer; on a
   phone the selection's tools ran off the screen and the board's foot covered
-  the cards; a matrix-lens pick would have added draft cards.
+  the cards; a matrix-lens pick would have added draft cards; an attached
+  file and the person's writing were both called "Document" in Artifacts (the
+  writing is now **Writing**); the passage picker offered every document this
+  device had read, not only this conversation's; a key pressed on a button
+  inside a card also fired the card's own shortcut; in the column before
+  Logos 5, every caret move re-rendered the whole app to light the map.
 - `test/write.test.mjs` (the model, Enter and Backspace, ranges and pastes,
   cards and piles, versions, storage bounds, HTML/Markdown/text, pastes from
   Word, Google Docs and the web, Markdown, the old drafts, Word out and in, the

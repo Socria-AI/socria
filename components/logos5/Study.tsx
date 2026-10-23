@@ -831,7 +831,7 @@ export interface ArtifactItem {
   title: string;
   /** what the line above it says, when it is not something made from the conversation */
   eyebrow?: string;
-  /** drawn edge to edge, with its own chrome — the Document */
+  /** drawn edge to edge, with its own chrome — the person's writing */
   bare?: boolean;
   render: () => ReactNode;
 }

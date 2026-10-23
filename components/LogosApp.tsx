@@ -597,6 +597,11 @@ export function LogosApp({
   const writeSelRef = useRef<WriteSel | null>(null);
   writeSelRef.current = writeSel;
   const [draftSaveState, setDraftSaveState] = useState<SaveState>('saved');
+  /** the paragraph being written lights what it touches on the map — a new set only when that changes */
+  const onWritingParagraph = useCallback((text: string) => {
+    const ids = text.trim() ? relevantNodes(mapRef.current, text) : [];
+    setRelevant((prev) => (prev.size === ids.length && ids.every((id) => prev.has(id)) ? prev : new Set(ids)));
+  }, []);
   /** a phone's width, for the writing's own layout wherever it is shown */
   const [writeNarrow, setWriteNarrow] = useState(false);
   useEffect(() => {
@@ -2634,7 +2639,7 @@ export function LogosApp({
     openWriting();
   }
 
-  /** The writing, opened: the Document artifact in Logos 5, the writing column beside the map before it. */
+  /** The writing, opened: the Writing artifact in Logos 5, the writing column beside the map before it. */
   function openWriting() {
     if (!limits.draftSpace) {
       ask('draft-locked');
@@ -4230,6 +4235,34 @@ export function LogosApp({
   // conversation is a panel folded away beside it until it is asked for.
   // Which view, and which artifact, belong to this visit only.
   const study = useMemo(() => (l5 ? studyIn(map.objects) : null), [l5, map.objects]);
+  // THE WRITING'S DOCUMENTS: this line of thinking's own — attached in its
+  // conversation, or sorted in its Components — for linking cards and citing
+  // paragraphs; never another conversation's, though this device has read it
+  const writeDocIds = useMemo(() => Array.from(new Set([...letters.keys(), ...(study?.state.files.map((f) => f.doc) ?? [])])).sort().join(','), [letters, study]);
+  useEffect(() => {
+    const missing = (writeDocIds ? writeDocIds.split(',') : []).filter((id) => !docsRef.current.has(id));
+    if (!missing.length) return;
+    let off = false;
+    void loadDocs(missing).then((found) => {
+      if (off || !found.length) return;
+      setDocs((m) => {
+        const n = new Map(m);
+        for (const d of found) n.set(d.id, d);
+        return n;
+      });
+    });
+    return () => {
+      off = true;
+    };
+  }, [writeDocIds]);
+  const writeDocs = useMemo(() => {
+    const m = new Map<string, SourceDoc>();
+    for (const id of writeDocIds ? writeDocIds.split(',') : []) {
+      const d = docs.get(id);
+      if (d) m.set(id, d);
+    }
+    return m;
+  }, [writeDocIds, docs]);
   const [studyTabs, setStudyTabs] = useState<Record<string, StudyTab>>({});
   const studyTab: StudyTab = studyTabs[activeId ?? ''] ?? (study && map.nodes.length < 3 ? 'components' : 'logic');
   /** the artifact open in Artifacts, per line of thinking */
@@ -6619,14 +6652,14 @@ export function LogosApp({
     />
   );
   const artifactItems: ArtifactItem[] = [
-    // THE DOCUMENT: the person's own writing — always here, blank until they write
+    // THE WRITING: the person's own document — always here, blank until they write
     ...(limits.draftSpace && activeId
       ? [
           {
             key: 'w:doc',
-            kind: 'Document',
+            kind: 'Writing',
             title: writeDoc.title.trim() || 'Untitled',
-            eyebrow: 'Artifact · Document · yours — Socria writes nothing here',
+            eyebrow: 'Artifact · Writing · yours — Socria writes nothing here',
             bare: true,
             render: () => writeSpaceEl('artifact'),
           },
@@ -7216,14 +7249,14 @@ export function LogosApp({
         doc={writeDoc}
         onChange={(d) => patchWriteDoc(activeId, d)}
         saveState={draftSaveState}
-        docs={docs}
+        docs={writeDocs}
         map={map}
         assist={runWriteAssist}
         onAsk={askAboutWriting}
         asking={writeSel}
         onOpenPassage={openWritingPassage}
         onOpenNode={openWritingNode}
-        onParagraph={(text) => setRelevant(new Set(text.trim() ? relevantNodes(mapRef.current, text) : []))}
+        onParagraph={l5 ? undefined : onWritingParagraph}
         readOther={readOtherDoc}
         narrow={writeNarrow}
         where={where}
@@ -7233,7 +7266,7 @@ export function LogosApp({
     ) : null;
   const draftEl = (
     <>
-      {/* ── the writing, beside the map (before Logos 5; in Logos 5 it is the Document artifact) ── */}
+      {/* ── the writing, beside the map (before Logos 5; in Logos 5 it is the Writing artifact) ── */}
       {draftOpen && !l5 && <div className="lg-draft-col">{writeSpaceEl('column')}</div>}
     </>
   );

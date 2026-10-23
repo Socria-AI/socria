@@ -28,9 +28,9 @@ export function DraftsGrounding() {
         One document, two faces. The <strong>Draft Space</strong> is where an
         argument is put together before it is prose; the{' '}
         <strong>Writing Space</strong> is the page. On a wide screen they sit
-        side by side. In Logos 5 the document is the first of a line of
-        thinking&rsquo;s Artifacts — blank until you write, and ready to type
-        into the moment it opens.
+        side by side. In Logos 5 it is the first of a line of
+        thinking&rsquo;s Artifacts, called Writing — blank until you write, and
+        ready to type into the moment it opens.
       </p>
       <p>
         <strong>Socria never writes into it.</strong> Writing without Socria
