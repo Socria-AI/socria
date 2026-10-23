@@ -693,3 +693,19 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
 
 /* beside the map, before Logos 5: the column it fills */
 .logos-root .lg-draft-col > .w-space { flex: 1 1 auto; height: auto; min-height: 0; }
+
+/* starting the writing, offered in Artifacts — never opened for them */
+.logos-root .l5 .l5s-write-start {
+  margin-top: 14px;
+  padding: 8px 16px;
+  min-height: 36px;
+  border-radius: 999px;
+  border: 1px solid var(--lg-line);
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5s-write-start:hover { border-color: var(--lg-primary); color: var(--lg-primary); }
+.logos-root .l5 .l5s-art-pill.is-add { border-style: dashed; color: var(--lg-ink-60); }

@@ -544,8 +544,12 @@ three-region Mind Graph drawing; the design is in `mockups/logos-5-memory/`.
 ## 8. Writing: the Draft Space and the Writing Space
 
 The person's own writing — one document with two faces, saved with the line of
-thinking (`draft.doc`, `lib/write/doc.ts`), shown as the first of its
-**Artifacts**, called Writing (`components/write/WriteSpace.tsx`). It replaced the old Draft
+thinking (`draft.doc`, `lib/write/doc.ts`), one of its **Artifacts**, called
+Writing (`components/write/WriteSpace.tsx`). It is opt-in: Artifacts never opens
+on it, and a blank page is not shown at all — **Start writing** on an empty
+Artifacts, **+ Write** beside what Socria made, **Write** in the menu or **Add
+to draft** on a map card opens it; once it holds words it is one pill among the
+rest. It replaced the old Draft
 Space (`components/DraftSpace.tsx`, `DraftResponsePanel.tsx`, `lib/logos-draft.ts`
 and `/api/logos/draft`), which are gone rather than kept beside it. Before
 Logos 5 the same component is the column the header's **Write** opens.

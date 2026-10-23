@@ -597,6 +597,8 @@ export function LogosApp({
   const writeSelRef = useRef<WriteSel | null>(null);
   writeSelRef.current = writeSel;
   const [draftSaveState, setDraftSaveState] = useState<SaveState>('saved');
+  /** the lines of thinking whose writing was opened on this visit — a blank page is shown only once asked for */
+  const [writeStarted, setWriteStarted] = useState<Record<string, true>>({});
   /** the paragraph being written lights what it touches on the map — a new set only when that changes */
   const onWritingParagraph = useCallback((text: string) => {
     const ids = text.trim() ? relevantNodes(mapRef.current, text) : [];
@@ -2645,6 +2647,8 @@ export function LogosApp({
       ask('draft-locked');
       return;
     }
+    const id = activeIdRef.current;
+    if (id) setWriteStarted((m) => (m[id] ? m : { ...m, [id]: true }));
     if (l5) showArtifact('w:doc');
     else setDraftOpen(true);
   }
@@ -6651,9 +6655,11 @@ export function LogosApp({
       }}
     />
   );
+  const writingShown = limits.draftSpace && !!activeId && (!isEmptyDoc(writeDoc) || !!writeStarted[activeId]);
   const artifactItems: ArtifactItem[] = [
-    // THE WRITING: the person's own document — always here, blank until they write
-    ...(limits.draftSpace && activeId
+    // THE WRITING: the person's own document — one artifact among the rest, there once they
+    // have started it (Start writing, Write in the menu, Add to draft) and never chosen for them
+    ...(writingShown
       ? [
           {
             key: 'w:doc',
@@ -6700,7 +6706,7 @@ export function LogosApp({
   ];
   const artifactsView = (
     <>
-      <ArtifactsView items={artifactItems} selected={artKey} onSelect={showArtifact} narrow={narrow} />
+      <ArtifactsView items={artifactItems} selected={artKey} onSelect={showArtifact} narrow={narrow} onWrite={limits.draftSpace && !writingShown ? openWriting : undefined} />
       {studyNote && studyTab === 'artifacts' && (
         <p className="l5s-note l5s-main-note" role="status">
           {studyNote}

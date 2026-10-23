@@ -837,7 +837,20 @@ export interface ArtifactItem {
 }
 
 /** Everything made in a line of thinking, one at a time: a strip to choose, the one chosen at full size. */
-export function ArtifactsView({ items, selected, onSelect, narrow }: { items: ArtifactItem[]; selected: string | null; onSelect: (key: string) => void; narrow: boolean }) {
+export function ArtifactsView({
+  items,
+  selected,
+  onSelect,
+  narrow,
+  onWrite,
+}: {
+  items: ArtifactItem[];
+  selected: string | null;
+  onSelect: (key: string) => void;
+  narrow: boolean;
+  /** start the person's own writing — offered, never opened for them */
+  onWrite?: () => void;
+}) {
   if (!items.length)
     return (
       <div className="l5s-cempty is-arts">
@@ -845,13 +858,18 @@ export function ArtifactsView({ items, selected, onSelect, narrow }: { items: Ar
           {!narrow && <span className="l5s-eyebrow">Artifacts</span>}
           <h2>Nothing made yet.</h2>
           <p>Ask for a chart of your numbers, a plan, a comparison or a worksheet — or practise a topic from your files — and it is kept here, made from the conversation.</p>
+          {onWrite && (
+            <button type="button" className="l5s-write-start" onClick={onWrite}>
+              Start writing <span aria-hidden="true">→</span>
+            </button>
+          )}
         </div>
       </div>
     );
   const cur = items.find((i) => i.key === selected) ?? items[items.length - 1];
   return (
     <div className="l5s-arts">
-      {items.length > 1 && (
+      {(items.length > 1 || onWrite) && (
         <div className="l5s-arts-strip" role="tablist" aria-label="Artifacts">
           {items.map((it) => (
             <button key={it.key} type="button" role="tab" aria-selected={it.key === cur.key} className={`l5s-art-pill${it.key === cur.key ? ' is-on' : ''}`} onClick={() => onSelect(it.key)}>
@@ -859,6 +877,11 @@ export function ArtifactsView({ items, selected, onSelect, narrow }: { items: Ar
               <span className="l5s-art-t">{it.title}</span>
             </button>
           ))}
+          {onWrite && (
+            <button type="button" className="l5s-art-pill is-add" onClick={onWrite}>
+              <span className="l5s-art-t">+ Write</span>
+            </button>
+          )}
         </div>
       )}
       <section className={`l5s-art${cur.bare ? ' is-bare' : ''}`} aria-label={cur.title}>
