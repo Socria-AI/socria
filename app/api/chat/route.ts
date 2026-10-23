@@ -8,6 +8,7 @@ import { nameBlock } from '@/lib/onboarding-name';
 import { resolveConversationStyle } from '@/lib/conversation-style';
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
   buildSystemPrompt,
@@ -485,7 +486,7 @@ export async function POST(req: NextRequest) {
       process.env.NODE_ENV !== 'production' &&
       req.headers.get('x-socria-no-controller') === '1';
 
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'core/chat');
 
     let systemPrompt = basePrompt;
     let guidance: ReturnType<typeof computeGuidance> | null = null;

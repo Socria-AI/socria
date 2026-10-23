@@ -18,6 +18,7 @@ import { readActivity } from './.tmp/activity.mjs';
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve as res } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import { systemOf } from './helpers/prompt.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -115,8 +116,8 @@ async function logos(messages, { reply, script = [], guard } = {}) {
   const received = await r.text();
   await settle();
   const streamed = globalThis.__logosCalls.find((c) => c.stream);
-  const retry = globalThis.__logosCalls.find((c) => !c.stream && /previous draft was rejected/.test(String(c.messages?.[0]?.content ?? '')));
-  return { status: r.status, system: String(streamed?.messages?.[0]?.content ?? ''), retry: retry ? String(retry.messages[0].content) : null, received };
+  const retry = globalThis.__logosCalls.find((c) => !c.stream && /previous draft was rejected/.test(systemOf(c)));
+  return { status: r.status, system: systemOf(streamed), retry: retry ? systemOf(retry) : null, received };
 }
 
 db.reset();

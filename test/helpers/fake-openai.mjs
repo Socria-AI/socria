@@ -5,6 +5,13 @@
 // scripted verdicts (ALLOW / unsure by default); the reply stream records the
 // SYSTEM PROMPT it was given — which is the thing the end-to-end tests
 // actually read, because it is exactly what Core 4 would have seen.
+//
+// The recorded prompt is every system message, in order — the Logos reply
+// sends its stable part first and this turn's context just before the newest
+// message (app/api/logos/chat/route.ts). Which scripted branch answers is
+// still decided by the first one.
+import { systemOf } from './prompt.mjs';
+
 export default class OpenAI {
   constructor() {
     this.chat = {
@@ -59,7 +66,7 @@ export default class OpenAI {
             return { choices: [{ message: { content: typeof scripted === 'string' ? scripted : JSON.stringify(scripted ?? {}) } }] };
           }
           if (p.stream) {
-            (g.__prompts ??= []).push(sys);
+            (g.__prompts ??= []).push(systemOf(p));
             // __streamError makes the provider fail the way it really does:
             // create() resolves and the FIRST token throws, so the failure
             // lands inside the stream rather than in the route's outer catch.
@@ -87,7 +94,7 @@ export default class OpenAI {
           // A buffered Core 4 regeneration (role 'retry') is a non-streamed
           // call with the reply prompt.
           if (sys.startsWith('You are Socria')) {
-            (g.__prompts ??= []).push(sys);
+            (g.__prompts ??= []).push(systemOf(p));
             const text = (g.__replies ?? []).shift() ?? g.__reply ?? 'Noted.';
             return { choices: [{ message: { content: text } }] };
           }

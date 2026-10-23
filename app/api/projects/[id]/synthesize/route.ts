@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL } from '@/lib/logos';
@@ -76,7 +77,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     goals,
     files.map((f) => ({ id: f.id, name: f.name, bytes: f.bytes, createdAt: f.createdAt }))
   );
-  const openai = new OpenAI({ apiKey });
+  const openai = tracked(new OpenAI({ apiKey }), 'projects/synthesize');
   const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
   const ask = (model: string) =>
     openai.chat.completions.create({

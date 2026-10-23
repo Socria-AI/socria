@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL } from '@/lib/logos';
 import '@/lib/objects';
@@ -44,7 +45,7 @@ export async function POST(req: NextRequest) {
 
   const prompted = buildPrompt(ask, state);
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'logos/experience');
     const configured = process.env.OPENAI_MODEL_LOGOS_EXPERIENCE || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
     const call = (model: string) =>
       openai.chat.completions.create({

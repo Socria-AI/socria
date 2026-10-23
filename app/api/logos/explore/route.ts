@@ -7,6 +7,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
   LOGOS_MODEL,
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
   const nodeContexts = sanitizeNodeContextList(body?.contexts);
   const grounded = nodeContexts.length ? renderContextsForNode(nodeContexts) : '';
 
-  const openai = new OpenAI({ apiKey });
+  const openai = tracked(new OpenAI({ apiKey }), 'logos/explore');
   const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 
   const complete = async (system: string, user: string, maxTokens: number) => {

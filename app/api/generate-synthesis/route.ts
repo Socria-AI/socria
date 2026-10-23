@@ -9,6 +9,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import {
   EMPTY_MEMORY,
   THINKING_DEPTHS,
@@ -71,7 +72,7 @@ export async function POST(req: NextRequest) {
     .join('\n\n');
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'core/synthesis');
     const prompt = buildSynthesisPrompt(memory, exchange, depthLabel);
     const model = process.env.OPENAI_SYNTHESIS_MODEL || 'gpt-4o-mini';
 

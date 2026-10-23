@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import {
   EMPTY_MEMORY,
   buildMemoryExtractorPrompt,
@@ -91,7 +92,7 @@ export async function POST(req: NextRequest) {
       .map((m: any) => `${m.role === 'user' ? 'User' : 'Socria'}: ${String(m.content).slice(0, 800)}`)
       .join('\n\n');
     try {
-      const openai = new OpenAI({ apiKey });
+      const openai = tracked(new OpenAI({ apiKey }), 'core/extract-memory');
       const completion = await openai.chat.completions.create({
         model: process.env.OPENAI_MEMORY_MODEL || 'gpt-4o-mini',
         messages: [
@@ -125,7 +126,7 @@ export async function POST(req: NextRequest) {
     .join('\n\n');
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'core/extract-memory');
     const extractorPrompt = buildMemoryExtractorPrompt(
       currentMemory,
       recent,

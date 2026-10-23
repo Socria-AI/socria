@@ -12,6 +12,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
 import { buildWritePrompt, sanitizeAssist, sanitizeAssistInput } from '@/lib/write/assist';
@@ -46,7 +47,7 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Select some of your writing first.' }, { status: 400 });
   }
 
-  const openai = new OpenAI({ apiKey });
+  const openai = tracked(new OpenAI({ apiKey }), 'logos/write');
   const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
   // How Socria talks to them shapes the wording of its notes — never their writing, never the edits.
   const voice =

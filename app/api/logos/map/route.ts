@@ -15,6 +15,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
   buildMapPrompt,
@@ -203,7 +204,7 @@ export async function POST(req: NextRequest) {
   };
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'logos/map');
     const configured =
       process.env.OPENAI_MODEL_LOGOS_MAP || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 

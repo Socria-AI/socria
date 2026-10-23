@@ -316,6 +316,10 @@ const MODULES = [
   'test/helpers/logos5-under-test.tsx',
   // the Draft Space and the Writing Space: the document, Word, the checks, the board (lib/write/*)
   'test/helpers/write-under-test.ts',
+  // what each model call cost: the usage log and the client wrapper (lib/openai-usage.ts)
+  'lib/openai-usage.ts',
+  // the turns the map is not redrawn for (lib/map-skip.ts)
+  'lib/map-skip.ts',
 ];
 
 export async function buildAll() {

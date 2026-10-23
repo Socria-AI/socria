@@ -1281,22 +1281,14 @@ Someone who says "more guns" wants the position along the frontier MOVED, not a 
 `;
   })();
 
-  return `You extract the STRUCTURE of a person's thinking from a conversation and maintain it as a small graph. You never talk to the user.
+  // THE INSTRUCTIONS FIRST, THE MAP LAST. Everything above "THE MAP AS IT
+  // STANDS" is the same on every call, for everyone, so the provider can serve
+  // it from its prompt cache instead of reading ~19k tokens afresh each turn
+  // (lib/openai-usage.ts logs whether it does). It used to open with the
+  // current map, which changes every turn — and a cached prefix ends at the
+  // first character that differs.
+  return `You extract the STRUCTURE of a person's thinking from a conversation and maintain it as a small graph. You never talk to the user. The map as it stands this turn — its nodes and edges, anything the person removed, the thinking context, what they are building, the picture on screen, grounded material — comes after these instructions, under THE MAP AS IT STANDS.
 
-${currentBlock}${removedBlock}
-
-Thinking context: ${contextLine}
-What they are building: ${buildingLine(current.building)}
-${vizBlock}
-${
-  grounded
-    ? `
-Grounded material the user attached to specific nodes (each line: node_id ← "title" [source, whose it is]).
-PRESERVE the id of any node that appears here — do not merge it away or drop it; if you must merge, keep the grounded node's id as the survivor.
-${grounded}
-`
-    : ''
-}
 Return ONLY JSON, exactly this shape:
 {
   "building": {"kind": "${GRAMMAR_IDS.join('|')}", "also": ["other shapes present in the same thinking"], "why": "one short line: what they are constructing"},
@@ -1575,5 +1567,21 @@ WHOSE THINKING IS IT:
 - Grounded material attached to a node gives CONTEXT, NOT AUTHORITY. It may sharpen THAT node's label, add claims/evidence/source/constraint nodes connected to it, or justify status "supported" when it genuinely backs the node. It never creates a belief, value, goal or decision the user hasn't voiced, never resolves a question for them, and never outranks what they actually said in conversation.
 - If the latest message adds nothing structural, return the current map unchanged.
 - A node marked "suggested by Socria and accepted" keeps its id and its wording unless the person changes it.
-- SOCRIA'S SYNTHESES ARE NOT THE PERSON'S THINKING. They are removed from the transcript you see. When the person replies to one: if they correct Socria's READING ("that's not what I meant"), the map does not change; if they state their OWN position ("ease of access matters more than personalization"), map that position like anything else they say.`;
+- SOCRIA'S SYNTHESES ARE NOT THE PERSON'S THINKING. They are removed from the transcript you see. When the person replies to one: if they correct Socria's READING ("that's not what I meant"), the map does not change; if they state their OWN position ("ease of access matters more than personalization"), map that position like anything else they say.
+
+=== THE MAP AS IT STANDS ===
+${currentBlock}${removedBlock}
+
+Thinking context: ${contextLine}
+What they are building: ${buildingLine(current.building)}
+${vizBlock}
+${
+  grounded
+    ? `
+Grounded material the user attached to specific nodes (each line: node_id ← "title" [source, whose it is]).
+PRESERVE the id of any node that appears here — do not merge it away or drop it; if you must merge, keep the grounded node's id as the survivor.
+${grounded}
+`
+    : ''
+}`;
 }

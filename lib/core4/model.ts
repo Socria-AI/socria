@@ -18,6 +18,7 @@
 // it before this seam existed, so production behaviour does not move.
 
 import OpenAI from 'openai';
+import { tracked } from '../openai-usage';
 
 /** Which step of the turn a call belongs to — for logging, caching and evals. */
 export type ModelRole = 'state' | 'reply' | 'retry' | 'guard' | 'verify' | 'extract' | 'baseline';
@@ -54,14 +55,20 @@ export interface ModelClient {
 // ── OpenAI (production) ─────────────────────────────────────────────
 
 export function openAIClient(apiKey: string): ModelClient {
-  const openai = new OpenAI({ apiKey });
+  // one client a step, so each call's cost is logged as the step it was (lib/openai-usage.ts)
+  const clients = new Map<ModelRole, OpenAI>();
+  const clientFor = (role: ModelRole) => {
+    let c = clients.get(role);
+    if (!c) clients.set(role, (c = tracked(new OpenAI({ apiKey }), `seam/${role}`)));
+    return c;
+  };
   const toMessages = (req: CompleteRequest) => [
     { role: 'system' as const, content: req.system },
     ...req.messages.map((m) => ({ role: m.role, content: m.content })),
   ];
   return {
     async complete(req) {
-      const res = await openai.chat.completions.create({
+      const res = await clientFor(req.role).chat.completions.create({
         model: req.model,
         temperature: req.temperature,
         max_tokens: req.maxTokens,
@@ -88,7 +95,7 @@ export function openAIClient(apiKey: string): ModelClient {
         let served: string | undefined;
         let finishReason: string | undefined;
         try {
-          const s = await openai.chat.completions.create({
+          const s = await clientFor(req.role).chat.completions.create({
             model: req.model,
             temperature: req.temperature,
             max_tokens: req.maxTokens,

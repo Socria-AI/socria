@@ -223,6 +223,7 @@ import {
   type ThinkingMap as TMap,
 } from '@/lib/logos';
 import { owesExtraction } from '@/lib/conversation-surface';
+import { lastReplyIn, skipsMap } from '@/lib/map-skip';
 import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { WhatsNew } from '@/components/onboarding/WhatsNew';
@@ -2897,8 +2898,9 @@ export function LogosApp({
       }
 
       // Accepted — the reasoning done in this node belongs on the map. Same
-      // rule as the main composer: a refused turn is not extracted from.
-      refreshMap();
+      // rules as the main composer: a refused turn is not extracted from, and
+      // an "ok" changes nothing (lib/map-skip.ts).
+      if (!skipsMap({ text: content, lastReply: lastReplyIn(prior), mapNodes: mapRef.current.nodes.length })) refreshMap();
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -3968,8 +3970,10 @@ export function LogosApp({
         throw new Error(failureText(body));
       }
 
-      // The turn was accepted. Now the map may be rebuilt from it.
-      refreshMap();
+      // The turn was accepted. Now the map may be rebuilt from it — unless all
+      // it said was "ok" or "thanks", which cannot change it; the next turn
+      // that says something sends the whole conversation (lib/map-skip.ts).
+      if (!skipsMap({ text: content, attachments: atts.length, replying: !!replying, lastReply: lastReplyIn(before), mapNodes: mapRef.current.nodes.length })) refreshMap();
       // ...and it was one of the day's messages: the count is re-read, so the
       // next send knows where the free day stands before it goes.
       if (!one) void refreshUsage(activeIdRef.current);

@@ -366,6 +366,40 @@ Japan and South Korea among them); adding a country is adding its code to
 `OPT_IN_COUNTRIES`. The lookup is by IP address, so a visitor on a VPN is
 placed where the VPN is.
 
+## Model spend
+
+Every model call logs one line with what it read, how much of that the
+provider served from its prompt cache, and what it wrote
+(`lib/openai-usage.ts`):
+
+```
+[tokens] {"route":"logos/map","model":"…","in":19830,"cached":19456,"out":612}
+```
+
+Export a deployment's runtime logs and total them by route:
+
+```
+node scripts/token-report.mjs < logs.txt
+```
+
+The cache share is the column to watch. OpenAI caches the longest prefix of a
+request it has recently seen, byte for byte, so the long prompts are laid out
+for it: the map extractor's instructions come before the map
+(`lib/logos.ts` `buildMapPrompt`). The Logos reply is ordered stable prompt,
+then the history, then this turn's context, then the person's newest message
+(`app/api/logos/chat`). A route whose cache share stays near zero has
+something changing near the top of its prompt. The reply's history stops
+caching once a conversation passes 24 messages, because the window then
+slides by one each turn. Documents travel in the newest message and are read
+afresh each turn.
+
+A turn that says only "ok" or "thanks" does not rebuild the map
+(`lib/map-skip.ts`). The next turn that says something sends the whole
+conversation as before.
+
+`SOCRIA_TOKEN_LOG=off` silences the lines. Transcription is billed by the
+minute and is not in them; neither is the upstream health check.
+
 ---
 
 ## What CI does not do, and why

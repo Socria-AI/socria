@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import {
   EMPTY_UNDERSTANDING,
   buildJourneyExtractorPrompt,
@@ -170,7 +171,7 @@ export async function POST(req: NextRequest) {
   }
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'understanding');
     const model =
       process.env.OPENAI_JOURNEY_MODEL ||
       process.env.OPENAI_MEMORY_MODEL ||

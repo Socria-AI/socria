@@ -14,6 +14,7 @@ import { isSynthesisText, SYNTHESIS_CORRECTION } from '@/lib/logos-synthesis';
 import { NextRequest, NextResponse } from 'next/server';
 import { streamFailureNotice } from '@/lib/upstream-error';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
   LOGOS_CHAT_PROMPT,
@@ -563,7 +564,23 @@ export async function POST(req: NextRequest) {
       signals,
     });
 
-    const guided =
+    // THE PROMPT IN TWO PARTS, FOR THE PROVIDER'S PROMPT CACHE.
+    //
+    // `stable` is what holds for every turn of this line of thinking: the base
+    // prompt, depth and the guard, the Conversation Style and their own
+    // instructions, who they are, the rules for reading documents. It opens
+    // the request, the history follows it, and both are the same next turn —
+    // so the provider can serve them from its cache instead of reading them
+    // afresh (lib/openai-usage.ts logs how much it does).
+    //
+    // `turnContext` is what this turn alone adds — the picture on screen, what
+    // is selected, the objects, what is being built, what is remembered for
+    // this message, how to help on it, what was computed. It goes AFTER the
+    // history, as a system message just before their newest message: it is
+    // still the freshest thing the model reads, and it no longer ends the
+    // cacheable part on the first block that changed. Same blocks, same order
+    // within each part; nothing is added or dropped.
+    const stable =
       system +
       // Clamped by the plan like the map and explore routes, so the menu and
       // the answer agree (every plan opens all four today).
@@ -574,6 +591,13 @@ export async function POST(req: NextRequest) {
       // each block subordinating itself to what came before.
       conversationStyleBlock(body?.conversationStyle, 'logos') +
       styleBlock(body?.style) +
+      // what they mostly think about, from onboarding — examples, not assumptions
+      roleBlock(body?.role) +
+      nameBlock(body?.name) +
+      // How to read and cite the documents in the conversation — the rules
+      // here, the documents themselves in the turn (with their message).
+      (docRefs.length ? `\n\n${DOC_RULES}\n` : '');
+    const turnContext =
       // What they are looking at.
       //
       // TWO BLOCKS, AND ONLY ONE OF THEM AT A TIME. `vizState` is the picture
@@ -599,9 +623,6 @@ export async function POST(req: NextRequest) {
       // so "why is this negative?" is about the thing they are looking at.
       // Not on a focused node thread, which is already about one node.
       (focusLabel ? '' : focusBlock(selected)) +
-      // what they mostly think about, from onboarding — examples, not assumptions
-      roleBlock(body?.role) +
-      nameBlock(body?.name) +
       // THE OBJECTS THEY ARE WORKING ON — the matrix, the function — as the
       // workspace holds them. Re-sanitised, which RE-COMPUTES every step from
       // the state before it (lib/objects/core.ts), so nothing a browser sends
@@ -646,21 +667,40 @@ export async function POST(req: NextRequest) {
       // the person reached the model as two identical blocks — twice the
       // tokens, and twice the weight against the guidance above it.
       memoryBlock +
-      // How to read and cite the documents in the conversation — the rules
-      // here, the documents themselves in the turn (above).
-      (docRefs.length ? `\n\n${DOC_RULES}\n` : '') +
       // How to help on this turn — then, last, so it is the freshest thing the
       // model reads: what was computed.
       renderAssist(assist) +
       accuracy.block;
 
-    const openai = new OpenAI({ apiKey });
+    /**
+     * The request's messages: the stable prompt, the history (their newest
+     * message carrying any documents), and this turn's context just before
+     * that newest message. `note` joins this turn's context — the corrective
+     * retry's reason, which is about this turn and nothing else.
+     */
+    const turnMessages = (note = '') => {
+      const history = withDocs(clean);
+      const now = turnContext + note;
+      if (!now.trim()) return [{ role: 'system' as const, content: stable }, ...history];
+      // A newest turn that was nothing but spaces is dropped from `clean`, so
+      // the history can end on Socria's turn; then there is no newest message
+      // to stand before, and the context stays with the instructions.
+      if (history[history.length - 1]?.role !== 'user') return [{ role: 'system' as const, content: stable + now }, ...history];
+      return [
+        { role: 'system' as const, content: stable },
+        ...history.slice(0, -1),
+        { role: 'system' as const, content: `=== THIS TURN ===\n${now.replace(/^\s+/, '')}` },
+        history[history.length - 1],
+      ];
+    };
+
+    const openai = tracked(new OpenAI({ apiKey }), 'logos/chat');
     const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
 
     const make = (model: string) =>
       openai.chat.completions.create({
         model,
-        messages: [{ role: 'system', content: guided }, ...withDocs(clean)],
+        messages: turnMessages(),
         temperature: 0.7,
         // Short is the prompt's default; the ceiling leaves room for the
         // people whose custom instructions ask for more than four sentences —
@@ -742,7 +782,7 @@ export async function POST(req: NextRequest) {
                 const note = `\n\n=== Your previous draft was rejected ===\nWHY: ${first.retryNote}\nWrite the reply again. Do not apologise, do not mention this instruction, and do not reference a previous attempt — the person has not seen one.\n`;
                 const r = await openai.chat.completions.create({
                   model: served,
-                  messages: [{ role: 'system', content: guided + note }, ...withDocs(clean)],
+                  messages: turnMessages(note),
                   temperature: 0.7,
                   max_tokens: docRefs.length ? 950 : 640,
                 });

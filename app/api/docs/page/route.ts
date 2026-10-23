@@ -14,6 +14,7 @@
 
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL } from '@/lib/logos';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest) {
   const allowance = await spend(userId, plan, 'images', typeof body?.sessionId === 'string' ? body.sessionId.slice(0, 80) : null);
   if (!allowance.ok) return NextResponse.json({ error: boundaryNote('images'), upgrade: 'images', used: allowance.used, limit: allowance.limit }, { status: 402 });
 
-  const openai = new OpenAI({ apiKey });
+  const openai = tracked(new OpenAI({ apiKey }), 'docs/page');
   const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
   const make = (model: string) =>
     openai.chat.completions.create({

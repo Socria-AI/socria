@@ -15,6 +15,7 @@ import { SOCRIA_MODELS } from './.tmp/socria-prompt.mjs';
 import { isOffered, offeredModels, withdrawnTo } from './.tmp/socria-model-store.mjs';
 import { roomsEnabled } from './.tmp/rooms-flag.mjs';
 import { joinUrl, joinCodeFrom } from './.tmp/collab.mjs';
+import { systemOf, turnsOf } from './helpers/prompt.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -130,7 +131,7 @@ console.log('\n=== Socria, between two people (the real chat route) ===');
     const r = await chat.POST(new NextRequest('http://localhost/api/logos/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
     try { await r.text(); } catch {}
     const call = globalThis.__logosCalls.find((c) => c.stream);
-    return { status: r.status, system: String(call?.messages?.[0]?.content ?? ''), msgs: call?.messages?.slice(1) ?? [] };
+    return { status: r.status, system: systemOf(call), msgs: turnsOf(call) };
   };
   const messages = [
     { role: 'user', content: 'We should launch in March.', by: { id: 'u1', name: 'Ana', seat: 'host' } },

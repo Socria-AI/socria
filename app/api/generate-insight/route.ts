@@ -11,6 +11,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import {
   EMPTY_MEMORY,
   INSIGHT_HEADER_LABELS,
@@ -69,7 +70,7 @@ export async function POST(req: NextRequest) {
     .join('\n\n');
 
   try {
-    const openai = new OpenAI({ apiKey });
+    const openai = tracked(new OpenAI({ apiKey }), 'core/insight');
     const prompt = buildInsightPrompt(memory, exchange);
     const insightModel =
       process.env.OPENAI_INSIGHT_MODEL || 'gpt-4o-mini';

@@ -4,11 +4,12 @@
 // what came back is not JSON. SERVER ONLY.
 
 import OpenAI from 'openai';
+import { tracked } from '@/lib/openai-usage';
 import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL } from '@/lib/logos';
 import type { Asked } from './study-ask';
 
 export async function askJson(asked: Asked, opts: { model?: string; maxTokens: number }): Promise<unknown | null> {
-  const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+  const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), 'logos/study');
   const configured = opts.model || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
   const call = (model: string) =>
     openai.chat.completions.create({
