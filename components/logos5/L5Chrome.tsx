@@ -199,12 +199,12 @@ export function L5Header({
   );
 }
 
-// ── the Mind Graph's door ──
+// ── Memory's door (the Mind Graph, drawn) ──
 
 /** A neuron: what Socria remembers, as its own place. */
 export function MindButton({ onOpen }: { onOpen: () => void }) {
   return (
-    <button type="button" className="l5-iconbtn l5-mindbtn" onClick={onOpen} aria-label="Mind Graph — what Socria remembers" title="Mind Graph — what Socria remembers">
+    <button type="button" className="l5-iconbtn l5-mindbtn" onClick={onOpen} aria-label="Memory — what Socria remembers" title="Memory — what Socria remembers">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12.5" r="3.2" />
         <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8M12 4.5l-2.2-1.6M12 4.5l2.2-1.6M5.1 17l-1.9.2M18.9 17l1.9.2" />

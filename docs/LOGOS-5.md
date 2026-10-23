@@ -20,7 +20,7 @@ The redesign (§6–7) turns the line of thinking around: **the map is the
 screen.** Components, Artifacts and the Logic Map are three views of one line
 of thinking, switched in the header; the conversation folds away to a
 composer floating over the map, and a card is asked about where it is. What
-Socria remembers has a place of its own, drawn as a mind: the **Mind Graph**.
+Socria remembers has a place of its own, drawn as a mind: **Memory** (§7).
 
 ## 1. What was wrong with Logos 4's screen
 
@@ -471,36 +471,75 @@ Project, or "Logos" — and the title in the serif; the switch in the middle;
 the Conversation pill, the Mind Graph, the menu and the account on the right.
 "Manage conversations" in the menu brings back the rail.
 
-## 7. The Mind Graph
+## 7. Memory
 
-What Socria remembers about the person (the Mind Graph store, `lib/mind`,
-read through `/api/mind?scope=logos` — nothing private) is its own place,
-drawn as a mind (`lib/logos5/mindgraph.ts`, `components/logos5/MindGraph.tsx`).
-The brain icon in a line of thinking's header, or **Mind Graph** on home,
-opens it.
+What Socria remembers about the person — the Mind Graph store (`lib/mind`), read
+through `/api/mind?scope=logos` and `/api/mind/changes?scope=logos`, so nothing
+private ever arrives — is its own place: **Memory**, drawn as an atlas of a mind
+(`lib/logos5/memoryAtlas.ts`; the view `components/logos5/MemoryView.tsx`, its
+network `MemoryNetwork.tsx` and its parts `MemoryParts.tsx`). The brain icon in a
+line of thinking's header, or **Memory** on home, opens it. It replaced the
+three-region Mind Graph drawing; the design is in `mockups/logos-5-memory/`.
 
-- **A neuron per memory**: its cell sized by how much it matters (importance,
-  how often seen, confidence), a dendrite for each conversation it was learned
-  in, an axon to each memory it informs. The weightiest of each region leads
-  it, larger and darker.
-- **Three regions**, by the kind the store gave it: **How you decide**
-  (habits: preferences, beliefs, decisions, insights, values, patterns…),
-  **What you are holding** (facts: people, places, events, givens) and **What
-  you are working on** (projects, goals, plans). The store's own bookkeeping
-  (conversations) is not drawn; nor is anything archived.
-- Under each name, how it is known: "set by you", "seen in 3 lines of
-  thinking", the one conversation it came from, or "since March".
-- **All · Habits · Facts · Projects**, and **Find a memory**, which reaches the
-  memories past the drawing's cap (36) as well.
-- **A memory pressed**: "Habit · remembered", its words, *Learned from* (each
-  conversation a press away), *Informs*, *First noticed*; **Edit**
-  (`PATCH /api/mind/node`), **Show where** (opens the conversation it was
-  learned in), **Forget this** (asks once more, then `DELETE`).
+- **Eight regions, each with a fixed home**: Identity in the middle; Goals,
+  Open Questions, Projects & Work, People & Relationships, Preferences,
+  Learning and Recent Context around it, neighbours that usually relate side by
+  side. A memory's region is read from the kind the store gave it (`regionOf`);
+  an unfamiliar kind is a claim about the person, as the store treats it, and
+  goes to Identity; the store's bookkeeping (conversations) is never drawn.
+- **A neuron per memory, a fibre per relationship.** The cell is sized by
+  importance; relationships inside a region are short curves in its colour,
+  those between regions are bundled into tracts that bend around Identity.
+  Every line is an edge the store holds.
+- **Stable.** Homes never move; a memory is placed from a seed of its own id,
+  leaned toward the regions it connects to and eased apart from its
+  neighbours. The same memories land in the same places on every visit, and
+  adding or forgetting one moves only its own region, a little.
+- **States, never colour alone** — each has a shape and a word, read from the
+  store: *Confirmed* (solid; nothing waits on it), *Proposed* (dashed: a change
+  to it waits for the person, or it is held tentatively), *Updated this week*
+  (a soft gold ring, from `updatedAt`), *Possible contradiction* (a triangle;
+  also "In tension", and "You said this isn't right" for one they challenged),
+  *Older* (faded: superseded, historical or archived) and *Important* (a pin:
+  importance 0.8 or more). No confidence score is shown.
+- **Progressive disclosure by distance.** The overview shows every region and
+  the memories that matter most in each (24; the rest are in its list), named
+  where the words fit. A region opens in place — its memories larger, each named
+  with its kind, every relationship's word on a small plate; the other regions
+  at the edges, showing only what connects here. A memory selected lights its
+  relationships ("constrained by", "evidence for"…) and dims the rest. Words
+  are set at one size on screen and placed again as the distance changes.
+- **The inspector**: what it is and its kind; its state in words; a change
+  Socria read, with the choices; *Why Socria remembers this* — how it is known
+  ("You said it", "Socria noticed it", "From your file"), when it was first
+  remembered, how often it came up, each conversation it was learned in (Open)
+  and any file it came from; *Connected to*, each relationship in words; its
+  *History* from the record (`evolutionOf`). **Edit**, **This isn't right**
+  (recorded as their disagreement, `PATCH` with `challenge`) and **Forget**
+  (asks once more; tombstoned, so it is not learned again).
+- **Changes**: every change the memory records, newest first by month — what it
+  was, what it is now, in whose words, where, and what it reached — filtered by
+  waiting, confirmed, changed position, reworded or contradictions. Selected, a
+  change shows itself drawn small, and what each answer would do.
+- **Review**: what waits for a decision, a possible contradiction first. Every
+  choice says what it will do. A change of position: *Yes, I changed my mind*,
+  *Not a change* (what it displaced comes back exactly), *That's not what I
+  think* (only for a claim the change itself created). A rewording: keep the
+  new words or the earlier ones. Two claims in tension: **It changed — keep the
+  newer** (`supersede`, new in `reviewChange`: the earlier becomes what they
+  used to think, the tension is not proposed again), *Both are true*, or forget
+  the newer one. Claims noticed only once stay on the full Memory page
+  (`/memory`): they carry no privacy mark, so Logos does not show them.
+- **Moving through it**: the wheel, a drag, two fingers, the zoom buttons, or
+  the keyboard (`+` `−` `0`; the arrows walk along relationships from what is
+  selected; Enter opens; Esc closes the memory, then the region; `/` searches).
+  With reduced motion nothing animates; a change reached is a still glow.
+- **The list is the other half**: every region in the left column, every memory
+  under it with its state in words — the accessible form of the network, and
+  how a large memory is reached (forty at a time).
+- After every write the view reads again, so what is shown is what was saved.
 - Signed out it says memory lives with an account; if the store cannot be
-  reached it says so, and nothing else changes.
-- Every position is computed, deterministically. On a phone the regions are
-  one under another, a memory to a row at the phone's own size, and the page
-  scrolls.
+  reached it says so and offers to try again.
 
 ## 8. Data
 
@@ -584,9 +623,11 @@ everyone has.
 | Piece | File |
 |---|---|
 | The turn, the pending reply | `components/logos5/L5Message.tsx` |
-| Header, menu, link bar, stage head, outline, the view switch, the Mind Graph button | `components/logos5/L5Chrome.tsx` |
+| Header, menu, link bar, stage head, outline, the view switch, the Memory button | `components/logos5/L5Chrome.tsx` |
 | "Asking about": a card asked about on the map | `components/logos5/L5Ask.tsx`, `components/ThinkingMap.tsx` (`askCard`) |
-| The Mind Graph (drawing; the view) | `lib/logos5/mindgraph.ts`, `components/logos5/MindGraph.tsx` |
+| Memory: the atlas (regions, states, placement, words) | `lib/logos5/memoryAtlas.ts` |
+| Memory: the view, the network, the inspector and change cards, the styles | `components/logos5/MemoryView.tsx`, `MemoryNetwork.tsx`, `MemoryParts.tsx`, `memory.css` |
+| Changes as Logos may see them; "keep the newer" | `app/api/mind/changes/route.ts` (`scope=logos`), `lib/mind/types.ts` (`openToLogos`), `lib/mind/evolve.ts` (`supersede`) |
 | The screen's styles (the redesign last, over the others) | `components/logos5/l5.css`, `components/logos5/study.css`, `components/logos5/redesign.css` |
 | Linking the thread and the map | `lib/logos5/linking.ts` |
 | The switch and the stage's per-browser memory | `lib/logos5/flags.ts` |
@@ -863,8 +904,8 @@ Found and fixed on the way:
 surfaces (`--l5-*`) and some fifty colours were written out as paper's, so on
 Dark and One the words went light while the cards stayed cream. Every such
 colour is now a token whose default is exactly paper's value
-(`components/logos5/l5.css`, `redesign.css`, `study.css`; the Mind Graph's
-neurons in `MindGraph.tsx`), and `app/themes.css` gives Dark, One and Night
+(`components/logos5/l5.css`, `redesign.css`, `study.css`; Memory's regions in
+`memory.css`, with their own colours for the dark grounds), and `app/themes.css` gives Dark, One and Night
 their own ("Logos 5 on every dark ground"). Checked:
 - Paper: the computed colours of every element in 25 states — a line of
   thinking (graph, "Asking about", the menu, editing, the folded composer, a
@@ -1293,3 +1334,63 @@ center it and hide the views, etc."
   dragged, reloaded (still there), moved by the keys, the views hidden and
   brought back with Esc, folded where it floated, the composer dragged, docked
   again. `test/logos5-box.test.mjs`.
+- Fixed after it shipped ("can't see up"): a message longer than a line lost its
+  first lines, with no way to scroll up to them. Stacked, the words had been
+  held to one line by the shared composer rule's `flex: 1`, and the scrollbar
+  this change hid was hidden below a cap the box never reached; a box filled
+  while hidden (the study's "go deeper" question) was measured at nothing. Now
+  it grows with what is written, up to a third of the screen, then scrolls; it
+  is measured again when it appears, when its width changes and when the font
+  arrives; and a scrollbar is hidden only when every word is in view.
+
+### Memory, as an atlas of a mind
+
+Asked for: the Neural Memory Interface — an organic, neuron-like network of
+what Socria remembers, in clusters drawn from the real data, with a search and
+filters, collapsible categories, an inspector, Network / Changes / Review, the
+states (confirmed, proposed, recently updated, contradiction, older, important)
+in words as well as marks, a phone layout with pinch-to-zoom, a bottom-sheet
+inspector and a searchable list — reusing the memory Socria keeps, inventing
+nothing. Designed first as mockups (`mockups/logos-5-memory/`), then built (§7).
+
+- **No second store.** Every read is the store's own route with `scope=logos`;
+  every write is `PATCH`/`DELETE /api/mind/node` or `POST /api/mind/changes`,
+  and the view reads again after each one. The Mind Graph drawing it replaced
+  (`lib/logos5/mindgraph.ts`, `components/logos5/MindGraph.tsx`) is gone rather
+  than kept beside it.
+- **Two small additions to the store, both tested:** `/api/mind/changes` takes
+  `scope=logos` and cuts private memories out before walking the graph, so a
+  change, what it reached and a memory's history never carry a private label
+  out (`openToLogos`), and refuses a decision from Logos on a change Logos could
+  not have been shown; and `reviewChange` has a fourth decision, `supersede`,
+  for two claims in tension: the link becomes a change of position from the
+  claim held first to the newer one, recorded as the person's own and settled,
+  and the tension is tombstoned. Undone later, the earlier claim is exactly as
+  it was.
+- Checked in a real browser, signed in, with every `/api/mind` call answered by
+  the store's own functions over Alex's 39 memories from the mockups (and one
+  private memory, which never reached the page): the overview, a region opened,
+  a memory selected (its words, state, the change waiting on it, why it is
+  kept, Open, what it connects to, its history), keeping a rewording, the arrow
+  keys walking relationships, Esc twice, `/` and a search, Edit, This isn't
+  right, Forget, Changes and a change selected, Review — "It changed — keep the
+  newer" and "Not a change" — until nothing waits. Celestial and Dark, reduced
+  motion, and a phone: regions first, names closer in, a region's list below
+  the drawing, the inspector as a sheet, the list, full screen, Changes and
+  Review with thumb-sized choices. 44 of 44, no page errors.
+- Found and fixed on the way: the canvas took the pointer on press, so a tap on
+  a memory landed on the ground; the editor stayed open after Save; a tension
+  listed its own other side as something it reached; on a phone the names of
+  memories lay over the regions' names, and an opened region's list covered its
+  drawing.
+- `test/logos5-memory.test.mjs` (regions, states, a stable atlas, words that
+  never touch, an open region, a phone, and the view reading only through the
+  private-filtered feeds) and `test/mind-evolve.test.mjs` (keep the newer;
+  nothing private through a walk).
+
+**Not verified here:** against a real account's memory — the store's routes
+were answered by its own functions over a seeded graph, not by the database;
+how the atlas reads with several hundred memories (each region draws 24 from a
+distance and 36 opened, the rest in its list, by design); "Important" is read
+from importance, and there is no way yet for a person to pin something
+themselves.

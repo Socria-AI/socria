@@ -50,6 +50,8 @@ const MODULES = [
   'lib/theme.ts',
   'lib/new-socria.ts',
   'lib/logos5/box.ts',
+  // the Memory view's atlas: regions, states, placement, words (lib/logos5/memoryAtlas.ts)
+  'lib/logos5/memoryAtlas.ts',
   // Celestial: the sky, generated and painted (lib/celestial.ts)
   'lib/celestial.ts',
   'lib/entitlements.ts',

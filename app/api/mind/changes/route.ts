@@ -1,7 +1,15 @@
 // app/api/mind/changes/route.ts
 // GET  → { changes, proposed }            every change the person's memory records, newest first
 // GET  ?node=<id> → { evolution }         one memory's history, from the record alone
-// POST { id, decision } → { ok, say }     confirm a change, or reject it (restoring what it displaced)
+// POST { id, decision } → { ok, say }     confirm a change, reject it (restoring what it displaced),
+//                                         forget the newer claim, or — for two claims in tension —
+//                                         say it changed and keep the newer (supersede)
+//
+// ?scope=logos, on any of them: the graph as Logos may see it (openToLogos) —
+// no private memory, nothing walked through one — cut here on the server, the
+// same way /api/mind?scope=logos cuts, because a filter the browser applies is
+// a filter that has already been sent. A decision asked from Logos is refused
+// for a change Logos could not have been shown.
 //
 // THE PERSON'S SAY OVER HOW SOCRIA'S UNDERSTANDING OF THEM CHANGES. A change
 // read from a conversation — a new position replacing an old one, two claims
@@ -14,6 +22,7 @@ import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { loadGraph, persistGraph } from '@/lib/mind/store';
 import { changesOf, evolutionOf, reviewChange, type Decision } from '@/lib/mind/evolve';
+import { openToLogos } from '@/lib/mind/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -25,13 +34,14 @@ export async function GET(req: NextRequest) {
   if (limited) return limited;
   const graph = await loadGraph(userId).catch(() => null);
   if (!graph) return NextResponse.json({ error: 'Your memory could not be read just now.' }, { status: 503 });
+  const seen = req.nextUrl.searchParams.get('scope') === 'logos' ? openToLogos(graph) : graph;
   const node = req.nextUrl.searchParams.get('node');
-  if (node) return NextResponse.json({ evolution: evolutionOf(graph, node.slice(0, 120)) });
-  const changes = changesOf(graph, { withAffected: true, limit: 80 });
+  if (node) return NextResponse.json({ evolution: evolutionOf(seen, node.slice(0, 120)) });
+  const changes = changesOf(seen, { withAffected: true, limit: 80 });
   return NextResponse.json({ changes, proposed: changes.filter((c) => c.review === 'proposed').length });
 }
 
-const DECISIONS: Decision[] = ['confirm', 'reject', 'forget'];
+const DECISIONS: Decision[] = ['confirm', 'reject', 'forget', 'supersede'];
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
@@ -44,6 +54,9 @@ export async function POST(req: NextRequest) {
   if (!id || !decision) return NextResponse.json({ error: 'Which change, and what do you decide?' }, { status: 400 });
   const before = await loadGraph(userId).catch(() => null);
   if (!before) return NextResponse.json({ error: 'Your memory could not be read just now.' }, { status: 503 });
+  if (req.nextUrl.searchParams.get('scope') === 'logos' && !changesOf(openToLogos(before), { withAffected: false }).some((c) => c.id === id)) {
+    return NextResponse.json({ ok: false, error: 'That change is no longer in your memory.' }, { status: 404 });
+  }
   const r = reviewChange(before, id, decision, Date.now());
   if (!r.ok) return NextResponse.json({ ok: false, error: r.why }, { status: 409 });
   const saved = await persistGraph(userId, before, r.graph);

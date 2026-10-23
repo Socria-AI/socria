@@ -464,6 +464,19 @@ export function privateElsewhere(
   return !n.provenance?.some((p) => p.conversationId === here);
 }
 
+/**
+ * The graph as Logos may see it: no private node, and no edge that touched
+ * one. The same cut /api/mind?scope=logos makes, for the routes that walk the
+ * graph before answering (a change, what it reached, a memory's history) — a
+ * walk over the whole graph would carry a private label out in its answer.
+ * Tombstones and the pending ledger are left behind: Logos reads neither.
+ */
+export function openToLogos(graph: MindGraph): MindGraph {
+  const nodes = graph.nodes.filter((n) => !privateElsewhere(n, undefined, true));
+  const ids = new Set(nodes.map((n) => n.id));
+  return { nodes, edges: graph.edges.filter((e) => ids.has(e.sourceId) && ids.has(e.targetId)), tombstones: [], pending: [] };
+}
+
 export function isForgotten(graph: MindGraph, fingerprint: string): boolean {
   return graph.tombstones.includes(fingerprint);
 }

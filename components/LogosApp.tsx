@@ -170,7 +170,7 @@ import { L5Header, L5LinkBar, L5Outline, L5Switch, MindButton, type L5MenuItem, 
 import { ArtifactsView, ComponentsEmpty, StartPanel, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem, type StudyTab } from './logos5/Study';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView } from './logos5/Universe';
-import { MindGraphView } from './logos5/MindGraph';
+import { MemoryView } from './logos5/MemoryView';
 import type { UniverseIn } from '@/lib/logos5/universe';
 import { checkPractice, clozeFrom, intentOf, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
 import { restudy, studyIn, type StudyState } from '@/lib/objects/display-study';
@@ -4221,7 +4221,7 @@ export function LogosApp({
   }, [l5, messages]);
   /** files dropped on an empty Components, being read */
   const [readingFiles, setReadingFiles] = useState<string | null>(null);
-  /** the Mind Graph: what Socria remembers, as its own place */
+  /** Memory: what Socria remembers, as its own place (components/logos5/MemoryView.tsx) */
   const [l5Mind, setL5Mind] = useState(false);
   /** something new landed on the stage while it was put away */
   const [stageFresh, setStageFresh] = useState(false);
@@ -6906,7 +6906,7 @@ export function LogosApp({
       introShowing: introWanted,
       busy: busy || !!streaming || organizing || sortPending,
     });
-  /** the Mind Graph is its own place: over home and over a line of thinking alike */
+  /** Memory is its own place: over home and over a line of thinking alike */
   const mindShown = l5 && l5Mind && !hydrating && !room.active;
   function goHome() {
     setL5Home(true);
@@ -6972,7 +6972,7 @@ export function LogosApp({
     else onMoveChat?.(id, projectId);
   }
   const l5MindView = mindShown ? (
-    <MindGraphView
+    <MemoryView
       signedIn={!!isSignedIn}
       narrow={narrow}
       onOpen={(place) => {
@@ -6983,8 +6983,8 @@ export function LogosApp({
         chromeHidden ? null : (
           <L5Header
             onHome={goHome}
-            eyebrow="Mind Graph"
-            title="How you think, so far"
+            eyebrow="Memory"
+            title="What Socria remembers about you"
             stage={null}
             center={center}
             menu={l5Menu}

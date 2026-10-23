@@ -7,7 +7,8 @@
 // history is read only from the record; private memories stay out of Logos;
 // and what Core and Logos are told says plainly which changes are unconfirmed.
 
-import { EMPTY_GRAPH } from './.tmp/types.mjs';
+import { EMPTY_GRAPH, openToLogos } from './.tmp/types.mjs';
+import { readFileSync } from 'node:fs';
 import { applyCandidates } from './.tmp/apply.mjs';
 import { TURN_BUDGET } from './.tmp/gate.mjs';
 import { changesOf, reviewChange, detectContradictions, evolutionOf, selectForPrompt, changesBlock, affectedBy } from './.tmp/evolve.mjs';
@@ -100,6 +101,49 @@ const base = g;
   const no = reviewChange(d.graph, c.id, 'reject', T0 + 2000);
   const redo = detectContradictions(no.graph, touched, { now: T0 + 3000, nextId: ids, provenance: { surface: 'core' } });
   ok('a dismissed possible contradiction is never proposed again', no.ok && redo.proposed.length === 0);
+
+  // "It changed — keep the newer": the tension becomes the change it was
+  const kept = reviewChange(d.graph, c.id, 'supersede', T0 + 2500);
+  ok('it changed: the earlier becomes what they used to think', kept.ok && node(kept.graph, 'Living near the mountains').status === 'superseded' && node(kept.graph, 'Not near mountains').status === 'active', kept.why);
+  const link = kept.graph.edges.find((e) => e.id === c.id.slice(2));
+  ok('  the same link, now a change of position from the earlier to the newer',
+    link && link.relationship === 'superseded_by' && link.sourceId === node(kept.graph, 'Living near the mountains').id && link.targetId === node(kept.graph, 'Not near mountains').id);
+  ok('  recorded as theirs, settled, with what it displaced',
+    link.provenance.length === 1 && link.provenance[0].surface === 'user' && link.provenance[0].review === 'confirmed' && link.provenance[0].prior?.status === 'active');
+  const after = changesOf(kept.graph);
+  ok('  read back as a confirmed change of position, not a tension',
+    after.some((x) => x.id === c.id && x.kind === 'superseded' && x.review === 'confirmed' && !x.legacy) && !after.some((x) => x.kind === 'possible-conflict'));
+  ok('  and it says so', /Kept the newer/.test(kept.say));
+  const redo2 = detectContradictions(kept.graph, touched, { now: T0 + 3000, nextId: ids, provenance: { surface: 'core' } });
+  ok('  the tension is never proposed again', redo2.proposed.length === 0);
+  const undone = reviewChange(kept.graph, c.id, 'reject', T0 + 3500);
+  ok('  undone later, the earlier claim is exactly as it was', undone.ok && node(undone.graph, 'Living near the mountains').status === 'active' && !undone.graph.edges.some((e) => e.id === c.id.slice(2)));
+  ok('only two claims in tension can be settled as a change',
+    !reviewChange(kept.graph, c.id, 'supersede', T0 + 4000).ok);
+  // a tension read in a conversation (both contradicted) settles the same way, the newer live again
+  const { graph: g3 } = apply(base, [C('Belief', 'Remote work suits me', 'I work best from home')], [], { now: T0 + 500 });
+  const { graph: g4 } = apply(g3, [C('Belief', 'An office suits me now', 'I work better in an office now', 'stated', { conflictsWith: 'Remote work suits me' })], [], { now: T0 + 1000 });
+  const tension = changesOf(g4).find((x) => x.kind === 'conflict');
+  const settled = tension && reviewChange(g4, tension.id, 'supersede', T0 + 2000);
+  ok('a tension read in a conversation settles the same way, the newer live again',
+    settled?.ok && node(settled.graph, 'Remote work suits me').status === 'superseded' && node(settled.graph, 'An office suits me now').status === 'active', JSON.stringify(tension?.kind));
+}
+
+// ── Logos sees no private memory, even through a walk ───────────────
+{
+  const { graph: p1 } = apply(base, [C('Decision', 'See a therapist', 'I am going to start seeing a therapist', 'stated', { private: true })], [], { now: T0 + 100 });
+  const { graph: p2 } = apply(p1, [C('Decision', 'Stop seeing a therapist', 'I stopped seeing the therapist', 'stated', { private: true, replaces: 'See a therapist' })], [], { now: T0 + 200 });
+  const open = openToLogos(p2);
+  ok('the Logos view holds no private memory', open.nodes.every((n) => !n.private) && open.nodes.length === p2.nodes.filter((n) => !n.private).length);
+  ok('  and no link that touched one', open.edges.every((e) => open.nodes.some((n) => n.id === e.sourceId) && open.nodes.some((n) => n.id === e.targetId)));
+  ok('  so a private change is not in its changes', changesOf(open).length === 0 && changesOf(p2).length === 1);
+  ok('  and carries no tombstone or pending claim', open.tombstones.length === 0 && open.pending.length === 0);
+  const route = readFileSync(new URL('../app/api/mind/changes/route.ts', import.meta.url), 'utf8');
+  ok('the changes route cuts on the server, for reading and for history',
+    /const seen = req\.nextUrl\.searchParams\.get\('scope'\) === 'logos' \? openToLogos\(graph\) : graph;/.test(route) && /evolutionOf\(seen,/.test(route) && /changesOf\(seen,/.test(route));
+  ok('  and refuses a decision from Logos on a change Logos could not have been shown',
+    /get\('scope'\) === 'logos' && !changesOf\(openToLogos\(before\)/.test(route));
+  ok('  and takes the new decision', /const DECISIONS: Decision\[\] = \['confirm', 'reject', 'forget', 'supersede'\];/.test(route));
 }
 
 // ── one memory's history ─────────────────────────────────────────────

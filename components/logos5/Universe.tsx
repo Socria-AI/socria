@@ -120,7 +120,7 @@ export function UniverseView({
   onCreateProject?: (name: string) => Promise<string | null>;
   /** rename a Project or give it a colour; what went wrong, or null */
   onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
-  /** the Mind Graph, for a signed-in person */
+  /** Memory (the Mind Graph, drawn), for a signed-in person */
   onMind?: () => void;
   /** the contents column: every conversation, by subject */
   contents?: boolean;
@@ -659,7 +659,7 @@ export function UniverseView({
       </div>
       {onMind && (
         <button type="button" className="l5c-mind" onClick={onMind}>
-          Mind Graph <span aria-hidden="true">→</span>
+          Memory <span aria-hidden="true">→</span>
         </button>
       )}
     </aside>

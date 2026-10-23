@@ -185,17 +185,24 @@ export function changesOf(graph: MindGraph, opts: { excludePrivate?: boolean; he
   return opts.limit ? out.slice(0, opts.limit) : out;
 }
 
-export type Decision = 'confirm' | 'reject' | 'forget';
+export type Decision = 'confirm' | 'reject' | 'forget' | 'supersede';
 
 /**
  * The person's decision on a change.
  *
- *   confirm  it stands, and is said as settled from now on
- *   reject   it was not a change: what it displaced is restored exactly
- *            (`prior`), the link is removed and tombstoned so the same reading
- *            is not made again; the newer claim, if any, stays as a claim
- *   forget   as reject, and the newer claim is forgotten too — only for a
- *            claim this change itself created
+ *   confirm    it stands, and is said as settled from now on
+ *   reject     it was not a change: what it displaced is restored exactly
+ *              (`prior`), the link is removed and tombstoned so the same reading
+ *              is not made again; the newer claim, if any, stays as a claim
+ *   forget     as reject, and the newer claim is forgotten too — only for a
+ *              claim this change itself created
+ *   supersede  for two claims in tension: neither is wrong, their thinking
+ *              CHANGED — the earlier becomes what they used to think, the newer
+ *              what they think now. Recorded the way a change of position read
+ *              from a conversation is (a superseded_by link, the earlier marked
+ *              superseded), as the person's own, settled; the tension is
+ *              tombstoned so it is not proposed again. Rejecting that change
+ *              later restores the earlier claim exactly, as any other.
  *
  * A rewording rejected keeps the earlier words.
  */
@@ -209,6 +216,7 @@ export function reviewChange(graph: MindGraph, changeId: string, decision: Decis
     const entry = n?.provenance.find((p) => p.at === at && p.note?.startsWith('was: '));
     if (!n || !entry) return { ok: false, why: 'That change is no longer in your memory.' };
     if (decision === 'forget') return { ok: false, why: 'A rewording can be kept or undone — use “keep the earlier words”.' };
+    if (decision === 'supersede') return { ok: false, why: 'A rewording is one claim in new words — keep the new words, or the earlier ones.' };
     const was = entry.note!.slice(5);
     const marked = n.provenance.map((p) => (p === entry ? { ...p, review: decision === 'confirm' ? ('confirmed' as const) : ('rejected' as const) } : p));
     const node: MindNode =
@@ -225,6 +233,37 @@ export function reviewChange(graph: MindGraph, changeId: string, decision: Decis
   if (!a || !b) return { ok: false, why: 'One side of that change is no longer in your memory.' };
   const entry = changeEntry(edge);
   const possible = edge.relationship === 'contradicts' && entry?.kind === 'inferred' && /possible contradiction/.test(entry?.note ?? '');
+
+  if (decision === 'supersede') {
+    if (edge.relationship !== 'contradicts') return { ok: false, why: 'That is already a change of position — confirm it, or undo it.' };
+    // the link runs from what was held first to what was said since — detectContradictions
+    // and apply.ts both write it that way, and the Memory view says so on the card
+    const [older, newer] = [a, b];
+    const live = (s: NodeStatus): NodeStatus => (s === 'contradicted' || s === 'tentative' || s === 'uncertain' ? 'active' : s);
+    // the tension is not proposed again (detectContradictions reads this tombstone)
+    const stone = fingerprintEdge(a.type, a.label, 'contradicts', b.type, b.label);
+    const tombstones = graph.tombstones.includes(stone) ? graph.tombstones : [...graph.tombstones, stone];
+    // the same link, now the change it was: same id, so the store updates the row it already has
+    const edges = graph.edges.map((e) =>
+      e.id === edge.id
+        ? {
+            ...e,
+            sourceId: older.id,
+            targetId: newer.id,
+            relationship: 'superseded_by',
+            provenance: [{ kind: 'stated' as const, surface: 'user' as const, at: now, note: 'You said it changed.', review: 'confirmed' as const, prior: { status: older.status, toStatus: newer.status } }],
+            updatedAt: now,
+            lastReinforced: now,
+          }
+        : e
+    );
+    const nodes = graph.nodes.map((n) => {
+      if (n.id === older.id) return { ...n, status: 'superseded' as const, updatedAt: now };
+      if (n.id === newer.id) return { ...n, status: stillDisputed(graph, n.id, edge.id) ? n.status : live(n.status), updatedAt: now };
+      return n;
+    });
+    return { ok: true, graph: { ...graph, nodes, edges, tombstones }, say: `Kept the newer: “${newer.label}” is what you think now, and “${older.label}” what you used to.` };
+  }
 
   if (decision === 'confirm') {
     const edges = graph.edges.map((e) => (e.id === edge.id ? { ...e, provenance: e.provenance.map((p, i) => (i === 0 ? { ...p, review: 'confirmed' as const } : p)), updatedAt: now } : e));

@@ -154,9 +154,6 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   --l5-no-ink: var(--lg-tension);
   --l5s-gold-ink: var(--lg-secondary);
   --l5s-review-ink: var(--lg-secondary);
-  /* the Mind Graph's neurons: the lead one in the lit colour, the rest in the ink */
-  --l5m-lead: var(--lg-primary);
-  --l5m-line: rgba(var(--lg-ink-rgb), 0.45);
 }
 html[data-theme="dark"] .logos-root .l5 {
   --l5-surface: #25261F; --l5-surface-rgb: 37, 38, 31; --l5-paper-hi: #25261F; --l5-raise: #2E2F28;
@@ -169,7 +166,6 @@ html[data-theme="dark"] .logos-root .l5 {
   --l5s-ok: #A9C27A; --l5s-ok-rgb: 169, 194, 122; --l5s-ok-soft: rgba(169, 194, 122, 0.14);
   --l5s-no-soft: rgba(209, 138, 104, 0.14); --l5s-no-fill: rgba(209, 138, 104, 0.16); --l5s-no-wash: rgba(209, 138, 104, 0.08);
   --l5s-gold-rgb: 201, 180, 126;
-  --l5m-habit: #283121; --l5m-fact: #25261F; --l5m-project: #302B20;
 }
 html[data-theme="one"] .logos-root .l5 {
   --l5-surface: #1B3749; --l5-surface-rgb: 27, 55, 73; --l5-paper-hi: #1B3749; --l5-raise: #22415A;
@@ -182,7 +178,6 @@ html[data-theme="one"] .logos-root .l5 {
   --l5s-ok: #A6D6A9; --l5s-ok-rgb: 166, 214, 169; --l5s-ok-soft: rgba(166, 214, 169, 0.14);
   --l5s-no-soft: rgba(227, 154, 122, 0.14); --l5s-no-fill: rgba(227, 154, 122, 0.16); --l5s-no-wash: rgba(227, 154, 122, 0.08);
   --l5s-gold-rgb: 229, 211, 161;
-  --l5m-habit: #1D3E48; --l5m-fact: #1B3749; --l5m-project: #2D3B46;
 }
 html[data-theme="night"] .logos-root .l5 {
   --l5-surface: #131D33; --l5-surface-rgb: 19, 29, 51; --l5-paper-hi: #131D33; --l5-raise: #1A2642;
@@ -195,7 +190,6 @@ html[data-theme="night"] .logos-root .l5 {
   --l5s-ok: #93D3A2; --l5s-ok-rgb: 147, 211, 162; --l5s-ok-soft: rgba(147, 211, 162, 0.13);
   --l5s-no-soft: rgba(232, 153, 138, 0.13); --l5s-no-fill: rgba(232, 153, 138, 0.16); --l5s-no-wash: rgba(232, 153, 138, 0.08);
   --l5s-gold-rgb: 195, 177, 225;
-  --l5m-habit: #142838; --l5m-fact: #131D33; --l5m-project: #262438;
   /* the ground is a sky: a faint glow from the top, and no stars behind words */
   background: radial-gradient(ellipse 120% 70% at 50% -12%, rgba(80, 110, 190, 0.16), transparent 72%), var(--lg-paper);
 }

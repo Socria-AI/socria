@@ -12,7 +12,6 @@ export { StudyBoard, StartPanel, TopicInspector, StudyPractice, PracticeEmpty, C
 export { UniverseView } from '@/components/logos5/Universe';
 export { WhatsNew, keptLine } from '@/components/onboarding/WhatsNew';
 export { emptyArrangement } from '@/lib/logos5/arrange';
-// the Mind Graph: what Socria remembers, drawn as a mind
-export { MindGraphView } from '@/components/logos5/MindGraph';
-export { mindDrawing, groupOf, subOf, memoryMatches, hash as mindHash } from '@/lib/logos5/mindgraph';
+// Memory: what Socria remembers, as an atlas of a mind
+export { MemoryView } from '@/components/logos5/MemoryView';
 export { checkPractice } from '@/lib/logos5/study';

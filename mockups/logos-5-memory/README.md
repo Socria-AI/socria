@@ -1,8 +1,10 @@
 # Logos 5 Memory: neural memory network mockups
 
-High-fidelity PNG mockups of a redesigned Memory tab for Logos 5, for judging
-the look and the interaction model before anything is built. **Nothing here
-is shipped, and no application code was changed.**
+High-fidelity PNG mockups of a redesigned Memory tab for Logos 5, made to judge
+the look and the interaction model before anything was built. **It has since
+been built** — `lib/logos5/memoryAtlas.ts` and `components/logos5/MemoryView.tsx`
+(docs/LOGOS-5.md §7) — with "It changed — keep the newer" added to the store as
+the `supersede` decision. A pin the person sets is still new (see the table).
 
 The screens are static HTML (`src/`) drawn with Socria's Paper tokens
 (`app/globals.css`, `components/logos5/l5.css`) and the app's own fonts
@@ -131,7 +133,7 @@ a new write).
 | Confirm or Not right on a change | `POST /api/mind/changes` with `confirm` or `reject`. Reject restores `prior`. | Exists |
 | Both are true | `reject` on the possible contradiction. The link is tombstoned and never proposed again. | Exists |
 | Forget the newer one | `forget`, offered only when `Change.canForget` is true | Exists |
-| It changed — keep the newer | Three existing writes: reject, then `POST /api/mind/edge` with `superseded_by`, then `PATCH` the older node's status. Doing it atomically needs one new decision in `reviewChange`. | **New** (small) |
+| It changed — keep the newer | One decision in `reviewChange`, `supersede`, added when this was built: the tension becomes a change of position, recorded as theirs | Exists (added) |
 | Edit, This isn't right, Forget | `PATCH /api/mind/node` (edit, `challenge`) and `DELETE` (tombstoned) | Exists |
 | Noticed once, and Dismiss | `PendingClaim`; `DELETE /api/mind/node` with kind `pending` | Exists |
 | "To review" counts per region | proposed changes grouped by the regions of their two sides | Derivable |
