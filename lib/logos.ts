@@ -32,6 +32,12 @@ export const LOGOS_MODEL = 'gpt-5.6-sol';
 // If the Sol id is ever rejected as unknown, the routes retry with this so a
 // demo never dies mid-sentence.
 export const LOGOS_FALLBACK_MODEL = 'gpt-4o';
+// The map pass (app/api/logos/map) — the extractor that redraws the map after
+// every turn, and the largest prompt Socria sends — runs on GPT 5.6 Terra: a
+// structured reading of the conversation, on a cheaper model than Sol. The
+// reply stays on Sol. OPENAI_MODEL_LOGOS_MAP overrides it with no redeploy, and
+// a rejected id steps down to Sol, then to the fallback.
+export const LOGOS_MAP_MODEL = 'gpt-5.6-terra';
 
 export const NODE_TYPES = [
   // deciding
@@ -1194,100 +1200,22 @@ If what they asked for genuinely cannot be written as objects with expressions, 
 ${PROPOSAL_RULES}`;
 }
 
-export function buildMapPrompt(current: ThinkingMap, grounded = ''): string {
-  const currentBlock =
-    current.nodes.length > 0
-      ? `Current map (REORGANIZE it — do not start over, and do not merely append):
-nodes:
-${current.nodes
-  .map(
-    (n) =>
-      `  ${n.id} [${n.type}${n.status && n.status !== 'open' ? `/${n.status}` : ''}${n.role ? `, role ${n.role}` : ''}${n.origin === 'socria' ? ', suggested by Socria and accepted' : ''}] ${n.label}` +
-      (n.merged?.length ? `  (absorbed: ${n.merged.join('; ')})` : '')
-  )
-  .join('\n')}
-edges:
-${
-  current.edges.length
-    ? current.edges
-        .map(
-          (e) =>
-            `  ${e.from} --${e.relation}${
-              e.strength && e.strength !== 'normal' ? `(${e.strength})` : ''
-            }${e.when ? ` [when ${e.when}]` : ''}--> ${e.to}`
-        )
-        .join('\n')
-    : '  (none yet)'
-}`
-      : 'The map is empty. Build the first version from this conversation.';
-
-  const contextLine = current.context
-    ? `Last read as: ${current.context}. Keep it there unless the conversation has genuinely moved.`
-    : 'Not yet established — read it from the conversation.';
-
-  // What the person removed by hand. The transcript still contains whatever
-  // put it there; this is the only place the extractor learns it was taken
-  // off on purpose. The client drops a match on arrival in any case.
-  const removedBlock = current.removed?.length
-    ? `\nREMOVED BY THE PERSON — they took these off the map themselves. Do not put them back, under this wording or another, even though the conversation still mentions them:\n${current.removed.map((r) => `  - ${r}`).join('\n')}\n`
-    : '';
-
-  /**
-   * The scene already on screen, shown so it can be EDITED.
-   *
-   * Without this the extractor was being asked to keep a picture in step with
-   * the conversation while unable to see the picture. Its only honest moves
-   * were to invent a whole new scene — which usually reproduced the default
-   * and looked like nothing had happened — or to omit the field, which the
-   * client reads as "no opinion" and carries the old scene forward. Either
-   * way the graph never moved, however plainly someone asked it to.
-   *
-   * Serialised as the JSON it will be handed back, minus the reader's own
-   * overlays: those are theirs, they persist on their own, and listing them
-   * invites the model to rewrite them.
-   */
-  const vizBlock = (() => {
-    if (!current.viz) return '';
-    const { overlays, ...scene } = current.viz;
-    // Sliders are shown as id/range/value only. Their help text is UI copy
-    // written for the reader, it is a third of the scene by length, and
-    // showing it invites the model to rewrite prose it was never asked to
-    // touch. What it needs from a parameter is where the handle is and how
-    // far it may move.
-    const lean = {
-      ...scene,
-      params: (scene.params ?? []).map(({ id, min, max, step, value, symbol, integer, sweep, toward }) => ({
-        id,
-        min,
-        max,
-        step,
-        value,
-        ...(symbol ? { symbol } : {}),
-        ...(integer ? { integer } : {}),
-        ...(sweep ? { sweep } : {}),
-        ...(toward ? { toward } : {}),
-      })),
-    };
-    return `
-The picture currently on screen, as JSON. EDIT IT rather than replacing it — return the same object with only what this turn changed:
-${JSON.stringify(lean)}
-DO WHAT THEY ASKED, TO THE PICTURE. A request to change the drawing is an instruction, not a topic of conversation:
-- "make a bigger", "raise the tax to 20", "set n to 8", "double the intercept" → change that "value" (or that field) to the number they named, or a clearly bigger/smaller one when they did not name one. Widen the parameter's "min"/"max" if the number they want is outside the current range.
-- "zoom out", "show me from 0 to 100", "I can't see the intercept" → change "view".
-- "make it steeper", "shift demand up", "make the curve flatter" → change the slope/intercept/coefficient that does that.
-- "now suppose a frost hits the crop", "what if we get better at making guns" → move the curve or the frontier the fact moves.
-- "add x^2 to it" → add an overlay; do not replace what is there.
-Someone who says "more guns" wants the position along the frontier MOVED, not a lecture about it. Keep the axis names, the numbers and the kind unless the subject genuinely changed. Omit "viz" entirely only when this turn said nothing about the picture at all — the one on screen then stays exactly as it is.
-`;
-  })();
-
-  // THE INSTRUCTIONS FIRST, THE MAP LAST. Everything above "THE MAP AS IT
-  // STANDS" is the same on every call, for everyone, so the provider can serve
-  // it from its prompt cache instead of reading ~19k tokens afresh each turn
-  // (lib/openai-usage.ts logs whether it does). It used to open with the
-  // current map, which changes every turn — and a cached prefix ends at the
-  // first character that differs.
-  return `You extract the STRUCTURE of a person's thinking from a conversation and maintain it as a small graph. You never talk to the user. The map as it stands this turn — its nodes and edges, anything the person removed, the thinking context, what they are building, the picture on screen, grounded material — comes after these instructions, under THE MAP AS IT STANDS.
+/**
+ * THE EXTRACTOR'S INSTRUCTIONS — the same on every call, for everyone.
+ *
+ * Sent as a message of their own, with the map as it stands and the
+ * conversation in the message after them (app/api/logos/map). A provider's
+ * prompt cache serves a repeated opening at a tenth of the price, but it can
+ * only stop at the end of a message — GPT-5.6 matches at message boundaries —
+ * so while ~19k tokens of instructions shared a message with a map that
+ * changes every turn, they were read, and written to the cache, afresh on
+ * every call. lib/openai-usage.ts logs whether they are served from it now.
+ *
+ * Built once: nothing in it depends on the call.
+ */
+let instructions: string | null = null;
+export function mapInstructions(): string {
+  return (instructions ??= `You extract the STRUCTURE of a person's thinking from a conversation and maintain it as a small graph. You never talk to the user. The map as it stands this turn — its nodes and edges, anything the person removed, the thinking context, what they are building, the picture on screen, grounded material — comes after these instructions, under THE MAP AS IT STANDS, and the conversation after it, under THE CONVERSATION.
 
 Return ONLY JSON, exactly this shape:
 {
@@ -1567,9 +1495,98 @@ WHOSE THINKING IS IT:
 - Grounded material attached to a node gives CONTEXT, NOT AUTHORITY. It may sharpen THAT node's label, add claims/evidence/source/constraint nodes connected to it, or justify status "supported" when it genuinely backs the node. It never creates a belief, value, goal or decision the user hasn't voiced, never resolves a question for them, and never outranks what they actually said in conversation.
 - If the latest message adds nothing structural, return the current map unchanged.
 - A node marked "suggested by Socria and accepted" keeps its id and its wording unless the person changes it.
-- SOCRIA'S SYNTHESES ARE NOT THE PERSON'S THINKING. They are removed from the transcript you see. When the person replies to one: if they correct Socria's READING ("that's not what I meant"), the map does not change; if they state their OWN position ("ease of access matters more than personalization"), map that position like anything else they say.
+- SOCRIA'S SYNTHESES ARE NOT THE PERSON'S THINKING. They are removed from the transcript you see. When the person replies to one: if they correct Socria's READING ("that's not what I meant"), the map does not change; if they state their OWN position ("ease of access matters more than personalization"), map that position like anything else they say.`);
+}
 
-=== THE MAP AS IT STANDS ===
+/** The map as it stands this turn — what the instructions are applied to. */
+export function mapAsItStands(current: ThinkingMap, grounded = ''): string {
+  const currentBlock =
+    current.nodes.length > 0
+      ? `Current map (REORGANIZE it — do not start over, and do not merely append):
+nodes:
+${current.nodes
+  .map(
+    (n) =>
+      `  ${n.id} [${n.type}${n.status && n.status !== 'open' ? `/${n.status}` : ''}${n.role ? `, role ${n.role}` : ''}${n.origin === 'socria' ? ', suggested by Socria and accepted' : ''}] ${n.label}` +
+      (n.merged?.length ? `  (absorbed: ${n.merged.join('; ')})` : '')
+  )
+  .join('\n')}
+edges:
+${
+  current.edges.length
+    ? current.edges
+        .map(
+          (e) =>
+            `  ${e.from} --${e.relation}${
+              e.strength && e.strength !== 'normal' ? `(${e.strength})` : ''
+            }${e.when ? ` [when ${e.when}]` : ''}--> ${e.to}`
+        )
+        .join('\n')
+    : '  (none yet)'
+}`
+      : 'The map is empty. Build the first version from this conversation.';
+
+  const contextLine = current.context
+    ? `Last read as: ${current.context}. Keep it there unless the conversation has genuinely moved.`
+    : 'Not yet established — read it from the conversation.';
+
+  // What the person removed by hand. The transcript still contains whatever
+  // put it there; this is the only place the extractor learns it was taken
+  // off on purpose. The client drops a match on arrival in any case.
+  const removedBlock = current.removed?.length
+    ? `\nREMOVED BY THE PERSON — they took these off the map themselves. Do not put them back, under this wording or another, even though the conversation still mentions them:\n${current.removed.map((r) => `  - ${r}`).join('\n')}\n`
+    : '';
+
+  /**
+   * The scene already on screen, shown so it can be EDITED.
+   *
+   * Without this the extractor was being asked to keep a picture in step with
+   * the conversation while unable to see the picture. Its only honest moves
+   * were to invent a whole new scene — which usually reproduced the default
+   * and looked like nothing had happened — or to omit the field, which the
+   * client reads as "no opinion" and carries the old scene forward. Either
+   * way the graph never moved, however plainly someone asked it to.
+   *
+   * Serialised as the JSON it will be handed back, minus the reader's own
+   * overlays: those are theirs, they persist on their own, and listing them
+   * invites the model to rewrite them.
+   */
+  const vizBlock = (() => {
+    if (!current.viz) return '';
+    const { overlays, ...scene } = current.viz;
+    // Sliders are shown as id/range/value only. Their help text is UI copy
+    // written for the reader, it is a third of the scene by length, and
+    // showing it invites the model to rewrite prose it was never asked to
+    // touch. What it needs from a parameter is where the handle is and how
+    // far it may move.
+    const lean = {
+      ...scene,
+      params: (scene.params ?? []).map(({ id, min, max, step, value, symbol, integer, sweep, toward }) => ({
+        id,
+        min,
+        max,
+        step,
+        value,
+        ...(symbol ? { symbol } : {}),
+        ...(integer ? { integer } : {}),
+        ...(sweep ? { sweep } : {}),
+        ...(toward ? { toward } : {}),
+      })),
+    };
+    return `
+The picture currently on screen, as JSON. EDIT IT rather than replacing it — return the same object with only what this turn changed:
+${JSON.stringify(lean)}
+DO WHAT THEY ASKED, TO THE PICTURE. A request to change the drawing is an instruction, not a topic of conversation:
+- "make a bigger", "raise the tax to 20", "set n to 8", "double the intercept" → change that "value" (or that field) to the number they named, or a clearly bigger/smaller one when they did not name one. Widen the parameter's "min"/"max" if the number they want is outside the current range.
+- "zoom out", "show me from 0 to 100", "I can't see the intercept" → change "view".
+- "make it steeper", "shift demand up", "make the curve flatter" → change the slope/intercept/coefficient that does that.
+- "now suppose a frost hits the crop", "what if we get better at making guns" → move the curve or the frontier the fact moves.
+- "add x^2 to it" → add an overlay; do not replace what is there.
+Someone who says "more guns" wants the position along the frontier MOVED, not a lecture about it. Keep the axis names, the numbers and the kind unless the subject genuinely changed. Omit "viz" entirely only when this turn said nothing about the picture at all — the one on screen then stays exactly as it is.
+`;
+  })();
+
+  return `=== THE MAP AS IT STANDS ===
 ${currentBlock}${removedBlock}
 
 Thinking context: ${contextLine}
@@ -1584,4 +1601,9 @@ ${grounded}
 `
     : ''
 }`;
+}
+
+/** Everything the extractor is told about the map: its instructions, then the map as it stands. */
+export function buildMapPrompt(current: ThinkingMap, grounded = ''): string {
+  return `${mapInstructions()}\n\n${mapAsItStands(current, grounded)}`;
 }

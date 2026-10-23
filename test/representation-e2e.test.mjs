@@ -102,7 +102,10 @@ import { availableLenses, leadLens } from './.tmp/logos-layout.mjs';
 import { ONBOARDING_CLOUD, ONBOARDING_REPAIRED, ONBOARDING_TURNS, SCENARIOS } from './fixtures/shapes.mjs';
 
 const lead = (m) => leadLens(availableLenses(m), !!m.viz || !!m.models?.docs?.length, m.building);
-const sys = (calls, i = 0) => String(calls[i]?.messages?.[0]?.content ?? '');
+// What the extractor was told: its instructions, and — in the message after
+// them since the map pass keeps its instructions a message of their own
+// (app/api/logos/map) — the map as it stands and the conversation.
+const sys = (calls, i = 0) => (calls[i]?.messages ?? []).map((m) => String(m?.content ?? '')).join('\n\n');
 
 console.log('=== the reported failure, through the route ===');
 {

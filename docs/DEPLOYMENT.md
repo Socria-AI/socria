@@ -383,15 +383,28 @@ node scripts/token-report.mjs < logs.txt
 ```
 
 The cache share is the column to watch. OpenAI caches the longest prefix of a
-request it has recently seen, byte for byte, so the long prompts are laid out
-for it: the map extractor's instructions come before the map
-(`lib/logos.ts` `buildMapPrompt`). The Logos reply is ordered stable prompt,
-then the history, then this turn's context, then the person's newest message
-(`app/api/logos/chat`). A route whose cache share stays near zero has
-something changing near the top of its prompt. The reply's history stops
+request it has recently seen, byte for byte, and on GPT-5.6 only a prefix that
+ends where a message ends — so the long prompts are laid out for it. The map
+extractor's ~19k tokens of instructions are a message of their own, with the
+map as it stands and the conversation in the message after them
+(`lib/logos.ts` `mapInstructions`, `mapAsItStands`). The Logos reply is ordered
+stable prompt, then the history, then this turn's context, then the person's
+newest message (`app/api/logos/chat`). A route whose cache share stays near
+zero has something changing in its first message. The reply's history stops
 caching once a conversation passes 24 messages, because the window then
 slides by one each turn. Documents travel in the newest message and are read
 afresh each turn.
+
+GPT-5.6 also bills writing a prefix into the cache above the normal input
+price, and reading it back well below it, so a prefix read again pays for
+itself and one never reused costs a little more. The log records reads
+(`cached`); writes (`cache_write_tokens` in the usage) are not in it yet.
+
+The map pass runs on GPT 5.6 Terra (`LOGOS_MAP_MODEL`), every other Logos call
+on Sol. `OPENAI_MODEL_LOGOS_MAP` moves the map with no redeploy;
+`OPENAI_MODEL_LOGOS` no longer does. A refused id steps down to Sol, then to
+`gpt-4o`, with a `logos map: … was refused` warning in the log — and the
+`model` in the `[tokens]` lines says which one answered.
 
 A turn that says only "ok" or "thanks" does not rebuild the map
 (`lib/map-skip.ts`). The next turn that says something sends the whole

@@ -18,10 +18,12 @@ import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
-  buildMapPrompt,
+  mapInstructions,
+  mapAsItStands,
   buildProposePrompt,
   sanitizeMap,
   LOGOS_MODEL,
+  LOGOS_MAP_MODEL,
   LOGOS_FALLBACK_MODEL,
   EMPTY_MAP,
   type ThinkingMap,
@@ -205,8 +207,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'logos/map');
-    const configured =
-      process.env.OPENAI_MODEL_LOGOS_MAP || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+    // GPT 5.6 Terra (lib/logos.ts LOGOS_MAP_MODEL), whatever the reply runs on:
+    // only the map's own override moves it, not OPENAI_MODEL_LOGOS.
+    const configured = process.env.OPENAI_MODEL_LOGOS_MAP || LOGOS_MAP_MODEL;
 
     // The ceiling has to fit the JSON the prompt asks for, which is now a map
     // AND, when the conversation wants one, a picture the model authors part
@@ -223,33 +226,46 @@ export async function POST(req: NextRequest) {
         max_tokens: cap,
         response_format: { type: 'json_object' },
         messages: [
+          // THE INSTRUCTIONS ARE A MESSAGE OF THEIR OWN. They are the same on
+          // every call — with the depth and the guard, which hold for the
+          // whole conversation — and a provider's prompt cache can only stop
+          // at the end of a message (lib/logos.ts mapInstructions). Everything
+          // that changes turn to turn comes after them, in the message that
+          // asks: the map as it stands, the objects, the conversation.
+          { role: 'system', content: mapInstructions() + guidance },
           {
-            role: 'system',
+            role: 'user',
             content:
-              buildMapPrompt(asked, grounded) +
-              guidance +
+              mapAsItStands(asked, grounded) +
               // the objects the person is working on exist as themselves —
               // nodes refer to them, never copy or "compute" their values
               objectsForExtractor(current.objects) +
+              `\n\n=== THE CONVERSATION ===\n${transcript}` +
               (withPicture ? '' : NO_PICTURE),
           },
-          { role: 'user', content: transcript },
         ],
       });
 
-    let completion;
-    try {
-      completion = await make(configured);
-    } catch (e: any) {
+    /** The provider refusing the model id itself, rather than the request. */
+    const refusedModel = (e: any) => {
       const status = e?.status ?? e?.response?.status;
-      const isModelError =
-        status === 404 ||
-        /model/i.test(e?.code || '') ||
-        /model|not found|does not exist|unknown/i.test(e?.message || '');
-      if (isModelError && configured !== LOGOS_FALLBACK_MODEL) {
-        completion = await make(LOGOS_FALLBACK_MODEL);
-      } else {
-        throw e;
+      return status === 404 || /model/i.test(e?.code || '') || /model|not found|does not exist|unknown/i.test(e?.message || '');
+    };
+
+    // A REFUSED ID STEPS DOWN, NEVER OUT: Terra, then Sol, then the old
+    // fallback — said in the log, so a map quietly answered by another model
+    // is seen. Every pass after this one asks the model that answered.
+    const ladder = [...new Set([configured, LOGOS_MODEL, LOGOS_FALLBACK_MODEL])];
+    let served = configured;
+    let completion;
+    for (let i = 0; ; i++) {
+      try {
+        completion = await make(ladder[i]);
+        served = ladder[i];
+        break;
+      } catch (e: any) {
+        if (!refusedModel(e) || i === ladder.length - 1) throw e;
+        console.warn('logos map: %s was refused (%s) — asking %s', ladder[i], String(e?.message ?? e).slice(0, 160), ladder[i + 1]);
       }
     }
 
@@ -260,7 +276,7 @@ export async function POST(req: NextRequest) {
     if (completion.choices?.[0]?.finish_reason === 'length') {
       console.warn('logos map: truncated at the ceiling — retrying without the picture');
       try {
-        completion = await make(configured, CEILING, false);
+        completion = await make(served, CEILING, false);
       } catch {
         /* keep the truncated one; the parse below will decide */
       }
@@ -317,7 +333,7 @@ export async function POST(req: NextRequest) {
     if (claimed && claimed !== 'model' && next.nodes.length >= 3 && !satisfies(next, claimed)) {
       try {
         const again = await openai.chat.completions.create({
-          model: configured,
+          model: served,
           temperature: 0,
           max_tokens: CEILING,
           response_format: { type: 'json_object' },
@@ -449,7 +465,7 @@ export async function POST(req: NextRequest) {
           else display = { ok: false, failure: 'malformed', says: 'That could not be made from what is here.' };
         } else {
           const drafted = await openai.chat.completions.create({
-            model: configured,
+            model: served,
             temperature: 0,
             max_tokens: 2400,
             response_format: { type: 'json_object' },
@@ -584,7 +600,7 @@ export async function POST(req: NextRequest) {
     if (!answeredByScene() && !displayAsked && ((!proposal && wantedBuild) || prose)) {
       try {
         const again = await openai.chat.completions.create({
-          model: configured,
+          model: served,
           temperature: 0,
           max_tokens: CEILING,
           response_format: { type: 'json_object' },

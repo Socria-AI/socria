@@ -41,6 +41,19 @@ function chatReply(messages) {
   return 'Keep going — what is the part you are least sure of?';
 }
 
+/**
+ * The map pass sends the map as it stands and then the conversation, under
+ * "=== THE CONVERSATION ===", in one message (app/api/logos/map): the
+ * conversation alone, so the canned map is drawn from what was said.
+ */
+function conversationOf(messages) {
+  return messages.map((m) => {
+    const text = String(m.content ?? '');
+    const at = text.indexOf('=== THE CONVERSATION ===\n');
+    return at < 0 ? m : { ...m, content: text.slice(at + '=== THE CONVERSATION ===\n'.length) };
+  });
+}
+
 /** A Thinking Map for the conversation so far: deterministic, from the person's own sentences. */
 function mapReply(messages) {
   const transcript = messages.map((m) => String(m.content ?? '')).join('\n');
@@ -233,7 +246,7 @@ const server = http.createServer((req, res) => {
         const isSort = /sort a student’s files into study topics/.test(system);
         const isEntries = /journal-entry practice/.test(system);
         const isWrite = system.startsWith('You help someone with their own writing.');
-        const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(messages.slice(1)) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
+        const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
       const text = chatReply(messages.slice(1));
