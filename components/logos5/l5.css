@@ -1051,6 +1051,13 @@
   font-size: 16px;
   line-height: 1.5;
 }
+/* Stacked, the words are a row of a column: their height is the one the
+   composer measures (LogosComposer grow), not a share of the box. The shared
+   rule's `flex: 1` (a basis of 0, made for the inline row) pinned them to a
+   single line, however much was written. */
+.logos-root .l5-dock .lg-composer-box > textarea {
+  flex: 0 0 auto;
+}
 .logos-root .l5-ctools {
   display: flex;
   align-items: center;

@@ -366,21 +366,52 @@ export function LogosComposer({
     });
   }
 
+  const grownAt = useRef(0);
   function grow() {
     const el = taRef.current;
     if (!el) return;
+    // Not laid out yet — hidden, or not in the page: measured now it would be
+    // sized to nothing and come back a line tall, the rest of the words cut
+    // off above it. It is measured the moment it has a width (below).
+    if (!el.clientWidth) {
+      el.style.height = '';
+      el.style.overflowY = '';
+      return;
+    }
+    grownAt.current = el.clientWidth;
     el.style.height = 'auto';
     // Room for a real paragraph, but never so tall it eats the conversation.
     const cap = Math.round(window.innerHeight * 0.34);
     el.style.height = Math.min(el.scrollHeight, cap) + 'px';
-    // A scrollbar only once there is more than the cap to scroll: an empty
-    // box showed one, its italic placeholder a little taller than a line.
-    el.style.overflowY = el.scrollHeight > cap ? 'auto' : 'hidden';
+    // A scrollbar only when there is more than the box shows (an empty box
+    // showed one, its italic placeholder a little taller than a line) — and
+    // never words cut off with no way to scroll up to them.
+    el.style.overflowY = el.scrollHeight > el.clientHeight + 1 ? 'auto' : 'hidden';
   }
 
   // Text also arrives without a keystroke — a failed send hands the message
-  // back, and the box has to come back with it.
+  // back, a panel puts a question in to be finished — and the box has to come
+  // back with it.
   useLayoutEffect(grow, [value]);
+  // So does a new width: shown after being hidden, the box floated or docked,
+  // the window resized. The words wrap again, so it is measured again.
+  useEffect(() => {
+    const el = taRef.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => {
+      if (el.clientWidth && el.clientWidth !== grownAt.current) grow();
+    });
+    ro.observe(el);
+    // and the font arriving after the words did wraps them again too
+    const fonts = typeof document !== 'undefined' ? document.fonts : undefined;
+    fonts?.addEventListener?.('loadingdone', grow);
+    return () => {
+      ro.disconnect();
+      fonts?.removeEventListener?.('loadingdone', grow);
+    };
+    // grow reads only the ref and the window; the box is re-observed if its layout changes
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [layout]);
 
   // Something offered a sentence to finish — a row operation's shape, a scene to build — and the box is where
   // it is finished and sent: the caret goes to the gap it left, or to the end.

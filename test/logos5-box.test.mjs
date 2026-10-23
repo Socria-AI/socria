@@ -83,7 +83,15 @@ console.log('\n=== the wiring ===');
   ok('with the views hidden, the views and their switch go', /\.l5x\.is-focus \.l5x-view \{\s*visibility: hidden/.test(css) && /\.l5:has\(\.l5x\.is-focus\) \.l5-head-mid \{\s*visibility: hidden/.test(css));
   ok('a reply over a folded composer still hides the legend, wherever the composer is', /\.l5x:has\(\.l5x-peek\) \.lg-legend/.test(css));
   const composer = read('components/LogosComposer.tsx');
-  ok('the composer shows a scrollbar only once there is more than its cap to scroll', /el\.style\.overflowY = el\.scrollHeight > cap \? 'auto' : 'hidden';/.test(composer));
+  // "can't see up": a message longer than a line lost its first lines. The
+  // stacked box was pinned to one line by the shared rule's `flex: 1`, and the
+  // scrollbar was turned off by a cap it never reached; a box filled while
+  // hidden was measured at nothing.
+  ok('the composer shows a scrollbar only when there is more than the box shows — never words out of reach', /el\.style\.overflowY = el\.scrollHeight > el\.clientHeight \+ 1 \? 'auto' : 'hidden';/.test(composer) && !/scrollHeight > cap \?/.test(composer));
+  ok('  it grows with what is written, up to its cap', /el\.style\.height = Math\.min\(el\.scrollHeight, cap\) \+ 'px';/.test(composer));
+  ok('  stacked, its height is the one it measures, not a share of the box', /\.l5-dock \.lg-composer-box > textarea \{\s*flex: 0 0 auto;/.test(read('components/logos5/l5.css')));
+  ok('  filled while hidden, it is not measured at nothing', /if \(!el\.clientWidth\) \{\s*el\.style\.height = '';/.test(composer));
+  ok('  and it is measured again when its width changes, or the font arrives', /new ResizeObserver\(\(\) => \{\s*if \(el\.clientWidth && el\.clientWidth !== grownAt\.current\) grow\(\);/.test(composer) && /addEventListener\?\.\('loadingdone', grow\)/.test(composer));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
