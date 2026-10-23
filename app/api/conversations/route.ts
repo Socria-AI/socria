@@ -17,6 +17,7 @@ import { MAX_FILE_TEXT } from '@/lib/file-kinds';
 import { sanitizeContexts } from '@/lib/logos-sources';
 import { MindStoreError, listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
 import { adoptConversation, releaseConversation } from '@/lib/mind/projects';
+import { sanitizeStoredDraft, type StoredDraft } from '@/lib/write/doc';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -204,14 +205,13 @@ function warnLegacy(op: string) {
 }
 
 // The draft is the person's own writing, so it is stored verbatim — only
-// bounded, never reformatted or cleaned up on their behalf.
+// bounded, never reformatted or cleaned up on their behalf. It is the Draft
+// Space and Writing Space document (lib/write/doc.ts), with the title and the
+// HTML rendered from it kept beside it for anything that still reads those.
 const MAX_DRAFT_HTML = 200_000;
-function sanitizeDraft(raw: any): { title: string; html: string } | null {
-  if (!raw || typeof raw !== 'object' || typeof raw.html !== 'string') return null;
-  return {
-    title: typeof raw.title === 'string' ? raw.title.slice(0, MAX_TITLE) : '',
-    html: raw.html.slice(0, MAX_DRAFT_HTML),
-  };
+function sanitizeDraft(raw: any): StoredDraft | null {
+  const d = sanitizeStoredDraft(raw, MAX_DRAFT_HTML);
+  return d ? { ...d, title: d.title.slice(0, MAX_TITLE) } : null;
 }
 
 export async function GET() {

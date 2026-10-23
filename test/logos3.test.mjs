@@ -94,7 +94,7 @@ console.log('\n=== the surface ===');
   ok('the bar is in the header while a room is live; Share otherwise', /collab && room\.active \? \(\s*<CollabBar room=\{room\} \/>/.test(app) && /setShareOpen\(true\)/.test(app));
   ok('a sent turn is stamped and broadcast, in the room only', /if \(roomRef\.current\.active && sharedIdsRef\.current\.has\(activeIdRef\.current \?\? ''\)\) \{[\s\S]{0,200}return roomRef\.current\.onLocalMessage\(turn\);/.test(app) && /const sent = postTurn\(turn, group\);/.test(app));
   ok('the map is attributed before it is shown', /roomRef\.current\.onLocalMap\(/.test(app));
-  ok('a shared room is never saved to one account', /if \(roomRef\.current\?\.active \|\| sharedIdsRef\.current\.has\(s\.id\)\) return;/.test(app));
+  ok('a shared room is never saved to one account', /if \(roomRef\.current\?\.active \|\| sharedIdsRef\.current\.has\(s\.id\)\) return(?: null)?;/.test(app));
   ok('the private understanding pass never reads one', /!sharedIdsRef\.current\.has\(sid\)/.test(app));
   ok('Socria is told the names only when others are here — a room, or a shared line of thinking', /const people = inShared\s*\? roomRef\.current\.people/.test(app) && /\.\.\.\(people\.length >= 2 \? \{ collab: \{ people \} \} : \{\}\)/.test(app));
   ok('the picker calls it what it is', /m\.collab \? 'think together' : 'a different surface'/.test(read('components/ModelPicker.tsx')));

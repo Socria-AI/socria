@@ -79,8 +79,9 @@ Triaged as legitimate; re-syncs should not read these as new.
 
 Floor cards everywhere — **0 authored previews**, by choice, for speed. All 44
 components import and render fully functionally; 34 show the honest "preview
-not yet authored" card. `SetupNotice`, `SubscribeForm`, `DraftSpace` and a few
-others render real content because they need no props.
+not yet authored" card. `SetupNotice`, `SubscribeForm`, `DraftSpace` (since replaced by
+`WriteSpace`, components/write/) and a few others render real content because
+they need no props.
 
 Authoring previews is incremental: drop `.design-sync/previews/<Name>.tsx` and
 re-sync. Authored files and grades carry forward, so this is not a decision

@@ -168,7 +168,7 @@ console.log('\n=== what the person sees ===');
 console.log('\n=== wired: the app, the map, the route ===');
 {
   const app = read('components/LogosApp.tsx');
-  ok('the turn records what it was about, from the same brief the reply is told', /const askBrief = workspaceOn \? describeFocus\(focusRef\.current, mapRef\.current, docsRef\.current\)/.test(app) && /about: \{ kind: askBrief\.kind, label: askBrief\.label/.test(app) && /\.\.\.\(askBrief \? \{ focus: askBrief \} : \{\}\)/.test(app));
+  ok('the turn records what it was about, from the same brief the reply is told', /const askBrief = writeSelRef\.current\s*\?\s*describeWriting\(writeDocRef\.current, writeSelRef\.current\)\s*:\s*workspaceOn\s*\?\s*describeFocus\(focusRef\.current, mapRef\.current, docsRef\.current\)/.test(app) && /about: \{ kind: askBrief\.kind, label: askBrief\.label/.test(app) && /\.\.\.\(askBrief \? \{ focus: askBrief \} : \{\}\)/.test(app));
   ok('the composer is given the selection, and clearing it clears every trace', /about=\{focusBrief \?/.test(app) && /onClearAbout=\{clearAbout\}/.test(app) && /const clearAbout = \(\) => \{\s*setFocus\(null\);\s*setObjSel\(null\);/.test(app));
   ok('the map offers "Ask Socria" on a card, and replies’ maths can be picked', /onAsk=\{workspaceOn && LOGOS4\.pointAsk \? askAboutNode : undefined\}/.test(app) && /LOGOS4\.pointAsk \? \{ onPickTex: askAboutExpression \}/.test(app));
   ok('asking never types or sends anything for them', !/why is it what it is\?/.test(app));

@@ -1807,14 +1807,6 @@ export function ThinkingMap({
                 width={size.w}
                 height={size.h}
                 guarded={guarded}
-                onPick={
-                  canFocus && onFocus
-                    ? (id) => {
-                        const n = map.nodes.find((q) => q.id === id);
-                        if (n) onFocus({ id: n.id, label: n.label, type: n.type });
-                      }
-                    : undefined
-                }
               />
             ) : null;
           })()}
@@ -2228,8 +2220,9 @@ export function ThinkingMap({
                   <span className="lg-act-label">Add context</span>
                   <span className="lg-act-blurb">Ground it in your material</span>
                 </button>
-                {/* Only offered while the draft is open — it holds the node
-                    beside the writing, and copies nothing into it. */}
+                {/* A card of the Draft Space, made from this idea and linked
+                    back to it — the person's own words to start from, in the
+                    place they sort an argument before writing it. */}
                 {canFocus && (
                   <button
                     type="button"
@@ -2240,8 +2233,8 @@ export function ThinkingMap({
                       onFocus?.({ id: node.id, label: node.label, type: node.type });
                     }}
                   >
-                    <span className="lg-act-label">Hold in view</span>
-                    <span className="lg-act-blurb">Keep this beside the draft</span>
+                    <span className="lg-act-label">Add to draft</span>
+                    <span className="lg-act-blurb">A card in your Draft Space, linked here</span>
                   </button>
                 )}
                 {/* The map is theirs to edit. Settle or reopen a card, or take

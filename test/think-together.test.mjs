@@ -15,8 +15,8 @@ const app = read('components/LogosApp.tsx');
 const hook = read('components/share/useSharedSession.ts');
 
 console.log('=== a shared Logos session is written through the share routes ===');
-ok('the active shared session pushes its turns and map, never a whole-row save', /if \(t\?\.active && s\.id === activeIdRef\.current\) \{[\s\S]{0,120}void t\.push\(\);\s*t\.keepOwn\(s\.draft, s\.contexts\);\s*return;/.test(app));
-ok('someone else\'s session is never saved as one\'s own', /if \(foreignIdsRef\.current\.has\(s\.id\)\) return;/.test(app));
+ok('the active shared session pushes its turns and map, never a whole-row save', /if \(t\?\.active && s\.id === activeIdRef\.current\) \{[\s\S]{0,120}void t\.push\(\);\s*t\.keepOwn\(s\.draft, s\.contexts\);\s*return(?: null)?;/.test(app));
+ok('someone else\'s session is never saved as one\'s own', /if \(foreignIdsRef\.current\.has\(s\.id\)\) return(?: null)?;/.test(app));
 ok('it is opened from a share link through the share gate', /sharedLink = q\.get\('shared'\) === '1'/.test(app) && /\/api\/shared\/conversation\/\$\{encodeURIComponent\(wanted\)\}/.test(app) && /foreignIdsRef\.current\.add\(c\.id\)/.test(app));
 ok('what the server holds is put on screen for the session it was read for, without saving it back', /onRemote: \(id, r\) => \{\s*patchSession\(\s*id,[\s\S]{0,300}false\s*\);/.test(app));
 ok('the map — its nodes, models, objects and plots — is what syncs, when the server\'s is taken', /map: r\.map !== undefined \? \(\(r\.map as LogosSession\['map'\]\) \?\? cur\.map\) : cur\.map/.test(app));

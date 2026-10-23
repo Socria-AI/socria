@@ -46,6 +46,7 @@ import { sanitizeContexts } from '@/lib/logos-sources';
 import { can, type Role } from '@/lib/share/roles';
 import { displayNameOf, isShared, noteChange, shareAccess } from '@/lib/share/server';
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
+import { sanitizeStoredDraft } from '@/lib/write/doc';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef } from '@/lib/chat-thread';
 
 export const runtime = 'nodejs';
@@ -175,12 +176,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     if (fresh.length) patch.messages = messages;
     if (wantsMap && !stale) patch.map = sanitizeMap(body.map);
     if (wantsTitle) patch.title = String(body.title).replace(/\s+/g, ' ').trim().slice(0, 200) || row.title;
-    if (body?.draft !== undefined) {
-      const d = body.draft;
-      patch.draft = d && typeof d === 'object' && typeof d.html === 'string'
-        ? { title: typeof d.title === 'string' ? d.title.slice(0, 200) : '', html: d.html.slice(0, 200_000) }
-        : null;
-    }
+    // the owner's Draft Space and Writing Space document, bounded as every save of it is (lib/write/doc.ts)
+    if (body?.draft !== undefined) patch.draft = sanitizeStoredDraft(body.draft);
     if (body?.contexts !== undefined) patch.contexts = sanitizeContexts(body.contexts);
     const { error, count } = await supabaseAdmin()
       .from('conversations')

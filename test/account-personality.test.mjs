@@ -34,7 +34,7 @@ console.log('=== one personality: the dials are gone ===');
   ok('the dial module is gone', !existsSync('lib/logos-personality.ts') && !existsSync('components/PersonalityDial.tsx'));
   const files = [
     'components/LogosApp.tsx', 'components/account/AccountSheet.tsx', 'app/api/logos/chat/route.ts',
-    'app/api/logos/explore/route.ts', 'app/api/logos/draft/route.ts', 'app/logos/LogosDemo.tsx',
+    'app/api/logos/explore/route.ts', 'app/api/logos/write/route.ts', 'app/logos/LogosDemo.tsx',
     'app/logos/LogosStory.tsx', 'app/docs/content/depth-personality.tsx',
   ];
   for (const f of files) ok(`${f} reads no dials`, !/logos-personality|PersonalityDial|personalityBlock|PERSONALITY_DIMENSIONS/.test(read(f)));

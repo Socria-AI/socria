@@ -106,7 +106,7 @@ export interface AboutRef {
   /** the model, display, map or document it belongs to */
   of?: string;
 }
-export const ABOUT_KINDS = ['node', 'part', 'param', 'input', 'object', 'passage', 'expression'] as const;
+export const ABOUT_KINDS = ['node', 'part', 'param', 'input', 'object', 'passage', 'expression', 'writing'] as const;
 export type AboutKind = (typeof ABOUT_KINDS)[number];
 
 export function cleanAboutRef(v: unknown): AboutRef | undefined {
@@ -124,7 +124,7 @@ export function aboutLine(a: AboutRef): string {
   // a passage's words are the document's: they reach the model only inside the
   // DOCUMENTS fence, never as a line of the person's own turn
   if (a.kind === 'passage') return '[About a passage they had selected in one of their documents]';
-  const what = a.kind === 'expression' ? 'an expression they selected' : a.kind === 'node' ? 'an idea they selected on the map' : 'something they selected in the workspace';
+  const what = a.kind === 'expression' ? 'an expression they selected' : a.kind === 'node' ? 'an idea they selected on the map' : a.kind === 'writing' ? 'words they selected in their own draft' : 'something they selected in the workspace';
   return `[About ${what}: “${oneLine(a.label, 120).replace(/[“”]/g, '"')}”${a.of ? ` — in ${oneLine(a.of, 90)}` : ''}]`;
 }
 

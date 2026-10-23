@@ -14,6 +14,8 @@ import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
 import type { AboutRef, ReplyRef } from './chat-thread';
+import type { WriteDoc } from './write/doc';
+import { normalizeDraft } from './write/parse';
 
 export interface LogosMsg {
   /**
@@ -38,10 +40,15 @@ export interface LogosMsg {
   synthesis?: Synthesis;
 }
 
-/** What the person actually wrote. Theirs — Logos never writes into it. */
+/**
+ * What the person actually wrote. Theirs — Logos never writes into it. The
+ * document of the Draft Space and the Writing Space (lib/write/doc.ts), with
+ * its title and an HTML rendering kept beside it for anything older.
+ */
 export interface LogosDraft {
   title: string;
   html: string;
+  doc?: WriteDoc;
 }
 
 export const EMPTY_DRAFT: LogosDraft = { title: '', html: '' };
@@ -123,10 +130,8 @@ export function loadLocal(): LogosSession[] {
         title: typeof s.title === 'string' ? s.title : UNTITLED,
         messages: s.messages,
         map: s.map && Array.isArray(s.map.nodes) ? s.map : { ...EMPTY_MAP },
-        draft:
-          s.draft && typeof s.draft.html === 'string'
-            ? { title: String(s.draft.title ?? ''), html: s.draft.html }
-            : undefined,
+        // an old draft opens as a document, every word kept (lib/write/parse.ts)
+        draft: normalizeDraft(s.draft),
         contexts: sanitizeContexts(s.contexts),
         projectId: typeof s.projectId === 'string' ? s.projectId : null,
         updatedAt: Number(s.updatedAt) || 0,

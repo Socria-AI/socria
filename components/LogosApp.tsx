@@ -49,8 +49,7 @@ import { trace } from '@/lib/workspace/trace';
 import { LogosRail, type RailProject } from '@/components/LogosRail';
 import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
 import { LogosMessage, MsgActions, SocriaAnswering, SocriaPending, type Side } from '@/components/LogosMessage';
-import { DraftSpace, type DraftHandle, type DraftSelection } from '@/components/DraftSpace';
-import { DraftResponsePanel } from '@/components/DraftResponsePanel';
+import { WriteSpace, type SaveState, type WriteSpaceHandle } from '@/components/write/WriteSpace';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { Tour } from '@/components/Tour';
 import { MindAtlas } from '@/components/mind/MindAtlas';
@@ -115,7 +114,11 @@ import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
 import { MAX_ATTACHMENTS, MAX_NOTE_CHARS, type Attachment, type AttachmentOrigin } from '@/lib/logos-attachments';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
-import { relevantNodes, type DraftAction, type DraftResponse } from '@/lib/logos-draft';
+import { relevantNodes } from '@/lib/write/links';
+import { addCard as addDraftCard, emptyDoc, isEmptyDoc, type CardKind, type WriteDoc } from '@/lib/write/doc';
+import { normalizeDraft, storedFrom } from '@/lib/write/parse';
+import { describeWriting, type WriteSel } from '@/lib/write/focus';
+import type { AssistInput, AssistResult } from '@/lib/write/assist';
 import { boundaryNote, DIRECT_UPLOAD_BYTES, limitsFor, type Counter } from '@/lib/entitlements';
 import { failureText } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
@@ -586,18 +589,24 @@ export function LogosApp({
   const [draftOpen, setDraftOpen] = useState(false);
   // Shown once, the first time someone gets through the gate.
   const [guideOpen, setGuideOpen] = useState(false);
-  const [draftFocus, setDraftFocus] = useState<MapNodeRef | null>(null);
   const [relevant, setRelevant] = useState<Set<string>>(new Set());
-  const [dr, setDr] = useState<{
-    open: boolean;
-    action: DraftAction;
-    selection: string;
-    data: DraftResponse | null;
-    loading: boolean;
-    error: string | null;
-  }>({ open: false, action: 'clarify', selection: '', data: null, loading: false, error: null });
-  const drSeq = useRef(0);
-  const draftRef = useRef<DraftHandle>(null);
+  // the Draft Space and the Writing Space, open (components/write/WriteSpace.tsx)
+  const writeRef = useRef<WriteSpaceHandle>(null);
+  /** POINT & ASK on writing: words of the draft, or a card, asked about in the conversation */
+  const [writeSel, setWriteSel] = useState<WriteSel | null>(null);
+  const writeSelRef = useRef<WriteSel | null>(null);
+  writeSelRef.current = writeSel;
+  const [draftSaveState, setDraftSaveState] = useState<SaveState>('saved');
+  /** a phone's width, for the writing's own layout wherever it is shown */
+  const [writeNarrow, setWriteNarrow] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 720px)');
+    const on = () => setWriteNarrow(mq.matches);
+    on();
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
 
   const bottomRef = useRef<HTMLDivElement>(null);
   // The part of an object of thought the person has selected — a row, an
@@ -815,7 +824,11 @@ export function LogosApp({
       return next;
     });
   }, []);
-  const draft = active?.draft ?? { title: '', html: '' };
+  // the document of the Draft Space and the Writing Space; a blank one until something is written
+  const storedWriteDoc = active?.draft?.doc;
+  const writeDoc = useMemo<WriteDoc>(() => storedWriteDoc ?? emptyDoc(0), [storedWriteDoc]);
+  const writeDocRef = useRef(writeDoc);
+  writeDocRef.current = writeDoc;
   const contexts = active?.contexts ?? {};
   const contextsRef = useRef<Record<string, NodeContext[]>>({});
   contextsRef.current = contexts;
@@ -1794,15 +1807,16 @@ export function LogosApp({
   /** the shared-session sync for the active line of thinking (useSharedSession) */
   const togetherRef = useRef<ReturnType<typeof useSharedSession> | null>(null);
 
+  /** Save a session: true when it landed, false when it did not, null where this device does not save it as a row. */
   const persist = useCallback(
-    async (s: LogosSession) => {
+    async (s: LogosSession): Promise<boolean | null> => {
       // A SHARED ROOM IS NOT SAVED TO ANYBODY'S CONVERSATION ROW. The host's
       // client holds the merged session — both people's words — and saving it
       // would put the guest's thinking under the host's account, where the
       // guest could neither export nor delete it. The room's own event log is
       // the shared record, and every row in it carries who wrote it. The same
       // after leaving: the session still in memory is the merged one.
-      if (roomRef.current?.active || sharedIdsRef.current.has(s.id)) return;
+      if (roomRef.current?.active || sharedIdsRef.current.has(s.id)) return null;
       // A SHARED line of thinking is written through the share routes, never
       // as a whole row: turns are appended and the map is sent against the
       // version it was drawn on, so two people working at once both land
@@ -1812,12 +1826,12 @@ export function LogosApp({
         // what the server lacks, read from the session when the write goes
         void t.push();
         t.keepOwn(s.draft, s.contexts);
-        return;
+        return null;
       }
-      if (foreignIdsRef.current.has(s.id)) return;
+      if (foreignIdsRef.current.has(s.id)) return null;
       if (!cloud) {
         saveLocal(sessionsRef.current);
-        return;
+        return true;
       }
       try {
         const res = await fetch('/api/conversations', {
@@ -1827,9 +1841,11 @@ export function LogosApp({
         });
         // the stored map changed: Socria Rewards reads progress from it (components/rewards/useRewards)
         if (res.ok) window.dispatchEvent(new Event(SESSION_SAVED));
+        return res.ok;
       } catch {
         // A failed save must never interrupt thinking. The session stays in
         // memory and the next turn tries again.
+        return false;
       }
     },
     [cloud]
@@ -1973,10 +1989,8 @@ export function LogosApp({
                 // puts every revision back through the engine and drops a model
                 // that no longer computes (lib/model/propose.ts revalidate).
                 map: c.map?.nodes ? sanitizeMap(c.map, { trust: 'stored' }) : { ...EMPTY_MAP },
-                draft:
-                  c.draft && typeof c.draft.html === 'string'
-                    ? { title: String(c.draft.title ?? ''), html: c.draft.html }
-                    : undefined,
+                // an old draft opens as a document, every word kept (lib/write/parse.ts)
+                draft: normalizeDraft(c.draft),
                 contexts: sanitizeContexts(c.contexts),
                 projectId: typeof c.projectId === 'string' ? c.projectId : null,
                 updatedAt: Number(c.updatedAt) || 0,
@@ -2528,26 +2542,42 @@ export function LogosApp({
     return () => clearTimeout(t);
   }, [changed, deltaNote]);
 
-  // ── draft ──────────────────────────────────────────────────────────
-  // Writing is saved on a timer rather than per keystroke: a network round
-  // trip per character would be absurd, and losing a sentence would be worse.
+  // ── the Draft Space and the Writing Space ──────────────────────────
+  // The document is handed here by the WriteSpace a moment after typing stops
+  // (components/write/WriteSpace.tsx) and saved on a timer rather than per
+  // handoff: a round trip per pause would be absurd, and losing a sentence
+  // would be worse. BY SESSION ID, so writing handed over as a line of thinking
+  // is left lands in that one, never in whichever is open now.
   const draftSave = useRef<ReturnType<typeof setTimeout> | null>(null);
-  function patchDraft(next: { title?: string; html?: string }) {
-    patchActive(
-      (s) => ({ ...s, draft: { ...(s.draft ?? { title: '', html: '' }), ...next } }),
-      false
-    );
-    if (draftSave.current) clearTimeout(draftSave.current);
-    draftSave.current = setTimeout(() => {
-      const id = activeIdRef.current;
+  const draftRetry = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const saveDraftNow = useCallback(
+    async (id: string) => {
+      if (draftSave.current) clearTimeout(draftSave.current);
+      draftSave.current = null;
       const s = sessionsRef.current.find((x) => x.id === id);
-      if (s) void persist(s);
-    }, 1200);
+      if (!s) return;
+      const ok = await persist(s);
+      setDraftSaveState(!cloud ? 'local' : ok === false ? 'offline' : 'saved');
+      // a save that did not land is tried again, quietly, until it does
+      if (ok === false) {
+        if (draftRetry.current) clearTimeout(draftRetry.current);
+        draftRetry.current = setTimeout(() => void saveDraftNow(id), 15_000);
+      }
+    },
+    [persist, cloud]
+  );
+  function patchWriteDoc(id: string, doc: WriteDoc) {
+    patchSession(id, (s) => ({ ...s, draft: storedFrom(doc) }), false);
+    setDraftSaveState(cloud ? 'saving' : 'local');
+    if (draftSave.current) clearTimeout(draftSave.current);
+    draftSave.current = setTimeout(() => void saveDraftNow(id), 1200);
   }
 
-  // Save whatever is unsaved before the tab goes away.
+  // Save whatever is unsaved before the tab goes away — the writing still in
+  // the WriteSpace's hands first.
   useEffect(() => {
     const flush = () => {
+      writeRef.current?.flush();
       if (!draftSave.current) return;
       clearTimeout(draftSave.current);
       draftSave.current = null;
@@ -2561,42 +2591,79 @@ export function LogosApp({
     };
   }, [persist]);
 
-  /** The map softly lights whatever the passage being written touches. */
-  function onDraftSelect(sel: DraftSelection | null) {
-    const passage = sel?.text.trim() || sel?.around || '';
-    setRelevant(new Set(passage ? relevantNodes(mapRef.current, passage) : []));
-  }
-
-  async function runDraftAction(action: DraftAction, sel: DraftSelection) {
-    const seq = ++drSeq.current;
-    setDr({ open: true, action, selection: sel.text, data: null, loading: true, error: null });
-    try {
-      const res = await fetch('/api/logos/draft', {
+  /** Socria, asked about the person's own writing (app/api/logos/write). */
+  const runWriteAssist = useCallback(
+    async (input: AssistInput): Promise<AssistResult> => {
+      const res = await fetch('/api/logos/write', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({
-          action,
-          selection: sel.text,
-          around: sel.around,
-          map: mapRef.current,
-          ...guidance(),
-        }),
+        body: JSON.stringify({ ...input, ...guidance() }),
       });
-      if (!res.ok) {
-        const b = await res.json().catch(() => ({}));
-        throw new Error(b.error || 'Could not work with that passage.');
-      }
-      const json = await res.json();
-      if (seq !== drSeq.current) return;
-      const result: DraftResponse | null = json?.result ?? null;
-      setDr((d) => ({ ...d, data: result, loading: false }));
-      // Trace lights the reasoning the passage actually rests on.
-      if (result?.action === 'trace') setRelevant(new Set(result.nodeIds ?? []));
-    } catch (e: any) {
-      if (seq !== drSeq.current) return;
-      setDr((d) => ({ ...d, loading: false, error: e?.message || 'Something went wrong.' }));
-    }
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok || !json?.result) throw new Error(json?.error || 'That could not be done just now.');
+      return json.result as AssistResult;
+    },
+    // guidance() reads refs
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [keyHeaders]
+  );
+
+  /** POINT & ASK on writing: the words become the conversation's "this", and the cursor goes to the box. */
+  function askAboutWriting(sel: WriteSel) {
+    setFocus(null);
+    setObjSel(null);
+    setWriteSel(sel);
+    setMobileView('chat');
+    focusComposer();
   }
+
+  /** A Logic Map idea, made a card of the Draft Space — linked back to the idea it came from. */
+  function addNodeToDraft(node: MapNodeRef) {
+    const t = node.type;
+    const kind: CardKind =
+      t === 'claim' || t === 'belief' ? 'claim' : t === 'evidence' || t === 'source' || t === 'given' ? 'evidence' : t === 'question' || t === 'unknown' ? 'question' : t === 'counterpoint' || t === 'counterexample' || t === 'tension' ? 'counter' : t === 'consequence' || t === 'result' ? 'conclusion' : 'idea';
+    const links = [{ k: 'node' as const, id: node.id, label: node.label }];
+    if (writeRef.current) {
+      writeRef.current.addCard(node.label, { kind, links });
+      return;
+    }
+    const id = activeIdRef.current;
+    if (!id) return;
+    const cur = sessionsRef.current.find((x) => x.id === id)?.draft?.doc ?? emptyDoc();
+    patchWriteDoc(id, { ...addDraftCard(cur, node.label, { kind, links }).doc, face: 'draft' });
+    openWriting();
+  }
+
+  /** The writing, opened: the Document artifact in Logos 5, the writing column beside the map before it. */
+  function openWriting() {
+    if (!limits.draftSpace) {
+      ask('draft-locked');
+      return;
+    }
+    if (l5) showArtifact('w:doc');
+    else setDraftOpen(true);
+  }
+
+  /** A link on a card or a citation, followed: the passage in its document, or the idea on the map. */
+  function openWritingPassage(docId: string, blockId: string) {
+    if (l5) setStudyTab('logic');
+    openCite(docId, blockId);
+  }
+  function openWritingNode(id: string) {
+    if (l5) setStudyTab('logic');
+    setChanged(new Set([id]));
+    if (workspaceOn) setFocus({ kind: 'node', id });
+  }
+
+  /** A document the browser cannot read itself (OpenDocument, RTF), read as attachments are — for opening into the writing. */
+  const readOtherDoc = useCallback(
+    async (file: File): Promise<SourceDoc> => {
+      const read = await readFileAsDoc(file, { headers: keyHeaders, uploadLimit: limits.uploadBytes, directLimit: DIRECT_UPLOAD_BYTES });
+      if (!read.doc) throw new Error(read.note?.why || 'That document could not be read.');
+      return read.doc;
+    },
+    [keyHeaders, limits.uploadBytes]
+  );
 
   // ── grounding a node in real material ──────────────────────────────
   function openAddContext(node: MapNodeRef) {
@@ -3696,7 +3763,12 @@ export function LogosApp({
     // state (lib/workspace/focus.ts), told to the reply, and kept on the
     // message so the thread still says what "this" was after the selection
     // has gone.
-    const askBrief = workspaceOn ? describeFocus(focusRef.current, mapRef.current, docsRef.current) : null;
+    // their own writing, when words of the draft are what they selected (lib/write/focus.ts)
+    const askBrief = writeSelRef.current
+      ? describeWriting(writeDocRef.current, writeSelRef.current)
+      : workspaceOn
+        ? describeFocus(focusRef.current, mapRef.current, docsRef.current)
+        : null;
     const turn: Msg = {
       id: newMsgId(),
       at: Date.now(),
@@ -4134,6 +4206,10 @@ export function LogosApp({
   const [focus, setFocus] = useState<Focus>(null);
   const focusRef = useRef<Focus>(null);
   focusRef.current = focus;
+  // a selection anywhere else in the workspace is the newer "this": the writing's yields to it
+  useEffect(() => {
+    if (focus) setWriteSel(null);
+  }, [focus]);
 
   // ── LOGOS 5: CONVERSATION FIRST, A WORKSPACE BESIDE IT (docs/LOGOS-5.md) ──
   //
@@ -5055,12 +5131,13 @@ export function LogosApp({
   const wsActiveDoc = map.models ? (activeDoc(map.models) ?? wsDocs[wsDocs.length - 1] ?? null) : null;
   const panelDoc = (p: PanelNode) => (p.config?.doc && map.models ? docOf(map.models, p.config.doc) : wsActiveDoc);
   const firstOf = (t: PanelNode['type']) => (wsLayout ? panelsOf(wsLayout).find((x) => x.type === t)?.id ?? null : null);
-  const focusBrief = workspaceOn ? describeFocus(focus, map, docs) : null;
+  const focusBrief = writeSel ? describeWriting(writeDoc, writeSel) : workspaceOn ? describeFocus(focus, map, docs) : null;
   // POINT & ASK, CLEARED: the selection goes everywhere at once — the chip,
   // the highlighted part, the passage a document view holds.
   const clearAbout = () => {
     setFocus(null);
     setObjSel(null);
+    setWriteSel(null);
   };
 
   const sceneOf = (p: PanelNode): ThoughtObject | null => {
@@ -5376,8 +5453,9 @@ export function LogosApp({
                   ? setDraftOpen((v) => !v)
                   : ask('draft-locked')
               }
+              title="The Draft Space and the Writing Space — yours; Socria only when you ask"
             >
-              Draft
+              Write
               {!limits.draftSpace && <OneLock className="lg-draft-lock" />}
             </button>
             {/* Leaving is a model switch, not just a link: /chat opens on
@@ -6105,8 +6183,8 @@ export function LogosApp({
             explored={exploredIds}
             changed={changed}
             relevant={relevant}
-            canFocus={draftOpen}
-            onFocus={(node) => setDraftFocus(node)}
+            canFocus={limits.draftSpace}
+            onFocus={(node) => addNodeToDraft(node)}
             grounded={groundedCounts}
             onAddContext={openAddContext}
             onEdit={(edit) => editMap([edit])}
@@ -6291,7 +6369,7 @@ export function LogosApp({
     { label: 'Universal Map', hint: 'Every conversation, as one map', onSelect: goHome },
     { label: listOpen ? 'Put the list away' : 'Manage conversations', hint: 'Rename, delete, file in a Project', onSelect: () => toggleManage() },
     { label: synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize', hint: canSynthesize(map) ? 'Where your thinking stands' : 'Needs two things on the map', disabled: !canSynthesize(map) || !!synthBusy || busy, onSelect: () => void synthesize('workspace') },
-    { label: draftOpen ? 'Close the draft' : 'Draft', hint: limits.draftSpace ? 'A page only you write on' : 'Part of Socria One', onSelect: () => (limits.draftSpace ? setDraftOpen((v) => !v) : ask('draft-locked')) },
+    { label: 'Write', hint: limits.draftSpace ? 'The Draft Space and the Writing Space — yours' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     { label: 'What Logos does', sep: true, onSelect: () => setGuideOpen(true) },
@@ -6541,6 +6619,19 @@ export function LogosApp({
     />
   );
   const artifactItems: ArtifactItem[] = [
+    // THE DOCUMENT: the person's own writing — always here, blank until they write
+    ...(limits.draftSpace && activeId
+      ? [
+          {
+            key: 'w:doc',
+            kind: 'Document',
+            title: writeDoc.title.trim() || 'Untitled',
+            eyebrow: 'Artifact · Document · yours — Socria writes nothing here',
+            bare: true,
+            render: () => writeSpaceEl('artifact'),
+          },
+        ]
+      : []),
     ...displaysHere.map((o) => {
       const noun = displayMeta(o.kind)?.noun ?? o.kind;
       return {
@@ -6586,7 +6677,8 @@ export function LogosApp({
   );
   const switchItems: L5SwitchItem[] = [
     { id: 'components', label: 'Components', count: study?.state.topics.length ?? 0 },
-    { id: 'artifacts', label: 'Artifacts', count: artifactItems.length },
+    // a blank document is not something made yet
+    { id: 'artifacts', label: 'Artifacts', count: artifactItems.length - (artifactItems[0]?.key === 'w:doc' && isEmptyDoc(writeDoc) ? 1 : 0) },
     { id: 'logic', label: 'Logic Map', count: map.nodes.length, fresh: stageFresh },
   ];
   const switchEl = (wide = false) => <L5Switch items={switchItems} value={studyTab} onChange={(id) => setStudyTab(id as StudyTab)} label="What this shows" wide={wide} />;
@@ -7114,43 +7206,35 @@ export function LogosApp({
       </div>
     </>
   );
+  /** The Draft Space and the Writing Space, for this line of thinking — as an artifact, or as the column beside the map. */
+  const writeSpaceEl = (where: 'artifact' | 'column') =>
+    activeId ? (
+      <WriteSpace
+        key={activeId}
+        ref={writeRef}
+        sessionId={activeId}
+        doc={writeDoc}
+        onChange={(d) => patchWriteDoc(activeId, d)}
+        saveState={draftSaveState}
+        docs={docs}
+        map={map}
+        assist={runWriteAssist}
+        onAsk={askAboutWriting}
+        asking={writeSel}
+        onOpenPassage={openWritingPassage}
+        onOpenNode={openWritingNode}
+        onParagraph={(text) => setRelevant(new Set(text.trim() ? relevantNodes(mapRef.current, text) : []))}
+        readOther={readOtherDoc}
+        narrow={writeNarrow}
+        where={where}
+        onClose={where === 'column' ? () => setDraftOpen(false) : undefined}
+        autoFocus
+      />
+    ) : null;
   const draftEl = (
     <>
-      {/* ── Draft ──────────────────────────────────────── */}
-      {draftOpen && (
-        <div className="lg-draft-col">
-          <DraftSpace
-            ref={draftRef}
-            html={draft.html}
-            onChange={(html) => patchDraft({ html })}
-            title={draft.title}
-            onTitle={(title) => patchDraft({ title })}
-            focus={
-              draftFocus
-                ? { ...draftFocus, lineage: describeLineage(map, draftFocus.id) }
-                : null
-            }
-            onClearFocus={() => setDraftFocus(null)}
-            onSelect={onDraftSelect}
-            onAction={runDraftAction}
-            busy={dr.loading}
-            onClose={() => setDraftOpen(false)}
-          />
-          <DraftResponsePanel
-            open={dr.open}
-            loading={dr.loading}
-            error={dr.error}
-            action={dr.action}
-            selection={dr.selection}
-            data={dr.data}
-            onApply={(text) => {
-              draftRef.current?.applyProposal(text);
-              setDr((d) => ({ ...d, open: false }));
-            }}
-            onClose={() => setDr((d) => ({ ...d, open: false }))}
-          />
-        </div>
-      )}
+      {/* ── the writing, beside the map (before Logos 5; in Logos 5 it is the Document artifact) ── */}
+      {draftOpen && !l5 && <div className="lg-draft-col">{writeSpaceEl('column')}</div>}
     </>
   );
   const chromeEls = (

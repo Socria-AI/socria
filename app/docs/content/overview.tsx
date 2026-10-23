@@ -34,9 +34,9 @@ export function Overview() {
         tone of voice — it is enforced in the product. In Core 3.1 and
         Logos, questions are earned, never reflexive; conclusions stay yours
         everywhere. The map draws <em>your</em> claims, not its verdicts. And
-        even Draft Space — the one surface built for prose — starts blank and
-        stays yours: Socria offers rewordings of passages you wrote, and they
-        land on the page only if you apply them.
+        even the Writing Space — the one surface built for prose — starts
+        blank and stays yours: Socria proposes edits to words you wrote only
+        when you ask, and each one lands on the page only if you accept it.
       </p>
 
       <H2 id="shape">The shape of the product</H2>
@@ -71,7 +71,7 @@ export function Overview() {
           can move, read, edit and undo: a surface, a mechanism, a set of
           equations, a fitted relationship, or a simulation of a black hole.
           With <Link href="/docs/mathematics">mathematics support</Link>, a{' '}
-          <Link href="/docs/drafts-grounding">Draft Space</Link>, and research
+          <Link href="/docs/drafts-grounding">Draft Space and Writing Space</Link>, and research
           grounded in real sources.
         </li>
         <li>
@@ -112,8 +112,8 @@ export function Overview() {
         <li>
           <strong>Authorship.</strong> Your conclusions are yours. Socria asks,
           reflects, challenges and connects; it does not decide for you, and
-          it does not write for you — even in Draft Space, where its Refine
-          suggestions are proposals that land only if you apply them yourself.
+          it does not write for you — even in the Writing Space, where its
+          edits are proposals you accept or reject one at a time.
         </li>
         <li>
           <strong>The Answer Guard.</strong> While you are learning

@@ -351,7 +351,7 @@ console.log('\n=== wired end to end: the account, the routes, the clients ===');
   const lchat = read('app/api/logos/chat/route.ts');
   const order = ['guidanceBlock(depthForPlan', "conversationStyleBlock(body?.conversationStyle, 'logos')", 'styleBlock(body?.style)'].map((x) => lchat.indexOf(x));
   ok('Logos chat: guidance, style, instructions — in that order', order.every((i, k) => i > 0 && (k === 0 || i > order[k - 1])), order.join());
-  for (const r of ['chat', 'explore', 'draft']) {
+  for (const r of ['chat', 'explore', 'write']) {
     const src = read(`app/api/logos/${r}/route.ts`);
     ok(`Logos ${r}: no personality dials are read — the style is the one personality`, !/personalityBlock|body\?\.persona|logos-personality/.test(src));
     if (r === 'chat') continue;

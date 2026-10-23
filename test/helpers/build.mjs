@@ -314,6 +314,8 @@ const MODULES = [
   'test/helpers/events-under-test.ts',
   // Logos 5: the turn, the chrome, rich reading and the stage preferences
   'test/helpers/logos5-under-test.tsx',
+  // the Draft Space and the Writing Space: the document, Word, the checks, the board (lib/write/*)
+  'test/helpers/write-under-test.ts',
 ];
 
 export async function buildAll() {

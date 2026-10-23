@@ -541,7 +541,80 @@ three-region Mind Graph drawing; the design is in `mockups/logos-5-memory/`.
 - Signed out it says memory lives with an account; if the store cannot be
   reached it says so and offers to try again.
 
-## 8. Data
+## 8. Writing: the Draft Space and the Writing Space
+
+The person's own writing — one document with two faces, saved with the line of
+thinking (`draft.doc`, `lib/write/doc.ts`), shown as the first of its
+**Artifacts** (`components/write/WriteSpace.tsx`). It replaced the old Draft
+Space (`components/DraftSpace.tsx`, `DraftResponsePanel.tsx`, `lib/logos-draft.ts`
+and `/api/logos/draft`), which are gone rather than kept beside it. Before
+Logos 5 the same component is the column the header's **Write** opens.
+
+- **One model.** Blocks of plain text with bold, italic and underline marks
+  (paragraph, three headings, quotation, bulleted and numbered lists three
+  deep, a line break inside a block), each able to cite passages of the
+  person's documents and to remember the Draft Space cards it grew from; cards
+  (idea, claim, evidence, example, counterargument, conclusion, question) in
+  piles, linked to passages, Logic Map ideas or other cards; dismissed
+  findings; versions. Every operation returns a new document; none can change
+  a word the person did not ask to change. The old `{ title, html }` draft is
+  read into a document the first time it opens (`normalizeDraft`), every word
+  kept; `title` and an HTML rendering are saved beside the document for
+  anything older that still reads them. The server bounds it
+  (`sanitizeStoredDraft`, also in the shared-room route) and never rewords it.
+- **The Draft Space** (`components/write/Board.tsx`): brain-dump (Enter; a
+  pasted list is a card a line), kinds guessed from wording and changed in one
+  tap, piles, drag and keyboard moves (Alt+Shift+arrows), multi-select, merge,
+  links. `boardHints` (`lib/write/board.ts`) says on the card what the board's
+  shape shows; **Look for gaps** asks the model (the `board` op) and shows its
+  findings beside the cards. **Turn into an outline** (`outlineFrom`) appends
+  named piles as headings and cards as an outline — evidence linked to a
+  passage arrives as a citation — and never touches what is written; a card
+  already written is not added twice.
+- **The Writing Space** (`components/write/Editor.tsx`, `dom.ts`): one
+  contentEditable page drawn from the model. The browser types characters
+  inside a block (so input methods, spelling corrections and dictation work);
+  everything that changes the document's shape — Enter, Backspace at a block's
+  start, a selection across blocks, paste, marks, list depth, moving a
+  paragraph — is a model operation on the native `beforeinput` event, so undo
+  and redo are the document's own and exact. Markdown's habits at a line's
+  start. Paste from Word, Google Docs and the web keeps headings, lists and
+  emphasis (`lib/write/parse.ts`); copying carries the blocks.
+- **Asked for, never automatic** (`app/api/logos/write`, `lib/write/assist.ts`):
+  Ask (Point & Ask: a `writing` focus — the words verbatim, where they sit,
+  what they cite and grew from), Explain, Critique, Shorten, Improve, Develop
+  (questions and a bracketed shape, never the sentence), Other wordings (only
+  when asked), Proofread, and the board's gaps. Code checks every answer: an
+  edit must be words of the passage; an edit that brings in a number, a
+  citation, a quotation or an address is dropped; "shorter" must be shorter; a
+  finding must be found in its block, a card id must be a card. Edits are
+  shown one at a time and change the page only when accepted.
+- **Proofreading without a model** (`lib/write/checks.ts`): rules for the
+  decidable — misspellings that are never words, doubled words, "could of",
+  then/than, its/it's, a/an by sound, a lone "i", spacing, doubled
+  punctuation, sentence capitals, very long sentences and paragraphs, the same
+  opening three times, a word repeated close by, the same sentence twice,
+  research or figures with nothing cited, quotations with no source. Each
+  says *definite*, *likely* (and when it would be right after all) or *a
+  judgement call*; only definite and likely are underlined (CSS highlights, so
+  never in the DOM), and only when the caret is put on them does the card
+  open. Dismissals hold across edits. Quotations are only checked for a
+  citation. Unchanged paragraphs are not checked again (the cache is keyed by
+  the block object).
+- **Word** (`lib/write/docx.ts`, `word.ts`, `zip.ts`, `import.ts`): a real
+  .docx with Word's built-in styles and numbering, citations as superscript
+  numbers and a Sources list; Word files read in the browser (zip inflated with
+  `DecompressionStream`, within ceilings) with their styles, numbering and
+  emphasis resolved; Markdown, text, HTML; OpenDocument and RTF through the
+  document reader. Print gives PDF.
+- **Kept safe**: handed to the session 400 ms after typing stops (at once for
+  anything else), saved 1.2 s later, with the state said (Saved / Saving /
+  Saved on this device / Not saved yet — trying again, retried every 15 s); a
+  copy in this browser offered back if a save never landed; versions every ten
+  minutes or so of writing, on request, and before an import, a restore or a
+  recovery replaces anything.
+
+## 9. Data
 
 Unchanged: the session and message shapes (`lib/logos-sessions.ts`), the
 `/api/conversations` contract, ids (`lg_…`, `m_…`), every localStorage key
@@ -585,7 +658,7 @@ opened in Logos and saved there used to have its Core memory replaced by an
 empty one; a client that sends a memory still replaces it, and a new row
 starts empty. The older database's sidecar keeps it the same way.
 
-## 9. Phones
+## 10. Phones
 
 The view is the screen: the header, then **Components · Artifacts · Logic
 Map** across the full width, then the view. The conversation is a sheet at the
@@ -599,7 +672,7 @@ another two hubs across, today's learning before what it builds on (its lines
 faint until a star is pressed) and everything else; a star's card is a sheet
 from the foot.
 
-## 10. Switch
+## 11. Switch
 
 `NEXT_PUBLIC_LOGOS5=off` brings back the Logos 4 layout without a deploy of
 code. Logos 2 is unchanged.
@@ -618,7 +691,7 @@ either surface, and the moment the record says the new Socria opened. A gate
 decides a screen, not access to the engine: every route behind it is the Logos
 everyone has.
 
-## 11. What is where
+## 12. What is where
 
 | Piece | File |
 |---|---|
@@ -660,15 +733,21 @@ everyone has.
 | A map written alone, and the mark taken away (`firstMap`, `opened`); a save that leaves the memory | `app/api/conversations/route.ts` (`mapOnly`, PUT) |
 | The move, the drawing, the chip, opening a Core chat here | `components/LogosApp.tsx` (search `THE CORE CHATS, BROUGHT IN`), `components/logos5/Universe.tsx` (`drawing`), `app/chat/page.tsx` (`onConversationsMoved`) |
 | The challenge leaving an unopened map alone | `lib/rewards/challenge-rule.ts` |
+| Writing: the document — blocks, marks, citations, cards, piles, versions, bounds (pure) | `lib/write/doc.ts` |
+| Writing: in and out — pastes, Markdown, the old drafts; HTML, Markdown, text; Word out; Word in (in the browser) | `lib/write/parse.ts`, `render.ts`, `docx.ts`, `word.ts`, `zip.ts`, `import.ts` |
+| Writing: the rules that proofread on the device; the board's hints and outline; Point & Ask's brief; the map lit while writing | `lib/write/checks.ts`, `board.ts`, `focus.ts`, `links.ts` |
+| Writing: what Socria may be asked, and how its answers are checked; the route | `lib/write/assist.ts`, `app/api/logos/write/route.ts` |
+| Writing: the space, the page, the board, the panels, the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Board.tsx`, `parts.tsx`, `write.css` |
+| Writing: where it is wired in (the Document artifact, the column, saving, Point & Ask, Add to draft) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`) |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Month|All`; any of them on a theme with `THEME=night`) |
 
 Core chat (`app/chat/page.tsx`) keeps its screen; its list lets go of the
 chats brought into Logos 5, and its rail and a Project's home open them there
 (`logosToOpen`). Logos 2 keeps its two columns. Everything Logos 3–4 could do is still reached from Logos 5: the
 workspace panels, "+ View", every lens, displays, documents, models, Live 3D,
-Synthesize, Draft, Capture, Voice, sharing and comments.
+Synthesize, the writing (Draft and Write), Capture, Voice, sharing and comments.
 
-## 12. Results
+## 13. Results
 
 Measured on dev before shipping, not intended. Browser runs used the local
 stand-ins (fake model, fake database), at 1440×900 and 390×844:
@@ -964,7 +1043,7 @@ The two histories made one (§5, "Core 4 and Logos 5: one history").
   production build pass.
 
 Found and fixed on the way: Logos saved without a memory, which reset a Core
-chat's memory every time it was opened and saved in Logos (above, §8).
+chat's memory every time it was opened and saved in Logos (above, §9).
 
 **Not verified here:** against a real database and a real account — the move,
 the first-run record and the background drawing were driven against stand-ins;
@@ -1394,3 +1473,92 @@ how the atlas reads with several hundred memories (each region draws 24 from a
 distance and 36 opened, the rest in its list, by design); "Important" is read
 from importance, and there is no way yet for a person to pin something
 themselves.
+
+### Writing: the Draft Space and the Writing Space
+
+Asked for: a human-first writing system native to Logos 5 — a Draft Space to
+brain-dump, arrange, merge and group ideas (claims, evidence, examples,
+counterarguments, conclusions), linked to uploaded documents and the Logic
+Map, turned into editable outlines; a distraction-free Writing Space with
+headings, lists, quotations, citations, paragraphs moved by hand, help on
+selected words (explain, critique, shorten, improve) with every edit reviewed
+on its own, proofreading that separates the definite from the subjective,
+autosave, undo, versions and export; Point & Ask on sentences, paragraphs and
+cards; one document model; phones; nothing done for the person unasked — and
+Word in and out, and the old draft replaced. Built as §8 describes.
+
+- **One document, kept with the line of thinking.** The `draft` column holds
+  `{ title, html, doc }`; old `{ title, html }` drafts open as documents with
+  every word and its emphasis (read through the real conversations route, and
+  in the browser in both the Logos 5 artifact and the column before it). The
+  shared-room route saves it the same way.
+- **Checked in a real browser** (the dev app, signed out so the sessions are
+  local; the fake model answering the writing route): a blank document typed
+  into at once from Artifacts; Markdown's `#`, `-` and Enter-Enter out of a
+  list; a brain-dump with a pasted list, a pile, three cards moved by
+  Alt+Shift+→ and one dragged, a Logic Map idea linked, a kind changed, two
+  cards merged, **Look for gaps**; **Turn into an outline** — four cards added
+  as a heading and a two-level outline, the six paragraphs above untouched;
+  Improve on a sentence — the edit shown alone, accepted, the rest rejected,
+  then undone and redone with the keyboard; the Check list — a misspelling
+  fixed, a finding dismissed, Socria's proofread adding a "Does this follow?"
+  finding on the exact words; Point & Ask on a sentence (the composer's chip
+  names it and the draft); a Word export; a reload with everything there. Then
+  Celestial; a phone (two faces, the selection's tools under the words, panels
+  as sheets, piles stacked, no sideways scroll); the column before Logos 5 with
+  an old draft; a pandoc .docx opened into an empty page (title, headings,
+  nested and numbered lists, quotation, line break, bold and italic, a table as
+  lines — said), a version kept and restored (what it replaced kept too), a
+  LibreOffice .docx added after the writing when asked, a paragraph moved with
+  Alt+Shift+↑ and undone, bold with Ctrl+B, the bar reached with Tab and its
+  menu closed with Escape. No page errors in any of them.
+- **No model calls while writing**: typing six paragraphs, a brain-dump and
+  an outline made no request to any model route; the 23 findings shown came
+  from the rules on the device. Socria is asked only from a button.
+- **Word**: the .docx made in the browser was opened by LibreOffice, pandoc,
+  the app's own reader and the server's document reader, each finding the
+  title, headings, nested lists and words; the test suite does the same with
+  LibreOffice where it is installed, and reads Word files written by pandoc and
+  LibreOffice (kept as fixtures).
+- **Accessibility**: axe-core (WCAG 2 A and AA, best practice) over both faces
+  with the Check panel open, in Paper and Celestial: four kinds of violation
+  found — secondary text just under 4.5:1 in Paper, `aria-selected` on a card,
+  a skipped heading level, a nested `aside` — all fixed; none remain.
+- **Speed**: the rules check a 1,500-paragraph document in about 80 ms, and
+  about 12 ms after one paragraph changes (only that one is read again).
+- Found and fixed on the way: React's `onBeforeInput` is an older polyfill
+  with no `inputType`, so Enter and Backspace reached the browser instead of the
+  model — the page now listens to the native event; the caret was measured
+  against a paragraph's previous length, so `# ` never became a heading; a
+  finding's card opened while the person was still typing (it now opens only
+  where the caret is put); undo right after typing could leave the page showing
+  words the document no longer held (the editor now tracks what each element
+  shows); the toast and the side panel sat under the floating composer; on a
+  phone the selection's tools ran off the screen and the board's foot covered
+  the cards; a matrix-lens pick would have added draft cards.
+- `test/write.test.mjs` (the model, Enter and Backspace, ranges and pastes,
+  cards and piles, versions, storage bounds, HTML/Markdown/text, pastes from
+  Word, Google Docs and the web, Markdown, the old drafts, Word out and in, the
+  zip's ceilings, every rule and its false friends, dismissals, the board's
+  hints and outline, Point & Ask's brief), `test/write-route.test.mjs` (the
+  route: who may ask, what the model is told, edits and findings checked
+  against the writing, fallback, unusable answers) and
+  `test/write-store-e2e.test.mjs` (saved and read back exactly; bounded, not
+  reworded; old drafts).
+
+**What this does not show.** Whether it makes revising easier or the writing
+better has not been measured with anyone: there has been no user study, and
+nothing here should be read as evidence that it does. What can be counted is
+what each step costs in the journey above — an outline of the board is one
+press, each proposed edit is one press to accept or reject and one key to
+undo, a definite slip is one press to fix — not whether those are the right
+steps. Also not verified: the real model's explanations, critiques, edits and
+proofreading (the route's rules and checks are tested; the answers were
+canned); Microsoft Word itself opening the .docx (LibreOffice and pandoc did);
+iOS Safari and Android keyboards, input-method composition and dictation on
+real devices (only Chromium, with a touch profile); a signed-in save through
+the database (the route was exercised with its own handlers over a fake
+store); documents of hundreds of pages in a browser. The newsletter issue
+`2026-11-draft-space` (`lib/newsletter-issues.ts`) describes the Draft Space
+that is on production — Clarify, Challenge, Trace, Refine, Hold in view — and
+should be rewritten when this reaches main.

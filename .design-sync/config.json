@@ -10,8 +10,6 @@
     "ChoiceChips": "components/ChoiceChips.tsx",
     "CoverArt": "components/CoverArt.tsx",
     "DepthPicker": "components/DepthPicker.tsx",
-    "DraftResponsePanel": "components/DraftResponsePanel.tsx",
-    "DraftSpace": "components/DraftSpace.tsx",
     "EnvBadge": "components/EnvBadge.tsx",
     "ExplorePanel": "components/ExplorePanel.tsx",
     "ImportProfileModal": "components/ImportProfileModal.tsx",
@@ -65,7 +63,8 @@
     "DataPrivacyPanel": null,
     "OneMark": null,
     "AuthShell": null,
-    "Logo": null
+    "Logo": null,
+    "WriteSpace": "components/write/WriteSpace.tsx"
   },
   "readmeHeader": ".design-sync/conventions.md",
   "runtimeFontPrefixes": [

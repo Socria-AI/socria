@@ -45,6 +45,19 @@ export default class OpenAI {
             (g.__checkCalls ??= []).push(p);
             return { choices: [{ message: { content: JSON.stringify(g.__check ?? { verdict: 'unsure', confidence: 0.3 }) } }] };
           }
+          // The writing assist route (lib/write/assist.ts WRITE_SYSTEM_HEAD): a
+          // scripted answer per call (__writes) or one for every call (__write).
+          if (sys.startsWith('You help someone with their own writing.')) {
+            (g.__writeCalls ??= []).push(p);
+            // `once`: only the first call fails, so a fallback model can answer
+            if (g.__writeThrow) {
+              const { once, ...t } = g.__writeThrow;
+              if (once) g.__writeThrow = undefined;
+              throw Object.assign(new Error(t.message ?? 'upstream'), t);
+            }
+            const scripted = Array.isArray(g.__writes) && g.__writes.length ? g.__writes.shift() : g.__write;
+            return { choices: [{ message: { content: typeof scripted === 'string' ? scripted : JSON.stringify(scripted ?? {}) } }] };
+          }
           if (p.stream) {
             (g.__prompts ??= []).push(sys);
             // __streamError makes the provider fail the way it really does:

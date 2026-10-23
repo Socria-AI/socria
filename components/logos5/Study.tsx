@@ -829,6 +829,10 @@ export interface ArtifactItem {
   /** what it is: Chart, Plan, Document, Practice… */
   kind: string;
   title: string;
+  /** what the line above it says, when it is not something made from the conversation */
+  eyebrow?: string;
+  /** drawn edge to edge, with its own chrome — the Document */
+  bare?: boolean;
   render: () => ReactNode;
 }
 
@@ -857,10 +861,8 @@ export function ArtifactsView({ items, selected, onSelect, narrow }: { items: Ar
           ))}
         </div>
       )}
-      <section className="l5s-art" aria-label={cur.title}>
-        <p className="l5s-art-eyebrow">
-          Artifact · {cur.kind} · made from the conversation
-        </p>
+      <section className={`l5s-art${cur.bare ? ' is-bare' : ''}`} aria-label={cur.title}>
+        <p className="l5s-art-eyebrow">{cur.eyebrow ?? `Artifact · ${cur.kind} · made from the conversation`}</p>
         <div className="l5s-art-body">{cur.render()}</div>
       </section>
     </div>

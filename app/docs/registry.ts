@@ -127,8 +127,8 @@ export const DOC_PAGES: DocPage[] = [
   },
   {
     slug: 'drafts-grounding',
-    title: 'Draft Space & grounding',
-    blurb: 'The one surface built for prose — yours to write — and how nodes get grounded in real material.',
+    title: 'Draft Space, Writing Space & grounding',
+    blurb: 'Where an argument is put together and written — yours to write, Socria only when asked — and how nodes get grounded in real material.',
     group: 'The reasoning environment',
   },
   {

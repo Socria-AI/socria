@@ -15,7 +15,8 @@
 //
 // What it answers:
 //   POST /v1/chat/completions      streamed text, or JSON when json_object is asked
-//                                  (a map, a study's topics, journal-entry practice)
+//                                  (a map, a study's topics, journal-entry practice,
+//                                  a reading or proposed edits for the writing space)
 //   POST /v1/audio/transcriptions  {"text": …} — the voice composer's path
 //   GET  /v1/models                a short list
 
@@ -125,6 +126,60 @@ function entriesReply(user) {
   return { title: 'Record the adjustments for March 31', events: events.slice(0, 4), balance };
 }
 
+/** The writing assist route (lib/write/assist.ts): canned, but always about the words it was given. */
+function writeReply(system) {
+  const op = /^You help someone with their own writing\. Task: (\w+)\./.exec(system)?.[1] ?? '';
+  const sel = /The passage they selected:\n"""\n([\s\S]*?)\n"""/.exec(system)?.[1] ?? '';
+  const words = sel.split(/\s+/).filter(Boolean);
+  const gist = words.slice(0, 9).join(' ');
+  const swaps = [
+    [/\bvery very\b/i, 'very', 'One “very” is enough.', 'grammar'],
+    [/\balot\b/, 'a lot', '“A lot” is two words.', 'grammar'],
+    [/\bcould of\b/i, 'could have', '“could have”, not “could of”.', 'grammar'],
+    [/\bin order to\b/i, 'to', '“To” says the same.', 'concision'],
+    [/\bdue to the fact that\b/i, 'because', '“Because” says the same.', 'concision'],
+    [/\bat this point in time\b/i, 'now', '“Now” says the same.', 'concision'],
+    [/\breally /i, '', '“Really” adds little here.', 'concision'],
+    [/\bvery /i, '', '“Very” adds little here.', 'concision'],
+  ];
+  const edits = [];
+  for (const [re, to, why, kind] of swaps) {
+    const m = re.exec(sel);
+    if (m && !edits.some((e) => sel.indexOf(e.from) < m.index + m[0].length && m.index < sel.indexOf(e.from) + e.from.length)) edits.push({ from: m[0], to, why, kind });
+  }
+  if (op === 'explain') return { body: `A reader takes this as saying: ${gist}${words.length > 9 ? '…' : ''} — and as something you believe, not something you are reporting.`, points: words.length > 6 ? ['“It” could point back to more than one thing here.'] : [] };
+  if (op === 'critique') return { body: 'This asks a reader to accept a general claim on the strength of what you have said so far.', points: ['The claim is stated, not shown — a sceptical reader asks for the case behind it.', 'It assumes the reader already agrees about why this matters.'], question: 'What is the one piece of evidence that would convince someone who disagrees?' };
+  if (op === 'shorten') return { edits: edits.filter((e) => e.to.length < e.from.length), body: edits.length ? 'The length is in a few words that repeat what the sentence already says.' : 'This is already tight.' };
+  if (op === 'improve') return { edits, body: edits.length ? 'A couple of small slips were making it harder to read.' : 'This is already clear.' };
+  if (op === 'develop') {
+    const key = words.find((w) => w.length > 5)?.replace(/[^\p{L}]/gu, '') || words[0] || 'this';
+    const prev = /The paragraph before:/.test(system);
+    return { questions: [`What exactly do you mean by “${key}”?`, 'Why is that so — what makes it true?', 'What is one example a reader would recognise?'], shape: '[your claim] because [your reason]. For instance, [your example].', transitions: prev ? [{ text: 'As a result,', why: 'it follows from the paragraph before' }] : [], missing: 'Who or what this is about, specifically.' };
+  }
+  if (op === 'phrase') return { options: [{ text: sel.includes(' and ') ? sel.replace(' and ', ', and ') : `Put simply, ${sel[0]?.toLowerCase() ?? ''}${sel.slice(1)}`, why: 'a pause where the thought turns' }] };
+  if (op === 'proofread') {
+    const issues = [];
+    for (const m of system.matchAll(/^\[([A-Za-z0-9_-]+)\](?: \(\w+\))? (.*)$/gm)) {
+      const [, block, text] = m;
+      const g = /\b(they|we|you) was\b/i.exec(text);
+      if (g) issues.push({ block, quote: g[0], kind: 'grammar', certainty: 'definite', why: `“${g[1]}” takes “were”.`, fix: `${g[1]} were` });
+      const l = /\b(therefore|so) (every|all|always)\b[^.]*/i.exec(text);
+      if (l) issues.push({ block, quote: l[0], kind: 'logic', certainty: 'likely', why: 'This goes from one case to every case — a reader will ask what makes it general. It may be right; it is not yet shown.' });
+    }
+    return { issues };
+  }
+  if (op === 'board') {
+    const cards = Array.from(system.matchAll(/^\[([A-Za-z0-9_-]+)\] \((\w+), pile: ([^)]*)\) (.*)$/gm)).map((m) => ({ id: m[1], kind: m[2], pile: m[3], text: m[4] }));
+    const claim = cards.find((c) => c.kind === 'claim');
+    const ev = cards.find((c) => c.kind === 'evidence');
+    const findings = [];
+    if (claim && ev && claim.pile !== ev.pile) findings.push({ kind: 'connection', cards: [claim.id, ev.id], says: 'The evidence that backs this claim sits in a different pile from it — a reader meets the claim with nothing under it.', question: 'Should they be in the same paragraph?' });
+    else if (claim && !ev) findings.push({ kind: 'unsupported', cards: [claim.id], says: 'This claim is the centre of the board and nothing on the board supports it yet.', question: 'What would someone who disagrees need to see?' });
+    return { findings };
+  }
+  return {};
+}
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
@@ -177,7 +232,8 @@ const server = http.createServer((req, res) => {
         const isMap = /"nodes": \[\{"id": "short_snake_case_id"/.test(system);
         const isSort = /sort a student’s files into study topics/.test(system);
         const isEntries = /journal-entry practice/.test(system);
-        const content = JSON.stringify(isMap ? mapReply(messages.slice(1)) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
+        const isWrite = system.startsWith('You help someone with their own writing.');
+        const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(messages.slice(1)) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
       const text = chatReply(messages.slice(1));

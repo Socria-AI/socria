@@ -38,7 +38,8 @@ export type Focus =
 
 /** What the conversation is told about the focus. Small, plain, bounded. */
 export interface FocusBrief {
-  kind: 'param' | 'input' | 'object' | 'node' | 'part' | 'passage' | 'expression';
+  /** 'writing': words of their own draft (lib/write/focus.ts) */
+  kind: 'param' | 'input' | 'object' | 'node' | 'part' | 'passage' | 'expression' | 'writing';
   /** what it is called, as the person sees it */
   label: string;
   /** the model or map it belongs to */
@@ -184,7 +185,7 @@ export function sanitizeFocus(raw: unknown): FocusBrief | null {
   if (!raw || typeof raw !== 'object') return null;
   const r = raw as Record<string, unknown>;
   const kind = r.kind;
-  if (kind !== 'param' && kind !== 'input' && kind !== 'object' && kind !== 'node' && kind !== 'part' && kind !== 'passage' && kind !== 'expression') return null;
+  if (kind !== 'param' && kind !== 'input' && kind !== 'object' && kind !== 'node' && kind !== 'part' && kind !== 'passage' && kind !== 'expression' && kind !== 'writing') return null;
   const str = (v: unknown, n: number) => (typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '');
   const label = str(r.label, 80);
   if (!label) return null;
@@ -208,6 +209,15 @@ export function focusBlock(b: FocusBrief | null): string {
     return `
 
 WHAT THEY HAVE SELECTED IN THE WORKSPACE: a passage of one of their documents. It is marked as selected in the DOCUMENTS section of their message, by its key. When they say "this", "it" or "here", they mean that passage, unless what they wrote says otherwise. Answer from its words as read, cite it by its key, and where the reading of it is marked doubtful, say so rather than guess.`;
+  }
+  // THEIR OWN WORDS, from their draft: the person's writing, as trusted as their
+  // message, so the words are shown — with the rule that they stay theirs.
+  if (b.kind === 'writing') {
+    return `
+
+WHAT THEY HAVE SELECTED IN THEIR WRITING: words of their own draft${b.of ? `, ${b.of}` : ''}. When they say "this", "it" or "here", they mean these words, unless what they wrote says otherwise. What the draft holds about them:
+${b.lines.map((l) => `- ${l}`).join('\n')}
+It is their writing. Talk about it with them — what it says, where it is unclear, what it rests on — and do not rewrite it unless they ask you to. If they ask for wording, offer it as a suggestion they can take or leave, never as the replacement.`;
   }
   const what =
     b.kind === 'expression'

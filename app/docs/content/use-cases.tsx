@@ -119,14 +119,14 @@ export function UseCases() {
 
       <H2 id="writing">Writing something that matters</H2>
       <p>
-        <strong>Think in Logos 2, then open{' '}
-        <Link href="/docs/drafts-grounding">Draft Space</Link>.</strong> Draft
-        Space is the one surface built for prose — and you write it. The page
-        starts blank, with your map alongside lighting the reasoning each
-        paragraph rests on. Select any passage and five actions return
-        something to read — Refine offers a clearer wording you can take or
-        leave — while the thinking stays upstream on the map, where it can
-        still be challenged.
+        <strong>Think in Logos, then open the{' '}
+        <Link href="/docs/drafts-grounding">Draft Space and the Writing Space</Link>.</strong>{' '}
+        Brain-dump ideas as cards, sort them into piles that will each be a
+        paragraph, link them to the passages of your files and the ideas on
+        your map, then turn the board into an outline and write. The page
+        is yours: Socria explains, critiques or proposes edits only when you
+        select your words and ask, and every proposed edit is yours to
+        accept or reject, one at a time.
       </p>
 
       <H2 id="research">Testing an idea against evidence</H2>

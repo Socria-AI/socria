@@ -123,7 +123,7 @@ export function Logos() {
         on your map, but never one of <em>your</em> beliefs. Images enter as
         context — described, never adopted as positions. Grounding a
         specific node in material is covered under{' '}
-        <Link href="/docs/drafts-grounding">Draft Space &amp; grounding</Link>.
+        <Link href="/docs/drafts-grounding">Draft Space, Writing Space &amp; grounding</Link>.
       </p>
     </Article>
   );

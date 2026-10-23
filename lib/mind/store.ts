@@ -539,11 +539,12 @@ export async function listProjectChats(
       throw new MindStoreError(classifyStoreError(error), `conversations: ${error.message}`);
     }
     return ((data ?? []) as unknown as Record<string, unknown>[]).map((r) => {
-      // The Draft Space is { title, html } (lib/logos-sessions.ts); it counts
-      // when there are words in it, not when there is markup.
-      const draft = r.draft as { title?: unknown; html?: unknown } | null | undefined;
+      // The draft is { title, html, doc } (lib/write/doc.ts); it counts when
+      // there are words in it — on the page or on a card — not when there is markup.
+      const draft = r.draft as { title?: unknown; html?: unknown; doc?: { cards?: unknown } } | null | undefined;
       const words = (v: unknown) => (typeof v === 'string' ? v.replace(/<[^>]*>/g, ' ').replace(/&nbsp;/g, ' ').trim() : '');
-      const hasDraft = !!draft && (words(draft.html).length > 0 || words(draft.title).length > 0);
+      const cards = Array.isArray(draft?.doc?.cards) ? (draft!.doc!.cards as { text?: unknown }[]).some((c) => words(c?.text).length > 0) : false;
+      const hasDraft = !!draft && (words(draft.html).length > 0 || words(draft.title).length > 0 || cards);
       return {
         id: String(r.id),
         title: typeof r.title === 'string' ? r.title : '',
