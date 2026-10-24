@@ -199,7 +199,10 @@ export default function PrivacyPage() {
       <h2 id="where">Where it lives</h2>
       <p>
         <strong>Signed in</strong>, your conversations and maps are stored in
-        our database and follow you across devices.
+        our database and follow you across devices. Pictures you put in your
+        writing are kept in private storage under your account — never public,
+        and reached only through the writing they are in; signed out, they stay
+        in your browser.
       </p>
       <p>
         <strong>Signed out</strong>, they are{' '}
@@ -219,7 +222,7 @@ export default function PrivacyPage() {
       <h2 id="rights">Your choices</h2>
       <ul>
         <li><strong>See it</strong> — everything you have written is visible in the app.</li>
-        <li><strong>Delete a conversation</strong> — deleting one removes it, and its map, draft and memory, from our database.</li>
+        <li><strong>Delete a conversation</strong> — deleting one removes it, and its map, draft and memory, from our database, and the pictures in its draft from our storage (unless another of your conversations uses the same picture).</li>
         <li>
           <strong>Forget what Socria worked out</strong> &mdash;{' '}
           <a href="/account/data">Data &amp; Privacy</a> has a control that
@@ -231,8 +234,9 @@ export default function PrivacyPage() {
           <strong>Export</strong> &mdash; one click in{' '}
           <a href="/account/data">Data &amp; Privacy</a> downloads everything we
           hold about you as a JSON file: conversations, maps, drafts, memory,
-          profile and subscription status. Connected accounts are listed as
-          connected; their access tokens are never included.
+          profile and subscription status, with a link to each picture in your
+          writing. Connected accounts are listed as connected; their access
+          tokens are never included.
         </li>
         <li>
           <strong>Delete everything</strong> &mdash; the same page deletes your

@@ -1,7 +1,7 @@
 // An in-memory stand-in for the Supabase client, for end-to-end route tests.
 //
 // It implements the slice of PostgREST the app actually uses — select with a
-// column list or *, eq / in / lt / gte / not-is-null filters, order, limit, range, maybeSingle,
+// column list or *, eq / in / lt / gte / not-is-null / like filters, order, limit, range, maybeSingle,
 // head counts, insert / upsert / update / delete with exact counts (and gt /
 // lte, for the email ledger's paging) — and it
 // enforces the constraints that matter to the code under test: primary keys,
@@ -111,6 +111,24 @@ class Query {
   not(c, op, v) {
     if (op === 'is' && v === null) this.filters.push((r) => r[c] !== null && r[c] !== undefined);
     this._cols = [...(this._cols ?? []), c];
+    return this;
+  }
+  // PostgREST's like, on a column or a path into a jsonb one (`draft->>doc`:
+  // that part of the document as text); % is any run of characters, _ one.
+  like(c, pattern) {
+    const [col, ...path] = c.split(/->>?/);
+    const esc = (x) => x.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const re = new RegExp(`^${pattern.split('%').map((part) => part.split('_').map(esc).join('.')).join('.*')}$`, 's');
+    const read = (r) => {
+      let v = r[col];
+      for (const k of path) v = v && typeof v === 'object' ? v[k] : undefined;
+      return v === null || v === undefined ? null : typeof v === 'string' ? v : JSON.stringify(v);
+    };
+    this.filters.push((r) => {
+      const v = read(r);
+      return v !== null && re.test(v);
+    });
+    this._cols = [...(this._cols ?? []), col];
     return this;
   }
   // Each call adds a key, as PostgREST's does: .order('a').order('b') sorts by a, then b.

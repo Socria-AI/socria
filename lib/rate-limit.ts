@@ -120,7 +120,11 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // for a caller with no account or key.
 // 'capture' is the Quick Capture inbox: cheap database writes, in bursts
 // when a browser's local captures move to the account.
-type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture';
+// 'media' is the pictures in a person's writing (/api/write/media): a
+// document with thirty pictures opened on a new device reads thirty at once,
+// and a pasted page can bring a dozen; each is a storage read or write, never
+// a model.
+type Kind = 'chat' | 'aux' | 'room' | 'count' | 'code' | 'rsvp' | 'staff' | 'voice' | 'capture' | 'media';
 const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { minute: number; day: number } }> = {
   chat: { authed: { minute: 20, day: 400 }, anon: { minute: 8, day: 80 } },
   aux: { authed: { minute: 40, day: 1200 }, anon: { minute: 20, day: 300 } },
@@ -134,6 +138,7 @@ const LIMITS: Record<Kind, { authed: { minute: number; day: number }; anon: { mi
   staff: { authed: { minute: 240, day: 10_000 }, anon: { minute: 5, day: 50 } },
   voice: { authed: { minute: 12, day: 300 }, anon: { minute: 6, day: 60 } },
   capture: { authed: { minute: 60, day: 2000 }, anon: { minute: 10, day: 100 } },
+  media: { authed: { minute: 120, day: 5000 }, anon: { minute: 5, day: 50 } },
 };
 
 function tooMany(r: RLResult): NextResponse {

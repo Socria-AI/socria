@@ -19,7 +19,7 @@
 //
 // PURE.
 
-import { isHeading, isList, type Block, type WriteDoc } from './doc';
+import { isHeading, isList, isTextType, textBlocks, textOrder, type Block, type WriteDoc } from './doc';
 
 export const ISSUE_KINDS = ['spelling', 'grammar', 'clarity', 'logic', 'support', 'repetition', 'structure', 'citation'] as const;
 export type IssueKind = (typeof ISSUE_KINDS)[number];
@@ -193,7 +193,8 @@ function caseLike(model: string, word: string): string {
 export function checkBlock(block: Block, ctx: Ctx): Issue[] {
   const text = block.text;
   const supported = ctx.supported || !!block.cites?.length;
-  if (!text.trim()) return [];
+  // code is not prose, and a picture, a line or a table has no words of its own here (a table's cells are read one by one)
+  if (!text.trim() || block.t === 'code' || !isTextType(block.t)) return [];
   const out: Issue[] = [];
   const add = (rule: string, kind: IssueKind, certainty: Certainty, s: number, e: number, title: string, why: string, fix?: string) => {
     if (out.some((x) => x.s < e && s < x.e && x.kind === kind)) return;
@@ -410,7 +411,8 @@ const norm = (s: string) => s.toLowerCase().replace(/[^\p{L}\p{N}\s]/gu, '').rep
 export function checkDoc(doc: Pick<WriteDoc, 'blocks' | 'cards' | 'dismissed'>): Issue[] {
   const backed = supportedCards(doc);
   const out: Issue[] = [];
-  for (const b of doc.blocks) {
+  // every block of words: paragraphs, headings, lists, quotes — and each cell of a table
+  for (const b of textBlocks(doc)) {
     const supported = !!b.cites?.length || !!b.from?.some((f) => backed.has(f));
     let hit = cache.get(b);
     if (!hit || hit.supported !== supported) {
@@ -434,7 +436,7 @@ export function checkDoc(doc: Pick<WriteDoc, 'blocks' | 'cards' | 'dismissed'>):
   }
   const seen = new Map<string, string>();
   for (const b of doc.blocks) {
-    if (b.t === 'quote' || isHeading(b.t)) continue;
+    if (b.t === 'quote' || isHeading(b.t) || b.t === 'code' || !isTextType(b.t)) continue;
     for (const sn of sentences(b.text)) {
       if (words(sn.text) < 6) continue;
       const key = norm(sn.text);
@@ -447,7 +449,7 @@ export function checkDoc(doc: Pick<WriteDoc, 'blocks' | 'cards' | 'dismissed'>):
   }
 
   const dismissed = new Set(doc.dismissed);
-  const order = new Map(doc.blocks.map((b, k) => [b.id, k]));
+  const order = textOrder(doc);
   return out
     .filter((i) => !dismissed.has(i.id))
     .sort((a, b) => (order.get(a.block)! - order.get(b.block)!) || a.s - b.s);

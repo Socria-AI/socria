@@ -19,6 +19,7 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { purgeSharing } from '@/lib/share/server';
 import { purgeRegistrationsForEmails } from '@/lib/events/privacy';
 import { purgeUploads } from '@/lib/upload-store';
+import { purgeMedia } from '@/lib/write/media-store';
 import { purgeReferrer } from '@/lib/rewards/supabase-rewards-store';
 
 export const runtime = 'nodejs';
@@ -264,6 +265,8 @@ export async function DELETE(req: NextRequest) {
   // read; anything uploaded and never read goes too (best effort — at most
   // an hour's worth, and the daily sweep catches what this misses).
   await purgeUploads(userId);
+  // The pictures in their writing: one folder of private storage, removed whole.
+  await purgeMedia(userId);
 
   // The identity last.
   try {

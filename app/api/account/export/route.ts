@@ -15,6 +15,7 @@ import { auth, currentUser } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { exportRegistrationsForEmails } from '@/lib/events/privacy';
+import { listMedia } from '@/lib/write/media-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -248,6 +249,19 @@ export async function GET(req: NextRequest) {
     out.eventRegistrations = [];
   }
 
+  // The pictures in their writing. A document's picture block says `m:<id>`;
+  // each picture is listed here by that id, with a link to its file that
+  // works for an hour (the files themselves are too large to put inside one
+  // JSON file). Every export of a document — Word, PDF, web page — carries
+  // its pictures as well.
+  let writingPicturesErr: unknown = null;
+  try {
+    out.writingPictures = await listMedia(userId);
+  } catch (e) {
+    writingPicturesErr = e;
+    out.writingPictures = [];
+  }
+
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
     'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
@@ -289,6 +303,7 @@ export async function GET(req: NextRequest) {
     ['friendsYouInvited', youInvitedErr],
     ['captures', capturesErr],
     ['eventRegistrations', eventRegistrationsErr],
+    ['writingPictures', writingPicturesErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

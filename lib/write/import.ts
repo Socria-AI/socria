@@ -1,15 +1,19 @@
 // lib/write/import.ts — a file opened into the writing.
 //
 // Word (.docx), Markdown, plain text and HTML are read here, in the browser,
-// and never leave the device. Other formats a writer might have (OpenDocument,
-// RTF) go through the same document reader every attachment does and come in
-// as their words, without emphasis — and the import says so.
+// and never leave the device — with their formatting, tables and pictures
+// (a picture comes in at the address it had and is kept by the caller before
+// it joins the writing: parse.ts settleImages). Other formats a writer might
+// have (PDF, OpenDocument, RTF) go through the same document reader every
+// attachment does and come in as their words and their shape — headings,
+// lists, paragraphs — without emphasis; a PDF holds placed text, not
+// paragraphs and styles, and the import says so.
 //
 // PURE apart from the reader passed in for those other formats.
 
 import type { SourceDoc } from '@/lib/docs/types';
-import { uid, type Block } from './doc';
-import { htmlToBlocks, markdownToBlocks, textToBlocks } from './parse';
+import { uid, type Block, type PageSetup } from './doc';
+import { decodeHtml, htmlToBlocks, markdownToBlocks, textToBlocks } from './parse';
 import { readDocx } from './word';
 import { ZipError } from './zip';
 
@@ -17,17 +21,21 @@ export interface Imported {
   title: string;
   blocks: Block[];
   notes: string[];
+  /** a Word document's paper and margins, and its own font and size */
+  page?: PageSetup;
+  font?: string;
+  size?: number;
 }
 
 /** What can be opened, for the file picker. */
-export const IMPORT_ACCEPT = '.docx,.docm,.dotx,.md,.markdown,.txt,.text,.html,.htm,.odt,.rtf';
+export const IMPORT_ACCEPT = '.docx,.docm,.dotx,.md,.markdown,.txt,.text,.html,.htm,.pdf,.odt,.rtf';
 
 export const MAX_IMPORT_BYTES = 25 * 1024 * 1024;
 
 const stem = (name: string) => name.replace(/\.[^.]+$/, '').replace(/[_]+/g, ' ').trim();
 
 /** A SourceDoc's blocks as writing: headings, paragraphs, lists and quotes; page furniture left out. */
-export function blocksFromSource(doc: SourceDoc): Imported {
+export function blocksFromSource(doc: SourceDoc, format: 'pdf' | 'other' = 'other'): Imported {
   const blocks: Block[] = [];
   let title = doc.title?.trim() ?? '';
   let figures = 0;
@@ -64,7 +72,11 @@ export function blocksFromSource(doc: SourceDoc): Imported {
     if (b.kind === 'table') tables++;
     blocks.push({ id: uid('b'), t: 'p', text });
   }
-  const notes = ['The words came in without their bold, italics and underlining — open a .docx to keep them.'];
+  const notes = [
+    format === 'pdf'
+      ? 'A PDF holds words placed on pages, not paragraphs and styles: its words and headings came in, without their fonts, emphasis or layout.'
+      : 'The words came in without their bold, italics and underlining — open a .docx to keep them.',
+  ];
   if (figures) notes.push(figures === 1 ? 'A picture was left out.' : `${figures} pictures were left out.`);
   if (tables) notes.push(tables === 1 ? 'A table came in as lines of text.' : `${tables} tables came in as lines of text.`);
   return { title, blocks, notes };
@@ -83,7 +95,7 @@ export async function importFile(file: File, readOther?: (file: File) => Promise
     try {
       const r = await readDocx(bytes);
       if (!r.blocks.length && !r.title) throw new ZipError(`${name} has no words in it to bring in.`);
-      return { title: r.title || stem(name), blocks: r.blocks, notes: r.notes };
+      return { title: r.title || stem(name), blocks: r.blocks, notes: r.notes, ...(r.page ? { page: r.page } : {}), ...(r.font ? { font: r.font } : {}), ...(r.size ? { size: r.size } : {}) };
     } catch (e) {
       throw new Error(e instanceof Error ? e.message : 'That document could not be opened.');
     }
@@ -92,11 +104,15 @@ export async function importFile(file: File, readOther?: (file: File) => Promise
     const text = await file.text();
     if (!text.trim()) throw new Error(`${name} is empty.`);
     if (/\.html?$/i.test(name)) {
-      const t = /<title[^>]*>([^<]*)<\/title>/i.exec(text)?.[1]?.trim();
-      return { title: t || stem(name), blocks: htmlToBlocks(text), notes: [] };
+      const t = decodeHtml(/<title[^>]*>([^<]*)<\/title>/i.exec(text)?.[1] ?? '').replace(/\s+/g, ' ').trim();
+      const blocks = htmlToBlocks(text, { images: true });
+      // a page Socria made puts its title first, as a heading: it is the title, not a heading
+      const first = blocks[0];
+      if (t && first?.t === 'h1' && first.text === t) return { title: t, blocks: blocks.slice(1), notes: [] };
+      return { title: t || stem(name), blocks, notes: [] };
     }
     if (/\.(md|markdown)$/i.test(name)) {
-      const blocks = markdownToBlocks(text);
+      const blocks = markdownToBlocks(text, { images: true });
       // a Markdown file's first top heading is its title
       const first = blocks[0];
       if (first?.t === 'h1') return { title: first.text, blocks: blocks.slice(1), notes: [] };
@@ -104,10 +120,10 @@ export async function importFile(file: File, readOther?: (file: File) => Promise
     }
     return { title: stem(name), blocks: textToBlocks(text), notes: [] };
   }
-  if (/\.(odt|rtf)$/i.test(name) && readOther) {
+  if (/\.(pdf|odt|rtf)$/i.test(name) && readOther) {
     const doc = await readOther(file);
-    const r = blocksFromSource(doc);
+    const r = blocksFromSource(doc, /\.pdf$/i.test(name) ? 'pdf' : 'other');
     return { ...r, title: r.title || stem(name) };
   }
-  throw new Error('That kind of file cannot be opened into the writing. Word (.docx), Markdown, text and HTML can.');
+  throw new Error('That kind of file cannot be opened into the writing. Word (.docx), PDF, Markdown, text and HTML can.');
 }

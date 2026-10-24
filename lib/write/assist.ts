@@ -22,7 +22,7 @@ import { ISSUE_KINDS, issueId, type Certainty, type Issue, type IssueKind } from
 /** The most of a passage one request works on: a few paragraphs. */
 export const MAX_SELECTION_CHARS = 6_000;
 
-export const WRITE_OPS = ['explain', 'critique', 'shorten', 'improve', 'develop', 'phrase', 'proofread', 'board'] as const;
+export const WRITE_OPS = ['explain', 'critique', 'shorten', 'improve', 'develop', 'phrase', 'proofread', 'board', 'structure'] as const;
 export type WriteOp = (typeof WRITE_OPS)[number];
 
 export const WRITE_OP_META: Record<WriteOp, { label: string; blurb: string }> = {
@@ -34,7 +34,26 @@ export const WRITE_OP_META: Record<WriteOp, { label: string; blurb: string }> = 
   phrase: { label: 'Other wordings', blurb: 'Only when you ask for them' },
   proofread: { label: 'Proofread', blurb: 'What a careful editor would mark' },
   board: { label: 'Review the board', blurb: 'Gaps in the reasoning' },
+  structure: { label: 'Structure', blurb: 'How the argument is organised — a reverse outline' },
 };
+
+/** What a paragraph does in an argument, in a reverse outline. */
+export const ROLES = ['claim', 'reason', 'evidence', 'example', 'counter', 'response', 'background', 'transition', 'conclusion', 'other'] as const;
+export type Role = (typeof ROLES)[number];
+
+/** One line of a reverse outline: a paragraph, its role, and what it does — said about their paragraph, never a rewrite of it. */
+export interface OutlineLine {
+  block: string;
+  role: Role;
+  does: string;
+}
+
+/** A whole paragraph moved to after another (null: to the top) — the words unchanged. */
+export interface Move {
+  block: string;
+  after: string | null;
+  why: string;
+}
 
 /** One proposed change: exact words of theirs, what they would become, and why. */
 export interface Edit {
@@ -67,6 +86,11 @@ export interface AssistResult {
   options?: { text: string; why: string }[];
   issues?: Issue[];
   findings?: Finding[];
+  /** structure: what each paragraph does, the sentence that reads as the main claim (quoted exactly), moves to consider, gaps as questions */
+  outline?: OutlineLine[];
+  thesis?: { block: string; quote: string };
+  moves?: Move[];
+  gaps?: string[];
 }
 
 /** What the route is given: the passage, where it sits, and what it is connected to — by name. */
@@ -81,8 +105,13 @@ export interface AssistInput {
   title?: string;
   /** passages and map ideas it is linked to, by name — for reference, never to quote from */
   linked?: string[];
-  /** proofread: the blocks in scope */
+  /** proofread and structure: the blocks in scope */
   blocks?: { id: string; t: string; text: string }[];
+  /** proofread: everything a careful editor would mark, or only grammar, spelling and punctuation */
+  focus?: 'all' | 'grammar';
+  /** the line of thinking this writing belongs to, and ideas on its Logic Map — names only, for reference */
+  topic?: string;
+  ideas?: string[];
   /** board: the cards (lib/write/board.ts boardBrief) */
   cards?: { id: string; kind: string; pile: string; text: string; links: string[] }[];
 }
@@ -110,6 +139,15 @@ function context(i: AssistInput): string {
     fence('The paragraph after', i.next),
     i.title?.trim() ? `\nThe document is titled: "${i.title.trim().slice(0, 200)}"` : '',
     i.linked?.length ? `\nWhat this passage is linked to in their workspace (names only — not text you can quote): ${i.linked.slice(0, 8).join('; ')}` : '',
+    workspace(i),
+  ].join('');
+}
+
+/** The line of thinking the writing belongs to, by name — what they have been thinking about, never text to quote. */
+function workspace(i: AssistInput): string {
+  return [
+    i.topic?.trim() ? `\nThis writing belongs to their line of thinking called "${i.topic.trim().slice(0, 120)}".` : '',
+    i.ideas?.length ? `\nIdeas on their Logic Map (names only — for reference, never to supply as content): ${i.ideas.slice(0, 12).join('; ')}` : '',
   ].join('');
 }
 
@@ -185,10 +223,25 @@ ${(i.blocks ?? []).map((b) => `[${b.id}]${b.t !== 'p' ? ` (${b.t})` : ''} ${b.te
 ${i.title?.trim() ? `The document is titled: "${i.title.trim().slice(0, 200)}"` : ''}
 
 Your job: proofread it the way a careful editor would — only what matters, never style preferences. Rules already mark spelling slips, doubled words, a/an, capitals, spacing, very long sentences and research claims with nothing cited: do not repeat those.
-Look for: grammar a rule cannot catch (agreement, tense, a dangling modifier, a fragment not meant as one); unclear sentences (an "it" or "this" with two possible referents, a sentence doing two jobs); logic (a step that does not follow, a conclusion stronger than its support, a contradiction); claims a reader would push back on without support; an idea repeated; structure (a paragraph doing two jobs, a point out of place); citation problems.
+${i.focus === 'grammar' ? 'Look ONLY for grammar, spelling, punctuation and phrasing a reader would trip on: agreement, tense, a dangling modifier, a fragment not meant as one, a word that is wrong for the sentence, an "it" or "this" with two possible referents. Nothing about logic, support, structure or citations — they asked for the language only.' : 'Look for: grammar a rule cannot catch (agreement, tense, a dangling modifier, a fragment not meant as one); unclear sentences (an "it" or "this" with two possible referents, a sentence doing two jobs); logic (a step that does not follow, a conclusion stronger than its support, a contradiction); claims a reader would push back on without support; an idea repeated; structure (a paragraph doing two jobs, a point out of place); citation problems.'}
 Return JSON:
 {"issues":[{"block":"the block id","quote":"the exact words, copied character for character from that block","kind":"grammar|spelling|clarity|logic|support|repetition|structure|citation","certainty":"definite|likely|suggestion","why":"one or two sentences to them: what is wrong and why; for a judgement call, say it is one","fix":"ONLY for grammar, spelling or clarity with one clear right answer: the corrected words for that quote and nothing else. Omit otherwise."}]}
 certainty: definite = a rule is broken and there is one right answer; likely = almost certainly wrong but the context could make it right — say what; suggestion = a judgement call. At most 12 issues. Quotations (blocks marked quote) are someone else's words: only say whether they need a citation. If nothing matters, return {"issues":[]} — that is a good result.`;
+
+  if (i.op === 'structure')
+    return `${head}
+${RULES}
+
+Their writing, paragraph by paragraph (each line starts with its block id in square brackets):
+"""
+${(i.blocks ?? []).map((b) => `[${b.id}]${b.t !== 'p' ? ` (${b.t})` : ''} ${b.text}`).join('\n')}
+"""
+${i.title?.trim() ? `The document is titled: "${i.title.trim().slice(0, 200)}"` : ''}${workspace(i)}
+
+Your job: show them how their argument is organised — a reverse outline — so they can judge the order themselves. You describe; you do not rewrite.
+Return JSON:
+{"outline":[{"block":"the block id","role":"claim|reason|evidence|example|counter|response|background|transition|conclusion|other","does":"what this paragraph does, in at most 12 words, said ABOUT it (e.g. 'gives the 2020 vacancy figure as support') — never a new version of it"}],"thesis":{"block":"the block id","quote":"the sentence that reads as the main claim, copied EXACTLY from that block"},"moves":[{"block":"a block id","after":"the block id it would follow, or null for the very top","why":"one sentence: what the reader gains"}],"gaps":["at most 3 questions about a step the argument seems to skip or a claim it leaves open"]}
+Rules: one outline line per paragraph you were given, in order (headings get role "other"). If nothing reads as a main claim, omit "thesis" — never write one for them. Suggest at most 3 moves, only where the order genuinely makes a reader work harder; none is a good result. Never write sentences for them to add.`;
 
   return `${head}
 ${RULES}
@@ -361,9 +414,12 @@ export function sanitizeAssist(op: WriteOp, parsed: unknown, input: AssistInput)
     return { op, options };
   }
   if (op === 'proofread') {
-    const issues = verifyIssues(r.issues, input.blocks ?? []);
+    const all = verifyIssues(r.issues, input.blocks ?? []);
+    // asked for the language only: the language only
+    const issues = input.focus === 'grammar' ? all.filter((x) => x.kind === 'grammar' || x.kind === 'spelling' || x.kind === 'clarity') : all;
     return { op, issues };
   }
+  if (op === 'structure') return verifyStructure(r, input);
   // board
   const known = new Set((input.cards ?? []).map((c) => c.id));
   const findings: Finding[] = [];
@@ -379,6 +435,58 @@ export function sanitizeAssist(op: WriteOp, parsed: unknown, input: AssistInput)
     if (findings.length >= 6) break;
   }
   return { op, findings };
+}
+
+/**
+ * A reverse outline held to the writing: every line names a paragraph that
+ * was sent, in a role from the list; the main claim is a sentence found, word
+ * for word, in its paragraph — or there is none; a move names two real
+ * paragraphs; a gap is a question. Nothing in it is words for their page.
+ */
+export function verifyStructure(r: Record<string, unknown>, input: AssistInput): AssistResult | null {
+  const blocks = input.blocks ?? [];
+  const ids = new Set(blocks.map((b) => b.id));
+  const outline: OutlineLine[] = [];
+  const seen = new Set<string>();
+  for (const x of (Array.isArray(r.outline) ? r.outline : []).slice(0, 200)) {
+    if (!x || typeof x !== 'object') continue;
+    const o = x as Record<string, unknown>;
+    const block = String(o.block ?? '');
+    if (!ids.has(block) || seen.has(block)) continue;
+    const role = (ROLES as readonly string[]).includes(o.role as string) ? (o.role as Role) : 'other';
+    const does = str(o.does, 160);
+    if (!does) continue;
+    seen.add(block);
+    outline.push({ block, role, does });
+  }
+  // in the order the paragraphs are in
+  const order = new Map(blocks.map((b, k) => [b.id, k]));
+  outline.sort((a, b) => order.get(a.block)! - order.get(b.block)!);
+  let thesis: AssistResult['thesis'];
+  if (r.thesis && typeof r.thesis === 'object') {
+    const t = r.thesis as Record<string, unknown>;
+    const b = blocks.find((x) => x.id === String(t.block ?? ''));
+    const quote = raw(t.quote, 1200).trim();
+    if (b && quote.length >= 8 && b.text.includes(quote)) thesis = { block: b.id, quote };
+  }
+  const moves: Move[] = [];
+  for (const x of (Array.isArray(r.moves) ? r.moves : []).slice(0, 8)) {
+    if (!x || typeof x !== 'object') continue;
+    const m = x as Record<string, unknown>;
+    const block = String(m.block ?? '');
+    const after = m.after === null || m.after === undefined || m.after === '' ? null : String(m.after);
+    if (!ids.has(block) || (after !== null && (!ids.has(after) || after === block))) continue;
+    // a move to where it already is moves nothing
+    const k = order.get(block)!;
+    if ((after === null && k === 0) || (after !== null && order.get(after)! === k - 1)) continue;
+    const why = str(m.why, 220);
+    if (!why || moves.some((y) => y.block === block)) continue;
+    moves.push({ block, after, why });
+    if (moves.length >= 3) break;
+  }
+  const gaps = (Array.isArray(r.gaps) ? r.gaps : []).map((g) => str(g, 220)).filter((g) => g.endsWith('?')).slice(0, 3);
+  if (!outline.length && !thesis && !moves.length && !gaps.length) return null;
+  return { op: 'structure', outline, ...(thesis ? { thesis } : {}), moves, gaps };
 }
 
 /** The input as it arrives from a browser: every field bounded, the op checked. */
@@ -397,7 +505,12 @@ export function sanitizeAssistInput(body: unknown): AssistInput | null {
     title: text(b.title, 200),
     linked: (Array.isArray(b.linked) ? b.linked : []).map((l) => text(l, 160)).filter((l): l is string => !!l?.trim()).slice(0, 8),
   };
-  if (op === 'proofread') {
+  if (b.focus === 'grammar') input.focus = 'grammar';
+  const topic = text(b.topic, 120);
+  if (topic?.trim()) input.topic = topic.replace(/\s+/g, ' ').trim();
+  const ideas = (Array.isArray(b.ideas) ? b.ideas : []).map((x) => text(x, 120)).filter((x): x is string => !!x?.trim()).slice(0, 12);
+  if (ideas.length) input.ideas = ideas.map((x) => x.replace(/\s+/g, ' ').trim());
+  if (op === 'proofread' || op === 'structure') {
     let budget = 14_000;
     input.blocks = [];
     for (const x of Array.isArray(b.blocks) ? b.blocks.slice(0, 200) : []) {

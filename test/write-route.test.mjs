@@ -188,6 +188,53 @@ console.log('\n=== the board: findings about real cards ===');
   ok('  the board reaches the model with each card’s kind, pile and links by name', r.sys.includes('[k2] (evidence, pile: Why) Vacancy fell — linked to passage: Housing report, p. 2'));
 }
 
+console.log('\n=== the language only, and the argument\'s structure ===');
+{
+  const blocks = [
+    { id: 'b1', t: 'p', text: 'Landlords said they was losing money.' },
+    { id: 'b2', t: 'p', text: 'Therefore every city should cap rents.' },
+  ];
+  const g = await ask(
+    { op: 'proofread', focus: 'grammar', blocks },
+    { issues: [{ block: 'b1', quote: 'they was', kind: 'grammar', certainty: 'definite', why: '“They” takes “were”.', fix: 'they were' }, { block: 'b2', quote: 'Therefore every city should cap rents.', kind: 'logic', certainty: 'likely', why: 'One case to every case.' }] }
+  );
+  ok('asked for the language only: the model is told so', /Look ONLY for grammar, spelling, punctuation/.test(g.sys) && !/a step that does not follow/.test(g.sys));
+  ok('  and a finding about the argument is not shown, even if one comes back', g.status === 200 && g.json.result.issues.length === 1 && g.json.result.issues[0].kind === 'grammar' && g.json.result.issues[0].fix === 'they were', J(g.json?.result));
+  const paras = [
+    { id: 'p1', t: 'p', text: 'For example, Berlin froze rents in 2020.' },
+    { id: 'p2', t: 'p', text: 'Cities should build more homes because supply lags demand.' },
+    { id: 'p3', t: 'p', text: 'Landlords would build less under a cap.' },
+  ];
+  const st = await ask(
+    { op: 'structure', blocks: paras, title: 'Rents', topic: 'Essay on rents', ideas: ['supply lags demand', 'rent caps'] },
+    {
+      outline: [
+        { block: 'p2', role: 'claim', does: 'makes the argument' },
+        { block: 'p1', role: 'example', does: 'gives an example' },
+        { block: 'p9', role: 'claim', does: 'a paragraph that is not there' },
+        { block: 'p3', role: 'vibes', does: 'raises an objection' },
+      ],
+      thesis: { block: 'p2', quote: 'Cities should build more homes because supply lags demand.' },
+      moves: [
+        { block: 'p1', after: 'p2', why: 'The example comes before its claim.' },
+        { block: 'p2', after: 'p1', why: 'Where it already is.' },
+        { block: 'p3', after: 'p9', why: 'After a paragraph that is not there.' },
+      ],
+      gaps: ['What would a landlord say?', 'This is not a question.'],
+    }
+  );
+  const res = st.json?.result;
+  ok('structure: their paragraphs reach the model by id, with the line of thinking and its ideas by name', st.sys.includes('[p2] Cities should build more homes') && st.sys.includes('line of thinking called "Essay on rents"') && st.sys.includes('supply lags demand; rent caps') && /never a new version of it/.test(st.sys));
+  ok('  a reverse outline of real paragraphs only, in their order; an unknown role is "other"', J(res.outline.map((o) => [o.block, o.role])) === J([['p1', 'example'], ['p2', 'claim'], ['p3', 'other']]), J(res.outline));
+  ok('  the main claim, because it is their sentence word for word', res.thesis?.quote === 'Cities should build more homes because supply lags demand.');
+  ok('  a move between real paragraphs; one to where it already is, or to a paragraph that is not there, is dropped', J(res.moves.map((m) => [m.block, m.after])) === J([['p1', 'p2']]), J(res.moves));
+  ok('  gaps are questions', J(res.gaps) === J(['What would a landlord say?']));
+  const made = await ask({ op: 'structure', blocks: paras }, { thesis: { block: 'p2', quote: 'Cities must build ten thousand homes.' }, outline: [{ block: 'p1', role: 'example', does: 'gives an example' }] });
+  ok('a main claim that is not in their words is not shown — Socria does not write one for them', made.status === 200 && !made.json.result.thesis && made.json.result.outline.length === 1, J(made.json?.result));
+  const none = await ask({ op: 'structure', blocks: [] }, { outline: [] });
+  ok('no paragraphs: refused, the model never asked', none.status === 400 && none.calls.length === 0);
+}
+
 console.log('\n=== the model failing ===');
 {
   // a model that is not there: the first call fails with a 404, the fallback answers

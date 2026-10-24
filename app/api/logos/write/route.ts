@@ -1,8 +1,9 @@
 // app/api/logos/write/route.ts
 // POST /api/logos/write → { result } for one thing the person asked of their own writing.
 //
-// Explain, critique, shorten, improve, develop, other wordings, proofread, or
-// review the Draft Space's board (lib/write/assist.ts). Nothing here writes
+// Explain, critique, shorten, improve, develop, other wordings, proofread (all
+// of it, or the language only), review the Draft Space's board, or read the
+// argument's structure as a reverse outline (lib/write/assist.ts). Nothing here writes
 // into the document: the answer is something to read, or edits proposed one
 // at a time — and every edit, finding and card it names is checked against
 // what the person actually wrote before it is returned.
@@ -25,7 +26,7 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 // what each kind of request may run to: a reading is short; a proofread of a section is longer
-const TOKENS = { explain: 600, critique: 700, shorten: 1200, improve: 1400, develop: 700, phrase: 1200, proofread: 1800, board: 1000 } as const;
+const TOKENS = { explain: 600, critique: 700, shorten: 1200, improve: 1400, develop: 700, phrase: 1200, proofread: 1800, board: 1000, structure: 1600 } as const;
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
@@ -61,7 +62,7 @@ export async function POST(req: NextRequest) {
     openai.chat.completions.create({
       model,
       // edits and proofreading stay close to what is written; a reading may notice a little more
-      temperature: input.op === 'explain' || input.op === 'critique' || input.op === 'board' ? 0.4 : 0.2,
+      temperature: input.op === 'explain' || input.op === 'critique' || input.op === 'board' || input.op === 'structure' ? 0.4 : 0.2,
       max_tokens: TOKENS[input.op],
       response_format: { type: 'json_object' },
       messages: [

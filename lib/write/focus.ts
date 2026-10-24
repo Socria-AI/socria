@@ -10,7 +10,7 @@
 // PURE.
 
 import type { FocusBrief } from '@/lib/workspace/focus';
-import { CARD_KIND_LABEL, type WriteDoc } from './doc';
+import { CARD_KIND_LABEL, findCell, type WriteDoc } from './doc';
 
 /** What is selected in the writing: a range of a block, or a card. */
 export type WriteSel = { kind: 'block'; block: string; s: number; e: number } | { kind: 'card'; card: string };
@@ -37,6 +37,21 @@ export function describeWriting(doc: WriteDoc | null | undefined, sel: WriteSel 
     return { kind: 'writing', label: one(c.text, 80), of: of ? `the Draft Space of ${of}` : 'their Draft Space', lines };
   }
   const i = doc.blocks.findIndex((b) => b.id === sel.block);
+  const cell = i < 0 ? findCell(doc, sel.block) : null;
+  if (cell) {
+    // a cell of a table: its words, and where in the table they are
+    const t = cell.cell.text;
+    const s = Math.max(0, Math.min(t.length, Math.min(sel.s, sel.e)));
+    const e = Math.max(0, Math.min(t.length, Math.max(sel.s, sel.e)));
+    const words = (e > s ? t.slice(s, e) : t).trim();
+    if (!words) return null;
+    const head = cell.table.head ? (cell.table.rows?.[0] ?? []).map((c) => c.text.trim()).filter(Boolean) : [];
+    const lines = [
+      `a cell of a table in their draft — row ${cell.r + 1}, column ${cell.c + 1}${head[cell.c] && cell.r > 0 ? `, under “${one(head[cell.c], 60)}”` : ''}`,
+      `their words, verbatim: “${one(words, 190)}”`,
+    ];
+    return { kind: 'writing', label: one(words, 80), of: of ? `the draft ${of}` : 'their draft', lines };
+  }
   const b = doc.blocks[i];
   if (!b) return null;
   const s = Math.max(0, Math.min(b.text.length, Math.min(sel.s, sel.e)));

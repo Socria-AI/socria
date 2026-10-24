@@ -43,7 +43,7 @@ const isMac = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(n
 /** The marks a card's kind wears — its word is always beside it, never colour alone. */
 const KIND_GLYPH: Record<CardKind, string> = { idea: '○', claim: '◆', evidence: '▤', example: '◇', counter: '↺', conclusion: '■', question: '?' };
 
-export type CardAction = 'link-doc' | 'link-node' | 'link-card' | 'develop' | 'ask';
+export type CardAction = 'link-doc' | 'link-node' | 'link-card' | 'develop' | 'ask' | 'keep';
 
 export function Board({
   doc,
@@ -56,6 +56,7 @@ export function Board({
   onOutline,
   onReview,
   reviewing,
+  canKeep,
 }: {
   doc: WriteDoc;
   onChange: (next: WriteDoc) => void;
@@ -67,6 +68,8 @@ export function Board({
   onOutline: (pile?: string | null) => void;
   onReview: () => void;
   reviewing: boolean;
+  /** signed in: a card can be kept in memory */
+  canKeep?: boolean;
 }) {
   const [dump, setDump] = useState('');
   const [editing, setEditing] = useState<string | null>(null);
@@ -513,6 +516,7 @@ export function Board({
                         ['link-card', 'Link another card'],
                         ['develop', 'Develop this — questions, not words'],
                         ['ask', 'Ask about this in the conversation'],
+                        ...(canKeep ? [['keep', 'Keep in memory'] as [CardAction, string]] : []),
                       ] as [CardAction, string][]
                     ).map(([a, label], k) => (
                       <button

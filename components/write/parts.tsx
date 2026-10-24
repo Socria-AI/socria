@@ -11,9 +11,9 @@
 import { useMemo, useState } from 'react';
 import type { SourceDoc } from '@/lib/docs/types';
 import type { ThinkingMap } from '@/lib/logos';
-import { docText, wordCount, type Card, type Version, type WriteDoc } from '@/lib/write/doc';
+import { docText, findText, wordCount, type Card, type Version, type WriteDoc } from '@/lib/write/doc';
 import { ISSUE_KIND_LABEL, ISSUE_KINDS, type Issue, type IssueKind } from '@/lib/write/checks';
-import { WRITE_OP_META, type AssistResult, type WriteOp } from '@/lib/write/assist';
+import { WRITE_OP_META, type AssistResult, type Role, type WriteOp } from '@/lib/write/assist';
 
 const CERTAINTY: Record<Issue['certainty'], string> = { definite: 'Definite', likely: 'Likely', suggestion: 'A judgement call' };
 
@@ -207,7 +207,7 @@ export function CheckPanel({
   onFix: (i: Issue) => void;
   onDismiss: (i: Issue) => void;
   onShow: (i: Issue) => void;
-  onProofread: () => void;
+  onProofread: (focus: 'all' | 'grammar') => void;
   proofreading: boolean;
   scopeLabel: string;
   underline: boolean;
@@ -259,9 +259,14 @@ export function CheckPanel({
         ))}
       </ul>
       <div className="w-check-foot">
-        <button type="button" className="w-btn" onClick={onProofread} disabled={proofreading}>
-          {proofreading ? 'Socria is reading…' : `Ask Socria to proofread ${scopeLabel}`}
-        </button>
+        <div className="w-row is-wrap">
+          <button type="button" className="w-btn" onClick={() => onProofread('all')} disabled={proofreading}>
+            {proofreading ? 'Socria is reading…' : `Ask Socria to proofread ${scopeLabel}`}
+          </button>
+          <button type="button" className="w-btn is-quiet" onClick={() => onProofread('grammar')} disabled={proofreading} title="Grammar, spelling and punctuation — nothing about the argument">
+            The language only
+          </button>
+        </div>
         {error && <p className="w-error" role="alert">{error}</p>}
         <label className="w-toggle">
           <input type="checkbox" checked={underline} onChange={(e) => onUnderline(e.target.checked)} /> Underline what is definite or likely, as I write
@@ -292,6 +297,157 @@ export function IssueCard({ issue, rect, onFix, onDismiss, onClose }: { issue: I
           Dismiss
         </button>
       </div>
+    </div>
+  );
+}
+
+/**
+ * A proposed edit, on its own words: what they would become and why — taken
+ * or left right there. The page does not change until Accept is pressed.
+ */
+export function ProposalCard({ proposal, rect, onAccept, onReject, onClose }: { proposal: Proposal; rect: DOMRect; onAccept: () => void; onReject: () => void; onClose: () => void }) {
+  const top = Math.min(rect.bottom + 8, (typeof window !== 'undefined' ? window.innerHeight : 800) - 200);
+  const left = Math.max(12, Math.min(rect.left, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 332));
+  return (
+    <div className="w-issuecard is-proposal" role="dialog" aria-label="A proposed edit" style={{ top, left }} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
+      <p className="w-issue-head">
+        <span className="w-issue-t">Proposed edit</span>
+        {proposal.kind && <span className="w-badge">{proposal.kind}</span>}
+      </p>
+      <p className="w-diff">
+        <del>{proposal.from}</del>
+        {proposal.to ? <ins>{proposal.to}</ins> : <span className="w-cut">(cut)</span>}
+      </p>
+      <p className="w-why">{proposal.why}</p>
+      <div className="w-row">
+        <button type="button" className="w-btn is-primary" onMouseDown={(e) => e.preventDefault()} onClick={onAccept}>
+          Accept
+        </button>
+        <button type="button" className="w-btn" onMouseDown={(e) => e.preventDefault()} onClick={onReject}>
+          Reject
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// ── the argument's structure ──────────────────────────────────────
+
+const ROLE_LABEL: Record<Role, string> = {
+  claim: 'Claim',
+  reason: 'Reason',
+  evidence: 'Evidence',
+  example: 'Example',
+  counter: 'Objection',
+  response: 'Answer',
+  background: 'Background',
+  transition: 'Link',
+  conclusion: 'Conclusion',
+  other: 'Other',
+};
+
+/**
+ * A reverse outline: what each paragraph does, said about it; the sentence
+ * that reads as the main claim, found in their words; moves to consider,
+ * each one press and one undo; gaps as questions. Nothing here writes.
+ */
+export function StructurePanel({
+  doc,
+  result,
+  loading,
+  error,
+  onShow,
+  onMove,
+  onRetry,
+}: {
+  doc: WriteDoc;
+  result: AssistResult | null;
+  loading: boolean;
+  error: string | null;
+  onShow: (block: string, s: number, e: number) => void;
+  onMove: (block: string, after: string | null) => void;
+  onRetry: () => void;
+}) {
+  const label = (id: string) => {
+    const b = findText(doc, id);
+    if (!b) return 'a paragraph that is no longer there';
+    const t = b.text.replace(/\s+/g, ' ').trim();
+    return `“${t.length > 60 ? `${t.slice(0, 59)}…` : t}”`;
+  };
+  const thesis = result?.thesis;
+  const tb = thesis ? findText(doc, thesis.block) : null;
+  const at = tb && thesis ? tb.text.indexOf(thesis.quote) : -1;
+  return (
+    <div className="w-structure" aria-live="polite">
+      <p className="w-eyebrow">
+        Structure · <span>what each paragraph does, read back to you</span>
+      </p>
+      {loading && <p className="w-quiet w-pulse">Reading the argument…</p>}
+      {error && (
+        <div className="w-error" role="alert">
+          <p>{error}</p>
+          <button type="button" className="w-btn" onClick={onRetry}>
+            Try again
+          </button>
+        </div>
+      )}
+      {result && (
+        <>
+          {thesis && at >= 0 ? (
+            <div className="w-thesis">
+              <p className="w-eyebrow">What reads as your main claim</p>
+              <button type="button" className="w-thesis-q" onClick={() => onShow(thesis.block, at, at + thesis.quote.length)}>
+                “{thesis.quote}”
+              </button>
+              <p className="w-quiet">If that is not the claim you mean to make, the reader may not find it either.</p>
+            </div>
+          ) : (
+            <p className="w-q">Nothing reads clearly as one main claim yet — what is the one sentence you want a reader to come away with?</p>
+          )}
+          {!!result.outline?.length && (
+            <ol className="w-reverse">
+              {result.outline.map((o) => (
+                <li key={o.block} className={findText(doc, o.block) ? '' : 'is-gone'}>
+                  <span className={`w-role is-${o.role}`}>{ROLE_LABEL[o.role]}</span>
+                  <button type="button" className="w-reverse-go" onClick={() => onShow(o.block, 0, 0)} title={label(o.block)}>
+                    {o.does}
+                  </button>
+                </li>
+              ))}
+            </ol>
+          )}
+          {!!result.moves?.length && (
+            <div className="w-moves">
+              <p className="w-eyebrow">Moves to consider — each one changes only the order</p>
+              <ul className="w-props">
+                {result.moves.map((m) => (
+                  <li key={m.block} className="w-prop">
+                    <p>
+                      Move {label(m.block)} {m.after ? <>after {label(m.after)}</> : 'to the top'}
+                    </p>
+                    <p className="w-why">{m.why}</p>
+                    <div className="w-row">
+                      <button type="button" className="w-btn" disabled={!findText(doc, m.block) || (m.after !== null && !findText(doc, m.after))} onClick={() => onMove(m.block, m.after)}>
+                        Move it
+                      </button>
+                    </div>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
+          {!!result.gaps?.length && (
+            <>
+              <p className="w-eyebrow">Questions the argument leaves open</p>
+              <ul className="w-points">
+                {result.gaps.map((g, k) => (
+                  <li key={k}>{g}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </>
+      )}
     </div>
   );
 }
@@ -342,7 +498,7 @@ export function VersionsPanel({ doc, onKeep, onRestore }: { doc: WriteDoc; onKee
                 {v.title && <p className="w-peek-title">{v.title}</p>}
                 {v.blocks.slice(0, 40).map((b) => (
                   <p key={b.id} className={`w-peek-${b.t}`}>
-                    {b.text}
+                    {b.t === 'img' ? `[Picture${b.alt ? `: ${b.alt}` : ''}]` : b.t === 'hr' ? '———' : b.t === 'pb' ? '[Page break]' : b.t === 'table' ? `[Table: ${b.rows?.length ?? 0} rows]` : b.text}
                   </p>
                 ))}
                 {v.blocks.length > 40 && <p className="w-quiet">…and {v.blocks.length - 40} more paragraphs.</p>}

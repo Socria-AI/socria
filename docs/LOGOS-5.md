@@ -570,18 +570,33 @@ Space (`components/DraftSpace.tsx`, `DraftResponsePanel.tsx`, `lib/logos-draft.t
 and `/api/logos/draft`), which are gone rather than kept beside it. Before
 Logos 5 the same component is the column the header's **Write** opens.
 
-- **One model.** Blocks of plain text with bold, italic and underline marks
-  (paragraph, three headings, quotation, bulleted and numbered lists three
-  deep, a line break inside a block), each able to cite passages of the
-  person's documents and to remember the Draft Space cards it grew from; cards
-  (idea, claim, evidence, example, counterargument, conclusion, question) in
-  piles, linked to passages, Logic Map ideas or other cards; dismissed
-  findings; versions. Every operation returns a new document; none can change
-  a word the person did not ask to change. The old `{ title, html }` draft is
-  read into a document the first time it opens (`normalizeDraft`), every word
-  kept; `title` and an HTML rendering are saved beside the document for
-  anything older that still reads them. The server bounds it
-  (`sanitizeStoredDraft`, also in the shared-room route) and never rewords it.
+- **One model.** Blocks of words — paragraph, three headings, quotation,
+  bulleted and numbered lists three deep, code — and blocks that are whole: a
+  picture, a table, a line, a page break. Over a block's words, marks: bold,
+  italic, underline, strikethrough, superscript, subscript, and marks that
+  carry a value — a link (http, https, mailto and tel only), a text colour and
+  a highlight (`#rrggbb`), a font (one of ten, each with its fallbacks) and a
+  size in points — one value a character, the later one winning. A
+  paragraph's alignment, indentation (half an inch a step), line spacing and
+  space before and after. A table's cells are blocks of words of their own,
+  with their own ids: found, edited, checked, searched and asked about like
+  paragraphs, and the table's words kept in its `text` as well (cells by tabs,
+  rows by lines). The page: paper (Letter, A4, Legal, A5), orientation,
+  margins; the document's own font and size; one flow or pages. Each block can
+  cite passages of the person's documents and remember the Draft Space cards
+  it grew from; cards (idea, claim, evidence, example, counterargument,
+  conclusion, question) in piles, linked to passages, Logic Map ideas or other
+  cards; dismissed findings; versions. Every operation returns a new document;
+  none can change a word the person did not ask to change. The old `{ title,
+  html }` draft is read into a document the first time it opens
+  (`normalizeDraft`), every word kept; `title` and an HTML rendering are saved
+  beside the document for anything older that still reads them. **No
+  migration**: the stored shape is still `v: 2` and everything new in it is
+  optional, so a document saved before the word processor reads exactly as it
+  was. The server bounds it (`sanitizeWriteDoc` through `sanitizeStoredDraft`,
+  also in the shared-room route) and never rewords it: no script in a link, no
+  colour that is not one, no font name that could break out of CSS, a picture
+  only by its media id, a ragged table made square, a page within its bounds.
 - **The Draft Space** (`components/write/Board.tsx`): brain-dump (Enter; a
   pasted list is a card a line), kinds guessed from wording and changed in one
   tap, piles, drag and keyboard moves (Alt+Shift+arrows), multi-select, merge,
@@ -590,25 +605,71 @@ Logos 5 the same component is the column the header's **Write** opens.
   findings beside the cards. **Turn into an outline** (`outlineFrom`) appends
   named piles as headings and cards as an outline — evidence linked to a
   passage arrives as a citation — and never touches what is written; a card
-  already written is not added twice.
-- **The Writing Space** (`components/write/Editor.tsx`, `dom.ts`): one
-  contentEditable page drawn from the model. The browser types characters
-  inside a block (so input methods, spelling corrections and dictation work);
-  everything that changes the document's shape — Enter, Backspace at a block's
-  start, a selection across blocks, paste, marks, list depth, moving a
-  paragraph — is a model operation on the native `beforeinput` event, so undo
-  and redo are the document's own and exact. Markdown's habits at a line's
-  start. Paste from Word, Google Docs and the web keeps headings, lists and
-  emphasis (`lib/write/parse.ts`); copying carries the blocks.
-- **Asked for, never automatic** (`app/api/logos/write`, `lib/write/assist.ts`):
-  Ask (Point & Ask: a `writing` focus — the words verbatim, where they sit,
-  what they cite and grew from), Explain, Critique, Shorten, Improve, Develop
-  (questions and a bracketed shape, never the sentence), Other wordings (only
-  when asked), Proofread, and the board's gaps. Code checks every answer: an
-  edit must be words of the passage; an edit that brings in a number, a
-  citation, a quotation or an address is dropped; "shorter" must be shorter; a
-  finding must be found in its block, a card id must be a card. Edits are
-  shown one at a time and change the page only when accepted.
+  already written is not added twice. Signed in, a card's menu can **Keep in
+  memory** — it becomes a node of the person's memory (a claim a belief, a
+  question a question, evidence or an example evidence, anything else an
+  insight), noted as kept from this writing.
+- **The Writing Space** (`components/write/Editor.tsx`, `dom.ts`,
+  `Toolbar.tsx`, `panels.tsx`): one contentEditable page drawn from the model.
+  The browser types characters inside a block (so input methods, spelling
+  corrections and dictation work); everything that changes the document's
+  shape — Enter, Backspace at a block's start, a selection across blocks,
+  paste, marks, list depth, moving a paragraph, a table's rows — is a model
+  operation on the native `beforeinput` event, so undo and redo are the
+  document's own and exact. Pictures, tables, lines and page breaks are islands
+  the browser cannot type into, a table's cells editable islands inside them;
+  a picture, a line or a page break is picked whole (Backspace after one picks
+  it before anything is removed). Formatting chosen with nothing selected is
+  held at the caret and written with the next characters.
+  - **The toolbar**, one row over the page: undo and redo; style; font; size
+    (−, the number, +); bold, italic, underline; text colour and highlight;
+    link; **Insert** (a picture, a table up to 6×6 from a grid, a line, a page
+    break); alignment; line and paragraph spacing; bullets, numbers, indent;
+    **More** (strikethrough, superscript, subscript, clear formatting, find,
+    the outline, page setup). In a table it adds a row above or below, a
+    column left or right, deletes them, turns the header row on or off,
+    deletes the table; on a picture, small, medium and full width, its
+    alignment, its description, replace and delete. A picture's corner drags
+    its width; a table's column edges drag theirs. On a phone the row scrolls
+    and its menus are sheets from the foot.
+  - **Links**: ⌘/Ctrl+K edits one, a bubble under the caret shows where it
+    goes, ⌘/Ctrl-click opens it; a URL pasted over words links them.
+  - **Find and replace** (⌘/Ctrl+F; ⌘/Ctrl+H, ⌘⇧H on a Mac): any case or
+    matching it, whole words, cells included; each found word replaced where
+    it is, keeping its emphasis.
+  - **The outline** lists the headings, goes to one, moves a section whole.
+    **Page setup**: paper, orientation, margins, the document's font and size,
+    and the page view — the paper drawn, the pages counted.
+  - **Keys**: ⌘/Ctrl+B, I, U; ⌘⇧X strikethrough; ⌘. superscript, ⌘,
+    subscript; ⌘⇧> and ⌘⇧< a size up or down; ⌘\ clears formatting; ⌘⇧L, E,
+    R, J align; ⌘] and ⌘[ indent; ⌘⌥0–3 paragraph and headings; ⌘⇧7, 8, 9
+    numbers, bullets, quotation; ⌘Enter a page break; ⌘⇧V pastes words alone;
+    Tab and ⇧Tab between cells (Tab in the last adds a row); Alt+Shift+↑/↓
+    (Ctrl+Shift on a Mac) moves a paragraph. Markdown's habits at a line's
+    start.
+  - **Paste** from Word, Google Docs and the web keeps headings, lists,
+    emphasis, links, colours, fonts, sizes, alignment, tables with their
+    widths, and pictures — not a link's own blue and underline, black text or
+    a white highlight, or the page's base size (`lib/write/parse.ts`); copying
+    carries the blocks.
+- **Asked for, never automatic** (`app/api/logos/write`,
+  `lib/write/assist.ts`): Ask (Point & Ask: a `writing` focus — the words
+  verbatim, where they sit, what they cite and grew from; in a table, its row,
+  column and heading), Explain, Critique, Shorten, Improve, Develop (questions
+  and a bracketed shape, never the sentence; it and Critique read the line of
+  thinking and the map's ideas too), Other wordings (only when asked),
+  Proofread — of everything, or **the language only** (grammar and spelling,
+  nothing about the argument) — **Structure** (from the outline: a reverse
+  outline, what each paragraph does, the main claim quoted as written, at most
+  three moves to consider, the questions a reader would still ask — never a
+  rewrite), and the board's gaps. Code checks every answer: an edit must be
+  words of the passage; an edit that brings in a number, a citation, a
+  quotation or an address is dropped; "shorter" must be shorter; a finding
+  must be found in its block, a card id must be a card; the main claim must be
+  a sentence of its paragraph, word for word; a move must name paragraphs that
+  exist and change something; a gap must be a question. Edits are shown one at
+  a time, on the words themselves as well as in the panel, and change the page
+  only when accepted; a move moves nothing until **Move it** is pressed.
 - **Proofreading without a model** (`lib/write/checks.ts`): rules for the
   decidable — misspellings that are never words, doubled words, "could of",
   then/than, its/it's, a/an by sound, a lone "i", spacing, doubled
@@ -619,20 +680,57 @@ Logos 5 the same component is the column the header's **Write** opens.
   judgement call*; only definite and likely are underlined (CSS highlights, so
   never in the DOM), and only when the caret is put on them does the card
   open. Dismissals hold across edits. Quotations are only checked for a
-  citation. Unchanged paragraphs are not checked again (the cache is keyed by
-  the block object).
-- **Word** (`lib/write/docx.ts`, `word.ts`, `zip.ts`, `import.ts`): a real
-  .docx with Word's built-in styles and numbering, citations as superscript
-  numbers and a Sources list; Word files read in the browser (zip inflated with
-  `DecompressionStream`, within ceilings) with their styles, numbering and
-  emphasis resolved; Markdown, text, HTML; OpenDocument and RTF through the
-  document reader. Print gives PDF.
+  citation; table cells are read like paragraphs, code not at all. Unchanged
+  paragraphs are not checked again (the cache is keyed by the block object).
+- **Out and in** (`lib/write/docx.ts`, `word.ts`, `pdf.ts`, `pdf-fonts.ts`,
+  `render.ts`, `parse.ts`, `zip.ts`, `import.ts`):
+  - **Word**, both ways, in the browser: styles, numbering, fonts, sizes,
+    colours, highlights, links (as Word's own hyperlinks), strikethrough,
+    superscript and subscript, alignment, spacing, indents, code, lines, page
+    breaks, tables (header row, column widths, merged cells read as their
+    words), pictures, the paper and margins, the document's font and size;
+    citations as superscript numbers and a Sources list.
+  - **PDF**, made in the browser with the fourteen fonts every reader has
+    (Times, Helvetica and Courier, and Symbol for Greek and mathematical
+    signs), so its words can be selected and searched: links, pictures (with
+    their transparency), tables whose header row repeats on the next page,
+    the paper and margins, the title. A character those fonts cannot show (a
+    CJK character, an emoji) is named before the file is made, and Print is
+    offered instead — nothing is dropped in silence. A PDF opened comes in
+    through the document reader as its words and shape (headings, lists,
+    paragraphs) and says it holds no styles.
+  - **Markdown** both ways (tables, fenced code, strikethrough, links,
+    pictures), **a web page** both ways (pictures in it), **plain text**, and
+    **Print** (the page set on its paper). OpenDocument and RTF come in
+    through the document reader.
+- **Pictures** (`lib/write/media.ts`, `components/write/media-client.ts`,
+  `lib/write/media-store.ts`, `app/api/write/media`): kept apart from the
+  document, which holds only `m:<id>` — 128 random bits, chosen in the browser
+  so a picture is in the writing the moment it is put in. Put in from a file,
+  a paste or a drop, or arriving in a paste or an import; made at most 2,000
+  pixels across and 4 MB in the browser (turned upright if the camera said it
+  was on its side). In this browser they are in IndexedDB; signed in, each is
+  also sent to the account — a private bucket, `socria-write-media`, made on
+  first use with a picture's ceiling and picture types only, one folder per
+  person named by a digest of the account — where the server decides what it
+  is from its own bytes (PNG, JPEG, GIF or WebP, a sensible size from its
+  header) and serves it only as that, to someone signed in who has its id.
+  Deleting a conversation removes the pictures its writing held, except one
+  that other writing of theirs still holds (the database looks for it in their
+  other drafts and versions; when it cannot be asked, every picture stays).
+  Deleting the account removes the folder; the export lists every picture with
+  a link that works for an hour. A picture taken out of a draft stays in the
+  folder until its conversation or the account is deleted — a version or an
+  undo may still need it. A picture not on this device and not in the account
+  says so in its place.
 - **Kept safe**: handed to the session 400 ms after typing stops (at once for
   anything else), saved 1.2 s later, with the state said (Saved / Saving /
   Saved on this device / Not saved yet — trying again, retried every 15 s); a
-  copy in this browser offered back if a save never landed; versions every ten
-  minutes or so of writing, on request, and before an import, a restore or a
-  recovery replaces anything.
+  copy in this browser offered back if a save never landed; pictures sent a
+  moment after the writing settles, and again if one did not go; versions
+  every ten minutes or so of writing, on request, and before an import, a
+  restore or a recovery replaces anything. The foot of the page counts the
+  words (of the selection, while there is one) and, as pages, the pages.
 
 ## 9. Data
 
@@ -697,6 +795,18 @@ from the foot.
 `NEXT_PUBLIC_LOGOS5=off` brings back the Logos 4 layout without a deploy of
 code. Logos 2 is unchanged.
 
+`NEXT_PUBLIC_WRITE_RICH=off` (`lib/write/flags.ts`) takes the word
+processor's tools away — the toolbar, the page view, pictures put in, the link
+editor, the page section of the menu — and gives back bold, italic and
+underline on the selection's tools, without touching a document: what is
+already formatted stays formatted and is saved as it is, and every export
+still carries it. It is the way back, because the documents need nothing
+undone. Taking the code itself back is safe for the words, not for the rest:
+the reader before it opens a document made since with every word (a table's
+words are in its `text`, a picture or a line is a block it reads as an empty
+paragraph), but shows none of the new formatting, and drops it from any
+document it saves again. Pictures stay in their bucket either way.
+
 **Per person, behind a code.** On a deployment that offers it, Logos 5 — the
 new Socria — opens only for whoever has entered its access code under Manage
 Account → Access code (the `socria` feature gate, `lib/new-socria.ts`): checked
@@ -753,12 +863,14 @@ everyone has.
 | A map written alone, and the mark taken away (`firstMap`, `opened`); a save that leaves the memory | `app/api/conversations/route.ts` (`mapOnly`, PUT) |
 | The move, the drawing, the chip, opening a Core chat here | `components/LogosApp.tsx` (search `THE CORE CHATS, BROUGHT IN`), `components/logos5/Universe.tsx` (`drawing`), `app/chat/page.tsx` (`onConversationsMoved`) |
 | The challenge leaving an unopened map alone | `lib/rewards/challenge-rule.ts` |
-| Writing: the document — blocks, marks, citations, cards, piles, versions, bounds (pure) | `lib/write/doc.ts` |
-| Writing: in and out — pastes, Markdown, the old drafts; HTML, Markdown, text; Word out; Word in (in the browser) | `lib/write/parse.ts`, `render.ts`, `docx.ts`, `word.ts`, `zip.ts`, `import.ts` |
+| Writing: the document — blocks, marks and their values, paragraphs' settings, tables, pictures, the page, find and replace, the outline, citations, cards, piles, versions, bounds (pure) | `lib/write/doc.ts` |
+| Writing: in and out — pastes, Markdown, the old drafts; HTML, Markdown, text; Word out; Word in (in the browser); PDF out, and the metrics of its fonts | `lib/write/parse.ts`, `render.ts`, `docx.ts`, `word.ts`, `zip.ts`, `import.ts`, `pdf.ts`, `pdf-fonts.ts` |
+| Writing: pictures — known by their bytes; kept in the browser and sent to the account; kept, served, listed, released with a conversation and purged with an account on the server | `lib/write/media.ts`, `components/write/media-client.ts`, `lib/write/media-store.ts`, `app/api/write/media/route.ts`, `app/api/write/media/[id]/route.ts`, `app/api/conversations/[id]/route.ts` |
+| Writing: the word processor's switch | `lib/write/flags.ts` (`NEXT_PUBLIC_WRITE_RICH`) |
 | Writing: the rules that proofread on the device; the board's hints and outline; Point & Ask's brief; the map lit while writing | `lib/write/checks.ts`, `board.ts`, `focus.ts`, `links.ts` |
 | Writing: what Socria may be asked, and how its answers are checked; the route | `lib/write/assist.ts`, `app/api/logos/write/route.ts` |
-| Writing: the space, the page, the board, the panels, the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Board.tsx`, `parts.tsx`, `write.css` |
-| Writing: where it is wired in (the Writing artifact, the column, saving, Point & Ask, Add to draft) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`) |
+| Writing: the space, the page, the toolbar, the board, the panels (find, the outline, page setup, links, a picture's description; checks, versions, structure, a proposed edit), the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Toolbar.tsx`, `Board.tsx`, `panels.tsx`, `parts.tsx`, `write.css` |
+| Writing: where it is wired in (the Writing artifact, the column, saving, Point & Ask, Add to draft, Keep in memory) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`; `keepWritingInMemory`) |
 | Driving the four views in a browser | `scripts/dev/logos5-views-journey.mjs` (desktop, `W=390 H=844` for a phone, `THEME=night`, `AXE=…/axe.min.js` for an accessibility scan per screen) |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Month|All`; any of them on a theme with `THEME=night`) |
 
@@ -1592,3 +1704,99 @@ store); documents of hundreds of pages in a browser. The newsletter issue
 `2026-11-draft-space` (`lib/newsletter-issues.ts`) describes the Draft Space
 that is on production — Clarify, Challenge, Trace, Refine, Hold in view — and
 should be rewritten when this reaches main.
+
+### The Writing Space as a word processor
+
+Asked for: the Write/Draft Space turned into a real document editor, the
+kind Google Docs or Notion are — fonts, sizes, colours, emphasis, alignment,
+headings, lists and spacing; tables, links, pictures, page layout, margins
+and a word count; undo and redo, keyboard shortcuts, autosave; DOCX, PDF,
+Markdown and text in and out with the formatting kept; writing help that
+suggests inline, checks grammar, proofreads what is pointed at, organises an
+argument and develops ideas without rewriting the person's sentences; the
+writing kept with its conversation, memory and workspace; one clean toolbar,
+working on a phone — inside the existing space, nothing added to the app's
+navigation. Built as §8 describes; the switch and the way back are in §11.
+
+- **One model, no migration.** Everything new in the stored document is an
+  optional field, so a document saved before reads exactly as it was
+  (checked), and what the server keeps is bounded field by field. A table's
+  words are in its `text` too, so the reader before this one keeps every
+  word of a document made since (its code read for this, and imitated in
+  the tests).
+- **Checked in a real browser** (the dev app, signed out so the writing is
+  local; Chromium at 1366×900 and at 390×844 with a touch profile; no page
+  errors in any run): typing a title and paragraphs; bold from the toolbar;
+  Arial, a size up, red and a highlight on a phrase; a link with Ctrl+K;
+  Ctrl+B at the caret, then typing in bold; a centred paragraph; a bulleted
+  list; a 3×3 table filled with Tab, a row added by Tab in the last cell, one
+  deleted from the bar; a picture from a file, then made medium, centred and
+  described; a line and a page break; find (1 of 2); undo and redo; the five
+  exports (Word, PDF, Markdown, text, a web page); A4 landscape as pages
+  ("2 pages"); and a reload with all of it there, the picture drawn again
+  from this browser's store. Socria's help with the stand-in model: Improve
+  on a sentence, its edit shown in the panel and on the words, accepted
+  there; the language only, finding "they was" and fixing it; Structure — the
+  reverse outline, the main claim quoted, **Move it** putting an example
+  after its claim. A paste shaped like Google Docs' (a heading, centring,
+  bold, a colour, a link, a highlight, a table with its widths, a picture at a
+  data address — kept) and a picture from the clipboard; the exported Word
+  file opened back in with every block and setting, the writing it replaced
+  kept as a version.
+- **Read back by other software**: the Word file opened by LibreOffice (A4,
+  two pages, every word) and pandoc (bold, strikethrough, highlight,
+  superscript, the link, the table, the picture); the PDF by pdfinfo,
+  pdftotext (the table's numbers in their columns) and pdf.js (two pages,
+  every word, the Greek and the signs as themselves, A4) — each run by the
+  test suite where the program is installed.
+- **Pictures, signed in**: the routes were run end to end over an in-memory
+  bucket that keeps a real one's rules (`test/write-media-route.test.mjs`):
+  nothing kept or served signed out; an SVG calling itself a PNG, a header
+  claiming 30,000 pixels, more than 4 MB — said or not said, a body that
+  never ends is stopped past the ceiling — all refused before storage; a
+  picture kept at its id in a digest-named folder, a retry kept; served as
+  the picture it is (nosniff, a sandboxing policy) to its owner and to
+  someone with its id and folder, to nobody without; listed for the export
+  and removed with the account, nobody else's touched; a conversation deleted
+  taking the pictures only its writing held, keeping one another draft or a
+  version still holds, and keeping them all when the drafts cannot be
+  searched. The account checks
+  (`test/account-data-complete.test.mjs`) now fail on any storage bucket that
+  is not deleted with an account, and on a kept one missing from the export.
+- Found and fixed on the way: Ctrl+K opened the app's search as well as the
+  link editor; formatting typed at a collapsed caret landed in the wrong
+  place; a picture was unpicked the moment it was picked; formatting did
+  nothing inside coloured words (two attributes shared a name); the page drew
+  a focus ring; on a phone the toolbar made the page 958px wide, its menus
+  opened under the composer, and a long save status ("Saved on this device")
+  widened the whole artifact past the screen; a landscape sheet was cut off
+  beside a panel; a Google Docs link came in with its own blue and underline
+  as formatting; a page saved as HTML brought its doctype in as words; Word's
+  quotation style came in as italics; a line was not read back from Word;
+  percentage column widths and a picture's width were ignored in HTML; a
+  section could not be moved up past one that had subsections; A4 was a twip
+  narrow in Word; a web page's title with an ampersand was taken
+  for a heading.
+- `test/write-editor.test.mjs` (marks with values, paragraphs' settings,
+  pictures, lines and page breaks as wholes, tables, find and replace, the
+  outline, storage and the rollback, HTML, Markdown and text out, pastes in,
+  pictures by their bytes, one document with everything through Word and
+  PDF and back, the checks on cells, Point & Ask on a cell, the switch,
+  opening files — 121 checks), `test/write-media-route.test.mjs` (44), and the
+  earlier suites updated where the model now holds more (a link is a link, not
+  words; code and lines are blocks; a table is a table): `test/write.test.mjs`
+  (187), `test/write-route.test.mjs` (43, now with the language only and the
+  argument's structure), `test/write-store-e2e.test.mjs` (14).
+
+**What this does not show.** Nobody has used it yet: whether the structure
+help makes an argument better, or the toolbar is the right one, has not been
+studied, and nothing here is evidence that it is. Not verified: a picture
+uploaded to real storage and read back across two signed-in devices (the
+routes ran against a stand-in bucket); Keep in memory end to end (the memory's
+own node-making is tested; the button was not pressed in a browser); the print
+dialog; Safari, Firefox, iOS and Android, and their keyboards, input methods
+and dictation; the real model's improvements, proofreading and reverse
+outlines (the checks applied to them are tested; the answers were canned);
+Microsoft Word itself opening the files (LibreOffice and pandoc did); a
+document of hundreds of pages in the browser (the PDF writer was run on 140
+paragraphs).

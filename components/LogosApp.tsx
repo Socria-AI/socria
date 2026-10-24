@@ -2648,6 +2648,27 @@ export function LogosApp({
     [keyHeaders]
   );
 
+  /**
+   * Words of the person's own writing kept in memory, because they asked: the
+   * same write path as the Memory page, so a tombstone still outranks it and a
+   * duplicate comes back as what is already there. Says what happened.
+   */
+  const keepWritingInMemory = useCallback(async (text: string, kind: CardKind): Promise<string> => {
+    const label = text.replace(/\s+/g, ' ').trim().slice(0, 200);
+    if (!label) return 'There are no words there to keep.';
+    const type = kind === 'claim' ? 'Belief' : kind === 'question' ? 'Question' : kind === 'evidence' || kind === 'example' ? 'Evidence' : 'Insight';
+    const title = writeDocRef.current.title.trim();
+    const res = await fetch('/api/mind/node', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ type, label, note: `kept from your writing${title ? ` “${title.slice(0, 80)}”` : ''}` }),
+    });
+    const j = await res.json().catch(() => null);
+    if (!res.ok) throw new Error(j?.error || 'That could not be kept just now.');
+    if (j?.ok === false) return typeof j.say === 'string' ? j.say : 'That is already in your memory.';
+    return 'Kept in your memory — you will find it on the Memory page.';
+  }, []);
+
   /** POINT & ASK on writing: the words become the conversation's "this", and the cursor goes to the box. */
   function askAboutWriting(sel: WriteSel) {
     setFocus(null);
@@ -4498,6 +4519,8 @@ export function LogosApp({
   useEffect(() => {
     if (!l5) return;
     const onKey = (e: KeyboardEvent) => {
+      // a key the page already used — Ctrl/⌘+K is a link in the writing — is not also a search
+      if (e.defaultPrevented) return;
       if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 'k') {
         e.preventDefault();
         setSearchOpen((v) => (v ? null : Date.now()));
@@ -7640,6 +7663,9 @@ export function LogosApp({
         where={where}
         onClose={where === 'column' ? () => setDraftOpen(false) : undefined}
         autoFocus
+        cloud={cloud}
+        topic={active?.title}
+        onKeep={cloud ? keepWritingInMemory : undefined}
       />
     ) : null;
   const draftEl = (

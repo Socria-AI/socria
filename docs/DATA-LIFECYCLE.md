@@ -25,6 +25,7 @@ no separate log database, no vector index.
 | Clerk | email, sign-in credentials, sessions | Clerk user id |
 | Stripe | customer, subscription, payment method, invoices | Stripe customer id |
 | Upstash Redis | one integer counter per rate-limit bucket | `rl:<bucket>:<user or ip>` |
+| Supabase Storage, `socria-write-media` (private) | pictures put into the person's writing — PNG, JPEG, GIF or WebP, at most 4 MB each, decided by their bytes (`lib/write/media-store.ts`) | `<digest of user id>/<128-bit random id>` |
 
 `conversations.id` is the **sole** primary key — it does not include `user_id`.
 That is a live sharp edge: any write path that conflicts on `id` alone can
@@ -124,11 +125,11 @@ record — but it means deletion controls have to actually work.
 
 | Control | Endpoint | Removes | Leaves |
 |---|---|---|---|
-| Delete one conversation | `DELETE /api/conversations/[id]` | that row entirely: messages, map, draft, contexts, memory | everything else |
+| Delete one conversation | `DELETE /api/conversations/[id]` | that row entirely: messages, map, draft, contexts, memory; and the pictures its draft held, from storage | everything else — including a picture another of their drafts (or its versions) still holds, and every picture if the drafts cannot be searched (`releaseDraftMedia`) |
 | Clear memory | `DELETE /api/account/memory` | the derived keys from every conversation, plus `profile` and `understanding` | your messages, maps and drafts |
 | Disconnect a source | `DELETE /api/logos/connections` | the encrypted token row | material already pulled into a conversation |
-| Export | `GET /api/account/export` | — | returns every row keyed to you as JSON; connections are reported as *existing*, never with their tokens |
-| Delete account | `DELETE /api/account/delete` | Stripe subscription cancelled **first**, then all four tables, then the Clerk user | nothing |
+| Export | `GET /api/account/export` | — | returns every row keyed to you as JSON; connections are reported as *existing*, never with their tokens; the pictures in your writing as a list with a link to each that works for an hour |
+| Delete account | `DELETE /api/account/delete` | Stripe subscription cancelled **first**, then all four tables, then the folder of pictures in storage, then the Clerk user | nothing |
 
 Deletes are immediate and hard — `.delete()`, not a soft flag. Nothing is kept
 in a trash state.
@@ -203,7 +204,10 @@ update, or fix the primary key first.
 Before shipping anything that touches storage:
 
 1. New table? Add it to `OWNED_TABLES` in the account-delete route, to the
-   export route, and to `supabase/rls.sql`.
+   export route, and to `supabase/rls.sql`. New storage bucket? Purge it in
+   the account-delete route and, if it keeps files rather than passing them
+   through, list them in the export — `test/account-data-complete.test.mjs`
+   fails until a bucket has both decisions.
 2. New derived memory field? Add it to `DERIVED`.
 3. New vendor receiving any user data? Add it to `/subprocessors` **before** it
    goes live, not after.
@@ -218,6 +222,11 @@ with dashboard access:
 
 - Confirm and record Supabase's backup retention window.
 - Confirm and record Vercel's log retention window.
+- A picture taken out of a draft stays in its owner's folder until the
+  conversation holding it or the account is deleted (a version or an undo may
+  still need it); nothing yet sweeps away pictures that no writing refers to.
+  A picture someone puts into a draft shared with them is kept in *their*
+  folder, so it goes with their account, not with the owner's conversation.
 - MFA on the Supabase, Vercel, Clerk, Stripe, OpenAI and GitHub accounts.
 - Rotate any key that predates this document or has ever been pasted anywhere.
 - Separate dev / staging / production projects, so a mistake in development

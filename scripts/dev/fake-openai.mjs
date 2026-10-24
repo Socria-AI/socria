@@ -223,6 +223,18 @@ function writeReply(system) {
     }
     return { issues };
   }
+  if (op === 'structure') {
+    // a reverse outline of the paragraphs it was given: roles from their wording, the first sentence that argues as the claim
+    const paras = Array.from(system.matchAll(/^\[([A-Za-z0-9_-]+)\](?: \((\w+)\))? (.*)$/gm)).map((m) => ({ id: m[1], t: m[2] ?? 'p', text: m[3] }));
+    const role = (x) => (/^h/.test(x.t) ? 'other' : /\b(for example|for instance)\b/i.test(x.text) ? 'example' : /\b(but|however|critics)\b/i.test(x.text) ? 'counter' : /\b(\d+%|data|study|survey)\b/i.test(x.text) ? 'evidence' : /\b(so|therefore|in conclusion)\b/i.test(x.text) ? 'conclusion' : /\b(should|must|because)\b/i.test(x.text) ? 'claim' : 'background');
+    const outline = paras.map((x) => ({ block: x.id, role: role(x), does: `${role(x) === 'other' ? 'names the section' : role(x) === 'example' ? 'gives an example' : role(x) === 'evidence' ? 'gives a figure as support' : role(x) === 'claim' ? 'makes the argument' : role(x) === 'counter' ? 'raises an objection' : role(x) === 'conclusion' ? 'draws the conclusion' : 'sets the scene'}` }));
+    const claimP = paras.find((x) => role(x) === 'claim');
+    const sentence = claimP ? (claimP.text.match(/[^.!?]+[.!?]/) ?? [claimP.text])[0].trim() : null;
+    const ex = paras.findIndex((x) => role(x) === 'example');
+    const cl = claimP ? paras.indexOf(claimP) : -1;
+    const moves = ex >= 0 && cl > ex ? [{ block: paras[ex].id, after: paras[cl].id, why: 'The example comes before the claim it illustrates; after it, a reader knows what it is an example of.' }] : [];
+    return { outline, ...(sentence ? { thesis: { block: claimP.id, quote: sentence } } : {}), moves, gaps: ['What would someone who disagrees point to first?'] };
+  }
   if (op === 'board') {
     const cards = Array.from(system.matchAll(/^\[([A-Za-z0-9_-]+)\] \((\w+), pile: ([^)]*)\) (.*)$/gm)).map((m) => ({ id: m[1], kind: m[2], pile: m[3], text: m[4] }));
     const claim = cards.find((c) => c.kind === 'claim');

@@ -8,7 +8,7 @@
 // and only the first one breaks anything if you skip it. This test makes
 // skipping the other two break something.
 
-import { readFileSync } from 'node:fs';
+import { readdirSync, readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -127,6 +127,36 @@ for (const t of tables) {
     continue;
   }
   ok(`${t} — exported`, new RegExp(`from\\('${t}'\\)`).test(exp), 'no .from() for it');
+}
+
+console.log('\n=== every storage bucket ===');
+{
+  // Private storage is not in schema.sql, so nothing above can see it. Every
+  // bucket a person's files are kept in is named here with what reaches it; a
+  // new bucket fails until someone decides how it is deleted and exported.
+  // Uploads only pass through (each is deleted as it is read), so there is
+  // nothing to export; a writing's pictures are kept, so they are listed.
+  const KNOWN = {
+    UPLOAD_BUCKET: { purge: /await purgeUploads\(userId\)/ },
+    MEDIA_BUCKET: { purge: /await purgeMedia\(userId\)/, exported: /out\.writingPictures = await listMedia\(userId\)/ },
+  };
+  const found = [];
+  const walk = (dir) => {
+    for (const e of readdirSync(join(root, dir), { withFileTypes: true })) {
+      const p = join(dir, e.name);
+      if (e.isDirectory()) walk(p);
+      else if (/\.tsx?$/.test(e.name)) for (const m of read(p).matchAll(/export const (\w+_BUCKET) = '([^']+)'/g)) found.push(m[1]);
+    }
+  };
+  walk('lib');
+  ok('the buckets are found', found.length >= 2, found.join(', '));
+  for (const b of found) {
+    const k = KNOWN[b];
+    ok(`${b} — known, with a decision about it`, !!k);
+    if (!k) continue;
+    ok(`${b} — emptied with the account`, k.purge.test(del));
+    if (k.exported) ok(`${b} — in the export`, k.exported.test(exp));
+  }
 }
 
 console.log('\n=== the deletion still fails closed ===');
