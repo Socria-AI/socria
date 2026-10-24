@@ -22,31 +22,60 @@
 //                     given when asked — the call stays theirs), and the
 //                     substance of writing that will be theirs
 //
-// AN EXPLICIT HAND-OVER IS HONOURED. "You decide", "just write it for me",
-// "I need the finished version": they have made the call about the call, and
-// overruling it would be the paternalism this exists to avoid. Only the Answer
-// Guard — which they switch on — withholds anything.
+// CORE 4'S ALLOCATOR, WHOLE (replay.ts). Where the route hands over the
+// conversation, the split is no longer taken alone: Core 4's `allocate` runs
+// over Core 4's state, replayed from the transcript — its eight modes, the
+// person's explicit words carried through the conversation, a withhold only
+// on their words and always with what they can have instead, the practice
+// ladder that bottoms out on repeated failure, graded work, the safety
+// override. The Logos move is kept (it reads evidence the allocator does not:
+// the engine's verdicts, their map, what they selected) and made to obey the
+// allocation: nothing withheld is ever informed.
+//
+// A HAND-OVER MOVES THE SERVICE, NOT THE COGNITION. Under Core 4's allocator
+// "you decide" and "just write it for me" get no questions, full length and
+// everything around the work — Socria's view, plainly; every part of a draft
+// but its substance — and the choice and the substance stay theirs: that is
+// Core 4's invariant, and it came with the allocator. A practical brief ("an
+// email to my landlord about the heater") is still simply written.
+//
+// Without the conversation — LOGOS_ALLOCATION=lite — this is the split and
+// the move as they were: an explicit hand-over honoured in full, and only the
+// Answer Guard withholding.
 //
 // Pure. No model, no network, no clock.
 
-import { splitFor } from '../core4/split';
+import { splitFor, mustNotPerform, CONTRIBUTION } from '../core4/split';
 import { ownershipRead } from '../core4/allocation';
 import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
 import { chooseAssist, renderAssist, type AssistDecision, type AssistInput } from '../cognition/assist';
 import { TALK, type Exchange } from '../cognition/register';
-import type { CognitiveSplit, ExplicitSignals } from '../core4/types';
+import { EVIDENCE_WITHHELD, type Allocation, type AllocationMode, type CognitiveSplit, type ExplicitSignals } from '../core4/types';
 import type { TurnState } from './state';
+import { replayConversation, type ReplayInput } from './replay';
 
 export interface RuntimeAllocation {
   split: CognitiveSplit;
   /** Core 4's read of whose work this is: handed over, scoped, theirs, unclear, or not a question */
   ownership: 'delegated' | 'scoped' | 'theirs' | 'ambiguous' | null;
-  /** the move this turn (the Logos 4 engine) */
+  /** the move this turn (the Logos 4 engine), made to obey the allocation */
   assist: AssistDecision;
   /** in words a reply can act on */
   does: string[];
   supports: string[];
   theirs: string[];
+  /** Core 4's allocation over the replayed conversation; null without it (LOGOS_ALLOCATION=lite) */
+  core: CoreView | null;
+}
+
+/** What the reply needs of Core 4's allocation — never shown to the person, never named in a reply. */
+export interface CoreView {
+  mode: AllocationMode;
+  reasonCode: string;
+  /** what stays with them and why, on their words — Core 4 sets it on nothing else */
+  withhold: Allocation['withhold'];
+  /** the first time anything is held back in this conversation */
+  announce: boolean;
 }
 
 const explicit = <T,>(value: T) => ({ value, source: 'explicit' as const, confidence: 1 });
@@ -85,19 +114,58 @@ export interface AllocateInput {
   signals: ExplicitSignals;
   /** everything chooseAssist reads — the caller already has it */
   assist: Omit<AssistInput, 'signals'>;
+  /**
+   * The conversation, for Core 4's allocator (replay.ts): their engine-checked
+   * claims this turn, whether the engine computed the answer to what they
+   * asked, and their Project's standing instructions. Absent, the split and
+   * the move stand alone, as before (LOGOS_ALLOCATION=lite).
+   */
+  replay?: Pick<ReplayInput, 'checked' | 'asked' | 'instructions'>;
 }
 
-export function allocate(i: AllocateInput): RuntimeAllocation {
-  const text = i.assist.lastUserText;
-  const core = coreStateFor(i.state, i.signals);
-  const ownership = ownershipRead(text, i.signals, core);
-  let split = splitFor({ state: core, signals: i.signals, text, ownership });
-  if (ownership === 'delegated') {
-    // Core 4 performs a handed-over task with its supporting split; the same here.
-    split = { ...split, creativity: 'share', judgment: 'share', reasoning: split.reasoning === 'scaffold' && i.state.preferences.learning ? 'scaffold' : 'perform' };
+/**
+ * The move, made to obey the allocation. The Logos engine picks what helps;
+ * Core 4 decides what may be given. Where they disagree the allocation wins,
+ * and it only ever narrows one thing: a thing they asked to produce is never
+ * informed. Safety is never touched.
+ */
+export function reconcile(assist: AssistDecision, a: Allocation): AssistDecision {
+  if (assist.reasons.includes('safety')) return assist;
+  const why = [...assist.reasons, `alloc:${a.reasonCode}`];
+  // They want to be heard, and said so: room, not advice.
+  if (a.mode === 'HUMAN_REFLECTS') return { ...assist, mode: 'space', forced: true, questions: 0, scaffold: 'none', reasons: why };
+  // The ladder bottomed out, or they are learning and stuck: this one, worked through.
+  if (a.reasonCode === 'practice.bottom_out' || (a.reasonCode === 'practice.stuck' && !a.withhold)) {
+    return { ...assist, mode: 'explain', forced: true, questions: 0, scaffold: 'steps', reasons: why };
   }
-  const assist = chooseAssist({ ...i.assist, signals: i.signals, exchange: i.state.exchange.kind });
+  if (a.withhold) {
+    const stuck = a.reasonCode.endsWith('.stuck');
+    if (a.withhold.reason === 'assessment_integrity') {
+      // The method in full and an analogous example — the submittable answer stays theirs.
+      return { ...assist, mode: 'explain', forced: true, questions: 0, scaffold: 'none', reasons: why };
+    }
+    // Their own writing: the move stands — critique, structure, craft — and the
+    // block says what is theirs. A hint toward "the answer" means nothing here.
+    if (a.withhold.reason === 'authorship') return { ...assist, ...(assist.mode === 'inform' ? { mode: 'open' as const, forced: false } : {}), reasons: why };
+    if (assist.mode === 'verify') return { ...assist, scaffold: stuck ? 'steps' : 'hint', reasons: why };
+    if (assist.mode === 'inform' || assist.mode === 'explain' || assist.mode === 'open') {
+      return { ...assist, mode: a.mode === 'AI_VERIFIES' ? 'verify' : 'explain', forced: true, scaffold: stuck ? 'steps' : 'hint', reasons: why };
+    }
+    return { ...assist, reasons: why };
+  }
+  // Their attempt, and nothing they asked to keep: the correction itself, not a hint toward it.
+  if (a.reasonCode === 'verify.correct' && assist.mode === 'verify') return { ...assist, scaffold: 'none', reasons: why };
+  // They handed it over in so many words — "you decide", "just write it", "just
+  // tell me": nothing is asked (Core 4: "what changes when they ask this way is
+  // that nothing is held back and nothing is asked").
+  if (HANDED.has(a.reasonCode) && assist.questions > 0) return { ...assist, questions: 0, reasons: why };
+  return assist;
+}
 
+const HANDED = new Set(['answer.requested', 'answer.requested.overrides_contract', 'judgment.theirs.asked', 'creation.asked.to.finish']);
+
+/** The split in words a reply can act on. */
+function wordsFor(split: CognitiveSplit): Pick<RuntimeAllocation, 'does' | 'supports' | 'theirs'> {
   const does = ['look things up from what you were given, check, organise and format, and do the arithmetic'];
   const supports: string[] = [];
   const theirs: string[] = [];
@@ -106,7 +174,91 @@ export function allocate(i: AllocateInput): RuntimeAllocation {
   else supports.push('the reasoning, worked through together');
   if (split.judgment === 'human') theirs.push('the decision: lay out what it rests on and the alternatives; give your own read if they ask; the call is theirs');
   if (split.creativity === 'human') theirs.push('the substance of what they are writing or making: build on their ideas with structure, options and critique, and improve their own sentences — do not hand them a finished piece from nothing');
-  return { split, ownership, assist, does, supports, theirs };
+  return { does, supports, theirs };
+}
+
+export function allocate(i: AllocateInput): RuntimeAllocation {
+  const text = i.assist.lastUserText;
+  const chosen = chooseAssist({ ...i.assist, signals: i.signals, exchange: i.state.exchange.kind });
+  if (i.replay) {
+    const { allocation: a } = replayConversation({
+      history: i.assist.history,
+      text,
+      signals: i.signals,
+      checked: i.replay.checked,
+      asked: i.replay.asked,
+      instructions: i.replay.instructions,
+      intent: i.state.intent,
+    });
+    return {
+      split: a.split,
+      ownership: a.ownership,
+      assist: reconcile(chosen, a),
+      ...wordsFor(a.split),
+      core: { mode: a.mode, reasonCode: a.reasonCode, withhold: a.withhold, announce: a.announce },
+    };
+  }
+  const core = coreStateFor(i.state, i.signals);
+  const ownership = ownershipRead(text, i.signals, core);
+  let split = splitFor({ state: core, signals: i.signals, text, ownership });
+  if (ownership === 'delegated') {
+    // Core 4 performs a handed-over task with its supporting split; the same here.
+    split = { ...split, creativity: 'share', judgment: 'share', reasoning: split.reasoning === 'scaffold' && i.state.preferences.learning ? 'scaffold' : 'perform' };
+  }
+  return { split, ownership, assist: chosen, ...wordsFor(split), core: null };
+}
+
+/**
+ * What Core 4 decided, in the few lines a reply needs — Core 4's own wording
+ * where it has one (intervene.ts renderDecision, turn.ts). Empty on most
+ * turns: a fact, a fix, a draft they handed over decide nothing worth a line.
+ */
+const REASON_LINE: Record<string, string> = {
+  'verify.confirm': 'Their attempt is right: say so plainly, first, and why.',
+  'verify.correct': 'Their attempt gets the correction: where it first goes wrong, and what is right.',
+  'verify.practice': 'They are practising this: say whether it is right, and exactly where and what kind of error — the redo is theirs.',
+  'practice.goal': 'Producing it is the point for them: support at the exact point they are stuck — a check, a pointer, a hint — never the answer.',
+  'practice.bottom_out': 'Several attempts on this one have not landed: work it through fully, name the principle, and give the next one back to them.',
+  'practice.stuck': 'They are learning this and stuck: explain this one fully; practice resumes on the next.',
+  'answer.requested.assessment': 'This is graded work they will submit as their own: explain the method fully and work an analogous example, and say once, plainly, why you are not handing over the submittable answer.',
+  'answer.requested.overrides_contract': 'Their newest instruction outranks their standing one: give them what they asked for.',
+  'reflect.heard': 'They want to be heard: precise acknowledgement and at most one observation — no advice, no question.',
+  'judgment.theirs.asked': 'They asked you to decide: give your view plainly, marked as yours, with the reasons and the one value that would flip it — no questions. The choice itself stays theirs.',
+  'creation.asked.to.finish': 'They asked for it finished: do every part that is not the substance, at full length, and ask nothing — and say in one sentence what is still theirs to put in.',
+};
+
+function reasonLine(code: string): string {
+  if (REASON_LINE[code]) return REASON_LINE[code];
+  if (code.endsWith('.stuck')) return 'Several attempts have not landed, or they are lost, and they asked to keep it: much stronger support inside that boundary — an analogous worked example, or the next step outright, stopping before the final one.';
+  if (code === 'requested_no_answer' || code === 'agency_boundary') return 'They asked not to be given the answer: check, point and hint — never the answer itself.';
+  return '';
+}
+
+/** Core 4's lines for this turn: the reason, the withhold in their words, the announcement, what is owed. */
+function renderCore(a: RuntimeAllocation, st: TurnState): string[] {
+  const c = a.core;
+  if (!c) return [];
+  const lines: string[] = [];
+  const reason = reasonLine(c.reasonCode);
+  if (reason) lines.push(reason);
+  if (c.withhold) {
+    const w = c.withhold;
+    lines.push(
+      `KEEP WITH THEM: ${w.what}.`,
+      w.quote === EVIDENCE_WITHHELD ? 'BECAUSE THEY ASKED FOR THAT, earlier in this conversation.' : `BECAUSE THEY SAID: "${w.quote}"`,
+      `THEY CAN HAVE: ${w.alternative}.`,
+      `They have a reason to produce it themselves (${w.reason.replace(/_/g, ' ')}). Do not produce it, not even inside an example, a hint or a "for instance". Everything else you can give, give.`
+    );
+    if (c.announce) {
+      lines.push('This is the first time you are holding something back in this conversation: say so once, in a clause, and that they can have it by asking. Do not repeat this in later turns.');
+    }
+  }
+  // PRESERVATION WITHOUT AUGMENTATION IS UNDER-HELP (Core 4, split.ts): a turn
+  // that keeps something with them owes a specific contribution, named. Under
+  // a withhold, THEY CAN HAVE has already named it.
+  const [lead] = mustNotPerform(a.split);
+  if (lead && !c.withhold && st.exchange.kind === 'task') lines.push(`What you owe them instead: ${CONTRIBUTION[lead]}.`);
+  return lines;
 }
 
 /** What a domain asks of a colleague, in a line. */
@@ -190,11 +342,14 @@ function mannerLine(x: Exchange): string {
 export function renderAllocation(a: RuntimeAllocation, st: TurnState): string {
   const x = st.exchange;
   const lines: string[] = [];
+  const core = renderCore(a, st);
   if (x.kind === 'task') {
     lines.push(DOMAIN_LINE[st.domain], `You do: ${a.does.join('; ')}.`);
     if (a.supports.length) lines.push(`You support: ${a.supports.join('; ')}.`);
     if (a.theirs.length) lines.push(`Theirs: ${a.theirs.join('; ')}.`);
-    if (st.preferences.answerFirst) lines.push('They asked for the answer: give it first.');
+    // "They asked for the answer" beside a withhold is one instruction arguing with another.
+    if (st.preferences.answerFirst && !a.core?.withhold) lines.push('They asked for the answer: give it first.');
+    lines.push(...core);
     if (x.saidFeeling) lines.push(ON_TASK[x.saidFeeling]);
     else if (x.joking) lines.push(ON_TASK.joking);
   } else {
@@ -203,6 +358,8 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState): string {
     if (x.aboutSocria) lines.push(ABOUT_SOCRIA_LINE);
     if (a.supports.length && !TALK.has(x.kind)) lines.push(`You support: ${a.supports.join('; ')}.`);
     if (a.theirs.length && x.kind !== 'social' && x.kind !== 'playful') lines.push(`Theirs: ${a.theirs.join('; ')}.`);
+    // Talk gets Core 4's lines only when they hold something back or ask to be heard.
+    if (a.core?.withhold || a.core?.reasonCode === 'reflect.heard') lines.push(...core);
     const manner = mannerLine(x);
     if (manner) lines.push(manner);
   }

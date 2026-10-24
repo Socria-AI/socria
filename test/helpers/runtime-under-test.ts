@@ -9,3 +9,5 @@ export { chooseAssist, renderAssist, offersWork, wantsExplanation } from '@/lib/
 export { webIntent } from '@/lib/core4/web';
 export { interrogatives } from '@/lib/core4/questions';
 export { SentenceGate } from '@/lib/core4/stream-gate';
+// Their claims decided by the engine, as the route hands them to Core 4's allocator (replay.ts).
+export { planTurn } from '@/lib/accuracy/accuracy';

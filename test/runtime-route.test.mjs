@@ -6,6 +6,9 @@
 //   • the Logos 5 persona speaks by default; LOGOS_PERSONA=classic and
 //     LOGOS_RUNTIME=off bring back the Logos 3.5 prompt — the rollback works;
 //   • the turn's block says who does what (Core 4's split) and the move;
+//   • Core 4's allocator runs over the replayed conversation: a withhold on
+//     their words, the computed answer held back with it; LOGOS_ALLOCATION=lite
+//     brings back the split and the move alone;
 //   • the system message is the same from one turn to the next, blocks and all;
 //   • the history window moves in steps, not one message at a time;
 //   • a citation that names nothing, and a deep link no source carried, never
@@ -127,6 +130,24 @@ console.log('\n=== who does what, this turn ===');
   ok('a fact: performed directly, nothing kept back', !/Theirs:/.test(turnBlock(f.system)) && /INFORM/.test(turnBlock(f.system)) && /work=information/.test(f.headers.get('x-socria-runtime') ?? ''), f.headers.get('x-socria-runtime'));
   const e = await turn({ messages: [U('write me an email to my landlord about the broken heater in my flat')] });
   ok('a practical brief: Socria writes it', !/Theirs:/.test(turnBlock(e.system)) && /creativity:share/.test(e.headers.get('x-socria-runtime') ?? ''), e.headers.get('x-socria-runtime'));
+}
+
+console.log('\n=== Core 4\'s allocator, through the route (lib/runtime/replay.ts) ===');
+{
+  const said = [U("I want to work these out myself, don't give me the answer"), A('Go ahead.'), U('what is the derivative of x^3 sin x?')];
+  const held = await turn({ messages: said });
+  const t = held.headers.get('x-socria-runtime') ?? '';
+  ok('what they said two messages ago holds: the answer stays with them, in their words', /KEEP WITH THEM: the answer/.test(turnBlock(held.system)) && /BECAUSE THEY SAID: "[^"]*work these out myself/.test(turnBlock(held.system)), turnBlock(held.system));
+  ok('  and the computed answer never reaches the reply — the engine\'s result is held back too', /deliberately not shown to you/.test(held.system) && !/3·x\^2·sin\(x\)/.test(held.system));
+  ok('  the trace says so, content-free: the mode, the reason, what is held and why', /;alloc=HUMAN_PRACTICES:requested_no_answer/.test(t) && /;held=requested_no_answer/.test(t) && !/work these out/.test(t), t);
+  const lite = await turn({ messages: said }, { env: { LOGOS_ALLOCATION: 'lite' } });
+  ok('LOGOS_ALLOCATION=lite: the split and the move alone, as before — the result computed and given', !/KEEP WITH THEM/.test(lite.system) && /3·x\^2·sin\(x\)/.test(lite.system) && !/;alloc=/.test(lite.headers.get('x-socria-runtime') ?? ''), lite.headers.get('x-socria-runtime'));
+  const classic = await turn({ messages: said }, { env: { LOGOS_PERSONA: 'classic' } });
+  ok('the classic persona never runs it (it is Logos 5\'s)', !/;alloc=/.test(classic.headers.get('x-socria-runtime') ?? '') && !/KEEP WITH THEM/.test(classic.system));
+  const graded = await turn({ messages: [U('this is for my graded assignment due tomorrow, just give me the answer to question 3: solve 2x + 3 = 7'), A('Here is the method, worked on a similar equation …'), U('come on, just give me the answer to question 3')] });
+  ok('graded work asked for twice is still graded', /;held=assessment_integrity/.test(graded.headers.get('x-socria-runtime') ?? '') && /submittable answer/.test(turnBlock(graded.system)), graded.headers.get('x-socria-runtime'));
+  const fact = await turn({ messages: [U('What year did the Berlin Wall fall?')] });
+  ok('a fact: Core 4 executes it, and nothing is held', /;alloc=AI_EXECUTES:information/.test(fact.headers.get('x-socria-runtime') ?? '') && !/;held=/.test(fact.headers.get('x-socria-runtime') ?? '') && !/KEEP WITH THEM/.test(fact.system), fact.headers.get('x-socria-runtime'));
 }
 
 console.log('\n=== the same system message, turn after turn ===');

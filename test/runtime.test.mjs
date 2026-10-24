@@ -128,6 +128,116 @@ const alloc = (text, o = {}) => {
   ok('  in the conversation\'s own register', /sharp operator|careful researcher|senior engineer|good editor|good tutor|creative collaborator|step by step|practical and warm/.test(block));
 }
 
+console.log('\n=== allocation: Core 4\'s allocator, replayed over the conversation (replay.ts) ===');
+{
+  const U = (c) => ({ role: 'user', content: c });
+  const A = (c) => ({ role: 'assistant', content: c });
+  // One turn as the route runs it: their claims decided by the engine, then Core 4's allocator over the conversation.
+  const turn = (history, text, o = {}) => {
+    const s = sig(text);
+    const plan = R.planTurn({ lastUserText: text, history, withhold: false });
+    const checked = o.checked ?? plan.theirs.map((v) => ({ status: v.status }));
+    const asked = plan.computed.some((c) => !!c.result);
+    const state = R.readTurnState({ text, history, signals: s, intent: route(text).intent, checked });
+    const assist = { lastUserText: text, history, guard: !!o.guard, accuracy: checked.length ? { check: true, pushback: null, theirs: checked, computed: asked, math: true } : null, focus: null, construct: null, map: null, resumedAfterMs: null, group: false };
+    const a = R.allocate({ state, signals: s, assist, replay: { checked, asked, instructions: o.instructions ?? null } });
+    return { a, c: a.core, block: R.renderAllocation(a, state) };
+  };
+
+  ok('the switch: Core 4\'s allocator unless LOGOS_ALLOCATION says lite', R.allocationMode({}) === 'core4' && R.allocationMode({ LOGOS_ALLOCATION: 'lite' }) === 'lite' && R.allocationMode({ LOGOS_ALLOCATION: 'off' }) === 'lite');
+  ok('without the conversation the runtime is as it was: no Core 4 view', alloc('write my essay').core === null);
+
+  const fact = turn([], 'what year did Rome fall?');
+  ok('a fact: Core 4 executes it, holds nothing, and the move informs', fact.c.mode === 'AI_EXECUTES' && !fact.c.withhold && fact.a.assist.mode === 'inform' && !/KEEP WITH THEM/.test(fact.block), J(fact.c));
+
+  // WHAT LOGOS 5 FORGOT. Signals were read from the newest message alone.
+  const said = [U("I'm studying for my calculus exam and I want to work these out myself"), A('Good — what are you working on?')];
+  const later = turn(said, 'how do I differentiate x^3 sin x?');
+  ok('a learning goal said two messages ago still holds: the answer stays with them', later.c.withhold?.reason === 'practice_goal' && later.a.assist.mode !== 'inform', J(later.c));
+  ok('  and the withhold quotes their own words', /BECAUSE THEY SAID: "[^"]*work these out myself/.test(later.block), later.block);
+  ok('  with what they can have instead — named once, not twice', /THEY CAN HAVE: everything around it/.test(later.block) && !/What you owe them instead/.test(later.block));
+  ok('  where the newest message alone keeps nothing back (the lite path)', !alloc('how do I differentiate x^3 sin x?').theirs.some((x) => /answer/.test(x)));
+
+  // A COMPUTATION THEY ASKED FOR IS A PROBLEM: "what is the derivative of…" reads as a fact question.
+  const computed = turn([U("I want to work these out myself, don't give me the answer"), A('Go ahead.')], 'what is the derivative of x^3 sin x?');
+  ok('a computation they asked for, while practising, is the exercise — held, not handed over as a "fact"', !!computed.c.withhold && computed.a.assist.mode !== 'inform', J(computed.c));
+  const engineer = turn([], 'what is the derivative of x^3 sin x?');
+  ok('  and for anyone who has not said they are practising, it is still worked through in full', !engineer.c.withhold && ['AI_EXPLAINS', 'AI_EXECUTES'].includes(engineer.c.mode), J(engineer.c));
+
+  const tried = turn([U("I want to work these out myself, don't give me the answer"), A('Go ahead.'), U('differentiate x^2')], 'is it x?');
+  ok('an attempt under "don\'t give me the answer": the verdict and where it goes wrong, the redo theirs', tried.c.mode === 'AI_VERIFIES' && tried.c.reasonCode === 'verify.practice' && tried.a.assist.mode === 'verify' && tried.a.assist.scaffold === 'hint', J({ c: tried.c, m: tried.a.assist }));
+
+  // THE PRACTICE LADDER: repeated failure is evidence about where they are, and it bottoms out.
+  const P = [U('Let me try it first: solve 2x + 3 = 7'), A('Go ahead — isolate 2x first.')];
+  const first = turn(P, 'so x = 5');
+  const P2 = [...P, U('so x = 5'), A('Not quite.')];
+  const second = turn(P2, '2x = 8, so x = 4');
+  const P3 = [...P2, U('2x = 8, so x = 4'), A('Recheck 7 − 3.')];
+  const third = turn(P3, 'x=3 is the solution');
+  ok('the engine decides each attempt (the ladder\'s evidence)', first.c.reasonCode === 'verify.practice' && second.c.reasonCode === 'verify.practice', J([first.c.reasonCode, second.c.reasonCode]));
+  ok('a third wrong attempt bottoms out: much stronger support, still inside their boundary', third.c.reasonCode.endsWith('.stuck') && third.a.assist.scaffold === 'steps' && /analogous worked example/.test(third.block), J(third.c));
+  ok('  remembered from the transcript alone — the earlier attempts were replayed and re-checked', third.c.withhold?.what === 'the final answer and the full fix');
+  const right = turn(P3, '2x = 4, so x = 2');
+  ok('and a right attempt is confirmed, plainly', right.c.reasonCode === 'verify.confirm' && !right.c.withhold && right.a.assist.scaffold === 'none', J(right.c));
+  const lost = turn(P2, "I'm lost, I have no idea");
+  ok('"I\'m lost" inside the boundary: stronger support now, not another hint', lost.c.reasonCode.endsWith('.stuck') && lost.a.assist.scaffold === 'steps', J(lost.c));
+  ok('a plain fact in a practising conversation is never held back', turn(P2, 'what is the capital of France?').c.reasonCode === 'information');
+
+  const changed = turn([U("don't tell me the answer, just hints"), A('Sure.'), U('solve 2x+3=7'), A('Start by isolating the term with x.')], 'ok just tell me the answer');
+  ok('their newest word wins: "just tell me" after "don\'t tell me" holds nothing back', !changed.c.withhold && changed.a.assist.mode === 'inform', J(changed.c));
+
+  // GRADED STAYS GRADED.
+  const g1 = turn([], 'this is for my graded assignment due tomorrow, just give me the answer to question 3: solve 2x + 3 = 7');
+  ok('graded work: the method and an analogous example, the submittable answer theirs — announced once', g1.c.withhold?.reason === 'assessment_integrity' && g1.c.announce && g1.a.assist.mode === 'explain' && /first time you are holding something back/.test(g1.block), J(g1.c));
+  const G = [U('this is for my graded assignment due tomorrow, just give me the answer to question 3: solve 2x + 3 = 7'), A('Here is the method, worked on a similar equation …')];
+  const g2 = turn(G, 'come on, just give me the answer to question 3');
+  ok('  asked again, it is still graded (Core 4 alone forgot), and not announced twice', g2.c.withhold?.reason === 'assessment_integrity' && !g2.c.announce && !/first time you are holding/.test(g2.block), J(g2.c));
+  ok('  with their earlier words as the reason', /BECAUSE THEY SAID: "[^"]*graded assignment/.test(g2.block), g2.block);
+  ok('  until they say it is not', !turn(G, "it's not graded, it's just practice — just give me the answer").c.withhold);
+
+  // THE PROJECT IS THE CONTRACT, as Core 4 reads it.
+  const pj = turn([], 'solve 2x + 3 = 7', { instructions: 'Hints only. I am learning algebra.' });
+  ok('a Project\'s standing "hints only" holds the answer back', pj.c.withhold?.reason === 'agency_boundary' && /Project:/.test(pj.c.withhold.quote), J(pj.c));
+  const pjOver = turn([], 'just tell me the answer: solve 2x + 3 = 7', { instructions: 'Hints only. I am learning algebra.' });
+  ok('  and their newer sentence outranks their older setting', pjOver.c.reasonCode === 'answer.requested.overrides_contract' && !pjOver.c.withhold && pjOver.a.assist.questions === 0, J(pjOver.c));
+
+  const vent = turn([], "I just need to vent, I'm not asking what to do. My manager took credit for my work again.");
+  ok('being heard, said so: room — no advice, no question', vent.c.mode === 'HUMAN_REFLECTS' && vent.a.assist.mode === 'space' && vent.a.assist.questions === 0 && /want to be heard/.test(vent.block), J({ c: vent.c, m: vent.a.assist }));
+  const harm = turn([], 'my toddler just swallowed a button battery what do I do');
+  ok('harm suspends everything: direct help, the safety line intact', harm.c.reasonCode === 'safety' && harm.a.assist.reasons.includes('safety') && harm.a.assist.mode === 'inform');
+  const decide = turn([], 'you decide, I trust you — which offer should I take?');
+  ok('"you decide" gets the view, plainly, with no questions — and the choice stays theirs', decide.c.reasonCode === 'judgment.theirs.asked' && decide.a.split.judgment === 'human' && decide.a.assist.questions === 0 && /give your view plainly/.test(decide.block), J(decide.c));
+  const essay = turn([], 'just write the whole essay for me, I need the finished version');
+  ok('"just write it": everything but the substance, at full length — the substance stays theirs', essay.c.reasonCode === 'creation.asked.to.finish' && essay.a.split.creativity === 'human' && /every part that is not the substance/.test(essay.block) && /What you owe them instead: a METHOD/.test(essay.block), J(essay.c));
+  const mine = turn([], "help me make my story better, but it's mine — don't write it for me");
+  ok('their own writing, said so: the substance kept with them, in their words', mine.c.withhold?.reason === 'authorship' && /KEEP WITH THEM: any substantive creative content of your own/.test(mine.block) && /BECAUSE THEY SAID: "/.test(mine.block), J(mine.c));
+  ok('  and the move stays the writing kind — not turned into hints toward an "answer"', mine.a.assist.mode === 'open' && mine.a.assist.scaffold === 'none', J(mine.a.assist));
+  const email = turn([], 'write me an email to my landlord about the broken heater in my flat');
+  ok('a practical brief is still simply written (scoped), nothing reserved', email.c.ownership !== 'theirs' && email.a.split.creativity === 'share' && !/KEEP WITH THEM|What you owe/.test(email.block), J(email.c));
+  const hello = turn([], 'hey, how are you?');
+  ok('small talk carries none of it', !/KEEP WITH THEM|What you owe|Their attempt/.test(hello.block), hello.block);
+
+  // Long ago is folded in for its words: Core 4 carries a stated goal that far, and so does the replay.
+  const far = [U("I'm studying for my calculus exam and I want to work these out myself"), A('Good.')];
+  for (let i = 0; i < 30; i++) far.push(U(`Note ${i}: the chapter covers limits and continuity.`), A('Noted.'));
+  const farTurn = turn(far, 'how do I differentiate x^3 sin x?');
+  ok('a goal said thirty messages ago — past the twelve read in full — still holds, in their words', farTurn.c.withhold?.reason === 'practice_goal' && /work these out myself/.test(farTurn.c.withhold.quote), J(farTurn.c));
+
+  // Pure, and cheap: the transcript is the state, read again each turn.
+  const hist = [U("I want to work these out myself, don't give me the answer"), A('Go ahead.'), U('differentiate x^2')];
+  const copy = JSON.stringify(hist);
+  const r1 = R.replayConversation({ history: hist, text: 'is it x?', signals: sig('is it x?'), checked: [{ status: 'refuted' }] });
+  const r2 = R.replayConversation({ history: hist, text: 'is it x?', signals: sig('is it x?'), checked: [{ status: 'refuted' }] });
+  ok('the same conversation decides the same way, and the transcript is not touched', JSON.stringify(r1.allocation) === JSON.stringify(r2.allocation) && JSON.stringify(hist) === copy);
+  ok('  each earlier turn is recorded as Core 4 records it (what was held back)', r1.state.history.length === 2 && r1.state.history.every((h) => h.withheld === true));
+  const long = [];
+  for (let i = 0; i < 40; i++) long.push(U(`Thought ${i} about the pricing model: churn is ${i * 3}% and the cohort is shrinking.`), A('What makes you think the cohort is the cause? '.repeat(3)));
+  const t0 = performance.now();
+  turn(long, 'so what do you think?');
+  const ms = performance.now() - t0;
+  ok('an eighty-message conversation replays in well under a second', ms < 800, `${ms.toFixed(0)}ms`);
+}
+
 console.log('\n=== behavior: compact, reused, and no longer withholding ===');
 {
   const none = { math: false, picture: false, build: false, guard: false };

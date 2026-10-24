@@ -84,7 +84,7 @@ banner, a legend, and a Today lens that fell back to the last day worked.
 
 | Area | Decision | Why |
 |---|---|---|
-| Core 4 `splitFor`, `allocate`'s rules | **Inherit** into the runtime's allocation | Deterministic, tested, and the thing Logos lacked |
+| Core 4 `splitFor`, `allocate`'s rules | **Inherit** into the runtime's allocation — and since §13, `allocate` itself, over Core 4's state replayed from the conversation | Deterministic, tested, and the thing Logos lacked |
 | Core 4 `readState` (a model call per turn) | **Replace** with a deterministic state | The brief asks for a lightweight state; a 2 s model call on every turn is neither |
 | Core 4 budget, gate, signals, questions, considered | **Inherit** (already shared) | Proven, pure |
 | Logos 4 `chooseAssist` | **Refactor** — becomes the move inside the runtime's allocation | Two move deciders for one product was duplication |
@@ -195,7 +195,10 @@ comes from the Logos 4 engine; the result is rendered as one short block:
   the substance of writing that will be theirs (structure, critique and
   sharper versions of their sentences, not a finished essay from nothing).
 
-Withholding happens only under the Answer Guard they switched on.
+Withholding happened only under the Answer Guard they switched on — until
+§13: Core 4's allocator now runs over the conversation, and it withholds on
+the person's own words too (never on an inference), always saying what they
+can have instead. `LOGOS_ALLOCATION=lite` is the block above, as it was.
 
 ### 4.4 Behavioral Control — `behavior.ts`
 
@@ -453,6 +456,7 @@ both on every push.
 | `LOGOS_RUNTIME` | on | the route as it was: old prompt assembly, no epistemic checks, 24-message window |
 | `LOGOS_PERSONA` | unset: the Logos 5 persona for the new Socria's screen — the one behind its access code, which sends `surface: 'logos5'` with every turn — and `LOGOS_CHAT_PROMPT` for any other Logos screen | `classic` restores `LOGOS_CHAT_PROMPT` everywhere; `v5` gives every Logos screen the Logos 5 persona |
 | `NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN` | off | on restores a map pass on every turn |
+| `LOGOS_ALLOCATION` | `core4`: Core 4's allocator over the replayed conversation (§13) | `lite` (or `off`) restores the split and the move alone; only the Answer Guard withholds |
 
 `NEXT_PUBLIC_LOGOS5=off` still brings back the Logos 4 screen for a
 deployment (lib/logos5/flags.ts). The four views (§5) are not behind a switch
@@ -842,3 +846,134 @@ stored conversations still draw theirs. The data is additive: a message's `ui`
 is optional, cleaned where it is saved, ignored by older code — no migration.
 The length uses the key Core 4 already had. Reverting the commit brings back
 the toggle mic and the model picker.
+
+## 13. Core 4's allocation, whole
+
+Logos 5 had Core 4's **split** (`splitFor`, `ownershipRead`) and nothing
+around it. Core 4's **allocator** — the eight modes, the withhold contract,
+the practice ladder — and the state it decides over stayed in Core 4. The
+person asked for it, and for whatever else of Core 4 would help Logos 5 most.
+
+### What Logos 5 lacked
+
+- **Memory of what they said.** Signals were read from the newest message
+  alone (`readSignals(last.content)`). "I want to work these out myself" on the
+  first message was gone by the third; "this is graded" was gone by the next
+  ask; a Project's "hints only" was never read at all.
+- **The ladder.** Nothing remembered the attempts before this one, so nothing
+  could bottom out: endless hints to somebody genuinely stuck, or nothing held
+  back for somebody who asked.
+- **Calibration by mode.** A wrong attempt always got "help them repair that
+  step", even from someone who never said they were practising; Core 4 gives
+  that person the correction and keeps the redo only for someone who asked.
+- **A withhold anyone could see.** The Answer Guard (a switch) was the only
+  way anything was held back, and the reply was never told what to keep, why
+  in their words, or what they could have instead.
+
+### How: the conversation, replayed (`lib/runtime/replay.ts`)
+
+Core 4 keeps its state in a store and fills it with a model call every turn.
+Logos 5 does neither, and does not start: the transcript the client already
+sends is replayed through **Core 4's own** `mergeState`, `allocate` and
+`recordTurn`, one message of theirs at a time, with the runtime's
+deterministic readers standing in for Core 4's model reader. The same rules,
+decided by the same code — a standing "don't tell me" holds until they say
+otherwise, a bare "just tell me" fades, a stated learning goal stays stated,
+being heard holds until they ask — and nothing written anywhere. Earlier
+attempts are decided again by the math engine (the last four messages of
+theirs), which is the ladder's evidence. A Project's standing instructions
+are read as Core 4 reads them, as the contract (`getProject`, only the
+person's own Project, never in a shared room).
+
+What the readers cannot see — an inferred learning goal, inferred expertise,
+stakes — stays at Core 4's defaults. Core 4's allocator was built for that: an
+inference never withholds anything, so a missing reading only means more help.
+
+### What the reply now gets
+
+`allocation.ts` keeps the Logos move (it reads evidence the allocator does not:
+the engine's verdicts, their map, what they selected) and makes it obey the
+allocation (`reconcile`): a thing they asked to produce is never informed;
+being heard is room; the bottom of the ladder is a worked explanation;
+graded work is the method in full; a turn they handed over asks nothing.
+Safety is never touched. Then, in the turn's block, only where Core 4 decided
+something:
+
+- **The withhold, in Core 4's words** — `KEEP WITH THEM` (what), `BECAUSE THEY
+  SAID` (their words — Core 4 will not withhold without a quote),
+  `THEY CAN HAVE` (the alternative, always the longer list), and the line that
+  it is not a style note. The first one in a conversation is announced once:
+  they can have it by asking.
+- **The reason**, for the modes worth a line: verify and confirm, verify and
+  correct, verify and keep the redo, practise, bottom out, stuck inside a
+  boundary, graded, their newer word over their Project's, being heard, "you
+  decide" (the view, plainly — the choice stays theirs), "just write it"
+  (everything but the substance, at full length).
+- **What the turn owes them** whenever the split keeps something with them —
+  Core 4's `CONTRIBUTION`: preservation without augmentation is under-help.
+- **No computed answer** reaches a turn that is holding it back: the accuracy
+  plan is drawn again with the result withheld, as Core 4 does.
+- **The trace** (`X-Socria-Runtime`): `alloc=<mode>:<reason>` and
+  `held=<reason>[:announced]` — codes only, never their words.
+
+### Two things beyond Core 4
+
+- **Graded stays graded.** Core 4 reads "this is for my graded assignment" from
+  the message that says it, and its state has nowhere to keep it, so the next
+  "just give me the answer" handed the submittable answer over. In the replay,
+  once said it rides on every later request for the answer, quoting their
+  words, until they say it is not graded.
+- **A computation they ask for while practising is the exercise.** "What is the
+  derivative of…" reads to the readers as a question of fact, and Core 4 never
+  holds a fact back. Where the engine computed an answer to what they asked and
+  they have said in so many words that they are practising, it is read as the
+  practice it is. Anyone else asking the same thing gets the answer.
+
+### Changed from the Logos 5 that was
+
+Core 4's invariant comes with its allocator, and two hand-overs Logos 5 used to
+honour in full now are not, by design: **"just write the whole essay for me"**
+gets everything but the substance — structure, craft, every mechanical part,
+at full length, no questions — with the premise and the ideas still theirs;
+**"you decide"** gets Socria's view, plainly and marked as a view, with what
+would flip it — the choice stays theirs. A practical brief ("write an email to
+my landlord about the heater") is still simply written. `LOGOS_ALLOCATION=lite`
+restores the old behaviour.
+
+### Deliberately not brought over
+
+| Core 4 piece | Why not |
+|---|---|
+| `readState` (a model call every turn) | Replaced by the deterministic readers (§2); the replay needs no model |
+| The state store, the reasoning ledger, capability evidence | Storage whose value in Logos is unmeasured (§2); the transcript is already the state, and the Logic Map is Logos's ledger |
+| `guardModel`, counterfactual ablation (`guard2.ts`, `counterfactual.ts`) | Extra model calls on a turn; Logos already checks a reply's mathematics by computation and its citations against the evidence |
+| `selectIntervention` (17 moves) | Two move deciders for one product was the duplication §2 removed; the Logos move is kept and made to obey the allocation |
+
+### Cost and limits, measured
+
+Pure and deterministic: no model call, no network, nothing stored. Measured
+on this machine, warm: an eighty-message conversation of prose replays in a
+median 18 ms, one of maths attempts in 6 ms. The first call in a fresh server
+process pays roughly 400 ms to compile the readers' patterns, most of which the
+route's own readers compile anyway. What keeps it there: the engine re-checks at
+most four earlier messages; only the last twelve of theirs are read in full and
+allocated (Core 4 itself remembers eight), and anything older is folded in for
+its words alone; and an earlier message's intent is not read — the costliest
+reader, and one that changes nothing the allocator decides. The readers are English
+patterns; what the engine cannot decide (a bare "x = 5" is read as a
+definition, not an answer) cannot count towards the ladder. Not verified: how
+a live model honours `KEEP WITH THEM` — the tests check what the reply is
+told, with the model replaced.
+
+### Tested
+
+`test/runtime.test.mjs` (the replay: a goal said earlier holds and is quoted;
+the ladder from the transcript; the right attempt confirmed; "I'm lost"; a
+fact never held; their newest word wins; graded stays graded, announced once,
+until taken back; the Project contract and its override; being heard; harm;
+"you decide"; "just write it"; a brief still written; small talk untouched;
+determinism; an eighty-message replay under a second, as a guard against a
+regression rather than a benchmark) and `test/runtime-route.test.mjs`
+(through the real route: the withhold in their words, the computed answer held
+back, the trace, `LOGOS_ALLOCATION=lite`, the classic persona untouched, graded
+twice, a fact).

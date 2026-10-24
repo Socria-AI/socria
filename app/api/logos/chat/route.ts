@@ -77,6 +77,7 @@ import { roleBlock } from '@/lib/onboarding-roles';
 import { nameBlock } from '@/lib/onboarding-name';
 import { wantedSimulation, bareRequest, hasSurface, simulationBlock } from '@/lib/model/wants';
 import { recall, remember, type RecallResult } from '@/lib/mind/pipeline';
+import { getProject } from '@/lib/mind/store';
 import { sharedTurn } from '@/lib/share/turn';
 import { extractionContext } from '@/lib/mind/activate';
 import { cleanId, logosMemoryText, logosPersistPolicy } from '@/lib/mind/logos-turn';
@@ -84,6 +85,7 @@ import { waitUntil } from '@vercel/functions';
 import {
   PERSONA_VERSION,
   allocate,
+  allocationMode,
   assessNeed,
   buildEvidence,
   checkReply,
@@ -538,6 +540,13 @@ export async function POST(req: NextRequest) {
     const mindPolicy = mindOn
       ? logosPersistPolicy(clean.filter((m: { role: string }) => m.role === 'user').map((m: { content: string }) => m.content))
       : 'none';
+    // CORE 4'S ALLOCATOR READS THE PROJECT'S STANDING INSTRUCTIONS as its
+    // contract ("hints only", "this is graded work"), exactly as Core 4 does
+    // (lib/runtime/replay.ts). Only the person's own Project, never in a
+    // shared room; asked for here so it runs alongside the recall below.
+    const coreAllocation = persona === 'v5' && allocationMode() === 'core4';
+    const ownProject = coreAllocation && !!userId && !twoPeople && !sharedCtx.shared ? cleanId(body?.projectId) : null;
+    const projectP = ownProject ? getProject(userId!, ownProject).catch(() => null) : Promise.resolve(null);
     let recalled: RecallResult | null = null;
     if (mindOn) {
       recalled = await recall(userId!, String(last?.content ?? '').slice(0, 2000), {
@@ -574,7 +583,7 @@ export async function POST(req: NextRequest) {
     // for, the claims in their message, and — when they push back — the
     // claims in the reply they dispute, decided by the symbolic engine and by
     // evaluation. Under the Answer Guard nothing computed reaches the model.
-    const accuracy = planTurn({
+    let accuracy = planTurn({
       lastUserText: String(last.content ?? ''),
       history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
       withhold: resolveGuard(body?.guard) === 'guard',
@@ -653,7 +662,36 @@ export async function POST(req: NextRequest) {
       resumedAfterMs,
       checked: accuracy.theirs.map((v) => ({ status: v.status })),
     });
-    const allocation = persona === 'v5' ? allocate({ state: turnState, signals, assist: assistInput }) : null;
+    // Core 4's allocator over the conversation (LOGOS_ALLOCATION=lite: the split and the move alone).
+    const projectInstructions = coreAllocation ? ((await projectP)?.instructions ?? null) : null;
+    const allocation =
+      persona === 'v5'
+        ? allocate({
+            state: turnState,
+            signals,
+            assist: assistInput,
+            ...(coreAllocation
+              ? {
+                  replay: {
+                    checked: accuracy.theirs.map((v) => ({ status: v.status })),
+                    asked: accuracy.computed.some((c) => !!c.result),
+                    instructions: projectInstructions,
+                  },
+                }
+              : {}),
+          })
+        : null;
+    // A COMPUTED ANSWER NEVER REACHES A TURN THAT IS HOLDING IT BACK (Core 4,
+    // turn.ts). The plan above was drawn for the Answer Guard alone; when the
+    // allocation keeps the answer with them, it is drawn again with nothing
+    // computed in it — whether their claims hold is still said, never the value.
+    if (allocation?.core?.withhold && !assistInput.guard) {
+      accuracy = planTurn({
+        lastUserText: String(last.content ?? ''),
+        history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+        withhold: true,
+      });
+    }
     // The exchange (small talk, joking, something personal…) keeps the engine
     // from imposing a task's move on a hello; LOGOS_RUNTIME=off is the route as
     // it was, so it goes without.
@@ -1102,6 +1140,13 @@ export async function POST(req: NextRequest) {
                 `exchange=${turnState.exchange.kind}`,
                 `inline=${presentation.forms.join(',') || 'none'}`,
                 ...(allocation ? [`split=${Object.entries(allocation.split).map(([k, v]) => `${k}:${v}`).join(',')}`] : []),
+                // Core 4's allocation, content-free: the mode and reason code, what is held back and why, never their words
+                ...(allocation?.core
+                  ? [
+                      `alloc=${allocation.core.mode}:${allocation.core.reasonCode}`,
+                      ...(allocation.core.withhold ? [`held=${allocation.core.withhold.reason}${allocation.core.announce ? ':announced' : ''}`] : []),
+                    ]
+                  : []),
               ].join(';'),
             }
           : {}),
