@@ -17,6 +17,7 @@
 import type { ExplicitSignals, WorkKind } from '../core4/types';
 import type { MapDigest } from '../cognition/digest';
 import { asksForDecision, isFactQuestion, offersWork, wantsExplanation } from '../cognition/assist';
+import { onlyAboutSocria, readExchange, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
 import type { Intent } from './orchestrate';
 
 export const DOMAINS = ['business', 'research', 'engineering', 'writing', 'learning', 'creative', 'math', 'everyday'] as const;
@@ -100,9 +101,16 @@ const CREATION = /\b(?:write|draft|compose|create|generate|make|invent|come up w
 
 /** What they want done this turn, read deterministically — Core 4's `work`, without the model call. */
 export function readWork(text: string, signals: ExplicitSignals, intent: Intent, checkedWork: boolean): WorkKind {
-  const t = text.trim();
-  if (!t) return 'conversation';
+  const said = text.trim();
+  if (!said) return 'conversation';
   if (signals.vent) return 'reflection';
+  // "how are you?", "thanks!", "what's up?", "what's your favourite book?" —
+  // before any reader below takes a how-question for a request to explain, or
+  // "what's…" for a fact to look up.
+  if (smallTalk(said) || onlyAboutSocria(said)) return 'conversation';
+  // The readers below look at how a request begins; a greeting in front of it
+  // ("good morning! what is the capital of Peru?") is not where it begins.
+  const t = withoutGreeting(said);
   if (checkedWork || offersWork(t)) return 'verification';
   if (LEADS_WITH_DOING.test(t)) return CREATION.test(t) ? 'creation' : 'execution';
   if (DIAGNOSIS.test(t)) return 'diagnosis';
@@ -142,6 +150,13 @@ export interface TurnState {
   intent: Intent;
   domain: Domain;
   work: WorkKind;
+  /**
+   * What kind of exchange this turn is — small talk, joking, something
+   * personal, a brainstorm, a discussion, pushback, plain conversation, or a
+   * task (lib/cognition/register.ts). Read from their words this turn; a
+   * feeling counts only when they said it, and nothing here is kept.
+   */
+  exchange: Exchange;
   workspace: { docs: number; artifacts: number; nodes: number; writing: boolean; selection: string | null };
   /** what this turn showed — counts, never a label */
   understanding: { right: number; wrong: number; saidStuck: boolean };
@@ -170,11 +185,16 @@ export function readTurnState(i: StateInput): TurnState {
   const first = userTexts.find((t) => t.trim().length > 12) ?? userTexts[0] ?? '';
   const checked = i.checked ?? [];
   const s = i.signals;
+  const work = readWork(i.text, s, i.intent, checked.length > 0);
+  // Work in the message, by the readers above: something to answer, explain,
+  // check, make, fix or decide, or something to show. Talk is the rest.
+  const task = (work !== 'conversation' && work !== 'reflection') || i.intent !== 'conversation';
   return {
     objective: line(i.building || first, 140),
     intent: i.intent,
     domain: readDomain(userTexts, i.map?.context ?? null),
-    work: readWork(i.text, s, i.intent, checked.length > 0),
+    work,
+    exchange: readExchange({ text: i.text, history: i.history, task, work, signals: s, mapContext: i.map?.context ?? null }),
     workspace: {
       docs: i.workspace?.docs ?? 0,
       artifacts: i.workspace?.artifacts ?? 0,

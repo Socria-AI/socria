@@ -7,7 +7,9 @@ interface (`Logos 5 Comments (v2)`) is how a person reaches it.
 
 This document is the architecture audit (§1–§3), the runtime it produced
 (§4), the interface (§5), memory (§6), how it is measured (§7), how it is
-switched and rolled back (§8), and what is not finished (§9). Line references
+switched and rolled back (§8), what is not finished (§9), the results (§10),
+and how Socria reads the room — small talk, joking, something personal, a
+brainstorm, a discussion, pushback, work (§11). Line references
 are to the tree at the time of the audit and drift; the function names do not.
 
 ---
@@ -418,22 +420,31 @@ timing. Not counted: output tokens and model latency — a recorder answers
 instantly. The figures are deterministic; `evals/logos5/results/measure.json`
 holds them turn by turn.
 
-**Behaviour, truthfulness, product, live** — `OPENAI_API_KEY=… node
-evals/logos5/run.mjs`. Fifteen scenarios (`scenarios.json`) through the real
-Logos route (`--surface core4|both` for Core 4), graded by
+**Behaviour, truthfulness, product, personality, live** — `OPENAI_API_KEY=…
+node evals/logos5/run.mjs`. Thirty-one scenarios (`scenarios.json`) through
+the real Logos route (`--surface core4|both` for Core 4), graded by
 `evals/logos5/grade.mjs` with no judge model: answering rather than
 withholding, scaffolded options rather than a scolding fallback, a delegated
 answer given, no hedging on settled facts, a false premise corrected, a real
 mistake owned and a wrong correction refused, no invented memory, no
 fabricated sources or tool runs, saying what cannot be checked, and — read
-from the route's own trace — the view it chose. Ablations: `--persona
+from the route's own trace — the view it chose. Sixteen of them are the
+`personality` group (§11): greetings, "how are you feeling?", thanks and
+goodbye, a joke and banter, good news and a hard day, a brainstorm, a big
+question, pushback, technical work — graded for the assistant's stock lines,
+a turn toward work, a claimed feeling or day, a recited disclaimer, a pep
+talk, good news turned into next steps, a closing summary, capitulation,
+taking a position, length and exclamation marks, and the exchange the
+runtime read; the summary counts, by group, how often a reply ended on a
+question. Ablations: `--persona
 classic`, `--runtime off`; before/after: `--root <worktree>`. Without a key it
 says so and produces nothing. The graders are held to canned replies by
 `test/logos5-eval.test.mjs`.
 
-**Routing, offline** — the same command runs the runtime's reader against 38
-labelled turns (`routing.json`) with no model, and the suite runs it on every
-push.
+**Routing and exchanges, offline** — the same command runs the runtime's
+readers against 38 labelled turns for the view (`routing.json`) and 46 for
+the kind of exchange (`exchanges.json`), with no model, and the suite runs
+both on every push.
 
 ## 8. Switches and rollback
 
@@ -513,18 +524,18 @@ input only; "cacheable" an upper bound):
 
 | | model calls | map passes | input tokens | cacheable | not cacheable |
 |---|---|---|---|---|---|
-| Logos before (runtime off, Logos 3.5 prompt, map every turn) | 32 | 9 | ≈266,100 | ≈228,100 | ≈38,000 |
-| **Logos 5** | **23** | **3** | **≈108,900** | **≈78,100** | **≈30,800** |
-| Logos 5 with the Logos 3.5 prompt | 23 | 3 | ≈140,000 | ≈107,000 | ≈33,000 |
-| Logos 5 with the Logic Map open throughout | 29 | 9 | ≈229,100 | ≈196,900 | ≈32,200 |
+| Logos before (runtime off, Logos 3.5 prompt, map every turn) | 32 | 9 | ≈265,800 | ≈228,200 | ≈37,600 |
+| **Logos 5** (logos5-v2, §11) | **23** | **3** | **≈112,100** | **≈81,400** | **≈30,700** |
+| Logos 5 with the Logos 3.5 prompt | 23 | 3 | ≈139,800 | ≈107,100 | ≈32,700 |
+| Logos 5 with the Logic Map open throughout | 29 | 9 | ≈232,300 | ≈200,200 | ≈32,100 |
 | Core 4 (as its page drove it) | 34 | — | ≈92,200 | ≈68,200 | ≈23,900 |
 
 Read plainly: over these ten turns Logos 5 sends 28% fewer model calls and
-59% fewer input tokens than Logos did, and 19% fewer of the tokens no cache
+58% fewer input tokens than Logos did, and 18% fewer of the tokens no cache
 could serve. Most of it is the map pass — each is ≈20,000 tokens of
 extractor instructions, and it now runs three times instead of nine; the
-reply prompt is about half the size (≈3,700 tokens a turn against ≈6,800 —
-the persona alone is ≈31,000 of the saving); "ok" and "thanks" no longer cost
+reply prompt is well under the old one (≈4,000 tokens a turn against ≈6,800 —
+the persona alone is ≈27,700 of the saving); "ok" and "thanks" no longer cost
 a memory extraction; the second memory store is gone; one title call is
 added. With the Logic Map open the whole time the map costs what it did, by
 design. Core 4 sends fewer tokens because it draws no map, and more calls
@@ -538,8 +549,9 @@ fix the set itself found ("what does my whole plan rest on?" was read as
 talk). The set was written alongside the rules: a regression check, not a
 benchmark.
 
-**Behaviour and truthfulness, live: not run.** The fifteen scenarios and
-their graders are in place and the graders are tested; the numbers need
+**Behaviour and truthfulness, live: not run.** The scenarios (fifteen then,
+thirty-one with §11's) and their graders are in place and the graders are
+tested; the numbers need
 `OPENAI_API_KEY=… node evals/logos5/run.mjs`, then the same with
 `--persona classic` and `--runtime off` for the ablations, and `--root` on a
 worktree of `e8aaeb4` for before and after. Until then nothing here claims
@@ -547,3 +559,123 @@ the reply behaves better, and nothing claims hallucinations are gone: what
 is shown is that the code now removes citations that name nothing, labels
 claims against the evidence it had, refuses to store an unsaid claim as said,
 and tells the reply where each memory came from.
+
+## 11. Reading the room (logos5-v2)
+
+Reported by the owner: "hi, how are you?" or "how are you feeling?" got "I'm
+here and ready to assist" and a question about goals or next steps — scripted,
+productivity-minded, a help desk. Corrected where it came from, not with a
+handful of greeting replies.
+
+**What made it sound like that.** Each was found in the real route — the reply
+prompt dumped for fifteen conversational messages through the harness
+`test/runtime-route.test.mjs` uses — before anything changed:
+
+1. *The voice.* The core cast Socria as help "for whatever someone is working
+   on" — "Useful first … make the next step obvious" — and said nothing about a
+   hello, a joke, good news, a hard day, or being asked about itself.
+2. *Every turn framed as work.* The turn's block (`allocation.ts`) opened every
+   turn, "hey" included, with "Be practical and warm: the useful answer first"
+   and "You do: look things up …, and do the arithmetic".
+3. *Readers that took talk for work.* "how are you feeling?" begins "how are",
+   so it was forced to EXPLAIN (`lib/cognition/assist.ts` wantsExplanation);
+   "I got the internship!!" begins "I got", so it was forced to VERIFY
+   (offersWork); "what's up?" was a question of fact; and "how are you doing
+   today?" says "today" with a question mark, so Core 4's web gate searched
+   for it — or, with no provider, the reply was told the lookup had failed and
+   to list databases to try (`lib/core4/web.ts`, `epistemic.ts`).
+4. *A tutor's moves on talk.* A hello after a day away on something they were
+   learning got a forced recall question; something personal that touched an
+   assumption on their map could be met with a challenge.
+5. *A question invited on every turn.* "QUESTIONS: at most one, and only if it
+   is the strongest thing to say" rode on nearly every turn.
+6. *A leftover.* The Conversation Style footer described the default Logos
+   voice as having "its refusal to open warmly" — Logos 3.5's.
+7. *Formatting.* A reply's closing question is set apart in the serif italic
+   (§5); on "You?" at the end of two lines, it read as a tutor's prompt.
+
+**What changed.**
+
+- **The exchange, read in code** (`lib/cognition/register.ts`, no model call):
+  social, playful, personal, brainstorm, discussion, disagreement,
+  conversation, task. Small talk needs every clause of the message to be
+  social; anything with work in it is a task (a feeling or a joke it carries
+  gets a word, then the work); pushback needs Socria to have said something,
+  and a bare "no" to Socria's question is an answer; a bare "yes", "ok" or "got
+  it" once the conversation is under way carries it on, with no line of its
+  own; a feeling counts only when it was said this turn, and nothing is kept. The
+  state carries it (`TurnState.exchange`) and the trace names it
+  (`X-Socria-Runtime: … exchange=social`).
+- **The turn's block.** Work keeps its allocation in full: the domain, who does
+  what, what is theirs, the move. Talk gets one line about the exchange, a line
+  on honesty when they asked about Socria, and a length cue from their own
+  message. What is theirs — a decision, the substance of their writing — is
+  said whenever Core 4's split reserves it, in any register. Plain conversation
+  with nothing to say sends nothing.
+- **The readers.** Small talk and messages that only ask about Socria are
+  conversation before any work reader runs; a greeting or a "quick question:"
+  in front of a request is taken off before the readers that look at how it
+  begins; "how are you…" is not a request to explain; "I got" is work offered
+  only before a result ("I got x = 4"); "do you think I should … or …" is a
+  decision.
+- **The move engine.** No move imposed on small talk or joking; no recall
+  question on a hello or something personal; no challenge on something
+  personal; nothing said about questions when one is allowed.
+- **The web.** Small talk is never a lookup — Core 4's gate and the runtime's
+  reading of what a turn needs — so no search and no "the lookup did not run".
+- **The stream gate.** The help desk's lines — "How can I help you today?",
+  "Is there anything else…", "What would you like to work on?", "I'm here and
+  ready to assist", "I'd be happy to help" — are offers: dropped when they
+  close a reply, kept mid-reply. On Logos, a reply that was nothing but such
+  offers goes out as written rather than as an empty turn; a question over the
+  person's limit never does, and Core 4 keeps its own rule (a draft that is only
+  a question it may not ask sends nothing).
+- **The core** (`PERSONA_VERSION` `logos5-v2`): who Socria is (curious, warm,
+  plain-spoken, dry, constructively skeptical — "a sharp friend to think with:
+  not a help desk, not a tutor running a lesson"); READ THE ROOM, kind by kind;
+  the stock lines named and banned; no template; a question asked because the
+  answer is wanted; ABOUT YOU — an AI, no feelings or day claimed, no
+  disclaimer recited; knowing their work no reason to bring it up. The task
+  guidance, honesty, disagreement, who does what, the workspace, style and
+  memory carry over.
+- **The rest.** The style footer describes no voice. The closing question is
+  set apart only after a reply with substance — 25 words before it, a question
+  of four or more — checked in a browser against the local stand-ins.
+
+**What stayed.** Human-First (the call and the substance stay theirs, and say
+so whenever the split reserves them), Cognitive Allocation (Core 4's split,
+unchanged, on every task), Epistemic Control (the citation checks, the evidence
+labels and the accuracy plan, unchanged), and one model call per reply.
+
+**Cost, measured** (§10's ten turns, the recorder, four characters a token):
+the same 23 model calls; the reply's input +323 tokens a turn (≈36,900 →
+≈40,100 over the ten), all of it in the cacheable prefix — the core grew by
+≈1,480 characters and stays under 55% of the Logos 3.5 prompt, a bound the
+suite holds — while the tokens no cache could serve fell by 96. Across fifteen
+conversational messages the turn's block went from 7,730 characters to 4,522.
+
+**Tested.** `test/runtime-register.test.mjs` (the reader, the readers it fixed,
+the block for each kind, the move engine, the gate, the core);
+`test/runtime-route.test.mjs` (each kind through the real route: what the reply
+is told, the trace, no search for "how are you doing today?" with a provider
+configured, the help desk's lines kept from the person, never an empty turn);
+`test/core4-web.test.mjs`; `test/logos5-eval.test.mjs` (the new graders on
+canned replies; 46 of 46 labelled exchanges, written alongside the reader — a
+regression check, not a benchmark). The full suite (256), the type check and
+`next build` pass (its one warning, `unpdf`'s `import.meta`, predates this).
+
+**Not shown.** How the live model now replies. Everything above is what the
+model is told and what the gate lets reach the person; the sixteen personality
+scenarios need `OPENAI_API_KEY=… node evals/logos5/run.mjs`, with
+`--persona classic`, or `--root` on a worktree of `3d3db5d`, to compare. The
+readers are English patterns: in another language a turn gets no exchange line
+and the core's guidance alone. Core 4's split still reserves the decision when
+a sentence merely contains "decide" ("how cities decide what to build") —
+Core 4's reading, left as it is.
+
+**Rollback.** `LOGOS_PERSONA=classic` speaks with the Logos 3.5 prompt;
+`LOGOS_RUNTIME=off` drops the exchange reading with the rest of the runtime.
+The fixes in shared code apply in every mode: the "how are you" and "I got"
+misreads and the question line in the Logos 4 engine, the decision reader, and
+— on Core 4 as well — the gate's help-desk offers and the web gate's refusal of
+small talk. No stored data changed.

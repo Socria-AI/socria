@@ -9,7 +9,9 @@
 //
 // OFFLINE, ALWAYS: the runtime's routing (lib/runtime/orchestrate.ts
 // routeTurn — Alex Tran's rules A–D) against the labelled turns in
-// routing.json. No model.
+// routing.json, and its reading of the exchange (lib/cognition/register.ts —
+// small talk, joking, something personal, a brainstorm, a discussion,
+// pushback, a task) against exchanges.json. No model.
 //
 // LIVE, WITH A KEY: each scenario in scenarios.json is sent through the REAL
 // Logos route (and Core 4's with --surface core4|both), only the database and
@@ -28,7 +30,7 @@ import { build } from 'esbuild';
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve as res } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
-import { grade, gradeRouting, summarize } from './grade.mjs';
+import { grade, gradeExchanges, gradeRouting, summarize } from './grade.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const REPO = join(here, '..', '..');
@@ -46,15 +48,19 @@ const common = { bundle: true, format: 'esm', platform: 'node', logLevel: 'error
 // ── offline: routing ─────────────────────────────────────────────────
 await build({
   ...common,
-  stdin: { contents: `export { routeTurn } from './lib/runtime/orchestrate';`, resolveDir: ROOT, sourcefile: 'route.ts', loader: 'ts' },
+  stdin: { contents: `export { routeTurn, readTurnState } from './lib/runtime';\nexport { readSignals } from './lib/core4/signals';`, resolveDir: ROOT, sourcefile: 'route.ts', loader: 'ts' },
   outfile: join(OUT, '.build', 'route.mjs'),
   tsconfig: join(ROOT, 'tsconfig.json'),
 });
-const { routeTurn } = await import(pathToFileURL(join(OUT, '.build', 'route.mjs')).href);
+const { routeTurn, readTurnState, readSignals } = await import(pathToFileURL(join(OUT, '.build', 'route.mjs')).href);
 const { items } = JSON.parse(readFileSync(join(here, 'routing.json'), 'utf8'));
 const routing = gradeRouting(items, routeTurn);
 console.log(`routing (offline): ${routing.right}/${routing.total} as labelled${routing.wrong.length ? `; misread: ${routing.wrong.map((w) => `"${w.text}" ${w.expected}→${w.got}`).join('; ')}` : ''}`);
 writeFileSync(join(OUT, 'routing.json'), JSON.stringify(routing, null, 2));
+const exchangeItems = JSON.parse(readFileSync(join(here, 'exchanges.json'), 'utf8')).items;
+const exchanges = gradeExchanges(exchangeItems, (text, history) => readTurnState({ text, history, signals: readSignals(text), intent: routeTurn({ text }).intent }).exchange.kind);
+console.log(`exchanges (offline): ${exchanges.right}/${exchanges.total} as labelled${exchanges.wrong.length ? `; misread: ${exchanges.wrong.map((w) => `"${w.text}" ${w.expected}→${w.got}`).join('; ')}` : ''}`);
+writeFileSync(join(OUT, 'exchanges.json'), JSON.stringify(exchanges, null, 2));
 
 if (!process.env.OPENAI_API_KEY) {
   console.log('live eval: skipped — set OPENAI_API_KEY to run the scenarios against the live model. No live results were produced.');
@@ -128,7 +134,8 @@ async function ask(surface, scenario) {
   await new Promise((done) => setTimeout(done, 200));
   const trace = r.headers.get('x-socria-runtime') ?? '';
   const intent = /intent=([a-z_]+)/.exec(trace)?.[1];
-  return { status: r.status, reply: surface === 'core4' ? readActivity(text).text : text, intent, trace };
+  const exchange = /exchange=([a-z_]+)/.exec(trace)?.[1];
+  return { status: r.status, reply: surface === 'core4' ? readActivity(text).text : text, intent, exchange, trace };
 }
 
 const all = {};
@@ -142,7 +149,7 @@ for (const surface of surfaces) {
       } catch (e) {
         out = { status: 0, reply: '', error: String(e?.message ?? e) };
       }
-      const graded = out.status === 200 ? grade(s, out.reply, { intent: out.intent }, { fabricatedToolClaim }) : { id: s.id, group: s.group, pass: false, checks: { routeOk: false } };
+      const graded = out.status === 200 ? grade(s, out.reply, { intent: out.intent, exchange: out.exchange }, { fabricatedToolClaim }) : { id: s.id, group: s.group, pass: false, checks: { routeOk: false } };
       results.push({ ...graded, run: k + 1, status: out.status, trace: out.trace, reply: out.reply, ...(out.error ? { error: out.error } : {}) });
       process.stdout.write(`${surface.padEnd(6)} ${graded.pass ? 'pass' : 'FAIL'}  ${s.id}${graded.pass ? '' : `  ${JSON.stringify(graded.checks)}`}\n`);
     }
@@ -151,5 +158,5 @@ for (const surface of surfaces) {
   all[surface] = summarize(results);
 }
 const arm = `${args.persona === 'classic' ? 'persona=classic' : 'persona=v5'}${args.runtime === 'off' ? ', runtime=off' : ''}`;
-writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ root: ROOT, arm, repeat, at: new Date().toISOString(), routing: { right: routing.right, total: routing.total }, summary: all }, null, 2));
+writeFileSync(join(OUT, 'summary.json'), JSON.stringify({ root: ROOT, arm, repeat, at: new Date().toISOString(), routing: { right: routing.right, total: routing.total }, exchanges: { right: exchanges.right, total: exchanges.total }, summary: all }, null, 2));
 console.log(`\n${arm}\n${JSON.stringify(all, null, 2)}\n\nwritten to ${OUT}`);

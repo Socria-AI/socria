@@ -196,7 +196,11 @@ const SCRIPTS: Record<Exclude<ConversationStyle, 'thinker'>, StyleScript> = {
 /** What each product's own default voice is, as the footer names it. */
 const DEFAULT_VOICE: Record<StyleSurface, string> = {
   core: 'the temperament described above — its one-to-three paragraphs, its occasional dry humour, its deliberate pace',
-  logos: 'the voice described above — its two to four sentences, its lean into the challenge, its refusal to open warmly',
+  // No adjectives: two Logos voices sit above this footer (the Logos 5 core and,
+  // for rollback, the Logos 3.5 prompt), and describing one of them here — "its
+  // refusal to open warmly" was Logos 3.5's — told the Logos 5 reply its default
+  // voice was cold.
+  logos: 'the default voice described above',
 };
 
 /** What the protected layer is called on each product, so the footer can point at it. */

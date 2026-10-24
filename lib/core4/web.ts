@@ -27,6 +27,7 @@
 // and the provider lives there.
 
 import type { ExplicitSignals } from './types';
+import { smallTalk } from '../cognition/register';
 
 /** One result, as the prompt sees it. */
 export interface WebSource {
@@ -155,6 +156,10 @@ const INWARD = /\b(?:i (?:feel|think|wonder|keep|can'?t)|should i|am i|my (?:dra
  *   2a. AND A DATABASE THAT COULD NOT BE READ IS NEITHER OF THOSE. See the
  *      `policy` parameter: 'unknown' is a fourth value precisely because
  *      collapsing it into 'none' cost Core 4 its internet entirely.
+ *   2b. small talk is not an errand. "how are you doing today?" carries a
+ *      freshness word and a question mark, which is everything step 5 asks
+ *      for, and it went to a search provider — or, with none configured, the
+ *      reply was told the lookup had failed and to list databases to try.
  *   3. a URL they pasted is read, not searched: they already chose the source.
  *   4. an explicit ask is honoured.
  *   5. otherwise it takes a currency signal AND a question or request — "the
@@ -208,6 +213,7 @@ export function webIntent(
   if (policy === 'none') return { want: false, why: 'this conversation is off the record' };
   if (signals?.safety) return { want: false, why: 'safety: answer, do not research' };
   if (signals?.offRecord) return { want: false, why: 'off the record' };
+  if (smallTalk(t)) return { want: false, why: 'small talk is not a lookup' };
 
   // A LINK IS NOT ALWAYS AN ERRAND. "I saw https://… earlier, anyway what do
   // you think of my draft?" mentions a page; it does not ask for it to be

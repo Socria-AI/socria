@@ -57,7 +57,12 @@ export class SentenceGate {
    * citation that names no source and a link no source carried, and keeps the
    * rest of the sentence. Fenced code never reaches it.
    */
-  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string } = {}) {}
+  /**
+   * neverEmpty: a reply that would end up empty because everything in it was a
+   * closing offer sends the offers instead (Logos). Questions over the budget
+   * are still dropped.
+   */
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string; neverEmpty?: boolean } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -150,9 +155,11 @@ export class SentenceGate {
   finish(maxQuestions: 0 | 1, considered: readonly string[] = []): string[] {
     if (this.buf.trim()) this.consider(this.buf);
     this.buf = '';
+    const held = this.held;
+    this.held = [];
     const dropped: string[] = [];
     let allowed = maxQuestions;
-    for (const h of this.held) {
+    for (const h of held) {
       const q = interrogatives(h);
       const reasked = considered.length > 0 && classify(h.trim(), considered).verdict === 'REDUNDANT';
       if (!q.offers.length && !reasked && allowed > 0) {
@@ -160,7 +167,18 @@ export class SentenceGate {
         this.send(h);
       } else dropped.push(h.trim());
     }
-    this.held = [];
+    // NOT NOTHING, WHERE THE SURFACE ASKS FOR IT (Logos). A reply that was
+    // nothing but closing offers — "How can I help you today?" and no more —
+    // would reach the person as an empty turn, which is worse than the line;
+    // the offers go out as written. Never a question over the budget: a limit
+    // they set holds even then. Core 4 keeps its own rule (council D4): a
+    // draft that is only a question it may not ask sends nothing.
+    if (this.opts.neverEmpty && !this.out.trim() && dropped.length) {
+      const offers = held.filter((h) => interrogatives(h).offers.length > 0);
+      for (const h of offers) this.send(h);
+      const sent = new Set(offers.map((h) => h.trim()));
+      return dropped.filter((d) => !sent.has(d));
+    }
     return dropped;
   }
 }

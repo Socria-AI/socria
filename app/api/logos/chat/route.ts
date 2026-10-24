@@ -645,7 +645,10 @@ export async function POST(req: NextRequest) {
       checked: accuracy.theirs.map((v) => ({ status: v.status })),
     });
     const allocation = persona === 'v5' ? allocate({ state: turnState, signals, assist: assistInput }) : null;
-    const assist = allocation ? allocation.assist : chooseAssist({ ...assistInput, signals });
+    // The exchange (small talk, joking, something personal…) keeps the engine
+    // from imposing a task's move on a hello; LOGOS_RUNTIME=off is the route as
+    // it was, so it goes without.
+    const assist = allocation ? allocation.assist : chooseAssist({ ...assistInput, signals, ...(runtime ? { exchange: turnState.exchange.kind } : {}) });
 
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the
@@ -947,7 +950,7 @@ export async function POST(req: NextRequest) {
             // cannot drift. The opener yields only when the engine confirms
             // they caught a real mistake of Socria's.
             if (reply) {
-              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt, rewrite });
+              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt, rewrite, neverEmpty: true });
               held.push(reply);
               held.finish(assist.questions);
               if (held.out.trim()) reply = held.out;
@@ -965,7 +968,7 @@ export async function POST(req: NextRequest) {
               sent = true;
               reply += text;
               controller.enqueue(encoder.encode(text));
-            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }), rewrite });
+            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }), rewrite, neverEmpty: true });
             for await (const chunk of completion) {
               const delta = chunk.choices?.[0]?.delta?.content ?? '';
               if (delta) gate.push(delta);
@@ -1043,6 +1046,7 @@ export async function POST(req: NextRequest) {
                 `intent=${turnRoute.intent}`,
                 `domain=${turnState.domain}`,
                 `work=${turnState.work}`,
+                `exchange=${turnState.exchange.kind}`,
                 ...(allocation ? [`split=${Object.entries(allocation.split).map(([k, v]) => `${k}:${v}`).join(',')}`] : []),
               ].join(';'),
             }

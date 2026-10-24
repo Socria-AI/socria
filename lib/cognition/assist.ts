@@ -48,6 +48,7 @@ import { EMPTY_STATE } from '@/lib/cognition/state';
 import { conceptTerms } from '@/lib/core4/considered';
 import type { ExplicitSignals } from '@/lib/core4/types';
 import type { MapDigest } from './digest';
+import { TALK, withoutGreeting, type ExchangeKind } from './register';
 
 export { sanitizeDigest, digestOf, type MapDigest } from './digest';
 
@@ -86,6 +87,8 @@ export interface AssistInput {
   group?: boolean;
   /** signals already read by the caller (else read here) */
   signals?: ExplicitSignals;
+  /** what kind of exchange the turn is (lib/cognition/register.ts), when the runtime read it */
+  exchange?: ExchangeKind;
 }
 
 export interface AssistDecision {
@@ -133,23 +136,43 @@ export function isFactQuestion(text: string): boolean {
   return false;
 }
 
+/**
+ * A how-question put to Socria about itself or its day — "how are you
+ * feeling?", "how do you feel about…", "how have you been" — is conversation,
+ * not a request for reasoning. It began with "how are", so it was read as one,
+ * and a hello came back EXPLAINing.
+ */
+const HOW_ABOUT_YOU = /^how\s+(?:are|r)\s+(?:you|u|ya|things)\b|^how\s+(?:do|did)\s+you\s+(?:feel|do|sleep)\b|^how\s+(?:have|'ve)\s+you\s+been\b|^how(?:'s|\s+is|\s+was)\s+(?:your\s+(?:day|week|weekend|morning|evening|night)|it\s+going|life|everything)\b/;
+
 /** They want the reasoning: how or why something works. */
 export function wantsExplanation(text: string, s: ExplicitSignals): boolean {
-  if (s.explainAsked) return true;
   const t = clean(text).toLowerCase();
+  if (HOW_ABOUT_YOU.test(t)) return false;
+  if (s.explainAsked) return true;
   if (ABOUT_THEM.test(t)) return false;
   return /^(?:how\s+(?:does|do|did|is|are|can|come)|why\s+(?:does|do|did|is|are|would|can|was)|explain|walk\s+me\s+through|help\s+me\s+understand|i\s+don'?t\s+(?:get|understand)|what\s+does\s+.+\s+mean)\b/.test(t);
 }
 
-/** They asked Socria to make, or weigh, their decision. */
+/**
+ * They asked Socria to make, or weigh, their decision. "Do you think I should
+ * take the job or stay?" asks it as surely as "should I…?" does — the word
+ * order was the only thing that kept it from being read as one.
+ */
 export function asksForDecision(text: string, s: ExplicitSignals): boolean {
   if (s.recommendationRequested) return true;
-  return /\b(?:should\s+i\b|which\s+(?:one\s+)?should\s+i|what\s+would\s+you\s+(?:do|pick|choose)|help\s+me\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend)\b/i.test(clean(text));
+  return /\b(?:should\s+i\b|which\s+(?:one\s+)?should\s+i|what\s+would\s+you\s+(?:do|pick|choose)|help\s+me\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+i\s+should|i\s+should\s+[^.?!]{1,80}\bor\b)/i.test(clean(text));
 }
 
-/** They put their own work down to be checked. */
+/**
+ * They put their own work down to be checked.
+ *
+ * "I got" is how a worked answer is reported — "I got x = 4", "I got 12.5" —
+ * and it is also how good news is: "I got the internship!!" was read as work
+ * offered for checking, and the reply was told to VERIFY it. So "I got" counts
+ * only when what follows is a result: a number, an expression, "the answer".
+ */
 export function offersWork(text: string): boolean {
-  return /\b(?:is\s+(?:this|that|my\s+\w+)\s+(?:right|correct)|did\s+i\s+(?:get|do)\s+(?:it|this|that)\s+right|check\s+(?:my|this|it)|here'?s\s+my\s+(?:answer|working|work|solution|attempt)|i\s+got\b|my\s+answer\s+is)\b/i.test(clean(text));
+  return /\b(?:is\s+(?:this|that|my\s+\w+)\s+(?:right|correct)\b|did\s+i\s+(?:get|do)\s+(?:it|this|that)\s+right\b|check\s+(?:my|this|it)\b|here'?s\s+my\s+(?:answer|working|work|solution|attempt)\b|i\s+got\s+(?:[-−+]?\s*[\d.(]|[a-z]\s*[=≈<>]|\$|an?\s+(?:answer|result|value|total)\s+of\b|the\s+(?:same\s+)?(?:answer|result|value|total)\b|that\s+(?:it|the|x|y)\b)|my\s+answer\s+is\b)/i.test(clean(text));
 }
 
 /** Mid-flow: another idea, another item, a continuation that wants room rather than a question. */
@@ -227,6 +250,9 @@ export const RETRIEVAL_GAP_MS = 20 * 60 * 60 * 1000;
 
 export function chooseAssist(input: AssistInput): AssistDecision {
   const s = input.signals ?? readSignals(input.lastUserText);
+  // What they asked, without the greeting in front of it: the readers below
+  // look at how a request begins ("hi! what's 15% of 240?" is a fact).
+  const said = withoutGreeting(input.lastUserText);
   const reasons: string[] = [];
   const acc = input.accuracy ?? null;
   const learn = learning(input, s);
@@ -272,11 +298,19 @@ export function chooseAssist(input: AssistInput): AssistDecision {
   // 3. Pushback on something Socria said: re-check and hold ground, or own it.
   if (acc?.pushback) return decide('verify', true, { reasons: [`pushback:${acc.pushback.kind}`] });
 
+  // 3b. Small talk and joking: nothing to inform, explain, check or build, so
+  //     no move is imposed — "what's up?" is not a question of fact, and "how
+  //     are you?" is not a request to explain. The budget still holds.
+  const talking = !!input.exchange && TALK.has(input.exchange);
+  if (input.exchange === 'social' || input.exchange === 'playful') return decide('open', false, { reasons: [`talk:${input.exchange}`] });
+
   // 4. Coming back to something they were learning, after a gap: recall first.
-  //    One question, and only when the budget and their words allow it.
+  //    One question, and only when the budget and their words allow it — and
+  //    never in answer to a hello or to something personal, which would be a
+  //    quiz where a greeting was.
   const resumed = (input.resumedAfterMs ?? 0) >= RETRIEVAL_GAP_MS;
   const priorReplies = input.history.filter((m) => m.role === 'assistant').length;
-  if (resumed && learn && priorReplies >= 2 && !s.stopQuestions && s.directness !== 'answer' && !acc?.theirs.length) {
+  if (resumed && learn && !talking && priorReplies >= 2 && !s.stopQuestions && s.directness !== 'answer' && !acc?.theirs.length) {
     return decide('ask', true, { questions: 1, retrieval: true, reasons: ['retrieval:resumed'] });
   }
 
@@ -290,7 +324,7 @@ export function chooseAssist(input: AssistInput): AssistDecision {
   const checked = acc?.theirs ?? [];
   const wrong = checked.some((v) => v.status === 'refuted');
   const right = checked.some((v) => v.status === 'verified');
-  if (checked.length || offersWork(input.lastUserText)) {
+  if (checked.length || offersWork(said)) {
     const selfExplain = learn && right && !wrong && questions === 1 && !askedWhyRecently(input.history);
     return decide('verify', true, {
       scaffold: wrong ? (s.expertise === 'novice' || s.dontKnow ? 'steps' : 'hint') : 'none',
@@ -308,19 +342,19 @@ export function chooseAssist(input: AssistInput): AssistDecision {
   }
 
   // 9. A question of fact, or a quick calculation: answered plainly.
-  if (isFactQuestion(input.lastUserText)) {
+  if (isFactQuestion(said)) {
     if (input.guard && acc?.math) return decide('explain', true, { questions: 0, scaffold: 'hint', reasons: ['fact:guarded'] });
     return decide('inform', true, { reasons: ['fact'] });
   }
 
   // 10. Point & Ask: the question is about the thing they selected — never "which one?".
   if (input.focus) {
-    const mode: AssistMode = wantsExplanation(input.lastUserText, s) ? 'explain' : 'inform';
+    const mode: AssistMode = wantsExplanation(said, s) ? 'explain' : 'inform';
     return decide(mode, true, { target: input.focus.label, scaffold: learn && mode === 'explain' ? 'steps' : 'none', reasons: [`focus:${input.focus.kind}`] });
   }
 
   // 11. They want the reasoning.
-  if (wantsExplanation(input.lastUserText, s)) {
+  if (wantsExplanation(said, s)) {
     const scaffold: Scaffold = s.expertise === 'expert' ? 'none' : learn || s.expertise === 'novice' ? 'steps' : 'none';
     return decide('explain', true, { scaffold, reasons: ['explain'] });
   }
@@ -329,15 +363,17 @@ export function chooseAssist(input: AssistInput): AssistDecision {
   if (s.dontKnow) return decide('explain', true, { questions: 0, scaffold: 'steps', reasons: ['dont-know'] });
 
   // 13. They asked Socria to decide: the considerations and the alternatives; the choice stays theirs.
-  if (asksForDecision(input.lastUserText, s)) return decide('perspective', true, { reasons: ['decision-asked'] });
+  if (asksForDecision(said, s)) return decide('perspective', true, { reasons: ['decision-asked'] });
 
   // 14. Their message leans on an assumption their own map marks as unexamined,
-  //     or on one side of a conflict on it: challenge it — once.
-  const ch = challengeTarget(input);
+  //     or on one side of a conflict on it: challenge it — once. Not when they
+  //     are telling Socria something personal: "I'm dreading the defense
+  //     tomorrow" is not an opening to test the thesis.
+  const ch = talking ? null : challengeTarget(input);
   if (ch) return decide('challenge', false, { target: ch.target, reasons: [`challenge:${ch.why}`] });
 
   // 15. Mid-brainstorm: room.
-  if (continuing(input.lastUserText, input.map)) return decide('space', false, { questions: 0, reasons: ['flow'] });
+  if (continuing(said, input.map)) return decide('space', false, { questions: 0, reasons: ['flow'] });
 
   // 16. Nothing settles it: the reply chooses its move, inside the budget.
   return decide('open', false, { reasons: ['open'] });
@@ -373,8 +409,11 @@ export function renderAssist(d: AssistDecision): string {
   if (d.reasons.includes('safety')) lines.push('SAFETY: what they wrote may mean they are in danger now. Put everything else aside — the map, the topic, the method. Respond with care, plainly and directly. If they might harm themselves, say you are glad they told you, and urge them to reach someone right now: in the US, call or text 988 (Suicide & Crisis Lifeline); elsewhere, their local emergency number. If someone is in immediate danger, emergency services first.');
   if (d.retrieval) lines.push('THEY ARE BACK after a gap on something they were learning. Before adding anything new, ask them — in one short question — to recall the key idea from last time in their own words. Then stop and let them answer.');
   if (d.selfExplain) lines.push('Their step checks out. Say so in a sentence, then — once — ask them why it works, in their own words. Skip it if they were already asked.');
+  // With a question allowed, nothing is said about questions: the prompt's own
+  // rule covers it and the stream gate enforces the budget. "At most one, and
+  // only if it is the strongest thing to say" rode on nearly every turn, and a
+  // line about questions on every turn reads as an invitation to ask one.
   if (d.questions === 0) lines.push('QUESTIONS: none this turn. End on a statement — no question, no "want me to…?" offer.');
-  else if (d.mode !== 'ask' && !d.retrieval && !d.selfExplain) lines.push('QUESTIONS: at most one, and only if it is the strongest thing to say.');
   if (!lines.length) return '';
   return `\n\n=== How to help on this turn (Socria's own reading of the conversation — never mention it) ===\n${lines.join('\n')}\n`;
 }

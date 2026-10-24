@@ -261,11 +261,12 @@ function BlockNode({ block, math, k, cite, rich }: { block: Block; math?: boolea
 export function RichText({ text, math, cite, rich, askLast }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean }) {
   const blocks = parseBlocks(text, { rich });
   const last = blocks.length - 1;
+  const apart = !!askLast && setsApart(text);
   return (
     <>
       {blocks.map((b, i) => {
         // Logos 5: a reply that ends by asking, asks in its own voice — the closing question set apart
-        const split = askLast && i === last && b.kind === 'p' ? closingQuestion(b.text) : null;
+        const split = apart && i === last && b.kind === 'p' ? closingQuestion(b.text) : null;
         if (!split) return BlockNode({ block: b, math, k: `b${i}`, cite, rich });
         return (
           <p key={`b${i}`}>
@@ -282,6 +283,22 @@ export function RichText({ text, math, cite, rich, askLast }: { text: string; ma
       })}
     </>
   );
+}
+
+/**
+ * Whether a reply's closing question is set apart at all. After a reply with
+ * substance, the question is the turn handed back and setting it apart lets it
+ * be seen. In two lines of conversation — "Quiet day on my end. You?" — the
+ * same serif italic turns a passing "you?" into a tutor's prompt, so a short
+ * reply, or a question of a word or three, stays in the sentence.
+ */
+export function setsApart(text: string): boolean {
+  const t = text.trim();
+  const m = /([^.!?…\n]*\?)["'’”)\]]*\s*$/.exec(t);
+  if (!m) return false;
+  const before = t.slice(0, m.index).split(/\s+/).filter(Boolean).length;
+  const asked = m[1].trim().split(/\s+/).filter(Boolean).length;
+  return before >= 25 && asked >= 4;
 }
 
 /**

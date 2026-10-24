@@ -132,7 +132,7 @@ console.log('\n=== behavior: compact, reused, and no longer withholding ===');
 {
   const none = { math: false, picture: false, build: false, guard: false };
   const core = R.logos5System(none);
-  ok('the core is less than half the Logos 3.5 prompt', core.length < R.LOGOS_CHAT_PROMPT.length * 0.55, `${core.length} vs ${R.LOGOS_CHAT_PROMPT.length}`);
+  ok('the core stays at most 55% of the Logos 3.5 prompt — reading the room cost no more than that', core.length < R.LOGOS_CHAT_PROMPT.length * 0.55, `${core.length} vs ${R.LOGOS_CHAT_PROMPT.length}`);
   ok('the same bytes for the same conversation, turn after turn', R.logos5System(none) === core && R.logos5System({ ...none, math: true }) === R.logos5System({ ...none, math: true }));
   ok('blocks join only when the conversation needs them', !/MATHEMATICS\./.test(core) && /MATHEMATICS\./.test(R.logos5System({ ...none, math: true })) && /THE PICTURE BESIDE YOU/.test(R.logos5System({ ...none, picture: true })) && /A MODEL IN THE WORKSPACE/.test(R.logos5System({ ...none, build: true })) && /WHY YOU WILL NOT JUST GIVE THEM THE ANSWER/.test(R.logos5System({ ...none, guard: true })));
   ok('the withholding stance is gone', !/you are the mirror/i.test(core) && !/never resolve it for them/i.test(core) && !/the bar for pushing is LOW/i.test(core) && !/purpose is not to produce answers/i.test(core));

@@ -49,6 +49,11 @@ console.log('\n=== turns that must NOT reach the internet ===');
   ok('off the record stays off the record',
     webIntent('look up the current pricing', { offRecord: true }).want === false);
   ok('an empty turn looks nothing up', webIntent('', NO).want === false);
+  // "today" and a question mark were all the freshness rule needed, and a
+  // greeting has both: it went to a search provider.
+  for (const t of ['how are you doing today?', 'hey, how is your day going?', "what's up today?", 'how are you feeling right now?'])
+    ok(`small talk is not a lookup: "${t}"`, webIntent(t, NO).want === false && /small talk/.test(webIntent(t, NO).why), webIntent(t, NO).why);
+  ok('  but a question about today still is', webIntent("what's the weather today?", NO).want === true && webIntent('hi! what is the latest news on the election today?', NO).want === true);
 
   // THE NOUN IS RARELY NEXT TO THE VERB.
   //

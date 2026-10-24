@@ -35,6 +35,7 @@
 
 import { webIntent } from '../core4/web';
 import type { ExplicitSignals } from '../core4/types';
+import { smallTalk } from '../cognition/register';
 
 // ── what the turn asks for ───────────────────────────────────────────
 
@@ -69,8 +70,11 @@ export function assessNeed(i: NeedInput): Need {
   const kinds: ClaimKind[] = [];
   if (i.math) kinds.push('computation');
   if (i.docs) kinds.push('documents');
-  if (CURRENT.test(t) && (t.includes('?') || FACT.test(t) || /\b(?:look up|check|find out|search)\b/i.test(t))) kinds.push('current');
-  else if (FACT.test(t)) kinds.push('fact');
+  // "How are you doing today?" asks after Socria, not after the world: it is
+  // not a claim about anything current, and "what's up?" is not a fact.
+  const chat = smallTalk(t);
+  if (!chat && CURRENT.test(t) && (t.includes('?') || FACT.test(t) || /\b(?:look up|check|find out|search)\b/i.test(t))) kinds.push('current');
+  else if (!chat && FACT.test(t)) kinds.push('fact');
   const w = webIntent(t, i.signals, i.policy);
   return { kinds, web: w.want ? { want: true, why: w.why, kind: w.kind, ...(w.url ? { url: w.url } : {}) } : { want: false, why: w.why } };
 }

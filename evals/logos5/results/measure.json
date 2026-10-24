@@ -1,6 +1,6 @@
 {
-  "about": "Offline measurement by evals/logos5/measure.mjs: the real routes, a recording model, one scripted ten-turn conversation. Tokens are estimated at four characters per token; cacheable is the byte-identical leading prefix each call shares with the previous call of its kind (>= 1024 tokens, in 128-token steps) - an upper bound on what a provider cache serves. Output tokens and model latency are not measured; routeMsMedian is the route's own work with a model that answers instantly.",
-  "at": "2026-10-24T02:16:44.356Z",
+  "root": "/home/user/socria",
+  "at": "2026-10-24T04:00:12.214Z",
   "script": [
     "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
     "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
@@ -30,13 +30,13 @@
         "map": 180069,
         "memory": 13461,
         "other": 1112,
-        "reply": 67767,
+        "reply": 67539,
         "understanding": 3647
       },
-      "inputTokensTotal": 266056,
-      "cacheableTokens": 228096,
-      "uncachedTokens": 37960,
-      "routeMsMedian": 69
+      "inputTokensTotal": 265828,
+      "cacheableTokens": 228224,
+      "uncachedTokens": 37604,
+      "routeMsMedian": 70
     },
     {
       "arm": "after",
@@ -54,13 +54,13 @@
         "map": 59895,
         "memory": 10792,
         "other": 1112,
-        "reply": 36876,
+        "reply": 40108,
         "title": 202
       },
-      "inputTokensTotal": 108877,
-      "cacheableTokens": 78080,
-      "uncachedTokens": 30797,
-      "routeMsMedian": 68
+      "inputTokensTotal": 112109,
+      "cacheableTokens": 81408,
+      "uncachedTokens": 30701,
+      "routeMsMedian": 71
     },
     {
       "arm": "core4",
@@ -84,7 +84,7 @@
       "inputTokensTotal": 92165,
       "cacheableTokens": 68224,
       "uncachedTokens": 23941,
-      "routeMsMedian": 66
+      "routeMsMedian": 65
     },
     {
       "arm": "classic",
@@ -102,13 +102,13 @@
         "map": 59895,
         "memory": 10792,
         "other": 1112,
-        "reply": 68045,
+        "reply": 67816,
         "title": 202
       },
-      "inputTokensTotal": 140046,
-      "cacheableTokens": 107008,
-      "uncachedTokens": 33038,
-      "routeMsMedian": 67
+      "inputTokensTotal": 139817,
+      "cacheableTokens": 107136,
+      "uncachedTokens": 32681,
+      "routeMsMedian": 68
     },
     {
       "arm": "open",
@@ -126,807 +126,1082 @@
         "map": 180069,
         "memory": 10792,
         "other": 1112,
-        "reply": 36876,
+        "reply": 40108,
         "title": 202
       },
-      "inputTokensTotal": 229051,
-      "cacheableTokens": 196864,
-      "uncachedTokens": 32187,
-      "routeMsMedian": 67
+      "inputTokensTotal": 232283,
+      "cacheableTokens": 200192,
+      "uncachedTokens": 32091,
+      "routeMsMedian": 68
     }
   ],
-  "perTurn": {
-    "before": [
-      {
-        "turn": 1,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 6447,
-          "memory": 1357,
-          "map": 19624
-        },
-        "cacheableTokens": 0,
-        "map": true
+  "detail": [
+    {
+      "arm": "before",
+      "turns": 10,
+      "ok": true,
+      "calls": {
+        "map": 9,
+        "memory": 10,
+        "other": 1,
+        "reply": 10,
+        "understanding": 2
       },
-      {
-        "turn": 2,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 6532,
-          "memory": 1352,
-          "map": 19772
-        },
-        "cacheableTokens": 26880,
-        "map": true
+      "callsTotal": 32,
+      "mapPasses": 9,
+      "inputTokens": {
+        "map": 180069,
+        "memory": 13461,
+        "other": 1112,
+        "reply": 67539,
+        "understanding": 3647
       },
-      {
-        "turn": 3,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
+      "inputTokensTotal": 265828,
+      "cacheableTokens": 228224,
+      "uncachedTokens": 37604,
+      "routeMsMedian": 70,
+      "perTurn": [
+        {
+          "turn": 1,
+          "text": "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 25604,
+            "memory": 5427,
+            "map": 78496
+          },
+          "cachedTok": 0,
+          "ms": 207,
+          "map": true,
+          "status": 200
         },
-        "inputTokens": {
-          "reply": 6583,
-          "memory": 1337
+        {
+          "turn": 2,
+          "text": "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 26128,
+            "memory": 5406,
+            "map": 79088
+          },
+          "cachedTok": 27008,
+          "ms": 96,
+          "map": true,
+          "status": 200
         },
-        "cacheableTokens": 7552,
-        "map": false
+        {
+          "turn": 3,
+          "text": "ok",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 26148,
+            "memory": 5346
+          },
+          "cachedTok": 7552,
+          "ms": 75,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 4,
+          "text": "What is the typical rent difference between Denver and Austin right now?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "understanding": 1
+          },
+          "inChars": {
+            "reply": 26846,
+            "memory": 5393,
+            "map": 79649,
+            "understanding": 7330
+          },
+          "cachedTok": 27392,
+          "ms": 68,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 5,
+          "text": "Map out my argument for moving so I can see what it rests on.",
+          "intent": "structure",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 26738,
+            "memory": 5405,
+            "map": 79965
+          },
+          "cachedTok": 27520,
+          "ms": 69,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 6,
+          "text": "Make a decision matrix of the two options.",
+          "intent": "visual",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "other": 1
+          },
+          "inChars": {
+            "reply": 27534,
+            "memory": 5363,
+            "map": 80239,
+            "other": 4447
+          },
+          "cachedTok": 27776,
+          "ms": 67,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 7,
+          "text": "Honestly I think the money matters less than I said at first.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 27298,
+            "memory": 5405,
+            "map": 80555
+          },
+          "cachedTok": 27776,
+          "ms": 70,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 8,
+          "text": "thanks",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "understanding": 1
+          },
+          "inChars": {
+            "reply": 27743,
+            "memory": 5327,
+            "map": 80793,
+            "understanding": 7258
+          },
+          "cachedTok": 28032,
+          "ms": 69,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 9,
+          "text": "So what would I actually be giving up by staying?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 27810,
+            "memory": 5393,
+            "map": 80759
+          },
+          "cachedTok": 27520,
+          "ms": 70,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 10,
+          "text": "Let me sleep on it and talk to my partner this weekend.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 28304,
+            "memory": 5376,
+            "map": 80729
+          },
+          "cachedTok": 27648,
+          "ms": 67,
+          "map": true,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "arm": "after",
+      "turns": 10,
+      "ok": true,
+      "calls": {
+        "map": 3,
+        "memory": 8,
+        "other": 1,
+        "reply": 10,
+        "title": 1
       },
-      {
-        "turn": 4,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "understanding": 1
-        },
-        "inputTokens": {
-          "reply": 6712,
-          "memory": 1349,
-          "map": 19913,
-          "understanding": 1833
-        },
-        "cacheableTokens": 27392,
-        "map": true
+      "callsTotal": 23,
+      "mapPasses": 3,
+      "inputTokens": {
+        "map": 59895,
+        "memory": 10792,
+        "other": 1112,
+        "reply": 40108,
+        "title": 202
       },
-      {
-        "turn": 5,
-        "intent": "structure",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
+      "inputTokensTotal": 112109,
+      "cacheableTokens": 81408,
+      "uncachedTokens": 30701,
+      "routeMsMedian": 71,
+      "perTurn": [
+        {
+          "turn": 1,
+          "text": "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "title": 1
+          },
+          "inChars": {
+            "reply": 14108,
+            "memory": 5427,
+            "title": 808
+          },
+          "cachedTok": 0,
+          "ms": 74,
+          "map": false,
+          "status": 200
         },
-        "inputTokens": {
-          "reply": 6731,
-          "memory": 1352,
-          "map": 19992
+        {
+          "turn": 2,
+          "text": "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 14651,
+            "memory": 5406
+          },
+          "cachedTok": 4608,
+          "ms": 71,
+          "map": false,
+          "status": 200
         },
-        "cacheableTokens": 27520,
-        "map": true
+        {
+          "turn": 3,
+          "text": "ok",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1
+          },
+          "inChars": {
+            "reply": 14652
+          },
+          "cachedTok": 3584,
+          "ms": 68,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 4,
+          "text": "What is the typical rent difference between Denver and Austin right now?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 16652,
+            "memory": 5393,
+            "map": 79374
+          },
+          "cachedTok": 4736,
+          "ms": 66,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 5,
+          "text": "Map out my argument for moving so I can see what it rests on.",
+          "intent": "structure",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 15452,
+            "memory": 5405,
+            "map": 79965
+          },
+          "cachedTok": 24320,
+          "ms": 65,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 6,
+          "text": "Make a decision matrix of the two options.",
+          "intent": "visual",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "other": 1
+          },
+          "inChars": {
+            "reply": 16875,
+            "memory": 5363,
+            "map": 80239,
+            "other": 4447
+          },
+          "cachedTok": 24448,
+          "ms": 71,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 7,
+          "text": "Honestly I think the money matters less than I said at first.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 16605,
+            "memory": 5405
+          },
+          "cachedTok": 5120,
+          "ms": 71,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 8,
+          "text": "thanks",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1
+          },
+          "inChars": {
+            "reply": 17083
+          },
+          "cachedTok": 3968,
+          "ms": 70,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 9,
+          "text": "So what would I actually be giving up by staying?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 16919,
+            "memory": 5393
+          },
+          "cachedTok": 5248,
+          "ms": 76,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 10,
+          "text": "Let me sleep on it and talk to my partner this weekend.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 17432,
+            "memory": 5376
+          },
+          "cachedTok": 5376,
+          "ms": 68,
+          "map": false,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "arm": "core4",
+      "turns": 10,
+      "ok": true,
+      "calls": {
+        "memory": 10,
+        "other": 10,
+        "reply": 10,
+        "title": 2,
+        "understanding": 2
       },
-      {
-        "turn": 6,
-        "intent": "visual",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "other": 1
-        },
-        "inputTokens": {
-          "reply": 6884,
-          "memory": 1341,
-          "map": 20060,
-          "other": 1112
-        },
-        "cacheableTokens": 27776,
-        "map": true
+      "callsTotal": 34,
+      "mapPasses": 0,
+      "inputTokens": {
+        "memory": 13434,
+        "other": 19511,
+        "reply": 55253,
+        "title": 350,
+        "understanding": 3617
       },
-      {
-        "turn": 7,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
+      "inputTokensTotal": 92165,
+      "cacheableTokens": 68224,
+      "uncachedTokens": 23941,
+      "routeMsMedian": 65,
+      "perTurn": [
+        {
+          "turn": 1,
+          "text": "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1,
+            "title": 1
+          },
+          "inChars": {
+            "other": 5808,
+            "reply": 20737,
+            "memory": 5405,
+            "title": 539
+          },
+          "cachedTok": 0,
+          "ms": 78,
+          "map": false,
+          "status": 200
         },
-        "inputTokens": {
-          "reply": 6871,
-          "memory": 1352,
-          "map": 20139
+        {
+          "turn": 2,
+          "text": "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1,
+            "title": 1
+          },
+          "inChars": {
+            "other": 6811,
+            "reply": 20548,
+            "memory": 5407,
+            "title": 860
+          },
+          "cachedTok": 7168,
+          "ms": 69,
+          "map": false,
+          "status": 200
         },
-        "cacheableTokens": 27776,
-        "map": true
+        {
+          "turn": 3,
+          "text": "ok",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "other": 7160,
+            "reply": 21670,
+            "memory": 5324
+          },
+          "cachedTok": 7296,
+          "ms": 63,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 4,
+          "text": "What is the typical rent difference between Denver and Austin right now?",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1,
+            "understanding": 1
+          },
+          "inChars": {
+            "other": 7468,
+            "reply": 22341,
+            "memory": 5394,
+            "understanding": 7265
+          },
+          "cachedTok": 7296,
+          "ms": 66,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 5,
+          "text": "Map out my argument for moving so I can see what it rests on.",
+          "intent": "structure",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "other": 7765,
+            "reply": 22213,
+            "memory": 5383
+          },
+          "cachedTok": 7552,
+          "ms": 65,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 6,
+          "text": "Make a decision matrix of the two options.",
+          "intent": "visual",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "other": 8043,
+            "reply": 21710,
+            "memory": 5363
+          },
+          "cachedTok": 7680,
+          "ms": 71,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 7,
+          "text": "Honestly I think the money matters less than I said at first.",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "other": 8350,
+            "reply": 22762,
+            "memory": 5383
+          },
+          "cachedTok": 7680,
+          "ms": 64,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 8,
+          "text": "thanks",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1,
+            "understanding": 1
+          },
+          "inChars": {
+            "other": 8592,
+            "reply": 23012,
+            "memory": 5328,
+            "understanding": 7203
+          },
+          "cachedTok": 7808,
+          "ms": 64,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 9,
+          "text": "So what would I actually be giving up by staying?",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "other": 8877,
+            "reply": 22490,
+            "memory": 5371
+          },
+          "cachedTok": 7808,
+          "ms": 64,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 10,
+          "text": "Let me sleep on it and talk to my partner this weekend.",
+          "intent": "conversation",
+          "calls": {
+            "other": 1,
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "other": 9168,
+            "reply": 23526,
+            "memory": 5377
+          },
+          "cachedTok": 7936,
+          "ms": 64,
+          "map": false,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "arm": "classic",
+      "turns": 10,
+      "ok": true,
+      "calls": {
+        "map": 3,
+        "memory": 8,
+        "other": 1,
+        "reply": 10,
+        "title": 1
       },
-      {
-        "turn": 8,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "understanding": 1
-        },
-        "inputTokens": {
-          "reply": 6936,
-          "memory": 1332,
-          "map": 20199,
-          "understanding": 1815
-        },
-        "cacheableTokens": 28032,
-        "map": true
+      "callsTotal": 23,
+      "mapPasses": 3,
+      "inputTokens": {
+        "map": 59895,
+        "memory": 10792,
+        "other": 1112,
+        "reply": 67816,
+        "title": 202
       },
-      {
-        "turn": 9,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
+      "inputTokensTotal": 139817,
+      "cacheableTokens": 107136,
+      "uncachedTokens": 32681,
+      "routeMsMedian": 68,
+      "perTurn": [
+        {
+          "turn": 1,
+          "text": "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "title": 1
+          },
+          "inChars": {
+            "reply": 25604,
+            "memory": 5427,
+            "title": 808
+          },
+          "cachedTok": 0,
+          "ms": 67,
+          "map": false,
+          "status": 200
         },
-        "inputTokens": {
-          "reply": 6999,
-          "memory": 1349,
-          "map": 20190
+        {
+          "turn": 2,
+          "text": "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 26128,
+            "memory": 5406
+          },
+          "cachedTok": 7552,
+          "ms": 68,
+          "map": false,
+          "status": 200
         },
-        "cacheableTokens": 27520,
-        "map": true
+        {
+          "turn": 3,
+          "text": "ok",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1
+          },
+          "inChars": {
+            "reply": 26148
+          },
+          "cachedTok": 6400,
+          "ms": 66,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 4,
+          "text": "What is the typical rent difference between Denver and Austin right now?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 27956,
+            "memory": 5393,
+            "map": 79374
+          },
+          "cachedTok": 7680,
+          "ms": 64,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 5,
+          "text": "Map out my argument for moving so I can see what it rests on.",
+          "intent": "structure",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 26738,
+            "memory": 5405,
+            "map": 79965
+          },
+          "cachedTok": 27136,
+          "ms": 64,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 6,
+          "text": "Make a decision matrix of the two options.",
+          "intent": "visual",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "other": 1
+          },
+          "inChars": {
+            "reply": 27534,
+            "memory": 5363,
+            "map": 80239,
+            "other": 4447
+          },
+          "cachedTok": 27776,
+          "ms": 70,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 7,
+          "text": "Honestly I think the money matters less than I said at first.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 27298,
+            "memory": 5405
+          },
+          "cachedTok": 7808,
+          "ms": 68,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 8,
+          "text": "thanks",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1
+          },
+          "inChars": {
+            "reply": 27743
+          },
+          "cachedTok": 6784,
+          "ms": 67,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 9,
+          "text": "So what would I actually be giving up by staying?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 27810,
+            "memory": 5393
+          },
+          "cachedTok": 7936,
+          "ms": 68,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 10,
+          "text": "Let me sleep on it and talk to my partner this weekend.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1
+          },
+          "inChars": {
+            "reply": 28304,
+            "memory": 5376
+          },
+          "cachedTok": 8064,
+          "ms": 73,
+          "map": false,
+          "status": 200
+        }
+      ]
+    },
+    {
+      "arm": "open",
+      "turns": 10,
+      "ok": true,
+      "calls": {
+        "map": 9,
+        "memory": 8,
+        "other": 1,
+        "reply": 10,
+        "title": 1
       },
-      {
-        "turn": 10,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 7076,
-          "memory": 1344,
-          "map": 20183
-        },
-        "cacheableTokens": 27648,
-        "map": true
-      }
-    ],
-    "after": [
-      {
-        "turn": 1,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "title": 1
-        },
-        "inputTokens": {
-          "reply": 3251,
-          "memory": 1357,
-          "title": 202
-        },
-        "cacheableTokens": 0,
-        "map": false
+      "callsTotal": 29,
+      "mapPasses": 9,
+      "inputTokens": {
+        "map": 180069,
+        "memory": 10792,
+        "other": 1112,
+        "reply": 40108,
+        "title": 202
       },
-      {
-        "turn": 2,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 3336,
-          "memory": 1352
-        },
-        "cacheableTokens": 4224,
-        "map": false
-      },
-      {
-        "turn": 3,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1
-        },
-        "inputTokens": {
-          "reply": 3387
-        },
-        "cacheableTokens": 3200,
-        "map": false
-      },
-      {
-        "turn": 4,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3793,
-          "memory": 1349,
-          "map": 19844
-        },
-        "cacheableTokens": 4352,
-        "map": true
-      },
-      {
-        "turn": 5,
-        "intent": "structure",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3534,
-          "memory": 1352,
-          "map": 19992
-        },
-        "cacheableTokens": 23936,
-        "map": true
-      },
-      {
-        "turn": 6,
-        "intent": "visual",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "other": 1
-        },
-        "inputTokens": {
-          "reply": 3849,
-          "memory": 1341,
-          "map": 20060,
-          "other": 1112
-        },
-        "cacheableTokens": 24064,
-        "map": true
-      },
-      {
-        "turn": 7,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 3835,
-          "memory": 1352
-        },
-        "cacheableTokens": 4736,
-        "map": false
-      },
-      {
-        "turn": 8,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1
-        },
-        "inputTokens": {
-          "reply": 3901
-        },
-        "cacheableTokens": 3712,
-        "map": false
-      },
-      {
-        "turn": 9,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 3963,
-          "memory": 1349
-        },
-        "cacheableTokens": 4864,
-        "map": false
-      },
-      {
-        "turn": 10,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 4031,
-          "memory": 1344
-        },
-        "cacheableTokens": 4992,
-        "map": false
-      }
-    ],
-    "core4": [
-      {
-        "turn": 1,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1,
-          "title": 1
-        },
-        "inputTokens": {
-          "other": 1452,
-          "reply": 5185,
-          "memory": 1352,
-          "title": 135
-        },
-        "cacheableTokens": 0,
-        "map": false
-      },
-      {
-        "turn": 2,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1,
-          "title": 1
-        },
-        "inputTokens": {
-          "other": 1703,
-          "reply": 5137,
-          "memory": 1352,
-          "title": 215
-        },
-        "cacheableTokens": 7168,
-        "map": false
-      },
-      {
-        "turn": 3,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "other": 1790,
-          "reply": 5418,
-          "memory": 1331
-        },
-        "cacheableTokens": 7296,
-        "map": false
-      },
-      {
-        "turn": 4,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1,
-          "understanding": 1
-        },
-        "inputTokens": {
-          "other": 1867,
-          "reply": 5586,
-          "memory": 1349,
-          "understanding": 1817
-        },
-        "cacheableTokens": 7296,
-        "map": false
-      },
-      {
-        "turn": 5,
-        "intent": "structure",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "other": 1942,
-          "reply": 5554,
-          "memory": 1346
-        },
-        "cacheableTokens": 7552,
-        "map": false
-      },
-      {
-        "turn": 6,
-        "intent": "visual",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "other": 2011,
-          "reply": 5428,
-          "memory": 1341
-        },
-        "cacheableTokens": 7680,
-        "map": false
-      },
-      {
-        "turn": 7,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "other": 2088,
-          "reply": 5691,
-          "memory": 1346
-        },
-        "cacheableTokens": 7680,
-        "map": false
-      },
-      {
-        "turn": 8,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1,
-          "understanding": 1
-        },
-        "inputTokens": {
-          "other": 2148,
-          "reply": 5753,
-          "memory": 1332,
-          "understanding": 1801
-        },
-        "cacheableTokens": 7808,
-        "map": false
-      },
-      {
-        "turn": 9,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "other": 2220,
-          "reply": 5623,
-          "memory": 1343
-        },
-        "cacheableTokens": 7808,
-        "map": false
-      },
-      {
-        "turn": 10,
-        "intent": "conversation",
-        "calls": {
-          "other": 1,
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "other": 2292,
-          "reply": 5882,
-          "memory": 1345
-        },
-        "cacheableTokens": 7936,
-        "map": false
-      }
-    ],
-    "classic": [
-      {
-        "turn": 1,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "title": 1
-        },
-        "inputTokens": {
-          "reply": 6447,
-          "memory": 1357,
-          "title": 202
-        },
-        "cacheableTokens": 0,
-        "map": false
-      },
-      {
-        "turn": 2,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 6532,
-          "memory": 1352
-        },
-        "cacheableTokens": 7424,
-        "map": false
-      },
-      {
-        "turn": 3,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1
-        },
-        "inputTokens": {
-          "reply": 6583
-        },
-        "cacheableTokens": 6400,
-        "map": false
-      },
-      {
-        "turn": 4,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 6989,
-          "memory": 1349,
-          "map": 19844
-        },
-        "cacheableTokens": 7680,
-        "map": true
-      },
-      {
-        "turn": 5,
-        "intent": "structure",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 6731,
-          "memory": 1352,
-          "map": 19992
-        },
-        "cacheableTokens": 27136,
-        "map": true
-      },
-      {
-        "turn": 6,
-        "intent": "visual",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "other": 1
-        },
-        "inputTokens": {
-          "reply": 6884,
-          "memory": 1341,
-          "map": 20060,
-          "other": 1112
-        },
-        "cacheableTokens": 27776,
-        "map": true
-      },
-      {
-        "turn": 7,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 6871,
-          "memory": 1352
-        },
-        "cacheableTokens": 7808,
-        "map": false
-      },
-      {
-        "turn": 8,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1
-        },
-        "inputTokens": {
-          "reply": 6936
-        },
-        "cacheableTokens": 6784,
-        "map": false
-      },
-      {
-        "turn": 9,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 6999,
-          "memory": 1349
-        },
-        "cacheableTokens": 7936,
-        "map": false
-      },
-      {
-        "turn": 10,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1
-        },
-        "inputTokens": {
-          "reply": 7076,
-          "memory": 1344
-        },
-        "cacheableTokens": 8064,
-        "map": false
-      }
-    ],
-    "open": [
-      {
-        "turn": 1,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "title": 1
-        },
-        "inputTokens": {
-          "reply": 3251,
-          "memory": 1357,
-          "map": 19624,
-          "title": 202
-        },
-        "cacheableTokens": 0,
-        "map": true
-      },
-      {
-        "turn": 2,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3336,
-          "memory": 1352,
-          "map": 19772
-        },
-        "cacheableTokens": 23680,
-        "map": true
-      },
-      {
-        "turn": 3,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1
-        },
-        "inputTokens": {
-          "reply": 3387
-        },
-        "cacheableTokens": 3200,
-        "map": false
-      },
-      {
-        "turn": 4,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3793,
-          "memory": 1349,
-          "map": 19913
-        },
-        "cacheableTokens": 24064,
-        "map": true
-      },
-      {
-        "turn": 5,
-        "intent": "structure",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3534,
-          "memory": 1352,
-          "map": 19992
-        },
-        "cacheableTokens": 24320,
-        "map": true
-      },
-      {
-        "turn": 6,
-        "intent": "visual",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1,
-          "other": 1
-        },
-        "inputTokens": {
-          "reply": 3849,
-          "memory": 1341,
-          "map": 20060,
-          "other": 1112
-        },
-        "cacheableTokens": 24064,
-        "map": true
-      },
-      {
-        "turn": 7,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3835,
-          "memory": 1352,
-          "map": 20139
-        },
-        "cacheableTokens": 24704,
-        "map": true
-      },
-      {
-        "turn": 8,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3901,
-          "map": 20199
-        },
-        "cacheableTokens": 23808,
-        "map": true
-      },
-      {
-        "turn": 9,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 3963,
-          "memory": 1349,
-          "map": 20190
-        },
-        "cacheableTokens": 24448,
-        "map": true
-      },
-      {
-        "turn": 10,
-        "intent": "conversation",
-        "calls": {
-          "reply": 1,
-          "memory": 1,
-          "map": 1
-        },
-        "inputTokens": {
-          "reply": 4031,
-          "memory": 1344,
-          "map": 20183
-        },
-        "cacheableTokens": 24576,
-        "map": true
-      }
-    ]
-  }
+      "inputTokensTotal": 232283,
+      "cacheableTokens": 200192,
+      "uncachedTokens": 32091,
+      "routeMsMedian": 68,
+      "perTurn": [
+        {
+          "turn": 1,
+          "text": "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "title": 1
+          },
+          "inChars": {
+            "reply": 14108,
+            "memory": 5427,
+            "map": 78496,
+            "title": 808
+          },
+          "cachedTok": 0,
+          "ms": 68,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 2,
+          "text": "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 14651,
+            "memory": 5406,
+            "map": 79088
+          },
+          "cachedTok": 24064,
+          "ms": 66,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 3,
+          "text": "ok",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1
+          },
+          "inChars": {
+            "reply": 14652
+          },
+          "cachedTok": 3584,
+          "ms": 65,
+          "map": false,
+          "status": 200
+        },
+        {
+          "turn": 4,
+          "text": "What is the typical rent difference between Denver and Austin right now?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 16652,
+            "memory": 5393,
+            "map": 79649
+          },
+          "cachedTok": 24448,
+          "ms": 64,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 5,
+          "text": "Map out my argument for moving so I can see what it rests on.",
+          "intent": "structure",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 15452,
+            "memory": 5405,
+            "map": 79965
+          },
+          "cachedTok": 24704,
+          "ms": 63,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 6,
+          "text": "Make a decision matrix of the two options.",
+          "intent": "visual",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1,
+            "other": 1
+          },
+          "inChars": {
+            "reply": 16875,
+            "memory": 5363,
+            "map": 80239,
+            "other": 4447
+          },
+          "cachedTok": 24448,
+          "ms": 69,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 7,
+          "text": "Honestly I think the money matters less than I said at first.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 16605,
+            "memory": 5405,
+            "map": 80555
+          },
+          "cachedTok": 25088,
+          "ms": 68,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 8,
+          "text": "thanks",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 17083,
+            "map": 80793
+          },
+          "cachedTok": 24064,
+          "ms": 67,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 9,
+          "text": "So what would I actually be giving up by staying?",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 16919,
+            "memory": 5393,
+            "map": 80759
+          },
+          "cachedTok": 24832,
+          "ms": 68,
+          "map": true,
+          "status": 200
+        },
+        {
+          "turn": 10,
+          "text": "Let me sleep on it and talk to my partner this weekend.",
+          "intent": "conversation",
+          "calls": {
+            "reply": 1,
+            "memory": 1,
+            "map": 1
+          },
+          "inChars": {
+            "reply": 17432,
+            "memory": 5376,
+            "map": 80729
+          },
+          "cachedTok": 24960,
+          "ms": 69,
+          "map": true,
+          "status": 200
+        }
+      ]
+    }
+  ]
 }

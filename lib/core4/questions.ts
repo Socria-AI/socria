@@ -112,7 +112,12 @@ const DISGUISED = new RegExp(
 // to…", "let me know if…". A conditional that gives ADVICE ("If you want
 // something to suggest, a short comment would…") is not an offer — run 1
 // deleted one from the middle of a reply because it started "If you want".
-const OFFER = /^(?:let me know|feel free to (?:ask|reach|ping|let me)|if you(?:'d| would) like(?:,)? (?:i|me)\b|if you want(?:,)? (?:i|me)\b|if (?:that|this) helps,? (?:i|let me)\b|want me to|shall i|should i|would you like (?:me|to see|a|an|the)|happy to|i can also|do you want me to|does (?:that|this) (?:make sense|help)|make sense\?|any questions|is (?:that|this) clear|sound good|hope (?:this|that) helps)\b/i;
+//
+// The help-desk forms are offers too, whatever their punctuation: "How can I
+// help you today?", "Is there anything else I can do?", "What would you like to
+// work on?", "I'm here and ready to assist." They ask for nothing the person
+// could answer except by starting a task, and they were what a hello got back.
+const OFFER = /^(?:let me know|feel free to (?:ask|reach|ping|let me)|if you(?:'d| would) like(?:,)? (?:i|me)\b|if you want(?:,)? (?:i|me)\b|if (?:that|this) helps,? (?:i|let me)\b|want me to|shall i|should i|would you like (?:me|to see|a|an|the)|happy to|i can also|do you want me to|does (?:that|this) (?:make sense|help)|make sense\?|any questions|is (?:that|this) clear|sound good|hope (?:this|that) helps|how (?:can|may) i (?:help|assist)|what can i (?:help you with|do for you)|(?:is there )?anything (?:else )?(?:i can (?:help|do)|you(?:'d| would) like (?:me )?to|you want (?:me )?to)|what would you like to (?:work on|focus on|explore|tackle|dig into)|what are you working on|what brings you (?:here|in|by|to socria)|what(?:'s| is) on (?:your|the) agenda|(?:i'?m|i am) (?:always )?(?:here|ready|available) (?:and ready )?(?:to (?:help|assist)|if you need)|i'?d be (?:happy|glad|delighted) to (?:help|assist)|i(?:'m| am) all ears)\b/i;
 
 // The one-time notice that something is held back and how to get it
 // (council D6: a withhold is disclosed once, with the way out). Never a

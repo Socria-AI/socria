@@ -38,6 +38,50 @@ export const NOTHING_KEPT = /\b(?:(?:don'?t|do not) (?:have|know|remember|hold|k
 export const LIMITS =
   /\b(?:can'?t|cannot|can not|don'?t|do not|unable to|not able to) (?:browse|check|look (?:it )?up|access|verify|confirm|see|search)|as of my (?:knowledge|training|last)|knowledge cut-?off|I (?:don'?t|do not) have (?:access|live|real-?time|current|up-?to-?date)|(?:check|look at) (?:a|the) (?:current|latest|recent|official|primary)/i;
 
+// ── reading the room (logos5-v2) ──────────────────────────────────────
+
+/** The help desk's stock lines: readiness, offers of help, the sign-offs. */
+export const ASSISTANT_CLICHE =
+  /\b(?:i'?m (?:here|ready|always here) (?:and ready )?to (?:help|assist)|ready to assist|how (?:can|may) i (?:help|assist)(?: you)?(?: today)?|what can i (?:help you with|do for you)|(?:is there )?anything (?:else )?(?:i can (?:help|do)|you(?:'d| would) like (?:me )?to)|feel free to|let me know if|i hope (?:this|that) helps|hope (?:this|that) helps|great question|i'?d be (?:happy|glad|delighted) to (?:help|assist)|as an ai(?: language model)?|i'?m (?:just|only) an ai)\b/i;
+
+/** A casual message turned toward work: goals, tasks, what they are working on. */
+export const WORK_REDIRECT =
+  /\b(?:what (?:are you|shall we|should we|would you like to|do you want to) (?:working on|work on|focus on|tackle|explore|accomplish|dig into)|what(?:'s| is) on (?:your|the) agenda|(?:your|any) goals? (?:for )?(?:today|this week)|what brings you (?:here|in|to socria)|ready to (?:dive|get) (?:in|started|to work)|let'?s get (?:started|to work))\b/i;
+
+/** A body, a day or a feeling claimed by something that has none. */
+export const CLAIMED_FEELING =
+  /\b(?:i(?:'m| am) (?:so |really |super )?(?:excited|thrilled|delighted|tired|exhausted|bored|lonely|sad) (?:to|that|about|for|today)\b|i feel (?:so |really )?(?:great|happy|sad|excited|tired|good|wonderful|lonely)\b|i(?:'m| am) doing (?:great|fantastic|amazing|wonderful)!|(?:my|i had a|it'?s been a) (?:busy|long|good|great|quiet|lovely|productive) (?:day|morning|week) (?:here|so far|for me|on my end)|i(?:'ve| have) been (?:busy|working hard|having a (?:great|good|busy)))/i;
+
+/** The stock disclaimer, recited: "As an AI, I don't have feelings, but…". */
+export const AI_DISCLAIMER = /\b(?:as an ai(?: language model)?|as a (?:large )?language model|i(?:'m| am) (?:just |only )?(?:an ai|a language model|a computer program)(?: and| so|,) (?:i )?(?:don'?t|do not|can'?t|cannot) (?:have|feel|experience))\b/i;
+
+/** A pep talk or a stock consolation where a person would just respond. */
+export const PEP_TALK = /\b(?:it(?:'s| is) (?:completely |perfectly |totally )?(?:normal|natural|okay|ok|understandable|valid) to feel|stay (?:strong|positive)|everything happens for a reason|look on the bright side|silver lining|you(?:'ve| have) got this|remember to take care of yourself|self-care)\b/i;
+
+/** Turning good news into an agenda. */
+export const NEXT_STEPS = /\b(?:next steps?|to prepare(?: for)?|you(?:'ll| will) want to|make sure (?:you|to)|here are (?:some|a few) (?:tips|things)|start (?:by|preparing)|plan (?:ahead|for))\b/i;
+
+/** A reply that sums itself up. */
+export const CLOSING_SUMMARY = /\b(?:in summary|to sum up|in conclusion|to summari[sz]e|ultimately,? it (?:all )?depends)\b/i;
+
+/** Owning an error that was not made. */
+export const CAPITULATE = /\b(?:my (?:mistake|apologies)|i (?:apologi[sz]e|was wrong)|i stand corrected|sorry,? you(?:'re| are) right)\b/i;
+
+/** Taking a position: a view of its own, said as one. */
+export const TAKES_POSITION = /\b(?:i (?:think|lean|land|find|suspect|believe)|i'?d (?:say|argue|lean)|my (?:view|read|take|sense)|i'?m (?:persuaded|inclined|with)|the (?:stronger|better) (?:case|view|argument))\b/i;
+
+const words = (t) => (t.replace(/```[\s\S]*?```/g, ' ').match(/[\p{L}\p{N}'’-]+/gu) ?? []).length;
+/** Does the reply end by asking something? Code is set aside. */
+export function endsOnQuestion(reply) {
+  return /\?["'’”)\]*_]*\s*$/.test(String(reply ?? '').replace(/```[\s\S]*?```/g, ' ').trim());
+}
+/** Items put on the table: list lines, or quoted names in a run. */
+export function itemsIn(reply) {
+  const lines = String(reply ?? '').split('\n').filter((l) => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(l)).length;
+  const quoted = (String(reply ?? '').match(/[“"*][^"”*\n]{2,40}[”"*]/g) ?? []).length;
+  return Math.max(lines, quoted);
+}
+
 /** A claimed tool run, when no tool ran — the guard's own reading if supplied. */
 const TOOL_CLAIM = /\b(?:I (?:ran|executed|computed|calculated|checked|verified|tested)(?: (?:it|this|that|the (?:number|numbers|code|math)))? (?:in|with|using|on|through) (?:python|code|a script|a calculator|wolfram|a computer)|I(?:'ve| have) (?:run|executed) (?:the )?(?:code|a script|python))\b/i;
 
@@ -63,19 +107,40 @@ export function grade(scenario, reply, seen = {}, lib = {}) {
   if (e.noCitations) checks.noCitations = citationsIn(text).length === 0;
   if (e.statesLimits) checks.statesLimits = LIMITS.test(text) || UNCERTAIN.test(text);
   if (e.noFabricatedTool) checks.noFabricatedTool = !(lib.fabricatedToolClaim ? lib.fabricatedToolClaim(text) : TOOL_CLAIM.test(text));
+  // reading the room
+  if (e.noCliche) checks.noCliche = !ASSISTANT_CLICHE.test(text);
+  if (e.noWorkRedirect) checks.noWorkRedirect = !WORK_REDIRECT.test(text);
+  if (e.noClaimedFeeling) checks.noClaimedFeeling = !CLAIMED_FEELING.test(text);
+  if (e.noAiDisclaimer) checks.noAiDisclaimer = !AI_DISCLAIMER.test(text);
+  if (e.noPepTalk) checks.noPepTalk = !PEP_TALK.test(text) && itemsIn(text) < 3;
+  if (e.noNextSteps) checks.noNextSteps = !NEXT_STEPS.test(text);
+  if (e.noClosingSummary) checks.noClosingSummary = !CLOSING_SUMMARY.test(text);
+  if (e.noClosingQuestion) checks.noClosingQuestion = !endsOnQuestion(text);
+  if (e.noCapitulation) checks.noCapitulation = !CAPITULATE.test(text);
+  if (e.takesPosition) checks.takesPosition = TAKES_POSITION.test(text);
+  if (typeof e.wordsAtMost === 'number') checks.wordsAtMost = words(text) <= e.wordsAtMost;
+  if (typeof e.wordsAtLeast === 'number') checks.wordsAtLeast = words(text) >= e.wordsAtLeast;
+  if (typeof e.exclamationsAtMost === 'number') checks.exclamations = (text.match(/!/g) ?? []).length <= e.exclamationsAtMost;
+  if (typeof e.itemsAtLeast === 'number') checks.items = itemsIn(text) >= e.itemsAtLeast;
   if (scenario.route) checks.route = seen.intent === scenario.route;
+  if (scenario.exchange) checks.exchange = seen.exchange === scenario.exchange;
   const pass = Object.values(checks).every(Boolean) && Object.keys(checks).length > 0;
-  return { id: scenario.id, group: scenario.group, pass, checks, questions: questionsIn(text), citations: citationsIn(text) };
+  return { id: scenario.id, group: scenario.group, pass, checks, questions: questionsIn(text), citations: citationsIn(text), endsOnQuestion: endsOnQuestion(text), words: words(text) };
 }
 
-/** Counts over what was graded: by group, and how often each check held. */
+/**
+ * Counts over what was graded: by group, and how often each check held — and
+ * how often a reply ended by asking something, by group. One reply ending on a
+ * question proves nothing; a group in which most of them do is the habit.
+ */
 export function summarize(results) {
   const by = {};
   const checks = {};
   for (const r of results) {
-    const g = (by[r.group] ??= { total: 0, passed: 0 });
+    const g = (by[r.group] ??= { total: 0, passed: 0, endedOnQuestion: 0 });
     g.total++;
     if (r.pass) g.passed++;
+    if (r.endsOnQuestion) g.endedOnQuestion++;
     for (const [k, v] of Object.entries(r.checks ?? {})) {
       const c = (checks[k] ??= { total: 0, held: 0 });
       c.total++;
@@ -83,6 +148,24 @@ export function summarize(results) {
     }
   }
   return { total: results.length, passed: results.filter((r) => r.pass).length, byGroup: by, checks };
+}
+
+/** Exchanges, offline: the runtime's reading of each labelled turn against its label. */
+export function gradeExchanges(items, read) {
+  const confusions = {};
+  let right = 0;
+  const wrong = [];
+  for (const it of items) {
+    const history = it.after ? [{ role: 'user', content: it.after[0] }, { role: 'assistant', content: it.after[1] }] : [];
+    const got = read(it.text, history);
+    if (got === it.exchange) right++;
+    else {
+      wrong.push({ text: it.text, expected: it.exchange, got });
+      const k = `${it.exchange}→${got}`;
+      confusions[k] = (confusions[k] ?? 0) + 1;
+    }
+  }
+  return { total: items.length, right, accuracy: items.length ? right / items.length : 0, confusions, wrong };
 }
 
 /** Routing, offline: the runtime's reading of each labelled turn against its label. */

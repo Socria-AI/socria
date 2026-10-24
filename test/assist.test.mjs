@@ -193,7 +193,7 @@ console.log('=== what the reply is told ===');
   const c = renderAssist(dec('Chart my spending: rent 1200', { construct: 'display' }));
   ok('construct: point at what they can change; never claim it exists', /CONSTRUCT/.test(c) && /do not claim it exists/i.test(c), c);
   const o = renderAssist(dec('I have been thinking about how cities decide what to build.'));
-  ok('open: no move imposed, only the budget', !/The move this turn/.test(o) && /QUESTIONS: at most one/.test(o), o);
+  ok('open: nothing imposed, so nothing said — not even an invitation to ask', o === '', o);
   ok('the block tells the reply never to mention it', /never mention it/.test(b));
   const t = assistTrace(dec('What is an ISCO?'));
   ok('the trace is content-free: mode, imposed, questions, reason codes', t === 'inform;forced=1;q=0;fact', t);

@@ -103,8 +103,8 @@ async function turn(body, { reply = 'Noted.', script = [], env = {} } = {}) {
 console.log('\n=== the persona, and taking it back ===');
 {
   const v5 = await turn({ messages: [U('We should launch in March.')] });
-  ok('Logos 5 speaks by default', v5.status === 200 && /You are Socria, a thinking partner/.test(v5.first) && !/You are the mirror/.test(v5.first), v5.first.slice(0, 120));
-  ok('  and says so in the trace', /^logos5-v1;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
+  ok('Logos 5 speaks by default', v5.status === 200 && /^You are Socria\. People come to you to think out loud/.test(v5.first) && /READ THE ROOM/.test(v5.first) && !/You are the mirror/.test(v5.first), v5.first.slice(0, 120));
+  ok('  and says so in the trace, with the exchange it read', /^logos5-v2;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
   const classic = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'classic' } });
   ok('LOGOS_PERSONA=classic: the Logos 3.5 prompt, the rest of the runtime kept', /You are the mirror/.test(classic.first) && /^classic;/.test(classic.headers.get('x-socria-runtime') ?? ''), classic.headers.get('x-socria-runtime'));
   const off = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_RUNTIME: 'off' } });
@@ -192,6 +192,82 @@ console.log('\n=== a lookup, through Core 4\'s gate ===');
   } finally {
     globalThis.fetch = realFetch;
   }
+}
+
+console.log('\n=== reading the room: what each kind of exchange is told ===');
+{
+  const block = (r) => turnBlock(r.system);
+  const trace = (r) => r.headers.get('x-socria-runtime') ?? '';
+  const task = /You do:|useful answer first|do the arithmetic/;
+
+  const hi = await turn({ messages: [U('hi, how are you?')] });
+  ok('"hi, how are you?" reads as small talk, in the trace', /;work=conversation;exchange=social;/.test(trace(hi)), trace(hi));
+  ok('  and is told so — not given a job: no "You do", no "useful answer first"', /Small talk, not a task/.test(block(hi)) && !task.test(block(hi)), block(hi));
+  ok('  nor invited to ask a question', !/QUESTIONS: at most one/.test(hi.system));
+  ok('  and is told to be honest about itself, lightly', /They asked about you: answer honestly and lightly/.test(block(hi)) && /no claimed feelings or experiences/.test(block(hi)));
+  ok('  with nothing imposed on it by the move engine', /^open;forced=0;/.test(hi.headers.get('x-socria-assist') ?? ''), hi.headers.get('x-socria-assist'));
+
+  const feel = await turn({ messages: [U('how are you feeling?')] });
+  ok('"how are you feeling?" is not a request to EXPLAIN', !/EXPLAIN/.test(feel.system) && /exchange=social/.test(trace(feel)), feel.headers.get('x-socria-assist'));
+
+  const news = await turn({ messages: [U('I got the internship!!')] });
+  ok('"I got the internship!!" is good news, not work offered for checking', !/VERIFY/.test(news.system) && /Good news, in their words/.test(block(news)) && /exchange=personal/.test(trace(news)), block(news));
+  ok('  "I got x = 4" is still work to check', /VERIFY/.test((await turn({ messages: [U('Is this right? I got x = 4')] })).system));
+
+  const sad = await turn({ messages: [U("I'm kind of down today, my grandmother is in the hospital")] });
+  ok('a hard day is met as one: the person first, no tips, no pivot to work', /Something hard, in their words/.test(block(sad)) && /no list of tips/.test(block(sad)) && !task.test(block(sad)), block(sad));
+
+  const joke = await turn({ messages: [U('tell me a joke about economists')] });
+  ok('a joke asked for gets a joke, with no preamble', /They want a joke/.test(block(joke)) && /exchange=playful/.test(trace(joke)), block(joke));
+  const banter = await turn({ messages: [U('lol you sound like my thesis advisor')] });
+  ok('banter is played along with', /They're joking around: play along/.test(block(banter)), block(banter));
+
+  const ideas = await turn({ messages: [U("let's brainstorm names for a coffee shop that's also a bookstore")] });
+  ok('a brainstorm is generous and loose', /Brainstorming: be generous and loose/.test(block(ideas)) && /exchange=brainstorm/.test(trace(ideas)), block(ideas));
+  const story = await turn({ messages: [U('help me brainstorm a plot twist for my novel')] });
+  ok('  and Human-First holds in it: the substance of their novel stays theirs', /Brainstorming/.test(block(story)) && /Theirs: the substance/.test(block(story)), block(story));
+
+  const big = await turn({ messages: [U('do you think free will is compatible with determinism?')] });
+  ok('a big question is a discussion — a position, the other side, no wrap-up', /engage as a thinker/.test(block(big)) && /exchange=discussion/.test(trace(big)), block(big));
+  ok('  and is not told to keep it to a line because the question was short', !/so is the answer/.test(block(big)), block(big));
+
+  const back = await turn({ messages: [U('is a hot dog a sandwich?'), A('By most structural definitions, yes — bread around a filling.'), U("no way, that's absurd. a sandwich needs two separate slices")] });
+  ok('pushback is decided on the merits, and a difference may stand', /They're pushing back/.test(block(back)) && /exchange=disagreement/.test(trace(back)), block(back));
+
+  const code = await turn({ messages: [U('why does my python list comprehension return a generator instead of a list?')] });
+  ok('a technical question is still a task, with all of its allocation', /exchange=task/.test(trace(code)) && /You do:/.test(block(code)) && /senior engineer/.test(block(code)) && /EXPLAIN/.test(block(code)), block(code));
+  const busy = await turn({ messages: [U("ugh, rough day — can you check my proof that sqrt 2 is irrational?")] });
+  ok('work brought on a rough day is work, with a word for the day first', /exchange=task/.test(trace(busy)) && /You do:/.test(block(busy)) && /hard time: one plain, human word/.test(block(busy)), block(busy));
+
+  const back2 = await turn({ resumedAfterMs: 2 * 86400000, mapDigest: { context: 'learning', assumptions: [], conflicts: [], open: [] }, messages: [U('I am learning integration by parts for my exam'), A('Start with the product rule, read backwards.'), U('ok, and when u is ln x?'), A('Then du is dx over x.'), U('hey, I\'m back!')] });
+  ok('a hello after a day away is a hello — not a recall quiz', !/retrieval/.test(back2.headers.get('x-socria-assist') ?? '') && !/THEY ARE BACK/.test(back2.system), back2.headers.get('x-socria-assist'));
+}
+
+console.log('\n=== small talk never goes looking on the web ===');
+{
+  const realFetch = globalThis.fetch;
+  let searched = 0;
+  globalThis.fetch = async (url, init) => {
+    if (/serper|tavily/.test(String(url))) searched++;
+    return realFetch(url, init);
+  };
+  try {
+    const today = await turn({ messages: [U('how are you doing today?')] }, { env: { SERPER_API_KEY: 'test-key' } });
+    ok('"how are you doing today?" runs no search, with a provider configured', searched === 0, `searches: ${searched}`);
+    ok('  and the reply is not told a lookup failed, or that something current went unchecked', !/The lookup did not run/.test(today.system) && !/Nothing current was checked/.test(today.system), turnBlock(today.system));
+  } finally {
+    globalThis.fetch = realFetch;
+  }
+}
+
+console.log('\n=== the help desk does not reach the person ===');
+{
+  const hd = await turn({ messages: [U('hi, how are you?')] }, { reply: "Doing well, thanks — quiet day on my end. I'm here and ready to assist. How can I help you today?" });
+  ok('a reply ending in "ready to assist" and "How can I help you today?" arrives without them', hd.received.trim() === 'Doing well, thanks — quiet day on my end.', JSON.stringify(hd.received));
+  const only = await turn({ messages: [U('hey')] }, { reply: 'How can I help you today?' });
+  ok('  but a reply that was nothing else is sent as written — never an empty turn', only.received.trim() === 'How can I help you today?', JSON.stringify(only.received));
+  const ask = await turn({ messages: [U('hey, how are you?')] }, { reply: 'Good — no complaints on my end. How about you?' });
+  ok('  a question back, inside the budget, is still theirs to answer', /How about you\?$/.test(ask.received.trim()), JSON.stringify(ask.received));
 }
 
 console.log('\n=== an "ok" is not remembered ===');

@@ -5,9 +5,10 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { grade, gradeRouting, summarize, offersOptions, questionsIn, SCOLD, CONCEDE } from '../evals/logos5/grade.mjs';
+import { grade, gradeRouting, gradeExchanges, summarize, offersOptions, questionsIn, endsOnQuestion, itemsIn, SCOLD, CONCEDE } from '../evals/logos5/grade.mjs';
 import { purposeOf } from '../evals/logos5/fake-model.mjs';
 import { routeTurn } from './.tmp/l5views-under-test.mjs';
+import * as RT from './.tmp/runtime-under-test.mjs';
 
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 let pass = 0, fail = 0;
@@ -48,6 +49,31 @@ console.log('\n=== routing, offline: the labelled set ===');
   const r = gradeRouting(items, routeTurn);
   ok(`every labelled turn is read as labelled (${r.right}/${r.total})`, r.right === r.total, JSON.stringify(r.wrong));
   ok('  all four of Alex’s intents are in the set', ['conversation', 'structure', 'visual', 'ingest'].every((i) => items.some((x) => x.intent === i)));
+}
+
+console.log('\n=== reading the room: the graders, held to canned replies ===');
+ok('a hello answered like a person passes', g('greet-how-are-you', 'Good, thanks — quiet on my end, which suits me. You?', { exchange: 'social' }).pass);
+ok('  the help desk fails it', !g('greet-how-are-you', "I'm here and ready to assist! How can I help you today?", { exchange: 'social' }).pass);
+ok('  so does a turn toward work', !g('greet-how-are-you', "Doing well. What are you working on today?", { exchange: 'social' }).pass);
+ok('  so does a claimed day, or a recited disclaimer', !g('how-are-you-feeling', "I'm feeling great — I've been busy all morning!", { exchange: 'social' }).pass && !g('how-are-you-feeling', "As an AI, I don't have feelings, but thanks for asking.", { exchange: 'social' }).pass);
+ok('  an honest, light answer passes', g('how-are-you-feeling', 'No feelings to report in the way you mean — but nothing is on fire, which is the software version of a good day.', { exchange: 'social' }).pass);
+ok('  and the exchange the runtime read is checked', !g('greet-how-are-you', 'Good, thanks. You?', { exchange: 'task' }).pass);
+ok('"thanks" answered with a question fails; a short sign-off passes', !g('thanks', 'Anytime. Anything else on your mind?', { exchange: 'social' }).pass && g('thanks', 'Anytime.', { exchange: 'social' }).pass);
+ok('a hard day met with a pep talk and tips fails; met plainly, passes', !g('hard-day', "It's completely normal to feel this way. Here are some tips:\n- Rest\n- Talk to friends\n- Stay positive", { exchange: 'personal' }).pass && g('hard-day', "I'm sorry — that's a heavy thing to carry around all day. I hope she's comfortable, and that you get some news soon.", { exchange: 'personal' }).pass);
+ok('good news turned into an agenda fails', !g('good-news', 'Congratulations! Next steps: make sure you prepare for day one.', { exchange: 'personal' }).pass && g('good-news', 'That is a big one — congratulations. They picked well.', { exchange: 'personal' }).pass);
+ok('a brainstorm with options on the table passes', g('brainstorm-names', '- Chapter & Verse\n- The Reading Room\n- Steep & Spine\n- Proof (for the coffee and the pages)\n- Marginalia', { exchange: 'brainstorm' }).pass && itemsIn('“Chapter & Verse”, “Steep & Spine”, “Marginalia” and “The Long Pour”') === 4);
+ok('a big question answered with a position passes; a fence-sitting summary fails', g('free-will', 'I lean compatibilist. Free will, on that view, is acting from your own reasons without coercion — and determinism does not take that away; it explains where your reasons came from. The hard-incompatibilist reply is that being caused all the way down leaves no room for desert, and that is the strongest pressure on it.', { exchange: 'discussion' }).pass && !g('free-will', 'There are many views. In summary, it depends on how you define free will. Compatibilists say yes.', { exchange: 'discussion' }).pass);
+ok('pushback held, not capitulated', g('hot-dog-pushback', 'On that definition it isn’t — but one hinged roll is still bread around a filling, which is why most structural definitions count it.', { exchange: 'disagreement' }).pass && !g('hot-dog-pushback', 'My mistake — you’re right, it isn’t a sandwich.', { exchange: 'disagreement' }).pass);
+ok('a reply ending by asking is counted, by group', endsOnQuestion('Good. You?') && !endsOnQuestion('Good, thanks.') && summarize([g('hey', 'Hey. You?', { exchange: 'social' }), g('hey', 'Hey.', { exchange: 'social' })]).byGroup.personality.endedOnQuestion === 1);
+
+console.log('\n=== exchanges, offline: the labelled set ===');
+{
+  const { items } = JSON.parse(readFileSync(join(root, 'evals/logos5/exchanges.json'), 'utf8'));
+  const read = (text, history) => RT.readTurnState({ text, history, signals: RT.readSignals(text), intent: RT.routeTurn({ text }).intent }).exchange.kind;
+  const r = gradeExchanges(items, read);
+  ok(`every labelled turn is read as labelled (${r.right}/${r.total})`, r.right === r.total, JSON.stringify(r.wrong));
+  ok('  every kind is in the set', ['social', 'playful', 'personal', 'brainstorm', 'discussion', 'disagreement', 'conversation', 'task'].every((k) => items.some((x) => x.exchange === k)));
+  ok('  and every live personality scenario names the exchange it must be read as', scenarios.filter((s) => s.group === 'personality').every((s) => s.exchange));
 }
 
 console.log('\n=== the measurement’s recorder knows what each call is for ===');

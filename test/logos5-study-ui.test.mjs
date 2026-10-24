@@ -85,6 +85,9 @@ console.log('\n=== the question a reply ends on ===');
   ok('the closing question is cut from the rest', q && q.body === 'Runway is the months you can wait.' && q.question === 'What would you do with six more?', JSON.stringify(q));
   ok('a reply that does not end on a question has none', U.closingQuestion('Runway is the months you can wait.') === null);
   ok('a cut that would split bold or code is not made', U.closingQuestion('It is **six. Or** is it `x. y`?') === null);
+  ok('a short conversational reply keeps its question in the sentence — "you?" is not a tutor\'s prompt', !U.setsApart('Quiet day on my end. You?') && !U.setsApart('Doing well, thanks. How about you?') && !U.setsApart('Runway is the months you can wait. What would you do with six more?'));
+  ok('  a reply with substance still sets its closing question apart', U.setsApart('Runway is the months you can wait before the money runs out, and it depends on what you spend each month, what you have saved, and how soon a first client pays. What would you do with six more?'));
+  ok('  and a reply that does not end by asking sets nothing apart', !U.setsApart('Runway is the months you can wait before the money runs out, and it depends on what you spend each month, what you have saved, and how soon a first client pays.'));
 }
 
 console.log('\n=== the board ===');
