@@ -10,6 +10,8 @@ export { readStagePrefs, writeStagePrefs, logos5On, DEFAULT_STAGE_SHARE, STAGE_K
 // the study path: intake, board, a topic, practice, the three views — and the Universal Map
 export { StudyBoard, StartPanel, TopicInspector, StudyPractice, PracticeEmpty, ComponentsEmpty, ArtifactsView } from '@/components/logos5/Study';
 export { UniverseView } from '@/components/logos5/Universe';
+export { PreviewCard } from '@/components/logos5/UniverseParts';
+export { tileOf } from '@/lib/logos5/universe';
 export { WhatsNew, keptLine } from '@/components/onboarding/WhatsNew';
 export { emptyArrangement } from '@/lib/logos5/arrange';
 // Memory: what Socria remembers, as an atlas of a mind

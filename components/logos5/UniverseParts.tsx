@@ -100,6 +100,10 @@ export interface PreviewActs {
   onWeek?: () => void;
   /** on a map: where it is in time */
   onTime?: () => void;
+  /** a new name for it */
+  onRename?: (title: string) => void;
+  /** gone, with everything in it — asked once more before it happens */
+  onDelete?: () => void;
   onClose: () => void;
 }
 
@@ -131,6 +135,8 @@ export function PreviewCard({
 }) {
   const [moving, setMoving] = useState(false);
   const [naming, setNaming] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState(false);
   const chat = tile.kind === 'core';
   return (
     <aside className={`l5h-pv${sheet ? ' is-sheet' : ''}`} style={style} role="dialog" aria-label={tile.title} onPointerDown={(e) => e.stopPropagation()}>
@@ -226,10 +232,56 @@ export function PreviewCard({
             Its own subject
           </button>
         )}
+        {acts.onRename && (
+          <button type="button" className={`l5h-btn${renaming !== null ? ' is-on' : ''}`} aria-expanded={renaming !== null} onClick={() => (setRenaming((v) => (v === null ? tile.title : null)), setDeleting(false))}>
+            Rename
+          </button>
+        )}
         <button type="button" className="l5h-btn is-quiet" onClick={acts.onHide}>
           Hide
         </button>
+        {acts.onDelete && (
+          <button type="button" className={`l5h-btn is-quiet${deleting ? ' is-on' : ''}`} aria-expanded={deleting} onClick={() => (setDeleting((v) => !v), setRenaming(null))}>
+            Delete
+          </button>
+        )}
       </div>
+      {renaming !== null && acts.onRename && (
+        <form
+          className="l5h-name l5h-pv-rename"
+          onSubmit={(e) => {
+            e.preventDefault();
+            if (renaming.trim() && renaming.trim() !== tile.title) acts.onRename!(renaming);
+            setRenaming(null);
+          }}
+        >
+          <input
+            autoFocus
+            value={renaming}
+            maxLength={80}
+            aria-label="A new name for this conversation"
+            onChange={(e) => setRenaming(e.target.value)}
+            onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setRenaming(null))}
+            style={{ fontSize: 16 }}
+          />
+          <button type="submit" className="l5h-btn" disabled={!renaming.trim()}>
+            Save
+          </button>
+        </form>
+      )}
+      {deleting && acts.onDelete && (
+        <div className="l5h-pv-confirm" role="group" aria-label={`Delete ${tile.title}`}>
+          <p>Delete it? Its messages, its map and anything written or made in it go with it, and it cannot be brought back.</p>
+          <div className="l5h-pv-acts">
+            <button type="button" className="l5h-btn is-danger" onClick={acts.onDelete}>
+              Delete it
+            </button>
+            <button type="button" className="l5h-btn" autoFocus onClick={() => setDeleting(false)}>
+              Keep it
+            </button>
+          </div>
+        </div>
+      )}
       {moving && acts.onMove && (
         <div className="l5h-pv-move" role="menu" aria-label="Move to a Project">
           {projects.map((p) => (

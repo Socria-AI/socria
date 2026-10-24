@@ -804,6 +804,22 @@
   border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.38);
 }
 
+/* renaming or deleting from the card, under its buttons */
+.logos-root .l5 .l5h-pv-rename {
+  margin-top: 10px;
+}
+.logos-root .l5 .l5h-pv-confirm {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5 .l5h-pv-confirm p {
+  margin: 0 0 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--lg-ink-60);
+}
+
 /* ── the card beside a conversation ───────────────────────────────── */
 .logos-root .l5 .l5h-pv {
   position: absolute;

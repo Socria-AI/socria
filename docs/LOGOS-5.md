@@ -64,9 +64,11 @@ thread, the composer and every turn's actions are the same pieces.*
    ("show the map", "open the chart"), or by something being *made* — a
    display, a document, a model. A map that grows from ordinary talk does not
    open it: the header's **Map · N** says it is there.
-3. **The rail** — put away in Logos 5 (§5): home is the Universal Map, and the
-   rail is under the menu's "Manage conversations". Lines of thinking and
-   projects (`LogosRail`), a drawer on narrow screens.
+3. **The rail** — retired in Logos 5 (§5): home is the Universal Map, and a
+   line of thinking is renamed, deleted and filed from its own card there
+   (Rename, Delete — asked once more — and Move to…). The menu's "Manage
+   conversations", which brought the rail back, is gone; `LogosRail` stays for
+   the Logos 4 screen.
 
 **Progressive disclosure, specifically:**
 - The meter appears only near a limit (≤ 3 left) or at it.
@@ -366,7 +368,8 @@ it to be made the person's own. Empty, it offers where to pick up.
   or ⌘/Ctrl-scroll zooms (`lib/canvas.ts`). The map refits when its room
   changes, unless it has been moved by hand.
 - **List** in the header opens a column of every conversation by subject,
-  starred first. The menu's "Manage conversations" brings back the rail.
+  starred first. A conversation's card on the map renames it, deletes it (after
+  asking) and files it in a Project.
 - The Socria mark always comes back here.
 
 **Celestial.** On the Celestial theme (Settings → Theme; everyone's, like
@@ -478,7 +481,11 @@ leaves bold, code, maths and links whole).
 The header: the Socria mark (home), a small-caps eyebrow — the course, the
 Project, or "Logos" — and the title in the serif; the switch in the middle;
 the Conversation pill, the Mind Graph, the menu and the account on the right.
-"Manage conversations" in the menu brings back the rail.
+The menu: Write (from the map, it opens in a new line of thinking — or the
+empty one waiting), Quick capture, Save the map as an image, What Logos does,
+Socria One, Hide the bars. "Manage conversations" and "How Socria works with
+you" are out of it for now; the instructions are still reached from the note
+that says Socria updated them.
 
 ## 7. Memory
 

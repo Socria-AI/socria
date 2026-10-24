@@ -80,6 +80,8 @@ export function UniverseView({
   onFile,
   onCreateProject,
   onUpdateProject,
+  onRename,
+  onDelete,
   onMind,
   contents = false,
   atlas,
@@ -113,6 +115,10 @@ export function UniverseView({
   onCreateProject?: (name: string) => Promise<string | null>;
   /** rename a Project or give it a colour; what went wrong, or null */
   onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
+  /** a new name for a line of thinking */
+  onRename?: (id: string, title: string) => void;
+  /** a line of thinking deleted, with everything in it */
+  onDelete?: (id: string) => void;
   /** Memory (the Mind Graph, drawn), for a signed-in person */
   onMind?: () => void;
   /** the contents column: every conversation, by subject */
@@ -587,6 +593,16 @@ export function UniverseView({
           onNewProject: onFile && onCreateProject && projects ? (name) => void newProjectWith([previewTile.id], name) : undefined,
           onFileHere: previewSuggested && onFile ? () => fileTo([previewTile.id], previewSuggested.projectId) : undefined,
           onUnsubject: arr.subjectOf[previewTile.id] ? () => commit((a) => A.setSubject(A.unpinTiles(a, [previewTile.id]), [previewTile.id], null), [], true) : undefined,
+          // a line of thinking is renamed and deleted here, where it lives on the map (a Core chat, in Core)
+          onRename: onRename && previewTile.kind === 'logos' ? (title) => onRename(previewTile.id, title) : undefined,
+          onDelete:
+            onDelete && previewTile.kind === 'logos'
+              ? () => {
+                  onDelete(previewTile.id);
+                  setPreview(null);
+                  setSaid(`“${previewTile.title}” is deleted.`);
+                }
+              : undefined,
           onClose: () => setPreview(null),
         }}
       />

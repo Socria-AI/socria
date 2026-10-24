@@ -110,6 +110,7 @@ import { guardWatches, type GuardSignal } from '@/lib/logos-guidance';
 import { MAX_STYLE, STYLE_CHANGED, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
 import { chooseModel, lastCoreModel, readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
+import { cleanTitle } from '@/lib/session-rail';
 import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
@@ -2676,6 +2677,18 @@ export function LogosApp({
     if (!limits.draftSpace) {
       ask('draft-locked');
       return;
+    }
+    // Writing belongs to a line of thinking. On the Universal Map none is on
+    // screen, so pressing Write did nothing: it opens in the empty one waiting,
+    // or a new one — never in whichever was open last. Inside one, whatever is
+    // over it (Memory, the list) steps aside.
+    if (l5) {
+      if (l5Home || !activeIdRef.current) {
+        if (!newFromHome()) return;
+      } else {
+        setL5Mind(false);
+        setL5List(false);
+      }
     }
     const id = activeIdRef.current;
     if (id) setWriteStarted((m) => (m[id] ? m : { ...m, [id]: true }));
@@ -6702,19 +6715,14 @@ export function LogosApp({
   const listOpen = l5Manage && railOpen && !chromeHidden;
   // The Universal Map is the bar's first control and Synthesize is the Content and Logic Map
   // views' own (Alex Tran, Logos 5 Comments v2): neither is hidden in here any more.
+  // Renaming, deleting and filing a line of thinking are on its card on the
+  // Universal Map (components/logos5/UniverseParts.tsx PreviewCard), where it
+  // lives, rather than in a list brought back from here.
   const l5Menu: L5MenuItem[] = [
-    { label: listOpen ? 'Put the list away' : 'Manage conversations', hint: 'Rename, delete, file in a Project', onSelect: () => toggleManage() },
     { label: 'Write', hint: limits.draftSpace ? 'The Draft Space and the Writing Space — yours' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     { label: 'What Logos does', sep: true, onSelect: () => setGuideOpen(true) },
-    {
-      label: 'How Socria works with you',
-      onSelect: () => {
-        setStyleDraftText(styleText);
-        setStyleOpen(true);
-      },
-    },
     ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
   ];
@@ -7369,12 +7377,6 @@ export function LogosApp({
   function toggleList() {
     setL5List((v) => !v);
   }
-  /** the rail: every conversation as a list, to rename, delete or file */
-  function toggleManage() {
-    if (listOpen) return setL5Manage(false);
-    setL5Manage(true);
-    setRailOpen(true);
-  }
   /** a conversation pressed on the map: opened — at the card pressed, when one was */
   function openFromHome(id: string, node?: string) {
     setL5Home(false);
@@ -7509,6 +7511,11 @@ export function LogosApp({
       onFile={cloud ? fileFromHome : undefined}
       onCreateProject={onCreateProject}
       onUpdateProject={onUpdateProject}
+      onRename={(id, title) => {
+        const name = cleanTitle(title);
+        if (name) renameSession(id, name);
+      }}
+      onDelete={(id) => void deleteSession(id)}
       onMind={cloud ? () => setL5Mind(true) : undefined}
       contents={l5List}
       drawing={drawing}
