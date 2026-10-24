@@ -18,6 +18,7 @@ import { timeLayout, TIME_NARROW, TIME_WIDE, type TimeBead } from '@/lib/logos5/
 import type { Homes } from '@/lib/logos5/spatial';
 import type { Match, Tile } from '@/lib/logos5/universe';
 import { colorVar, kindLine, shortDate, tileSaid } from './UniverseParts';
+import { nodeLabel } from '@/lib/logos5/title';
 
 const css = (vars: Record<string, string | number>): CSSProperties => vars as unknown as CSSProperties;
 /** before paint in a browser; nothing on the server, where there is nothing to scroll */
@@ -146,15 +147,18 @@ export function TimeView({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [foundKey]);
 
-  // a wheel turned up and down goes back and forth, unless there is more to see up and down
+  // A WHEEL TURNED UP AND DOWN GOES BACK AND FORTH through time (Alex Tran, Logos 5
+  // Comments v2: This month and All time pan sideways). A sideways swipe is already
+  // sideways; a pinch or Ctrl/⌘ is the browser's zoom; Shift, when there is more to
+  // see up and down, scrolls up and down.
   useEffect(() => {
     const el = scroller.current;
     if (!el) return;
     const wheel = (e: WheelEvent) => {
-      if (e.ctrlKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
-      if (el.scrollHeight > el.clientHeight + 4 && !e.shiftKey) return;
+      if (e.ctrlKey || e.metaKey || Math.abs(e.deltaX) >= Math.abs(e.deltaY)) return;
+      if (e.shiftKey && el.scrollHeight > el.clientHeight + 4) return;
       e.preventDefault();
-      el.scrollLeft += e.deltaY;
+      el.scrollLeft += e.deltaY * (e.deltaMode === 1 ? 16 : e.deltaMode === 2 ? el.clientWidth : 1);
     };
     el.addEventListener('wheel', wheel, { passive: false });
     return () => el.removeEventListener('wheel', wheel);
@@ -242,7 +246,7 @@ export function TimeView({
         tabIndex={matchOf && !m ? -1 : 0}
         aria-pressed={sel.has(b.id)}
         aria-label={tileSaid(t, homes.of.get(b.id)?.name)}
-        title={b.label === 'none' || bare ? t.title : undefined}
+        title={t.title}
         onClick={(e) => press(b.id, e.currentTarget)}
         onDoubleClick={() => acts.onOpen(b.id)}
         onKeyDown={(e) => {
@@ -258,7 +262,7 @@ export function TimeView({
         {b.label !== 'none' && (
           <span className="l5t-words" aria-hidden="true">
             <span className="l5t-t">
-              {starred.has(b.id) ? <Starred title={t.title} /> : t.title}
+              {starred.has(b.id) ? <Starred title={nodeLabel(t.title)} /> : nodeLabel(t.title)}
             </span>
             {b.hub && (
               <span className="l5t-k">

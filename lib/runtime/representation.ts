@@ -225,16 +225,44 @@ export function fuzzyScore(query: string, text: string): number {
   for (const p of parts) {
     if (words.includes(p)) sum += 1;
     else if (words.some((w) => w.startsWith(p))) sum += 0.75;
-    else if (p.length >= 4 && subsequence(p, t)) sum += 0.3;
+    else if (p.length >= 4 && words.some((w) => slip(p, w))) sum += 0.4;
     else return 0;
   }
   return (sum / parts.length) * 0.9;
 }
 
-function subsequence(p: string, t: string): boolean {
-  let i = 0;
-  for (const ch of t) if (ch === p[i] && ++i === p.length) return true;
-  return false;
+/**
+ * A slip of the finger, within one word: a letter wrong, missing, extra or two
+ * swapped (two slips in a long word) — of the word, or of its beginning
+ * ("pricng" finds "pricing", "accural" finds "accruals"). Never letters
+ * strung across a whole sentence: "denver" does not find "depends … never".
+ */
+function slip(p: string, w: string): boolean {
+  const max = p.length >= 8 ? 2 : 1;
+  if (Math.abs(p.length - w.length) <= max && edits(p, w, max) <= max) return true;
+  return w.length > p.length && edits(p, w.slice(0, p.length), max) <= max;
+}
+
+/** Edits between two short words (optimal string alignment), given up past `max`. */
+function edits(a: string, b: string, max: number): number {
+  if (Math.abs(a.length - b.length) > max) return max + 1;
+  let prev2: number[] = [];
+  let prev = Array.from({ length: b.length + 1 }, (_, j) => j);
+  for (let i = 1; i <= a.length; i++) {
+    const cur = [i];
+    let best = cur[0];
+    for (let j = 1; j <= b.length; j++) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1;
+      let v = Math.min(prev[j] + 1, cur[j - 1] + 1, prev[j - 1] + cost);
+      if (i > 1 && j > 1 && a[i - 1] === b[j - 2] && a[i - 2] === b[j - 1]) v = Math.min(v, prev2[j - 2] + 1);
+      cur.push(v);
+      best = Math.min(best, v);
+    }
+    if (best > max) return max + 1;
+    prev2 = prev;
+    prev = cur;
+  }
+  return prev[b.length];
 }
 
 function snippetOf(text: string, query: string): string {

@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 // scripts/dev/logos5-journey.mjs — drive Logos 5 in a real browser, by hand.
 //
+// Its line-of-thinking steps (stage, convo, card, the phone's sheet) predate
+// the four views of Logos 5 Comments v2 and look for the folding conversation
+// box that was retired; scripts/dev/logos5-views-journey.mjs drives the screen
+// as it is now. The study and home steps still apply.
+//
 // DEVELOPMENT ONLY. Runs against a local app with the stand-ins, so there is
 // no account, no key and no spend:
 //

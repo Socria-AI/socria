@@ -116,7 +116,8 @@ export function routeTurn(t: TurnInput): TurnRoute {
   const view = readViewRequest(text);
   if (STRUCTURE.test(text) || (view && MAP_LENSES.has(view.lens))) {
     reasons.push(view && MAP_LENSES.has(view.lens) ? `structure:lens:${view.lens}` : 'structure:asked');
-    return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: null } };
+    // the reply is read beside the map it draws (on a phone, the map alone)
+    return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' } };
   }
 
   const sim = wantedSimulation(text);

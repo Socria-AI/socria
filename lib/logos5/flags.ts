@@ -61,3 +61,11 @@ export function writeStagePrefs(storage: StorageLike | null | undefined, prefs: 
     /* a full or blocked store: the stage still opens and closes, it is just not remembered */
   }
 }
+
+/**
+ * NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN=on brings back a map pass after every
+ * turn (lib/runtime/orchestrate.ts needsMap). Off by default: the map is
+ * drawn when structure or something to look at is asked for, while the
+ * Logic Map is open, and on a light cadence in the background.
+ */
+export const MAP_EVERY_TURN = /^(on|1|true|yes)$/i.test((process.env.NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN ?? '').trim());

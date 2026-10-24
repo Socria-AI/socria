@@ -70,6 +70,13 @@ export interface BubbleIn {
   all?: readonly Tile[];
   /** room kept for a new Project, at the end of the folded row */
   canMake?: boolean;
+  /**
+   * Today, exactly (Alex Tran, Logos 5 Comments v2): `tiles` are only what was
+   * begun today, and nothing else is drawn — no Projects or subjects folded
+   * round them. The Universal Map sets it; without it Today draws the day and
+   * what it builds on, as it did.
+   */
+  strictToday?: boolean;
 }
 
 export interface BubbleHub {
@@ -670,7 +677,9 @@ function groupsOf(input: BubbleIn): { groups: Group[]; today?: BubbleLayout['tod
       const first = g.members.filter((m) => day.has(m.tile.id)).sort((a, b) => newestFirst(a.tile, b.tile))[0];
       if (first) first.hub = true;
     }
-  const away = projectsAway();
+  // Today is exactly today (Alex Tran, Logos 5 Comments v2): the Projects and subjects with
+  // nothing begun today are on This week and the line, not here
+  const away: Group[] = input.strictToday ? [] : projectsAway();
   // the subjects (not Projects: those are all there already) worked on lately but not today, the newest first
   const later = new Map<string, Tile[]>();
   for (const t of plan.rest) {
@@ -682,7 +691,7 @@ function groupsOf(input: BubbleIn): { groups: Group[]; today?: BubbleLayout['tod
     .sort((a, b) => Math.max(...b[1].map((t) => t.at)) - Math.max(...a[1].map((t) => t.at)) || (a[0] < b[0] ? -1 : 1))
     .slice(0, FAR_MAX)
     .map(([key]) => elsewhere(homeOf(later.get(key)![0].id), plan.rest.filter((t) => homeOf(t.id).key === key)));
-  return { groups: [...order([...groups.values()]), ...away, ...far], today: { when: plan.when, day: plan.day } };
+  return { groups: [...order([...groups.values()]), ...away, ...(input.strictToday ? [] : far)], today: { when: plan.when, day: plan.day } };
 }
 
 /** The subjects in the order they are packed: the one with the halo first, then the fullest, then the newest. */

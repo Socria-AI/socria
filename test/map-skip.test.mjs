@@ -52,8 +52,11 @@ console.log('\n=== LogosApp asks before rebuilding the map ===');
 {
   const src = readFileSync(join(root, 'components', 'LogosApp.tsx'), 'utf8');
   ok('imported from lib/map-skip', /import \{ lastReplyIn, skipsMap \} from '@\/lib\/map-skip';/.test(src));
-  const gates = [...src.matchAll(/if \(!skipsMap\(\{[^}]*\}\)\) refreshMap\(\);/g)];
+  // Logos 5 asks needsMap too (lib/runtime/orchestrate.ts, through mapWanted): an "ok" is
+  // still never redrawn for, and before Logos 5 it is the only thing that is not
+  const gates = [...src.matchAll(/if \(mapWanted\([^;]*?skipsMap\(\{[^}]*\}\)\)\) refreshMap\(\);/g)];
   ok('both sends — the composer and a node\'s thread — are gated', gates.length === 2, String(gates.length));
+  ok('  before Logos 5, every turn but an "ok" redraws it, as it always did', /if \(!l5\) return !filler;/.test(src));
   ok('  the composer\'s with its files, its reply-to and what Socria said before', gates.some((g) => /attachments: atts\.length/.test(g[0]) && /replying: !!replying/.test(g[0]) && /lastReplyIn\(before\)/.test(g[0])));
   ok('  the node thread\'s with that thread\'s last reply', gates.some((g) => /lastReplyIn\(prior\)/.test(g[0])));
   ok('  both with the map as it stands', gates.every((g) => /mapNodes: mapRef\.current\.nodes\.length/.test(g[0])));

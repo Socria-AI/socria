@@ -3411,3 +3411,56 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
 .logos-root .l5 .l5h-atlas {
   padding-bottom: var(--l5h-foot, 92px);
 }
+
+/* ── Logos 5 Comments v2 (Alex Tran): a label never breaks the node it names ──
+   At most seven words (lib/logos5/title.ts nodeLabel), on one line, with an
+   ellipsis when it would run past its room. Inside a hub's disc the words keep
+   the lines the disc has room for — clamped, never overflowing it. */
+.logos-root .l5 .l5b-dot-t,
+.logos-root .l5 .l5t-t {
+  display: block;
+  -webkit-line-clamp: unset;
+  max-width: 100%;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.logos-root .l5 .l5t-words {
+  width: var(--lw);
+  max-width: var(--lw);
+}
+
+/* Today with nothing begun today: one quiet invitation, in the middle */
+.logos-root .l5 .l5h-empty.is-today {
+  display: grid;
+  place-items: center;
+  height: 100%;
+}
+.logos-root .l5 .l5h-todaynode {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  max-width: min(440px, calc(100% - 32px));
+  padding: 14px 20px;
+  border: 1px dashed color-mix(in srgb, var(--lg-ink) 26%, transparent);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--lg-paper) 88%, transparent);
+  color: color-mix(in srgb, var(--lg-ink) 78%, transparent);
+  font: 500 14px/1.35 var(--l5-ui, var(--lg-sans));
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5 .l5h-todaynode:hover,
+.logos-root .l5 .l5h-todaynode:focus-visible {
+  border-style: solid;
+  border-color: var(--lg-primary);
+  color: var(--lg-ink);
+  outline: none;
+}
+.logos-root .l5 .l5h-todaynode-dot {
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+}

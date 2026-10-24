@@ -21,7 +21,7 @@
 // It is deliberately NOT read during render: the server has no localStorage,
 // and a component that reads it there hydrates into a mismatch.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useUser } from '@clerk/nextjs';
 import { Avatar } from './Avatar';
@@ -35,6 +35,7 @@ export function AccountControl({
   onOpen,
   href,
   isOne = false,
+  items,
 }: {
   /** open the account sheet — what /chat and /logos want, over the app */
   onOpen?: () => void;
@@ -47,9 +48,37 @@ export function AccountControl({
   href?: string;
   /** One opens marks the free tier does not carry; sanitize needs to know. */
   isOne?: boolean;
+  /**
+   * The profile's own menu, when the chip opens one rather than the sheet —
+   * Logos 5 keeps Memory here (Alex Tran: the mind graph lives in the
+   * profile). Escape and a press elsewhere close it.
+   */
+  items?: { label: string; hint?: string; onSelect: () => void }[];
 }) {
   const { user } = useUser();
   const [pfp, setPfp] = useState<PfpConfig | null>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+  const wrap = useRef<HTMLSpanElement>(null);
+  const menuId = useId();
+  useEffect(() => {
+    if (!menuOpen) return;
+    const away = (e: PointerEvent) => {
+      if (!wrap.current?.contains(e.target as Node)) setMenuOpen(false);
+    };
+    const key = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        setMenuOpen(false);
+        wrap.current?.querySelector<HTMLButtonElement>('.who-btn')?.focus();
+      }
+    };
+    window.addEventListener('pointerdown', away);
+    window.addEventListener('keydown', key);
+    requestAnimationFrame(() => wrap.current?.querySelector<HTMLButtonElement>('[role="menuitem"]')?.focus());
+    return () => {
+      window.removeEventListener('pointerdown', away);
+      window.removeEventListener('keydown', key);
+    };
+  }, [menuOpen]);
 
   useEffect(() => {
     const read = () => {
@@ -99,6 +128,42 @@ export function AccountControl({
       <Link href={href} className="who-btn" title="Your account">
         {inside}
       </Link>
+    );
+  }
+
+  if (items?.length) {
+    return (
+      <span className="who-wrap" ref={wrap}>
+        <button
+          type="button"
+          className="who-btn"
+          onClick={() => setMenuOpen((v) => !v)}
+          aria-haspopup="menu"
+          aria-expanded={menuOpen}
+          aria-controls={menuOpen ? menuId : undefined}
+          title="Your account"
+        >
+          {inside}
+        </button>
+        {menuOpen && (
+          <span className="who-menu" role="menu" id={menuId} aria-label="Your account">
+            {items.map((it) => (
+              <button
+                key={it.label}
+                type="button"
+                role="menuitem"
+                onClick={() => {
+                  setMenuOpen(false);
+                  it.onSelect();
+                }}
+              >
+                <span>{it.label}</span>
+                {it.hint && <small>{it.hint}</small>}
+              </button>
+            ))}
+          </span>
+        )}
+      </span>
     );
   }
 

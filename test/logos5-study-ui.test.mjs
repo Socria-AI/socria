@@ -11,16 +11,18 @@
 //   • the three views (Components, Artifacts, Logic Map) are counted, and
 //     each says what it holds — or how it comes to hold something;
 //   • a card asked about says which card, its last answer and where it came from;
-//   • the Universal Map is the home — "Your map, not a list": Today and This
-//     week are drawn as subjects, each a circle named for its field and its
-//     course, a real study session a disc with its name inside, a quick
-//     question a dot, the person's links and the ideas subjects share as
-//     curves with a card that says why, their stars and notes on it, and a ↩
-//     to where a subject was before; every Project of theirs is on it, an
-//     empty one too; Today folds the subjects worked on lately but not today; This month and All time are a line through time, the
-//     oldest on the left, joined where one followed on; the lenses are at the
-//     top, what the marks mean and the box that searches or starts at the
-//     foot; and there is a way to begin when there is nothing yet.
+//   • the Universal Map is the home: Today and This week are drawn as
+//     subjects, each a circle named for its field and its course, a real study
+//     session a disc with its name inside, a quick question a dot, the
+//     person's links and the ideas subjects share as curves with a card that
+//     says why, their stars and notes on it, and a ↩ to where a subject was
+//     before; every Project of theirs is on This week, an empty one too;
+//     Today is exactly what was begun today, local time, and nothing else —
+//     an empty day one quiet invitation (Alex Tran, Logos 5 Comments v2);
+//     This month and All time are a line through time, the oldest on the
+//     left, joined where one followed on; the lenses are at the top, the box
+//     that searches or starts at the foot — no banner, no legend; and there is
+//     a way to begin when there is nothing yet.
 
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as h } from 'react';
@@ -150,12 +152,13 @@ console.log('\n=== the Universal Map ===');
   const NOW = new Date(2026, 9, 21, 15, 0).getTime();
   const DAY = 86_400_000;
   const say = (role, content, d) => ({ role, content, at: NOW - d * DAY });
+  // `fresh`: begun today, a few hours ago — every turn of it today
   const conv = (id, title, o = {}) => ({
     id,
     title,
     updatedAt: NOW - (o.last ?? 1) * DAY,
     projectId: o.project ?? null,
-    messages: Array.from({ length: o.turns ?? 1 }).flatMap((_, i) => [say('user', i ? 'and then?' : title, (o.last ?? 1) + 2 - i * 0.01), say('assistant', `Where it stands: ${title.toLowerCase()} is narrowing.${o.ask && i === (o.turns ?? 1) - 1 ? ' ' + o.ask : ''}`, (o.last ?? 1) - i * 0.001)]),
+    messages: Array.from({ length: o.turns ?? 1 }).flatMap((_, i) => [say('user', i ? 'and then?' : title, o.fresh ? 0.2 - i * 0.01 : (o.last ?? 1) + 2 - i * 0.01), say('assistant', `Where it stands: ${title.toLowerCase()} is narrowing.${o.ask && i === (o.turns ?? 1) - 1 ? ' ' + o.ask : ''}`, o.fresh ? 0.1 - i * 0.001 : (o.last ?? 1) - i * 0.001)]),
     map: { nodes: (o.ideas ?? []).map((label, i) => ({ id: `${id}${i}`, label })), edges: [] },
   });
   const head = (center, count) => h('header', { className: 'test-head' }, `COUNT:${count}`, center);
@@ -167,11 +170,12 @@ console.log('\n=== the Universal Map ===');
   ok('the box takes files — its clip, every kind it reads — and carries the model and how far it goes', boxed.includes('aria-label="Add files — notes, documents, slides, PDFs"') && boxed.includes('accept=".pdf,.docx,.pptx') && boxed.includes('class="l5h-find-pick"><span class="PICKER">Logos 5 · Balanced</span>'));
   ok('  begun in a Project, it says so', boxed.includes('placeholder="Search, or start something new in “ACCT 2301”…"'));
 
-  const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 2, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
-  ok('the page says what it is: everything thought through — your map, not a list', few.includes('Everything you’ve thought through') && few.includes('Your map, <em>not a list</em>'));
-  ok('today: the day’s session a disc with its name inside — one before, of another subject, folded to its name; one about nothing in particular, not drawn', (few.match(/class="l5b-hub[ "]/g) ?? []).length === 1 && /class="l5b-hub[^"]*"[^>]*data-node="a"/.test(few) && few.includes('Two job offers') && !few.includes('data-node="b"') && /class="l5b-fold"[^>]*aria-label="Money: one conversation, folded. Open it."/.test(few) && !few.includes('data-node="c"'));
+  const few = html(h(U.UniverseView, { ...base, conversations: [conv('a', 'Two job offers', { last: 0.1, fresh: true, turns: 3, ask: 'Which would you leave for?' }), conv('b', 'Rent or buy', { last: 0.3, turns: 3 }), conv('c', 'Exam 2', { last: 3, turns: 3 })] }));
+  ok('no banner and no motivational line: the canvas is for the nodes', !few.includes('Everything you’ve thought through') && !few.includes('not a list') && !few.includes('l5h-kicker'));
+  ok('today, exactly: the session begun today a disc with its name inside — and nothing else, not one begun earlier and worked on today, nothing folded round it', (few.match(/class="l5b-hub[ "]/g) ?? []).length === 1 && /class="l5b-hub[^"]*"[^>]*data-node="a"/.test(few) && few.includes('Two job offers') && !few.includes('data-node="b"') && !few.includes('data-node="c"') && !few.includes('class="l5b-fold'));
   ok('the header is told how many there are; the box that finds or starts is at the foot, not in it', few.includes('COUNT:3') && few.includes('<header class="test-head">COUNT:3</header>') && /class="l5h-foot"[^]*placeholder="Search or start something new…"/.test(few));
-  ok('what the marks mean, at the foot', few.includes('Hub — a conversation you went deep in') && few.includes('Quick question') && few.includes('Connects across subjects'));
+  ok('no legend or colour key at the foot', !few.includes('Hub — a conversation you went deep in') && !few.includes('l5h-legend') && !few.includes('Connects across subjects'));
+  ok('no hint strip over the map', !few.includes('l5h-hint') && !few.includes('press one to see it, twice to open it'));
   ok('where to pick up is a press away, and haloed on the map', few.includes('Pick up where you left off') && /l5h-pick-t">Two job offers/.test(few) && few.includes('l5b-halo') && few.includes('where you left off'));
   ok('four ways to see it, Today first — then This week, This month, All time', /role="radio" aria-checked="true" class="is-on"><span class="l5h-long">Today</.test(few) && few.includes('>This week<') && few.includes('>This month<') && few.includes('>All time<'));
   ok('today: by the day', few.includes('Today · Wed Oct 21'));
@@ -214,9 +218,11 @@ console.log('\n=== the Universal Map ===');
   ok('this month is the same line, from the first', (month.match(/data-bead="/g) ?? []).length === 7 && month.includes('aria-checked="true" class="is-on"><span class="l5h-long">This month'));
 
   const today = html(h(U.UniverseView, { ...base, conversations, projects, initial: E }));
-  ok('today: the day, and why each earlier one is beside it', today.includes('Today · Wed Oct 21') && /title="Accruals — shares “Accrual basis”"/.test(today) && /aria-label="Accruals, [^"]*shares “Accrual basis”"/.test(today));
-  ok('  a Project not worked on today, folded to its name, a press from opening', /class="l5b-fold is-project"[^>]*aria-label="Careers, Job hunt, a Project of yours: 2 conversations, folded. Open it."/.test(today));
-  ok('  on the line, what the marks mean says what follows on', all.includes('Followed on within a week') && !all.includes('Connects across subjects'));
+  ok('today with nothing begun today: one quiet invitation, in the middle — no empty chart, no last-day fallback', today.includes('No sessions recorded today. Start a chat to begin a new map node.') && today.includes('l5h-todaynode') && !/data-node="/.test(today) && !today.includes('last worked on') && today.includes('Today · Wed Oct 21'));
+  const todayOne = html(h(U.UniverseView, { ...base, conversations: [...conversations, conv('a3', 'Closing entries', { project: 'P1', fresh: true, last: 0.05, ideas: ['Accrual basis'], turns: 3 })], projects, initial: E }));
+  ok('  begun today: only that one — an earlier one sharing its idea is not drawn beside it', /data-node="a3"/.test(todayOne) && !/data-node="a1"/.test(todayOne) && !todayOne.includes('shares “Accrual basis”'));
+  ok('  and a Project with nothing begun today is not on Today (it is on This week)', !/class="l5b-fold is-project"/.test(todayOne) && /class="l5b-fold is-project is-empty"/.test(map));
+  ok('  on the line, no legend either', !all.includes('Followed on within a week') && !all.includes('l5h-legend'));
 
   const noChats = html(h(U.UniverseView, { ...base, conversations, projects, initial: { ...arranged, mode: 'all', display: { ...E.display, chats: false } } }));
   ok('Core chats can be left off it', all.includes('Tax questions') && !noChats.includes('Tax questions'));

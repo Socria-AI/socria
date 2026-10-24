@@ -1,8 +1,9 @@
 // app/api/extract-memory/route.ts
 // POST /api/extract-memory
-// Body: { messages: [{role, content}, ...], currentMemory: ConversationMemory, titleOnly?: boolean }
+// Body: { messages: [{role, content}, ...], currentMemory: ConversationMemory, titleOnly?: boolean, titleStyle?: 'topic' }
 // Returns: { memory: ConversationMemory, suggestedTitle: string | null }
-// With titleOnly (Core 4), only a title is produced and memory comes back unchanged.
+// With titleOnly (Core 4), only a title is produced and memory comes back unchanged;
+// titleStyle 'topic' (Logos 5) names the topic as a concept rather than the request.
 //
 // Uses a cheap model (gpt-4o-mini regardless of the user's chat model) to
 // distill the most recent exchange into an updated thread memory. Only
@@ -91,16 +92,23 @@ export async function POST(req: NextRequest) {
       .slice(0, 6)
       .map((m: any) => `${m.role === 'user' ? 'User' : 'Socria'}: ${String(m.content).slice(0, 800)}`)
       .join('\n\n');
+    // Logos 5 (Alex Tran): a node on the Universal Map names the TOPIC, as a
+    // concept — "Anatomy – Nervous System Review" — never the request itself
+    // ("Help me study for this big bio test tomorrow night please").
+    const topic = body?.titleStyle === 'topic';
     try {
-      const openai = tracked(new OpenAI({ apiKey }), 'core/extract-memory');
+      const openai = tracked(new OpenAI({ apiKey }), topic ? 'logos/title' : 'core/extract-memory');
       const completion = await openai.chat.completions.create({
         model: process.env.OPENAI_MEMORY_MODEL || 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content:
-              'Give this conversation a short, specific title (3–7 words) naming what it is about, in the person\'s terms. ' +
-              'No quotes, no trailing punctuation, never generic ("New chat", "Discussion"). Return JSON: {"suggestedTitle":"..."}',
+            content: topic
+              ? 'Name the topic of this conversation as a concise academic or conceptual title of 3–7 words — e.g. "Anatomy – Nervous System Review", "Thermodynamics – Carnot Cycle", "Pricing a Bakery in Austin". ' +
+                'Use "Subject – Topic" when a subject is clear. Name what it is ABOUT, never the request ("Help me…", "Can you…"), never the deadline or the mood. ' +
+                'No quotes, no trailing punctuation, never generic ("New chat", "Discussion", "Question"). Return JSON: {"suggestedTitle":"..."}'
+              : 'Give this conversation a short, specific title (3–7 words) naming what it is about, in the person\'s terms. ' +
+                'No quotes, no trailing punctuation, never generic ("New chat", "Discussion"). Return JSON: {"suggestedTitle":"..."}',
           },
           { role: 'user', content: opening },
         ],

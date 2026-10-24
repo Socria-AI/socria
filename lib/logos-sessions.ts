@@ -8,6 +8,7 @@
 // chats, tagged kind='logos'). Key-unlocked visitors have no account to sync
 // to, so they get the same thing in localStorage.
 
+import { topicTitle } from './logos5/title';
 import { EMPTY_MAP, type ThinkingMap } from './logos';
 import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
@@ -92,7 +93,13 @@ export function emptySession(): LogosSession {
   };
 }
 
-/** A session is named by the thought that started it, not by a summary. */
+/**
+ * A session is named for what it is about — never the request itself
+ * (Alex Tran, Logos 5 Comments v2): "Help me study for this big bio test
+ * tomorrow night please" is "Biology – Exam Review", at most seven words
+ * (lib/logos5/title.ts). A small model may name it better once, after the
+ * first reply; a name the person gave is never replaced.
+ */
 export function titleFor(messages: LogosMsg[]): string {
   const firstTurn = messages.find((m) => m.role === 'user');
   // A turn can be nothing but an attachment — name it after that rather than
@@ -108,6 +115,8 @@ export function titleFor(messages: LogosMsg[]): string {
           : 'A note'
       : '');
   if (!first) return UNTITLED;
+  const topic = firstTurn?.content?.trim() ? topicTitle(first) : '';
+  if (topic) return topic;
   const clean = first.replace(/\s+/g, ' ');
   return clean.length > 52 ? clean.slice(0, 52).trimEnd() + '…' : clean;
 }

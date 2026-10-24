@@ -1,5 +1,14 @@
 # Logos 5 — one workspace, conversation first
 
+> **Superseded in part (Logos 5 Comments v2, Alex Tran).** A line of thinking
+> is now four views — Chat (where it opens), Content, Artifacts and the Logic
+> Map — with Split View docking one more panel beside whichever is open, and
+> the view chosen by the runtime's rules A–D. "Components" is Content; the
+> folding, floating conversation box and the phone's conversation sheet are
+> retired; the Universal Map has no banner or legend and an exact Today. The
+> screen as built is described in [LOGOS-5-RUNTIME.md §5](./LOGOS-5-RUNTIME.md);
+> §6–7 below are the history of how it got there.
+
 Logos 5 rebuilds the Logos surface's frontend. The model entry, the
 routes, the map pass, the displays, documents, memory and every saved
 conversation are the same; what a person sees and touches is new.
@@ -743,6 +752,7 @@ everyone has.
 | Writing: what Socria may be asked, and how its answers are checked; the route | `lib/write/assist.ts`, `app/api/logos/write/route.ts` |
 | Writing: the space, the page, the board, the panels, the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Board.tsx`, `parts.tsx`, `write.css` |
 | Writing: where it is wired in (the Writing artifact, the column, saving, Point & Ask, Add to draft) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`) |
+| Driving the four views in a browser | `scripts/dev/logos5-views-journey.mjs` (desktop, `W=390 H=844` for a phone, `THEME=night`, `AXE=…/axe.min.js` for an accessibility scan per screen) |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Month|All`; any of them on a theme with `THEME=night`) |
 
 Core chat (`app/chat/page.tsx`) keeps its screen; its list lets go of the

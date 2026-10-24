@@ -105,7 +105,7 @@ rewritten.
 Recorded here because some are outside this work and should not be lost:
 
 - `lib/mind/ingest-text.ts` sets `sourceNodeId` to the `src_` row id, so the
-  Inspector's file list is always empty. Fixed (§6).
+  Inspector's file list is always empty. To be fixed with the memory stage (§6).
 - Every storage write calls `sanitizeMap` without `trust:'stored'`, which
   strips `viz.built` on save (`app/api/conversations/route.ts`). Not changed
   here — it needs its own test of what a stored scene must keep.
@@ -239,29 +239,123 @@ map labels are protected from the extractor (§6).
 
 ## 5. The interface (Alex's specification)
 
-`ActiveViewport = 'chat' | 'content' | 'artifacts' | 'logic_map'`, Chat the
-default; Components renamed Content; Rules A–D route from the runtime's
-intent; Split View (Open Beside) docks one panel beside the primary view, in
-three sections; Synthesize moved into the Content and Logic Map headers; the
-Mind button moved into the account menu; "← Universal Map" persistent at the
-top left; global search on Cmd/Ctrl+K; the study start card gone; Inter for
-all chrome; the omnibox at 768 px, 28 px radius, paperclip inside, Enter to
-send, Shift+Enter for a newline, growing to 240 px; real processing states
-from the route's own activity markers; Universal Map titles of at most seven
-words derived from the topic, no banner or legend, Today meaning sessions
-begun today in local time with the specified empty node, and the wheel
-panning sideways on This month and All time.
+Implemented in `components/LogosApp.tsx` over three pure modules —
+`lib/logos5/views.ts` (the state machine), `lib/logos5/title.ts`,
+`lib/logos5/content.ts` + `contentBoard.ts` — and the shell in
+`components/logos5/L5Views.tsx`, `ContentView.tsx`, `GlobalSearch.tsx`,
+`l5v.css`. Held by `test/logos5-views.test.mjs` (the modules),
+`test/logos5-shell.test.mjs` (the wiring) and browser journeys on desktop and a
+390 px phone in Paper and Night, with axe (WCAG 2 A/AA) clean on Chat, the
+Logic Map, Split View, Content and search.
+
+**Four views.** `Screen = { view: 'chat' | 'content' | 'artifacts' |
+'logic_map', beside: BesideId | null }`, per line of thinking, this visit only.
+A line of thinking opens on Chat. "Components" is Content everywhere it is
+said. The tab row is a tablist (arrow keys, Home/End) with what each view holds
+counted, and a dot when something arrived in a view that is not open (a reply
+while Chat is away, something made in the background, the map grown).
+
+**Rules A–D, from the runtime's own reading** (`routeTurn`, the same function
+the server runs), applied once when a turn is sent (`afterSend`):
+A talk stays in Chat — from another view on a wide screen the conversation
+docks beside it, so what they were looking at stays; the Logic Map never opens
+for talk. B documents are read into Content in the background and said under
+the turn ("Added to Content · file · Open Content"); the screen does not move.
+C something asked to be made opens Artifacts with the conversation beside it;
+a display, a model or a plot that lands because the turn asked is selected
+there (`onMade`); one made in the background marks the tab and moves nothing.
+D structure asked for opens the Logic Map — with the conversation beside it on
+a wide screen, so the reply is read beside the map it draws (Alex's text is
+silent on this; without it the reply streamed off screen). A question asked on
+a card's popover is answered there and moves nothing. A surface named in words
+("open the display", "the model beside the map") maps onto views
+(`screenForRequest`) instead of rearranging a workspace.
+
+**Logic Map** is the Thinking Map and only it: the workspace layout is
+normalised to a single map panel in Logos 5 (not written back, so a Logos 3
+arrangement in the browser is untouched), "+ View" is gone, and the map's own
+name row and colour key are hidden (the cards name their kinds). It is drawn
+when it is worth its cost (§4.1 `needsMap`): structure or something to see
+asked for, while it is the view, and on a light cadence; opened on a map older
+than the conversation it is drawn again, once.
+
+**Split View** replaces "+ View": one panel beside whichever view is open, in
+Alex's three sections, built from the same catalogue "+ View" used (so each
+panel opens configured for what is there), resizable by a separator that takes
+the arrow keys, closed by Escape or its ×. Desktop only; a phone shows one
+thing.
+
+**Content** is a canvas of cards (documents, notes, pictures — each document
+once): drag to place, drop onto another to stack, a menu to stack or unstack,
+arrow keys to move, Enter to open; the arrangement is kept per line of
+thinking on the device; the documents are never changed. Opened, a document is
+read in its document view; the topics files were sorted into sit below, the
+recommended one marked on its card — the "Where do you want to start?" panel is
+gone. **Artifacts** holds everything made: the writing (once begun), models
+and their pictures, the plot, Live 3D scenes, displays (not documents), practice.
+
+**Top bar**: "← Universal Map" at the top left, the title, a new line of
+thinking, search in the middle (⌘K / Ctrl K from anywhere), Split View, the ⋯
+menu (Synthesize and the Universal Map are no longer in it; "Back to Socria
+chat" is gone with the separate Core product), and the account. Memory moved
+into the account chip's own menu. Synthesize is the Content and Logic Map
+views' own action.
+
+**Search** indexes the representation layer (§4.6) — every line of thinking,
+what was said, documents and their passages (all documents this device has
+read, loaded when the box opens), artifacts, writing and cards, map nodes — and
+opens a result where it lives: a turn scrolled to in Chat, a passage selected in
+Content, a card lit on the Logic Map. Typo tolerance is per word (one slip,
+two in a long word).
+
+**Omnibox**: one 28 px pill (the second box round it removed), ≤ 768 px,
+centred, neutral shadow, the paperclip inside at its left; Enter sends,
+Shift+Enter is a newline, an IME composition is never sent; it grows to 240 px
+and then scrolls, and is re-measured when what it says changes (the longer
+words shown while Socria replies used to leave it two lines tall on a phone).
+While nothing has arrived the send button spins and nothing more is sent.
+
+**Loading, truthfully**: the thread shows a shimmer and only milestones that
+happened — files read on this device, Sent, the number of sources found (from
+the server's `X-Socria-Sources` header), then "Writing the reply", and "Drawing
+the Logic Map" while that pass runs. Sorting files shows its own steps.
+
+**Type**: Inter and the system stack for the whole shell, base 15 px at
+line-height 1.35, weights 400/500/600, the placeholder upright in the same
+face. Muted text was raised to ≥ 4.5:1 — the Paper theme does not define
+`--lg-ink-rgb`, so the stylesheet carries its Paper values as fallbacks.
+
+**Universal Map**: no banner, no legend, no hint strip. Today is exactly what
+was begun on this calendar day in local time (`dayBounds`), nothing earlier
+however related, no Projects or subjects folded round it; an empty day is one
+centred invitation, "No sessions recorded today. Start a chat to begin a new
+map node." A node's label is at most seven words with an ellipsis
+(`nodeLabel`), one line outside a node and clamped inside a hub's disc (a
+single line there would cut most titles to two words). This month and All
+time: the wheel pans sideways (Shift for up and down when there is more to
+see; Ctrl/⌘ is zoom). Titles: deterministic from the first message
+(`topicTitle`: "Help me study for this big bio test tomorrow night please" →
+"Biology – Exam Review"), then once per conversation, for accounts only, a
+small model names the topic as a concept (`/api/extract-memory`,
+`titleStyle: 'topic'`) — never over a title the person chose. The Universal
+Map stays where a returning person lands; a new line of thinking opens on Chat.
+
+**Retired**: the folded/floating draggable conversation box
+(`components/logos5/L5Line.tsx`, `lib/logos5/box.ts`) — Split View docks the
+conversation instead; the phone's conversation sheet — on a phone the
+conversation is the Chat view and the composer floats over the others.
 
 ## 6. Memory
 
-The Mind Graph is the one person-memory store for Logos 5. Changes in this
-pass: a `stated` claim about the person must be grounded in their own words
-or it is stored as Socria's reading; a file can never assert something about
-the person; proposed changes stay proposals until reviewed; recalled memory
-carries its provenance into the prompt; the atlas says "Confirmed" only for
-what the person confirmed and "You said it" only for what they said; nodes
-can be confirmed; hand edits keep the value they replaced and are protected
-from extraction; off-the-record turns never reach any memory store.
+The Mind Graph is the one person-memory store for Logos 5. The integrity
+fixes the audit called for are the next stage of this work and are **not in
+this commit**: a `stated` claim about the person grounded in their own words or
+stored as Socria's reading; a file never asserting something about the person;
+recalled memory carrying its provenance into the prompt; the atlas saying
+"Confirmed" only for what the person confirmed; node-level confirmation; hand
+edits keeping the value they replaced; off-the-record turns reaching no memory
+store; Logos 5 no longer writing a second store. This section is rewritten
+when they land.
 
 ## 7. Measurement
 
@@ -287,6 +381,24 @@ any of this back: nothing stored was rewritten.
 ## 9. Not finished, or decided differently
 
 Kept current as the work lands; see §10 for the final state.
+
+- **Decided differently.** Rule D keeps the conversation beside the Logic Map
+  on a wide screen (the reply would otherwise stream off screen). Hub labels on
+  the Universal Map stay clamped to the lines their disc holds rather than one
+  line. The Universal Map remains where a returning person lands (an earlier
+  decision of the owner's); a new line of thinking opens on Chat. The floating,
+  draggable conversation box built earlier is retired in favour of Split View.
+  "Back to Socria chat" is gone from the Logos 5 menu with the separate Core
+  product.
+- **Costs that moved.** The map pass no longer follows every turn; it is drawn
+  for structure or something to see, while the Logic Map is open, on a light
+  background cadence, and once when the Logic Map is opened on a stale map. A
+  stored map can therefore lag the conversation by up to three turns until one
+  of those happens — this matters to anything that reads the stored map,
+  including the 5-node rewards challenge. One small title call is added per new
+  conversation, for accounts only.
+- **Not finished yet.** The memory-integrity stage (§6); the evaluation
+  harness and measurements (§7).
 
 ## 10. Results
 

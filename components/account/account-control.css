@@ -66,3 +66,50 @@
   font-size: 0.92rem;
   flex: 0 0 auto;
 }
+
+/* The profile's own menu, when the chip opens one (Logos 5: Account settings, Memory). */
+.who-wrap {
+  position: relative;
+  display: inline-flex;
+}
+.who-menu {
+  position: absolute;
+  top: calc(100% + 6px);
+  right: 0;
+  z-index: 60;
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 6px;
+  border-radius: 12px;
+  border: 1px solid var(--ink-16, rgba(var(--ink-rgb, 31, 31, 31), 0.16));
+  background: var(--surface, #fff);
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.12);
+  font-family: var(--sans);
+}
+.who-menu [role='menuitem'] {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: var(--ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+.who-menu [role='menuitem'] small {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--ink-60, rgba(var(--ink-rgb, 31, 31, 31), 0.6));
+}
+.who-menu [role='menuitem']:hover,
+.who-menu [role='menuitem']:focus-visible {
+  background: var(--ink-06, rgba(var(--ink-rgb, 31, 31, 31), 0.06));
+  outline: none;
+}

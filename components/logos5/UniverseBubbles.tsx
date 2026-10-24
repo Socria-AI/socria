@@ -33,6 +33,7 @@ import { bubbleLayout, foldedBox, type BubbleCluster, type BubbleLens, type Bubb
 import { PROJECT_COLOR_KEYS, type Homes } from '@/lib/logos5/spatial';
 import type { Arrangement } from '@/lib/logos5/arrange';
 import { MadeMark, StarMark, colorVar, shortDate, tileSaid } from './UniverseParts';
+import { nodeLabel } from '@/lib/logos5/title';
 
 export interface BubbleActs {
   onSelect: (ids: string[], add?: boolean) => void;
@@ -176,7 +177,7 @@ export function BubbleMap({
 
   const folded = useMemo(() => new Set(Object.entries(arr.frames).filter(([, f]) => f.collapsed).map(([k]) => k)), [arr.frames]);
   const L = useMemo(
-    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject }),
+    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject && lens === 'week', strictToday: lens === 'today' }),
     [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject]
   );
   const notes = lens === 'week' ? arr.notes : [];
@@ -695,7 +696,7 @@ export function BubbleMap({
               tabIndex={matchOf && !m ? -1 : 0}
               aria-pressed={sel.has(h.id)}
               aria-label={tileSaid(tile, homes.of.get(h.id)?.name) + (h.halo && h.id === resumeId ? ', where you left off' : '') + (h.why ? `, ${h.why}` : '')}
-              title={h.why ? `${tile.title} — ${h.why}` : undefined}
+              title={h.why ? `${tile.title} — ${h.why}` : tile.title}
               onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(h.id)}
               onPointerLeave={() => setHover((x) => (x === h.id ? null : x))}
             >
@@ -704,7 +705,7 @@ export function BubbleMap({
                 <span className="l5b-disc" aria-hidden="true" />
                 <span className="l5b-hub-words" aria-hidden="true">
                   <span className="l5b-hub-t">
-                    {tile.title}
+                    {nodeLabel(tile.title)}
                     {starred.has(h.id) && (
                       <>
                         {' '}
@@ -758,7 +759,7 @@ export function BubbleMap({
               tabIndex={matchOf && !m ? -1 : 0}
               aria-pressed={sel.has(d.id)}
               aria-label={tileSaid(tile, homes.of.get(d.id)?.name) + (d.why ? `, ${d.why}` : '')}
-              title={d.why ? `${tile.title} — ${d.why}` : undefined}
+              title={d.why ? `${tile.title} — ${d.why}` : tile.title}
               onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(d.id)}
               onPointerLeave={() => setHover((x) => (x === d.id ? null : x))}
             >
@@ -769,7 +770,7 @@ export function BubbleMap({
                 style={d.side === 'above' ? { left: d.label.x - d.x, bottom: d.y - d.label.y - d.label.h, width: d.label.w } : d.side === 'below' ? { left: d.label.x - d.x, top: d.label.y - d.y, width: d.label.w } : { left: d.label.x - d.x, top: 0, width: d.label.w }}
                 aria-hidden="true"
               >
-                {tile.title}
+                {nodeLabel(tile.title)}
                 {starred.has(d.id) && (
                   <>
                     {' '}

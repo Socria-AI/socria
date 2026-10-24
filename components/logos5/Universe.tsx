@@ -1,8 +1,9 @@
 'use client';
 // components/logos5/Universe.tsx — the Universal Map, Logos 5's home.
 //
-// Every past conversation, on one map: "Your map, not a list." How much of
-// it, chosen at the top right: Today and This week are drawn as subjects —
+// Every past conversation, on one map. How much of it, chosen at the top
+// right: Today (exactly what was begun today, local time) and This week are
+// drawn as subjects —
 // each a dashed circle, a real study session a disc in its colour, a quick
 // question a dot on a spoke from its session, and what joins two subjects a
 // dashed curve with a card that says why (lib/logos5/bubbles.ts; nothing has
@@ -22,6 +23,7 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { resumeOf, sharedIdeas, tileMatch, tilesOf, type ProjectIn, type Tile, type UniverseIn } from '@/lib/logos5/universe';
 import { dayName, dayStart, homesOf, todayOf, weekStart } from '@/lib/logos5/spatial';
+import { TODAY_EMPTY, dayBounds } from '@/lib/logos5/views';
 import { monthStart } from '@/lib/logos5/timeline';
 import { OTHER } from '@/lib/logos5/subjects';
 import * as A from '@/lib/logos5/arrange';
@@ -58,21 +60,12 @@ const LENS_SAID: Record<A.HomeMode, { long: string; short: string }> = {
   all: { long: 'All time', short: 'All' },
 };
 
-const HINT: Record<A.HomeMode, string> = {
-  today: 'Today’s sessions, what they build on, and what links them across subjects · press one to see it, twice to open it · drag one into another subject to file it there',
-  week: 'This week by subject — a disc is a conversation you went deep in, a dot a quick question · drag one into another subject to file it there · ↩ finds where a subject was before',
-  month: 'Oldest on the left, newest on the right — each where it began; joined when it followed on within a week · ↩ goes back to where a subject was before',
-  all: 'Oldest on the left, newest on the right — each where it began; joined when it followed on within a week · ↩ goes back to where a subject was before',
-};
-
 const DAY = 86_400_000;
 /** In order (This month, All time) rather than a map. */
 const inTime = (m: A.HomeMode) => m === 'month' || m === 'all';
 /** what the page's own words and the box at the foot cover of the map, wide and on a phone */
 const TOP = { wide: 150, narrow: 140 } as const;
 const FOOT = { wide: 92, narrow: 78 } as const;
-/** the foot's width that holds what the marks mean beside the box */
-const LEGEND_ROOM = 1240;
 
 export function UniverseView({
   conversations,
@@ -192,8 +185,17 @@ export function UniverseView({
     }
     return out;
   }, [lens, scoped, homes, visible, weekFrom]);
-  /** Today: the day it is about — today, or the last day anything was worked on */
-  const todayPlan = useMemo(() => (lens === 'today' ? todayOf(shown, shownHomes, ideas, now, arr.links) : null), [lens, shown, shownHomes, ideas, now, arr.links]);
+  /**
+   * TODAY, EXACTLY (Alex Tran, Logos 5 Comments v2): what was begun on this
+   * calendar day, in the person's own time zone — 00:00:00 to 23:59:59 —
+   * and nothing earlier, however related. No last-day fallback, no ring of
+   * older conversations: an empty day is said as one.
+   */
+  const todayTiles = useMemo(() => {
+    const { start, end } = dayBounds(now);
+    return shown.filter((t) => t.started >= start && t.started <= end);
+  }, [shown, now]);
+  const todayPlan = useMemo(() => (lens === 'today' ? todayOf(todayTiles, shownHomes, ideas, now, arr.links) : null), [lens, todayTiles, shownHomes, ideas, now, arr.links]);
   /** the folded subjects and Projects opened on the map; let go on another lens */
   const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
   /** go to one on the line — a ↩ on the week's map, "Find it in time" — once per press */
@@ -245,15 +247,15 @@ export function UniverseView({
    * foot is wide enough for what the marks mean beside the box (a smaller
    * window, or the List open beside the map, and it gives way).
    */
-  const [insets, setInsets] = useState<{ top: number; foot: number; legend: boolean } | null>(null);
+  const [insets, setInsets] = useState<{ top: number; foot: number } | null>(null);
   const hasTop = tiles.length > 0 && !atlasOn;
   useBeforePaint(() => {
     const measure = () => {
       const t = topRef.current?.getBoundingClientRect().height ?? 0;
       const f = footRef.current?.getBoundingClientRect();
       if (!f?.height) return;
-      const next = { top: Math.ceil(t), foot: Math.ceil(f.height), legend: f.width >= LEGEND_ROOM };
-      setInsets((cur) => (cur && cur.top === next.top && cur.foot === next.foot && cur.legend === next.legend ? cur : next));
+      const next = { top: Math.ceil(t), foot: Math.ceil(f.height) };
+      setInsets((cur) => (cur && cur.top === next.top && cur.foot === next.foot ? cur : next));
     };
     measure();
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(measure) : null;
@@ -698,7 +700,7 @@ export function UniverseView({
   const subline =
     lens === 'today' ? (
       <div className="l5h-sub">
-        <span className="l5h-sub-k">{todayPlan?.when === 'last' ? `Nothing yet today · last worked on ${dayName(todayPlan.day)}` : `Today · ${dayName(todayPlan?.day ?? dayStart(now))}`}</span>
+        <span className="l5h-sub-k">{`Today · ${dayName(dayStart(now))}`}</span>
         {pickUp}
       </div>
     ) : lens === 'week' ? (
@@ -791,6 +793,15 @@ export function UniverseView({
         </button>
       </div>
     );
+  else if (lens === 'today' && !todayTiles.length)
+    body = (
+      <div className="l5h-empty is-today">
+        <button type="button" className="l5h-todaynode" onClick={() => findRef.current?.focus()}>
+          <span className="l5h-todaynode-dot" aria-hidden="true" />
+          {TODAY_EMPTY}
+        </button>
+      </div>
+    );
   else if (lens === 'week' && !scoped.length)
     body = (
       <div className="l5h-empty">
@@ -805,7 +816,7 @@ export function UniverseView({
       <BubbleMap
         key={lens === 'week' ? `week:${weekFrom}` : 'today'}
         lens={lens === 'week' ? 'week' : 'today'}
-        tiles={lens === 'week' ? scoped : shown}
+        tiles={lens === 'week' ? scoped : todayTiles}
         tileById={tileById}
         homes={shownHomes}
         ideas={ideas}
@@ -824,7 +835,7 @@ export function UniverseView({
         top={top}
         bottom={foot}
         narrow={narrow}
-        all={shown}
+        all={lens === 'week' ? shown : todayTiles}
         opened={opened}
         backOf={backOf}
         acts={mapActs}
@@ -837,7 +848,7 @@ export function UniverseView({
       <div className="l5h-body">
         {contentsEl}
         <div
-          className={`l5h-main lens-${lens}${inTime(lens) ? ' is-time' : ''}${isMap && !arr.seen.hint ? ' has-hint' : ''}${dropping ? ' is-dropping' : ''}`}
+          className={`l5h-main lens-${lens}${inTime(lens) ? ' is-time' : ''}${dropping ? ' is-dropping' : ''}`}
           ref={mainRef}
           style={{ ['--l5h-foot' as string]: `${foot}px` }}
           onDragEnter={(e) => takeRef.current && e.dataTransfer?.types?.includes('Files') && (e.preventDefault(), setDropping(true))}
@@ -853,13 +864,7 @@ export function UniverseView({
           {body}
           {hasTop && (
             <div className="l5h-top" ref={topRef}>
-              <div className="l5h-title">
-                <p className="l5h-kicker">Everything you’ve thought through</p>
-                <h1 className="l5h-h">
-                  Your map, <em>not a list</em>
-                </h1>
-                {subline}
-              </div>
+              <div className="l5h-title">{subline}</div>
               <div className="l5h-right">
                 <LensSwitch lens={lens} narrow={narrow} onPick={pickLens} />
                 <div className="l5h-tools" role="toolbar" aria-label="The map">
@@ -897,7 +902,6 @@ export function UniverseView({
             </div>
           )}
           <div className="l5h-foot" ref={footRef}>
-            {!narrow && hasTop && insets?.legend !== false && <Legend lens={lens} />}
             <div className="l5h-omni">{findEl}</div>
           </div>
           {viewOpen && (
@@ -1003,14 +1007,6 @@ export function UniverseView({
               </button>
             </div>
           )}
-          {isMap && !arr.seen.hint && !linkFrom && sel.length < 2 && (
-            <p className="l5h-hint">
-              {HINT[lens]}
-              <button type="button" className="l5h-x" aria-label="Got it" onClick={() => prefer((a) => A.markSeen(a, 'hint'))}>
-                ×
-              </button>
-            </p>
-          )}
           {said && (
             <p className="l5h-said" role="status">
               {said}
@@ -1053,38 +1049,5 @@ function LensSwitch({ lens, narrow, onPick }: { lens: A.HomeMode; narrow: boolea
         </button>
       ))}
     </div>
-  );
-}
-
-/** What the marks mean: on the map, a session, a quick question, a link across subjects; on the line, what follows on. */
-function Legend({ lens }: { lens: A.HomeMode }) {
-  return (
-    <ul className="l5h-legend" aria-label="What the marks mean">
-      <li>
-        <span className="l5h-lg-hub" aria-hidden="true" />
-        Hub — a conversation you went deep in
-      </li>
-      <li>
-        <span className="l5h-lg-dot" aria-hidden="true" />
-        Quick question
-      </li>
-      {!inTime(lens) && (
-        <li>
-          <span className="l5h-lg-proj" aria-hidden="true" />
-          Your project
-        </li>
-      )}
-      {inTime(lens) ? (
-        <li>
-          <span className="l5h-lg-line" aria-hidden="true" />
-          Followed on within a week
-        </li>
-      ) : (
-        <li>
-          <span className="l5h-lg-link" aria-hidden="true" />
-          Connects across subjects
-        </li>
-      )}
-    </ul>
   );
 }

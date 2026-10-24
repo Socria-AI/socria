@@ -249,6 +249,8 @@ console.log('\n=== representation: the workspace as typed, linked entities ===')
   ok('…a passage inside a document', hits('pricing must be final').includes('blk:d1#p1.2'));
   ok('…an artifact and a node by name', hits('revenue matrix').includes('obj:s1/M') && hits('revenue matrix').includes('node:s1/n3'));
   ok('…by a prefix, and through a typo', hits('pric').length > 0 && hits('pricng').length > 0, J(hits('pricng')));
+  ok('…two letters swapped, or a slip in a word’s beginning', hits('prciing').length > 0 && hits('lanuch').length > 0, J([hits('prciing'), hits('lanuch')]));
+  ok('a slip is within one word: letters strung across a sentence find nothing', hits('wlbmp').length === 0 && R.fuzzyScore('denver', 'Plainly: it depends on the part you have not stated yet — never mind') === 0);
   ok('nothing for nothing', R.searchWorkspace(ix, '   ').length === 0 && hits('zebra quantum').length === 0);
   ok('neighbours: what a node is linked to, both ways', R.neighbours(ix, 'node:s1/n2').in.some((x) => x.from === 'card:s1/c1'));
 }

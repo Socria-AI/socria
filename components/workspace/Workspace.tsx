@@ -88,6 +88,11 @@ export interface WorkspaceProps {
   onDockSide?: (side: DockSide) => void;
   /** a contextual card (the inspector, for a selection), over the panel in focus */
   overlay?: ReactNode;
+  /**
+   * "+ View" at the end of the top row. Logos 5 sets it false: one more panel
+   * docks beside its views with Split View instead (components/logos5/L5Views.tsx).
+   */
+  addViews?: boolean;
 }
 
 function useNarrow(): boolean {
@@ -495,7 +500,8 @@ export function Workspace(props: WorkspaceProps) {
       )}
     </span>
   );
-  const top = (
+  const bare = props.addViews === false && !props.head && !props.suggestion;
+  const top = bare ? null : (
     <div className="ws-top" ref={topRef}>
       <div className="ws-top-head">{props.head}</div>
       {props.suggestion && (
@@ -505,7 +511,7 @@ export function Workspace(props: WorkspaceProps) {
           <button type="button" className="ws-suggest-no" onClick={() => props.onDismiss(props.suggestion!)}>Not now</button>
         </div>
       )}
-      {addView}
+      {props.addViews === false ? null : addView}
     </div>
   );
 

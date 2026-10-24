@@ -249,6 +249,7 @@ export function LogosComposer({
   setDrafts,
   onSend,
   busy,
+  waiting,
   readImage,
   readDocument,
   onOpenDoc,
@@ -309,6 +310,12 @@ export function LogosComposer({
   layout?: 'inline' | 'stacked';
   /** stop the answer that is arriving (shown in place of send while busy) */
   onStop?: () => void;
+  /**
+   * The turn has gone and nothing of the answer has arrived yet: the send
+   * button turns into a spinner and takes nothing more until the words begin
+   * (Alex Tran, Logos 5 Comments v2 — no second submission mid-flight).
+   */
+  waiting?: boolean;
   /** the host's controls in the tool row — the model and depth */
   footer?: ReactNode;
   /** Quick Capture, offered under "+" beside attaching */
@@ -380,8 +387,9 @@ export function LogosComposer({
     }
     grownAt.current = el.clientWidth;
     el.style.height = 'auto';
-    // Room for a real paragraph, but never so tall it eats the conversation.
-    const cap = Math.round(window.innerHeight * 0.34);
+    // Room for a real paragraph, but never so tall it eats the conversation:
+    // 240px, then it scrolls inside (Alex Tran, Logos 5 Comments v2).
+    const cap = 240;
     el.style.height = Math.min(el.scrollHeight, cap) + 'px';
     // A scrollbar only when there is more than the box shows (an empty box
     // showed one, its italic placeholder a little taller than a line) — and
@@ -389,10 +397,24 @@ export function LogosComposer({
     el.style.overflowY = el.scrollHeight > el.clientHeight + 1 ? 'auto' : 'hidden';
   }
 
+  /** what the empty box says — the same words in both layouts */
+  const shownPlaceholder = replyTo
+    ? `Reply to ${replyTo.who}…`
+    : about
+      ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
+      : group
+        ? 'Message everyone — @socria to ask Socria'
+        : busy
+          ? 'Keep writing — you can send once Socria has replied'
+          : layout === 'stacked'
+            ? idlePlaceholder ?? 'What are you working through?'
+            : 'What are you working through?';
   // Text also arrives without a keystroke — a failed send hands the message
   // back, a panel puts a question in to be finished — and the box has to come
-  // back with it.
-  useLayoutEffect(grow, [value]);
+  // back with it. An empty box is as tall as what it says: the longer words it
+  // says while Socria replies wrap on a phone, and the box must come back to
+  // one line when they go.
+  useLayoutEffect(grow, [value, shownPlaceholder]);
   // So does a new width: shown after being hidden, the box floated or docked,
   // the window resized. The words wrap again, so it is measured again.
   useEffect(() => {
@@ -653,6 +675,20 @@ export function LogosComposer({
 
         {layout === 'stacked' ? (
           <>
+            <div className="l5-crow">
+            {/* the paperclip, inside the pill, to the left of the words */}
+            <button
+              type="button"
+              className="lg-attach l5-clip"
+              onClick={() => fileRef.current?.click()}
+              disabled={drafts.length >= MAX_ATTACHMENTS}
+              aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
+              title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
+            >
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
+              </svg>
+            </button>
             <textarea
               ref={taRef}
               value={value}
@@ -661,17 +697,7 @@ export function LogosComposer({
               // caret, so while Socria replied the person could not type — the
               // "I have to fold the conversation away to type" report. Only
               // sending waits for the reply (canSend); writing never does.
-              placeholder={
-                replyTo
-                  ? `Reply to ${replyTo.who}…`
-                  : about
-                    ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
-                    : group
-                    ? 'Message everyone — @socria to ask Socria'
-                    : busy
-                      ? 'Keep writing — you can send once Socria has replied'
-                      : idlePlaceholder ?? 'What are you working through?'
-              }
+              placeholder={shownPlaceholder}
               aria-busy={busy || undefined}
               onChange={(e) => {
                 onChange(e.target.value);
@@ -698,15 +724,18 @@ export function LogosComposer({
                     return;
                   }
                 }
-                if (e.key === 'Enter' && !e.shiftKey) {
+                // Enter sends, Shift+Enter is a new line — and Enter that ends a
+                // word being composed (Japanese, Chinese, an accent) is not a send
+                if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
                   e.preventDefault();
-                  if (canSend) {
+                  if (canSend && !waiting) {
                     onSend();
                     if (taRef.current) taRef.current.style.height = 'auto';
                   }
                 }
               }}
             />
+            </div>
             <div className="l5-ctools">
             {onCapture ? (
               <L5Menu
@@ -719,25 +748,9 @@ export function LogosComposer({
                     <path d="M12 5v14M5 12h14" />
                   </svg>
                 }
-                items={[
-                  { label: readDocument ? 'Attach a document or a photo' : 'Attach an image or a text file', onSelect: () => fileRef.current?.click(), disabled: drafts.length >= MAX_ATTACHMENTS },
-                  { label: 'Quick capture', hint: 'Keep a thought for later', onSelect: onCapture },
-                ]}
+                items={[{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: onCapture }]}
               />
-            ) : (
-              <button
-                type="button"
-                className="lg-attach"
-                onClick={() => fileRef.current?.click()}
-                disabled={drafts.length >= MAX_ATTACHMENTS}
-                aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
-                title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
-                </svg>
-              </button>
-            )}
+            ) : null}
             <input
               ref={fileRef}
               type="file"
@@ -787,7 +800,11 @@ export function LogosComposer({
                   ∑
                 </button>
               )}
-              {onStop && busy && !group ? (
+              {waiting && !group ? (
+                <button type="button" className="lg-send is-waiting" disabled aria-label="Sent — waiting for the first words" title="Sent — waiting for the first words">
+                  <span className="lg-send-spin" aria-hidden="true" />
+                </button>
+              ) : onStop && busy && !group ? (
                 <button type="button" className="lg-send is-stop" onClick={onStop} aria-label="Stop the answer" title="Stop">
                   <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
                     <rect x="7" y="7" width="10" height="10" rx="2" />
@@ -847,17 +864,7 @@ export function LogosComposer({
               // caret, so while Socria replied the person could not type — the
               // "I have to fold the conversation away to type" report. Only
               // sending waits for the reply (canSend); writing never does.
-              placeholder={
-                replyTo
-                  ? `Reply to ${replyTo.who}…`
-                  : about
-                    ? `Ask about “${about.label.length > 40 ? `${about.label.slice(0, 39)}…` : about.label}”…`
-                    : group
-                    ? 'Message everyone — @socria to ask Socria'
-                    : busy
-                      ? 'Keep writing — you can send once Socria has replied'
-                      : 'What are you working through?'
-              }
+              placeholder={shownPlaceholder}
               aria-busy={busy || undefined}
               onChange={(e) => {
                 onChange(e.target.value);

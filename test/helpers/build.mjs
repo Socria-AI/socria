@@ -49,7 +49,6 @@ const MODULES = [
   'lib/onboarding-name.ts',
   'lib/theme.ts',
   'lib/new-socria.ts',
-  'lib/logos5/box.ts',
   // the Memory view's atlas: regions, states, placement, words (lib/logos5/memoryAtlas.ts)
   'lib/logos5/memoryAtlas.ts',
   // Celestial: the sky, generated and painted (lib/celestial.ts)
@@ -322,6 +321,8 @@ const MODULES = [
   'lib/map-skip.ts',
   // the Logos Runtime (lib/runtime): six subsystems in one bundle
   'test/helpers/runtime-under-test.ts',
+  // Logos 5's four views, titles, Content (lib/logos5/views.ts, title.ts, content.ts, contentBoard.ts)
+  'test/helpers/l5views-under-test.ts',
 ];
 
 export async function buildAll() {

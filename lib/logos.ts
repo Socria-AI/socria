@@ -311,6 +311,15 @@ export interface ThinkingMap {
    */
   history?: MapHistory;
   /**
+   * WHEN THE MAP WAS LAST DRAWN FROM THE CONVERSATION (ms). The map pass no
+   * longer runs after every turn (lib/runtime/orchestrate.ts needsMap): it
+   * runs when structure or something to build is asked for, while the Logic
+   * Map is open, and on a light cadence — and this says how far behind the
+   * conversation the map is, so opening the Logic Map can bring it up to date.
+   * Set by the client when a drawing lands.
+   */
+  drawnAt?: number;
+  /**
    * DRAWN IN THE BACKGROUND, AND NOT OPENED HERE SINCE — the map of a Core
    * chat brought into Logos 5 (lib/logos5/merge.ts). It is on the Universal
    * Map like any other. It is not yet something the person made in Logos, so
@@ -645,6 +654,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     edges,
     ...(removed.length ? { removed } : {}),
     ...(history ? { history } : {}),
+    ...(Number.isFinite(raw.drawnAt) && raw.drawnAt > 0 ? { drawnAt: Math.floor(raw.drawnAt) } : {}),
     // read back from storage only: no extractor, and no client save, can set it
     // (the background's own write does, app/api/conversations PATCH)
     ...(raw.unopened === true && opts?.trust === 'stored' ? { unopened: true as const } : {}),

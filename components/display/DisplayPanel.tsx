@@ -34,6 +34,7 @@ export function DisplayPanel({
   ask,
   onPrompt,
   onDraft,
+  pick = true,
 }: {
   obj: ThoughtObject | null;
   all: ThoughtObject[];
@@ -54,6 +55,11 @@ export function DisplayPanel({
   onPrompt?: (text: string) => void;
   /** put a sentence a display offers (an equation from a document) into the composer */
   onDraft?: (text: string) => void;
+  /**
+   * The strip of the other displays and "New…". Off where the place the
+   * display is shown has its own (Logos 5's Artifacts strip, Content's reader).
+   */
+  pick?: boolean;
 }) {
   const [browsing, setBrowsing] = useState(false);
   if (!obj || browsing) {
@@ -75,6 +81,7 @@ export function DisplayPanel({
   }
   return (
     <div className="dsp-panel">
+      {pick && (
       <nav className="dsp-panel-pick" aria-label="Displays in this line of thinking">
         {all.length > 1 &&
           all.map((o) => {
@@ -89,6 +96,7 @@ export function DisplayPanel({
           New…
         </button>
       </nav>
+      )}
       <ObjectFigure
         obj={obj}
         at={obj.at}
