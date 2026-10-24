@@ -1,6 +1,6 @@
 // @ts-nocheck
 'use client';
-// components/journal/ds-bundle.ts
+// components/ds/bundle.ts
 //
 // The Socria design system's components, exactly as the design project ships
 // them. MACHINE-EXTRACTED — DO NOT HAND-EDIT.
@@ -15,15 +15,17 @@
 //
 // `@ts-nocheck` is deliberate and is confined to THIS file. The bodies are
 // untyped by construction; the contract callers are actually checked against
-// lives next door in ds.ts, written from each component's own parameter list.
-// Splitting them is what keeps "the port is unchecked" from quietly becoming
-// "the journal is unchecked".
+// lives next door in index.ts, written from each component's own parameter
+// list. Splitting them is what keeps "the port is unchecked" from quietly
+// becoming "everything that uses it is unchecked".
 //
-// Upstream is the design project. To change a component, change it there and
-// re-port; to change how the journal USES one, wrap it in parts.tsx.
+// Upstream is the design project (claude.ai/design, the Socria design system
+// SocriaDesignSystem_060a22). To change a component, change it there and
+// re-port; the only local edit is the fallback stack on each font variable.
 //
-// Self-styling via inline styles and the custom properties in
-// app/journal.css, so there is no stylesheet to keep in step.
+// Self-styling via inline styles and custom properties (--ink, --moss-700,
+// --lg-*, …), declared at the root in app/globals.css and, for the public
+// site, in components/site/site.css.
 
 import React from 'react';
 
@@ -1794,4 +1796,34 @@ function _ContrastPair({
   }, ourQuestion)));
 }
 
-export { _Logo, _Label, _Button, _InkMark, _InsightCard, _Message, _SynthesisCard, _Transcript, _DefinitionEntry, _Composer, _GuardBar, _LogosNode, _OneLock, _OneMark, _SpecTable, _ContrastPair };
+function _SpreadHead({
+  num,
+  name
+}) {
+  return /*#__PURE__*/React.createElement("div", {
+    style: {
+      display: 'flex',
+      alignItems: 'baseline',
+      gap: 16,
+      marginBottom: 'clamp(28px,5vh,56px)'
+    }
+  }, num && /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--font-serif, Georgia, serif)',
+      fontStyle: 'italic',
+      fontSize: '1.15rem',
+      color: 'var(--moss-700)'
+    }
+  }, num), /*#__PURE__*/React.createElement("span", {
+    style: {
+      fontFamily: 'var(--font-sans, system-ui, -apple-system, "Segoe UI", sans-serif)',
+      fontSize: 'var(--type-label)',
+      fontWeight: 600,
+      letterSpacing: 'var(--tracking-label)',
+      textTransform: 'uppercase',
+      color: 'var(--ink-45-journal)'
+    }
+  }, name));
+}
+
+export { _Logo, _Label, _Button, _InkMark, _InsightCard, _Message, _SynthesisCard, _Transcript, _DefinitionEntry, _Composer, _GuardBar, _LogosNode, _OneLock, _OneMark, _SpecTable, _ContrastPair, _SpreadHead };

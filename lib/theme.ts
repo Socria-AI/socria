@@ -102,7 +102,7 @@ export function chooseTheme(id: ThemeId, isOne: boolean): ThemeId {
   return shown;
 }
 
-/** The app's own routes — where a reader's theme applies. The journal, the docs and the pages about Socria keep their paper. */
+/** The app's own routes — where a reader's theme applies. The public site, the docs and the pages about Socria keep their paper. */
 export const THEMED_ROUTES = /^\/(chat|account|memory|projects|logos2-test)(\/|$)/;
 export const themeAppliesTo = (pathname: string | null | undefined) => !!pathname && THEMED_ROUTES.test(pathname);
 

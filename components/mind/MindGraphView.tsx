@@ -32,7 +32,7 @@
 // people already have for "show me everything you have on me, in folders".
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Label, Button } from '@/components/journal/ds';
+import { Label, Button } from '@/components/ds';
 import { MindChanges, MindEvolution } from './MindChanges';
 import type { Change, EvolutionStep } from '@/lib/mind/evolve';
 import { NodeGlyph } from '@/components/NodeGlyph';

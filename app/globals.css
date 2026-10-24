@@ -35,8 +35,9 @@
   --blue: #9fbfd3;
   /* Socria One — the /one cover's palette, defined once and read by the
      prompt sheet, the Logos accents and the in-chrome marks alike. The page
-     itself (app/one/one.css) still carries its own copy because it is
-     scoped to .one-root and shipped only on that route; change both. */
+     itself (components/site/site.css, the design system's tokens/one.css)
+     carries its own copy because it is scoped to .site-root and shipped only
+     on the public site; change both. */
   --one-blue-0: #0f2430;
   --one-blue-1: #16303d;
   --one-blue-2: #1d3a4a;
@@ -74,12 +75,13 @@
   --type-label: 0.7rem;
   --tracking-label: 0.28em;
   --leading-prose: 1.7;
-  /* app/journal.css scopes its whole token block under .jr-root, which is
-     right for a stylesheet that only ships on the journal routes — but the
-     design system's primitives (Label, Button) read these by name wherever
-     they are mounted, and the auth plate mounts them outside it. These are
-     the same values, at the root, so a primitive is not silently unstyled
-     the first time it is used somewhere new. */
+  /* The public site (components/site/site.css) scopes its token block under
+     .site-root, which is right for a stylesheet that only ships on those
+     routes — but the design system's primitives (components/ds: Label,
+     Button) read these by name wherever they are mounted, and the auth plate
+     mounts them outside it. These are the same names, at the root, so a
+     primitive is not silently unstyled the first time it is used somewhere
+     new. */
   --ink-45-journal: rgba(var(--ink-rgb, 31, 31, 31), 0.45);
   --ink-70-journal: rgba(var(--ink-rgb, 31, 31, 31), 0.7);
   --ink-25-journal: rgba(var(--ink-rgb, 31, 31, 31), 0.25);
@@ -92,12 +94,11 @@
   /* The mathematics face, AT THE ROOT — and it has to be here.
    *
    * It was declared inside `.logos-root`, so it reached the Logos Board and
-   * nothing else. app/journal.css reads it for the homepage Board's equations
-   * (`.jr-root .board .eq`), and its own header says these tokens are "left to
-   * cascade" — meaning from the root. Scoped to Logos, the declaration on the
-   * journal was invalid and the notation fell through to the inherited serif,
-   * which is exactly the failure the token's own comment warns about: Georgia
-   * is a serif but not a maths face, and the minus signs give it away.
+   * nothing else. A Board set anywhere outside Logos (the old homepage had
+   * one) found the declaration invalid and its notation fell through to the
+   * inherited serif, which is exactly the failure the token's own comment
+   * warns about: Georgia is a serif but not a maths face, and the minus
+   * signs give it away.
    *
    * next/font sets --font-stix on <html>, so the stack resolves everywhere. */
   --font-math: var(--font-stix, Georgia, serif), 'STIX Two Math', 'Cambria Math', KaTeX_Main, Georgia, serif;
@@ -7582,10 +7583,11 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
    stopped has one question, and a feature list is not an answer to it. The
    link at the foot goes to the page that does answer it.
 
-   Tokens are copied from app/one/one.css rather than imported: that file is
-   scoped to .one-root and loaded only on that route, and Logos must not pull
-   a whole page's stylesheet to draw one sheet. They are named here so the
-   next person can see they are meant to match, and where to look.
+   Tokens are copied from the /one page's (components/site/site.css) rather
+   than imported: that file is scoped to .site-root and loaded only on the
+   public site, and Logos must not pull a whole site's stylesheet to draw one
+   sheet. They are named here so the next person can see they are meant to
+   match, and where to look.
 
    On a phone it is a bottom sheet — thumb-reachable, covering the least of
    what someone was reading. On a wider screen it centres. */
@@ -8543,9 +8545,8 @@ a.one-mark.is-strip:hover { background: rgba(38, 72, 90, 0.075); }
 
 /* ── the shared colophon ────────────────────────────────────────────
  *
- * The base treatment, for paper grounds. The journal issue overrides it
- * with `.jr-root .colophon`, which is more specific and wins — see
- * components/Colophon.tsx for why the two exist.
+ * The treatment for paper grounds, which is every surface that wears it —
+ * see components/Colophon.tsx for why it is shared.
  */
 .sc-colophon {
   margin-top: clamp(48px, 8vh, 96px);

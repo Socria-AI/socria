@@ -1,15 +1,15 @@
 /* app/onboarding.css — the four beats, ported from the design package.
  *
  * SELF-CONTAINED TOKENS, on purpose. The values this sheet reaches for —
- * --ink-45, --ink-12, --ease-out-expo — are declared in journal.css under
- * `.jr-root`, so they do not exist on a page that is not the journal. Rather
- * than widen those to :root (which would let a magazine's palette leak into
- * every surface in the product) the handful this needs are restated here, on
- * `.ob` itself. Nothing outside this page can see them and nothing inside it
- * depends on which root it happens to be under.
+ * --ink-45, --ink-12, --ease-out-expo — are the design package's, and the
+ * design package's palette is scoped where it is declared rather than set at
+ * :root (which would let a magazine's palette leak into every surface in the
+ * product). The handful this needs are restated here, on `.ob` itself.
+ * Nothing outside this page can see them and nothing inside it depends on
+ * which root it happens to be under.
  *
- * Every selector is already .ob-prefixed in the source, so unlike the journal
- * sheet this one needed no scoping transform.
+ * Every selector is already .ob-prefixed in the source, so this sheet needed
+ * no scoping transform.
  */
 
 /* NOTE ON THE SERIF.

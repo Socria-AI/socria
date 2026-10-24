@@ -41,7 +41,7 @@ export function AccountControl({
   onOpen?: () => void;
   /**
    * Navigate instead, for the pages that have no sheet to open over.
-   * The journal and the blog are reading surfaces; putting a modal over an
+   * The public site and the blog are reading surfaces; putting a modal over an
    * article to change a password would be the wrong shape of thing entirely,
    * so there they link to /account.
    */

@@ -256,7 +256,7 @@ console.log('\n=== how somebody arrived ===');
   ok('not where the country is unknown', attributionAllowed(null) === false && attributionAllowed('XX') === false);
 }
 
-// ── rendered: the homepage's heading and the student page ─────────────
+// ── rendered: the public site and the student page ────────────────────
 
 const OUT = join(here, '.tmp', 'e2e-seo');
 rmSync(OUT, { recursive: true, force: true });
@@ -266,11 +266,13 @@ const SHIMS = {
     export const usePathname = () => '/';
     export const useSearchParams = () => new URLSearchParams();`,
   // the masthead's signed-in / signed-out halves; on the server, before
-  // Clerk loads, the "loading" half is what renders
+  // Clerk loads, the "loading" half is what renders. /one asks who is
+  // signed in (usePlan); on the server nobody has answered yet.
   '@clerk/nextjs': `export const SignedIn = () => null;
     export const SignedOut = () => null;
     export const ClerkLoaded = () => null;
-    export const ClerkLoading = ({ children }) => children ?? null;`,
+    export const ClerkLoading = ({ children }) => children ?? null;
+    export const useAuth = () => ({ isLoaded: false, isSignedIn: false });`,
 };
 await build({
   entryPoints: [join(here, 'helpers', 'seo-under-test.tsx')],
@@ -286,16 +288,50 @@ await build({
 });
 const UI = await import(pathToFileURL(join(OUT, 'seo-ui.mjs')).href);
 
-console.log('\n=== the homepage heading ===');
+const h1Of = (html) => (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? '').replace(/<[^>]+>/g, '');
+const h1Count = (html) => (html.match(/<h1[\s>]/g) ?? []).length;
+const hrefs = (html) => [...html.matchAll(/href="([^"]+)"/g)].map((m) => m[1].replace(/&amp;/g, '&'));
+
+console.log('\n=== the homepage ===');
 {
-  const html = renderToStaticMarkup(h(UI.Door, {}));
-  const h1s = html.match(/<h1[\s>]/g) ?? [];
-  ok('exactly one h1', h1s.length === 1, String(h1s.length));
-  const text = (html.match(/<h1[^>]*>([\s\S]*?)<\/h1>/)?.[1] ?? '').replace(/<[^>]+>/g, '');
-  ok('it says the line', /Think for yourself\./.test(text), text);
-  ok('…and what Socria is', /Socria is the AI that sharpens your reasoning/.test(text));
-  ok('the issue label is current', html.includes('Logos 3.5') && !html.includes('Logos 3 ·'));
-  ok('the ask box is still there', html.includes('aria-label="Ask Socria"'));
+  const html = renderToStaticMarkup(h(UI.Landing, {}));
+  ok('exactly one h1', h1Count(html) === 1, String(h1Count(html)));
+  ok('it says the line', /Come out sharper\./.test(h1Of(html)), h1Of(html));
+  ok('every "Start a conversation" opens Logos', (html.match(/Start a conversation/g) ?? []).length === 3 && hrefs(html).filter((x) => x === '/logos').length === 4);
+  ok('the masthead reaches One and the Charter', hrefs(html).includes('/one') && hrefs(html).includes('/charter') && hrefs(html).includes('#session'));
+  ok('…and the conversation it scrolls to is there', html.includes('id="session"'));
+  ok('the price, from the one place it lives', html.includes('Socria One') && html.includes('· $15 a month'));
+  ok('the foot carries Privacy and Terms', hrefs(html).includes('/privacy') && hrefs(html).includes('/terms'));
+  ok('the product picture is one labelled figure, inert inside', /<figure class="s-shot" aria-label="Logos 5: /.test(html) && /<div class="s-app" aria-hidden="true" inert=""/.test(html));
+  ok('the margin cards are a picture, not controls', (html.match(/<div class="s-margin" inert="">/g) ?? []).length === 2);
+  // Before anything runs, a demo is its final state: every line in place,
+  // no "Thinking…" row showing, nothing waiting to fade in.
+  ok('the demos render finished', html.includes('What in it is owed but not paid?') && html.includes('A repair date, in writing, by Friday') && !/s-step[^"]*is-armed/.test(html) && (html.match(/s-thinking is-gone/g) ?? []).length === 4);
+  ok('nothing from the old journal is left', !/jr-root|Logos 3\.5|Issue No/.test(html));
+}
+
+console.log('\n=== Socria One ===');
+{
+  const html = renderToStaticMarkup(h(UI.One, {}));
+  ok('exactly one h1', h1Count(html) === 1 && /Socria One/.test(h1Of(html)), h1Of(html));
+  ok('the price and its period, from lib/socria-one', html.includes('<span class="s-one-amt">$15</span>') && html.includes('<span class="s-one-per">a month</span>') && html.includes('$15 a month.'));
+  ok('the memory line is the plan table’s, not the design’s', html.includes('Free remembers twelve things about you') && html.includes('One remembers 160') && !html.includes('Free remembers the conversation'));
+  ok('sharing, from the share rules', html.includes('Free shares one at a time'));
+  ok('five chapters', (html.match(/class="s-chapter"/g) ?? []).length === 5);
+  ok('the cover and the join band can subscribe', (html.match(/<button type="button" class="s-pill is-cream[^"]*"/g) ?? []).length === 2);
+  ok('the masthead goes to the join band', /<a class="s-pill is-deep" href="#join">Become a member<\/a>/.test(html) && html.includes('id="join"'));
+  ok('the free tier opens Logos', /<a class="s-free" href="\/logos">continue with the free tier<\/a>/.test(html));
+  ok('it says how it renews', html.includes('Renews monthly until you cancel.'));
+}
+
+console.log('\n=== the Charter ===');
+{
+  const html = renderToStaticMarkup(h(UI.Charter, {}));
+  ok('exactly one h1', h1Count(html) === 1 && h1Of(html) === 'The Socria Charter', h1Of(html));
+  ok('every paragraph, in order', UI.CHARTER_TEXT.length === 12 && UI.CHARTER_TEXT.every((p, i) => html.indexOf(p) > (i === 0 ? 0 : html.indexOf(UI.CHARTER_TEXT[i - 1]))));
+  ok('"No." stands alone', html.includes('<p class="s-no">No.</p>'));
+  ok('the PDF is offered twice, as a download', (html.match(/href="\/socria-charter\.pdf" download=""/g) ?? []).length === 2);
+  ok('it ends on the line', /The machines work for us\.<\/p><p>Not the other way around\.<\/p>/.test(html));
 }
 
 console.log('\n=== the student page ===');

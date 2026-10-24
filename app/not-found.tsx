@@ -18,9 +18,10 @@ export const metadata: Metadata = {
 };
 
 const ROUTES: [string, string, string][] = [
-  ['The issue', '/', 'Socria, in its current form'],
-  ['Logos', '/logos', 'The reasoning environment'],
+  ['Socria', '/', 'Come out sharper'],
+  ['Logos', '/logos', 'Start a conversation'],
   ['Socria One', '/one', 'Membership'],
+  ['The Charter', '/charter', 'What Socria is for'],
   ['Blog', '/blog', 'Essays and dispatches'],
   ['Docs', '/docs', 'How the product works'],
 ];

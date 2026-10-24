@@ -1,20 +1,17 @@
-// app/one/page.tsx — the Socria One page, at its own address.
+// app/one/page.tsx — Socria One, at its own address. The page is
+// components/site/One.tsx, from the design project's `Socria One`.
 import type { Metadata } from 'next';
-// one.css is NOT imported: it styles `.one-root`, the root of OneStory,
-// which this page replaced and which nothing renders — 28KB matching nothing.
-// The live page is `.jr-root one-issue`, styled by journal.css.
-import { OneIssue } from './OneIssue';
+import { One } from '@/components/site/One';
 import { priceWithPeriod } from '@/lib/socria-one';
-import '../journal.css';
 import { pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
   path: '/one',
-  title: 'Socria One — the complete reasoning environment',
+  title: 'Socria One — everything Socria does, without the ceiling',
   absolute: true,
-  description: `Socria One. Everything Socria does, without the ceiling: no daily count, in Core or in Logos. ${priceWithPeriod()}.`,
+  description: `Socria One: no daily count, lines of thinking as you need them, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Socria is free to start.`,
 });
 
 export default function OnePage() {
-  return <OneIssue />;
+  return <One />;
 }

@@ -15,7 +15,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Avatar } from './Avatar';
-import { Label, OneMark } from '@/components/journal/ds';
+import { Label, OneMark } from '@/components/ds';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import { LogosMark } from '@/components/LogosMark';
 import { OneLock } from '@/components/OneLock';

@@ -23,7 +23,7 @@
 // surface is their answer.
 
 import { useEffect, useRef, useState } from 'react';
-import { Logo } from '@/components/journal/ds';
+import { Logo } from '@/components/ds';
 import { ObIcon } from './ObIcon';
 import { ROLES, readRole, roleOf, writeRole, type IntentId, type Role } from '@/lib/onboarding-roles';
 import { readName, sanitizeName, writeName } from '@/lib/onboarding-name';

@@ -7,8 +7,8 @@
 // this file is a switch over block kinds and a choice of element.
 //
 // ONE VOCABULARY, TWO SURFACES. Core and Logos emit the same class names and
-// differ only in what their CSS makes of them — Core under `.prose-socria` in
-// app/globals.css, Logos under `.logos-root` in app/logos/logos.css. That is
+// differ only in what their CSS makes of them — Core under `.prose-socria`,
+// Logos under `.logos-root`, both in app/globals.css. That is
 // deliberate: a reply that reads well in one should read well in the other,
 // and the alternative is two renderers drifting apart, which is exactly the
 // state this replaced.

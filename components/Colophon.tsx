@@ -13,17 +13,17 @@
 // So one component, one link set, every public page. Adding a page now means
 // adding a Colophon to it, and forgetting is visible.
 //
-// STYLING IS PER-SURFACE, DELIBERATELY. The journal issue is a dark forest
-// ground and everything else is paper, so a single colour would be invisible
-// on one of them. The class `colophon` (already defined under .jr-root, and
-// more specific than the base rules here) keeps the dark treatment; every
-// other surface gets `sc-colophon` and reads on paper. The LINKS — the part
-// that actually matters — are the same everywhere.
+// The public site's own pages (the homepage, /one, /charter) end on the
+// design's foot (components/site/chrome.tsx, SiteFoot), which carries the
+// same legal links. Every other public surface wears this one, on paper, as
+// `sc-colophon`; a surface that needs its own treatment passes a class. The
+// LINKS — the part that actually matters — are the same everywhere.
 
 import Link from 'next/link';
 
 const LINKS: { href: string; label: string }[] = [
-  { href: '/logos', label: 'Logos' },
+  { href: '/one', label: 'Socria One' },
+  { href: '/charter', label: 'The Charter' },
   { href: '/explore', label: 'Explore' },
   { href: '/blog', label: 'Blog' },
   { href: '/docs', label: 'Docs' },
@@ -38,9 +38,9 @@ export function Colophon({
   className = '',
   children,
 }: {
-  /** extra classes — the journal passes `colophon` for its dark treatment */
+  /** extra classes, for a surface that needs its own treatment */
   className?: string;
-  /** anything surface-specific, e.g. the journal's print link */
+  /** anything surface-specific */
   children?: React.ReactNode;
 }) {
   return (

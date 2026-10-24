@@ -26,9 +26,10 @@ someone who pressed Explore and found it had stopped. The foot links to the
 page that does carry the ledger.
 
 The One page's tokens are **copied** into the `.lg-op-scrim` block in
-`app/globals.css`, not imported — `app/one/one.css` is scoped to `.one-root`
-and loaded only on that route, and Logos should not pull a whole page's
-stylesheet to draw one sheet. If the One palette changes, change both.
+`app/globals.css`, not imported — the page's stylesheet
+(`components/site/site.css`) is scoped to `.site-root` and loaded only on the
+public site, and Logos should not pull a whole site's stylesheet to draw one
+sheet. If the One palette changes, change both.
 
 Verified in Chromium at 320, 360, 390, 640 and 1280px: bottom sheet flush to
 the bottom edge below 640px, centred 452px plate above it, eyebrow on one line

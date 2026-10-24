@@ -13,7 +13,7 @@
 // twice sees two different kinds of problem: a heat sink drawn in 3D,
 // pattern formation, a strange attractor, an engine's layout, an invasion
 // front, an oscillator that keeps its own beat. Each surface that shows Logos 3 picks a different subject from
-// the others (the homepage stage has its own; the docs pages theirs).
+// the others (the docs pages have their own).
 //
 // PURE.
 
@@ -50,22 +50,6 @@ export function showcaseAt(list: readonly ShowcaseItem[], i: number): ShowcaseIt
   const n = list.length;
   return list[((Math.floor(i) % n) + n) % n];
 }
-
-/**
- * The homepage stage's subject, its own and shown nowhere else: what holds an
- * aircraft up. The model is the engine's lift example, asked for in its own
- * words; the wing is what Live 3D's reader draws from one message — one wing
- * of a NACA 2412 section (the section on a Cessna 172's wing), 1.5 m chord and
- * 5.35 m span: two of them are about the 16 m² the model's wing has.
- */
-export const STAGE_MODEL: ShowcaseItem = { id: 'lift', kind: 'model', title: 'Lift against airspeed', said: ask('lift'), cue: 'Solved live. Move the wing area or C_L.' };
-export const STAGE_DESIGN: ShowcaseItem = {
-  id: 'stage-wing',
-  kind: 'scene',
-  title: 'The wing, in 3D',
-  said: 'Now draw a NACA 2412 aluminium wing with chord 1.5 m and span 5.35 m.',
-  cue: 'Drawn by Live 3D from that message. Drag to turn it.',
-};
 
 /**
  * The Logos 3 docs page's own: four kinds of work none of the other surfaces

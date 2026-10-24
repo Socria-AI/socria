@@ -1,26 +1,31 @@
 'use client';
-// components/journal/ds.ts
+// components/ds/index.ts
 //
-// What the journal may use, and with which props.
+// The Socria design system, as the product imports it, and with which props.
 //
-// The bodies live in ds-bundle.ts, which is machine-extracted and runs with
+// The bodies live in bundle.ts, which is machine-extracted and runs with
 // checking off. This file is the contract: each declaration is written from
 // that component's own parameter list, so a typo in a prop name fails here
 // even though the implementation it points at is unchecked.
 
 import type React from 'react';
-import * as B from './ds-bundle';
+import * as B from './bundle';
 
-// ── the typed surface the journal imports ────────────────────────────
+// ── the typed surface ────────────────────────────────────────────────
 //
-// The bodies above are untyped by construction. These declarations are the
-// contract the rest of the journal is checked against, written from each
-// component's own parameter list.
+// The bodies are untyped by construction. These declarations are the
+// contract everything that imports them is checked against.
 
+/** The card types the bundle draws a silhouette for, plus `given`, which it
+ *  draws as a plain card with its own glyph — as the landing's problem set does. */
 export type NodeType =
   | 'goal' | 'decision' | 'value' | 'belief' | 'idea'
   | 'assumption' | 'evidence' | 'question' | 'tension' | 'consequence'
-  | 'claim' | 'counterpoint' | 'source' | 'concept' | 'misconception';
+  | 'claim' | 'counterpoint' | 'source' | 'concept' | 'misconception'
+  | 'theme' | 'character' | 'constraint' | 'milestone' | 'given';
+
+/** A card's standing: what the reasoning has done to it since it was drawn. */
+export type NodeStatus = 'open' | 'supported' | 'resolved' | 'revised';
 
 export interface TranscriptLine { who: 'you' | 'socria'; text: string; label?: string }
 export interface SynthesisSection { label: string; items: string[] }
@@ -67,7 +72,7 @@ export const GuardBar = B._GuardBar as C<{
   onHint?: () => void; onReveal?: () => void;
 }>;
 export const LogosNode = B._LogosNode as C<{
-  type?: NodeType; label?: string; status?: string;
+  type?: NodeType; label?: string; status?: NodeStatus;
   state?: 'default' | 'lit' | 'focused' | 'dim';
   onClick?: () => void; style?: React.CSSProperties;
 }>;
@@ -106,3 +111,8 @@ export const ContrastPair = B._ContrastPair as C<{
   ourLabel?: string;
   ourQuestion?: React.ReactNode;
 }>;
+/**
+ * How every spread opens: a roman numeral in moss italic, then the section's
+ * name as a micro-label. The only navigation a long editorial page has.
+ */
+export const SpreadHead = B._SpreadHead as C<{ num?: string; name?: string }>;

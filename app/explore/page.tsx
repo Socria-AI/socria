@@ -31,7 +31,7 @@ export default function ExplorePage() {
           <span>Socria</span>
         </Link>
         <nav className="exp-nav">
-          <Link href="/logos">Logos</Link>
+          <Link href="/docs/logos">Logos</Link>
           <Link href="/docs">Docs</Link>
           <Link href="/chat">Open Socria</Link>
         </nav>

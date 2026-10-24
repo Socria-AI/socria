@@ -13,7 +13,7 @@ import { readFileSync } from 'node:fs';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { createElement as h } from 'react';
 import { LogosCover, freeTerms } from './.tmp/LogosCover.mjs';
-import { COVER_SHOWCASE, DOCS_SHOWCASE, STAGE_DESIGN, STAGE_MODEL, showcaseAt } from './.tmp/logos3-showcase.mjs';
+import { COVER_SHOWCASE, DOCS_SHOWCASE, showcaseAt } from './.tmp/logos3-showcase.mjs';
 import { ENGINEERING, SCENE_EXAMPLES } from './.tmp/engineering.mjs';
 import { DYNAMICS } from './.tmp/dynamics-examples.mjs';
 import { PLANS } from './.tmp/entitlements.mjs';
@@ -71,17 +71,14 @@ console.log('=== each surface its own subjects ===');
   const cover = new Set(COVER_SHOWCASE.map((s) => s.id));
   const docs = new Set(DOCS_SHOWCASE.map((s) => s.id));
   ok('the docs page shows none of the cover’s', [...docs].every((id) => !cover.has(id)));
-  ok('the homepage stage shows neither’s', ![STAGE_MODEL.id, STAGE_DESIGN.id].some((id) => cover.has(id) || docs.has(id)) && !cover.has('wing') && !docs.has('wing'));
   ok('the docs items are examples the product carries, quoted word for word', DOCS_SHOWCASE.every((s) => s.said && s.said === (s.kind === 'scene' ? SCENE_EXAMPLES.find((e) => e.id === s.id)?.say : all.find((e) => e.id === s.id)?.ask)));
-  ok('the stage’s model is the lift example, asked for in its own words', STAGE_MODEL.said === all.find((e) => e.id === 'lift')?.ask);
-  ok('the stage’s wing is built from the very message shown', /<LiveFigure item=\{STAGE_DESIGN\} \/>/.test(read('components/journal/Stage.tsx')) && /<Message role="user" text=\{STAGE_DESIGN\.said\} \/>/.test(read('components/journal/Stage.tsx')));
   // THE PREVIEW IS NOT THE PRODUCT. LiveFigure draws readScene(...).preview,
   // which skips words it cannot read; typed into the chat, the same line goes
   // through sceneTurn, which builds nothing when a word is left unread. The
   // homepage once showed "Now draw one wing: …" — drawn on the page, and
   // 'not read — wing' in the product. Every scene line shown anywhere must
   // build where a person would actually type it.
-  for (const s of [...COVER_SHOWCASE, ...DOCS_SHOWCASE, STAGE_DESIGN].filter((x) => x.kind === 'scene')) {
+  for (const s of [...COVER_SHOWCASE, ...DOCS_SHOWCASE].filter((x) => x.kind === 'scene')) {
     const turn = sceneTurn(s.said, EMPTY_SCENE);
     ok(`${s.id}: typed into the chat, it builds — not only in the preview`, turn?.kind === 'build', turn ? turn.kind : 'null');
   }

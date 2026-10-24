@@ -12,7 +12,7 @@
 // Older changes are kept as history, never presented as needing a decision.
 
 import { useState } from 'react';
-import { Label } from '@/components/journal/ds';
+import { Label } from '@/components/ds';
 import type { Change, EvolutionStep } from '@/lib/mind/evolve';
 
 const KIND: Record<Change['kind'], string> = {

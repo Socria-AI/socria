@@ -169,13 +169,6 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     changeFrequency: 'weekly',
   },
   {
-    path: '/logos',
-    name: 'Logos',
-    summary: 'Talk it through and Logos draws your reasoning beside the conversation — claims, assumptions, tensions and open questions — and reads the documents you attach, with every citation checked.',
-    priority: 0.9,
-    changeFrequency: 'weekly',
-  },
-  {
     path: '/explore',
     name: 'Explore',
     summary: 'Research, learning, decisions, argument and creative work, each shown in the running product.',
@@ -188,6 +181,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     summary: `Everything Socria does, without the ceiling — ${priceWithPeriod()}. Socria is free to start.`,
     priority: 0.8,
     changeFrequency: 'monthly',
+  },
+  {
+    path: '/charter',
+    name: 'The Socria Charter',
+    summary: 'The founding constitution of Socria: artificial intelligence built for human enhancement. The machines work for us, not the other way around.',
+    priority: 0.7,
+    changeFrequency: 'yearly',
   },
   {
     path: '/docs',

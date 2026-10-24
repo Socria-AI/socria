@@ -16,7 +16,7 @@
 import Link from 'next/link';
 import Image from 'next/image';
 import { AUTH_CROSSLINK, authUrl, otherAuth, type AuthKind } from '@/lib/auth-links';
-import { Label } from '@/components/journal/ds';
+import { Label } from '@/components/ds';
 
 export function AuthPlate({
   kind,
@@ -79,9 +79,9 @@ export function AuthPlate({
         </div>
 
         <div className="foot-links">
-          <Link href="/">The issue</Link>
-          <Link href="/logos">Logos</Link>
+          <Link href="/">Socria</Link>
           <Link href="/one">Socria One</Link>
+          <Link href="/charter">The Charter</Link>
           <Link href="/privacy">Privacy</Link>
         </div>
       </div>

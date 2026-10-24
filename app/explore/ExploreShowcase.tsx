@@ -149,10 +149,10 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
           </Frame>
         </>
       ) : (
-        // One column, set inline: the app's own .lg-split rule sets two and
-        // wins from logos.css, and this is the one exhibit with nothing to
-        // put in the second — an empty right half beside a conversation reads
-        // as a panel that failed to load rather than one deliberately absent.
+        // One column, set inline: the app's own .lg-split rule sets two, and
+        // this is the one exhibit with nothing to put in the second — an
+        // empty right half beside a conversation reads as a panel that failed
+        // to load rather than one deliberately absent.
         <Frame label={scenario.caption} height={620}>
           <div
             className="lg-split lg-demo-split exp-nopanel"

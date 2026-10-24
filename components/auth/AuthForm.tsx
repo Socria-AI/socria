@@ -40,7 +40,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { useSignIn, useSignUp } from '@clerk/nextjs';
-import { Button } from '@/components/journal/ds';
+import { Button } from '@/components/ds';
 import { clerkMessage } from '@/lib/clerk-errors';
 import {
   AFTER_AUTH,

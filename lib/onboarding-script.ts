@@ -13,8 +13,7 @@
 // asked to type it twice.
 //
 // Session storage, not local: this is for exactly one landing, and the chat
-// clears it as it reads. The homepage door uses the same key for the same
-// reason (components/journal/parts.tsx).
+// clears it as it reads.
 
 /** What the first-run screen hands to the chat, so they land in their own session. */
 export const CARRY_KEY = 'socria.ob';

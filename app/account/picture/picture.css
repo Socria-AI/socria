@@ -2,9 +2,9 @@
  * design package.
  *
  * Tokens restated on .pfp-root for the same reason as the onboarding sheet:
- * the ones this reaches for live under .jr-root in journal.css and do not
- * exist on a page that is not the journal. Nothing here leaks out and
- * nothing in it depends on which root it sits under.
+ * the design package's values are scoped where they are declared, not
+ * global, so this sheet carries the ones it needs. Nothing here leaks out
+ * and nothing in it depends on which root it sits under.
  */
 
 /* NOTE ON THE SERIF.

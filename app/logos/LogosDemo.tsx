@@ -10,8 +10,8 @@
 // when they open it.
 //
 // Containment: .logos-root is `position: fixed; inset: 0` in the app, which
-// would swallow the page. `.lg-demo` (in logos.css) puts it back into flow at
-// a fixed height; everything inside then styles itself normally.
+// would swallow the page. `.lg-demo` (in app/docs/docs.css) puts it back into
+// flow at a fixed height; everything inside then styles itself normally.
 
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { applyMapEdits } from '@/lib/map-edit';

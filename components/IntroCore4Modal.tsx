@@ -37,7 +37,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Dial } from './ModelPicker';
 import { ModelGlyph } from './ModelGlyph';
 import { RichText } from './RichText';
-import { LogosNode } from './journal/ds';
+import { LogosNode } from './ds';
 import {
   READABILITY_OPTIONS,
   LENGTH_OPTIONS,

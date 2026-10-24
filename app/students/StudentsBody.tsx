@@ -2,7 +2,7 @@
 // the offer is open, so both states render (and can be checked) the same way.
 
 import Link from 'next/link';
-import { Button, Label } from '@/components/journal/ds';
+import { Button, Label } from '@/components/ds';
 import { TryInSocria } from '@/components/TryInSocria';
 import { STUDENT_OFFER } from '@/lib/socria-edu';
 

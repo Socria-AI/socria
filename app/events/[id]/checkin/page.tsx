@@ -8,7 +8,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import { notFound } from 'next/navigation';
-import { Label } from '@/components/journal/ds';
+import { Label } from '@/components/ds';
 import { NOINDEX } from '@/lib/seo';
 import { getEvent } from '@/lib/events/store';
 import { publicEvent, type PublicEvent } from '@/lib/events/model';

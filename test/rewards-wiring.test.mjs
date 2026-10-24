@@ -46,7 +46,7 @@ console.log('=== billing: never sells twice, never refuses someone on a reward, 
   const up = read('components/usePlan.ts');
   ok('a reward is never cached in the browser as a membership', /plan === 'one' && !promo\?\.only/.test(up));
   ok('…in Logos either', /json\.plan === 'one' && !json\?\.promo\?\.only/.test(read('components/LogosApp.tsx')));
-  const one = read('app/one/OneIssue.tsx');
+  const one = read('components/site/OneJoin.tsx');
   ok('/one still sells to someone on a reward, and says what happens to their days', /const isOne = plan\.known && plan\.plan === 'one' && !fromReward;/.test(one) && /saved, not lost/.test(one));
   const sheet = read('components/account/AccountSheet.tsx');
   ok('the account says "from Socria Rewards", not "manage membership", for reward-only One', /fromReward \? 'Keep Socria One →'/.test(sheet));

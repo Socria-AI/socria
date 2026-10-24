@@ -165,7 +165,7 @@
 /* Core 3.1 has no panel: the conversation takes the whole frame, which is
    the point being made rather than an empty half. (The single column itself
    is set inline — see ExploreShowcase — because the app's own .lg-split rule
-   wins from logos.css.) A full-width thread would run to 850px of line, so
+   sets two.) A full-width thread would run to 850px of line, so
    the readable column is centred inside it. */
 .exp-root .exp-nopanel .lg-thread,
 .exp-root .exp-nopanel .lg-composer-box { max-width: 640px; margin-inline: auto; }

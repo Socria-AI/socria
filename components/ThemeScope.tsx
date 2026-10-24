@@ -3,7 +3,7 @@
 //
 // The reader's theme belongs to the app's own routes. The head script applies
 // it on a first load; this keeps it right across client-side navigation —
-// on into /chat, or out to the journal, which keeps its paper.
+// on into /chat, or out to the public site, which keeps its paper.
 
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';

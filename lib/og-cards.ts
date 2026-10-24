@@ -66,6 +66,11 @@ const FIXED: Record<string, OgCard> = {
     title: 'Everything Socria does, without the ceiling.',
     line: `No daily count, in Core or in Logos — ${priceWithPeriod()}.`,
   },
+  charter: {
+    kicker: 'Socria',
+    title: 'The Socria Charter.',
+    line: 'The machines work for us. Not the other way around.',
+  },
   docs: {
     kicker: 'Socria Docs',
     title: 'How the whole thing works.',

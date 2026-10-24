@@ -33,10 +33,10 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
           Socria <em>Docs</em>
         </Link>
         <nav className="d-top-links" aria-label="Site">
-          <Link href="/">The journal</Link>
+          <Link href="/">Socria</Link>
           <Link href="/explore">Explore</Link>
-          <Link href="/logos">Logos</Link>
           <Link href="/one">Socria One</Link>
+          <Link href="/charter">The Charter</Link>
           <Link href="/chat" className="d-open">Open Socria</Link>
         </nav>
       </header>
@@ -67,7 +67,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
       <footer className="d-foot">
         <span>Socria — Human-First AI</span>
         <span className="d-foot-links">
-          <Link href="/logos">What Logos is</Link>
+          <Link href="/docs/logos">What Logos is</Link>
           <Link href="/one">Socria One</Link>
           {/* A third copy of the site's links — see the note in
               components/BlogShell.tsx. The docs are where somebody lands when

@@ -1,46 +1,30 @@
-// app/logos/page.tsx — the page that explains Logos.
+// app/logos/page.tsx — "Start a conversation".
 //
-// Logos itself is a MODEL, not a route: selecting it swaps the experience into
-// /chat. So this address is free to be what a link to "socria.app/logos"
-// should actually give someone — an explanation of what Logos is.
+// Every call to action on the public site points here (components/site,
+// START), and this address opens Logos: the product the site is about. Logos
+// is a MODEL, not a route — selecting it swaps the experience into /chat —
+// so this page only sends people on, carrying anything in the query (an old
+// bookmark, a deep-link to a session, a return from Stripe) with them.
 //
-// Anyone arriving with the app's own query strings (an old bookmark, a
-// deep-link to a session, a return from Stripe) is sent on to /chat, where
-// those now belong.
+// It used to be a page explaining Logos. The homepage does that now, with
+// the product itself framed on its cover, so the explanation went with the
+// rest of the old journal pages.
+//
+// A temporary redirect, not a permanent one: what "start a conversation"
+// opens is the product's to change, and one address for it means the site
+// never has to.
 
-import type { Metadata } from 'next';
 import { redirect } from 'next/navigation';
-// logos.css is NOT imported: it styles `.lgx-root`, the root of LogosStory,
-// which this page replaced and which nothing renders. It was 54KB of
-// render-blocking CSS matching no element on the page. The file and the
-// component stay in the tree — LogosDemo, which the docs still mount, takes
-// its chrome from docs.css and the `.logos-root` block in globals.css.
-import '../journal.css';
-import { LogosIssue } from './LogosIssue';
-import { pageMetadata } from '@/lib/seo';
-
-export const metadata: Metadata = pageMetadata({
-  path: '/logos',
-  title: 'Logos — think out loud, watch it take shape',
-  description:
-    'Know what you think, and why. Logos reads how you reason and draws it live beside the conversation: claims, assumptions, tensions and open questions, as a Thinking Map that reorganizes while you think.',
-});
-
-const APP_PARAMS = ['s', 'one', 'connect', 'session_id'];
 
 export default function LogosPage({
   searchParams,
 }: {
   searchParams?: Record<string, string | string[] | undefined>;
 }) {
-  const carried = APP_PARAMS.filter((k) => searchParams?.[k] !== undefined);
-  if (carried.length) {
-    const q = new URLSearchParams();
-    for (const [k, v] of Object.entries(searchParams ?? {})) {
-      if (typeof v === 'string') q.set(k, v);
-    }
-    q.set('model', 'logos');
-    redirect(`/chat?${q.toString()}`);
+  const q = new URLSearchParams();
+  for (const [k, v] of Object.entries(searchParams ?? {})) {
+    if (typeof v === 'string') q.set(k, v);
   }
-  return <LogosIssue />;
+  q.set('model', 'logos');
+  redirect(`/chat?${q.toString()}`);
 }
