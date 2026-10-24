@@ -93,7 +93,8 @@ console.log('\n=== states, read from the record ===');
   ok('what needs them comes first', ms.indexOf(by.new) < ms.indexOf(by.plain) && ms.indexOf(by.morning) < ms.indexOf(by.plain));
   const words = A.stateWords(by.new, NOW);
   ok('every state is said in words too', words.includes('Proposed change') && words.includes('Updated 2 days ago') && words.includes('Important'), words.join('|'));
-  ok('  a memory with nothing pending is confirmed', A.stateWords(by.plain, NOW)[0] === 'Confirmed');
+  // "Confirmed" only for what they confirmed (test/mind-ground.test.mjs): this one they said
+  ok('  a memory with nothing pending says how it stands — in their words, not "Confirmed"', A.stateWords(by.plain, NOW)[0] === 'In your words', A.stateWords(by.plain, NOW).join('|'));
   ok('  an earlier position says so', A.stateWords(by.old, NOW).includes('An earlier position'));
   ok('  and a tension is never only a colour', A.stateWords(by.morning, NOW).includes('Possible contradiction'));
   ok('how it is known comes from its first ground', A.knownBy(by.wrong) === 'Socria noticed it' && A.knownBy(by.plain) === 'You said it');
@@ -207,6 +208,17 @@ console.log('\n=== drawn ===');
   ok('  and says it is reading, before anything has come back', /Reading what Socria remembers/.test(s));
   ok('nothing is fetched while it is drawn', fetched === 0);
   ok('it is one region of the page, labelled', /<section class="l5mm" aria-label="Memory">/.test(s));
+}
+
+console.log('\n=== the inspector: confirm what is right ===');
+{
+  const NOW2 = Date.UTC(2026, 9, 24);
+  const mem = (id, provenance) => U.memoriesOf([{ id, type: 'Preference', label: `Memory ${id}`, content: 'x', status: 'active', importance: 0.5, createdAt: NOW2 - 9e8, updatedAt: NOW2 - 9e8, provenance }], [], [], NOW2)[0];
+  const props = (m, confirm) => ({ m, now: NOW2, edges: [], byId: new Map([[m.id, m]]), places: [], changes: [], history: null, busy: false, note: null, onClose: () => {}, onSelect: () => {}, onOpenPlace: () => {}, onSave: () => {}, onChallenge: () => {}, onForget: () => {}, onDecide: () => {}, ...(confirm ? { onConfirm: () => {} } : {}) });
+  const reading = renderToStaticMarkup(h(U.MemoryInspector, props(mem('r', [{ kind: 'inferred', surface: 'core', at: NOW2 - 9e8 }]), true)));
+  ok('a reading offers "That’s right", and says it is Socria’s reading', reading.includes('That’s right') && reading.includes('Socria’s reading'));
+  const yours = renderToStaticMarkup(h(U.MemoryInspector, props(mem('y', [{ kind: 'inferred', surface: 'core', at: NOW2 - 9e8 }, { kind: 'stated', surface: 'user', at: NOW2 - 1e8, note: 'confirmed by you', review: 'confirmed' }]), true)));
+  ok('  one they confirmed does not, and says so', !yours.includes('That’s right') && yours.includes('Confirmed'));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

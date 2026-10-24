@@ -168,7 +168,9 @@ ok('a second Project with the same name is refused', dup.status === 409, String(
 // ── 2. a conversation inside Calculus updates the graph ─────────────
 
 console.log('\n=== a conversation inside Calculus ===');
-const c1 = await chat('I finally get derivatives — the moving tangent line did it, the rules never did.', {
+// What the extractor calls stated is held to the person's own words (lib/mind/ground.ts), so the
+// turn says what it is credited with saying.
+const c1 = await chat('I finally get derivatives — the moving tangent line did it, the rules never did. I learn visually: once it is drawn, I understand it. The Calc II final exam is on December 12th, and Professor Lin holds office hours on Thursdays.', {
   projectId: CALC, conversationId: 'calc-1',
   extract: {
     nodes: [

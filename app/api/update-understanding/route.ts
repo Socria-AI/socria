@@ -33,6 +33,7 @@ import {
   type MemoryEntry,
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
+import { logosPersistPolicy } from '@/lib/mind/logos-turn';
 
 /**
  * How many known entries the extractor is shown.
@@ -159,6 +160,18 @@ export async function POST(req: NextRequest) {
 
   if (!recent) {
     return NextResponse.json({ understanding: current });
+  }
+
+  // OFF THE RECORD MEANS NO MEMORY AT ALL — here as in the Mind Graph. The
+  // person's own words decide it, read the way Core 4 and Logos read them
+  // (lib/mind/logos-turn.ts logosPersistPolicy): a conversation taken off the
+  // record teaches this cross-conversation profile nothing, and neither does
+  // one that reads as sensitive, whose memory belongs to that conversation.
+  const policy = logosPersistPolicy(
+    messages.filter((m: any) => m?.role === 'user' && typeof m.content === 'string').map((m: any) => m.content as string)
+  );
+  if (policy !== 'full') {
+    return NextResponse.json({ understanding: current, skipped: policy === 'none' ? 'off-record' : 'sensitive' });
   }
 
   // A conversation the person is working something personal through teaches

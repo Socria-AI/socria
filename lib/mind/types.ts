@@ -94,6 +94,26 @@ export function isGeneralising(type: string): boolean {
   return !OCCURRENCE_NORMALIZED.has(normalize(type));
 }
 
+// ── where a memory came from ────────────────────────────────────────
+
+/**
+ * WHERE A MEMORY CAME FROM, in a word the reply can act on: said by them in so
+ * many words; confirmed by them (on the Memory page, or a change they
+ * accepted); read from a file they gave (or imported); found in a source or
+ * computed; or Socria's own reading of them. Without it every line reached
+ * the prompt as the same flat fact, and a reading came back as "you told me".
+ */
+export type WhereFrom = 'confirmed' | 'said' | 'file' | 'source' | 'reading';
+
+export function whereFrom(n: { provenance?: readonly { kind?: string; surface?: string; review?: string }[] }): WhereFrom {
+  const p = n.provenance ?? [];
+  if (p.some((x) => x.surface === 'user' || x.review === 'confirmed')) return 'confirmed';
+  if (p.some((x) => (x.kind === 'stated' || x.kind === 'established') && (x.surface === 'core' || x.surface === 'logos'))) return 'said';
+  if (p.some((x) => x.surface === 'file' || x.surface === 'import')) return 'file';
+  if (p.some((x) => x.kind === 'researched' || x.kind === 'calculated' || x.surface === 'tool')) return 'source';
+  return 'reading';
+}
+
 // ── why a read or write failed ──────────────────────────────────────
 
 /**
@@ -259,7 +279,7 @@ export interface Provenance {
    */
   review?: ReviewState;
   /** what the change displaced, so rejecting it restores exactly what was there */
-  prior?: { status?: NodeStatus; toStatus?: NodeStatus; content?: string };
+  prior?: { status?: NodeStatus; toStatus?: NodeStatus; content?: string; label?: string };
 }
 
 export const REVIEW_STATES = ['proposed', 'confirmed', 'rejected'] as const;

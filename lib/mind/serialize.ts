@@ -17,7 +17,8 @@
 import type { ActivatedSubgraph } from './activate';
 import { SAVED_VOICE_READING } from '../memory-voice';
 import { MEMBERSHIP_RELATIONSHIPS } from './projects';
-import type { MindEdge, MindNode } from './types';
+import { whereFrom, type MindEdge, type MindNode } from './types';
+export { whereFrom, type WhereFrom } from './types';
 
 /** How many relationships one node may show. A hub is not more relevant
  *  for having more edges, and one unbounded block defeats the ceiling. */
@@ -83,7 +84,7 @@ export function serializeSubgraph(
   for (const n of ordered) {
     const lines: string[] = [];
     const from = opts.origin?.[n.id] ? ` [from project: ${opts.origin[n.id]}]` : '';
-    lines.push(`${n.type}${statusNote(n, opts.now)}: ${n.label} — ${n.content}${from}`);
+    lines.push(`${n.type}${statusNote(n, opts.now)} [${whereFrom(n)}]: ${n.label} — ${n.content}${from}`);
 
     let shown = 0;
     for (const e of sub.edges) {
@@ -145,6 +146,12 @@ useful thing here; do not present it as current. A tentative or uncertain item
 is a reading, not a fact. A contradicted item is in dispute and should be
 treated as open. A relationship marked unconfirmed is a change Socria read
 from a conversation that the person has not confirmed: do not rely on it.
+
+Each item says where it came from, in brackets. [said]: they said it in so
+many words. [confirmed]: they confirmed it, or wrote it themselves on their
+Memory page. [file]: read from a file they gave — not something they said.
+[source]: found in a source, or computed. [reading]: Socria's own reading of
+them, never said by them — never tell them they said it.
 
 This is context, not truth. What they say now takes precedence over anything
 here, and if something below is wrong, believe them and move on.

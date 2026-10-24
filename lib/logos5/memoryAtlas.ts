@@ -25,6 +25,8 @@
 // PURE: no React, no DOM, no clock — the caller passes `now`, and the width of
 // words is estimated here unless the caller can measure them.
 
+import { whereFrom, type WhereFrom } from '../mind/types';
+
 // ── the eight regions ────────────────────────────────────────────────
 
 export type RegionId = 'identity' | 'goals' | 'work' | 'learning' | 'people' | 'prefs' | 'recent' | 'questions';
@@ -279,20 +281,31 @@ export function stateWords(m: Memory, now: number): string[] {
   if (s.recent) out.push(`Updated ${agoOf(m.updatedAt, now)}`);
   if (s.faded) out.push(m.status === 'superseded' ? 'An earlier position' : m.status === 'archived' ? 'Archived' : 'Older');
   if (s.pinned) out.push('Important');
-  if (!out.length || (!s.proposed && !s.warn && !s.faded)) out.unshift('Confirmed');
+  // how it stands, truthfully: "Confirmed" only for what they confirmed or wrote themselves
+  if (!out.length || (!s.proposed && !s.warn && !s.faded)) out.unshift(STANDS[whereFrom(m)]);
   return out;
 }
 
-/** How Socria came to know it, from the record's first ground. */
+/** A memory with nothing pending, in a word that is true of it (lib/mind/types.ts whereFrom). */
+const STANDS: Record<WhereFrom, string> = {
+  confirmed: 'Confirmed',
+  said: 'In your words',
+  file: 'From your file',
+  source: 'From a source',
+  reading: 'Socria’s reading',
+};
+
+/** How Socria came to know it, from the record's first ground — "You said it" only when they did. */
 export function knownBy(m: Memory): string {
   const first = m.provenance[0];
   const yours = m.provenance.some((p) => p.surface === 'user' && !p.note);
   if (yours && first?.surface === 'user') return 'You added it';
   if (first?.surface === 'file') return 'From your file';
-  if (first?.kind === 'inferred' || first?.kind === 'hypothesis') return 'Socria noticed it';
-  if (first?.kind === 'researched') return 'From a source';
+  if (first?.surface === 'import') return 'Imported';
+  if (first?.kind === 'researched' || first?.surface === 'tool') return 'From a source';
   if (first?.kind === 'calculated') return 'Worked out';
-  return 'You said it';
+  if ((first?.kind === 'stated' || first?.kind === 'established') && (first.surface === 'core' || first.surface === 'logos')) return 'You said it';
+  return 'Socria noticed it';
 }
 
 /** A relationship, read as plain words — from the memory at one end, toward the other. */

@@ -374,6 +374,23 @@ export async function saveSource(userId: string, s: StoredSource): Promise<boole
   return !error;
 }
 
+/**
+ * A conversation the person asked to keep out of everything (supabase/schema.sql
+ * `conversations.incognito`): never shared, never remembered. A store without
+ * the column has no incognito conversations; a read that fails is answered
+ * "not incognito" because the write it guards fails against the same store.
+ */
+export async function isIncognito(userId: string, conversationId: string): Promise<boolean> {
+  try {
+    const { data, error } = await supabaseAdmin()
+      .from('conversations').select('incognito').eq('user_id', userId).eq('id', conversationId).maybeSingle();
+    if (error) return false;
+    return (data as { incognito?: unknown } | null)?.incognito === true;
+  } catch {
+    return false;
+  }
+}
+
 export async function readSource(userId: string, id: string): Promise<StoredSource | null> {
   const { data } = await supabaseAdmin()
     .from('mind_sources').select('*').eq('user_id', userId).eq('id', id).maybeSingle();

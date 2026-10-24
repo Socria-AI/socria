@@ -175,7 +175,9 @@ export function applyCandidates(
       // prompt ever sees. If the pattern is real it recurs and the next
       // extraction finds it here; if it was one bad afternoon it expires.
       if (verdict.reason === 'generalisation-needs-second-sighting') {
-        pending = notePending(pending, c.type, label, content, opts.now, opts.provenance.conversationId);
+        // a sighting in a private conversation stays there: it neither corroborates a claim
+        // elsewhere nor waits in the ledger, where its words would outlive the conversation
+        if (!c.private) pending = notePending(pending, c.type, label, content, opts.now, opts.provenance.conversationId);
       }
       continue;
     }
@@ -264,14 +266,19 @@ export function applyCandidates(
       // gate refused, but REINFORCEMENT, which quietly overwrote a stated
       // node with an inferred character claim and left it marked active.
       const sameWords = normalize(n.content) === normalize(content);
+      // ONCE THEY HAVE TOUCHED IT, ONLY THEY CHANGE ITS WORDS. A memory the
+      // person wrote, edited, confirmed or disputed on the Memory page is
+      // reinforced by later sightings, never reworded by an extraction.
       const revised =
-        verdict.mayRewrite && !sameWords && content.length > n.content.length * 1.15;
+        verdict.mayRewrite && !touchedByThem(n) && !sameWords && content.length > n.content.length * 1.15;
       // A claim that was held back is still a SIGHTING, and it has to be
       // recorded as one or corroboration can never accumulate for it: the
       // reinforcement path would swallow every occurrence and the claim would
       // never become believable however often it recurred.
       if (!verdict.mayRewrite) {
-        pending = notePending(pending, c.type, label, content, opts.now, opts.provenance.conversationId);
+        // a sighting in a private conversation stays there: it neither corroborates a claim
+        // elsewhere nor waits in the ledger, where its words would outlive the conversation
+        if (!c.private) pending = notePending(pending, c.type, label, content, opts.now, opts.provenance.conversationId);
         report.refused.push({ label, reason: 'generalisation-needs-second-sighting' });
         heldBack.add(normalize(label));
       }
@@ -550,6 +557,38 @@ export function forgetEdge(graph: MindGraph, id: string): MindGraph {
  * what Socria believed and why it was wrong, and erasing it loses that. The
  * person can still delete it outright if they want it gone.
  */
+/** The person has written, edited, confirmed or disputed this memory themselves. */
+export function touchedByThem(n: Pick<MindNode, 'provenance'>): boolean {
+  return n.provenance.some((p) => p.surface === 'user');
+}
+
+/**
+ * "Yes — that's right." A memory the person confirms is theirs: held as
+ * current (a tentative or disputed one is no longer either), marked confirmed
+ * in its record — and, from then on, never reworded by an extraction
+ * (touchedByThem). Recorded as a ground like any other, so its history says
+ * who settled it, and when.
+ */
+export function confirmNode(graph: MindGraph, id: string, at: number): MindGraph {
+  return {
+    ...graph,
+    nodes: graph.nodes.map((n) =>
+      n.id === id
+        ? {
+            ...n,
+            status: n.status === 'tentative' || n.status === 'uncertain' || n.status === 'contradicted' ? ('active' as const) : n.status,
+            confidence: Math.max(n.confidence, 0.9),
+            provenance: boundProvenance([
+              ...n.provenance,
+              { kind: 'stated' as const, surface: 'user' as const, at, note: 'confirmed by you', review: 'confirmed' as const },
+            ]),
+            updatedAt: at,
+          }
+        : n
+    ),
+  };
+}
+
 export function challengeNode(
   graph: MindGraph, id: string, at: number, note: string
 ): MindGraph {

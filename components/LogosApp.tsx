@@ -4146,6 +4146,11 @@ export function LogosApp({
       const userTurns = landed.filter((m) => m.role === 'user').length;
       if (
         isSignedIn &&
+        // ONE MEMORY OF A PERSON. With the Mind Graph on (Logos 5 sends `mind`
+        // for an account), this turn is remembered there (app/api/logos/chat
+        // remember()); writing the older profile as well would keep the same
+        // things twice, in two stores that drift apart.
+        !(workspaceOn && cloud) &&
         userTurns >= JOURNEY_EVERY_TURNS &&
         userTurns % JOURNEY_EVERY_TURNS === 0 &&
         mapRef.current.context !== 'reflecting' &&

@@ -104,8 +104,8 @@ rewritten.
 
 Recorded here because some are outside this work and should not be lost:
 
-- `lib/mind/ingest-text.ts` sets `sourceNodeId` to the `src_` row id, so the
-  Inspector's file list is always empty. To be fixed with the memory stage (§6).
+- `lib/mind/ingest-text.ts` set `sourceNodeId` to the `src_` row id, so the
+  Inspector's file list was always empty. Fixed (§6).
 - Every storage write calls `sanitizeMap` without `trust:'stored'`, which
   strips `viz.built` on save (`app/api/conversations/route.ts`). Not changed
   here — it needs its own test of what a stored scene must keep.
@@ -113,8 +113,8 @@ Recorded here because some are outside this work and should not be lost:
   exist, four ablations where the code allows six, prompt "v6" where the code
   is v9. `docs/LOGOS-4.md` and `docs/ACCURACY.md` describe a filter-only
   stream gate that is now the full gate.
-- `conversations.incognito` is documented as "never remembered" and no remember
-  path reads it.
+- `conversations.incognito` was documented as "never remembered" and no
+  remember path read it. `remember()` now does (§6); nothing sets it yet.
 
 ## 4. The runtime (`lib/runtime/`)
 
@@ -347,15 +347,57 @@ conversation is the Chat view and the composer floats over the others.
 
 ## 6. Memory
 
-The Mind Graph is the one person-memory store for Logos 5. The integrity
-fixes the audit called for are the next stage of this work and are **not in
-this commit**: a `stated` claim about the person grounded in their own words or
-stored as Socria's reading; a file never asserting something about the person;
-recalled memory carrying its provenance into the prompt; the atlas saying
-"Confirmed" only for what the person confirmed; node-level confirmation; hand
-edits keeping the value they replaced; off-the-record turns reaching no memory
-store; Logos 5 no longer writing a second store. This section is rewritten
-when they land.
+The Mind Graph is the one person-memory store for Logos 5, and "inferences
+never silently become facts" is now enforced in code, not only in the
+extractor's instructions. Held by `test/mind-ground.test.mjs`, with
+`test/logos5-memory.test.mjs` and `test/projects-e2e.test.mjs` updated.
+
+- **Stated means said** (`lib/mind/ground.ts`, applied in `remember()` before
+  any register decides). A claim the extractor labels stated, established or
+  tentative must be carried by the person's own words in the turn — their
+  half, never Socria's reply, never the text of a file they attached — by most
+  of its name or two words of its content, with the same polarity ("I'm not
+  vegetarian" does not ground "Vegetarian"; negation is read word by word). One
+  their words do not carry is stored as Socria's reading (`inferred`): a claim
+  about the person then waits for a second conversation, as every inference
+  does. The name read deterministically from their sentence is exempt. This
+  applies to Core 4's turns too — it is the same pipeline.
+- **A file is not the person.** Knowledge in a file (a concept or insight that
+  is not about them) is `researched`; a claim about them from a file is kept
+  `tentative` and may never reword their own words; things that happened stay
+  as the file says them. A person a search or a sum turned up is tentative.
+- **Recall says where each memory came from**: `[said]`, `[confirmed]`,
+  `[file]`, `[source]`, `[reading]` on every line (`whereFrom`,
+  `lib/mind/types.ts`), and the block tells the reply never to present a
+  reading as something they said. The standing profile that travels on every
+  turn now carries only what they said or confirmed, marked so, and no longer
+  calls itself "true".
+- **They can confirm.** "That's right" on a memory (PATCH `confirm`,
+  `confirmNode`) holds it as theirs. Once they have written, edited, confirmed
+  or disputed a memory, extraction reinforces it but never rewords it
+  (`touchedByThem`). A hand edit records the words it replaced (`prior`) and
+  its history shows them; provenance is bounded the way every record is.
+- **The Memory page tells the truth**: "Confirmed" only for what they
+  confirmed; "In your words", "From your file", "From a source", "Socria's
+  reading" otherwise; "You said it" only when they did; a change they turned
+  down is not called confirmed; the solid mark is "Current".
+- **Private and off the record.** A sighting in a private conversation never
+  waits in the pending ledger (it could otherwise corroborate a claim
+  elsewhere). An incognito conversation is never remembered — checked inside
+  `remember()`, where every surface's write passes. The older understanding
+  profile learns nothing from a conversation taken off the record or read as
+  sensitive.
+- **One store.** With the Mind Graph on, Logos 5 no longer also writes the
+  older understanding profile; it is still read as a fallback when the graph
+  has nothing to say, as before.
+- **Fixed on the way**: file ingestion recorded the stored file's row id where
+  the Source node's id belongs, so the Memory inspector's list of files was
+  always empty.
+
+Not done: proposed rewordings are still applied and then reviewed (rejecting
+one restores the earlier words, and both prompt and page say it is
+unconfirmed) rather than held aside until confirmed; nothing in the product
+sets a conversation incognito yet.
 
 ## 7. Measurement
 
@@ -397,8 +439,8 @@ Kept current as the work lands; see §10 for the final state.
   of those happens — this matters to anything that reads the stored map,
   including the 5-node rewards challenge. One small title call is added per new
   conversation, for accounts only.
-- **Not finished yet.** The memory-integrity stage (§6); the evaluation
-  harness and measurements (§7).
+- **Not finished yet.** The evaluation harness and measurements (§7).
+  Proposed rewordings are applied-then-reviewed rather than held aside (§6).
 
 ## 10. Results
 

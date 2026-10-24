@@ -423,6 +423,11 @@ export function evolutionOf(graph: MindGraph, nodeId: string): EvolutionStep[] {
     steps.push({ at: first?.at ?? n.createdAt, kind: 'origin', label: n.label, text: n.content, review: undefined });
     for (const p of n.provenance) {
       if (p.note?.startsWith('was: ')) steps.push({ at: p.at, kind: 'reworded', label: n.label, text: `was: ${p.note.slice(5)}`, review: reviewOf(p) });
+      // their own edit, with the words it replaced (recorded since edits kept them)
+      else if (p.surface === 'user' && p.note === 'edited by hand') {
+        const was = p.prior ? [p.prior.label && p.prior.label !== n.label ? p.prior.label : null, p.prior.content].filter(Boolean).join(': ') : '';
+        steps.push({ at: p.at, kind: 'reworded', label: n.label, text: was ? `edited by you — was: ${was}` : 'edited by you', review: 'confirmed' });
+      } else if (p.surface === 'user' && p.note === 'confirmed by you') steps.push({ at: p.at, kind: 'corrected', label: n.label, text: 'Confirmed by you', review: 'confirmed' });
       else if (p.surface === 'user' && p.note && !p.note.startsWith('kept the earlier')) steps.push({ at: p.at, kind: 'corrected', label: n.label, text: p.note });
     }
   }

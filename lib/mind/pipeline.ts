@@ -20,11 +20,12 @@ import { recordChangeImpact } from './waiting';
 import { applyCandidates, type ApplyReport, type EdgeCandidate, type NodeCandidate } from './apply';
 import { extract } from './extract';
 import { FILE_BUDGET, TURN_BUDGET, type Budget } from './gate';
+import { fromFile, groundCandidates } from './ground';
 import { renderMindGraph } from './serialize';
 import {
   associate, projectGoals, renderProjectContext, type ProjectContainer,
 } from './projects';
-import {
+import { isIncognito,
   getProject, listProjects, listSources, loadGraph, persistGraph, touchNodes,
 } from './store';
 import { MAX_EDGES, MAX_NODES, type MindGraph, type ProvenanceSurface } from './types';
@@ -266,6 +267,11 @@ export async function remember(
   }
 ): Promise<RememberResult> {
   try {
+    // INCOGNITO MEANS NEVER REMEMBERED — read here, where every surface's
+    // write passes, rather than left to each caller to remember to ask.
+    if (opts.conversationId && (await isIncognito(userId, opts.conversationId))) {
+      return { report: null, persisted: false };
+    }
     const [before, project] = await Promise.all([
       loadGraph(userId),
       // Scoped to the owner inside getProject, so a foreign id is null here.
@@ -278,8 +284,18 @@ export async function remember(
       return { report: null, persisted: false };
     }
 
-    const candidates =
+    const extracted =
       opts.candidates ?? (await extract(opts.apiKey, text, opts.existing ?? null));
+    // A FILE IS NOT THE PERSON SPEAKING, and a model's "stated" is not a record
+    // of what they said: a claim is held to their own words in this turn, or
+    // to the file it came from, before any register decides it (lib/mind/ground.ts).
+    const candidates =
+      opts.surface === 'file'
+        ? fromFile(extracted.nodes, extracted.edges)
+        : (() => {
+            const g = groundCandidates(extracted.nodes, extracted.edges, text);
+            return { nodes: g.nodes, edges: g.edges };
+          })();
 
     // ── WHAT THEY SAID ABOUT THEMSELVES, WITHOUT ASKING A MODEL ──────
     //

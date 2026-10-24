@@ -27,7 +27,7 @@
 // self digest surfaces only what the graph already holds. Nothing here mints a
 // belief about anybody.
 
-import { normalize, privateElsewhere, STATUS_WEIGHT, type MindGraph, type MindNode } from './types';
+import { whereFrom, normalize, privateElsewhere, STATUS_WEIGHT, type MindGraph, type MindNode } from './types';
 
 /**
  * The alias every node ABOUT THE PERSON carries.
@@ -263,7 +263,10 @@ export function standingProfile(
     // 0.4, not 0.45: apply.ts defaults a candidate's importance to exactly
     // 0.4 when the extractor does not rate it, and a floor one hundredth above
     // the default meant every unrated fact was saved and never seen again.
-    .filter((n) => isSelf(n) || (STANDING.has(String(n.type)) && n.importance >= 0.4))
+    // and only what they said or confirmed: a reading travels on every turn as though it were
+    // known, which is how an inference becomes a fact with nobody looking (it is still recalled,
+    // marked, when what they say touches it)
+    .filter((n) => isSelf(n) || (STANDING.has(String(n.type)) && n.importance >= 0.4 && (whereFrom(n) === 'said' || whereFrom(n) === 'confirmed')))
     .sort((a, b) => score(b) - score(a))
     .slice(0, limit);
 }
@@ -279,11 +282,11 @@ export function renderProfile(nodes: readonly MindNode[]): string {
   if (!nodes.length) return '';
   const lines = nodes.map((n) => {
     const status = n.status === 'active' ? '' : ` [${n.status}]`;
-    return `- ${n.type}: ${n.label}${status} — ${n.content}`;
+    return `- ${n.type}: ${n.label}${status} [${whereFrom(n)}] — ${n.content}`;
   });
   return (
     '\n=== Who you are talking to ===\n' +
-    'Standing context, carried into every conversation because it is true between them. ' +
+    'Standing context, carried into every conversation: what they have said about themselves, or confirmed — each line marked [said] or [confirmed]. ' +
     'Use it the way you would use knowing somebody: it changes how you answer, and you do not announce it. ' +
     'Do not open by telling them what you know about them, do not list it back, and do not thank them for it. ' +
     'If something here is wrong, what they say now wins — they can correct any of it on the memory page.\n' +

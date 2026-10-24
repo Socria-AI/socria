@@ -14,4 +14,6 @@ export { WhatsNew, keptLine } from '@/components/onboarding/WhatsNew';
 export { emptyArrangement } from '@/lib/logos5/arrange';
 // Memory: what Socria remembers, as an atlas of a mind
 export { MemoryView } from '@/components/logos5/MemoryView';
+export { Inspector as MemoryInspector } from '@/components/logos5/MemoryParts';
+export { memoriesOf } from '@/lib/logos5/memoryAtlas';
 export { checkPractice } from '@/lib/logos5/study';

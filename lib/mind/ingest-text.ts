@@ -26,6 +26,7 @@ import { applyCandidates, type EdgeCandidate, type NodeCandidate } from './apply
 import { loadGraph, persistGraph, saveSource } from './store';
 import { associate, type ProjectContainer } from './projects';
 import { clip, normalize, type MindGraph, type MindNode } from './types';
+import { fromFile } from './ground';
 
 /** Big enough to hold an argument, small enough to keep offsets meaningful. */
 export const CHUNK_CHARS = 1500;
@@ -200,11 +201,17 @@ export async function ingestTextFile(
     edges.push(...found.edges);
   }
 
-  const { graph: after, report } = applyCandidates(withSource, nodes, edges, {
+  // A file is not the person speaking: what it says about them is kept tentative,
+  // knowledge in it is what it is — found in a source (lib/mind/ground.ts).
+  const read = fromFile(nodes, edges);
+  // `sourceNodeId` names the Source NODE the claim came from — the one the
+  // Memory inspector lists — not the stored file's row (which it once was, so
+  // the inspector's list of files was always empty).
+  const { graph: after, report } = applyCandidates(withSource, read.nodes, read.edges, {
     now: opts.now,
     nextId,
     budget: FILE_BUDGET,
-    provenance: { surface: 'file', sourceNodeId: sourceId },
+    provenance: { surface: 'file', sourceNodeId: sourceNode.id },
   });
 
   let graph = after;
@@ -219,7 +226,7 @@ export async function ingestTextFile(
       {
         now: opts.now,
         nextId,
-        provenance: { surface: 'file', sourceNodeId: sourceId },
+        provenance: { surface: 'file', sourceNodeId: sourceNode.id },
       }
     );
     graph = tied.graph;

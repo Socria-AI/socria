@@ -1,6 +1,6 @@
 // app/api/mind/node/route.ts
 // POST   → add an object by hand
-// PATCH  → edit, re-type, re-status, archive or challenge one node
+// PATCH  → edit, re-type, re-status, archive, confirm or challenge one node
 // DELETE → forget a node, or an edge, for good
 //
 // This is where the Memory page stops being a visualization. A graph you can
@@ -24,10 +24,10 @@ import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
-import { challengeNode, forgetEdge, forgetNode } from '@/lib/mind/apply';
+import { challengeNode, confirmNode, forgetEdge, forgetNode } from '@/lib/mind/apply';
 import { recordImpact } from '@/lib/mind/waiting';
 import { createNode } from '@/lib/workspace/write';
-import { NODE_STATUSES, MAX_CONTENT, MAX_LABEL, clip, fingerprintNode, type NodeStatus } from '@/lib/mind/types';
+import { NODE_STATUSES, MAX_CONTENT, MAX_LABEL, boundProvenance, clip, fingerprintNode, type NodeStatus } from '@/lib/mind/types';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -103,6 +103,9 @@ export async function PATCH(req: NextRequest) {
   // can still delete it outright if they want it gone.
   if (typeof body?.challenge === 'string' && body.challenge.trim()) {
     after = challengeNode(before, id, now, body.challenge);
+  } else if (body?.confirm === true) {
+    // "Yes — that's right": held as theirs, and never reworded by an extraction again
+    after = confirmNode(before, id, now);
   } else {
     const label = typeof body?.label === 'string' ? clip(body.label, MAX_LABEL) : null;
     const content = typeof body?.content === 'string' ? clip(body.content, MAX_CONTENT) : null;
@@ -125,11 +128,19 @@ export async function PATCH(req: NextRequest) {
               status: status ?? n.status,
               // Their correction is a first-class ground, recorded like any
               // other — so the node's history says a person changed it, and
-              // when, rather than simply showing different words than before.
-              provenance: [
+              // when, and what it said before (`prior`), rather than simply
+              // showing different words than before. Bounded the way every
+              // record is, so the first ground is never the one dropped.
+              provenance: boundProvenance([
                 ...n.provenance,
-                { kind: 'stated' as const, surface: 'user' as const, at: now, note: 'edited by hand' },
-              ].slice(-20),
+                {
+                  kind: 'stated' as const,
+                  surface: 'user' as const,
+                  at: now,
+                  note: 'edited by hand',
+                  ...((label && label !== n.label) || (content !== null && content !== n.content) ? { prior: { label: n.label, content: n.content } } : {}),
+                },
+              ]),
               updatedAt: now,
             }
       ),

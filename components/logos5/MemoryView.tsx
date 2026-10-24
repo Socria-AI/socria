@@ -258,6 +258,13 @@ export function MemoryView({
     await after(r, chosen.id, 'Saved.');
     setBusy(false);
   }
+  async function confirm() {
+    if (!chosen) return;
+    setBusy(true);
+    const r = await call('/api/mind/node', { method: 'PATCH', body: JSON.stringify({ id: chosen.id, confirm: true }) });
+    await after(r, chosen.id, 'Confirmed — Socria holds it as yours, and won’t reword it.');
+    setBusy(false);
+  }
   async function challenge(why: string) {
     if (!chosen) return;
     setBusy(true);
@@ -483,6 +490,7 @@ export function MemoryView({
       onOpenPlace={onOpen}
       onSave={(l, c) => void save(l, c)}
       onChallenge={(w) => void challenge(w)}
+      onConfirm={() => void confirm()}
       onForget={() => void forget()}
       onDecide={(id, d) => void decide(id, d)}
       sheet={narrow}

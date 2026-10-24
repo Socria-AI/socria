@@ -212,6 +212,8 @@ const MODULES = [
   'lib/mind/atlas.ts',
   'lib/mind/constellation.ts',
   'lib/mind/logos-turn.ts',
+  // a stated claim held to the person's own words; a file never the person (lib/mind/ground.ts)
+  'lib/mind/ground.ts',
   'lib/project-home.ts',
   'lib/project-visual.ts',
   'lib/share/roles.ts',

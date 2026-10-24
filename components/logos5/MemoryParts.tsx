@@ -21,6 +21,7 @@ import {
   type Memory,
   type RegionId,
 } from '@/lib/logos5/memoryAtlas';
+import { whereFrom } from '@/lib/mind/types';
 
 export type Decision = 'confirm' | 'reject' | 'forget' | 'supersede';
 
@@ -155,7 +156,7 @@ export function markOf(m: Memory): MarkKind {
 }
 
 const LEGEND: [MarkKind, string][] = [
-  ['confirmed', 'Confirmed'],
+  ['confirmed', 'Current'],
   ['proposed', 'Proposed'],
   ['recent', 'Updated this week'],
   ['warn', 'Possible contradiction'],
@@ -259,6 +260,7 @@ export const reachOf = (c: ChangeIn) => c.affected.filter((a) => a.id !== c.from
 export function reviewWords(c: ChangeIn, now: number): string {
   if (c.review === 'proposed') return c.kind === 'possible-conflict' ? 'Waiting for you' : 'Proposed · waiting for you';
   if (c.legacy) return `Recorded ${dayOf(c.at, now)}`;
+  if (c.review === 'rejected') return 'Turned down by you';
   return c.surface === 'user' ? 'Your change' : 'Confirmed by you';
 }
 
@@ -368,6 +370,7 @@ export function Inspector({
   onOpenPlace,
   onSave,
   onChallenge,
+  onConfirm,
   onForget,
   onDecide,
   sheet,
@@ -386,6 +389,8 @@ export function Inspector({
   onOpenPlace: (p: PlaceIn) => void;
   onSave: (label: string, content: string) => void;
   onChallenge: (why: string) => void;
+  /** "Yes — that's right": held as theirs (PATCH confirm) — offered until they have */
+  onConfirm?: () => void;
   onForget: () => void;
   onDecide: (id: string, d: Decision) => void;
   sheet?: boolean;
@@ -415,7 +420,7 @@ export function Inspector({
   const markFor = (w: string): { kind: MarkKind; cls?: string } =>
     /contradiction|tension|isn’t right/.test(w)
       ? { kind: 'warn', cls: ' is-warn' }
-      : /Proposed|lightly/.test(w)
+      : /Proposed|lightly|reading/.test(w)
         ? { kind: 'proposed' }
         : /Updated/.test(w)
           ? { kind: 'recent' }
@@ -646,6 +651,11 @@ export function Inspector({
               <Icon name="pencil" size={14} />
               Edit
             </button>
+            {onConfirm && whereFrom(m) !== 'confirmed' && (
+              <button type="button" className="l5mm-btn is-primary" disabled={busy} onClick={onConfirm} title="Yes — this is right. Socria holds it as yours, and won’t reword it.">
+                That’s right
+              </button>
+            )}
             <button type="button" className="l5mm-btn" onClick={() => setMode('challenge')}>
               This isn’t right
             </button>

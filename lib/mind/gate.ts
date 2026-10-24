@@ -259,7 +259,10 @@ export function gate(input: GateInput): GateVerdict {
     return { pass: false, reason: 'forgotten' };
   }
 
-  return { pass: true, status: rule.status ?? 'active', mayRewrite };
+  // A person found in a source or a sum is somebody the person may not know at
+  // all — a namesake, a mistaken match. Kept, but tentative until they say so.
+  const found = (input.kind === 'researched' || input.kind === 'calculated') && normalize(input.type) === 'person';
+  return { pass: true, status: found ? 'tentative' : rule.status ?? 'active', mayRewrite };
 }
 
 // ── how much may land in one turn ───────────────────────────────────
