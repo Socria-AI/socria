@@ -14,6 +14,7 @@
 // builds or is refused with what is missing named in the person's terms.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { contentAsText } from '@/lib/inline-ui';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
@@ -162,8 +163,9 @@ export async function POST(req: NextRequest) {
   // of half the conversation. The newest turn gets more room than the rest.
   const transcript = kept
     .map((m: any, i: number) => {
+      // an inline element Socria drew is read as words, not as its JSON (lib/inline-ui.ts)
       const rendered = renderMessageForModel(
-        { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
+        { role: m.role, content: m.role === 'assistant' ? contentAsText(m.content) : m.content, attachments: sanitizeAttachments(m.attachments) },
         i === kept.length - 1
       );
       const room = i === kept.length - 1 ? 6_000 : 700;

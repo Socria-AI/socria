@@ -90,14 +90,19 @@ import {
   conflicts,
   epistemicLog,
   historyStart,
+  lengthLine,
   logos5FocusSystem,
   logos5System,
   looksMathematical,
+  replyCeiling,
   memorable,
   modelFor,
   pathOf,
   personaOf,
+  planPresentation,
+  presentationRoom,
   readTurnState,
+  renderPresentation,
   renderAllocation,
   renderConflicts,
   rewriteCitations,
@@ -106,6 +111,7 @@ import {
   UNCHECKED_CURRENT,
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
+import { contentAsText, contentForCheck, contentForHistory, gateInlineBlock, type InlineContext } from '@/lib/inline-ui';
 import { renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
 
 export const runtime = 'nodejs';
@@ -259,8 +265,10 @@ export async function POST(req: NextRequest) {
     // being answered carries a long note in full.
     const clean = kept
       .map((m: any, i: number) => {
+        // An inline block Socria showed earlier is read back as a line saying
+        // what it was, not as its JSON (lib/inline-ui.ts contentForHistory).
         const rendered = renderMessageForModel(
-          { role: m.role, content: m.content, attachments: sanitizeAttachments(m.attachments) },
+          { role: m.role, content: m.role === 'assistant' ? contentForHistory(m.content) : m.content, attachments: sanitizeAttachments(m.attachments) },
           i === kept.length - 1,
           sentLetters
         );
@@ -650,6 +658,26 @@ export async function POST(req: NextRequest) {
     // it was, so it goes without.
     const assist = allocation ? allocation.assist : chooseAssist({ ...assistInput, signals, ...(runtime ? { exchange: turnState.exchange.kind } : {}) });
 
+    // ADAPTIVE RESPONSE RENDERING (lib/runtime/presentation.ts): which inline
+    // elements the reply may use this turn — decided in code, offered with
+    // their grammar only when one fits, which is most turns not at all.
+    // LOGOS_INLINE=off: no element is offered, and any the reply writes anyway is dropped (below)
+    const inlineOn = process.env.LOGOS_INLINE !== 'off';
+    const presentation =
+      persona === 'v5' && inlineOn
+        ? planPresentation({
+            text: String(last.content ?? ''),
+            state: turnState,
+            signals,
+            questions: assist.questions,
+            ownWriting: allocation?.split.creativity === 'human',
+            ownJudgment: allocation?.split.judgment === 'human',
+            ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
+            guard: assistInput.guard,
+            history: assistInput.history,
+          })
+        : { forms: [], reasons: [] };
+
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the
     // engine's results, and the web when Core 4's gate opens — never on a
@@ -708,6 +736,8 @@ export async function POST(req: NextRequest) {
       // Clamped by the plan like the map and explore routes, so the menu and
       // the answer agree (every plan opens all four today).
       guidanceBlock(depthForPlan(resolveDepth(body?.depth), plan), resolveGuard(body?.guard), 'chat') +
+      // Logos 5's one setting, how much it says (Balanced adds nothing)
+      (persona === 'v5' ? lengthLine(body?.length) : '') +
       // The hierarchy, in reading order: protected principles and depth
       // (above), then the Conversation Style chosen for the account — the one
       // personality, the same as Core 4's — then their free-text instructions,
@@ -795,6 +825,8 @@ export async function POST(req: NextRequest) {
       // How to help on this turn: under the runtime, who does what and the
       // move (allocation.ts); under the classic persona, the move alone.
       (allocation ? renderAllocation(allocation, turnState) : renderAssist(assist)) +
+      // …and what shape it may take: the inline elements on offer, if any
+      renderPresentation(presentation) +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
       evidenceBlock +
       accuracy.block;
@@ -823,6 +855,9 @@ export async function POST(req: NextRequest) {
 
     const openai = tracked(new OpenAI({ apiKey }), 'logos/chat');
     const configured = modelFor('reply');
+    // The ceiling follows their length setting (Logos 5), and rises for an
+    // answer about a document, which quotes, cites and calculates.
+    const maxReply = (persona === 'v5' ? replyCeiling(body?.length) : 640) + (docRefs.length ? 310 : 0) + presentationRoom(presentation);
 
     const make = (model: string) =>
       openai.chat.completions.create({
@@ -835,7 +870,7 @@ export async function POST(req: NextRequest) {
         // since promising three paragraphs and truncating at two is worse
         // than never offering them.
         // An answer about a document quotes, cites and calculates: it gets more room.
-        max_tokens: docRefs.length ? 950 : 640,
+        max_tokens: maxReply,
         stream: true,
       });
 
@@ -903,6 +938,23 @@ export async function POST(req: NextRequest) {
       : undefined;
     const searched = !!research;
 
+    // INLINE ELEMENTS, CHECKED AS THEY STREAM (lib/inline-ui.ts). A ```ui block
+    // is drawn only in its canonical form, and only if it holds up: a chart's
+    // numbers are theirs or this turn's sources', choices only where a
+    // question may go, nothing that works a guarded problem, no draft of
+    // writing that is theirs, at most two in a reply.
+    const inlineCtx: InlineContext = {
+      theirs: userTexts.join('\n'),
+      sources: (evidence?.sources ?? []).map((x) => x.text).join('\n'),
+      questions: assist.questions,
+      guard: resolveGuard(body?.guard) === 'guard',
+      ownWriting: allocation?.split.creativity === 'human',
+      ownJudgment: allocation?.split.judgment === 'human',
+      ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
+      shown: { n: 0 },
+    };
+    const inlineBlock = (chunk: string, open: boolean) => (inlineOn ? gateInlineBlock(chunk, inlineCtx, open) : gateInlineBlock(chunk, { ...inlineCtx, shown: { n: Infinity } }, open));
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -915,7 +967,7 @@ export async function POST(req: NextRequest) {
             // and — if the regeneration is still wrong — sent with the
             // correction stated after it rather than with the error alone.
             for await (const chunk of completion) reply += chunk.choices?.[0]?.delta?.content ?? '';
-            const first = checkDraft(reply, accuracy.context);
+            const first = checkDraft(contentForCheck(reply), accuracy.context);
             if (first.retryNote) {
               let again = '';
               try {
@@ -924,13 +976,13 @@ export async function POST(req: NextRequest) {
                   model: served,
                   messages: turnMessages(note),
                   temperature: 0.7,
-                  max_tokens: docRefs.length ? 950 : 640,
+                  max_tokens: maxReply,
                 });
                 again = r.choices?.[0]?.message?.content?.trim() ?? '';
               } catch (e) {
                 console.error('[logos/chat] accuracy retry failed', e);
               }
-              const second = again ? checkDraft(again, accuracy.context) : null;
+              const second = again ? checkDraft(contentForCheck(again), accuracy.context) : null;
               if (second && !second.retryNote) {
                 reply = again;
               } else {
@@ -950,7 +1002,7 @@ export async function POST(req: NextRequest) {
             // cannot drift. The opener yields only when the engine confirms
             // they caught a real mistake of Socria's.
             if (reply) {
-              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt, rewrite, neverEmpty: true });
+              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt, rewrite, neverEmpty: true, block: inlineBlock });
               held.push(reply);
               held.finish(assist.questions);
               if (held.out.trim()) reply = held.out;
@@ -968,7 +1020,7 @@ export async function POST(req: NextRequest) {
               sent = true;
               reply += text;
               controller.enqueue(encoder.encode(text));
-            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }), rewrite, neverEmpty: true });
+            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }), rewrite, neverEmpty: true, block: inlineBlock });
             for await (const chunk of completion) {
               const delta = chunk.choices?.[0]?.delta?.content ?? '';
               if (delta) gate.push(delta);
@@ -976,7 +1028,7 @@ export async function POST(req: NextRequest) {
             gate.finish(assist.questions);
             // Streamed because nothing looked risky; if the finished reply
             // states something the engine refutes, say so now, plainly.
-            const late = checkDraft(reply, accuracy.context);
+            const late = checkDraft(contentForCheck(reply), accuracy.context);
             const note = late.refuted.length ? correctionFor(late, accuracy.context.withhold) : '';
             if (note) {
               reply += `\n\n${note}`;
@@ -996,7 +1048,7 @@ export async function POST(req: NextRequest) {
           if (evidence && need && reply.trim()) {
             const factual = need.kinds.some((k) => k !== 'computation');
             console.info(
-              epistemicLog('logos/chat', checkReply(reply, evidence, { factual }), removedCites.length, {
+              epistemicLog('logos/chat', checkReply(contentAsText(reply), evidence, { factual }), removedCites.length, {
                 path: pathOf({ intent: turnRoute.intent, checked: accuracy.check || searched || docRefs.length > 0 }),
                 intent: turnRoute.intent,
                 searched: searched ? 1 : 0,
@@ -1006,7 +1058,7 @@ export async function POST(req: NextRequest) {
           // An "ok" or a "thanks" has nothing in it to remember: no extraction call.
           if (mindOn && mindPolicy !== 'none' && reply.trim() && (!runtime || memorable(String(last?.content ?? '')))) {
             const write = () =>
-              remember(userId!, logosMemoryText(String(last?.content ?? ''), reply), {
+              remember(userId!, logosMemoryText(String(last?.content ?? ''), contentAsText(reply)), {
                 now: Date.now(),
                 apiKey: apiKey!,
                 surface: 'logos',
@@ -1047,6 +1099,7 @@ export async function POST(req: NextRequest) {
                 `domain=${turnState.domain}`,
                 `work=${turnState.work}`,
                 `exchange=${turnState.exchange.kind}`,
+                `inline=${presentation.forms.join(',') || 'none'}`,
                 ...(allocation ? [`split=${Object.entries(allocation.split).map(([k, v]) => `${k}:${v}`).join(',')}`] : []),
               ].join(';'),
             }

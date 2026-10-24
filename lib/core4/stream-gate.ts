@@ -62,7 +62,13 @@ export class SentenceGate {
    * closing offer sends the offers instead (Logos). Questions over the budget
    * are still dropped.
    */
-  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string; neverEmpty?: boolean } = {}) {}
+  /**
+   * block: a finished fenced block, before anyone sees it — Logos 5's inline
+   * vocabulary (lib/inline-ui.ts gateInlineBlock) checks a ```ui block here and
+   * sends its canonical form, a notice, or nothing; anything else it returns
+   * unchanged. `open` is a block the stream ended inside of.
+   */
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string; neverEmpty?: boolean; block?: (chunk: string, open: boolean) => string } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -73,7 +79,7 @@ export class SentenceGate {
         const chunk = this.buf.slice(0, end + 3);
         this.buf = this.buf.slice(end + 3);
         this.inCode = false;
-        this.send(chunk);
+        this.sendBlock(chunk);
         continue;
       }
       const fence = this.buf.indexOf('```');
@@ -88,7 +94,7 @@ export class SentenceGate {
         const chunk = this.buf.slice(0, end + 3);
         this.buf = this.buf.slice(end + 3);
         this.inCode = false;
-        this.send(chunk);
+        this.sendBlock(chunk);
         continue;
       }
       if (!m) return;
@@ -146,6 +152,16 @@ export class SentenceGate {
     this.emit(s);
   }
 
+  /** A finished fenced block: through the block hook, if there is one, and always on a line of its own. */
+  private sendBlock(chunk: string, open = false) {
+    this.flushHeldInline();
+    const out = this.opts.block ? this.opts.block(chunk, open) : chunk;
+    if (!out) return;
+    // a fence the reader can find starts a line; one glued to a sentence is read as text
+    const lead = out.startsWith('```') && this.out && !this.out.endsWith('\n') ? '\n\n' : '';
+    this.send(lead + out);
+  }
+
   /**
    * End of stream: the trailing held sentences ship only within the budget,
    * and never a question that re-asks something already considered (the
@@ -153,8 +169,12 @@ export class SentenceGate {
    * Returns what was dropped.
    */
   finish(maxQuestions: 0 | 1, considered: readonly string[] = []): string[] {
-    if (this.buf.trim()) this.consider(this.buf);
+    // a stream that ended inside a fenced block: the hook decides (a cut-off
+    // inline spec is dropped; other code goes out as it was)
+    if (this.inCode && this.opts.block && this.buf.trim()) this.sendBlock(this.buf, true);
+    else if (this.buf.trim()) this.consider(this.buf);
     this.buf = '';
+    this.inCode = false;
     const held = this.held;
     this.held = [];
     const dropped: string[] = [];

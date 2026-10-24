@@ -679,3 +679,157 @@ The fixes in shared code apply in every mode: the "how are you" and "I got"
 misreads and the question line in the Logos 4 engine, the decision reader, and
 — on Core 4 as well — the gate's help-desk offers and the web gate's refusal of
 small talk. No stored data changed.
+
+## 12. Adaptive response rendering, push to talk, one setting
+
+Asked for: "add voice to text for socria you can hold down then talk, push to
+talk. also remove the model selection for socria entirely lol, only
+conciseness" — and then adaptive response rendering: a reply that stays plain
+conversation and becomes interactive only where that helps (a small chart, a
+slider, a comparison, reasoning folded away, choices to tap, text to edit),
+drawn from validated descriptions inside the conversation, larger work in the
+existing Artifacts view, no new mode or tab, nothing fabricated, low tokens.
+
+**What was there.** A reply was prose (`lib/rich-text.ts`, `components/RichText.tsx`).
+Anything visual was a display (`lib/objects/display-*`) the map pass or a
+display request built in Artifacts — never inside the conversation. The
+runtime decided which view a turn needed (rules A–D, §4.1) but nothing decided
+the shape of a reply. The composer's chip ("Logos 5 · Balanced") opened the
+model picker: Core registers, Logos surfaces, depths. The mic was a toggle.
+
+### What changed
+
+1. **Push to talk** (`lib/logos4/voice.ts` holdOutcome, `components/useVoiceInput.ts`,
+   `components/LogosComposer.tsx` HoldMic). Hold the mic — pointer captured, on
+   touch too, or Space/Enter held on it — and talk; let go and the words land in
+   the composer, never sent by themselves; slide away (64px) to cancel. A press
+   shorter than 350ms says how it works instead of recording nothing; a click
+   with no hold still starts and stops, for assistive technology.
+2. **One setting** (`components/logos5/ConcisePicker.tsx`). Concise · Balanced ·
+   Detailed, on Core 4's dial and in its storage, sent as `length`. The route
+   says it once in the stable prompt (nothing for Balanced) and sets the reply's
+   ceiling: 480, 700, 1,200 tokens (`lib/runtime/behavior.ts` lengthLine,
+   replyCeiling). Logos 5 answers at Balanced depth — the dial is length, never
+   how carefully — and the model picker is left only on the Logos 4 screen.
+   *Fixed on the way:* the composer's tools strip clipped the sheet of anything
+   opened from it (the model picker's too); the sheet now opens above the
+   composer box, inside the screen on a phone.
+3. **A vocabulary of six** (`lib/inline-ui.ts`). A reply may hold a fenced
+   ` ```ui ` block of JSON: a chart (bar, line, pie), a slider, a comparison,
+   reasoning, choices, a draft. Each is sanitised into one canonical shape or
+   dropped — labels cleaned, limits on points, series, rows, steps and length;
+   a pie is one non-negative whole; a slider's formula is compiled by the math
+   engine's parser over exactly its single-letter variables and must give a
+   number where it starts. Nothing in a spec is ever run as code.
+4. **The offer, decided in code** (`lib/runtime/presentation.ts`, called by the
+   route after allocation). Which elements a reply *may* use this turn: a chart
+   for their own named amounts; a slider for a quantity that moves with
+   something they can vary; a comparison for options set against each other; a
+   draft for practical writing they handed over; choices for an open request
+   for help, only where a question may go; folded reasoning for a check, or a
+   call Socria may weigh in on. Never on a greeting, a joke or something
+   personal, never on a turn another view answers, never reasoning that is
+   theirs to do or a conclusion on a decision that is theirs, two at most, and
+   not the same element a third reply running. Only the offered elements'
+   grammar is sent — a line each, after the history, outside the cached
+   prefix — and the ceiling grows by 350 tokens (700 for a draft) so a spec is
+   never cut off. Most turns are offered nothing.
+5. **Epistemic Control on the stream.** The sentence gate hands each finished
+   fence to `gateInlineBlock`: a chart's numbers must be ones they gave or this
+   turn's sources carried, or it is replaced by a line saying a chart was left
+   out; illustrative numbers are drawn only labelled as examples; a comparison's
+   figures that nothing checked are marked; choices need the question budget;
+   under the Answer Guard no reasoning and no calculator; no lean on a decision
+   that is theirs, no draft of writing that is theirs; at most two; a block that
+   is cut off or invalid is dropped; what passes goes out canonical, on a line
+   of its own. The math check reads each block as the words it stands for
+   (`contentForCheck`), so a reasoning step's arithmetic is checked like a
+   sentence.
+6. **Representation.** A block is words wherever a picture cannot go: in the
+   history the model reads back (`contentForHistory`: "[shown inline — chart:
+   …]", cheaper than the JSON and no stale chart re-emitted), the map pass's
+   transcript, memory, the reply's own checks, search, Copy, and the older
+   surfaces that do not draw elements. What the person does with one — a
+   slider's values, the choice tapped, a draft's edits, reasoning unfolded, the
+   artifact it opened as — is kept on the message (`ui`), cleaned by
+   `/api/conversations` and kept in the local store.
+7. **Drawn in the conversation** (`components/inline/InlineUI.tsx`, `inline.css`):
+   the reply's column, its hairline and radius, its type. Charts measure their
+   width so their words keep their size on a phone, hold zero on a bar's axis,
+   light a mark under the pointer or a tap with the others stepping back, and
+   carry a table for screen readers; a pie names every slice with its amount and
+   a share that adds to 100. Series colours are a validated set (lightness,
+   chroma, colour-blind separation, contrast) on Paper and White, and on the
+   Dark, One and Celestial grounds; one series is the theme's own colour; on
+   Celestial an element sits on the surface, not the stars.
+8. **Deterministic interactions, no model call.** A slider computes in the
+   browser and is kept when the hand stops; a tapped choice is simply their next
+   message (what they had typed stays); a draft is edited, undone and copied in
+   place. A chart opens in Artifacts as a data display and a comparison as a
+   comparison — real objects, made once; pressed again, what was made opens. A
+   calculation stays the calculator in the reply: Artifacts has no view of a
+   lone function, and an object nobody can see is not offered.
+
+### Cost, measured
+
+The ten turns of §7, the recorder, four characters a token: the same 23 calls;
+the reply's input 40,108 → 40,212 tokens over the ten — one turn of ten was
+offered an element (+418 characters), nine are byte for byte as before; the
+cacheable prefix unchanged (81,408). Run over 43 everyday messages the planner
+offered nothing to 25 (greetings, thanks, a hard day, a joke, explanations,
+facts, map or plot requests); an offer is under 700 characters for one element
+and under 1,000 for two (both held by the suite).
+
+### Tested
+
+- `test/inline-ui.test.mjs` (125): every shape's validation, including code
+  in a formula; each epistemic check; the gate on a reply streamed one, three,
+  seven and fifty characters at a time; the words a block becomes; state
+  cleaning; a chart and a comparison accepted as real displays; the planner on
+  plain talk, other views, explanations and each element's cases; each
+  component drawn (accessible names, a table for screen readers, escaped words,
+  nothing drawn for an invalid block, a placeholder while one arrives).
+- `test/runtime-route.test.mjs` (+20, through the real route): a hello offered
+  nothing; their amounts offered a chart, after the history; the chart of their
+  numbers arriving whole; invented numbers refused with the notice; two at
+  most; cut-off and unknown blocks dropped; code untouched; no choices when
+  they asked for no questions; nothing under the guard; no draft of their own
+  essay; a practical email as a draft; history read back as a line; the length
+  line and ceilings; room for an element; `LOGOS_INLINE=off`.
+- `test/logos4-capture-voice.test.mjs` (push to talk), `test/logos3.test.mjs`
+  (Logos 5's depth). The full suite, the type check and `next build`.
+- In the browser, against the local stand-ins (`scripts/dev/fake-openai.mjs`
+  now answers an offered turn with the element it was offered), desktop and a
+  390px phone, Paper, Dark and Celestial: all six drawn and no JSON anywhere;
+  a hovered or tapped bar's value; Copy gives words; a slider moved, a draft
+  edited and reasoning unfolded all kept across a reload; a chart opened in
+  Artifacts as an editable chart keeping "Your numbers", once; a tapped choice
+  sent as the next message and then still, the choice marked; their amounts
+  through the real route drawn as a chart, a "thanks" with nothing, an email as
+  a draft; Concise carried on the request and kept across a reload, the only
+  picker left in Logos 5; hold to talk — "Listening… let go to add it · slide
+  away to cancel" — and the words in the composer; no sideways scroll on the
+  phone, tick labels at 11px.
+
+### Not shown, and limits
+
+- **How the live model uses it.** No key here. Whether a real model takes the
+  offers sparingly and writes valid specs is not measured; the gate means a
+  wrong one is dropped, never drawn — at the cost of an element the model meant
+  to show.
+- The planner reads English patterns, as the exchange reader does (§11).
+- A chart is drawn only from numbers the person gave or a source this turn: the
+  model's own estimates go in words, or in a chart labelled as examples.
+- In a shared line of thinking, what one person does with an element stays on
+  their screen until a reload (the share routes append turns; they do not carry
+  a message's state).
+- Choices can be tapped on the latest reply only, while nothing is being
+  answered.
+
+### Switches and rollback
+
+`LOGOS_INLINE=off` offers nothing and drops any block a reply writes anyway;
+stored conversations still draw theirs. The data is additive: a message's `ui`
+is optional, cleaned where it is saved, ignored by older code — no migration.
+The length uses the key Core 4 already had. Reverting the commit brings back
+the toggle mic and the model picker.

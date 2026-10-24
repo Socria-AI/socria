@@ -1069,10 +1069,30 @@
   min-width: 0;
   display: flex;
   align-items: center;
-  overflow: hidden;
+  /* not clipped: the length dial's sheet opens up out of this strip. A long
+     label shortens itself instead (below). */
+  overflow: visible;
 }
 .logos-root .l5-ctools-mid .mp-btn {
   max-width: 100%;
+  min-width: 0;
+}
+.logos-root .l5-ctools-mid .mp-btn .nm {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* the length dial's sheet opens above the composer, from its left edge — held
+   by the composer box, not the small button, so it is never wider than the
+   composer nor past the screen's edge on a phone */
+.logos-root .l5-concise.mp {
+  position: static;
+}
+.logos-root .l5-concise .mp-sheet {
+  left: 8px;
+  right: auto;
+  width: min(340px, calc(100% - 16px));
 }
 .logos-root .l5-ctools-end {
   display: inline-flex;

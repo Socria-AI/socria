@@ -20,6 +20,23 @@
 .logos-root .lg-mic:disabled { opacity: 0.35; cursor: default; }
 .logos-root .lg-mic.is-on { color: #fff; background: #a33a2c; }
 .logos-root .lg-mic.is-on svg { width: 14px; height: 14px; }
+/* Held, not clicked: the page must not scroll, select or open a long-press
+   menu under a finger that is talking. */
+.logos-root .lg-mic.is-hold {
+  touch-action: none;
+  user-select: none;
+  -webkit-user-select: none;
+  -webkit-touch-callout: none;
+  -webkit-tap-highlight-color: transparent;
+}
+.logos-root .lg-mic.is-hold.is-on { box-shadow: 0 0 0 4px rgba(192, 65, 47, 0.18); }
+.logos-root .lg-mic.is-hold.is-on svg { width: 16px; height: 16px; }
+.logos-root .lg-voice.is-away { background: rgba(192, 65, 47, 0.1); color: #8a3a2e; }
+.logos-root .lg-voice-how { flex: 0 1 auto; color: var(--lg-ink-40); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.logos-root .lg-voice-hint { font-style: normal; }
+@media (max-width: 420px) {
+  .logos-root .lg-voice-how { display: none; }
+}
 
 .logos-root .lg-voice {
   display: flex;

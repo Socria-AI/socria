@@ -1220,7 +1220,8 @@ opened on.
   (dropped on the box or anywhere on the map, or added with the clip) are read
   there and sorted when sent — the map says "Sorting your files into topics…",
   waiting for an answer still coming if there is one, then the board opens —
-  and the model picker rides in it. An opening chosen elsewhere goes into it;
+  and the length dial rides in it (the model picker, until Logos 5 stopped
+  offering a choice of models: LOGOS-5-RUNTIME.md §12). An opening chosen elsewhere goes into it;
   a Project's "new line of thinking" says it will start there.
 - Checked in the real app (signed out, through the dev stand-ins): it opened
   on the map; "What is accrual accounting?" from the box opened that

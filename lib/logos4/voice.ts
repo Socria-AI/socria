@@ -99,6 +99,33 @@ export function micError(e: unknown): string {
   return 'The microphone could not be started.';
 }
 
+// ── push to talk ─────────────────────────────────────────────────────
+//
+// The mic is held, not clicked: press and hold, talk, let go and the words
+// arrive. Three things a hand does that a click never did, each decided here
+// so the button stays simple and the rule can be tested:
+//   • a tap — too short to have said anything — records nothing and says
+//     "hold to talk" instead of transcribing half a second of silence;
+//   • a slide off the button before letting go throws the recording away;
+//   • the first hold of all raises the browser's permission prompt, and the
+//     hand comes off to answer it: that hold records nothing either, and the
+//     next one works.
+
+/** Shorter than this is a tap, not speech. */
+export const MIN_HOLD_MS = 350;
+/** Dragged this far from where it was pressed, letting go cancels. */
+export const SLIDE_CANCEL_PX = 64;
+
+export type HoldOutcome = 'stop' | 'cancel' | 'tap' | 'later' | 'none';
+
+/** What letting go of a held mic does, from where the recorder is and how the hand moved. */
+export function holdOutcome(i: { state: string; heldMs: number; away: boolean }): HoldOutcome {
+  if (i.state === 'asking') return 'later';
+  if (i.state !== 'recording') return 'none';
+  if (i.away) return 'cancel';
+  return i.heldMs < MIN_HOLD_MS ? 'tap' : 'stop';
+}
+
 /** m:ss for the recording timer. */
 export function clock(seconds: number): string {
   const s = Math.max(0, Math.floor(seconds));

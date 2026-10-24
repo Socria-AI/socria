@@ -36,6 +36,7 @@
 // Pure.
 
 import type { LogosSession } from '../logos-sessions';
+import { contentAsText } from '../inline-ui';
 
 export type EntityKind = 'conversation' | 'message' | 'document' | 'passage' | 'artifact' | 'node' | 'writing' | 'card';
 
@@ -112,7 +113,8 @@ export function indexWorkspace(sessions: readonly LogosSession[], docs: readonly
 
     s.messages.forEach((m, i) => {
       const id = `msg:${s.id}/${m.id ?? i}`;
-      const text = clip(m.content, 600);
+      // a reply's inline elements are found by what they say, not by their JSON
+      const text = clip(m.role === 'assistant' && m.content.includes('```') ? contentAsText(m.content) : m.content, 600);
       if (!text && !m.attachments?.length) return;
       put({ id, kind: 'message', title: clip(s.title, 80), text, session: s.id, view: 'chat', provenance: m.role === 'user' ? 'person' : 'socria', ...(m.at ? { at: m.at } : {}) });
       rel(conv, id, 'contains');

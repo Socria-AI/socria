@@ -17,6 +17,8 @@
 // because parsing is where the bugs are and JSX cannot be tested by the
 // plain-node harness in test/. Everything below returns plain data.
 
+import { parseInlineSpec, type InlineSpec } from './inline-ui';
+
 /** One run of inline text, and what it is. */
 export interface Inline {
   kind: 'text' | 'em' | 'strong' | 'strong-em' | 'code';
@@ -61,7 +63,14 @@ export type Block =
   // ── RICH ONLY (Logos 5: parseBlocks(text, { rich: true })) ──
   | { kind: 'h'; level: 1 | 2 | 3; text: string }
   | { kind: 'code'; lang: string | null; text: string; open: boolean }
-  | { kind: 'quote'; text: string };
+  | { kind: 'quote'; text: string }
+  /**
+   * An inline element (lib/inline-ui.ts): a ```ui block, its spec validated
+   * here as well as on the server — null when it is not one of the six — and
+   * `n`, its position among the reply's inline blocks, which keys its state.
+   * `open` while the reply is still writing it.
+   */
+  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number };
 
 /**
  * RICH READING — Logos 5's thread, and nowhere else unless asked.
@@ -319,6 +328,8 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
   const lines = text.replace(/\r/g, '').split('\n');
   const blocks: Block[] = [];
   const rich = !!opts.rich;
+  /** inline blocks met so far — the next one's position */
+  let uiSeen = 0;
   /** a line that starts a rich block — a paragraph stops before it */
   const richStart = (l: string) => rich && (FENCE_RE.test(l) || HEADING_RE.test(l) || QUOTE_RE.test(l));
   let i = 0;
@@ -337,6 +348,10 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
         while (i < lines.length && !FENCE_RE.test(lines[i])) body.push(lines[i++]);
         const open = i >= lines.length;
         if (!open) i++;
+        if ((fence[1] || '').toLowerCase() === 'ui') {
+          blocks.push({ kind: 'ui', spec: open ? null : parseInlineSpec(body.join('\n')), open, n: uiSeen++ });
+          continue;
+        }
         blocks.push({ kind: 'code', lang: fence[1] || null, text: body.join('\n'), open });
         continue;
       }

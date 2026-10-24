@@ -279,5 +279,71 @@ console.log('\n=== an "ok" is not remembered ===');
   ok('a turn with something in it is sent to the memory extractor; "thanks" is not', ok1 >= 1 && extracts(thanks) === 0, `${ok1} then ${extracts(thanks)}`);
 }
 
+console.log('\n=== adaptive response rendering: inline only when it helps ===');
+{
+  const fence = (o) => '```ui\n' + JSON.stringify(o) + '\n```';
+  const rt = (r) => r.headers.get('x-socria-runtime') ?? '';
+  const OFFER = /INLINE, IF IT HELPS/;
+  const hi = await turn({ messages: [U('hi there!')] }, { reply: 'Hi. What are you working on?' });
+  ok('a hello is offered nothing: no grammar in the prompt, inline=none in the trace', !OFFER.test(hi.system) && /;inline=none;/.test(rt(hi)), rt(hi));
+  const plain = await turn({ messages: [U('Why did the Roman Republic fall?')] });
+  ok('  nor is a question with nothing to draw', !OFFER.test(plain.system) || /inline=reasoning/.test(rt(plain)), rt(plain));
+  const costs = 'My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?';
+  const c = await turn({ messages: [U(costs)] }, {
+    reply: `Mostly rent: it is over two thirds of the total.\n\n${fence({ type: 'chart', kind: 'bar', title: 'Monthly costs', x: ['Rent', 'Food', 'Transport', 'Phone'], series: [{ values: [1200, 400, 150, 60] }], unit: '$', basis: 'given' })}\n\nFood is the one to look at next.`,
+  });
+  ok('their own named amounts: the chart grammar is offered, after the history, never in the cached part', OFFER.test(c.system) && /"type":"chart"/.test(c.system) && !OFFER.test(c.first) && /inline=[a-z,]*chart/.test(rt(c)), rt(c));
+  ok('  the chart of their numbers reaches them, whole and canonical, with the words around it', /```ui\n\{"type":"chart","kind":"bar","title":"Monthly costs","x":\["Rent","Food","Transport","Phone"\],"series":\[\{"values":\[1200,400,150,60\]\}\],"unit":"\$","basis":"given"\}\n```/.test(c.received) && /^Mostly rent/.test(c.received) && /Food is the one to look at next\.$/.test(c.received.trim()), JSON.stringify(c.received));
+  const bad = await turn({ messages: [U(costs)] }, {
+    reply: `Here it is.\n\n${fence({ type: 'chart', kind: 'pie', x: ['Rent', 'Food', 'Transport'], series: [{ values: [1300, 420, 150] }], basis: 'given' })}`,
+  });
+  ok('a chart of numbers they never gave is not drawn — it says so instead', !/```ui/.test(bad.received) && /A chart was left out/.test(bad.received), JSON.stringify(bad.received));
+  const three = await turn({ messages: [U(costs)] }, {
+    reply: [1, 2, 3].map((k) => fence({ type: 'chart', kind: 'bar', x: ['Rent', 'Food', 'Phone'], series: [{ values: [1200, 400, 60] }], basis: 'given', title: `Take ${k}` })).join('\n\n'),
+  });
+  ok('at most two elements in one reply', (three.received.match(/```ui/g) ?? []).length === 2, three.received);
+  const cut = await turn({ messages: [U(costs)] }, { reply: 'Rent is most of it.\n\n```ui\n{"type":"chart","kind":"bar","x":["Rent"' });
+  ok('a block the stream ended inside of is dropped; the words stay', cut.received.trim() === 'Rent is most of it.', JSON.stringify(cut.received));
+  const junk = await turn({ messages: [U(costs)] }, { reply: 'Rent is most of it.\n\n```ui\n{"type":"spreadsheet","cells":[1,2]}\n```\n\nThen food.' });
+  ok('a block that is not one of the six is nothing at all', !/```/.test(junk.received) && /Rent is most of it\./.test(junk.received) && /Then food\./.test(junk.received), JSON.stringify(junk.received));
+  const code = await turn({ messages: [U('show me a python loop over a list')] }, { reply: 'Like this:\n\n```python\nfor x in items:\n    print(x)\n```' });
+  ok('ordinary code passes untouched', code.received.includes('```python\nfor x in items:\n    print(x)\n```'), JSON.stringify(code.received));
+
+  const ask = await turn({ messages: [U('stop asking me questions. help me with my essay')] }, {
+    reply: `Start with the claim.\n\n${fence({ type: 'options', options: [{ label: 'Fix the introduction' }, { label: 'Tighten the argument' }] })}`,
+  });
+  ok('choices are a question: none when they asked for none', !/```ui/.test(ask.received) && /Start with the claim\./.test(ask.received), JSON.stringify(ask.received));
+  const g = await turn({ guard: 'guard', messages: [U('Solve 2x + 6 = 14 for x — what are the steps?')] }, {
+    reply: `Start by getting the x term alone.\n\n${fence({ type: 'reasoning', summary: 'x = 4', steps: ['2x = 8', 'x = 4'] })}`,
+  });
+  ok('under the Answer Guard, reasoning that works the problem is not shown', !/```ui/.test(g.received) && /getting the x term alone/.test(g.received), JSON.stringify(g.received));
+  const mine = await turn({ messages: [U('help me write my college admissions essay about my grandmother')] }, {
+    reply: `What do you remember most about her?\n\n${fence({ type: 'draft', kind: 'paragraph', text: 'My grandmother taught me patience.' })}`,
+  });
+  ok('their own writing is not drafted for them, even when a reply tries', !/```ui/.test(mine.received), `${rt(mine)} ${JSON.stringify(mine.received)}`);
+  const email = await turn({ messages: [U('write a short email to my landlord saying the heater is broken')] }, {
+    reply: `Here is one you can send.\n\n${fence({ type: 'draft', kind: 'email', title: 'To your landlord', text: 'Hi Sam,\n\nThe heater in my flat stopped working yesterday. Could you arrange a repair this week?\n\nThanks,\nAlex' })}`,
+  });
+  ok('a practical email is offered as a draft, and arrives editable', /inline=[a-z,]*draft/.test(rt(email)) && /```ui\n\{"type":"draft"/.test(email.received), `${rt(email)} ${JSON.stringify(email.received).slice(0, 200)}`);
+
+  const shown = 'Mostly rent.\n\n' + fence({ type: 'chart', kind: 'bar', x: ['Rent', 'Food', 'Transport'], series: [{ values: [1200, 400, 150] }], unit: '$', basis: 'given' });
+  const after = await turn({ messages: [U(costs), A(shown), U('ok, what should I cut first?')] });
+  const back = after.turns.find((m) => m.role === 'assistant')?.content ?? '';
+  ok('a chart already shown is read back as a line saying so, not as its JSON', back.startsWith('Mostly rent.') && /\[shown inline — chart: Rent 1,200; Food 400; Transport 150 \(\$\)\]/.test(back) && !back.includes('```'), back);
+
+  const len = (r) => r.calls.find((x) => x.stream)?.max_tokens;
+  const conc = await turn({ length: 'concise', messages: [U('We should launch in March.')] });
+  const bal = await turn({ messages: [U('We should launch in March.')] });
+  const det = await turn({ length: 'detailed', messages: [U('We should launch in March.')] });
+  ok('Concise: said once in the stable prompt, and a lower ceiling', /LENGTH — Concise/.test(conc.first) && len(conc) === 480, `${len(conc)}`);
+  ok('Balanced is the core\'s own default: no line, the usual ceiling', !/=== LENGTH/.test(bal.first) && len(bal) === 700, `${len(bal)}`);
+  ok('Detailed: room to cover it, said once', /LENGTH — Detailed/.test(det.first) && len(det) === 1200, `${len(det)}`);
+  ok('an element offered makes room for itself, so a spec is never cut off', len(c) === 700 + 350 && len(email) >= 700 + 700, `${len(c)} ${len(email)}`);
+  const off = await turn({ messages: [U(costs)] }, { env: { LOGOS_INLINE: 'off' }, reply: `Mostly rent.\n\n${fence({ type: 'chart', kind: 'bar', x: ['Rent', 'Food', 'Transport'], series: [{ values: [1200, 400, 150] }], basis: 'given' })}` });
+  ok('LOGOS_INLINE=off: nothing offered, and a block written anyway never reaches them', !OFFER.test(off.system) && /;inline=none;/.test(rt(off)) && !/```/.test(off.received) && off.received.trim() === 'Mostly rent.', JSON.stringify(off.received));
+  const c2 = await turn({ messages: [U(costs), A('Mostly rent.'), U('and how about my savings goal?')] });
+  ok('the stable prompt does not change with what a turn is offered', c.first === c2.first || c.first === hi.first, 'system message differs');
+}
+
 console.log(`\nruntime route: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

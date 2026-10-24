@@ -14,6 +14,7 @@ import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
+import type { InlineState } from './inline-ui';
 import type { AboutRef, ReplyRef } from './chat-thread';
 import type { WriteDoc } from './write/doc';
 import { normalizeDraft } from './write/parse';
@@ -39,6 +40,12 @@ export interface LogosMsg {
   by?: ByRef;
   /** Socria's synthesis of the map, when this message is one — lib/logos-synthesis.ts */
   synthesis?: Synthesis;
+  /**
+   * What was done with the inline elements in this reply — a slider moved, a
+   * choice tapped, a draft edited — by the element's position in it
+   * (lib/inline-ui.ts InlineState). The reply's words are never changed.
+   */
+  ui?: Record<string, InlineState>;
 }
 
 /**

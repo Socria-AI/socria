@@ -42,6 +42,48 @@ function chatReply(messages) {
 }
 
 /**
+ * A turn offered an inline element (app/api/logos/chat, lib/runtime/presentation.ts
+ * renderPresentation) is answered with one, so the browser can be driven through
+ * a chart, a slider, a comparison, choices, a draft and folded reasoning. The
+ * chart is drawn from the numbers in their message, as the real model is told to.
+ */
+function inlineReply(messages) {
+  const sys = messages.filter((m) => m?.role === 'system').map((m) => String(m.content ?? '')).join('\n');
+  if (!sys.includes('INLINE, IF IT HELPS')) return null;
+  const t = lastUser(messages);
+  const ui = (o) => '```ui\n' + JSON.stringify(o) + '\n```';
+  if (sys.includes('"type":"chart"')) {
+    const pairs = [...t.matchAll(/\b([A-Za-z][A-Za-z]{1,20}|[A-Za-z]\d{1,2})\s*[:=]?\s*\$?(\d[\d,]*(?:\.\d+)?)(k?)\b(?!\s*%)/g)]
+      .filter((m) => !/^(?:at|of|is|was|are|and|or|my|the|a|over|for|on|in)$/i.test(m[1]))
+      .slice(0, 8);
+    if (pairs.length >= 3) {
+      const x = pairs.map((m) => m[1][0].toUpperCase() + m[1].slice(1));
+      const values = pairs.map((m) => Number(m[2].replace(/,/g, '')));
+      const top = x[values.indexOf(Math.max(...values))];
+      return `${top} is the largest part of it.\n\n${ui({ type: 'chart', kind: 'bar', title: 'What you listed', x, series: [{ values }], basis: 'given' })}\n\nThe rest are close to each other.`;
+    }
+  }
+  if (sys.includes('"type":"slider"')) {
+    return `About $1,799 a month at those numbers. Move them to see how it changes.\n\n${ui({ type: 'slider', title: 'Monthly payment', formula: 'p*(r/1200)/(1-(1+r/1200)^(-n))', result: { label: 'Monthly payment', unit: '$', digits: 0 }, vars: [{ name: 'p', label: 'Loan', min: 50000, max: 1000000, step: 5000, value: 300000, unit: '$' }, { name: 'r', label: 'Rate', min: 1, max: 12, step: 0.25, value: 6, unit: '%' }, { name: 'n', label: 'Months', min: 60, max: 480, step: 12, value: 360 }] })}`;
+  }
+  if (sys.includes('"type":"compare"')) {
+    const two = /\b([A-Z][\w+#.]*)\s+(?:and|or|vs\.?|versus)\s+(?:the\s+)?([A-Z][\w+#.]*)/.exec(t);
+    const [a, b] = two ? [two[1], two[2]] : ['The first', 'The second'];
+    return `They differ most on cost and on how much you have to look after.\n\n${ui({ type: 'compare', options: [a, b], rows: [{ label: 'Cost', values: ['$15 a month', '$25 a month'] }, { label: 'Upkeep', values: ['Low', 'Medium'] }, { label: 'Best for', values: ['Getting started', 'Scaling later'] }], pick: 0 })}\n\nI lean to ${a} for where you are now.`;
+  }
+  if (sys.includes('"type":"draft"')) {
+    return `Here is one you can send.\n\n${ui({ type: 'draft', kind: 'email', title: 'To your landlord', text: 'Hi Sam,\n\nThe heater in my flat stopped working on Monday and the place is getting cold. Could you arrange for someone to look at it this week?\n\nThanks,\nAlex' })}`;
+  }
+  if (sys.includes('"type":"options"')) {
+    return `Happy to. Where do you want to start?\n\n${ui({ type: 'options', options: [{ label: 'The structure' }, { label: 'The opening' }, { label: 'Tightening the argument' }] })}`;
+  }
+  if (sys.includes('"type":"reasoning"')) {
+    return `Yes — 36 is right, not 42.\n\n${ui({ type: 'reasoning', summary: 'The integral of 2x from 0 to 6 is 36', steps: ['An antiderivative of 2x is x²', 'Evaluate at 6: 36', 'Evaluate at 0: 0', '36 − 0 = 36'] })}`;
+  }
+  return null;
+}
+
+/**
  * The map pass sends the map as it stands and then the conversation, under
  * "=== THE CONVERSATION ===", in one message (app/api/logos/map): the
  * conversation alone, so the canned map is drawn from what was said.
@@ -249,7 +291,7 @@ const server = http.createServer((req, res) => {
         const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
-      const text = chatReply(messages.slice(1));
+      const text = inlineReply(messages) ?? chatReply(messages.slice(1));
       if (body.stream) return streamText(res, text, model);
       return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
     }

@@ -102,12 +102,15 @@ import { MathText } from '@/components/TeX';
 import { Inline, RichText, StreamingRichText } from '@/components/RichText';
 import {
   SOCRIA_MODELS,
+  type ReplyLength,
   type SocriaModel,
   type ThinkingDepth,
 } from '@/lib/socria-prompt';
 import { guardWatches, type GuardSignal } from '@/lib/logos-guidance';
 import { MAX_STYLE, STYLE_CHANGED, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
-import { chooseModel, lastCoreModel } from '@/lib/socria-model-store';
+import { chooseModel, lastCoreModel, readLength, rememberLength } from '@/lib/socria-model-store';
+import { ConcisePicker } from '@/components/logos5/ConcisePicker';
+import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -898,6 +901,19 @@ export function LogosApp({
   // async closures (refreshMap, sends) read the latest through refs
   const depthRef = useRef<ThinkingDepth>('balanced');
   depthRef.current = depth;
+  // LOGOS 5: HOW MUCH IT SAYS, THE ONE SETTING (components/logos5/ConcisePicker.tsx).
+  // Kept where Core 4 keeps its length (lib/socria-model-store.ts), so the two
+  // agree. Logos 5 offers no depth: it answers at Balanced, and length is the
+  // dial — l5Ref says which surface is asking, set once l5 is known below.
+  const [replyLength, setReplyLength] = useState<ReplyLength>('standard');
+  const lengthRef = useRef<ReplyLength>('standard');
+  lengthRef.current = replyLength;
+  const l5Ref = useRef(false);
+  useEffect(() => setReplyLength(readLength()), []);
+  const pickLength = (next: ReplyLength) => {
+    setReplyLength(next);
+    rememberLength(next);
+  };
   const guardRef = useRef<GuardSignal>('');
   guardRef.current = guard;
   const styleRef = useRef('');
@@ -988,7 +1004,11 @@ export function LogosApp({
     // A surface with no depth modes answers at the one depth it has. The
     // stored depth is shared with the Core chat, so without this a "Deep"
     // chosen on Core 3.1 rode along into Logos with no control to see it by.
-    depth: depthOn ? depthRef.current : ('balanced' as ThinkingDepth),
+    // Logos 5 has no depth control at all — its one setting is the length —
+    // so it answers Balanced, whatever another surface stored.
+    depth: !l5Ref.current && depthOn ? depthRef.current : ('balanced' as ThinkingDepth),
+    // Logos 5's one setting: how long the answers run
+    ...(l5Ref.current ? { length: lengthRef.current } : {}),
     guard: guardRef.current,
     // the character chosen for the account — the same one Core 4 uses —
     // and the written instructions below it (lib/conversation-style.ts)
@@ -4362,6 +4382,7 @@ export function LogosApp({
   // from ordinary talk. The links between the thread and the map are read
   // from what the session already holds (lib/logos5/linking.ts).
   const l5 = workspaceOn && newSocria;
+  l5Ref.current = l5;
   // THE MAP IS THE SCREEN (docs/LOGOS-5.md §6). A line of thinking shows one
   // of three things — its Components (the files as topics), its Artifacts
   // (what was made: charts, plans, documents, practice) or its Logic Map (the
@@ -4574,6 +4595,67 @@ export function LogosApp({
   /** A display or document a turn opened: Artifacts, on it. */
   function showObject(id: string) {
     showArtifact(`d:${id}`);
+  }
+
+  // ── INLINE ELEMENTS (lib/inline-ui.ts, components/inline/InlineUI.tsx) ──
+  //
+  // A reply's chart, slider, comparison, folded reasoning, choices or draft is
+  // drawn from a validated description in the message itself. What the person
+  // does with one is theirs and is kept with that message; nothing here calls
+  // a model — a tapped choice is simply what they say next.
+
+  /** What was done with one of a reply's inline elements, merged into what is kept with that message. */
+  function keepInline(msg: Msg, n: number, s: InlineState) {
+    if (!msg.id) return;
+    const key = String(n);
+    const swap: { from?: Msg; to?: Msg } = {};
+    patchActive((sn) => ({
+      ...sn,
+      messages: sn.messages.map((x) => {
+        if (x.id !== msg.id) return x;
+        const ui = { ...(x.ui ?? {}) };
+        const one = sanitizeInlineStateOne({ ...(ui[key] ?? {}), ...s });
+        if (one) ui[key] = one;
+        else delete ui[key];
+        swap.from = x;
+        swap.to = { ...x, ui: Object.keys(ui).length ? ui : undefined };
+        return swap.to;
+      }),
+    }));
+    // the record the map reads holds the same turn: it follows, so nothing is said twice
+    const { from, to } = swap;
+    if (from && to) chronRef.current = chronRef.current.map((c) => (c === from ? to : c));
+  }
+
+  /** A choice tapped in the latest reply: sent as their next message, and whatever they had started typing stays. */
+  function chooseInline(text: string) {
+    const typed = input;
+    void send(text);
+    if (typed.trim()) setInput(typed);
+  }
+
+  /**
+   * An inline chart or comparison as the full artifact it stands for
+   * (artifactFromSpec): a data display, a comparison — in Artifacts, where it
+   * can be edited, re-viewed and kept. Made once; pressed again, what it made
+   * opens.
+   */
+  function openInline(msg: Msg, n: number, spec: InlineSpec) {
+    if (!workspaceOn) return;
+    const space = spaceOf(mapRef.current);
+    const had = msg.ui?.[String(n)]?.artifact;
+    if (had && objOf(space, had)) return showObject(had);
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+      setError('You can look at this line of thinking, but not change it.');
+      return;
+    }
+    const a = artifactFromSpec(spec);
+    if (!a) return;
+    const made = makeDisplay(space, a.kind, a.state, 'socria');
+    if (!made.ok) return setError(made.says);
+    commitObjects(made.space, objOf(made.space, made.obj.id));
+    keepInline(msg, n, { artifact: made.obj.id });
+    showObject(made.obj.id);
   }
 
   // ── LOGOS 5: STUDY (lib/logos5/study.ts, docs/LOGOS-5.md §4) ──────────
@@ -6795,16 +6877,7 @@ export function LogosApp({
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
         idlePlaceholder={focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?')}
-        footer={
-          <ModelPicker
-            value={model}
-            onChange={pickModel}
-            isSignedIn={!!isSignedIn || unlocked}
-            depth={depthOn ? depth : undefined}
-            onDepth={depthOn ? pickDepth : undefined}
-            plan={planKnown ? plan : undefined}
-          />
-        }
+        footer={<ConcisePicker value={replyLength} onChange={pickLength} />}
       />
       {l5Meter}
     </div>
@@ -7085,6 +7158,9 @@ export function LogosApp({
                 onHoverNodes={setHoverNodes}
                 onShowNodes={showNodes}
                 onOpenObject={showObject}
+                {...(m.role === 'assistant' && m.id && !togetherReadOnly
+                  ? { onInline: keepInline, onOpenInline: openInline, ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
+                  : {})}
               />
               {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
               {brought.length > 0 && (
@@ -7437,16 +7513,7 @@ export function LogosApp({
       contents={l5List}
       drawing={drawing}
       readDocument={readDocument}
-      picker={
-        <ModelPicker
-          value={model}
-          onChange={pickModel}
-          isSignedIn={!!isSignedIn || unlocked}
-          depth={depthOn ? depth : undefined}
-          onDepth={depthOn ? pickDepth : undefined}
-          plan={planKnown ? plan : undefined}
-        />
-      }
+      picker={<ConcisePicker value={replyLength} onChange={pickLength} />}
       startWith={homeStart}
       startIn={emptyHere && active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name ?? null : null}
       working={(organizing || sortPending) && messages.length === 0 ? 'Sorting your files into topics…' : null}

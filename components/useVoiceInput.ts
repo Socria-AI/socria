@@ -13,12 +13,21 @@
 // The mic is drawn only where it can work: the browser can record, the
 // feature is on (lib/logos4/flags.ts) and the server has a transcription key
 // (GET /api/transcribe, asked once per page).
+//
+// PUSH TO TALK. `press` and `release` are the held mic: press starts, letting
+// go stops and transcribes — or, for a tap, a slide off the button, or a hold
+// interrupted by the permission prompt, records nothing and leaves a short
+// hint (lib/logos4/voice.ts holdOutcome). `start`/`stop` remain for a mic
+// pressed without a hand on it (a screen reader's activation): click once to
+// start, again to stop.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LOGOS4 } from '@/lib/logos4/flags';
-import { MAX_RECORD_SECONDS, micError, pickRecorderType } from '@/lib/logos4/voice';
+import { MAX_RECORD_SECONDS, holdOutcome, micError, pickRecorderType } from '@/lib/logos4/voice';
 
 export type VoiceState = 'idle' | 'asking' | 'recording' | 'transcribing' | 'error';
+/** A line under the composer after a hold that recorded nothing: why, and what to do. */
+export type VoiceHint = 'hold' | 'ready' | null;
 
 let serverSays: Promise<boolean> | null = null;
 function serverAvailable(): Promise<boolean> {
@@ -49,6 +58,21 @@ export function useVoiceInput(onText: (text: string) => void) {
   const live = useRef(true);
   const onTextRef = useRef(onText);
   onTextRef.current = onText;
+  /** the hand came off while the browser was still asking for the microphone */
+  const releasedEarly = useRef(false);
+  const pressedAt = useRef(0);
+  const stateRef = useRef<VoiceState>('idle');
+  stateRef.current = state;
+  const [hint, setHint] = useState<VoiceHint>(null);
+  const hintTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const showHint = useCallback((h: VoiceHint) => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+    setHint(h);
+    if (h) hintTimer.current = setTimeout(() => live.current && setHint(null), 2600);
+  }, []);
+  useEffect(() => () => {
+    if (hintTimer.current) clearTimeout(hintTimer.current);
+  }, []);
 
   useEffect(() => {
     live.current = true;
@@ -148,6 +172,15 @@ export function useVoiceInput(onText: (text: string) => void) {
       rec.start(1000);
       startedAt.current = Date.now();
       setState('recording');
+      // The permission prompt took the hand off the mic: nothing was said
+      // into this one. Stop it unrecorded; the next hold works.
+      if (releasedEarly.current) {
+        releasedEarly.current = false;
+        cancelled.current = true;
+        rec.stop();
+        showHint('ready');
+        return;
+      }
       timer.current = setInterval(() => {
         const sec = (Date.now() - startedAt.current) / 1000;
         setSeconds(sec);
@@ -158,11 +191,12 @@ export function useVoiceInput(onText: (text: string) => void) {
       }, 250);
     } catch (e) {
       release();
+      releasedEarly.current = false;
       if (!live.current) return;
       setError(micError(e));
       setState('error');
     }
-  }, [state, release, send, stop]);
+  }, [state, release, send, stop, showHint]);
 
   const cancel = useCallback(() => {
     if (recorder.current?.state === 'recording') {
@@ -188,5 +222,28 @@ export function useVoiceInput(onText: (text: string) => void) {
     setState('idle');
   }, []);
 
-  return { available, state, error, seconds, capped, start, stop, cancel, retry, dismiss, canRetryAudio: !!lastAudio.current };
+  /** The mic pressed and held: start recording. */
+  const press = useCallback(() => {
+    releasedEarly.current = false;
+    pressedAt.current = Date.now();
+    showHint(null);
+    void start();
+  }, [start, showHint]);
+
+  /** The mic let go: transcribe what was said, or — for a tap, a slide off, or a hold the permission prompt interrupted — nothing. */
+  const releaseHold = useCallback(
+    (opts: { away?: boolean } = {}) => {
+      const outcome = holdOutcome({ state: stateRef.current, heldMs: Date.now() - pressedAt.current, away: !!opts.away });
+      if (outcome === 'later') releasedEarly.current = true;
+      else if (outcome === 'stop') stop();
+      else if (outcome === 'cancel') cancel();
+      else if (outcome === 'tap') {
+        cancel();
+        showHint('hold');
+      }
+    },
+    [stop, cancel, showHint]
+  );
+
+  return { available, state, error, seconds, capped, start, stop, cancel, retry, dismiss, press, release: releaseHold, hint, canRetryAudio: !!lastAudio.current };
 }

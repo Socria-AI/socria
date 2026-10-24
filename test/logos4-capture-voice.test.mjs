@@ -218,6 +218,31 @@ console.log('\n=== Voice: pure parts ===');
   ok('clock', V.clock(0) === '0:00' && V.clock(75.6) === '1:15' && V.clock(120) === '2:00');
 }
 
+console.log('\n=== Voice: push to talk ===');
+{
+  const V = R.voice;
+  ok('held long enough, letting go transcribes', V.holdOutcome({ state: 'recording', heldMs: 2400, away: false }) === 'stop');
+  ok('a tap records nothing and says "hold to talk"', V.holdOutcome({ state: 'recording', heldMs: V.MIN_HOLD_MS - 1, away: false }) === 'tap');
+  ok('slid off before letting go: thrown away, however long it was', V.holdOutcome({ state: 'recording', heldMs: 9000, away: true }) === 'cancel');
+  ok('let go while the browser still asks for the microphone: nothing now, the next hold works', V.holdOutcome({ state: 'asking', heldMs: 3000, away: false }) === 'later');
+  ok('let go with nothing recording does nothing', V.holdOutcome({ state: 'idle', heldMs: 900, away: false }) === 'none' && V.holdOutcome({ state: 'transcribing', heldMs: 900, away: false }) === 'none');
+  ok('a slide that cancels is a real distance, not a wobble', V.SLIDE_CANCEL_PX >= 48);
+}
+
+console.log('\n=== Voice: the held mic, in the composer ===');
+{
+  const { readFileSync } = await import('node:fs');
+  const composer = readFileSync(join(here, '..', 'components/LogosComposer.tsx'), 'utf8');
+  const css = readFileSync(join(here, '..', 'components/logos4.css'), 'utf8');
+  ok('the mic is held: pointer down starts, up lets go, captured so letting go anywhere counts', /onPointerDown=/.test(composer) && /setPointerCapture\(e\.pointerId\)/.test(composer) && /onPointerUp=\{\(\) => end\(\)\}/.test(composer));
+  ok('  a cancelled pointer throws the recording away', /onPointerCancel=\{\(\) => end\(true\)\}/.test(composer));
+  ok('  held from a keyboard: Space or Enter down starts, up lets go, repeats ignored', /\(e\.key === ' ' \|\| e\.key === 'Enter'\) && !e\.repeat/.test(composer) && /onKeyUp=/.test(composer));
+  ok('  a press with no hand behind it (a screen reader) toggles instead', /if \(mic\.state === 'recording'\) mic\.stop\(\);\s*else if \(mic\.state === 'idle' \|\| mic\.state === 'error'\) void mic\.start\(\);/.test(composer));
+  ok('  named for what it does', /aria-label=\{live \? 'Recording — let go to add it' : 'Hold to talk'\}/.test(composer));
+  ok('nothing under the finger scrolls, selects or opens a menu', /\.lg-mic\.is-hold \{[^}]*touch-action: none;[^}]*user-select: none;[^}]*-webkit-touch-callout: none;/.test(css) && /onContextMenu=\{\(e\) => e\.preventDefault\(\)\}/.test(composer));
+  ok('the bar says how to finish and how to cancel, and turns when the hand slides off', /Let go to add it · slide away to cancel/.test(composer) && /'Let go to cancel'/.test(composer));
+}
+
 console.log('\n=== Voice: the route ===');
 const openai = { calls: [], reply: () => new Response(J({ text: '  Okay so the equilibrium price is four dollars.  ' }), { status: 200 }) };
 const realFetch = globalThis.fetch;

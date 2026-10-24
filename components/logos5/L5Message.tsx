@@ -12,8 +12,10 @@
 // latest answer; edit what you sent (in place, saying plainly what that
 // replaces). Nothing here holds conversation state: it says what was pressed.
 
-import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import type { LogosMsg } from '@/lib/logos-sessions';
+import { contentAsText, sanitizeInlineState, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import type { InlineHost } from '@/components/inline/InlineUI';
 import { copyText } from '@/lib/copy-text';
 import { initialOf } from '@/lib/collab';
 import { AttachmentList } from '@/components/LogosComposer';
@@ -94,6 +96,12 @@ export interface L5MessageProps {
   /** press an effect: show the workspace on it */
   onShowNodes?: (ids: string[]) => void;
   onOpenObject?: (id: string) => void;
+  /** what was done with one of the reply's inline elements — a slider moved, a choice tapped, a draft edited — kept with it */
+  onInline?: (m: LogosMsg, n: number, s: InlineState) => void;
+  /** a choice tapped in the latest reply, sent as their next message */
+  onChoose?: (text: string) => void;
+  /** an inline element opened in Artifacts as a full artifact */
+  onOpenInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -183,6 +191,21 @@ export function L5Message(p: L5MessageProps) {
   const mapFx = m.role === 'assistant' ? p.effect?.map : null;
   const objFx = m.role === 'assistant' ? p.effect?.objects ?? [] : [];
   const whose = p.who === 'You' ? 'your' : `${p.who}’s`;
+  // the reply's inline elements: what was done with them, and where their actions go
+  const { onInline, onChoose, onOpenInline, latest } = p;
+  const inline = useMemo<InlineHost | undefined>(
+    () =>
+      m.role === 'assistant'
+        ? {
+            state: sanitizeInlineState(m.ui),
+            onState: onInline ? (n, s) => onInline(m, n, s) : undefined,
+            onChoose: latest ? onChoose : undefined,
+            onOpen: onOpenInline ? (n, spec) => onOpenInline(m, n, spec) : undefined,
+            live: !!latest,
+          }
+        : undefined,
+    [m, onInline, onChoose, onOpenInline, latest]
+  );
 
   return (
     <article
@@ -253,7 +276,7 @@ export function L5Message(p: L5MessageProps) {
           <div className={m.role === 'assistant' ? 'l5-prose' : 'l5-said'}>
             {m.role === 'assistant' ? (
               <TexPick.Provider value={p.onPickTex ?? null}>
-                <RichText text={m.content} math rich cite={cite} askLast />
+                <RichText text={m.content} math rich cite={cite} askLast inline={inline} />
               </TexPick.Provider>
             ) : (
               <SaidText text={m.content} />
@@ -290,7 +313,7 @@ export function L5Message(p: L5MessageProps) {
 
       {(m.content || p.onRetry) && !editing && (
         <div className="l5-acts" role="group" aria-label={`Actions for ${whose} message`}>
-          {m.content && <CopyButton text={m.content} label={`Copy ${whose} message`} />}
+          {m.content && <CopyButton text={m.role === 'assistant' ? contentAsText(m.content) : m.content} label={`Copy ${whose} message`} />}
           {p.canReply && p.onReply && (
             <button type="button" className="l5-act" onClick={() => p.onReply!(m)} aria-label={`Reply to ${whose} message`} title="Reply">
               <Icon d={I.reply} />

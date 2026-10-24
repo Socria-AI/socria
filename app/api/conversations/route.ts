@@ -5,6 +5,7 @@
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
+import { sanitizeInlineState } from '@/lib/inline-ui';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -56,6 +57,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // A Logos synthesis: Socria's structured reading of the map, kept so it
       // re-renders as itself and so the next one can say what changed.
       const synthesis = m.role === 'assistant' ? sanitizeSynthesis(m.synthesis) : undefined;
+      // what was done with the reply's inline elements (lib/inline-ui.ts) — never its words
+      const ui = m.role === 'assistant' ? sanitizeInlineState(m.ui) : undefined;
       // Its name, when it was said, and what it answers (lib/chat-thread.ts):
       // how two screens agree which message is which, and how a reply keeps
       // its quote. Display data — shaped and clipped, trusted for nothing.
@@ -74,6 +77,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),
+        ...(ui ? { ui } : {}),
       };
     });
 }

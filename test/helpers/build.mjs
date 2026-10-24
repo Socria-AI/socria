@@ -325,6 +325,8 @@ const MODULES = [
   'test/helpers/runtime-under-test.ts',
   // Logos 5's four views, titles, Content (lib/logos5/views.ts, title.ts, content.ts, contentBoard.ts)
   'test/helpers/l5views-under-test.ts',
+  // adaptive response rendering: the inline vocabulary, its planner, its gate and its components
+  'test/helpers/inline-under-test.tsx',
 ];
 
 export async function buildAll() {

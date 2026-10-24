@@ -40,6 +40,7 @@
 import { ACCURACY_RULES } from '../accuracy/rules';
 import { WHY_NOT_ANSWER } from '../why-not-answer';
 import { WRONG_CHAT } from '../wrong-chat';
+import type { ReplyLength } from '../socria-prompt';
 
 export const PERSONA_VERSION = 'logos5-v2';
 
@@ -131,6 +132,22 @@ When they want to hold something afterwards — a model, a simulation, a solid t
 - Never state a number the engine computes — a volume, a fitted coefficient, an R².
 - A specification with no data is still a complete model; nothing in it is estimated. If they want estimates, what is missing is data, and saying so is a useful answer.
 - A specification is not a causal claim: it "models the relationship between education and wages"; whether education raises wages is a further question.`;
+
+/**
+ * HOW MUCH IT SAYS — Logos 5's one setting (components/logos5/ConcisePicker.tsx).
+ * Balanced is the core's own default ("short by default"), so it adds nothing;
+ * the other two say what changes. In the stable part of the prompt: it changes
+ * only when they move the dial.
+ */
+export const resolveLength = (v: unknown): ReplyLength => (v === 'concise' || v === 'detailed' ? v : 'standard');
+const LENGTH_LINE: Record<ReplyLength, string> = {
+  concise: '\n\n=== LENGTH — Concise (their setting) ===\nThe shortest reply that carries it: a sentence or two for most things, a short paragraph at most. More only when they ask.',
+  standard: '',
+  detailed: '\n\n=== LENGTH — Detailed (their setting) ===\nRoom to cover what matters — the reasoning, the caveat that changes things, an example — and still no padding, no preamble, no summary of what you just said.',
+};
+export const lengthLine = (v: unknown): string => LENGTH_LINE[resolveLength(v)];
+/** The reply's ceiling, by their setting: a cut-off answer is worse than a long one. */
+export const replyCeiling = (v: unknown): number => ({ concise: 480, standard: 700, detailed: 1200 })[resolveLength(v)];
 
 export interface PersonaBlocks {
   /** the conversation has been mathematical */

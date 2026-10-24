@@ -30,7 +30,7 @@ const DOC_ACCEPT = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e 
 import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
 import { TeX } from './TeX';
 import { useVoiceInput } from './useVoiceInput';
-import { MAX_RECORD_SECONDS, clock, insertSpoken } from '@/lib/logos4/voice';
+import { MAX_RECORD_SECONDS, SLIDE_CANCEL_PX, clock, insertSpoken } from '@/lib/logos4/voice';
 import './logos-thread.css';
 import './logos4.css';
 
@@ -240,6 +240,109 @@ function insertAtCaret(
   });
 }
 
+type Voice = ReturnType<typeof useVoiceInput>;
+/** What the hand on the mic is doing: holding it, and whether it has slid off to cancel. */
+type Hold = { holding: boolean; away: boolean };
+
+/**
+ * THE MIC, HELD: press and talk, let go and the words land in the box to edit
+ * (lib/logos4/voice.ts holdOutcome decides what letting go does). A mouse, a
+ * finger or a pen holds it through pointer capture, so letting go anywhere
+ * counts; sliding a long way off before letting go cancels. Space or Enter,
+ * held on the focused mic, does the same from a keyboard. A press with no hand
+ * behind it — a screen reader activating the button — toggles instead: once to
+ * start, again to stop.
+ */
+function HoldMic({ mic, onHold }: { mic: Voice; onHold: (h: Hold) => void }) {
+  const holding = useRef(false);
+  /** this press was a hold already handled — the click the browser sends after it is not a toggle */
+  const handled = useRef(false);
+  const from = useRef<{ x: number; y: number } | null>(null);
+  const away = useRef(false);
+  const live = mic.state === 'recording' || mic.state === 'asking';
+  const begin = () => {
+    holding.current = true;
+    handled.current = true;
+    away.current = false;
+    onHold({ holding: true, away: false });
+    mic.press();
+  };
+  const end = (cancel = false) => {
+    if (!holding.current) return;
+    holding.current = false;
+    mic.release({ away: cancel || away.current });
+    away.current = false;
+    from.current = null;
+    onHold({ holding: false, away: false });
+  };
+  return (
+    <button
+      type="button"
+      className={`lg-mic is-hold${live ? ' is-on' : ''}`}
+      onPointerDown={(e) => {
+        if ((e.pointerType === 'mouse' && e.button !== 0) || mic.state === 'transcribing') return;
+        // no focus moves and no text is selected: the caret stays where the words will go
+        e.preventDefault();
+        try {
+          e.currentTarget.setPointerCapture(e.pointerId);
+        } catch {
+          /* a pointer the browser will not capture still ends with pointerup here */
+        }
+        from.current = { x: e.clientX, y: e.clientY };
+        begin();
+      }}
+      onPointerMove={(e) => {
+        if (!holding.current || !from.current) return;
+        const off = Math.hypot(e.clientX - from.current.x, e.clientY - from.current.y) > SLIDE_CANCEL_PX;
+        if (off !== away.current) {
+          away.current = off;
+          onHold({ holding: true, away: off });
+        }
+      }}
+      onPointerUp={() => end()}
+      onPointerCancel={() => end(true)}
+      onKeyDown={(e) => {
+        if ((e.key === ' ' || e.key === 'Enter') && !e.repeat && !holding.current && mic.state !== 'transcribing') {
+          e.preventDefault();
+          begin();
+        }
+      }}
+      onKeyUp={(e) => {
+        if (e.key === ' ' || e.key === 'Enter') {
+          e.preventDefault();
+          end();
+        }
+      }}
+      onBlur={() => end()}
+      onClick={() => {
+        if (holding.current || handled.current) {
+          handled.current = false;
+          return;
+        }
+        if (mic.state === 'recording') mic.stop();
+        else if (mic.state === 'idle' || mic.state === 'error') void mic.start();
+      }}
+      onContextMenu={(e) => e.preventDefault()}
+      disabled={mic.state === 'transcribing'}
+      aria-pressed={live}
+      aria-label={live ? 'Recording — let go to add it' : 'Hold to talk'}
+      title={live ? 'Let go to add it — slide away to cancel' : 'Hold to talk — the words land here for you to edit'}
+    >
+      {live ? (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3" fill="currentColor" />
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+        </svg>
+      ) : (
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          <rect x="9" y="3" width="6" height="11" rx="3" />
+          <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
+        </svg>
+      )}
+    </button>
+  );
+}
+
 export function LogosComposer({
   value,
   onChange,
@@ -352,6 +455,8 @@ export function LogosComposer({
   });
   const micOn = !!voice && mic.available;
   const listening = mic.state === 'recording' || mic.state === 'asking';
+  // a hand on the mic: the bar says "let go", or "let go to cancel" once it has slid off
+  const [hold, setHold] = useState<Hold>({ holding: false, away: false });
 
   const readying = drafts.some((d) => d.status === 'reading');
   const canSend = (!!value.trim() || drafts.some((d) => d.status === 'ready')) && (!busy || !!group) && !readying;
@@ -652,13 +757,20 @@ export function LogosComposer({
         )}
 
         {micOn && (listening || mic.state === 'transcribing') && (
-          <div className="lg-voice" role="status" aria-live="polite">
+          <div className={`lg-voice${hold.holding && hold.away ? ' is-away' : ''}`} role="status" aria-live="polite">
             <span className={`lg-voice-dot${mic.state === 'recording' ? ' is-live' : ''}`} aria-hidden="true" />
             <span className="lg-voice-k">
-              {mic.state === 'asking' ? 'Waiting for the microphone…' : mic.state === 'transcribing' ? 'Turning that into text…' : `Listening ${clock(mic.seconds)}`}
-              {mic.state === 'recording' && <span className="lg-voice-cap"> / {clock(MAX_RECORD_SECONDS)}</span>}
+              {mic.state === 'asking'
+                ? 'Waiting for the microphone…'
+                : mic.state === 'transcribing'
+                  ? 'Turning that into text…'
+                  : hold.holding && hold.away
+                    ? 'Let go to cancel'
+                    : `Listening ${clock(mic.seconds)}`}
+              {mic.state === 'recording' && !(hold.holding && hold.away) && <span className="lg-voice-cap"> / {clock(MAX_RECORD_SECONDS)}</span>}
             </span>
-            {mic.state !== 'transcribing' && (
+            {hold.holding && mic.state === 'recording' && !hold.away && <span className="lg-voice-how">Let go to add it · slide away to cancel</span>}
+            {mic.state !== 'transcribing' && !hold.holding && (
               <>
                 <button type="button" className="lg-voice-btn" onClick={mic.cancel}>
                   Cancel
@@ -764,28 +876,7 @@ export function LogosComposer({
             />
               {footer && <span className="l5-ctools-mid">{footer}</span>}
               <span className="l5-ctools-end">
-              {micOn && (
-                <button
-                  type="button"
-                  className={`lg-mic${listening ? ' is-on' : ''}`}
-                  onClick={() => (listening ? mic.stop() : mic.start())}
-                  disabled={mic.state === 'transcribing'}
-                  aria-pressed={listening}
-                  aria-label={listening ? 'Stop and transcribe' : 'Speak instead of typing'}
-                  title={listening ? 'Stop and transcribe' : 'Speak — the words land here for you to edit'}
-                >
-                  {listening ? (
-                    <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                      <rect x="7" y="7" width="10" height="10" rx="2" />
-                    </svg>
-                  ) : (
-                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                      <rect x="9" y="3" width="6" height="11" rx="3" />
-                      <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-                    </svg>
-                  )}
-                </button>
-              )}
+              {micOn && <HoldMic mic={mic} onHold={setHold} />}
               {/* Appears only when mathematics is in play, and stays put once it
                   has — see lib/math-context.ts for why that hysteresis matters. */}
               {mathAvailable && (
@@ -901,28 +992,7 @@ export function LogosComposer({
               }}
             />
 
-            {micOn && (
-              <button
-                type="button"
-                className={`lg-mic${listening ? ' is-on' : ''}`}
-                onClick={() => (listening ? mic.stop() : mic.start())}
-                disabled={mic.state === 'transcribing'}
-                aria-pressed={listening}
-                aria-label={listening ? 'Stop and transcribe' : 'Speak instead of typing'}
-                title={listening ? 'Stop and transcribe' : 'Speak — the words land here for you to edit'}
-              >
-                {listening ? (
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <rect x="7" y="7" width="10" height="10" rx="2" />
-                  </svg>
-                ) : (
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <rect x="9" y="3" width="6" height="11" rx="3" />
-                    <path d="M5 11a7 7 0 0 0 14 0M12 18v3" />
-                  </svg>
-                )}
-              </button>
-            )}
+            {micOn && <HoldMic mic={mic} onHold={setHold} />}
 
             {/* Appears only when mathematics is in play, and stays put once it
                 has — see lib/math-context.ts for why that hysteresis matters. */}
@@ -972,6 +1042,11 @@ export function LogosComposer({
         </p>
       )}
       {mic.capped && mic.state === 'transcribing' && <p className="lg-composer-note">Stopped at two minutes — transcribing what was said.</p>}
+      {micOn && mic.hint && mic.state === 'idle' && (
+        <p className="lg-composer-note lg-voice-hint" role="status">
+          {mic.hint === 'ready' ? 'The microphone is on. Hold the mic while you talk.' : 'Hold the mic while you talk — let go and the words appear here.'}
+        </p>
+      )}
 
       {(notice || readying) && (
         <p className="lg-composer-note">

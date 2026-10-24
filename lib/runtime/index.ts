@@ -8,6 +8,7 @@
 //   behavior.ts        the compact instructions
 //   epistemic.ts       what may be asserted, on what evidence
 //   representation.ts  the workspace as typed, linked entities
+//   presentation.ts    the inline elements a reply may use this turn
 //
 // SWITCHED, so any of it can be taken back without a deploy of code:
 //   LOGOS_RUNTIME=off   the reply route as it was before the runtime
@@ -19,6 +20,7 @@ export * from './allocation';
 export * from './behavior';
 export * from './epistemic';
 export * from './representation';
+export * from './presentation';
 
 const off = (v: string | undefined): boolean => /^(off|0|false|no)$/i.test((v ?? '').trim());
 

@@ -22,6 +22,8 @@ import { copyText } from '@/lib/copy-text';
 import { parseBlocks, splitInline, stripMarks, type Block } from '@/lib/rich-text';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
+import { InlineBlock, type InlineHost } from '@/components/inline/InlineUI';
+import { contentAsText } from '@/lib/inline-ui';
 
 /**
  * How a surface draws a citation key — [A3.12], [A3.12, A4.2] — when its
@@ -145,7 +147,7 @@ function CodeBlock({ lang, text, open }: { lang: string | null; text: string; op
   );
 }
 
-function BlockNode({ block, math, k, cite, rich }: { block: Block; math?: boolean; k: string; cite?: CiteRender; rich?: boolean }): ReactNode {
+function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?: boolean; k: string; cite?: CiteRender; rich?: boolean; inline?: InlineHost }): ReactNode {
   switch (block.kind) {
     case 'p':
       return <p key={k}>{<Inline text={block.text} math={math} keyBase={k} cite={cite} code={rich} />}</p>;
@@ -221,6 +223,20 @@ function BlockNode({ block, math, k, cite, rich }: { block: Block; math?: boolea
     case 'sources':
       return <SourceCards key={k} query={block.query} items={block.items} />;
 
+    // An inline element (components/inline/InlineUI.tsx): drawn from its
+    // validated spec; what the person does with it goes to the surface's host.
+    case 'ui':
+      return (
+        <InlineBlock
+          key={k}
+          spec={block.spec}
+          open={block.open}
+          n={block.n}
+          host={inline}
+          renderInline={(t, key) => <Inline text={t} math={math} keyBase={`${k}-${key}`} code={rich} />}
+        />
+      );
+
     case 'table':
       return (
         // The wrapper scrolls on its own so a wide table never makes the
@@ -256,10 +272,12 @@ function BlockNode({ block, math, k, cite, rich }: { block: Block; math?: boolea
 /**
  * A finished reply: paragraphs, lists, titled groups and small tables — and,
  * where the surface draws them, its citations. `rich` (Logos 5) also reads
- * headings, fenced code, quotations and inline code (lib/rich-text.ts).
+ * headings, fenced code, quotations, inline code and the inline elements
+ * (lib/inline-ui.ts), whose state and actions `inline` carries. A surface that
+ * does not draw those reads each one as the words it stands for.
  */
-export function RichText({ text, math, cite, rich, askLast }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean }) {
-  const blocks = parseBlocks(text, { rich });
+export function RichText({ text, math, cite, rich, askLast, inline }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean; inline?: InlineHost }) {
+  const blocks = parseBlocks(!rich && text.includes('```') ? contentAsText(text) : text, { rich });
   const last = blocks.length - 1;
   const apart = !!askLast && setsApart(text);
   return (
@@ -267,7 +285,7 @@ export function RichText({ text, math, cite, rich, askLast }: { text: string; ma
       {blocks.map((b, i) => {
         // Logos 5: a reply that ends by asking, asks in its own voice — the closing question set apart
         const split = apart && i === last && b.kind === 'p' ? closingQuestion(b.text) : null;
-        if (!split) return BlockNode({ block: b, math, k: `b${i}`, cite, rich });
+        if (!split) return BlockNode({ block: b, math, k: `b${i}`, cite, rich, inline });
         return (
           <p key={`b${i}`}>
             {split.body && (
