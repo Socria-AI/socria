@@ -320,6 +320,8 @@ const MODULES = [
   'lib/openai-usage.ts',
   // the turns the map is not redrawn for (lib/map-skip.ts)
   'lib/map-skip.ts',
+  // the Logos Runtime (lib/runtime): six subsystems in one bundle
+  'test/helpers/runtime-under-test.ts',
 ];
 
 export async function buildAll() {

@@ -121,7 +121,7 @@ const ABOUT_THEM = /\b(?:should\s+i|do\s+i|am\s+i|can\s+i|would\s+i|will\s+i|wha
 export function isFactQuestion(text: string): boolean {
   const t = clean(text).toLowerCase();
   if (!t || t.length > 260 || ABOUT_THEM.test(t)) return false;
-  if (/^(?:what(?:'s|\s+is|\s+are|\s+was|\s+were|\s+does|\s+do)|who(?:'s|\s+is|\s+was|\s+were)?|when(?:'s|\s+is|\s+was|\s+did)|where(?:'s|\s+is|\s+are)|which\s+(?:year|country|city|element|planet|is\s+the)|how\s+(?:many|much|long|far|old|big|tall|heavy))\b/.test(t)) {
+  if (/^(?:what(?:'s|\s+is|\s+are|\s+was|\s+were|\s+does|\s+do|\s+(?:year|day|date|time|century|decade|month|country|city|language|currency|percentage|percent))|who(?:'s|\s+is|\s+was|\s+were)?|when(?:'s|\s+is|\s+was|\s+did)|where(?:'s|\s+is|\s+are)|which\s+(?:year|country|city|element|planet|is\s+the)|how\s+(?:many|much|long|far|old|big|tall|heavy))\b/.test(t)) {
     // "what is the meaning of my life" is not a fact; "what does X mean" is
     if (/\b(?:my|our)\s+(?:life|purpose|future|career|relationship|goal)/.test(t)) return false;
     return true;

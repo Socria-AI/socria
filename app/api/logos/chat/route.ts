@@ -18,7 +18,6 @@ import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
   LOGOS_CHAT_PROMPT,
-  LOGOS_MODEL,
   LOGOS_FALLBACK_MODEL,
   NODE_TYPES,
   buildFocusPrompt,
@@ -82,6 +81,32 @@ import { sharedTurn } from '@/lib/share/turn';
 import { extractionContext } from '@/lib/mind/activate';
 import { cleanId, logosMemoryText, logosPersistPolicy } from '@/lib/mind/logos-turn';
 import { waitUntil } from '@vercel/functions';
+import {
+  PERSONA_VERSION,
+  allocate,
+  assessNeed,
+  buildEvidence,
+  checkReply,
+  conflicts,
+  epistemicLog,
+  historyStart,
+  logos5FocusSystem,
+  logos5System,
+  looksMathematical,
+  memorable,
+  modelFor,
+  pathOf,
+  personaOf,
+  readTurnState,
+  renderAllocation,
+  renderConflicts,
+  rewriteCitations,
+  routeTurn,
+  runtimeOn,
+  UNCHECKED_CURRENT,
+} from '@/lib/runtime';
+import { runResearch } from '@/lib/core4/web-server';
+import { renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -160,14 +185,19 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const kept = messages
-      .filter(
-        (m: any) =>
-          m &&
-          (m.role === 'user' || m.role === 'assistant') &&
-          typeof m.content === 'string'
-      )
-      .slice(-MAX_HISTORY);
+    const usable = messages.filter(
+      (m: any) =>
+        m &&
+        (m.role === 'user' || m.role === 'assistant') &&
+        typeof m.content === 'string'
+    );
+    // THE LOGOS RUNTIME (lib/runtime), unless LOGOS_RUNTIME=off. With it the
+    // history window moves in steps of sixteen rather than one, so a long
+    // conversation's history stays in the provider's prompt cache
+    // (orchestrate.ts historyStart); without it, the last 24 as before.
+    const runtime = runtimeOn();
+    const persona = personaOf();
+    const kept = runtime ? usable.slice(historyStart(usable.length)) : usable.slice(-MAX_HISTORY);
 
     // Two people, or one? A shared Logos 3 room — or a line of thinking shared
     // with others who are here now — passes `collab.people`, their display
@@ -404,17 +434,34 @@ export async function POST(req: NextRequest) {
 
     const focusLabel = trim(f?.label, 120);
     const focusContexts = sanitizeNodeContextList(f?.contexts);
-    const system = focusLabel
-      ? buildFocusPrompt({
-          label: focusLabel,
-          type: NODE_TYPES.includes(f?.type) ? f.type : 'idea',
-          concept: trim(f?.concept, 100) || undefined,
-          framing: trim(f?.framing, 700) || undefined,
-          grounded: focusContexts.length
-            ? renderContextsForNode(focusContexts, 2_000)
-            : undefined,
-        })
-      : LOGOS_CHAT_PROMPT;
+    const focusFacts = {
+      label: focusLabel,
+      type: NODE_TYPES.includes(f?.type) ? f.type : 'idea',
+      concept: trim(f?.concept, 100) || undefined,
+      framing: trim(f?.framing, 700) || undefined,
+      grounded: focusContexts.length ? renderContextsForNode(focusContexts, 2_000) : undefined,
+    };
+    // BEHAVIORAL CONTROL (lib/runtime/behavior.ts). The Logos 5 core and only
+    // the blocks this conversation has needed — each one a fact that, once
+    // true, stays true (it has been mathematical; there is a picture; a model
+    // was asked for; the guard is up), so the message is the same next turn.
+    // LOGOS_PERSONA=classic (or LOGOS_RUNTIME=off) speaks with the Logos 3.5
+    // prompt instead.
+    const userTexts = clean.filter((m) => m.role === 'user').map((m) => m.content);
+    const personaBlocks = {
+      math: looksMathematical(userTexts),
+      picture: !!body?.viz || !!body?.vizState,
+      build: userTexts.some((t) => !!wantedSimulation(t) || ['model', 'simulation'].includes(constructAsk(t) ?? '')),
+      guard: resolveGuard(body?.guard) === 'guard',
+    };
+    const system =
+      persona === 'v5'
+        ? focusLabel
+          ? logos5FocusSystem(focusFacts, personaBlocks)
+          : logos5System(personaBlocks)
+        : focusLabel
+          ? buildFocusPrompt(focusFacts)
+          : LOGOS_CHAT_PROMPT;
 
     // Depth (how deeply to help them think) + the Answer Guard (learning math:
     // hints, not answers). The guard is the same one every surface honours.
@@ -541,7 +588,8 @@ export async function POST(req: NextRequest) {
       typeof body?.resumedAfterMs === 'number' && Number.isFinite(body.resumedAfterMs) && body.resumedAfterMs > 0
         ? Math.min(body.resumedAfterMs, 400 * 86_400_000)
         : null;
-    const assist = chooseAssist({
+    const digest = sanitizeDigest(body?.mapDigest);
+    const assistInput = {
       lastUserText: String(last.content ?? ''),
       history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
       guard: resolveGuard(body?.guard) === 'guard',
@@ -557,12 +605,84 @@ export async function POST(req: NextRequest) {
         : focusLabel
           ? { kind: 'node', label: focusLabel }
           : null,
-      construct: focusLabel ? null : readDisplayRequest(last.content) ? 'display' : (asked ? 'simulation' : constructAsk(String(last.content ?? ''))),
-      map: sanitizeDigest(body?.mapDigest),
+      // Under the runtime the engine builds only what was asked for by name
+      // (orchestrate.ts routeTurn: Alex's rule C), so the move is "construct"
+      // only then — a decision question that happens to fit a display is a
+      // question, and a reply told something was being built would say so.
+      construct: focusLabel
+        ? null
+        : runtime && routeTurn({ text: String(last.content ?? '') }).intent !== 'visual'
+          ? null
+          : readDisplayRequest(last.content) ? 'display' : (asked ? 'simulation' : constructAsk(String(last.content ?? ''))),
+      map: digest,
       resumedAfterMs,
       group: twoPeople,
+    };
+
+    // ── THE LOGOS RUNTIME: state, allocation, evidence (lib/runtime) ──
+    //
+    // What the turn is (Alex's rules A–D, read in code), the cognitive state
+    // (no model call), and who does what: Core 4's CognitiveSplit with the
+    // Logos 4 move inside it. The classic persona keeps the Logos 4 move alone,
+    // exactly as before, so the ablation compares like with like.
+    const newestAtts = (kept[kept.length - 1] as { attachments?: { kind: string }[] } | undefined)?.attachments ?? [];
+    const turnRoute = routeTurn({ text: String(last.content ?? ''), attachments: newestAtts });
+    const turnState = readTurnState({
+      text: String(last.content ?? ''),
+      history: assistInput.history,
       signals,
+      intent: turnRoute.intent,
+      map: digest,
+      workspace: {
+        docs: docRefs.length,
+        artifacts: sanitizeSpace(body?.objects)?.objs.length ?? 0,
+        writing: selected?.kind === 'writing',
+        selection: selected?.label ?? null,
+      },
+      guard: assistInput.guard,
+      style: typeof body?.conversationStyle === 'string' ? body.conversationStyle : null,
+      resumedAfterMs,
+      checked: accuracy.theirs.map((v) => ({ status: v.status })),
     });
+    const allocation = persona === 'v5' ? allocate({ state: turnState, signals, assist: assistInput }) : null;
+    const assist = allocation ? allocation.assist : chooseAssist({ ...assistInput, signals });
+
+    // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
+    // and the evidence there is for it: their documents' passages, the
+    // engine's results, and the web when Core 4's gate opens — never on a
+    // sensitive or off-the-record conversation, never in a room of several
+    // people. A search that is wanted and cannot run is said to the reply, so
+    // it never answers as though it had checked.
+    const webPolicy = logosPersistPolicy(userTexts);
+    const need = runtime
+      ? assessNeed({ text: String(last.content ?? ''), signals, docs: docRefs.length, math: accuracy.check || accuracy.reasons.includes('math'), policy: webPolicy })
+      : null;
+    let research: Research | null = null;
+    if (need?.web.want && !twoPeople) {
+      research = await runResearch({
+        lastUserText: String(last.content ?? ''),
+        signals,
+        names: [trim(body?.name, 60)].filter(Boolean),
+        policy: webPolicy,
+      }).catch(() => null);
+    }
+    const evidence = runtime
+      ? buildEvidence({
+          web: research?.sources,
+          docs: docRefs.map((r) => ({ letter: r.letter, blocks: r.doc.blocks })),
+          computed: accuracy.computed.map((c) => c.result).filter((r): r is string => !!r),
+          userTexts,
+        })
+      : null;
+    const evidenceBlock = !need || !evidence
+      ? ''
+      : (research
+          ? renderResearch(research)
+          : need.web.want
+            ? renderNoResearch(true, '')
+            : need.kinds.includes('current')
+              ? UNCHECKED_CURRENT
+              : '') + renderConflicts(conflicts(evidence.sources));
 
     // THE PROMPT IN TWO PARTS, FOR THE PROVIDER'S PROMPT CACHE.
     //
@@ -669,7 +789,11 @@ export async function POST(req: NextRequest) {
       memoryBlock +
       // How to help on this turn — then, last, so it is the freshest thing the
       // model reads: what was computed.
-      renderAssist(assist) +
+      // How to help on this turn: under the runtime, who does what and the
+      // move (allocation.ts); under the classic persona, the move alone.
+      (allocation ? renderAllocation(allocation, turnState) : renderAssist(assist)) +
+      // What may be asserted on what (epistemic.ts) — then, last, what was computed.
+      evidenceBlock +
       accuracy.block;
 
     /**
@@ -695,7 +819,7 @@ export async function POST(req: NextRequest) {
     };
 
     const openai = tracked(new OpenAI({ apiKey }), 'logos/chat');
-    const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+    const configured = modelFor('reply');
 
     const make = (model: string) =>
       openai.chat.completions.create({
@@ -763,6 +887,19 @@ export async function POST(req: NextRequest) {
     // ...and the day's message, under the same rule: the model has the turn.
     if (!gifted && userId && limitOf(plan, 'messages') !== null) await bumpUsage(userId, 'messages');
 
+    // A citation that names no source given this turn, and a deep link no
+    // source carried, are taken out of the sentence before it is sent
+    // (epistemic.ts rewriteCitations) — on the held path and the streamed one.
+    const removedCites: string[] = [];
+    const rewrite = evidence
+      ? (sentence: string) => {
+          const r = rewriteCitations(sentence, evidence);
+          if (r.removed.length) removedCites.push(...r.removed);
+          return r.text;
+        }
+      : undefined;
+    const searched = !!research;
+
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
       async start(controller) {
@@ -803,14 +940,14 @@ export async function POST(req: NextRequest) {
             }
             // A claimed tool run that did not happen is removed, as Core 4's
             // guard removes it: the reply ran nothing.
-            const invented = sentencesOf(reply).filter((x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }));
+            const invented = sentencesOf(reply).filter((x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }));
             if (invented.length) reply = deleteSentences(reply, invented.map((x) => x.trim())) ?? reply;
             // The question budget and the opener rule hold on a held turn too —
             // through the same gate the streamed path uses, so the two paths
             // cannot drift. The opener yields only when the engine confirms
             // they caught a real mistake of Socria's.
             if (reply) {
-              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt });
+              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt, rewrite });
               held.push(reply);
               held.finish(assist.questions);
               if (held.out.trim()) reply = held.out;
@@ -828,7 +965,7 @@ export async function POST(req: NextRequest) {
               sent = true;
               reply += text;
               controller.enqueue(encoder.encode(text));
-            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched: false, computed: accuracy.context.computed }) });
+            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }), rewrite });
             for await (const chunk of completion) {
               const delta = chunk.choices?.[0]?.delta?.content ?? '';
               if (delta) gate.push(delta);
@@ -852,7 +989,19 @@ export async function POST(req: NextRequest) {
           // needs the request it was registered from (the same note as Core's,
           // app/api/chat/route.ts). Only a whole answer is read; a failure
           // notice is not something Socria said.
-          if (mindOn && mindPolicy !== 'none' && reply.trim()) {
+          // What the reply asserted, labelled, counted — never its content.
+          if (evidence && need && reply.trim()) {
+            const factual = need.kinds.some((k) => k !== 'computation');
+            console.info(
+              epistemicLog('logos/chat', checkReply(reply, evidence, { factual }), removedCites.length, {
+                path: pathOf({ intent: turnRoute.intent, checked: accuracy.check || searched || docRefs.length > 0 }),
+                intent: turnRoute.intent,
+                searched: searched ? 1 : 0,
+              })
+            );
+          }
+          // An "ok" or a "thanks" has nothing in it to remember: no extraction call.
+          if (mindOn && mindPolicy !== 'none' && reply.trim() && (!runtime || memorable(String(last?.content ?? '')))) {
             const write = () =>
               remember(userId!, logosMemoryText(String(last?.content ?? ''), reply), {
                 now: Date.now(),
@@ -885,6 +1034,30 @@ export async function POST(req: NextRequest) {
         ...(gifted ? { 'X-Socria-First-Thought': '1' } : {}),
         // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
         'X-Socria-Assist': assistTrace(assist),
+        // the runtime's reading of the turn: content-free, for the client and the evals
+        ...(runtime
+          ? {
+              'X-Socria-Runtime': [
+                persona === 'v5' ? PERSONA_VERSION : 'classic',
+                `path=${pathOf({ intent: turnRoute.intent, checked: accuracy.check || searched || docRefs.length > 0 })}`,
+                `intent=${turnRoute.intent}`,
+                `domain=${turnState.domain}`,
+                `work=${turnState.work}`,
+                ...(allocation ? [`split=${Object.entries(allocation.split).map(([k, v]) => `${k}:${v}`).join(',')}`] : []),
+              ].join(';'),
+            }
+          : {}),
+        // the sources this reply was given, for the person to see — title, site, address, never page text
+        ...(research
+          ? {
+              'X-Socria-Sources': encodeURIComponent(
+                JSON.stringify({
+                  query: research.query,
+                  sources: research.sources.map((x) => ({ n: x.n, title: x.title.slice(0, 160), url: x.url, site: x.site, ...(x.published ? { published: x.published } : {}) })),
+                })
+              ),
+            }
+          : {}),
       },
     });
   } catch (e: any) {

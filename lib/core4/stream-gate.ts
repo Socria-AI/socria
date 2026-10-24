@@ -51,7 +51,13 @@ export class SentenceGate {
    * math engine has confirmed answers a real mistake of Socria's, where "you're
    * right" is the honest first word (lib/accuracy theyCaughtIt).
    */
-  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean } = {}) {}
+  /**
+   * rewrite: change a sentence before anything else reads it — Logos 5's
+   * citation check (lib/runtime/epistemic.ts rewriteCitations) takes out a
+   * citation that names no source and a link no source carried, and keeps the
+   * rest of the sentence. Fenced code never reaches it.
+   */
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -88,6 +94,7 @@ export class SentenceGate {
   }
 
   private consider(sentence: string) {
+    if (this.opts.rewrite && sentence.trim()) sentence = this.opts.rewrite(sentence);
     if (this.opts.drop && sentence.trim() && this.opts.drop(sentence)) {
       this.stripped.push(sentence.trim());
       return;
