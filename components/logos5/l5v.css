@@ -4,39 +4,18 @@
  * omnibox. Every colour is a token (l5.css, app/themes.css), so Paper and the
  * dark grounds both hold.
  *
- * TYPOGRAPHY: one sans for the whole application — Inter, then the system
- * faces — never the marketing site's serif. Base text at 15px (between 11pt
- * and 12pt), line height 1.35, weights 400 / 500 / 600 and nothing heavier.
+ * TYPOGRAPHY: the faces the rest of Logos 5 is set in, and nothing of this
+ * sheet's own — Inter (the bundled face, --lg-sans) for the interface and the
+ * reading, Instrument Serif (--l5-serif, l5.css) for titles, the emphasised
+ * word and the closing question. A sheet that set one sans for everything,
+ * at its own size and line height, was tried and taken back: the faces read
+ * wrong, and a bare "Inter" ahead of the bundled one picked up whatever copy
+ * of Inter a machine happened to have installed. --l5-ui is only a name for
+ * the bundled sans, for the rules below that use it.
  */
 
 .logos-root .l5 {
-  --l5-serif: var(--lg-sans);
-  --l5-ui: Inter, var(--font-sans, -apple-system), BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  font-family: var(--l5-ui);
-  font-size: 15px;
-  line-height: 1.35;
-}
-.logos-root .l5 b,
-.logos-root .l5 strong,
-.logos-root .l5 h1,
-.logos-root .l5 h2,
-.logos-root .l5 h3,
-.logos-root .l5 th {
-  font-weight: 600;
-}
-.logos-root .l5 .l5-prose,
-.logos-root .l5 .l5-prose p,
-.logos-root .l5 .l5-prose li {
-  font-family: var(--l5-ui);
-  font-size: 15px;
-  line-height: 1.35;
-}
-.logos-root .l5 .l5-prose p + p {
-  margin-top: 0.6em;
-}
-/* the signature emphasis keeps its colour and its italic, in the same face */
-.logos-root .l5 .l5-prose em {
-  font-family: var(--l5-ui);
+  --l5-ui: var(--lg-sans);
 }
 
 /* ── the header ─────────────────────────────────────────────────────── */

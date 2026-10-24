@@ -54,8 +54,9 @@ ok('a pill: radius 28px, a neutral shadow, centred, at most 768px', /border-radi
 ok('Chat is one centred column, 768px at most', /\.l5v-body\.is-chat \.l5-thread-in,\s*\.l5v-body\.is-chat \.l5-dock \{\s*max-width: 768px;/.test(css));
 
 console.log('\n=== type ===');
-ok('the shell is set in Inter and the system stack', /--l5-ui: Inter, var\(--font-sans, -apple-system\), BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;/.test(css));
-ok('  at line-height 1.35', /line-height: 1\.35/.test(css) || /\/1\.35 /.test(css));
+ok('the shell is set in the app’s own faces: the bundled Inter for the interface', /\.logos-root \.l5 \{\s*--l5-ui: var\(--lg-sans\);\s*\}/.test(css));
+ok('  and Instrument Serif where Logos 5 uses its serif — the shell does not replace it', !/--l5-serif\s*:/.test(css) && /--l5-serif: var\(--serif, 'Instrument Serif', Georgia, serif\);/.test(read('components/logos5/l5.css')));
+ok('  no face of its own: no bare "Inter" ahead of the bundled one, no base size or line height laid over the reading', !/font-family:\s*Inter|--l5-ui:\s*Inter/.test(css) && !/\.logos-root \.l5 \{[^}]*font-size/.test(css) && !/\.l5-prose em \{\s*font-family/.test(css));
 
 console.log('\n=== loading, truthfully ===');
 ok('the thread shows only what has happened: files read, sent, sources found, writing', /label: `Read \$\{turnInfo\.files\}/.test(app) && /label: 'Sent', state: 'done'/.test(app) && /to check it against/.test(app) && /'Writing the reply' : 'Socria is reading it'/.test(app));
