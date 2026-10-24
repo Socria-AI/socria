@@ -1,0 +1,932 @@
+{
+  "about": "Offline measurement by evals/logos5/measure.mjs: the real routes, a recording model, one scripted ten-turn conversation. Tokens are estimated at four characters per token; cacheable is the byte-identical leading prefix each call shares with the previous call of its kind (>= 1024 tokens, in 128-token steps) - an upper bound on what a provider cache serves. Output tokens and model latency are not measured; routeMsMedian is the route's own work with a model that answers instantly.",
+  "at": "2026-10-24T02:16:44.356Z",
+  "script": [
+    "I keep going back and forth on whether to take the job in Denver or stay in Austin.",
+    "The Denver offer pays 20% more, but my partner works here and we just signed a lease.",
+    "ok",
+    "What is the typical rent difference between Denver and Austin right now?",
+    "Map out my argument for moving so I can see what it rests on.",
+    "Make a decision matrix of the two options.",
+    "Honestly I think the money matters less than I said at first.",
+    "thanks",
+    "So what would I actually be giving up by staying?",
+    "Let me sleep on it and talk to my partner this weekend."
+  ],
+  "results": [
+    {
+      "arm": "before",
+      "ok": true,
+      "calls": {
+        "map": 9,
+        "memory": 10,
+        "other": 1,
+        "reply": 10,
+        "understanding": 2
+      },
+      "callsTotal": 32,
+      "mapPasses": 9,
+      "inputTokens": {
+        "map": 180069,
+        "memory": 13461,
+        "other": 1112,
+        "reply": 67767,
+        "understanding": 3647
+      },
+      "inputTokensTotal": 266056,
+      "cacheableTokens": 228096,
+      "uncachedTokens": 37960,
+      "routeMsMedian": 69
+    },
+    {
+      "arm": "after",
+      "ok": true,
+      "calls": {
+        "map": 3,
+        "memory": 8,
+        "other": 1,
+        "reply": 10,
+        "title": 1
+      },
+      "callsTotal": 23,
+      "mapPasses": 3,
+      "inputTokens": {
+        "map": 59895,
+        "memory": 10792,
+        "other": 1112,
+        "reply": 36876,
+        "title": 202
+      },
+      "inputTokensTotal": 108877,
+      "cacheableTokens": 78080,
+      "uncachedTokens": 30797,
+      "routeMsMedian": 68
+    },
+    {
+      "arm": "core4",
+      "ok": true,
+      "calls": {
+        "memory": 10,
+        "other": 10,
+        "reply": 10,
+        "title": 2,
+        "understanding": 2
+      },
+      "callsTotal": 34,
+      "mapPasses": 0,
+      "inputTokens": {
+        "memory": 13434,
+        "other": 19511,
+        "reply": 55253,
+        "title": 350,
+        "understanding": 3617
+      },
+      "inputTokensTotal": 92165,
+      "cacheableTokens": 68224,
+      "uncachedTokens": 23941,
+      "routeMsMedian": 66
+    },
+    {
+      "arm": "classic",
+      "ok": true,
+      "calls": {
+        "map": 3,
+        "memory": 8,
+        "other": 1,
+        "reply": 10,
+        "title": 1
+      },
+      "callsTotal": 23,
+      "mapPasses": 3,
+      "inputTokens": {
+        "map": 59895,
+        "memory": 10792,
+        "other": 1112,
+        "reply": 68045,
+        "title": 202
+      },
+      "inputTokensTotal": 140046,
+      "cacheableTokens": 107008,
+      "uncachedTokens": 33038,
+      "routeMsMedian": 67
+    },
+    {
+      "arm": "open",
+      "ok": true,
+      "calls": {
+        "map": 9,
+        "memory": 8,
+        "other": 1,
+        "reply": 10,
+        "title": 1
+      },
+      "callsTotal": 29,
+      "mapPasses": 9,
+      "inputTokens": {
+        "map": 180069,
+        "memory": 10792,
+        "other": 1112,
+        "reply": 36876,
+        "title": 202
+      },
+      "inputTokensTotal": 229051,
+      "cacheableTokens": 196864,
+      "uncachedTokens": 32187,
+      "routeMsMedian": 67
+    }
+  ],
+  "perTurn": {
+    "before": [
+      {
+        "turn": 1,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6447,
+          "memory": 1357,
+          "map": 19624
+        },
+        "cacheableTokens": 0,
+        "map": true
+      },
+      {
+        "turn": 2,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6532,
+          "memory": 1352,
+          "map": 19772
+        },
+        "cacheableTokens": 26880,
+        "map": true
+      },
+      {
+        "turn": 3,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 6583,
+          "memory": 1337
+        },
+        "cacheableTokens": 7552,
+        "map": false
+      },
+      {
+        "turn": 4,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "understanding": 1
+        },
+        "inputTokens": {
+          "reply": 6712,
+          "memory": 1349,
+          "map": 19913,
+          "understanding": 1833
+        },
+        "cacheableTokens": 27392,
+        "map": true
+      },
+      {
+        "turn": 5,
+        "intent": "structure",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6731,
+          "memory": 1352,
+          "map": 19992
+        },
+        "cacheableTokens": 27520,
+        "map": true
+      },
+      {
+        "turn": 6,
+        "intent": "visual",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "other": 1
+        },
+        "inputTokens": {
+          "reply": 6884,
+          "memory": 1341,
+          "map": 20060,
+          "other": 1112
+        },
+        "cacheableTokens": 27776,
+        "map": true
+      },
+      {
+        "turn": 7,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6871,
+          "memory": 1352,
+          "map": 20139
+        },
+        "cacheableTokens": 27776,
+        "map": true
+      },
+      {
+        "turn": 8,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "understanding": 1
+        },
+        "inputTokens": {
+          "reply": 6936,
+          "memory": 1332,
+          "map": 20199,
+          "understanding": 1815
+        },
+        "cacheableTokens": 28032,
+        "map": true
+      },
+      {
+        "turn": 9,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6999,
+          "memory": 1349,
+          "map": 20190
+        },
+        "cacheableTokens": 27520,
+        "map": true
+      },
+      {
+        "turn": 10,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 7076,
+          "memory": 1344,
+          "map": 20183
+        },
+        "cacheableTokens": 27648,
+        "map": true
+      }
+    ],
+    "after": [
+      {
+        "turn": 1,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "title": 1
+        },
+        "inputTokens": {
+          "reply": 3251,
+          "memory": 1357,
+          "title": 202
+        },
+        "cacheableTokens": 0,
+        "map": false
+      },
+      {
+        "turn": 2,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 3336,
+          "memory": 1352
+        },
+        "cacheableTokens": 4224,
+        "map": false
+      },
+      {
+        "turn": 3,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1
+        },
+        "inputTokens": {
+          "reply": 3387
+        },
+        "cacheableTokens": 3200,
+        "map": false
+      },
+      {
+        "turn": 4,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3793,
+          "memory": 1349,
+          "map": 19844
+        },
+        "cacheableTokens": 4352,
+        "map": true
+      },
+      {
+        "turn": 5,
+        "intent": "structure",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3534,
+          "memory": 1352,
+          "map": 19992
+        },
+        "cacheableTokens": 23936,
+        "map": true
+      },
+      {
+        "turn": 6,
+        "intent": "visual",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "other": 1
+        },
+        "inputTokens": {
+          "reply": 3849,
+          "memory": 1341,
+          "map": 20060,
+          "other": 1112
+        },
+        "cacheableTokens": 24064,
+        "map": true
+      },
+      {
+        "turn": 7,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 3835,
+          "memory": 1352
+        },
+        "cacheableTokens": 4736,
+        "map": false
+      },
+      {
+        "turn": 8,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1
+        },
+        "inputTokens": {
+          "reply": 3901
+        },
+        "cacheableTokens": 3712,
+        "map": false
+      },
+      {
+        "turn": 9,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 3963,
+          "memory": 1349
+        },
+        "cacheableTokens": 4864,
+        "map": false
+      },
+      {
+        "turn": 10,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 4031,
+          "memory": 1344
+        },
+        "cacheableTokens": 4992,
+        "map": false
+      }
+    ],
+    "core4": [
+      {
+        "turn": 1,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1,
+          "title": 1
+        },
+        "inputTokens": {
+          "other": 1452,
+          "reply": 5185,
+          "memory": 1352,
+          "title": 135
+        },
+        "cacheableTokens": 0,
+        "map": false
+      },
+      {
+        "turn": 2,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1,
+          "title": 1
+        },
+        "inputTokens": {
+          "other": 1703,
+          "reply": 5137,
+          "memory": 1352,
+          "title": 215
+        },
+        "cacheableTokens": 7168,
+        "map": false
+      },
+      {
+        "turn": 3,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "other": 1790,
+          "reply": 5418,
+          "memory": 1331
+        },
+        "cacheableTokens": 7296,
+        "map": false
+      },
+      {
+        "turn": 4,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1,
+          "understanding": 1
+        },
+        "inputTokens": {
+          "other": 1867,
+          "reply": 5586,
+          "memory": 1349,
+          "understanding": 1817
+        },
+        "cacheableTokens": 7296,
+        "map": false
+      },
+      {
+        "turn": 5,
+        "intent": "structure",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "other": 1942,
+          "reply": 5554,
+          "memory": 1346
+        },
+        "cacheableTokens": 7552,
+        "map": false
+      },
+      {
+        "turn": 6,
+        "intent": "visual",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "other": 2011,
+          "reply": 5428,
+          "memory": 1341
+        },
+        "cacheableTokens": 7680,
+        "map": false
+      },
+      {
+        "turn": 7,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "other": 2088,
+          "reply": 5691,
+          "memory": 1346
+        },
+        "cacheableTokens": 7680,
+        "map": false
+      },
+      {
+        "turn": 8,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1,
+          "understanding": 1
+        },
+        "inputTokens": {
+          "other": 2148,
+          "reply": 5753,
+          "memory": 1332,
+          "understanding": 1801
+        },
+        "cacheableTokens": 7808,
+        "map": false
+      },
+      {
+        "turn": 9,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "other": 2220,
+          "reply": 5623,
+          "memory": 1343
+        },
+        "cacheableTokens": 7808,
+        "map": false
+      },
+      {
+        "turn": 10,
+        "intent": "conversation",
+        "calls": {
+          "other": 1,
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "other": 2292,
+          "reply": 5882,
+          "memory": 1345
+        },
+        "cacheableTokens": 7936,
+        "map": false
+      }
+    ],
+    "classic": [
+      {
+        "turn": 1,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "title": 1
+        },
+        "inputTokens": {
+          "reply": 6447,
+          "memory": 1357,
+          "title": 202
+        },
+        "cacheableTokens": 0,
+        "map": false
+      },
+      {
+        "turn": 2,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 6532,
+          "memory": 1352
+        },
+        "cacheableTokens": 7424,
+        "map": false
+      },
+      {
+        "turn": 3,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1
+        },
+        "inputTokens": {
+          "reply": 6583
+        },
+        "cacheableTokens": 6400,
+        "map": false
+      },
+      {
+        "turn": 4,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6989,
+          "memory": 1349,
+          "map": 19844
+        },
+        "cacheableTokens": 7680,
+        "map": true
+      },
+      {
+        "turn": 5,
+        "intent": "structure",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 6731,
+          "memory": 1352,
+          "map": 19992
+        },
+        "cacheableTokens": 27136,
+        "map": true
+      },
+      {
+        "turn": 6,
+        "intent": "visual",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "other": 1
+        },
+        "inputTokens": {
+          "reply": 6884,
+          "memory": 1341,
+          "map": 20060,
+          "other": 1112
+        },
+        "cacheableTokens": 27776,
+        "map": true
+      },
+      {
+        "turn": 7,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 6871,
+          "memory": 1352
+        },
+        "cacheableTokens": 7808,
+        "map": false
+      },
+      {
+        "turn": 8,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1
+        },
+        "inputTokens": {
+          "reply": 6936
+        },
+        "cacheableTokens": 6784,
+        "map": false
+      },
+      {
+        "turn": 9,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 6999,
+          "memory": 1349
+        },
+        "cacheableTokens": 7936,
+        "map": false
+      },
+      {
+        "turn": 10,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1
+        },
+        "inputTokens": {
+          "reply": 7076,
+          "memory": 1344
+        },
+        "cacheableTokens": 8064,
+        "map": false
+      }
+    ],
+    "open": [
+      {
+        "turn": 1,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "title": 1
+        },
+        "inputTokens": {
+          "reply": 3251,
+          "memory": 1357,
+          "map": 19624,
+          "title": 202
+        },
+        "cacheableTokens": 0,
+        "map": true
+      },
+      {
+        "turn": 2,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3336,
+          "memory": 1352,
+          "map": 19772
+        },
+        "cacheableTokens": 23680,
+        "map": true
+      },
+      {
+        "turn": 3,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1
+        },
+        "inputTokens": {
+          "reply": 3387
+        },
+        "cacheableTokens": 3200,
+        "map": false
+      },
+      {
+        "turn": 4,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3793,
+          "memory": 1349,
+          "map": 19913
+        },
+        "cacheableTokens": 24064,
+        "map": true
+      },
+      {
+        "turn": 5,
+        "intent": "structure",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3534,
+          "memory": 1352,
+          "map": 19992
+        },
+        "cacheableTokens": 24320,
+        "map": true
+      },
+      {
+        "turn": 6,
+        "intent": "visual",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1,
+          "other": 1
+        },
+        "inputTokens": {
+          "reply": 3849,
+          "memory": 1341,
+          "map": 20060,
+          "other": 1112
+        },
+        "cacheableTokens": 24064,
+        "map": true
+      },
+      {
+        "turn": 7,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3835,
+          "memory": 1352,
+          "map": 20139
+        },
+        "cacheableTokens": 24704,
+        "map": true
+      },
+      {
+        "turn": 8,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3901,
+          "map": 20199
+        },
+        "cacheableTokens": 23808,
+        "map": true
+      },
+      {
+        "turn": 9,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 3963,
+          "memory": 1349,
+          "map": 20190
+        },
+        "cacheableTokens": 24448,
+        "map": true
+      },
+      {
+        "turn": 10,
+        "intent": "conversation",
+        "calls": {
+          "reply": 1,
+          "memory": 1,
+          "map": 1
+        },
+        "inputTokens": {
+          "reply": 4031,
+          "memory": 1344,
+          "map": 20183
+        },
+        "cacheableTokens": 24576,
+        "map": true
+      }
+    ]
+  }
+}

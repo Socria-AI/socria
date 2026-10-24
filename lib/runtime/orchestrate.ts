@@ -71,7 +71,7 @@ const STRUCTURE = new RegExp(
     String.raw`\b(?:logical|structural|argument)\s+(?:audit|analysis|deconstruction|breakdown|structure)\b`,
     String.raw`\b(?:causal|dependency|dependencies)\s+(?:chain|graph|diagram|structure|mapping|tree)\b`,
     String.raw`\b(?:node|decision|argument|issue|logic)\s+tree\b`,
-    String.raw`\bwhat\s+(?:does|do)\s+(?:this|that|it|my\s+\w+)\s+(?:rest|rests|depend|depends|hinge|hinges)\s+on\b`,
+    String.raw`\bwhat\s+(?:does|do)\s+(?:this|that|it|(?:my|the|this|our)(?:\s+\w+){1,3})\s+(?:rest|rests|depend|depends|hinge|hinges)\s+on\b`,
     String.raw`\b(?:show|visuali[sz]e|draw|lay\s+out)\s+(?:me\s+)?(?:the|my|this)\s+(?:structure|logic|reasoning|argument)\b`,
     String.raw`\b(?:open|show|go\s+to|switch\s+to)\s+(?:the\s+)?logic\s+map\b`,
   ].join('|'),

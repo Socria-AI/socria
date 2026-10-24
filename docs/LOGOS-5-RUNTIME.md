@@ -401,12 +401,39 @@ sets a conversation incognito yet.
 
 ## 7. Measurement
 
-`evals/logos5/` — behaviour and truthfulness scenarios graded
-deterministically, run through the real route against the live model (they
-say so and exit when no key is set), with `--persona classic` for the
-ablation and `--root` for before/after. `evals/logos5/cost.mjs` — model calls
-and prompt sizes per interaction for scripted conversations through the real
-routes, old orchestration against new. Results and their limits are in §10.
+Three instruments, in `evals/logos5/`. Results and their limits are in §10.
+
+**Cost per interaction, offline** — `node evals/logos5/measure.mjs`. The real
+routes (Logos, its map pass, the title, the older understanding profile, Core
+4) built from a checkout and driven through one scripted ten-turn
+conversation — talk, an "ok", a factual question, structure asked for, a
+decision matrix asked for, a "thanks" — with the database and auth swapped as
+in `evals/accuracy` and the model replaced by a recorder
+(`evals/logos5/fake-model.mjs`) that keeps every request. Counted: calls by
+purpose; input tokens (estimated at four characters per token); and the
+leading prefix each call repeats byte for byte from the previous call of its
+kind — what a provider prompt cache could serve (OpenAI's rule: ≥ 1024
+tokens, in 128-token steps), an upper bound since a cache also depends on
+timing. Not counted: output tokens and model latency — a recorder answers
+instantly. The figures are deterministic; `evals/logos5/results/measure.json`
+holds them turn by turn.
+
+**Behaviour, truthfulness, product, live** — `OPENAI_API_KEY=… node
+evals/logos5/run.mjs`. Fifteen scenarios (`scenarios.json`) through the real
+Logos route (`--surface core4|both` for Core 4), graded by
+`evals/logos5/grade.mjs` with no judge model: answering rather than
+withholding, scaffolded options rather than a scolding fallback, a delegated
+answer given, no hedging on settled facts, a false premise corrected, a real
+mistake owned and a wrong correction refused, no invented memory, no
+fabricated sources or tool runs, saying what cannot be checked, and — read
+from the route's own trace — the view it chose. Ablations: `--persona
+classic`, `--runtime off`; before/after: `--root <worktree>`. Without a key it
+says so and produces nothing. The graders are held to canned replies by
+`test/logos5-eval.test.mjs`.
+
+**Routing, offline** — the same command runs the runtime's reader against 38
+labelled turns (`routing.json`) with no model, and the suite runs it on every
+push.
 
 ## 8. Switches and rollback
 
@@ -416,9 +443,20 @@ routes, old orchestration against new. Results and their limits are in §10.
 | `LOGOS_PERSONA` | `v5` | `classic` restores `LOGOS_CHAT_PROMPT` |
 | `NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN` | off | on restores a map pass on every turn |
 
-The interface (§5) is not behind a switch: it changes no stored data, so a
-revert of its commit is the rollback. No data migration is needed to roll
-any of this back: nothing stored was rewritten.
+`NEXT_PUBLIC_LOGOS5=off` still brings back the Logos 4 screen for a
+deployment (lib/logos5/flags.ts). The four views (§5) are not behind a switch
+of their own: they change no stored data, so reverting their commit is the
+rollback.
+
+**Data.** No schema changed and no stored row was rewritten. What is new is
+additive and optional, so older code reads it and ignores it: a map's
+`drawnAt`; a memory's provenance entries for a confirmation ("confirmed by
+you") and an edit's `prior`; per-device keys for the Content canvas
+(`socria.logos5.content.v1`) and Split View's width
+(`socria.logos5.beside.v1`). The memory rules (§6) decide what is written from
+now on; they do not touch what is already stored — a claim stored as stated
+before them stays stated. Reverting the memory commit restores the old rules
+for new writes. Nothing here needs a migration to roll back.
 
 ## 9. Not finished, or decided differently
 
@@ -444,4 +482,68 @@ Kept current as the work lands; see §10 for the final state.
 
 ## 10. Results
 
-Filled in when the work is complete.
+As of the last commit of this work on `dev`. Nothing here was deployed to
+production, and nothing was run against a live model: this environment has
+no key, so every figure below is either deterministic or measured with a
+recording model, and says which.
+
+**Checks.** 255 test suites pass (`node test/run.mjs`), the type check is
+clean, and `next build` succeeds (its one warning — `unpdf`'s `import.meta`
+— predates this work). New suites: `runtime`, `runtime-route`,
+`logos5-views`, `logos5-shell`, `mind-ground`, `logos5-eval`.
+
+**The interface, in a browser.** A journey through the real app against the
+local stand-ins (`scripts/dev/logos5-views-journey.mjs`) passes on a 1440 px
+desktop and a 390 px phone, in Paper and in Night: Chat first; rule A (a
+question stays in Chat, no map pass), B (a document read into Content, the
+screen stays, "Added to Content" under the turn), C (a chart opens Artifacts
+beside the conversation), D (structure opens the Logic Map, the reply beside
+it); the Logic Map drawn once when opened stale; Split View's three sections
+and Escape; a Content card dragged and kept; ⌘K search finding and opening
+another line of thinking; the Universal Map with no banner, legend or hint
+and an exact Today. axe (WCAG 2 A/AA) found nothing on Chat, the Logic Map,
+Split View, Content or search, in either theme or on the phone — after the
+journey caught the colour fallbacks the Paper theme lacked (§5). Signed out
+only: the Memory page's "That's right" is held by a render test, not a
+signed-in browser session.
+
+**Cost per interaction, measured offline** (`evals/logos5/measure.mjs`; ten
+turns, the same conversation; tokens estimated at four characters each;
+input only; "cacheable" an upper bound):
+
+| | model calls | map passes | input tokens | cacheable | not cacheable |
+|---|---|---|---|---|---|
+| Logos before (runtime off, Logos 3.5 prompt, map every turn) | 32 | 9 | ≈266,100 | ≈228,100 | ≈38,000 |
+| **Logos 5** | **23** | **3** | **≈108,900** | **≈78,100** | **≈30,800** |
+| Logos 5 with the Logos 3.5 prompt | 23 | 3 | ≈140,000 | ≈107,000 | ≈33,000 |
+| Logos 5 with the Logic Map open throughout | 29 | 9 | ≈229,100 | ≈196,900 | ≈32,200 |
+| Core 4 (as its page drove it) | 34 | — | ≈92,200 | ≈68,200 | ≈23,900 |
+
+Read plainly: over these ten turns Logos 5 sends 28% fewer model calls and
+59% fewer input tokens than Logos did, and 19% fewer of the tokens no cache
+could serve. Most of it is the map pass — each is ≈20,000 tokens of
+extractor instructions, and it now runs three times instead of nine; the
+reply prompt is about half the size (≈3,700 tokens a turn against ≈6,800 —
+the persona alone is ≈31,000 of the saving); "ok" and "thanks" no longer cost
+a memory extraction; the second memory store is gone; one title call is
+added. With the Logic Map open the whole time the map costs what it did, by
+design. Core 4 sends fewer tokens because it draws no map, and more calls
+(a state reading every turn). Not measured: output tokens, and latency — the
+reply is still one model call per turn and the map pass already ran beside
+it, so time to the first word is the reply model's, unchanged by this work;
+the routes' own work is ≈70 ms a turn either way.
+
+**Routing, offline.** 38 of 38 labelled turns read as labelled — after one
+fix the set itself found ("what does my whole plan rest on?" was read as
+talk). The set was written alongside the rules: a regression check, not a
+benchmark.
+
+**Behaviour and truthfulness, live: not run.** The fifteen scenarios and
+their graders are in place and the graders are tested; the numbers need
+`OPENAI_API_KEY=… node evals/logos5/run.mjs`, then the same with
+`--persona classic` and `--runtime off` for the ablations, and `--root` on a
+worktree of `e8aaeb4` for before and after. Until then nothing here claims
+the reply behaves better, and nothing claims hallucinations are gone: what
+is shown is that the code now removes citations that name nothing, labels
+claims against the evidence it had, refuses to store an unsaid claim as said,
+and tells the reply where each memory came from.
