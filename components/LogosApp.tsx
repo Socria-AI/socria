@@ -1008,8 +1008,10 @@ export function LogosApp({
     // Logos 5 has no depth control at all — its one setting is the length —
     // so it answers Balanced, whatever another surface stored.
     depth: !l5Ref.current && depthOn ? depthRef.current : ('balanced' as ThinkingDepth),
-    // Logos 5's one setting: how long the answers run
-    ...(l5Ref.current ? { length: lengthRef.current } : {}),
+    // Logos 5 — the new Socria, behind its access code: its one setting (how
+    // long the answers run), and which screen this is, so the reply speaks as
+    // Logos 5 here and as the Logos they had everywhere else (lib/runtime personaOf)
+    ...(l5Ref.current ? { length: lengthRef.current, surface: 'logos5' as const } : {}),
     guard: guardRef.current,
     // the character chosen for the account — the same one Core 4 uses —
     // and the written instructions below it (lib/conversation-style.ts)

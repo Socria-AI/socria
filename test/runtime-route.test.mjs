@@ -89,7 +89,8 @@ async function turn(body, { reply = 'Noted.', script = [], env = {} } = {}) {
     globalThis.__logosPrompts = [];
     globalThis.__logosReply = reply;
     globalThis.__logosScript = [...script];
-    const r = await chat.POST(new NextRequest('http://localhost/api/logos/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
+    // the new Socria's screen says so on every request (LogosApp guidance()); a test of another screen passes surface: undefined
+    const r = await chat.POST(new NextRequest('http://localhost/api/logos/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ surface: 'logos5', ...body }) }));
     const received = await r.text().catch(() => '');
     await new Promise((ok) => setTimeout(ok, 30));
     const calls = globalThis.__logosCalls;
@@ -109,6 +110,12 @@ console.log('\n=== the persona, and taking it back ===');
   ok('LOGOS_PERSONA=classic: the Logos 3.5 prompt, the rest of the runtime kept', /You are the mirror/.test(classic.first) && /^classic;/.test(classic.headers.get('x-socria-runtime') ?? ''), classic.headers.get('x-socria-runtime'));
   const off = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_RUNTIME: 'off' } });
   ok('LOGOS_RUNTIME=off: the route as it was — no runtime at all', /You are the mirror/.test(off.first) && off.headers.get('x-socria-runtime') === null && !/=== This turn ===/.test(off.system));
+  const l4 = await turn({ surface: undefined, messages: [U('We should launch in March.')] });
+  ok('another Logos screen — nobody who has entered the new Socria\'s code — keeps the Logos it had', /You are the mirror/.test(l4.first) && /^classic;/.test(l4.headers.get('x-socria-runtime') ?? ''), l4.headers.get('x-socria-runtime'));
+  const l4costs = await turn({ surface: undefined, length: 'concise', messages: [U('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?')] });
+  ok('  with none of the new Socria in it: no inline elements offered, no length line', !/INLINE, IF IT HELPS/.test(l4costs.system) && !/=== LENGTH/.test(l4costs.first) && /;inline=none(;|$)/.test(l4costs.headers.get('x-socria-runtime') ?? ''), l4costs.headers.get('x-socria-runtime'));
+  const every = await turn({ surface: undefined, messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'v5' } });
+  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v2;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
 }
 
 console.log('\n=== who does what, this turn ===');

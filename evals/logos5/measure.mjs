@@ -188,7 +188,7 @@ async function run(arm) {
       const turn = { turn: i + 1, text, intent: route.intent, calls: {}, inChars: {}, cachedTok: 0, ms: 0, map: false };
       const t = arm === 'core4'
         ? await post(R.core4, '/api/chat', { model: 'core-4', messages: history.map(({ role, content }) => ({ role, content })), conversationId: 'c_measure' })
-        : await post(R.logos, '/api/logos/chat', { sessionId: 'lg_measure', messages: history.map(({ role, content }) => ({ role, content })), mind: true });
+        : await post(R.logos, '/api/logos/chat', { sessionId: 'lg_measure', messages: history.map(({ role, content }) => ({ role, content })), mind: true, surface: 'logos5' });
       turn.ms = Math.round(t.ms);
       turn.status = t.status;
       history.push({ role: 'assistant', content: t.text.replace(/\u0000|\[\[[A-Z_]+[^\]]*\]\]/g, '').slice(0, 4000), at: Date.now() });

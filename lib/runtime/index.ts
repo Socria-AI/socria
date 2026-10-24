@@ -29,7 +29,18 @@ export function runtimeOn(env: Record<string, string | undefined> = process.env)
   return !off(env.LOGOS_RUNTIME);
 }
 
-/** Which persona speaks: the Logos 5 core, or the Logos 3.5 prompt (for rollback and for the ablation). */
-export function personaOf(env: Record<string, string | undefined> = process.env): 'v5' | 'classic' {
-  return runtimeOn(env) && !/^classic$/i.test((env.LOGOS_PERSONA ?? '').trim()) ? 'v5' : 'classic';
+/**
+ * Which persona speaks. The Logos 5 core is the new Socria's, and the new
+ * Socria is behind its access code (lib/new-socria.ts): its screen says so on
+ * every request (`surface: 'logos5'`, LogosApp guidance()). Everyone else keeps
+ * the Logos they had — the Logos 3.5 prompt, the rest of the runtime with it.
+ * LOGOS_PERSONA=classic is the rollback for everyone; LOGOS_PERSONA=v5 gives
+ * every surface the new persona (the evaluations' ablations use both).
+ */
+export function personaOf(env: Record<string, string | undefined> = process.env, surface?: unknown): 'v5' | 'classic' {
+  if (!runtimeOn(env)) return 'classic';
+  const want = (env.LOGOS_PERSONA ?? '').trim().toLowerCase();
+  if (want === 'classic') return 'classic';
+  if (want === 'v5') return 'v5';
+  return surface === 'logos5' ? 'v5' : 'classic';
 }

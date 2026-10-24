@@ -128,7 +128,8 @@ async function ask(surface, scenario) {
   db.reset();
   globalThis.__uid = undefined; // signed out: no memory either way, so the scenarios test the reply alone
   const url = surface === 'core4' ? 'http://localhost/api/chat' : 'http://localhost/api/logos/chat';
-  const body = surface === 'core4' ? { model: 'core-4', messages: scenario.messages, conversationId: `l5-${scenario.id}` } : { messages: scenario.messages };
+  // Logos as the new Socria's screen sends it (LogosApp guidance()): the Logos 5 persona, unless --persona classic
+  const body = surface === 'core4' ? { model: 'core-4', messages: scenario.messages, conversationId: `l5-${scenario.id}` } : { messages: scenario.messages, surface: 'logos5' };
   const r = await routes[surface].POST(new NextRequest(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   const text = await r.text();
   await new Promise((done) => setTimeout(done, 200));

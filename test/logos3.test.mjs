@@ -47,7 +47,7 @@ console.log('\n=== depth, in the model picker ===');
   ok('the Logos composer\'s model picker carries depth where the model has it', /depth=\{depthOn \? depth : undefined\}/.test(picker) && /onDepth=\{depthOn \? pickDepth : undefined\}/.test(picker));
   ok('…with the plan, once it is known, so a lock is never flashed at a member', /plan=\{planKnown \? plan : undefined\}/.test(picker));
   ok('one control, not two: the separate depth pill is gone', !/className="lg-depth"/.test(app));
-  ok('every Logos request carries the chosen depth when the model has depth modes — Logos 5, whose one setting is the length, answers Balanced', /depth: !l5Ref\.current && depthOn \? depthRef\.current : \('balanced' as ThinkingDepth\)/.test(app) && /\.\.\.\(l5Ref\.current \? \{ length: lengthRef\.current \} : \{\}\)/.test(app));
+  ok('every Logos request carries the chosen depth when the model has depth modes — Logos 5, whose one setting is the length, answers Balanced', /depth: !l5Ref\.current && depthOn \? depthRef\.current : \('balanced' as ThinkingDepth\)/.test(app) && /\.\.\.\(l5Ref\.current \? \{ length: lengthRef\.current, surface: 'logos5' as const \} : \{\}\)/.test(app));
   ok('the chat route clamps it by plan, as the map and explore routes do', /depthForPlan\(resolveDepth\(body\?\.depth\), plan\)/.test(read('app/api/logos/chat/route.ts')));
 }
 

@@ -202,7 +202,8 @@ export async function POST(req: NextRequest) {
     // conversation's history stays in the provider's prompt cache
     // (orchestrate.ts historyStart); without it, the last 24 as before.
     const runtime = runtimeOn();
-    const persona = personaOf();
+    // the new Socria's screen (behind its access code) gets the Logos 5 persona; any other Logos screen keeps its own
+    const persona = personaOf(process.env, body?.surface);
     const kept = runtime ? usable.slice(historyStart(usable.length)) : usable.slice(-MAX_HISTORY);
 
     // Two people, or one? A shared Logos 3 room — or a line of thinking shared

@@ -451,7 +451,7 @@ both on every push.
 | Switch | Default | Off means |
 |---|---|---|
 | `LOGOS_RUNTIME` | on | the route as it was: old prompt assembly, no epistemic checks, 24-message window |
-| `LOGOS_PERSONA` | `v5` | `classic` restores `LOGOS_CHAT_PROMPT` |
+| `LOGOS_PERSONA` | unset: the Logos 5 persona for the new Socria's screen — the one behind its access code, which sends `surface: 'logos5'` with every turn — and `LOGOS_CHAT_PROMPT` for any other Logos screen | `classic` restores `LOGOS_CHAT_PROMPT` everywhere; `v5` gives every Logos screen the Logos 5 persona |
 | `NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN` | off | on restores a map pass on every turn |
 
 `NEXT_PUBLIC_LOGOS5=off` still brings back the Logos 4 screen for a
@@ -827,6 +827,15 @@ and under 1,000 for two (both held by the suite).
   answered.
 
 ### Switches and rollback
+
+**Behind the access code.** The Logos 5 persona — and with it the inline
+elements, the length setting and the turn's allocation — is the new Socria's,
+and so is chosen per request: the Logos 5 screen, which only someone who has
+entered the code sees (lib/new-socria.ts), says so with `surface: 'logos5'`;
+a Logos 4 screen sends nothing and keeps `LOGOS_CHAT_PROMPT`, with the rest of
+the runtime (the citation checks, the stepped history, the move engine's
+fixes). The gate is a rollout, not a security boundary: a request that claims
+the surface gets a different voice and nothing it could not otherwise use.
 
 `LOGOS_INLINE=off` offers nothing and drops any block a reply writes anyway;
 stored conversations still draw theirs. The data is additive: a message's `ui`
