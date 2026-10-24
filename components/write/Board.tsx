@@ -342,7 +342,7 @@ export function Board({
           value={dump}
           rows={1}
           placeholder="Brain-dump an idea, then Enter — paste a list to add many"
-          aria-label="Add an idea to the Draft Space"
+          aria-label="Add an idea to your notes"
           onChange={(e) => setDump(e.target.value)}
           onKeyDown={(e) => {
             if (e.key === 'Enter' && !e.shiftKey) {

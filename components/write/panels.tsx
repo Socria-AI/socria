@@ -132,18 +132,17 @@ export function OutlinePanel({
   onGo,
   onMove,
   onStructure,
-  structuring,
 }: {
   doc: WriteDoc;
   onGo: (id: string) => void;
   onMove: (id: string, dir: -1 | 1) => void;
+  /** a reverse outline of the argument, read by Socria — in its panel */
   onStructure?: () => void;
-  structuring?: boolean;
 }) {
   const items = useMemo(() => outlineOf(doc), [doc]);
   return (
     <div className="w-outline">
-      <p className="w-eyebrow">Outline · your headings; move a section and everything under it moves too</p>
+      <p className="w-quiet">Your headings. Moving a section moves everything under it too.</p>
       {!items.length && <p className="w-quiet">The headings you write appear here. Make a line a heading from the toolbar’s style menu, or start it with “# ”.</p>}
       <ol className="w-outline-list">
         {items.map((it) => (
@@ -163,12 +162,9 @@ export function OutlinePanel({
         ))}
       </ol>
       {onStructure && (
-        <div className="w-check-foot">
-          <button type="button" className="w-btn" onClick={onStructure} disabled={structuring}>
-            {structuring ? 'Socria is reading the argument…' : 'Ask Socria how the argument is organised'}
-          </button>
-          <p className="w-quiet">A reverse outline — what each paragraph does — and where the order or a step might not hold. It moves nothing until you do.</p>
-        </div>
+        <button type="button" className="w-link-btn" onClick={onStructure}>
+          How is the argument organised? Ask Socria →
+        </button>
       )}
     </div>
   );
@@ -196,7 +192,7 @@ export function PagePanel({ doc, onChange }: { doc: WriteDoc; onChange: (patch: 
   };
   return (
     <div className="w-pagesetup">
-      <p className="w-eyebrow">Page setup · how it prints and exports</p>
+      <p className="w-quiet">How it prints, and how Word and PDF copies are laid out.</p>
       <label className="w-field">
         <span>Paper</span>
         <select className="w-input" value={page.size} onChange={(e) => setPage({ size: e.target.value as PaperSize })}>

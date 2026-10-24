@@ -2,8 +2,10 @@
 //
 // What can be decided by a rule is decided by a rule, here, on the device, as
 // the person writes: a doubled word, a misspelling that is never a word,
-// "could of", a missing capital, a sentence that runs to fifty words, a claim
-// of research with nothing cited. Each finding says how sure it is —
+// "could of", "they was", "their is", a bracket never closed, a missing
+// capital, a sentence that runs to fifty words, "in order to" where "to" will
+// do, a claim of research with nothing cited. Each finding says how sure it
+// is —
 //
 //   definite    a rule of English is broken; there is one right answer
 //   likely      almost certainly wrong, but the context could make it right — and the note says what
@@ -19,7 +21,7 @@
 //
 // PURE.
 
-import { isHeading, isList, isTextType, textBlocks, textOrder, type Block, type WriteDoc } from './doc';
+import { findText, isHeading, isList, isTextType, replaceText, spliceBlock, textBlocks, textOrder, type Block, type WriteDoc } from './doc';
 
 export const ISSUE_KINDS = ['spelling', 'grammar', 'clarity', 'logic', 'support', 'repetition', 'structure', 'citation'] as const;
 export type IssueKind = (typeof ISSUE_KINDS)[number];
@@ -135,6 +137,37 @@ const STOP = new Set(
   'the a an and or but if then than that this these those of to in on for with as at by from is are was were be been being it its i you he she they we my your our their his her not no do does did have has had will would can could should may might must about into over under just very really more most some any all what which who when where how why so because there here them us me him also such each other only own same than too'.split(' ')
 );
 
+// Findings about a sentence or a paragraph as a whole, not about some of its words.
+const WIDE = new Set(['long-sentence', 'long-paragraph', 'unsupported', 'uncited-quote', 'same-opening']);
+
+// Phrases that say no more than a shorter one. Each is a judgement call: the
+// longer one is not wrong, and the writer may want its rhythm.
+const WORDY: [RegExp, string | ((m: RegExpMatchArray) => string), string][] = [
+  [/\bin order to\b/gi, 'to', '“In order to” usually says no more than “to”.'],
+  [/\bdue to the fact that\b/gi, 'because', '“Because” says the same in one word.'],
+  [/\bin spite of the fact that\b/gi, 'although', '“Although” says the same in one word.'],
+  [/\bdespite the fact that\b/gi, 'although', '“Although” says the same in one word.'],
+  [/\bat this point in time\b/gi, 'now', '“Now” says the same in one word.'],
+  [/\bat the present time\b/gi, 'now', '“Now” says the same in one word.'],
+  [/\bfor the purpose of\b/gi, 'for', '“For” usually says the same.'],
+  [/\b(has|have) the ability to\b/gi, 'can', '“Can” says the same in one word.'],
+  [/\bin the event that\b/gi, 'if', '“If” says the same in one word.'],
+  [/\ba (large|great) number of\b/gi, 'many', '“Many” says the same in one word.'],
+  [/\bthe (vast )?majority of\b/gi, 'most', '“Most” says the same in one word.'],
+  [/\bwith (regard|regards|respect) to\b/gi, 'about', '“About” (or “on”) usually says the same.'],
+  [/\beach and every\b/gi, 'every', '“Each and every” says “every” twice.'],
+  [/\bvery unique\b/gi, 'unique', '“Unique” already means one of a kind, so it does not take “very”.'],
+  [/\babsolutely (essential|necessary)\b/gi, (m) => m[1], 'What is essential cannot be more so; “absolutely” adds nothing.'],
+  [/\bend result\b/gi, 'result', 'A result is already the end.'],
+  [/\bpast history\b/gi, 'history', 'History is already past.'],
+  [/\bfuture plans\b/gi, 'plans', 'Plans are already for the future.'],
+  [/\bfree gift\b/gi, 'gift', 'A gift is already free.'],
+  [/\bbasic fundamentals\b/gi, 'fundamentals', 'Fundamentals are already basic.'],
+  [/\bcompletely (finished|eliminated|destroyed|eliminate|destroy)\b/gi, (m) => m[1], 'This already says “completely”.'],
+  [/\brevert back\b/gi, 'revert', 'To revert is already to go back.'],
+  [/\bclose proximity\b/gi, 'proximity', 'Proximity is already closeness.'],
+];
+
 // ── one block ────────────────────────────────────────────────────────
 
 interface Ctx {
@@ -197,7 +230,8 @@ export function checkBlock(block: Block, ctx: Ctx): Issue[] {
   if (!text.trim() || block.t === 'code' || !isTextType(block.t)) return [];
   const out: Issue[] = [];
   const add = (rule: string, kind: IssueKind, certainty: Certainty, s: number, e: number, title: string, why: string, fix?: string) => {
-    if (out.some((x) => x.s < e && s < x.e && x.kind === kind)) return;
+    // one finding of a kind on the same words; a finding about a whole sentence or paragraph stands beside them
+    if (out.some((x) => x.s < e && s < x.e && x.kind === kind && !WIDE.has(x.rule) && !WIDE.has(rule))) return;
     out.push({ id: issueId(rule, block, s, e), block: block.id, s, e, kind, certainty, rule, title, why, text: text.slice(s, e), ...(fix !== undefined ? { fix } : {}), by: 'check' });
   };
 
@@ -256,6 +290,128 @@ export function checkBlock(block: Block, ctx: Ctx): Issue[] {
   for (const m of text.matchAll(/\b(your)\s+(welcome|a|an|not|going to|right|wrong)\b/gi)) {
     const s = m.index!;
     add('your-youre', 'grammar', 'likely', s, s + 4, '“your” for “you’re”', '“You’re” is “you are”; “your” is belonging to you. If it belongs to them, leave it.', caseLike(m[1], 'you’re'));
+  }
+
+  // "its" where "it is" is meant, before the words that only follow "it is"
+  for (const m of text.matchAll(/\b(its)\s+(important|true|clear|obvious|hard|easy|possible|impossible|likely|unlikely|necessary|essential|worth|just|also|still|really|so|too|always|never|getting|becoming)\b/gi)) {
+    const s = m.index!;
+    add('its-is', 'grammar', 'likely', s, s + 3, '“its” for “it’s”', '“Its” is belonging to it; “it is” is “it’s”. If you mean something that belongs to it, leave it.', caseLike(m[1], 'it’s'));
+  }
+
+  // the verb agreeing with its subject: "they was", "I is", "she have", "they has"
+  const wordBefore = (at: number) => /([A-Za-z’']+)\s*$/.exec(text.slice(0, at))?.[1]?.toLowerCase() ?? '';
+  // a word that asks, or a helper, puts the bare verb after "he" or "she" correctly: "did she have", "should it have"
+  const AUX = /^(did|does|do|didn[’']t|doesn[’']t|will|would|could|should|might|must|may|can|shall|let|to|make|makes|made|help|helps|helped|see|saw|watch|hear|heard)$/;
+  // "thank you is", "singular they is", "the word we is": the pronoun is not the subject
+  const NOT_SUBJECT = /^(thank|bless|singular|royal|the|a|word|pronoun|editorial)$/;
+  for (const m of text.matchAll(/\b(they|we|you)\s+(was)\b/gi)) {
+    if (NOT_SUBJECT.test(wordBefore(m.index!))) continue;
+    const s = m.index! + m[0].length - 3;
+    add('agree-was', 'grammar', 'definite', s, s + 3, `“${m[1]} was”`, `With “${m[1].toLowerCase()}”, the verb is “were”. In dialogue that speaks this way on purpose, dismiss this.`, caseLike(m[2], 'were'));
+  }
+  for (const m of text.matchAll(/\b(I)\s+(is|are|has|does|doesn[’']t)\b/g)) {
+    const prev = /([A-Za-z]+)\s*$/.exec(text.slice(0, m.index!))?.[1] ?? '';
+    // "Part I is", "World War I has": a numeral, not the writer — a capital that does not start the sentence
+    const lead = text.slice(0, m.index!).replace(/[A-Za-z]+\s*$/, '');
+    const initial = !lead.trim() || /[.!?]["”’)]?\s*$/.test(lead);
+    if ((/^[A-Z]/.test(prev) && !initial) || /^(part|chapter|book|volume|vol|act|scene|phase|stage|war|section|appendix|figure|fig|table|type|class|level|grade|unit|model|series|article|annex|exhibit)$/i.test(prev)) continue;
+    const fix = { is: 'am', are: 'am', has: 'have', does: 'do', 'doesn’t': 'don’t', "doesn't": "don't" }[m[2]] ?? null;
+    if (!fix) continue;
+    const s = m.index! + m[0].length - m[2].length;
+    add('agree-i', 'grammar', 'likely', s, s + m[2].length, `“I ${m[2]}”`, `With “I”, the verb is “${fix}”. If “I” here is a numeral or a letter (“Part I”), leave it.`, fix);
+  }
+  for (const m of text.matchAll(/\b(he|she|it)\s+(have|haven[’']t|don[’']t)\b/gi)) {
+    if (AUX.test(wordBefore(m.index!))) continue;
+    const verb = m[2].toLowerCase();
+    const fix = verb === 'have' ? 'has' : verb.startsWith('haven') ? `hasn${verb.slice(5)}` : `doesn${verb.slice(3)}`;
+    const s = m.index! + m[0].length - m[2].length;
+    add('agree-3', 'grammar', 'likely', s, s + m[2].length, `“${m[1]} ${m[2]}”`, `With “${m[1].toLowerCase()}”, the verb is “${fix}” — unless a word like “did” or “should” comes first (“did she have”).`, caseLike(m[2], fix));
+  }
+  for (const m of text.matchAll(/\b(they|we|you)\s+(has|does|doesn[’']t|is)\b/gi)) {
+    const w = wordBefore(m.index!);
+    if (AUX.test(w) || NOT_SUBJECT.test(w)) continue;
+    const verb = m[2].toLowerCase();
+    const fix = verb === 'has' ? 'have' : verb === 'does' ? 'do' : verb === 'is' ? 'are' : `don${verb.slice(5)}`;
+    const s = m.index! + m[0].length - m[2].length;
+    add('agree-pl', 'grammar', 'likely', s, s + m[2].length, `“${m[1]} ${m[2]}”`, `With “${m[1].toLowerCase()}”, the verb is “${fix}”.`, caseLike(m[2], fix));
+  }
+  for (const m of text.matchAll(/\b(he|she|it)\s+(were)\b/gi)) {
+    // "if it were", "as though she were", "as it were": the subjunctive, which is right
+    if (/\b(if|though|wish|wished|wishes|suppose|supposing|imagine|unless|lest|as)\b[^.!?;]*$/i.test(text.slice(Math.max(0, m.index! - 60), m.index!))) continue;
+    const s = m.index! + m[0].length - 4;
+    add('agree-were', 'grammar', 'likely', s, s + 4, `“${m[1]} were”`, `With “${m[1].toLowerCase()}”, it is usually “was”. After “if” or “as though” — something imagined — “were” is right, and this would not be marked.`, caseLike(m[2], 'was'));
+  }
+
+  // there, their, they're
+  for (const m of text.matchAll(/\b(their)\s+(is|are|was|were|will be|has been|have been)\b/gi)) {
+    const s = m.index!;
+    add('their-there', 'grammar', 'likely', s, s + 5, '“their” for “there”', '“Their” is belonging to them; “there is” and “there are” say that something exists.', caseLike(m[1], 'there'));
+  }
+  for (const m of text.matchAll(/\b(there|they[’']re)\s+own\b/gi)) {
+    const s = m.index!;
+    add('there-own', 'grammar', 'definite', s, s + m[1].length, `“${m[1]} own”`, '“Their own” — belonging to them — is spelt “their”.', caseLike(m[1], 'their'));
+  }
+
+  // "between you and I" → "me" (after a preposition, the object). Only where nothing follows the "I" —
+  // "for you and I think…" starts a new clause, and is right
+  for (const m of text.matchAll(/\b(between)\s+(you|him|her|them|us)\s+and\s+(I)(?![’'\w])|\b(for|with|to|from|of|about|against|among|beside|without)\s+(you|him|her|them|us)\s+and\s+(I)(?=\s*[.,;:!?)”"]|\s*$)/g)) {
+    const prep = (m[1] ?? m[4]).toLowerCase();
+    const pron = m[2] ?? m[5];
+    const s = m.index! + m[0].length - 1;
+    add('and-i', 'grammar', 'likely', s, s + 1, '“and I” after a preposition', `After “${prep}”, it is “me”: you would write “${prep} me”, so it is “${prep} ${pron} and me”.`, 'me');
+  }
+
+  // "may of", "ought to of" → "have" (the rest of "could of" is below)
+  for (const m of text.matchAll(/\b(may|ought to)\s+of\b(?!\s+course)/g)) {
+    const s = m.index!;
+    add('could-of', 'grammar', 'definite', s, s + m[0].length, '“of” for “have”', `After “${m[1]}”, the word is “have” — “of” is how it sounds, not how it is written.`, `${m[1]} have`);
+  }
+
+  // words that are swapped for others that sound like them
+  for (const m of text.matchAll(/\b(to|will|would|could|might|may|don[’']t|didn[’']t|do not|does not|did not|cannot|can[’']t)\s+(loose)\b/gi)) {
+    const s = m.index! + m[0].length - 5;
+    add('loose-lose', 'grammar', 'likely', s, s + 5, '“loose” for “lose”', '“Lose” is to stop having something; “loose” is not tight. If you mean to set something free, leave it.', caseLike(m[2], 'lose'));
+  }
+  for (const m of text.matchAll(/\b(an|the|any|no|little)\s+(affect)\b/gi)) {
+    const s = m.index! + m[0].length - 6;
+    add('affect-effect', 'grammar', 'likely', s, s + 6, '“affect” for “effect”', 'The result is an “effect”; to “affect” is to change something. (In psychology “affect” is also a noun — then leave it.)', caseLike(m[2], 'effect'));
+  }
+  for (const m of text.matchAll(/\b(less)\s+(people|persons|students|children|kids|things|items|words|books|cars|days|weeks|months|years|hours|minutes|mistakes|errors|options|choices|jobs|cases|times|calories|members|users|employees|workers|countries|cities|homes|houses)\b/gi)) {
+    const s = m.index!;
+    add('less-fewer', 'grammar', 'likely', s, s + 4, '“less” for “fewer”', `Things that can be counted take “fewer” (fewer ${m[2].toLowerCase()}); “less” is for amounts (less time, less money).`, caseLike(m[1], 'fewer'));
+  }
+  for (const m of text.matchAll(/\b(amount)\s+of\s+(people|persons|students|children|things|items|words|books|cars|days|years|mistakes|errors|options|choices|jobs|cases|times|members|users|employees|countries|cities|homes|houses)\b/gi)) {
+    const s = m.index!;
+    add('amount-number', 'grammar', 'likely', s, s + 6, '“amount of” for “number of”', `Things that can be counted take “number of”; “amount of” is for what cannot (an amount of water).`, caseLike(m[1], 'number'));
+  }
+  for (const m of text.matchAll(/\b(irregardless)\b/gi)) {
+    const s = m.index!;
+    add('irregardless', 'grammar', 'likely', s, s + m[0].length, '“irregardless”', '“Regardless” says it; “irregardless” is read by many as an error.', caseLike(m[1], 'regardless'));
+  }
+  for (const m of text.matchAll(/\bfor all intensive purposes\b/gi)) {
+    const s = m.index!;
+    add('intents', 'grammar', 'definite', s, s + m[0].length, '“intensive purposes”', 'The phrase is “for all intents and purposes”.', caseLike(m[0], 'for all intents and purposes'));
+  }
+  for (const m of text.matchAll(/\b(its[’'])(?=\s)/gi)) {
+    const s = m.index!;
+    add('its-apos', 'grammar', 'definite', s, s + m[1].length, '“its’”', '“Its’” is never right: belonging to it is “its”; “it is” is “it’s”.', caseLike(m[1], 'its'));
+  }
+
+  // spaces: two between words, none after a comma, one before ; : ! ?
+  for (const m of text.matchAll(/([^\s])( {2,})(?=[^\s])/g)) {
+    const s = m.index! + 1;
+    const afterStop = /[.!?]["”’)]?$/.test(m[1]);
+    add('double-space', 'grammar', afterStop ? 'likely' : 'definite', s, s + m[2].length, 'Extra space', afterStop ? 'Two spaces after a full stop are a typewriter habit; one is the rule in print.' : 'There are two spaces between these words.', ' ');
+  }
+  for (const m of text.matchAll(/([A-Za-z]{2,}),([A-Za-z]{2,})/g)) {
+    const s = m.index! + m[1].length;
+    if (inCode(text, m.index!, s + 1 + m[2].length)) continue;
+    add('comma-space', 'grammar', 'likely', s, s + 1, 'Missing space', 'There is no space after the comma.', ', ');
+  }
+  for (const m of text.matchAll(/([A-Za-z0-9”"’)])(\s+)([;:!?])(?=\s|$)/g)) {
+    if (m[2].includes('\n')) continue;
+    const s = m.index! + 1;
+    add('space-punct', 'grammar', 'likely', s, s + m[2].length + 1, 'Space before punctuation', `In English there is no space before “${m[3]}”. (French puts one there — if this is French, leave it.)`, m[3]);
   }
 
   // a / an
@@ -362,6 +518,49 @@ export function checkBlock(block: Block, ctx: Ctx): Issue[] {
     }
   }
 
+  // a bracket or a quotation opened and never closed (or closed and never opened)
+  if (prose || isHeading(block.t)) {
+    const open: number[] = [];
+    let stray = -1;
+    for (let k = 0; k < text.length; k++) {
+      const c = text[k];
+      const lead = text.slice(Math.max(0, k - 3), k);
+      // ":(" and ":)" are faces
+      if (c === '(' && !/[:;]-?$/.test(lead)) open.push(k);
+      else if (c === ')') {
+        if (open.length) {
+          open.pop();
+          continue;
+        }
+        // with nothing open, "1)" and "a)" number a list
+        if (/(^|\s)[A-Za-z0-9]{1,2}$/.test(lead) || /[:;]-?$/.test(lead)) continue;
+        if (stray < 0) stray = k;
+      }
+    }
+    if (open.length) add('bracket-open', 'grammar', 'likely', open[open.length - 1], open[open.length - 1] + 1, 'A bracket never closed', 'This bracket is opened and not closed in this paragraph.');
+    else if (stray >= 0) add('bracket-close', 'grammar', 'likely', stray, stray + 1, 'A bracket never opened', 'This closing bracket has no opening one before it in this paragraph.');
+    const opens = (text.match(/“/g) ?? []).length;
+    const closes = (text.match(/”/g) ?? []).length;
+    if (opens > closes) {
+      const at = text.lastIndexOf('“');
+      add('quote-open', 'grammar', 'likely', at, at + 1, 'A quotation never closed', 'These quotation marks open and do not close in this paragraph. (A quotation running over several paragraphs closes only at its end — then leave it.)');
+    } else if ((text.match(/"/g) ?? []).length % 2 === 1 && !/\d"/.test(text)) {
+      const at = text.lastIndexOf('"');
+      add('quote-open', 'grammar', 'likely', at, at + 1, 'A quotation mark without its pair', 'There is an odd number of quotation marks in this paragraph — one has lost its pair.');
+    }
+  }
+
+  // wordiness: a phrase that says no more than a shorter one — a judgement call, offered, never underlined
+  if (prose || isHeading(block.t)) {
+    for (const [re, to, why] of WORDY) {
+      for (const m of text.matchAll(re)) {
+        const s = m.index!;
+        const fix = typeof to === 'function' ? to(m) : to;
+        add('wordy', 'clarity', 'suggestion', s, s + m[0].length, `“${m[0]}”`, why, caseLike(m[0], fix));
+      }
+    }
+  }
+
   // research and figures with nothing behind them
   if (prose && !supported) {
     const claims = [
@@ -389,7 +588,7 @@ export function checkBlock(block: Block, ctx: Ctx): Issue[] {
     }
   }
 
-  return out.slice(0, 12);
+  return out.slice(0, 16);
 }
 
 // ── the whole document ───────────────────────────────────────────────
@@ -457,3 +656,41 @@ export function checkDoc(doc: Pick<WriteDoc, 'blocks' | 'cards' | 'dismissed'>):
 
 /** What is shown under the words as the person writes: only what is definite or likely. */
 export const inline = (issues: Issue[]) => issues.filter((i) => i.certainty !== 'suggestion');
+
+/** The Check list's three groups, by kind: the language, how it reads, and what holds it up. */
+export const ISSUE_GROUPS: { key: string; label: string; kinds: IssueKind[] }[] = [
+  { key: 'language', label: 'Spelling and grammar', kinds: ['spelling', 'grammar'] },
+  { key: 'clarity', label: 'Clarity and style', kinds: ['clarity', 'repetition', 'structure'] },
+  { key: 'support', label: 'Reasoning and sources', kinds: ['logic', 'support', 'citation'] },
+];
+
+/**
+ * Every fix of these findings made at once — "Fix all": each only where its
+ * words still are, from the end of a block back so the offsets before it stay
+ * true, and none that overlaps one already made. Returns the new document and
+ * how many were made. Nothing without a fix is touched.
+ */
+export function applyFixes(doc: WriteDoc, issues: Issue[]): { doc: WriteDoc; applied: number } {
+  const byBlock = new Map<string, Issue[]>();
+  for (const i of issues) {
+    if (i.fix === undefined) continue;
+    const list = byBlock.get(i.block) ?? [];
+    list.push(i);
+    byBlock.set(i.block, list);
+  }
+  let d = doc;
+  let applied = 0;
+  for (const [id, list] of Array.from(byBlock)) {
+    let b = findText(d, id);
+    if (!b) continue;
+    let floor = Infinity;
+    for (const i of [...list].sort((x, y) => y.s - x.s || y.e - x.e)) {
+      if (i.e > floor || b.text.slice(i.s, i.e) !== i.text) continue;
+      b = spliceBlock(b, i.s, i.e, i.fix!);
+      floor = i.s;
+      applied++;
+    }
+    d = replaceText(d, b);
+  }
+  return { doc: d, applied };
+}

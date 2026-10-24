@@ -1,4 +1,4 @@
-/* components/write/write.css — the Draft Space and the Writing Space (WriteSpace, Editor, Board, parts).
+/* components/write/write.css — the Writing Space: its row, its page, its panels (WriteSpace, Toolbar, Editor, Board, socria, parts).
  *
  * A page first: a serif to read and write in, a measure a line can be read
  * at, nothing at the edges until it is wanted. Drawn in Logos's tokens
@@ -29,70 +29,27 @@
 /* as the Writing artifact (Logos 5): one long page the canvas scrolls, its bar held at the top */
 .logos-root .w-space.in-artifact { height: auto; min-height: min(76vh, 900px); background: transparent; }
 .logos-root .w-space.in-artifact .w-head { position: sticky; top: 0; z-index: 30; border-radius: 18px 18px 0 0; }
-.logos-root .w-space.in-artifact .w-bar { border-radius: 18px 18px 0 0; }
+.logos-root .w-space.in-artifact .w-tb { border-radius: 18px 18px 0 0; }
 .logos-root .w-space.in-artifact .w-body,
-.logos-root .w-space.in-artifact .w-only,
-.logos-root .w-space.in-artifact .w-split-draft,
-.logos-root .w-space.in-artifact .w-split-write { overflow: visible; }
+.logos-root .w-space.in-artifact .w-only { overflow: visible; }
 .logos-root .w-space.in-artifact .w-side {
   position: sticky;
-  top: 52px;
+  top: 46px;
   align-self: flex-start;
   max-height: calc(100vh - 170px - var(--omni, 0px));
   border-left: 1px solid var(--lg-line);
 }
-.logos-root .w-space.in-artifact .w-split { align-items: start; }
-.logos-root .w-space.in-artifact .w-board-foot { border-radius: 0 0 0 18px; }
 .logos-root .l5 .l5s-art.is-bare { padding: 0; gap: 0; width: min(1180px, 100%); }
 .logos-root .l5 .l5s-art.is-bare > .l5s-art-eyebrow { padding: 14px 20px 10px; }
 .logos-root .l5 .l5s-art.is-bare > .l5s-art-body { min-height: 0; }
 
-/* ── the bar ─────────────────────────────────────────────────────── */
-.logos-root .w-bar {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 12px;
-  border-bottom: 1px solid var(--lg-line);
-  font-size: 12.5px;
-  background: var(--w-surface);
-  position: relative;
-  z-index: 5;
-}
-.logos-root .w-faces {
-  display: inline-flex;
-  padding: 2px;
-  border-radius: 9px;
-  background: rgba(var(--w-tint), 0.07);
-}
-.logos-root .w-faces button {
-  border: 0;
-  background: transparent;
-  color: var(--w-ink-soft);
-  font: inherit;
-  font-weight: 500;
-  padding: 5px 12px;
-  border-radius: 7px;
-  cursor: pointer;
-  min-height: 28px;
-}
-.logos-root .w-faces button.is-on {
-  background: var(--w-raise);
-  color: var(--lg-ink);
-  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.12);
-}
+/* ── the status, and a count ─────────────────────────────────────── */
 .logos-root .w-status {
   color: var(--w-ink-soft);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
-}
-.logos-root .w-bar-acts {
-  margin-left: auto;
-  display: flex;
-  align-items: center;
-  gap: 4px;
 }
 .logos-root .w-num {
   margin-left: 6px;
@@ -125,6 +82,7 @@
 .logos-root .w-btn.is-primary { background: var(--lg-primary); border-color: transparent; color: var(--w-on-primary); }
 .logos-root .w-btn.is-primary:hover:not(:disabled) { background: var(--lg-primary); filter: brightness(1.08); }
 .logos-root .w-btn.is-quiet { border-color: transparent; }
+.logos-root .w-btn.is-small { min-height: 28px; padding: 4px 9px; font-size: 12px; }
 .logos-root .w-btn.is-on { background: rgba(var(--w-tint), 0.1); }
 .logos-root .w-btn.is-danger,
 .logos-root .w-menu .is-danger { color: var(--lg-tension); }
@@ -168,13 +126,9 @@
   outline-offset: 2px;
 }
 
-/* ── the body: one face, or both ──────────────────────────────────── */
+/* ── the body: the page, and a panel beside it ────────────────────── */
 .logos-root .w-body { flex: 1 1 auto; min-height: 0; display: flex; overflow: hidden; }
-.logos-root .w-only,
-.logos-root .w-split-draft,
-.logos-root .w-split-write { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
-.logos-root .w-split { flex: 1 1 auto; display: grid; grid-template-columns: minmax(300px, 0.9fr) minmax(0, 1.1fr); min-height: 0; min-width: 0; }
-.logos-root .w-split-draft { border-right: 1px solid var(--lg-line); background: rgba(var(--w-tint), 0.025); }
+.logos-root .w-only { flex: 1 1 auto; min-width: 0; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
 .logos-root .w-side {
   flex: 0 0 340px;
   width: 340px;
@@ -182,9 +136,24 @@
   overflow-y: auto;
   background: var(--w-surface);
 }
-.logos-root .w-panel-body { position: relative; padding: 16px 16px 24px; font-size: 13.5px; line-height: 1.5; }
-.logos-root .w-panel-body > .w-x { position: absolute; top: 8px; right: 8px; }
-.logos-root .w-panel-body > .w-x + * > .w-eyebrow:first-child { padding-right: 26px; }
+.logos-root .w-panel-body { position: relative; padding: 0 16px 24px; font-size: 13.5px; line-height: 1.5; }
+.logos-root .w-panel-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 -16px 10px;
+  padding: 10px 10px 10px 16px;
+  background: var(--w-surface);
+  border-bottom: 1px solid var(--lg-line);
+}
+.logos-root .w-panel-title { flex: 1; margin: 0; font-size: 14px; font-weight: 650; display: flex; align-items: center; gap: 6px; }
+.logos-root .w-spark { color: var(--lg-primary); font-size: 0.95em; }
+.logos-root .w-panel-body.is-notes { padding: 0; }
+.logos-root .w-panel-body.is-notes > .w-panel-head { margin: 0 0 4px; }
+.logos-root .w-side.is-notes { flex-basis: 400px; width: 400px; }
 
 /* ── the page ─────────────────────────────────────────────────────── */
 .logos-root .w-page { position: relative; max-width: 700px; margin: 0 auto; padding: 44px 32px 32vh 48px; }
@@ -352,6 +321,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
   min-height: 30px;
 }
 .logos-root .w-tools button:hover { background: rgba(var(--w-tint), 0.08); }
+.logos-root .w-tools button.is-socria { color: var(--lg-primary); }
 .logos-root .w-tools .w-fmt { width: 30px; padding: 6px 0; font-family: var(--w-serif); font-size: 14px; }
 .logos-root .w-sep { width: 1px; height: 18px; background: var(--lg-line); margin: 0 3px; flex: 0 0 auto; }
 .logos-root .w-menuwrap { position: relative; display: inline-flex; }
@@ -473,7 +443,8 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
 .logos-root .w-cut { color: var(--w-ink-soft); font-style: italic; font-family: var(--lg-sans); font-size: 12px; }
 .logos-root .w-shapeline { font-family: var(--w-serif); font-size: 15px; padding: 8px 10px; border-radius: 8px; background: rgba(var(--w-tint), 0.05); }
 .logos-root .w-options p:first-child { margin: 0 0 4px; font-family: var(--w-serif); font-size: 15px; }
-.logos-root .w-link-btn { border: 0; background: transparent; color: var(--lg-primary); padding: 8px 0; font-size: 13px; font-weight: 500; }
+.logos-root .w-link-btn { border: 0; background: transparent; color: var(--lg-primary); padding: 8px 0; font-size: 13px; font-weight: 500; text-align: left; }
+.logos-root .w-link-btn.is-end { margin-left: auto; padding: 4px 0; font-size: 12px; }
 .logos-root .w-issue-words { margin: 2px 0 4px; font-family: var(--w-serif); font-size: 14px; }
 .logos-root .w-check-foot { margin-top: 14px; padding-top: 12px; border-top: 1px solid var(--lg-line); display: flex; flex-direction: column; gap: 10px; align-items: flex-start; }
 .logos-root .w-toggle { display: flex; gap: 8px; align-items: flex-start; font-size: 12.5px; color: var(--w-ink-soft); }
@@ -630,7 +601,6 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
   background: var(--w-surface);
   border-top: 1px solid var(--lg-line);
 }
-.logos-root .w-split-draft .w-board-foot { background: transparent; }
 .logos-root .w-count { font-weight: 600; font-size: 13px; margin-right: 4px; }
 .logos-root .w-ghost {
   position: fixed;
@@ -647,8 +617,9 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
 }
 
 /* ── phones ───────────────────────────────────────────────────────── */
-.logos-root .w-space.is-narrow .w-bar { padding: 8px 10px; gap: 8px; }
-.logos-root .w-space.is-narrow .w-status { font-size: 11.5px; }
+
+/* the row's menus open over a panel's sheet, not under it */
+.logos-root .w-space.is-narrow .w-head { z-index: 84; }
 .logos-root .w-space.is-narrow .w-page { padding: 26px 18px 45vh 34px; }
 .logos-root .w-space.is-narrow .w-title { font-size: 29px; }
 .logos-root .w-space.is-narrow .w-page { --w-pt: 1.4583px; }
@@ -688,7 +659,8 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
   padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px));
 }
 @media (pointer: coarse) {
-  .logos-root .w-space :is(.w-btn, .w-faces button) { min-height: 40px; }
+  .logos-root .w-space .w-btn { min-height: 40px; }
+  .logos-root .w-space .w-btn.is-small { min-height: 36px; }
   .logos-root .w-tools > button { min-height: 38px; }
   .logos-root .w-menu button { min-height: 44px; }
 }
@@ -796,8 +768,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 ::highlight(w-found) { background-color: rgba(255, 150, 20, 0.62); }
 
 /* ── as pages: the paper at its real width, its margins, where pages will likely end ── */
-.logos-root .w-space.is-pages .w-only.is-write,
-.logos-root .w-space.is-pages .w-split-write { background: rgba(var(--w-tint), 0.05); }
+.logos-root .w-space.is-pages .w-only.is-write { background: rgba(var(--w-tint), 0.05); }
 .logos-root .w-space.is-pages .w-page.is-sheet {
   --w-pt: 1.3333px;
   box-sizing: border-box;
@@ -819,12 +790,53 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
    bar, never wider than the screen because of what it holds — a long status ("Saved on this
    device") shortens with an ellipsis instead of widening the whole artifact on a phone */
 .logos-root .w-head { position: relative; z-index: 30; background: var(--w-surface); min-width: 0; contain: inline-size; }
-/* the bar never makes the page wider than the screen: on a phone its one row scrolls inside the width it is given */
+/* the row never makes the page wider than the screen: on a phone its tools scroll inside the width they are given */
 .logos-root .w-tb { border-bottom: 1px solid var(--lg-line); background: var(--w-surface); font-size: 13px; contain: inline-size; }
 .logos-root .w-tb-row { display: flex; align-items: center; gap: 2px; padding: 4px 8px; flex-wrap: wrap; }
+.logos-root .w-tb-row.is-main { flex-wrap: nowrap; gap: 10px; padding: 5px 8px 5px 10px; }
+.logos-root .w-tb-tools { flex: 1 1 auto; min-width: 0; display: flex; align-items: center; flex-wrap: wrap; gap: 2px; }
+.logos-root .w-tb-acts { flex: 0 0 auto; display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .logos-root .w-tb-row.is-context { border-top: 1px solid var(--lg-line); background: rgba(var(--w-tint), 0.035); }
-.logos-root .w-tb.is-narrow .w-tb-row { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
-.logos-root .w-tb.is-narrow .w-tb-row::-webkit-scrollbar { display: none; }
+.logos-root .w-tb.is-narrow .w-tb-row.is-context { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.logos-root .w-tb.is-narrow .w-tb-tools { flex-wrap: nowrap; overflow-x: auto; overscroll-behavior-x: contain; scrollbar-width: none; }
+.logos-root .w-tb.is-narrow :is(.w-tb-tools, .w-tb-row.is-context)::-webkit-scrollbar { display: none; }
+/* a phone: two lines — the save state and the document's actions above, the tools across the whole width below */
+.logos-root .w-tb.is-narrow .w-tb-row.is-main { flex-wrap: wrap; gap: 2px 6px; padding: 4px 6px; }
+.logos-root .w-tb.is-narrow .w-tb-acts { order: -1; flex: 1 0 100%; gap: 6px; padding: 2px 0 4px; border-bottom: 1px solid var(--lg-line); }
+.logos-root .w-tb.is-narrow .w-tb-tools { flex: 1 0 100%; }
+.logos-root .w-tb.is-narrow .w-tb-acts .w-status { flex: 1 1 auto; min-width: 0; max-width: none; padding-left: 4px; }
+.logos-root .w-tb:is(.is-narrow, .is-compact) .w-tb-acts .w-tb-word,
+.logos-root .w-tb.is-narrow .w-tb-word { display: none; }
+.logos-root .w-tb.is-narrow .w-socria-btn .w-tb-word { display: inline; }
+/* the save state, quietly, before the actions */
+.logos-root .w-tb-acts .w-status { font-size: 12px; max-width: 240px; }
+.logos-root .w-tb-acts .w-status.is-warn { color: var(--lg-tension); }
+/* Socria: one quiet button — its mark in the accent, nothing louder than the tools beside it */
+.logos-root .w-socria-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--lg-line);
+  border-radius: 8px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.logos-root .w-socria-btn:hover { background: rgba(var(--w-tint), 0.06); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); }
+.logos-root .w-socria-btn.is-on { background: rgba(var(--w-tint), 0.12); border-color: transparent; }
+.logos-root .w-socria-btn .w-num { margin-left: 0; }
+.logos-root .w-tb-btn.is-labelled { gap: 5px; padding: 0 9px 0 7px; font-size: 13px; }
+.logos-root .w-tb-acts .w-tb-btn.is-labelled { border: 1px solid var(--lg-line); height: 32px; }
+.logos-root .w-tb-word { white-space: nowrap; }
+.logos-root .w-tb-hint { font-size: 11.5px; color: var(--w-ink-soft); }
+.logos-root .w-tb-item.is-two { flex-direction: column; align-items: flex-start; gap: 0; }
+.logos-root .w-tb-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 2px; }
 .logos-root .w-tb-btn {
   display: inline-flex;
   align-items: center;
@@ -869,6 +881,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   font-variant-numeric: tabular-nums;
 }
 .logos-root .w-tb-menuwrap { position: relative; display: inline-flex; flex: 0 0 auto; }
+.logos-root .w-tb-menu.is-right { left: auto; right: 0; }
 .logos-root .w-tb-menu {
   position: absolute;
   top: calc(100% + 6px);
@@ -925,7 +938,8 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 }
 @media (max-width: 640px) {
   /* a phone: the bar's menus open as sheets from the bottom */
-  .logos-root .w-tb-menu { position: fixed; left: 8px; right: 8px; bottom: 8px; top: auto; max-height: 62vh; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
+  .logos-root .w-tb-menu,
+  .logos-root .w-tb-menu.is-right { position: fixed; left: 8px; right: 8px; bottom: 8px; top: auto; max-height: 62vh; padding-bottom: calc(6px + env(safe-area-inset-bottom, 0px)); }
 }
 
 /* ── find, links, a picture's description ─────────────────────────── */
@@ -979,3 +993,86 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .w-role.is-evidence, .logos-root .w-role.is-example { background: rgba(38, 70, 83, 0.12); }
 .logos-root .w-reverse-go { border: 0; background: transparent; padding: 0; color: var(--lg-ink); font: inherit; font-size: 13px; text-align: left; cursor: pointer; }
 .logos-root .w-issuecard.is-proposal { width: 320px; }
+
+/* ── Socria: one panel, three tabs ────────────────────────────────── */
+.logos-root .w-tabs { display: flex; gap: 2px; padding: 3px; margin: 0 0 12px; border-radius: 10px; background: rgba(var(--w-tint), 0.07); }
+.logos-root .w-tabs button {
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 5px;
+  min-height: 30px;
+  padding: 4px 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--w-ink-soft);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 550;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.logos-root .w-tabs button.is-on { background: var(--w-raise); color: var(--lg-ink); box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.12); }
+.logos-root .w-tabs .w-num { margin-left: 0; }
+/* Check */
+.logos-root .w-check-sum { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin: 0 0 10px; }
+.logos-root .w-check-sum p { margin: 0; font-size: 13px; }
+.logos-root .w-igroup { margin: 0 0 6px; }
+.logos-root .w-igroup-h { margin: 12px 0 2px; font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--w-ink-soft); font-weight: 650; }
+.logos-root .w-igroup-h span { margin-left: 4px; font-variant-numeric: tabular-nums; }
+.logos-root .w-issue-main { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 0; border: 0; background: transparent; color: var(--lg-ink); font: inherit; text-align: left; cursor: pointer; }
+.logos-root .w-issue-main .w-issue-head { margin: 0; }
+.logos-root .w-issue-ctx { font-family: var(--w-serif); font-size: 13.5px; line-height: 1.45; color: var(--w-ink-soft); }
+.logos-root .w-issue-ctx mark { background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.12); color: var(--lg-ink); border-radius: 3px; padding: 0 1px; text-decoration: underline wavy rgba(156, 91, 60, 0.7); text-underline-offset: 3px; }
+.logos-root .w-issue.is-suggestion .w-issue-ctx mark { text-decoration: none; }
+.logos-root .w-issue .w-why { margin: 4px 0 6px; }
+/* Improve and Think it through */
+.logos-root .w-target { margin: 0 0 10px; padding: 9px 11px; border-radius: 10px; background: rgba(var(--w-tint), 0.05); }
+.logos-root .w-target.is-none { color: var(--w-ink-soft); font-size: 12.5px; }
+.logos-root .w-target-k { margin: 0 0 3px; font-size: 10.5px; letter-spacing: 0.06em; text-transform: uppercase; color: var(--w-ink-soft); font-weight: 650; }
+.logos-root .w-target-q { margin: 0; font-family: var(--w-serif); font-size: 13.5px; line-height: 1.45; }
+.logos-root .w-choices { display: flex; flex-direction: column; gap: 6px; margin: 0 0 12px; }
+.logos-root .w-choice {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  padding: 9px 11px;
+  border: 1px solid var(--lg-line);
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .w-choice b { font-size: 13.5px; font-weight: 600; }
+.logos-root .w-choice span { font-size: 12px; color: var(--w-ink-soft); }
+.logos-root .w-choice:hover:not(:disabled) { border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); background: rgba(var(--w-tint), 0.04); }
+.logos-root .w-choice.is-on { border-color: var(--lg-primary); background: rgba(var(--w-tint), 0.07); }
+.logos-root .w-choice:disabled { opacity: 0.5; cursor: default; }
+.logos-root .w-result { margin: 4px 0 8px; }
+.logos-root .w-result-head { display: flex; align-items: center; justify-content: space-between; gap: 8px; }
+.logos-root .w-result-head .w-eyebrow { margin: 0; }
+.logos-root .w-foot-note { margin-top: 14px; font-size: 12px; }
+@media (pointer: coarse) {
+  .logos-root .w-tabs button { min-height: 40px; }
+  .logos-root .w-choice { padding: 11px 12px; }
+}
+
+/* ── while the person writes, the conversation's box steps back ────────
+   Logos 5's composer floats over the foot of the view. While the page has
+   the cursor it fades and slides most of the way down, out of the words;
+   pointing at it or tapping it brings it straight back. */
+.logos-root .l5v-primary:has(.w-page:focus-within) > .l5v-omni:not(:hover):not(:focus-within) {
+  opacity: 0.32;
+  transform: translate(-50%, 62%);
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+@media (max-width: 1023px) {
+  .logos-root .l5v-primary:has(.w-page:focus-within) > .l5v-omni:not(:hover):not(:focus-within) { transform: translateY(62%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5v-primary:has(.w-page:focus-within) > .l5v-omni:not(:hover):not(:focus-within) { transform: none; transition: none; }
+}

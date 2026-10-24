@@ -1,25 +1,26 @@
 'use client';
 
-// components/write/WriteSpace.tsx — the Draft Space and the Writing Space: one document, two faces.
+// components/write/WriteSpace.tsx — the person's writing: one page, one row of tools.
 //
-// A blank page that can be written on at once, with nothing in the way — and
-// a word processor's tools one row above it when they are wanted: styles,
-// fonts and sizes, emphasis and colour, links, pictures, tables, alignment,
-// spacing, lists, find and replace, an outline, page setup, and every export
-// a writer needs (Word, PDF, print, Markdown, text, a web page). The Draft
-// Space beside it (or instead of it, on a phone) is where ideas are dumped and
-// arranged before they are prose; "Turn into an outline" carries the board
-// into the writing, adding to it and never rewriting it. Both are the same
-// document (lib/write/doc.ts), saved with the line of thinking.
+// A blank page that can be written on at once, with one row above it laid out
+// the way a word processor's is: the formatting tools on the left (styles,
+// fonts and sizes, emphasis and colour, links, pictures and tables, alignment,
+// spacing, lists — Toolbar.tsx), and on the right the document's three
+// actions: Socria, Export, and ⋯ (find, the outline, notes, versions, page
+// setup, opening a file). Everything else opens in one panel beside the page
+// (a sheet on a phone), one at a time. The notes — the old Draft Space, where
+// ideas are dumped and arranged before they are prose — are one of those
+// panels; "Turn into an outline" carries them into the writing, adding to it
+// and never rewriting it. All of it is one document (lib/write/doc.ts), saved
+// with the line of thinking.
 //
-// Everything Socria does here is asked for and reviewable: a reading of the
-// selected words, edits proposed one at a time (shown on the words, accepted
-// or rejected where they are), a proofread whose every finding says how sure
-// it is — of everything, or of the language only — a reverse outline of the
-// argument with moves the person can make, a reading of the board's gaps. The
-// rules that need no model (lib/write/checks.ts) run on the device as the
-// person writes. Writing without Socria is the default, and needs nothing
-// switched off.
+// Everything Socria does here is asked for, in one panel (socria.tsx): Check —
+// the rules that run on the device as the person writes (lib/write/checks.ts),
+// every definite slip fixable at once, and Socria's own proofread when asked;
+// Improve — edits to the selected words or the paragraph the cursor is in,
+// each shown on the words and accepted or rejected there; Think it through —
+// questions, weak spots, a reverse outline. Writing without Socria is the
+// default, and needs nothing switched off.
 //
 // The document is kept here while it is being written and handed to the line
 // of thinking a moment after typing stops (and at once for anything else), so
@@ -97,9 +98,9 @@ import {
   type Point,
   type WriteDoc,
 } from '@/lib/write/doc';
-import { checkDoc, inline, type Issue } from '@/lib/write/checks';
+import { applyFixes, checkDoc, inline, type Issue } from '@/lib/write/checks';
 import { boardBrief, boardHints, outlineFrom } from '@/lib/write/board';
-import { WRITE_OP_META, type AssistInput, type AssistResult, type Finding, type WriteOp } from '@/lib/write/assist';
+import type { AssistInput, AssistResult, Finding, WriteOp } from '@/lib/write/assist';
 import { fileNameFor, toHtml, toMarkdown, toText } from '@/lib/write/render';
 import { DOCX_TYPE, toDocx, type MediaBytes } from '@/lib/write/docx';
 import { PDF_TYPE, pdfCoverage, toPdf, type PdfPicture } from '@/lib/write/pdf';
@@ -110,31 +111,38 @@ import { richWriting } from '@/lib/write/flags';
 import type { WriteSel } from '@/lib/write/focus';
 import { Editor, pasteInto, type EditorHandle, type EditorRange, type EditorSelection, type FormatOp, type FormatState, type Marked } from './Editor';
 import { Board, type CardAction } from './Board';
-import { Toolbar } from './Toolbar';
+import { I, Icon, Menu, TOOL_TIERS, Toolbar } from './Toolbar';
 import { AltEditor, FindBar, LinkBubble, LinkEditor, OutlinePanel, PagePanel } from './panels';
 import { mediaClient } from './media-client';
-import { ago, AssistPanel, CheckPanel, IssueCard, LinkPicker, ProposalCard, StructurePanel, VersionsPanel, type Pick, type Proposal } from './parts';
+import { ago, IssueCard, LinkPicker, ProposalCard, VersionsPanel, type Pick, type Proposal } from './parts';
+import { SocriaPanel, type Asked, type ImproveOp, type SocriaTab, type Target, type ThinkOp } from './socria';
 import './write.css';
 
 export type SaveState = 'saved' | 'saving' | 'local' | 'offline';
 
 export interface WriteSpaceHandle {
-  /** a card added from elsewhere — a Logic Map idea, a passage — while the space is open */
+  /** a card added to the notes from elsewhere — a Logic Map idea, a passage — while the space is open */
   addCard(text: string, opts?: { kind?: CardKind; links?: CardLink[] }): void;
+  /** the notes opened beside the writing ('draft', 'both'), or closed ('write') */
   show(face: Face): void;
   /** hand over what is still being typed, now — before the page goes away */
   flush(): void;
 }
 
+// One panel beside the page at a time (a sheet on a phone).
 type Panel =
-  | { kind: 'assist'; op: WriteOp; input: AssistInput; range: EditorRange | null; result: AssistResult | null; loading: boolean; error: string | null }
-  | { kind: 'check' }
+  | { kind: 'socria'; tab: SocriaTab }
+  | { kind: 'notes' }
   | { kind: 'versions' }
   | { kind: 'link'; mode: 'doc' | 'node' | 'card'; card?: string; block?: string }
   | { kind: 'outline' }
   | { kind: 'page' }
-  | { kind: 'structure'; result: AssistResult | null; loading: boolean; error: string | null }
   | null;
+
+/** A reading Socria was asked for, with what it was asked about. */
+type Asking = Asked & { input: AssistInput; range: EditorRange | null };
+
+const IMPROVE_OPS: WriteOp[] = ['improve', 'shorten', 'phrase'];
 
 interface Snap {
   title: string;
@@ -159,10 +167,11 @@ const TYPES: [BlockType, string][] = [
   ['code', 'Code'],
 ];
 
-function initialFace(doc: WriteDoc, narrow: boolean): Face {
-  if (doc.face && !(doc.face === 'both' && narrow)) return doc.face;
+/** The notes open as the space opens: where they were left open, or where there are notes and no writing yet. */
+function notesOpenAtFirst(doc: WriteDoc): boolean {
+  if (doc.face) return doc.face !== 'write' && doc.cards.length > 0;
   const words = doc.blocks.some((b) => b.text.trim() || isOpaque(b.t));
-  return !words && doc.cards.length ? 'draft' : 'write';
+  return !words && doc.cards.length > 0;
 }
 
 /** Findings Socria made, kept on the words they were made on — or dropped when those words are gone. */
@@ -247,7 +256,6 @@ export const WriteSpace = forwardRef<
     return () => ro.disconnect();
   }, []);
   const narrow = props.narrow || (width > 0 && width < 640);
-  const canSplit = !narrow && (width === 0 || width >= 900);
   const rich = richWriting();
   const media = useMemo(() => mediaClient(!!props.cloud), [props.cloud]);
   const [doc, setDoc] = useState<WriteDoc>(props.doc);
@@ -349,12 +357,11 @@ export const WriteSpace = forwardRef<
     if (findText(docRef.current, at.block)) editor.current?.focus(at);
   });
 
-  // ── which face ─────────────────────────────────────────────────────
-  const [face, setFace] = useState<Face>(() => initialFace(props.doc, narrow));
-  const shown: Face = face === 'both' && !canSplit ? 'write' : face;
-  const choose = (f: Face) => {
-    setFace(f);
-    commit({ ...docRef.current, face: f }, 'meta');
+  // ── the notes: a panel beside the writing, remembered open or closed with the document ──
+  const showNotes = (open: boolean) => {
+    setPanel(open ? { kind: 'notes' } : null);
+    const face: Face = open ? 'both' : 'write';
+    if (docRef.current.face !== face) commit({ ...docRef.current, face }, 'meta');
   };
 
   // ── checks, findings, proposals ────────────────────────────────────
@@ -443,9 +450,10 @@ export const WriteSpace = forwardRef<
   }, [issues, proposals, props.asking, underline, found]);
 
   // ── panels and menus ───────────────────────────────────────────────
-  const [panel, setPanel] = useState<Panel>(null);
+  const [panel, setPanel] = useState<Panel>(() => (notesOpenAtFirst(props.doc) ? { kind: 'notes' } : null));
   const [blockMenu, setBlockMenu] = useState<{ id: string; rect: DOMRect } | null>(null);
-  const [menuOpen, setMenuOpen] = useState(false);
+  const [headMenu, setHeadMenu] = useState<string | null>(null);
+  const headMenuOf = (id: string) => ({ open: headMenu === id, setOpen: (v: boolean) => setHeadMenu(v ? id : null) });
   const [toast, setToast] = useState<{ text: string; undo?: boolean; action?: { label: string; run: () => void } } | null>(null);
   useEffect(() => {
     if (!toast) return;
@@ -472,7 +480,11 @@ export const WriteSpace = forwardRef<
   });
 
   // ── Socria, when asked ─────────────────────────────────────────────
-  const seq = useRef(0);
+  // each tab has its own count, so asking in one never throws away the other's answer
+  const seqImprove = useRef(0);
+  const seqThink = useRef(0);
+  const [improve, setImprove] = useState<Asking | null>(null);
+  const [think, setThink] = useState<Asking | null>(null);
   const [proofreading, setProofreading] = useState(false);
   const [proofError, setProofError] = useState<string | null>(null);
   const [reviewing, setReviewing] = useState(false);
@@ -521,18 +533,87 @@ export const WriteSpace = forwardRef<
         };
       }
     }
+    const into: SocriaTab = IMPROVE_OPS.includes(op) ? 'improve' : 'think';
+    const seq = into === 'improve' ? seqImprove : seqThink;
+    const set = into === 'improve' ? setImprove : setThink;
     const n = ++seq.current;
-    setProposals([]);
-    setPanel({ kind: 'assist', op, input, range, result: null, loading: true, error: null });
+    if (into === 'improve') setProposals([]);
+    set({ op, input, range, result: null, loading: true, error: null });
+    setPanel({ kind: 'socria', tab: into });
     try {
       const result = await props.assist(input);
       if (n !== seq.current) return;
       if ((op === 'shorten' || op === 'improve') && range) setProposals(locateEdits(result, range));
-      setPanel({ kind: 'assist', op, input, range, result, loading: false, error: null });
+      set({ op, input, range, result, loading: false, error: null });
     } catch (e) {
       if (n !== seq.current) return;
-      setPanel({ kind: 'assist', op, input, range, result: null, loading: false, error: e instanceof Error ? e.message : 'That could not be done just now.' });
+      set({ op, input, range, result: null, loading: false, error: e instanceof Error ? e.message : 'That could not be done just now.' });
     }
+  }
+
+  /** What Improve and Think work on now: the selection, else the whole paragraph the cursor is in. */
+  function workingRange(): EditorRange | null {
+    const r = editor.current?.lastRange() ?? null;
+    if (!r) return null;
+    if (!(r.from.block === r.to.block && r.from.offset === r.to.offset)) return r;
+    const b = findText(docRef.current, r.from.block);
+    if (!b || !b.text.trim() || !isTextType(b.t) || b.t === 'code') return null;
+    return { from: { block: b.id, offset: 0 }, to: { block: b.id, offset: b.text.length } };
+  }
+
+  function improveNow(op: ImproveOp) {
+    const r = workingRange();
+    if (!r) {
+      setToast({ text: 'Select some words, or put the cursor in a paragraph, first.' });
+      return;
+    }
+    void runAssist(op, r);
+  }
+
+  function thinkNow(op: ThinkOp) {
+    if (op === 'structure') {
+      void structure();
+      return;
+    }
+    const r = workingRange();
+    if (!r) {
+      setToast({ text: 'Select some words, or put the cursor in a paragraph, first.' });
+      return;
+    }
+    void runAssist(op, r);
+  }
+
+  /** Every suggested edit still on its words, made at once — one Undo takes them all back. */
+  function acceptAll() {
+    let d = docRef.current;
+    let n = 0;
+    const blocks = Array.from(new Set(proposals.filter((p) => !p.stale).map((p) => p.block)));
+    for (const id of blocks) {
+      let b = findText(d, id);
+      if (!b) continue;
+      let floor = Infinity;
+      for (const p of proposals.filter((x) => !x.stale && x.block === id).sort((x, y) => y.s - x.s)) {
+        if (p.e > floor || b.text.slice(p.s, p.e) !== p.from) continue;
+        b = spliceBlock(b, p.s, p.e, p.to);
+        floor = p.s;
+        n++;
+      }
+      d = replaceText(d, b);
+    }
+    if (!n) return;
+    commit(d, 'structure');
+    setProposals([]);
+    setToast({ text: `Made ${n} edit${n === 1 ? '' : 's'}.`, undo: true });
+  }
+
+  /** Every definite slip with one right answer, fixed at once — one Undo takes them all back. */
+  function fixAll(list: Issue[]) {
+    const r = applyFixes(docRef.current, list);
+    if (!r.applied) return;
+    commit(r.doc, 'structure');
+    const ids = new Set(list.map((i) => i.id));
+    setSocria((xs) => xs.filter((x) => !ids.has(x.id)));
+    setToast({ text: `Fixed ${r.applied}.`, undo: true });
   }
 
   /** An edit's words found where they were selected — an edit to words that are not there is not shown. */
@@ -658,15 +739,17 @@ export const WriteSpace = forwardRef<
       setToast({ text: 'There needs to be more than one paragraph to read an argument’s structure.' });
       return;
     }
-    const n = ++seq.current;
-    setPanel({ kind: 'structure', result: null, loading: true, error: null });
+    const input: AssistInput = { op: 'structure', blocks, title: d.title, ...workspace() };
+    const n = ++seqThink.current;
+    setThink({ op: 'structure', input, range: null, result: null, loading: true, error: null });
+    setPanel({ kind: 'socria', tab: 'think' });
     try {
-      const result = await props.assist({ op: 'structure', blocks, title: d.title, ...workspace() });
-      if (n !== seq.current) return;
-      setPanel({ kind: 'structure', result, loading: false, error: null });
+      const result = await props.assist(input);
+      if (n !== seqThink.current) return;
+      setThink({ op: 'structure', input, range: null, result, loading: false, error: null });
     } catch (e) {
-      if (n !== seq.current) return;
-      setPanel({ kind: 'structure', result: null, loading: false, error: e instanceof Error ? e.message : 'That could not be done just now.' });
+      if (n !== seqThink.current) return;
+      setThink({ op: 'structure', input, range: null, result: null, loading: false, error: e instanceof Error ? e.message : 'That could not be done just now.' });
     }
   }
 
@@ -713,7 +796,7 @@ export const WriteSpace = forwardRef<
     if (l.k === 'doc' && l.doc) props.onOpenPassage?.(l.doc, l.id);
     else if (l.k === 'node') props.onOpenNode?.(l.id);
     else {
-      choose(narrow ? 'draft' : shown === 'write' ? 'both' : shown);
+      showNotes(true);
       requestAnimationFrame(() => document.querySelector<HTMLElement>(`[data-card="${l.id}"]`)?.focus());
     }
   }
@@ -727,7 +810,6 @@ export const WriteSpace = forwardRef<
       return;
     }
     commit(appendBlocks(d, out.blocks), 'structure');
-    if (shown === 'draft') choose('write');
     setToast({ text: `Added ${out.added} card${out.added === 1 ? '' : 's'} to the end of your writing as an outline — nothing already written was changed.`, undo: true });
   }
 
@@ -910,7 +992,7 @@ export const WriteSpace = forwardRef<
   const missingNote = (n: number) => (n ? ` ${n === 1 ? 'A picture that is not on this device was' : `${n} pictures that are not on this device were`} left as ${n === 1 ? 'its description' : 'their descriptions'}.` : '');
 
   async function exportAs(kind: 'docx' | 'pdf' | 'md' | 'txt' | 'html' | 'print') {
-    setMenuOpen(false);
+    setHeadMenu(null);
     flush();
     const d = docRef.current;
     const title = d.title.trim() || 'Untitled';
@@ -1013,7 +1095,6 @@ export const WriteSpace = forwardRef<
       const next: WriteDoc = { ...kept, title: d.title.trim() ? d.title : r.title, blocks: settled.blocks.length ? settled.blocks : [emptyBlock()], ...(r.page ? { page: r.page } : {}), ...(r.font ? { font: r.font } : {}), ...(r.size ? { size: r.size } : {}) };
       commit(withTextAround(next), 'structure');
     } else commit(withTextAround(appendBlocks(d, settled.blocks)), 'structure');
-    if (shown === 'draft') choose('write');
     const dropped = settled.dropped ? [settled.dropped === 1 ? 'A picture could not be brought in.' : `${settled.dropped} pictures could not be brought in.`] : [];
     setToast({ text: [how === 'replace' && !isEmptyDoc({ ...d, cards: [] }) ? 'Opened — what was here is kept as a version.' : 'Opened.', ...r.notes, ...dropped].join(' ') });
   }
@@ -1078,11 +1159,11 @@ export const WriteSpace = forwardRef<
     addCard(text, opts) {
       const made = addCard(docRef.current, text, opts ?? {});
       commit(made.doc, 'board');
-      if (shown === 'write') choose(narrow ? 'draft' : 'both');
-      setToast({ text: 'Added to the Draft Space, linked back to where it came from.' });
+      showNotes(true);
+      setToast({ text: 'Added to your notes, linked back to where it came from.' });
     },
     show(f) {
-      choose(f);
+      showNotes(f !== 'write');
     },
     flush() {
       backupNow();
@@ -1091,7 +1172,7 @@ export const WriteSpace = forwardRef<
   }));
 
   useEffect(() => {
-    if (props.autoFocus && shown !== 'draft' && isEmptyDoc({ ...doc, cards: [] })) requestAnimationFrame(() => editor.current?.focus('start'));
+    if (props.autoFocus && isEmptyDoc({ ...doc, cards: [] })) requestAnimationFrame(() => editor.current?.focus('start'));
     // only as it opens
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1101,12 +1182,12 @@ export const WriteSpace = forwardRef<
     const mac = typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
     const mod = mac ? e.metaKey : e.ctrlKey;
     const k = e.key.toLowerCase();
-    if (mod && !e.altKey && k === 'f' && shown !== 'draft') {
+    if (mod && !e.altKey && k === 'f') {
       e.preventDefault();
       setFind({ replace: false });
       return;
     }
-    if (mod && !e.altKey && ((k === 'h' && !mac) || (k === 'h' && e.shiftKey && mac)) && shown !== 'draft') {
+    if (mod && !e.altKey && ((k === 'h' && !mac) || (k === 'h' && e.shiftKey && mac))) {
       e.preventDefault();
       setFind({ replace: true });
       return;
@@ -1115,7 +1196,7 @@ export const WriteSpace = forwardRef<
       if (linkEdit) setLinkEdit(null);
       else if (altEdit) setAltEdit(null);
       else if (blockMenu) setBlockMenu(null);
-      else if (menuOpen) setMenuOpen(false);
+      else if (headMenu) setHeadMenu(null);
       else if (find) setFind(null);
       else if (panel) setPanel(null);
     }
@@ -1125,7 +1206,20 @@ export const WriteSpace = forwardRef<
   const selWords = sel ? wordCount(sel.text) : 0;
   const status =
     pending.current || props.saveState === 'saving' ? 'Saving…' : props.saveState === 'offline' ? 'Not saved yet — trying again' : props.saveState === 'local' ? 'Saved on this device' : 'Saved';
-  const scope = panel?.kind === 'check' ? proofScope() : null;
+  const scope = panel?.kind === 'socria' && panel.tab === 'check' ? proofScope() : null;
+  const toFix = issues.filter((i) => i.certainty !== 'suggestion').length;
+  // what Improve and Think work on: the selection, else the paragraph the cursor is in — the last one
+  // is kept on show while the panel is being used
+  const lastTarget = useRef<Target | null>(null);
+  const liveTarget: Target | null = (() => {
+    if (sel && sel.text.trim()) return { kind: 'selection', words: wordCount(sel.text), text: sel.text };
+    const b = caret ? findText(doc, caret.block) : null;
+    if (b && b.text.trim() && isTextType(b.t) && b.t !== 'code') return { kind: 'paragraph', words: wordCount(b.text), text: b.text };
+    return null;
+  })();
+  if (liveTarget) lastTarget.current = liveTarget;
+  const target = liveTarget ?? lastTarget.current;
+  const openSocria = (tab: SocriaTab) => setPanel({ kind: 'socria', tab });
   const blk = blockMenu ? doc.blocks.find((b) => b.id === blockMenu.id) : null;
   const toolbarAt = sel && sel.rect && (sel.rect.width || sel.rect.height) ? sel.rect : null;
   const touch = typeof window !== 'undefined' && window.matchMedia?.('(pointer: coarse)').matches;
@@ -1190,7 +1284,7 @@ export const WriteSpace = forwardRef<
         pageHeight={pageView ? (paper.h - page.m[0] - page.m[2]) * 96 : null}
         onPages={setPages}
         media={media}
-        placeholder={doc.cards.length ? 'Start writing — or turn the Draft Space into an outline' : 'Start writing. Nothing here is Socria’s unless you ask.'}
+        placeholder={doc.cards.length ? 'Start writing — or open your notes (⋯ → Notes) and turn them into an outline.' : 'Start writing. Select words to format them, or to ask Socria about them.'}
         label="Your writing"
       />
       {doc.blocks.some((b) => b.cites?.length) && (
@@ -1215,7 +1309,7 @@ export const WriteSpace = forwardRef<
       onChange={(next) => commit(next, 'board')}
       hints={hints}
       findings={findings}
-      narrow={narrow}
+      narrow
       onCardAction={onCardAction}
       onOpenLink={openLink}
       onOutline={outline}
@@ -1225,55 +1319,84 @@ export const WriteSpace = forwardRef<
     />
   );
 
-  const panelLabel = !panel
+  const panelTitle = !panel
     ? ''
-    : panel.kind === 'check'
-      ? 'Proofreading'
-      : panel.kind === 'versions'
-        ? 'Versions'
-        : panel.kind === 'link'
-          ? 'Link'
-          : panel.kind === 'outline'
-            ? 'Outline'
-            : panel.kind === 'page'
-              ? 'Page setup'
-              : panel.kind === 'structure'
-                ? 'Structure'
-                : WRITE_OP_META[panel.op].label;
+    : panel.kind === 'socria'
+      ? 'Socria'
+      : panel.kind === 'notes'
+        ? 'Notes'
+        : panel.kind === 'versions'
+          ? 'Version history'
+          : panel.kind === 'link'
+            ? 'Link'
+            : panel.kind === 'outline'
+              ? 'Outline'
+              : 'Page setup';
+
+  const closePanel = () => {
+    if (panel?.kind === 'notes') showNotes(false);
+    else setPanel(null);
+  };
 
   const panelEl = panel && (
-    <div className="w-panel-body">
+    <div className={`w-panel-body is-${panel.kind}`}>
       {panel.kind !== 'link' && (
-        <button type="button" className="w-x" aria-label="Close" onClick={() => (setPanel(null), panel.kind === 'assist' && setProposals([]))}>
-          ×
-        </button>
+        <div className="w-panel-head">
+          <h2 className="w-panel-title">
+            {panel.kind === 'socria' && (
+              <span className="w-spark" aria-hidden="true">
+                ✦
+              </span>
+            )}
+            {panelTitle}
+          </h2>
+          <button type="button" className="w-x" aria-label={`Close ${panelTitle}`} onMouseDown={(e) => e.preventDefault()} onClick={closePanel}>
+            ×
+          </button>
+        </div>
       )}
-      {panel.kind === 'assist' && (
-        <AssistPanel
-          op={panel.op}
-          result={panel.result}
-          loading={panel.loading}
-          error={panel.error}
+      {panel.kind === 'socria' && (
+        <SocriaPanel
+          tab={panel.tab}
+          onTab={openSocria}
+          doc={doc}
+          target={target}
+          issues={issues}
+          onFix={fix}
+          onDismiss={dismiss}
+          onShowIssue={(i) => editor.current?.select(i.block, i.s, i.e)}
+          onFixAll={fixAll}
+          onProofread={(focus) => void proofread(focus)}
+          proofreading={proofreading}
+          proofError={proofError}
+          scopeLabel={scope?.label ?? 'the document'}
+          underline={underline}
+          onUnderline={setUnderlinePref}
+          improve={improve}
           proposals={proposals}
+          onImprove={improveNow}
           onAccept={accept}
           onReject={(p) => setProposals((ps) => ps.filter((x) => x.id !== p.id))}
-          onShow={(p) => editor.current?.select(p.block, p.s, p.e)}
+          onAcceptAll={acceptAll}
+          onShowProposal={(p) => editor.current?.select(p.block, p.s, p.e)}
           onUseOption={(text) => {
-            const r = panel.range;
-            if (!r) return;
+            const r = improve?.range;
+            if (!improve || !r) return;
             const d = docRef.current;
             if (r.from.block !== r.to.block) return;
             const b = findText(d, r.from.block);
-            if (!b || b.text.slice(r.from.offset, r.to.offset) !== panel.input.selection) {
+            if (!b || b.text.slice(r.from.offset, r.to.offset) !== improve.input.selection) {
               setToast({ text: 'The words changed since you asked — select them again.' });
               return;
             }
             commit(replaceText(d, spliceBlock(b, r.from.offset, r.to.offset, text)), 'structure');
-            setPanel(null);
+            setImprove(null);
           }}
+          think={think}
+          onThink={thinkNow}
           onInsert={(text) => {
             const d = docRef.current;
-            const id = panel.range?.from.block ?? caret?.block;
+            const id = think?.range?.from.block ?? caret?.block;
             const b = id ? findText(d, id) : null;
             if (!b) return;
             // a connective at the start of the paragraph; the word after it loses its capital, nothing else changes
@@ -1281,24 +1404,20 @@ export const WriteSpace = forwardRef<
             const spliced = spliceBlock(spliceBlock(b, 0, b.text.length ? 1 : 0, lower), 0, 0, `${text} `);
             commit(replaceText(d, spliced), 'structure');
           }}
-          onAsk={() => askAbout(panel.range)}
-          onRetry={() => void runAssist(panel.op, panel.range, panel.range ? {} : { selection: panel.input.selection })}
+          onAsk={() => askAbout(think?.range ?? null)}
+          onMove={(block, after) => {
+            const d = docRef.current;
+            const to = after === null ? 0 : d.blocks.findIndex((b) => b.id === after) + 1;
+            const next = moveBlocks(d, [block], to);
+            if (next !== d) {
+              commit(next, 'structure');
+              setToast({ text: 'Moved — the words are as you wrote them.', undo: true });
+            }
+          }}
+          onShowSpan={(block, s, e) => (e > s ? editor.current?.select(block, s, e) : editor.current?.focus({ block, offset: 0 }))}
         />
       )}
-      {panel.kind === 'check' && (
-        <CheckPanel
-          issues={issues}
-          onFix={fix}
-          onDismiss={dismiss}
-          onShow={(i) => editor.current?.select(i.block, i.s, i.e)}
-          onProofread={(focus) => void proofread(focus)}
-          proofreading={proofreading}
-          scopeLabel={scope?.label ?? 'the document'}
-          underline={underline}
-          onUnderline={setUnderlinePref}
-          error={proofError}
-        />
-      )}
+      {panel.kind === 'notes' && boardEl}
       {panel.kind === 'versions' && (
         <VersionsPanel
           doc={doc}
@@ -1323,8 +1442,7 @@ export const WriteSpace = forwardRef<
             if (next === docRef.current) setToast({ text: dir < 0 ? 'Nothing at the same level comes before it.' : 'Nothing at the same level comes after it.' });
             else commit(next, 'structure');
           }}
-          onStructure={() => void structure()}
-          structuring={false}
+          onStructure={() => thinkNow('structure')}
         />
       )}
       {panel.kind === 'page' && (
@@ -1336,149 +1454,123 @@ export const WriteSpace = forwardRef<
           }}
         />
       )}
-      {panel.kind === 'structure' && (
-        <StructurePanel
-          doc={doc}
-          result={panel.result}
-          loading={panel.loading}
-          error={panel.error}
-          onShow={(block, s, e) => (e > s ? editor.current?.select(block, s, e) : editor.current?.focus({ block, offset: 0 }))}
-          onMove={(block, after) => {
-            const d = docRef.current;
-            const to = after === null ? 0 : d.blocks.findIndex((b) => b.id === after) + 1;
-            const next = moveBlocks(d, [block], to);
-            if (next !== d) {
-              commit(next, 'structure');
-              setToast({ text: 'Moved — the words are as you wrote them.', undo: true });
-            }
-          }}
-          onRetry={() => void structure()}
-        />
-      )}
     </div>
   );
 
-  const issueCount = issues.length;
+  const countLine = `${sel && selWords ? `${selWords.toLocaleString()} of ${words.toLocaleString()}` : words.toLocaleString()} word${words === 1 && !(sel && selWords) ? '' : 's'}${pageView ? ` · ${pages} page${pages === 1 ? '' : 's'}` : ''}`;
+  const doMenu = (run: () => void) => () => {
+    setHeadMenu(null);
+    run();
+  };
+  // the document's own actions, at the right end of the row: Socria, Export, everything else
+  const actions = (
+    <>
+      {/* the save state, where there is room — always when a save has not landed */}
+      {(width === 0 || width >= TOOL_TIERS.status || narrow || props.saveState === 'offline') && (
+        <span className={`w-status${props.saveState === 'offline' ? ' is-warn' : ''}`} aria-live="polite" title={`${status} · ${countLine}`}>
+          {busy ?? status}
+        </span>
+      )}
+      <button
+        type="button"
+        className={`w-socria-btn${panel?.kind === 'socria' ? ' is-on' : ''}`}
+        aria-pressed={panel?.kind === 'socria'}
+        title="Socria: check, improve, think it through — only when you ask"
+        onMouseDown={(e) => e.preventDefault()}
+        onClick={() => (panel?.kind === 'socria' ? setPanel(null) : openSocria(toFix ? 'check' : 'improve'))}
+      >
+        <span className="w-spark" aria-hidden="true">
+          ✦
+        </span>
+        <span className="w-tb-word">Socria</span>
+        {toFix > 0 && <span className="w-num" aria-label={`${toFix} to check`}>{toFix}</span>}
+      </button>
+      <Menu
+        label={
+          <>
+            <Icon d={I.download} />
+            <span className="w-tb-word">Export</span>
+          </>
+        }
+        title="Export"
+        button="is-labelled"
+        right
+        {...headMenuOf('export')}
+      >
+        <span className="w-tb-label">Download a copy</span>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={() => void exportAs('docx')}>
+          Word document (.docx)
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={() => void exportAs('pdf')}>
+          PDF (.pdf)
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={() => void exportAs('md')}>
+          Markdown (.md)
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={() => void exportAs('txt')}>
+          Plain text (.txt)
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={() => void exportAs('html')}>
+          Web page (.html)
+        </button>
+        <span className="w-tb-rule" />
+        <button type="button" role="menuitem" className="w-tb-item" onClick={() => void exportAs('print')}>
+          Print…
+        </button>
+      </Menu>
+      <Menu label={<Icon d={I.more} />} title="Document" right {...headMenuOf('doc')}>
+        <span className="w-tb-label is-quiet">
+          {countLine} · {status}
+        </span>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={doMenu(() => setFind({ replace: false }))}>
+          Find and replace <kbd>{isMacKeys() ? '⌘F' : 'Ctrl+F'}</kbd>
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={doMenu(() => setPanel({ kind: 'outline' }))}>
+          Outline
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={doMenu(() => showNotes(true))}>
+          Notes{doc.cards.length ? ` (${doc.cards.length})` : ''}
+        </button>
+        <button type="button" role="menuitem" className="w-tb-item" onClick={doMenu(() => setPanel({ kind: 'versions' }))}>
+          Version history{doc.versions.length ? ` (${doc.versions.length})` : ''}
+        </button>
+        {rich && (
+          <>
+            <button type="button" role="menuitem" className="w-tb-item" onClick={doMenu(() => setPanel({ kind: 'page' }))}>
+              Page setup…
+            </button>
+            {!narrow && (
+              <button type="button" role="menuitemcheckbox" aria-checked={pageView} className="w-tb-item" onClick={doMenu(() => commit({ ...docRef.current, view: pageView ? 'flow' : 'page' }, 'meta'))}>
+                Show as pages
+              </button>
+            )}
+          </>
+        )}
+        <span className="w-tb-rule" />
+        <button type="button" role="menuitem" className="w-tb-item is-two" onClick={doMenu(() => fileRef.current?.click())}>
+          <span>Open a file…</span>
+          <span className="w-tb-hint">Word, PDF, Markdown or text</span>
+        </button>
+      </Menu>
+      {props.onClose && (
+        <button type="button" className="w-x is-close" aria-label="Close the writing" onClick={() => (flush(), props.onClose?.())}>
+          ×
+        </button>
+      )}
+    </>
+  );
 
   return (
-    <div ref={rootRef} className={`w-space is-${shown}${narrow ? ' is-narrow' : ''} in-${props.where}${panel ? ' has-panel' : ''}${pageView ? ' is-pages' : ''}`} onKeyDown={onKeyDown}>
+    <div ref={rootRef} className={`w-space is-write${narrow ? ' is-narrow' : ''} in-${props.where}${panel ? ' has-panel' : ''}${pageView ? ' is-pages' : ''}`} onKeyDown={onKeyDown}>
       <div className="w-head">
-        <div className="w-bar" role="toolbar" aria-label="Writing">
-          <div className="w-faces" role="tablist" aria-label="Draft or write">
-            {(canSplit ? (['draft', 'write', 'both'] as Face[]) : (['draft', 'write'] as Face[])).map((f) => (
-              <button key={f} type="button" role="tab" aria-selected={shown === f} className={shown === f ? 'is-on' : ''} onClick={() => choose(f)}>
-                {f === 'draft' ? 'Draft' : f === 'write' ? 'Write' : 'Side by side'}
-              </button>
-            ))}
-          </div>
-          <span className="w-status" aria-live="polite">
-            {sel && selWords ? `${selWords.toLocaleString()} of ${words.toLocaleString()} words` : `${words.toLocaleString()} word${words === 1 ? '' : 's'}`}
-            {pageView ? ` · ${pages} page${pages === 1 ? '' : 's'}` : ''} · {busy ?? status}
-          </span>
-          <div className="w-bar-acts">
-            {shown !== 'draft' && (
-              <button type="button" className={`w-btn is-quiet${panel?.kind === 'check' ? ' is-on' : ''}`} aria-pressed={panel?.kind === 'check'} onClick={() => setPanel((p) => (p?.kind === 'check' ? null : { kind: 'check' }))}>
-                Check{issueCount ? <span className="w-num">{issueCount}</span> : null}
-              </button>
-            )}
-            <div className="w-menuwrap">
-              <button type="button" className="w-btn is-quiet" aria-haspopup="menu" aria-expanded={menuOpen} aria-label="More" onClick={() => setMenuOpen((v) => !v)}>
-                ⋯
-              </button>
-              {menuOpen && (
-                <div className="w-menu is-right" role="menu" onKeyDown={(e) => e.key === 'Escape' && setMenuOpen(false)}>
-                  <p className="w-menu-k">Save a copy</p>
-                  <button type="button" role="menuitem" autoFocus onClick={() => void exportAs('docx')}>
-                    Word document (.docx)
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => void exportAs('pdf')}>
-                    PDF document (.pdf)
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => void exportAs('print')}>
-                    Print…
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => void exportAs('md')}>
-                    Markdown (.md)
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => void exportAs('txt')}>
-                    Plain text (.txt)
-                  </button>
-                  <button type="button" role="menuitem" onClick={() => void exportAs('html')}>
-                    Web page (.html)
-                  </button>
-                  <p className="w-menu-k">Bring writing in</p>
-                  <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), fileRef.current?.click())}>
-                    Open a Word document, PDF, Markdown or text…
-                  </button>
-                  {rich && shown !== 'draft' && (
-                    <>
-                      <p className="w-menu-k">The page</p>
-                      <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), setFind({ replace: false }))}>
-                        Find and replace
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), setPanel({ kind: 'outline' }))}>
-                        Outline
-                      </button>
-                      <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), setPanel({ kind: 'page' }))}>
-                        Page setup…
-                      </button>
-                      {!narrow && (
-                        <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), commit({ ...docRef.current, view: pageView ? 'flow' : 'page' }, 'meta'))}>
-                          {pageView ? 'Show as one flowing page' : 'Show as pages'}
-                        </button>
-                      )}
-                    </>
-                  )}
-                  <p className="w-menu-k">History</p>
-                  <button type="button" role="menuitem" onClick={() => (setMenuOpen(false), setPanel({ kind: 'versions' }))}>
-                    Versions{doc.versions.length ? ` (${doc.versions.length})` : ''}
-                  </button>
-                  <button type="button" role="menuitem" disabled={!past.current.length} onClick={() => (setMenuOpen(false), undo())}>
-                    Undo
-                  </button>
-                  <button type="button" role="menuitem" disabled={!future.current.length} onClick={() => (setMenuOpen(false), redo())}>
-                    Redo
-                  </button>
-                </div>
-              )}
-            </div>
-            {props.onClose && (
-              <button type="button" className="w-x is-close" aria-label="Close the writing" onClick={() => (flush(), props.onClose?.())}>
-                ×
-              </button>
-            )}
-          </div>
-          <input
-            ref={fileRef}
-            type="file"
-            accept={IMPORT_ACCEPT}
-            hidden
-            onChange={(e) => {
-              const f = e.target.files?.[0];
-              e.target.value = '';
-              if (f) void onImportFile(f);
-            }}
-          />
-          <input
-            ref={pictureRef}
-            type="file"
-            accept="image/png,image/jpeg,image/gif,image/webp"
-            multiple
-            hidden
-            onChange={(e) => {
-              const files = Array.from(e.target.files ?? []);
-              e.target.value = '';
-              if (files.length) void addPictures(files);
-              else replacing.current = null;
-            }}
-          />
-        </div>
-        {rich && shown !== 'draft' && (
+        {rich ? (
           <Toolbar
             state={fmt}
             docFont={doc.font}
             docSize={doc.size}
             narrow={narrow}
+            width={width}
+            trailing={actions}
             canUndo={past.current.length > 0}
             canRedo={future.current.length > 0}
             onUndo={undo}
@@ -1492,14 +1584,42 @@ export const WriteSpace = forwardRef<
             onTable={(r, c) => editor.current?.insert([makeTable(r, c, r > 1)])}
             onRule={() => editor.current?.insert([makeRule()])}
             onPageBreak={() => editor.current?.insert([makePageBreak()])}
-            onFind={() => setFind({ replace: false })}
-            onOutline={() => setPanel({ kind: 'outline' })}
-            onPage={() => setPanel({ kind: 'page' })}
             onTableOp={onTableOp}
             onPictureOp={onPictureOp}
           />
+        ) : (
+          <div className={`w-tb${narrow ? ' is-narrow' : ''}${width && width < TOOL_TIERS.labels ? ' is-compact' : ''}`} role="toolbar" aria-label="Writing">
+            <div className="w-tb-row is-main">
+              <div className="w-tb-tools" />
+              <div className="w-tb-acts">{actions}</div>
+            </div>
+          </div>
         )}
-        {find && shown !== 'draft' && (
+        <input
+          ref={fileRef}
+          type="file"
+          accept={IMPORT_ACCEPT}
+          hidden
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            e.target.value = '';
+            if (f) void onImportFile(f);
+          }}
+        />
+        <input
+          ref={pictureRef}
+          type="file"
+          accept="image/png,image/jpeg,image/gif,image/webp"
+          multiple
+          hidden
+          onChange={(e) => {
+            const files = Array.from(e.target.files ?? []);
+            e.target.value = '';
+            if (files.length) void addPictures(files);
+            else replacing.current = null;
+          }}
+        />
+        {find && (
           <FindBar
             doc={doc}
             replace={find.replace}
@@ -1550,7 +1670,7 @@ export const WriteSpace = forwardRef<
           </div>
         </div>
       )}
-      {nearLimit(doc) && <p className="w-banner is-warn">This document is near the size kept with a conversation — save a copy (⋯ → Word) to be safe.</p>}
+      {nearLimit(doc) && <p className="w-banner is-warn">This document is near the size kept with a conversation — download a copy (Export → Word) to be safe.</p>}
       {importing && (
         <div className="w-banner" role="dialog" aria-label="Open a document">
           <p>
@@ -1581,44 +1701,29 @@ export const WriteSpace = forwardRef<
       )}
 
       <div className="w-body">
-        {shown === 'both' ? (
-          <div className="w-split">
-            <section className="w-split-draft" aria-label="Draft Space">
-              {boardEl}
-            </section>
-            <section className="w-split-write" aria-label="Writing Space">
-              {editorEl}
-            </section>
-          </div>
-        ) : shown === 'draft' ? (
-          <section className="w-only" aria-label="Draft Space">
-            {boardEl}
-          </section>
-        ) : (
-          <section className="w-only is-write" aria-label="Writing Space">
-            {editorEl}
-          </section>
-        )}
+        <section className="w-only is-write" aria-label="Your writing">
+          {editorEl}
+        </section>
         {panel && !narrow && (
-          <section className="w-side" aria-label={panelLabel}>
+          <section className={`w-side is-${panel.kind}`} aria-label={panelTitle}>
             {panelEl}
           </section>
         )}
       </div>
       {panel && narrow && (
-        <div className="w-sheet" role="dialog" aria-label={panelLabel}>
+        <div className={`w-sheet is-${panel.kind}`} role="dialog" aria-label={panelTitle}>
           {panelEl}
         </div>
       )}
 
-      {toolbarAt && shown !== 'draft' && !blockMenu && !(narrow && panel) && !linkEdit && (
+      {toolbarAt && !blockMenu && !(narrow && panel) && !linkEdit && (
         <div
           className={`w-tools${touch ? ' is-below' : ''}`}
           role="toolbar"
           aria-label="Selected words"
           style={{
             top: touch ? Math.min(toolbarAt.bottom + 10, window.innerHeight - 120) : Math.max(8, toolbarAt.top - 46),
-            left: Math.max(8, Math.min(toolbarAt.left + toolbarAt.width / 2 - 190, window.innerWidth - 388)),
+            left: Math.max(8, Math.min(toolbarAt.left + toolbarAt.width / 2 - 130, window.innerWidth - 268)),
           }}
           onMouseDown={(e) => e.preventDefault()}
         >
@@ -1636,31 +1741,29 @@ export const WriteSpace = forwardRef<
               <span className="w-sep" aria-hidden="true" />
             </>
           )}
-          <button type="button" onClick={() => askAbout(sel)} title="Ask about these words in the conversation">
-            Ask
+          <button type="button" className="is-socria" onClick={() => sel && void runAssist('improve', sel)} title="Clearer, in your voice — edits to review, nothing changed until you accept">
+            <span className="w-spark" aria-hidden="true">
+              ✦
+            </span>{' '}
+            Improve
           </button>
-          {(['explain', 'critique', 'shorten', 'improve'] as WriteOp[]).map((op) => (
-            <button key={op} type="button" onClick={() => sel && void runAssist(op, sel)} title={WRITE_OP_META[op].blurb}>
-              {WRITE_OP_META[op].label}
+          <button type="button" onClick={() => askAbout(sel)} title="Ask about these words in the conversation">
+            Ask Socria
+          </button>
+          {props.docs.size > 0 && (
+            <button
+              type="button"
+              onClick={() => sel && setPanel({ kind: 'link', mode: 'doc', block: blockIndex(docRef.current, sel.from.block) >= 0 ? sel.from.block : findCell(docRef.current, sel.from.block)?.table.id ?? sel.from.block })}
+              title="Cite a passage from your files for these words"
+            >
+              Cite
             </button>
-          ))}
-          <ToolsMore
-            canKeep={!!props.onKeep}
-            onPick={(what) => {
-              if (!sel) return;
-              if (what === 'cite') setPanel({ kind: 'link', mode: 'doc', block: blockIndex(docRef.current, sel.from.block) >= 0 ? sel.from.block : findCell(docRef.current, sel.from.block)?.table.id ?? sel.from.block });
-              else if (what === 'grammar') {
-                setPanel({ kind: 'check' });
-                void proofread('grammar');
-              } else if (what === 'keep') void keep(sel.text, 'idea');
-              else void runAssist(what, sel);
-            }}
-          />
+          )}
         </div>
       )}
 
       {issueRect && caretIssue && !sel && (
-        <IssueCard issue={caretIssue} rect={issueRect} onFix={() => fix(caretIssue)} onDismiss={() => dismiss(caretIssue)} onClose={() => setClosedCard(caretIssue.id)} />
+        <IssueCard issue={caretIssue} rect={issueRect} onFix={() => fix(caretIssue)} onDismiss={() => dismiss(caretIssue)} onClose={() => setClosedCard(caretIssue.id)} onMore={() => (setClosedCard(caretIssue.id), openSocria('check'))} />
       )}
       {proposalRect && caretProposal && !sel && !(issueRect && caretIssue) && (
         <ProposalCard
@@ -1744,8 +1847,12 @@ export const WriteSpace = forwardRef<
                   Cite a passage from your files…
                 </button>
                 {!!blk.cites?.length && <p className="w-menu-note">Cites {blk.cites.map((c) => c.label).join('; ')}</p>}
+                <p className="w-menu-k">Socria</p>
+                <button type="button" role="menuitem" disabled={!blk.text.trim()} onClick={() => (setBlockMenu(null), void runAssist('improve', { from: { block: blk.id, offset: 0 }, to: { block: blk.id, offset: blk.text.length } }))}>
+                  Improve it
+                </button>
                 <button type="button" role="menuitem" disabled={!blk.text.trim()} onClick={() => (setBlockMenu(null), void runAssist('develop', { from: { block: blk.id, offset: 0 }, to: { block: blk.id, offset: blk.text.length } }))}>
-                  Develop — questions and a shape
+                  Questions to develop it
                 </button>
                 <button
                   type="button"
@@ -1753,11 +1860,14 @@ export const WriteSpace = forwardRef<
                   disabled={!blk.text.trim()}
                   onClick={() => {
                     setBlockMenu(null);
-                    setPanel({ kind: 'check' });
+                    openSocria('check');
                     void proofread('all', { blocks: [{ id: blk.id, t: blk.t, text: blk.text }], label: 'this paragraph' });
                   }}
                 >
-                  Proofread this paragraph
+                  Check it with Socria
+                </button>
+                <button type="button" role="menuitem" onClick={() => (setBlockMenu(null), askAbout({ from: { block: blk.id, offset: 0 }, to: { block: blk.id, offset: blk.text.length } }))}>
+                  Ask about it in the conversation
                 </button>
                 {isList(blk.t) &&
                   (() => {
@@ -1774,9 +1884,6 @@ export const WriteSpace = forwardRef<
                       </button>
                     ) : null;
                   })()}
-                <button type="button" role="menuitem" onClick={() => (setBlockMenu(null), askAbout({ from: { block: blk.id, offset: 0 }, to: { block: blk.id, offset: blk.text.length } }))}>
-                  Ask about it in the conversation
-                </button>
                 <button type="button" role="menuitem" className="is-danger" onClick={() => (setBlockMenu(null), commit(removeBlocks(docRef.current, [blk.id]), 'structure'))}>
                   Delete
                 </button>
@@ -1806,35 +1913,3 @@ export const WriteSpace = forwardRef<
 });
 
 const isMacKeys = () => typeof navigator !== 'undefined' && /Mac|iPhone|iPad/.test(navigator.platform || navigator.userAgent);
-
-function ToolsMore({ onPick, canKeep }: { onPick: (what: 'develop' | 'phrase' | 'cite' | 'grammar' | 'keep') => void; canKeep: boolean }) {
-  const [open, setOpen] = useState(false);
-  return (
-    <span className="w-menuwrap">
-      <button type="button" aria-haspopup="menu" aria-expanded={open} aria-label="More for the selected words" onClick={() => setOpen((v) => !v)}>
-        ⋯
-      </button>
-      {open && (
-        <span className="w-menu is-tools" role="menu">
-          <button type="button" role="menuitem" onClick={() => (setOpen(false), onPick('develop'))}>
-            Develop — questions, not words
-          </button>
-          <button type="button" role="menuitem" onClick={() => (setOpen(false), onPick('grammar'))}>
-            Check the grammar and spelling
-          </button>
-          <button type="button" role="menuitem" onClick={() => (setOpen(false), onPick('phrase'))}>
-            Suggest other wordings
-          </button>
-          <button type="button" role="menuitem" onClick={() => (setOpen(false), onPick('cite'))}>
-            Cite a passage…
-          </button>
-          {canKeep && (
-            <button type="button" role="menuitem" onClick={() => (setOpen(false), onPick('keep'))}>
-              Keep in memory
-            </button>
-          )}
-        </span>
-      )}
-    </span>
-  );
-}

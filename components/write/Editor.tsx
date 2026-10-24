@@ -114,6 +114,9 @@ export interface FormatState {
   block: BlockType | null;
   align: Align | 'left';
   lh: number | null;
+  /** space before and after the paragraph, in points */
+  sb: number | null;
+  sa: number | null;
   flags: Record<FlagMark, boolean>;
   font: string | null;
   size: number | null;
@@ -1405,7 +1408,7 @@ export const Editor = forwardRef<
     const sel = pickedRef.current ? d.blocks.find((b) => b.id === pickedRef.current) : null;
     const r = rangeNow(true);
     const flags = { b: false, i: false, u: false, s: false, sup: false, sub: false } as Record<FlagMark, boolean>;
-    const state: FormatState = { block: null, align: 'left', lh: null, flags, font: null, size: null, color: null, bg: null, link: null, cell: null, selected: sel ? { id: sel.id, t: sel.t } : null, collapsed: true };
+    const state: FormatState = { block: null, align: 'left', lh: null, sb: null, sa: null, flags, font: null, size: null, color: null, bg: null, link: null, cell: null, selected: sel ? { id: sel.id, t: sel.t } : null, collapsed: true };
     if (sel) {
       state.align = sel.align ?? 'left';
     } else if (r) {
@@ -1419,6 +1422,8 @@ export const Editor = forwardRef<
         state.block = top ? top.t : 'p';
         state.align = first.align ?? 'left';
         state.lh = top?.lh ?? null;
+        state.sb = top?.sb ?? null;
+        state.sa = top?.sa ?? null;
       }
       if (collapsed && first) {
         const here = marksAt(first, r.from.offset);

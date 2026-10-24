@@ -435,6 +435,51 @@ console.log('\n=== the checks: what a rule can decide ===');
   const q = W.checkBlock(P('teh the the studies show 50% of could of', { t: 'quote' }), { supported: false });
   ok('a quotation is someone else’s words: only its citation is checked', q.length === 1 && q[0].rule === 'uncited-quote', J(q));
   ok('headings are not prose: no capital or length rules on them', !W.checkBlock(P('why rents rise', { t: 'h2' }), { supported: false }).some((i) => i.kind === 'clarity' || i.rule === 'sentence-cap'));
+
+  // the verb and its subject, and the words people swap — each with the right uses it must leave alone
+  ok('“they was” → “were”, definite', (() => { const i = first('They was late again.', 'agree-was'); return i && i.certainty === 'definite' && i.fix === 'were'; })());
+  ok('  “thank you was” and “the singular they was” are not about the pronoun', !has('Thank you was all she said.', 'agree-was') && !has('The singular they was common.', 'agree-was'));
+  ok('“I is” → “am”, “I has” → “have”', first('I is ready.', 'agree-i')?.fix === 'am' && first('Today I has a plan.', 'agree-i')?.fix === 'have');
+  ok('  a numeral is not the writer: “Part I is”, “World War I has”', !has('Part I is short. In World War I has been written about.', 'agree-i'));
+  ok('“she have” → “has”; “it don’t” → “doesn’t”', first('She have a point.', 'agree-3')?.fix === 'has' && first('It don’t matter.', 'agree-3')?.fix === 'doesn’t');
+  ok('  a question or a helper puts the bare verb there rightly: “did she have”, “should it have”', !has('Did she have the keys? Should it have broken? Let it have rest.', 'agree-3'));
+  ok('“they has”, “you is” → “have”, “are”', first('They has gone.', 'agree-pl')?.fix === 'have' && first('You is welcome.', 'agree-pl')?.fix === 'are');
+  ok('  but not “thank you is”', !has('Thank you is not enough.', 'agree-pl'));
+  ok('“he were” → “was”, likely', first('Yesterday he were home.', 'agree-were')?.fix === 'was');
+  ok('  the subjunctive is left alone: “if he were”, “as though it were”, “as it were”', !has('If he were taller he would play. She looked as though it were raining. As it were, nothing came.', 'agree-were'));
+  ok('“their is” → “there”', first('Their is a problem.', 'their-there')?.fix === 'There');
+  ok('“there own” → “their own”, definite', (() => { const i = first('They each have there own way.', 'there-own'); return i && i.certainty === 'definite' && i.fix === 'their'; })());
+  ok('“between you and I” → “me”', first('This stays between you and I.', 'and-i')?.fix === 'me');
+  ok('  but “for you and I think…” starts a new clause, and “to London and I” is a place', !has('I made it for you and I think you will like it. We went to London and I loved it.', 'and-i'));
+  ok('“may of” → “may have”; the month is left alone', first('You may of heard.', 'could-of')?.fix === 'may have' && !has('May of 2020 was hard.', 'could-of'));
+  ok('“do not loose” → “lose”; “the knot is not loose” is right', first('Do not loose the keys.', 'loose-lose')?.fix === 'lose' && !has('The knot is not loose.', 'loose-lose'));
+  ok('“the affect” → “effect”, saying when “affect” is a noun after all', (() => { const i = first('The affect was large.', 'affect-effect'); return i && i.fix === 'effect' && /psychology/.test(i.why); })());
+  ok('“less people” → “fewer”; “amount of students” → “number”', first('There were less people.', 'less-fewer')?.fix === 'fewer' && first('A large amount of students came.', 'amount-number')?.fix === 'number');
+  ok('“its’” → “its”; “for all intensive purposes”', first('The dog wagged its’ tail.', 'its-apos')?.fix === 'its' && first('For all intensive purposes it is done.', 'intents')?.fix === 'For all intents and purposes');
+  ok('“its important” → “it’s”; “its very nature” is the possessive, left alone', first('Its important to rest.', 'its-is')?.fix === 'It’s' && !has('Its very nature is to change.', 'its-is'));
+  ok('two spaces between words, definite; after a full stop, likely', (() => { const r = run('Two  spaces. And  more.  Then.').filter((i) => i.rule === 'double-space'); return r.length === 3 && r.filter((i) => i.certainty === 'definite').length === 2 && r.every((i) => i.fix === ' '); })());
+  ok('no space after a comma; a space before “;”, “!” (French typography said)', first('Red,green and blue.', 'comma-space')?.fix === ', ' && /French/.test(first('Also this !', 'space-punct')?.why ?? ''));
+  ok('  numbers and addresses keep their commas', !has('It cost 1,200 dollars at a,b.example.com.', 'comma-space'));
+  ok('a bracket never closed; a stray closing one', has('The plan (as agreed was fine.', 'bracket-open') && has('Then a stray ) appears.', 'bracket-close'));
+  ok('  “(see p. 42)”, a list’s “1)” and a face “:)” are right', !run('See p. 42 (in the appendix), and the list: 1) one 2) two. Happy :) and sad :(').some((i) => i.rule.startsWith('bracket')));
+  ok('a quotation opened and never closed', has('He said “this is unfinished.', 'quote-open') && !has('He said “this is finished.”', 'quote-open'));
+  const wordy = run('In order to win, due to the fact that we can, the vast majority of us want the end result.').filter((i) => i.rule === 'wordy');
+  ok('wordiness offered, never underlined: a judgement call with a shorter way', wordy.length === 4 && wordy.every((i) => i.certainty === 'suggestion' && i.kind === 'clarity') && J(wordy.map((i) => i.fix)) === J(['To', 'because', 'most', 'result']), J(wordy.map((i) => i.fix)));
+  ok('  a long sentence and the wordy phrase inside it are both kept', (() => { const r = run('In order to see it ' + 'and going and going '.repeat(12) + 'we stop.'); return r.some((i) => i.rule === 'long-sentence') && r.some((i) => i.rule === 'wordy'); })());
+}
+
+console.log('\n=== fixing every definite slip at once ===');
+{
+  const d = docOf([P('They was late and teh  dog barked.', { id: 'a', marks: [{ s: 0, e: 4, t: 'b' }] }), P('Their is a problem with alot of it.', { id: 'b' })]);
+  const issues = W.checkDoc(d);
+  const definite = issues.filter((i) => i.certainty === 'definite' && i.fix !== undefined);
+  const r = W.applyFixes(d, definite);
+  ok('every definite fix made, from the end of each paragraph back', r.applied === definite.length && r.doc.blocks[0].text === 'They were late and the dog barked.' && r.doc.blocks[1].text === 'Their is a problem with a lot of it.', J(r.doc.blocks.map((b) => b.text)));
+  ok('  what is only likely is left for the writer', r.doc.blocks[1].text.startsWith('Their'));
+  ok('  the bold on “They” is where it was', J(r.doc.blocks[0].marks) === J([{ s: 0, e: 4, t: 'b' }]));
+  const moved = W.replaceBlock(d, { ...d.blocks[0], text: 'Someone changed this line.' });
+  ok('  a fix whose words are gone is not made', W.applyFixes(moved, definite).doc.blocks[0].text === 'Someone changed this line.');
+  ok('the Check list’s three groups cover every kind', J(W.ISSUE_GROUPS.flatMap((g) => g.kinds).sort()) === J([...W.ISSUE_KINDS].sort()));
 }
 
 console.log('\n=== the checks: across the document, and dismissals that hold ===');

@@ -831,7 +831,7 @@ export interface ArtifactItem {
   title: string;
   /** what the line above it says, when it is not something made from the conversation */
   eyebrow?: string;
-  /** drawn edge to edge, with its own chrome — the person's writing */
+  /** drawn edge to edge, with its own chrome and no label over it — the person's writing */
   bare?: boolean;
   render: () => ReactNode;
 }
@@ -885,7 +885,8 @@ export function ArtifactsView({
         </div>
       )}
       <section className={`l5s-art${cur.bare ? ' is-bare' : ''}`} aria-label={cur.title}>
-        <p className="l5s-art-eyebrow">{cur.eyebrow ?? `Artifact · ${cur.kind} · made from the conversation`}</p>
+        {/* the person's writing has its own chrome, and needs no label over it */}
+        {!cur.bare && <p className="l5s-art-eyebrow">{cur.eyebrow ?? `Artifact · ${cur.kind} · made from the conversation`}</p>}
         <div className="l5s-art-body">{cur.render()}</div>
       </section>
     </div>

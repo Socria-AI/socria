@@ -1,19 +1,20 @@
 'use client';
 
-// components/write/parts.tsx — what the Writing Space shows beside the page.
+// components/write/parts.tsx — what the Writing Space shows beside the page
+// and on its words (the Socria panel itself is socria.tsx).
 //
-// A reading Socria was asked for, the edits it proposes (each on its own, to
-// accept or reject), the findings of the proofreading with how sure each one
-// is, the versions kept, and the pickers that link writing to the passages of
-// the person's documents and the ideas on their Logic Map. None of it changes
-// the writing until the person presses the one button that says what it does.
+// The card under an underlined word, an edit proposed on its own words (each
+// on its own, to accept or reject), the argument's structure read back, the
+// versions kept, and the pickers that link writing to the passages of the
+// person's documents and the ideas on their Logic Map. None of it changes the
+// writing until the person presses the one button that says what it does.
 
 import { useMemo, useState } from 'react';
 import type { SourceDoc } from '@/lib/docs/types';
 import type { ThinkingMap } from '@/lib/logos';
 import { docText, findText, wordCount, type Card, type Version, type WriteDoc } from '@/lib/write/doc';
-import { ISSUE_KIND_LABEL, ISSUE_KINDS, type Issue, type IssueKind } from '@/lib/write/checks';
-import { WRITE_OP_META, type AssistResult, type Role, type WriteOp } from '@/lib/write/assist';
+import type { Issue } from '@/lib/write/checks';
+import type { AssistResult, Role } from '@/lib/write/assist';
 
 const CERTAINTY: Record<Issue['certainty'], string> = { definite: 'Definite', likely: 'Likely', suggestion: 'A judgement call' };
 
@@ -41,243 +42,8 @@ export interface Proposal {
   stale?: boolean;
 }
 
-// ── a reading Socria was asked for ─────────────────────────────────
-
-export function AssistPanel({
-  op,
-  result,
-  loading,
-  error,
-  proposals,
-  onAccept,
-  onReject,
-  onShow,
-  onUseOption,
-  onInsert,
-  onAsk,
-  onRetry,
-}: {
-  op: WriteOp;
-  result: AssistResult | null;
-  loading: boolean;
-  error: string | null;
-  proposals: Proposal[];
-  onAccept: (p: Proposal) => void;
-  onReject: (p: Proposal) => void;
-  onShow: (p: Proposal) => void;
-  onUseOption: (text: string) => void;
-  onInsert: (text: string) => void;
-  onAsk: () => void;
-  onRetry: () => void;
-}) {
-  const meta = WRITE_OP_META[op];
-  return (
-    <div className="w-assist" aria-live="polite">
-      <p className="w-eyebrow">
-        {meta.label} · <span>{meta.blurb}</span>
-      </p>
-      {loading && <p className="w-quiet w-pulse">Reading what you wrote…</p>}
-      {error && (
-        <div className="w-error" role="alert">
-          <p>{error}</p>
-          <button type="button" className="w-btn" onClick={onRetry}>
-            Try again
-          </button>
-        </div>
-      )}
-      {result && (
-        <>
-          {result.body && <p className="w-said">{result.body}</p>}
-          {!!result.points?.length && (
-            <ul className="w-points">
-              {result.points.map((p, k) => (
-                <li key={k}>{p}</li>
-              ))}
-            </ul>
-          )}
-          {result.question && <p className="w-q">{result.question}</p>}
-          {(op === 'shorten' || op === 'improve') && (
-            <div className="w-props">
-              {proposals.length ? (
-                <>
-                  <p className="w-eyebrow">
-                    {proposals.length} proposed edit{proposals.length === 1 ? '' : 's'} — review each; nothing changes until you accept it
-                  </p>
-                  <ul>
-                    {proposals.map((p) => (
-                      <li key={p.id} className={`w-prop${p.stale ? ' is-stale' : ''}`} onMouseEnter={() => onShow(p)} onFocus={() => onShow(p)} tabIndex={-1}>
-                        <p className="w-diff">
-                          <del>{p.from}</del>
-                          {p.to ? <ins>{p.to}</ins> : <span className="w-cut">(cut)</span>}
-                        </p>
-                        <p className="w-why">{p.why}</p>
-                        {p.stale ? (
-                          <p className="w-quiet">The words changed since this was proposed.</p>
-                        ) : (
-                          <div className="w-row">
-                            <button type="button" className="w-btn is-primary" onClick={() => onAccept(p)}>
-                              Accept
-                            </button>
-                            <button type="button" className="w-btn" onClick={() => onReject(p)}>
-                              Reject
-                            </button>
-                          </div>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
-                </>
-              ) : (
-                !loading && <p className="w-quiet">No edits left to review.</p>
-              )}
-            </div>
-          )}
-          {op === 'develop' && (
-            <div className="w-develop">
-              {!!result.questions?.length && (
-                <>
-                  <p className="w-eyebrow">Questions only you can answer</p>
-                  <ul className="w-points">
-                    {result.questions.map((q, k) => (
-                      <li key={k}>{q}</li>
-                    ))}
-                  </ul>
-                </>
-              )}
-              {result.shape && (
-                <>
-                  <p className="w-eyebrow">A shape for it — the brackets are for your words</p>
-                  <p className="w-shapeline">{result.shape}</p>
-                </>
-              )}
-              {!!result.transitions?.length && (
-                <>
-                  <p className="w-eyebrow">Ways in from the paragraph before</p>
-                  <div className="w-row is-wrap">
-                    {result.transitions.map((t, k) => (
-                      <button key={k} type="button" className="w-chip" title={`${t.why} — puts it at the start of the paragraph`} onClick={() => onInsert(t.text)}>
-                        {t.text}
-                      </button>
-                    ))}
-                  </div>
-                </>
-              )}
-              {result.missing && <p className="w-q">{result.missing}</p>}
-            </div>
-          )}
-          {op === 'phrase' && !!result.options?.length && (
-            <ul className="w-options">
-              {result.options.map((o, k) => (
-                <li key={k}>
-                  <p>{o.text}</p>
-                  <p className="w-why">{o.why}</p>
-                  <button type="button" className="w-btn" onClick={() => onUseOption(o.text)}>
-                    Use this wording
-                  </button>
-                </li>
-              ))}
-            </ul>
-          )}
-          {(op === 'explain' || op === 'critique' || op === 'develop') && (
-            <button type="button" className="w-link-btn" onClick={onAsk}>
-              Talk it through in the conversation →
-            </button>
-          )}
-        </>
-      )}
-    </div>
-  );
-}
-
-// ── the proofreading ───────────────────────────────────────────────
-
-export function CheckPanel({
-  issues,
-  onFix,
-  onDismiss,
-  onShow,
-  onProofread,
-  proofreading,
-  scopeLabel,
-  underline,
-  onUnderline,
-  error,
-}: {
-  issues: Issue[];
-  onFix: (i: Issue) => void;
-  onDismiss: (i: Issue) => void;
-  onShow: (i: Issue) => void;
-  onProofread: (focus: 'all' | 'grammar') => void;
-  proofreading: boolean;
-  scopeLabel: string;
-  underline: boolean;
-  onUnderline: (on: boolean) => void;
-  error: string | null;
-}) {
-  const [kind, setKind] = useState<IssueKind | 'all'>('all');
-  const counts = useMemo(() => {
-    const c = new Map<IssueKind, number>();
-    for (const i of issues) c.set(i.kind, (c.get(i.kind) ?? 0) + 1);
-    return c;
-  }, [issues]);
-  const shown = issues.filter((i) => kind === 'all' || i.kind === kind);
-  return (
-    <div className="w-check">
-      <p className="w-eyebrow">Proofreading · rules on your device; Socria only when you ask</p>
-      <div className="w-row is-wrap" role="tablist" aria-label="Kinds of finding">
-        <button type="button" role="tab" aria-selected={kind === 'all'} className={`w-chip${kind === 'all' ? ' is-on' : ''}`} onClick={() => setKind('all')}>
-          All {issues.length}
-        </button>
-        {ISSUE_KINDS.filter((k) => counts.get(k)).map((k) => (
-          <button key={k} type="button" role="tab" aria-selected={kind === k} className={`w-chip${kind === k ? ' is-on' : ''}`} onClick={() => setKind(k)}>
-            {ISSUE_KIND_LABEL[k]} {counts.get(k)}
-          </button>
-        ))}
-      </div>
-      {!issues.length && <p className="w-quiet">Nothing the rules can see. Logic and whether a claim holds need a reading — ask for one below.</p>}
-      <ul className="w-issues">
-        {shown.map((i) => (
-          <li key={i.id} className={`w-issue is-${i.certainty}`}>
-            <button type="button" className="w-issue-head" onClick={() => onShow(i)}>
-              <span className="w-issue-t">{i.title}</span>
-              <span className={`w-badge is-${i.certainty}`}>{CERTAINTY[i.certainty]}</span>
-              {i.by === 'socria' && <span className="w-badge is-socria">Socria</span>}
-            </button>
-            <p className="w-issue-words">“{i.text.length > 120 ? `${i.text.slice(0, 119)}…` : i.text}”</p>
-            <p className="w-why">{i.why}</p>
-            <div className="w-row">
-              {i.fix !== undefined && (
-                <button type="button" className="w-btn is-primary" onClick={() => onFix(i)} title={`Change it to “${i.fix}”`}>
-                  Change to “{i.fix.length > 28 ? `${i.fix.slice(0, 27)}…` : i.fix}”
-                </button>
-              )}
-              <button type="button" className="w-btn" onClick={() => onDismiss(i)}>
-                Dismiss
-              </button>
-            </div>
-          </li>
-        ))}
-      </ul>
-      <div className="w-check-foot">
-        <div className="w-row is-wrap">
-          <button type="button" className="w-btn" onClick={() => onProofread('all')} disabled={proofreading}>
-            {proofreading ? 'Socria is reading…' : `Ask Socria to proofread ${scopeLabel}`}
-          </button>
-          <button type="button" className="w-btn is-quiet" onClick={() => onProofread('grammar')} disabled={proofreading} title="Grammar, spelling and punctuation — nothing about the argument">
-            The language only
-          </button>
-        </div>
-        {error && <p className="w-error" role="alert">{error}</p>}
-        <label className="w-toggle">
-          <input type="checkbox" checked={underline} onChange={(e) => onUnderline(e.target.checked)} /> Underline what is definite or likely, as I write
-        </label>
-      </div>
-    </div>
-  );
-}
-
 /** The card shown under an underlined word. */
-export function IssueCard({ issue, rect, onFix, onDismiss, onClose }: { issue: Issue; rect: DOMRect; onFix: () => void; onDismiss: () => void; onClose: () => void }) {
+export function IssueCard({ issue, rect, onFix, onDismiss, onClose, onMore }: { issue: Issue; rect: DOMRect; onFix: () => void; onDismiss: () => void; onClose: () => void; onMore?: () => void }) {
   const top = Math.min(rect.bottom + 8, (typeof window !== 'undefined' ? window.innerHeight : 800) - 180);
   const left = Math.max(12, Math.min(rect.left, (typeof window !== 'undefined' ? window.innerWidth : 1200) - 312));
   return (
@@ -290,12 +56,17 @@ export function IssueCard({ issue, rect, onFix, onDismiss, onClose }: { issue: I
       <div className="w-row">
         {issue.fix !== undefined && (
           <button type="button" className="w-btn is-primary" onMouseDown={(e) => e.preventDefault()} onClick={onFix}>
-            Change to “{issue.fix}”
+            {issue.fix.trim() ? `Change to “${issue.fix}”` : 'Remove it'}
           </button>
         )}
         <button type="button" className="w-btn" onMouseDown={(e) => e.preventDefault()} onClick={onDismiss}>
           Dismiss
         </button>
+        {onMore && (
+          <button type="button" className="w-link-btn is-end" onMouseDown={(e) => e.preventDefault()} onClick={onMore}>
+            Everything to check
+          </button>
+        )}
       </div>
     </div>
   );
@@ -379,9 +150,6 @@ export function StructurePanel({
   const at = tb && thesis ? tb.text.indexOf(thesis.quote) : -1;
   return (
     <div className="w-structure" aria-live="polite">
-      <p className="w-eyebrow">
-        Structure · <span>what each paragraph does, read back to you</span>
-      </p>
       {loading && <p className="w-quiet w-pulse">Reading the argument…</p>}
       {error && (
         <div className="w-error" role="alert">
@@ -461,7 +229,7 @@ export function VersionsPanel({ doc, onKeep, onRestore }: { doc: WriteDoc; onKee
   const [peek, setPeek] = useState<string | null>(null);
   return (
     <div className="w-versions">
-      <p className="w-eyebrow">Versions · kept with the conversation; a restore keeps what it replaces</p>
+      <p className="w-quiet">Kept with the conversation. Restoring one keeps what it replaces as a version too.</p>
       <form
         className="w-row"
         onSubmit={(e) => {

@@ -2220,7 +2220,7 @@ export function ThinkingMap({
                   <span className="lg-act-label">Add context</span>
                   <span className="lg-act-blurb">Ground it in your material</span>
                 </button>
-                {/* A card of the Draft Space, made from this idea and linked
+                {/* A note beside the writing, made from this idea and linked
                     back to it — the person's own words to start from, in the
                     place they sort an argument before writing it. */}
                 {canFocus && (
@@ -2233,8 +2233,8 @@ export function ThinkingMap({
                       onFocus?.({ id: node.id, label: node.label, type: node.type });
                     }}
                   >
-                    <span className="lg-act-label">Add to draft</span>
-                    <span className="lg-act-blurb">A card in your Draft Space, linked here</span>
+                    <span className="lg-act-label">Add to notes</span>
+                    <span className="lg-act-blurb">A note beside your writing, linked here</span>
                   </button>
                 )}
                 {/* The map is theirs to edit. Settle or reopen a card, or take

@@ -557,15 +557,15 @@ three-region Mind Graph drawing; the design is in `mockups/logos-5-memory/`.
 - Signed out it says memory lives with an account; if the store cannot be
   reached it says so and offers to try again.
 
-## 8. Writing: the Draft Space and the Writing Space
+## 8. Writing: the page, its notes, and Socria when asked
 
-The person's own writing — one document with two faces, saved with the line of
-thinking (`draft.doc`, `lib/write/doc.ts`), one of its **Artifacts**, called
-Writing (`components/write/WriteSpace.tsx`). It is opt-in: Artifacts never opens
-on it, and a blank page is not shown at all — **Start writing** on an empty
-Artifacts, **+ Write** beside what Socria made, **Write** in the menu or **Add
-to draft** on a map card opens it; once it holds words it is one pill among the
-rest. It replaced the old Draft
+The person's own writing — one document, saved with the line of thinking
+(`draft.doc`, `lib/write/doc.ts`), one of its **Artifacts**, called Writing
+(`components/write/WriteSpace.tsx`), drawn edge to edge with no label over it.
+It is opt-in: Artifacts never opens on it, and a blank page is not shown at all
+— **Start writing** on an empty Artifacts, **+ Write** beside what Socria made,
+**Write** in the menu or **Add to notes** on a map card opens it; once it holds
+words it is one pill among the rest. It replaced the old Draft
 Space (`components/DraftSpace.tsx`, `DraftResponsePanel.tsx`, `lib/logos-draft.ts`
 and `/api/logos/draft`), which are gone rather than kept beside it. Before
 Logos 5 the same component is the column the header's **Write** opens.
@@ -583,7 +583,7 @@ Logos 5 the same component is the column the header's **Write** opens.
   paragraphs, and the table's words kept in its `text` as well (cells by tabs,
   rows by lines). The page: paper (Letter, A4, Legal, A5), orientation,
   margins; the document's own font and size; one flow or pages. Each block can
-  cite passages of the person's documents and remember the Draft Space cards
+  cite passages of the person's documents and remember the notes (cards)
   it grew from; cards (idea, claim, evidence, example, counterargument,
   conclusion, question) in piles, linked to passages, Logic Map ideas or other
   cards; dismissed findings; versions. Every operation returns a new document;
@@ -597,8 +597,10 @@ Logos 5 the same component is the column the header's **Write** opens.
   also in the shared-room route) and never rewords it: no script in a link, no
   colour that is not one, no font name that could break out of CSS, a picture
   only by its media id, a ragged table made square, a page within its bounds.
-- **The Draft Space** (`components/write/Board.tsx`): brain-dump (Enter; a
-  pasted list is a card a line), kinds guessed from wording and changed in one
+- **Notes** (`components/write/Board.tsx`) — the old Draft Space, now a panel
+  beside the page (⋯ → Notes; it opens by itself where it was left open, or
+  where there are notes and no writing yet, and **Add to notes** on a map card
+  opens it): brain-dump (Enter; a pasted list is a card a line), kinds guessed from wording and changed in one
   tap, piles, drag and keyboard moves (Alt+Shift+arrows), multi-select, merge,
   links. `boardHints` (`lib/write/board.ts`) says on the card what the board's
   shape shows; **Look for gaps** asks the model (the `board` op) and shows its
@@ -621,17 +623,35 @@ Logos 5 the same component is the column the header's **Write** opens.
   a picture, a line or a page break is picked whole (Backspace after one picks
   it before anything is removed). Formatting chosen with nothing selected is
   held at the caret and written with the next characters.
-  - **The toolbar**, one row over the page: undo and redo; style; font; size
-    (−, the number, +); bold, italic, underline; text colour and highlight;
-    link; **Insert** (a picture, a table up to 6×6 from a grid, a line, a page
-    break); alignment; line and paragraph spacing; bullets, numbers, indent;
-    **More** (strikethrough, superscript, subscript, clear formatting, find,
-    the outline, page setup). In a table it adds a row above or below, a
-    column left or right, deletes them, turns the header row on or off,
-    deletes the table; on a picture, small, medium and full width, its
-    alignment, its description, replace and delete. A picture's corner drags
-    its width; a table's column edges drag theirs. On a phone the row scrolls
-    and its menus are sheets from the foot.
+  - **One row** over the page, laid out the way a word processor's is
+    (`Toolbar.tsx`). On the left the formatting tools: undo and redo; style;
+    font; size (−, the number, +); bold, italic, underline; text colour and
+    highlight; link; **+ Insert** (a picture, a table up to 6×6 from a grid,
+    a line, a page break); alignment; line and paragraph spacing; bullets,
+    numbers, indent; **More** (strikethrough, superscript, subscript, clear
+    formatting). On the right the document's actions: the save state,
+    **✦ Socria** (one quiet button, with the number of things to check),
+    **Export** (Word, PDF, Markdown, text, a web page, Print) and **⋯** (the
+    word count, Find and replace, the Outline, Notes, Version history, Page
+    setup, Show as pages, Open a file). Nothing is in two places. The row gives
+    way as it narrows rather than wrapping: spacing and indents go into More
+    first (below 1,300px), then the save state (1,150), alignment (1,090),
+    the font and size (960), the highlight and numbering (840), and the words
+    on Socria and Export (760) — each appearing in More exactly when it leaves
+    the row (`TOOL_TIERS`). On a phone the head is two lines: the save state
+    and the actions above, the tools across the whole width below, scrolling,
+    their menus sheets from the foot. In a table a second row adds a row above
+    or below, a column left or right, deletes them, turns the header row on
+    or off, deletes the table; on a picture, small, medium and full width,
+    its alignment, its description, replace and delete. A picture's corner
+    drags its width; a table's column edges drag theirs. One panel at a time
+    opens beside the page (a sheet on a phone), each with the same head: its
+    name and a close.
+  - **Selected words** get two things over them: **✦ Improve** and **Ask
+    Socria** (and **Cite**, when there are documents to cite) — formatting is
+    the row's. While the page has the cursor, Logos 5's floating conversation
+    box fades and slides most of the way down; pointing at it or tapping it
+    brings it back.
   - **Links**: ⌘/Ctrl+K edits one, a bubble under the caret shows where it
     goes, ⌘/Ctrl-click opens it; a URL pasted over words links them.
   - **Find and replace** (⌘/Ctrl+F; ⌘/Ctrl+H, ⌘⇧H on a Mac): any case or
@@ -652,17 +672,25 @@ Logos 5 the same component is the column the header's **Write** opens.
     widths, and pictures — not a link's own blue and underline, black text or
     a white highlight, or the page's base size (`lib/write/parse.ts`); copying
     carries the blocks.
-- **Asked for, never automatic** (`app/api/logos/write`,
-  `lib/write/assist.ts`): Ask (Point & Ask: a `writing` focus — the words
-  verbatim, where they sit, what they cite and grew from; in a table, its row,
-  column and heading), Explain, Critique, Shorten, Improve, Develop (questions
-  and a bracketed shape, never the sentence; it and Critique read the line of
-  thinking and the map's ideas too), Other wordings (only when asked),
-  Proofread — of everything, or **the language only** (grammar and spelling,
-  nothing about the argument) — **Structure** (from the outline: a reverse
-  outline, what each paragraph does, the main claim quoted as written, at most
-  three moves to consider, the questions a reader would still ask — never a
-  rewrite), and the board's gaps. Code checks every answer: an edit must be
+- **Asked for, never automatic** — one Socria panel with three tabs
+  (`components/write/socria.tsx`; the route is `app/api/logos/write`, the
+  rules `lib/write/assist.ts`). **Check**: the rules' findings grouped
+  (spelling and grammar; clarity and style; reasoning and sources), each with
+  the words in their sentence, how sure it is, a one-press fix and Dismiss;
+  **Fix all** makes every definite fix at once, one Undo taking them all back
+  (`applyFixes`); **Check with Socria** and **The language only** ask the
+  model for what rules cannot see. **Improve**: the selected words, or the
+  paragraph the cursor is in — **Clearer**, **Shorter** or **Other wordings**;
+  edits are shown in the panel and on the words, accepted or rejected one at a
+  time or all at once. **Think it through**: **Questions to develop it**
+  (questions and a bracketed shape, never the sentence), **Where it gives
+  way** (both read the line of thinking and the map's ideas too) and **How
+  it's organised** (a reverse outline, what each paragraph does, the main
+  claim quoted as written, at most three moves to consider, the questions a
+  reader would still ask — never a rewrite; the Outline links to it too). Ask
+  (Point & Ask: a `writing` focus — the words verbatim, where they sit, what
+  they cite and grew from; in a table, its row, column and heading) puts the
+  words in the conversation. The board's gaps are asked from Notes. Code checks every answer: an edit must be
   words of the passage; an edit that brings in a number, a citation, a
   quotation or an address is dropped; "shorter" must be shorter; a finding
   must be found in its block, a card id must be a card; the main claim must be
@@ -671,11 +699,20 @@ Logos 5 the same component is the column the header's **Write** opens.
   a time, on the words themselves as well as in the panel, and change the page
   only when accepted; a move moves nothing until **Move it** is pressed.
 - **Proofreading without a model** (`lib/write/checks.ts`): rules for the
-  decidable — misspellings that are never words, doubled words, "could of",
-  then/than, its/it's, a/an by sound, a lone "i", spacing, doubled
-  punctuation, sentence capitals, very long sentences and paragraphs, the same
-  opening three times, a word repeated close by, the same sentence twice,
-  research or figures with nothing cited, quotations with no source. Each
+  decidable — misspellings that are never words, doubled words, "could of"
+  and "may of", then/than, its/it's/its', a/an by sound, a lone "i"; the verb
+  and its subject ("they was", "I is", "she have", "they has", "he were" —
+  never "if he were", "did she have", "thank you is" or "Part I is");
+  there/their/they're, loose/lose, affect/effect, less/fewer, amount/number,
+  "between you and I", "irregardless", "intensive purposes"; spaces (two
+  between words, none after a comma, one before ";" or "!"), doubled
+  punctuation, a bracket or quotation opened and never closed; sentence
+  capitals; very long sentences and paragraphs, the same opening three times,
+  a word repeated close by, the same sentence twice; wordiness ("in order
+  to", "due to the fact that", "the vast majority of" — offered with the
+  shorter way as a judgement call, never underlined); research or figures with
+  nothing cited, quotations with no source. Spelling beyond the list is the
+  browser's own checker, underlined as it is everywhere. Each
   says *definite*, *likely* (and when it would be right after all) or *a
   judgement call*; only definite and likely are underlined (CSS highlights, so
   never in the DOM), and only when the caret is put on them does the card
@@ -869,8 +906,8 @@ everyone has.
 | Writing: the word processor's switch | `lib/write/flags.ts` (`NEXT_PUBLIC_WRITE_RICH`) |
 | Writing: the rules that proofread on the device; the board's hints and outline; Point & Ask's brief; the map lit while writing | `lib/write/checks.ts`, `board.ts`, `focus.ts`, `links.ts` |
 | Writing: what Socria may be asked, and how its answers are checked; the route | `lib/write/assist.ts`, `app/api/logos/write/route.ts` |
-| Writing: the space, the page, the toolbar, the board, the panels (find, the outline, page setup, links, a picture's description; checks, versions, structure, a proposed edit), the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Toolbar.tsx`, `Board.tsx`, `panels.tsx`, `parts.tsx`, `write.css` |
-| Writing: where it is wired in (the Writing artifact, the column, saving, Point & Ask, Add to draft, Keep in memory) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`; `keepWritingInMemory`) |
+| Writing: the space, the page, the one row (tools and the document's actions), the notes, the Socria panel (Check, Improve, Think it through), the other panels (find, the outline, page setup, links, a picture's description, versions, the structure, a proposed edit), the styles | `components/write/WriteSpace.tsx`, `Editor.tsx`, `dom.ts`, `Toolbar.tsx`, `Board.tsx`, `socria.tsx`, `panels.tsx`, `parts.tsx`, `write.css` |
+| Writing: where it is wired in (the Writing artifact, the column, saving, Point & Ask, Add to notes, Keep in memory) | `components/LogosApp.tsx` (search `the Draft Space and the Writing Space`; `keepWritingInMemory`) |
 | Driving the four views in a browser | `scripts/dev/logos5-views-journey.mjs` (desktop, `W=390 H=844` for a phone, `THEME=night`, `AXE=…/axe.min.js` for an accessibility scan per screen) |
 | Driving it in a browser by hand | `scripts/dev/logos5-journey.mjs` (the map: `STEPS=talk,talk2,stage,convo,card,cardask,arts`; study: `STUDY_FILES=… STEPS=intake,board,topic,practice,fill,check,more,askwhy,reload`; home: `STEPS=start,seed,home,find,press,star,hide,undo,drag,lasso,note,viewmenu,mode,list` with `MODE=Today|Week|Month|All`; any of them on a theme with `THEME=night`) |
 
@@ -1800,3 +1837,56 @@ outlines (the checks applied to them are tested; the answers were canned);
 Microsoft Word itself opening the files (LibreOffice and pandoc did); a
 document of hundreds of pages in the browser (the PDF writer was run on 140
 paragraphs).
+
+### The Writing Space, made simpler
+
+Asked for: the Write space was confusing — "I don't know what does which".
+A Google Docs–style design, made better where it can be, with parts cut or
+merged, and better proofreading. Built as §8 describes:
+
+- **What went.** The "Artifact · Writing · yours" label; the Draft / Write /
+  Side by side switch (the board is now Notes, a panel); a second bar above
+  the toolbar; Find, the Outline and Page setup each reachable from two
+  menus; the separate Check button and panel; ten Socria verbs (Ask, Explain,
+  Critique, Shorten, Improve, Develop, Other wordings, Proofread, The language
+  only, Structure) spread over four places; Undo and Redo in a menu as well as
+  on the row; Keep in memory on selected words (it stays on notes).
+- **What it is now.** One row: the tools on the left, Socria · Export · ⋯ on
+  the right. One Socria panel: Check · Improve · Think it through. Two things
+  over selected words: Improve and Ask Socria. Notes, the Outline, Versions and
+  Page setup in ⋯, one panel at a time.
+- **Better than a word processor's**: the row gives way instead of wrapping —
+  what it has no room for moves into More, and only then; the save state stays
+  in view on a phone, and on a desk wherever there is room (always when a save
+  has not landed); the word count is one press away in ⋯, not in a menu of
+  tools; **Fix all** for the slips with one right answer; edits shown on the
+  words themselves; the conversation's box stepping back while the page has
+  the cursor.
+- **Proofreading**: the rules above, added in this change, each held down by
+  a test with the right uses it must leave alone (`test/write.test.mjs`, now
+  220 checks: "if he were", "did she have", "thank you is", "Part I is",
+  "for you and I think…", "to London and I", "the knot is not loose", "(see
+  p. 42)", "1)", ":)", "its very nature", "May of 2020"); Fix all made from
+  the end of each paragraph back, only where the words still are, the bold
+  around them kept.
+- **Checked in a real browser** (the dev app, signed out, the stand-in model;
+  no page errors): the row measured on one line at 620, 700, 800, 900, 1000,
+  1100, 1240 and 1366px wide, with what left it found in More; the head on a
+  390px phone as two lines with Bold to Text colour in view; Check grouping
+  three slips and a wordy phrase, Fix all making the two definite ones;
+  Improve on the paragraph at the cursor, its edit accepted from the panel and
+  from the words; Think it through's reverse outline and a move; Notes opened
+  from ⋯ and a note added; Export and ⋯; the bubble over selected words; the
+  conversation's box fading while typing and back when pointed at. The whole
+  earlier journey — formatting, a link, held bold, a table with rows added and
+  deleted, a picture sized and described, a line and a page break, find, undo
+  and redo, the five exports, A4 landscape as pages, a reload — passes again
+  on a desk and on a phone (where the font, size, highlight and alignment are
+  reached through More), as do the paste-and-open journey and the writing
+  help journey.
+
+**What this does not show.** Whether it is easier now has not been asked of
+anyone but the person who asked for it: there has been no study. Not
+verified: Safari, Firefox, iOS and Android; the real model's suggestions;
+how the browser's own spelling underline looks beside the rules' on each
+platform.

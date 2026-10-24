@@ -2678,7 +2678,7 @@ export function LogosApp({
     focusComposer();
   }
 
-  /** A Logic Map idea, made a card of the Draft Space — linked back to the idea it came from. */
+  /** A Logic Map idea, made a note beside the writing — linked back to the idea it came from. */
   function addNodeToDraft(node: MapNodeRef) {
     const t = node.type;
     const kind: CardKind =
@@ -5826,7 +5826,7 @@ export function LogosApp({
                   ? setDraftOpen((v) => !v)
                   : ask('draft-locked')
               }
-              title="The Draft Space and the Writing Space — yours; Socria only when you ask"
+              title="Your writing — yours; Socria only when you ask"
             >
               Write
               {!limits.draftSpace && <OneLock className="lg-draft-lock" />}
@@ -6744,7 +6744,7 @@ export function LogosApp({
   // Universal Map (components/logos5/UniverseParts.tsx PreviewCard), where it
   // lives, rather than in a list brought back from here.
   const l5Menu: L5MenuItem[] = [
-    { label: 'Write', hint: limits.draftSpace ? 'The Draft Space and the Writing Space — yours' : 'Part of Socria One', onSelect: openWriting },
+    { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     { label: 'What Logos does', sep: true, onSelect: () => setGuideOpen(true) },
@@ -6999,14 +6999,13 @@ export function LogosApp({
   const writingShown = limits.draftSpace && !!activeId && (!isEmptyDoc(writeDoc) || !!writeStarted[activeId]);
   const artifactItems: ArtifactItem[] = [
     // THE WRITING: the person's own document — one artifact among the rest, there once they
-    // have started it (Start writing, Write in the menu, Add to draft) and never chosen for them
+    // have started it (Start writing, Write in the menu, Add to notes) and never chosen for them
     ...(writingShown
       ? [
           {
             key: 'w:doc',
             kind: 'Writing',
             title: writeDoc.title.trim() || 'Untitled',
-            eyebrow: 'Artifact · Writing · yours — Socria writes nothing here',
             bare: true,
             render: () => writeSpaceEl('artifact'),
           },
