@@ -7,19 +7,17 @@
 // route adds nothing of its own except the handover: the sentence goes into
 // session storage, and the surface it was written for picks it up.
 //
-// WHICH SURFACE. The chat, unless the person came here on their way to Logos
-// (`?to=logos` — the Logos page's own door). Nobody is asked to choose between
-// Core and Logos: a new person should not need the product's taxonomy before
-// receiving anything from it.
+// WHICH SURFACE. Logos 5, the one there is (docs/ARCHIVE.md). It used to be
+// the chat unless the person came by the Logos page's door (`?to=logos`, still
+// accepted), with a question choosing between Core 4 and Logos; both went with
+// the Core chat on 24 October 2026.
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
-import { FirstRunIntro, type StartModel } from '@/components/onboarding/FirstRunIntro';
+import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { replayFirstRun, useFirstRun } from '@/components/useFirstRun';
-import { useNewSocria } from '@/components/useNewSocria';
 import { isProduction } from '@/lib/environment';
-import { chooseModel } from '@/lib/socria-model-store';
 import { carry } from '@/lib/onboarding-script';
 import { track } from '@/lib/analytics';
 
@@ -28,10 +26,8 @@ export function Onboarding() {
   const params = useSearchParams();
   const { isSignedIn, user } = useUser();
   const toLogos = params?.get('to') === 'logos';
-  const surface = toLogos ? 'logos' : 'core';
-  // the new Socria has opened for them only once its code is entered (lib/new-socria.ts)
-  const newSocria = useNewSocria();
-  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface, opened: newSocria });
+  const surface = 'logos';
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface });
 
   // REPLAY (off production only): forget everything the first run has shown,
   // on this browser and on the account, then load this page again cleanly —
@@ -56,46 +52,30 @@ export function Onboarding() {
   }, [surface, clearing]);
   useEffect(() => setClearing(replay), [replay]);
 
-  // WHERE THEY LAND is what they answered: talking it through opens Core 4,
-  // seeing it laid out opens Logos — 3 where it is offered, 2 where it is not
-  // (the intro asks which). No answer opens the automatic default.
-  const go = useCallback(
-    (model: StartModel | null | undefined) => {
-      if (model) chooseModel(model);
-      router.push(model ? `/chat?model=${model}` : '/chat');
-    },
-    [router]
-  );
+  // WHERE THEY LAND: Logos 5, with what they wrote sent for them.
+  const go = useCallback(() => router.push('/chat'), [router]);
 
   if (clearing) return null;
 
   return (
     <FirstRunIntro
       surface={surface}
-      // Both models need an account; somebody signed out is not asked to
-      // choose between two things they cannot open yet.
-      askModel={isSignedIn !== false}
       defaultName={user?.firstName ?? null}
-      // the Logos page's own door leans toward seeing it laid out — Logos 3, or
-      // whichever Logos this browser is offered (FirstRunIntro matches any Logos)
-      suggest={toLogos ? 'logos-3' : null}
-      onStart={(text, intent, model) => {
+      onStart={(text, intent) => {
         firstRun.reach('socria.intro');
         carry(typeof sessionStorage !== 'undefined' ? sessionStorage : null, {
           text,
           intent,
-          surface: model === 'logos-2' || model === 'logos-3' ? 'logos' : 'core',
-          // which Logos, so the chat opens the one they chose rather than its default
-          ...(model === 'logos-3' ? { model } : {}),
+          surface: 'logos',
           // it goes straight through: they land on Socria's answer to their own
           // question, and the tour starts from there
           send: true,
         });
-        go(model);
+        go();
       }}
-      onSkip={(model) => {
+      onSkip={() => {
         firstRun.reach('socria.intro', { skipped: true });
-        go(model);
+        go();
       }}
     />
   );

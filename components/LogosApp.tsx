@@ -13,7 +13,6 @@
 // answer is still arriving, which is the whole interaction being tested here.
 
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, VIEW_RESET, type MapNodeRef, type ObjectAction } from '@/components/ThinkingMap';
 import { sanitizeViz } from '@/lib/logos-viz';
@@ -47,8 +46,8 @@ import { emptyWorkspace, update as wsUpdate } from '@/lib/workspace/store';
 import { bridgeSurfaces, projectMap, projectMind } from '@/lib/workspace/adapters';
 import { trace } from '@/lib/workspace/trace';
 import { LogosRail, type RailProject } from '@/components/LogosRail';
-import { AttachmentList, LogosComposer, type Draft } from '@/components/LogosComposer';
-import { LogosMessage, MsgActions, SocriaAnswering, SocriaPending, type Side } from '@/components/LogosMessage';
+import { LogosComposer, type Draft } from '@/components/LogosComposer';
+import { MsgActions, SocriaAnswering, type Side } from '@/components/LogosMessage';
 import { WriteSpace, type SaveState, type WriteSpaceHandle } from '@/components/write/WriteSpace';
 import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
 import { Tour } from '@/components/Tour';
@@ -66,7 +65,6 @@ import { AccountSheet } from '@/components/account/AccountSheet';
 import { useConversationStyle } from '@/components/useConversationStyle';
 import { ChallengeChip } from '@/components/rewards/ChallengeChip';
 import { PLAN_CHANGED, SESSION_SAVED } from '@/components/rewards/useRewards';
-import { ModelPicker } from '@/components/ModelPicker';
 import { CollabBar } from '@/components/CollabBar';
 import { useLogosCollab } from '@/components/useLogosCollab';
 import { cleanName, joinCodeFrom } from '@/lib/collab';
@@ -83,7 +81,6 @@ import {
   FIRST_MAP_KEY,
   FIRST_MAP_NOTE,
   openingsFor,
-  OPENING_LEAD,
   firstMapCrossed,
   openingValue,
   readStart,
@@ -91,15 +88,11 @@ import {
 } from '@/lib/first-session';
 import { exportMapPng } from '@/components/MapPoster';
 import { sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-prompt';
-import { OneLock } from '@/components/OneLock';
 import {
   FREE_DEPTH,
   meaningfulNodes,
-  type OneFeature,
   type Plan,
 } from '@/lib/socria-one';
-import { MathText } from '@/components/TeX';
-import { Inline, RichText, StreamingRichText } from '@/components/RichText';
 import {
   SOCRIA_MODELS,
   type ReplyLength,
@@ -108,10 +101,11 @@ import {
 } from '@/lib/socria-prompt';
 import { guardWatches, type GuardSignal } from '@/lib/logos-guidance';
 import { MAX_STYLE, STYLE_CHANGED, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
-import { chooseModel, lastCoreModel, readLength, rememberLength } from '@/lib/socria-model-store';
+import { readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
 import { MakePicker } from '@/components/logos5/MakePicker';
 import { askFor, makeChoice } from '@/lib/logos5/make';
+import { mapArtifacts, pictureRepeatsDisplay, plotArtifact } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
 import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
@@ -165,13 +159,11 @@ import {
   type PanelNode,
   type WorkspaceLayout,
 } from '@/lib/workspace/tiling';
-import { VIEW_CATALOGUE, afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, openBeside, showLens, suggestLayout, suggestViews, viewCatalogue, type LayoutSuggestion } from '@/lib/workspace/surfaces';
+import { afterDisplay, arrangementsFor, factsFrom, interfaceContext, layoutForRequest, openBeside, showLens, suggestLayout, suggestViews, viewCatalogue, type LayoutSuggestion } from '@/lib/workspace/surfaces';
 import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-request';
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
-import { logosName, newSocriaOpen } from '@/lib/new-socria';
-import { useNewSocria } from '@/components/useNewSocria';
 import { L5Layout, L5Tabs, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5Views';
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
 import { ContentView, PlainReader } from '@/components/logos5/ContentView';
@@ -185,7 +177,7 @@ import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { L5Header, L5LinkBar, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
-import { UniverseView } from './logos5/Universe';
+import { UniverseView, type SharedIn } from './logos5/Universe';
 import { MemoryView } from './logos5/MemoryView';
 import type { UniverseIn } from '@/lib/logos5/universe';
 import { checkPractice, clozeFrom, intentOf, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
@@ -220,7 +212,7 @@ const EMPTY_SCENE: SceneState = { nodes: [], next: 1, unit: 'm' };
 const DOCK_KEY = 'socria.logos3.dock.v1';
 /** the chats bar and header, hidden from the top-right control — per browser */
 const CHROME_KEY = 'socria.logos.chrome.v1';
-import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
+import { readDrift, type DriftVerdict } from '@/lib/topic-drift';
 import {
   MATH_FADE_MS,
   readMathSignal,
@@ -241,7 +233,7 @@ import { lastReplyIn, skipsMap } from '@/lib/map-skip';
 import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { WhatsNew } from '@/components/onboarding/WhatsNew';
-import { LogosCover } from '@/components/LogosCover';
+import { GuestWall } from '@/components/logos5/GuestWall';
 import { useFirstRun } from '@/components/useFirstRun';
 import { wantsIntro, wantsWhatsNew } from '@/lib/first-run';
 import { computationFacts, whatChanged } from '@/lib/model/inspect';
@@ -348,9 +340,6 @@ const STARTERS = [
 const CHANGE_FLASH_MS = 4200;
 
 export function LogosApp({
-  // Set by /chat, which renders this component. Switching model there is a
-  // state change, not a navigation — see switchTo.
-  onSwitchModel,
   // The sentence somebody wrote during onboarding. /chat reads it (once —
   // the handover clears as it is read) and hands it down, so it reaches
   // whichever composer actually mounted rather than racing for it.
@@ -380,10 +369,14 @@ export function LogosApp({
   // The Core chats brought into Logos 5 (lib/logos5/merge.ts), told to the
   // host so its own list moves them too: from then on its rail opens them here.
   onConversationsMoved,
+  // What others have shared with them, and the two ways in: pressing one, and
+  // an eight-character code (the host holds the dialog and where each opens).
+  shared,
+  onOpenShared,
+  onJoinWithCode,
   autoSend = false,
   tourAfter = false,
 }: {
-  onSwitchModel?: (next: SocriaModel) => void;
   initialInput?: string;
   /** send initialInput on landing — onboarding's first thought, free once per account */
   autoSend?: boolean;
@@ -403,6 +396,11 @@ export function LogosApp({
   onUpdateProject?: (id: string, patch: { name?: string; color?: string | null }) => Promise<string | null>;
   onMoveChat?: (id: string, projectId: string | null) => void;
   onConversationsMoved?: (moved: { id: string; title: string; updatedAt: number; projectId: string | null }[]) => void;
+  /** what is shared with them (/api/shared); undefined signed out — the contents column then has no such group */
+  shared?: SharedIn[];
+  onOpenShared?: (item: SharedIn) => void;
+  /** signed in: "Join with a code", in the More menu and under Shared with you */
+  onJoinWithCode?: () => void;
 } = {}) {
   const { isLoaded, isSignedIn, user } = useUser();
   // The account's Conversation Style (Manage Account → Personalization):
@@ -455,7 +453,6 @@ export function LogosApp({
   // registered without them (supportsDepth: false), so it shows no depth
   // control and every request goes at the one depth it answers at.
   const depthOn = !!SOCRIA_MODELS[model]?.supportsDepth;
-  const router = useRouter();
 
   // ── Socria One ────────────────────────────────────────────────────
   const [plan, setPlan] = useState<Plan>('free');
@@ -501,7 +498,6 @@ export function LogosApp({
   // The boundary note is dismissible — said once, not nagged.
   const [limitNoteOff, setLimitNoteOff] = useState(false);
   // The extraction wanted to add something and the free map was full.
-  const [mapCapped, setMapCapped] = useState(false);
   /** what the engine said about a model built (or refused) this turn */
   const [buildNote, setBuildNote] = useState<string | null>(null);
   // a display the last turn made, to be opened beside the map once the map holds it (surfaces.ts afterDisplay)
@@ -872,12 +868,7 @@ export function LogosApp({
   // What this person has already been taught, on every surface (lib/first-run.ts):
   // the Logos sequence runs once per person, on their own first map or model,
   // and never again on any device the record has been merged with.
-  // THE NEW SOCRIA, BEHIND ITS CODE (lib/new-socria.ts): Logos 5's screen for
-  // whoever has entered it, the Logos 4 layout for everybody else. Read at
-  // once — this is never rendered on the server — so the first frame is
-  // already the right screen.
-  const newSocria = useNewSocria(true);
-  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'logos', opened: newSocria });
+  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'logos' });
   // THERE IS NO LOGOS-ONLY ONBOARDING. The three-beat sequence that used to
   // open over a first map is gone: onboarding is one sequence for all of
   // Socria (components/onboarding/FirstRunIntro.tsx). What remains here is
@@ -1099,41 +1090,6 @@ export function LogosApp({
     try {
       localStorage.setItem(DEPTH_KEY, next);
     } catch {}
-  }
-
-  // Logos is one of the models, so switching away from it is a navigation,
-  // not a setting. Write the choice where the Core chat reads it, then go —
-  // /chat picks it up on mount instead of opening on whatever was there last.
-  function pickModel(next: SocriaModel) {
-    // The one you are already on. Compared against THIS surface rather than
-    // the string 'logos', or picking Logos 2 from inside Logos 2 would count
-    // as a switch and reload the room you are standing in.
-    if (next === model) return;
-    switchTo(next);
-  }
-
-  /** The way out of Logos: back to whichever Core model they came from. */
-  function leaveForChat() {
-    switchTo(lastCoreModel());
-  }
-
-  // Leaving Logos is a model switch. It USED to be `router.push('/chat')`,
-  // which does nothing visible: /chat is already the route — it renders this
-  // component whenever the model is Logos — so pushing it again re-renders
-  // the same surface with the same state. Remembering the new model doesn't
-  // help either, since /chat only reads storage on mount. So when /chat is
-  // our host, hand the switch back to it and let it re-render; the router is
-  // only for the case where this is mounted somewhere else.
-  function switchTo(next: SocriaModel) {
-    // Pressing "Socria chat" is a choice, and it outranks the automatic
-    // default from here on — otherwise a member who wanted Core back would be
-    // put into Logos again on the next visit, for ever.
-    chooseModel(next);
-    if (onSwitchModel) {
-      onSwitchModel(next);
-      return;
-    }
-    router.push(SOCRIA_MODELS[next].href ?? '/chat');
   }
 
   // The chips on an empty line of thinking. Logos keeps no journey of its own,
@@ -1454,7 +1410,33 @@ export function LogosApp({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [resumeCheckout, isLoaded, isSignedIn]);
 
-  const hasAccess = unlocked || !!isSignedIn;
+  // EVERYONE, once the account has answered: signed in, holding the access
+  // key, or a GUEST — signed out, with one line of thinking and its map
+  // (lib/guest-pass.ts; a second asks them to sign up, GuestWall).
+  const hasAccess = unlocked || !!isSignedIn || authSettled;
+  const guest = authSettled && !isSignedIn && !unlocked;
+  const guestRef = useRef(guest);
+  guestRef.current = guest;
+  /** the guest's one line of thinking, claimed on this server (POST /api/logos/guest) */
+  const guestClaimRef = useRef<string | null>(null);
+  const [guestWall, setGuestWall] = useState(false);
+  const signUpHref = authUrl('sign-up', '/chat');
+  const signInHref = authUrl('sign-in', '/chat');
+  /** Claim the guest's one line of thinking before its first turn: false when another is already theirs. */
+  async function claimGuestPass(sessionId: string | null): Promise<boolean> {
+    if (!sessionId) return false;
+    if (guestClaimRef.current === sessionId) return true;
+    try {
+      const r = await fetch('/api/logos/guest', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ sessionId }) });
+      if (!r.ok) return false;
+      guestClaimRef.current = sessionId;
+      return true;
+    } catch {
+      return false;
+    }
+  }
+  /** A guest already has a line of thinking with words in it, other than this one. */
+  const guestHasAnother = (id: string | null) => sessionsRef.current.some((x) => x.id !== id && x.messages.length > 0);
 
   // THE GUIDE NO LONGER OPENS ITSELF. A modal of miniature demonstrations
   // before a word has been said was Logos explaining itself in place of
@@ -2046,6 +2028,30 @@ export function LogosApp({
         } catch {
           // Fall through to an empty list rather than blocking the page.
         }
+        // A GUEST WHO SIGNED UP: what they thought through signed out, on this
+        // browser, comes with them — saved to the account once, then no longer
+        // kept on the device (lib/guest-pass.ts; GuestWall promises it).
+        const carried = loadLocal().filter((x) => x.messages.length > 0 && !list.some((y) => y.id === x.id)).slice(0, 5);
+        if (carried.length && !cancelled) {
+          const kept: LogosSession[] = [];
+          for (const x of carried) {
+            try {
+              const r = await fetch('/api/conversations', {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ conversation: { ...x, kind: 'logos' } }),
+              });
+              if (r.ok) kept.push(x);
+            } catch {
+              /* kept on the device; the next sign-in tries again */
+            }
+          }
+          if (kept.length) {
+            const keptIds = new Set(kept.map((x) => x.id));
+            list = [...kept, ...list];
+            saveLocal(loadLocal().filter((x) => !keptIds.has(x.id)));
+          }
+        }
       } else {
         list = loadLocal();
       }
@@ -2123,7 +2129,7 @@ export function LogosApp({
       activeIdRef.current = target;
       // LOGOS 5 opens on the Universal Map — unless a link, a Project or a
       // first message chose a line of thinking, or there is nothing on it yet
-      if (SOCRIA_MODELS[model]?.workspace && newSocriaOpen() && !wanted && !pendingStart && sorted.some((x) => x.messages.length > 0)) setL5Home(true);
+      if (!wanted && !pendingStart && sorted.some((x) => x.messages.length > 0)) setL5Home(true);
       chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
       if (!pendingStart) restoreView(target, 'load');
       setHydrating(false);
@@ -2134,8 +2140,7 @@ export function LogosApp({
       if (pendingStart) {
         const { id, message } = pendingStart;
         // Logos 5 begins on the Universal Map: the opening goes into the box at its foot
-        if (SOCRIA_MODELS[model]?.workspace && newSocriaOpen()) setHomeStart(message);
-        else setInput(message);
+        setHomeStart(message);
         startIdRef.current = id;
         requestAnimationFrame(() => {
           const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
@@ -2189,9 +2194,6 @@ export function LogosApp({
     setCtxPanel({ open: false, node: null });
     setChanged(new Set());
     setDeltaNote(null);
-    // The boundary belongs to a map, not to the reader — a different line of
-    // thinking gets its own room and its own notice.
-    setMapCapped(false);
     setLimitNoteOff(false);
     setError(null);
     setStreaming('');
@@ -2221,6 +2223,11 @@ export function LogosApp({
   }
 
   function newSession(projectId: string | null = null): boolean {
+    // a guest has one line of thinking: starting another is where an account comes in
+    if (guestRef.current && sessionsRef.current.some((x) => x.messages.length > 0)) {
+      setGuestWall(true);
+      return false;
+    }
     // The month's count is the server's, and it is spent when a line of
     // thinking BEGINS rather than when an empty one is created — so opening
     // Logos and closing it again costs nothing. Everything already open stays
@@ -2407,6 +2414,7 @@ export function LogosApp({
           method: 'POST',
           headers: { 'Content-Type': 'application/json', ...keyHeaders() },
           body: JSON.stringify({
+            sessionId: forSession,
             messages: chronRef.current,
             map: mapRef.current,
             // contextsRef is only reassigned on render, so a just-attached
@@ -2532,8 +2540,6 @@ export function LogosApp({
             });
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
-            // The server says whether this line of thinking outgrew a free map.
-            setMapCapped(!!json.capped);
             // …and what the engine did with a model this turn proposed. A
             // refusal is as much news as a build: "I can hold the structure but
             // I need a value for the mass" is the useful state, and it would
@@ -3757,7 +3763,7 @@ export function LogosApp({
         // Logos 5: a plot is something to look at — Artifacts, on it, beside the conversation
         if (wsFacts.lenses.includes('plot')) {
           const sid = activeIdRef.current;
-          if (sid) setArtSel((m) => ({ ...m, [sid]: 'v:plot' }));
+          if (sid) setArtSel((m) => ({ ...m, [sid]: plotItem() }));
           setScreen((s) => onMade(true, s, narrowRef.current));
           setError(null);
           setInput('');
@@ -3791,7 +3797,7 @@ export function LogosApp({
         const sid = activeIdRef.current;
         const key =
           to.artifact === 'plot'
-            ? 'v:plot'
+            ? plotItem()
             : to.artifact === 'model'
               ? wsFacts.docs.length
                 ? `m:${wsFacts.activeDoc ?? wsFacts.docs[wsFacts.docs.length - 1].id}`
@@ -3873,6 +3879,12 @@ export function LogosApp({
     // in a group. The count can be a turn stale; the server holds the line.
     if (!one && messagesSpent && !firstThoughtRef.current) {
       if (!ask('messages-spent')) setError(boundaryNote('messages'));
+      return;
+    }
+    // A GUEST: their one line of thinking, claimed before its first turn (lib/guest-pass.ts). Words
+    // in another one already, or the server says so: the sign-up note, and nothing is sent.
+    if (guestRef.current && (guestHasAnother(activeIdRef.current) || !(await claimGuestPass(activeIdRef.current)))) {
+      setGuestWall(true);
       return;
     }
 
@@ -4102,6 +4114,20 @@ export function LogosApp({
         const reached: Counter = body?.upgrade === 'messages' ? 'messages' : 'chats';
         if (!ask(reasonForCounter(reached))) setError(body?.error || boundaryNote(reached));
         return;
+      }
+      if (res.status === 401 && guestRef.current) {
+        const body = await res.json().catch(() => ({}));
+        if (body?.guestLimit) {
+          guestClaimRef.current = null;
+          patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
+          chronRef.current = withoutTurn(chronRef.current, sent);
+          setInput(content);
+          setReplyTo(replying);
+          setBusy(false);
+          setGuestWall(true);
+          return;
+        }
+        throw new Error(failureText(body));
       }
       if (!res.ok) {
         const body = await res.json().catch(() => ({}));
@@ -4426,7 +4452,7 @@ export function LogosApp({
   // it opens when something is MADE or asked for, never because a map grew
   // from ordinary talk. The links between the thread and the map are read
   // from what the session already holds (lib/logos5/linking.ts).
-  const l5 = workspaceOn && newSocria;
+  const l5 = true;
   l5Ref.current = l5;
   // THE MAP IS THE SCREEN (docs/LOGOS-5.md §6). A line of thinking shows one
   // of three things — its Components (the files as topics), its Artifacts
@@ -4509,14 +4535,6 @@ export function LogosApp({
   const stageOpen = l5 && !!activeId && studyTab === 'logic_map';
   /** the turn just sent asked for something to be made: what the engine makes is shown (rule C) */
   const askedMakeRef = useRef(false);
-  /** a question asked from a card's popover: its answer is read there */
-  const [cardAsking, setCardAsking] = useState(false);
-  useEffect(() => {
-    if (error) setCardAsking(false);
-  }, [error]);
-  useEffect(() => {
-    setCardAsking(false);
-  }, [activeId]);
   /** a question asked from a card's popover is read there: the screen does not move for it */
   const cardAskRef = useRef(false);
   /** the lines of thinking whose topic has been asked for a name, this visit (lib/logos5/title.ts) */
@@ -4725,15 +4743,6 @@ export function LogosApp({
   // opened from the map, and a new one begun from it. The rail is put away; it
   // is still there ("List") for renaming, deleting and filing.
   const [l5Home, setL5Home] = useState(false);
-  // THE CODE ENTERED WHILE THIS IS OPEN — under Manage Account, in another
-  // tab, or brought from another device by the account: the new Socria opens
-  // where it begins, on its map. (Still loading, the loader decides that
-  // itself, reading the gate when it lands.)
-  const hadNewSocria = useRef(newSocria);
-  useEffect(() => {
-    if (newSocria && !hadNewSocria.current && !hydrating && workspaceOn) setL5Home(true);
-    hadNewSocria.current = newSocria;
-  }, [newSocria, hydrating, workspaceOn]);
   /** an opening chosen elsewhere, put in the map's box to be made their own before it is sent */
   const [homeStart, setHomeStart] = useState<string | null>(null);
   /** files sent from the map's box: sorted once the new line of thinking they begin is the one open */
@@ -5383,19 +5392,9 @@ export function LogosApp({
     if (l5 && t && atEndRef.current) requestAnimationFrame(() => (t.scrollTop = t.scrollHeight));
   }, [l5, buildNote, firstMapNote, found, mapping]);
 
-  if (!hasAccess) {
-    // THE COVER IS THE GATE. The same card the chat opens from its pill —
-    // the real thing built live, the terms read from the plan table, the way
-    // in — naming the Logos this surface is, so the two doors say the same
-    // thing in the same words. The access key stays behind its disclosure.
-    return (
-      <div className="logos-root">
-        {authSettled && (
-          <LogosCover as="gate" version={model === 'logos-3' ? 'logos-3' : 'logos-2'} name={logosName(newSocria)} isSignedIn={false} primaryHref={gateHref} onUnlock={unlockWith} />
-        )}
-      </div>
-    );
-  }
+  // Until the account has answered there is nothing to show; after, everyone
+  // gets Logos 5 — a guest with one line of thinking and its map.
+  if (!hasAccess) return <div className="logos-root" />;
 
   // THE PREMISE, for a person with nothing here yet and nothing carried in.
   // The record is shared with the chat, so a Core veteran opening Logos is
@@ -5520,6 +5519,10 @@ export function LogosApp({
     const spec = viewCatalogue(wsLayout, wsFacts).find((e) => e.id === b)?.panel ?? (b === 'plot' ? { type: 'map' as const, config: { lens: 'plot' } } : { type: b });
     return { kind: 'panel', id: `l5b-${b}`, type: spec.type, ...(spec.config ? { config: spec.config } : {}) };
   }
+  /** The artifact that draws the plot (lib/logos5/artifacts.ts). */
+  function plotItem(): string {
+    return plotArtifact(wsFacts.docs.map((d) => d.id), wsFacts.activeDoc, !!wsFacts.viz);
+  }
   /** Logos 5, Artifacts: the panel an artifact is drawn in — a model, the picture, the plot, a Live 3D scene. */
   function artPanelOf(key: string): PanelNode | null {
     if (key.startsWith('m:')) return { kind: 'panel', id: `l5a-m-${key.slice(2)}`, type: 'model', config: { doc: key.slice(2) } };
@@ -5534,12 +5537,7 @@ export function LogosApp({
     switch (p.type) {
       case 'chat':
         // Logos 5: the conversation is always beside the workspace, never inside it
-        if (l5) return <p className="l5-chatnote">The conversation is beside the workspace.</p>;
-        return (
-          <div className="lg-convo lg-convo-panel">
-            {convoBody}
-          </div>
-        );
+        return <p className="l5-chatnote">The conversation is beside the workspace.</p>;
       case 'map':
         // Logos 5: the Logic Map's map, or the map docked beside another view — never both at once
         // Logos 5: the Logic Map (and the map docked beside) draws the person's ideas; an artifact, or
@@ -5735,155 +5733,6 @@ export function LogosApp({
           </span>
         ) : null}
     </>
-  );
-  const convoHead = (
-          <header className={`lg-head${collab ? ' lg-head-collab' : ''}`}>
-            {/* The header measures itself; this row is what it arranges. They
-                are two elements because a container query cannot restyle the
-                container — only what is inside it (globals.css, "the header,
-                when the conversation column is narrow"). */}
-            <div className="lg-head-row">
-            {/* The rail's toggle, and it is HERE rather than in the rail
-                because the rail is the Core surface's and the Core surface's
-                has no desktop collapse. Logos needs one — it shows three
-                columns and the draft makes four — so the control sits with the
-                other layout controls instead of being bolted onto a shared
-                component. On a phone the rail is a drawer and this is the
-                hamburger that brings it back; the × inside the drawer, which
-                app-shell.css shows only at that width, puts it away again. */}
-            <button
-              type="button"
-              className="lg-mrail"
-              onClick={() => setRailOpen((v) => !v)}
-              aria-expanded={railOpen}
-              aria-label={railOpen ? 'Hide your lines of thinking' : 'Your lines of thinking'}
-              title={railOpen ? 'Hide the rail' : 'Your lines of thinking'}
-            >
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                <path d="M4 7h16M4 12h16M4 17h10" />
-              </svg>
-            </button>
-            {/* No mark here: the header keeps to the controls. The surface's
-                name stays for screen readers, which the mark never was. */}
-            <span className="lg-word">
-              <span className="lg-sr">Socria Logos</span>
-            </span>
-            <span className="lg-head-note">A reasoning environment</span>
-            {/* WHERE THE MEMORY BUTTON WENT. It was here, and it opened the
-                Thinking Journey. /chat moved the same control into the rail's
-                footer as a link to /memory, because /memory IS the Mind Graph
-                — the rows the prompt is actually built from — and the Journey
-                is on that page too, labelled as the older Cores' store and
-                carrying the per-entry forget. Logos now shows the Core rail, so
-                that link is already on this screen; a second control in the
-                header, pointing somewhere else, is how one product ends up
-                telling a person two things about what it remembers. */
-            }
-            {/* Logos 2 only. Logos 3's header keeps to the workspace: the
-                walk-through and the working-style sheet have no button here.
-                The sheet still opens from the note shown when the chat
-                changes how Socria works with you. */}
-            {!workspaceOn && (
-              <>
-                <button
-                  type="button"
-                  className="lg-guide-open"
-                  onClick={() => setGuideOpen(true)}
-                  aria-label="What Logos does"
-                  title="What Logos does"
-                >
-                  ?
-                </button>
-                <button
-                  type="button"
-                  className="lg-style-open"
-                  onClick={() => {
-                    setStyleDraftText(styleText);
-                    setStyleOpen(true);
-                  }}
-                  aria-label="How should Socria work with you?"
-                  title="How should Socria work with you?"
-                >
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                    <path d="M4 7h9M17 7h3M4 17h3M11 17h9" />
-                    <circle cx="15" cy="7" r="2.2" />
-                    <circle cx="9" cy="17" r="2.2" />
-                  </svg>
-                </button>
-              </>
-            )}
-            {/* Socria Rewards: the 5-Node Challenge, quietly, beside the map it is about —
-                while the rail (and its mark beside the Socria mark) is put away. */}
-            <ChallengeChip enabled={cloud} progress={!(railOpen && !chromeHidden)} onOpenAccount={() => setAcctOpen(true)} />
-            {/* Connected sources are dormant (see connectorsEnabled) — no
-                door to a room that isn't open. */}
-            {CONNECTORS_ON && (
-              <button
-                type="button"
-                className="lg-conn-open"
-                onClick={() =>
-                  one
-                    ? setConnOpen(true)
-                    : ask('connections-locked')
-                }
-                aria-label="Connections"
-                title={one ? 'Connect Google, Notion, and more' : 'Connected sources are part of Socria One'}
-              >
-                <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M9 11a4 4 0 0 1 0-5l1-1a4 4 0 0 1 6 6l-1 1" />
-                  <path d="M15 13a4 4 0 0 1 0 5l-1 1a4 4 0 0 1-6-6l1-1" />
-                </svg>
-              </button>
-            )}
-            {/* Deep ceiling, quiet door. It nudges only once the thinking
-                has actually turned into something worth writing. */}
-            <button
-              type="button"
-              className={`lg-draft-open${
-                !draftOpen && (map.context === 'writing' || map.context === 'creating')
-                  ? ' is-nudged'
-                  : ''
-              }${draftOpen ? ' is-on' : ''}`}
-              onClick={() =>
-                limits.draftSpace
-                  ? setDraftOpen((v) => !v)
-                  : ask('draft-locked')
-              }
-              title="Your writing — yours; Socria only when you ask"
-            >
-              Write
-              {!limits.draftSpace && <OneLock className="lg-draft-lock" />}
-            </button>
-            {/* Leaving is a model switch, not just a link: /chat opens on
-                whichever model is remembered, and that is still Logos — so a
-                bare href back to it re-rendered this and looked like a dead
-                button. Hand back the Core model they came from. */}
-            {/* Logos 3: who is here, and how to bring someone in. */}
-            {/* THINK TOGETHER: who is here, the comments, and the one way to
-                bring someone in — on Logos 3, and on any Logos surface once
-                the line of thinking is shared. A room joined by its old code
-                keeps its own bar. */}
-            {presenceBar}
-            <button type="button" className="lg-back" onClick={leaveForChat} aria-label="Back to Socria chat">
-              <span className="lg-lbl-long">Socria chat</span>
-              <span className="lg-lbl-short" aria-hidden="true">Chat</span> <span aria-hidden="true">→</span>
-            </button>
-            {isSignedIn && (
-              <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} />
-            )}
-            <button
-              type="button"
-              className="lg-chrome-hide"
-              onClick={() => hideChrome(true)}
-              aria-label="Hide the chats bar and header"
-              title="Hide the chats bar and header"
-            >
-              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
-              </svg>
-            </button>
-            </div>
-          </header>
   );
   // NOTES ON THE WORK, IN THE CONVERSATION (Logos 3). What the engine did with
   // a model this turn proposed, a cue to something worth finding, the first
@@ -6133,284 +5982,6 @@ export function LogosApp({
           )}
     </>
   );
-  const convoBody = (
-    <>
-
-          <div
-            className="lg-thread"
-            ref={threadRef}
-            onScroll={(e) => {
-              const t = e.currentTarget;
-              atEndRef.current = t.scrollHeight - t.scrollTop - t.clientHeight < 48;
-              // Instant Resume: where they were reading, kept a moment after they stop
-              if (LOGOS4.resume) {
-                if (viewTimer.current) clearTimeout(viewTimer.current);
-                viewTimer.current = setTimeout(() => saveViewRef.current(), 700);
-              }
-            }}
-          >
-            {messages.length === 0 && !streaming && (
-              <div className="lg-intro">
-                <h1>Think out loud.</h1>
-                {workspaceOn ? (
-                  <p>
-                    Type what you’re working through. Logos asks questions back,
-                    draws the shape of your reasoning as you go, and builds what
-                    you describe beside it: a model you can move, a matrix you
-                    can work, a shape in Live 3D.
-                  </p>
-                ) : (
-                  <p>
-                    Type what you’re working through. Logos asks questions back,
-                    and draws the shape of your reasoning on the right as you go.
-                  </p>
-                )}
-                {/* INSTANT RESUME: the latest line of thinking still waiting on
-                    them — the question Socria left, or the message they began —
-                    one press away, quoted, never opened by itself. */}
-                {pickUpOffer && (
-                  <button type="button" className="lg-pickup" onClick={() => switchSession(pickUpOffer.id)}>
-                    <span className="lg-pickup-k">Pick up where you left off</span>
-                    <span className="lg-pickup-t">{pickUpOffer.title}</span>
-                    <span className="lg-pickup-q">
-                      {pickUpOffer.kind === 'question' ? 'Socria asked' : 'You had started'}: “{pickUpOffer.waiting}”
-                    </span>
-                    <span className="lg-pickup-when">{relTime(pickUpOffer.at)}</span>
-                  </button>
-                )}
-                {noSessions && !input ? (
-                  // Nothing has ever been said here. The chips would send a
-                  // line too thin to draw; these are four complete first
-                  // messages, put into the composer and NEVER sent — the
-                  // person edits them into their own situation first.
-                  <div className="lg-openings">
-                    <p className="lg-openings-lead">{OPENING_LEAD}</p>
-                    {openingsFor(workspaceOn).map((o) => (
-                      <button
-                        key={o.id}
-                        type="button"
-                        className="lg-opening"
-                        onClick={() => {
-                          setInput(o.message);
-                          startIdRef.current = o.id;
-                          requestAnimationFrame(() => {
-                            const ta = document.querySelector<HTMLTextAreaElement>('.lg-composer textarea');
-                            if (ta) {
-                              ta.focus();
-                              ta.setSelectionRange(ta.value.length, ta.value.length);
-                            }
-                          });
-                        }}
-                      >
-                        <strong>{o.label}</strong>
-                        <small>{o.shows}</small>
-                      </button>
-                    ))}
-                  </div>
-                ) : (
-                  <div className="lg-starters">
-                    {logosStarters.map((s) => (
-                      <button
-                        key={s.prompt}
-                        type="button"
-                        onClick={() => send(s.prompt)}
-                        title={s.prompt !== s.label ? s.prompt : undefined}
-                      >
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            )}
-
-            {messages.map((m, i) => {
-              if (m.synthesis) {
-                // Socria's reading of the map: copied or replied to like anything else it says
-                return (
-                  <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="lg-synth-wrap">
-                    <LogosSynthesis {...synthProps(m.synthesis, i === lastSynthIndex && i === messages.length - 1)} />
-                    <MsgActions m={m} who="Socria" canReply={!togetherReadOnly} onReply={startReply} />
-                  </div>
-                );
-              }
-              const prev = i > 0 ? messages[i - 1] : null;
-              const side: Side = m.role === 'assistant' ? 'socria' : isMine(m) ? 'mine' : 'other';
-              return (
-                <LogosMessage
-                  key={m.id ?? i}
-                  m={m}
-                  side={side}
-                  who={shownWho(m)}
-                  group={groupView}
-                  cont={!!prev && !prev.synthesis && authorKey(prev) === authorKey(m)}
-                  hue={groupView && side === 'other' ? hueOf(authorKey(m)) : undefined}
-                  // Socria's answer right under the question it answers needs no quote of it
-                  showQuote={!!m.replyTo && (m.role === 'user' || !prev?.id || prev.id !== m.replyTo.id)}
-                  canReply={!togetherReadOnly && (m.role === 'assistant' || (groupView && side === 'other'))}
-                  onReply={startReply}
-                  onJump={jumpTo}
-                  toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
-                  docRefs={docRefs}
-                  {...(workspaceOn ? { onOpenCite: openCite, onOpenDoc: openDoc, ...(LOGOS4.pointAsk ? { onPickTex: askAboutExpression } : {}) } : {})}
-                />
-              );
-            })}
-
-            {/* Logos 3: notes on the work, under the reply they belong to */}
-            {chatNotes}
-
-            {/* someone else asked Socria; its answer is on its way to them */}
-            <SocriaAnswering names={answeringOthers} />
-
-            {streaming && <SocriaPending text={streaming} group={groupView} to={groupView ? 'You' : null} />}
-
-            {synthBusy && <SynthesisPending scope={synthBusy} />}
-
-            {busy && !streaming && <SocriaPending text="" group={groupView} to={groupView ? 'You' : null} />}
-
-            {gifted && !busy && !one && (
-              <p className="lg-gift" role="note">
-                This one was on us.{' '}
-                {usage.chats?.limit != null
-                  ? (() => {
-                      const left = Math.max(0, usage.chats.limit - usage.chats.used);
-                      return `You still have ${left} free Logos ${left === 1 ? 'chat' : 'chats'} this month.`;
-                    })()
-                  : 'Your free Logos chats this month are all still there.'}
-              </p>
-            )}
-            {error && <p className="lg-error">{error}</p>}
-            <div ref={bottomRef} />
-          </div>
-
-          {convoNotes}
-          <LogosComposer
-            value={input}
-            onChange={setInput}
-            focusSignal={composerFocus}
-            mathAvailable={mathAvailable}
-            mathTopic={mathTopic}
-            drafts={drafts}
-            setDrafts={setDrafts}
-            onSend={sendFromComposer}
-            busy={busy}
-            readImage={readImage}
-            readDocument={readDocument}
-            {...(workspaceOn ? { onOpenDoc: openDoc } : {})}
-            replyTo={replyTo}
-            onCancelReply={() => setReplyTo(null)}
-            group={groupLive}
-            about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
-            onClearAbout={clearAbout}
-            voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
-          />
-
-          {/* Which mind you're talking to, and how deep it goes — kept beside
-              the box you type in rather than parked up in the header. Both
-              menus open upward; they sit at the bottom of the screen. */}
-          {/* What the free tier holds, said plainly and once. Nobody should
-              discover a limit by hitting it. Reads the same count the routes
-              enforce against, so it cannot claim room that is not there.
-              It used to list the per-conversation ceilings beside the month —
-              "1 Explore per chat", "1 Research per chat" — which read as a
-              product measured out by the spoonful. Those ceilings are fair use
-              now, identical on both plans and far out of reach, so the panel
-              says the numbers that actually are boundaries: the month's lines
-              of thinking and the day's messages. */}
-          {!one && usage.chats && (
-            <div className="lg-allow" role="note">
-              <span className="lg-allow-tier">Free Logos</span>
-              <span className="lg-allow-items">
-                {(() => {
-                  const cap = usage.chats.limit ?? 0;
-                  const left = Math.max(0, cap - usage.chats.used);
-                  return (
-                    <span className={left === 0 ? 'is-out' : undefined}>
-                      {/* the plural agrees with the TOTAL, not the remainder:
-                          "1 of 2 chats left", never "1 of 2 chat left" */}
-                      {left} of {cap} {cap === 1 ? 'chat' : 'chats'} left this month
-                    </span>
-                  );
-                })()}
-                {usage.messages?.limit != null ? (
-                  (() => {
-                    const cap = usage.messages.limit ?? 0;
-                    const left = Math.max(0, cap - usage.messages.used);
-                    return (
-                      <span className={left === 0 ? 'is-out' : undefined}>
-                        {left} of {cap} {cap === 1 ? 'message' : 'messages'} left today
-                      </span>
-                    );
-                  })()
-                ) : (
-                  <span>everything inside them, in full</span>
-                )}
-              </span>
-              <button type="button" className="lg-allow-go" onClick={() => askOne()}>
-                Socria One
-              </button>
-            </div>
-          )}
-
-          <div className="lg-tools">
-            {one && oneManageable && (
-              <button
-                type="button"
-                className="lg-one-chip"
-                onClick={manageOne}
-                title="Manage your Socria One subscription"
-              >
-                Socria One
-              </button>
-            )}
-
-            {/* Logos is itself one of the models, so this is THE SAME SWITCH
-                the Core chat carries — the same component, so the button, the
-                sheet, the order and the words are one design on both
-                surfaces. This was a menu of its own, and it drifted: a
-                different button, a different list order, glyphs instead of
-                the "how it answers" sheet. Picking another model navigates
-                there; Logos 2 has no axes of its own to show beneath it. */}
-            {/* QUICK CAPTURE — a thought kept for later without starting a
-                conversation about it (Logos 4). */}
-            {LOGOS4.capture && (
-              <button type="button" className="lg-synth lg-capture" onClick={() => setCaptureOpen(true)} title="Keep a thought, a note or a photo for later" aria-haspopup="dialog">
-                <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M3 2.5h10v11l-5-3-5 3z" />
-                </svg>
-                Capture
-              </button>
-            )}
-            {/* SYNTHESIZE — the payoff after externalising: Socria reads what
-                the map has become. Quiet until there is enough to read. */}
-            <button
-              type="button"
-              className="lg-synth"
-              onClick={() => void synthesize('workspace')}
-              disabled={!canSynthesize(map) || !!synthBusy || busy}
-              title={canSynthesize(map) ? 'See where your thinking stands' : 'Synthesis needs at least two things on the map'}
-            >
-              <svg viewBox="0 0 16 16" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden="true">
-                <path d="M2 3.5h5.5M2 8h4M2 12.5h5.5M9.5 3.5 13 8l-3.5 4.5M7.5 8H13" />
-              </svg>
-              {synthBusy === 'workspace' ? 'Reading your map…' : 'Synthesize'}
-            </button>
-            {/* Depth rides in the picker, as in the Core chat — one control,
-                two questions: which model, and how far it goes. Only where
-                the model has depth modes (Logos 3); Logos 2 shows the model
-                axis alone. */}
-            <ModelPicker
-              value={model}
-              onChange={pickModel}
-              isSignedIn={!!isSignedIn || unlocked}
-              depth={depthOn ? depth : undefined}
-              onDepth={depthOn ? pickDepth : undefined}
-              plan={planKnown ? plan : undefined}
-            />
-          </div>
-    </>
-  );
   const mapBody = ({ lens, primary, shapes }: { lens?: string; primary: boolean; shapes?: 'ideas' | MadeLens }) => (
     <>
           <header className="lg-panel-head">
@@ -6648,65 +6219,7 @@ export function LogosApp({
     </>
   );
 
-  // ── LOGOS 3, AT REST ───────────────────────────────────────────────
-  //
-  // THE DOCK. While the conversation is not a panel, it is this: Socria's
-  // latest reply as a few lines, the composer, and — only when asked — the
-  // history above them. The thing being thought about keeps the screen.
-  const chatPanelOpen = !!wsLayout && panelsOf(wsLayout).some((x) => x.type === 'chat');
   // (no hooks here: this runs after the access gate's early return)
-  // Alone, the peek is Socria's latest reply. In a group it is the latest
-  // message from anyone, under their name — someone's new line is not hidden
-  // behind an older answer from Socria.
-  const peekMsg = groupView ? [...messages].reverse().find((x) => !x.synthesis) : [...messages].reverse().find((x) => x.role === 'assistant');
-  const lastReply = peekMsg?.content ?? '';
-  const peekWho = streaming || !peekMsg ? 'Socria' : shownWho(peekMsg);
-  const lastIsSynth = !!messages[messages.length - 1]?.synthesis;
-  const peek = streaming || (busy || lastIsSynth ? '' : lastReply);
-  // Beside the stage the history is always shown; below or above, on demand.
-  const dockShown = dockOpen || dockSide === 'left' || dockSide === 'right';
-  const wsDock =
-    workspaceOn && !chatPanelOpen ? (
-      <div className={`ws-dock lg-convo${dockShown ? ' is-open' : ''}${messages.length ? '' : ' is-new'}`}>
-        {/* A synthesis opens above the composer — the moment it exists for. */}
-        {!dockShown && synthBusy && <SynthesisPending scope={synthBusy} />}
-        {!dockShown && !synthBusy && lastIsSynth && !busy && !streaming && (
-          <LogosSynthesis {...synthProps(messages[messages.length - 1].synthesis!, true)} />
-        )}
-        {messages.length > 0 && (
-          <div className="ws-dock-row">
-            {!dockShown && (peek || busy) ? (
-              <button type="button" className="ws-peek" onClick={() => setDockOpen(true)} aria-label={`${peekWho === 'Socria' ? 'Socria’s latest reply' : 'The latest message'} — open the conversation`}>
-                <span className="ws-peek-who">{peekWho}</span>
-                {peek ? (
-                  <span className="ws-peek-text">
-                    <Inline text={peek} math />
-                  </span>
-                ) : (
-                  <span className="lg-thinking" aria-label="Thinking">
-                    <span /> <span /> <span />
-                  </span>
-                )}
-              </button>
-            ) : (
-              <span className="ws-peek-gap" />
-            )}
-            <button
-              type="button"
-              className="ws-dock-toggle"
-              aria-expanded={dockShown}
-              onClick={() => setDockOpen((v) => !v)}
-              title={dockOpen ? 'Fold the conversation away' : 'The whole conversation'}
-            >
-              {dockOpen ? 'Fold away' : `Conversation · ${messages.length}`}
-            </button>
-          </div>
-        )}
-        {/* folded, the notes sit under the reply's peek; open, in the thread */}
-        {!dockShown && chatNotes}
-        {convoBody}
-      </div>
-    ) : null;
   // THE INSPECTOR, WHEN THERE IS SOMETHING TO INSPECT. Selecting a part of a
   // model, a parameter or an input brings a small card describing it; it
   // goes when the selection does. "Keep open" makes it a panel.
@@ -6771,6 +6284,7 @@ export function LogosApp({
     { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
+    ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
     { label: 'What Logos does', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
@@ -6857,7 +6371,6 @@ export function LogosApp({
     // and the composer goes back to whatever it was asking about
     const before = focusRef.current;
     focusRef.current = { kind: 'node', id: node.id };
-    setCardAsking(true);
     cardAskRef.current = true;
     void send(text);
     cardAskRef.current = false;
@@ -7039,6 +6552,18 @@ export function LogosApp({
   // but a document's (documents are Content), models and what they picture,
   // the plot, Live 3D scenes, practice.
   const writingShown = limits.draftSpace && !!activeId && (!isEmptyDoc(writeDoc) || !!writeStarted[activeId]);
+  // What the map draws itself, listed once (lib/logos5/artifacts.ts): a picture that repeats a display
+  // is not listed — the display is the answer — and the plot only where nothing else draws it.
+  const drawn = mapArtifacts({
+    models: wsFacts.docs.length,
+    viz: wsFacts.viz,
+    plot: wsFacts.lenses.includes('plot'),
+    repeats: pictureRepeatsDisplay(
+      map.viz?.title,
+      wsFacts.viz === 'simulation',
+      displaysHere.map((o) => String((o.states[o.at] as { title?: unknown } | undefined)?.title ?? o.name)),
+    ),
+  });
   // what is being worked on as itself (a matrix, a function); displays and 3D scenes are artifacts of their own
   const worked = (map.objects?.objs ?? []).filter((o) => !isDisplayKind(o.kind) && o.kind !== 'scene' && o.kind !== 'study');
   const workedHere = wsFacts.lenses.includes('work') && worked.length ? (worked.length === 1 ? (worked[0].name ? `Working on ${worked[0].name}` : 'What you are working on') : `${worked.length} things you are working on`) : null;
@@ -7057,8 +6582,10 @@ export function LogosApp({
         ]
       : []),
     ...wsFacts.docs.map((d) => ({ key: `m:${d.id}`, kind: d.dynamic ? 'Simulation' : 'Model', title: d.title || 'Model', render: () => renderPanel(artPanelOf(`m:${d.id}`)!) })),
-    ...(!wsFacts.docs.length && wsFacts.viz ? [{ key: 'v:viz', kind: wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture', title: map.viz?.title || (wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture'), render: () => renderPanel(artPanelOf('v:viz')!) }] : []),
-    ...(wsFacts.lenses.includes('plot') ? [{ key: 'v:plot', kind: 'Plot', title: 'The functions, plotted', render: () => renderPanel(artPanelOf('v:plot')!) }] : []),
+    ...(drawn.viz ? [{ key: 'v:viz', kind: wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture', title: map.viz?.title || (wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture'), render: () => renderPanel(artPanelOf('v:viz')!) }] : []),
+    // The plot lens draws the picture or the model when there is one — which is already the
+    // item above — so it is an artifact of its own only for functions nothing else draws.
+    ...(drawn.plot ? [{ key: 'v:plot', kind: 'Plot', title: 'The functions, plotted', render: () => renderPanel(artPanelOf('v:plot')!) }] : []),
     // the working, step by step, and the things being worked on (a matrix, a function): made from the
     // ideas, so here rather than on the Logic Map, which keeps to the ideas themselves
     ...(wsFacts.lenses.includes('solve') ? [{ key: 'v:solve', kind: 'Solution', title: 'The working, step by step', render: () => renderPanel(artPanelOf('v:solve')!) }] : []),
@@ -7609,6 +7136,9 @@ export function LogosApp({
       onDelete={(id) => void deleteSession(id)}
       onMind={cloud ? () => setL5Mind(true) : undefined}
       contents={l5List}
+      shared={shared}
+      onOpenShared={onOpenShared}
+      onJoinCode={onJoinWithCode}
       drawing={drawing}
       readDocument={readDocument}
       picker={<ConcisePicker value={replyLength} onChange={pickLength} />}
@@ -7799,7 +7329,7 @@ export function LogosApp({
           {...(!togetherReadOnly ? { onAddToMap: captureToMap } : {})}
         />
       )}
-      <LogosGuide open={guideOpen} onClose={closeGuide} edition={workspaceOn ? 3 : 2} name={logosName(newSocria)} />
+      <LogosGuide open={guideOpen} onClose={closeGuide} edition={3} name="Logos 5" />
       {shareOpen && activeId && (
         <ShareDialog
           type="conversation"
@@ -7961,7 +7491,6 @@ export function LogosApp({
           {connBanner}
         </div>
       )}
-      {l5 ? (
         <div
           className={`l5${listOpen ? ' list-open' : ' rail-closed'}${homeShown ? ' is-home' : ''}${mindShown ? ' is-mind' : ''}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}`}
         >
@@ -7973,6 +7502,7 @@ export function LogosApp({
           </div>
           {draftEl}
           {chromeEls}
+          <GuestWall open={guestWall && guest} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />
           {searchOpen !== null && (
             <GlobalSearch
               sessions={sessions}
@@ -7991,77 +7521,6 @@ export function LogosApp({
             />
           )}
         </div>
-      ) : (
-        <div
-          className={`lg-split${workspaceOn ? ' is-ws' : ''}${railOpen && !chromeHidden ? '' : ' rail-closed'}${chromeHidden ? ' chrome-hidden' : ''}${draftOpen ? ' draft-open' : ''}${
-            mobileView === 'map' ? ' mv-map' : ''
-          }`}
-        >
-          {/* The rail is the Core surface's rail, and app-shell.css scopes every
-              `.s-*` rule under `.app-root` — so it arrives inside one. The host
-              is a box in this grid and nothing more: `.app-root`'s own page
-              background and 100svh floor belong to a page, not to one column of
-              this one, and globals.css turns both off for `.lg-railhost`. */}
-          {railEl}
-          {workspaceOn && wsLayout ? (
-            <div className="lg-ws-col">
-              <Workspace
-                layout={wsLayout}
-                onLayout={changeLayout}
-                render={renderPanel}
-                titleOf={panelTitle}
-                views={wsViews}
-                arrangements={wsArrangements}
-                suggestion={wsSuggestion}
-                onAccept={acceptSuggestion}
-                onDismiss={(s) => setWsDismissed((d) => new Set(d).add(s.id))}
-                head={convoHead}
-                dock={wsDock}
-                dockSide={dockSide}
-                onDockSide={moveDock}
-                onResetView={resetView}
-                overlay={wsCard}
-              />
-            </div>
-          ) : (
-            <>
-              {/* ── Conversation ───────────────────────────────── */}
-              <section className="lg-convo" aria-label="Conversation">
-                {convoHead}
-                {convoBody}
-              </section>
-
-              {/* ── Thinking Map ───────────────────────────────── */}
-              <section className="lg-panel" aria-label="Thinking map">
-                {mapBody({ primary: true })}
-              </section>
-            </>
-          )}
-
-          {draftEl}
-          {chromeEls}
-          <div className="lg-mswitch" role="tablist" aria-label="View">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mobileView === 'chat'}
-              className={`lg-mswitch-btn${mobileView === 'chat' ? ' is-on' : ''}`}
-              onClick={() => setMobileView('chat')}
-            >
-              Conversation
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={mobileView === 'map'}
-              className={`lg-mswitch-btn${mobileView === 'map' ? ' is-on' : ''}`}
-              onClick={() => setMobileView('map')}
-            >
-              Map
-            </button>
-          </div>
-        </div>
-      )}
     </div>
     </DocsContext.Provider>
   );

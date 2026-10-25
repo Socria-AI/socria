@@ -40,12 +40,10 @@ console.log('=== the model ===');
   ok('Logos 2 still answers at one depth', SOCRIA_MODELS['logos-2'].supportsDepth === false);
 }
 
-console.log('\n=== depth, in the model picker ===');
+console.log('\n=== depth ===');
 {
   const app = read('components/LogosApp.tsx');
-  const picker = app.slice(app.indexOf('<ModelPicker'), app.indexOf('/>', app.indexOf('<ModelPicker')));
-  ok('the Logos composer\'s model picker carries depth where the model has it', /depth=\{depthOn \? depth : undefined\}/.test(picker) && /onDepth=\{depthOn \? pickDepth : undefined\}/.test(picker));
-  ok('…with the plan, once it is known, so a lock is never flashed at a member', /plan=\{planKnown \? plan : undefined\}/.test(picker));
+  // The Logos composer's model picker, which carried depth and the plan for its lock, was archived: Logos 5's composer has the length dial and Make.
   ok('one control, not two: the separate depth pill is gone', !/className="lg-depth"/.test(app));
   ok('every Logos request carries the chosen depth when the model has depth modes — Logos 5, whose one setting is the length, answers Balanced', /depth: !l5Ref\.current && depthOn \? depthRef\.current : \('balanced' as ThinkingDepth\)/.test(app) && /\.\.\.\(l5Ref\.current \? \{ length: lengthRef\.current, surface: 'logos5' as const \} : \{\}\)/.test(app));
   ok('the chat route clamps it by plan, as the map and explore routes do', /depthForPlan\(resolveDepth\(body\?\.depth\), plan\)/.test(read('app/api/logos/chat/route.ts')));
@@ -62,7 +60,7 @@ console.log('\n=== offered everywhere, production included ===');
   }
   ok('it is not marked dev-only any more', !SOCRIA_MODELS['logos-3'].devOnly);
   ok('  nor behind a gate', !SOCRIA_MODELS['logos-3'].gate);
-  ok('/chat opens a ?model= link by the same rule as the menus', /isOffered\(m as SocriaModel\)/.test(read('app/chat/page.tsx')));
+  // /chat no longer opens a ?model= link by any rule: it drops it, Logos 5 being the one surface (archived with the Core chat).
   // The mechanism stays, for the next model that needs it.
   ok('a dev-only model would still be held back on production', /!\(m\.devOnly && isProduction\(\)\)/.test(read('lib/socria-model-store.ts')));
 }

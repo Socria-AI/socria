@@ -945,33 +945,13 @@
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5s-make {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 8px;
-  max-width: 640px;
+  width: min(960px, 100%);
 }
-.logos-root .l5 .l5s-cempty .l5s-make {
+.logos-root .l5 .l5s-cempty.is-arts {
   justify-content: flex-start;
 }
-.logos-root .l5 .l5s-make-opt {
-  min-height: 34px;
-  padding: 6px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-paper-hi);
-  color: var(--lg-ink);
-  font: inherit;
-  font-size: 13.5px;
-  cursor: pointer;
-}
-.logos-root .l5 .l5s-make-opt:hover {
-  border-color: var(--lg-primary);
-  color: var(--lg-primary);
-}
-.logos-root .l5 .l5s-make-opt:focus-visible {
-  outline: 2px solid var(--lg-primary);
-  outline-offset: 2px;
+.logos-root .l5 .l5s-cempty .l5s-make {
+  text-align: left;
 }
 .logos-root .l5 .l5s-art-k {
   font-size: 10.5px;
@@ -1003,9 +983,24 @@
   color: var(--lg-ink-40);
 }
 .logos-root .l5 .l5s-art-body {
+  /* the box an artifact is drawn in: everything it draws stays inside it */
+  position: relative;
   min-height: 360px;
   display: flex;
   flex-direction: column;
+}
+/* A PANEL AS AN ARTIFACT (a model or the picture, the plot, the worked
+   solution, a Live 3D scene) lays its layers out absolutely against its panel.
+   Without a positioned, sized box here they measured the whole view instead:
+   the picture spread over the strip of artifacts above it and took its
+   clicks. Each is given a definite height, and nothing it draws escapes. */
+.logos-root .l5 .l5s-art-body > :is(.ws-model, .lg-panel, .s3) {
+  position: relative;
+  flex: 0 0 auto;
+  /* the view's height less the bar, the strip, the card's own head and the composer floating below */
+  height: clamp(360px, calc(100vh - 390px), 680px);
+  overflow: hidden;
+  border-radius: 12px;
 }
 .logos-root .l5 .l5s-art-body > * {
   flex: 1 1 auto;
@@ -1113,6 +1108,20 @@
   margin: 0;
   font-size: 13.5px;
   color: var(--lg-ink-40);
+}
+.logos-root .l5 .l5c-join {
+  align-self: flex-start;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--lg-primary);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5c-join:hover {
+  text-decoration: underline;
+  text-underline-offset: 3px;
 }
 .logos-root .l5 .l5c-mind {
   align-self: flex-start;

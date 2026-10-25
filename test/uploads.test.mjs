@@ -40,10 +40,17 @@ console.log('=== the routes do what they say ===');
   ok('the bucket is private, and its own ceiling is the plan’s limit', /createBucket\(UPLOAD_BUCKET, \{ public: false, fileSizeLimit: limitsFor\('one'\)\.uploadBytes \}\)/.test(store));
   ok('the daily cron sweeps unread uploads', /await sweepStaleUploads\(\);/.test(read('app/api/cron/lifecycle/route.ts')));
   ok('account deletion removes a person’s uploads', /await purgeUploads\(userId\);/.test(read('app/api/account/delete/route.ts')));
-  const client = read('components/ChatAttachments.tsx');
-  ok('the browser sends large files to storage, small ones directly', /if \(file\.size > DIRECT_UPLOAD_BYTES\)/.test(client) && /fetch\('\/api\/files\/upload'/.test(client) && /method: 'PUT'/.test(client));
-  ok('  and refuses past the plan’s limit, saying what One allows', /Socria One reads documents up to/.test(client));
-  ok('the chat page passes the plan’s limit', /uploadLimit: \(\) => limitsFor\(planState\.plan === 'one' \? 'one' : 'free'\)\.uploadBytes/.test(read('app/chat/page.tsx')));
+  // The Core chat's attachments (components/ChatAttachments.tsx) were archived with it; Logos 5 reads documents through lib/docs/client.ts.
+  const client = read('lib/docs/client.ts');
+  const app = read('components/LogosApp.tsx');
+  // Every read Logos 5 makes, each with its options in view.
+  const reads = app.match(/readFileAsDoc\(file, \{[^}]*\}\)/g) ?? [];
+  const everyRead = reads.length > 0 && reads.length === (app.match(/readFileAsDoc\(/g) ?? []).length;
+  ok('the browser sends large files to storage, small ones directly', /if \(file\.size > o\.directLimit\)/.test(client) && /fetch\('\/api\/files\/upload'/.test(client) && /method: 'PUT'/.test(client) && /form\.append\('file', file\);/.test(client)
+    && everyRead && reads.every((r) => /directLimit: DIRECT_UPLOAD_BYTES/.test(r)));
+  // Its notice that Socria One reads documents up to 30 MB went with it.
+  ok('  and refuses past the plan’s limit', /if \(file\.size > o\.uploadLimit\) throw new Error\(/.test(client) && client.indexOf('file.size > o.uploadLimit') < client.indexOf("fetch('/api/files/upload'"));
+  ok('Logos 5 passes the plan’s limit', /const limits = limitsFor\(plan\);/.test(app) && everyRead && reads.every((r) => /uploadLimit: limits\.uploadBytes/.test(r)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

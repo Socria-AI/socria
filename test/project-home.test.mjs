@@ -172,12 +172,22 @@ console.log('=== the visuals draw only what is there ===');
 console.log('=== wiring: the home is the door, the rail stays ===');
 {
   const page = read('app/chat/page.tsx');
-  ok('pressing a Project opens its home', /onClick=\{\(\) => openProjectHome\(pr\.id\)\}/.test(page));
-  ok('  the chevron still only folds', /e\.stopPropagation\(\);\s*toggleFolder\(pr\.id\);/.test(page));
-  ok('  and its chats stay in the rail', /kids\.map\(renderRow\)/.test(page));
-  ok('opening any chat, or starting one, closes the home', /setActiveId\(item\.id\);\s*setProjectEntry\(null\);\s*setHomeProject\(null\);/.test(page) && /function newChatIn\(p: RailProject\) \{\s*setHomeProject\(null\);/.test(page));
+  // The Core chat's rail, where this was wired, was archived with it: the rail is Logos 5's now, and the home a page beside it.
+  const rail = read('components/LogosRail.tsx');
+  const app = read('components/LogosApp.tsx');
+  const railEl = app.slice(app.indexOf('const railEl = ('), app.indexOf('const writeSpaceEl'));
+  const fromHome = page.slice(page.indexOf('function openFromHome('), page.indexOf('/** Back to Logos 5'));
+  ok('pressing a Project opens its home', /onClick=\{\(\) => \(onOpenProject \? onOpenProject\(pr\.id\) : toggleFolder\(pr\.id\)\)\}/.test(rail) && /<LogosRail\b/.test(railEl) && /onOpenProject=\{onOpenProject\}/.test(railEl) && /onOpenProject=\{\(pid\) => setHomeProject\(pid\)\}/.test(page));
+  ok('  the chevron still only folds', /e\.stopPropagation\(\);\s*toggleFolder\(pr\.id\);/.test(rail));
+  ok('  and its chats stay in the rail', /kids\.map\(renderRow\)/.test(rail));
+  // From the home a conversation opens by a link without ?p= — or, someone else's Core chat, in place of the home.
+  ok('opening any chat, or starting one, closes the home',
+    /if \(mine\) return window\.location\.assign\(`\/chat\?s=\$\{encodeURIComponent\(id\)\}`\);/.test(fromHome)
+      && /if \(kind === 'logos'\) return window\.location\.assign\(`\/chat\?s=\$\{encodeURIComponent\(id\)\}&shared=1`\);/.test(fromHome)
+      && /setHomeProject\(null\);\s*setSharedOpen\(id\);\s*\}$/.test(fromHome.trim())
+      && /onNewChat=\{\(\) => window\.location\.assign\(`\/chat\?in=\$\{encodeURIComponent\(homeProject\)\}`\)\}/.test(page));
   ok('?p= opens it and follows it', /params\.get\('p'\)/.test(page) && /u\.searchParams\.set\('p', homeProject\)/.test(page));
-  ok('a new Logos line of thinking is filed in the Project from Home', /\/chat\?model=\$\{m\}&in=\$\{encodeURIComponent\(pid\)\}/.test(page) && /startIn = pin &&/.test(read('components/LogosApp.tsx')));
+  ok('a new Logos line of thinking is filed in the Project from Home', /`\/chat\?in=\$\{encodeURIComponent\(homeProject\)\}`/.test(page) && /startIn = pin &&/.test(app));
   ok('the Logos rail opens it too, without breaking its folders', /onOpenProject \? onOpenProject\(pr\.id\) : toggleFolder\(pr\.id\)/.test(read('components/LogosRail.tsx')));
   const route = read('app/api/projects/[id]/home/route.ts');
   ok('the home route goes through the one gate', /projectAccess\(userId, params\.id\)/.test(route) && /No such Project/.test(route));

@@ -172,14 +172,17 @@ ok('the Clerk identity is deleted too', /clerkClient\.users\.deleteUser/.test(de
 // in a chip somebody redesigns. The chat sidebar chip that opened the Thinking
 // Journey is gone — it pointed at a store Core 4 does not read — and it
 // carried the only per-entry forget. This pins where it went, so the next
-// person to move that link has to move the control with it.
+// person to move that link has to move the control with it. The sidebar is
+// Logos 5's rail now: the Core chat's went with it on 24 October 2026.
 console.log('\n=== forgetting ONE thing is still reachable ===');
 {
   const memoryPage = read('app/memory/page.tsx');
   const record = read('components/mind/JourneyRecord.tsx');
   const chat = read('app/chat/page.tsx');
-  ok('the chat sidebar points at /memory', /href="\/memory"/.test(chat));
-  ok('  and no longer mounts the journey modal itself', !/JourneyDebugModal/.test(chat));
+  const logos = read('components/LogosApp.tsx');
+  const rail = read('components/LogosRail.tsx');
+  ok('the chat sidebar points at /memory', /<LogosRail\b/.test(logos) && /href="\/memory"/.test(rail));
+  ok('  and no longer mounts the journey modal itself', ![chat, logos, rail].some((s) => /JourneyDebugModal/.test(s)));
   ok('/memory renders the journey', /<JourneyRecord \/>/.test(memoryPage));
   ok('  with the per-entry route wired', /api\/profile\/forget/.test(record));
   ok('  and forget-everything wired to the account route', /api\/account\/memory/.test(record) && /method: 'DELETE'/.test(record));

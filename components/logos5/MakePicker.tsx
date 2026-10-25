@@ -2,12 +2,13 @@
 // components/logos5/MakePicker.tsx — WHAT TO MAKE, chosen before asking.
 //
 // Beside the length dial in the composer's tool row: pick a chart, a table, a
-// timeline… and the next message asks for exactly that, in words
-// (lib/logos5/make.ts). Picked, the button names the choice and an × takes it
+// timeline… — each shown as it will be drawn (MakeGallery) — and the next
+// message asks for exactly that, in words (lib/logos5/make.ts). Picked, the button names the choice and an × takes it
 // back; sent, it clears, so a choice never lingers into the next message.
 
 import { useEffect, useRef, useState } from 'react';
-import { MAKE_CHOICES, makeChoice } from '@/lib/logos5/make';
+import { makeChoice } from '@/lib/logos5/make';
+import { MakeGallery } from './MakeGallery';
 import '@/app/app-shell.css';
 
 export function MakePicker({ value, onChange }: { value: string | null; onChange: (next: string | null) => void }) {
@@ -31,7 +32,7 @@ export function MakePicker({ value, onChange }: { value: string | null; onChange
   const now = makeChoice(value);
   return (
     <span className="app-root app-inline">
-      <div className={`mp l5-make${now ? ' is-set' : ''}`} ref={box}>
+      <div className={`mp l5-make${now ? ' is-set' : ''}`} ref={box} data-tour="make">
         <button
           type="button"
           className={`mp-btn${open ? ' open' : ''}`}
@@ -57,23 +58,15 @@ export function MakePicker({ value, onChange }: { value: string | null; onChange
         {open && (
           <div className="mp-sheet" role="dialog" aria-label="Choose what to make">
             <p className="mp-lbl">Make</p>
-            <div className="l5-make-list">
-              {MAKE_CHOICES.map((c) => (
-                <button
-                  key={c.id}
-                  type="button"
-                  className={`l5-make-opt${c.id === value ? ' on' : ''}`}
-                  aria-pressed={c.id === value}
-                  onClick={() => {
-                    onChange(c.id === value ? null : c.id);
-                    setOpen(false);
-                  }}
-                >
-                  {c.label}
-                </button>
-              ))}
-            </div>
-            <p className="mp-note">Then say what it is about. It is kept in Artifacts.</p>
+            <MakeGallery
+              compact
+              selected={value}
+              onPick={(id) => {
+                onChange(id === value ? null : id);
+                setOpen(false);
+              }}
+            />
+            <p className="mp-note">Each is drawn as it will be. Choose one, then say what it is about — it is kept in Artifacts.</p>
           </div>
         )}
       </div>

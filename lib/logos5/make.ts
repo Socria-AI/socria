@@ -12,7 +12,7 @@
 // lib/objects/display-request.ts readDisplayRequest, the map pass), so a
 // picked chart and a typed one cannot be made differently, and the
 // conversation shows exactly what was asked. The suite checks every choice
-// against those readers (test/logos5-make.test.mjs).
+// against those readers (test/logic-map-ideas.test.mjs).
 //
 // PURE.
 
@@ -20,6 +20,19 @@ export interface MakeChoice {
   id: string;
   /** what the person picks */
   label: string;
+  /** what it is for, in a line — under its preview */
+  about: string;
+  /**
+   * THE TEMPLATE IT FILLS: a display kind and the view it opens on
+   * (lib/objects), drawn by the same figure whatever is poured into it — so
+   * what is made is the template, never a picture improvised beside it
+   * (app/api/logos/map, ONE ANSWER TO ONE ASK). The words below are read as
+   * exactly this kind, opened on exactly this view (the request's view is
+   * held to — lib/objects/display-propose.ts), so the preview is what comes
+   * back; test/make-gallery.test.mjs holds every choice to it. Null for what
+   * the engine builds itself: a plot, a simulation, a 3D model.
+   */
+  template: { kind: string; view?: string } | null;
   /** the composer's prompt while it is chosen */
   placeholder: string;
   /** the request, in the words someone would type */
@@ -35,17 +48,19 @@ const make = (noun: string) => ({
 
 /** The choices, in the order they are offered. Each one is something Artifacts can hold. */
 export const MAKE_CHOICES: readonly MakeChoice[] = [
-  { id: 'chart', label: 'Chart', placeholder: 'What should it show? e.g. rent 1200, food 400, transport 90', ...make('chart') },
-  { id: 'table', label: 'Comparison table', placeholder: 'What are you comparing? e.g. three laptops on price, weight, battery', ...make('comparison table') },
-  { id: 'timeline', label: 'Timeline', placeholder: 'What happened, or what is coming? e.g. my semester deadlines', ...make('timeline') },
-  { id: 'plan', label: 'Study plan', placeholder: 'For what, and by when? e.g. finals in two weeks, four subjects', ...make('study plan') },
-  { id: 'checklist', label: 'Checklist', placeholder: 'For what? e.g. moving into my dorm', ...make('checklist') },
-  { id: 'flowchart', label: 'Flowchart', placeholder: 'What process? e.g. how a bill becomes law', ...make('flowchart') },
-  { id: 'proscons', label: 'Pros and cons', placeholder: 'Of what? e.g. taking the summer internship', ...make('pros and cons table') },
-  { id: 'venn', label: 'Venn diagram', placeholder: 'Of what? e.g. mitosis and meiosis', ...make('venn diagram') },
+  { id: 'chart', label: 'Chart', about: 'Your numbers at a glance — as bars, a line or a pie.', template: { kind: 'data' }, placeholder: 'What should it show? e.g. rent 1200, food 400, transport 90', ...make('chart') },
+  { id: 'table', label: 'Comparison table', about: 'Options side by side, on what matters to you.', template: { kind: 'compare', view: 'matrix' }, placeholder: 'What are you comparing? e.g. three laptops on price, weight, battery', ...make('comparison table') },
+  { id: 'timeline', label: 'Timeline', about: 'What happens when, in order.', template: { kind: 'plan', view: 'timeline' }, placeholder: 'What happened, or what is coming? e.g. my semester deadlines', ...make('timeline') },
+  { id: 'plan', label: 'Study plan', about: 'What to do on which day, up to the deadline.', template: { kind: 'plan', view: 'calendar' }, placeholder: 'For what, and by when? e.g. finals in two weeks, four subjects', ...make('study calendar') },
+  { id: 'checklist', label: 'Checklist', about: 'Steps to tick off as you go.', template: { kind: 'plan', view: 'checklist' }, placeholder: 'For what? e.g. moving into my dorm', ...make('checklist') },
+  { id: 'flowchart', label: 'Flowchart', about: 'A process step by step, with where it branches.', template: { kind: 'diagram', view: 'flow' }, placeholder: 'What process? e.g. how a bill becomes law', ...make('flowchart') },
+  { id: 'proscons', label: 'Pros and cons', about: 'A decision: the options, and what weighs on each.', template: { kind: 'crossroads', view: 'compare' }, placeholder: 'Of what? e.g. taking the summer internship', ...make('pros and cons table') },
+  { id: 'venn', label: 'Venn diagram', about: 'What two or three things share, and where they differ.', template: { kind: 'venn', view: 'venn' }, placeholder: 'Of what? e.g. mitosis and meiosis', ...make('venn diagram') },
   {
     id: 'plot',
     label: 'Plot',
+    about: 'A function, drawn — change it and watch.',
+    template: null,
     placeholder: 'A function, e.g. y = x^2 - 3',
     ask: (about) => `Plot ${about}`,
     fromHere: 'Plot the functions in this conversation',
@@ -53,6 +68,8 @@ export const MAKE_CHOICES: readonly MakeChoice[] = [
   {
     id: 'simulation',
     label: 'Simulation',
+    about: 'Something moving, with sliders to change it.',
+    template: null,
     placeholder: 'Of what? e.g. a pendulum, supply and demand',
     ask: (about) => `Simulate ${about}`,
     fromHere: 'Simulate what we are talking about',
@@ -60,6 +77,8 @@ export const MAKE_CHOICES: readonly MakeChoice[] = [
   {
     id: 'model3d',
     label: '3D model',
+    about: 'A shape you can turn and take apart.',
+    template: null,
     placeholder: 'Of what? e.g. a water molecule',
     ask: (about) => `Build a 3D model of ${about}`,
     fromHere: 'Build a 3D model of what we are talking about',

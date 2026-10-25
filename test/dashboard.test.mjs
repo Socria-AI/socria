@@ -55,7 +55,8 @@ console.log('=== the onboarding screen sends kinds, never words ===');
   // pins the call sites, so a redesign of the screen keeps sending kinds.
   const src = readFileSync(join(root, 'components/onboarding/FirstRunIntro.tsx'), 'utf8');
   const calls = [...src.matchAll(/answer\('(\w+)', ([^)]+)\)/g)].map((m) => [m[1], m[2].trim()]);
-  ok('every step of the screen is counted, and the Skip button on any of them', ['premise', 'name', 'who', 'how', 'thought', 'example'].every((st) => calls.some(([c]) => c === st)) && /answer\(beat, 'skip_all'\)/.test(src), JSON.stringify(calls));
+  // Its "how" step, the choice of model, was archived with the Core chat; the counters below still read what it left.
+  ok('every step of the screen is counted, and the Skip button on any of them', ['premise', 'name', 'who', 'thought', 'example'].every((st) => calls.some(([c]) => c === st)) && /answer\(beat, 'skip_all'\)/.test(src), JSON.stringify(calls));
   ok('for the name, only whether one was kept', calls.filter(([c]) => c === 'name').every(([, k]) => k === "clean ? 'given' : 'skipped'"));
   ok('for the first thought, only its starting point', calls.filter(([c]) => c === 'thought').every(([, k]) => k === "intent?.id ?? 'none'"));
   ok('the event is sent from one place', (src.match(/track\('onboarding_answered'/g) ?? []).length === 1);

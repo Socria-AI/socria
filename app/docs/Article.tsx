@@ -23,6 +23,7 @@ export function Article({
       <span className="d-kicker">{page.group}</span>
       <h1>{page.title}</h1>
       <p className="d-lead">{page.blurb}</p>
+      {page.archived && <ArchivedNote page={page} />}
       {sections.length > 1 && (
         <nav className="d-toc" aria-label="On this page">
           {sections.map((s) => (
@@ -46,6 +47,26 @@ export function Article({
         )}
       </nav>
     </article>
+  );
+}
+
+/**
+ * The banner every archived page opens with, drawn from the registry so they
+ * all say the same three things: when, what replaced it, and that nothing a
+ * person wrote went anywhere.
+ */
+function ArchivedNote({ page }: { page: DocPage }) {
+  const a = page.archived!;
+  return (
+    <aside className="d-archived" aria-label="Archived">
+      <span className="d-callout-tag">Archived</span>
+      <p>
+        <strong>{a.what} is no longer offered.</strong> It was archived {a.on}, and gave way to{' '}
+        {a.replacedBy}. Conversations from it open in <Link href="/docs/logos-5">Logos 5</Link> —
+        nothing was deleted. This page is kept as a record of how it worked, so it describes it as it
+        was; <Link href="/docs/history">the history</Link> says where it sits among the rest.
+      </p>
+    </aside>
   );
 }
 

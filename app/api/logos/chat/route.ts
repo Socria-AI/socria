@@ -114,6 +114,7 @@ import {
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, gateInlineBlock, type InlineContext } from '@/lib/inline-ui';
+import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 // METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
 import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
 import { deliberationOn, mrMode, storeOn } from '@/lib/mr/config';
@@ -145,19 +146,19 @@ export async function POST(req: NextRequest) {
     }
 
     const { userId } = auth();
-    // Same gate as Core 3.1: a Clerk session or the typed access key.
+    // A Clerk session, the typed access key — or a GUEST: signed out, in the
+    // one line of thinking their pass names (lib/guest-pass.ts), checked as
+    // soon as the body says which. Rate-limited first, by address.
     const keyUnlocked = mayUse(req, userId);
-    if (!userId && !keyUnlocked) {
-      return NextResponse.json(
-        { error: 'Logos requires an access key.', requiresKey: true },
-        { status: 401 }
-      );
-    }
+    const guest = !userId && !keyUnlocked;
 
     const limited = await enforceRateLimit(req, userId, 'chat');
     if (limited) return limited;
 
     const body = await req.json().catch(() => null);
+    if (guest && !guestMay(req.cookies.get(GUEST_COOKIE)?.value, body?.sessionId, Date.now())) {
+      return NextResponse.json({ error: GUEST_LIMIT, guestLimit: true, requiresKey: true }, { status: 401 });
+    }
     const messages = body?.messages;
 
     const nameOf = (by: unknown): string =>

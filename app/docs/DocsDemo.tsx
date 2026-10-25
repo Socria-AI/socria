@@ -170,11 +170,12 @@ export function DemoAdAs() {
 // anyone having to remember to come here and edit it.
 
 /** How each counter is described to a reader, and what its period is. */
-const COUNTER_LABEL: Record<Counter, string> = {
-  'core-chats': 'Core chats begun',
-  'core-messages': 'Core messages',
-  chats: 'Logos lines of thinking begun',
-  messages: 'Logos messages',
+// The Core counters are not listed: Core is archived (docs/history), so
+// there is no Core chat to begin and no Core message to send. The table
+// lists what a person can meet in Logos 5.
+const COUNTER_LABEL: Partial<Record<Counter, string>> = {
+  chats: 'Lines of thinking begun',
+  messages: 'Messages',
   explore: 'Explore, on a node',
   research: 'Research runs',
   challenge: 'Challenge — Logos pushing back',
@@ -239,7 +240,7 @@ export function DemoLimitsTable() {
           {counters.map((c) => (
             <tr key={c}>
               <td>
-                {COUNTER_LABEL[c]}{' '}
+                {COUNTER_LABEL[c] ?? c}{' '}
                 <span className="d-dim">{PERIOD[COUNTER_SCOPE[c]]}</span>
               </td>
               <td>{tiered(c) ? cap(free.counters[c]) : oneCap(free.counters[c])}</td>
@@ -257,12 +258,7 @@ export function DemoLimitsTable() {
             <td>{one.lenses === null ? 'All of them' : cap(one.lenses)}</td>
           </tr>
           <tr>
-            <td>Thinking depth</td>
-            <td>{free.allDepths ? 'All four' : 'Balanced only'}</td>
-            <td>{one.allDepths ? 'All four' : 'Balanced only'}</td>
-          </tr>
-          <tr>
-            <td>Draft Space</td>
+            <td>Write, and its notes</td>
             <td>{free.draftSpace ? 'Yes' : '—'}</td>
             <td>{one.draftSpace ? 'Yes' : '—'}</td>
           </tr>

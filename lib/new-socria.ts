@@ -2,16 +2,16 @@
 //
 // Logos 5 (docs/LOGOS-5.md) is the new Socria: the Universal Map as home, the
 // map as the screen, the Core chats brought into it, and "We killed the
-// chatbot." to whoever used the one before. It ships to production behind an
-// access code — the 'socria' feature gate (lib/feature-gates.ts), entered
+// chatbot." to whoever used the one before. It shipped to production behind
+// an access code — the 'socria' feature gate (lib/feature-gates.ts), entered
 // under Manage Account and checked on the server, so the code never reaches
-// the browser. Whoever has not entered it keeps the Logos they had, in its
-// Logos 4 layout: exactly what NEXT_PUBLIC_LOGOS5=off gives a deployment,
-// decided per person instead.
+// the browser.
 //
-// What stays the same either way: every conversation, map, model and memory —
-// the gate chooses a screen, and nothing is moved, hidden or rewritten for
-// somebody it has not opened for.
+// SINCE 25 OCTOBER 2026 THE CODE CHOOSES NO SCREEN. Logos 5 is everybody's —
+// guests included — and the Logos 4 layout it once kept for whoever had not
+// entered the code was archived with the Core chat (docs/ARCHIVE.md). The
+// code still opens /logos-5-internal; what is read here only names the
+// surface, for a picker no page mounts now.
 
 import { LOGOS5 } from './logos5/flags';
 import { gateOpen, type GateId } from './feature-gates';

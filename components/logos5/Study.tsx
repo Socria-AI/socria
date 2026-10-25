@@ -34,7 +34,7 @@ import {
   type StudyState,
   type StudyTopic,
 } from '@/lib/logos5/study';
-import { MAKE_CHOICES } from '@/lib/logos5/make';
+import { MakeGallery } from './MakeGallery';
 import './study.css';
 
 /** a layout effect in the browser; on the server (which renders first) an ordinary one, so nothing warns */
@@ -856,21 +856,15 @@ export function ArtifactsView({
   onMake?: (id: string) => void;
 }) {
   const [choosing, setChoosing] = useState(false);
+  // what to make, each drawn as it will be (MakeGallery): Socria fills the template from the conversation
   const choices = onMake ? (
-    <div className="l5s-make" role="group" aria-label="Choose what to make">
-      {MAKE_CHOICES.map((c) => (
-        <button
-          key={c.id}
-          type="button"
-          className="l5s-make-opt"
-          onClick={() => {
-            setChoosing(false);
-            onMake(c.id);
-          }}
-        >
-          {c.label}
-        </button>
-      ))}
+    <div className="l5s-make">
+      <MakeGallery
+        onPick={(id) => {
+          setChoosing(false);
+          onMake(id);
+        }}
+      />
     </div>
   ) : null;
   if (!items.length)
@@ -880,18 +874,14 @@ export function ArtifactsView({
           {!narrow && <span className="l5s-eyebrow">Artifacts</span>}
           <h2>Nothing made yet.</h2>
           <p>Ask for a chart of your numbers, a plan, a comparison or a worksheet — or practise a topic from your files — and it is kept here, made from the conversation.</p>
-          {choices && (
-            <>
-              <p className="l5s-make-h">Or choose what to make, then say what it is about:</p>
-              {choices}
-            </>
-          )}
+          {choices && <p className="l5s-make-h">Or choose one below — each is drawn as it will be — then say what it is about.</p>}
           {onWrite && (
             <button type="button" className="l5s-write-start" onClick={onWrite}>
               Start writing <span aria-hidden="true">→</span>
             </button>
           )}
         </div>
+        {choices}
       </div>
     );
   const cur = items.find((i) => i.key === selected) ?? items[items.length - 1];

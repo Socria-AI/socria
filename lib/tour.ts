@@ -39,7 +39,7 @@ export const LOGOS_TOUR: TourStep[] = [
   { anchor: 'map', place: 'left', title: 'This is your map', body: 'What you say is drawn here <em>as you talk.</em>' },
   { anchor: 'card', place: 'below', title: 'Tap any card', body: 'Explore it, challenge it, <em>or ask about it.</em>' },
   { anchor: 'composer', place: 'above', title: 'Keep talking', body: 'The map grows <em>with every message.</em>' },
-  { anchor: 'model', place: 'above', title: 'Switch any time', body: 'Rather just talk it through? <em>Pick Core 4 here.</em>' },
+  { anchor: 'make', place: 'above', title: 'Make something', body: 'Pick what to make, <em>then say what it is about.</em>' },
 ];
 
 /**
@@ -52,7 +52,7 @@ export const LOGOS3_TOUR: TourStep[] = [
   { anchor: 'map', place: 'left', title: 'This is your map', body: 'What you say is drawn here <em>as you talk.</em>' },
   { anchor: 'composer', place: 'above', title: 'One box for everything', body: 'Ask, or say what to build. <em>It is built beside you.</em>' },
   { anchor: 'views', place: 'below', title: 'Open views beside it', body: 'A model, its parameters, Live 3D: <em>+ View.</em>' },
-  { anchor: 'model', place: 'above', title: 'Switch any time', body: 'Rather just talk it through? <em>Pick Core 4 here.</em>' },
+  { anchor: 'make', place: 'above', title: 'Make something', body: 'Pick what to make, <em>then say what it is about.</em>' },
 ];
 
 /** The chat's tour — what "Take the tour again" replays. */

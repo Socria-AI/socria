@@ -117,7 +117,7 @@ console.log('\n=== Logos 3 leads with a model to build ===');
   ok('  no id collision', !OPENINGS.some((x) => x.id === o.id));
   ok('  and it resolves like any other', startMessage('spring') === o.message && openingFor('spring') === o && openingValue('spring') === 'spring');
   const app = readFileSync(new URL('../components/LogosApp.tsx', import.meta.url), 'utf8');
-  ok('Logos shows the openings for its surface', /openingsFor\(workspaceOn\)\.map/.test(app));
+  ok('Logos 5 shows the openings for its surface', /openingsFor\(true\)\.map/.test(app));
 }
 
 console.log('\n=== a start id resolves to a message, or to nothing ===');

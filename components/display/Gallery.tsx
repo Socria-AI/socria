@@ -31,10 +31,22 @@ const SAMPLES: Record<string, () => unknown> = {
 };
 
 function sampleOf(m: DisplayMeta): ThoughtObject | null {
+  return sampleObject(m.kind);
+}
+
+/**
+ * A kind's example, made into an object to draw — on one of its views when
+ * asked (a plan as a timeline or a checklist, a diagram as a flowchart). The
+ * same example the catalogue keeps, so a preview is never a mock-up: it is the
+ * figure the person gets, on example words. Null for a kind with none.
+ */
+export function sampleObject(kind: string, view?: string): ThoughtObject | null {
   try {
-    const state = SAMPLES[m.kind]?.() ?? m.example;
-    if (!state) return null;
-    return create(EMPTY_SPACE, m.kind, state, { origin: 'socria', name: 'Ex' })?.obj ?? null;
+    const m = displayKinds().find((x) => x.kind === kind);
+    const base = SAMPLES[kind]?.() ?? m?.example;
+    if (!base) return null;
+    const state = view && typeof base === 'object' ? { ...(base as Record<string, unknown>), view } : base;
+    return create(EMPTY_SPACE, kind, state, { origin: 'socria', name: 'Ex' })?.obj ?? null;
   } catch {
     return null;
   }

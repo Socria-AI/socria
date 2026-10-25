@@ -18,6 +18,7 @@ import { contentAsText } from '@/lib/inline-ui';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
+import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 import {
   mapInstructions,
   mapAsItStands,
@@ -116,7 +117,9 @@ THIS TURN ONLY: omit "viz" entirely. The previous attempt ran out of room. Retur
 export async function POST(req: NextRequest) {
   const { userId } = auth();
   const keyUnlocked = mayUse(req, userId);
-  if (!userId && !keyUnlocked) {
+  // a guest draws the map of their one line of thinking (lib/guest-pass.ts), and no other
+  const guest = !userId && !keyUnlocked;
+  if (guest && !req.cookies.get(GUEST_COOKIE)?.value) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
 
@@ -129,6 +132,9 @@ export async function POST(req: NextRequest) {
   }
 
   const body = await req.json().catch(() => null);
+  if (guest && !guestMay(req.cookies.get(GUEST_COOKIE)?.value, body?.sessionId, Date.now())) {
+    return NextResponse.json({ error: GUEST_LIMIT, guestLimit: true }, { status: 401 });
+  }
   // The map the client is holding is this product's own state — its models were
   // built by the engine on an earlier turn — so it comes in on the stored path,
   // where a built model is re-validated rather than stripped.
@@ -500,12 +506,13 @@ export async function POST(req: NextRequest) {
           if (made.ok) {
             next = { ...next, objects: made.space };
             display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: [madeSays(made.obj, sealed.gaps, sealed.from), sealed.says].filter(Boolean).join(' ').slice(0, 300) };
-            // ONE ANSWER TO ONE ASK. Told to draw whenever someone says "chart" or "plot", the
-            // extractor also drew this turn's numbers as a picture of its own — a second, cruder
-            // copy on the Plot lens, made by hand from the same words. The display is the answer;
-            // a picture this turn invented beside it is dropped, and one already on screen stays.
-            const drewBars = next.viz && ['diagram', 'distribution', 'sequence'].includes(String(next.viz.kind));
-            if (sealed.kind === 'data' && sealed.from === 'words' && drewBars && JSON.stringify(next.viz) !== JSON.stringify(current.viz ?? null)) {
+            // ONE ANSWER TO ONE ASK. Told to draw whenever someone says "chart", "plot" or
+            // "diagram", the extractor also drew this turn's request as a picture of its own — a
+            // second, cruder copy made by hand from the same words: a chart's numbers as bars, a
+            // Venn diagram as overlapping triangles on axes. The display is the answer, whatever
+            // its kind; a picture this turn invented beside it is dropped, and one already on
+            // screen stays.
+            if (next.viz && JSON.stringify(next.viz) !== JSON.stringify(current.viz ?? null)) {
               const { viz: _drawn, ...rest } = next;
               next = (current.viz ? { ...rest, viz: current.viz } : rest) as typeof next;
             }

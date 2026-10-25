@@ -4,10 +4,10 @@
 // inside /chat. That makes "which model" a piece of state both surfaces have
 // to agree on, and it lived as a bare localStorage key copied into each file.
 //
-// It also needs a second key. Leaving Logos means going back to the Core chat,
-// and going back to core-2 every time would quietly demote anyone who was on
-// Core 3.1 before they opened Logos — so the last Core model is remembered
-// alongside the current one, and the way back reads that.
+// It had a second key once, for the way back from Logos to the Core chat
+// (the last Core model). The Core chat was archived on 24 October 2026
+// (docs/ARCHIVE.md), so there is no way back to remember; whatever a browser
+// still holds under it is never read.
 //
 // AND A THIRD, which is the interesting one: whether the stored model is
 // there because the PERSON picked it, or because we did. Everyone used to
@@ -38,7 +38,6 @@ export const MODEL_KEY = 'socria.model.v1';
  */
 export const READABILITY_KEY = 'socria.readability.v1';
 export const LENGTH_KEY = 'socria.length.v1';
-const LAST_CORE_KEY = 'socria.model.lastCore.v1';
 /** Set only when the person picked from the menu — never when we resolved. */
 const MODEL_CHOSEN_KEY = 'socria.model.chosen.v1';
 
@@ -59,7 +58,6 @@ function isModel(v: unknown): v is SocriaModel {
 export function rememberModel(model: SocriaModel): void {
   try {
     localStorage.setItem(MODEL_KEY, model);
-    if (!SOCRIA_MODELS[model].logosSurface) localStorage.setItem(LAST_CORE_KEY, model);
   } catch {}
 }
 
@@ -157,10 +155,13 @@ export function isOffered(model: SocriaModel, gates: readonly GateId[] = openGat
 }
 
 /**
- * The earlier models, listed under "Other models" in the picker by name alone.
- * Not the ones Socria leads with; kept for whoever wants them.
+ * The earlier models a picker listed under "Other models" by name alone, kept
+ * for whoever wanted them. EMPTY since 24 October 2026: there is no picker and
+ * no Core chat screen — Logos 5 is the one surface, and every earlier model is
+ * archived (docs/ARCHIVE.md). Kept as the one place a model would be named to
+ * come back as a choice.
  */
-export const OTHER_MODELS: readonly SocriaModel[] = ['core-2', 'core-3', 'logos'];
+export const OTHER_MODELS: readonly SocriaModel[] = [];
 
 /**
  * Whether any model waits behind a feature gate. While none does, an access
@@ -180,70 +181,38 @@ export function offeredModels(gates: readonly GateId[] = openGates()): SocriaMod
  *
  * The successor is found STRUCTURALLY rather than by name: a withdrawn Logos
  * surface hands over to another Logos surface that is offered, because that is
- * the same kind of experience. With no such successor the answer is null, and
- * the caller falls back to the automatic default — which is better than a
- * hand-written pair that goes stale the next time the registry changes.
+ * the same kind of experience. A withdrawn Core with no Core left on offer —
+ * every Core, since the Core chat was archived — hands over to the Logos
+ * surface, where its conversations now open. Null only when nothing at all is
+ * offered.
  */
 export function withdrawnTo(model: SocriaModel): SocriaModel | null {
   const from = SOCRIA_MODELS[model];
+  const offered = offeredModels().filter((id) => id !== model);
   // a current model first; an earlier one only if nothing current is of the same kind
   const sameKind =
-    offeredModels().find(
-      (id) => id !== model && !OTHER_MODELS.includes(id) && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface
-    ) ?? offeredModels().find((id) => id !== model && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface);
-  return sameKind ?? null;
+    offered.find((id) => !OTHER_MODELS.includes(id) && !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface) ??
+    offered.find((id) => !!SOCRIA_MODELS[id].logosSurface === !!from.logosSurface);
+  return sameKind ?? offered.find((id) => !!SOCRIA_MODELS[id].logosSurface) ?? null;
 }
 
 /**
  * The model somebody opens on when they have not chosen one.
  *
- * Entitlement, not history. A member opens in the environment they are paying
- * for; everybody else opens on Core 3.1, including a visitor with no account.
+ * LOGOS 5, FOR EVERYBODY. It used to be decided by entitlement — a member on
+ * the environment they paid for, everybody else on Core 3.1, the model that
+ * needed no account — and before that everyone landed on Core 2. Since
+ * 24 October 2026 there is one surface: Logos 5, free to start with a free
+ * account, and every Core archived (docs/ARCHIVE.md). Somebody signed out
+ * meets its sign-up cover rather than a different product.
  *
- * CORE 2 IS NO LONGER THE DOOR. It used to be the answer for anyone without
- * an account, because it was the model that needed none — and it retires on
- * 2 October. Keeping a weaker model alive purely to hold the door open would
- * have meant a signed-out person meeting the product at its worst, which is
- * the bug this function was written to fix in the first place. So the free
- * tier moved up rather than out: Core 3.1 is open signed out (see
- * `requiresAuth` in the registry), and what an account buys is Logos, Core 4,
- * memory across devices and more than one conversation.
- *
- * `hasAccount` is sign-in OR the typed access key — a key-holder is not a
- * stranger. It no longer decides Core 3.1, because nothing does; it is the
- * flag that keeps a Logos default from being handed to somebody who would be
- * bounced out of it.
- *
- * Pure, and separated from the storage above so the rule can be tested
- * without a browser — it is a policy, and policies are what drift.
+ * The options are kept so callers and tests that pass them still read the
+ * rule: neither changes the answer now. Pure, and separated from the storage
+ * above so the rule can be tested without a browser.
  */
-export function autoModel(opts: { hasAccount: boolean; isOne: boolean }): SocriaModel {
-  const want: SocriaModel = opts.isOne && opts.hasAccount ? 'logos' : 'core-3';
-  // …unless that model has been withdrawn, in which case its successor. Written
-  // this way rather than by editing the pair above so that turning a model off is
-  // one line in the registry and nothing else — see `withdrawn` there.
-  return SOCRIA_MODELS[want].withdrawn ? (withdrawnTo(want) ?? 'core-3') : want;
-}
-
-/** The Core model to return to when leaving Logos. */
-export function lastCoreModel(): SocriaModel {
-  try {
-    const raw = localStorage.getItem(LAST_CORE_KEY);
-    // Any real, selectable, non-Logos model — not a hand-written pair. Named
-    // ids meant a Core added later was written to this key by rememberModel
-    // and then silently thrown away on the way back, dropping the person on
-    // Core 2 with no explanation.
-    if (
-      typeof raw === 'string' &&
-      raw in SOCRIA_MODELS &&
-      !SOCRIA_MODELS[raw as SocriaModel].soon &&
-      !SOCRIA_MODELS[raw as SocriaModel].withdrawn &&
-      !SOCRIA_MODELS[raw as SocriaModel].logosSurface
-    ) {
-      return raw as SocriaModel;
-    }
-  } catch {}
-  // Core 3.1, not Core 2: the way out of Logos lands where the product now
-  // opens, and Core 2 has a date on it.
-  return 'core-3';
+export function autoModel(_opts?: { hasAccount: boolean; isOne: boolean }): SocriaModel {
+  const want: SocriaModel = 'logos-3';
+  // …unless that has been withdrawn, in which case whatever is offered of its
+  // kind. Turning a model off stays one line in the registry.
+  return SOCRIA_MODELS[want].withdrawn || !isOffered(want) ? (withdrawnTo(want) ?? want) : want;
 }

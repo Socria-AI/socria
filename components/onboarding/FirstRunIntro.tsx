@@ -3,24 +3,23 @@
 //
 // ONE ONBOARDING, FOR ALL OF SOCRIA.
 //
-// Five short beats on paper, each one answered or skipped, nothing performing
+// Four short beats on paper, each one answered or skipped, nothing performing
 // itself:
 //
 //   premise   "Most AI gives you an answer. Socria helps you build the thinking
 //              behind one."
 //   name      what they want to be called (lib/onboarding-name.ts)
 //   who       what they mostly think about (lib/onboarding-roles.ts)
-//   how       how they like to think something through — which IS the choice
-//             of model: talking it through (Core 4) or seeing it laid out
-//             (Logos 3 where it is offered, Logos 2 where it is not), asked as
-//             a preference rather than a product menu
 //   thought   the question, a field, and five starting points worded for them
 //
-// Whatever they write goes, verbatim, into the composer of the surface they
-// chose. It is the SAME component on /onboarding, over the chat and over
-// Logos, so it is read once rather than three times (lib/first-run.ts). Over a
-// surface somebody has already opened, the model question is not asked — the
-// surface is their answer.
+// Whatever they write goes, verbatim, into Logos 5's composer. It is the SAME
+// component on /onboarding and over Logos, so it is read once rather than
+// twice (lib/first-run.ts).
+//
+// There was a fifth beat, "how do you like to think something through?",
+// which was the choice of model: talking it through (Core 4) or seeing it laid
+// out (Logos). It went with the Core chat on 24 October 2026 (docs/ARCHIVE.md):
+// there is one surface, so there is nothing to choose.
 
 import { useEffect, useRef, useState } from 'react';
 import { Logo } from '@/components/ds';
@@ -28,8 +27,7 @@ import { ObIcon } from './ObIcon';
 import { ROLES, readRole, roleOf, writeRole, type IntentId, type Role } from '@/lib/onboarding-roles';
 import { readName, sanitizeName, writeName } from '@/lib/onboarding-name';
 import { track } from '@/lib/analytics';
-import { INTENTS, type Intent, type StartModel } from '@/lib/onboarding-intents';
-import { isOffered } from '@/lib/socria-model-store';
+import { INTENTS, type Intent } from '@/lib/onboarding-intents';
 import '@/app/onboarding/onboarding.css';
 
 /* ── words, rising on mount. Nothing here depends on scroll. ── */
@@ -51,61 +49,31 @@ function Rise({ text, from = 0 }: { text: string; from?: number }) {
   );
 }
 
-/** How they like to think — and so which model they start on. */
-export type { StartModel, Intent } from '@/lib/onboarding-intents';
-type How = { model: StartModel; title: string; line: string; name: string };
-const TALK: How = { model: 'core-4', title: 'Talk it through', line: 'A conversation that asks the questions you would skip, and leaves the thinking to you.', name: 'Socria Core 4' };
-const HOW_2: How[] = [
-  TALK,
-  { model: 'logos-2', title: 'See it laid out', line: 'The same conversation, with your reasoning drawn as a live map beside it.', name: 'Socria Logos 2' },
-];
-// LOGOS 3, WHERE IT IS OFFERED (lib/socria-model-store isOffered: every
-// deployment, production included; HOW_2 is the fallback). It is the same
-// "see it laid out", and says the two things it adds: what you describe is
-// built beside the map, and someone can think it through with you.
-const HOW_3: How[] = [
-  TALK,
-  { model: 'logos-3', title: 'See it laid out', line: 'Your reasoning drawn as a live map, and what you describe built beside it: models you can move, alone or with someone.', name: 'Socria Logos 3.5' },
-];
-const isLogos = (m: StartModel | null | undefined) => m === 'logos-2' || m === 'logos-3';
-
 const MAX = 2000;
-type Beat = 'premise' | 'name' | 'who' | 'how' | 'thought';
+type Beat = 'premise' | 'name' | 'who' | 'thought';
 
 export function FirstRunIntro({
   surface: _surface,
   onStart,
   onSkip,
-  askModel = false,
   defaultName,
-  suggest,
 }: {
   /** which surface mounted it — kept for callers; the questions are the same everywhere */
   surface: 'core' | 'logos';
-  /** the thought, verbatim; the starting point they picked; the model they chose, if asked */
-  onStart: (text: string, intent: string | null, model: StartModel | null) => void;
-  onSkip: (model?: StartModel | null) => void;
-  /** ask how they like to think (and so which model) — only where no surface is chosen yet */
-  askModel?: boolean;
+  /** the thought, verbatim, and the starting point they picked */
+  onStart: (text: string, intent: string | null) => void;
+  onSkip: () => void;
   /** a name the account already knows, to start the field with */
   defaultName?: string | null;
-  /** an answer to pre-select on the model question (the Logos page's door) */
-  suggest?: StartModel | null;
 }) {
   const [beat, setBeat] = useState<Beat>('premise');
   const [name, setName] = useState('');
   const [role, setRole] = useState<Role | null>(null);
-  const [model, setModel] = useState<StartModel | null>(null);
   const [intent, setIntent] = useState<Intent | null>(null);
   const [text, setText] = useState('');
   const area = useRef<HTMLTextAreaElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const known = useRef<{ name: string | null; role: Role | null }>({ name: null, role: null });
-  // Read after mount: what is offered depends on this browser (its opened gates), which the server cannot see.
-  const [logos3, setLogos3] = useState(false);
-  useEffect(() => setLogos3(isOffered('logos-3')), []);
-  const HOW = logos3 ? HOW_3 : HOW_2;
-
   useEffect(() => {
     const n = readName();
     const r = roleOf(readRole());
@@ -122,22 +90,21 @@ export function FirstRunIntro({
   // The beats this person still needs, in order — anything already answered
   // on this browser is not asked again.
   const next = (from: Beat): Beat => {
-    const order: Beat[] = ['premise', 'name', 'who', 'how', 'thought'];
+    const order: Beat[] = ['premise', 'name', 'who', 'thought'];
     for (let i = order.indexOf(from) + 1; i < order.length; i++) {
       const b = order[i];
       if (b === 'name' && known.current.name) continue;
       if (b === 'who' && known.current.role) continue;
-      if (b === 'how' && !askModel) continue;
       return b;
     }
     return 'thought';
   };
 
-  // Every answer on this screen, as a step and a kind — a role id, a model id,
-  // a starting point, or 'skipped' — counted anonymously (lib/product-events.ts)
-  // so the developer dashboard can say what people choose. Never their words,
-  // never their name: for the name, only whether they gave one.
-  const answer = (step: 'premise' | 'name' | 'who' | 'how' | 'thought' | 'example', kind: string) =>
+  // Every answer on this screen, as a step and a kind — a role id, a starting
+  // point, or 'skipped' — counted anonymously (lib/product-events.ts) so the
+  // developer dashboard can say what people choose. Never their words, never
+  // their name: for the name, only whether they gave one.
+  const answer = (step: 'premise' | 'name' | 'who' | 'thought' | 'example', kind: string) =>
     track('onboarding_answered', { step, kind });
 
   const saveName = (v: string | null) => {
@@ -156,17 +123,11 @@ export function FirstRunIntro({
     setIntent(null);
     setBeat(next('who'));
   };
-  const pickHow = (m: StartModel | null) => {
-    answer('how', m ?? 'skipped');
-    setModel(m);
-    if (m) track('onboarding_model_chosen', { kind: m });
-    setBeat('thought');
-  };
   const begin = (v: string) => {
     const s = (v || '').replace(/\s+$/, '').slice(0, MAX);
     if (!s.trim()) return;
     answer('thought', intent?.id ?? 'none');
-    onStart(s, intent?.id ?? null, model);
+    onStart(s, intent?.id ?? null);
   };
 
   // the starting points, in the order that fits them, worded for their life
@@ -176,7 +137,7 @@ export function FirstRunIntro({
     return w ? { ...base, placeholder: w.placeholder, eg: w.eg } : base;
   });
   const first = sanitizeName(name)?.split(' ')[0] ?? null;
-  const steps: Beat[] = ['name', 'who', ...(askModel ? (['how'] as Beat[]) : []), 'thought'];
+  const steps: Beat[] = ['name', 'who', 'thought'];
   const stepAt = steps.indexOf(beat);
 
   return (
@@ -197,7 +158,7 @@ export function FirstRunIntro({
           className="ob-skip"
           onClick={() => {
             answer(beat, 'skip_all');
-            onSkip(model);
+            onSkip();
           }}
         >
           Skip
@@ -290,40 +251,6 @@ export function FirstRunIntro({
           </div>
         )}
 
-        {beat === 'how' && (
-          <div className="ob-wrap ob-wrap-wide" key="how">
-            <h1 className="ob-q ob-q-sm">
-              <Rise text="How do you like to think something through?" />
-            </h1>
-            <p className="ob-sub ob-fade" style={{ '--d': '.35s' } as React.CSSProperties}>
-              Either way, you can switch any time from the model menu.
-            </p>
-            <div className="ob-how ob-fade" style={{ '--d': '.5s' } as React.CSSProperties} role="radiogroup" aria-label="How you like to think">
-              {HOW.map((h) => (
-                <button
-                  key={h.model}
-                  type="button"
-                  role="radio"
-                  aria-checked={model === h.model}
-                  // the Logos page's door suggests Logos — whichever Logos this browser is offered
-                  className={`ob-howc${model === h.model || (!model && (suggest === h.model || (isLogos(suggest) && isLogos(h.model)))) ? ' is-on' : ''}`}
-                  onClick={() => pickHow(h.model)}
-                >
-                  <HowPicture kind={h.model} />
-                  <span className="ob-howc-t">{h.title}</span>
-                  <span className="ob-howc-d">{h.line}</span>
-                  <span className="ob-howc-n">{h.name}</span>
-                </button>
-              ))}
-            </div>
-            <p className="ob-fade" style={{ '--d': '.7s' } as React.CSSProperties}>
-              <button type="button" className="ob-later" onClick={() => pickHow(null)}>
-                Not sure yet — choose for me
-              </button>
-            </p>
-          </div>
-        )}
-
         {beat === 'thought' && (
           <div className="ob-wrap ob-wrap-wide" key="thought">
             <h1 className="ob-q ob-q-sm">
@@ -392,51 +319,5 @@ export function FirstRunIntro({
         )}
       </div>
     </div>
-  );
-}
-
-/** A small picture of each way of thinking — what the screen will look like. */
-function HowPicture({ kind }: { kind: StartModel }) {
-  if (kind === 'logos-3') {
-    // the conversation, the map, and a model built beside them
-    return (
-      <svg className="ob-howc-pic" viewBox="0 0 160 84" aria-hidden="true">
-        <rect x="6" y="12" width="40" height="12" rx="6" className="b1" />
-        <rect x="6" y="30" width="32" height="12" rx="6" className="b2" />
-        <rect x="6" y="48" width="36" height="12" rx="6" className="b1" />
-        <line x1="54" y1="6" x2="54" y2="78" className="rule" />
-        <path d="M74 18 L100 13 M74 18 L88 34 M100 13 L88 34" className="edge" />
-        <rect x="62" y="11" width="22" height="13" rx="3" className="n" />
-        <rect x="92" y="6" width="22" height="13" rx="3" className="n" />
-        <rect x="77" y="29" width="22" height="13" rx="3" className="n on" />
-        <rect x="64" y="48" width="88" height="30" rx="4" className="n" />
-        <path d="M68 52 C 74 52, 76 74, 82 74 S 90 57, 96 57 S 104 70, 110 70 S 118 61, 124 61 S 132 66, 138 66 S 144 63, 148 64" className="curve" />
-        <circle cx="128" cy="20" r="6" className="who" />
-        <circle cx="140" cy="20" r="6" className="who b" />
-      </svg>
-    );
-  }
-  if (kind === 'core-4') {
-    return (
-      <svg className="ob-howc-pic" viewBox="0 0 160 84" aria-hidden="true">
-        <rect x="8" y="10" width="92" height="20" rx="10" className="b1" />
-        <rect x="60" y="36" width="92" height="20" rx="10" className="b2" />
-        <rect x="8" y="62" width="70" height="16" rx="8" className="b1" />
-        <circle cx="18" cy="20" r="3" className="dot" />
-      </svg>
-    );
-  }
-  return (
-    <svg className="ob-howc-pic" viewBox="0 0 160 84" aria-hidden="true">
-      <rect x="6" y="12" width="44" height="12" rx="6" className="b1" />
-      <rect x="6" y="30" width="36" height="12" rx="6" className="b2" />
-      <rect x="6" y="48" width="40" height="12" rx="6" className="b1" />
-      <line x1="62" y1="6" x2="62" y2="78" className="rule" />
-      <path d="M92 22 L122 16 M92 22 L104 52 M122 16 L140 46 M104 52 L140 46" className="edge" />
-      <rect x="80" y="15" width="24" height="14" rx="3" className="n" />
-      <rect x="112" y="9" width="24" height="14" rx="3" className="n" />
-      <rect x="92" y="45" width="24" height="14" rx="3" className="n" />
-      <rect x="128" y="39" width="24" height="14" rx="3" className="n on" />
-    </svg>
   );
 }

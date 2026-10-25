@@ -232,7 +232,6 @@ const MODULES = [
   'lib/first-session.ts',
   'components/MapPoster.tsx',
   'components/LogosRail.tsx',
-  'components/LogosCover.tsx',
   'lib/logos3-showcase.ts',
   'lib/science/random.ts',
   'lib/science/provenance.ts',
@@ -328,6 +327,8 @@ const MODULES = [
   'test/helpers/l5views-under-test.ts',
   // adaptive response rendering: the inline vocabulary, its planner, its gate and its components
   'test/helpers/inline-under-test.tsx',
+  // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws
+  'test/helpers/make-under-test.tsx',
 ];
 
 export async function buildAll() {

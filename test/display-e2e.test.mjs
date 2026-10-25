@@ -232,6 +232,43 @@ console.log('\n=== THE FAILURE: "Chart my monthly spending…" ===');
   ok('when the extractor itself fails, the map is salvaged and nothing is claimed', threw.status === 200 && !threw.json.display?.ok);
 }
 
+console.log('\n=== ONE ANSWER TO ONE ASK, whatever the kind: "Venn diagram of mitosis and meiosis" ===');
+{
+  // The screenshot: a Venn diagram asked for, and beside the display a "Picture" the extractor
+  // drew of the same words — overlapping triangles on axes, spilling out of its card. The display
+  // is the answer whatever its kind, not only a chart's.
+  const said = 'Make a Venn diagram of mitosis and meiosis';
+  const DRAWN = { kind: 'diagram', title: 'Venn Diagram: Mitosis and Meiosis', parts: [{ o: 'rects', bars: [{ x0: 0, x1: 1, y: 2 }, { x0: 1, x1: 2, y: 1 }] }] };
+  const VENN = {
+    display: {
+      kind: 'venn',
+      state: {
+        title: 'Mitosis and meiosis',
+        view: 'venn',
+        sets: [{ id: 'mi', name: 'Mitosis' }, { id: 'me', name: 'Meiosis' }],
+        elements: [
+          { id: 'a', label: 'Two daughter cells', sets: ['mi'] },
+          { id: 'b', label: 'Four daughter cells', sets: ['me'] },
+          { id: 'c', label: 'DNA replicated first', sets: ['mi', 'me'] },
+        ],
+      },
+    },
+  };
+  const READ = { nodes: [{ id: 'm', label: 'Cell division', type: 'concept' }], edges: [], context: 'learning', ask: { action: 'construct', artifact: 'display', topic: 'mitosis and meiosis' }, viz: DRAWN };
+  const { json } = await mapTurn(said, [READ, VENN]);
+  const v = (json.map?.objects?.objs ?? []).find((o) => o.kind === 'venn');
+  ok('the Venn diagram is made, as a Venn diagram', json.display?.ok === true && !!v, JSON.stringify(json.display));
+  ok('  the picture the extractor drew of the same ask is not kept beside it', !json.map?.viz, JSON.stringify(json.map?.viz)?.slice(0, 160));
+  const onScreen = { nodes: [{ id: 'f', label: 'y = x²', type: 'concept' }], edges: [], viz: { kind: 'function', expr: 'x^2', title: 'y = x^2' } };
+  const kept = await mapTurn(said, [{ ...READ, nodes: onScreen.nodes }, VENN], { map: onScreen });
+  // The route answers with the picture on screen or with none, and the screen keeps its own when
+  // none comes back (components/LogosApp.tsx: json.map.viz ?? the map's) — never the new drawing.
+  const back = kept.json.map?.viz;
+  ok('  a picture already on screen stays as it was', kept.json.display?.ok === true && (!back || (back.kind === 'function' && back.expr === 'x^2')), JSON.stringify({ d: kept.json.display?.ok, v: back ?? null }).slice(0, 300));
+  const talk = await mapTurn('How does meiosis make four cells?', [{ ...READ, ask: { action: 'discuss', artifact: 'answer' } }]);
+  ok('  with no display asked for, the extractor’s picture is still drawn', !talk.json.display && talk.json.map?.viz?.title === 'Venn Diagram: Mitosis and Meiosis', JSON.stringify(talk.json.display ?? talk.json.map?.viz)?.slice(0, 160));
+}
+
 console.log('\n=== the other everyday asks, end to end ===');
 {
   const before = [{ role: 'user', content: 'My expenses: rent 1200, food 400, transport 150' }, { role: 'assistant', content: 'Got it.' }];

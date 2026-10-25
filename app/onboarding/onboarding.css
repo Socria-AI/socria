@@ -264,27 +264,6 @@
 .ob-name input::placeholder{color:var(--ink-25)}
 .ob-primary:disabled{opacity:.4;cursor:default;transform:none}
 
-/* ── how they like to think: two large cards with a picture of each ── */
-.ob-how{margin-top:clamp(22px,4vh,36px);display:grid;grid-template-columns:repeat(auto-fit,minmax(260px,1fr));gap:16px}
-.ob-howc{display:flex;flex-direction:column;align-items:flex-start;gap:6px;text-align:left;padding:18px 20px 18px;border:1px solid var(--ink-12);
-  border-radius:16px;background:rgba(255,255,255,.6);cursor:pointer;color:var(--ink);transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
-.ob-howc:hover,.ob-howc:focus-visible{border-color:var(--moss);background:rgba(255,255,255,.9);transform:translateY(-2px);box-shadow:0 14px 34px -22px rgba(32,32,27,.5);outline:none}
-.ob-howc.is-on{border-color:var(--moss);background:rgba(94,118,51,.08)}
-.ob-howc-pic{width:100%;height:auto;max-height:96px;margin-bottom:8px;border-radius:10px;background:rgba(94,118,51,.06)}
-.ob-howc-pic .b1{fill:rgba(32,32,27,.1)}
-.ob-howc-pic .b2{fill:rgba(94,118,51,.28)}
-.ob-howc-pic .dot{fill:var(--moss)}
-.ob-howc-pic .rule{stroke:rgba(32,32,27,.14);stroke-width:1}
-.ob-howc-pic .edge{fill:none;stroke:rgba(94,118,51,.55);stroke-width:1.2}
-.ob-howc-pic .n{fill:#fff;stroke:rgba(32,32,27,.28);stroke-width:1}
-.ob-howc-pic .n.on{fill:rgba(94,118,51,.2);stroke:var(--moss)}
-.ob-howc-pic .curve{fill:none;stroke:var(--moss);stroke-width:1.4}
-.ob-howc-pic .who{fill:rgba(94,118,51,.45)}
-.ob-howc-pic .who.b{fill:rgba(38,70,83,.4)}
-.ob-howc-t{font-family:var(--serif);font-size:clamp(1.4rem,2.4vw,1.7rem);line-height:1.05}
-.ob-howc-d{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.88rem;line-height:1.4;color:var(--ink-60)}
-.ob-howc-n{margin-top:6px;font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.68rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--moss-700)}
-
 /* ── the starting points: large, impossible to miss, each with its icon ── */
 .ob-kick{margin:10px 0 0;font-family:var(--serif);font-style:italic;font-size:clamp(1.05rem,1.6vw,1.25rem);color:var(--ink-60)}
 .ob-ways{margin:clamp(18px,3vh,26px) 0 clamp(14px,2.6vh,22px);display:grid;grid-template-columns:repeat(auto-fit,minmax(168px,1fr));gap:12px}
@@ -308,8 +287,7 @@
   .ob-way{padding:12px}
   .ob-way-ic{width:36px;height:36px}
   .ob-way-t{font-size:1.08rem}
-  .ob-how{grid-template-columns:1fr}
   .ob-steps{margin-right:10px}
   .ob-steps i{width:14px}
 }
-@media(prefers-reduced-motion:reduce){.ob-way,.ob-howc{transition:none}.ob-way:hover,.ob-howc:hover{transform:none}}
+@media(prefers-reduced-motion:reduce){.ob-way{transition:none}.ob-way:hover{transform:none}}

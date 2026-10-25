@@ -2,10 +2,12 @@
 // that names a gate, on production (lib/feature-gates.ts,
 // lib/feature-gates-server.ts). Logos 3 was the first; it is open to everyone
 // now, so no model names a gate. The new Socria is the second
-// (lib/new-socria.ts, test/new-socria.test.mjs): its code opens Logos 5's
-// screen, so Manage Account asks for a code wherever that is offered. That
-// code is handed out and this repository is public, so the server keeps only
-// its fingerprint — and nothing here writes it either.
+// (lib/new-socria.ts, test/new-socria.test.mjs): its code opened Logos 5's
+// screen until 24 October 2026, when Logos 5 became everybody's
+// (docs/ARCHIVE.md). Manage Account still asks for it wherever Logos 5 is
+// offered, and it still opens /logos-5-internal. That code is handed out and
+// this repository is public, so the server keeps only its fingerprint — and
+// nothing here writes it either.
 //
 // Held here: the code is checked on the server, in any case and spacing; it
 // never ships to the browser; what a browser or an account remembers can only
@@ -66,7 +68,7 @@ const env = process.env.VERCEL_ENV;
 process.env.VERCEL_ENV = 'production';
 ok('open to everyone: listed with no code entered', isOffered('logos-3', []) && offeredModels([]).includes('logos-3'));
 ok('  and still listed for someone who entered the old code', isOffered('logos-3', ['logos3']));
-ok('Logos 2 and the Cores are not gated', isOffered('logos-2', []) && isOffered('core-4', []));
+// Logos 2 and the Cores are no longer listed at all: archived with the Core chat (withdrawn in lib/socria-prompt.ts), not gated.
 ok('no model names a gate, so there is nothing for a code to open', !anyModelGated() && Object.values(SOCRIA_MODELS).every((m) => !m.gate));
 {
   // The rule itself stays, for the next model that names a gate. (Each module
@@ -104,7 +106,7 @@ ok('the code never ships to the browser', !/LOGOS3['"]/.test(read('lib/feature-g
 ok('the route checks it, signed in and rate-limited', /gateForCode\(body\?\.code\)/.test(read('app/api/access/gate/route.ts')) && /enforceRateLimit/.test(read('app/api/access/gate/route.ts')) && /Unauthorized|Sign in/.test(read('app/api/access/gate/route.ts')));
 ok('Manage Account has the field, shown while a model is gated or the new Socria is offered', /\{\(anyModelGated\(\) \|\| LOGOS5\.on\) && \(\s*<div className="sec">\s*<span className="lbl">Access code<\/span>\s*<AccessCode onOpened=\{onClose\} \/>/.test(read('components/account/AccountSheet.tsx')));
 ok('the model menu re-reads what it offers when a gate opens', /GATE_CHANGED/.test(read('components/ModelPicker.tsx')));
-ok('a link to Logos 3 obeys the same rule as the menu', /isOffered\(m as SocriaModel\)/.test(read('app/chat/page.tsx')));
+// A ?model= link no longer opens a model, so there is no rule for it to obey: /chat drops it (archived with the Core chat).
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

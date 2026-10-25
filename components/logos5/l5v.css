@@ -291,6 +291,10 @@
 .l5v-body {
   position: relative;
   flex: 1 1 auto;
+  /* never wider than the screen it is in: without this a long row inside —
+     the composer's tools with a choice made, on a phone — widened the whole
+     view past the edge and cut the send button off */
+  min-width: 0;
   min-height: 0;
   display: flex;
 }

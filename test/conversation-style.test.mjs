@@ -364,8 +364,8 @@ console.log('\n=== wired end to end: the account, the routes, the clients ===');
   const app = read('components/LogosApp.tsx');
   ok('every Logos request carries it (one place: guidance())', /conversationStyle: conversationStyleRef\.current,/.test(app) && (app.match(/\.\.\.guidance\(\)/g) ?? []).length >= 4);
   const page = read('app/chat/page.tsx');
-  ok('every Core turn carries it, read at send time', /conversationStyle: conversationStyleRef\.current,/.test(page));
-  ok('  and a shared thread is handed it', /conversationStyle=\{conversationStyle\}/.test(page) && /\.\.\.\(conversationStyle \? \{ conversationStyle \} : \{\}\)/.test(read('components/share/SharedThread.tsx')));
+  // The Core chat's own turns (read at send time from its ref) were archived with it; a shared Core thread is what asks Core now.
+  ok('a shared Core thread is handed it, and every turn it asks carries it', /conversationStyle=\{conversationStyle\}/.test(page) && /\.\.\.\(conversationStyle \? \{ conversationStyle \} : \{\}\)/.test(read('components/share/SharedThread.tsx')));
 
   const profile = read('app/api/profile/route.ts');
   ok('the account reads it', /conversation_style/.test(profile) && /conversationStyle: styleFrom\(data, used === 0\)/.test(profile));

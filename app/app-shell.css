@@ -761,3 +761,13 @@
 .app-root .try-link{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:1rem;
   color:var(--moss-700);border-bottom:1px solid var(--moss-700);padding-bottom:1px;cursor:pointer;background:none}
 .app-root .try-link:hover{color:var(--ink);border-color:var(--ink)}
+
+/* ---------- beside Logos 5: a Project's home, a shared Core thread (app/chat/page.tsx) ---------- */
+.app-root.chat-aside{display:flex;flex-direction:column;min-height:100svh}
+.app-root .chat-aside-bar{position:sticky;top:0;z-index:5;display:flex;align-items:center;justify-content:space-between;gap:12px;
+  padding:10px clamp(16px,3vw,28px);border-bottom:1px solid var(--app-border);background:var(--app-paper)}
+.app-root .chat-aside-back{display:inline-flex;align-items:center;gap:6px;padding:7px 14px;border:1px solid var(--app-border);border-radius:999px;
+  font-size:.86rem;font-weight:500;color:var(--ink);background:var(--surface, #fff);transition:border-color .2s}
+.app-root .chat-aside-back:hover,.app-root .chat-aside-back:focus-visible{border-color:var(--moss);outline:none}
+.app-root .chat-aside-error{margin:12px clamp(16px,3vw,28px) 0;font-size:.88rem;color:var(--danger, #9b2c2c)}
+.app-root.chat-aside > :last-child{flex:1;min-height:0}

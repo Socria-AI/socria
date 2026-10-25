@@ -94,7 +94,7 @@ const SWITCHES: [string, string, string][] = [
   ['LOGOS_IFR · LOGOS_MR_ARM · LOGOS_MR_POLICY', 'on · full · current', 'the IFR factor, the comparison arms, pinning an earlier policy (rollback)'],
   ['LOGOS_MR_DELIBERATE', 'off', 'on: at most two small model calls per conversation when MR’s rules conflict'],
   ['LOGOS_MR_STORE', 'on', 'off: MR never reads or writes its ledger'],
-  ['NEXT_PUBLIC_LOGOS5', 'on', 'off: the Logos 4 screen for a deployment'],
+  ['NEXT_PUBLIC_LOGOS5', 'on', 'off: no access code field in Manage Account (the Logos 4 screen it brought back is archived)'],
   ['NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN', 'off', 'on: a map pass on every turn'],
 ];
 

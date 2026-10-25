@@ -10,6 +10,12 @@
 // Core 4 is the page that prompted it: adding one page meant touching four
 // files, and the fourth was easy to forget.
 //
+// SINCE THE ARCHIVE (24 October 2026) the registry also says which pages are
+// a record of something no longer offered — `archived`, under Earlier Socria,
+// which every such page's banner is drawn from — and that is held to the
+// model registry too: a withdrawn model's page is in the archive, and the
+// model on offer is documented as current.
+//
 // Source-read rather than rendered: these are server components full of JSX,
 // and what is being checked is the agreement between the lists, which is a
 // property of the text.
@@ -63,7 +69,10 @@ console.log('\n=== each page agrees with its own contents strip ===');
 console.log('\n=== Core 4 is documented, and documented honestly ===');
 {
   const p = docPage('core-4');
-  ok('it is in the registry', !!p && p.group === 'The models');
+  // Archived with the Core chat, and kept as a record of how it worked: so it
+  // is in the archive, and every claim below is still checked, because the
+  // page still makes them.
+  ok('it is in the registry, kept in the archive', !!p && p.group === 'Earlier Socria' && !!p.archived, p?.group);
   const src = read('app/docs/content/core-4.tsx');
 
   // The four claims a reader most needs, each of which is a real property of
@@ -114,23 +123,70 @@ console.log('\n=== Core 4 is documented, and documented honestly ===');
     /eighty-two turns/.test(src) && /0\/82/.test(evals));
 }
 
-console.log('\n=== the models page names every model a reader can pick ===');
+console.log('\n=== the models page names every model, and counts the ones a reader can pick ===');
 {
   const models = read('app/docs/content/models.tsx');
-  for (const name of ['Core 2', 'Core 3.1', 'Core 4', 'Logos'])
-    ok(`${name} is on the comparison page`, models.includes(name));
-  // The count a page states is the count the menu offers — read from the
-  // registry, so the next retirement or launch fails here until the prose
-  // catches up, in either direction.
+  // Every model in the registry, by the name the product gives it: the one on
+  // offer, and each one before it. A name counts only as itself — "Logos" in
+  // "Logos 5" is not the original Logos.
+  const names = (src, name) => new RegExp(`\\b${name.replace(/\./g, '\\.')}\\b(?!\\s?\\d|\\.\\d)`).test(src);
+  for (const id of Object.keys(SOCRIA_MODELS))
+    ok(`${SOCRIA_MODELS[id].short} is on the models page`, names(models, SOCRIA_MODELS[id].short));
+  // The count a page states is the count on offer — read from the registry,
+  // so the next retirement or launch fails here until the prose catches up,
+  // in either direction. There is no menu now, and one model: "one model".
   const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
   // The docs are production's: a dev-only model is not one a reader can pick.
-  // Retired models kept by name under "Other models" are not counted.
+  // Retired models kept by name under "Other models" are not counted (none
+  // are kept there since the archive).
   const n = WORDS[offeredModels().filter((id) => !SOCRIA_MODELS[id].devOnly && !SOCRIA_MODELS[id].withdrawn).length];
-  const said = (src) => [...src.matchAll(/\b(two|three|four|five|six|seven) models\b/gi)].map((m) => m[1].toLowerCase());
-  ok(`the page says there are ${n}, as the menu offers`, said(models).length > 0 && said(models).every((w) => w === n), said(models).join(','));
+  const said = (src) => [...src.matchAll(/\b(one|two|three|four|five|six|seven) models?\b/gi)].map((m) => m[1].toLowerCase());
+  ok(`the page says there ${n === 'one' ? 'is one' : `are ${n}`}, as many as are offered`, said(models).length > 0 && said(models).every((w) => w === n), said(models).join(','));
   const overview = read('app/docs/content/overview.tsx');
   ok('the overview counts them the same way', said(overview).length > 0 && said(overview).every((w) => w === n), said(overview).join(','));
   ok('  and links to Core 4', overview.includes('/docs/core-4'));
+  ok('  and to Logos 5, and to the history', overview.includes('/docs/logos-5') && overview.includes('/docs/history'));
+  // "The models before it": every page kept in the archive is a row, linked.
+  const kept = DOC_PAGES.filter((p) => p.archived);
+  const unlinked = kept.filter((p) => !models.includes(`href="/docs/${p.slug}"`)).map((p) => p.slug);
+  ok('the models page links every archived page', kept.length > 0 && unlinked.length === 0, unlinked.join(','));
+  ok('  and the history', models.includes('href="/docs/history"'));
+}
+
+console.log('\n=== the archive is marked as the archive, and agrees with the models ===');
+{
+  const kept = DOC_PAGES.filter((p) => p.archived);
+  // Every archived page opens with a banner drawn from its registry entry, so
+  // the entry is what has to be right.
+  ok('the banner is drawn from the registry', /\{page\.archived && <ArchivedNote page=\{page\} \/>\}/.test(read('app/docs/Article.tsx')));
+  ok('every archived page is under Earlier Socria', kept.every((p) => p.group === 'Earlier Socria'),
+    kept.filter((p) => p.group !== 'Earlier Socria').map((p) => p.slug).join(','));
+  for (const p of kept)
+    ok(`${p.slug}: says what, when, and what replaced it`,
+      [p.archived.what, p.archived.on, p.archived.replacedBy].every((s) => typeof s === 'string' && s.trim().length > 2));
+
+  // Held to the models: a withdrawn model's page is in the archive, dated as
+  // the registry dates it where the registry gives a date, and the model on
+  // offer is documented as current. A model's page is the one titled with
+  // its label.
+  const DATE = /\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December)\b/;
+  for (const id of Object.keys(SOCRIA_MODELS)) {
+    const m = SOCRIA_MODELS[id];
+    const page = DOC_PAGES.find((p) => p.title === m.label);
+    if (m.withdrawn) {
+      const date = m.withdrawn.match(DATE)?.[0];
+      ok(`${m.short} is withdrawn, and its page is in the archive${date ? `, dated ${date}` : ''}`,
+        !!page?.archived && (!date || new RegExp(`\\b${date}\\b`).test(page.archived.on)),
+        page ? (page.archived ? JSON.stringify(page.archived) : `${page.slug} is not archived`) : `no page titled ${m.label}`);
+    } else if (!m.devOnly && offeredModels().includes(id)) {
+      ok(`${m.short} is offered, and its page is current`, !!page && !page.archived && page.group !== 'Earlier Socria',
+        page ? page.slug : `no page titled ${m.label}`);
+    }
+  }
+
+  const history = read('app/docs/content/history.tsx');
+  const untold = kept.filter((p) => !history.includes(`href="/docs/${p.slug}"`)).map((p) => p.slug);
+  ok('the history links every archived page', untold.length === 0, untold.join(','));
 }
 
 console.log('\n=== prev/next walks the whole wiki ===');
@@ -147,6 +203,12 @@ console.log('\n=== prev/next walks the whole wiki ===');
     if (steps > DOC_PAGES.length) break;
   }
   ok('following next reaches every page exactly once', steps === DOC_PAGES.length, String(steps));
+  // The sidebar lists DOC_GROUPS in order; next has to walk it the same way,
+  // a group at a time — which puts the current product before the archive.
+  const groupAt = DOC_PAGES.map((p) => DOC_GROUPS.indexOf(p.group));
+  ok('and walks the sidebar a group at a time, the archive last',
+    groupAt.every((g, i) => i === 0 || g >= groupAt[i - 1]) && DOC_GROUPS[DOC_GROUPS.length - 1] === 'Earlier Socria',
+    DOC_PAGES.map((p) => p.group).join(' > '));
 }
 
 console.log('\n=== Logos 3.5 is documented, and documented honestly ===');

@@ -1603,6 +1603,11 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     defaultOpenAIModel: CORE_3_MODEL,
     supportsDepth: true,
     requiresAuth: false,
+    // ARCHIVED with the Core chat screen (docs/ARCHIVE.md): Logos 5 is the one
+    // surface, open to everyone with a free account. Withdrawn, not deleted —
+    // a conversation that was on it still answers where it is read (a shared
+    // Core thread, app/api/chat), and its chats were brought into Logos 5.
+    withdrawn: 'Archived on 24 October 2026 with the Core chat; its conversations open in Logos 5.',
   },
   logos: {
     id: 'logos',
@@ -1619,7 +1624,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     // offering the older one — and a person who picked it got the surface that
     // is no longer where the work is going. Nothing about this model changed;
     // delete this line to offer it again.
-    withdrawn: 'Logos 2 is the surface being worked on; this one is held back while that is true.',
+    withdrawn: 'Archived; Logos 5 is the Logos surface, and its conversations open there.',
   },
   // Logos 2 — the Logos surface with the representation engine in it: models
   // the engine builds as objects in the workspace, with identity, revisions and
@@ -1644,6 +1649,9 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     supportsDepth: false,
     requiresAuth: true,
     logosSurface: true,
+    // ARCHIVED with the Logos 4 layout (docs/ARCHIVE.md): its conversations
+    // are lines of thinking like any other, and open in Logos 5.
+    withdrawn: 'Archived on 24 October 2026; Logos 5 opens its conversations.',
   },
   // Logos 3 — Logos 2 with the room back in it: two people in one line of
   // thinking, one Thinking Map and one model workspace, Socria as the layer
@@ -1675,6 +1683,9 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     // No `gate`: open to everyone on production. It was listed there only once
     // its code had been entered under Manage Account (lib/feature-gates.ts);
     // that gate still exists, and opens nothing until a model names it again.
+    // THE ONE SURFACE since 24 October 2026: every other model is archived,
+    // the Core chat screen and the Logos 4 layout are gone, and nothing waits
+    // behind the new-Socria code any more (docs/ARCHIVE.md).
   },
   // Core 4 — built, and selectable. It carried `soon` while it was an
   // announcement, which made the picker grey it out; that flag came off when
@@ -1698,6 +1709,10 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     supportsDepth: false,
     supportsCommunication: true,
     requiresAuth: true,
+    // ARCHIVED with the Core chat screen (docs/ARCHIVE.md). Its engine is not:
+    // Logos 5 runs on Core 4's split, allocation and state (lib/runtime), and
+    // a shared Core thread still answers on it.
+    withdrawn: 'Archived on 24 October 2026 with the Core chat; Logos 5 runs on its engine.',
   },
 };
 

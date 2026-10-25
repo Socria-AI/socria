@@ -326,7 +326,7 @@ export function ShareDialog({
                       <button className="sh-small" disabled={busy} onClick={() => void act({ action: 'code', role: state.code!.role, fresh: true })}>New code</button>
                     </div>
                   )}
-                  <span className="sh-sub">Readable aloud — for a room, a call, a class. Joined with “Join with a code” in the sidebar.</span>
+                  <span className="sh-sub">Readable aloud — for a room, a call, a class. Joined with “Join with a code”, in the More menu.</span>
                 </div>
               </div>
             )}
@@ -390,9 +390,10 @@ export function JoinWithCode({ onDone, autoFocus = false }: { onDone?: () => voi
 }
 
 /**
- * The code, asked for in a popup — opened from the rail's "Join with a code"
- * button rather than sitting in the rail as a field. Escape, the backdrop or ×
- * closes it; a code that opens something goes straight there.
+ * The code, asked for in a popup — opened from "Join with a code" in Logos 5's
+ * More menu and under Shared with you, rather than sitting there as a field.
+ * Escape, the backdrop or × closes it; a code that opens something goes
+ * straight there.
  */
 export function JoinCodeDialog({ open, onClose }: { open: boolean; onClose: () => void }) {
   useEffect(() => {

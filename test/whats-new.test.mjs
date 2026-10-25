@@ -7,8 +7,8 @@
 //     copy of the record is in, never over the premise, never twice;
 //   • the moment is per person and the earliest across devices, so it does
 //     not depend on when this reached them;
-//   • where: over the map on Logos 5 and over Core's chat for an account, the
-//     last beat lifting away to the map or leading to it;
+//   • where: over the map on Logos 5, the last beat lifting away to the map
+//     (Core's chat told an account too, until it was archived);
 //   • what: three beats — the chatbot gone and nothing lost, how to read the
 //     map and its lenses, the one box — with Skip, Back and the keyboard;
 //   • replayable for testing, and the replay moves the line to now.
@@ -99,7 +99,7 @@ console.log('=== the record ===');
 console.log('=== where it is shown ===');
 {
   const hook = read('components/useFirstRun.ts');
-  ok('the hook records the new Socria opening, once the record is read and it has opened for them (its code: lib/new-socria.ts)', /if \(ready && opened\) reach\('socria\.opened'\)/.test(hook));
+  ok('the hook records the new Socria opening once the record is read, for everybody (no code holds it back now)',/useEffect\(\(\) => \{\s*if \(ready\) reach\('socria\.opened'\);\s*\}, \[ready, reach\]\);/.test(hook));
   ok('  and says when the account copy is in, computed so no frame decides early', /const synced = ready && \(!opts\.signedIn \|\| merged\)/.test(hook) && /accountMerge \?\?= mergeAccount\(\)/.test(hook));
   ok('  every replay asks the account again', (hook.match(/accountMerge = null;/g) ?? []).length === 2);
   ok('  and a milestone a page leaves on still reaches the account', /keepalive: true/.test(hook));
@@ -108,9 +108,7 @@ console.log('=== where it is shown ===');
   ok('  every conversation counts, the Core chats beside them too', /work: \[\.\.\.withWork\.map\(\(x\) => x\.updatedAt\), \.\.\.chatsBeside\.map\(\(c\) => c\.updatedAt\)\]/.test(app));
   ok('  not over the premise, nor while anything is under way', /introShowing: introWanted/.test(app) && /busy: busy \|\| !!streaming \|\| organizing \|\| sortPending/.test(app));
   ok('  finishing or skipping is reached once', /onDone=\{\(\) => firstRun\.reach\('socria\.new'\)\}/.test(app) && /onSkip=\{\(\) => firstRun\.reach\('socria\.new', \{ skipped: true \}\)\}/.test(app));
-  const chat = read('app/chat/page.tsx');
-  ok('Core\'s chat tells an account the map opens for, and its last beat opens the map', /const showWhatsNew =[\s\S]{0,120}?newSocria &&\s*!!isSignedIn &&/.test(chat) && /firstRun\.reach\('socria\.new'\);[\s\S]{0,200}pickModel\(logosToOpen\(\)\)/.test(chat));
-  ok('  not over a Project, a shared conversation or the tour', /!homeProject &&\s*!sharedOpen &&\s*!tourOpen &&/.test(chat));
+  // Core's chat told it too, its last beat opening the map; that was archived with the Core chat (app/chat/page.tsx).
   const tools = read('components/account/TestingTools.tsx');
   ok('Manage Account → Testing can replay it', /replayPart\('new'\)/.test(tools) && /We killed the chatbot/.test(tools));
 }

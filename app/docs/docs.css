@@ -665,3 +665,53 @@
 .docs-root .d-display-frame .dsp p { margin: 0; }
 .docs-root .d-display-frame .dsp table { margin: 0; width: 100%; }
 .docs-root .d-display-frame .dsp button { font: inherit; }
+
+/* An archived page's banner (Article.tsx ArchivedNote): a callout in the
+   caution colour, first thing under the lead, the same words on every page. */
+.docs-root .d-archived {
+  margin: 0 0 22px; padding: 14px 18px;
+  background: var(--d-card);
+  border: 1px solid var(--d-line);
+  border-left: 3px solid #a5623a;
+  border-radius: 0 10px 10px 0;
+}
+.docs-root .d-archived .d-callout-tag {
+  display: block; margin-bottom: 4px;
+  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  text-transform: uppercase; color: #a5623a;
+}
+.docs-root .d-archived p { margin: 0; }
+@media (max-width: 640px), (hover: none) {
+  .docs-root .d-archived .d-callout-tag { font-size: 11.5px; letter-spacing: 0.08em; }
+}
+
+/* Diagrams (app/docs/Diagrams.tsx): inline SVG drawn only from the wiki's own
+   tokens, so whatever ground .docs-root is given — the paper here, Explore's
+   variant — the lines and words follow it. Text never goes below 12px on a
+   phone: the viewBox is scaled, so the drawing is kept wide enough to read
+   and scrolls sideways inside its frame rather than shrinking. */
+.docs-root .d-diagram { margin: 20px 0 22px; }
+.docs-root .d-diagram-frame {
+  overflow-x: auto; -webkit-overflow-scrolling: touch;
+  border: 1px solid var(--d-line); border-radius: 10px;
+  background: var(--d-card);
+  padding: 12px;
+}
+.docs-root .d-diagram svg { display: block; width: 100%; height: auto; min-width: 560px; }
+.docs-root .d-diagram figcaption { margin-top: 8px; font-size: 14px; line-height: 1.55; color: var(--d-ink-70); }
+.docs-root .d-diagram .dg-box { fill: var(--d-paper); stroke: var(--d-ink-25); stroke-width: 1; }
+.docs-root .d-diagram .dg-box.is-now { fill: var(--d-paper-2); stroke: var(--d-moss); stroke-width: 1.5; }
+.docs-root .d-diagram .dg-box.is-past { fill: var(--d-card); stroke: var(--d-ink-25); stroke-dasharray: 4 3; }
+.docs-root .d-diagram .dg-band { fill: var(--d-paper-2); stroke: none; }
+.docs-root .d-diagram .dg-t { fill: var(--d-ink); font-family: var(--d-sans); font-size: 13px; }
+.docs-root .d-diagram .dg-t.is-strong { font-weight: 600; }
+.docs-root .d-diagram .dg-t.is-small { fill: var(--d-ink-70); font-size: 11.5px; }
+.docs-root .d-diagram .dg-t.is-accent { fill: var(--d-moss-deep); font-weight: 600; }
+.docs-root .d-diagram .dg-t.is-serif { font-family: var(--d-serif); font-size: 17px; }
+.docs-root .d-diagram .dg-line { stroke: var(--d-ink-45); stroke-width: 1.2; fill: none; }
+.docs-root .d-diagram .dg-line.is-accent { stroke: var(--d-moss); stroke-width: 1.6; }
+.docs-root .d-diagram .dg-line.is-soft { stroke: var(--d-ink-25); stroke-dasharray: 3 3; }
+.docs-root .d-diagram .dg-dot { fill: var(--d-moss); }
+.docs-root .d-diagram .dg-dot.is-past { fill: var(--d-ink-45); }
+.docs-root .d-diagram .dg-arrow { fill: var(--d-ink-45); }
+.docs-root .d-diagram .dg-arrow.is-accent { fill: var(--d-moss); }

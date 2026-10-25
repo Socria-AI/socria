@@ -58,7 +58,10 @@ ok('Tailwind’s paper, ink, moss and surface read the theme, falling back to pa
 ok('the layout boots the theme and scopes it to the app', /THEME_BOOT/.test(read('app/layout.tsx')) && /<ThemeScope \/>/.test(read('app/layout.tsx')));
 ok('the account sheet offers the themes', /<ThemePicker isOne=\{isOne\}/.test(read('components/account/AccountSheet.tsx')));
 ok('a locked theme cannot be chosen', /if \(locked\) return;/.test(read('components/account/ThemePicker.tsx')));
-ok('both app surfaces put a lapsed member back on paper', /useThemeGuard\(/.test(read('app/chat/page.tsx')) && /useThemeGuard\(one, planKnown\)/.test(read('components/LogosApp.tsx')));
+// The Core chat was the other surface, and it was archived; /chat still shows a Project's home and a
+// shared thread without Logos 5 mounted (app/chat/page.tsx), so the page needs its own guard for those.
+ok('Logos 5 puts a lapsed member back on paper', /useThemeGuard\(one, planKnown\)/.test(read('components/LogosApp.tsx')));
+ok('  and so does /chat, for the pages it shows without Logos 5', /useThemeGuard\(/.test(read('app/chat/page.tsx')));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

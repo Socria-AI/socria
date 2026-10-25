@@ -8,8 +8,12 @@
 // and nothing else. core4-voice.test.mjs pins that on the engine — Simple
 // changes no move, no coverage, no question budget. This suite pins the wiring
 // around it: the tables the menu reads, that the menu is driven by the model
-// registry rather than by an id, that the page actually sends what it stores,
-// and that the route validates instead of trusting the browser.
+// registry rather than by an id, that Logos 5 actually sends the length it
+// stores, and that the routes validate instead of trusting the browser.
+//
+// Readability, the other dial, went with the Core chat when it was archived
+// on 24 October 2026: Logos 5 offers the length alone
+// (components/logos5/ConcisePicker.tsx).
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -94,20 +98,27 @@ console.log('\n=== the picker, as two dials ===');
     /how the answer is written — never how hard it is\s*\n?\s*thought about/.test(src));
 }
 
-console.log('\n=== the page stores it and sends it ===');
+console.log('\n=== Logos 5 stores the length and sends it ===');
 {
-  const src = read('app/chat/page.tsx');
+  const src = read('components/LogosApp.tsx');
+  const page = read('app/chat/page.tsx');
+  const send = src.slice(src.indexOf('async function send('), src.indexOf('// ── FOUND ALONG THE WAY'));
   // The keys moved into lib/socria-model-store.ts when onboarding started
   // setting them too: two copies of a storage key is how a preference set in
   // one place quietly fails to be read in another.
   const store = read('lib/socria-model-store.ts');
-  ok('both are persisted', /rememberReadability\(next\)/.test(src) && /rememberLength\(next\)/.test(src));
+  // Readability's persist, hydrate, send and picker were the Core chat page's — archived with it.
+  ok('the length is persisted', /const pickLength = \(next: ReplyLength\) => \{\s*setReplyLength\(next\);\s*rememberLength\(next\);/.test(src));
   ok('  through one definition of each key, not two',
     /READABILITY_KEY = 'socria\.readability\.v1'/.test(store) && /LENGTH_KEY = 'socria\.length\.v1'/.test(store)
-      && !/'socria\.readability\.v1'/.test(src));
-  ok('  and hydrated on mount', /setReadability\(readReadability\(\)\)/.test(src) && /setReplyLength\(readLength\(\)\)/.test(src));
-  ok('both are sent with the turn', /\n\s+readability,\n\s+length: replyLength,/.test(src));
-  ok('the picker is given both', /readability=\{readability\}/.test(src) && /length=\{replyLength\}/.test(src));
+      && [src, page].every((s) => !/'socria\.(readability|length)\.v1'/.test(s)));
+  ok('  and hydrated on mount', /useEffect\(\(\) => setReplyLength\(readLength\(\)\), \[\]\);/.test(src));
+  // Every Logos request carries guidance(); Logos 5 is the only screen, so the length always rides in it.
+  ok('the length is sent with every turn',
+    /\.\.\.\(l5Ref\.current \? \{ length: lengthRef\.current, surface: 'logos5' as const \} : \{\}\)/.test(src)
+      && /const l5 = true;\s*l5Ref\.current = l5;/.test(src)
+      && /fetch\('\/api\/logos\/chat'[\s\S]*?\.\.\.guidance\(\),/.test(send));
+  ok('the picker is given it', /<ConcisePicker value=\{replyLength\} onChange=\{pickLength\} \/>/.test(src));
 
   // A stored value is whatever was last in localStorage, including whatever a
   // previous version of the app or a hand-edit put there.
@@ -129,6 +140,16 @@ console.log('\n=== the route does not trust the browser ===');
   ok('length is checked against the allowed three',
     /\['concise', 'standard', 'detailed'\]\.includes\(String\(body\?\.length\)\)/.test(src));
   ok('and anything else becomes standard', (src.match(/: 'standard',/g) || []).length >= 2);
+
+  // Logos 5 sends the length to its own route, which reads it through one resolver.
+  const lchat = read('app/api/logos/chat/route.ts');
+  const behavior = read('lib/runtime/behavior.ts');
+  ok('Logos 5\'s route checks it too: resolved (anything else is standard), or against the allowed three',
+    /export const resolveLength = \(v: unknown\): ReplyLength => \(v === 'concise' \|\| v === 'detailed' \? v : 'standard'\);/.test(behavior)
+      && /export const lengthLine = \(v: unknown\): string => LENGTH_LINE\[resolveLength\(v\)\];/.test(behavior)
+      && /export const replyCeiling = \(v: unknown\): number => \(\{[^}]*\}\)\[resolveLength\(v\)\];/.test(behavior)
+      && /replyCeiling\(body\?\.length\)/.test(lchat) && /lengthLine\(body\?\.length\)/.test(lchat)
+      && /\(body\?\.length === 'concise' \|\| body\?\.length === 'standard' \|\| body\?\.length === 'detailed'\) \? \(body\.length as /.test(lchat));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

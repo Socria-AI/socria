@@ -4,7 +4,14 @@
 // `input === 'core-3' ? 'core-3' : 'core-2'`, so a Core added later did not
 // error — it answered as Core 2, on Core 2's prompt, skipping its own auth
 // requirement. Nothing about that looks wrong from the outside. The same
-// shape appeared in the chat route's auth gate and in lastCoreModel().
+// shape appeared in the chat route's auth gate and in lastCoreModel(), which
+// went with the Core chat.
+//
+// ARCHIVED AS A CHOICE, NOT AS AN ENGINE. Since 24 October 2026 Core 4 is not
+// offered: the Core chat screen and its model menu were archived
+// (docs/ARCHIVE.md) and Logos 5 is the one surface. But Logos 5 runs on Core
+// 4's allocator, and a shared Core thread still answers on Core 4
+// (app/api/chat), so everything here about how it answers still holds.
 
 import {
   SOCRIA_MODELS,
@@ -16,7 +23,7 @@ import {
   CORE_3_FALLBACK_MODEL,
   CORE_4_PROMPT_VERSION,
 } from './.tmp/socria-prompt.mjs';
-import { rememberModel, lastCoreModel, readStoredModel } from './.tmp/socria-model-store.mjs';
+import { MODEL_KEY, rememberModel, readStoredModel, withdrawnTo } from './.tmp/socria-model-store.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
@@ -208,13 +215,17 @@ console.log('\n=== it survives a round trip through storage ===');
     setItem: (k, v) => store.set(k, String(v)),
     removeItem: (k) => store.delete(k),
   };
+  // Withdrawn, so a browser still holding it is handed on when it reads it
+  // back. What must survive is that it is a real model there: written as
+  // itself, and never refused the way a `soon` teaser or junk is (null).
   rememberModel('core-4');
-  ok('it is a storable model', readStoredModel() === 'core-4', 'a `soon` model is refused here');
-  ok('and it is the last Core', lastCoreModel() === 'core-4', 'it used to be discarded, dropping you on Core 2');
-  rememberModel('logos');
-  ok('Logos does not become the last Core', lastCoreModel() === 'core-4');
-  rememberModel('core-3');
-  ok('switching Cores updates it', lastCoreModel() === 'core-3');
+  ok('it is a storable model, written as itself', store.get(MODEL_KEY) === 'core-4');
+  const back = readStoredModel();
+  ok('  and read back as a model, not refused', back !== null, 'a `soon` model is refused here');
+  ok('  handed to the offered Logos surface its conversations open in',
+    back !== null && back === withdrawnTo('core-4') && !!SOCRIA_MODELS[back].logosSurface && !SOCRIA_MODELS[back].withdrawn,
+    String(back));
+  // The last-Core checks went with lastCoreModel(): the Core chat was archived, so there is no way back to remember.
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

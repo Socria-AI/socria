@@ -139,8 +139,6 @@ async function mergeAccount(): Promise<void> {
 export function useFirstRun(opts: {
   signedIn: boolean;
   surface: 'core' | 'logos';
-  /** whether the new Socria is open for them (lib/new-socria.ts); absent, it is */
-  opened?: boolean;
 }) {
   const [state, setState] = useState<FirstRun>(EMPTY_FIRST_RUN);
   // False until the browser's record has been read — a decision made on the
@@ -198,14 +196,12 @@ export function useFirstRun(opts: {
 
   // THE NEW SOCRIA OPENED HERE (lib/first-run.ts usedBefore): the first time
   // on any device, which the account merge keeps as the earliest. Whatever
-  // the record or the history holds from before it was the old Socria's.
-  // Only once it has opened for them — behind its code (lib/new-socria.ts),
-  // what somebody did before entering it was the old Socria's too, and they
-  // are told what changed when it opens.
-  const opened = opts.opened !== false;
+  // the record or the history holds from before it was the old Socria's, and
+  // they are told what changed. It used to wait for the new Socria's access
+  // code; since 24 October 2026 it is open to everybody (docs/ARCHIVE.md).
   useEffect(() => {
-    if (ready && opened) reach('socria.opened');
-  }, [ready, reach, opened]);
+    if (ready) reach('socria.opened');
+  }, [ready, reach]);
 
   const hasReached = useCallback((m: Milestone) => has(state, m), [state]);
 

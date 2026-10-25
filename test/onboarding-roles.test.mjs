@@ -49,7 +49,8 @@ ok('onboarding asks it after the name, skippably', /beat === 'who'/.test(intro) 
 ok('the starting points follow the role’s order and wording', /role \? role\.order/.test(intro) && /role\?\.ways\[id\]/.test(intro));
 ok('the starting points are visible cards with icons, not a line of italics', /className=\{`ob-way/.test(intro) && /<ObIcon/.test(intro) && !/ob-intents/.test(intro));
 ok('both chat routes give Socria the line', /roleBlock\(body\?\.role\)/.test(read('app/api/chat/route.ts')) && /roleBlock\(body\?\.role\)/.test(read('app/api/logos/chat/route.ts')));
-ok('both surfaces send only the id', /role: readRole\(\) \?\? undefined/.test(read('app/chat/page.tsx')) && /\{ role: readRole\(\) \}/.test(read('components/LogosApp.tsx')));
+// The Core chat sent it with its own requests too; that went with the Core chat, and Logos 5 is the one surface.
+ok('Logos 5 sends only the id', /\{ role: readRole\(\) \}/.test(read('components/LogosApp.tsx')));
 ok('analytics hears the id, never words', /track\('onboarding_role_chosen', \{ kind: r\.id \}\)/.test(intro));
 ok('Manage Account can change or clear it', /<RolePicker \/>/.test(read('components/account/AccountSheet.tsx')) && /writeRole\(id\)/.test(read('components/account/RolePicker.tsx')));
 ok('a full onboarding replay asks it again', /'socria\.role\.v1'/.test(read('lib/first-run.ts')));

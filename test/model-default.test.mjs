@@ -5,25 +5,26 @@
 // is not. The product opened on its own weakest surface and waited to be
 // corrected.
 //
-// CORE 2 RETIRES ON 2 OCTOBER, so the last person landing there was the
-// signed-out visitor, and that has moved up rather than out: Core 3.1 is open
-// with no account, and an account now buys Logos, Core 4 and everything that
-// needs somewhere to keep a map. `canUseCore3` became `hasAccount` in the same
-// change, because a flag named after a permission it no longer grants is a
-// comment that lies.
+// CORE 2 RETIRED ON 2 OCTOBER, and the signed-out visitor who last landed
+// there moved up rather than out, to Core 3.1. The fix was to default by
+// entitlement: Core 3.1 for everybody, the Logos surface for a member.
 //
-// The fix is to default by entitlement, and the whole risk of defaulting by
-// entitlement is that it turns into OVERRIDING. So the suite is really about
-// one distinction: a model that is stored because the person picked it, and a
-// model that is stored because we did. Get that wrong and "open on your best
-// surface" becomes "ignore what you asked for", which is worse than the bug
-// it replaced.
+// ONE SURFACE SINCE 24 OCTOBER 2026. The Core chat was archived with every
+// model but Logos 5 (docs/ARCHIVE.md), so there is no entitlement left to
+// default by: everybody opens on Logos 5, and /chat chooses it on every
+// visit. `autoModel` still takes `hasAccount` and `isOne`; this suite asserts
+// that neither moves the answer.
+//
+// What the suite is still really about is one distinction: a model that is
+// stored because the person picked it, and a model that is stored because we
+// did — and beside it, that a withdrawn model stays a model, offered to nobody
+// and stranding nobody. Get the first wrong and a default becomes "ignore
+// what you asked for", which is worse than the bug it replaced.
 
 import {
   MODEL_KEY,
   autoModel,
   chooseModel,
-  lastCoreModel,
   modelWasChosen,
   offeredModels,
   readStoredModel,
@@ -56,24 +57,26 @@ function store() {
 const fresh = () => { globalThis.localStorage = store(); };
 fresh();
 
-console.log('=== the default, by entitlement ===');
+console.log('=== the default: Logos 5, for everybody ===');
 {
   const auto = (hasAccount, isOne) => autoModel({ hasAccount, isOne });
 
-  ok('a visitor with no account opens on Core 3.1', auto(false, false) === 'core-3');
-  ok('somebody signed in opens on Core 3.1 too', auto(true, false) === 'core-3');
-  // LOGOS 1 IS WITHDRAWN, so the member's default is its successor. The rule
-  // itself still names `logos`; `autoModel` sends it on. That indirection is
-  // the point — turning a model off is one line in the registry, and this
-  // assertion is what stops somebody "simplifying" it back into a hard pair.
-  ok('a member opens in the Logos surface that is offered', auto(true, true) === 'logos-2');
-  ok('...which is not the withdrawn one', auto(true, true) !== 'logos');
+  // It used to be Core 3.1 for a visitor or a free account, and the Logos
+  // surface on offer for a member. Every Core is archived now, so the answer
+  // is the one surface whoever asks — a visitor with no account meets it
+  // signed out rather than a different product.
+  ok('a visitor with no account opens on Logos 5', auto(false, false) === 'logos-3');
+  ok('somebody signed in opens on Logos 5 too', auto(true, false) === 'logos-3');
+  ok('and so does a member', auto(true, true) === 'logos-3');
+  ok('...which is the model the registry calls Logos 5, and offers',
+    MODELS['logos-3'].short === 'Logos 5' && offeredModels().includes('logos-3'));
+  ok('...which is not a withdrawn one', !MODELS[auto(true, true)].withdrawn);
   ok('nobody is landed on a model with a retirement date', auto(false, false) !== 'core-2' && auto(true, false) !== 'core-2');
 
-  // The one combination that should not exist, answered safely anyway: a plan
-  // claim from a browser with no account must not open a surface the API
-  // would bounce every message from.
-  ok('One with no account still opens on Core 3.1', auto(false, true) === 'core-3');
+  // The one combination that should not exist — a plan claim from a browser
+  // with no account — had to be kept off a surface the API would bounce every
+  // message from. With one surface it gets the answer everybody gets.
+  ok('One with no account opens on Logos 5 as well', auto(false, true) === 'logos-3');
 
   ok('it is pure — same answer twice', auto(true, true) === auto(true, true));
 }
@@ -86,13 +89,14 @@ console.log('\n=== ours versus theirs ===');
 
   // What WE write is a default: it survives, but it never claims to be a
   // decision, so the automatic rule keeps applying on the next visit.
-  rememberModel('core-3');
-  ok('a remembered model is stored', readStoredModel() === 'core-3');
+  rememberModel('logos-3');
+  ok('a remembered model is stored', readStoredModel() === 'logos-3');
   ok('...but is still not a choice', modelWasChosen() === false);
 
-  // What THEY write outranks it from then on.
+  // What THEY write outranks it from then on. Core 4 is withdrawn, so its
+  // write is asserted where it lands, as written; the read hands it on.
   chooseModel('core-4');
-  ok('a chosen model is stored', readStoredModel() === 'core-4');
+  ok('a chosen model is stored', localStorage.getItem(MODEL_KEY) === 'core-4');
   ok('...and is marked as chosen', modelWasChosen() === true);
 
   // And the flag is sticky: a later default write must not quietly clear it,
@@ -105,86 +109,55 @@ console.log('\n=== ours versus theirs ===');
   // model returns.
   ok('...and what was written is what is stored',
     localStorage.getItem(MODEL_KEY) === 'logos');
-  // Logos 1 is offered (under Other models), so it reads back as itself.
+  // Nothing is kept under Other models since the archive, so Logos 1 reads
+  // back as its successor.
   ok('...while reading it back gives the surface that is offered',
-    readStoredModel() === 'logos');
+    readStoredModel() === withdrawnTo('logos') && offeredModels().includes(readStoredModel()),
+    String(readStoredModel()));
 }
 
 console.log('\n=== what the rule does to each kind of person ===');
 {
-  // The whole policy, composed the way the page composes it: honour a choice,
-  // otherwise resolve by entitlement.
+  // The whole policy, composed the way the Core chat composed it: honour a
+  // choice, otherwise the automatic default. /chat no longer composes it — it
+  // chooses Logos 5 on every visit — but the store has to give that same
+  // answer whoever comes and whatever they last picked.
   const opens = ({ hasAccount, isOne }) =>
     modelWasChosen() ? readStoredModel() : autoModel({ hasAccount, isOne });
 
   fresh();
-  ok('a first-time visitor: Core 3.1', opens({ hasAccount: false, isOne: false }) === 'core-3');
+  ok('a first-time visitor: Logos 5', opens({ hasAccount: false, isOne: false }) === 'logos-3');
 
   fresh();
-  ok('signing in: Core 3.1', opens({ hasAccount: true, isOne: false }) === 'core-3');
+  ok('signing in: Logos 5', opens({ hasAccount: true, isOne: false }) === 'logos-3');
 
   fresh();
-  ok('subscribing: Logos', opens({ hasAccount: true, isOne: true }) === 'logos-2');
+  ok('subscribing: Logos 5', opens({ hasAccount: true, isOne: true }) === 'logos-3');
 
-  // THE ONE THAT MATTERS. A member who deliberately went back to Core must
-  // stay there — being returned to Logos on every visit is the product
-  // arguing with somebody about their own preference.
+  // A member who deliberately went back to Core used to stay there. Every Core
+  // is archived, so the choice is honoured the only way left: it opens where
+  // their Core conversations went.
   fresh();
   chooseModel('core-3');
-  ok('a member who chose Core stays on Core',
-    opens({ hasAccount: true, isOne: true }) === 'core-3');
-  ok('...and again the visit after', opens({ hasAccount: true, isOne: true }) === 'core-3');
+  ok('a member who chose Core opens where their Core conversations went',
+    opens({ hasAccount: true, isOne: true }) === 'logos-3');
+  ok('...and again the visit after', opens({ hasAccount: true, isOne: true }) === 'logos-3');
 
-  // The reverse, which is why the default is written without the flag: a
-  // lapsed member has never chosen anything, so they are moved off Logos
-  // rather than left on a surface they are out of chats for.
-  fresh();
-  rememberModel('logos');
-  ok('a lapsed member is moved back to Core 3.1',
-    opens({ hasAccount: true, isOne: false }) === 'core-3');
+  // The lapsed member moved back to Core 3.1 went with the Core chat: there is no Core to move them to.
 
   // Somebody who chose Logos on the free tier keeps it — Logos is theirs,
-  // two lines of thinking a month, and a lapse is not a reason to take the
-  // surface away.
+  // and a lapse is not a reason to take the surface away. Logos 1 is no longer
+  // kept under "Other models": chosen, it reads back as the surface offered.
   fresh();
   chooseModel('logos');
-  // Logos 1 is kept under "Other models": chosen, it is what they get.
+  const kept = opens({ hasAccount: true, isOne: false });
   ok('a free person who chose Logos keeps a Logos surface',
-    opens({ hasAccount: true, isOne: false }) === 'logos');
+    kept !== null && !!MODELS[kept].logosSurface && !MODELS[kept].withdrawn, String(kept));
 
-  // Signing out is the exception the page enforces separately, because the
-  // API would bounce every message. Asserted here as the rule it is.
-  // Signing out no longer costs anybody Core 3.1 — it is open — so the
-  // clamp is about the surfaces an account carries.
-  fresh();
-  chooseModel('logos');
-  const signedOut = opens({ hasAccount: false, isOne: false });
-  ok('a choice they can no longer use is still their choice, until clamped',
-    signedOut === 'logos');
-  ok('...and the clamp answers Core 3.1', autoModel({ hasAccount: false, isOne: false }) === 'core-3');
+  // The clamp that sent a signed-out Logos choice to Core 3.1 went with the Core chat too.
 }
 
-console.log('\n=== the way back out of Logos ===');
-{
-  // Unchanged behaviour, asserted because the new write path runs through the
-  // same function: leaving Logos must not demote somebody who was on Core 3.1
-  // before they opened it.
-  fresh();
-  ok('with nothing stored, the way back is Core 3.1', lastCoreModel() === 'core-3');
-
-  chooseModel('core-3');
-  chooseModel('logos');
-  ok('Logos is not remembered as the Core model', lastCoreModel() === 'core-3');
-
-  fresh();
-  rememberModel('core-4');
-  rememberModel('logos');
-  ok('and a default write behaves the same way', lastCoreModel() === 'core-4');
-  // Core 2 still stores and still returns: it answers until 2 October, and a
-  // retirement that took somebody out of a conversation early would be the
-  // one thing worse than the retirement.
-  ok('a model with a date on it is still a model', readStoredModel() === 'logos');
-}
+// The way back out of Logos (lastCoreModel) went with the Core chat, archived on 24 October 2026.
 
 console.log('\n=== nothing here throws in a browser that refuses storage ===');
 {
@@ -198,12 +171,13 @@ console.log('\n=== nothing here throws in a browser that refuses storage ===');
   };
   ok('reading survives', readStoredModel() === null);
   ok('the chosen flag survives', modelWasChosen() === false);
-  ok('the way back survives', lastCoreModel() === 'core-3');
+  // The way back out of Logos was checked here; it went with the Core chat.
   let threw = false;
   try { rememberModel('core-3'); chooseModel('logos'); } catch { threw = true; }
   ok('and writing survives', threw === false);
-  // The rule itself never touches storage, so it still answers.
-  ok('the default is still decided', autoModel({ hasAccount: true, isOne: true }) === 'logos-2');
+  // The rule reads no stored model — only the open gates, behind a guard —
+  // so it still answers.
+  ok('the default is still decided', autoModel({ hasAccount: true, isOne: true }) === 'logos-3');
 }
 
 console.log('\n=== junk in storage is not a model ===');
@@ -216,20 +190,15 @@ console.log('\n=== junk in storage is not a model ===');
     localStorage.setItem(MODEL_KEY, junk);
     ok(`"${junk}" is not a stored model`, readStoredModel() === null);
   }
-  localStorage.setItem(MODEL_KEY, 'logos');
-  ok('a real one still reads', readStoredModel() === 'logos');
-  // Logos 2 is real and selectable — it must store like any other.
+  localStorage.setItem(MODEL_KEY, 'logos-3');
+  ok('a real one still reads', readStoredModel() === 'logos-3');
+  // Logos 2 is real but archived — it must not read as junk, only be handed on.
   localStorage.setItem(MODEL_KEY, 'logos-2');
-  ok('Logos 2 is a stored model', readStoredModel() === 'logos-2');
+  ok('Logos 2 is a stored model, read as the surface offered',
+    readStoredModel() !== null && readStoredModel() === withdrawnTo('logos-2'), String(readStoredModel()));
 }
 
-console.log('\n=== leaving a logos surface returns to a Core model ===');
-{
-  fresh();
-  rememberModel('core-3');
-  rememberModel('logos');   // a logos surface must not become "last core"
-  ok('nor does plain Logos', lastCoreModel() === 'core-3');
-}
+// Leaving a Logos surface for the last Core model went with the Core chat: there is no Core chat to return to.
 
 console.log('\n=== the retirement is data, and it has happened ===');
 {
@@ -238,29 +207,30 @@ console.log('\n=== the retirement is data, and it has happened ===');
   // it, offered to nobody, and nobody whose browser holds it is stranded.
   const docs = readFile('app/docs/content/core-2.tsx');
   ok('Core 2 is withdrawn, with the reason beside the switch', typeof MODELS['core-2'].withdrawn === 'string' && /2 October/.test(MODELS['core-2'].withdrawn));
-  // …but kept, by name only, under "Other models" for whoever wants it.
-  ok('  and kept only under Other models', OTHER_MODELS.includes('core-2') && offeredModels().includes('core-2'));
-  ok('  which the picker lists apart from the current models', /OTHER_MODELS\.includes\(id\)/.test(readFile('components/ModelPicker.tsx')) && /Other models/.test(readFile('components/ModelPicker.tsx')));
+  // It was kept by name under "Other models" until the archive; nothing is kept there now.
+  ok('  and not kept under Other models either', !OTHER_MODELS.includes('core-2') && !offeredModels().includes('core-2'));
+  ok('  which the picker would still list apart from the current models', /OTHER_MODELS\.includes\(id\)/.test(readFile('components/ModelPicker.tsx')) && /Other models/.test(readFile('components/ModelPicker.tsx')));
   ok('nothing is leaving any more', Object.values(MODELS).filter((m) => m.leaving).length === 0);
   ok('the model’s own page says it retired', /retired on 2 October/.test(docs));
   ok('  and where the free tier went', /Core 3\.1/.test(docs));
 
-  // The other half of the same change: Core 3.1 is what a signed-out visitor
-  // now opens on, so it cannot require an account.
+  // The other half of the same change: Core 3.1 became what a signed-out
+  // visitor opened on, so it could not require an account. Archived, it
+  // still needs none — app/api/chat, which still answers a Core
+  // conversation, reads that flag.
   ok('Core 3.1 needs no account', MODELS['core-3'].requiresAuth === false);
   ok('Core 2 still answers a conversation that was on it', MODELS['core-2'].requiresAuth === false && !MODELS['core-2'].soon);
   ok('the surfaces that keep something still need one',
     MODELS['logos'].requiresAuth && MODELS['core-4'].requiresAuth);
-  ok('the menu no longer offers Core 2 as the way in, signed out',
-    /Core 3\.1 stays open, signed out/.test(readFile('components/ModelPicker.tsx')));
+  // The menu's "Core 3.1 stays open, signed out" went with the Core chat: Core 3.1 is archived, so it is no way in.
 }
 
 console.log('\n=== a withdrawn model: still there, not offered, not stranding anybody ===');
 {
-  // TEMPORARY, AND THE TESTS SAY SO. Logos 1 is held back while Logos 2 is
-  // the surface being worked on. What is asserted here is the MECHANISM, not
-  // the fact that this particular model is off — so the day the line comes out
-  // of the registry, these tests keep passing and nothing has to be unpicked.
+  // Since 24 October 2026 every model but Logos 5 is withdrawn, archived with
+  // the Core chat (docs/ARCHIVE.md). What is asserted here is the MECHANISM,
+  // not which models are off — so the day a line comes out of the registry,
+  // these tests keep passing and nothing has to be unpicked.
 
   const held = Object.keys(MODELS).filter((id) => MODELS[id].withdrawn);
   ok('a withdrawn model says why, in a sentence',
@@ -289,14 +259,18 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
     routes.every((f) => !/withdrawn/.test(readFile(f))));
 
   // The successor is found by SHAPE. A withdrawn Logos surface hands over to a
-  // Logos surface; a withdrawn Core would hand over to a Core. Asserted as the
-  // rule rather than as the pair, because the pair is what goes stale.
+  // Logos surface; a withdrawn Core hands over to a Core while one is offered,
+  // and — with every Core archived — to the Logos surface, where its
+  // conversations now open. Asserted as the rule rather than as the pair,
+  // because the pair is what goes stale.
+  const isLogos = (id) => !!MODELS[id].logosSurface;
   for (const id of held) {
     const to = withdrawnTo(id);
     ok(`${id} has a successor`, to !== null);
     if (to) {
-      ok(`  ${to} is the same kind of surface`,
-        !!MODELS[to].logosSurface === !!MODELS[id].logosSurface);
+      const ownKindOffered = offeredModels().some((o) => o !== id && isLogos(o) === isLogos(id));
+      ok(ownKindOffered ? `  ${to} is the same kind of surface` : `  ${to} is the Logos surface, with none of its own kind offered`,
+        ownKindOffered ? isLogos(to) === isLogos(id) : isLogos(to));
       ok('  and it is one that is actually offered',
         !MODELS[to].withdrawn && !MODELS[to].soon);
     }
@@ -312,47 +286,51 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
   for (const id of held) {
     fresh();
     chooseModel(id);
+    const back = readStoredModel();
     ok(`a stored ${id} reads back as something offered`,
-      OTHER_MODELS.includes(id) ? readStoredModel() === id : !MODELS[readStoredModel()].withdrawn);
+      OTHER_MODELS.includes(id) ? back === id : back !== null && !MODELS[back].withdrawn, String(back));
     ok('  ...and the raw choice is kept, so restoring the model restores them',
       localStorage.getItem(MODEL_KEY) === id);
-    rememberModel(id);
-    ok('  ...and it never becomes the way back out of Logos',
-      !MODELS[lastCoreModel()].withdrawn);
+    // (Checked here too: that it never became the way back out of Logos — lastCoreModel, gone with the Core chat.)
   }
 
-  // EVERY MENU HAS TO AGREE. There are two: the Core picker beside the
+  // EVERY MENU HAS TO AGREE. There were two: the Core picker beside the
   // composer, and Logos's own inside its composer. Logos's used to iterate
   // `Object.keys(SOCRIA_MODELS)` with no filter, so the model that had just
   // been held back was still one click away on the surface replacing it.
-  // The rule is `offeredModels` and it is in the store; these assert that
-  // neither menu builds its own list again.
+  // Since the archive no surface mounts a model menu — there is one model —
+  // but the picker is still a component, the rule is still `offeredModels`
+  // in the store, and these assert that nothing builds its own list again.
   const picker = readFile('components/ModelPicker.tsx');
   const chat = readFile('app/chat/page.tsx');
   const logos = readFile('components/LogosApp.tsx');
   const rollsOwn = (src) => /Object\.keys\(SOCRIA_MODELS\)/.test(src);
 
-  ok('the Core picker takes its list from the store', /offeredModels\(gates\)/.test(picker));
+  ok('the picker takes its list from the store', /offeredModels\(gates\)/.test(picker));
   ok('  and does not build one of its own', !rollsOwn(picker));
-  ok('the Logos picker is the same picker, so it shows the same list', /<ModelPicker\s+value=\{model\}/.test(logos) && !/lg-model-btn/.test(logos));
-  ok('  and does not build one of its own', !rollsOwn(logos));
+  // "The Logos picker is the same picker" went with it: Logos 5 mounts no model menu since the archive.
+  ok('Logos does not build a menu of its own', !rollsOwn(logos) && !/lg-model-btn/.test(logos));
   ok('offeredModels leaves out everything withdrawn, except what is kept under Other models',
     offeredModels().every((id) => (!MODELS[id].withdrawn || OTHER_MODELS.includes(id)) && !MODELS[id].soon));
   ok('  and leaves in everything else',
     offeredModels().length === Object.keys(MODELS).filter(
       (id) => (!MODELS[id].withdrawn || OTHER_MODELS.includes(id)) && !MODELS[id].soon).length);
 
-  ok('the chat page refuses to select one', /withdrawn/.test(chat));
-  ok('  and sends a ?model= link for one to the successor',
-    /withdrawnTo/.test(chat));
+  // /chat selects by name now, on every visit, so it refuses a withdrawn
+  // model by naming only the one that is offered.
+  const selected = [...chat.matchAll(/chooseModel\(([^)]*)\)/g)].map((m) => m[1].trim());
+  ok('the chat page refuses to select one: it selects Logos 5 alone, and that is offered',
+    selected.length > 0 && selected.every((a) => a === "'logos-3'") && offeredModels().includes('logos-3'),
+    selected.join(','));
+  ok('  and drops a ?model= link for one, landing on Logos 5 — every withdrawn model’s successor',
+    /searchParams\.delete\('model'\)/.test(chat) && held.every((id) => withdrawnTo(id) === 'logos-3'));
 
-  // The other half of the same bug: Logos assumed WHICH Logos it was. With
-  // two surfaces and one withdrawn, an assumed id means the composer names
-  // the wrong model and ticks the wrong row.
+  // The other half of the same bug: Logos assumed WHICH Logos it was. An
+  // assumed id means the surface reads the wrong model's switches — its
+  // depth, the room and the workspace all come from SOCRIA_MODELS[model].
   ok('the Logos surface is told which one it is', /model = 'logos',/.test(logos));
-  ok('  and /chat tells it', /model=\{model\}/.test(chat));
-  ok('  so "the one you are on" is not a hard-coded id',
-    /if \(next === model\) return;/.test(logos));
+  ok('  and /chat tells it: Logos 5', /<LogosApp\b[\s\S]*?\smodel="logos-3"/.test(chat));
+  // "The one you are on" (pickModel's `next === model`) went with Logos's model menu.
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

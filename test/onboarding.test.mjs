@@ -2,8 +2,9 @@
 //
 // The Logos-only three-beat sequence (lib/onboarding.ts, components/FirstMap.tsx)
 // is gone: onboarding is the premise, the name, what they mostly think about,
-// how they like to think (which sets Core 4 or Logos 2), and the first thought —
-// components/onboarding/FirstRunIntro.tsx, the same everywhere.
+// and the first thought — components/onboarding/FirstRunIntro.tsx, the same
+// everywhere — and it lands in Logos 5. The beat that asked how they like to
+// think (which set Core 4 or Logos) was archived with the Core chat.
 
 import { FIRST_RUN_KEYS, forgetFirstRunLocal, readFirstRun, REPLAYS, withoutMilestones, MILESTONES } from './.tmp/first-run.mjs';
 import { NAME_KEY, sanitizeName, readName, writeName, nameBlock } from './.tmp/onboarding-name.mjs';
@@ -25,30 +26,21 @@ console.log('=== one onboarding, no Logos-only sequence ===');
   ok('the first map still arrives once, with nothing to press', /setEmerging\(true\)/.test(app) && /firstRun\.has\('logos\.model'\)/.test(app));
   ok('the notes found along the way no longer wait for a sequence that never runs', !/fmDone|fmRunning/.test(app));
   const intro = read('components/onboarding/FirstRunIntro.tsx');
-  ok('the beats, in order: premise, name, who, how, thought', /const order: Beat\[\] = \['premise', 'name', 'who', 'how', 'thought'\]/.test(intro));
+  ok('the beats, in order: premise, name, who, thought', /const order: Beat\[\] = \['premise', 'name', 'who', 'thought'\]/.test(intro));
   ok('anything already answered on this browser is not asked again', /known\.current\.name\) continue/.test(intro) && /known\.current\.role\) continue/.test(intro));
   ok('one question everywhere — no Logos wording', !/What are you trying to understand\?/.test(intro));
-  ok('how they like to think is the choice of model: Core 4 or Logos 2', /model: 'core-4', title: 'Talk it through'/.test(intro) && /model: 'logos-2', title: 'See it laid out'/.test(intro));
-  ok('  asked only where no surface is chosen yet', /askModel = false/.test(intro) && /if \(b === 'how' && !askModel\) continue/.test(intro));
-  ok('  and says which model it is, and that it can change', /Socria Core 4/.test(intro) && /switch any time from the model menu/.test(intro));
-  ok('where Logos 3 is offered, seeing it laid out is Logos 3', /model: 'logos-3', title: 'See it laid out'/.test(intro) && /Socria Logos 3/.test(intro) && /const HOW = logos3 \? HOW_3 : HOW_2/.test(intro));
-  ok('  decided by the one rule every menu uses, read after mount', /setLogos3\(isOffered\('logos-3'\)\)/.test(intro) && /import \{ isOffered \} from '@\/lib\/socria-model-store'/.test(intro));
-  ok('  and it says what Logos 3 adds: built models, and someone else', /models you can move, alone or with someone/.test(intro));
-  ok('  the Logos door suggests whichever Logos is offered', /isLogos\(suggest\) && isLogos\(h\.model\)/.test(intro));
+  // The "how do you like to think" beat (the choice of Core 4 or Logos, and which Logos) was archived with the Core chat.
   const ob = read('components/onboarding/Onboarding.tsx');
-  ok('/onboarding asks it of anyone who can open both', /askModel=\{isSignedIn !== false\}/.test(ob));
-  ok('  and lands them on what they chose', /router\.push\(model \? `\/chat\?model=\$\{model\}` : '\/chat'\)/.test(ob) && /chooseModel\(model\)/.test(ob));
-  ok('  with the sentence in that surface\'s composer', /surface: model === 'logos-2' \|\| model === 'logos-3' \? 'logos' : 'core'/.test(ob));
-  ok('  and the Logos they chose carried with it', /\.\.\.\(model === 'logos-3' \? \{ model \} : \{\}\)/.test(ob));
-  const chatPage = read('app/chat/page.tsx');
-  ok('  which the chat opens, while it is still offered — else Logos 2', /carried\.model === 'logos-3' && isOffered\('logos-3'\) \? 'logos-3' : 'logos-2'/.test(chatPage));
+  ok('/onboarding lands them on Logos 5, at /chat', /const go = useCallback\(\(\) => router\.push\('\/chat'\), \[router\]\);/.test(ob));
+  ok('  with the sentence for its composer', /text,\s*intent,\s*surface: 'logos',/.test(ob));
+  // The model they chose, carried to the chat and opened there, was archived with the choice: /chat opens Logos 5 alone.
   ok('the account\'s first name starts the name field', /defaultName=\{user\?\.firstName \?\? null\}/.test(ob));
   const guide = read('components/LogosGuide.tsx');
-  ok('the "?" guide has a Logos 3 walk, and Logos 3 opens it', /edition === 3 \? STEPS_3 : STEPS/.test(guide) && /<LogosGuide open=\{guideOpen\} onClose=\{closeGuide\} edition=\{workspaceOn \? 3 : 2\} name=\{logosName\(newSocria\)\} \/>/.test(read('components/LogosApp.tsx')));
+  ok('the "?" guide has a Logos 3 walk, and Logos 5 opens it', /edition === 3 \? STEPS_3 : STEPS/.test(guide) && /<LogosGuide open=\{guideOpen\} onClose=\{closeGuide\} edition=\{3\} name="Logos 5" \/>/.test(read('components/LogosApp.tsx')));
   ok('  saying what Logos 3 adds, each shown in miniature', ['Describe it, and it’s built.', 'The chat works everything.', 'Open what you need beside it.', 'Think it through with someone.'].every((t) => guide.includes(`title: '${t}'`)) && /demo: Built/.test(guide) && /demo: OneBox/.test(guide) && /demo: Views/.test(guide) && /demo: Together/.test(guide));
   ok('  sharing Logos 2\'s steps as the same objects', /const at = \(title: string\) => STEPS\.find/.test(guide) && (guide.match(/\bat\('/g) || []).length >= 5);
   ok('  and honest that Live 3D is a preview', /a geometric preview with exact sizes and masses, not a physical simulation/.test(guide));
-  ok('Logos 3\'s first screen says what it builds', /a model you can move, a matrix you\s+can work, a shape in Live 3D/.test(read('components/LogosApp.tsx')));
+  // Logos 3's own first screen (its conversation outside Logos 5) was archived with the Logos 4 layout.
   ok('the starting points are large cards with icons and a line each', /className=\{`ob-way/.test(intro) && /ob-way-d/.test(intro) && /<ObIcon/.test(intro));
 }
 
@@ -89,7 +81,7 @@ console.log('\n=== replaying onboarding, for testing ===');
   ok('replaying the notes takes back found.* and the hints seen', Object.keys(withoutMilestones(rec, REPLAYS.found.milestones).at).every((m) => !m.startsWith('found.')) && REPLAYS.found.keys.includes('socria.hints.seen.v1'));
   const ob = read('components/onboarding/Onboarding.tsx');
   ok('/onboarding?replay=1 resets, then loads clean — never on production', /params\?\.get\('replay'\) === '1' && !isProduction\(\)/.test(ob) && /window\.location\.replace/.test(ob));
-  ok('the Logos page\'s door leans toward seeing it laid out', /suggest=\{toLogos \? 'logos-3' : null\}/.test(ob));
+  // The Logos page's door leaning toward "see it laid out" went with the "how" beat it pre-selected.
   const sheet = read('components/account/AccountSheet.tsx');
   const tools = read('components/account/TestingTools.tsx');
   ok('Manage Account has a Testing section', /<TestingTools onClose=\{onClose\} \/>/.test(sheet) && /<span className="lbl">Testing<\/span>/.test(tools));
@@ -103,8 +95,9 @@ console.log('=== the first thought goes straight through ===');
   const ob = read('components/onboarding/Onboarding.tsx');
   ok('onboarding carries its sentence with send', /send: true/.test(ob));
   const chat = read('app/chat/page.tsx');
-  ok('the chat reads it and sends it to Core once hydrated', /if \(carried\.send\)/.test(chat) && /autoSend\.logos \|\| hydrating \|\| sending/.test(chat) && /void send\(text\)/.test(chat));
-  ok('  and hands Logos its own', /autoSend=\{!!autoSend\?\.logos\}/.test(chat) && /tourAfter=\{tourAfter\}/.test(chat));
+  // Core's own send of it, once the Core chat had hydrated, was archived with the Core chat: Logos 5 sends it (below).
+  ok('the chat reads it and hands it to Logos 5 to send', /setCarriedText\(carried\.text\)/.test(chat) && /if \(carried\.send\) \{\s*setAutoSend\(true\);\s*setTourAfter\(true\);/.test(chat) && /initialInput=\{carriedText\}/.test(chat));
+  ok('  with the send, and the tour after it', /autoSend=\{autoSend\}/.test(chat) && /tourAfter=\{tourAfter\}/.test(chat));
   const app = read('components/LogosApp.tsx');
   ok('Logos sends it once there is a session', /if \(!autoSend \|\| autoSentRef\.current \|\| !initialInput \|\| hydrating \|\| busy \|\| !activeId\) return;/.test(app));
   ok('  marked as the first thought, only for that send', /firstThoughtRef\.current = true;/.test(app) && /firstThoughtRef\.current = false;/.test(app) && /firstThoughtRef\.current \? \{ firstThought: true \}/.test(app));

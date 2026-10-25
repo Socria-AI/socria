@@ -2,9 +2,11 @@
 //
 // The rule that decides when a popup may open by itself is pure
 // (lib/rewards/popup-rule.ts) and pinned here first; then the places it meets
-// the product: both rails carry the marks, each surface mounts the popups
-// once, a popup never opens into a room something else is speaking in, and
-// what they say about stacking is what the engine does (rewards.test.mjs).
+// the product: the rail carries the marks, the page mounts the popups once, a
+// popup never opens into a room something else is speaking in, and what they
+// say about stacking is what the engine does (rewards.test.mjs). There is one
+// rail and one surface — Logos 5's — since the Core chat, its rail and its
+// way into Logos were archived on 24 October 2026.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -114,13 +116,12 @@ console.log('=== the memory: tolerant, and only what it is for ===');
   ok('the history keeps a fortnight', remember(remember(empty(), 'give', 'shown', T0), 'give', 'shown', T0 + 20 * DAY).history.length === 1);
 }
 
-console.log('=== the marks: both rails, beside the Socria mark ===');
+console.log('=== the marks: the rail, beside the Socria mark ===');
 {
-  const page = read('app/chat/page.tsx');
   const rail = read('components/LogosRail.tsx');
   const app = read('components/LogosApp.tsx');
-  ok('Core rail: the marks right after the Socria mark', /<div className="s-top">\s*<Logo \/>\s*\{\/\*[^*]*\*\/\}\s*<RewardsBadges enabled=\{!!isSignedIn\} \/>/.test(page));
-  ok('Logos rail: the same', /<div className="s-top">\s*<Logo \/>\s*<RewardsBadges enabled=\{rewards\} \/>/.test(rail));
+  // The Core rail's marks were archived with it.
+  ok('Logos rail: the marks right after the Socria mark', /<div className="s-top">\s*<Logo \/>\s*<RewardsBadges enabled=\{rewards\} \/>/.test(rail));
   ok('…for a signed-in person only', /rewards = false,/.test(rail) && /<LogosRail\s+sessions=\{sessions\}\s+rewards=\{cloud\}/.test(app));
   const badges = read('components/rewards/RewardsBadges.tsx');
   ok('the gift while there is a link to give', /const showGive = !!view\.link;/.test(badges));
@@ -137,11 +138,15 @@ console.log('=== the popups: once per surface, into a quiet room ===');
 {
   const page = read('app/chat/page.tsx');
   const mounts = page.match(/<RewardsPopups /g) || [];
-  ok('mounted twice in the page — once in each branch, so once on screen', mounts.length === 2);
-  ok('…Core with the way into Logos, Logos without', /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="core" onOpenLogos=\{openNewestLogos\} \/>/.test(page) && /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="logos" \/>/.test(page));
-  ok('quiet waits for everything to be known, and for nothing else to be open', /const rewardsQuiet =\s*isLoaded && !hydrating && planState\.known && !spokeThisVisit && !anythingOpen && !findOpen;/.test(page));
-  ok('once the One invitation, the tour or onboarding has spoken, the popups wait for another visit', /if \(onePrompt \|\| tourOpen \|\| tourAfter \|\| autoSend\) setSpokeThisVisit\(true\);/.test(page));
-  ok('the challenge opens the newest Logos on offer', /if \(isOffered\('logos-3'\)\) \{\s*setModel\('logos-3'\);\s*chooseModel\('logos-3'\);/.test(page));
+  // The Core surface's mount, with the challenge's way into the newest Logos (openNewestLogos), was archived with the Core chat.
+  ok('mounted once in the page, beside Logos 5 — so once on screen', mounts.length === 1);
+  ok('…as Logos, with no way into Logos to offer', /<RewardsPopups enabled=\{!!isSignedIn\} quiet=\{rewardsQuiet\} surface="logos" \/>/.test(page));
+  // The page's own sheets are its to see; Logos 5's sheets and tour the popup sees itself (screenTaken, below).
+  ok('quiet waits for everything to be known, and for nothing else to be open', /const rewardsQuiet =\s*isLoaded && !hydrating && planState\.known && !autoSend && !tourAfter && !shareFor && !sheet && !joinOpen;/.test(page));
+  // The Core chat's own One invitation and tour, which silenced them for the visit too, went with it.
+  ok('once onboarding has spoken — its sentence sent, the tour to follow — the popups wait for another visit',
+    /!autoSend && !tourAfter/.test(page) && /autoSend=\{autoSend\}/.test(page) && /tourAfter=\{tourAfter\}/.test(page)
+      && !/setAutoSend\(false\)|setTourAfter\(false\)/.test(page));
   const pop = read('components/rewards/RewardsPopups.tsx');
   ok('by itself only through the rule, the arrival counted first', /const memory = countOpen\(readPopupMemory\(readFlag\(POPUP_MEMORY_KEY\)\)\);/.test(pop) && /const kind = pickPopup\(factsOf\(view\), memory, now\);/.test(pop));
   ok('…and the count kept whether or not anything opened', /writeFlag\(POPUP_MEMORY_KEY, writePopupMemory\(kind \? remember\(memory, kind, 'shown', now\) : memory\)\);/.test(pop));

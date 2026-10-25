@@ -1,24 +1,27 @@
-// The new Socria, behind its code (lib/new-socria.ts).
+// The new Socria, and the code it shipped behind (lib/new-socria.ts).
 //
 // "Push to main but add a code to access the new socria." Logos 5 — the
 // Universal Map as home, the map as the screen, the Core chats brought into
-// it, "We killed the chatbot." — ships to production for whoever enters its
-// code under Manage Account; everybody else keeps the Logos they had, in its
-// Logos 4 layout. (The code is handed out, and this repository is public:
+// it, "We killed the chatbot." — shipped to production for whoever entered
+// its code under Manage Account; everybody else kept the Logos they had, in
+// its Logos 4 layout. On 24 October 2026 that layout was archived with the
+// Core chat (docs/ARCHIVE.md): Logos 5 is everybody's, and the code no longer
+// chooses the screen. (The code is handed out, and this repository is public:
 // the server keeps only its fingerprint, and nothing here writes it.) Held
 // here:
 //
-//   - what opens it: the code's gate in this browser, on a deployment that
-//     offers Logos 5 at all, and nothing else;
-//   - everything that switches the new Socria on reads that, not the
-//     deployment's switch alone: the screen, opening on the map, a first
-//     message put in the map's box, the Core chats moved in, the welcome on
-//     both surfaces and the moment the record says it opened;
-//   - the surface is called what it opens: Logos 5 with the code, Logos 4
-//     without;
-//   - and nothing is moved or hidden for somebody it has not opened for.
+//   - what opens its gate: the code entered in this browser, on a deployment
+//     that offers Logos 5 at all, and nothing else;
+//   - what the gate names: Logos 5 with the code, Logos 4 without, wherever a
+//     name is still read from it — and the guide on the one screen says
+//     Logos 5;
+//   - what it used to switch on is the new screen's, for everybody, and the
+//     deployment's switch is still not read for it: opening on the map, a
+//     first message put in the map's box, the Core chats moved in, the
+//     welcome, and the record saying it opened once the record has been read;
+//   - and where the code is still entered, and how it is remembered.
 // The code itself, and that it never reaches the browser:
-// test/feature-gates.test.mjs.
+// test/feature-gates.test.mjs. A guest's Logos 5: test/guest.test.mjs.
 
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
@@ -57,31 +60,26 @@ ok('Logos 4 without it', logosName(false) === 'Logos 4');
 {
   const picker = read('components/ModelPicker.tsx');
   ok('the model menu names the current Logos by it — its row, its button and its sign-in line', /id === 'logos-3' \? logosName\(newSocria\)/.test(picker) && /<span className="nm">\{short\(id\)\}<\/span>/.test(picker) && /setNeeds\(short\(id\)\)/.test(picker));
-  const page = read('app/chat/page.tsx');
-  ok('so do the pill and the cover on Core', /<TryLogosPill[\s\S]*?name=\{logosName\(newSocria\)\}/.test(page) && /<LogosCover\s+as="modal"[\s\S]*?name=\{logosName\(newSocria\)\}/.test(page));
+  // The "Try Logos" pill and the Logos cover on Core were archived with the Core chat (docs/ARCHIVE.md).
   const app = read('components/LogosApp.tsx');
-  ok('  and the gate and the guide on Logos', /<LogosCover as="gate"[^>]*name=\{logosName\(newSocria\)\}/.test(app) && /<LogosGuide [^>]*name=\{logosName\(newSocria\)\}/.test(app));
+  // Logos's own gate, the cover naming the Logos behind it, was archived too: a guest gets Logos 5 (test/guest.test.mjs).
+  ok('the guide on Logos names the one Logos there is', /<LogosGuide [^>]*name="Logos 5"/.test(app));
   ok('a start offered to somebody new names no version it may not open', /'logos-3': 'See it laid out \(Logos\)'/.test(read('lib/onboarding-intents.ts')));
 }
 
-console.log('\n=== everything that switches it on reads the gate ===');
+console.log('\n=== what it switched on is the new screen\'s, for everybody ===');
 {
   const app = read('components/LogosApp.tsx');
-  ok('the screen: Logos 5 only where the gate is open', /const newSocria = useNewSocria\(true\);/.test(app) && /const l5 = workspaceOn && newSocria;/.test(app));
-  ok('  and the deployment\'s switch is never read alone here', !/LOGOS5\.on/.test(app));
-  ok('opening on the map, and a first message put in its box, read the gate as they land', /workspace && newSocriaOpen\(\) && !wanted && !pendingStart/.test(app) && /workspace && newSocriaOpen\(\)\) setHomeStart\(message\)/.test(app));
+  // The gate choosing the screen (Logos 5 where it was open, the Logos 4 layout elsewhere) was archived: Logos 5 is everybody's.
+  ok('the deployment\'s switch is never read alone here', !/LOGOS5\.on/.test(app));
+  ok('opening on the map, and a first message put in its box, as they land', /if \(!wanted && !pendingStart && sorted\.some\(\(x\) => x\.messages\.length > 0\)\) setL5Home\(true\);/.test(app) && /const \{ id, message \} = pendingStart;[\s\S]{0,160}setHomeStart\(message\);/.test(app));
   ok('the Core chats are moved in only on the new screen', /if \(!l5 \|\| !cloud \|\| hydrating \|\| !firstRun\.ready\) return;[\s\S]{0,400}\/api\/conversations\/merge/.test(app));
   ok('  and listed beside these only there', /if \(!l5\) return \[\];[\s\S]{0,600}kind: 'core' as const/.test(app));
   ok('the welcome on the map only on the map', /const homeShown = l5 && /.test(app) && /const whatsNewShown =\s*homeShown &&/.test(app));
-  ok('the code entered while Logos is open opens the new Socria on its map', /if \(newSocria && !hadNewSocria\.current && !hydrating && workspaceOn\) setL5Home\(true\);/.test(app));
-  ok('the record\'s "it opened" waits for the gate, on Logos', /useFirstRun\(\{ signedIn: !!isSignedIn, surface: 'logos', opened: newSocria \}\)/.test(app));
-
-  const page = read('app/chat/page.tsx');
-  ok('the welcome on Core only where the map it points to opens', /const showWhatsNew =\s*\/\/[^\n]*\n\s*newSocria &&/.test(page));
-  ok('  and the record\'s "it opened" waits for the gate, on Core', /useFirstRun\(\{ signedIn: !!isSignedIn, surface: 'core', opened: newSocria \}\)/.test(page));
-  ok('  and on the first-run page', /useFirstRun\(\{ signedIn: !!isSignedIn, surface, opened: newSocria \}\)/.test(read('components/onboarding/Onboarding.tsx')));
+  // Entering the code while Logos is open no longer moves anyone onto the map: the code no longer opens a screen (archived).
+  // The record's "it opened" no longer waits for the gate, on Logos, on Core or on the first-run page; Core's welcome went with the Core chat (archived).
   const hook = read('components/useFirstRun.ts');
-  ok('the record waits: "it opened" is reached only once it has', /const opened = opts\.opened !== false;/.test(hook) && /if \(ready && opened\) reach\('socria\.opened'\);/.test(hook));
+  ok('the record waits: "it opened" is reached only once the record has been read', /if \(ready\) reach\('socria\.opened'\);/.test(hook));
 }
 
 console.log('\n=== told what changed when it opens, not before ===');

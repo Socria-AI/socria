@@ -5,6 +5,8 @@
 
 import type { ComponentType } from 'react';
 import { Overview } from './overview';
+import { Logos5 } from './logos-5';
+import { History } from './history';
 import { UseCases } from './use-cases';
 import { Models } from './models';
 import { Core2 } from './core-2';
@@ -26,6 +28,8 @@ import { AccountsData } from './accounts-data';
 
 export const CONTENT: Record<string, ComponentType> = {
   overview: Overview,
+  'logos-5': Logos5,
+  history: History,
   'use-cases': UseCases,
   models: Models,
   'core-2': Core2,

@@ -71,7 +71,8 @@ console.log('=== seeing it: the Mind view and the Memory page ===');
   ok('the Memory page has Everything beside Graph and List', /setView\('everything'\)/.test(mem) && /<MindAtlas scope="all" onOpenChat=\{openChat\} \/>/.test(mem));
   ok('  and shows it even before any memory exists', /mem-everything[\s\S]{0,120}<MindAtlas scope="all"/.test(mem));
   const chat = read('app/chat/page.tsx');
-  ok('a link can open one particular Core chat', (chat.match(/get\('c'\)/g) || []).length === 2);
+  // Logos 5 hosts /chat now: ?c=<id> is handed to it as ?s=<id>, and it opens that conversation among every one it loads
+  ok('a link can open one particular Core chat', /const c = params\.get\('c'\);\s*if \(idOk\(c, 120\) && !params\.get\('s'\)\) u\.searchParams\.set\('s', c\);/.test(chat) && /wanted = q\.get\('s'\);/.test(app) && /surface === 'logos' \? `\/chat\?s=\$\{q\}` : `\/chat\?c=\$\{q\}`/.test(mem));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

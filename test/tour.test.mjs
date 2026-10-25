@@ -32,7 +32,7 @@ console.log('=== the steps — stupidly simple ===');
   ok('Core: three notes', CORE_TOUR.length === 3, String(CORE_TOUR.length));
   ok('Logos: four notes', LOGOS_TOUR.length === 4, String(LOGOS_TOUR.length));
   ok('Logos 3: four notes too', LOGOS3_TOUR.length === 4, String(LOGOS3_TOUR.length));
-  ok('  the map, the one box, + View, and Core 4', LOGOS3_TOUR.map((s) => s.anchor).join() === 'map,composer,views,model');
+  ok('  the map, the one box, + View, and what to make', LOGOS3_TOUR.map((s) => s.anchor).join() === 'map,composer,views,make');
   ok('"Take the tour again" on the chat replays the Core one', TOUR_STEPS === CORE_TOUR);
   ok('two keys, so taking one does not spend the other', TOUR_KEY !== LOGOS_TOUR_KEY);
   for (const [name, steps] of [['core', CORE_TOUR], ['logos', LOGOS_TOUR], ['logos3', LOGOS3_TOUR]]) {
@@ -59,8 +59,7 @@ console.log('=== the steps — stupidly simple ===');
 
 console.log('=== every anchor exists where its tour runs ===');
 {
-  const chat = read('app/chat/page.tsx') + read('components/ModelPicker.tsx');
-  for (const s of CORE_TOUR) ok(`core: data-tour="${s.anchor}" is rendered`, chat.includes(`data-tour="${s.anchor}"`), s.anchor);
+  // Core's tour ran on the Core chat, which was archived: it has no screen left to anchor to.
   const logos = read('components/LogosApp.tsx') + read('components/ThinkingMap.tsx') + read('components/LogosComposer.tsx') + read('components/ModelPicker.tsx');
   for (const s of LOGOS_TOUR) {
     const lit = logos.includes(`data-tour="${s.anchor}"`) || logos.includes(`'${s.anchor}'`);
@@ -78,11 +77,12 @@ console.log('=== every anchor exists where its tour runs ===');
 
 console.log('=== onboarding starts it, after the first answer ===');
 {
-  const chat = read('app/chat/page.tsx');
-  ok('the chat waits for an answer before the tour', /messages\.some\(\(m\) => m\.role === 'assistant'\)/.test(chat) && /setTourOpen\(true\)/.test(chat));
-  ok('  and asks the rule, with the screen state', /shouldRunTour\(\{[\s\S]{0,200}blocked: anythingOpen/.test(chat));
-  ok('  and reads whether it was already taken', /localStorage\.getItem\(TOUR_KEY\)/.test(chat));
+  // The Core chat ran its own tour after Core's first answer; that was archived with it. The chat
+  // now hands onboarding's tour to Logos 5 (tourAfter, test/onboarding.test.mjs), which runs it.
   const app = read('components/LogosApp.tsx');
+  ok('Logos waits for an answer before the tour', /if \(tourShownRef\.current \|\| busy \|\| !hasReply\) return;/.test(app) && /tourShownRef\.current = true;\s*setTourOpen\(true\);/.test(app));
+  ok('  and asks the rule, with the screen state', /shouldRunTour\(\{[\s\S]{0,200}blocked: screenBusy/.test(app));
+  ok('  and reads whether it was already taken', /localStorage\.getItem\(LOGOS_TOUR_KEY\)/.test(app));
   ok('Logos mounts its own tour — Logos 3 its own notes', /<Tour open=\{tourOpen\} steps=\{workspaceOn \? LOGOS3_TOUR : LOGOS_TOUR\} onDone=\{endTour\} \/>/.test(app));
   ok('  after the answer', /const hasReply = messages\.some\(\(m\) => m\.role === 'assistant'\)/.test(app));
   ok('  never over the guide, a sheet, or the first map rising', /const screenBusy = guideOpen \|\| styleOpen \|\| emerging/.test(app));

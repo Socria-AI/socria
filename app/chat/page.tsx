@@ -1,693 +1,134 @@
 // app/chat/page.tsx
 'use client';
 
-import { readRole } from '@/lib/onboarding-roles';
-import { readName } from '@/lib/onboarding-name';
-import { useThemeGuard } from '@/components/account/ThemePicker';
-import { useGateSync } from '@/components/account/AccessCode';
-import { useNewSocria } from '@/components/useNewSocria';
-import { logosName } from '@/lib/new-socria';
+// /chat — LOGOS 5, AND ONLY LOGOS 5.
+//
+// This was the Core chat. Logos was a model chosen inside it, and choosing it
+// swapped the whole surface in here, so /chat stayed the address of "talking
+// to Socria" whichever mind answered. On 24 October 2026 the Core chat was
+// archived with every model but Logos 5 (docs/ARCHIVE.md): Core 2, Core 3.1,
+// Core 4, Logos 1 and Logos 2 are withdrawn in lib/socria-prompt.ts, and the
+// screen that hosted them is gone. Everybody opens Logos 5 — somebody signed
+// out as a guest, with one line of thinking and its map (lib/guest-pass.ts),
+// which comes with them when they sign up.
+//
+// WHAT THIS PAGE STILL DOES, because it is the host:
+//   • A GUEST'S CORE CHATS, CARRIED IN. A browser that talked to Core 3.1
+//     signed out kept those chats in localStorage. On the first sign-in they
+//     go to the account exactly as before, and Logos 5 brings them in with
+//     every other Core chat (lib/logos5/merge.ts). Until then they stay where
+//     they are, untouched.
+//   • THE PROFILE AND THE JOURNEY, CARRIED UP. Core's imported profile and its
+//     thinking journey were mirrored to the account from here; one built
+//     signed out is still pushed up once, so nothing a guest made is lost.
+//   • PROJECTS — the folders Logos 5's rail and Universal Map file into, their
+//     settings sheet, and a Project's home (?p=), which is where a shared
+//     Project's link lands.
+//   • A CORE CONVERSATION SHARED WITH THEM (?shared=<id>). Its owner's chats
+//     come into Logos 5 when the owner next opens it; until then the shared
+//     thread opens here, on its own, as it did beside the Core chat.
+//   • Onboarding's sentence, handed to Logos 5 once, and sent for them.
+//
+// OLD LINKS STILL LAND. ?model=<anything> is dropped — there is one surface —
+// and ?c=<id>, which opened one Core chat, opens that conversation in Logos 5.
+
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { useRouter } from 'next/navigation';
-import {
-  SignedIn,
-  SignedOut,
-  SignInButton,
-  useUser,
-} from '@clerk/nextjs';
+import { useUser } from '@clerk/nextjs';
 import '../app-shell.css';
-import {
-  moveNote,
-  moves,
-  surfaceForModel,
-  type Placeable,
-} from '@/lib/conversation-surface';
-import { Logo } from '@/components/Logo';
-import { AccountControl } from '@/components/account/AccountControl';
-import { ModelPicker } from '@/components/ModelPicker';
-import { usePlan } from '@/components/usePlan';
-import { OneFoot } from '@/components/OneMark';
-import { OnePrompt } from '@/components/OnePrompt';
-import { useOnePrompt } from '@/components/useOnePrompt';
-import { MapGlyph } from '@/components/MapGlyph';
-import { NodeTile } from '@/components/NodeTile';
+import { useGateSync } from '@/components/account/AccessCode';
+import { useThemeGuard } from '@/components/account/ThemePicker';
 import { LogosApp } from '@/components/LogosApp';
+import type { RailProject } from '@/components/LogosRail';
+import type { SharedIn } from '@/components/logos5/Universe';
 import { ProjectSheet } from '@/components/projects/ProjectSheet';
-import type { Attachment } from '@/lib/logos-attachments';
-import { forRequest, wordsOnly } from '@/lib/chat-attachments';
-import { newMsgId, replyRefOf, type ReplyRef } from '@/lib/chat-thread';
-import { copyText } from '@/lib/copy-text';
-import { ACCEPT_ATTR } from '@/lib/file-kinds';
-import { AttachmentChips, PaperclipIcon, useChatAttachments } from '@/components/ChatAttachments';
-import { failureText } from '@/lib/upstream-error';
-import { GATE_CHANGED } from '@/lib/feature-gates';
-import { isOffered,
-  MODEL_KEY,
-  autoModel,
-  chooseModel,
-  lastCoreModel,
-  modelWasChosen,
-  readLength,
-  readReadability,
-  readStoredModel,
-  rememberLength,
-  rememberModel,
-  rememberReadability,
-  withdrawnTo,
-} from '@/lib/socria-model-store';
-import { buildStarters } from '@/lib/starters';
-import {
-  loadLocal as loadLocalLogos,
-  saveLocal as saveLocalLogos,
-} from '@/lib/logos-sessions';
-import { DRIFT_DISMISS_LIMIT, readDrift, type DriftVerdict } from '@/lib/topic-drift';
-import { readStart, startMessage } from '@/lib/first-session';
-import { takeCarried } from '@/lib/onboarding-script';
-import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
-import { useFirstRun } from '@/components/useFirstRun';
-import { WhatsNew } from '@/components/onboarding/WhatsNew';
-import { wantsCoreLine, wantsIntro, wantsWhatsNew } from '@/lib/first-run';
-import { Tour } from '@/components/Tour';
-import { FindPanel } from '@/components/FindPanel';
-import { Hint, useSeenHints } from '@/components/Hint';
-import { pickHint } from '@/lib/hints';
-import { AccountSheet } from '@/components/account/AccountSheet';
-import { FEEDBACK_URL } from '@/lib/feedback';
-import { RewardsSync } from '@/components/rewards/RewardsSync';
-import { RewardsBadges } from '@/components/rewards/RewardsBadges';
-import { RewardsPopups } from '@/components/rewards/RewardsPopups';
-import { TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { ProjectHome } from '@/components/projects/ProjectHome';
 import { JoinCodeDialog, ShareDialog } from '@/components/share/ShareDialog';
 import { SharedThread } from '@/components/share/SharedThread';
+import { RewardsPopups } from '@/components/rewards/RewardsPopups';
 import { useConversationStyle } from '@/components/useConversationStyle';
-import { limitsFor } from '@/lib/entitlements';
-import type { ResourceType } from '@/lib/share/roles';
+import { Logo } from '@/components/Logo';
+import { usePlan } from '@/components/usePlan';
+import { takeCarried } from '@/lib/onboarding-script';
 import { isSource } from '@/lib/checkout-attribution';
-import { track } from '@/lib/analytics';
-import { hasJourneyContent as journeyHasContent } from '@/lib/socria-prompt';
-import {
-  cleanTitle,
-  groupRail,
-  searchRail,
-  shouldShowSearch,
-} from '@/lib/session-rail';
-import { TryLogosPill } from '@/components/TryLogosPill';
-import { LogosCover, type CoverVersion } from '@/components/LogosCover';
-import { IntroCore4Modal } from '@/components/IntroCore4Modal';
-import { RichText } from '@/components/RichText';
-import { splitInline } from '@/lib/rich-text';
-import { InsightCard } from '@/components/InsightCard';
-import { InsightShareModal } from '@/components/InsightShareModal';
-import { ImportProfileModal } from '@/components/ImportProfileModal';
-import Link from 'next/link';
-import { SynthesisCard, SynthesisPending } from '@/components/SynthesisCard';
-import { ChoiceChips } from '@/components/ChoiceChips';
-import { readActivity, type Activity } from '@/lib/core4/activity';
-import { parseMessage, splitChoices, type SynthesisData } from '@/lib/synthesis';
-import { synthesisCadence, type Insight } from '@/lib/socria-prompt';
+import { chooseModel } from '@/lib/socria-model-store';
+import { hasJourneyContent, sanitizeUserUnderstanding, type UserUnderstanding } from '@/lib/socria-prompt';
+import type { ResourceType } from '@/lib/share/roles';
 
-// Core 3 auto-generates an Insight Card once the conversation has passed
-// this many user turns, and only if we haven't shown one in the last
-// INSIGHT_MIN_GAP turns.
-const INSIGHT_MIN_USER_TURNS = 6;
-const INSIGHT_MIN_GAP = 3;
-
-// A key of its own: dismissing the old Core 3.1 note is not a decision about
-// Logos, so anyone who had seen that one is still shown this once.
-const LOGOS_INTRO_DISMISS_KEY = 'socria.logosIntroDontShowAgain.v1';
-/**
- * The Core 4 introduction, which now holds the one slot this page opens with.
- *
- * Its own key rather than the Logos one: somebody who dismissed the Logos
- * invitation months ago has not been shown this, and reusing that flag would
- * have silently skipped the announcement for exactly the people who have been
- * here longest.
- */
-const CORE4_INTRO_DISMISS_KEY = 'socria.core4IntroDontShowAgain.v1';
-// Set to '1' once the user unlocks auth-gated models with the typed access
-// key. Lets anonymous (not-signed-in) users reach Core 3.1.
-const SMART_KEY_STORAGE = 'socria.core3AccessKey.v1';
-// Profile imported from another AI ("import your history"). Kept locally and,
-// for signed-in users, mirrored to the cloud via /api/profile.
-const PROFILE_KEY = 'socria.importedProfile.v1';
-// Cross-conversation thinking journey (evolving understanding, open threads,
-// timeline). Same storage pattern as the profile; refreshed every few turns.
-const JOURNEY_KEY = 'socria.journey.v1';
-const JOURNEY_EVERY_TURNS = 4;
-import {
-  SOCRIA_MODELS,
-  EMPTY_MEMORY,
-
-  type SocriaModel,
-  type ThinkingDepth,
-  type Readability,
-  type ReplyLength,
-  sanitizeUserUnderstanding,
-  hasJourneyContent,
-  type ConversationMemory,
-  type UserUnderstanding,
-} from '@/lib/socria-prompt';
-
-type Role = 'user' | 'assistant';
-interface Message {
-  /** its name, from where it was made (lib/chat-thread.ts) — what a reply points at */
-  id?: string;
-  role: Role;
-  content: string;
-  /** Core 4: files and images sent with this turn, already read into text */
-  attachments?: Attachment[];
-  /** the message this turn answers — Reply on one of Socria's messages */
-  replyTo?: ReplyRef;
-}
-interface Conversation {
-  id: string;
-  title: string;
-  messages: Message[];
-  updatedAt: number;
-  // Core 3 thread memory — extracted from user messages, injected into
-  // future turns. Optional so Core 2 conversations don't carry an unused
-  // field.
-  memory?: ConversationMemory;
-  // Last title Core 3's extractor auto-suggested. If the current title
-  // still matches this string, we treat the title as "auto" and are free
-  // to replace it with a newer suggestion. If the user renamed manually,
-  // c.title will no longer match c.autoTitledAs and we won't override.
-  autoTitledAs?: string;
-  /**
-   * The Project this conversation is in, if any. A conversation belongs to
-   * a Project; what is learned in it goes into the one Mind Graph and is
-   * only TIED to the Project (lib/mind/projects.ts).
-   */
-  projectId?: string | null;
-}
-
-/** A Project, as the rail needs it: a folder of chats. */
-interface RailProject {
-  id: string;
-  name: string;
-  archived: boolean;
-  updatedAt: number;
-  /** when it was made, and Project Home's colour — how the Universal Map places and draws it */
-  createdAt?: number;
-  color?: string | null;
-}
-
-const FOLDER_ICON = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
-  </svg>
-);
-// The rail foot's two rows: history coming in, and the Mind Graph.
-const IMPORT_ICON = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M12 4v10M8 10.5l4 4 4-4M5 19h14" />
-  </svg>
-);
-const MEMORY_ICON = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" aria-hidden="true">
-    <circle cx="6.5" cy="7" r="2.3" />
-    <circle cx="17.5" cy="8.5" r="2.3" />
-    <circle cx="11" cy="17.5" r="2.3" />
-    <path d="M8.8 7.3l6.4.9M7.4 9.1l2.7 6.3M16.2 10.4l-3.9 5.2" />
-  </svg>
-);
-// The foot's Feedback row: a speech bubble, in the same hand as the others.
-const FEEDBACK_ICON = (
-  <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-    <path d="M5 5.5h14a1.5 1.5 0 0 1 1.5 1.5v8.5a1.5 1.5 0 0 1-1.5 1.5H10l-4.5 3.5V17H5a1.5 1.5 0 0 1-1.5-1.5V7A1.5 1.5 0 0 1 5 5.5z" />
-    <path d="M8 10h8M8 13h5" />
-  </svg>
-);
-const PLUS_ICON = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round"><path d="M12 5v14M5 12h14" /></svg>
-);
-const DOTS_ICON = (
-  <svg viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.7" /><circle cx="12" cy="12" r="1.7" /><circle cx="19" cy="12" r="1.7" /></svg>
-);
-const MOVE_ICON = (
-  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-    <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h4.2l1.8 2h9A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z" />
-    <path d="M10 13.5h5M13 11.5l2 2-2 2" />
-  </svg>
-);
-
+// A guest's Core chats, kept by the Core chat in this browser, and the record
+// of which account they were carried into. Read only to carry them.
 const STORAGE_KEY = 'socria.conversations.v1';
 const ACTIVE_KEY = 'socria.activeConversationId.v1';
 const MIGRATED_KEY = 'socria.cloudMigrated.v1';
-// Set the first time an anonymous user finishes a thought session (gets an
-// AI reply). From then on, starting a *second* anonymous session requires
-// sign-in — even if they delete the first one. Cleared on sign-in.
-const USED_FREE_KEY = 'socria.usedFreeConvo.v1';
-const DEPTH_KEY = 'socria.depth.v1';
-/** How often this person has told us a topic change was intentional. */
-const DRIFT_KEY = 'socria.chat.driftDismissals.v1';
+// Core's imported profile ("import your history") and its thinking journey.
+const PROFILE_KEY = 'socria.importedProfile.v1';
+const JOURNEY_KEY = 'socria.journey.v1';
 
-/** Both Logos and Logos 2 open the split-screen surface. Safe on any input:
-    a URL string that is not a real model id is simply not a logos surface. */
-function isLogosSurface(m: unknown): boolean {
-  return typeof m === 'string' && m in SOCRIA_MODELS && !!SOCRIA_MODELS[m as SocriaModel].logosSurface;
+/** A conversation, as the host lists it for Logos 5. */
+interface Row {
+  id: string;
+  title: string;
+  updatedAt: number;
+  projectId: string | null;
 }
 
-/** A model id that may actually be selected — real, and not a `soon` teaser. */
-function isSelectable(m: unknown): m is SocriaModel {
-  return (
-    typeof m === 'string' &&
-    m in SOCRIA_MODELS &&
-    // A withdrawn model cannot be selected — including by a link. Every
-    // ?model=logos link in the product, in an email and in somebody's bookmarks
-    // now lands on the successor rather than on a surface the picker will not
-    // show them; the redirect happens where `want` is applied. The same rule
-    // as the menus (`isOffered`), so a dev-only model is not reachable by
-    // link on production either.
-    isOffered(m as SocriaModel)
-  );
-}
-
-function readModel(): SocriaModel {
-  if (typeof window === 'undefined') return 'core-3';
-  // Core 3.1 only until we know better — the model open to everyone, now that
-  // Core 2 has retired. The automatic default needs Clerk and the plan route
-  // to have answered, and guessing before they do would show somebody Logos
-  // and then take it away again.
-  return readStoredModel() ?? 'core-3';
-}
-
-function readDepth(): ThinkingDepth {
-  if (typeof window === 'undefined') return 'balanced';
-  try {
-    const raw = localStorage.getItem(DEPTH_KEY);
-    if (raw === 'quick' || raw === 'deep' || raw === 'abstract') return raw;
-    return 'balanced';
-  } catch {
-    return 'balanced';
-  }
-}
-
-function readSmartUnlocked(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return localStorage.getItem(SMART_KEY_STORAGE) === '1';
-  } catch {
-    return false;
-  }
-}
-
-// The openings offered to someone with no history — and the top-up for
-// everyone else. buildStarters puts what they have actually been thinking
-// about ahead of these.
-const STARTER_PROMPTS = [
-  'I don’t know what decision to make',
-  'Help me think through this idea',
-  'I’m stuck on what to build',
-  'Challenge my reasoning',
-];
-
-function uid() {
-  return Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
-
-function loadLocal(): Conversation[] {
-  if (typeof window === 'undefined') return [];
+/** The guest's Core chats, verbatim — whatever shape the Core chat wrote them in. */
+function loadGuestChats(): unknown[] {
   try {
     const raw = localStorage.getItem(STORAGE_KEY);
-    if (!raw) return [];
-    const parsed = JSON.parse(raw);
+    const parsed = raw ? JSON.parse(raw) : [];
     return Array.isArray(parsed) ? parsed : [];
   } catch {
     return [];
   }
 }
 
-function saveLocal(convos: Conversation[]) {
-  try {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(convos));
-  } catch (e) {
-    console.error('Could not save conversations locally:', e);
-  }
-}
-
-function readUsedFree(): boolean {
-  if (typeof window === 'undefined') return false;
-  try {
-    return localStorage.getItem(USED_FREE_KEY) === '1';
-  } catch {
-    return false;
-  }
-}
-
-function writeUsedFree(v: boolean) {
-  try {
-    if (v) localStorage.setItem(USED_FREE_KEY, '1');
-    else localStorage.removeItem(USED_FREE_KEY);
-  } catch {}
-}
+const idOk = (v: string | null, max: number): v is string => !!v && new RegExp(`^[A-Za-z0-9_-]{1,${max}}$`).test(v);
 
 export default function ChatPage() {
   const { isLoaded, isSignedIn, user } = useUser();
-  // How Socria talks with them (Manage Account → Personalization): the
-  // account's choice, kept current in this tab and sent with every turn.
-  const { style: conversationStyle, ref: conversationStyleRef } = useConversationStyle(!!isSignedIn);
-  const router = useRouter();
-  const [conversations, setConversations] = useState<Conversation[]>([]);
-  // Logos sessions live in the same store; listed here so one sidebar shows
-  // everything you've been thinking about, whichever surface produced it —
-  // interleaved by when you last touched it, not filed under the model that
-  // produced it. Which one it was is a mark on the row, not a heading.
-  const [logosSessions, setLogosSessions] = useState<
-    { id: string; title: string; nodes: number; updatedAt: number; projectId?: string | null }[]
-  >([]);
-  const [activeId, setActiveId] = useState<string | null>(null);
-  /**
-   * A Project the NEXT new conversation should start in — set by arriving
-   * from a Project's "New conversation", cleared by starting an ordinary
-   * session or opening another one.
-   */
-  const [projectEntry, setProjectEntry] = useState<{ id: string; name: string } | null>(null);
-  /**
-   * PROJECT HOME — the Project open in the main pane (components/projects/
-   * ProjectHome). Opening a Project's folder opens it; opening any chat, or
-   * starting one, closes it. Mirrored in the URL as ?p= so it survives a
-   * reload and can be linked to.
-   */
-  const [homeProject, setHomeProject] = useState<string | null>(null);
-  /** a shared Core conversation open together (components/share/SharedThread), ?shared= */
-  const [sharedOpen, setSharedOpen] = useState<string | null>(null);
-  /** what is shared with this person — Projects and conversations (/api/shared) */
-  const [sharedItems, setSharedItems] = useState<{ type: ResourceType; id: string; kind: 'chat' | 'logos' | 'project'; title: string; role: string; owner: string }[]>([]);
-  /** the Share sheet, open for one thing */
-  const [shareFor, setShareFor] = useState<{ type: ResourceType; id: string; title: string } | null>(null);
-  /** The person's Projects — the folders in the rail. Signed-in only. */
-  const [projects, setProjects] = useState<RailProject[]>([]);
-  /** true once the list has actually been fetched — Logos files nothing against a list that has not arrived */
-  const [projectsLoaded, setProjectsLoaded] = useState(false);
-  /** Which folders are open. */
-  const [openFolders, setOpenFolders] = useState<string[]>([]);
-  /** The name being typed for a new folder; null when not making one. */
-  const [folderDraft, setFolderDraft] = useState<string | null>(null);
-  /** The chat whose "Move to" menu is open. */
-  const [moving, setMoving] = useState<string | null>(null);
-  /** The Project whose settings sheet is open. */
-  const [sheet, setSheet] = useState<string | null>(null);
-  /** The folder a chat is being dragged over. */
-  const [dropTarget, setDropTarget] = useState<string | null>(null);
-  /** A chat waiting to go into the folder being named from its menu. */
-  const pendingMove = useRef<string | null>(null);
-  const [input, setInput] = useState('');
-  /** the message the next one answers — Reply puts it above the box */
-  const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
-  /** what to say when the picker has just moved this conversation to another surface */
-  const [moveSaid, setMoveSaid] = useState<string | null>(null);
-  /** the sentence written during onboarding, for whichever composer mounts */
-  const [carriedText, setCarriedText] = useState('');
-  /** they arrived with a sentence from the first-run screen — it has just been read */
-  const carriedRef = useRef(false);
-  /**
-   * ONBOARDING'S SENTENCE GOES STRAIGHT THROUGH. Written on /onboarding, it is
-   * sent on landing — to Core here, or to Logos (which sends its own) — and
-   * once Socria's first answer is on screen, the tour starts.
-   */
-  const [autoSend, setAutoSend] = useState<{ text: string; logos: boolean } | null>(null);
-  const [tourAfter, setTourAfter] = useState(false);
-  // What this person has already been taught, on every surface (lib/first-run.ts).
-  // The new Socria, behind its code (lib/new-socria.ts): whether what changed
-  // is told here, and what the Logos on offer is called.
-  const newSocria = useNewSocria();
-  const firstRun = useFirstRun({ signedIn: !!isSignedIn, surface: 'core', opened: newSocria });
-  /** the conversation Core's one line is shown under, if any */
-  const [coreLine, setCoreLine] = useState<string | null>(null);
-
-  // ── the first-run tour ──
-  // Held off for anybody who has just come through /onboarding: that walks
-  // them through what Socria is FOR, on their own sentence, and this walks
-  // them round the furniture. Both in one sitting is too much teaching at
-  // once, so it waits for a later visit — which is also when the furniture
-  // starts to matter.
-  const [tourOpen, setTourOpen] = useState(false);
-  const [acctOpen, setAcctOpen] = useState(false);
-  /** the "Join with a code" popup */
-  const [joinOpen, setJoinOpen] = useState(false);
-
-  // ── find in this conversation ──
-  // Cmd/Ctrl-F, the shortcut people already have in their hands for exactly
-  // this. The browser's own find searches the rendered page, which in a long
-  // thread means whatever happens to be mounted — this searches the whole
-  // conversation, including insight cards, which are the lines people most
-  // often come back for.
-  const [findOpen, setFindOpen] = useState(false);
-  useEffect(() => {
-    const key = (e: KeyboardEvent) => {
-      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'f') {
-        e.preventDefault();
-        setFindOpen(true);
-      }
-    };
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, []);
-
-  const endTour = useCallback(() => {
-    setTourOpen(false);
-    try { localStorage.setItem(TOUR_KEY, '1'); } catch {}
-  }, []);
-  const [sending, setSending] = useState(false);
-  const [streamed, setStreamed] = useState('');
-  /**
-   * The word under the dots. Driven by markers the server sends from the place
-   * each operation actually runs, so it never claims something that is not
-   * happening; 'thinking' is the default and the fallback.
-   */
-  const [activity, setActivity] = useState<Activity>('thinking');
-  const [error, setError] = useState<string | null>(null);
-  // The free day's messages still to come, as the server counted them with the
-  // last reply (X-Socria-Left). Said quietly under the conversation once it is
-  // nearly spent; null on Socria One and signed out, where nothing is counted.
-  const [messagesLeft, setMessagesLeft] = useState<number | null>(null);
-  const [sidebarOpen, setSidebarOpen] = useState(false);
-  // What is typed in the rail's search box, and whether the "Maps only" chip
-  // is down. Neither is persisted: a filter that survives a reload is a list
-  // that lies about what is in it.
-  const [railQuery, setRailQuery] = useState('');
-  const [mapsOnly, setMapsOnly] = useState(false);
-  // Which row is being renamed, and what is in the box. Rows from both
-  // surfaces share it, so the id is prefixed the way the keys are.
-  const [renaming, setRenaming] = useState<string | null>(null);
-  const [renameDraft, setRenameDraft] = useState('');
-  /** conversations whose one note about the free thread memory has been closed (this tab) */
-  const [frozenNoteClosed, setFrozenNoteClosed] = useState<Set<string>>(new Set());
-  /** just back from checkout: the one line worth saying, then gone */
-  const [oneWelcome, setOneWelcome] = useState(false);
-  // A misfiled message, and how many times this person has said they meant it.
-  const [drift, setDrift] = useState<(DriftVerdict & { text: string; from: string }) | null>(null);
-  const [driftDismissals, setDriftDismissals] = useState(0);
-  const [hydrating, setHydrating] = useState(true);
-  const [usedFree, setUsedFree] = useState(false);
-  const [model, setModel] = useState<SocriaModel>('core-3');
-  const [depth, setDepth] = useState<ThinkingDepth>('balanced');
-  const [readability, setReadability] = useState<Readability>('standard');
-  const [replyLength, setReplyLength] = useState<ReplyLength>('standard');
-  const [smartUnlocked, setSmartUnlocked] = useState(false);
-  const [logosModalOpen, setLogosModalOpen] = useState(false);
-  /** they arrived straight from /onboarding this session */
-  const justOnboarded = useRef(false);
-  const [logosDismissed, setLogosDismissed] = useState(false);
-  const [core4IntroOpen, setCore4IntroOpen] = useState(false);
-  /** they pressed "don't show again" — the pill goes with the auto-open */
-  const [core4Dismissed, setCore4Dismissed] = useState(false);
-  const [autoOpenChecked, setAutoOpenChecked] = useState(false);
-  const [shareInsight, setShareInsight] = useState<Insight | null>(null);
-  const [importedProfile, setImportedProfile] = useState('');
-  const [importOpen, setImportOpen] = useState(false);
-
-  // WHEN THE TOUR MAY OPEN.
-  //
-  // Only once nothing else owns the screen. `blocked` is the condition
-  // lib/tour.ts already asks about and it was being answered `false`
-  // unconditionally, which is how the tour came to be consumed invisibly
-  // under the Logos modal on a first visit. Depending on the real state
-  // means the tour simply waits, and opens when the screen is free.
-  const anythingOpen =
-    logosModalOpen || core4IntroOpen || acctOpen || importOpen || joinOpen || !!shareInsight;
-  // THE TOUR RUNS ONCE, STARTED BY ONBOARDING: after the sentence onboarding
-  // sent has been answered (see the effect beside the auto-send). Otherwise
-  // it is reachable from the account sheet for anyone who wants the
-  // furniture named.
-  const [journey, setJourney] = useState<UserUnderstanding | null>(null);
-  // Freshest journey, immune to stale closures (the cadence update fires from
-  // async flows that captured an older render).
-  const journeyRef = useRef<UserUnderstanding | null>(null);
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  // a reply belongs to the conversation it was started in
-  useEffect(() => {
-    setReplyTo(null);
-  }, [activeId]);
-  /** To the turn a reply's quote points at — lit, the way Find lights a result. */
-  const jumpToTurn = useCallback((id: string) => {
-    const el = document.querySelector<HTMLElement>(`[data-mid="${id}"]`);
-    if (!el) return;
-    el.scrollIntoView({ block: 'center', behavior: 'smooth' });
-    el.classList.remove('lit');
-    void el.offsetWidth;
-    el.classList.add('lit');
-    window.setTimeout(() => el.classList.remove('lit'), 1600);
-  }, []);
-
-  const mode: 'cloud' | 'local' = isSignedIn ? 'cloud' : 'local';
-
-  // Signed in OR unlocked with the typed access key. It used to be the
-  // question "may they use Core 3.1", and the name said so; Core 3.1 is open
-  // to everybody now that Core 2 has a retirement date, so what this flag
-  // actually decides is Logos, Core 4, and the surfaces an account carries.
-  const hasAccount = !!isSignedIn || smartUnlocked;
-  // What they hold, for the two quiet mentions of One on this page: the
-  // sidebar foot and the model menu. Both wait for `known` — see usePlan.
+  // How Socria talks with them (Manage Account → Personalization), for a shared thread.
+  const { style: conversationStyle } = useConversationStyle(!!isSignedIn);
   const planState = usePlan();
+  // A lapsed member goes back to paper on every page this host shows — a
+  // Project's home and a shared thread too, which open without Logos 5 (it
+  // guards its own screen).
   useThemeGuard(planState.plan === 'one', planState.known);
   // A feature unlocked on another device (Manage Account → Access code).
   useGateSync();
 
-  // ── Socria One, said at the two moments it is allowed to be ────────
-  //
-  // Everything about frequency, plan, context and rationing is decided inside
-  // `ask` (lib/one-prompt.ts). This surface only names the moments:
-  //
-  //   'core-messages-spent' / 'core-chats-spent'
-  //                  — the free day's twenty messages, or its four new chats,
-  //                    ran out mid-turn (lib/entitlements.ts). They pressed
-  //                    send and it stopped; explaining that is not promotion.
-  //   'welcome-back' — they came back, on the free tier, having used it
-  //                    before. Nobody asked for this one, and it is a
-  //                    deliberate product decision rather than an event; the
-  //                    rules that keep it decent live with the decision.
-  const {
-    prompt: onePrompt,
-    ask: askOne,
-    dismiss: dismissOne,
-    accept: acceptOne,
-  } = useOnePrompt({
-    plan: planState.plan === 'one' ? 'one' : 'free',
-    signedIn: !!isSignedIn,
-    // Conversations rather than Logos sessions: on this surface that is what
-    // "have they been here before" is made of.
-    sessions: conversations.filter((c) => c.messages.length > 0),
-    mapNodes: 0,
-    surface: 'core',
-  });
-  const [oneBusy, setOneBusy] = useState(false);
-  const [oneError, setOneError] = useState<string | null>(null);
-
-  /**
-   * They came back.
-   *
-   * Once everything that decides it is actually known — Clerk has answered,
-   * the plan has answered, and the conversations have loaded — because asking
-   * before any of those is asking on a guess, and the guess is "free, new,
-   * nothing saved", which is the one state this prompt must not fire in.
-   */
-  const welcomed = useRef(false);
-  useEffect(() => {
-    if (welcomed.current) return;
-    if (!isLoaded || hydrating || !planState.known) return;
-    if (!isSignedIn || planState.plan === 'one') return;
-    if (tourOpen || anythingOpen) return;
-    welcomed.current = true;
-    askOne('welcome-back');
-  }, [isLoaded, hydrating, planState.known, planState.plan, isSignedIn, tourOpen, anythingOpen, askOne]);
-
-  // ── Socria Rewards may greet someone arriving — into a quiet room only ──
-  //
-  // Once something else has spoken this visit (the One invitation, the tour,
-  // onboarding's first exchange), the rewards popups keep quiet until the next
-  // one; and they never open over a sheet, Find, or a prompt. The rest of the
-  // rationing — once a visit, days apart, "Not now" honoured — is
-  // lib/rewards/popup-rule.ts.
-  const [spokeThisVisit, setSpokeThisVisit] = useState(false);
-  useEffect(() => {
-    if (onePrompt || tourOpen || tourAfter || autoSend) setSpokeThisVisit(true);
-  }, [onePrompt, tourOpen, tourAfter, autoSend]);
-  const rewardsQuiet =
-    isLoaded && !hydrating && planState.known && !spokeThisVisit && !anythingOpen && !findOpen;
-  /** Into the newest Logos on offer: the cover's way in, and the challenge's. */
-  const openNewestLogos = () => {
-    if (isOffered('logos-3')) {
-      setModel('logos-3');
-      chooseModel('logos-3');
-      return;
-    }
-    openLogos();
-  };
-  // The Logos the cover and the pill introduce: Logos 3 wherever it is offered.
-  // Read after mount — the gates live in this browser, and the server cannot see them.
-  // Starts from what holds without this browser's gates (the same on the server), so a
-  // deployment that offers Logos 3 to everybody never paints "Logos 2" first.
-  const [coverVersion, setCoverVersion] = useState<CoverVersion>(() => (isOffered('logos-3', []) ? 'logos-3' : 'logos-2'));
-  useEffect(() => {
-    const read = () => setCoverVersion(isOffered('logos-3') ? 'logos-3' : 'logos-2');
-    read();
-    window.addEventListener(GATE_CHANGED, read);
-    return () => window.removeEventListener(GATE_CHANGED, read);
-  }, []);
-
-  /** Checkout, from the prompt. The trigger rides along so the webhook can count it. */
-  const startOneCheckout = useCallback(async () => {
-    if (oneBusy) return;
-    setOneBusy(true);
-    setOneError(null);
-    try {
-      const res = await fetch('/api/stripe/checkout', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ trigger: onePrompt?.reason, surface: 'core' }),
-      });
-      if (res.status === 401) {
-        const back = window.location.pathname + window.location.search;
-        window.location.href = '/sign-in?redirect_url=' + encodeURIComponent(back);
-        return;
-      }
-      // They already hold it. Not an error — the server refuses to sell it twice.
-      if (res.status === 409) {
-        setOneError('You already have Socria One.');
-        setOneBusy(false);
-        return;
-      }
-      const json = await res.json().catch(() => null);
-      if (res.ok && json?.url) {
-        window.location.href = json.url;
-        return;
-      }
-      setOneError('Could not reach checkout. Try again.');
-    } catch {
-      setOneError('Could not reach checkout. Try again.');
-    }
-    setOneBusy(false);
-  }, [oneBusy, onePrompt?.reason]);
-
-  // Anonymous users get one free thought session. They're "locked out" of
-  // starting a new one once that flag is set OR they're already mid-session.
-  // Unlocking with the access key lifts the cap too, so Core 3.1 is usable.
-  const lockedOut =
-    !isSignedIn && !smartUnlocked && (usedFree || conversations.length >= 1);
-
-  // Header sent to gated API routes when the user unlocked via access key
-  // instead of signing in. Harmless (and omitted) for signed-in users.
-  // An unlock now travels as the httpOnly cookie the server set when it
-  // accepted the typed code; the browser attaches it on its own. The page
-  // holds no code to send, which is the point. Kept as a function so the
-  // dozen call sites that spread it need no change.
-  const keyHeaders = (): Record<string, string> => ({});
-  // What is attached to the message being written (Core 4). Read into text
-  // as it is added; see components/ChatAttachments.tsx.
-  const files = useChatAttachments({ headers: keyHeaders, sessionId: () => activeId, uploadLimit: () => limitsFor(planState.plan === 'one' ? 'one' : 'free').uploadBytes });
-  const fileInputRef = useRef<HTMLInputElement>(null);
-  const [dragging, setDragging] = useState(false);
+  /** their conversations that are not lines of thinking yet — Logos 5 brings them in */
+  const [chats, setChats] = useState<Row[]>([]);
+  /** their lines of thinking, for what a Project's home opens */
+  const [lines, setLines] = useState<Row[]>([]);
+  const [hydrating, setHydrating] = useState(true);
+  /** The person's Projects. Signed-in only. */
+  const [projects, setProjects] = useState<RailProject[]>([]);
+  /** true once the list has actually been fetched — Logos files nothing against a list that has not arrived */
+  const [projectsLoaded, setProjectsLoaded] = useState(false);
+  /** the Project whose settings sheet is open */
+  const [sheet, setSheet] = useState<string | null>(null);
+  /** the Project whose home is open (?p=) */
+  const [homeProject, setHomeProject] = useState<string | null>(null);
+  /** a Core conversation shared with them, open together (?shared=<id>) */
+  const [sharedOpen, setSharedOpen] = useState<string | null>(null);
+  /** what is shared with this person (/api/shared): listed under Shared with you, and a shared Project's name */
+  const [sharedItems, setSharedItems] = useState<SharedIn[]>([]);
+  /** "Join with a code", open (from the More menu or under Shared with you) */
+  const [joinOpen, setJoinOpen] = useState(false);
+  /** the Share sheet, open for one thing */
+  const [shareFor, setShareFor] = useState<{ type: ResourceType; id: string; title: string } | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  /** the URL has been read: Logos 5 mounts after, so it sees what was carried and the links it reads */
+  const [urlRead, setUrlRead] = useState(false);
+  /** the sentence written during onboarding, for Logos 5's composer */
+  const [carriedText, setCarriedText] = useState('');
+  /** onboarding's sentence is sent on landing, and the tour follows Socria's first answer */
+  const [autoSend, setAutoSend] = useState(false);
+  const [tourAfter, setTourAfter] = useState(false);
 
   // DON'T HANG BEHIND CLERK. If it never initialises — a blocked script, a
-  // preview build, a flaky network — the page used to wait forever: no
-  // conversations, no empty state, a rail saying "Loading sessions…" under a
-  // composer that still worked. After a few seconds the browser's own copy is
-  // loaded as signed-out; when Clerk does arrive the effect runs again on the
-  // real answer, which is what it always did when sign-in state flipped.
+  // preview build, a flaky network — this page reads as signed out after a
+  // few seconds, and again on the real answer when Clerk does arrive.
   const [authTimedOut, setAuthTimedOut] = useState(false);
   useEffect(() => {
     if (isLoaded) return;
@@ -696,212 +137,148 @@ export default function ChatPage() {
   }, [isLoaded]);
   const authSettled = isLoaded || authTimedOut;
 
-  // Load conversations whenever auth state resolves or flips.
+  // ── the URL, read once, before Logos 5 mounts ─────────────────────
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const u = new URL(window.location.href);
+    // One surface. Whatever a link or a bookmark asked for, it opens here —
+    // and is remembered as the choice, so nothing reads an archived one back.
+    if (params.has('model')) u.searchParams.delete('model');
+    chooseModel('logos-3');
+    // ?c=<id> opened one Core chat; it opens in Logos 5, which reads ?s=.
+    const c = params.get('c');
+    if (idOk(c, 120) && !params.get('s')) u.searchParams.set('s', c);
+    u.searchParams.delete('c');
+    // A Project's home, and a Core conversation shared with them. A shared line
+    // of thinking is ?s=<id>&shared=1, and Logos 5 opens that itself.
+    const p = params.get('p');
+    if (idOk(p, 80)) setHomeProject(p);
+    const shared = params.get('shared');
+    if (idOk(shared, 120) && shared !== '1' && !params.get('s')) setSharedOpen(shared);
+    // A link from an email says which one it was; remembered for checkout.
+    const via = params.get('via');
+    if (via) {
+      try {
+        if (isSource(via)) sessionStorage.setItem('socria.via.v1', via);
+      } catch {}
+      u.searchParams.delete('via');
+    }
+    // The sentence they wrote during onboarding. takeCarried clears as it
+    // reads, so it is read here, once, and handed down.
+    const carried = takeCarried(sessionStorage);
+    if (carried) {
+      setCarriedText(carried.text);
+      if (carried.send) {
+        setAutoSend(true);
+        setTourAfter(true);
+      }
+    }
+    if (u.href !== window.location.href) window.history.replaceState({}, '', u.pathname + u.search);
+    setUrlRead(true);
+  }, []);
+
+  // ?p= and ?shared= follow what is open, so a reload or a copied link lands in
+  // the same place. Only one that WAS open is taken out of the URL.
+  const homeWas = useRef<string | null>(null);
+  const sharedWas = useRef<string | null>(null);
+  useEffect(() => {
+    if (!urlRead) return;
+    try {
+      const u = new URL(window.location.href);
+      if (homeProject) u.searchParams.set('p', homeProject);
+      else if (homeWas.current) u.searchParams.delete('p');
+      if (sharedOpen) u.searchParams.set('shared', sharedOpen);
+      else if (sharedWas.current) u.searchParams.delete('shared');
+      homeWas.current = homeProject;
+      sharedWas.current = sharedOpen;
+      if (u.href !== window.location.href) window.history.replaceState({}, '', u.pathname + u.search);
+    } catch {}
+  }, [urlRead, homeProject, sharedOpen]);
+
+  // ── their conversations: a guest's carried in, then listed ───────
   useEffect(() => {
     if (!authSettled) return;
     let cancelled = false;
-
-    async function hydrate() {
+    (async () => {
       setHydrating(true);
-      setError(null);
-
-      if (isSignedIn) {
-        // Signed-in users have no per-session cap; clear the local flag.
-        writeUsedFree(false);
-        setUsedFree(false);
-        // First sign-in for this browser: push localStorage into the cloud.
-        try {
-          const migratedFor = localStorage.getItem(MIGRATED_KEY);
-          const local = loadLocal();
-          if (user?.id && migratedFor !== user.id && local.length > 0) {
-            await fetch('/api/conversations', {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ conversations: local }),
-            });
+      if (!isSignedIn) {
+        // Signed out there is nothing to list: Logos 5 keeps its own lines of
+        // thinking for a key-holder, and a guest's Core chats wait here for
+        // their first sign-in.
+        setChats([]);
+        setLines([]);
+        setHydrating(false);
+        return;
+      }
+      // First sign-in for this browser: a guest's Core chats go into the account.
+      try {
+        const migratedFor = localStorage.getItem(MIGRATED_KEY);
+        const local = loadGuestChats();
+        if (user?.id && migratedFor !== user.id && local.length > 0) {
+          const res = await fetch('/api/conversations', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ conversations: local }),
+          });
+          // Kept until the account has them: a failed write is tried again next time.
+          if (res.ok) {
             localStorage.removeItem(STORAGE_KEY);
             localStorage.removeItem(ACTIVE_KEY);
+            localStorage.setItem(MIGRATED_KEY, user.id);
           }
-          if (user?.id) localStorage.setItem(MIGRATED_KEY, user.id);
-        } catch (e) {
-          console.error('Migration failed:', e);
+        } else if (user?.id) {
+          localStorage.setItem(MIGRATED_KEY, user.id);
         }
-
-        try {
-          const res = await fetch('/api/conversations', { cache: 'no-store' });
-          if (!res.ok) {
-            const body = await res.json().catch(() => ({}));
-            throw new Error(
-              body.error || `Failed to load conversations (HTTP ${res.status})`
-            );
-          }
-          const json = await res.json();
-          if (cancelled) return;
-          const all: Conversation[] = json.conversations || [];
-          // Logos sessions share this store but not this UI: they're listed
-          // in the same sidebar and opened in Logos, where their map lives.
-          const list = all.filter((c: any) => c.kind !== 'logos');
-          setLogosSessions(
-            all
-              .filter((c: any) => c.kind === 'logos')
-              .map((c: any) => ({
-                id: c.id,
-                title: c.title,
-                nodes: c.map?.nodes?.length ?? 0,
-                updatedAt: Number(c.updatedAt) || 0,
-                projectId: typeof c.projectId === 'string' ? c.projectId : null,
-              }))
-          );
-          setConversations(list);
-          // A link into one particular chat — from the Memory page's atlas,
-          // a Project's home — opens that chat rather than the newest.
-          const wantChat = new URLSearchParams(window.location.search).get('c');
-          setActiveId(wantChat && list.some((c) => c.id === wantChat) ? wantChat : list[0]?.id ?? null);
-        } catch (e: any) {
-          if (!cancelled) setError(e?.message || 'Failed to load conversations');
-        }
-      } else {
-        const stored = loadLocal();
+      } catch (e) {
+        console.error('Migration failed:', e);
+      }
+      try {
+        const res = await fetch('/api/conversations', { cache: 'no-store' });
+        if (!res.ok) throw new Error(`Failed to load conversations (HTTP ${res.status})`);
+        const json = await res.json();
         if (cancelled) return;
-        setConversations(stored);
-        setLogosSessions(
-          loadLocalLogos().map((s) => ({
-            id: s.id,
-            title: s.title,
-            nodes: s.map?.nodes?.length ?? 0,
-            updatedAt: Number(s.updatedAt) || 0,
-          }))
-        );
-        setUsedFree(readUsedFree());
-        const lastActive =
-          typeof window !== 'undefined'
-            ? localStorage.getItem(ACTIVE_KEY)
-            : null;
-        const wantChat = new URLSearchParams(window.location.search).get('c');
-        if (wantChat && stored.some((c) => c.id === wantChat)) {
-          setActiveId(wantChat);
-        } else if (lastActive && stored.some((c) => c.id === lastActive)) {
-          setActiveId(lastActive);
-        } else {
-          setActiveId(stored[0]?.id ?? null);
-        }
-      }
-
-      if (!cancelled) setHydrating(false);
-      // A conversation that was answered twice is a person who continued past
-      // a first reply — Core's line has nothing left to say to them, and the
-      // hints it holds back may come.
-      if (!cancelled) {
-        const seasoned = (list: { messages: { role: string }[] }[]) =>
-          list.some((c) => c.messages.filter((m) => m.role === 'assistant').length >= 2);
-        setConversations((cs) => {
-          if (seasoned(cs)) {
-            firstRun.reach('core.first');
-            firstRun.reach('core.aha');
-          }
-          return cs;
+        const rows = (json.conversations || []) as any[];
+        const row = (c: any): Row => ({
+          id: c.id,
+          title: c.title,
+          updatedAt: Number(c.updatedAt) || 0,
+          projectId: typeof c.projectId === 'string' ? c.projectId : null,
         });
+        setChats(rows.filter((c) => c.kind !== 'logos').map(row));
+        setLines(rows.filter((c) => c.kind === 'logos').map(row));
+      } catch (e: any) {
+        if (!cancelled) setError(e?.message || 'Failed to load conversations');
       }
-    }
-
-    hydrate();
+      if (!cancelled) setHydrating(false);
+    })();
     return () => {
       cancelled = true;
     };
   }, [authSettled, isSignedIn, user?.id]);
 
-  // Persist active id locally for anonymous users.
-  useEffect(() => {
-    if (mode !== 'local') return;
-    if (activeId) localStorage.setItem(ACTIVE_KEY, activeId);
-  }, [activeId, mode]);
-
-  // Hydrate + persist the selected Socria model and thinking depth.
-  useEffect(() => {
-    setModel(readModel());
-    setDepth(readDepth());
-    setReadability(readReadability());
-    setReplyLength(readLength());
-    setSmartUnlocked(readSmartUnlocked());
-    try {
-      setImportedProfile(localStorage.getItem(PROFILE_KEY) || '');
-    } catch {}
-    try {
-      const rawJourney = localStorage.getItem(JOURNEY_KEY);
-      if (rawJourney) {
-        const parsed = sanitizeUserUnderstanding(JSON.parse(rawJourney));
-        // Clamp corrupt future timestamps so cloud sync can't be blocked.
-        if (parsed.updatedAt > Date.now()) parsed.updatedAt = Date.now();
-        if (hasJourneyContent(parsed)) {
-          setJourney(parsed);
-          journeyRef.current = parsed;
-        }
-      }
-    } catch {}
-  }, []);
-
-  // Signed-in users: sync the imported profile with the cloud. Cloud value
-  // wins when present; a local-only profile is pushed up once. All failures
-  // are silent — the feature degrades to local-only.
+  // ── the profile and the journey, carried up once ─────────────────
+  //
+  // The Core chat mirrored both to the account. One built signed out (with the
+  // access key, before an account existed) is pushed up the first time it is
+  // newer than the account's, so it reaches every device; the account's copy is
+  // left alone otherwise. Every failure is silent: nothing here is in the way.
   useEffect(() => {
     if (!isLoaded || !isSignedIn) return;
     let cancelled = false;
     (async () => {
       try {
         const res = await fetch('/api/profile', { cache: 'no-store' });
-        if (!res.ok) return;
+        if (!res.ok || cancelled) return;
         const json = await res.json();
-        if (cancelled) return;
-        const cloud: string = json?.profile || '';
-        const local = (() => {
-          try {
-            return localStorage.getItem(PROFILE_KEY) || '';
-          } catch {
-            return '';
-          }
-        })();
-        if (cloud) {
-          setImportedProfile(cloud);
-          try {
-            localStorage.setItem(PROFILE_KEY, cloud);
-          } catch {}
-        } else if (local) {
-          void fetch('/api/profile', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ profile: local }),
-          }).catch(() => {});
-        }
-
-        // Journey: newest copy wins (both sides carry updatedAt).
-        const cloudJourney: UserUnderstanding | null = json?.understanding
-          ? sanitizeUserUnderstanding(json.understanding)
-          : null;
-        const localJourney = journeyRef.current;
-        if (
-          cloudJourney &&
-          hasJourneyContent(cloudJourney) &&
-          (!localJourney ||
-            (cloudJourney.updatedAt || 0) >= (localJourney.updatedAt || 0))
-        ) {
-          setJourney(cloudJourney);
-          journeyRef.current = cloudJourney;
-          try {
-            localStorage.setItem(JOURNEY_KEY, JSON.stringify(cloudJourney));
-          } catch {}
-        } else if (
-          localJourney &&
-          (!cloudJourney ||
-            (localJourney.updatedAt || 0) > (cloudJourney.updatedAt || 0))
-        ) {
-          // Local copy is newer (e.g. built anonymously with the access key
-          // before signing in) — push it up so other devices see it.
-          void fetch('/api/profile', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ understanding: localJourney }),
-          }).catch(() => {});
-        }
+        const put = (body: object) =>
+          void fetch('/api/profile', { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) }).catch(() => {});
+        const localProfile = localStorage.getItem(PROFILE_KEY) || '';
+        if (json?.profile) localStorage.setItem(PROFILE_KEY, json.profile);
+        else if (localProfile) put({ profile: localProfile });
+        const raw = localStorage.getItem(JOURNEY_KEY);
+        const local: UserUnderstanding | null = raw ? sanitizeUserUnderstanding(JSON.parse(raw)) : null;
+        const cloud: UserUnderstanding | null = json?.understanding ? sanitizeUserUnderstanding(json.understanding) : null;
+        if (local && hasJourneyContent(local) && Math.min(local.updatedAt || 0, Date.now()) > (cloud?.updatedAt || 0)) put({ understanding: local });
       } catch {}
     })();
     return () => {
@@ -909,1330 +286,27 @@ export default function ChatPage() {
     };
   }, [isLoaded, isSignedIn]);
 
-  function saveJourney(next: UserUnderstanding) {
-    // Never regress: a slow in-flight update resolving late must not
-    // overwrite a newer journey (and then propagate via newest-wins sync).
-    const cur = journeyRef.current;
-    if (cur && (next.updatedAt || 0) < (cur.updatedAt || 0)) return;
-    setJourney(next);
-    journeyRef.current = next;
-    try {
-      localStorage.setItem(JOURNEY_KEY, JSON.stringify(next));
-    } catch {}
-    if (isSignedIn) {
-      void fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ understanding: next }),
-      }).catch(() => {});
-    }
-  }
-
-  function saveImportedProfile(next: string) {
-    setImportedProfile(next);
-    try {
-      if (next) localStorage.setItem(PROFILE_KEY, next);
-      else localStorage.removeItem(PROFILE_KEY);
-    } catch {}
-    if (isSignedIn) {
-      void fetch('/api/profile', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ profile: next }),
-      }).catch(() => {});
-    }
-  }
-
-  // A signed-out browser may hold a selection from a session that had an
-  // account — Logos, Logos 2, Core 4 — and the API gate would bounce every
-  // message sent on one. Downgrade to Core 3.1, which is now the model that
-  // needs no account.
-  useEffect(() => {
-    if (!isLoaded) return;
-    if (!hasAccount && SOCRIA_MODELS[model].requiresAuth) {
-      setModel('core-3');
-      rememberModel('core-3');
-    }
-  }, [isLoaded, hasAccount, model]);
-
-  // Open on the surface they are entitled to, when they have never said
-  // otherwise.
-  //
-  // Everyone used to land on Core 2 — the model that needs no account —
-  // including people who have one and people paying for the environment Core 2
-  // is not. The product opened on its own weakest surface and waited to be
-  // corrected, which is a strange thing to do to somebody who just signed in
-  // and a worse one to do to a member.
-  //
-  // Waits for BOTH answers. Clerk decides whether Core 3.1 is theirs and the
-  // plan route decides whether Logos is; resolving on the first alone would
-  // land a member on Core 3.1 and then move them, and a surface that changes
-  // under somebody is worse than one that took a moment.
-  //
-  // Written back so it happens once per browser rather than on every load:
-  // the next visit reads it during hydration and opens there directly, with
-  // no flash. Written WITHOUT the chosen flag, so it stays a default — if
-  // their membership lapses they are moved back, and the moment they pick
-  // anything themselves this stops deciding for them.
-  useEffect(() => {
-    if (!isLoaded || !planState.known || modelWasChosen()) return;
-    const next = autoModel({ hasAccount, isOne: planState.plan === 'one' });
-    setModel(next);
-    rememberModel(next);
-  }, [isLoaded, planState.known, planState.plan, hasAccount]);
-
-  // The note is about the conversation it moved. Opening another one clears
-  // it, or it would sit over a thread it has nothing to do with.
-  useEffect(() => {
-    setMoveSaid(null);
-  }, [activeId]);
-
-  function pickModel(next: SocriaModel) {
-    const config = SOCRIA_MODELS[next];
-    // Gated model, and the user hasn't signed in or unlocked with the key:
-    // open the introduction for the model they actually reached for. Sending
-    // somebody who pressed Core 4 to a Logos pitch answers a question they
-    // did not ask.
-    if (config.requiresAuth && !hasAccount) {
-      if (next === 'core-4') setCore4IntroOpen(true);
-      else setLogosModalOpen(true);
-      return;
-    }
-    // Logos lives on its own route — it needs the split screen for the map.
-    if (config.href) {
-      router.push(config.href);
-      return;
-    }
-
-    // ── THE PICKER IS A SWITCHER, AND IT TAKES THE CONVERSATION WITH IT ──
-    //
-    // Choosing a model used to change only which engine answered next. If the
-    // new model lived on the other surface the conversation did not come — it
-    // stayed behind on a surface the new one could not even see, because
-    // `kind` was a gate rather than a memory. Somebody with four model
-    // specifications typed into Core chats could not open one of them where
-    // models are drawn.
-    //
-    // So: picking a model moves the conversation you are in. Its messages, its
-    // title, its map, its draft and its Project are untouched — see
-    // lib/conversation-surface.ts — and `kind` records where it now lives, so
-    // coming back to it later opens it where you left it.
-    const open = conversations.find((c) => c.id === activeId);
-    if (open && moves(open as Placeable, config)) {
-      const to = surfaceForModel(config);
-      setConversations((list) =>
-        list.map((c) => (c.id === open.id ? ({ ...c, kind: to } as typeof c) : c))
-      );
-      if (mode === 'cloud') {
-        void fetch('/api/conversations', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id: open.id, kind: to }),
-        }).catch(() => {});
-      }
-      // Said, because a thread arriving on a different surface is the most
-      // disorienting thing this control can do and they may have been browsing.
-      const note = moveNote(open as Placeable, config);
-      if (note) setMoveSaid(note);
-    }
-
-    setModel(next);
-    chooseModel(next);
-  }
-
-  // Validate + persist a typed access key. Resolves true when accepted.
-  //
-  // The page cannot answer this itself any more, and should never have been
-  // able to: judging a code locally meant the code was IN the page, and so in
-  // every visitor's browser. It now asks the server, which compares against
-  // its environment and — on success — sets an httpOnly grant cookie. The
-  // localStorage flag below is only so the UI remembers; the cookie is the
-  // authority, and a forged flag unlocks nothing the server will honour.
-  async function handleUnlockKey(key: string): Promise<boolean> {
-    let scope: 'core' | 'one' | null = null;
-    try {
-      const res = await fetch('/api/access/unlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: key }),
-      });
-      if (!res.ok) return false;
-      const json = await res.json().catch(() => null);
-      if (!json?.ok) return false;
-      scope = json.scope === 'one' ? 'one' : 'core';
-    } catch {
-      return false;
-    }
-    setSmartUnlocked(true);
-    try {
-      localStorage.setItem(SMART_KEY_STORAGE, '1');
-      if (scope === 'one') {
-        localStorage.setItem('socria.one.v1', '1');
-        void fetch('/api/logos/redeem', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ code: key }),
-        }).catch(() => {});
-      }
-    } catch {}
-    return true;
-  }
-  function pickDepth(next: ThinkingDepth) {
-    setDepth(next);
-    try {
-      localStorage.setItem(DEPTH_KEY, next);
-    } catch {}
-  }
-  function pickReadability(next: Readability) {
-    setReadability(next);
-    rememberReadability(next);
-  }
-  function pickLength(next: ReplyLength) {
-    setReplyLength(next);
-    rememberLength(next);
-  }
-
-  // The one thing this page opens with, once.
-  //
-  // It used to be the Logos invitation. Logos is one surface among several
-  // now, and the thing worth somebody's first thirty seconds is the model they
-  // are about to talk to — so Core 4 has the slot and Logos keeps its pill in
-  // the rail, which is where an invitation to a different surface belongs.
-  //
-  // Not shown to somebody already on Core 4 (they have it), nor on a Logos
-  // surface (a modal about the chat, over the map, is an interruption about
-  // something else). Both dismissals are still read, so nobody who has said no
-  // to either is asked again.
-  // THE ANNOUNCEMENT NO LONGER OPENS ITSELF. A modal about the model, over
-  // the chat, before a word has been exchanged, was the product explaining
-  // itself in place of behaving. The dismissals are still read — the pill
-  // beside the composer and the picker open the introduction on request, and
-  // nobody who said "don't show again" is shown it that way either.
-  useEffect(() => {
-    if (!isLoaded || autoOpenChecked) return;
-    setAutoOpenChecked(true);
-    try {
-      setLogosDismissed(localStorage.getItem(LOGOS_INTRO_DISMISS_KEY) === '1');
-      setCore4Dismissed(localStorage.getItem(CORE4_INTRO_DISMISS_KEY) === '1');
-    } catch {}
-  }, [isLoaded, autoOpenChecked]);
-
-  function handleCore4IntroClose(dontShowAgain: boolean) {
-    if (dontShowAgain) {
-      try {
-        localStorage.setItem(CORE4_INTRO_DISMISS_KEY, '1');
-      } catch {}
-      setCore4Dismissed(true);
-    }
-    setCore4IntroOpen(false);
-  }
-
-  /**
-   * "Start on Core 4" — or sign in, for somebody who cannot yet.
-   *
-   * The dismiss is written only for the people who actually got there. A
-   * visitor sent to sign-in has not seen Core 4, and marking the announcement
-   * as read on their way out would mean they never see it again.
-   */
-  function handleCore4IntroStart() {
-    if (hasAccount) {
-      try {
-        localStorage.setItem(CORE4_INTRO_DISMISS_KEY, '1');
-      } catch {}
-      setCore4Dismissed(true);
-      setCore4IntroOpen(false);
-      setModel('core-4');
-      chooseModel('core-4');
-      return;
-    }
-    setCore4IntroOpen(false);
-    router.push('/sign-in?redirect_url=%2Fchat%3Fmodel%3Dcore-4');
-  }
-
-  function handleLogosModalClose(dontShowAgain: boolean) {
-    if (dontShowAgain) {
-      try {
-        localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
-      } catch {}
-      setLogosDismissed(true);
-    }
-    setLogosModalOpen(false);
-  }
-
-  function handleLogosModalTry() {
-    // Anyone with access goes straight in and stops being nudged. Anyone else
-    // is sent to sign-in WITHOUT a permanent dismiss, so the invitation is
-    // still there when they come back with an account.
-    if (hasAccount) {
-      try {
-        localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
-      } catch {}
-      setLogosDismissed(true);
-      setLogosModalOpen(false);
-      openNewestLogos();
-      return;
-    }
-    setLogosModalOpen(false);
-    router.push(`/sign-in?redirect_url=%2Fchat%3Fmodel%3D${coverVersion}`);
-  }
-
-  /**
-   * Into the Logos surface — whichever one is currently offered.
-   *
-   * Written as one function rather than two `setModel('logos')` calls because
-   * Logos 1 is WITHDRAWN (see `withdrawn` in lib/socria-prompt.ts) and sending
-   * somebody to a model the picker no longer lists would drop them on a surface
-   * they cannot get back to. withdrawnTo finds the successor structurally, so
-   * turning the flag off restores the old behaviour with no edit here.
-   */
-  function openLogos() {
-    const want: SocriaModel = SOCRIA_MODELS.logos.withdrawn
-      ? (withdrawnTo('logos') ?? 'logos-2')
-      : 'logos';
-    setModel(want);
-    chooseModel(want);
-  }
-
-  // A valid access key opens the whole product, so it goes straight to Logos.
-  async function handleLogosModalUnlock(key: string): Promise<boolean> {
-    if (!(await handleUnlockKey(key))) return false;
-    try {
-      localStorage.setItem(LOGOS_INTRO_DISMISS_KEY, '1');
-    } catch {}
-    setLogosDismissed(true);
-    setLogosModalOpen(false);
-    openLogos();
-    return true;
-  }
-
-  // The empty screen's chips. An open thread is an unfinished line of thought,
-  // so it outranks a finished conversation's title; both outrank the generic
-  // openings, which stay to top the list up and to keep one way in to
-  // something new.
-  const returnChips = (journey?.openThreads ?? [])
-    .filter((t) => t.returnCue)
-    .sort((a, b) => b.lastTouched - a.lastTouched)
-    .slice(0, planState.plan === 'one' ? 3 : 1);
-
-  const starters = buildStarters({
-    // What the journey extractor thinks this person would want to ask next,
-    // from what they have actually been working through. Everything below is
-    // a fallback for when it has nothing — a new account, an everyday chat,
-    // or a model call that has not happened yet.
-    suggestions: journey?.nextQuestions,
-    threads: journey?.openThreads,
-    recent: conversations.map((c) => ({ title: c.title, updatedAt: c.updatedAt })),
-    fallback: STARTER_PROMPTS,
-  });
-
-  // One sidebar, one order. Chat sessions and Logos sessions are the same
-  // thing to the person reading the list — something they were thinking about
-  // — so they interleave by when each was last touched. The Logos mark on the
-  // row says which surface opens it; no heading files them apart.
-  // A chat in a folder is shown in its folder, not also in the dated list —
-  // unless the person is searching, when every chat is a candidate wherever
-  // it lives. A chat whose Project no longer exists is simply unfiled.
-  const filed = (c: { projectId?: string | null }) => !!c.projectId && projects.some((p) => p.id === c.projectId);
-  const allRail = [
-    ...conversations.map((c) => ({
-      kind: 'chat' as const,
-      id: c.id,
-      title: c.title,
-      updatedAt: c.updatedAt,
-      nodes: 0,
-      projectId: c.projectId ?? null,
-    })),
-    ...logosSessions.map((s) => ({ kind: 'logos' as const, ...s, projectId: s.projectId ?? null })),
-  ].sort((a, b) => b.updatedAt - a.updatedAt);
-  const sessionRail = allRail.filter((r) => !filed(r));
-
-  // ...but once the list is long, "which of these has the map I drew" is a
-  // question the ordering cannot answer. Two filters answer it — type a word,
-  // or ask for the ones with maps — and three headings say where in the week
-  // each row sits. All three live in lib/session-rail.ts.
-  //
-  // The controls only appear once the list is long enough to need them; the
-  // same threshold the tab bar used, for the same reason. A search box over
-  // four rows is furniture.
-  const railSearchable = shouldShowSearch(allRail);
-  const railFiltering = railSearchable && (!!railQuery || mapsOnly);
-  const railHits = railFiltering ? searchRail(allRail, railQuery, mapsOnly) : sessionRail;
-  const railGroups = groupRail(railHits);
-  // The chip is hidden on its own when nothing would survive it. A filter
-  // whose only outcome is "nothing here" teaches people not to press it.
-  const railHasMaps = allRail.some((i) => i.nodes > 0);
-
-  /**
-   * Rename a row, whichever surface it belongs to.
-   *
-   * Both kinds live in the same table, so both rename through the same PATCH.
-   * A chat's `autoTitledAs` is left as it was on purpose: the extractor only
-   * replaces a title that still matches that string, so a name set here stops
-   * being overwritten from the moment it is typed, with no extra flag.
-   */
-  function renameRow(kind: 'chat' | 'logos', id: string, title: string) {
-    if (kind === 'chat') {
-      const next = conversations.map((c) => (c.id === id ? { ...c, title } : c));
-      setConversations(next);
-      if (mode === 'local') saveLocal(next);
-    } else {
-      setLogosSessions((list) => list.map((s) => (s.id === id ? { ...s, title } : s)));
-      if (mode === 'local') {
-        // The rail holds a summary of each Logos session, not the session —
-        // so the rename is applied to the stored one, which has the map and
-        // the messages in it.
-        const stored = loadLocalLogos();
-        saveLocalLogos(stored.map((s) => (s.id === id ? { ...s, title } : s)));
-      }
-    }
-    if (mode === 'cloud') {
-      void fetch('/api/conversations', {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ id, title }),
-      }).catch(() => {});
-    }
-  }
-
-  // ── a message in the wrong conversation ────────────────────────────
-  useEffect(() => {
-    try {
-      const n = Number(localStorage.getItem(DRIFT_KEY) || '0');
-      if (Number.isFinite(n) && n > 0) setDriftDismissals(n);
-    } catch {}
-  }, []);
-
-  /**
-   * "I meant it here."
-   *
-   * Counted and remembered, because somebody whose work genuinely ranges
-   * across subjects should not be asked about it forever. After
-   * DRIFT_DISMISS_LIMIT the detector stops firing for them entirely.
-   */
-  function dismissDrift() {
-    setDrift(null);
-    setDriftDismissals((n) => {
-      const next = n + 1;
-      try {
-        localStorage.setItem(DRIFT_KEY, String(next));
-      } catch {}
-      return next;
-    });
-  }
-
-  /**
-   * Move the misfiled message into a session of its own.
-   *
-   * The message leaves the old conversation along with whatever was said in
-   * reply — an answer to a question that is no longer there is worse than
-   * nothing — and is sent again in a fresh one, so the thread it interrupted
-   * reads as though it was never interrupted.
-   */
-  function moveDriftToNewSession() {
-    const d = drift;
-    if (!d) return;
-    setDrift(null);
-    const trimmed = conversations.map((c) => {
-      if (c.id !== d.from) return c;
-      let cut = c.messages.length;
-      for (let i = c.messages.length - 1; i >= 0; i--) {
-        if (c.messages[i].role === 'user' && c.messages[i].content === d.text) {
-          cut = i;
-          break;
-        }
-      }
-      return { ...c, messages: c.messages.slice(0, cut) };
-    });
-    setConversations(trimmed);
-    if (mode === 'local') saveLocal(trimmed);
-    setActiveId(null);
-    setSidebarOpen(false);
-    // Same reason as newSession: a filtered rail would hide the session this
-    // message was just moved into.
-    setRailQuery('');
-    setMapsOnly(false);
-    // `send` would otherwise read the list it was rendered with, and put the
-    // message back into the conversation it was just taken out of.
-    void send(d.text, { convos: trimmed, id: null });
-  }
-
-  /** Take what was typed, or leave the name alone if it was emptied. */
-  function commitRename(kind: 'chat' | 'logos', id: string) {
-    const next = cleanTitle(renameDraft);
-    if (next) renameRow(kind, id, next);
-    setRenaming(null);
-  }
-
-  // Scroll to bottom when messages or stream changes
-  const active = conversations.find((c) => c.id === activeId);
-
-  // Onboarding's sentence, sent to Core once the conversations are in and the
-  // model they chose has been applied (Logos sends its own — see LogosApp).
-  useEffect(() => {
-    if (!autoSend || autoSend.logos || hydrating || sending || isLogosSurface(model)) return;
-    const text = autoSend.text;
-    setAutoSend(null);
-    setInput('');
-    void send(text);
-    // send reads the state it needs when it runs
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [autoSend, hydrating, sending, model]);
-  // …and once Socria's first answer has landed, the tour: a few notes, once.
-  useEffect(() => {
-    if (isLogosSurface(model) || sending) return;
-    if (!active?.messages.some((m) => m.role === 'assistant')) return;
-    let done = false;
-    try {
-      done = localStorage.getItem(TOUR_KEY) === '1';
-    } catch {}
-    const may = shouldRunTour({
-      done,
-      signedIn: !!isSignedIn,
-      justOnboarded: tourAfter && justOnboarded.current,
-      blocked: anythingOpen,
-    });
-    if (!may) return;
-    const t = setTimeout(() => {
-      setTourAfter(false);
-      setTourOpen(true);
-    }, 900);
-    return () => clearTimeout(t);
-  }, [tourAfter, model, sending, active?.messages, anythingOpen, isSignedIn]);
-  useEffect(() => {
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [active?.messages.length, streamed]);
-
-  // Fire-and-forget: extract updated thread memory from the latest exchange,
-  // patch the conversation with it, and persist to cloud/local. Core 3 only.
-  async function extractAndPersistMemory(
-    convoId: string,
-    convo: Conversation,
-    opts: { titleOnly?: boolean } = {}
-  ) {
-    try {
-      // Core 4 already has a title by its second turn; after that there is
-      // nothing for this call to do for it.
-      if (opts.titleOnly && convo.messages.filter((m) => m.role === 'user').length > 2) return;
-      const res = await fetch('/api/extract-memory', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({
-          // Words, with attachments named — a whole PDF is not thread memory.
-          messages: wordsOnly(convo.messages),
-          currentMemory: convo.memory ?? EMPTY_MEMORY,
-          ...(opts.titleOnly ? { titleOnly: true } : {}),
-        }),
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      const nextMemory: ConversationMemory | undefined = json?.memory;
-      const suggestedTitle: string | null = json?.suggestedTitle ?? null;
-      if (!nextMemory) return;
-
-      // The free tier's thread memory has stopped updating. Nothing on
-      // screen changed and the reply was the same; the note is shown once,
-      // and only from the turn where the stop could actually be felt — past
-      // the point where the raw history window (MAX_HISTORY/2 of the
-      // person's turns) has itself begun to slide.
-      if (json?.frozen === true && !(convo.memory?.frozenAt ?? 0)) {
-        const userTurns = convo.messages.filter((m) => m.role === 'user').length;
-        if (userTurns > 15) nextMemory.frozenAt = userTurns;
-      } else if (convo.memory?.frozenAt && json?.frozen !== true) {
-        // The thread is being carried again — they subscribed, or the plan
-        // resolver had a bad moment. Either way the note is about a boundary
-        // that is not there, and a stale flag would put a free-tier line
-        // about Socria One in front of a member on every reload.
-        delete nextMemory.frozenAt;
-      } else if (convo.memory?.frozenAt) {
-        nextMemory.frozenAt = convo.memory.frozenAt;
-      }
-
-      let latestPatched: Conversation | undefined;
-      setConversations((prev) => {
-        const next = prev.map((c) => {
-          if (c.id !== convoId) return c;
-          // Preserve any insight state that lives in the CURRENT conversation
-          // memory. The extractor ran on a snapshot captured before the
-          // insight was generated (both fire in parallel), so its response's
-          // insight fields are stale — merging live state here prevents the
-          // insight card from being wiped a beat after it appears.
-          const mergedMemory: ConversationMemory = {
-            ...nextMemory,
-            latestInsight:
-              c.memory?.latestInsight ?? nextMemory.latestInsight ?? null,
-            lastInsightAtTurn: Math.max(
-              c.memory?.lastInsightAtTurn ?? 0,
-              nextMemory.lastInsightAtTurn ?? 0
-            ),
-            latestSynthesis:
-              c.memory?.latestSynthesis ?? nextMemory.latestSynthesis ?? null,
-            lastSynthesisAtTurn: Math.max(
-              c.memory?.lastSynthesisAtTurn ?? 0,
-              nextMemory.lastSynthesisAtTurn ?? 0
-            ),
-          };
-          const patch: Partial<Conversation> = { memory: mergedMemory };
-          // Auto-title: only replace if the current title is either the
-          // default, the first-user-message stub, or a prior auto-suggestion.
-          // Once the user renames manually (via a future rename UI), the
-          // stored title no longer matches `autoTitledAs` and we won't touch it.
-          if (suggestedTitle) {
-            const firstUser = c.messages.find((m) => m.role === 'user');
-            const firstUserStub = firstUser
-              ? firstUser.content
-                  .slice(0, 60)
-                  .replace(/\s+/g, ' ')
-                  .trim()
-              : null;
-            const looksAuto =
-              c.title === 'New thought session' ||
-              c.title === c.autoTitledAs ||
-              (firstUserStub != null && c.title === firstUserStub);
-            if (looksAuto && suggestedTitle !== c.title) {
-              patch.title = suggestedTitle;
-              patch.autoTitledAs = suggestedTitle;
-              patch.updatedAt = Date.now();
-            }
-          }
-          return { ...c, ...patch };
-        });
-        latestPatched = next.find((c) => c.id === convoId);
-        if (mode === 'local') saveLocal(next);
-        return next;
-      });
-
-      if (mode === 'cloud' && latestPatched) {
-        // Persist the memory update to Supabase without waiting.
-        try {
-          await fetch('/api/conversations', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversation: latestPatched }),
-          });
-        } catch (e) {
-          console.error('Persist memory update failed:', e);
-        }
-      }
-
-      // Cross-conversation journey: every few turns, fold this
-      // conversation's evolving memory into the user-level understanding
-      // (narrative, open threads, timeline). Fire-and-forget; failures
-      // leave the previous journey intact.
-      const journeyTurns = convo.messages.filter(
-        (m) => m.role === 'user'
-      ).length;
-      // Not for Core 4: it does not read the journey (see the call site).
-      if (!opts.titleOnly && journeyTurns >= JOURNEY_EVERY_TURNS && journeyTurns % JOURNEY_EVERY_TURNS === 0) {
-        try {
-          const jr = await fetch('/api/update-understanding', {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-            body: JSON.stringify({
-              understanding: journeyRef.current ?? undefined,
-              memory: latestPatched?.memory ?? nextMemory,
-              title: latestPatched?.title ?? convo.title,
-              messages: wordsOnly(convo.messages),
-              surface: 'core',
-              conversationId: convoId,
-            }),
-          });
-          if (jr.ok) {
-            const jj = await jr.json();
-            if (jj?.understanding) saveJourney(jj.understanding);
-          }
-        } catch {}
-      }
-    } catch (e) {
-      console.error('Memory extraction failed:', e);
-    }
-  }
-
-  // Generate an Insight Card in the background. Only fires when the
-  // conversation has meaningful depth and we haven't shown one recently.
-  async function maybeGenerateInsight(convoId: string, convo: Conversation) {
-    const userTurns = convo.messages.filter(
-      (m) => m.role === 'user'
-    ).length;
-    if (userTurns < INSIGHT_MIN_USER_TURNS) return;
-    const lastAt = convo.memory?.lastInsightAtTurn ?? 0;
-    if (userTurns - lastAt < INSIGHT_MIN_GAP) return;
-    // Don't stack a new insight on top of an unread one.
-    if (convo.memory?.latestInsight) return;
-
-    try {
-      const res = await fetch('/api/generate-insight', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({
-          messages: convo.messages,
-          memory: convo.memory ?? EMPTY_MEMORY,
-          atTurn: userTurns,
-        }),
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      const insight: Insight | null = json?.insight ?? null;
-      if (!insight) return;
-
-      let latestPatched: Conversation | undefined;
-      setConversations((prev) => {
-        const next = prev.map((c) => {
-          if (c.id !== convoId) return c;
-          const nextMemory = {
-            ...(c.memory ?? EMPTY_MEMORY),
-            latestInsight: insight,
-            lastInsightAtTurn: userTurns,
-          };
-          return { ...c, memory: nextMemory };
-        });
-        latestPatched = next.find((c) => c.id === convoId);
-        if (mode === 'local') saveLocal(next);
-        return next;
-      });
-
-      if (mode === 'cloud' && latestPatched) {
-        try {
-          await fetch('/api/conversations', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversation: latestPatched }),
-          });
-        } catch (e) {
-          console.error('Persist insight failed:', e);
-        }
-      }
-    } catch (e) {
-      console.error('Insight generation failed:', e);
-    }
-  }
-
-  function dismissInsight(convoId: string) {
-    let latestPatched: Conversation | undefined;
-    setConversations((prev) => {
-      const next = prev.map((c) => {
-        if (c.id !== convoId) return c;
-        const nextMemory = {
-          ...(c.memory ?? EMPTY_MEMORY),
-          latestInsight: null,
-        };
-        return { ...c, memory: nextMemory };
-      });
-      latestPatched = next.find((c) => c.id === convoId);
-      if (mode === 'local') saveLocal(next);
-      return next;
-    });
-    if (mode === 'cloud' && latestPatched) {
-      // Fire and forget — server-side just needs the cleared state.
-      fetch('/api/conversations', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation: latestPatched }),
-      }).catch((e) => console.error('Persist insight dismiss failed:', e));
-    }
-  }
-
-  // Auto-synthesis: on a depth-paced cadence, generate a structured
-  // synthesis of the conversation and store it as an interactive card.
-  // Re-fires as the conversation grows (larger gap for later syntheses).
-  async function maybeGenerateSynthesis(convoId: string, convo: Conversation) {
-    const userTurns = convo.messages.filter((m) => m.role === 'user').length;
-    const { firstAt, gap } = synthesisCadence(depth);
-    const lastAt = convo.memory?.lastSynthesisAtTurn ?? 0;
-    // Not enough conversation yet for the first synthesis.
-    if (userTurns < firstAt) return;
-    // Respect the cadence gap after a prior synthesis.
-    if (lastAt > 0 && userTurns - lastAt < gap) return;
-    // Don't stack a new synthesis on top of an unread one.
-    if (convo.memory?.latestSynthesis) return;
-
-    try {
-      const res = await fetch('/api/generate-synthesis', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({
-          messages: convo.messages,
-          memory: convo.memory ?? EMPTY_MEMORY,
-          depth,
-          atTurn: userTurns,
-        }),
-      });
-      if (!res.ok) return;
-      const json = await res.json();
-      const synthesis: SynthesisData | null = json?.synthesis ?? null;
-      if (!synthesis || !synthesis.sections?.length) return;
-
-      let latestPatched: Conversation | undefined;
-      setConversations((prev) => {
-        const next = prev.map((c) => {
-          if (c.id !== convoId) return c;
-          const nextMemory = {
-            ...(c.memory ?? EMPTY_MEMORY),
-            latestSynthesis: synthesis,
-            lastSynthesisAtTurn: userTurns,
-          };
-          return { ...c, memory: nextMemory };
-        });
-        latestPatched = next.find((c) => c.id === convoId);
-        if (mode === 'local') saveLocal(next);
-        return next;
-      });
-
-      if (mode === 'cloud' && latestPatched) {
-        try {
-          await fetch('/api/conversations', {
-            method: 'PUT',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ conversation: latestPatched }),
-          });
-        } catch (e) {
-          console.error('Persist synthesis failed:', e);
-        }
-      }
-    } catch (e) {
-      console.error('Synthesis generation failed:', e);
-    }
-  }
-
-  function dismissSynthesis(convoId: string) {
-    let latestPatched: Conversation | undefined;
-    setConversations((prev) => {
-      const next = prev.map((c) => {
-        if (c.id !== convoId) return c;
-        return {
-          ...c,
-          memory: { ...(c.memory ?? EMPTY_MEMORY), latestSynthesis: null },
-        };
-      });
-      latestPatched = next.find((c) => c.id === convoId);
-      if (mode === 'local') saveLocal(next);
-      return next;
-    });
-    if (mode === 'cloud' && latestPatched) {
-      fetch('/api/conversations', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ conversation: latestPatched }),
-      }).catch((e) => console.error('Persist synthesis dismiss failed:', e));
-    }
-  }
-
-  async function persistConversation(c: Conversation, allConvos: Conversation[]) {
-    if (mode === 'cloud') {
-      try {
-        await fetch('/api/conversations', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation: c }),
-        });
-      } catch (e) {
-        console.error('Could not save conversation to cloud:', e);
-      }
-    } else {
-      saveLocal(allConvos);
-    }
-  }
-
-  async function removeConversation(id: string) {
-    if (mode === 'cloud') {
-      try {
-        await fetch(`/api/conversations/${encodeURIComponent(id)}`, {
-          method: 'DELETE',
-        });
-      } catch (e) {
-        console.error('Could not delete conversation in cloud:', e);
-      }
-    }
-    // For local mode, saveLocal is called by the caller after state update.
-  }
-
-  function newSession() {
-    // Anonymous users only get one session; nudge to sign-in for a second.
-    if (lockedOut) {
-      router.push('/sign-in?redirect_url=/chat');
-      return;
-    }
-    // An ordinary session. Starting one from the rail after arriving from a
-    // Project must not quietly file it under that Project.
-    setProjectEntry(null);
-    setHomeProject(null);
-    setSharedOpen(null);
-    const id = uid();
-    const fresh: Conversation = {
-      id,
-      title: 'New thought session',
-      messages: [],
-      updatedAt: Date.now(),
-    };
-    const next = [fresh, ...conversations];
-    setConversations(next);
-    setActiveId(id);
-    setSidebarOpen(false);
-    setError(null);
-    // Clear the rail's filters. With a word in the search box or the Maps-only
-    // chip down, the new row did not match and simply never appeared — the
-    // button looked broken while quietly working.
-    setRailQuery('');
-    setMapsOnly(false);
-    // Don't write empty sessions to the cloud; they'll be saved on first message.
-    if (mode === 'local') saveLocal(next);
-  }
-
-  async function deleteSession(id: string) {
-    if (!confirm('Delete this thought session?')) return;
-    const next = conversations.filter((c) => c.id !== id);
-    setConversations(next);
-    if (activeId === id) {
-      setActiveId(next.length > 0 ? next[0].id : null);
-    }
-    if (mode === 'local') saveLocal(next);
-    await removeConversation(id);
-  }
-
-  function handleInputChange(e: React.ChangeEvent<HTMLTextAreaElement>) {
-    setInput(e.target.value);
-    if (textareaRef.current) {
-      textareaRef.current.style.height = 'auto';
-      textareaRef.current.style.height =
-        Math.min(textareaRef.current.scrollHeight, 220) + 'px';
-    }
-  }
-
-  /**
-   * `start` is for the one caller that has already rewritten the list and
-   * cannot wait a render for state to catch up: moving a misfiled message to
-   * a session of its own.
-   */
-  async function send(
-    content: string,
-    start?: { convos: Conversation[]; id: string | null },
-    atts: Attachment[] = [],
-    replying: ReplyRef | null = null
-  ): Promise<boolean> {
-    const text = content.trim();
-    if ((!text && !atts.length) || sending) return false;
-    // A message that is only a file is titled by the file.
-    const titleText = text || atts.map((a) => a.name).filter(Boolean).join(', ') || 'Attachment';
-    setError(null);
-
-    // Anonymous user trying to spin up a *second* session — gate to sign-in.
-    // (They can keep messaging inside their existing session; activeId is set.)
-    // Key-unlocked users bypass the cap.
-    if (
-      !isSignedIn &&
-      !smartUnlocked &&
-      !activeId &&
-      (usedFree || conversations.length >= 1)
-    ) {
-      router.push('/sign-in?redirect_url=/chat');
-      return false;
-    }
-
-    // Ensure we have an active conversation
-    let workingId = start ? start.id : activeId;
-    let working = start ? start.convos : conversations;
-    if (!workingId) {
-      const id = uid();
-      const fresh: Conversation = {
-        id,
-        title: 'New thought session',
-        messages: [],
-        updatedAt: Date.now(),
-        ...(projectEntry ? { projectId: projectEntry.id } : {}),
-      };
-      // `working`, not `conversations` — a caller that handed us a rewritten
-      // list means it, and reaching past it here would undo the rewrite.
-      working = [fresh, ...working];
-      workingId = id;
-      setActiveId(id);
-    }
-
-    // Append user message
-    const withUser = working.map((c) =>
-      c.id === workingId
-        ? {
-            ...c,
-            messages: [
-              ...c.messages,
-              {
-                id: newMsgId(),
-                role: 'user' as Role,
-                content: text,
-                ...(atts.length ? { attachments: atts } : {}),
-                ...(replying ? { replyTo: replying } : {}),
-              },
-            ],
-            updatedAt: Date.now(),
-            title:
-              c.title === 'New thought session' && c.messages.length === 0
-                ? titleText.slice(0, 60).replace(/\s+/g, ' ').trim()
-                : c.title,
-          }
-        : c
-    );
-    setConversations(withUser);
-    if (mode === 'local') saveLocal(withUser);
-
-    // The first thought, anywhere — once, ever (lib/first-run.ts). And if
-    // Core's one line is on screen, continuing past it is the thing it was
-    // waiting for: the difference has been read and used.
-    firstRun.reach('socria.thought');
-    if (coreLine) setCoreLine(null);
-    // Continuing a conversation that has already answered once IS the aha —
-    // whether or not the line is still on screen (a refresh loses the line,
-    // which is a moment, not a state; it must not lose the fact).
-    if (working.find((c) => c.id === workingId)?.messages.some((m) => m.role === 'assistant')) {
-      firstRun.reach('core.first');
-      firstRun.reach('core.aha');
-    }
-
-    setInput('');
-    // Once, here, on the message as sent — never while typing, and judged
-    // against the conversation as it was a moment ago. The reply proceeds
-    // either way; this only decides whether a note appears beside it.
-    const before = working.find((c) => c.id === workingId);
-    const v = readDrift({
-      message: text,
-      title: before?.title === 'New thought session' ? undefined : before?.title,
-      recent: (before?.messages ?? []).map((m) => m.content),
-      dismissals: driftDismissals,
-    });
-    setDrift(v.flag && workingId ? { ...v, text, from: workingId } : null);
-
-    if (textareaRef.current) textareaRef.current.style.height = 'auto';
-    setSending(true);
-    setStreamed('');
-    // Every turn starts at the honest default and is moved only by a marker
-    // from the operation itself.
-    setActivity('thinking');
-
-    try {
-      const convoForRequest = withUser.find((c) => c.id === workingId)!;
-      const res = await fetch('/api/chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
-        body: JSON.stringify({
-          // Files go only to Core 4, and only as much of them as the budget
-          // allows — older ones travel as their opening (lib/chat-attachments.ts).
-          messages: forRequest(convoForRequest.messages, model === 'core-4'),
-          model,
-          depth,
-          // How they want it written. The route validates both rather than
-          // trusting them, and neither reaches the reasoning.
-          readability,
-          length: replyLength,
-          memory: convoForRequest.memory ?? EMPTY_MEMORY,
-          profile: importedProfile || undefined,
-          understanding: journey ?? undefined,
-          // Which conversation this is. The Mind Graph needs it to tell one
-          // afternoon from a pattern: a claim about the person is only
-          // believed once a DIFFERENT conversation has suggested it too, and
-          // without an id there is nothing to compare.
-          conversationId: workingId ?? undefined,
-          // The Project it is in. Retrieval gives that region of the graph
-          // priority — it does not wall anything else off.
-          projectId: convoForRequest.projectId ?? undefined,
-          // what they told onboarding they mostly think about (an id, or nothing)
-          role: readRole() ?? undefined,
-          // what they asked to be called (sanitised again on the server)
-          name: readName() ?? undefined,
-          // the Conversation Style chosen for the account — read at send
-          // time, so a change made mid-conversation shapes the next reply
-          conversationStyle: conversationStyleRef.current,
-        }),
-      });
-
-      if (!res.ok) {
-        const body = await res.json().catch(() => ({}));
-        // A boundary, not a failure: the free day's messages or new chats are
-        // spent. They pressed send and it stopped, so the answer to "why" is
-        // owed immediately — that is what an entitlement prompt is, and it is
-        // the one kind this system never rations.
-        if (res.status === 402 && (body?.upgrade === 'core-messages' || body?.upgrade === 'core-chats')) {
-          askOne(body.upgrade === 'core-chats' ? 'core-chats-spent' : 'core-messages-spent');
-        }
-        throw new Error(failureText(body, 'Something went wrong'));
-      }
-      {
-        const left = res.headers.get('X-Socria-Left');
-        setMessagesLeft(left === null ? null : Math.max(0, Number(left) || 0));
-      }
-
-      const reader = res.body?.getReader();
-      const decoder = new TextDecoder();
-      let assistantText = '';
-
-      if (reader) {
-        // Two parallel loops:
-        //  1. Receive: pull chunks from the OpenAI stream into `received`.
-        //  2. Reveal:  drip `received` into `revealed` one *complete word*
-        //              at a time so each word can pop in with its own CSS
-        //              entrance animation.
-        // We never reveal a partial word mid-stream: we only advance once
-        // we have a word followed by trailing whitespace in the buffer.
-        // When the stream ends, any trailing partial word is flushed.
-        // Speed-up rules keep the lag bounded once the buffer's ahead.
-        let received = '';
-        let streamDone = false;
-
-        const reveal = new Promise<void>((resolve) => {
-          const BASE_MS = 78;
-          let revealed = '';
-          const tick = () => {
-            const lag = received.length - revealed.length;
-
-            if (lag > 0) {
-              const remaining = received.slice(revealed.length);
-              // Take one full word + its trailing whitespace.
-              const m = remaining.match(/^(\s*\S+\s+)/);
-              if (m) {
-                const advanceWords =
-                  lag > 220 ? 4 : lag > 100 ? 2 : 1;
-                let take = 0;
-                let rest = remaining;
-                for (let i = 0; i < advanceWords; i++) {
-                  const mi = rest.match(/^(\s*\S+\s+)/);
-                  if (!mi) break;
-                  take += mi[0].length;
-                  rest = rest.slice(mi[0].length);
-                }
-                revealed = received.slice(0, revealed.length + take);
-                setStreamed(revealed);
-              } else if (streamDone) {
-                // Trailing partial word (no closing space). Flush it.
-                revealed = received;
-                setStreamed(revealed);
-              }
-            }
-
-            if (revealed.length >= received.length && streamDone) {
-              assistantText = revealed;
-              resolve();
-              return;
-            }
-
-            // Faster cadence when we're behind; gentler when caught up.
-            const next =
-              lag > 220 ? 28 : lag > 100 ? 50 : BASE_MS;
-            setTimeout(tick, next);
-          };
-          tick();
-        });
-
-        const receive = (async () => {
-          // Activity markers ride the same stream as the prose, on their own
-          // control lines, and are pulled out before a character of them can be
-          // revealed as text. `tail` carries a marker split across a chunk
-          // boundary — a partial line is not an activity yet, and must not be
-          // printed either.
-          let tail = '';
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) break;
-              const parsed = readActivity(tail + decoder.decode(value, { stream: true }));
-              tail = parsed.tail;
-              if (parsed.activities.length) setActivity(parsed.activities[parsed.activities.length - 1]);
-              received += parsed.text;
-            }
-          } finally {
-            streamDone = true;
-          }
-        })();
-
-        await Promise.all([reveal, receive]);
-      }
-
-      // Persist assistant message
-      setStreamed('');
-      const withAssistant = withUser.map((c) =>
-        c.id === workingId
-          ? {
-              ...c,
-              messages: [
-                ...c.messages,
-                { id: newMsgId(), role: 'assistant' as Role, content: assistantText },
-              ],
-              updatedAt: Date.now(),
-            }
-          : c
-      );
-      withAssistant.sort((a, b) => b.updatedAt - a.updatedAt);
-      setConversations(withAssistant);
-
-      const updated = withAssistant.find((c) => c.id === workingId)!;
-      await persistConversation(updated, withAssistant);
-
-      // CORE'S ONE LINE, under the first reply they have ever had. Real
-      // reply, real engine; the line only says what to read it against.
-      if (
-        updated.messages.filter((m) => m.role === 'assistant').length === 1 &&
-        wantsCoreLine(firstRun.state, { replies: 1, streaming: false })
-      ) {
-        setCoreLine(workingId!);
-        track('core_first_experience_started', { surface: 'core' });
-      }
-
-      // Anonymous user just finished one full exchange — they've used their
-      // free session. Any new-session attempt from here on opens the sign-in.
-      if (!isSignedIn) {
-        writeUsedFree(true);
-        setUsedFree(true);
-      }
-
-      // Thread memory: extract in the background. The next turn reads
-      // whatever is in the conversation's memory field. If this fails the
-      // conversation still works — memory just does not update.
-      //
-      // Core 4 takes a TITLE only. Its continuity is the Cognitive State and
-      // the Reasoning Ledger, written by /api/chat every turn, and its
-      // durable memory is the Mind Graph; buildSystemPrompt no longer hands
-      // it the thread memory or the Thinking Journey. Extracting them anyway
-      // would keep two more memories of the same conversation, unread, that
-      // the person could still see and correct as though they mattered.
-      if (hasAccount && model === 'core-3') {
-        void extractAndPersistMemory(workingId!, updated);
-      } else if (hasAccount && model === 'core-4') {
-        void extractAndPersistMemory(workingId!, updated, { titleOnly: true });
-      }
-      // Insight Cards and auto-synthesis stay Core 3.1's. They are surfaces
-      // of their own rather than things the prompt asks for, and Core 4 is
-      // deliberately just its prompt for now.
-      if (hasAccount && model === 'core-3') {
-        void maybeGenerateInsight(workingId!, updated);
-        void maybeGenerateSynthesis(workingId!, updated);
-      }
-    } catch (e: any) {
-      setError(e?.message || 'Failed to send');
-      // Roll back the user message we just added.
-      const rolledBack = withUser
-        .map((c) =>
-          c.id === workingId
-            ? { ...c, messages: c.messages.slice(0, -1) }
-            : c
-        )
-        .filter((c) => c.messages.length > 0 || c.id !== workingId);
-      setConversations(rolledBack);
-      if (mode === 'local') saveLocal(rolledBack);
-      if (!rolledBack.some((c) => c.id === workingId)) {
-        setActiveId(rolledBack[0]?.id ?? null);
-      }
-      setInput(text);
-      setReplyTo(replying);
-      return false;
-    } finally {
-      setSending(false);
-    }
-    return true;
-  }
-
-  const takesFiles = model === 'core-4';
-
-  /** Send what is in the box, with whatever finished reading. */
-  async function sendFromComposer() {
-    if (files.reading) return;
-    const atts = takesFiles ? files.ready() : [];
-    if (!input.trim() && !atts.length) return;
-    const kept = files.drafts;
-    if (atts.length) files.setDrafts([]);
-    const replying = replyTo;
-    setReplyTo(null);
-    const ok = await send(input, undefined, atts, replying);
-    // A failed send hands the message back — its files with it.
-    if (!ok && atts.length) files.setDrafts(kept);
-    if (ok) files.setNotice(null);
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
-    if (e.key === 'Escape' && replyTo) {
-      e.preventDefault();
-      setReplyTo(null);
-      return;
-    }
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      void sendFromComposer();
-    }
-  }
-
-  function handlePaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
-    if (!takesFiles) return;
-    const pasted = Array.from(e.clipboardData?.files ?? []);
-    if (pasted.length) {
-      e.preventDefault();
-      void files.add(pasted);
-    }
-  }
-
-  // ── Projects: folders in the rail ─────────────────────────────
-  //
-  // A Project is a folder of chats that also focuses Core 4's memory: inside
-  // one, retrieval looks at that region of the Mind Graph first, and can
-  // still reach anything else strongly relevant (lib/mind/projects.ts). Here
-  // it is just a folder — make one, open it, start a chat in it, move chats
-  // in and out.
+  // ── Projects ──────────────────────────────────────────────────────
   const loadProjects = useCallback(async () => {
-    if (!isSignedIn) { setProjects([]); setProjectsLoaded(false); return; }
+    if (!isSignedIn) {
+      setProjects([]);
+      setProjectsLoaded(false);
+      return;
+    }
     try {
       const res = await fetch('/api/projects', { cache: 'no-store' });
       if (!res.ok) return;
       const j = await res.json();
-      // A deployment without the table answers with a storage fault: no
-      // folders, and chats stay in the ordinary list where they work.
+      // A deployment without the table answers with a storage fault: no folders.
       setProjects(j.storage?.ok === false ? [] : (j.projects ?? []));
       setProjectsLoaded(true);
     } catch {}
   }, [isSignedIn]);
-  useEffect(() => { void loadProjects(); }, [loadProjects]);
-
-  // Opening a chat that lives in a folder opens the folder, so the row that
-  // is highlighted is one the person can actually see.
   useEffect(() => {
-    const pid = conversations.find((c) => c.id === activeId)?.projectId;
-    if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [activeId]);
+    void loadProjects();
+  }, [loadProjects]);
 
-  const toggleFolder = (id: string) =>
-    setOpenFolders((o) => (o.includes(id) ? o.filter((x) => x !== id) : [...o, id]));
-
-  /** Open a Project's home, and its folder with it, so its chats are in view too. */
-  function openProjectHome(id: string) {
-    setSharedOpen(null);
-    setHomeProject(id);
-    setOpenFolders((o) => (o.includes(id) ? o : [...o, id]));
-    setFindOpen(false);
-    setSidebarOpen(false);
-  }
-
-  // ?p= follows the home, so a reload or a copied link lands in the same place.
-  // Only a home that WAS open is taken out of the URL: on the first render the
-  // home is still null because ?p= has not been read yet, and removing it then
-  // is how a link to a Project used to land on an empty chat.
-  const homeWas = useRef<string | null>(null);
-  useEffect(() => {
-    try {
-      const u = new URL(window.location.href);
-      if (homeProject) u.searchParams.set('p', homeProject);
-      else if (homeWas.current) u.searchParams.delete('p');
-      homeWas.current = homeProject;
-      if (u.href !== window.location.href) window.history.replaceState({}, '', u.pathname + u.search);
-    } catch {}
-  }, [homeProject]);
-
-  // ?shared= follows the shared thread the same way.
-  const sharedWas = useRef<string | null>(null);
-  useEffect(() => {
-    try {
-      const u = new URL(window.location.href);
-      if (sharedOpen) u.searchParams.set('shared', sharedOpen);
-      else if (sharedWas.current) u.searchParams.delete('shared');
-      sharedWas.current = sharedOpen;
-      if (u.href !== window.location.href) window.history.replaceState({}, '', u.pathname + u.search);
-    } catch {}
-  }, [sharedOpen]);
-
-  // What others have shared with them — read when they arrive and whenever
-  // the Share sheet closes (they may just have left something).
+  // What others have shared with them — read when they arrive and whenever the Share sheet closes.
   const loadShared = useCallback(async () => {
     if (!isSignedIn) return;
     try {
@@ -2245,45 +319,7 @@ export default function ChatPage() {
     void loadShared();
   }, [loadShared]);
 
-  /**
-   * The Logos a conversation opens on from here: Logos 5 wherever it is
-   * offered — where every conversation lives now, the Core chats brought in
-   * included (lib/logos5/merge.ts). The plain 'logos' choice resolves to
-   * Logos 2 while Logos 1 is held back (lib/socria-model-store.ts withdrawnTo).
-   */
-  const logosToOpen = (): SocriaModel => (isOffered('logos-3') ? 'logos-3' : 'logos-2');
-
-  /** Into a conversation from Project Home: Core here, Logos on its own surface. */
-  function openFromHome(id: string, kind: 'chat' | 'logos') {
-    // Not one of theirs: it is a shared Project's conversation, opened together.
-    const mine = kind === 'logos' ? logosSessions.some((x) => x.id === id) : conversations.some((c) => c.id === id);
-    if (kind === 'logos') {
-      chooseModel(logosToOpen());
-      window.location.assign(mine ? `/chat?s=${encodeURIComponent(id)}` : `/chat?model=logos-3&s=${encodeURIComponent(id)}&shared=1`);
-      return;
-    }
-    setHomeProject(null);
-    setProjectEntry(null);
-    if (!mine) {
-      setSharedOpen(id);
-      return;
-    }
-    setActiveId(id);
-  }
-
-  /** A new conversation, filed in the Project from its first message. */
-  function newFromHome(pid: string, kind: 'chat' | 'logos') {
-    if (kind === 'logos') {
-      const m: SocriaModel = isOffered('logos-3') ? 'logos-3' : 'logos-2';
-      chooseModel(m);
-      window.location.assign(`/chat?model=${m}&in=${encodeURIComponent(pid)}`);
-      return;
-    }
-    const pr = projects.find((x) => x.id === pid);
-    newChatIn(pr ?? { id: pid, name: 'this Project', archived: false, updatedAt: 0 });
-  }
-
-  /** Make a Project by name; its id, or null when it could not be made (said in the error line). */
+  /** Make a Project by name; its id, or null when it could not be made. */
   async function createProject(name: string): Promise<string | null> {
     try {
       const res = await fetch('/api/projects', {
@@ -2318,71 +354,16 @@ export default function ChatPage() {
     }
   }
 
-  async function createFolder() {
-    const name = (folderDraft ?? '').replace(/\s+/g, ' ').trim();
-    setFolderDraft(null);
-    const carry = pendingMove.current;
-    pendingMove.current = null;
-    if (!name) return;
-    const id = await createProject(name);
-    if (!id) return;
-    setOpenFolders((o) => [...o, id]);
-    if (carry) await moveChat(carry, id);
-  }
-
   /**
-   * A new chat inside a Project. Not created yet — the first message creates
-   * it, carrying the Project — and on Core 4, the only Core whose memory is
-   * the Mind Graph and so the only one a Project can focus.
-   */
-  function newChatIn(p: RailProject) {
-    setHomeProject(null);
-    setSharedOpen(null);
-    setProjectEntry({ id: p.id, name: p.name });
-    setActiveId(null);
-    setModel('core-4');
-    chooseModel('core-4');
-    setOpenFolders((o) => (o.includes(p.id) ? o : [...o, p.id]));
-    setSidebarOpen(false);
-    requestAnimationFrame(() => textareaRef.current?.focus());
-  }
-
-  /**
-   * Move a chat into a folder, out of one, or between two. The server also
-   * re-files what the chat taught in the Mind Graph — see moveToProject in
-   * app/api/conversations/route.ts. Optimistic, and put back if it fails.
+   * File a conversation Logos 5 does not hold into a Project, out of one, or
+   * between two. The server also re-files what it taught in the Mind Graph
+   * (app/api/conversations moveToProject). Optimistic, and put back if it fails.
    */
   async function moveChat(id: string, pid: string | null) {
-    setMoving(null);
-    const c = conversations.find((x) => x.id === id);
-    // A line of thinking is a conversation in the same table, so it files the
-    // same way; only the list it is put back into on failure differs.
-    const lg = c ? undefined : logosSessions.find((x) => x.id === id);
-    if (lg) {
-      if ((lg.projectId ?? null) === pid) return;
-      const was = logosSessions;
-      setLogosSessions((ls) => ls.map((x) => (x.id === id ? { ...x, projectId: pid } : x)));
-      if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
-      try {
-        const res = await fetch('/api/conversations', {
-          method: 'PATCH',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ id, projectId: pid }),
-        });
-        const j = await res.json().catch(() => null);
-        if (!res.ok) throw new Error(j?.error || 'That line of thinking could not be moved.');
-      } catch (e: any) {
-        setLogosSessions(was);
-        setError(e?.message || 'That line of thinking could not be moved.');
-      }
-      return;
-    }
-    if (!c || (c.projectId ?? null) === pid) return;
-    const before = conversations;
-    setConversations((cs) => cs.map((x) => (x.id === id ? { ...x, projectId: pid } : x)));
-    if (pid) setOpenFolders((o) => (o.includes(pid) ? o : [...o, pid]));
-    // Not saved yet: its first save will carry the folder with it.
-    if (!c.messages.length) return;
+    const c = chats.find((x) => x.id === id);
+    if (!c || c.projectId === pid) return;
+    const before = chats;
+    setChats((cs) => cs.map((x) => (x.id === id ? { ...x, projectId: pid } : x)));
     try {
       const res = await fetch('/api/conversations', {
         method: 'PATCH',
@@ -2390,1888 +371,170 @@ export default function ChatPage() {
         body: JSON.stringify({ id, projectId: pid }),
       });
       const j = await res.json().catch(() => null);
-      if (!res.ok) throw new Error(j?.error || 'That chat could not be moved.');
+      if (!res.ok) throw new Error(j?.error || 'That conversation could not be moved.');
     } catch (e: any) {
-      setConversations(before);
-      setError(e?.message || 'That chat could not be moved.');
+      setChats(before);
+      setError(e?.message || 'That conversation could not be moved.');
     }
   }
 
-  // Any entry point can ask for a model by link — /chat?model=logos — which is
-  // how the explainer page, the Socria One page and the sidebar all open Logos
-  // without needing a route of its own.
-  useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const want = params.get('model');
-    const homeAt = params.get('p');
-    if (homeAt && /^[A-Za-z0-9_-]{1,80}$/.test(homeAt) && !isLogosSurface(want)) setHomeProject(homeAt);
-    const sharedAt = params.get('shared');
-    if (sharedAt && /^[A-Za-z0-9_-]{1,120}$/.test(sharedAt) && !isLogosSurface(want)) setSharedOpen(sharedAt);
+  /** Into a conversation from a Project's home: theirs in Logos 5; someone else's, opened together. */
+  function openFromHome(id: string, kind: 'chat' | 'logos') {
+    const mine = chats.some((c) => c.id === id) || lines.some((x) => x.id === id);
+    if (mine) return window.location.assign(`/chat?s=${encodeURIComponent(id)}`);
+    if (kind === 'logos') return window.location.assign(`/chat?s=${encodeURIComponent(id)}&shared=1`);
+    setHomeProject(null);
+    setSharedOpen(id);
+  }
 
-    // A first message chosen on /explore, for Core. Into the composer and
-    // never sent. When Logos is being routed — by the link, or by the model
-    // this page remembered — the parameter is left for it: Logos mounts a
-    // beat later and reads it itself, and this effect can run twice in
-    // development, the second time with `model` already gone from the URL.
-    // `model` state still holds its initial value here — the remembered model
-    // is applied by a later effect — so the store is asked directly.
-    // The sentence they wrote during onboarding, if they came straight from
-    // it. Read once and cleared by takeCarried, so it prefills the composer
-    // on this landing and never again.
-    // ONE reader. takeCarried clears as it reads, so if both this page and
-    // LogosApp called it the second would get nothing and which composer got
-    // the sentence would depend on mount order. It is read here, once, and
-    // handed down to whichever surface is actually rendering.
-    // The tour, decided once on mount. `justOnboarded` is exactly the carried
-    // handover: if they arrived with a sentence from /onboarding, they were
-    // taught ninety seconds ago and are left alone.
-    const carried = takeCarried(sessionStorage);
-    if (carried) {
-      carriedRef.current = true;
-      setCarriedText(carried.text);
-      if (carried.send) {
-        setAutoSend({ text: carried.text, logos: carried.surface === 'logos' });
-        setTourAfter(true);
-      }
-      setInput(carried.text);
-      requestAnimationFrame(() => textareaRef.current?.focus());
-      // Written for Logos — on the Logos page's own door — so it opens there,
-      // with the sentence in that composer. Logos needs an account; a browser
-      // without one meets Logos's own gate, which says so, and the sentence is
-      // kept in the chat's composer behind it.
-      if (carried.surface === 'logos') {
-        // the Logos they chose in onboarding — Logos 3 only while it is still offered to this browser
-        const logos = carried.model === 'logos-3' && isOffered('logos-3') ? 'logos-3' : 'logos-2';
-        setModel(logos);
-        chooseModel(logos);
-      }
-    }
-    // The tour decision moved out of this mount effect — see the effect
-    // below. It ran here with `blocked: false` hard-coded, so on a first
-    // signed-in visit it opened UNDER the Try-Logos modal, which mounts at
-    // the same moment: the visitor saw only the modal, and the one Escape
-    // that dismissed it also ended the tour and wrote TOUR_KEY. The
-    // first-run tour was spent without ever having been on screen.
-    if (carried) justOnboarded.current = true;
+  /** Back to Logos 5 from a Project's home or a shared thread. */
+  const backToLogos = () => {
+    setHomeProject(null);
+    setSharedOpen(null);
+  };
 
-    if (!carried && !isLogosSurface(want) && !isLogosSurface(readModel())) {
-      const { id } = readStart(window.location.search);
-      if (id) {
-        const msg = startMessage(id);
-        if (msg) {
-          setInput(msg);
-          requestAnimationFrame(() => textareaRef.current?.focus());
-        }
-        const u = new URL(window.location.href);
-        u.searchParams.delete('start');
-        window.history.replaceState({}, '', u.pathname + u.search);
-      }
-    }
+  /** Into something shared with them: a Project's home; a line of thinking, together; a Core conversation, beside Logos 5. */
+  function openShared(it: SharedIn) {
+    if (it.type === 'project') return setHomeProject(it.id);
+    if (it.kind === 'logos') return window.location.assign(`/chat?s=${encodeURIComponent(it.id)}&shared=1`);
+    setSharedOpen(it.id);
+  }
 
-    // A link from an email says which one it was; remembered for checkout.
-    const via = params.get('via');
-    if (via) {
-      try {
-        if (isSource(via)) sessionStorage.setItem('socria.via.v1', via);
-      } catch {}
-      const u = new URL(window.location.href);
-      u.searchParams.delete('via');
-      window.history.replaceState({}, '', u.pathname + u.search);
-    }
+  // Socria Rewards may greet someone arriving — into a quiet room only:
+  // not over onboarding's first exchange, a sheet or a Project's page.
+  const rewardsQuiet = isLoaded && !hydrating && planState.known && !autoSend && !tourAfter && !shareFor && !sheet && !joinOpen;
 
-    // Back from checkout on Core. Logos handles its own; here the one line
-    // is said in the thread and the plan is re-read until Stripe's webhook
-    // has landed. Counted from the browser too (once per checkout session):
-    // the webhook's event arrives as a visit by Stripe.
-    if (params.get('one') === 'welcome' && !isLogosSurface(want) && !isLogosSurface(readModel())) {
-      const sessionId = params.get('session_id');
-      const u = new URL(window.location.href);
-      u.searchParams.delete('one');
-      u.searchParams.delete('session_id');
-      window.history.replaceState({}, '', u.pathname + u.search);
-      setOneWelcome(true);
-      try {
-        if (sessionId && sessionStorage.getItem('socria.one.welcomed.v1') !== sessionId) {
-          sessionStorage.setItem('socria.one.welcomed.v1', sessionId);
-          const last = JSON.parse(localStorage.getItem('socria.checkout.last.v1') || 'null') as {
-            trigger?: string;
-            surface?: string;
-            source?: string;
-          } | null;
-          track('one_subscribed', {
-            trigger: last?.trigger,
-            surface: last?.surface ?? 'core',
-            source: last?.source ?? 'client',
-            plan: 'one',
-          });
-        }
-      } catch {}
-      // Not every branch's usePlan exposes refresh(); where it does not, the
-      // plan is re-read on the next mount and the line says "setting up".
-      const refresh = (planState as { refresh?: () => void }).refresh;
-      if (refresh) {
-        let tries = 0;
-        const poll = () => {
-          refresh();
-          tries += 1;
-          if (tries < 6) setTimeout(poll, 1000 * tries);
-        };
-        setTimeout(poll, 800);
-      }
-    }
-
-    // A link asking for a withdrawn model lands on its successor rather than
-    // being ignored: the link was somebody's intent to open the environment, and
-    // dropping them on whatever they happened to be on last answers a different
-    // question.
-    // The same for a model behind an access code nobody here has entered (a
-    // model naming a `gate`; none does today): the nearest surface of its kind.
-    const asked =
-      typeof want === 'string' && want in SOCRIA_MODELS && (SOCRIA_MODELS[want as SocriaModel].withdrawn || !isOffered(want as SocriaModel))
-        ? withdrawnTo(want as SocriaModel)
-        : want;
-    if (!isSelectable(asked)) return;
-    setModel(asked);
-    chooseModel(asked);
-    const url = new URL(window.location.href);
-    url.searchParams.delete('model');
-    window.history.replaceState({}, '', url.pathname + url.search);
-    // planState.refresh is stable; this is a mount-only read of the URL.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
-
-  const messages = active?.messages || [];
-  const hasMessages = messages.length > 0;
-
-  // WHICH ONE-LINE HINT, IF ANY.
-  //
-  // The account sheet has offered "Show hints again" since the register was
-  // ported, and there was nothing to show: no <Hint> was rendered anywhere in
-  // the product, so the button reset a key nothing read. The machinery was
-  // all here — lib/hints.ts, components/Hint.tsx, both covered — and only the
-  // rendering was missing.
-  //
-  // A hint earns its place only when something has appeared for the first
-  // time, so eligibility is about what is ON SCREEN. pickHint returns at most
-  // one, in HINT_ORDER, and never one already dismissed.
-  const seenHints = useSeenHints();
-  // Not during the first exchange: Core's one line is the only thing said
-  // under a first reply. The furniture hints wait until it has been read.
-  const settledIn = firstRun.has('core.first');
-  const liveHint = pickHint(
-    [
-      ...(hasMessages && settledIn ? ['picker'] : []),
-      ...(!isLogosSurface(model) && hasMessages && settledIn ? ['logos'] : []),
-      ...(messages.length >= 6 ? ['find'] : []),
-    ],
-    seenHints
+  const shareSheet = shareFor && (
+    <ShareDialog
+      type={shareFor.type}
+      id={shareFor.id}
+      title={shareFor.title}
+      open
+      onClose={() => {
+        setShareFor(null);
+        void loadShared();
+      }}
+      onUpgrade={() => window.location.assign('/one')}
+      onLeft={() => {
+        if (shareFor.type === 'project' && homeProject === shareFor.id) setHomeProject(null);
+        if (sharedOpen === shareFor.id) setSharedOpen(null);
+      }}
+    />
+  );
+  const projectSheet = sheet && (
+    <ProjectSheet
+      id={sheet}
+      onClose={() => setSheet(null)}
+      onChanged={() => void loadProjects()}
+      onDeleted={() => {
+        const gone = sheet;
+        setChats((cs) => cs.map((c) => (c.projectId === gone ? { ...c, projectId: null } : c)));
+        setLines((ls) => ls.map((x) => (x.projectId === gone ? { ...x, projectId: null } : x)));
+        if (homeProject === gone) setHomeProject(null);
+        setSheet(null);
+        void loadProjects();
+      }}
+    />
   );
 
-  // Logos is a model, not a destination: selecting it swaps the whole
-  // experience in here rather than navigating away, so /chat stays the
-  // address of "talking to Socria" whichever mind is answering. Every hook
-  // above has already run, so this branch is safe.
-  // Switching back out of Logos is the same swap in reverse, so it has to be
-  // a state change here — Logos pushing /chat would only re-render itself.
-  if (isLogosSurface(model))
+  // A Project's home and a shared Core thread are pages of their own beside
+  // Logos 5: a bar back to it, and the page.
+  if (urlRead && (homeProject || sharedOpen)) {
     return (
-      <>
-      {/* The Project settings sheet is the page's, not a surface's — it has
-          to be reachable from the Logos rail's folders too. */}
-      {shareFor && (
-        <ShareDialog
-          type={shareFor.type}
-          id={shareFor.id}
-          title={shareFor.title}
-          open
-          onClose={() => { setShareFor(null); void loadShared(); }}
-          onUpgrade={() => window.location.assign('/one')}
-          onLeft={() => {
-            if (shareFor.type === 'project' && homeProject === shareFor.id) setHomeProject(null);
-            if (sharedOpen === shareFor.id) setSharedOpen(null);
-          }}
-        />
-      )}
-      {sheet && (
-        <ProjectSheet
-          id={sheet}
-          onClose={() => setSheet(null)}
-          onChanged={() => void loadProjects()}
-          onDeleted={() => {
-            const gone = sheet;
-            setConversations((cs) => cs.map((c) => (c.projectId === gone ? { ...c, projectId: null } : c)));
-            setLogosSessions((ls) => ls.map((s) => (s.projectId === gone ? { ...s, projectId: null } : s)));
-            if (projectEntry?.id === gone) setProjectEntry(null);
-            setSheet(null);
-            void loadProjects();
-          }}
-        />
-      )}
-      {/* The rewards popups, for the Logos rail's marks — Logos's own sheets and
-          tour are seen by the popup itself (it never opens over a dialog). */}
-      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="logos" />
-      <LogosApp
-        initialInput={carriedText}
-        // onboarding's sentence is sent for them, and the tour follows the reply
-        autoSend={!!autoSend?.logos}
-        tourAfter={tourAfter}
-        // WHICH Logos. Without this the surface assumed it was Logos 1 — its
-        // composer's model menu named that one, ticked it, and offered it.
-        model={model}
-        // One rail, both surfaces. Logos used to list only its own sessions,
-        // so from inside it the rest of somebody's thinking did not exist and
-        // the way to a chat was to leave first and find it again. These are
-        // already in hand here; handing them down costs nothing.
-        chats={conversations.map((c) => ({
-          id: c.id,
-          title: c.title,
-          updatedAt: c.updatedAt,
-          projectId: c.projectId ?? null,
-        }))}
-        // The same folders, in the same rail. Undefined until they have been
-        // fetched, so Logos never files anything against a list that has not
-        // arrived; its own sessions it files itself, a chat row comes back here.
-        projects={isSignedIn && projectsLoaded ? projects : undefined}
-        onProjectSettings={(id) => setSheet(id)}
-        onCreateProject={createProject}
-        onUpdateProject={updateProject}
-        onMoveChat={(id, pid) => void moveChat(id, pid)}
-        // Opening one is the same swap the "Socria chat" button makes, with a
-        // destination: back to whichever Core model they came from, on that
-        // conversation. A navigation would work and would throw away the
-        // Logos session's unsaved input on the way.
-        onOpenChat={(id) => {
-          const back = lastCoreModel();
-          chooseModel(back);
-          setModel(back);
-          setActiveId(id);
-          setProjectEntry(null);
-          setSidebarOpen(false);
-        }}
-        onOpenProject={(pid) => {
-          // A Project's home lives on the Core surface, beside its chats.
-          const back = lastCoreModel();
-          chooseModel(back);
-          setModel(back);
-          openProjectHome(pid);
-        }}
-        onSwitchModel={(next) => {
-          setModel(next);
-          chooseModel(next);
-        }}
-        // The Core chats brought into Logos 5 (lib/logos5/merge.ts): moved in
-        // this list too, so the rail opens them there from now on. The Core
-        // screen lets go of the one it had open — it lives in Logos 5 now, and
-        // a message sent to it from Core would land nowhere.
-        onConversationsMoved={(moved) => {
-          const ids = new Set(moved.map((m) => m.id));
-          setConversations((cs) => cs.filter((c) => !ids.has(c.id)));
-          setLogosSessions((ls) => [
-            ...moved.filter((m) => !ls.some((l) => l.id === m.id)).map((m) => ({ ...m, nodes: 0 })),
-            ...ls,
-          ]);
-          setActiveId((a) => (a && ids.has(a) ? null : a));
-        }}
-      />
-      </>
-    );
-
-  /** One row of the rail — the dated list and the inside of folders alike. */
-  const renderRow = (item: (typeof allRail)[number]) => {
-    const rowKey = `${item.kind}-${item.id}`;
-    const startRename = () => {
-      setRenameDraft(item.title);
-      setRenaming(rowKey);
-    };
-    // The box replaces the row rather than sitting inside it: a
-    // Logos row is a link, and a text field inside a link is a
-    // fight between typing and navigating that typing loses.
-    if (renaming === rowKey) {
-      return (
-        <div key={rowKey} className="s-row">
-          {item.nodes ? <NodeTile count={item.nodes} seed={item.id} /> : <span className="s-gap" aria-hidden="true" />}
-          <input
-            autoFocus
-            className="s-rename"
-            value={renameDraft}
-            aria-label="Rename this session"
-            onChange={(e) => setRenameDraft(e.target.value)}
-            onFocus={(e) => e.currentTarget.select()}
-            // Blur commits as well as Enter: clicking away from
-            // a box you have typed in should keep what you typed.
-            onBlur={() => commitRename(item.kind, item.id)}
-            onKeyDown={(e) => {
-              e.stopPropagation();
-              if (e.key === 'Enter') commitRename(item.kind, item.id);
-              if (e.key === 'Escape') setRenaming(null);
-            }}
-          />
-        </div>
-      );
-    }
-
-    // A row with a map carries a small map — the thing that tells a line of
-    // thinking from a chat is the fact that it grew one, not the model's brand.
-    const mark = item.nodes ? (
-      <NodeTile count={item.nodes} seed={item.id} />
-    ) : (
-      <span className="s-gap" aria-hidden="true" />
-    );
-    const count = item.nodes ? <span className="n">{item.nodes}</span> : null;
-
-    const inProject = filed(item) ? item.projectId : null;
-    // Folders exist only for a signed-in person. Either kind goes in them:
-    // a line of thinking is a conversation in the same table.
-    const fileable = !!isSignedIn;
-    return (
-      <div key={rowKey}>
-      <div
-        className={`s-row${
-          item.kind === 'chat' && item.id === activeId ? ' on' : ''
-        }`}
-        draggable={fileable && projects.length > 0}
-        onDragStart={(e) => {
-          e.dataTransfer.setData('text/socria-chat', item.id);
-          e.dataTransfer.effectAllowed = 'move';
-        }}
-      >
-        {item.kind === 'logos' ? (
-          <a
-            className="s-open"
-            href={`/chat?s=${encodeURIComponent(item.id)}`}
-            // Opening one of these is a model switch as well as
-            // a navigation: record it before leaving, or coming
-            // back to /chat would land on whatever was active
-            // before and contradict where they just were.
-            onClick={() => chooseModel(logosToOpen())}
-            // NO onDoubleClick HERE, deliberately. A Logos row
-            // is a link, and a link navigates on the FIRST
-            // click — by the time a second arrives the page is
-            // already leaving, so double-click-to-rename could
-            // never fire. Making it work would mean cancelling
-            // every click and navigating on a timer, which buys
-            // a nicety by putting a delay on every open. The
-            // pencil beside the row renames both kinds and is
-            // always there.
-            title={`${item.title} — opens in Logos`}
-          >
-            {mark}
-            <span className="t">{item.title}</span>
-            {count}
-          </a>
-        ) : (
-          <button
-            type="button"
-            className="s-open"
-            onClick={() => {
-              setActiveId(item.id);
-              setProjectEntry(null);
-              setHomeProject(null);
-              setSharedOpen(null);
-              setSidebarOpen(false);
-            }}
-            onDoubleClick={startRename}
-            title={item.title}
-          >
-            {mark}
-            <span className="t">{item.title}</span>
-            {count}
+      <div className="app-root chat-aside">
+        {shareSheet}
+        {projectSheet}
+        <header className="chat-aside-bar">
+          <button type="button" className="chat-aside-back" onClick={backToLogos}>
+            <span aria-hidden="true">←</span> Logos
           </button>
+          <Logo size="sm" />
+        </header>
+        {error && (
+          <p className="chat-aside-error" role="alert">
+            {error}
+          </p>
         )}
-        <span className="s-act">
-          <button
-            type="button"
-            onClick={(e) => {
-              e.stopPropagation();
-              startRename();
-            }}
-            aria-label={`Rename ${item.title}`}
-            title="Rename"
-          >
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M12 20h9" />
-              <path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z" />
-            </svg>
-          </button>
-          {fileable && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                setMoving((m) => (m === item.id ? null : item.id));
-              }}
-              aria-label={`Move ${item.title} to a project`}
-              aria-expanded={moving === item.id}
-              title="Move to project"
-            >
-              {MOVE_ICON}
-            </button>
-          )}
-          {item.kind === 'chat' && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                deleteSession(item.id);
-              }}
-              aria-label={`Delete ${item.title}`}
-              title="Delete"
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="18" y1="6" x2="6" y2="18" />
-                <line x1="6" y1="6" x2="18" y2="18" />
-              </svg>
-            </button>
-          )}
-        </span>
-      </div>
-      {moving === item.id && (
-        <div className="s-move" role="menu" aria-label="Move to a project">
-          <p>Move to</p>
-          {projects.filter((pr) => !pr.archived).map((pr) => (
-            <button
-              key={pr.id}
-              type="button"
-              role="menuitem"
-              aria-current={inProject === pr.id}
-              onClick={() => void moveChat(item.id, pr.id)}
-            >
-              {pr.name}
-            </button>
-          ))}
-          {inProject && (
-            <button type="button" role="menuitem" onClick={() => void moveChat(item.id, null)}>
-              Out of the project
-            </button>
-          )}
-          <button
-            type="button"
-            role="menuitem"
-            onClick={() => {
-              pendingMove.current = item.id;
-              setMoving(null);
-              setFolderDraft('');
-            }}
-          >
-            New project…
-          </button>
-        </div>
-      )}
-      </div>
-    );
-  };
-
-  /** A folder, and — when open — the chats in it. */
-  const folderRow = (pr: RailProject) => {
-    const kids = allRail.filter((r) => r.projectId === pr.id);
-    const open = openFolders.includes(pr.id);
-    return (
-      <div key={`p-${pr.id}`}>
-        <div
-          className={`s-row s-fold${dropTarget === pr.id ? ' drop' : ''}`}
-          onDragOver={(e) => {
-            if (!e.dataTransfer.types.includes('text/socria-chat')) return;
-            e.preventDefault();
-            setDropTarget(pr.id);
-          }}
-          onDragLeave={() => setDropTarget((t) => (t === pr.id ? null : t))}
-          onDrop={(e) => {
-            e.preventDefault();
-            setDropTarget(null);
-            const id = e.dataTransfer.getData('text/socria-chat');
-            if (id) void moveChat(id, pr.id);
-          }}
-        >
-          <button
-            type="button"
-            className={`s-open${homeProject === pr.id ? ' is-home' : ''}`}
-            aria-expanded={open}
-            aria-current={homeProject === pr.id ? 'page' : undefined}
-            onClick={() => openProjectHome(pr.id)}
-            title={pr.name}
-          >
-            {/* The chevron only folds; the name opens the Project's home. */}
-            <span
-              className="chev"
-              aria-hidden="true"
-              onClick={(e) => {
-                e.stopPropagation();
-                toggleFolder(pr.id);
-              }}
-            >
-              {open ? '▾' : '▸'}
-            </span>
-            <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
-            <span className="t">{pr.name}</span>
-            {kids.length > 0 && <span className="n">{kids.length}</span>}
-          </button>
-          <span className="s-act">
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); newChatIn(pr); }}
-              aria-label={`New chat in ${pr.name}`}
-              title="New chat in this project"
-            >
-              {PLUS_ICON}
-            </button>
-            <button
-              type="button"
-              onClick={(e) => { e.stopPropagation(); setSheet(pr.id); }}
-              aria-label={`${pr.name} settings`}
-              title="Project settings"
-            >
-              {DOTS_ICON}
-            </button>
-          </span>
-        </div>
-        {open && (
-          <div className="s-kids">
-            {kids.length
-              ? kids.map(renderRow)
-              : <p className="s-none">No chats yet. <em>Start one with +.</em></p>}
-          </div>
-        )}
-      </div>
-    );
-  };
-
-  // THE PREMISE, for a person with nothing yet — signed in or not. The record
-  // says whether it has been read; a person with work on screen has met the
-  // product whatever the record says; a sentence carried from the first-run
-  // screen means it was read a moment ago.
-  const showIntro =
-    firstRun.ready &&
-    authSettled &&
-    wantsIntro(firstRun.state, {
-      work: conversations.filter((c) => c.messages.length > 0).length + logosSessions.length,
-      carried: carriedRef.current,
-      hydrated: !hydrating,
-    });
-
-  // WHAT CHANGED, to somebody who used the Socria before the map and has
-  // landed back in a chat (lib/first-run.ts wantsWhatsNew): the last beat is
-  // the way to the map. Signed in only — the map is an account's, and a
-  // stranger is told the premise instead.
-  const coreWork = conversations.filter((c) => c.messages.length > 0);
-  const showWhatsNew =
-    // only where the map it points to opens for them
-    newSocria &&
-    !!isSignedIn &&
-    authSettled &&
-    !homeProject &&
-    !sharedOpen &&
-    !tourOpen &&
-    wantsWhatsNew(firstRun.state, {
-      work: [...coreWork.map((c) => c.updatedAt), ...logosSessions.map((x) => x.updatedAt)],
-      hydrated: !hydrating,
-      synced: firstRun.synced,
-      introShowing: showIntro,
-      busy: sending,
-    });
-
-  return (
-    <div className="flex h-dvh">
-      {showWhatsNew && (
-        <WhatsNew
-          surface="core"
-          kept={coreWork.length + logosSessions.length}
-          onDone={() => {
-            firstRun.reach('socria.new');
-            // the same switch as the picker's: the open chat comes along, and
-            // Logos opens on the map
-            pickModel(logosToOpen());
-          }}
-          onSkip={() => firstRun.reach('socria.new', { skipped: true })}
-        />
-      )}
-      {showIntro && (
-        <IntroOnce
-          onStart={(text) => {
-            firstRun.reach('socria.intro');
-            // straight through: the answer to their own question is the welcome
-            void send(text);
-          }}
-          onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
-        />
-      )}
-      {shareFor && (
-        <ShareDialog
-          type={shareFor.type}
-          id={shareFor.id}
-          title={shareFor.title}
-          open
-          onClose={() => { setShareFor(null); void loadShared(); }}
-          onUpgrade={() => window.location.assign('/one')}
-          onLeft={() => {
-            if (shareFor.type === 'project' && homeProject === shareFor.id) setHomeProject(null);
-            if (sharedOpen === shareFor.id) setSharedOpen(null);
-          }}
-        />
-      )}
-      {sheet && (
-        <ProjectSheet
-          id={sheet}
-          onClose={() => setSheet(null)}
-          onChanged={() => void loadProjects()}
-          onDeleted={() => {
-            // The server moved its chats out; say so here too, or the next
-            // save of one of them would file it back under a Project that no
-            // longer exists.
-            const gone = sheet;
-            setConversations((cs) => cs.map((c) => (c.projectId === gone ? { ...c, projectId: null } : c)));
-            if (projectEntry?.id === gone) setProjectEntry(null);
-            setSheet(null);
-            void loadProjects();
-          }}
-        />
-      )}
-      <IntroCore4Modal
-        open={core4IntroOpen}
-        onClose={handleCore4IntroClose}
-        onStart={handleCore4IntroStart}
-        isSignedIn={hasAccount}
-      />
-      {/* The Logos cover: the one introduction the chat keeps for the
-          environment — Logos 3 wherever it is offered. Opened by the pill,
-          and by picking Logos without an account. The same card is the gate
-          on the Logos surface itself. */}
-      <LogosCover
-        as="modal"
-        version={coverVersion}
-        name={logosName(newSocria)}
-        open={logosModalOpen}
-        onClose={handleLogosModalClose}
-        onStart={handleLogosModalTry}
-        onUnlock={handleLogosModalUnlock}
-        isSignedIn={hasAccount}
-      />
-      <InsightShareModal
-        open={!!shareInsight}
-        onClose={() => setShareInsight(null)}
-        insight={shareInsight}
-      />
-      <ImportProfileModal
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        profile={importedProfile}
-        onSave={saveImportedProfile}
-      />
-      {/* Mobile backdrop when sidebar is open */}
-      {sidebarOpen && (
-        <div
-          className="md:hidden fixed inset-0 z-30 bg-ink/30 backdrop-blur-[2px]"
-          onClick={() => setSidebarOpen(false)}
-          aria-hidden
-        />
-      )}
-
-      {/* Sidebar — overlay on mobile, static column on desktop */}
-      <Tour open={tourOpen} onDone={endTour} />
-      {/* The invitation plate. Nothing opens it directly — see the two asks
-          above, and lib/one-prompt.ts for everything that decides it.
-          `.lg-tokens` carries Logos's palette without its geometry, so the
-          same plate is drawn here as there rather than redrawn for this
-          surface (app/globals.css, "THE TOKENS, SEPARATELY FROM THE
-          SURFACE"). */}
-      <div className="lg-tokens">
-      <OnePrompt
-        view={onePrompt}
-        onDismiss={dismissOne}
-        onAccept={() => {
-          acceptOne();
-          void startOneCheckout();
-        }}
-        busy={oneBusy}
-        error={oneError}
-      />
-      </div>
-      {/* Socria Rewards: a friend's link opened before sign-up, a friend's first real conversations */}
-      <RewardsSync enabled={!!isSignedIn} />
-      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="core" onOpenLogos={openNewestLogos} />
-      <JoinCodeDialog open={joinOpen} onClose={() => setJoinOpen(false)} />
-      <AccountSheet
-        open={acctOpen}
-        onClose={() => setAcctOpen(false)}
-        isOne={planState.plan === 'one'}
-        // The whole answer, so the sheet can show the university section
-        // where the deployment runs the programme.
-        plan={planState}
-        onRetakeTour={() => setTourOpen(true)}
-      />
-      {/* The sessions rail, in the design's own markup and its own stylesheet
-          (app/app-shell.css, scoped under .app-root). The wrapper is
-          `app-inline`, which is display:contents — the register's resets and
-          type reach the rail, its full-viewport background does not. */}
-      <div className="app-root app-inline">
-      {/* Below 860px the rail is an overlay, so it has to be able to be
-          shut; above it, it is a column and is always there. One attribute
-          says which, and the stylesheet decides what that means at each
-          width — rather than a class that would hide it on desktop too. */}
-      <aside data-tour="sessions" className="s-bar" data-open={sidebarOpen ? 'yes' : 'no'}>
-        <div className="s-top">
-          <Logo />
-          {/* Give 7, Get 7 and the 5-Node Challenge, beside the mark (components/rewards/RewardsBadges.tsx) */}
-          <RewardsBadges enabled={!!isSignedIn} />
-          <button
-            className="s-close"
-            onClick={() => setSidebarOpen(false)}
-            aria-label="Close sidebar"
-          >
-            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
-              <line x1="18" y1="6" x2="6" y2="18" />
-              <line x1="6" y1="6" x2="18" y2="18" />
-            </svg>
-          </button>
-        </div>
-
-        <button
-          className="s-new"
-          onClick={newSession}
-          title={
-            lockedOut
-              ? 'Sign in to start more sessions'
-              : 'Start a new thought session'
-          }
-        >
-          <span className="p" aria-hidden="true">{lockedOut ? '↗' : '+'}</span>
-          {lockedOut ? 'Sign in for more sessions' : 'New thought session'}
-        </button>
-
-        {/* An invite code, asked for in a popup: a button here, between a
-            new chat and the Projects, rather than a field in Shared with you. */}
-        {!hydrating && isSignedIn && (
-          <button type="button" className="s-joinbtn" onClick={() => setJoinOpen(true)} title="Open something shared with you by its code">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="8" cy="15" r="3.5" />
-              <path d="M10.5 12.5 19 4M15.5 7.5l2.5 2.5M13.5 9.5l2 2" />
-            </svg>
-            Join with a code
-          </button>
-        )}
-
-        <SignedOut>
-          <div className="s-anon">
-            <p className="l">Signed out</p>
-            <p className="t">This session lives in this browser, and nowhere else.</p>
-            <p className="c">
-              {lockedOut
-                ? 'Your free session is complete.'
-                : 'One free session, then sign in.'}
-            </p>
-            <SignInButton>
-              <button className="g">Sign in to keep it <span aria-hidden="true">→</span></button>
-            </SignInButton>
-          </div>
-        </SignedOut>
-
-        {/* Search and the one filter. Both only earn their place once the
-            list is long enough to need them — over a handful of rows,
-            "which of these has the map I drew" is a question the ordering
-            cannot answer, and under it they are furniture.
-            Not gated on being signed in: the list itself is not, and a
-            signed-out person with a browser full of local sessions needs to
-            search them exactly as much. The row count does the gating. */}
-        {railSearchable && (
-          <>
-            <div className="s-find">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.6"
-                   strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
-              </svg>
-              <input
-                value={railQuery}
-                onChange={(e) => setRailQuery(e.target.value)}
-                placeholder="Search your sessions"
-                aria-label="Search your sessions"
-              />
-              {railQuery && (
-                <button className="clear" onClick={() => setRailQuery('')} aria-label="Clear search">
-                  ×
-                </button>
-              )}
-            </div>
-
-            {(railHasMaps || railQuery) && (
-              <div className="s-filter">
-                {railHasMaps && (
-                  <button
-                    className="chip"
-                    aria-pressed={mapsOnly}
-                    onClick={() => setMapsOnly((v) => !v)}
-                  >
-                    <span className="s-glyph" aria-hidden="true">
-                      <MapGlyph size={13} />
-                    </span>
-                    Maps only
-                  </button>
-                )}
-                {(railQuery || mapsOnly) && (
-                  <span className="n">
-                    {railHits.length} of {allRail.length}
-                  </span>
-                )}
-              </div>
-            )}
-          </>
-        )}
-
-        <div className="s-list">
-          {/* Projects: folders of chats, above the dated list. Hidden while
-              searching — a search looks through every chat wherever it is
-              filed, and the folders would show the same rows twice. */}
-          {!hydrating && isSignedIn && !railFiltering && (
-            <section className="s-proj" aria-label="Projects">
-              <div className="s-proj-h">
-                <p className="s-when">Projects</p>
-                <button
-                  type="button"
-                  onClick={() => { pendingMove.current = null; setFolderDraft(''); }}
-                  aria-label="New project"
-                  title="New project"
-                >
-                  +
-                </button>
-              </div>
-              {folderDraft !== null && (
-                <div className="s-row s-new-proj">
-                  <span className="s-glyph" aria-hidden="true">{FOLDER_ICON}</span>
-                  <input
-                    autoFocus
-                    className="s-rename"
-                    value={folderDraft}
-                    maxLength={80}
-                    placeholder="Name the project"
-                    aria-label="New project name"
-                    onChange={(e) => setFolderDraft(e.target.value)}
-                    onBlur={() => void createFolder()}
-                    onKeyDown={(e) => {
-                      e.stopPropagation();
-                      if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
-                      if (e.key === 'Escape') { pendingMove.current = null; setFolderDraft(null); }
-                    }}
-                  />
-                </div>
-              )}
-              {projects.filter((pr) => !pr.archived).map(folderRow)}
-              {!projects.length && folderDraft === null && (
-                <p className="s-none">Group chats into a project, and Socria keeps <em>its</em> context in view.</p>
-              )}
-              {projects.some((pr) => pr.archived) && (
-                <details className="s-arch">
-                  <summary>Archived · {projects.filter((pr) => pr.archived).length}</summary>
-                  {projects.filter((pr) => pr.archived).map(folderRow)}
-                </details>
-              )}
-            </section>
-          )}
-          {/* SHARED WITH YOU — Projects and conversations others opened to
-              this person. Below their own Projects: their own work comes
-              first. The invite code is the "Join with a code" button above. */}
-          {!hydrating && isSignedIn && !railFiltering && (
-            <section className="s-proj s-shared" aria-label="Shared with you">
-              <div className="s-proj-h">
-                <p className="s-when">Shared with you</p>
-              </div>
-              {sharedItems.map((it) => (
-                <div key={`sh-${it.type}-${it.id}`} className="s-row">
-                  <button
-                    type="button"
-                    className={`s-open${(it.type === 'project' ? homeProject : sharedOpen) === it.id ? ' is-home' : ''}`}
-                    title={`${it.title} — shared by ${it.owner}`}
-                    onClick={() => {
-                      if (it.type === 'project') openProjectHome(it.id);
-                      else if (it.kind === 'logos') window.location.assign(`/chat?model=logos-3&s=${encodeURIComponent(it.id)}&shared=1`);
-                      else {
-                        setHomeProject(null);
-                        setSharedOpen(it.id);
-                        setSidebarOpen(false);
-                      }
-                    }}
-                  >
-                    <span className="s-glyph" aria-hidden="true">{it.type === 'project' ? FOLDER_ICON : '◦'}</span>
-                    <span className="t">{it.title || 'Untitled'}</span>
-                    <span className="n" title={`Shared by ${it.owner}`}>{it.owner.slice(0, 1).toUpperCase()}</span>
-                  </button>
-                </div>
-              ))}
-              {!sharedItems.length && <p className="s-none">When someone shares with you, it appears here.</p>}
-            </section>
-          )}
-          {hydrating ? (
-            <p className="s-none">Loading sessions…</p>
-          ) : allRail.length === 0 ? (
-            <p className="s-none">No sessions yet. <em>Start one.</em></p>
-          ) : railHits.length === 0 ? (
-            railFiltering ? <p className="s-none">Nothing matches. <em>Try fewer words.</em></p> : null
-          ) : (
-            railGroups.map(({ group, items }) => (
-              <section key={group}>
-                <p className="s-when">{group}</p>
-                {items.map(renderRow)}
-              </section>
-            ))
-          )}
-        </div>
-
-        <div className="s-foot">
-          {/* Socria One, said once and left alone. The same plate as the
-              /one cover, at the size of a sidebar row; it never moves and
-              never changes what it says. A member sees what they hold. */}
-          {planState.known && <OneFoot state={planState} />}
-          {/* Three rows and nothing else: where your history comes in, where
-              what Socria remembers lives, and the feedback form (also under
-              Manage Account). Signing in is offered at the top of the rail and
-              in the header, so it is not repeated here. */}
-          <nav className="s-foot-nav" aria-label="History, memory and feedback">
-            <button
-              type="button"
-              className="s-link"
-              title="Bring in your history from other AIs"
-              onClick={() => {
-                setImportOpen(true);
-                setSidebarOpen(false);
-              }}
-            >
-              {IMPORT_ICON}
-              <span>Import your history</span>
-              {importedProfile && (
-                <span className="s-link-on">
-                  <span className="sr-only">(in use)</span>
-                </span>
-              )}
-            </button>
-            {/*
-              /memory IS the Mind Graph — the same rows the prompt is built
-              from. It used to open the Thinking Journey, which Core 4 does
-              not read, so it showed a person one store and told Socria
-              another. The Journey is on that page too
-              (components/mind/JourneyRecord), with its per-entry forget.
-            */}
-            <Link href="/memory" className="s-link" onClick={() => setSidebarOpen(false)}>
-              {MEMORY_ICON}
-              <span>Memory</span>
-            </Link>
-            <a
-              href={FEEDBACK_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="s-link"
-              title="Tell us what is wrong, or what is missing"
-              onClick={() => setSidebarOpen(false)}
-            >
-              {FEEDBACK_ICON}
-              <span>Send feedback</span>
-            </a>
-          </nav>
-        </div>
-      </aside>
-      </div>
-
-      {/* Main */}
-      <div className="flex-1 flex flex-col min-w-0">
-        <div className="sticky top-0 z-20 border-b border-border/60 px-3 md:px-6 h-16 flex items-center justify-between gap-2 shrink-0 bg-paper/85 backdrop-blur-md">
-          {/* Left: sidebar toggle (mobile) — the model and depth pickers now live
-              down beside the composer, where the typing happens */}
-          <div className="flex items-center gap-2 min-w-0">
-            <button
-              onClick={() => setSidebarOpen((v) => !v)}
-              className="md:hidden text-ink/70 hover:text-ink p-2 -ml-1 shrink-0"
-              aria-label="Toggle sidebar"
-            >
-              <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                <line x1="3" y1="6" x2="21" y2="6" />
-                <line x1="3" y1="12" x2="21" y2="12" />
-                <line x1="3" y1="18" x2="21" y2="18" />
-              </svg>
-            </button>
-          </div>
-
-          {/* Right: find, the Logos invitation (desktop) + auth */}
-          <div className="flex items-center gap-2 shrink-0">
-            {/* Find had no control at all — only a Cmd/Ctrl-F handler, which
-                is the shortcut the browser itself claims, so on most machines
-                the feature was simply unreachable. It is a button now, and
-                the shortcut is a shortcut rather than the only door. Shown
-                once there is a conversation to search. */}
-            {/* Share this conversation — once it exists and is theirs. */}
-            {isSignedIn && hasMessages && activeId && !homeProject && !sharedOpen && conversations.some((c) => c.id === activeId) && (
-              <button
-                type="button"
-                className="sh-open"
-                onClick={() => setShareFor({ type: 'conversation', id: activeId, title: conversations.find((c) => c.id === activeId)?.title ?? 'This conversation' })}
-              >
-                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <circle cx="18" cy="5" r="2.5" /><circle cx="6" cy="12" r="2.5" /><circle cx="18" cy="19" r="2.5" /><path d="M8.2 10.8l7.6-4.4M8.2 13.2l7.6 4.4" />
-                </svg>
-                Share
-              </button>
-            )}
-            {hasMessages && (
-              <span className="app-root app-inline">
-                {liveHint === 'find' && (
-                  <Hint id="find" place="below">
-                    Long thread. <em>Find</em> searches this one, not all of them.
-                  </Hint>
-                )}
-                <button
-                  type="button"
-                  className="find-btn"
-                  aria-pressed={findOpen}
-                  onClick={() => setFindOpen((v) => !v)}
-                  title="Find in this conversation (⌘F)"
-                >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7"
-                       strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <circle cx="11" cy="11" r="6.5" /><path d="M16 16l4.5 4.5" />
-                  </svg>
-                  Find
-                </button>
-              </span>
-            )}
-            <div className="hidden sm:block">
-              {/* The standing invitation is Logos's: the surface a person
-                  would not guess from a text box — Logos 3 wherever it is
-                  offered. It stays until they say "don't show again" on the
-                  cover itself, and disappears on the surface it is inviting
-                  them to. Core 4's introduction is still one press away in
-                  the picker. */}
-              <TryLogosPill
-                version={coverVersion}
-                name={logosName(newSocria)}
-                currentModel={model}
-                visible={!logosDismissed}
-                onOpen={() => setLogosModalOpen(true)}
-              />
-            </div>
-            <SignedOut>
-              <SignInButton >
-                <button className="text-[13px] text-ink/70 hover:text-ink transition-colors whitespace-nowrap">
-                  Sign in
-                </button>
-              </SignInButton>
-            </SignedOut>
-            <SignedIn>
-              {/* Socria's own, not Clerk's — see AccountControl for why. The
-                  tour's fourth note rings this, so the attribute is on the
-                  wrapper rather than inside the register's display:contents. */}
-              <span data-tour="account">
-                <AccountControl
-                  onOpen={() => setAcctOpen(true)}
-                  isOne={planState.plan === 'one'}
-                />
-              </span>
-            </SignedIn>
-          </div>
-        </div>
-
-        {sharedOpen && !homeProject ? (
-          <SharedThread
-            id={sharedOpen}
-            conversationStyle={conversationStyle}
-            onClose={() => setSharedOpen(null)}
-            onShare={(title) => setShareFor({ type: 'conversation', id: sharedOpen, title })}
-            onUpgrade={() => window.location.assign('/one')}
-          />
-        ) : homeProject ? (
+        {homeProject ? (
           <ProjectHome
             id={homeProject}
-            onShare={isSignedIn ? () => setShareFor({ type: 'project', id: homeProject, title: projects.find((x) => x.id === homeProject)?.name ?? sharedItems.find((x) => x.id === homeProject)?.title ?? 'This Project' }) : undefined}
+            onShare={
+              isSignedIn
+                ? () =>
+                    setShareFor({
+                      type: 'project',
+                      id: homeProject,
+                      title: projects.find((x) => x.id === homeProject)?.name ?? sharedItems.find((x) => x.id === homeProject)?.title ?? 'This Project',
+                    })
+                : undefined
+            }
             onOpenChat={openFromHome}
-            onNewChat={(kind) => newFromHome(homeProject, kind)}
+            // Every new conversation is a line of thinking, begun in the Project.
+            onNewChat={() => window.location.assign(`/chat?in=${encodeURIComponent(homeProject)}`)}
             onSettings={() => setSheet(homeProject)}
-            onRenamed={(id, kind, title) => {
-              if (kind === 'logos') setLogosSessions((ls) => ls.map((x) => (x.id === id ? { ...x, title } : x)));
-              else setConversations((cs) => cs.map((c) => (c.id === id ? { ...c, title } : c)));
+            onRenamed={(id, _kind, title) => {
+              setChats((cs) => cs.map((c) => (c.id === id ? { ...c, title } : c)));
+              setLines((ls) => ls.map((x) => (x.id === id ? { ...x, title } : x)));
             }}
             refreshKey={projects.find((x) => x.id === homeProject)?.updatedAt}
           />
-        ) : (<>
-        {/* The conversation and the find rail, side by side.
-            `.chat-row` is the design's own container (app/app-shell.css:
-            `flex:1;min-height:0;display:flex;position:relative`) and the
-            reason Find is a COLUMN beside the thread rather than a panel
-            floating over it. The wrapper is display:contents, so the row is
-            still a direct flex child of the page column. */}
-        <div className="app-root app-inline">
-        <div className="chat-row">
-        <div className="flex-1 overflow-y-auto">
-          <div className="max-w-2xl mx-auto px-6 py-10">
-            {!hasMessages && !isSignedIn && !smartUnlocked && usedFree ? (
-              // Anon user who used their free convo but has no active one
-              // (either never created another or deleted the first). Hard
-              // gate: no starter prompts, just a sign-in CTA. Key-unlocked
-              // users skip this wall entirely.
-              <div className="text-center mt-12 animate-fade-up">
-                <h2 className="font-serif text-3xl md:text-4xl text-ink leading-tight">
-                  You&rsquo;ve used your free session.
-                </h2>
-                <p className="mt-3 text-ink/60 font-serif italic max-w-md mx-auto">
-                  Create a free account to keep thinking with Socria. Your
-                  sessions sync across every device.
-                </p>
-                <SignInButton >
-                  <button className="mt-8 inline-flex items-center gap-2 rounded-full bg-moss-600 text-paper hover:bg-moss-700 transition-colors h-12 px-7 text-[15px] font-medium">
-                    Create a free account
-                    <span aria-hidden>→</span>
-                  </button>
-                </SignInButton>
-                <p className="mt-4 text-[12px] text-ink/40">
-                  Takes 30 seconds. No credit card.
-                </p>
-              </div>
-            ) : !hasMessages ? (
-              <div className="text-center mt-12 animate-fade-up">
-                <h2 className="font-serif text-3xl md:text-4xl text-ink leading-tight">
-                  What would you like to think through?
-                </h2>
-                <p className="mt-3 text-ink/60 font-serif italic">
-                  A question, a draft, or a decision — whatever you&rsquo;re
-                  working through.
-                </p>
-
-                {/* Where they left off — the open threads whose return cue
-                    is ready to send, as the first chips. The free tier shows
-                    the most recent one; One shows up to three. Topic and cue
-                    are on screen only; never in analytics. */}
-                {returnChips.length > 0 && (
-                  <div className="mt-10 grid sm:grid-cols-2 gap-3 text-left">
-                    {returnChips.map((t) => (
-                      <button
-                        key={t.topic}
-                        // Into the composer, never sent: the cue is written in
-                        // their voice but they have not seen it yet.
-                        onClick={() => {
-                          setInput(t.returnCue!);
-                          requestAnimationFrame(() => textareaRef.current?.focus());
-                        }}
-                        disabled={sending}
-                        className="p-4 rounded-xl border border-moss-300/70 bg-moss-50/40 hover:border-moss-600 transition-all text-[14px] text-ink/80 text-left"
-                      >
-                        <span className="block text-[10px] uppercase tracking-wider text-moss-700 mb-1">still open</span>
-                        {t.topic}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {/* The design's closing offer on an empty screen. Signed
-                    out it says WHY an account is needed rather than just
-                    asking for one — a map has to be kept somewhere.
-                    (Lost here in the rail rewrite and recovered from main
-                    while carrying this work across; the register supplies
-                    the scope.) */}
-                <div className="app-root app-inline">
-                <div className="logos-offer">
-                  <div>
-                    <div className="lo-t">Want to see your reasoning drawn?</div>
-                    <p className="lo-b">
-                      {isSignedIn ? (
-                        'Logos puts a live Thinking Map beside the conversation.'
-                      ) : (
-                        <>
-                          Logos draws a live Thinking Map beside the conversation.{' '}
-                          <em>A map has to be kept somewhere, so it needs an account.</em>
-                        </>
-                      )}
-                    </p>
-                  </div>
-                  {isSignedIn ? (
-                    <button type="button" className="lo-go" onClick={() => pickModel('logos')}>
-                      Open Logos <span aria-hidden="true">→</span>
-                    </button>
-                  ) : (
-                    <SignInButton>
-                      <button type="button" className="lo-go">
-                        Sign in for Logos <span aria-hidden="true">→</span>
-                      </button>
-                    </SignInButton>
-                  )}
-                </div>
-                </div>
-
-                <div className={`${returnChips.length ? 'mt-3' : 'mt-10'} grid sm:grid-cols-2 gap-3 text-left`}>
-                  {starters.map((p) => (
-                    <button
-                      key={p.prompt}
-                      onClick={() => send(p.prompt)}
-                      title={p.prompt !== p.label ? p.prompt : undefined}
-                      disabled={sending}
-                      className="p-4 rounded-xl border border-border bg-paper hover:border-moss-600 hover:bg-moss-50/40 transition-all text-[14px] text-ink/80 text-left"
-                    >
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-
-                <SignedOut>
-                  <div className="mt-8 p-5 rounded-xl border border-moss-200/60 bg-moss-50/40 text-left flex items-center gap-4">
-                    <div className="flex-1">
-                      <p className="text-[14px] text-ink/80 leading-relaxed">
-                        Your first session is free. After that, sign in to
-                        keep thinking and sync across devices.
-                      </p>
-                    </div>
-                    <SignInButton >
-                      <button className="shrink-0 inline-flex items-center gap-2 rounded-full bg-moss-600 text-paper hover:bg-moss-700 transition-colors h-10 px-5 text-[13px] font-medium">
-                        Create account
-                        <span aria-hidden>→</span>
-                      </button>
-                    </SignInButton>
-                  </div>
-                </SignedOut>
-              </div>
-            ) : null}
-
-            {/* THE CONVERSATION CAME WITH YOU, said once. A thread arriving on
-                a different surface is the most disorienting thing the picker
-                can do, and the person who pressed it may have been browsing
-                models rather than asking for a move. The line names what
-                happened and what was not touched; dismissing it is the only
-                thing it asks for. */}
-            {moveSaid && (
-              <div className="my-4 flex items-start gap-3 rounded-xl border border-moss-200/70 bg-moss-50/40 p-3 text-[13px] text-ink/80" role="status">
-                <span className="flex-1">{moveSaid}</span>
-                <button
-                  type="button"
-                  className="px-1 text-ink/40 hover:text-ink"
-                  aria-label="Dismiss"
-                  onClick={() => setMoveSaid(null)}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-
-            {oneWelcome && (
-              <div className="my-4 flex items-start gap-3 rounded-xl border border-moss-200/70 bg-moss-50/40 p-3 text-[13px] text-ink/80" role="status">
-                <span className="flex-1">
-                  {planState.plan === 'one' ? (
-                    <>
-                      <b>Socria One is open.</b> Begin as many lines of thinking as you have, and Socria carries what it learns about how you reason from each one into the next — here and in Logos.
-                    </>
-                  ) : (
-                    <>
-                      <b>Thank you — setting up your subscription.</b> This takes a moment; it opens as soon as Stripe confirms.
-                    </>
-                  )}
-                </span>
-                <button type="button" className="px-1 text-ink/40 hover:text-ink" aria-label="Dismiss" onClick={() => setOneWelcome(false)}>
-                  ×
-                </button>
-              </div>
-            )}
-
-            {/* One scope for the whole thread: `.turn-row` and its `.lit`
-                flash are register rules, and display:contents means this
-                wrapper adds no box of its own. */}
-            <div className="app-root app-inline">
-            {messages.map((m, i) => {
-              const isAssistant = m.role === 'assistant';
-              const { body, choices } = isAssistant
-                ? splitChoices(m.content)
-                : { body: m.content, choices: [] as string[] };
-              const isLast = i === messages.length - 1;
-              // Only the newest assistant message's choices stay actionable,
-              // and only when we're idle (not streaming a reply).
-              const showChoices =
-                isAssistant &&
-                isLast &&
-                choices.length > 0 &&
-                !sending &&
-                !streamed;
-              return (
-                // The index is the anchor Find scrolls to, and `turn-row`
-                // is what the flash hangs on: the only rule that paints a hit
-                // is `.app-root .turn-row.lit`. Without the class, jumping to
-                // a result scrolled and lit nothing, so on a long thread
-                // there was no way to see which line you had landed on.
-                // Both stay on THIS element — the register's scope is
-                // supplied once by the list's wrapper, because `app-inline`
-                // is display:contents and an element with no box cannot be
-                // scrolled into view.
-                <div key={m.id ?? i} id={`turn-${i}`} data-mid={m.id} className="turn-row">
-                  <Bubble
-                    role={m.role}
-                    content={body}
-                    attachments={m.attachments}
-                    replyTo={m.replyTo}
-                    copy={m.content}
-                    onReply={
-                      isAssistant
-                        ? () => {
-                            setReplyTo(replyRefOf(m, 'Socria'));
-                            requestAnimationFrame(() => textareaRef.current?.focus());
-                          }
-                        : undefined
-                    }
-                    onJump={jumpToTurn}
-                  />
-                  {showChoices && (
-                    <ChoiceChips
-                      choices={choices}
-                      onPick={(t) => send(t)}
-                      disabled={sending}
-                    />
-                  )}
-                </div>
-              );
-            })}
-            </div>
-
-            {streamed && (
-              <Bubble
-                role="assistant"
-                content={splitChoices(streamed).body}
-                animate
-              />
-            )}
-
-            {/* Core's one line, once, under the first reply. Not a modal, not
-                a card: it names what to read the reply against, and goes
-                when they continue or press ×. */}
-            {coreLine && coreLine === activeId && !sending && !streamed && (
-              <p className="core-first" role="note">
-                <span>
-                  You&rsquo;ll still do the thinking. <em>Core helps you see what you&rsquo;re missing.</em>
-                </span>
-                <button
-                  type="button"
-                  aria-label="Dismiss"
-                  onClick={() => {
-                    setCoreLine(null);
-                    firstRun.reach('core.first');
-                  }}
-                >
-                  ×
-                </button>
-              </p>
-            )}
-
-            {/* Auto-synthesis — a depth-paced interactive synthesis card,
-                shown after the reply. Dismiss to keep chatting; it re-
-                generates as the conversation grows. */}
-            {!sending &&
-              !streamed &&
-              active?.memory?.latestSynthesis?.sections?.length &&
-              active.id ? (
-                <div className="synthesis-auto">
-                  <div className="synthesis-auto-eyebrow">
-                    Socria synthesized where your thinking is
-                  </div>
-                  <SynthesisCard data={active.memory.latestSynthesis} />
-                  <button
-                    type="button"
-                    className="synthesis-auto-continue"
-                    onClick={() => dismissSynthesis(active.id)}
-                  >
-                    Keep thinking →
-                  </button>
-                </div>
-              ) : null}
-
-            {/* Insight Card — appears after the assistant reply once
-                enough depth is reached. Not while a stream is in flight. */}
-            {!sending &&
-              !streamed &&
-              active?.memory?.latestInsight &&
-              active.id && (
-                <InsightCard
-                  insight={active.memory.latestInsight}
-                  onContinue={() => dismissInsight(active.id)}
-                  onShare={() =>
-                    setShareInsight(active.memory?.latestInsight ?? null)
-                  }
-                />
-              )}
-
-            {sending && !streamed && (
-              <div className="my-6 flex items-center gap-1 text-ink/50" aria-live="polite">
-                <span className="thinking-dots">
-                  <span className="thinking-dot" />
-                  <span className="thinking-dot" />
-                  <span className="thinking-dot" />
-                </span>
-                {/* The word is whatever Socria is actually doing — never a
-                    synonym rotated for variety, and never an operation that is
-                    not running. `thinking` is the honest default. */}
-                <span className="ml-2 font-serif italic text-sm">{activity}</span>
-              </div>
-            )}
-
-            {/* Unreachable: no plan freezes a thread's memory now, so
-                `frozenAt` is never set. Kept with its dismissal state because
-                a conversation already carrying the flag from before the caps
-                changed must still render something sensible. */}
-            {active?.memory?.frozenAt && planState.plan !== 'one' && !frozenNoteClosed.has(active.id) && !sending && (
-              <div className="my-4 flex items-center gap-3 px-1 text-[12.5px] text-ink/60" role="note">
-                <span className="font-serif italic flex-1">
-                  Earlier turns in this conversation are held as a summary rather than in full. Everything said here stays, and stays yours.
-                </span>
-                <button
-                  type="button"
-                  className="px-1 text-ink/35 hover:text-ink"
-                  aria-label="Dismiss"
-                  onClick={() => setFrozenNoteClosed((prev) => new Set(prev).add(active.id))}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-
-            {/* The free day, said before it is met rather than after: the last
-                few messages are counted out loud, once, quietly. */}
-            {messagesLeft !== null && messagesLeft <= 5 && planState.plan !== 'one' && !sending && (
-              <div className="my-3 flex items-baseline gap-3 px-1 text-[12.5px] text-ink/60" role="note">
-                <span className="font-serif italic flex-1">
-                  {messagesLeft === 0
-                    ? 'That was today’s last free message. Everything here stays, and picks up again tomorrow.'
-                    : `${messagesLeft} free ${messagesLeft === 1 ? 'message' : 'messages'} left today.`}
-                </span>
-                <Link href="/one" className="underline underline-offset-2 hover:text-ink">
-                  Socria One
-                </Link>
-              </div>
-            )}
-
-            {error && (
-              <div className="my-4 p-3 rounded-lg border border-red-300 bg-red-50 text-sm text-red-900">
-                {error}
-              </div>
-            )}
-
-            <div ref={bottomRef} />
-          </div>
-        </div>
-        {/* Not an overlay. It takes its width from the row and pushes the
-            conversation over; below 820px app-shell.css turns it into a
-            sheet anchored to this row, which is why the row is positioned. */}
-        {findOpen && (
-          <FindPanel
-            turns={messages}
-            onClose={() => setFindOpen(false)}
-            onJump={(i) => {
-              // NEVER scrollIntoView, which is the design's own note and it
-              // is right: it scrolls every scrollable ancestor, so in a chat
-              // the page moves as well as the thread. Move the container
-              // itself, then flash the line so the eye knows where it landed
-              // — a jump with no flash leaves you hunting for the thing you
-              // just found. The flash is re-armed by reading offsetWidth, so
-              // landing on the same line twice lights it twice.
-              const el = document.getElementById(`turn-${i}`);
-              const box = el?.closest('.overflow-y-auto') as HTMLElement | null;
-              if (!el || !box) return;
-              box.scrollTop +=
-                el.getBoundingClientRect().top - box.getBoundingClientRect().top - 20;
-              el.classList.remove('lit');
-              void el.offsetWidth;
-              el.classList.add('lit');
-              setTimeout(() => el.classList.remove('lit'), 1600);
-            }}
+        ) : (
+          <SharedThread
+            id={sharedOpen!}
+            conversationStyle={conversationStyle}
+            onClose={backToLogos}
+            onShare={(title) => setShareFor({ type: 'conversation', id: sharedOpen!, title })}
+            onUpgrade={() => window.location.assign('/one')}
           />
         )}
-        </div>
-        </div>
-
-        <div className="border-t border-border/60 bg-paper/80 backdrop-blur-sm">
-          <div className="max-w-2xl mx-auto px-6 py-4">
-            {/* An offer, after the fact. The message was sent and is being
-                answered; this only asks whether it landed where it was meant
-                to, and it is never in the way of the reply. It belongs to the
-                session it was sent in, so switching away takes it with you. */}
-            {(() => {
-              // Which Project this conversation is in — or, before the first
-              // message, which one it is about to start in. Said plainly,
-              // because retrieval behaves differently inside one and the
-              // person should never have to guess why.
-              const active = conversations.find((c) => c.id === activeId);
-              const pid = active ? active.projectId ?? null : projectEntry?.id ?? null;
-              if (!pid) return null;
-              const name = active ? projects.find((pr) => pr.id === pid)?.name : projectEntry!.name;
-              // A chat filed under a Project that no longer exists is simply
-              // unfiled; saying "In a Project" about it would be untrue.
-              if (!name) return null;
-              return (
-                <div className="mb-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-[12px] text-ink/60" role="note">
-                  <span className="font-serif italic">{active ? 'In' : 'Starting in'}</span>
-                  <button
-                    type="button"
-                    onClick={() => setSheet(pid)}
-                    className="rounded-full border border-ink/15 bg-surface/70 px-2.5 py-0.5 text-ink/80 hover:border-ink/40"
-                    title="Project settings"
-                  >
-                    {name}
-                  </button>
-                  {model !== 'core-4' && (
-                    <span className="text-ink/45">· Project memory applies on Core 4</span>
-                  )}
-                  {!active && (
-                    <button
-                      type="button"
-                      className="text-ink/45 underline decoration-ink/20 underline-offset-2 hover:text-ink"
-                      onClick={() => setProjectEntry(null)}
-                    >
-                      not in a Project
-                    </button>
-                  )}
-                </div>
-              );
-            })()}
-            {drift && drift.from === activeId && (
-              <div
-                className="mb-3 flex flex-wrap items-center gap-x-3 gap-y-2 rounded-xl border border-ink/12 bg-surface/70 px-3 py-2 text-[12.5px] text-ink/70"
-                role="note"
-              >
-                <span className="min-w-0 flex-1 font-serif italic">
-                  That reads like {drift.domain === 'code' ? 'a coding' : `a ${drift.domain}`} question,
-                  and this session has been about something else. Did you mean it here?
-                </span>
-                <span className="flex shrink-0 items-center gap-2">
-                  <button
-                    type="button"
-                    onClick={dismissDrift}
-                    className="rounded-md px-2 py-1 text-ink/60 hover:bg-ink/5 hover:text-ink transition-colors"
-                  >
-                    Keep it here
-                  </button>
-                  {/* Only when they can actually have another session —
-                      offering a door that leads to a sign-in wall is worse
-                      than not offering it. */}
-                  {!lockedOut && (
-                    <button
-                      type="button"
-                      onClick={moveDriftToNewSession}
-                      className="rounded-md px-2 py-1 font-medium text-moss-700 hover:bg-moss-50 hover:text-moss-800 transition-colors"
-                    >
-                      Move to a new session
-                    </button>
-                  )}
-                  <button
-                    type="button"
-                    onClick={dismissDrift}
-                    className="px-1 text-ink/35 hover:text-ink transition-colors"
-                    aria-label="Dismiss"
-                  >
-                    ×
-                  </button>
-                </span>
-              </div>
-            )}
-
-            {!isSignedIn && !smartUnlocked && hasMessages && (
-              <div className="mb-3 flex items-center justify-between gap-3 px-1 text-[12px] text-ink/55">
-                <span className="font-serif italic">
-                  This is your free session — sign in to start more.
-                </span>
-                <SignInButton >
-                  <button className="text-moss-700 hover:text-moss-800 font-medium">
-                    Sign in →
-                  </button>
-                </SignInButton>
-              </div>
-            )}
-            {(files.drafts.length > 0 || files.notice) && (
-              <div className="mb-2 px-1 space-y-2">
-                <AttachmentChips items={files.drafts} onRemove={files.remove} onOrigin={files.setOrigin} />
-                {!takesFiles && files.drafts.length > 0 && (
-                  <p className="text-[12px] text-ink/55 font-serif italic">
-                    Attachments are read by Core 4. Switch to Core 4 to send them.
-                  </p>
-                )}
-                {files.notice && (
-                  <p className="flex items-start gap-2 text-[12px] text-ink/60" role="status">
-                    <span className="min-w-0">{files.notice}</span>
-                    <button type="button" className="shrink-0 text-ink/40 hover:text-ink" aria-label="Dismiss" onClick={() => files.setNotice(null)}>
-                      ×
-                    </button>
-                  </p>
-                )}
-              </div>
-            )}
-            {replyTo && (
-              <div className="mb-2 flex items-center gap-2 rounded-lg border-l-2 border-moss-600 bg-moss-50/70 px-3 py-1.5 text-[12.5px] text-ink/70" role="status">
-                <span className="min-w-0 flex-1">
-                  <span className="block text-[11.5px] font-semibold text-moss-700">Replying to {replyTo.who}</span>
-                  <span className="block truncate">{replyTo.excerpt}</span>
-                </span>
-                <button
-                  type="button"
-                  className="shrink-0 w-7 h-7 rounded-full text-ink/45 hover:text-ink hover:bg-ink/5"
-                  aria-label={`Stop replying to ${replyTo.who}`}
-                  title="Stop replying (Esc)"
-                  onClick={() => setReplyTo(null)}
-                >
-                  ×
-                </button>
-              </div>
-            )}
-            <div
-              className={`flex items-end gap-3 rounded-2xl border bg-surface px-4 py-3 focus-within:border-moss-600 transition-colors ${
-                dragging ? 'border-moss-600 ring-2 ring-moss-200' : 'border-ink/15'
-              }`}
-              onDragOver={(e) => {
-                if (!takesFiles || !e.dataTransfer.types.includes('Files')) return;
-                e.preventDefault();
-                setDragging(true);
-              }}
-              onDragLeave={(e) => {
-                if (e.currentTarget.contains(e.relatedTarget as Node | null)) return;
-                setDragging(false);
-              }}
-              onDrop={(e) => {
-                if (!takesFiles) return;
-                e.preventDefault();
-                setDragging(false);
-                if (e.dataTransfer.files?.length) void files.add(e.dataTransfer.files);
-              }}
-            >
-              {takesFiles && (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={sending}
-                    className="shrink-0 w-9 h-9 -ml-1 rounded-full text-ink/55 flex items-center justify-center hover:text-ink hover:bg-ink/5 disabled:opacity-40 transition-colors"
-                    aria-label="Attach files or images"
-                    title="Attach images, PDFs, Word, PowerPoint, Excel, text, code or a zip"
-                  >
-                    <PaperclipIcon />
-                  </button>
-                  <input
-                    ref={fileInputRef}
-                    type="file"
-                    multiple
-                    accept={ACCEPT_ATTR}
-                    className="hidden"
-                    onChange={(e) => {
-                      if (e.target.files?.length) void files.add(e.target.files);
-                      e.target.value = '';
-                    }}
-                  />
-                </>
-              )}
-              <textarea
-                ref={textareaRef}
-                data-tour="composer"
-                value={input}
-                onChange={handleInputChange}
-                onKeyDown={handleKeyDown}
-                onPaste={handlePaste}
-                placeholder={replyTo ? `Reply to ${replyTo.who}…` : "Share what you're thinking through…"}
-                rows={1}
-                disabled={sending}
-                className="flex-1 resize-none bg-transparent outline-none text-ink placeholder:text-ink/40 leading-relaxed py-1 max-h-[220px]"
-              />
-              <button
-                onClick={() => void sendFromComposer()}
-                disabled={
-                  sending ||
-                  files.reading ||
-                  (!input.trim() && !(takesFiles && files.hasReady))
-                }
-                className="shrink-0 w-9 h-9 rounded-full bg-moss-600 text-paper flex items-center justify-center disabled:opacity-40 disabled:cursor-not-allowed hover:bg-moss-700 transition-colors"
-                aria-label="Send"
-              >
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M12 19V5M5 12l7-7 7 7" />
-                </svg>
-              </button>
-            </div>
-            {/* Which mind you're talking to, and how far it goes — one
-                control now rather than two, within reach of the box you type
-                in rather than parked in the header. It opens upward; it sits
-                at the bottom of the screen. */}
-            <div className="mt-2 flex items-center justify-between gap-3">
-              <p className="hidden sm:block text-[11px] text-ink/40 font-serif italic min-w-0 truncate">
-                Enter to send, Shift+Enter for a new line.
-              </p>
-              <div className="flex items-center gap-2 shrink-0 ml-auto">
-                {liveHint === 'picker' && (
-                  <span className="app-root app-inline">
-                    <Hint id="picker" place="above">
-                      One control, two questions: <em>which model</em>, and how far it goes.
-                    </Hint>
-                  </span>
-                )}
-                <ModelPicker
-                  value={model}
-                  onChange={pickModel}
-                  depth={depth}
-                  onDepth={pickDepth}
-                  readability={readability}
-                  onReadability={pickReadability}
-                  length={replyLength}
-                  onLength={pickLength}
-                  isSignedIn={hasAccount}
-                  onLockedAttempt={() => setLogosModalOpen(true)}
-                  plan={planState.known ? planState.plan : undefined}
-                />
-              </div>
-            </div>
-          </div>
-        </div>
-        </>)}
-      </div>
-    </div>
-  );
-}
-
-/** Reply and Copy under a turn — real buttons, shown on hover and focus, and always on touch. */
-function TurnActions({ text, onReply, align }: { text: string; onReply?: () => void; align: 'start' | 'end' }) {
-  const [copied, setCopied] = useState(false);
-  return (
-    // in the gap under the turn, so it adds no height to the conversation
-    <div className={`turn-acts absolute left-0 right-0 top-full pt-0.5 flex gap-1 ${align === 'end' ? 'justify-end' : 'justify-start'}`} role="group" aria-label="Actions for this message">
-      {onReply && (
-        <button type="button" className="turn-act" onClick={onReply} aria-label="Reply to Socria’s message">
-          Reply
-        </button>
-      )}
-      <button
-        type="button"
-        className="turn-act"
-        onClick={async () => {
-          if (await copyText(text)) {
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1600);
-          }
-        }}
-        aria-label="Copy this message"
-      >
-        {copied ? 'Copied' : 'Copy'}
-      </button>
-      <span className="sr-only" role="status" aria-live="polite">{copied ? 'Copied' : ''}</span>
-    </div>
-  );
-}
-
-function Bubble({
-  role,
-  content,
-  animate = false,
-  attachments,
-  replyTo,
-  copy,
-  onReply,
-  onJump,
-}: {
-  role: Role;
-  content: string;
-  animate?: boolean;
-  attachments?: Attachment[];
-  /** what this turn answers, shown as a quote above it */
-  replyTo?: ReplyRef;
-  /** the words Copy takes — the whole message as it was said */
-  copy?: string;
-  onReply?: () => void;
-  onJump?: (id: string) => void;
-}) {
-  const isUser = role === 'user';
-  const quote = replyTo ? (
-    <button
-      type="button"
-      onClick={() => replyTo.id && onJump?.(replyTo.id)}
-      disabled={!replyTo.id || !onJump}
-      className="turn-quote"
-      aria-label={`Replying to ${replyTo.who}: ${replyTo.excerpt}`}
-    >
-      <b>{replyTo.who}</b> {replyTo.excerpt}
-    </button>
-  ) : null;
-
-  if (isUser) {
-    return (
-      <div className="turn-msg relative my-6 flex flex-col items-end gap-2">
-        {quote}
-        {attachments?.length ? (
-          <div className="max-w-[85%]">
-            <AttachmentChips items={attachments} align="end" />
-          </div>
-        ) : null}
-        {content.trim() ? (
-          <div className="max-w-[85%] bg-moss-50 border border-moss-200/60 rounded-2xl rounded-br-md px-5 py-3">
-            <div className="prose-socria text-ink">{content}</div>
-          </div>
-        ) : null}
-        {!animate && copy?.trim() ? <TurnActions text={copy} align="end" /> : null}
       </div>
     );
   }
 
-  // Assistant message — may contain a structured synthesis block. Parse it
-  // into segments so the synthesis renders as an interactive card and the
-  // surrounding prose renders normally.
-  const segments = parseMessage(content);
-  const hasCard = segments.some(
-    (s) => s.type === 'synthesis' || s.type === 'synthesis-pending'
-  );
-
   return (
-    <div className="turn-msg my-6 flex justify-start">
-      <div className={`relative ${hasCard ? 'w-full' : 'max-w-[85%]'}`}>
-        <div className="text-[10px] uppercase tracking-[0.16em] text-moss-700 mb-1.5 font-medium">
-          Socria
-        </div>
-        {segments.map((seg, i) => {
-          if (seg.type === 'synthesis') {
-            return <SynthesisCard key={i} data={seg.data} />;
-          }
-          if (seg.type === 'synthesis-pending') {
-            return <SynthesisPending key={i} />;
-          }
-          return (
-            <div
-              key={i}
-              className="prose-socria text-ink/90 text-[15.5px]"
-            >
-              {animate ? renderAnimated(seg.text) : <RichText text={seg.text} />}
-            </div>
-          );
-        })}
-        {!animate && copy?.trim() ? <TurnActions text={copy} onReply={onReply} align="start" /> : null}
-      </div>
-    </div>
+    <>
+      {shareSheet}
+      {projectSheet}
+      <JoinCodeDialog open={joinOpen} onClose={() => setJoinOpen(false)} />
+      {/* The rewards popups, for the Logos rail's marks — Logos's own sheets and
+          tour are seen by the popup itself (it never opens over a dialog). */}
+      <RewardsPopups enabled={!!isSignedIn} quiet={rewardsQuiet} surface="logos" />
+      {urlRead && (
+        <LogosApp
+          initialInput={carriedText}
+          // onboarding's sentence is sent for them, and the tour follows the reply
+          autoSend={autoSend}
+          tourAfter={tourAfter}
+          model="logos-3"
+          // Their conversations not yet brought in, so the Universal Map and the
+          // rail show everything; Logos 5 holds every one of them once it has
+          // loaded (lib/logos5/merge.ts).
+          chats={isSignedIn ? chats : undefined}
+          // Undefined until fetched, so Logos never files anything against a list that has not arrived.
+          projects={isSignedIn && projectsLoaded ? projects : undefined}
+          onProjectSettings={(id) => setSheet(id)}
+          onCreateProject={createProject}
+          onUpdateProject={updateProject}
+          onMoveChat={(id, pid) => void moveChat(id, pid)}
+          // A conversation Logos 5 does not hold: theirs opens in it by its id;
+          // a Core conversation someone shared with them opens beside it.
+          onOpenChat={(id) => {
+            if (chats.some((c) => c.id === id)) window.location.assign(`/chat?s=${encodeURIComponent(id)}`);
+            else setSharedOpen(id);
+          }}
+          onOpenProject={(pid) => setHomeProject(pid)}
+          // What others shared with them, under their own in the List; a code opens the rest.
+          shared={isSignedIn ? sharedItems : undefined}
+          onOpenShared={openShared}
+          onJoinWithCode={isSignedIn ? () => setJoinOpen(true) : undefined}
+          // The Core chats brought into Logos 5: moved in this list too.
+          onConversationsMoved={(moved) => {
+            const ids = new Set(moved.map((m) => m.id));
+            setChats((cs) => cs.filter((c) => !ids.has(c.id)));
+            setLines((ls) => [...moved.filter((m) => !ls.some((l) => l.id === m.id)), ...ls]);
+          }}
+        />
+      )}
+    </>
   );
-}
-
-// Word-by-word entrance for the bubble that is still arriving.
-//
-// Streaming stays plain-flow on purpose: block structures settle once the
-// text stops, through <RichText/> below, because re-deciding "is this a list
-// yet?" on every token makes a half-written reply jump about under somebody
-// who is reading it. The marks themselves are read by the shared splitter, so
-// an emphasis that appears mid-stream is the same emphasis when it lands.
-function renderAnimated(text: string): React.ReactNode {
-  const out: React.ReactNode[] = [];
-  splitInline(text).forEach((seg, si) => {
-    const mark =
-      seg.kind === 'em' ? ' em' : seg.kind === 'strong' ? ' bold' : seg.kind === 'strong-em' ? ' em bold' : '';
-    // Whitespace stays a text node so the line wraps where it should; every
-    // other run becomes a word with the entrance animation on it. Keys are
-    // stable, so words already on screen do not replay it as the next arrives.
-    seg.text.split(/(\s+)/).forEach((p, pi) => {
-      if (p === '') return;
-      if (/^\s+$/.test(p)) {
-        out.push(p);
-        return;
-      }
-      out.push(
-        <span key={`${si}-${pi}`} className={`bubble-word${mark}`}>
-          {p}
-        </span>
-      );
-    });
-  });
-  return out;
-}
-
-
-/**
- * The first-run screen, mounted over the chat — and its own "started" event,
- * fired once per showing rather than per render.
- */
-function IntroOnce({ onStart, onSkip }: { onStart: (text: string) => void; onSkip: () => void }) {
-  useEffect(() => {
-    track('socria_intro_started', { surface: 'core' });
-  }, []);
-  return <FirstRunIntro surface="core" onStart={onStart} onSkip={onSkip} />;
 }

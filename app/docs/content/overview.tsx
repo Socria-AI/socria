@@ -1,10 +1,11 @@
 // The front door: what Socria is, in the product's own terms, and a map of
-// the docs themselves.
+// the docs themselves. Socria is one model now — Logos 5 — and the count is
+// held to the menu by test/docs-wiki.test.mjs.
 
 import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
 import { DemoSplit } from '../demos';
-import { DOC_PAGES, docPage } from '../registry';
+import { ARCHIVE_DATE, DOC_PAGES, docPage } from '../registry';
 import { priceWithPeriod } from '@/lib/socria-one';
 import { PLANS } from '@/lib/entitlements';
 
@@ -24,78 +25,51 @@ export function Overview() {
         Socria is built on a single conviction: <strong>the thinking should stay
         yours.</strong> Most AI products optimize for producing your answer.
         Socria optimizes for the quality of your own reasoning on the way to
-        it — it asks before it answers, it notices the
-        assumptions in your wording, and when you are working a math problem
-        to learn it, it will guide you to the result rather than hand it
-        over.
+        it — it does the mechanical work readily, shows you what your view
+        rests on, and leaves the decisions and the substance of your work
+        with you.
       </p>
       <p>
         That stance is called <strong>Human-First AI</strong>, and it is not a
-        tone of voice — it is enforced in the product. In Core 3.1 and
-        Logos, questions are earned, never reflexive; conclusions stay yours
-        everywhere. The map draws <em>your</em> claims, not its verdicts. And
-        even the Writing Space — the one surface built for prose — starts
-        blank and stays yours: Socria proposes edits to words you wrote only
-        when you ask, and each one lands on the page only if you accept it.
+        tone of voice — it is enforced in the product. Which part of a turn is
+        yours is decided in code from what you have said, and anything held
+        back is held back only for a reason you gave, in your own words, with
+        what you can have instead. The map draws <em>your</em> claims, not its
+        verdicts. And your writing stays yours: Socria never writes into it, and
+        an edit it proposes lands on the page only if you accept it.
       </p>
 
       <H2 id="shape">The shape of the product</H2>
       <p>
-        Everything lives at one address — <code>socria.app/chat</code> — behind
-        one model switcher. This is what the fullest of them looks like:
-        the conversation on the left, a map of the thinking it produced on the
-        right, kept in step with each other.
+        Socria is one model, <Link href="/docs/logos-5">Logos 5</Link>, at{' '}
+        <code>socria.app/chat</code>. You arrive on the Universal Map — every
+        conversation you have had, on one map — and a conversation opens on
+        Chat, with three more views beside it for when there is something to
+        show: Content for your files, Artifacts for what is made, and the
+        Logic Map, the <Link href="/docs/thinking-map">Thinking Map</Link> of
+        the conversation, which looks like this:
       </p>
       <DemoSplit />
-      <p>Four models share that address:</p>
-      <ul>
-        <li>
-          <strong><Link href="/docs/core-3">Core 3.1</Link></strong> — the
-          conversation that remembers: thread memory, periodic syntheses of
-          what you have worked out, and a running model of how you think. It
-          opens with no account, for a first session kept in your browser.
-        </li>
-        <li>
-          <strong><Link href="/docs/core-4">Core 4</Link></strong> — the model
-          that decides, each turn, which part of the work is yours and does
-          everything else itself. It keeps a record of the reasoning — claims,
-          objections, decisions, and whose each one is — so a long piece of
-          work stops circling.
-        </li>
-        <li>
-          <strong><Link href="/docs/logos-2">Logos 2</Link></strong> — the
-          reasoning environment. The conversation runs beside a live{' '}
-          <Link href="/docs/thinking-map">Thinking Map</Link> that draws your
-          claims, assumptions, tensions and evidence as you talk — and when
-          what you describe is a system, the engine builds a model of it you
-          can move, read, edit and undo: a surface, a mechanism, a set of
-          equations, a fitted relationship, or a simulation of a black hole.
-          With <Link href="/docs/mathematics">mathematics support</Link>, a{' '}
-          <Link href="/docs/drafts-grounding">Draft Space and Writing Space</Link>, and research
-          grounded in real sources.
-        </li>
-        <li>
-          <strong><Link href="/docs/logos-3">Logos 3.5</Link></strong> — Logos 2
-          with a workspace around it: charts, plans, comparisons and decisions made
-          from your own words (<Link href="/docs/logos-3-5">what is new</Link>), and
-          room for two people at once — one map, one set of models, and Socria as
-          the layer between you, naming the connections and the disagreements
-          without taking a side.
-        </li>
-      </ul>
       <p>
-        <Link href="/docs/core-2">Core 2</Link> retired on 2 October, and the
-        original <Link href="/docs/logos">Logos</Link> has given way to Logos 2.
+        Inside it is what the earlier models built, put together:{' '}
+        <Link href="/docs/core-4">Core 4</Link>&rsquo;s decision about whose
+        work is whose; the map from the original{' '}
+        <Link href="/docs/logos">Logos</Link>; the models{' '}
+        <Link href="/docs/logos-2">Logos 2</Link> let you move and undo;
+        designs in 3D, everyday displays and documents read and cited from{' '}
+        <Link href="/docs/logos-3">Logos 3</Link> and{' '}
+        <Link href="/docs/logos-3-5">3.5</Link>; and a word processor for your
+        own writing. The Core models and Logos 2 were archived on{' '}
+        {ARCHIVE_DATE}; every conversation you had with them opens in Logos 5,
+        and <Link href="/docs/history">the history</Link> tells how each one
+        led to the next.
       </p>
       <p>
-        Core 3.1 and Core 4 are chat models: different depths of attention,
-        and in Core 4&rsquo;s case a different question — not how deep to go,
-        but whose work this is. Logos 2 and Logos 3 are a different kind of
-        thing — an environment — and it is the centerpiece of{' '}
+        Logos 5 is free to start with an account, and it is the centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
-        {priceWithPeriod()} plan. Its free tier is not a trial of Logos 2 but
-        Logos 2 itself, counted — {PLANS.free.counters.chats} lines of thinking
-        a month and {PLANS.free.counters.messages} messages a day: what Socria
+        {priceWithPeriod()} plan. Its free tier is not a trial but Logos 5
+        itself, counted — {PLANS.free.counters.chats} lines of thinking a
+        month and {PLANS.free.counters.messages} messages a day: what Socria
         One sells is how much a day and a month can hold, and what is carried
         between conversations, never a better version of any one of them.
       </p>
@@ -110,10 +84,11 @@ export function Overview() {
       </Callout>
       <ul>
         <li>
-          <strong>Authorship.</strong> Your conclusions are yours. Socria asks,
-          reflects, challenges and connects; it does not decide for you, and
-          it does not write for you — even in the Writing Space, where its
-          edits are proposals you accept or reject one at a time.
+          <strong>Authorship.</strong> Your conclusions are yours. Socria
+          contributes, challenges and connects; it does not decide for you, and
+          it does not write the substance of your work for you — and in your
+          own writing its edits are proposals you accept or reject one at a
+          time.
         </li>
         <li>
           <strong>The Answer Guard.</strong> While you are learning

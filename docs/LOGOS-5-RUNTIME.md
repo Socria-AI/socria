@@ -1200,3 +1200,131 @@ The data is additive (two optional state fields, `picked` and `done`). Reverting
 the commit restores `logos5-v2` and the six elements; a reply saved with an
 overview or a sequence then shows its prose and nothing for the block, which
 older code does not know (it never shows JSON).
+
+## 17. Guests, and one surface
+
+The owner's words: "guests can have access to logos 5 … remove the old chat
+interface entirely … but only 1 chat 1 map". What was archived, and what
+still works, is in `docs/ARCHIVE.md`; this is how the guest part works.
+
+**One line of thinking, and its map.** A guest (signed out, no access key)
+opens Logos 5 as anyone else does: no cover, no key asked for. The first turn
+claims a guest pass. `POST /api/logos/guest` with the line of thinking's id
+sets `socria_guest`, an HMAC-signed, httpOnly, lax cookie scoped to
+`/api/logos` that names that one session for 30 days (`lib/guest-pass.ts`;
+the key is derived from `CLERK_SECRET_KEY`, so there is no new secret).
+`/api/logos/chat` and `/api/logos/map` take a guest turn only in the session
+the pass names (the map request now carries `sessionId`); anything else is a
+401 with `guestLimit`, and a claim for a second session is a 403. Nothing is
+spent on a refused turn.
+
+On the screen (`components/LogosApp.tsx`), starting a second line of
+thinking, or sending in one, opens `components/logos5/GuestWall.tsx`: "One
+line of thinking, and its map", with Sign up free (focused), Keep going with
+this one, and Sign in; Escape closes it. A 401 with `guestLimit` from either
+route puts the turn back in the box and opens the same note.
+
+**It comes with them.** On the first sign-in, a signed-out browser's lines of
+thinking that have messages (up to five) are saved to the account and are no
+longer kept on the device.
+
+**What bounds a guest.** A cleared cookie can claim again. What bounds that is
+the anonymous rate limit per address, as before: the pass only names a
+session, and grants nothing a signed-out browser could not already do.
+
+**What the Core rail held.** It was the only place that listed what others had
+shared with someone, and the only way to type an invite code. Both are in
+Logos 5 now: **Shared with you** is a group under their own conversations in
+the Universal Map's List (`components/logos5/Universe.tsx`), and **Join with a
+code** is in the More menu and under that group.
+
+**Checked.** `test/guest.test.mjs` (30): the pass (signature, expiry, a forged
+pass or another session refused), the claim route, both routes refusing a
+guest with no pass or in another session, and the screen. `test/make-gallery.test.mjs`
+renders Shared with you and checks where each shared thing opens. In the
+browser against the local stand-ins, desktop and a 390px phone: Logos 5 opens
+with no cover; the first turn claims a signed httpOnly pass for `/api/logos`;
+the reply and the map answer 200 for that line of thinking; a second one opens
+the note with Sign up free focused; Escape closes it; nothing more is sent to
+Socria. No page errors. (Shared with you needs a signed-in browser, which the
+stand-ins cannot give, so it is checked rendered, not clicked.)
+
+## 18. Artifacts: drawn once, inside their card, chosen by sight
+
+The owner's words: "artifacts are very buggy and need lots of fixing and i'd
+hardcode some of them templates. and make the gui of selecting artifacts more
+visual like you can see examples of them before choosing instead of just
+small buttons". The screenshot: a Venn diagram of mitosis and meiosis asked
+for, and Artifacts listing a "Picture" of overlapping triangles on axes that
+spilled over the strip, and a second "Plot: The functions, plotted".
+
+**What was wrong, and what changed.**
+
+- *A picture over everything.* The picture layer is placed against its nearest
+  positioned ancestor, and the card was not one, so the layer took the whole
+  main column and covered the strip's pills. `.l5s-art-body` is now positioned,
+  and a model, panel or 3D view in it has a height of its own and clips
+  (`components/logos5/redesign.css`).
+- *One ask, answered twice.* Told to draw whenever someone says "diagram", the
+  map pass drew its own picture of the request beside the display. The rule
+  that dropped that copy for charts now holds for every display kind: when a
+  display is made, a picture invented this turn is dropped and one already on
+  screen stays (`app/api/logos/map`, ONE ANSWER TO ONE ASK). A copy saved
+  before the fix is not listed when its title names a display that is here.
+- *The plot, listed twice.* The plot lens draws the picture or the model when
+  there is one, so it is an artifact of its own only for functions nothing
+  else draws, and "show me the plot" opens whatever draws it. These rules are
+  one pure module now, `lib/logos5/artifacts.ts` (`pictureRepeatsDisplay`,
+  `mapArtifacts`, `plotArtifact`), which `LogosApp` reads.
+- *A phone's composer.* With something chosen to make, the composer's tool row
+  widened the whole view past the screen and cut off the send button. The view
+  can no longer be wider than the screen (`.l5v-body { min-width: 0 }`), and on
+  a phone, with a choice made, the length dial shows only its icon.
+
+**Templates, hardcoded.** Each choice that fills a display names its template:
+a kind and the view it opens on (`lib/logos5/make.ts`, `template`).
+
+| Choice | Template |
+|---|---|
+| Chart | data |
+| Comparison table | compare, matrix |
+| Timeline | plan, timeline |
+| Study plan | plan, calendar (asked as "a study calendar") |
+| Checklist | plan, checklist |
+| Flowchart | diagram, flow |
+| Pros and cons | crossroads, compare |
+| Venn diagram | venn, venn |
+
+The words a choice sends are read as exactly that kind and view, and the
+asked-for view is held to when a display is drafted
+(`lib/objects/display-propose.ts`), so what comes back is the template that
+was shown. Two did not match before: the study plan previewed a board but
+named no view, and pros and cons previewed Crossroads' centre but opens on its
+comparison. A plot, a simulation and a 3D model are built by the engine and
+have no display template.
+
+**Seen before it is chosen.** `components/logos5/MakeGallery.tsx` is a card per
+choice, each showing its template drawn by the display's own figure over the
+catalogue's example (`sampleObject` in `components/display/Gallery.tsx`), or a
+small drawing for what the engine builds. The preview is a picture, hidden
+from assistive technology and inert, and the whole card is one button. The
+empty Artifacts view shows the gallery under its heading, **+ Make** opens it
+under the strip, and the composer's Make opens it small in its sheet (two to a
+row on a phone). Choosing still works as before: the composer asks what it is
+about, and the choice is said in words.
+
+**Checked.** `test/make-gallery.test.mjs` (100): every template is a real kind
+and view, and each choice's words (with something typed, with numbers, with
+nothing typed) are read as it; every preview opens on its view; the gallery's
+cards, buttons, inert previews and pressed state; the artifact rules; the
+containment and phone CSS. Mutation-checked: changing a template's view back
+to a board, or a preview that is no longer inert, fails it.
+`test/display-e2e.test.mjs` (+4, through the real map route): "Make a Venn
+diagram of mitosis and meiosis" makes the Venn diagram and keeps no picture of
+it; a picture already on screen stays; with no display asked for, the map's
+own picture is still drawn. In the browser, desktop and a 390px phone: the
+screenshot's session with the picture inside its card, the pills pressable and
+no second Plot; the gallery of eleven, each drawn; choosing Venn asks "Of
+what? e.g. mitosis and meiosis"; the composer's sheet is the same gallery with
+Venn marked; the send button stays in view with a choice made; no sideways
+scroll, no page errors.

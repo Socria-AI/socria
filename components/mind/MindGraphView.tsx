@@ -45,7 +45,6 @@ import { query } from '@/lib/workspace/portable';
 import type { MindGraph } from '@/lib/mind/types';
 import { MindAtlas } from './MindAtlas';
 import { MindShare } from '@/components/share/MindShare';
-import { isOffered, lastCoreModel } from '@/lib/socria-model-store';
 import './mind-graph.css';
 
 interface Provenance {
@@ -752,14 +751,10 @@ function Panel({
 
 // ── the page ────────────────────────────────────────────────────────
 
-/** Into a chat from the atlas: Logos sessions open in Logos, chats in Core. */
+/** Into a chat from the atlas: everything opens in Logos 5 — a line of thinking by ?s=, a Core chat by ?c= (app/chat/page.tsx). */
 function openChat(id: string, surface: 'core' | 'logos') {
   const q = encodeURIComponent(id);
-  window.location.assign(
-    surface === 'logos'
-      ? `/chat?model=${isOffered('logos-3') ? 'logos-3' : 'logos-2'}&s=${q}`
-      : `/chat?model=${lastCoreModel()}&c=${q}`
-  );
+  window.location.assign(surface === 'logos' ? `/chat?s=${q}` : `/chat?c=${q}`);
 }
 
 export function MindGraphView() {

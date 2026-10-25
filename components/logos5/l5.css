@@ -1107,7 +1107,9 @@
 .logos-root .l5-make .mp-sheet {
   left: 8px;
   right: auto;
-  width: min(340px, calc(100% - 16px));
+  /* wide enough to see the templates: two or three to a row */
+  width: min(560px, calc(100% - 16px));
+  max-height: min(68vh, 560px);
 }
 .logos-root .l5-make.is-set .mp-btn {
   color: var(--lg-primary);
@@ -1126,6 +1128,19 @@
   .logos-root .l5-ctools-mid .mp-btn .nm {
     max-width: 76px;
   }
+  /* with something chosen to make, the length is its icon: the choice is what
+     this message is about, and the row keeps the send button in view */
+  .logos-root .l5-ctools-mid:has(.l5-make.is-set) .l5-concise .mp-btn .nm {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .logos-root .l5-ctools-mid:has(.l5-make.is-set) .l5-make .mp-btn .nm {
+    max-width: 112px;
+  }
 }
 .logos-root .l5-make-x {
   width: 22px;
@@ -1142,34 +1157,6 @@
 .logos-root .l5-make-x:focus-visible {
   color: var(--lg-ink);
   background: rgba(var(--ink-rgb, 31, 31, 31), 0.06);
-}
-.logos-root .l5-make-list {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin: 0 4px;
-}
-.logos-root .l5-make-opt {
-  padding: 6px 11px;
-  border-radius: 999px;
-  border: 1px solid rgba(var(--ink-rgb, 31, 31, 31), 0.14);
-  background: transparent;
-  color: var(--lg-ink);
-  font: inherit;
-  font-size: 13px;
-  cursor: pointer;
-}
-.logos-root .l5-make-opt:hover {
-  background: rgba(var(--ink-rgb, 31, 31, 31), 0.05);
-}
-.logos-root .l5-make-opt.on {
-  border-color: var(--lg-primary);
-  background: rgba(var(--lg-primary-rgb), 0.12);
-}
-.logos-root .l5-make-opt:focus-visible,
-.logos-root .l5-make-x:focus-visible {
-  outline: 2px solid var(--lg-primary);
-  outline-offset: 1px;
 }
 .logos-root .l5-ctools-end {
   display: inline-flex;
@@ -1406,4 +1393,87 @@
   .logos-root .l5-ctools .mp-btn:hover {
     background: rgba(var(--l5-tint-rgb), 0.06);
   }
+}
+
+/* ── a guest's one line of thinking (GuestWall) ───────────────────── */
+.logos-root .l5-guestwall {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: grid;
+  place-items: center;
+  padding: max(16px, env(safe-area-inset-top, 0px)) max(16px, env(safe-area-inset-right, 0px)) max(16px, env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px));
+  background: rgba(var(--shadow-rgb, 20, 20, 16), 0.28);
+}
+.logos-root .l5-guestwall-card {
+  width: min(420px, 100%);
+  display: grid;
+  gap: 10px;
+  padding: 26px 24px 20px;
+  border: 1px solid var(--l5-hair, rgba(53, 70, 32, 0.14));
+  border-radius: 18px;
+  background: var(--l5-paper-hi, #fffdf8);
+  color: var(--lg-ink);
+  box-shadow: 0 40px 90px -50px rgba(var(--shadow-rgb, 20, 20, 16), 0.6);
+}
+.logos-root .l5-guestwall-k {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lg-primary);
+}
+.logos-root .l5-guestwall-h {
+  margin: 0;
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  font-weight: 400;
+  font-size: 30px;
+  line-height: 1.1;
+}
+.logos-root .l5-guestwall-d {
+  margin: 0 0 6px;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-guestwall-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.logos-root .l5-guestwall-go {
+  display: inline-flex;
+  align-items: center;
+  min-height: 42px;
+  padding: 0 18px;
+  border-radius: 999px;
+  background: var(--lg-primary);
+  color: var(--l5-on-primary, #fff);
+  font-size: 15px;
+  font-weight: 500;
+  text-decoration: none;
+}
+.logos-root .l5-guestwall-stay {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 1px solid var(--l5-hair, rgba(53, 70, 32, 0.14));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 14.5px;
+  cursor: pointer;
+}
+.logos-root .l5-guestwall-in {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5-guestwall-in a {
+  color: var(--lg-primary);
+}
+.logos-root :is(.l5-guestwall-go, .l5-guestwall-stay, .l5-guestwall-in a):focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
 }

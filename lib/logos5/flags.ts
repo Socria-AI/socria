@@ -1,9 +1,12 @@
 // lib/logos5/flags.ts — LOGOS 5, SWITCHABLE.
 //
-// Logos 5 is a new frontend over the same Logos (docs/LOGOS-5.md). It is on
-// by default; NEXT_PUBLIC_LOGOS5=off (or 0, false, no) brings back the Logos 4
-// layout for a deployment without a code change. Read with the literal
-// `process.env.NEXT_PUBLIC_…` name so Next.js inlines it into the client.
+// Logos 5 is a new frontend over the same Logos (docs/LOGOS-5.md), and since
+// 25 October 2026 the only one: the Logos 4 layout this switch used to bring
+// back was archived with the Core chat (docs/ARCHIVE.md), and LogosApp no
+// longer asks. NEXT_PUBLIC_LOGOS5=off (or 0, false, no) now only takes the
+// access code's field out of Manage Account where no model is gated either.
+// Read with the literal `process.env.NEXT_PUBLIC_…` name so Next.js inlines
+// it into the client.
 
 const off = (v: string | undefined): boolean => /^(off|0|false|no)$/i.test((v ?? '').trim());
 

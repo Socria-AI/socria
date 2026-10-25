@@ -67,6 +67,16 @@ const inTime = (m: A.HomeMode) => m === 'month' || m === 'all';
 const TOP = { wide: 150, narrow: 140 } as const;
 const FOOT = { wide: 92, narrow: 78 } as const;
 
+/** Something another person shared with this one (/api/shared): a Project or a conversation, and whose it is. */
+export interface SharedIn {
+  type: string;
+  id: string;
+  /** a conversation's surface: 'logos' for a line of thinking */
+  kind?: string;
+  title: string;
+  owner?: string;
+}
+
 export function UniverseView({
   conversations,
   projects,
@@ -84,6 +94,9 @@ export function UniverseView({
   onDelete,
   onMind,
   contents = false,
+  shared,
+  onOpenShared,
+  onJoinCode,
   atlas,
   drawing = null,
   readDocument,
@@ -123,6 +136,11 @@ export function UniverseView({
   onMind?: () => void;
   /** the contents column: every conversation, by subject */
   contents?: boolean;
+  /** what others have shared with them, listed under their own in the contents column; undefined signed out */
+  shared?: readonly SharedIn[];
+  onOpenShared?: (item: SharedIn) => void;
+  /** open something shared by its eight-character code */
+  onJoinCode?: () => void;
   /** the Mind Atlas, for a signed-in person */
   atlas?: ReactNode;
   /** the Core chats brought in having their maps drawn: how many of how many, while it lasts */
@@ -674,6 +692,35 @@ export function UniverseView({
           );
         })}
         {!shown.some((t) => !matchOf || matchOf(t.id)) && <p className="l5c-none">{tiles.length ? 'Nothing matches.' : 'Nothing here yet — every conversation you have is listed here.'}</p>}
+        {/* SHARED WITH YOU — Projects and conversations others opened to them,
+            below their own: their own work comes first. Not searched: the
+            search finds what is on their map. */}
+        {shared && !q && (
+          <div className="l5c-group l5c-shared" role="group" aria-label="Shared with you">
+            <span className="l5c-k">Shared with you</span>
+            {shared.map((it) => (
+              <button
+                key={`sh-${it.type}-${it.id}`}
+                type="button"
+                className="l5c-item"
+                onClick={() => onOpenShared?.(it)}
+                title={`${it.title || 'Untitled'}${it.owner ? ` — shared by ${it.owner}` : ''}`}
+              >
+                <span className="l5c-t">{it.title || 'Untitled'}</span>
+                <span className="l5c-s">
+                  {it.type === 'project' ? 'Project' : 'Conversation'}
+                  {it.owner ? ` · shared by ${it.owner}` : ''}
+                </span>
+              </button>
+            ))}
+            {!shared.length && <p className="l5c-none">When someone shares with you, it appears here.</p>}
+            {onJoinCode && (
+              <button type="button" className="l5c-join" onClick={onJoinCode} title="Open something shared with you by its code">
+                Join with a code <span aria-hidden="true">→</span>
+              </button>
+            )}
+          </div>
+        )}
       </div>
       {onMind && (
         <button type="button" className="l5c-mind" onClick={onMind}>

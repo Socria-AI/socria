@@ -1,5 +1,6 @@
-// Scenarios, each matched to the model and settings that fit it. This page
-// sells nothing; it routes people to the right part of the product.
+// Scenarios, each matched to the part of Logos 5 that fits it. This page
+// sells nothing; it routes people to the right part of the product. There is
+// one model now, so the question is no longer which model but which view.
 
 import Link from 'next/link';
 import { Article, H2, Callout } from '../Article';
@@ -20,21 +21,25 @@ export function UseCases() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        Socria is one product with several registers, so the practical question
-        is less <em>"what can it do"</em> than <em>"which surface fits this
-        moment."</em> These are the shapes of use the product was actually
-        built around.
+        Socria is one model, <Link href="/docs/logos-5">Logos 5</Link>, so the
+        practical question is less <em>"which one"</em> than <em>"where in it
+        does this happen."</em> Everything starts as a conversation; the views
+        beside it open when what you asked for lives there. These are the
+        shapes of use the product was actually built around.
       </p>
 
       <H2 id="deciding">Making a decision</H2>
       <p>
-        <strong>Use <Link href="/docs/logos-2">Logos 2</Link>.</strong> A decision is exactly the kind of thinking
-        that benefits from being seen: the reasons, the assumptions holding
-        them together, and the tensions between them. Talk the decision
-        through and the <Link href="/docs/thinking-map">Thinking Map</Link>{' '}
-        draws it live — when two of your own reasons pull against each other,
-        the map shows the conflict as a drawn edge rather than letting it hide
-        in prose.
+        <strong>Talk it through, then open the Logic Map.</strong> A decision
+        is exactly the kind of thinking that benefits from being seen: the
+        reasons, the assumptions holding them together, and the tensions
+        between them. Ask for the structure — &ldquo;what does this rest
+        on?&rdquo; — and the <Link href="/docs/thinking-map">Thinking Map</Link>{' '}
+        draws it beside the conversation — when two of your own reasons pull
+        against each other, the map shows the conflict as a drawn edge rather
+        than letting it hide in prose. Weighing options? Ask for a comparison
+        and it is made from your own words. The call stays yours: &ldquo;you
+        decide&rdquo; gets Socria&rsquo;s view, marked as one.
       </p>
       <p>
         When a claim looks load-bearing, click it: <strong>Challenge</strong>{' '}
@@ -46,9 +51,13 @@ export function UseCases() {
 
       <H2 id="learning">Learning something</H2>
       <p>
-        <strong>Use Logos 2.</strong> Say you are studying, or ask to be
-        taught, and the map turns to concepts and misconceptions as you build
-        them. When the learning is mathematical, the{' '}
+        <strong>Drop your files on the Universal Map&rsquo;s box.</strong> Say
+        what for, and they are sorted into topics in their own words, every
+        quote with its page; ask for practice and it is made from them and
+        checked when you submit. Say you want to work the problems out
+        yourself and Socria holds the answers back from then on — saying so
+        once, and saying what you can have instead. When the learning is
+        mathematical, the{' '}
         <Link href="/docs/mathematics">Answer Guard</Link> also arms: from
         then on Socria guides instead of solving — hints and next-step
         questions — and the result stays masked on every surface until{' '}
@@ -64,9 +73,11 @@ export function UseCases() {
 
       <H2 id="math">Working through math</H2>
       <p>
-        <strong>Use Logos 2.</strong> When the conversation turns mathematical,
-        the map does too: givens, unknowns, equation steps, mistakes and
-        results become typed nodes with real LaTeX, and three extra lenses
+        <strong>Ask in Chat; open the Logic Map for the working.</strong>{' '}
+        A derivative, integral, limit or root you ask for is computed by the
+        engine rather than recalled, and your own steps are checked against
+        it. On the map, givens, unknowns, equation steps, mistakes and results
+        become typed nodes with real LaTeX, and three extra lenses
         appear — the <strong>Solution</strong> chain, which follows the work
         step by step and leads the view; the <strong>Board</strong>, which
         lays it out like a hand-written scratch page (mistakes struck through
@@ -80,10 +91,10 @@ export function UseCases() {
 
       <H2 id="systems">Building a model of something</H2>
       <p>
-        <strong>Use <Link href="/docs/logos-2">Logos 2</Link>.</strong> When
-        what you are thinking about is a <em>system</em> — a shape, something
-        that moves, quantities that change over time, a relationship in data —
-        say so in a sentence and the engine builds a model of it beside the
+        <strong>Say what it is; it lands in Artifacts.</strong> When what you
+        are thinking about is a <em>system</em> — a shape, something that
+        moves, quantities that change over time, a relationship in data — say
+        so in a sentence and the engine builds a model of it beside the
         conversation: controls you can drag, axes with numbers and units, and
         a row of views that read the same model different ways.
       </p>
@@ -114,24 +125,30 @@ export function UseCases() {
         Then change it by saying so — &ldquo;make the damping zero&rdquo;,
         &ldquo;undo that&rdquo; — or select a part and ask about it. Pictures
         of each, and more to ask for, are on the{' '}
-        <Link href="/docs/logos-2#gallery">Logos 2 page</Link>.
+        <Link href="/docs/logos-2#gallery">Logos 2 page</Link>, where they
+        began, and on <Link href="/docs/logos-3-engineering">Engineering</Link>{' '}
+        and <Link href="/docs/logos-3-dynamics">Dynamics and chaos</Link>.
       </p>
 
       <H2 id="writing">Writing something that matters</H2>
       <p>
-        <strong>Think in Logos, then open the{' '}
-        <Link href="/docs/drafts-grounding">Draft Space and the Writing Space</Link>.</strong>{' '}
-        Brain-dump ideas as cards, sort them into piles that will each be a
+        <strong>Think it through, then open{' '}
+        <Link href="/docs/drafts-grounding">Write</Link>.</strong>{' '}
+        Brain-dump ideas as notes, sort them into piles that will each be a
         paragraph, link them to the passages of your files and the ideas on
-        your map, then turn the board into an outline and write. The page
-        is yours: Socria explains, critiques or proposes edits only when you
-        select your words and ask, and every proposed edit is yours to
-        accept or reject, one at a time.
+        your map, then turn them into an outline and write. The page is
+        yours: Socria checks, improves or thinks it through with you only
+        when you ask, and every proposed edit is yours to accept or reject,
+        one at a time. A practical piece you simply want written — an email,
+        a note to a landlord — Socria will write as a draft you edit in
+        place.
       </p>
 
       <H2 id="research">Testing an idea against evidence</H2>
       <p>
-        <strong>Use Research on a map node.</strong> It searches the live web,
+        <strong>Ask, or use Research on a map node.</strong> A question that
+        needs current information is looked up, and the reply cites only the
+        sources it actually had. Research on a node searches the live web,
         reads what it finds, and returns the evidence with sources listed —
         distinguishing what it actually cites from what it merely found. If no
         source supports a claim, it says so rather than inventing a citation.
@@ -141,20 +158,15 @@ export function UseCases() {
 
       <H2 id="quick">Just thinking out loud</H2>
       <p>
-        <strong>Core 3.1</strong> if you want no machinery and no account —
-        it works signed out for a first session — or if the thread is one you
-        will come back to:
-        it holds memory across the conversation, periodically synthesizes what
-        you have worked out, and keeps a running picture of how you tend to
-        think. <strong><Link href="/docs/core-4">Core 4</Link></strong> if the
-        work is long and consequential — a decision that runs for weeks, a
-        piece of research, a plan you need the load-bearing assumption of. It
-        contributes rather than quizzes, keeps a record of what you have
-        settled so nothing is re-litigated, and holds an answer back only for
-        a reason you gave it in your own words. Either way, if the thinking starts to sprawl, open Logos 2 and give
-        it a line of thinking of its own — chat and Logos sessions sit in one
-        list, interleaved by when you last touched them, whichever model made
-        them.
+        <strong>Just talk.</strong> A conversation that needs none of the
+        workspace is just a conversation: a hello is answered as a hello, a
+        joke as a joke, something hard as something hard — no tasks
+        suggested, no lesson begun. If the thinking starts to sprawl, ask for
+        the structure and the Logic Map draws it; everything you talk through
+        stays on your Universal Map, where you can come back to it. Long,
+        consequential work — a decision that runs for weeks, a piece of
+        research — is the same conversation: what you have said holds across
+        it, so you are not asked again.
       </p>
     </Article>
   );

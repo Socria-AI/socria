@@ -209,7 +209,8 @@ console.log('\n=== simple at rest, powerful on demand ===');
   ok('"+ View" holds the views and the arrangements', /Open beside/.test(ws) && /Arrange/.test(ws) && /onArrange/.test(ws));
   const app = read('components/LogosApp.tsx');
   ok('Logos 3 starts on one surface — the model if there is one, else the map', /singleLayout\(wsHasModel \? 'model' : 'map'\)/.test(app));
-  ok('the conversation is a composer beneath the stage until it is asked for', /className=\{`ws-dock lg-convo/.test(app) && /dock=\{wsDock\}/.test(app));
+  // Logos 5: the composer sits under whichever view is open (L5Layout's omni) until the conversation is opened, as Chat or beside
+  ok('the conversation is a composer beneath the stage until it is asked for', /const convoOpen = l5 && !!activeId && \(screen\.view === 'chat' \|\| screen\.beside === 'chat'\);/.test(app) && /omni=\{convoOpen \? null : l5Dock\}/.test(app) && /\{omni && <div className="l5v-omni">\{omni\}<\/div>\}/.test(read('components/logos5/L5Views.tsx')));
   // Logos 4: only what the inspector can describe opens it — a parameter, an input, a part of a model
   ok('the inspector appears for a selection, and only then', /focus && \(focus\.kind === 'param' \|\| focus\.kind === 'input' \|\| focus\.kind === 'object'\)/.test(app) && /overlay=\{wsCard\}/.test(app));
   // by the count it used to keep, or by the build itself (lib/workspace/surfaces.ts afterBuild, tested in logos3-interface)
@@ -247,7 +248,7 @@ console.log('\n=== the wiring ===');
   const app = read('components/LogosApp.tsx');
   const prompt = read('lib/socria-prompt.ts');
   ok('Logos 3 is the workspace', /workspace: true/.test(prompt.slice(prompt.indexOf("'logos-3': {"), prompt.indexOf("'logos-3': {") + 1200)));
-  ok('Logos 2 keeps its two columns, exactly as before', /\{mapBody\(\{ primary: true \}\)\}/.test(app) && /\{convoHead\}\s*\{convoBody\}/.test(app));
+  // Logos 2's two columns, the conversation beside the map, were archived with the Logos 2 and Logos 4 layouts: Logos 5 is the one screen.
   ok('every model edit — map, model panel, parameters — goes through one write path', (app.match(/onModel=\{stableModelEdited\}/g) || []).length >= 2 && /onModelEdited=\{stableModelEdited\}/.test(app) && /adopt\(ws, docId, m, Date\.now\(\)\)/.test(app));
   ok('undo and redo are the document’s own verbs', /undoDoc\(ws, docId\)/.test(app) && /redoDoc\(ws, docId\)/.test(app) && /restoreDoc\(ws, docId, op\)/.test(app));
   ok('the layout is kept in this browser, never in the session', /const WS_KEY = 'socria\.logos3\.workspace\.v2'/.test(app) && /localStorage\.setItem\(WS_KEY/.test(app) && !/workspace: wsLayout|layout: wsLayout,\s*\}/.test(app));
@@ -259,7 +260,7 @@ console.log('\n=== the wiring ===');
     ok('the chat route reads it, cleaned', /const brief = [^;]*sanitizeFocus\(body\?\.focus\)/.test(route) && /const selected = brief/.test(route) && /focusBlock\(selected\)/.test(route) && /focusIsBrief/.test(route));
   }
   ok('only the first model panel takes the reply’s ops and reports the picture', /onRead=\{primary \? takeViz : undefined\}/.test(app) && /ops=\{primary \? vizOps : null\}/.test(app));
-  ok('the workspace hooks sit above the access gate', app.indexOf('const [wsLayout, setWsLayout]') < app.indexOf('if (!hasAccess) {'));
+  ok('the workspace hooks sit above the access gate', app.indexOf('const [wsLayout, setWsLayout]') < app.indexOf('if (!hasAccess) return'));
   const ws = read('components/workspace/Workspace.tsx');
   ok('Escape restores a maximised panel', /e\.key === 'Escape'/.test(ws) && /restore\(layoutRef\.current\)/.test(ws));
   ok('dividers can be moved from the keyboard', /aria-orientation/.test(ws) && /ArrowLeft/.test(ws));

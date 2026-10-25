@@ -58,11 +58,11 @@ ok('Copy says Copied only when it worked', /if \(await copyText\(m\.content\)\) 
 const composer = read('components/LogosComposer.tsx');
 ok('the composer shows what it replies to, and Esc lets it go', /Replying to \{replyTo\.who\}/.test(composer) && /if \(replyTo && onCancelReply\) \{\s*e\.preventDefault\(\);\s*onCancelReply\(\);/.test(composer));
 ok('"@so" is finished as @socria, by Tab or Enter', /if \(offering && \(e\.key === 'Tab' \|\| \(e\.key === 'Enter' && !e\.shiftKey\)\)\)/.test(composer));
-ok('a quote goes to its message by scrolling the thread itself, never scrollIntoView', /t\.scrollTop \+= el\.getBoundingClientRect\(\)\.top/.test(app) && !/scrollIntoView/.test(app.slice(app.indexOf('function jumpTo('), app.indexOf('const convoBody'))));
-const core = read('app/chat/page.tsx');
-ok('Core chat: Reply and Copy under Socria\'s answers, the reply carried to the model', /<TurnActions text=\{copy\} onReply=\{onReply\} align="start" \/>/.test(core) && /\.\.\.\(replying \? \{ replyTo: replying \} : \{\}\)/.test(core));
+// jumpTo and the notes after it, up to the map's body (the Logos 4 conversation body that once ended this range was archived).
+ok('a quote goes to its message by scrolling the thread itself, never scrollIntoView', /t\.scrollTop \+= el\.getBoundingClientRect\(\)\.top/.test(app) && !/scrollIntoView/.test(app.slice(app.indexOf('function jumpTo('), app.indexOf('const mapBody'))));
+// The Core chat's own Reply and Copy (TurnActions), and the reply it carried to the model, were archived with it.
 const att = read('lib/chat-attachments.ts');
-ok('  forRequest carries it, and the route folds it into one quoted line', /\.\.\.ref\(m\)/.test(att) && /content: withQuote\(m\),/.test(att) && /content: withQuote\(m\) \}\)\)/.test(read('app/api/chat/route.ts')));
+ok('forRequest carries the reply, and the route folds it into one quoted line', /\.\.\.ref\(m\)/.test(att) && /content: withQuote\(m\),/.test(att) && /content: withQuote\(m\) \}\)\)/.test(read('app/api/chat/route.ts')));
 
 console.log('=== Core, together ===');
 const st = read('components/share/SharedThread.tsx');

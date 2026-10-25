@@ -76,19 +76,17 @@ console.log('\n=== the interface asks the table rather than the plan name ===');
 
   ok('LogosApp reads the plan table once, by name', /const limits = limitsFor\(plan\)/.test(logos));
   ok('the depth gate asks allDepths', /!limits\.allDepths && next !== FREE_DEPTH/.test(logos));
-  // The depth menu is the shared model picker now (Logos 3 has depth): it is
-  // handed the plan and locks from the same table.
-  ok('the depth menu lock asks allDepths', /plan=\{planKnown \? plan : undefined\}/.test(logos) && /PLANS\[plan\]\.allDepths/.test(readFileSync(join(root, 'components/ModelPicker.tsx'), 'utf8')));
+  // The depth menu, the model picker handed the plan, was archived with the choice of model: Logos 5's composer has no depth menu to lock.
   ok('Draft Space asks draftSpace', /limits\.draftSpace/.test(logos));
   ok('the map boundary asks mapNodes', /meaningfulNodes\(map\) >= \(limits\.mapNodes \?\? Infinity\)/.test(logos));
   ok('the lens limit is passed as the number it is', /lensLimit=\{limits\.lenses\}/.test(logos));
   ok('ThinkingMap takes a count, not a boolean', /lensLimit\?: number \| null;/.test(tmap));
 
-  // The gates that legitimately remain: how many lines of thinking, and
-  // connected sources. Everything else that tests `one` in LogosApp should
-  // be about billing or a welcome note, never about a capability.
+  // The gate that legitimately remains: how many lines of thinking.
+  // Everything else that tests `one` in LogosApp should be about billing or
+  // a welcome note, never about a capability.
   ok('the chat count still gates on the plan', /!one && chatsSpent/.test(logos));
-  ok('connected sources still gate on the plan', /connections-locked/.test(logos));
+  // Connected sources' door, which asked the plan, was archived with the Logos 4 header: Logos 5 has no Connections button.
 
   // And nothing may reintroduce the old boolean prop.
   ok('lensesLocked is gone from both', !/lensesLocked/.test(logos) && !/lensesLocked/.test(tmap));
