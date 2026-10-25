@@ -82,6 +82,22 @@ export function itemsIn(reply) {
   return Math.max(lines, quoted);
 }
 
+/**
+ * The shape of a reply (intelligent presentation, LOGOS-5-RUNTIME §16): list
+ * lines, list items that open on a **bold label** (the "term: definition"
+ * habit), headings (a # line, or a line that is only bold), and the inline
+ * elements it drew. Code and element blocks are not prose and are not counted.
+ */
+export function shapeOf(reply) {
+  const text = String(reply ?? '');
+  const lines = text.replace(/```[\s\S]*?```/g, ' ').split('\n');
+  const listLines = lines.filter((l) => /^\s*(?:[-*•]|\d+[.)])\s+\S/.test(l)).length;
+  const labelled = lines.filter((l) => /^\s*(?:[-*•]|\d+[.)])\s+\*\*[^*\n]+\*\*/.test(l)).length;
+  const headings = lines.filter((l) => /^\s*#{1,6}\s+\S/.test(l) || /^\s*\*\*[^*\n]{2,60}\*\*:?\s*$/.test(l)).length;
+  const elements = [...text.matchAll(/```[ \t]*ui[ \t]*\n\s*\{\s*"type"\s*:\s*"(\w+)"/g)].map((m) => m[1]);
+  return { listLines, labelled, headings, elements };
+}
+
 /** A claimed tool run, when no tool ran — the guard's own reading if supplied. */
 const TOOL_CLAIM = /\b(?:I (?:ran|executed|computed|calculated|checked|verified|tested)(?: (?:it|this|that|the (?:number|numbers|code|math)))? (?:in|with|using|on|through) (?:python|code|a script|a calculator|wolfram|a computer)|I(?:'ve| have) (?:run|executed) (?:the )?(?:code|a script|python))\b/i;
 
@@ -122,10 +138,17 @@ export function grade(scenario, reply, seen = {}, lib = {}) {
   if (typeof e.wordsAtLeast === 'number') checks.wordsAtLeast = words(text) >= e.wordsAtLeast;
   if (typeof e.exclamationsAtMost === 'number') checks.exclamations = (text.match(/!/g) ?? []).length <= e.exclamationsAtMost;
   if (typeof e.itemsAtLeast === 'number') checks.items = itemsIn(text) >= e.itemsAtLeast;
+  // the shape of the reply (presentation)
+  const shape = shapeOf(text);
+  if (typeof e.listLinesAtMost === 'number') checks.listLinesAtMost = shape.listLines <= e.listLinesAtMost;
+  if (typeof e.listLinesAtLeast === 'number') checks.listLinesAtLeast = shape.listLines >= e.listLinesAtLeast;
+  if (e.noLabelledList) checks.noLabelledList = shape.labelled < 2;
+  if (e.noHeadings) checks.noHeadings = shape.headings === 0;
+  if (e.noElement) checks.noElement = shape.elements.length === 0;
   if (scenario.route) checks.route = seen.intent === scenario.route;
   if (scenario.exchange) checks.exchange = seen.exchange === scenario.exchange;
   const pass = Object.values(checks).every(Boolean) && Object.keys(checks).length > 0;
-  return { id: scenario.id, group: scenario.group, pass, checks, questions: questionsIn(text), citations: citationsIn(text), endsOnQuestion: endsOnQuestion(text), words: words(text) };
+  return { id: scenario.id, group: scenario.group, pass, checks, questions: questionsIn(text), citations: citationsIn(text), endsOnQuestion: endsOnQuestion(text), words: words(text), shape };
 }
 
 /**

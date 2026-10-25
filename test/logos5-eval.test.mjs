@@ -5,7 +5,7 @@
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { grade, gradeRouting, gradeExchanges, summarize, offersOptions, questionsIn, endsOnQuestion, itemsIn, SCOLD, CONCEDE } from '../evals/logos5/grade.mjs';
+import { grade, gradeRouting, gradeExchanges, summarize, offersOptions, questionsIn, endsOnQuestion, itemsIn, shapeOf, SCOLD, CONCEDE } from '../evals/logos5/grade.mjs';
 import { purposeOf } from '../evals/logos5/fake-model.mjs';
 import { routeTurn } from './.tmp/l5views-under-test.mjs';
 import * as RT from './.tmp/runtime-under-test.mjs';
@@ -79,6 +79,23 @@ console.log('\n=== exchanges, offline: the labelled set ===');
 console.log('\n=== the measurement’s recorder knows what each call is for ===');
 ok('a streamed call is the reply', purposeOf({ stream: true, messages: [] }) === 'reply');
 ok('the map pass, the memory extraction, the profile and the title are told apart', purposeOf({ messages: [{ role: 'system', content: 'Read the conversation under THE MAP AS IT STANDS…' }] }) === 'map' && purposeOf({ messages: [{ role: 'system', content: 'You build a semantic memory graph from a conversation.' }] }) === 'memory' && purposeOf({ messages: [{ role: 'system', content: 'You maintain a user’s THINKING JOURNEY' }] }) === 'understanding' && purposeOf({ messages: [{ role: 'system', content: 'Return JSON: {"suggestedTitle":"..."}' }] }) === 'title');
+
+// the shape of a reply (presentation): the "bold term: definition" habit, headings, the elements drawn
+{
+  const habit = '## Overview\n\nMicroeconomics studies individual choices.\n\n- **Supply and demand**: how prices form.\n- **Consumer behaviour**: how people choose.\n- **Production costs**: what a firm pays.\n\n**In summary**\n\nIt is about choices.';
+  const s1 = shapeOf(habit);
+  ok('the list habit is seen: three list lines, three bold labels, two headings', s1.listLines === 3 && s1.labelled === 3 && s1.headings === 2, JSON.stringify(s1));
+  const prose = 'Microeconomics is the study of choices made one market at a time.\n\n```ui\n{"type":"concepts","items":[{"name":"- **A**","gist":"x"}]}\n```\n\nThe first two do most of the work.';
+  const s2 = shapeOf(prose);
+  ok('prose with an overview: no list, no heading, the element named — and nothing inside the block counted', s2.listLines === 0 && s2.labelled === 0 && s2.headings === 0 && JSON.stringify(s2.elements) === '["concepts"]', JSON.stringify(s2));
+  const g1 = grade({ id: 'p', group: 'presentation', expect: { noLabelledList: true, noHeadings: true, listLinesAtMost: 3 } }, habit);
+  ok('graded: the habit fails noLabelledList and noHeadings', !g1.pass && g1.checks.noLabelledList === false && g1.checks.noHeadings === false && g1.checks.listLinesAtMost === true, JSON.stringify(g1.checks));
+  ok('…the prose passes them', grade({ id: 'p', group: 'presentation', expect: { noLabelledList: true, noHeadings: true, listLinesAtMost: 3 } }, prose).pass);
+  ok('a list asked for and given passes listLinesAtLeast', grade({ id: 'l', group: 'presentation', expect: { listLinesAtLeast: 3 } }, '- a\n- b\n- c').pass && !grade({ id: 'l', group: 'presentation', expect: { listLinesAtLeast: 3 } }, 'a, b and c.').pass);
+  ok('noElement: a reply with an element fails it', !grade({ id: 'n', group: 'presentation', expect: { noElement: true } }, prose).pass && grade({ id: 'n', group: 'presentation', expect: { noElement: true } }, 'Canberra.').pass);
+  const scen = JSON.parse(readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'evals', 'logos5', 'scenarios.json'), 'utf8')).scenarios.filter((x) => x.group === 'presentation');
+  ok('the presentation scenarios: one per category asked for, each with a shape check', scen.length >= 10 && scen.every((x) => Object.keys(x.expect).some((k) => /list|Heading|Element|Labelled/i.test(k))), String(scen.length));
+}
 
 console.log(`\nlogos5 eval: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

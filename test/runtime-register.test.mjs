@@ -194,7 +194,7 @@ console.log('\n=== the core: who Socria is, and what it is ===');
   ok('what it is: no feelings claimed, no disclaimer recited', /ABOUT YOU/.test(core) && /Don't claim them/.test(core) && /don't recite a disclaimer/.test(core));
   ok('knowing their work is no reason to bring it up', /no reason to bring it up/.test(core));
   ok('Human-First, honesty and who-does-what are all still there', /WHO DOES WHAT/.test(core) && /the call is theirs/.test(core) && /NEVER INVENT A SOURCE/.test(core) && /Never agree because they insist/.test(core));
-  ok('the persona says which version it is', R.PERSONA_VERSION === 'logos5-v2');
+  ok('the persona says which version it is', R.PERSONA_VERSION === 'logos5-v3');
 }
 
 console.log(`\nruntime register: ${pass} passed, ${fail} failed`);

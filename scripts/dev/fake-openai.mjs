@@ -77,6 +77,31 @@ function inlineReply(messages) {
   if (sys.includes('"type":"options"')) {
     return `Happy to. Where do you want to start?\n\n${ui({ type: 'options', options: [{ label: 'The structure' }, { label: 'The opening' }, { label: 'Tightening the argument' }] })}`;
   }
+  if (sys.includes('"type":"concepts"')) {
+    return `Microeconomics is the study of choices made one market at a time — how buyers and sellers decide, and how their decisions settle into prices. Four ideas carry most of it, and each leans on the others.\n\n${ui({ type: 'concepts', title: 'Microeconomics', items: [
+      { name: 'Supply and demand', gist: 'How a price settles where what sellers offer meets what buyers want.', detail: 'Demand falls as price rises; supply rises with it. Where the two meet is the price that clears the market, and anything that shifts either curve moves it.', links: ['Market structure', 'Elasticity'] },
+      { name: 'Consumer behaviour', gist: 'How people choose what to buy with a limited budget.', detail: 'People weigh what an extra unit is worth to them against its price. Add up those choices and you get the demand curve.', links: ['Supply and demand'] },
+      { name: 'Costs of production', gist: 'What it costs a firm to make one more unit.', detail: 'Fixed costs stay put; variable costs grow with output. A firm keeps producing while one more unit brings in more than it costs.', links: ['Market structure'] },
+      { name: 'Market structure', gist: 'How many firms compete, and how much say each has over price.', detail: 'From many small firms that take the price as given to one firm that sets it, the structure decides how far prices sit above costs.' },
+      { name: 'Elasticity', gist: 'How strongly buyers or sellers react when the price moves.', detail: 'Necessities barely react; luxuries react a lot. It decides who ends up paying a tax and whether a price rise brings in more or less money.' },
+    ] })}`;
+  }
+  if (sys.includes('"type":"sequence"')) {
+    if (sys.includes('sequence:timeline') || /timeline|events|happened|over time|chronolog/i.test(t)) {
+      return `It moved fast once it started: in a little over two years the monarchy went from reform to abolition.\n\n${ui({ type: 'sequence', kind: 'timeline', title: 'The French Revolution, the first years', items: [
+        { label: 'The Estates-General meets', when: 'May 1789', detail: 'Called to fix the Crown\'s finances, it splits over how votes are counted.' },
+        { label: 'The Bastille falls', when: 'July 1789', detail: 'Crowds take the fortress; the King\'s authority in Paris collapses.' },
+        { label: 'Declaration of the Rights of Man', when: 'Aug 1789' },
+        { label: 'The monarchy is abolished', when: 'Sept 1792', detail: 'The Convention declares a republic.' },
+      ] })}`;
+    }
+    return `Four steps, and the second is the one people skip.\n\n${ui({ type: 'sequence', kind: 'steps', title: 'Setting up a budget', items: [
+      { label: 'Add up what comes in each month' },
+      { label: 'List every fixed cost', detail: 'Rent, phone, subscriptions — the bills that arrive whether you think about them or not.' },
+      { label: 'Set a weekly limit for the rest' },
+      { label: 'Check it after a month and adjust' },
+    ] })}`;
+  }
   if (sys.includes('"type":"reasoning"')) {
     return `Yes — 36 is right, not 42.\n\n${ui({ type: 'reasoning', summary: 'The integral of 2x from 0 to 6 is 36', steps: ['An antiderivative of 2x is x²', 'Evaluate at 6: 36', 'Evaluate at 0: 0', '36 − 0 = 36'] })}`;
   }

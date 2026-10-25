@@ -14,3 +14,5 @@ export { RichText, StreamingRichText } from '@/components/RichText';
 export { InlineBlock } from '@/components/inline/InlineUI';
 export { L5Message } from '@/components/logos5/L5Message';
 export { makeDisplay, EMPTY_SPACE } from '@/lib/objects';
+// the core prompt's rule on the shape of a reply (logos5-v3)
+export { LOGOS5_CORE, PERSONA_VERSION } from '@/lib/runtime/behavior';

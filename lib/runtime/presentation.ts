@@ -13,6 +13,14 @@
 // a form travels only on a turn where that form is plausible — a line or two
 // each, after the history, outside the cache — and a hello carries none.
 //
+// THE SHAPE OF THE THOUGHT, NOT THE MODEL'S HABIT. Left alone, a model answers
+// "give me an overview of microeconomics" with a bulleted list of bold terms
+// and definitions. The core prompt makes prose the default and keeps lists for
+// what really is a list (behavior.ts, HOW YOU SPEAK); here, a subject with
+// several parts is offered an overview to explore (concepts), and steps or
+// events whose order is the point a sequence. A list asked for in so many
+// words is a list: nothing is offered in its place.
+//
 // NEVER FORCED. Small talk, joking and something personal are plain text. A
 // thing to be built opens in Artifacts (rule C) and structure in the Logic Map
 // (rule D); this never competes with them. At most two forms are offered, and a
@@ -81,6 +89,18 @@ const FORMULA = /\b[a-z]\s*=\s*[^=\n]*[a-z][^=\n]*$|\bf\s*\(\s*x\s*\)\s*=/im;
 const OPEN_ASK = /^(?:hey,?\s+|hi,?\s+)?(?:(?:can|could) you help(?: me)?(?: with)?|help me(?: with)?|i need (?:some )?help(?: with)?)\b/i;
 /** Practical writing a person hands over: the words are the job, not theirs to author. */
 const PRACTICAL_TEXT = /\b(?:e-?mail|message|text|reply|note|post|caption|announcement|memo|bio|invite|invitation|toast|slack|letter|summary|description|tweet|review|agenda)\b/i;
+/** A subject with several parts, asked about as a whole: an overview, its main ideas, its branches. */
+const OVERVIEW = /\b(?:overview|introduction to|intro to|primer on|basics of|fundamentals of|crash course|big picture|(?:main|key|major|core|basic|central|important|different) (?:concepts|ideas|areas|branches|parts|components|principles|theories|topics|elements|themes|schools|types|kinds)|(?:branches|areas|schools|subfields|fields) of|what (?:does|do) [\w\s-]{2,40} (?:cover|involve|include)|teach me (?:about )?(?:the )?basics)\b/i;
+/** A field of study named on its own: "what is microeconomics?", "explain statistics", "tell me about organic chemistry". */
+const FIELD = /^(?:(?:can|could) you |please )?(?:explain|tell me about|what(?:'s| is)|describe|walk me through)\s+(?:the (?:field|subject|study) of\s+)?(?:[a-z-]+\s){0,2}[a-z-]*(?:ics|ology|onomy|istry|osophy|ography|calculus|algebra|geometry|theory|science|engineering|law|medicine)\s*\??$/i;
+/** A list asked for in so many words: they get a list, not something in its place. */
+const LIST_ASK = /\b(?:list|lists|listing|bullet(?:ed)?|bullets|enumerate|numbered|point form)\b/i;
+/** Steps to follow, in order. */
+const STEPS_ASK = /\b(?:steps? (?:to|for|in|of)|step[- ]by[- ]step|how (?:do|can|would|should) (?:i|you|we|one) (?:go about|get started|set up|apply|register|install|prepare|start|file|enrol|enroll)|(?:the )?process (?:of|for|to)|stages of|phases of|life ?cycle of|how does an? [\w\s-]{2,30} become|procedure (?:for|to))\b/i;
+/** Events in time, where the order is the point. */
+const TIMELINE_ASK = /\b(?:timeline|chronolog(?:y|ical)|sequence of events|key (?:events|dates|moments|milestones)|what happened (?:in|during|between|when|after|before)|how (?:did|has|have) [\w\s-]{2,40} (?:evolved?|developed?|changed?|unfold(?:ed)?) over time)\b/i;
+/** Work that is not reading an explanation: making something, doing it themselves, checking or fixing. */
+const NOT_READING = new Set(['creation', 'practice', 'verification', 'diagnosis', 'execution']);
 
 const words = (t: string) => t.trim().split(/\s+/).filter(Boolean).length;
 
@@ -125,6 +145,14 @@ export function planPresentation(i: PresentationInput): Presentation {
   if (work === 'creation' && PRACTICAL_TEXT.test(t) && !i.ownWriting) offer('draft', 'draft:practical-writing');
   // an open request: a few directions to tap instead of typing — a question, so only where one may go
   if (i.questions > 0 && words(t) <= 8 && OPEN_ASK.test(t) && !t.includes('?')) offer('options', 'options:open-request');
+  // A list asked for is a list; and under the guard, nothing laid out to read instead of working it.
+  const listAsked = LIST_ASK.test(t);
+  // the parts of a subject, to explore one at a time — an overview, not a list of terms and definitions
+  if (!i.guard && !listAsked && x.kind !== 'brainstorm' && !NOT_READING.has(work) && (OVERVIEW.test(t) || FIELD.test(t))) offer('concepts', 'concepts:overview');
+  // events whose order is the point (not under the guard: the gate would drop it, lib/inline-ui.ts)
+  if (!i.guard && !listAsked && TIMELINE_ASK.test(t)) offer('sequence', 'sequence:timeline');
+  // steps to follow — never the steps of something that is theirs to work out
+  else if (!i.guard && !listAsked && !i.ownReasoning && work !== 'creation' && STEPS_ASK.test(t)) offer('sequence', 'sequence:steps');
   // a check, or a call Socria may weigh in on: the answer up top, the steps folded under it. Not an
   // explanation — prose is the explanation — and never reasoning that is theirs to do or a decision
   // that is theirs to make
@@ -155,6 +183,10 @@ const GRAMMAR: Record<InlineKind, string> = {
     '{"type":"options","options":[{"label":"Start from the outline"},{"label":"Fix the introduction"}]} — 2–4 directions to tap instead of typing; then do not also ask in words.',
   draft:
     '{"type":"draft","kind":"email","title":"…","text":"…"} — the text they asked for, editable in place; a line around it at most.',
+  concepts:
+    '{"type":"concepts","title":"…","items":[{"name":"Supply and demand","gist":"what it is, in a line","detail":"two or three sentences, read when opened","links":["Market structure"]}]} — 3–7 parts of the subject; links name other items. Your prose is a short introduction: what holds the parts together. Do not also list them.',
+  sequence:
+    '{"type":"sequence","kind":"steps","title":"…","items":[{"label":"…","detail":"…"}]} — 3–8 in order; kind "timeline" gives every item a "when" ("1789"). Only when the order is the point; the prose says what it shows.',
 };
 
 /** The turn's offer, or '' when nothing is offered — which is most turns. */
@@ -163,8 +195,14 @@ export function renderPresentation(p: Presentation): string {
   return `\n\nINLINE, IF IT HELPS — optional; plain prose is often better. You may include ${p.forms.length === 1 ? 'this' : 'one or both of these'}, each as a fenced block on its own lines (\`\`\`ui, the JSON on one line, \`\`\`), and keep the words around it short:\n${p.forms.map((k) => `- ${GRAMMAR[k]}`).join('\n')}\n`;
 }
 
-/** The ceiling a reply needs when an element may be in it: a cut-off spec is dropped whole. */
+/**
+ * The ceiling a reply needs when an element may be in it: a cut-off spec is
+ * dropped whole. A draft and an overview (several parts, each with a few
+ * sentences to open) need the most; steps a little more than a chart. A
+ * ceiling, not a cost: nothing is spent that the reply does not write.
+ */
 export function presentationRoom(p: Presentation): number {
   if (!p.forms.length) return 0;
-  return p.forms.includes('draft') ? 700 : 350;
+  if (p.forms.includes('draft') || p.forms.includes('concepts')) return 700;
+  return p.forms.includes('sequence') ? 450 : 350;
 }

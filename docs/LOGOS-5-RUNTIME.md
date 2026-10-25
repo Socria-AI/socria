@@ -1056,3 +1056,147 @@ and opens Artifacts, and each display choice is read as the kind it names.
 does (its steps among its ideas); the map pass is not asked to extract
 anything different. The home screen's composer (a new line of thinking) has no
 Make control yet; the conversation's composer does.
+
+## 16. Intelligent presentation: the shape of the thought, not a list
+
+Asked for: Logos 5 kept answering like a conventional chatbot (an overview of
+microeconomics came back as a list of bold terms and their definitions). The
+shape of a reply should follow the shape of the thought: prose by default, a
+list when one is earned or asked for, and a native, interactive element where
+it really helps comprehension, chosen with no second model call.
+
+### What was there (the audit)
+
+- **The decision.** One reply call. What shape a reply may take was already
+  decided in code by `lib/runtime/presentation.ts` (§12): six inline elements
+  (chart, slider, comparison, folded reasoning, choices, draft), each offered
+  only where plausible, its grammar sent after the history, outside the cache.
+  Explanations were deliberately offered nothing ("prose is the explanation").
+- **The rule.** `LOGOS5_CORE` (HOW YOU SPEAK) said "plain prose, structure
+  only when it helps", then listed the marks the surface draws, among them
+  `**bold**` list labels and hyphen/numbered lists. "When it helps" is decided
+  by the model's habit: an overview became bold-term bullets.
+- **The rest, reused unchanged.** The stream gate (`lib/core4/stream-gate.ts`)
+  hands each finished ```ui fence to `gateInlineBlock`; specs are sanitised to
+  one canonical shape or dropped; a block cut off mid-stream is dropped; the
+  renderer (`components/inline/InlineUI.tsx`) shows a placeholder while one
+  arrives; every block reads as words for copying, history, memory, search and
+  older surfaces (`contentAsText`, `contentForHistory`, `contentForCheck`);
+  what the person does with one is kept on the message (`ui`). The four views
+  (§5) and rules A–D, Allocation, the Answer Guard, Epistemic Control and MR
+  all sit before this and are not changed by it.
+
+### What changed
+
+1. **The rule** (`lib/runtime/behavior.ts`, persona `logos5-v3`): "A reply
+   takes the shape of the thought. Prose by default: an explanation connects
+   ideas in sentences, never bolded terms with definitions; a short answer
+   stays short. A list only when the content is one (steps in order, things to
+   gather) or they ask for one. No 'Key points' or 'In summary'." The marks
+   the surface draws are unchanged. The core stays inside its size budget (55%
+   of the Logos 3.5 prompt), and the offer marker never appears in the cached
+   part.
+2. **Two elements** (`lib/inline-ui.ts`), sanitised, gated and drawn like the
+   six:
+   - **concepts**: the parts of a subject (3–7), each a name, a line, more to
+     read when opened, and links to the other parts (only to parts named in the
+     same overview; unknown and self links are dropped). Drawn as cards: open
+     one and its explanation shows (in a panel under the cards, or on a phone
+     directly under the card), the parts it connects to, either way, are lit
+     and a press away. On the latest reply, **Go deeper** asks for more on that
+     part and **See how they connect** asks, in words, for the Logic Map
+     ("Map out how these connect: …"), so the screen follows rule D with the
+     conversation beside it. The part opened is kept with the message.
+   - **sequence**: steps (numbered, ticked off as they are done, kept) or a
+     timeline (every event against its date; one undated event makes it steps).
+     An item with more to say opens in place.
+3. **The planner** (`lib/runtime/presentation.ts`) offers them where they fit:
+   concepts for a subject with several parts asked about as a whole (an
+   overview, its main ideas or branches, a field named on its own: "what is
+   microeconomics?"); a timeline where the order of events is the point; steps
+   for a process. Never when they asked for a list, never on a brainstorm, on
+   writing they are making, on practice, checking or fixing work, never under
+   the Answer Guard, and steps never for something whose working is theirs
+   (Core 4's split). A single idea ("what is tax incidence?", "why did the
+   Roman Republic fall?") is still prose. Still at most two elements, and not
+   the same one a third reply running.
+4. **The gate** drops concepts and sequences under the Answer Guard, and steps
+   when working it out is theirs. The reply's ceiling grows by 700 tokens when
+   an overview is offered (450 for steps) so a spec is never cut off and lost.
+5. **The views.** Nothing is moved to another view by this. Things made on
+   request still open in Artifacts (rule C: "give me a timeline of the French
+   Revolution" is something to make), structure still opens the Logic Map
+   (rule D), and an overview reaches the Logic Map only when the person presses
+   "See how they connect".
+
+### Cost
+
+No new model call and no new infrastructure. A turn offered nothing (most
+turns) is byte for byte the same apart from the core's rule, which is in the
+cached prefix (it changes once, with the persona version). An offer is 524
+characters for an overview, 415 for steps or a timeline, 758 for both, after
+the history and outside the cache. The reply's ceiling grows only when an
+element is offered, and only what the reply writes is billed.
+
+### Measured, and not
+
+- **Offline, the same 30 prompts before and after** (`node evals/logos5/presentation.mjs`,
+  `evals/logos5/results/presentation.json`; before = `55bce15`): what each
+  reply is told. Ten prompts are offered something different: every
+  multi-concept prompt and two of five general explanations (the overview and
+  the field named alone) are now offered an overview; three processes and
+  timelines a sequence. Casual talk, explicit list requests and the five
+  "UI unnecessary" prompts (a fact, a conversion, history as a story, writing
+  they are making, a brainstorm) are offered nothing, before and after. This
+  measures the instructions, not a model's replies.
+- **Not measured: what a live model does with them.** There is no key here.
+  `evals/logos5/scenarios.json` now holds a `presentation` group (12
+  scenarios) and `grade.mjs` checks the shape of each reply (list lines,
+  bold-label lists, headings, which element was drawn — `shapeOf`), so
+  `OPENAI_API_KEY=… node evals/logos5/run.mjs --only pres-` against this
+  checkout and `--root` a worktree of `55bce15` gives the before and after.
+  Until then, no claim is made that replies contain fewer lists or that
+  comprehension improved.
+
+### Tested
+
+- `test/presentation.test.mjs` (91): the ten categories asked for (general
+  explanations, casual talk, explicit lists, multi-concept explanations,
+  comparisons, mathematics, complex reasoning, UI unnecessary, malformed or
+  unsupported elements, streaming and fallback) through the planner, the core
+  prompt, the sanitiser, the gate (streamed 1, 3, 7 and 50 characters at a
+  time; a reply ending inside a block; the guard; `LOGOS_INLINE=off`), the
+  words a block becomes, and the components (accessible names, states kept,
+  escaped words, actions only where they can act).
+- `test/runtime-route.test.mjs` (+6, through the real route): an overview is
+  offered the concepts grammar after the history and arrives whole; a list
+  asked for is offered nothing; under the guard nothing is offered and a block
+  written anyway is dropped; the rule is in the cached prefix; the ceiling.
+- `test/logos5-eval.test.mjs`: the shape grader on the list habit and on prose
+  with an overview.
+- In the browser against the local stand-ins (`scripts/dev/fake-openai.mjs`
+  answers an offered overview, steps or timeline), desktop and a 390px phone:
+  the overview drawn with no JSON, a part opened (under its card on the phone,
+  drawn once), a connection followed, the part kept across a reload, "See how
+  they connect" opening the Logic Map, steps ticked off ("1 of 4 done"), a
+  timeline against its dates, no sideways scroll, no page errors.
+
+### Limits
+
+- Whether the live model takes the offers well, and writes fewer lists when
+  it is offered nothing, is the open question above.
+- The planner reads English patterns, like the rest of the runtime's readers.
+  A subject asked about in other words ("what should I know going into
+  econ 101?") may get prose rather than an overview, which is the safe miss.
+- A maths conversation can bring the Answer Guard up; under it no overview,
+  steps or timeline are offered or shown, by design.
+- In a shared line of thinking, an opened part or a ticked step stays on the
+  screen of the person who did it until a reload (as §12).
+
+### Switches and rollback
+
+`LOGOS_INLINE=off` offers nothing and drops any block, the new two included.
+The data is additive (two optional state fields, `picked` and `done`). Reverting
+the commit restores `logos5-v2` and the six elements; a reply saved with an
+overview or a sequence then shows its prose and nothing for the block, which
+older code does not know (it never shows JSON).

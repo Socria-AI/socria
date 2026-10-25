@@ -614,6 +614,205 @@ html[data-theme="night"] .logos-root .ln-options {
   50% { opacity: 1; }
 }
 
+/* ── the parts of a subject (concepts) ───────────────────────────── */
+
+.logos-root .ln .ln-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(168px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .ln .ln-cards > li {
+  display: flex;
+  min-width: 0;
+  margin: 0;
+  padding: 0;
+}
+.logos-root .ln .ln-card {
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+  width: 100%;
+  min-width: 0;
+  padding: 9px 11px 10px;
+  border: 1px solid var(--ln-hair);
+  border-radius: 10px;
+  background: var(--ln-ground);
+  color: var(--ln-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, opacity 0.15s;
+}
+.logos-root .ln .ln-card:hover {
+  border-color: rgba(var(--ln-tint), 0.32);
+}
+.logos-root .ln .ln-card.is-on {
+  border-color: var(--ln-primary);
+  box-shadow: inset 0 0 0 1px var(--ln-primary);
+}
+.logos-root .ln .ln-card.is-linked {
+  border-color: rgba(var(--ln-tint), 0.4);
+  border-style: dashed;
+}
+.logos-root .ln .ln-card-n {
+  font-size: 13.5px;
+  font-weight: 600;
+  line-height: 1.3;
+}
+.logos-root .ln .ln-card-g {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--ln-ink-60);
+}
+.logos-root .ln .ln-concept {
+  margin-top: 10px;
+  padding: 10px 2px 0;
+  border-top: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-concept.is-inline {
+  display: none;
+}
+.logos-root .ln .ln-cards > li:has(.ln-concept.is-inline) {
+  flex-direction: column;
+}
+.logos-root .ln .ln-concept-h {
+  margin: 0 0 4px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.logos-root .ln .ln-concept-d {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.logos-root .ln .ln-concept-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+.logos-root .ln .ln-link {
+  min-height: 26px;
+  padding: 0 9px;
+  border: 1px dashed rgba(var(--ln-tint), 0.4);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ln-ink);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.logos-root .ln .ln-link:hover {
+  border-color: var(--ln-primary);
+}
+.logos-root .ln :is(.ln-card, .ln-link, .ln-seq-label, .ln-seq-check):focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+}
+
+/* ── steps, or events in time (sequence) ──────────────────────────── */
+
+.logos-root .ln .ln-seq-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .ln .ln-seq-item {
+  position: relative;
+  display: grid;
+  grid-template-columns: 26px minmax(0, 1fr) auto;
+  align-items: start;
+  gap: 10px;
+  margin: 0;
+  padding: 0 0 12px;
+}
+.logos-root .ln .ln-seq-item:last-child {
+  padding-bottom: 2px;
+}
+/* the thread between one and the next */
+.logos-root .ln .ln-seq-item:not(:last-child)::before {
+  content: '';
+  position: absolute;
+  left: 12.5px;
+  top: 24px;
+  bottom: 0;
+  width: 1px;
+  background: var(--ln-hair);
+}
+.logos-root .ln .ln-seq-mark {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 24px;
+  border: 1px solid var(--ln-hair);
+  border-radius: 999px;
+  background: var(--ln-ground);
+  font-size: 12px;
+  font-variant-numeric: tabular-nums;
+  color: var(--ln-ink-60);
+}
+.logos-root .ln.is-timeline .ln-seq-mark {
+  width: 11px;
+  height: 11px;
+  margin: 5px 7.5px 0;
+  border-color: var(--ln-primary);
+}
+.logos-root .ln .ln-seq-item.is-done .ln-seq-mark {
+  border-color: var(--ln-primary);
+  color: var(--ln-primary);
+}
+.logos-root .ln .ln-seq-item.is-done .ln-seq-label {
+  color: var(--ln-ink-60);
+}
+.logos-root .ln .ln-seq-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+  padding-top: 2px;
+}
+.logos-root .ln .ln-seq-when {
+  font-size: 12px;
+  font-weight: 600;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  color: var(--ln-ink-60);
+}
+.logos-root .ln .ln-seq-label {
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--ln-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+}
+.logos-root .ln button.ln-seq-label {
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--ln-tint), 0.3);
+  text-underline-offset: 3px;
+}
+.logos-root .ln .ln-seq-detail {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ln-ink-60);
+}
+.logos-root .ln .ln-seq-check {
+  width: 18px;
+  height: 18px;
+  margin: 3px 0 0;
+  accent-color: var(--ln-primary);
+  cursor: pointer;
+}
+
 /* ── a phone ──────────────────────────────────────────────────────── */
 
 @media (max-width: 560px) {
@@ -640,6 +839,30 @@ html[data-theme="night"] .logos-root .ln-options {
   }
   .logos-root .ln .ln-chip {
     min-height: 40px;
+  }
+  .logos-root .ln .ln-cards {
+    grid-template-columns: 1fr;
+  }
+  /* the cards stack: an opened part says itself under its card, not under all of them */
+  .logos-root .ln .ln-concept.is-inline {
+    display: block;
+    margin: 0 0 4px;
+    padding: 10px 4px 2px;
+    border-top: 0;
+  }
+  .logos-root .ln .ln-concept.is-panel {
+    display: none;
+  }
+  /* the card above it already names it */
+  .logos-root .ln .ln-concept.is-inline .ln-concept-h {
+    display: none;
+  }
+  .logos-root .ln .ln-card {
+    min-height: 44px;
+  }
+  .logos-root .ln .ln-seq-check {
+    width: 22px;
+    height: 22px;
   }
   .logos-root .ln .ln-svg.is-pie {
     width: 116px;

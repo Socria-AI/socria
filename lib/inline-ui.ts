@@ -3,7 +3,8 @@
 // Most replies are prose and stay prose. Now and then a small, interactive
 // thing says it better than a paragraph: a little chart of the numbers they
 // gave, a slider over a formula, two options side by side, the reasoning folded
-// under its conclusion, a few choices to tap, a draft they can edit in place.
+// under its conclusion, a few choices to tap, a draft they can edit in place,
+// the parts of a subject to explore one at a time, steps or events in order.
 // Those are drawn INSIDE the conversation, from a structured description the
 // reply writes in a fenced block:
 //
@@ -11,11 +12,11 @@
 //   {"type":"compare","options":["Rent","Buy"],"rows":[{"label":"Monthly","values":["$1,900","$2,350"]}]}
 //   ```
 //
-// A DESCRIPTION, NEVER CODE. Six kinds, each with a fixed shape and limits;
+// A DESCRIPTION, NEVER CODE. Eight kinds, each with a fixed shape and limits;
 // anything else is not drawn. Every string is cleaned and capped, every number
 // is finite, a formula is compiled by the same safe parser the math engine
 // uses (lib/logos-math.ts compileExpr — no eval), and nothing in a spec can run.
-// The renderer (components/inline/InlineUI.tsx) knows these six and no others.
+// The renderer (components/inline/InlineUI.tsx) knows these eight and no others.
 //
 // CHECKED BEFORE IT IS SHOWN (Epistemic Control). The route runs every block
 // through `checkInlineSpec` as it streams (lib/core4/stream-gate.ts `block`):
@@ -28,14 +29,17 @@
 //   • a slider computes from a formula shown under it, never from a number the
 //     reply asserts;
 //   • choices are a question, so they go only where a question may;
-//   • a draft is never offered for writing that is theirs to write.
+//   • a draft is never offered for writing that is theirs to write;
+//   • under the Answer Guard, no steps laid out and no overview to read
+//     instead of working (concepts, sequence), and no steps when working it
+//     out is theirs.
 //
 // PURE: the route, the parser (lib/rich-text.ts), the renderer and the tests
 // share it.
 
 import { compileExpr, freeNames } from './logos-math';
 
-export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft'] as const;
+export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence'] as const;
 export type InlineKind = (typeof INLINE_KINDS)[number];
 
 export type ChartBasis = 'given' | 'source' | 'illustrative';
@@ -92,7 +96,27 @@ export interface DraftSpec {
   kind?: 'email' | 'message' | 'note' | 'paragraph' | 'post';
   text: string;
 }
-export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec;
+/**
+ * THE PARTS OF A SUBJECT, TO EXPLORE. An overview of something with several
+ * parts that bear on each other ("give me an overview of microeconomics"):
+ * each part named with a line on what it is, more on it when it is opened,
+ * and which of the others it connects to. Read one at a time, followed from
+ * one to the next, and taken further in the conversation when they want.
+ */
+export interface ConceptsSpec {
+  type: 'concepts';
+  title?: string;
+  items: { name: string; gist: string; detail?: string; links?: string[] }[];
+}
+/** Steps to follow in order, or events in time: the order is the point. */
+export interface SequenceSpec {
+  type: 'sequence';
+  kind: 'steps' | 'timeline';
+  title?: string;
+  /** `when` on every item of a timeline ("1789", "Week 3"); never on steps */
+  items: { label: string; when?: string; detail?: string }[];
+}
+export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec;
 
 export const INLINE_LIMITS = {
   points: 24,
@@ -112,6 +136,15 @@ export const INLINE_LIMITS = {
   choice: 60,
   reply: 200,
   draft: 4000,
+  /** an overview's parts: fewer than three is a sentence, more than seven a syllabus */
+  concepts: 7,
+  conceptName: 48,
+  gist: 160,
+  detail: 600,
+  links: 3,
+  /** steps or events in order */
+  sequence: 8,
+  when: 24,
   /** inline blocks in one reply: more than two is a dashboard */
   perReply: 2,
 } as const;
@@ -235,7 +268,46 @@ function sanitizeDraft(r: Record<string, unknown>): DraftSpec | null {
   return { type: 'draft', ...(title ? { title } : {}), ...(kind ? { kind } : {}), text };
 }
 
-/** Anything at all in, one of the six canonical shapes out — or null, and nothing is drawn. */
+function sanitizeConcepts(r: Record<string, unknown>): ConceptsSpec | null {
+  const items: ConceptsSpec['items'] = [];
+  for (const it of (Array.isArray(r.items) ? r.items : []).slice(0, L.concepts)) {
+    const o = it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
+    const name = line(o?.name, L.conceptName);
+    const gist = line(o?.gist, L.gist);
+    if (!name || !gist || items.some((x) => x.name.toLowerCase() === name.toLowerCase())) continue;
+    const detail = line(o?.detail, L.detail);
+    items.push({ name, gist, ...(detail && detail !== gist ? { detail } : {}), ...(Array.isArray(o?.links) ? { links: (o!.links as unknown[]).map((v) => line(v, L.conceptName)) } : {}) });
+  }
+  if (items.length < 3) return null;
+  // a connection is to another part of this overview, named as it is named here — anything else is dropped
+  const named = new Map(items.map((x) => [x.name.toLowerCase(), x.name]));
+  for (const x of items) {
+    if (!x.links) continue;
+    const links = [...new Set(x.links.map((l) => named.get(l.toLowerCase())).filter((l): l is string => !!l && l !== x.name))].slice(0, L.links);
+    if (links.length) x.links = links;
+    else delete x.links;
+  }
+  const title = line(r.title, L.title);
+  return { type: 'concepts', ...(title ? { title } : {}), items };
+}
+
+function sanitizeSequence(r: Record<string, unknown>): SequenceSpec | null {
+  const raw: { label: string; when: string; detail: string }[] = [];
+  for (const it of (Array.isArray(r.items) ? r.items : []).slice(0, L.sequence)) {
+    const o = typeof it === 'string' ? { label: it } : it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
+    const label = line(o?.label, L.step);
+    if (!label) continue;
+    raw.push({ label, when: line(o?.when, L.when), detail: line(o?.detail, L.detail) });
+  }
+  if (raw.length < 3) return null;
+  // a timeline dates every event; one that does not is steps, in the order given
+  const kind: SequenceSpec['kind'] = r.kind === 'timeline' && raw.every((x) => x.when) ? 'timeline' : 'steps';
+  const items = raw.map((x) => ({ label: x.label, ...(kind === 'timeline' ? { when: x.when } : {}), ...(x.detail && x.detail !== x.label ? { detail: x.detail } : {}) }));
+  const title = line(r.title, L.title);
+  return { type: 'sequence', kind, ...(title ? { title } : {}), items };
+}
+
+/** Anything at all in, one of the eight canonical shapes out — or null, and nothing is drawn. */
 export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
@@ -252,6 +324,10 @@ export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
       return sanitizeOptions(r);
     case 'draft':
       return sanitizeDraft(r);
+    case 'concepts':
+      return sanitizeConcepts(r);
+    case 'sequence':
+      return sanitizeSequence(r);
     default:
       return null;
   }
@@ -358,6 +434,10 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
     if (spec.type === 'reasoning' && ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'draft') {
     if (ctx.ownWriting) return { ok: false, why: 'their-writing' };
+  } else if (spec.type === 'concepts' || spec.type === 'sequence') {
+    // under the guard nothing is laid out to read instead of working it; steps that are theirs to find stay theirs
+    if (ctx.guard) return { ok: false, why: 'guarded' };
+    if (spec.type === 'sequence' && spec.kind === 'steps' && ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
   }
   ctx.shown.n++;
   return { ok: true, spec: out };
@@ -406,6 +486,10 @@ export function inlinePlainText(spec: InlineSpec): string {
       return `${spec.prompt ? `${spec.prompt} ` : ''}${spec.options.map((o) => o.label).join(' / ')}`;
     case 'draft':
       return spec.text;
+    case 'concepts':
+      return [spec.title ?? '', ...spec.items.map((x) => `${x.name}: ${x.gist}${x.detail ? ` ${x.detail}` : ''}${x.links ? ` (connects to ${x.links.join(', ')})` : ''}`)].filter(Boolean).join('\n');
+    case 'sequence':
+      return [spec.title ?? '', ...spec.items.map((x, i) => `${spec.kind === 'timeline' ? x.when : i + 1}${spec.kind === 'timeline' ? ':' : '.'} ${x.label}${x.detail ? ` — ${x.detail}` : ''}`)].filter(Boolean).join('\n');
   }
 }
 
@@ -457,6 +541,10 @@ export interface InlineState {
   text?: string;
   /** reasoning unfolded */
   open?: boolean;
+  /** the part of an overview, or the step, they opened */
+  picked?: number;
+  /** the steps they ticked off */
+  done?: number[];
   /** the artifact it was opened as, in this line of thinking's workspace — pressed again, that opens */
   artifact?: string;
 }
@@ -477,6 +565,11 @@ export function sanitizeInlineStateOne(raw: unknown): InlineState | null {
     if (t) out.text = t;
   }
   if (r.open === true) out.open = true;
+  if (Number.isInteger(r.picked) && (r.picked as number) >= 0 && (r.picked as number) < Math.max(L.concepts, L.sequence)) out.picked = r.picked as number;
+  if (Array.isArray(r.done)) {
+    const done = [...new Set(r.done.filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < L.sequence))].sort((a, b) => a - b);
+    if (done.length) out.done = done;
+  }
   // an object id as lib/objects/core.ts keeps them
   if (typeof r.artifact === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(r.artifact)) out.artifact = r.artifact;
   return Object.keys(out).length ? out : null;
@@ -505,7 +598,8 @@ export type InlineArtifact = { kind: 'data'; state: Record<string, unknown> } | 
  * a score nobody gave stays empty (lib/objects/display-compare.ts). Null for the
  * kinds that have no larger form there: a slider is already the calculator
  * (Artifacts has no view of a lone function with its parameters), and
- * reasoning, choices and a draft belong to the reply they are in.
+ * reasoning, choices, a draft, an overview and a sequence belong to the reply
+ * they are in (an overview's larger form is the Logic Map, asked for in words).
  */
 export function artifactFromSpec(spec: InlineSpec): InlineArtifact | null {
   if (spec.type === 'chart') {

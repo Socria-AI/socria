@@ -108,7 +108,7 @@ console.log('\n=== the persona, and taking it back ===');
 {
   const v5 = await turn({ messages: [U('We should launch in March.')] });
   ok('Logos 5 speaks by default', v5.status === 200 && /^You are Socria\. People come to you to think out loud/.test(v5.first) && /READ THE ROOM/.test(v5.first) && !/You are the mirror/.test(v5.first), v5.first.slice(0, 120));
-  ok('  and says so in the trace, with the exchange it read', /^logos5-v2;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
+  ok('  and says so in the trace, with the exchange it read', /^logos5-v3;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
   const classic = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'classic' } });
   ok('LOGOS_PERSONA=classic: the Logos 3.5 prompt, the rest of the runtime kept', /You are the mirror/.test(classic.first) && /^classic;/.test(classic.headers.get('x-socria-runtime') ?? ''), classic.headers.get('x-socria-runtime'));
   const off = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_RUNTIME: 'off' } });
@@ -118,7 +118,7 @@ console.log('\n=== the persona, and taking it back ===');
   const l4costs = await turn({ surface: undefined, length: 'concise', messages: [U('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?')] });
   ok('  with none of the new Socria in it: no inline elements offered, no length line', !/INLINE, IF IT HELPS/.test(l4costs.system) && !/=== LENGTH/.test(l4costs.first) && /;inline=none(;|$)/.test(l4costs.headers.get('x-socria-runtime') ?? ''), l4costs.headers.get('x-socria-runtime'));
   const every = await turn({ surface: undefined, messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'v5' } });
-  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v2;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
+  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v3;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
 }
 
 console.log('\n=== who does what, this turn ===');
@@ -373,6 +373,17 @@ console.log('\n=== adaptive response rendering: inline only when it helps ===');
   ok('an element offered makes room for itself, so a spec is never cut off', len(c) === 700 + 350 && len(email) >= 700 + 700, `${len(c)} ${len(email)}`);
   const off = await turn({ messages: [U(costs)] }, { env: { LOGOS_INLINE: 'off' }, reply: `Mostly rent.\n\n${fence({ type: 'chart', kind: 'bar', x: ['Rent', 'Food', 'Transport'], series: [{ values: [1200, 400, 150] }], basis: 'given' })}` });
   ok('LOGOS_INLINE=off: nothing offered, and a block written anyway never reaches them', !OFFER.test(off.system) && /;inline=none;/.test(rt(off)) && !/```/.test(off.received) && off.received.trim() === 'Mostly rent.', JSON.stringify(off.received));
+  // INTELLIGENT PRESENTATION: an overview is offered the parts to explore; a list asked for is offered nothing in its place
+  const concepts = { type: 'concepts', title: 'Microeconomics', items: [{ name: 'Supply and demand', gist: 'How prices settle.', links: ['Elasticity'] }, { name: 'Consumer behaviour', gist: 'How people choose.' }, { name: 'Elasticity', gist: 'How strongly people react to price.' }] };
+  const ov = await turn({ messages: [U('Give me an overview of microeconomics')] }, { reply: `Microeconomics is choices made one market at a time.\n\n${fence(concepts)}\n\nThe first is where most of it starts.` });
+  ok('an overview of a subject with parts: the concepts grammar offered, after the history', OFFER.test(ov.system) && /"type":"concepts"/.test(ov.system) && !OFFER.test(ov.first) && /inline=[a-z,]*concepts/.test(rt(ov)), rt(ov));
+  ok('  the overview reaches them whole and canonical, between its words', ov.received.includes('```ui\n{"type":"concepts","title":"Microeconomics"') && /^Microeconomics is choices/.test(ov.received) && /most of it starts\.$/.test(ov.received.trim()), JSON.stringify(ov.received).slice(0, 300));
+  const asked = await turn({ messages: [U('List the main concepts of microeconomics')] });
+  ok('a list asked for: nothing offered in its place', !/"type":"concepts"/.test(asked.system) && !/inline=[a-z,]*concepts/.test(rt(asked)), rt(asked));
+  const gov = await turn({ guard: 'guard', messages: [U('Give me an overview of microeconomics')] }, { reply: `Start with what you know.\n\n${fence(concepts)}` });
+  ok('under the Answer Guard: no overview offered, and one written anyway is dropped', !/"type":"concepts"/.test(gov.system) && !/```ui/.test(gov.received), JSON.stringify(gov.received));
+  ok('the core prompt carries the shape rule in its cached part', /A reply takes the shape of the thought/.test(ov.first));
+  ok('  an overview offered makes room for itself: the ceiling grows by 700', ov.calls.find((x) => x.stream)?.max_tokens === 700 + 700, String(ov.calls.find((x) => x.stream)?.max_tokens));
   const c2 = await turn({ messages: [U(costs), A('Mostly rent.'), U('and how about my savings goal?')] });
   ok('the stable prompt does not change with what a turn is offered', c.first === c2.first || c.first === hi.first, 'system message differs');
 }

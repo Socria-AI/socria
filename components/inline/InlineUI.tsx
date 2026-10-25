@@ -1,9 +1,9 @@
 'use client';
 // components/inline/InlineUI.tsx — THE INLINE ELEMENTS, DRAWN IN THE CONVERSATION.
 //
-// Six small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
+// Eight small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
 // comparison, reasoning folded under its conclusion, choices to tap, a draft to
-// edit. Each is drawn from a validated description, in the reading column,
+// edit, the parts of a subject to explore, steps or events in order. Each is drawn from a validated description, in the reading column,
 // quietly — a thin rule, the conversation's own type, nothing that looks like
 // a dashboard. What the person does with one (a slider moved, a choice tapped,
 // a draft edited) is kept with the message (`host.onState`); the larger ones
@@ -13,10 +13,10 @@
 // says where they came from; a slider evaluates the formula it shows with the
 // math engine's parser; a comparison marks the figures nothing checked.
 
-import { useEffect, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import type { ChartSpec, CompareSpec, DraftSpec, InlineSpec, InlineState, OptionsSpec, ReasoningSpec, SliderSpec } from '@/lib/inline-ui';
+import type { ChartSpec, CompareSpec, ConceptsSpec, DraftSpec, InlineSpec, InlineState, OptionsSpec, ReasoningSpec, SequenceSpec, SliderSpec } from '@/lib/inline-ui';
 import { copyText } from '@/lib/copy-text';
 import './inline.css';
 
@@ -34,7 +34,7 @@ export interface InlineHost {
 
 type RenderInline = (text: string, key: string) => ReactNode;
 
-/** One element: drawn, waiting to be (the reply is still writing it), or nothing (it was not one of the six). */
+/** One element: drawn, waiting to be (the reply is still writing it), or nothing (it was not one of the eight). */
 export function InlineBlock({ spec, open, n, host, renderInline }: { spec: InlineSpec | null; open: boolean; n: number; host?: InlineHost; renderInline: RenderInline }) {
   if (open) {
     return (
@@ -61,6 +61,10 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
       return <InlineOptions spec={spec} state={state} live={!!host?.live && !!host?.onChoose} onPick={(i, text) => { setState({ ...state, chosen: i }); host?.onChoose?.(text); }} />;
     case 'draft':
       return <InlineDraft spec={spec} state={state} onState={setState} />;
+    case 'concepts':
+      return <InlineConcepts spec={spec} state={state} onState={setState} onAsk={host?.live ? host?.onChoose : undefined} renderInline={renderInline} />;
+    case 'sequence':
+      return <InlineSequence spec={spec} state={state} onState={setState} renderInline={renderInline} />;
   }
 }
 
@@ -444,6 +448,151 @@ function InlineReasoning({ spec, state, onState, renderInline }: { spec: Reasoni
         ))}
       </ol>
     </details>
+  );
+}
+
+// ── the parts of a subject ───────────────────────────────────────────
+
+/**
+ * An overview to explore, not a list to read: each part named with its line;
+ * open one and its fuller explanation shows beneath, with the parts it
+ * connects to lit and a press away. Taken further in the conversation ("Go
+ * deeper"), or seen whole as a map of how they connect (the Logic Map, asked
+ * for in words, so the screen follows the runtime's own rule D).
+ */
+function InlineConcepts({
+  spec,
+  state,
+  onState,
+  onAsk,
+  renderInline,
+}: {
+  spec: ConceptsSpec;
+  state?: InlineState;
+  onState: (s: InlineState) => void;
+  onAsk?: (text: string) => void;
+  renderInline: RenderInline;
+}) {
+  const id = useId();
+  const picked = state?.picked !== undefined && state.picked < spec.items.length ? state.picked : null;
+  const cur = picked !== null ? spec.items[picked] : null;
+  const indexOf = (name: string) => spec.items.findIndex((x) => x.name === name);
+  // connected either way: what this part names, and what names it
+  const linked = new Set<number>(
+    cur ? [...(cur.links ?? []).map(indexOf), ...spec.items.map((x, i) => (x.links?.includes(cur.name) ? i : -1))].filter((i) => i >= 0 && i !== picked) : []
+  );
+  const pick = (i: number | null) => onState({ ...state, picked: i ?? undefined });
+  // what an opened part says: in its own panel under the cards, or — on a phone, where the cards stack —
+  // directly under the card pressed, so it is never a scroll away (one of the two is drawn at each width)
+  const detail = (where: 'panel' | 'inline') =>
+    cur && (
+      <div className={`ln-concept is-${where}`} {...(where === 'panel' ? { id: `${id}-d`, 'aria-live': 'polite' as const } : {})}>
+        <p className="ln-concept-h">{cur.name}</p>
+        <p className="ln-concept-d">{renderInline(cur.detail ?? cur.gist, `d-${where}`)}</p>
+        {linked.size > 0 && (
+          <p className="ln-concept-links">
+            <span className="ln-basis">Connects to</span>
+            {[...linked].map((i) => (
+              <button key={i} type="button" className="ln-link" onClick={() => pick(i)}>
+                {spec.items[i].name}
+              </button>
+            ))}
+          </p>
+        )}
+      </div>
+    );
+  return (
+    <div className="ln ln-concepts" role="group" aria-label={spec.title || 'The parts of it'}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <ul className="ln-cards">
+        {spec.items.map((x, i) => (
+          <li key={i}>
+            <button
+              type="button"
+              className={`ln-card${picked === i ? ' is-on' : ''}${linked.has(i) ? ' is-linked' : ''}`}
+              aria-expanded={picked === i}
+              aria-controls={`${id}-d`}
+              onClick={() => pick(picked === i ? null : i)}
+            >
+              <span className="ln-card-n">{x.name}</span>
+              <span className="ln-card-g">{renderInline(x.gist, `g${i}`)}</span>
+            </button>
+            {picked === i && detail('inline')}
+          </li>
+        ))}
+      </ul>
+      {detail('panel')}
+      <div className="ln-foot">
+        <span className="ln-basis">{cur ? `${picked! + 1} of ${spec.items.length}` : 'Open one to read more'}</span>
+        {onAsk && (
+          <span className="ln-acts">
+            {cur && (
+              <button type="button" className="ln-open" onClick={() => onAsk(`Take me further into ${cur.name}.`)}>
+                Go deeper
+              </button>
+            )}
+            <button type="button" className="ln-open" onClick={() => onAsk(`Map out how these connect: ${spec.items.map((x) => x.name).join(', ')}.`)} title="Draw how these parts connect, in the Logic Map">
+              See how they connect
+            </button>
+          </span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// ── steps, or events in time ─────────────────────────────────────────
+
+/**
+ * The order is the point: steps numbered (and ticked off as they are done,
+ * kept with the message), or events against their dates. An item with more to
+ * say opens in place.
+ */
+function InlineSequence({ spec, state, onState, renderInline }: { spec: SequenceSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline }) {
+  const steps = spec.kind === 'steps';
+  const done = new Set(state?.done ?? []);
+  const picked = state?.picked;
+  const toggle = (i: number) => {
+    const next = new Set(done);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    onState({ ...state, done: [...next].sort((a, b) => a - b) });
+  };
+  return (
+    <div className={`ln ln-seq is-${spec.kind}`}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <ol className="ln-seq-list">
+        {spec.items.map((x, i) => {
+          const open = picked === i && !!x.detail;
+          return (
+            <li key={i} className={`ln-seq-item${done.has(i) ? ' is-done' : ''}${open ? ' is-open' : ''}`}>
+              <span className="ln-seq-mark" aria-hidden="true">
+                {steps ? (done.has(i) ? '✓' : i + 1) : ''}
+              </span>
+              <div className="ln-seq-body">
+                {!steps && <span className="ln-seq-when">{x.when}</span>}
+                {x.detail ? (
+                  <button type="button" className="ln-seq-label" aria-expanded={open} onClick={() => onState({ ...state, picked: open ? undefined : i })}>
+                    {renderInline(x.label, `l${i}`)}
+                  </button>
+                ) : (
+                  <span className="ln-seq-label">{renderInline(x.label, `l${i}`)}</span>
+                )}
+                {open && <p className="ln-seq-detail">{renderInline(x.detail!, `d${i}`)}</p>}
+              </div>
+              {steps && <input type="checkbox" className="ln-seq-check" aria-label={`Done: step ${i + 1}`} checked={done.has(i)} onChange={() => toggle(i)} />}
+            </li>
+          );
+        })}
+      </ol>
+      {steps && (
+        <div className="ln-foot">
+          <span className="ln-basis" aria-live="polite">
+            {done.size ? `${done.size} of ${spec.items.length} done` : 'Tick each off as you go'}
+          </span>
+        </div>
+      )}
+    </div>
   );
 }
 
