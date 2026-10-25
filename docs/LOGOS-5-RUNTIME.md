@@ -457,7 +457,7 @@ both on every push.
 | `LOGOS_PERSONA` | unset: the Logos 5 persona for the new Socria's screen — the one behind its access code, which sends `surface: 'logos5'` with every turn — and `LOGOS_CHAT_PROMPT` for any other Logos screen | `classic` restores `LOGOS_CHAT_PROMPT` everywhere; `v5` gives every Logos screen the Logos 5 persona |
 | `NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN` | off | on restores a map pass on every turn |
 | `LOGOS_ALLOCATION` | `core4`: Core 4's allocator over the replayed conversation (§13) | `lite` (or `off`) restores the split and the move alone; only the Answer Guard withholds |
-| `LOGOS_MR` | **off** — the one switch here whose default is off: Metacognitive Regulation (§14, docs/MR.md) | `shadow` decides and traces without enforcing; `on` enforces. With MR off the route is byte-identical to the one without it |
+| `LOGOS_MR` | on: Metacognitive Regulation (§14, docs/MR.md) | `off` (or 0/false/no): the route byte-identical to the one without it; `shadow` decides and traces without enforcing |
 | `LOGOS_IFR`, `LOGOS_MR_ARM`, `LOGOS_MR_POLICY`, `LOGOS_MR_DELIBERATE`, `LOGOS_MR_STORE`, `LOGOS_MR_EXPERIMENT` | see docs/MR.md §7 | — |
 
 `NEXT_PUBLIC_LOGOS5=off` still brings back the Logos 4 screen for a

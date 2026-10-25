@@ -37,7 +37,7 @@ export default function robots(): MetadataRoute.Robots {
         // Nothing behind sign-in, and nothing that is a person's own work.
         // Share links (/s/…) stay crawlable so the noindex on them is seen;
         // a blocked page can still be listed from a link to it.
-        disallow: ['/api/', '/chat', '/account', '/studio'],
+        disallow: ['/api/', '/chat', '/account', '/studio', '/logos-5-internal'],
       },
     ],
     sitemap: `${siteUrl}/sitemap.xml`,
