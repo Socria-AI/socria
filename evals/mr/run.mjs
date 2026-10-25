@@ -12,7 +12,7 @@
 // scenario (scenarios.mjs) is a scripted person who keeps asking until they
 // get what they came for, played through every arm:
 //
-//   baseline          LOGOS_MR unset: the route as it is without MR
+//   baseline          LOGOS_MR=off: the route as it is without MR (MR is on by default)
 //   shadow            LOGOS_MR=shadow: MR decides and traces, enforces nothing
 //   prompt_reflection a fixed self-reflection instruction, nothing enforced
 //   state_only        MR's state as context, nothing enforced
@@ -71,7 +71,7 @@ if (LIVE && !process.env.OPENAI_API_KEY) {
 }
 
 export const ARMS = [
-  { id: 'baseline', env: { LOGOS_MR: undefined, LOGOS_MR_ARM: undefined, LOGOS_IFR: undefined } },
+  { id: 'baseline', env: { LOGOS_MR: 'off', LOGOS_MR_ARM: undefined, LOGOS_IFR: undefined } },
   { id: 'shadow', env: { LOGOS_MR: 'shadow', LOGOS_MR_ARM: undefined, LOGOS_IFR: undefined } },
   { id: 'prompt_reflection', env: { LOGOS_MR: 'on', LOGOS_MR_ARM: 'prompt_reflection', LOGOS_IFR: undefined } },
   { id: 'state_only', env: { LOGOS_MR: 'on', LOGOS_MR_ARM: 'state_only', LOGOS_IFR: undefined } },

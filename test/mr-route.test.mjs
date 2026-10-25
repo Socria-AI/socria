@@ -116,11 +116,14 @@ const STEPS = [U('How do I solve 2x + 3 = 11?'), A(ASKING), U('just show me the 
 
 console.log('\n=== MR off is the route as it was ===');
 {
-  const unset = await turn({ messages: STEPS }, { env: { LOGOS_MR: undefined } });
+  // MR is on by default: "off" (or 0/false/no) is the route as it was
+  const unset = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'false' } });
   const off = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'off' } });
-  ok('unset and off send byte-identical prompts', unset.status === 200 && JSON.stringify(unset.streamed.messages) === JSON.stringify(off.streamed.messages));
+  ok('"false" and "off" send byte-identical prompts', unset.status === 200 && JSON.stringify(unset.streamed.messages) === JSON.stringify(off.streamed.messages));
   ok('  no MR header, no [mr] line, no ledger rows', unset.mr === null && off.mr === null && unset.log.length === 0 && off.log.length === 0 && ledger().length === 0, `${unset.mr} ${unset.log.length} ${ledger().length}`);
   ok('  the same max_tokens', unset.streamed.max_tokens === off.streamed.max_tokens);
+  const byDefault = await turn({ messages: STEPS }, { env: { LOGOS_MR: undefined } });
+  ok('MR runs by default (LOGOS_MR unset): traced and enforced', /^mr1;arm=full;/.test(byDefault.mr ?? '') && /;enf=1;/.test(byDefault.mr ?? ''), byDefault.mr);
   const sh = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'shadow' } });
   ok('shadow: the identical prompt and ceiling…', JSON.stringify(sh.streamed.messages) === JSON.stringify(off.streamed.messages) && sh.streamed.max_tokens === off.streamed.max_tokens);
   ok('  …and the decision it WOULD have enforced, traced', /;enf=0;/.test(sh.mr ?? '') && /;a=direct;/.test(sh.mr ?? ''), sh.mr);
@@ -443,7 +446,7 @@ console.log('\n=== round 3, through the route ===');
       },
       configurable: true,
     });
-    const r = await turn({ sessionId: 'conv_r4_proj', mind: true, messages: [U('Help us plan the bakery opening menu.'), A('Sure — sweet or savoury?'), U('I prefer rye; remember that I bake every Sunday. What should we put on the menu?')] }, { env: { LOGOS_MR: undefined } });
+    const r = await turn({ sessionId: 'conv_r4_proj', mind: true, messages: [U('Help us plan the bakery opening menu.'), A('Sure — sweet or savoury?'), U('I prefer rye; remember that I bake every Sunday. What should we put on the menu?')] }, { env: { LOGOS_MR: 'off' } });
     delete db.tables.shares;
     const extracted = r.calls.some((c) => !c.stream && JSON.stringify(c.messages ?? '').includes('semantic memory graph'));
     ok('MR off: a shared Project is still shared when one share read fails (its frame, and no memory taken from it)', reads > 1 && /Current Project: Bakery/.test(r.system) && !extracted, `reads=${reads} frame=${/Current Project: Bakery/.test(r.system)} extracted=${extracted}`);
@@ -458,7 +461,7 @@ console.log('\n=== round 4, through the route ===');
   // the held (maths) path: a reply the core gate empties goes out as without MR when MR took nothing out
   const maths = [U('What is 12 * 13?')];
   const ask = 'Do you mean 12 times 13, or 12 to the power 13?';
-  const off = await turn({ sessionId: 'conv_r5_m', messages: maths }, { env: { LOGOS_MR: undefined }, reply: ask });
+  const off = await turn({ sessionId: 'conv_r5_m', messages: maths }, { env: { LOGOS_MR: 'off' }, reply: ask });
   const shadow = await turn({ sessionId: 'conv_r5_m', messages: maths }, { env: { LOGOS_MR: 'shadow' }, reply: ask });
   const mrOn = await turn({ sessionId: 'conv_r5_m', messages: maths }, { env: on, reply: ask });
   ok('held path: shadow delivers exactly what MR off does, and on with nothing taken out too', shadow.received === off.received && mrOn.received === off.received && off.received.length > 0, `${JSON.stringify(off.received)} | ${JSON.stringify(shadow.received)} | ${JSON.stringify(mrOn.received)}`);

@@ -4,9 +4,10 @@ MR is a supervisory control plane around the Logos 5 runtime. It watches
 whether the help Socria is giving is working and, when there is evidence that
 it is not, issues a **typed, scoped, expiring decision that the runtime
 enforces in code**. Most turns it decides nothing. It never makes a model call
-unless the optional deliberative loop is switched on, and it is **off by
-default** (`LOGOS_MR`), so the route is exactly what it was until MR is turned
-on for a deployment.
+unless the optional deliberative loop is switched on. It is **on by
+default**; `LOGOS_MR=off` turns it off for a deployment (the route is then
+exactly what it was before MR), and each person can switch it off for
+themselves in their settings.
 
 Primary invariant: Socria must not replace meaningful human cognition
 unnecessarily. Secondary invariant: **Human-First is not Question-First.** MR
@@ -69,7 +70,7 @@ headers: X-Socria-Assist (regulated move), X-Socria-MR (MR's trace), X-Socria-Ru
 ```
 
 MR text goes only into `turnContext` (after the history), never into the
-cache-stable prefix. With `LOGOS_MR` unset or `off`, none of this runs: the
+cache-stable prefix. With `LOGOS_MR=off`, none of this runs: the
 prompt, `max_tokens` and headers are byte-identical (`test/mr-route.test.mjs`).
 
 ---
@@ -641,7 +642,7 @@ column is a separate, destructive decision.
 
 | Switch | Default | Means |
 |---|---|---|
-| `LOGOS_MR` | **off** | `shadow`: decide and trace, enforce nothing. `on`: enforce. Anything unrecognised is off. |
+| `LOGOS_MR` | **on** | `off` (or 0/false/no): the route exactly as before MR. `shadow`: decide and trace, enforce nothing. Anything else, unset included, is on. |
 | `LOGOS_MR_ARM` | `full` | `baseline`, `prompt_reflection`, `state_only` or `full` when MR is on (for comparisons). |
 | `LOGOS_IFR` | on | `off`: the `ifr.*` rules are not enforced (the IFR-on/off factor). They are still folded, and recorded as `not_enforced`, so both arms measure the same things. |
 | `LOGOS_MR_POLICY` | current | Pin an earlier policy version (rollback). An unknown pin is ignored and reported. |
@@ -960,7 +961,7 @@ The proposal's 18 required cases map as follows:
   carried one holds from the turn it was carried in; the filter hands the
   gate a held number as its own piece (the opt-in `rewriteAll`); the reply
   filters cut clauses and asides, not sentences. The MR-off identity held
-  across about ten thousand fuzzed route runs (unset, off, shadow, and on for
+  across about ten thousand fuzzed route runs (off, shadow, and on for
   a person who switched it off).
 - **Later rounds, and what changed structurally.** The next two rounds again
   found misses on both sides — an answer inside a quiz ("What about

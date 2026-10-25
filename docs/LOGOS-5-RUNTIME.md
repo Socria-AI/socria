@@ -990,7 +990,7 @@ mid-reply check-ins when questions were taken away, `max_tokens`) and
 measured where it can only be asked for. It reuses what is here rather than
 duplicating it: `readSignals` (narrowed by its own readers before precedence
 acts on it), `interrogatives` and the stream gate, the Core 4 withhold and the Answer Guard (which it may never loosen),
-the maths engine's verdicts, the persist policy. Off by default (`LOGOS_MR`).
+the maths engine's verdicts, the persist policy. On by default; `LOGOS_MR=off` turns it off.
 Everything — the seven modules, Interaction Friction Regulation, precedence,
 persistence and privacy, the benchmark, what is and is not verified — is in
 docs/MR.md; what exists for a future study is in docs/MR-RESEARCH.md.

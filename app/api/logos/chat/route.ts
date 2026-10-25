@@ -114,7 +114,7 @@ import {
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, gateInlineBlock, type InlineContext } from '@/lib/inline-ui';
-// METACOGNITIVE REGULATION (docs/MR.md): off unless LOGOS_MR says otherwise.
+// METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
 import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
 import { deliberationOn, mrMode, storeOn } from '@/lib/mr/config';
 import { deliberate } from '@/lib/mr/deliberate';

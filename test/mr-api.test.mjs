@@ -147,7 +147,7 @@ console.log('\n=== GET: what MR runs, their settings, what it adjusted ===');
 {
   db.reset();
   let r = await call('GET');
-  ok('nothing recorded: MR not active on this deployment, the default settings, no adjustments', r.status === 200 && r.json.active === false && r.json.settings.enabled === true && r.json.settings.carryAcross === false && r.json.adjustments.length === 0 && !r.json.incomplete, r.text);
+  ok('nothing recorded: MR active by default, the default settings, no adjustments', r.status === 200 && r.json.active === true && r.json.settings.enabled === true && r.json.settings.carryAcross === false && r.json.adjustments.length === 0 && !r.json.incomplete, r.text);
   ok('  not cached', r.cache === 'no-store');
   process.env.LOGOS_MR = 'shadow';
   ok('  LOGOS_MR=shadow: not active — shadow changes no reply, so there is nothing to offer a switch for', (await call('GET')).json.active === false);

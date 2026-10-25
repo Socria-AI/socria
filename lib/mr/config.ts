@@ -12,8 +12,8 @@
 // SWITCHES are read on every call with an injectable env, like the runtime's
 // (lib/runtime/index.ts): tests and evaluations set them per turn.
 //
-//   LOGOS_MR=off|shadow|on       default OFF: until MR has been evaluated, the
-//                                route is exactly what it was. `shadow`
+//   LOGOS_MR=off|shadow|on       default ON. `off` (or 0/false/no) is the
+//                                route exactly as it was before MR; `shadow`
 //                                decides and traces without enforcing.
 //   LOGOS_MR_ARM=baseline|prompt_reflection|state_only|full
 //                                the condition the deployment runs when MR is
@@ -38,12 +38,12 @@ const isOff = (v: string) => /^(off|0|false|no)$/.test(v);
 const isOn = (v: string) => /^(on|1|true|yes)$/.test(v);
 const procEnv = (): Env => (typeof process !== 'undefined' ? (process.env as Env) : {});
 
-/** off unless LOGOS_MR says shadow or on. Anything unrecognised is off — an unknown value never enforces. */
+/** On unless LOGOS_MR says off (off/0/false/no) or shadow. The person's own switch still turns it off for them. */
 export function mrMode(env: Env = procEnv()): MRMode {
   const v = read(env, 'LOGOS_MR');
   if (v === 'shadow') return 'shadow';
-  if (isOn(v)) return 'on';
-  return 'off';
+  if (isOff(v)) return 'off';
+  return 'on';
 }
 
 /** The deployment's arm when MR runs. Unrecognised → full (the arm MR exists to be). */

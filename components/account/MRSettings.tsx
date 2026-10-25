@@ -9,7 +9,7 @@
 // (lib/mr/words.ts), and a reset.
 //
 // NOTHING RENDERS unless the account answered and MR runs on this
-// deployment. MR is off by default (LOGOS_MR), and a switch for a mechanism
+// deployment. MR is on by default (LOGOS_MR=off turns it off), and a switch for a mechanism
 // that is not running would be a placebo: it would let somebody believe they
 // had turned something off, or on, when nothing was there. Signed out there
 // is no account to keep the choice, so nothing renders either. An answer that
