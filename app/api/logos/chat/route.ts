@@ -920,6 +920,8 @@ export async function POST(req: NextRequest) {
         signals,
         names: [trim(body?.name, 60)].filter(Boolean),
         policy: webPolicy,
+        // "look it up" alone: what they asked just before is what to look up
+        previousUserText: userTexts.length > 1 ? String(userTexts[userTexts.length - 2] ?? '') : undefined,
       }).catch(() => null);
     }
     const evidence = runtime

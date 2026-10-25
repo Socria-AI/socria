@@ -31,8 +31,8 @@ import { runSearch, searchConfigured } from '../logos-explore';
 import { buildQuery, flatten, webIntent, type Research, type WebSource } from './web';
 import type { ExplicitSignals } from './types';
 
-/** Long enough for a search to answer, short enough not to hold a reply. */
-const SEARCH_TIMEOUT_MS = 6000;
+/** Long enough for a search to answer (OpenAI's web search takes several seconds), short enough not to hold a reply for long. */
+const SEARCH_TIMEOUT_MS = 12000;
 /** A page is bigger than a snippet, and fetchWeb has its own 12 s ceiling. */
 const PAGE_TIMEOUT_MS = 9000;
 /** Four is enough to disagree with itself; ten is a wall of text. */
@@ -129,6 +129,12 @@ export interface ResearchInput {
   /** names the query must not carry — the account's own, when known */
   names?: string[];
   /**
+   * Their message before this one. Read only when this one asks for a lookup
+   * and names nothing to look up ("look it up", "can you search that?"): then
+   * what they were just asking about is the subject, stripped the same way.
+   */
+  previousUserText?: string;
+  /**
    * What the conversation was already marked as (the carried-forward state's
    * persistPolicy). A conversation established as sensitive, or put off the
    * record, stays that way on every later turn — including the ones that read
@@ -168,7 +174,8 @@ export async function runResearch(input: ResearchInput): Promise<Research | null
   }
 
   if (!webAvailable()) return null;
-  const query = buildQuery(input.lastUserText, input.names ?? []);
+  let query = buildQuery(input.lastUserText, input.names ?? []);
+  if (query.length < 3 && intent.why === 'they asked for it' && input.previousUserText) query = buildQuery(input.previousUserText, input.names ?? []);
   if (query.length < 3) return null;
   say?.('searching', 'start');
   const { sources, provider } = await searchWeb(query);

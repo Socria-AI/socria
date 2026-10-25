@@ -140,6 +140,23 @@ const FUTURE_YEAR = /\b20(?:2[5-9]|[3-9]\d)\b/;
 /** They put a page in front of us; reading it is not a search. */
 const URL_IN_TEXT = /\bhttps?:\/\/[^\s<>()"']{4,}/i;
 
+/** A question of fact, put plainly: who, what, when, where, which, how much or many, is/does/did. */
+const FACT_ASKED = /^\s*(?:(?:hey|ok(?:ay)?|so|and|quick question)[,!.]?\s+)?(?:who|what(?:'s| is| are| was| were| does| did)|when|where|which|how (?:much|many|old|big|long|tall|far)|is|are|was|were|does|did|has|have)\b[^?]{0,140}\?\s*$/i;
+
+/** Words that are capitalised without naming anything in particular. */
+const NOT_A_NAME = /^(?:I|I'm|I've|I'd|I'll|OK|Okay|AI|The|A|An|This|That|These|Those|My|Your|Our|Their|It|Its|What|Who|When|Where|Which|How|Why|Is|Are|Was|Were|Does|Did|Has|Have|Can|Could|Should|Would|Will|Do|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December)$/;
+
+/** A capitalised word inside a sentence (not its first word): a name, a company, a product. */
+function namesSomething(t: string): boolean {
+  return t.split(/(?<=[.!?])\s+/).some((sentence) =>
+    sentence
+      .split(/\s+/)
+      .slice(1)
+      .map((w) => w.replace(/^["'(]+|[^\p{L}\p{N}'&.-]+$/gu, '').replace(/'s$/, ''))
+      .some((w) => /^\p{Lu}[\p{L}\p{N}&.'-]+$/u.test(w) && !NOT_A_NAME.test(w))
+  );
+}
+
 /** The turn is about the person, not about the world. */
 const INWARD = /\b(?:i (?:feel|think|wonder|keep|can'?t)|should i|am i|my (?:draft|essay|code|plan|idea|résumé|resume|cv))\b/i;
 
@@ -249,6 +266,13 @@ export function webIntent(
     /^\s*(?:summari[sz]e|tell me|give me|show me|list|compare|find out|catch me up|update me|remind me)\b/i.test(t);
   if ((CURRENT.test(t) || FUTURE_YEAR.test(t)) && asks && !INWARD.test(t)) {
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
+  }
+  // A FACT ABOUT A NAMED THING: "Who founded Socria?", "What does Anthropic's
+  // newest model cost?", "Where is Bolt headquartered?". What a model remembers
+  // about a particular person, company or product is old or missing, and an
+  // answer from that memory reads exactly like one that was checked.
+  if (FACT_ASKED.test(t) && namesSomething(t) && !INWARD.test(t)) {
+    return { want: true, kind: 'search', why: 'a fact about a named thing' };
   }
   return { want: false, why: 'the material is already in the message' };
 }

@@ -315,8 +315,78 @@ async function tavily(query: string, images: boolean): Promise<SearchBundle> {
   };
 }
 
+/**
+ * THE THIRD PROVIDER: OpenAI's own web search, through the key Socria already
+ * holds for its replies (OpenAI is already a sub-processor). Used only where
+ * neither Serper nor Tavily is configured, so a deployment with no search key
+ * still reads the live web; LOGOS_WEB_OPENAI=off turns it off. The query is
+ * the same stripped query the other two get, and what comes back is the same
+ * shape: title, link, snippet — the pages it cited, never its own answer.
+ */
+function openaiSearchOn(): boolean {
+  const off = /^(off|0|false|no)$/i.test((process.env.LOGOS_WEB_OPENAI ?? '').trim());
+  const key = (process.env.OPENAI_API_KEY ?? '').trim();
+  return !off && key.length > 0;
+}
+
+/** The sentence of the answer a citation points into: the snippet a search result would carry. */
+function citedSpan(text: string, start: number, end: number): string {
+  const from = Math.max(0, text.lastIndexOf('.', Math.max(0, start - 1)) + 1, text.lastIndexOf('\n', Math.max(0, start - 1)) + 1);
+  let to = text.indexOf('.', Math.max(end, start));
+  if (to < 0) to = text.length;
+  return text.slice(from, Math.min(to + 1, from + 400)).replace(/\s+/g, ' ').trim();
+}
+
+async function openaiSearch(query: string): Promise<SearchBundle> {
+  const key = (process.env.OPENAI_API_KEY ?? '').trim();
+  const base = ((process.env.OPENAI_BASE_URL ?? '').trim() || 'https://api.openai.com/v1').replace(/\/+$/, '');
+  const model = (process.env.OPENAI_MODEL_SEARCH ?? '').trim() || 'gpt-4o-mini';
+  const ask = (tool: string) =>
+    post(
+      `${base}/responses`,
+      { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
+      {
+        model,
+        tools: [{ type: tool }],
+        tool_choice: 'required',
+        input: `Search the web for: ${query}\nAnswer in a few sentences, citing the pages you used.`,
+      }
+    );
+  // the tool's current name, then the older one some accounts still have
+  let res = await ask('web_search');
+  if (!res.json && res.status === 400) res = await ask('web_search_preview');
+
+  const seen = new Set<string>();
+  const results: SearchBundle['results'] = [];
+  for (const item of Array.isArray(res.json?.output) ? res.json.output : []) {
+    if (item?.type !== 'message' || !Array.isArray(item.content)) continue;
+    for (const part of item.content) {
+      const text = typeof part?.text === 'string' ? part.text : '';
+      for (const a of Array.isArray(part?.annotations) ? part.annotations : []) {
+        if (a?.type !== 'url_citation') continue;
+        const url = safeUrl(typeof a.url === 'string' ? a.url.replace(/[?&]utm_source=openai$/, '') : null);
+        if (!url || seen.has(url)) continue;
+        seen.add(url);
+        results.push({
+          title: String(a.title ?? '').slice(0, 160) || siteOf(url),
+          url,
+          snippet: citedSpan(text, Number(a.start_index) || 0, Number(a.end_index) || 0),
+          site: siteOf(url),
+        });
+        if (results.length >= 8) break;
+      }
+    }
+  }
+  return {
+    results,
+    images: [],
+    provider: 'openai',
+    ...(results.length ? {} : { failure: noteEmpty(whyEmpty('openai', res.status)) }),
+  };
+}
+
 export function searchConfigured(): boolean {
-  return !!(providerKey('SERPER_API_KEY') || providerKey('TAVILY_API_KEY'));
+  return !!(providerKey('SERPER_API_KEY') || providerKey('TAVILY_API_KEY') || openaiSearchOn());
 }
 
 /**
@@ -333,10 +403,10 @@ export async function runSearch(
   opts?: { images?: boolean }
 ): Promise<SearchBundle> {
   const images = opts?.images !== false;
-  const provider = providerKey('SERPER_API_KEY') ? 'google' : providerKey('TAVILY_API_KEY') ? 'tavily' : null;
+  const provider = providerKey('SERPER_API_KEY') ? 'google' : providerKey('TAVILY_API_KEY') ? 'tavily' : openaiSearchOn() ? 'openai' : null;
   if (!provider) return EMPTY_SEARCH;
   try {
-    return provider === 'google' ? await serper(query, images) : await tavily(query, images);
+    return provider === 'google' ? await serper(query, images) : provider === 'tavily' ? await tavily(query, images) : await openaiSearch(query);
   } catch (e) {
     console.error('[search] provider threw', { provider, kind: (e as Error)?.name ?? typeof e });
     return { ...EMPTY_SEARCH, provider, failure: noteEmpty({ provider, status: null, why: 'unreachable' }) };

@@ -213,7 +213,11 @@ console.log('\n=== a lookup, through Core 4\'s gate ===');
     ok('…and shown to the person: query, title, site, address — no page text', src.sources?.[0]?.url === 'https://www.reuters.com/markets/fed-holds-rates' && src.sources[0].site && !('snippet' in src.sources[0]), JSON.stringify(src));
     ok('a citation of a real source stays; one of a source that does not exist goes', t.received.includes('[1]') && !t.received.includes('[4]'), t.received);
     ok('the trace says the path was verified', /path=verified/.test(t.headers.get('x-socria-runtime') ?? ''), t.headers.get('x-socria-runtime'));
-    const no = await turn({ messages: [U('Look up the latest Federal Reserve interest rate decision.')] }, { env: { SERPER_API_KEY: undefined, TAVILY_API_KEY: undefined } });
+    // a bare "look it up": what they asked just before is what is searched
+    searched = null;
+    await turn({ messages: [U('Who founded the Socria company?'), A('I am not sure.'), U('look it up')] }, { env: { SERPER_API_KEY: 'test-key' } });
+    ok('"look it up" alone searches the question they had just asked', !!searched && /founded/i.test(searched) && /socria/i.test(searched), searched);
+    const no = await turn({ messages: [U('Look up the latest Federal Reserve interest rate decision.')] }, { env: { SERPER_API_KEY: undefined, TAVILY_API_KEY: undefined, LOGOS_WEB_OPENAI: 'off' } });
     ok('with no provider, the reply is told the lookup did not run — so it never answers as if it had', /The lookup did not run/.test(no.system) && no.headers.get('x-socria-sources') === null);
     const sensitive = await turn({ messages: [U('Look up the latest treatment guidance for my depression.')] }, { env: { SERPER_API_KEY: 'test-key' } });
     ok('a sensitive subject is never searched', !/From the web/.test(sensitive.system));
