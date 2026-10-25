@@ -457,6 +457,8 @@ both on every push.
 | `LOGOS_PERSONA` | unset: the Logos 5 persona for the new Socria's screen — the one behind its access code, which sends `surface: 'logos5'` with every turn — and `LOGOS_CHAT_PROMPT` for any other Logos screen | `classic` restores `LOGOS_CHAT_PROMPT` everywhere; `v5` gives every Logos screen the Logos 5 persona |
 | `NEXT_PUBLIC_LOGOS5_MAP_EVERY_TURN` | off | on restores a map pass on every turn |
 | `LOGOS_ALLOCATION` | `core4`: Core 4's allocator over the replayed conversation (§13) | `lite` (or `off`) restores the split and the move alone; only the Answer Guard withholds |
+| `LOGOS_MR` | **off** — the one switch here whose default is off: Metacognitive Regulation (§14, docs/MR.md) | `shadow` decides and traces without enforcing; `on` enforces. With MR off the route is byte-identical to the one without it |
+| `LOGOS_IFR`, `LOGOS_MR_ARM`, `LOGOS_MR_POLICY`, `LOGOS_MR_DELIBERATE`, `LOGOS_MR_STORE`, `LOGOS_MR_EXPERIMENT` | see docs/MR.md §7 | — |
 
 `NEXT_PUBLIC_LOGOS5=off` still brings back the Logos 4 screen for a
 deployment (lib/logos5/flags.ts). The four views (§5) are not behind a switch
@@ -977,3 +979,24 @@ regression rather than a benchmark) and `test/runtime-route.test.mjs`
 (through the real route: the withhold in their words, the computed answer held
 back, the trace, `LOGOS_ALLOCATION=lite`, the classic persona untouched, graded
 twice, a fact).
+
+## 14. Metacognitive Regulation
+
+A supervisory control plane over this runtime: whether the help is working,
+and a typed, scoped, expiring adjustment when the evidence says it is not —
+their explicit words first, never a weak signal — enforced in code where it
+says so (the move, the question budget at the gate, a hard "no questions",
+mid-reply check-ins when questions were taken away, `max_tokens`) and
+measured where it can only be asked for. It reuses what is here rather than
+duplicating it: `readSignals` (narrowed by its own readers before precedence
+acts on it), `interrogatives` and the stream gate, the Core 4 withhold and the Answer Guard (which it may never loosen),
+the maths engine's verdicts, the persist policy. Off by default (`LOGOS_MR`).
+Everything — the seven modules, Interaction Friction Regulation, precedence,
+persistence and privacy, the benchmark, what is and is not verified — is in
+docs/MR.md; what exists for a future study is in docs/MR-RESEARCH.md.
+
+One defect it fixes when on, found by its audit: "stop asking me questions"
+held for one turn only (the replayed Core 4 state that remembered it was
+discarded by `allocate`); under MR it holds for the conversation, hard, until
+they take it back.
+

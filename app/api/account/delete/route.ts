@@ -72,6 +72,10 @@ const OWNED_TABLES = [
   'referrals',
   // Quick Capture (Logos 4): their private inbox of notes and photos.
   'captures',
+  // Metacognitive Regulation's intervention ledger: content-free codes of how
+  // Socria adjusted its help for them (lib/mr/store.ts MR_TABLES). Their MR
+  // settings live on user_profiles, above.
+  'mr_ledger',
 ] as const;
 
 /**
@@ -101,6 +105,7 @@ const LATE_TABLES = new Set<string>([
   'referral_codes',
   'referrals',
   'captures',
+  'mr_ledger',
 ]);
 
 /**

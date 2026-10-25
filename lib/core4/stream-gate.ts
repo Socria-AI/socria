@@ -63,12 +63,33 @@ export class SentenceGate {
    * are still dropped.
    */
   /**
+   * keep: an interrogative sentence another filter has already judged and
+   * kept as somebody else's words (Logos 5's Metacognitive Regulation under a
+   * "stop asking": a quoted draft's question, a table cell, a listed question
+   * they asked for) goes out in order instead of being held for the tail cap,
+   * which cannot see that it is not a question put to them. Unset: nothing
+   * changes.
+   */
+  /**
+   * rewriteAll: `rewrite` for a filter that may hand back the sentence as
+   * several pieces, each then read as a sentence of its own (or none: the
+   * sentence is gone, as `drop` would take it) — Metacognitive Regulation
+   * holds a list's number until its item arrives and gives both back apart,
+   * so the gate reads the number as it would have without the filter. Takes
+   * the place of `rewrite` when set. Unset: nothing changes.
+   */
+  /**
+   * see: a piece that is only whitespace never reaches `rewrite`; a filter
+   * that follows line breaks (Metacognitive Regulation) is shown it here, and
+   * what it returns goes out in its place. Unset: nothing changes.
+   */
+  /**
    * block: a finished fenced block, before anyone sees it — Logos 5's inline
    * vocabulary (lib/inline-ui.ts gateInlineBlock) checks a ```ui block here and
    * sends its canonical form, a notice, or nothing; anything else it returns
    * unchanged. `open` is a block the stream ended inside of.
    */
-  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string; neverEmpty?: boolean; block?: (chunk: string, open: boolean) => string } = {}) {}
+  constructor(private emit: (s: string) => void, private opts: { passQuestions?: boolean; drop?: (sentence: string) => boolean; filterOnly?: boolean; keepOpener?: boolean; rewrite?: (sentence: string) => string; neverEmpty?: boolean; keep?: (sentence: string) => boolean; see?: (whitespace: string) => string; rewriteAll?: (sentence: string) => string[]; block?: (chunk: string, open: boolean) => string } = {}) {}
 
   push(delta: string) {
     this.buf += delta;
@@ -105,7 +126,17 @@ export class SentenceGate {
   }
 
   private consider(sentence: string) {
+    if (this.opts.rewriteAll && sentence.trim()) {
+      for (const piece of this.opts.rewriteAll(sentence)) this.accept(piece);
+      return;
+    }
     if (this.opts.rewrite && sentence.trim()) sentence = this.opts.rewrite(sentence);
+    // a piece that is only a line or paragraph break: shown to a filter that follows lines (unset: nothing changes)
+    else if (this.opts.see && sentence && !sentence.trim()) sentence = this.opts.see(sentence);
+    this.accept(sentence);
+  }
+
+  private accept(sentence: string) {
     if (this.opts.drop && sentence.trim() && this.opts.drop(sentence)) {
       this.stripped.push(sentence.trim());
       return;
@@ -125,7 +156,7 @@ export class SentenceGate {
     }
     const q = interrogatives(sentence);
     const holdQuestion = !this.opts.passQuestions && (q.explicit.length || q.disguised.length);
-    if (holdQuestion || q.offers.length) {
+    if ((holdQuestion || q.offers.length) && !this.opts.keep?.(sentence)) {
       this.held.push(sentence);
       return;
     }

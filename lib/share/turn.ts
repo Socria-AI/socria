@@ -26,7 +26,7 @@ import 'server-only';
 import { getProject, listSources, loadGraph } from '@/lib/mind/store';
 import { renderProjectContext } from '@/lib/mind/projects';
 import { can, type Role } from './roles';
-import { isShared, resourceInfo, shareAccess } from './server';
+import { resourceInfo, shareAccess, sharedOrUnknown } from './server';
 
 export interface SharedTurn {
   /** more than one person can read this conversation */
@@ -37,6 +37,12 @@ export interface SharedTurn {
   ownerId: string | null;
   /** the Project frame for a shared conversation in a Project, '' otherwise */
   projectBlock: string;
+  /**
+   * The lookup failed, so whether it is shared is not known. `shared` stays
+   * false (the routes behave as before); a caller that keeps something per
+   * person — Metacognitive Regulation — treats unknown as shared.
+   */
+  unconfirmed?: boolean;
   refuse?: { status: number; error: string; upgrade?: string };
 }
 
@@ -47,9 +53,9 @@ export async function sharedTurn(userId: string | null, conversationId: unknown)
   if (!userId || !id) return NONE;
   let info;
   try {
-    info = await resourceInfo('conversation', id);
+    info = await resourceInfo('conversation', id, { strict: true });
   } catch {
-    return NONE;
+    return { ...NONE, unconfirmed: true };
   }
   // Not saved yet: a new conversation, and it is theirs.
   if (!info) return NONE;
@@ -61,8 +67,9 @@ export async function sharedTurn(userId: string | null, conversationId: unknown)
     role = access.role;
     if (!can(role, 'ask')) return { ...NONE, role, refuse: { status: 403, error: 'You can read this conversation, but not add to it.' } };
   }
-  const shared = guest || (await isShared('conversation', id).catch(() => false));
-  if (!shared) return { ...NONE, role };
+  const sharing = guest ? true : await sharedOrUnknown('conversation', id);
+  const shared = sharing === true;
+  if (!shared) return { ...NONE, role, ...(sharing === null ? { unconfirmed: true } : {}) };
 
   let projectBlock = '';
   if (info.projectId) {

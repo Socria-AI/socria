@@ -639,6 +639,52 @@ create table if not exists capability_evidence (
 
 create index if not exists capability_evidence_user_concept_idx on capability_evidence (user_id, concept);
 
+-- ── Metacognitive Regulation: the intervention ledger ────────────────
+--
+-- MR (lib/mr; docs/MR.md) regulates how Socria helps — fewer questions, a
+-- shorter reply, a worked example — and this is its record of doing so: one
+-- row per turn's exposure (the condition it ran under), per decision, per
+-- outcome read for an earlier decision, and per integrity finding.
+--
+-- CONTENT-FREE. `record` holds codes, counts, turn indices and times only —
+-- never a word the person or Socria wrote (lib/mr/ledger.ts sanitizeRecord
+-- refuses a record with a sentence in it, on write and on read). MR's state
+-- is re-derived from the conversation each turn; nothing here is read back
+-- into a prompt. Ids are deterministic hashes of (kind, conversation, turn,
+-- decision/finding), so a turn written twice is one row. Kept 180 days
+-- (lib/mr/store.ts MR_RETENTION_MS): never read past that, purged at write
+-- time for the person writing and daily for everybody (purgeExpired, from
+-- /api/cron/lifecycle); deleted with the conversation, with "forget what
+-- Socria worked out", and with the account; in the export. Timestamps are
+-- epoch ms.
+create table if not exists mr_ledger (
+  user_id text not null,
+  id text not null,
+  conversation_id text,
+  turn integer not null default 0,
+  kind text not null,
+  policy_version text not null,
+  arm text not null,
+  record jsonb not null default '{}'::jsonb,
+  created_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists mr_ledger_user_conv_created_idx on mr_ledger (user_id, conversation_id, created_at desc);
+create index if not exists mr_ledger_user_created_idx on mr_ledger (user_id, created_at);
+-- the daily purge reads across everybody, oldest first
+create index if not exists mr_ledger_created_idx on mr_ledger (created_at);
+
+-- The person's own MR settings (lib/mr/types.ts MRSettings): MR on or off for
+-- them, consent to carry a "from now on" across conversations, a study
+-- consent written only by that study's consent flow, and the time of their
+-- last reset. Choices, not content — plus two content-free markers the
+-- server keeps: the "from now on" rules their words took back (rule codes
+-- and times) and, for a day, hashes of conversations just deleted. Written
+-- only by lib/mr/store.ts writeSettings. Null is the defaults. Safe to re-run.
+alter table user_profiles
+  add column if not exists mr jsonb;
+
 -- ── Socria Rewards ───────────────────────────────────────────────────
 --
 --   Create 5 nodes. Get 7 days free.

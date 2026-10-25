@@ -16,7 +16,8 @@ let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
 
 ok('the inventory section exists', inventory.length > 200);
-for (const table of ['core4_state', 'reasoning_entries', 'reasoning_links', 'core4_turns', 'capability_evidence']) {
+// mr_ledger is Metacognitive Regulation's (lib/mr/store.ts), documented in the same inventory.
+for (const table of ['core4_state', 'reasoning_entries', 'reasoning_links', 'core4_turns', 'capability_evidence', 'mr_ledger']) {
   const m = schema.match(new RegExp(`create table if not exists ${table} \\(([\\s\\S]*?)\\n\\);`));
   ok(`${table} is in the schema`, !!m);
   if (!m) continue;

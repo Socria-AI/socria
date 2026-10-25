@@ -240,3 +240,51 @@
 .acct-sheet .persona-clear:hover{color:var(--ink)}
 .acct-sheet .persona-note{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.86rem;color:var(--moss-700)}
 .acct-sheet .persona-fine{margin-top:10px;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.84rem;color:var(--ink-70);line-height:1.4}
+
+/* How Socria adjusts to you (components/account/MRSettings.tsx): two switches,
+   the latest adjustments in plain words, and a reset that asks first. The
+   switch is a button with role=switch; its track and knob are drawn here,
+   in the sheet's own moss and ink, so it reads the same on every theme. */
+.acct-sheet .mr-switches{display:flex;flex-direction:column}
+.acct-sheet .mr-row{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;padding:10px 0;border-bottom:1px solid var(--ink-12)}
+.acct-sheet .mr-row:first-child{padding-top:2px}
+.acct-sheet .mr-txt{display:flex;flex-direction:column;gap:3px;min-width:0}
+.acct-sheet .mr-label{font-size:.95rem;line-height:1.3;color:var(--ink);cursor:pointer}
+.acct-sheet .mr-note{font-size:.78rem;line-height:1.4;color:var(--ink-70);max-width:42ch}
+.acct-sheet .mr-switch{position:relative;flex:0 0 auto;width:40px;height:24px;margin-top:1px;border-radius:999px;
+  border:1px solid var(--ink-25);background:var(--ink-12);cursor:pointer;transition:background-color .2s,border-color .2s}
+.acct-sheet .mr-switch:focus-visible{outline:2px solid var(--moss, #5e7633);outline-offset:2px}
+.acct-sheet .mr-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--ink-70);
+  transition:transform .2s var(--ease-out-expo),background-color .2s}
+.acct-sheet .mr-switch.on{background:var(--moss-700, #3e5a23);border-color:var(--moss-700, #3e5a23)}
+.acct-sheet .mr-switch.on .mr-knob{transform:translateX(16px);background:var(--app-paper)}
+.acct-sheet .mr-switch[aria-disabled="true"]{opacity:.5;cursor:default}
+.acct-sheet .mr-locked{display:block;margin:8px 0 0}
+.acct-sheet .mr-list-h{margin:14px 0 6px;font-family:var(--font-sans, system-ui, sans-serif);font-size:.62rem;font-weight:600;
+  letter-spacing:.14em;text-transform:uppercase;color:var(--ink-70)}
+.acct-sheet .mr-list{list-style:none;margin:0;padding:0}
+.acct-sheet .mr-item{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px dashed var(--ink-12)}
+.acct-sheet .mr-item:last-child{border-bottom:none}
+.acct-sheet .mr-what{font-size:.86rem;line-height:1.4;color:var(--ink)}
+.acct-sheet .mr-when{flex:0 0 auto;font-size:.74rem;color:var(--ink-70);text-align:right;white-space:nowrap}
+.acct-sheet .mr-still{color:var(--moss-700, #3e5a23)}
+.acct-sheet .mr-empty{margin:0;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.86rem;color:var(--ink-70)}
+.acct-sheet .mr-note.mr-unlisted{display:block;margin:8px 0 0}
+.acct-sheet .mr-reset-row{margin-top:12px}
+.acct-sheet .mr-reset{font-size:.86rem;color:var(--ink-70);border-bottom:1px solid var(--ink-25);padding-bottom:1px}
+.acct-sheet .mr-reset:hover{color:var(--ink);border-color:var(--ink)}
+.acct-sheet .mr-reset[aria-disabled="true"]{opacity:.5;cursor:default}
+.acct-sheet .mr-confirm{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+.acct-sheet .mr-confirm-q{flex-basis:100%;font-size:.84rem;line-height:1.45;color:var(--ink)}
+.acct-sheet .mr-confirm-d{flex-basis:100%;margin-top:-6px;font-size:.78rem;line-height:1.45;color:var(--ink-70);max-width:56ch}
+.acct-sheet .mr-reset-yes{padding:5px 14px;border-radius:999px;border:1px solid var(--machine, #8a3b2b);color:var(--machine, #8a3b2b);font-size:.84rem}
+.acct-sheet .mr-reset-yes:hover{background:var(--machine, #8a3b2b);color:var(--app-paper)}
+.acct-sheet .mr-reset-no{font-size:.84rem;color:var(--ink-70)}
+.acct-sheet .mr-reset-no:hover{color:var(--ink)}
+.acct-sheet .mr-reset:focus-visible,
+.acct-sheet .mr-reset-yes:focus-visible,
+.acct-sheet .mr-reset-no:focus-visible{outline:2px solid var(--moss, #5e7633);outline-offset:2px}
+.acct-sheet .mr-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700, #3e5a23)}
+.acct-sheet .mr-status.is-bad{color:var(--tension, #9c5b3c)}
+@media (max-width:440px){.acct-sheet .mr-item{flex-direction:column;gap:2px}.acct-sheet .mr-when{text-align:left;white-space:normal}}
+@media (prefers-reduced-motion:reduce){.acct-sheet .mr-switch,.acct-sheet .mr-knob{transition:none}}

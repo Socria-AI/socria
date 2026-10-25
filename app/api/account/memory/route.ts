@@ -5,9 +5,9 @@
 // conversations are yours and stay. What goes is the layer Socria built ON TOP
 // of them: the per-thread memory (goals, values, constraints, decisions), the
 // cross-conversation Thinking Journey, everything Core 4 worked out (its
-// Cognitive State, Reasoning Ledger, turn traces and capability evidence), and
-// the Mind Graph. Someone who wants to be forgotten but keep their notes has,
-// until now, had no way to say so.
+// Cognitive State, Reasoning Ledger, turn traces and capability evidence),
+// Metacognitive Regulation's ledger, and the Mind Graph. Someone who wants to
+// be forgotten but keep their notes has, until now, had no way to say so.
 //
 // THE MIND GRAPH WAS MISSING FROM THIS LIST, and the panel describing this
 // button describes the Mind Graph almost word for word — "goals, values,
@@ -29,6 +29,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { CORE4_TABLES } from '@/lib/core4/store';
 import { MIND_DERIVED_TABLES } from '@/lib/mind/store';
+import { MR_TABLES, stampReset } from '@/lib/mr/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -104,6 +105,31 @@ export async function DELETE(req: NextRequest) {
     for (const table of MIND_DERIVED_TABLES) {
       const { error } = await db.from(table).delete().eq('user_id', userId);
       if (error && !missingTable(error)) failed.push(table);
+    }
+
+    // Metacognitive Regulation's ledger: how Socria adjusted its help, which
+    // is Socria's record, so it goes. Their MR CHOICES stay (user_profiles.mr:
+    // MR on or off, carry-across consent) — those are theirs, not anything
+    // worked out about them.
+    //
+    // RESET STAMPED FIRST, as Reset in the settings does (app/api/mr DELETE):
+    // a Logos turn already streaming writes its rows after this delete,
+    // stamped with when it began, and lib/mr/store.ts writeRows does not write
+    // a row from before their last reset — without the stamp, the rows they
+    // were just told are gone would come back, and a "from now on" in them
+    // would be carried again. The stamp also ends what MR adjusted on its own
+    // (what it worked out) in every recorded conversation; what they asked for
+    // in their own words still holds where they asked. A stamp that fails is
+    // tried again after the delete, and one that still fails is reported: the
+    // rows are gone, but a turn in flight could put them back.
+    const stamp = await stampReset(userId);
+    for (const table of MR_TABLES) {
+      const { error } = await db.from(table).delete().eq('user_id', userId);
+      if (error && !missingTable(error)) failed.push(table);
+    }
+    if (!stamp.ok && !stamp.missing) {
+      const again = await stampReset(userId);
+      if (!again.ok && !again.missing) failed.push('user_profiles.mr');
     }
 
     // The nodes, minus the Project anchors. Deleting by explicit id rather than

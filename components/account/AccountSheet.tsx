@@ -40,6 +40,7 @@ import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
 import { ConversationStylePicker } from './ConversationStylePicker';
 import { LogosInstructions } from './LogosInstructions';
+import { MRSettings } from './MRSettings';
 
 export function AccountSheet({
   open,
@@ -188,6 +189,9 @@ export function AccountSheet({
                 <p className="sub-d">Standing instructions, layered over your Conversation Style.</p>
                 <LogosInstructions />
               </div>
+              {/* How Socria adjusts to you: its own .sub, and nothing at all
+                  signed out or where the deployment does not run it. */}
+              <MRSettings signedIn={!!user} />
               <div className="sub">
                 <h3 className="sub-h">What Socria calls you</h3>
                 <NameField />

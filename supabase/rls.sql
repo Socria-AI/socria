@@ -163,3 +163,10 @@ alter table event_sheet_sync     force row level security;
 revoke all on events              from anon, authenticated;
 revoke all on event_registrations from anon, authenticated;
 revoke all on event_sheet_sync    from anon, authenticated;
+
+-- Metacognitive Regulation's intervention ledger (schema.sql mr_ledger):
+-- content-free codes about how Socria adjusted its help for one person,
+-- reached only through lib/mr/store.ts with the service role.
+alter table mr_ledger enable row level security;
+alter table mr_ledger force row level security;
+revoke all on mr_ledger from anon, authenticated;

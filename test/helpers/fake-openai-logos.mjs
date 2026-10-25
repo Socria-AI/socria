@@ -5,7 +5,9 @@
 // an object is returned as its JSON, a string as itself, an Error is thrown,
 // and an exhausted script returns an empty completion. A streamed call (the
 // reply) records its system prompt in globalThis.__logosPrompts and streams
-// globalThis.__logosReply.
+// globalThis.__logosReply — in one delta, or, when globalThis.__logosChunk is
+// a positive number, in deltas of that many characters (as a real stream
+// arrives: a fence, a quotation or a table row split across deltas).
 //
 // "Its system prompt" is every system message, in order: the reply sends the
 // part that holds for the whole line of thinking first and this turn's
@@ -23,8 +25,9 @@ export default class OpenAI {
           if (p.stream) {
             (g.__logosPrompts ??= []).push(systemOf(p));
             const text = g.__logosReply ?? 'Here it is.';
+            const step = Number(g.__logosChunk) > 0 ? Number(g.__logosChunk) : text.length || 1;
             return (async function* () {
-              yield { choices: [{ delta: { content: text } }] };
+              for (let i = 0; i < Math.max(1, text.length); i += step) yield { choices: [{ delta: { content: text.slice(i, i + step) } }] };
             })();
           }
           const next = (g.__logosScript ??= []).shift();

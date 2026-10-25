@@ -16,6 +16,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { exportRegistrationsForEmails } from '@/lib/events/privacy';
 import { listMedia } from '@/lib/write/media-store';
+import { MR_RETENTION_MS } from '@/lib/mr/store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -236,6 +237,17 @@ export async function GET(req: NextRequest) {
   const capturesErr = missingTable(capturesRaw) ? null : capturesRaw;
   out.captures = captures ?? [];
 
+  // Metacognitive Regulation's intervention ledger: which condition each turn
+  // ran under, what MR decided, how it went and what its integrity checks
+  // caught — as codes, counts and turn indices. Their MR settings are on the
+  // profile above (profile.mr). Only what is inside the retention window the
+  // note below promises: an older row is due to be purged (lib/mr/store.ts
+  // purgeExpired, daily) and is not read anywhere else either.
+  const { data: mrLedger, error: mrLedgerRaw } = await db
+    .from('mr_ledger').select('conversation_id, turn, kind, policy_version, arm, record, created_at').eq('user_id', userId).gte('created_at', Date.now() - MR_RETENTION_MS).order('created_at', { ascending: false });
+  const mrLedgerErr = missingTable(mrLedgerRaw) ? null : mrLedgerRaw;
+  out.mrLedger = mrLedger ?? [];
+
   // Event RSVPs under this account's verified addresses (attendees need no
   // account, so these are found by email, not by user id). The secret behind
   // their check-in link is not included — only its hash was ever stored.
@@ -267,6 +279,10 @@ export async function GET(req: NextRequest) {
     'inferred field carries its confidence and the evidence it rests on, and a ledger entry ' +
     'is marked as yours only when it is grounded in your own words. core4Turns hold no text ' +
     'at all. None of this is used to train models.';
+  out.mrNote =
+    'mrLedger is how Socria adjusted the way it helped you (for example, fewer questions or a ' +
+    'shorter reply), why, and how it went. It holds codes and turn numbers only, none of your ' +
+    'words or Socria\'s. Rows are kept 180 days and then deleted. None of it is used to train models.';
 
   // An export that silently ships an empty section is worse than one that
   // fails: the file looks complete and nobody can tell from the outside what
@@ -302,6 +318,7 @@ export async function GET(req: NextRequest) {
     ['howYouArrived', invitedYouErr],
     ['friendsYouInvited', youInvitedErr],
     ['captures', capturesErr],
+    ['mrLedger', mrLedgerErr],
     ['eventRegistrations', eventRegistrationsErr],
     ['writingPictures', writingPicturesErr],
   ]

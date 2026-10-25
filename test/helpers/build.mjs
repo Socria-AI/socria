@@ -323,6 +323,7 @@ const MODULES = [
   'lib/map-skip.ts',
   // the Logos Runtime (lib/runtime): six subsystems in one bundle
   'test/helpers/runtime-under-test.ts',
+  'test/helpers/mr-under-test.ts',
   // Logos 5's four views, titles, Content (lib/logos5/views.ts, title.ts, content.ts, contentBoard.ts)
   'test/helpers/l5views-under-test.ts',
   // adaptive response rendering: the inline vocabulary, its planner, its gate and its components

@@ -1,5 +1,7 @@
 // app/api/cron/lifecycle/route.ts
 // GET — the daily lifecycle email run. Called by Vercel's cron (vercel.json).
+// It also does the day's housekeeping first, whatever the email switch says:
+// unread uploads swept, expired MR ledger rows purged.
 //
 // Three kinds go from here: day-3 and day-7, whose candidates the database
 // picks out (lifecycle_candidates in supabase/schema.sql), and limit-chats,
@@ -38,6 +40,7 @@ import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { trackServer } from '@/lib/analytics-server';
 import { addressesFor } from '@/lib/email-recipients';
 import { sweepStaleUploads } from '@/lib/upload-store';
+import { purgeExpired as purgeExpiredMr } from '@/lib/mr/store';
 import {
   emailBaseUrl,
   emailSecret,
@@ -154,11 +157,23 @@ export async function GET(req: NextRequest) {
   // Uploads that went to storage and were never read (a tab closed mid-way)
   // are removed here, whatever the email switch says: nothing is meant to
   // stay in that bucket longer than an hour (lib/upload-paths.ts).
+  //
+  // So are Metacognitive Regulation's ledger rows past their 180 days, for
+  // everybody (lib/mr/store.ts purgeExpired): the write that purges them runs
+  // only for whoever is taking a turn, and the account export tells people
+  // their rows are kept 180 days — someone who stops using Socria, or a
+  // deployment that turned MR off, would otherwise keep them for good. The
+  // rows hold no words; the purge is bounded and logs a count, never an id.
   if (req.nextUrl.searchParams.get('dry') !== '1') {
     try {
       await sweepStaleUploads();
     } catch (e) {
       console.error('[socria/cron] upload sweep failed', e);
+    }
+    try {
+      await purgeExpiredMr();
+    } catch (e) {
+      console.error('[socria/cron] mr ledger purge failed', e instanceof Error ? e.name : 'error');
     }
   }
 

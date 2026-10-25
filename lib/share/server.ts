@@ -190,10 +190,16 @@ export interface ResourceInfo {
  * Who owns a resource. Ids are random and global in practice; if two owners
  * somehow hold the same id, the answer is "nobody", not a guess.
  */
-export async function resourceInfo(type: ResourceType, id: string): Promise<ResourceInfo | null> {
+/**
+ * The resource's owner and kind, or null when there is no such resource.
+ * A failed lookup is null too — unless `strict`, when it throws, for a caller
+ * that must not read "could not look" as "not there" (sharedOrUnknown).
+ */
+export async function resourceInfo(type: ResourceType, id: string, opts: { strict?: boolean } = {}): Promise<ResourceInfo | null> {
   const db = supabaseAdmin();
   if (type === 'project') {
     const { data, error } = await db.from('mind_projects').select('user_id, name').eq('id', id).limit(2);
+    if (error && opts.strict && !missing(error)) throw error;
     if (error || !data || data.length !== 1) return null;
     const r = data[0] as Record<string, unknown>;
     return { ownerId: String(r.user_id), projectId: null, kind: 'project', title: String(r.name ?? ''), incognito: false };
@@ -206,7 +212,10 @@ export async function resourceInfo(type: ResourceType, id: string): Promise<Reso
       data = r.data as unknown as Record<string, unknown>[];
       break;
     }
-    if (!/column|does not exist|PGRST204|42703/i.test(`${r.error.code} ${r.error.message}`)) return null;
+    if (!/column|does not exist|PGRST204|42703/i.test(`${r.error.code} ${r.error.message}`)) {
+      if (opts.strict) throw r.error;
+      return null;
+    }
   }
   if (!data || data.length !== 1) return null;
   const r = data[0] as Record<string, unknown>;
@@ -334,6 +343,42 @@ export async function openShares(ownerId: string, type: ResourceType): Promise<O
 }
 
 /** Whether anybody besides the owner can reach it — memory goes quiet if so. */
+/**
+ * isShared, with a failed lookup reported as null rather than "not shared":
+ * for a caller that keeps something per person only where it is SURE the
+ * conversation is one person's (lib/share/turn.ts unconfirmed). It answers
+ * true exactly where isShared does — a failed read of the conversation's own
+ * share row still goes on to its Project, as isShared's does — and it reads
+ * the same rows in the same order; only "false" becomes null when a read on
+ * the way failed. (A shared conversation must never be taken for a private
+ * one because one read timed out: that read its owner's memory into a reply
+ * others see.)
+ */
+export async function sharedOrUnknown(type: ResourceType, id: string): Promise<boolean | null> {
+  let unsure = false;
+  const info = await resourceInfo(type, id, { strict: true }).catch(() => {
+    unsure = true;
+    return null;
+  });
+  if (!info) return unsure ? null : false;
+  const s = await shareFor(info.ownerId, type, id).catch(() => {
+    unsure = true;
+    return null;
+  });
+  if (s) {
+    if (s.linkRole || s.code) return true;
+    // isShared lets this one throw (its caller then reads "not shared"): unknown here
+    const members = await activeMembers(s.id).catch(() => null);
+    if (members === null) return null;
+    if (members.length) return true;
+  }
+  if (type === 'conversation' && info.projectId) {
+    const p = await sharedOrUnknown('project', info.projectId);
+    if (p !== false) return p;
+  }
+  return unsure ? null : false;
+}
+
 export async function isShared(type: ResourceType, id: string): Promise<boolean> {
   const info = await resourceInfo(type, id).catch(() => null);
   if (!info) return false;

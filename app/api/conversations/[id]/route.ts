@@ -1,11 +1,14 @@
 // app/api/conversations/[id]/route.ts
 // DELETE /api/conversations/:id → delete one conversation for the current user,
-// and with it what Core 4 kept about it and the pictures its writing held.
+// and with it what Core 4 and Metacognitive Regulation kept about it and the
+// pictures its writing held.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { deleteConversation } from '@/lib/core4/store';
+import { forgetConversation as forgetMrConversation } from '@/lib/mr/store';
+import { cleanId } from '@/lib/mind/logos-turn';
 import { releaseDraftMedia } from '@/lib/write/media-store';
 
 export const runtime = 'nodejs';
@@ -47,9 +50,24 @@ export async function DELETE(
       console.error('DELETE conversation: core 4 cascade failed', e);
       return NextResponse.json({ error: 'The conversation was deleted, but Socria could not remove everything it kept about it. Please try again.' }, { status: 500 });
     }
+    // …and MR's ledger rows for it. They are keyed by the id as the Logos route
+    // received it (cleanId), so an id of any other shape has none. The
+    // conversation is marked forgotten in their MR settings BEFORE its rows
+    // go (lib/mr/store.ts forgetConversation): a turn of it still streaming
+    // writes its rows after this, and the mark is how it knows not to — and
+    // a "from now on" they took back in it is kept there, so deleting the
+    // conversation does not bring the preference back everywhere.
+    const mrKey = cleanId(params.id);
+    const mrGone = !mrKey || (await forgetMrConversation(userId, mrKey)).ok;
     // its pictures, unless another of their drafts still holds one (best effort:
-    // a picture that cannot be released is kept, and goes with the account)
+    // a picture that cannot be released is kept, and goes with the account).
+    // Before reporting an MR failure, not after: the row is already gone, so a
+    // retry reads no draft and could never release them.
     await releaseDraftMedia(userId, draft);
+    if (!mrGone) {
+      console.error('DELETE conversation: mr cascade failed');
+      return NextResponse.json({ error: 'The conversation was deleted, but Socria could not remove everything it kept about it. Please try again.' }, { status: 500 });
+    }
     return NextResponse.json({ ok: true });
   } catch (e: any) {
     console.error('DELETE conversation threw:', e);

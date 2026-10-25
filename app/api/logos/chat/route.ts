@@ -114,6 +114,17 @@ import {
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, gateInlineBlock, type InlineContext } from '@/lib/inline-ui';
+// METACOGNITIVE REGULATION (docs/MR.md): off unless LOGOS_MR says otherwise.
+import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
+import { deliberationOn, mrMode, storeOn } from '@/lib/mr/config';
+import { deliberate } from '@/lib/mr/deliberate';
+import { resolveCondition } from '@/lib/mr/experiment';
+import { standingFacts } from '@/lib/mr/adaptation';
+import { checkPrivacy } from '@/lib/mr/integrity';
+import { recordPieces } from '@/lib/mr/ifr';
+import { carriedInOf, modelDeliberationsIn, persistAllowed, resetTurnOf, revocationsOf, rowsForTurn } from '@/lib/mr/ledger';
+import { loadForTurn, readIncognito, readSettings, writeRows, writeSettings } from '@/lib/mr/store';
+import type { LedgerRow, MRSettings } from '@/lib/mr/types';
 import { renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
 
 export const runtime = 'nodejs';
@@ -350,6 +361,44 @@ export async function POST(req: NextRequest) {
         { status: sharedCtx.refuse.status }
       );
     }
+    // METACOGNITIVE REGULATION's prior (docs/MR.md), started HERE so its reads
+    // overlap the allowance checks below rather than adding a wait before the
+    // first token: their settings, this conversation's ledger rows and its
+    // incognito flag go out together (the rows are read speculatively, and
+    // dropped when their settings say off or predate their reset); only a
+    // carried "from now on" needs a second read, and only with their consent
+    // to carry. Off: nothing is read.
+    // No per-person regulation where it is not one person's: a node's
+    // side-thread, a room or a shared line of thinking (the Mind Graph's
+    // exclusions) — and also any turn whose messages carry an author (only a
+    // room's do, whoever is present now) and any turn whose sharing could not
+    // be confirmed either way: unknown is not private.
+    const mr = mrMode();
+    // rows are stamped with when the turn BEGAN: a reset that lands while it runs still hides them
+    const mrStartedAt = Date.now();
+    const mrKey = cleanId(sessionId);
+    const mrAuthored = usable.some((m: { role?: string; by?: unknown }) => m.role === 'user' && !!m.by && typeof m.by === 'object');
+    const mrExcluded = !!trim(f?.label, 120) || twoPeople || !!body?.collab || sharedCtx.shared || !!sharedCtx.unconfirmed || mrAuthored;
+    type MRPrior = { settings: MRSettings | null; settingsOk: boolean; rows: LedgerRow[]; standing: LedgerRow[]; loaded: boolean; incognito: boolean | null; profile?: boolean };
+    const NO_ROWS = { ok: false, rows: [] as LedgerRow[], standing: [] as LedgerRow[] };
+    const mrPriorP: Promise<MRPrior> =
+      mr === 'off' || mrExcluded || !userId
+        ? Promise.resolve({ settings: null, settingsOk: true, rows: [], standing: [], loaded: false, incognito: null })
+        : (async (): Promise<MRPrior> => {
+            const useStore = storeOn() && !!mrKey;
+            const [st, here, incognito] = await Promise.all([
+              withTimeout(readSettings(userId), 800, { ok: false, settings: null as unknown as MRSettings }),
+              useStore ? withTimeout(loadForTurn(userId, mrKey, { timeoutMs: 800, carryAcross: false, resetAt: null }), 900, NO_ROWS) : Promise.resolve(NO_ROWS),
+              useStore ? withTimeout(readIncognito(userId, mrKey!), 800, null) : Promise.resolve(null),
+            ]);
+            const settings = st.ok ? st.settings : null;
+            if (!settings) return { settings: null, settingsOk: st.ok, rows: [], standing: [], loaded: false, incognito };
+            const resetAt = settings.resetAt ?? null;
+            const rows = here.rows.filter((r) => resetAt === null || r.created_at > resetAt);
+            // the one read that needs their settings first; not when the ledger already failed this turn
+            const across = useStore && settings.carryAcross && here.ok ? await withTimeout(loadForTurn(userId, mrKey, { timeoutMs: 800, carryAcross: true, resetAt }), 900, NO_ROWS) : NO_ROWS;
+            return { settings, settingsOk: true, rows, standing: across.standing, loaded: here.ok, incognito, profile: (st as { row?: boolean }).row === true };
+          })().catch(() => ({ settings: null, settingsOk: false, rows: [], standing: [], loaded: false, incognito: null }));
     const userTurns = clean.filter((m: { role: string }) => m.role === 'user').length;
     //
     // …and it is counted ONCE PER CONVERSATION, not once per first-turn
@@ -459,6 +508,30 @@ export async function POST(req: NextRequest) {
     // LOGOS_PERSONA=classic (or LOGOS_RUNTIME=off) speaks with the Logos 3.5
     // prompt instead.
     const userTexts = clean.filter((m) => m.role === 'user').map((m) => m.content);
+    // What MR may KEEP of this conversation: the stricter of the policy over
+    // the model's history window and over the WHOLE conversation — the window
+    // drops the oldest turns of a long conversation, and "this is off the
+    // record" must not drop with them, but the whole conversation can also read
+    // less strictly (an old "off the record" later lifted), so neither alone
+    // decides. Computed only when MR runs, once; an older message is read to
+    // its first 4,000 characters and, past them, wherever it mentions the
+    // record (lib/mr/ifr.ts recordPieces). (The Mind Graph keeps its own
+    // reading over the window, as it always has: MR off changes nothing.)
+    const STRICTNESS = { full: 0, conversation_only: 1, none: 2 } as const;
+    let keptPolicy: ReturnType<typeof logosPersistPolicy> | null = null;
+    let recordTexts: string[] = userTexts;
+    const keepPolicy = (): ReturnType<typeof logosPersistPolicy> => {
+      if (keptPolicy) return keptPolicy;
+      const earlier = usable
+        .slice(0, usable.length - kept.length)
+        .filter((m: { role: string }) => m.role === 'user')
+        .flatMap((m: { content: string }) => recordPieces(String(m.content ?? '')));
+      const windowed = logosPersistPolicy(userTexts);
+      recordTexts = earlier.length ? [...earlier, ...userTexts] : userTexts;
+      const whole = earlier.length ? logosPersistPolicy(recordTexts) : windowed;
+      keptPolicy = STRICTNESS[whole] > STRICTNESS[windowed] ? whole : windowed;
+      return keptPolicy;
+    };
     const personaBlocks = {
       math: looksMathematical(userTexts),
       picture: !!body?.viz || !!body?.vizState,
@@ -695,7 +768,120 @@ export async function POST(req: NextRequest) {
     // The exchange (small talk, joking, something personal…) keeps the engine
     // from imposing a task's move on a hello; LOGOS_RUNTIME=off is the route as
     // it was, so it goes without.
-    const assist = allocation ? allocation.assist : chooseAssist({ ...assistInput, signals, ...(runtime ? { exchange: turnState.exchange.kind } : {}) });
+    const assistAcs = allocation ? allocation.assist : chooseAssist({ ...assistInput, signals, ...(runtime ? { exchange: turnState.exchange.kind } : {}) });
+
+    // ── METACOGNITIVE REGULATION (lib/mr) ─────────────────────────────
+    //
+    // Whether the help is working, and a typed, expiring adjustment when the
+    // evidence says it is not — their explicit words above all, never a weak
+    // signal. No model call (the deliberative loop is off by default). Its
+    // decision narrows ACS's move here, before anything reads it, so the
+    // presentation planner, the inline gate and the stream gate all enforce the
+    // same budget. Any failure is the route exactly as it was: MR off.
+    const baseReply = (persona === 'v5' ? replyCeiling(body?.length) : 640) + (docRefs.length ? 310 : 0);
+    let mrRun: MRRegulation | null = null;
+    let mrPolicy: 'full' | 'conversation_only' | 'none' = 'none';
+    let mrPrior: Awaited<typeof mrPriorP> | null = null;
+    let mrMayStore = false;
+    let mrNotStored: string[] = [];
+    if (mr !== 'off' && !mrExcluded) {
+      try {
+        mrPrior = await mrPriorP;
+        mrPolicy = keepPolicy();
+        // The integrity monitor's privacy boundary (lib/mr/integrity.ts
+        // checkPrivacy) decides whether this turn may be written; why not is
+        // kept as codes for the [mr] line.
+        const boundary = checkPrivacy({
+          userId: userId ?? null,
+          shared: mrExcluded,
+          persistPolicy: mrPolicy,
+          incognito: mrPrior.incognito,
+          storeOn: storeOn(),
+          consent: { carryAcross: !!mrPrior.settings?.carryAcross },
+          crossConversation: false,
+          turn: 0,
+        });
+        mrNotStored = [...(!mrKey ? ['no_conversation'] : []), ...(!mrPrior.loaded ? ['ledger_unread'] : []), ...boundary.map((f) => f.detail)];
+        mrMayStore =
+          !!userId &&
+          !!mrKey &&
+          mrPrior.loaded &&
+          boundary.length === 0 &&
+          persistAllowed({ userId: userId ?? null, shared: mrExcluded, persistPolicy: mrPolicy, incognito: mrPrior.incognito, storeOn: storeOn() });
+        const condition = resolveCondition({ mode: mr, userId: userId ?? null, shared: mrExcluded, settings: mrPrior.settings, settingsOk: mrPrior.settingsOk });
+        const carried = mrPrior.settings?.carryAcross ? standingFacts(mrPrior.standing, mrPrior.settings, Date.now()) : undefined;
+        // Their reset, as a turn of this conversation — only where turns are
+        // recorded: a conversation nothing is kept for has no boundary to hold.
+        const userTurnNow = Math.max(0, usable.filter((m: { role: string }) => m.role === 'user').length - 1);
+        const resetAt = mrPrior.settings?.resetAt ?? null;
+        // (A conversation whose ledger cannot be read this turn has no boundary
+        // to read: MR's own pre-reset adjustment can hold one more turn, until
+        // the read works — not every adjustment ended for anyone who ever reset.)
+        const resetTurn = resetAt !== null && mrMayStore ? resetTurnOf(mrPrior.rows, resetAt, userTurnNow) : null;
+        const mrInput = {
+          conversationKey: mrKey,
+          messages: usable.map((m: { role: 'user' | 'assistant'; content: string }) => ({ role: m.role, content: m.content })),
+          signals,
+          acs: { assist: assistAcs, core: allocation?.core ?? null, split: allocation?.split ?? null },
+          turnState,
+          context: {
+            guard: assistInput.guard,
+            length: persona === 'v5' && (body?.length === 'concise' || body?.length === 'standard' || body?.length === 'detailed') ? (body.length as 'concise' | 'standard' | 'detailed') : null,
+            maxReply: baseReply,
+            shared: mrExcluded,
+            accuracy: {
+              check: accuracy.check,
+              computed: accuracy.computed.some((c) => !!c.result),
+              math: accuracy.reasons.includes('math'),
+              theirs: accuracy.theirs.map((v) => ({ status: v.status })),
+            },
+          },
+          condition,
+          ...(carried ? { carried, carriedIn: carriedInOf(mrPrior.rows, resetAt) } : {}),
+          ...(resetTurn !== null ? { resetTurn } : {}),
+        };
+        mrRun = regulateTurn(mrInput);
+        // Only where something is enforced (regulateTurn names no reason
+        // otherwise); the model is asked only with the budget readable —
+        // the model calls this conversation already made, from the ledger.
+        if (mrRun.needsDeliberation) {
+          const used = mrPrior.loaded ? modelDeliberationsIn(mrPrior.rows) : Infinity;
+          // …and only where this conversation's turns are recorded: elsewhere the count could never grow
+          const modelAllowed = deliberationOn() && !!userId && mrPrior.loaded && mrMayStore;
+          const mrOpenai = modelAllowed ? tracked(new OpenAI({ apiKey }), 'logos/mr') : null;
+          const d = await deliberate(mrRun, mrInput as Parameters<typeof deliberate>[1], {
+            used,
+            modelAllowed,
+            ...(mrOpenai
+              ? {
+                  create: (params: Record<string, unknown>) =>
+                    mrOpenai.chat.completions.create(params as unknown as Parameters<typeof mrOpenai.chat.completions.create>[0]) as unknown as Promise<{ choices?: { message?: { content?: string | null } }[] }>,
+                  model: process.env.OPENAI_MODEL_MR || modelFor('memory'),
+                  timeoutMs: 1500,
+                }
+              : {}),
+          });
+          mrRun = d.regulation;
+        }
+        // The same turn sent again (a retry) writes its exposure row again,
+        // under the same id: a model call already made for it stays counted.
+        // And every exposure row carries the running total, so the count
+        // outlives the older rows that leave the ledger read.
+        if (mrRun && mrPrior.loaded) {
+          const before = modelDeliberationsIn(mrPrior.rows);
+          const again = mrPrior.rows.some((r) => r.kind === 'exposure' && r.turn === mrRun!.state.turn && r.record.modelDeliberated === true);
+          const now = !!mrRun.timing.modelDeliberated && !again;
+          mrRun = { ...mrRun, timing: { ...mrRun.timing, ...(again ? { modelDeliberated: true } : {}), modelDeliberations: before + (now ? 1 : 0) } };
+        }
+      } catch (e) {
+        // content-free: which stage failed, never what anybody said
+        console.error('[mr] fast loop failed; this turn runs without MR', e instanceof Error ? e.name : 'error');
+        mrRun = null;
+      }
+    }
+    const assist = mrRun?.enforced ? mrRun.assist : assistAcs;
+    // the per-turn block renders the move from the allocation: it carries the regulated one
+    const allocationShown = allocation && mrRun?.enforced ? { ...allocation, assist } : allocation;
 
     // ADAPTIVE RESPONSE RENDERING (lib/runtime/presentation.ts): which inline
     // elements the reply may use this turn — decided in code, offered with
@@ -863,7 +1049,9 @@ export async function POST(req: NextRequest) {
       // model reads: what was computed.
       // How to help on this turn: under the runtime, who does what and the
       // move (allocation.ts); under the classic persona, the move alone.
-      (allocation ? renderAllocation(allocation, turnState) : renderAssist(assist)) +
+      (allocationShown ? renderAllocation(allocationShown, turnState) : renderAssist(assist)) +
+      // …adjusted, when MR is regulating this turn (lib/mr/execute.ts): only the lines its prompt-level controls need
+      (mrRun?.block ?? '') +
       // …and what shape it may take: the inline elements on offer, if any
       renderPresentation(presentation) +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
@@ -896,7 +1084,10 @@ export async function POST(req: NextRequest) {
     const configured = modelFor('reply');
     // The ceiling follows their length setting (Logos 5), and rises for an
     // answer about a document, which quotes, cites and calculates.
-    const maxReply = (persona === 'v5' ? replyCeiling(body?.length) : 640) + (docRefs.length ? 310 : 0) + presentationRoom(presentation);
+    // MR's "shorter" is a hard ceiling, never above the route's own (lib/mr/execute.ts)
+    const maxReply = mrRun?.ceiling
+      ? Math.min(baseReply, mrRun.ceiling) + presentationRoom(presentation)
+      : baseReply + presentationRoom(presentation);
 
     const make = (model: string) =>
       openai.chat.completions.create({
@@ -993,6 +1184,26 @@ export async function POST(req: NextRequest) {
       shown: { n: 0 },
     };
     const inlineBlock = (chunk: string, open: boolean) => (inlineOn ? gateInlineBlock(chunk, inlineCtx, open) : gateInlineBlock(chunk, { ...inlineCtx, shown: { n: Infinity } }, open));
+    // MR's reply filters (lib/mr/index.ts replyGate): every interrogative
+    // sentence when they told it to stop asking — mid-reply too, not only a
+    // closing one — and a claim that THEY improved, which one conversation
+    // cannot show. Quoted material and drafts for somebody else are never
+    // touched. Counted, never logged.
+    const mrDropped = { questions: 0, claims: 0, offersRestored: 0 };
+    const mrGate = mrRun ? replyGate(mrRun) : null;
+    /** A reply MR's filters would leave empty: its non-question offers, or the integrity monitor's one fixed line (lib/mr/index.ts emptyReplyFallback). */
+    let mrFallback = false;
+    const mrNotEmpty = (gate: NonNullable<typeof mrGate>): string => {
+      const f = emptyReplyFallback(gate, !!mrRun?.gate.hardNoQuestions);
+      if (!f) return '';
+      if (f.fallback) mrFallback = true;
+      return f.text;
+    };
+    const mrTally = (gate: NonNullable<typeof mrGate>) => {
+      mrDropped.questions += gate.dropped.questions;
+      mrDropped.claims += gate.dropped.claims;
+      mrDropped.offersRestored += gate.dropped.offersRestored;
+    };
 
     const encoder = new TextEncoder();
     const stream = new ReadableStream({
@@ -1040,11 +1251,39 @@ export async function POST(req: NextRequest) {
             // through the same gate the streamed path uses, so the two paths
             // cannot drift. The opener yields only when the engine confirms
             // they caught a real mistake of Socria's.
+            // MR's filters on a held turn run where the streamed path runs them:
+            // as this gate's rewrite, chunk by chunk, after the citation check
+            // and before the gate holds a question — so the tail cap never
+            // deletes a question MR kept (a quoted draft's, a table cell), and
+            // code, quotes and the opener are treated alike on both paths.
+            // Without MR the gate is exactly what it was.
             if (reply) {
-              const held = new SentenceGate(() => {}, { passQuestions: signals.requestsQuestions, keepOpener: accuracy.theyCaughtIt, rewrite, neverEmpty: true, block: inlineBlock });
+              const g = mrRun ? replyGate(mrRun) : null;
+              const held = new SentenceGate(() => {}, {
+                passQuestions: signals.requestsQuestions && !mrRun?.gate.hardNoQuestions,
+                keepOpener: accuracy.theyCaughtIt,
+                // MR's filters give back the pieces the gate reads: none for a chunk they take out, a list
+                // number apart from its item (lib/mr/index.ts filterAll)
+                ...(g ? { rewriteAll: (x: string) => g.filterAll(rewrite ? rewrite(x) : x), keep: g.exempt, see: g.see } : { rewrite }),
+                neverEmpty: true,
+                block: g
+                  ? (chunk: string, open: boolean) => {
+                      // what MR held (a list number, a break) goes out before the block, which starts its own line
+                      const pre = g.sawBlock(chunk);
+                      const out = inlineBlock(chunk, open);
+                      return out ? pre + (pre && !pre.endsWith('\n') && out.startsWith('```') ? '\n\n' : '') + out : pre;
+                    }
+                  : inlineBlock,
+              });
               held.push(reply);
               held.finish(assist.questions);
-              if (held.out.trim()) reply = held.out;
+              if (g) {
+                // a number with no item after it ("42.") goes out last
+                const out = held.out + g.settle();
+                // the gate left nothing: MR's fallback only where MR took something out; otherwise as without MR
+                reply = out.trim() ? out : g.dropped.questions || g.dropped.claims ? mrNotEmpty(g) : reply;
+                mrTally(g);
+              } else if (held.out.trim()) reply = held.out;
             }
             if (reply) {
               sent = true;
@@ -1056,15 +1295,57 @@ export async function POST(req: NextRequest) {
             // removed, and a trailing question ships only inside this turn's
             // budget (Core 4's gate — Logos 4 no longer runs it filter-only).
             const gate = new SentenceGate((text) => {
+              // (an empty piece is a list number MR holds, sent as nothing so the gate releases what it holds)
+              if (!text && mrGate) return;
               sent = true;
               reply += text;
               controller.enqueue(encoder.encode(text));
-            }, { passQuestions: signals.requestsQuestions, drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }), rewrite, neverEmpty: true, block: inlineBlock });
+            }, {
+              passQuestions: signals.requestsQuestions && !mrRun?.gate.hardNoQuestions,
+              // MR's filters see every chunk, in order (they follow quotation across them), after
+              // the citation check: a sentence of Socria's own they take out goes, quoted lines stay;
+              // a chunk they take out whole is no piece at all (not sent as empty text, which the gate
+              // would read as exposition and release the questions it holds), and a list number they
+              // held comes back apart from its item (lib/mr/index.ts filterAll)
+              ...(mrGate ? { rewriteAll: (x: string) => mrGate.filterAll(rewrite ? rewrite(x) : x) } : { rewrite }),
+              drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }),
+              // a question MR kept under their "stop asking" (somebody else's words) goes out in order, not to the tail cap
+              ...(mrGate ? { keep: mrGate.exempt, see: mrGate.see } : {}),
+              neverEmpty: true,
+              // the fences MR's filters do not see (lib/mr/index.ts sawBlock)
+              block: mrGate
+                ? (chunk: string, open: boolean) => {
+                    // what MR held (a list number, a break) goes out before the block, which starts its own line
+                    const pre = mrGate.sawBlock(chunk);
+                    const out = inlineBlock(chunk, open);
+                    return out ? pre + (pre && !pre.endsWith('\n') && out.startsWith('```') ? '\n\n' : '') + out : pre;
+                  }
+                : inlineBlock,
+            });
             for await (const chunk of completion) {
               const delta = chunk.choices?.[0]?.delta?.content ?? '';
               if (delta) gate.push(delta);
             }
             gate.finish(assist.questions);
+            // a number with no item after it ("42.") goes out last
+            const rest = mrGate?.settle() ?? '';
+            if (rest) {
+              sent = true;
+              reply += rest;
+              controller.enqueue(encoder.encode(rest));
+            }
+            // Everything was something MR's filters took out: never an empty
+            // turn — its non-question offers, or one fixed line; never the
+            // question their "stop asking" ruled out, never the claim.
+            if (mrGate && !reply.trim()) {
+              const back = mrNotEmpty(mrGate);
+              if (back) {
+                sent = true;
+                reply = back;
+                controller.enqueue(encoder.encode(back));
+              }
+            }
+            if (mrGate) mrTally(mrGate);
             // Streamed because nothing looked risky; if the finished reply
             // states something the engine refutes, say so now, plainly.
             const late = checkDraft(contentForCheck(reply), accuracy.context);
@@ -1093,6 +1374,51 @@ export async function POST(req: NextRequest) {
                 searched: searched ? 1 : 0,
               })
             );
+          }
+          // MR: what the reply did against what was enforced, then the ledger —
+          // content-free rows, after the stream, never awaited before it closes.
+          if (mrRun) {
+            try {
+              const measured = reply.trim() ? afterReply(mrRun, contentAsText(reply), mrDropped) : [];
+              if (mrFallback) measured.push({ code: 'unsupported_claim', severity: 'info', turn: mrRun.state.turn, detail: 'empty_after_filters:fixed_line', action: 'drop_sentence' });
+              const finished = { ...mrRun, integrity: [...mrRun.integrity, ...measured] };
+              console.info(
+                `[mr] ${finished.trace};dq=${mrDropped.questions};dc=${mrDropped.claims}${mrDropped.offersRestored ? `;or=${mrDropped.offersRestored}` : ''}${mrMayStore ? '' : `;store=0:${mrNotStored.join('+') || 'off'}`}`
+              );
+              if (mrMayStore) {
+                // a conversation kept to itself keeps its preferences to itself: nothing it says is carried elsewhere
+                const rows = rowsForTurn(finished, { userId: userId!, conversationKey: mrKey, now: mrStartedAt, arm: finished.condition.arm, conversationOnly: mrPolicy === 'conversation_only' });
+                const write = () => writeRows(userId!, rows, Date.now(), { hadProfile: mrPrior!.profile === true });
+                try {
+                  waitUntil(write());
+                } catch {
+                  void write();
+                }
+              } else if (userId && mrPrior?.settings) {
+                // NOTHING OF THE TURN IS KEPT HERE (incognito, off the record,
+                // no id) — but one of their choices is not the turn's content:
+                // taking back a "from now on" ("you can ask me questions again")
+                // goes into their settings as a rule id and a time, so the
+                // preference stops crossing into other conversations. Going off
+                // the record deletes nothing: MR stops recording from that turn
+                // on (as the Mind Graph does), and what it kept before holds no
+                // text. "Forget what Socria worked out here" and deleting the
+                // conversation are what delete it.
+                const revoke = mrPrior.settings.carryAcross
+                  ? revocationsOf(rowsForTurn(finished, { userId, conversationKey: mrKey, now: mrStartedAt, arm: finished.condition.arm })).filter((x) => !x.reasserted)
+                  : [];
+                if (revoke.length) {
+                  const done = () => writeSettings(userId, { revoke }).then((w) => (w.ok ? w : writeSettings(userId, { revoke })));
+                  try {
+                    waitUntil(done());
+                  } catch {
+                    void done();
+                  }
+                }
+              }
+            } catch (e) {
+              console.error('[mr] measurement failed', e instanceof Error ? e.name : 'error');
+            }
           }
           // An "ok" or a "thanks" has nothing in it to remember: no extraction call.
           if (mindOn && mindPolicy !== 'none' && reply.trim() && (!runtime || memorable(String(last?.content ?? '')))) {
@@ -1128,6 +1454,8 @@ export async function POST(req: NextRequest) {
         ...(gifted ? { 'X-Socria-First-Thought': '1' } : {}),
         // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
         'X-Socria-Assist': assistTrace(assist),
+        // Metacognitive Regulation's decision this turn: content-free codes (lib/mr/index.ts traceOf)
+        ...(mrRun ? { 'X-Socria-MR': mrRun.trace } : {}),
         // the runtime's reading of the turn: content-free, for the client and the evals
         ...(runtime
           ? {

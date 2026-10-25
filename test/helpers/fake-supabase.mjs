@@ -28,6 +28,7 @@ const PK = {
   lifecycle_emails: ['user_id', 'kind'],
   event_sheet_sync: ['event_id'],
   captures: ['id'],
+  mr_ledger: ['user_id', 'id'],
 };
 
 // Unique indexes beyond the primary key (supabase/schema.sql), as Postgres
