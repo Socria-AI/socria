@@ -52,6 +52,9 @@ import {
   LENSES,
   RELATION_LABEL,
   availableLenses,
+  ideaLead,
+  ideaLenses,
+  type MadeLens,
   layoutEvidence,
   layoutStructure,
   layoutTensions,
@@ -218,6 +221,7 @@ export function ThinkingMap({
   workspace,
   linked,
   reveal,
+  shapes,
 }: {
   map: TMap;
   initialLens?: LensId;
@@ -345,6 +349,13 @@ export function ThinkingMap({
   linked?: ReadonlySet<string>;
   /** Logos 5: bring this card into view; a new `n` asks again for the same card */
   reveal?: { id: string; n: number } | null;
+  /**
+   * Logos 5: which lenses this map offers. 'ideas' is the Logic Map, the
+   * person's own thinking in its shapes (lib/logos-layout.ts ideaLenses); a
+   * made lens is one artifact (the plot, the worked solution, the working),
+   * drawn on that lens alone. Unset, every lens the map can draw.
+   */
+  shapes?: 'ideas' | MadeLens;
 }) {
   /** a canvas of cards, which pans, zooms and drags — every lens but those that draw themselves */
   const isCanvasLens = (l: LensId) => drawsCards(l) && !(workspace && l === 'structure');
@@ -1049,7 +1060,10 @@ export function ThinkingMap({
     return true;
   };
 
-  const lenses = useMemo(() => availableLenses(map, { workspace }), [map, workspace]);
+  const lenses = useMemo(
+    () => (shapes === 'ideas' ? ideaLenses(map) : shapes ? availableLenses(map, { workspace }).filter((l) => l === shapes) : availableLenses(map, { workspace })),
+    [map, workspace, shapes]
+  );
 
 
   // The lens this map leads with — the signature view for what it holds,
@@ -1061,7 +1075,7 @@ export function ThinkingMap({
   // does. Without this a map carrying a document and no scene opened on the
   // concept graph, and the first-model sequence asked for a value to be
   // moved on a surface that was a tab away.
-  const lead = leadLens(lenses, !!map.viz || !!map.models?.docs?.length, map.building);
+  const lead = shapes === 'ideas' ? ideaLead(lenses, map.building) : leadLens(lenses, !!map.viz || !!map.models?.docs?.length, map.building);
   const open = useMemo(() => {
     if (lensLimit === null || lensLimit === undefined) return null;
     const ordered = [

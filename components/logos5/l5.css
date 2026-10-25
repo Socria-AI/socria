@@ -1094,6 +1094,83 @@
   right: auto;
   width: min(340px, calc(100% - 16px));
 }
+/* what to make (MakePicker): beside the length dial, its sheet opens from the composer's edge too */
+.logos-root .l5-ctools-mid {
+  gap: 2px;
+}
+.logos-root .l5-make.mp {
+  position: static;
+  display: inline-flex;
+  align-items: center;
+  min-width: 0;
+}
+.logos-root .l5-make .mp-sheet {
+  left: 8px;
+  right: auto;
+  width: min(340px, calc(100% - 16px));
+}
+.logos-root .l5-make.is-set .mp-btn {
+  color: var(--lg-primary);
+}
+/* a phone's tool row has room for one label: Make is its icon until something is chosen */
+@media (max-width: 560px) {
+  .logos-root .l5-make:not(.is-set) .mp-btn .nm {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  /* a choice and the length side by side: each label shortens itself */
+  .logos-root .l5-ctools-mid .mp-btn .nm {
+    max-width: 76px;
+  }
+}
+.logos-root .l5-make-x {
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink-40);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.logos-root .l5-make-x:hover,
+.logos-root .l5-make-x:focus-visible {
+  color: var(--lg-ink);
+  background: rgba(var(--ink-rgb, 31, 31, 31), 0.06);
+}
+.logos-root .l5-make-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0 4px;
+}
+.logos-root .l5-make-opt {
+  padding: 6px 11px;
+  border-radius: 999px;
+  border: 1px solid rgba(var(--ink-rgb, 31, 31, 31), 0.14);
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.logos-root .l5-make-opt:hover {
+  background: rgba(var(--ink-rgb, 31, 31, 31), 0.05);
+}
+.logos-root .l5-make-opt.on {
+  border-color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb), 0.12);
+}
+.logos-root .l5-make-opt:focus-visible,
+.logos-root .l5-make-x:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 1px;
+}
 .logos-root .l5-ctools-end {
   display: inline-flex;
   align-items: center;

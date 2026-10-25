@@ -110,6 +110,8 @@ import { guardWatches, type GuardSignal } from '@/lib/logos-guidance';
 import { MAX_STYLE, STYLE_CHANGED, STYLE_KEY, storeStyle, storedStyle } from '@/lib/logos-style';
 import { chooseModel, lastCoreModel, readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
+import { MakePicker } from '@/components/logos5/MakePicker';
+import { askFor, makeChoice } from '@/lib/logos5/make';
 import { cleanTitle } from '@/lib/session-rail';
 import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
@@ -208,7 +210,7 @@ import {
 } from '@/lib/logos-synthesis';
 import { LogosSynthesis, SynthesisPending } from '@/components/LogosSynthesis';
 import { useThemeGuard } from '@/components/account/ThemePicker';
-import { LENSES, type LensId } from '@/lib/logos-layout';
+import { LENSES, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
 const WS_KEY = 'socria.logos3.workspace.v2';
@@ -638,6 +640,12 @@ export function LogosApp({
   const sceneLastRef = useRef<string | null>(null);
   // asks the composer to take focus, with the caret where a filled-in form wants it
   const [composerFocus, setComposerFocus] = useState<{ n: number; caret?: number } | null>(null);
+  // Logos 5: what to make, chosen before asking (components/logos5/MakePicker.tsx) — spent by the message that asks for it
+  const [makeId, setMakeId] = useState<string | null>(null);
+  const pickMake = (id: string | null) => {
+    setMakeId(id);
+    if (id) setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+  };
   // Logos 4, Quick Capture: the inbox is open
   const [captureOpen, setCaptureOpen] = useState(false);
   const draftToComposer = (text: string, caret?: number) => {
@@ -3127,14 +3135,15 @@ export function LogosApp({
     return st?.doc ? { doc: st.doc, block: sel.part } : null;
   }
 
-  function sendFromComposer() {
+  /** `asked`: the message in place of what is typed — a chosen artifact, asked for in words (lib/logos5/make.ts) */
+  function sendFromComposer(asked?: string) {
     // Anything still being read, or that failed, is left behind rather than
     // sent as a silent blank.
     const ready: Attachment[] = drafts
       .filter((d) => d.status === 'ready')
       .map(({ id, status, error: _e, ...rest }) => rest);
     setDrafts([]);
-    void send(input, ready, replyTo);
+    void send(typeof asked === 'string' ? asked : input, ready, replyTo);
   }
 
   /**
@@ -5292,9 +5301,9 @@ export function LogosApp({
   // line of thinking that was all map builds its first model, the model is
   // what there is to look at; a line opened without a model shows its map.
   // An arrangement somebody made of several panels is theirs and never moves.
-  const wsSeen = useRef<{ id: string | null; docs: number; models: number; plot: boolean }>({ id: null, docs: 0, models: 0, plot: false });
-  const wsWasSeen = (id: string | null, docs: number, models = 0, plot = false) => {
-    wsSeen.current = { id, docs, models, plot };
+  const wsSeen = useRef<{ id: string | null; docs: number; models: number; plot: boolean; solve?: boolean }>({ id: null, docs: 0, models: 0, plot: false });
+  const wsWasSeen = (id: string | null, docs: number, models = 0, plot = false, solve = false) => {
+    wsSeen.current = { id, docs, models, plot, solve };
   };
   useEffect(() => {
     if (!workspaceOn || !wsLayout) return;
@@ -5319,7 +5328,10 @@ export function LogosApp({
         setScreen((s) => onMade(true, s, narrowRef.current));
       } else if (screenRef.current.view !== 'artifacts') setArtFresh(true);
     }
-    wsWasSeen(activeId, docs, wsFacts.docs.length, plot);
+    // the working, drawn by the map in the background: kept in Artifacts and marked new there, never shown unasked
+    const solve = wsFacts.lenses.includes('solve');
+    if (l5 && seen.id === activeId && solve && !seen.solve && screenRef.current.view !== 'artifacts') setArtFresh(true);
+    wsWasSeen(activeId, docs, wsFacts.docs.length, plot, solve);
   }, [workspaceOn, wsLayout, wsFacts, wsHasModel, activeId, changeLayout]);
   // The conversation, while it is not a panel: a composer and Socria's latest
   // reply beneath the stage, opened into its history only when asked.
@@ -5512,7 +5524,8 @@ export function LogosApp({
   function artPanelOf(key: string): PanelNode | null {
     if (key.startsWith('m:')) return { kind: 'panel', id: `l5a-m-${key.slice(2)}`, type: 'model', config: { doc: key.slice(2) } };
     if (key === 'v:viz') return { kind: 'panel', id: 'l5a-viz', type: 'model' };
-    if (key === 'v:plot') return { kind: 'panel', id: 'l5a-plot', type: 'map', config: { lens: 'plot' } };
+    // the plot, the worked solution, the working: the map's made lenses, each drawn on its own (lib/logos-layout.ts MADE_LENSES)
+    if (key.startsWith('v:') && isMadeLens(key.slice(2))) return { kind: 'panel', id: `l5a-${key.slice(2)}`, type: 'map', config: { lens: key.slice(2) } };
     if (key.startsWith('s:')) return { kind: 'panel', id: `l5a-s-${key.slice(2)}`, type: 'scene', config: { obj: key.slice(2) } };
     return null;
   }
@@ -5529,7 +5542,17 @@ export function LogosApp({
         );
       case 'map':
         // Logos 5: the Logic Map's map, or the map docked beside another view — never both at once
-        return <div className="lg-panel lg-panel-in">{mapBody({ lens: p.config?.lens, primary: p.id === firstOf('map') || (l5 && p.id === 'l5b-map') })}</div>;
+        // Logos 5: the Logic Map (and the map docked beside) draws the person's ideas; an artifact, or
+        // the plot docked beside, draws its one made lens
+        return (
+          <div className="lg-panel lg-panel-in">
+            {mapBody({
+              lens: p.config?.lens,
+              primary: p.id === firstOf('map') || (l5 && p.id === 'l5b-map'),
+              ...(l5 ? { shapes: /^l5[ab]-/.test(p.id) && isMadeLens(p.config?.lens) ? p.config.lens : 'ideas' } : {}),
+            })}
+          </div>
+        );
       case 'model': {
         const doc = panelDoc(p);
         // Logos 5: the model on screen — docked beside, else the one open in Artifacts — takes the reply's moves
@@ -6388,11 +6411,11 @@ export function LogosApp({
           </div>
     </>
   );
-  const mapBody = ({ lens, primary }: { lens?: string; primary: boolean }) => (
+  const mapBody = ({ lens, primary, shapes }: { lens?: string; primary: boolean; shapes?: 'ideas' | MadeLens }) => (
     <>
           <header className="lg-panel-head">
             <span className="lg-panel-title">
-              Thinking Map
+              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Thinking Map'}
               {/* What kind of thinking this turned out to be — read from the
                   conversation, never chosen from a menu. */}
               {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
@@ -6533,6 +6556,7 @@ export function LogosApp({
               return next;
             })}
             initialLens={lens as LensId | undefined}
+            shapes={shapes}
             workspace={workspaceOn}
             onSelectNode={(id) => {
               // in Logos 5 a pressed card is asked about in its own popover, not in the composer
@@ -6785,6 +6809,15 @@ export function LogosApp({
         : null;
   /** Sent from the composer: files sent from Content with no question are sorted in; anything else is asked in the conversation. */
   function sendFromStudy() {
+    // WHAT TO MAKE, chosen before asking: what they typed, asked for as that artifact, and the choice is spent
+    const choice = makeChoice(makeId);
+    if (choice) {
+      const asked = askFor(choice, input, messages.length > 0);
+      if (!asked) return;
+      setMakeId(null);
+      sendFromComposer(asked);
+      return;
+    }
     const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, ...rest }) => rest);
     if (studyTab === 'content' && !input.trim() && ready.some((a) => a.kind === 'doc')) {
       setDrafts([]);
@@ -6909,8 +6942,17 @@ export function LogosApp({
         onClearAbout={clearAbout}
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
-        idlePlaceholder={focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?')}
-        footer={<ConcisePicker value={replyLength} onChange={pickLength} />}
+        idlePlaceholder={
+          makeChoice(makeId)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?'))
+        }
+        // a chosen artifact can be made from the conversation so far, with nothing typed
+        sendable={!!makeChoice(makeId) && messages.length > 0}
+        footer={
+          <>
+            <MakePicker value={makeId} onChange={pickMake} />
+            <ConcisePicker value={replyLength} onChange={pickLength} />
+          </>
+        }
       />
       {l5Meter}
     </div>
@@ -6997,6 +7039,9 @@ export function LogosApp({
   // but a document's (documents are Content), models and what they picture,
   // the plot, Live 3D scenes, practice.
   const writingShown = limits.draftSpace && !!activeId && (!isEmptyDoc(writeDoc) || !!writeStarted[activeId]);
+  // what is being worked on as itself (a matrix, a function); displays and 3D scenes are artifacts of their own
+  const worked = (map.objects?.objs ?? []).filter((o) => !isDisplayKind(o.kind) && o.kind !== 'scene' && o.kind !== 'study');
+  const workedHere = wsFacts.lenses.includes('work') && worked.length ? (worked.length === 1 ? (worked[0].name ? `Working on ${worked[0].name}` : 'What you are working on') : `${worked.length} things you are working on`) : null;
   const artifactItems: ArtifactItem[] = [
     // THE WRITING: the person's own document — one artifact among the rest, there once they
     // have started it (Start writing, Write in the menu, Add to notes) and never chosen for them
@@ -7014,6 +7059,10 @@ export function LogosApp({
     ...wsFacts.docs.map((d) => ({ key: `m:${d.id}`, kind: d.dynamic ? 'Simulation' : 'Model', title: d.title || 'Model', render: () => renderPanel(artPanelOf(`m:${d.id}`)!) })),
     ...(!wsFacts.docs.length && wsFacts.viz ? [{ key: 'v:viz', kind: wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture', title: map.viz?.title || (wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture'), render: () => renderPanel(artPanelOf('v:viz')!) }] : []),
     ...(wsFacts.lenses.includes('plot') ? [{ key: 'v:plot', kind: 'Plot', title: 'The functions, plotted', render: () => renderPanel(artPanelOf('v:plot')!) }] : []),
+    // the working, step by step, and the things being worked on (a matrix, a function): made from the
+    // ideas, so here rather than on the Logic Map, which keeps to the ideas themselves
+    ...(wsFacts.lenses.includes('solve') ? [{ key: 'v:solve', kind: 'Solution', title: 'The working, step by step', render: () => renderPanel(artPanelOf('v:solve')!) }] : []),
+    ...(workedHere ? [{ key: 'v:work', kind: 'Working', title: workedHere, render: () => renderPanel(artPanelOf('v:work')!) }] : []),
     ...wsFacts.scenes.map((s) => ({ key: `s:${s.id}`, kind: 'Live 3D', title: s.name, render: () => renderPanel(artPanelOf(`s:${s.id}`)!) })),
     ...displaysHere
       .filter((o) => o.kind !== 'document')
@@ -7054,7 +7103,22 @@ export function LogosApp({
   artShownRef.current = (artifactItems.find((i) => i.key === artKey) ?? artifactItems[artifactItems.length - 1])?.key ?? null;
   const artifactsView = (
     <>
-      <ArtifactsView items={artifactItems} selected={artKey} onSelect={showArtifact} narrow={narrow} onWrite={limits.draftSpace && !writingShown ? openWriting : undefined} />
+      <ArtifactsView
+        items={artifactItems}
+        selected={artKey}
+        onSelect={showArtifact}
+        narrow={narrow}
+        onWrite={limits.draftSpace && !writingShown ? openWriting : undefined}
+        // choose what to make, then say what it is about: in the conversation, beside (on a phone, as the view)
+        onMake={
+          togetherReadOnly
+            ? undefined
+            : (id) => {
+                pickMake(id);
+                setScreen((s) => chatVisible(s, narrowRef.current));
+              }
+        }
+      />
       {studyNote && studyTab === 'artifacts' && (
         <p className="l5s-note l5s-main-note" role="status">
           {studyNote}
@@ -7259,14 +7323,17 @@ export function LogosApp({
       {l5Dock}
     </section>
   );
-  // LOGIC MAP: the structure of the reasoning — the Thinking Map, and only it.
-  // What was made is in Artifacts; one more panel docks beside with Split View.
+  // LOGIC MAP: the person's own ideas, in whatever shape the thinking takes — a
+  // web, a hierarchy, a flow, a timeline, tensions, evidence, a comparison —
+  // and only that, whatever the subject. What was made from them (charts,
+  // plots, the worked solution, models) is in Artifacts; one more panel docks
+  // beside with Split View.
   const logicView = wsLayout ? (
     <div className="l5v-logic">
       {map.nodes.length === 0 && !mapping ? (
         <div className="l5v-empty">
           <h2>Nothing mapped yet.</h2>
-          <p>{userTurns ? 'The Logic Map draws the structure of your reasoning — its claims, what they rest on, where they pull against each other.' : 'Say what you are working through, and the structure of it can be drawn here.'}</p>
+          <p>{userTurns ? 'The Logic Map draws your ideas — how they connect, what rests on what, where they pull against each other — in whatever shape your thinking takes.' : 'Say what you are working through, and your ideas can be drawn here.'}</p>
           {userTurns > 0 && !togetherReadOnly && (
             <button type="button" className="l5v-btn is-primary" onClick={() => refreshMap()} disabled={busy}>
               Map this conversation

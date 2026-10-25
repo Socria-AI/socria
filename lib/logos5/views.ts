@@ -3,9 +3,12 @@
 //   ActiveViewportState = 'chat' | 'content' | 'artifacts' | 'logic_map'
 //
 // Chat is where a line of thinking opens. Content holds what was brought to
-// it (documents, notes, sources). Artifacts holds what was made in it (plots,
-// models, 3D, displays, practice, the writing). The Logic Map holds the
-// structure of the reasoning, and opens only when structure is asked for.
+// it (documents, notes, sources). Artifacts holds what was made in it (charts,
+// tables, plots, the worked solution, models, 3D, displays, practice, the
+// writing), and can be chosen before asking (lib/logos5/make.ts). The Logic
+// Map holds the person's own ideas, in the shapes their thinking takes,
+// whatever the subject (lib/logos-layout.ts ideaLenses), and opens only when
+// structure is asked for.
 // "Split View" docks one more panel beside whichever view is open.
 //
 // What decides a view is the runtime's reading of the turn (lib/runtime/

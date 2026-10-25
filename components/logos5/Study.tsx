@@ -34,6 +34,7 @@ import {
   type StudyState,
   type StudyTopic,
 } from '@/lib/logos5/study';
+import { MAKE_CHOICES } from '@/lib/logos5/make';
 import './study.css';
 
 /** a layout effect in the browser; on the server (which renders first) an ordinary one, so nothing warns */
@@ -843,6 +844,7 @@ export function ArtifactsView({
   onSelect,
   narrow,
   onWrite,
+  onMake,
 }: {
   items: ArtifactItem[];
   selected: string | null;
@@ -850,7 +852,27 @@ export function ArtifactsView({
   narrow: boolean;
   /** start the person's own writing — offered, never opened for them */
   onWrite?: () => void;
+  /** choose what to make before asking (lib/logos5/make.ts); the composer then asks what it is about */
+  onMake?: (id: string) => void;
 }) {
+  const [choosing, setChoosing] = useState(false);
+  const choices = onMake ? (
+    <div className="l5s-make" role="group" aria-label="Choose what to make">
+      {MAKE_CHOICES.map((c) => (
+        <button
+          key={c.id}
+          type="button"
+          className="l5s-make-opt"
+          onClick={() => {
+            setChoosing(false);
+            onMake(c.id);
+          }}
+        >
+          {c.label}
+        </button>
+      ))}
+    </div>
+  ) : null;
   if (!items.length)
     return (
       <div className="l5s-cempty is-arts">
@@ -858,6 +880,12 @@ export function ArtifactsView({
           {!narrow && <span className="l5s-eyebrow">Artifacts</span>}
           <h2>Nothing made yet.</h2>
           <p>Ask for a chart of your numbers, a plan, a comparison or a worksheet — or practise a topic from your files — and it is kept here, made from the conversation.</p>
+          {choices && (
+            <>
+              <p className="l5s-make-h">Or choose what to make, then say what it is about:</p>
+              {choices}
+            </>
+          )}
           {onWrite && (
             <button type="button" className="l5s-write-start" onClick={onWrite}>
               Start writing <span aria-hidden="true">→</span>
@@ -869,7 +897,7 @@ export function ArtifactsView({
   const cur = items.find((i) => i.key === selected) ?? items[items.length - 1];
   return (
     <div className="l5s-arts">
-      {(items.length > 1 || onWrite) && (
+      {(items.length > 1 || onWrite || onMake) && (
         <div className="l5s-arts-strip" role="tablist" aria-label="Artifacts">
           {items.map((it) => (
             <button key={it.key} type="button" role="tab" aria-selected={it.key === cur.key} className={`l5s-art-pill${it.key === cur.key ? ' is-on' : ''}`} onClick={() => onSelect(it.key)}>
@@ -882,8 +910,14 @@ export function ArtifactsView({
               <span className="l5s-art-t">+ Write</span>
             </button>
           )}
+          {onMake && (
+            <button type="button" className="l5s-art-pill is-add" aria-expanded={choosing} onClick={() => setChoosing((v) => !v)}>
+              <span className="l5s-art-t">+ Make</span>
+            </button>
+          )}
         </div>
       )}
+      {choosing && choices}
       <section className={`l5s-art${cur.bare ? ' is-bare' : ''}`} aria-label={cur.title}>
         {/* the person's writing has its own chrome, and needs no label over it */}
         {!cur.bare && <p className="l5s-art-eyebrow">{cur.eyebrow ?? `Artifact · ${cur.kind} · made from the conversation`}</p>}

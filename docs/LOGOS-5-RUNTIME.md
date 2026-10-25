@@ -1000,3 +1000,59 @@ held for one turn only (the replayed Core 4 state that remembered it was
 discarded by `allocate`); under MR it holds for the conversation, hard, until
 they take it back.
 
+
+## 15. The Logic Map is the ideas; Artifacts is what was made
+
+The owner's direction: the Logic Map is the map of the person's ideas,
+whatever the subject, in the different shapes their thinking can take; the
+graphs and everything else made are Artifacts; and what to make can be chosen
+before asking.
+
+**What was wrong.** The Logic Map was the Thinking Map with every lens it can
+draw. For quantitative work (`availableLenses`: a maths conversation, a scene,
+a built model) that meant the plot, the worked solution and the objects being
+worked on, and no web or hierarchy of the ideas at all. A conversation about a
+function opened the Logic Map on the function.
+
+**What changed.**
+
+- `lib/logos-layout.ts`: `IDEA_LENSES` (graph, structure, flow, timeline,
+  tensions, evidence, matrix: the same set the router already sends to the
+  Logic Map, `MAP_LENSES` in `orchestrate.ts`) and `MADE_LENSES` (plot, solve,
+  work). `ideaLenses(map)` is the shapes of this map's thinking plus the web
+  and the hierarchy whenever there are ideas on it; `ideaLead` opens on the
+  shape being built, else the comparison, else the web.
+- `components/ThinkingMap.tsx`: a `shapes` prop. `'ideas'` offers
+  `ideaLenses`; a made lens offers that lens alone (no tab bar). Unset, the
+  map is Logos 3's, unchanged.
+- `components/LogosApp.tsx`: the Logic Map panel, and the map docked beside
+  in Split View, draw `'ideas'`. Artifacts gains **Solution** (the working,
+  step by step) and **Working** (a matrix or function worked on as itself)
+  beside the existing **Plot**, each drawn on its own lens; displays and 3D
+  scenes stay artifacts of their own, so the Working item is offered only for
+  objects that are neither. A worked solution drawn by the map in the
+  background marks Artifacts new; it never takes the screen unasked.
+- **Choosing what to make** (`lib/logos5/make.ts`,
+  `components/logos5/MakePicker.tsx`): a **Make** control beside the length
+  dial in the composer, and **+ Make** / the empty Artifacts in the Artifacts
+  view. The choices are chart, comparison table, timeline, study plan,
+  checklist, flowchart, pros and cons, Venn diagram, plot, simulation and 3D
+  model. A choice is said in words ("Make a chart: rent 1200, food 400"), so
+  the same readers that answer a typed request answer it (`routeTurn`,
+  `readDisplayRequest`, the map pass): nothing new on the server, no extra
+  model call, and the conversation shows what was asked. With nothing typed
+  it is made from the conversation so far; it clears once sent. Shapes of the
+  thinking (mind map, argument map, decision tree) are not on the list; those
+  are the Logic Map's.
+
+**Tested.** `test/logic-map-ideas.test.mjs`: the two lens sets are disjoint;
+maths, essay, process and model maps offer only idea shapes, always with the
+web and the hierarchy, and open on one of them (a process as its flow, maths
+and models on the web); Logos 3's `availableLenses` still offers the solution
+and the plot; every Make choice, typed or not, routes as something to make
+and opens Artifacts, and each display choice is read as the kind it names.
+
+**Limits.** A maths conversation's web draws the same nodes the solution chain
+does (its steps among its ideas); the map pass is not asked to extract
+anything different. The home screen's composer (a new line of thinking) has no
+Make control yet; the conversation's composer does.

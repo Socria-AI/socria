@@ -938,6 +938,41 @@
   border-color: var(--lg-primary);
   box-shadow: 0 0 0 1px var(--lg-primary);
 }
+/* choose what to make (lib/logos5/make.ts): in the empty Artifacts, and under "+ Make" */
+.logos-root .l5 .l5s-make-h {
+  margin: 18px 0 8px;
+  font-size: 13.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .l5 .l5s-make {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  max-width: 640px;
+}
+.logos-root .l5 .l5s-cempty .l5s-make {
+  justify-content: flex-start;
+}
+.logos-root .l5 .l5s-make-opt {
+  min-height: 34px;
+  padding: 6px 14px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-paper-hi);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5s-make-opt:hover {
+  border-color: var(--lg-primary);
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5s-make-opt:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
+}
 .logos-root .l5 .l5s-art-k {
   font-size: 10.5px;
   letter-spacing: 0.06em;

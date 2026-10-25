@@ -218,6 +218,50 @@ export function reasoningLens(lenses: LensId[], building?: Building | null): Len
   return own[0];
 }
 
+// ── Logos 5: the Logic Map draws the ideas; Artifacts draws what was worked ──
+
+/**
+ * THE SHAPES OF SOMEONE'S THINKING. In Logos 5 the Logic Map is the map of the
+ * person's own ideas, whatever the subject: how they connect, what sits under
+ * what, the order they run in, what pulls against what, what rests on what,
+ * options against criteria. A maths conversation has ideas too, and they are
+ * drawn the same way. What was MADE from the ideas (the plot, the worked
+ * solution, the objects being worked on) is not a shape of the thinking; it is
+ * in Artifacts (MADE_LENSES), one artifact per lens.
+ */
+export const IDEA_LENSES: readonly LensId[] = ['graph', 'structure', 'flow', 'timeline', 'tensions', 'evidence', 'matrix'];
+/** The lenses Logos 5 shows in Artifacts rather than on the Logic Map. The Board is Logos 3's alone. */
+export const MADE_LENSES = ['plot', 'solve', 'work'] as const;
+export type MadeLens = (typeof MADE_LENSES)[number];
+export const isMadeLens = (l: unknown): l is MadeLens => (MADE_LENSES as readonly unknown[]).includes(l);
+
+/**
+ * The Logic Map's lenses: the shapes of the thinking this map has, and the web
+ * and the hierarchy of it whenever there is anything on it, whatever the
+ * subject. Quantitative work used to get neither (availableLenses), so a
+ * conversation about a function showed the function and never the ideas.
+ */
+export function ideaLenses(map: ThinkingMap): LensId[] {
+  const out = availableLenses(map, { workspace: true }).filter((l) => IDEA_LENSES.includes(l));
+  if (map.nodes.length && !out.includes('graph')) out.unshift('graph');
+  if (map.nodes.length > 1 && !out.includes('structure')) out.splice(out.indexOf('graph') + 1, 0, 'structure');
+  return out;
+}
+
+/**
+ * The shape the Logic Map opens on: the one what they are building takes (a
+ * process as a flow, a decision as its table), else the comparison they are
+ * making, else the web of how it connects. A model being built takes none of
+ * these (its lenses are made ones), so its ideas open as the web.
+ */
+export function ideaLead(lenses: LensId[], building?: Building | null): LensId | null {
+  if (!lenses.length) return null;
+  const shaped = lensFor(building, lenses) as LensId | null;
+  if (shaped) return shaped;
+  if (lenses.includes('matrix')) return 'matrix';
+  return lenses[0];
+}
+
 /**
  * Is this piece of work quantitative?
  *

@@ -366,6 +366,7 @@ export function LogosComposer({
   layout = 'inline',
   onStop,
   footer,
+  sendable,
   onCapture,
   idlePlaceholder,
 }: {
@@ -421,6 +422,8 @@ export function LogosComposer({
   waiting?: boolean;
   /** the host's controls in the tool row — the model and depth */
   footer?: ReactNode;
+  /** something is ready to send with no words typed (Logos 5: an artifact chosen, made from the conversation so far) */
+  sendable?: boolean;
   /** Quick Capture, offered under "+" beside attaching */
   onCapture?: () => void;
   /** what the empty box says when nothing else applies */
@@ -459,7 +462,7 @@ export function LogosComposer({
   const [hold, setHold] = useState<Hold>({ holding: false, away: false });
 
   const readying = drafts.some((d) => d.status === 'reading');
-  const canSend = (!!value.trim() || drafts.some((d) => d.status === 'ready')) && (!busy || !!group) && !readying;
+  const canSend = (!!value.trim() || drafts.some((d) => d.status === 'ready') || !!sendable) && (!busy || !!group) && !readying;
   // "@so…" being typed in a group: offer to finish it as @socria
   const [caret, setCaret] = useState(0);
   const [mentionOff, setMentionOff] = useState(-1);
