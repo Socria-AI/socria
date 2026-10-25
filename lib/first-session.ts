@@ -57,7 +57,6 @@ export const SCENARIO_STARTS: Record<string, string> = {
   writing: 'Arguing to abolish grading in first-year courses. Six reasons, no idea what order.',
   creating:
     'My protagonist is meant to be sympathetic. Every reader finds her cold. Do not rewrite her.',
-  core: 'I think I only want to do the PhD because I do not know what else to do.',
 };
 
 export interface Opening {

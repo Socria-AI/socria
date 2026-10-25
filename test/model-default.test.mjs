@@ -205,14 +205,12 @@ console.log('\n=== the retirement is data, and it has happened ===');
   // Core 2 carried a leaving date until 2 October, shown in the picker. Past
   // the date it is withdrawn: still able to answer a conversation that was on
   // it, offered to nobody, and nobody whose browser holds it is stranded.
-  const docs = readFile('app/docs/content/core-2.tsx');
   ok('Core 2 is withdrawn, with the reason beside the switch', typeof MODELS['core-2'].withdrawn === 'string' && /2 October/.test(MODELS['core-2'].withdrawn));
   // It was kept by name under "Other models" until the archive; nothing is kept there now.
   ok('  and not kept under Other models either', !OTHER_MODELS.includes('core-2') && !offeredModels().includes('core-2'));
-  ok('  which the picker would still list apart from the current models', /OTHER_MODELS\.includes\(id\)/.test(readFile('components/ModelPicker.tsx')) && /Other models/.test(readFile('components/ModelPicker.tsx')));
+  // The picker that listed "Other models" was deleted with the Core models.
   ok('nothing is leaving any more', Object.values(MODELS).filter((m) => m.leaving).length === 0);
-  ok('the model’s own page says it retired', /retired on 2 October/.test(docs));
-  ok('  and where the free tier went', /Core 3\.1/.test(docs));
+  // Core 2's docs page was removed with every Core page (/docs/core-2 redirects to Logos 5's).
 
   // The other half of the same change: Core 3.1 became what a signed-out
   // visitor opened on, so it could not require an account. Archived, it
@@ -299,15 +297,14 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
   // `Object.keys(SOCRIA_MODELS)` with no filter, so the model that had just
   // been held back was still one click away on the surface replacing it.
   // Since the archive no surface mounts a model menu — there is one model —
-  // but the picker is still a component, the rule is still `offeredModels`
-  // in the store, and these assert that nothing builds its own list again.
-  const picker = readFile('components/ModelPicker.tsx');
+  // and the picker was deleted with the Core models. The rule is still
+  // `offeredModels` in the store, and these assert that nothing builds its own
+  // list again.
   const chat = readFile('app/chat/page.tsx');
   const logos = readFile('components/LogosApp.tsx');
   const rollsOwn = (src) => /Object\.keys\(SOCRIA_MODELS\)/.test(src);
 
-  ok('the picker takes its list from the store', /offeredModels\(gates\)/.test(picker));
-  ok('  and does not build one of its own', !rollsOwn(picker));
+  ok('no component builds a model list of its own', !rollsOwn(chat) && !rollsOwn(logos));
   // "The Logos picker is the same picker" went with it: Logos 5 mounts no model menu since the archive.
   ok('Logos does not build a menu of its own', !rollsOwn(logos) && !/lg-model-btn/.test(logos));
   ok('offeredModels leaves out everything withdrawn, except what is kept under Other models',

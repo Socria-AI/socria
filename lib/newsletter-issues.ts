@@ -117,7 +117,7 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     preheader: 'Add your @mavs.uta.edu address before December 9 and a free month starts. No card needed.',
     paragraphs: [
       'If you are a student at UT Arlington, your first month of Socria One is free. Sign in, add your @mavs.uta.edu address under Account, and enter the code sent to it. Thirty days start then.',
-      'Socria One has no daily limit in Core or Logos, remembers 160 things about how you reason instead of 12, and reads documents up to 30 MB. No card is asked for and nothing renews. A free month can begin until the end of December 9, 2026, Central time.',
+      'Socria One has no daily message limit, remembers 160 things about how you reason instead of 12, and reads documents up to 30 MB. No card is asked for and nothing renews. A free month can begin until the end of December 9, 2026, Central time.',
     ],
     link: { label: 'See the student offer', path: '/students' },
   },
@@ -143,7 +143,6 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     paragraphs: [
       'When a reply does calculus, algebra or arithmetic, Socria now works it out rather than recalling it: derivatives, integrals, limits, the solutions of an equation, unit conversions. If a step does not match what was computed, the reply is corrected, and says so.',
       'It also holds its ground. Ask "isn’t that positive?" or "my textbook says otherwise" and it re-derives the step instead of agreeing with whoever spoke last. If you caught a real mistake, it says so plainly. If you did not, it shows you where the step goes.',
-      'This works the same in the Core chat and in Logos.',
     ],
     link: { label: 'Try it in Socria', path: '/chat' },
   },
@@ -155,7 +154,7 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     subject: 'Think it through together',
     preheader: 'Share a line of thinking. Everyone can write in it, and Socria answers when asked.',
     paragraphs: [
-      'Press Share in a line of thinking, in Logos or in a Core chat, to bring in the people you are working it out with: by email, by link, or with an invite code. Each person can read it, comment on it, or think in it with you, and everyone sees the same conversation and the same map.',
+      'Press Share in a line of thinking to bring in the people you are working it out with: by email, by link, or with an invite code. Each person can read it, comment on it, or think in it with you, and everyone sees the same conversation and the same map.',
       'Socria is in the conversation too, and answers when someone asks it: type @socria, or reply to one of its messages. The rest of the time it stays out of the way, and nothing anyone writes, Socria included, disappears.',
     ],
     link: { label: 'Open Logos', path: '/chat?model=logos-3' },
@@ -261,7 +260,7 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     subject: 'What Socria remembers, and how your thinking changed',
     preheader: 'Your Memory page shows what Socria keeps, and lets you confirm, reject or forget it.',
     paragraphs: [
-      'Socria remembers a few things about how you reason and carries them between conversations. Your Memory page shows all of it: what is remembered, your Core and Logos chats around it grouped by project, and the models and plots that belong to them.',
+      'Socria remembers a few things about how you reason and carries them between conversations. Your Memory page shows all of it: what is remembered, your conversations around it grouped by project, and the models and plots that belong to them.',
       'Under "How your thinking has changed" you can confirm, reject or forget what Socria thinks has changed, and contradictions are shown rather than quietly resolved. Off the record keeps nothing, and nothing from a shared chat is remembered.',
     ],
     link: { label: 'Open your Memory', path: '/memory' },

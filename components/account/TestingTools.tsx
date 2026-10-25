@@ -94,12 +94,6 @@ export function TestingTools({ onClose }: { onClose: () => void }) {
           onClick={() => void run('new', () => replayPart('new'), () => window.location.assign('/chat'))}
         />
         <Item
-          id="core"
-          t="Replay Core’s first line"
-          d="Shows again under the next reply in the chat"
-          onClick={() => void run('core', () => replayPart('core'), () => window.location.assign('/chat'))}
-        />
-        <Item
           id="found"
           t="Replay the notes found along the way"
           d="Dependencies, Changed, Computed, Views, Evidence — each once again"

@@ -120,8 +120,8 @@ export function Logos2() {
           that&rdquo; — the model changes, not a picture of it.
         </li>
         <li>
-          <strong>No depth modes.</strong> Unlike Core 3.1 there is no depth to
-          set. Logos 2 answers at one depth and puts the effort into the model.
+          <strong>No depth modes.</strong> There is no depth to set. Logos 2
+          answers at one depth and puts the effort into the model.
         </li>
       </ul>
 
@@ -397,7 +397,7 @@ export function Logos2() {
       <H2 id="access">Access and plans</H2>
       <p>
         Logos 2 needs an account. Pick it from the model menu beside the chat
-        box; leaving it returns you to whichever Core model you were on. The{' '}
+        box. The{' '}
         <em>Try Logos 3.5</em> invitation beside the chat opens{' '}
         <Link href="/docs/logos-3">Logos 3.5</Link>, which is everything here
         with a second seat, thinking depth and the everyday displays.

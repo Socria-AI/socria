@@ -8,7 +8,7 @@ export const metadata: Metadata = pageMetadata({
   title: 'Socria Docs — how the whole thing works',
   absolute: true,
   description:
-    'The Socria documentation: every model (Core and Logos), every feature of the reasoning environment, and Socria One.',
+    'The Socria documentation: Logos 5, every feature of the reasoning environment, Socria One, and the models before it.',
 });
 
 export default function DocsIndex() {

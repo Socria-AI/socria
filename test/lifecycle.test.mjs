@@ -151,8 +151,13 @@ console.log('\n=== the copy: what each says, and what none may say ===');
   // and a new member now had all three the day before they paid.
   ok('welcome opens with the volume', /as many lines of thinking as you have/.test(all['welcome-one'].text));
   ok('welcome promises the continuity', /carries what it learns about how you reason/.test(all['welcome-one'].text));
-  ok('...on both surfaces', /into Core and into Logos/.test(all['welcome-one'].text));
+  // removed: "...on both surfaces" (/into Core and into Logos/) — Core was archived; Logos 5 is the one surface
+  ok('welcome says what is not counted', /there is no daily count/.test(all['welcome-one'].text));
   ok('welcome reassures', /Nothing you have already made changes/.test(all['welcome-one'].text));
+  // No email names Core: the Core models and the Core chat were archived (docs/ARCHIVE.md).
+  for (const k of LIFECYCLE_KINDS) {
+    ok(`${k} never says Core`, !/\bCore\b/.test(all[k].subject) && !/\bCore\b/.test(all[k].text) && !/\bCore\b/.test(all[k].html));
+  }
 
   // And it must not sell back anything the free tier already holds.
   for (const claim of [/every lens/i, /all four depth/i, /Draft Space/i, /keeps? developing past/i]) {

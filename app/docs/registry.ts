@@ -37,7 +37,7 @@ export interface DocPage {
   archived?: Archived;
 }
 
-/** The day Logos 5 became the only Socria, and Core and the Logos before it were archived. */
+/** The day Logos 5 became the only Socria, and the models still offered beside it were archived. */
 export const ARCHIVE_DATE = '24 October 2026';
 
 export const DOC_GROUPS = [
@@ -70,7 +70,7 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'models',
     title: 'One model',
-    blurb: 'Why Socria is one model now, the one setting it has, and where the Core and Logos models before it went.',
+    blurb: 'Why Socria is one model now, the one setting it has, and where the models before it went.',
     group: 'Logos 5',
   },
   {
@@ -130,29 +130,8 @@ export const DOC_PAGES: DocPage[] = [
   {
     slug: 'history',
     title: 'The history of Socria',
-    blurb: 'Every Core and every Logos, from Core 2 to Logos 5 — what each one was, what it added, and why the next one changed it.',
+    blurb: 'Every Logos, from the first to Logos 5 — what each one was, what it added, and why the next one changed it.',
     group: 'Earlier Socria',
-  },
-  {
-    slug: 'core-2',
-    title: 'Socria Core 2',
-    blurb: 'Calm, restrained Socratic questioning. Retired on 2 October 2026; Core 3.1 took its place.',
-    group: 'Earlier Socria',
-    archived: { what: 'Core 2', on: 'on 2 October 2026', replacedBy: 'Core 3.1, and Core 3.1 to Logos 5 on 24 October 2026' },
-  },
-  {
-    slug: 'core-3',
-    title: 'Socria Core 3.1',
-    blurb: 'The conversation that remembered, synthesized, and followed your thinking across sessions. Archived on 24 October 2026.',
-    group: 'Earlier Socria',
-    archived: { what: 'Core 3.1', on: `on ${ARCHIVE_DATE}`, replacedBy: 'Logos 5' },
-  },
-  {
-    slug: 'core-4',
-    title: 'Socria Core 4',
-    blurb: 'Decided, each turn, which part of the work was yours — and contributed everything else. Its allocator now runs inside Logos 5.',
-    group: 'Earlier Socria',
-    archived: { what: 'Core 4', on: `on ${ARCHIVE_DATE}`, replacedBy: 'Logos 5, which carries its allocator' },
   },
   {
     slug: 'logos',

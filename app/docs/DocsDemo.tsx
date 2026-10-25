@@ -16,9 +16,6 @@ import { MathViz } from '@/components/MathViz';
 import { sanitizeViz, type VizScene } from '@/lib/logos-viz';
 import { COUNTER_SCOPE, PLANS, TIERED_COUNTERS, megabytes, type Counter } from '@/lib/entitlements';
 import { SOCRIA_ONE } from '@/lib/socria-one';
-import { ModelPicker } from '@/components/ModelPicker';
-import { SynthesisCard } from '@/components/SynthesisCard';
-import { ChoiceChips } from '@/components/ChoiceChips';
 import type { ThinkingMap } from '@/lib/logos';
 import { ThinkingMap as ThinkingMapView } from '@/components/ThinkingMap';
 import { ModelView } from '@/components/model/ModelView';
@@ -29,9 +26,6 @@ import { LiveFigure } from '@/components/logos3/LiveExample';
 import type { ShowcaseItem } from '@/lib/logos3-showcase';
 import { ENGINEERING } from '@/lib/model/engineering';
 import { DYNAMICS } from '@/lib/model/dynamics-examples';
-import type { SocriaModel } from '@/lib/socria-prompt';
-import type { SynthesisData } from '@/lib/synthesis';
-import { SOCRIA_MODELS } from '@/lib/socria-prompt';
 
 /** The same framed figure the imported Logos demos use. */
 export function DocsFrame({
@@ -42,7 +36,7 @@ export function DocsFrame({
 }: {
   label: string;
   height?: number;
-  /** chat-side components style themselves; skip the Logos surface wrapper */
+  /** a note that is not a Logos surface (the engine declining to build); skip the Logos surface wrapper */
   bare?: boolean;
   children: React.ReactNode;
 }) {
@@ -170,9 +164,9 @@ export function DemoAdAs() {
 // anyone having to remember to come here and edit it.
 
 /** How each counter is described to a reader, and what its period is. */
-// The Core counters are not listed: Core is archived (docs/history), so
-// there is no Core chat to begin and no Core message to send. The table
-// lists what a person can meet in Logos 5.
+// The table lists what a person can meet in Logos 5. The archived chat's two
+// daily counters (`core-chats`, `core-messages`; docs/ARCHIVE.md) have no
+// chat left to begin and no message left to send, so they are not rows.
 const COUNTER_LABEL: Partial<Record<Counter, string>> = {
   chats: 'Lines of thinking begun',
   messages: 'Messages',
@@ -510,79 +504,6 @@ export function DemoCollege() {
         </div>
       </DocsFrame>
     </div>
-  );
-}
-
-/* ── the model picker, as it sits beside the chat box ─────────────── */
-export function DemoModelPicker() {
-  const [model, setModel] = useState<SocriaModel>('core-3');
-  return (
-    <DocsFrame label="The model switcher — open it, pick one" bare>
-      <div className="d-pickerdemo">
-        <ModelPicker value={model} onChange={setModel} isSignedIn />
-        <p className="d-pickernote">
-          {SOCRIA_MODELS[model].logosSurface
-            ? `In the app this swaps the whole surface into ${SOCRIA_MODELS[model].short}, in place.`
-            : `Selected: ${SOCRIA_MODELS[model].label}.`}
-        </p>
-      </div>
-    </DocsFrame>
-  );
-}
-
-/* ── Core 3.1's synthesis card, with the demo conversation's content ── */
-const SYNTHESIS: SynthesisData = {
-  title: 'Choosing Growth Over Familiarity',
-  sections: [
-    {
-      label: 'Recurring themes',
-      items: ['The raise keeps standing in for progress', 'Learning matters more to you than title'],
-    },
-    {
-      label: 'Tensions',
-      items: ['Security pulls against growth', 'Wanting the offer vs. wanting what it proves'],
-    },
-    {
-      label: 'Hidden assumptions',
-      items: ['More money means the work got better', 'Staying means standing still'],
-    },
-    {
-      label: 'Possible reframes',
-      items: ['Judge the role by its first three months of new problems'],
-    },
-  ],
-};
-
-export function DemoSynthesis() {
-  return (
-    <DocsFrame label="A synthesis card — tap the section tabs" bare>
-      <div className="d-carddemo">
-        <SynthesisCard data={SYNTHESIS} />
-      </div>
-    </DocsFrame>
-  );
-}
-
-/* ── choice chips under a Core 3.1 question ───────────────────────── */
-const CHIPS = [
-  'Honestly, I don’t know what it would teach me',
-  'New domain — but the same skills, and that worries me',
-  'It teaches me to manage, which I may not want',
-  'Maybe I’m asking the wrong question entirely',
-];
-
-export function DemoChips() {
-  const [picked, setPicked] = useState<string | null>(null);
-  return (
-    <DocsFrame label="Choice chips — every option in your own first person" bare>
-      <div className="d-carddemo">
-        <p className="d-chipq">What would the new role teach you?</p>
-        <ChoiceChips choices={CHIPS} onPick={setPicked} />
-        <p className="d-pickernote" aria-live="polite">
-          {picked ? <>Sent as: &ldquo;{picked}&rdquo;</> : 'In the app, picking one sends it as your reply.'}
-        </p>
-      </div>
-    </DocsFrame>
   );
 }
 

@@ -80,6 +80,10 @@ console.log('\n=== the committed issues ===');
     const p = issueProblems(i);
     ok(`issue ${i.id} has no problems`, p.length === 0, p.join('; '));
     ok(`issue ${i.id} renders`, !!newsletterCopy(i, { base: BASE, unsubscribeUrl: `${BASE}/u`, postalAddress: POSTAL }));
+    // The Core models and the Core chat were archived (docs/ARCHIVE.md): an
+    // issue describes only what a subscriber can use today.
+    const words = [i.subject, i.preheader ?? '', ...i.paragraphs, i.link?.label ?? ''].join(' ');
+    ok(`issue ${i.id} never says Core`, !/\bCore\b/.test(words), words.match(/.{0,60}\bCore\b.{0,60}/)?.[0]);
   }
   ok('findIssue by id', findIssue(NEWSLETTER_ISSUES, ids[0]) === NEWSLETTER_ISSUES[0]);
   ok('findIssue: unknown', findIssue(NEWSLETTER_ISSUES, 'no-such-issue') === null);

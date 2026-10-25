@@ -64,7 +64,7 @@ const FIXED: Record<string, OgCard> = {
   one: {
     kicker: 'Socria One',
     title: 'Everything Socria does, without the ceiling.',
-    line: `No daily count, in Core or in Logos — ${priceWithPeriod()}.`,
+    line: `No daily count, and lines of thinking as you need them — ${priceWithPeriod()}.`,
   },
   charter: {
     kicker: 'Socria',
@@ -95,11 +95,6 @@ const FIXED: Record<string, OgCard> = {
     kicker: 'Socria Logos 2',
     title: 'A workspace you arrange.',
     line: 'A Thinking Map, a transcript and a working surface.',
-  },
-  core4model: {
-    kicker: 'Socria Core 4',
-    title: 'One turn, as a model you can turn.',
-    line: 'The stages a reply falls through, and the guard that sends a draft back.',
   },
   privacy: { kicker: 'Socria', title: 'Privacy.', line: 'What Socria collects, why, and how to get it back or deleted.' },
   terms: { kicker: 'Socria', title: 'Terms.', line: 'The agreement for using Socria.' },

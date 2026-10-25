@@ -70,11 +70,13 @@ console.log('\n=== the registry drives the menu, not a model id ===');
   ok('only Core 4 carries it', comm.length === 1 && comm[0].id === 'core-4', comm.map((m) => m.id).join(','));
 }
 
-console.log('\n=== the picker, as two dials ===');
+console.log('\n=== the dial ===');
 {
-  const src = read('components/ModelPicker.tsx');
-  ok('both tables reach a dial',
-    /options=\{READABILITY_OPTIONS\}/.test(src) && /options=\{LENGTH_OPTIONS\}/.test(src));
+  // The Core model picker held two dials, readability and length; it was deleted with the Core models.
+  // The dial itself is Logos 5's one setting now: how much Socria says (components/logos5/ConcisePicker.tsx).
+  const src = read('components/Dial.tsx');
+  const concise = read('components/logos5/ConcisePicker.tsx');
+  ok('the length reaches a dial', /<Dial name="How much it says" options=\{CONCISENESS\}/.test(concise) && /from '\.\.\/Dial'/.test(concise));
   // A real range input, so drag, click, arrow keys, Home and End all work
   // without any of them being written here — the version of this control that
   // is three styled buttons gets at least one of those wrong.
@@ -84,18 +86,11 @@ console.log('\n=== the picker, as two dials ===');
   ok('the stop labels are hidden from the accessibility tree', /className="mp-stops" aria-hidden="true"/.test(src));
   ok('  and unreachable by tab, since the slider already is', /tabIndex=\{-1\}/.test(src));
   ok('the sentence follows the position', /\{now\.description\}/.test(src));
-  ok('gated on the registry flag', /current\.supportsCommunication/.test(src));
+  // "gated on the registry flag", "both settings are required together" and the sheet's note went with the picker.
   // A component that names a model is a component that has to be edited when
   // the next one arrives.
-  ok('no model id is special-cased', !/'core-4'/.test(src));
-  // Both halves or neither: a sheet offering one of two settings reads as a
-  // half-built control.
-  ok('both settings are required together',
-    /!!readability && !!onReadability && !!length && !!onLength/.test(src));
-  ok('the sheet does not close on a dial move',
-    !/onPick\([^)]*\);?\s*\n?\s*setOpen\(false\)/.test(src));
-  ok('the note says these are about expression, not effort',
-    /how the answer is written — never how hard it is\s*\n?\s*thought about/.test(src));
+  ok('no model id is special-cased', !/'core-4'/.test(src) && !/'core-4'/.test(concise));
+  ok('the sheet does not close on a dial move', !/onPick\([^)]*\);?\s*\n?\s*setOpen\(false\)/.test(src));
 }
 
 console.log('\n=== Logos 5 stores the length and sends it ===');

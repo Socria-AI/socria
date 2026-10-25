@@ -76,7 +76,7 @@ const ROWS = [
     name: 'Serper / Tavily',
     role: 'Web search, when a source is looked up',
     gets:
-      'The search phrase only — never your conversation. Two things can send one: Logos, when it looks something up for a node, and Core 4, when your message asks it to check something or turns on how the world is right now. Core 4 shows you the exact phrase before it answers, builds it from that one message and nothing else, and strips your email, phone, handle, long number runs and any name you introduced yourself by. A sensitive message, or one you have put off the record, is never searched at all.',
+      'The search phrase only — never your conversation. Logos sends one when it looks something up for a card on your map (Explore and Research), and when your message asks it to look something up, asks a fact about a particular person, company or product, or turns on how the world is right now. For a message, it builds the phrase from that message — or, when all the message asks is for a lookup, from the one before it — and strips your email, phone, handle, long number runs, any name you introduced yourself by and the name you asked Socria to call you. A sensitive message, or one you have put off the record, is never searched at all. Where neither Serper nor Tavily is set up, OpenAI’s web search runs the search instead and receives the same phrase, and nothing else.',
     where: 'United States',
     site: 'https://serper.dev/privacy-policy',
   },
@@ -108,7 +108,7 @@ export default function SubprocessorsPage() {
         The companies that process data on Socria&rsquo;s behalf. Each sees one
         slice, and only what it needs to do its job.
       </p>
-      <p className="lg-dates">Last updated September 2026</p>
+      <p className="lg-dates">Last updated October 2026</p>
 
       <h2 id="list">Who processes what</h2>
       <div className="lg-tablewrap">

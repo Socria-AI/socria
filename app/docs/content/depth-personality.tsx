@@ -4,8 +4,8 @@
 // and what it does), lib/conversation-style.ts and lib/logos-style.ts.
 //
 // The slug is still depth-personality, so links to it keep working; Thinking
-// Depth itself belonged to Core 3.1 and the Logos before 5, and is said here
-// only as what the length setting replaced.
+// Depth itself belonged to the models before Logos 5, and is said here only as
+// what the length setting replaced.
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def, TableWrap } from '../Article';
@@ -62,10 +62,11 @@ export function DepthPersonality() {
       </p>
       <p>
         It replaced Thinking Depth — Quick, Balanced, Deep and Abstract — which
-        Core 3.1 and the Logos before 5 had. Depth tried to set how far the
-        thinking went; in Logos 5 that is decided by what the turn needs, the
-        way <Link href="/docs/core-4">Core 4</Link> decided it, and what is
-        left for you to choose is how much you want to read.
+        the models before Logos 5 had. Depth tried to set how far the thinking
+        went; in Logos 5 that is decided by what each turn needs, read in code
+        from what you have said (see{' '}
+        <Link href="/docs/logos-5#yours">which part of the work is yours</Link>),
+        and what is left for you to choose is how much you want to read.
       </p>
 
       <H2 id="style">Conversation Style</H2>

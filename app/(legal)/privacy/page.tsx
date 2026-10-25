@@ -165,7 +165,7 @@ export default function PrivacyPage() {
             <tr>
               <td><strong>Serper / Tavily</strong></td>
               <td>Web search</td>
-              <td>The search phrase only, when Research or Core 4 looks something up</td>
+              <td>The search phrase only, when Logos looks something up</td>
             </tr>
             <tr>
               <td><strong>Resend, Inc.</strong></td>
@@ -176,16 +176,22 @@ export default function PrivacyPage() {
         </table>
       </div>
       <p>
-        When Research or Core 4 looks something up, a search provider receives{' '}
+        When Logos looks something up, a search provider receives{' '}
         <strong>the search phrase and nothing else</strong> &mdash; your
-        conversation is never sent to it. Core 4 does this when your message
-        asks it to, when you paste a link and ask about it, or when the answer
-        turns on how the world is right now; it shows you the exact phrase
-        above its reply, builds that phrase from that one message and nothing
-        else, and strips your email address, phone number, handle, long digit
-        runs and any name you introduced yourself by. A message you have put
-        off the record, or one about something sensitive, is never searched at
-        all. A rate-limiting service receives a
+        conversation is never sent to it. Logos does this for a card on your
+        map when you choose Explore or Research, and for a message that asks
+        it to look something up, asks a fact about a particular person,
+        company or product, or turns on how the world is right now. For a
+        message, it builds the phrase from that message &mdash; or, when all
+        the message asks is for a lookup, from the one before it &mdash; and
+        strips your email address, phone number, handle, long digit runs, any
+        name you introduced yourself by and the name you asked Socria to call
+        you. If you paste a link and ask about it, Logos reads that page
+        itself, and no search provider is involved. A message you have put off
+        the record, or one about something sensitive, is never searched at
+        all. Where neither Serper nor Tavily is set up, OpenAI&rsquo;s web
+        search runs the search instead, and receives the same phrase and
+        nothing else. A rate-limiting service receives a
         counter keyed to your account id, or your IP when you are signed out,
         and no content at all. If you connect Google or Notion yourself, your
         searches and the documents you choose reach those services too; both are

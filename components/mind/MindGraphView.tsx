@@ -1018,7 +1018,7 @@ export function MindGraphView() {
         {head('Nothing yet.')}
         <div className="empty">
           <p>
-            Talk to Core 4 and what it understands will appear here — every claim, where it came from, and how sure it
+            Think something through in Logos and what it understands will appear here — every claim, where it came from, and how sure it
             is. <em>Nothing is stored before then.</em>
           </p>
           <p>If it is not on this page, Socria does not know it.</p>

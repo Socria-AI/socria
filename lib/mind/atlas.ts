@@ -337,7 +337,7 @@ export function buildAtlas(input: AtlasInput): Atlas {
       kind: 'chat',
       type: 'Chat',
       label: clipLabel(c.title) || 'Untitled',
-      sub: c.kind === 'logos' ? 'Logos' : 'Core',
+      sub: c.kind === 'logos' ? 'Logos' : 'Chat',
       chats: [c.id],
       surface: c.kind === 'logos' ? 'logos' : 'core',
       projectId: c.projectId ?? null,

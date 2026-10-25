@@ -1,5 +1,7 @@
 // Accounts, storage, sync, deletion. Checkable against middleware.ts,
-// supabase/schema.sql, app/api/conversations/route.ts, lib/logos-sessions.ts.
+// supabase/schema.sql, app/api/conversations/route.ts, lib/logos-sessions.ts,
+// lib/guest-pass.ts (a guest's one line of thinking) and components/LogosApp.tsx
+// (what a signed-out browser holds is saved to the account on sign-in).
 
 import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
@@ -19,25 +21,20 @@ export function AccountsData() {
     <Article page={page} sections={sections}>
       <H2 id="signedout">Signed out</H2>
       <p>
-        You can use Socria without an account: Core 3.1 gives every anonymous
-        visitor one full session, kept in that browser. (Core 2 held that job
-        until its retirement on 2 October; the free tier moved up rather than
-        out.) Logos, Logos 2 and Core 4 ask you to sign in — an access code
-        opens them without an account, in which case your lines of thinking
-        are kept locally and the rail says so plainly: <em>&ldquo;Kept in this
-        browser.&rdquo;</em>
+        You can use Socria without an account. Signed out, Logos 5 gives you
+        one line of thinking and its map, kept in that browser; starting a
+        second asks you to sign up — free — and the one you have comes with
+        you. An access key opens Logos 5 without an account as well, and what
+        you think through with it is kept in that browser too.
       </p>
 
       <H2 id="signedin">Signed in</H2>
       <p>
         Accounts are handled by Clerk. On your first sign-in from a browser
-        that already holds local chat conversations, they are migrated up to
-        your account — once — and from then on everything syncs:{' '}
-        <em>&ldquo;Synced to your account.&rdquo;</em> Conversations, maps,
-        drafts and grounded material follow you across devices. One caveat:
-        Logos sessions created while key-unlocked and signed out stay in the
-        browser that made them — signing in starts cloud sessions but does
-        not lift the local ones up.
+        that holds conversations kept while signed out, they are saved to your
+        account — once — and are then no longer kept in the browser; from then
+        on everything syncs. Conversations, maps, drafts and grounded material
+        follow you across devices.
       </p>
 
       <H2 id="where">What lives where</H2>
@@ -51,10 +48,9 @@ export function AccountsData() {
           the billing projection Stripe writes.
         </Def>
         <Def term="Your browser (local)">
-          Interface state and preferences: which model and depth you were
-          on, Logos&rsquo;s personality dials and custom instructions, which
-          solutions you chose to reveal, a copy of your
-          Conversation Style so a visit does not wait for it, and — when
+          Interface state and preferences: the reply length you chose, your
+          custom instructions, which solutions you chose to reveal, a copy of
+          your Conversation Style so a visit does not wait for it, and — when
           signed out — the conversations themselves.
         </Def>
       </Defs>
@@ -73,11 +69,9 @@ export function AccountsData() {
 
       <H2 id="onelist">One list of sessions</H2>
       <p>
-        Chat conversations and Logos lines of thinking live in one store and
-        one sidebar, interleaved by when you last touched each — the Logos
-        glyph on a row tells you which surface opens it. Opening a Logos
-        session switches the model to Logos; leaving Logos returns you to
-        whichever Core model you came from.
+        Every conversation lives in one store and on one map. The Universal
+        Map holds every line of thinking — the conversations from the earlier
+        models among them — and each one opens in Logos 5.
       </p>
 
       <H2 id="deletion">Deletion</H2>

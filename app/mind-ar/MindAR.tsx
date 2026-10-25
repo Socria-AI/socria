@@ -126,7 +126,7 @@ export function MindAR() {
           m === 'signed-out'
             ? 'Sign in on this deployment to walk through your own.'
             : m === 'empty'
-              ? 'Nothing is remembered yet — talk to Core 4 and come back.'
+              ? 'Nothing is remembered yet — think something through in Logos and come back.'
               : 'Memory is not reachable here just now.'
         );
         adopt(SAMPLE_GRAPH.nodes, SAMPLE_GRAPH.edges);

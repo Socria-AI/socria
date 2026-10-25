@@ -108,6 +108,13 @@ console.log('\n=== the sign-up page, as each place sees it ===');
   for (const c of ['DE', 'FR', 'IE', 'GB', 'CA', 'CH', 'NO']) ok(`from ${c}: unticked`, box(page(c)) === false);
   ok('no header (a local run): unticked', box(page(null)) === false);
   ok('a header that is not a country: unticked', box(page('XX')) === false);
+  // What the page says a free account is: Logos 5, the one surface. The Core
+  // models it used to name were archived (docs/ARCHIVE.md).
+  ok('the page names Logos 5', us.includes('Logos 5: the conversation, and the map of your own reasoning drawn beside it.'));
+  globalThis.__headers = {};
+  const invited = renderToStaticMarkup(h(T.SignUpPage, { searchParams: { invited: '1' } }));
+  ok('…and so does the invitation', /days of Socria One/.test(invited) && invited.includes('Logos 5: the conversation'));
+  ok('…and neither version names Core', !/\bCore\b/.test(us) && !/\bCore\b/.test(invited));
 }
 
 console.log('\n=== the form on its own ===');

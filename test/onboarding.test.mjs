@@ -86,7 +86,8 @@ console.log('\n=== replaying onboarding, for testing ===');
   const tools = read('components/account/TestingTools.tsx');
   ok('Manage Account has a Testing section', /<TestingTools onClose=\{onClose\} \/>/.test(sheet) && /<span className="lbl">Testing<\/span>/.test(tools));
   ok('  which renders nothing on production', /if \(isProduction\(\)\) return null;/.test(tools));
-  ok('  with the replay, the parts, and the layout resets — no Logos-only ones', /href="\/onboarding\?replay=1"/.test(tools) && /replayPart\('core'\)/.test(tools) && /replayPart\('found'\)/.test(tools) && /CANVAS_PREFIX/.test(tools) && !/replayPart\('logos'\)|to=logos/.test(tools));
+  // "Replay Core's first line" went with the Core chat (there is no Core chat to show it under).
+  ok('  with the replay, the parts, and the layout resets — no Logos-only ones', /href="\/onboarding\?replay=1"/.test(tools) && /replayPart\('new'\)/.test(tools) && /replayPart\('found'\)/.test(tools) && /CANVAS_PREFIX/.test(tools) && !/replayPart\('logos'\)|to=logos/.test(tools) && !/replayPart\('core'\)/.test(tools));
   ok('  and it touches no conversations, maps or memory', !/conversations|\/api\/memory|socria\.logos\.sessions/.test(tools.replace(/never your conversations, maps, models or memory|Nothing here reaches anybody's\s*\/\/ conversations, maps, models or memory\./g, '')));
 }
 

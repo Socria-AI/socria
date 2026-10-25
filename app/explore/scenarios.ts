@@ -21,17 +21,14 @@ export type Turn = { role: 'user' | 'assistant'; content: string };
 export interface Scenario {
   id: string;
   /** the filter it sits under */
-  kind: 'Research' | 'Learning' | 'Deciding' | 'Writing' | 'Creating' | 'Conversation';
-  /** which model this shows */
-  model: 'logos' | 'core';
+  kind: 'Research' | 'Learning' | 'Deciding' | 'Writing' | 'Creating';
   title: string;
   /** who arrives with this, in one line */
   who: string;
   /** what the map is doing that a summary would not */
   point: string;
   turns: Turn[];
-  /** absent for the Core scenario, which has no map by design */
-  map?: ThinkingMap;
+  map: ThinkingMap;
   /** the caption under the framed UI */
   caption: string;
   /** how the map reads at a glance, for the panel header */
@@ -43,7 +40,6 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'research',
     kind: 'Research',
-    model: 'logos',
     title: 'Reason across papers, not summaries of them',
     who: 'A literature review where two studies disagree and you need to know why.',
     point:
@@ -95,7 +91,6 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'learning',
     kind: 'Learning',
-    model: 'logos',
     title: 'Move the variable and watch what the concept does',
     who: 'A student who can compute a derivative and cannot say what one is.',
     point:
@@ -164,7 +159,6 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'deciding',
     kind: 'Deciding',
-    model: 'logos',
     title: 'See what the decision is actually resting on',
     who: 'Anyone circling the same choice for the third week running.',
     point:
@@ -210,7 +204,6 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'writing',
     kind: 'Writing',
-    model: 'logos',
     title: 'Turn scattered thoughts into an argument that holds',
     who: 'An essay, a pitch, a paper — anything that has to survive a reader who disagrees.',
     point:
@@ -256,7 +249,6 @@ export const SCENARIOS: Scenario[] = [
   {
     id: 'creating',
     kind: 'Creating',
-    model: 'logos',
     title: 'Develop the idea without handing it over',
     who: 'A novel, a screenplay, a game — work where having it written for you defeats the point.',
     point:
@@ -296,36 +288,7 @@ export const SCENARIOS: Scenario[] = [
       ],
     },
   },
-
-  /* ── Core 3.1 ─────────────────────────────────────────────────────────── */
-  {
-    id: 'core',
-    kind: 'Conversation',
-    model: 'core',
-    title: 'Or just think out loud, with something that pushes back',
-    who: 'When you want the conversation and not the apparatus.',
-    point:
-      'Core 3.1 is the same posture without the map: it will not hand you the conclusion, and it will tell you when your reason is not the reason. No panel, no nodes — the thinking stays in the sentences.',
-    caption: 'Socria Core 3.1 — conversation, no map',
-    turns: [
-      {
-        role: 'user',
-        content: 'I think I only want to do the PhD because I do not know what else to do.',
-      },
-      {
-        role: 'assistant',
-        content:
-          'A real reason, and not automatically a bad one — plenty of good work starts as a way of buying time. What would have to be true in three years for you to be glad you did?',
-      },
-      { role: 'user', content: 'I suppose that I still find the questions interesting.' },
-      {
-        role: 'assistant',
-        content:
-          'Which questions? You said "the questions" rather than naming one — and you named three specific ones about the job you are avoiding.',
-      },
-    ],
-  },
 ];
 
-export const KINDS = ['All', 'Research', 'Learning', 'Deciding', 'Writing', 'Creating', 'Conversation'] as const;
+export const KINDS = ['All', 'Research', 'Learning', 'Deciding', 'Writing', 'Creating'] as const;
 export type Kind = (typeof KINDS)[number];

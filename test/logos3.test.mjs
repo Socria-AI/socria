@@ -96,7 +96,7 @@ console.log('\n=== the surface ===');
   ok('a shared room is never saved to one account', /if \(roomRef\.current\?\.active \|\| sharedIdsRef\.current\.has\(s\.id\)\) return(?: null)?;/.test(app));
   ok('the private understanding pass never reads one', /!sharedIdsRef\.current\.has\(sid\)/.test(app));
   ok('Socria is told the names only when others are here — a room, or a shared line of thinking', /const people = inShared\s*\? roomRef\.current\.people/.test(app) && /\.\.\.\(people\.length >= 2 \? \{ collab: \{ people \} \} : \{\}\)/.test(app));
-  ok('the picker calls it what it is', /m\.collab \? 'think together' : 'a different surface'/.test(read('components/ModelPicker.tsx')));
+  // "The picker calls it what it is" went with the model picker, deleted with the Core models.
 }
 
 console.log('\n=== Socria, between two people (the real chat route) ===');

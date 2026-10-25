@@ -29,12 +29,6 @@ export interface TourStep {
  * runs right after onboarding has sent their first thought — when they are
  * looking at Socria's first answer and the controls finally mean something.
  */
-export const CORE_TOUR: TourStep[] = [
-  { anchor: 'composer', place: 'above', title: 'Write here', body: 'Say what you are working through. <em>Socria asks back.</em>' },
-  { anchor: 'model', place: 'above', title: 'Pick how it thinks', body: 'Core 4 talks it through. <em>Logos draws it as a map.</em>' },
-  { anchor: 'sessions', place: 'right', title: 'It is all saved', body: 'Every conversation stays here, <em>in full.</em>' },
-];
-
 export const LOGOS_TOUR: TourStep[] = [
   { anchor: 'map', place: 'left', title: 'This is your map', body: 'What you say is drawn here <em>as you talk.</em>' },
   { anchor: 'card', place: 'below', title: 'Tap any card', body: 'Explore it, challenge it, <em>or ask about it.</em>' },
@@ -55,8 +49,8 @@ export const LOGOS3_TOUR: TourStep[] = [
   { anchor: 'make', place: 'above', title: 'Make something', body: 'Pick what to make, <em>then say what it is about.</em>' },
 ];
 
-/** The chat's tour — what "Take the tour again" replays. */
-export const TOUR_STEPS: TourStep[] = CORE_TOUR;
+/** The tour Logos 5 runs (its workspace is always on) — what "Take the tour again" replays. */
+export const TOUR_STEPS: TourStep[] = LOGOS3_TOUR;
 
 export const TOUR_KEY = 'socria.tour.v1';
 export const LOGOS_TOUR_KEY = 'socria.tour.logos.v1';

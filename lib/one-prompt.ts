@@ -142,9 +142,9 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
   {
     title: 'Pick it back up',
     body:
-      'The free plan holds four new chats a day in Core and two lines of thinking ' +
-      'a month in Logos. Socria One holds as many as you have, and carries what ' +
-      'it learns about how you reason from each one into the next.',
+      'The free plan holds two new lines of thinking a month and ten messages ' +
+      'a day. Socria One holds as many as you have, and carries what it learns ' +
+      'about how you reason from each one into the next.',
   },
   {
     title: 'What stays between conversations',

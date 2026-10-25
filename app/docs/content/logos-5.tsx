@@ -2,8 +2,8 @@
 // docs/LOGOS-5-RUNTIME.md (what happens on a turn, at the level this page
 // says it), lib/logos5/views.ts (the four views and Split View),
 // lib/inline-ui.ts (the six interactive elements), lib/runtime/replay.ts
-// (Core 4's allocator over the conversation) and lib/entitlements.ts (every
-// count on this page).
+// (the allocator, run over the whole conversation), lib/guest-pass.ts (what a
+// guest gets) and lib/entitlements.ts (every count on this page).
 //
 // PUBLIC LEVEL ONLY. What a person can see and rely on — never the model
 // behind a call, a threshold, a prompt, or how anything is kept safe. The
@@ -46,9 +46,9 @@ export function Logos5() {
       </p>
       <p>
         It is not new machinery so much as the earlier models put together. The conversation is the one
-        Logos has always had; the decision about which part of the work is yours is{' '}
-        <Link href="/docs/core-4">Core 4</Link>&rsquo;s, running inside it; the map, the models, the 3D
-        designs, the everyday displays and the documents are the ones{' '}
+        Logos has always had, with a decision made in code on every turn about which part of the work is
+        yours (<a href="#yours">below</a>); the map, the models, the 3D designs, the everyday displays and
+        the documents are the ones{' '}
         <Link href="/docs/logos-2">Logos 2</Link>, <Link href="/docs/logos-3">Logos 3</Link> and{' '}
         <Link href="/docs/logos-3-5">Logos 3.5</Link> built. <Link href="/docs/history">The history</Link>{' '}
         says which came from where. Every conversation you had with any of them opens here.
@@ -133,9 +133,8 @@ export function Logos5() {
 
       <H2 id="yours">Which part of the work is yours</H2>
       <p>
-        This is <Link href="/docs/core-4">Core 4</Link>&rsquo;s decision, carried whole into Logos 5, and it
-        is made over the whole conversation rather than the latest message — so something you said twenty
-        messages ago still holds.
+        This is decided in code, from what you have said, and over the whole conversation rather than the
+        latest message — so something you said twenty messages ago still holds.
       </p>
       <ul>
         <li>
@@ -254,12 +253,14 @@ export function Logos5() {
 
       <H2 id="plans">Plans and access</H2>
       <p>
-        Logos 5 needs a free account; signed out, you are asked to make one. On the free plan it holds{' '}
-        {FREE.counters.chats} new lines of thinking a calendar month and {FREE.counters.messages} messages a
-        day; going back to a line of thinking you have begun costs only its messages, and reaching either
-        count leaves everything you started open. <Link href="/docs/socria-one">Socria One</Link> has no
-        daily count. A line of thinking or a Project can be shared by invitation, by link or by code; on the
-        free plan, one chat at a time.
+        Signed out, Logos 5 is open to you as a guest: one line of thinking and its map, with no account.
+        Starting a second asks you to sign up, which is free, and the one you have comes with you. On the
+        free plan it holds {FREE.counters.chats} new lines of thinking a calendar month and{' '}
+        {FREE.counters.messages} messages a day; going back to a line of thinking you have begun costs only
+        its messages, and reaching either count leaves everything you started open.{' '}
+        <Link href="/docs/socria-one">Socria One</Link> has no daily limit on messages, and holds lines of
+        thinking only by a fair-use ceiling. A line of thinking or a Project can be shared by invitation, by
+        link or by code; on the free plan, one chat at a time.
       </p>
 
       <H2 id="limits">What it does not do</H2>

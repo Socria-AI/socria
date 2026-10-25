@@ -78,20 +78,44 @@ console.log('\n=== it recommends what the product actually ships ===');
     const recommended = new RegExp(`<b>${label}</b>`, 'i').test(ALL.map((i) => i.a.join(' ')).join(' '));
     ok(`  ${id} is withdrawn and is not recommended in bold`, !recommended);
   }
-  ok('Core 4 is named, since it is what the rest of the site introduces', /core 4/i.test(PROSE));
+  // removed: "Core 4 is named, since it is what the rest of the site introduces" — Core was archived; Logos 5 is what the site introduces now
+  ok('Logos 5 is named, the one surface there is', /logos 5/.test(PROSE));
+  ok('no answer names Core', !/\bcore\b/.test(PROSE), PROSE.match(/.{0,60}\bcore\b.{0,60}/g)?.join(' || ') ?? '');
   // THE FREE TIER, IN THE PLAN TABLE'S OWN NUMBERS. Read from lib/entitlements
   // rather than typed here, so a change to the table fails this line until the
   // answer catches up — the page once promised "two Core 4 conversations a
   // calendar month" and "a map pauses at four branches" long after both had
   // stopped being true.
   const f = PLANS.free.counters;
+  // removed: the Core half of this check ("4 new chats and 20 messages a day") — the Core chat was archived and its counters are internal now
   ok('the free tier is stated rather than left to be discovered',
-    PROSE.includes(`${f['core-chats']} new chats and ${f['core-messages']} messages a day`) &&
-      PROSE.includes(`${f.chats} new lines of thinking a calendar month and ${f.messages} messages a day`),
+    PROSE.includes(`${f.chats} new lines of thinking a calendar month and ${f.messages} messages a day`),
     PROSE.match(/.{0,60}messages a day.{0,20}/g)?.join(' || ') ?? 'no daily limit is stated');
+  ok('  and the archived counters are not advertised',
+    !PROSE.includes(`${f['core-chats']} new chats`) && !PROSE.includes(`${f['core-messages']} messages a day`),
+    PROSE.match(/.{0,60}(new chats|messages a day).{0,20}/g)?.join(' || ') ?? '');
   ok('  and no limit that has gone is still promised',
     !/four branches|core 4 conversations a calendar month|handful of sessions|core 3\.1 is open either way/i.test(PROSE),
     PROSE.match(/.{0,40}(four branches|conversations a calendar month|handful of sessions|open either way).{0,40}/g)?.join(' || ') ?? '');
+  // SOCRIA ONE, IN THE SAME TABLE'S NUMBERS: no daily message count, and the
+  // memory carried between conversations against the free plan's.
+  const one = TOPICS.find((t) => t.id === 'one').qs[0];
+  ok('One has no daily count on messages, and the answer says so',
+    PLANS.one.counters.messages === null && /no daily count on messages/.test(plainText(one)), plainText(one));
+  ok('  and its memory is the table’s',
+    plainText(one).includes(`${PLANS.one.memoryEntries} things, against ${PLANS.free.memoryEntries}`), plainText(one));
+  // SIGNED OUT: one line of thinking and its map; another needs a free account,
+  // and the one they have comes with them (docs/ARCHIVE.md, lib/guest-pass.ts).
+  const signedOut = plainText(TOPICS.find((t) => t.id === 'start').qs.find((q) => /account to use it/.test(q.q)));
+  ok('signed out is one line of thinking and its map', /one line of thinking and its map/.test(signedOut), signedOut);
+  ok('  and another starts with a free account that brings it along', /sign up free/.test(signedOut) && /comes with you/.test(signedOut), signedOut);
+  // THE STATUS CARD lists what exists. It is markup in the page, not data, so
+  // it is read from the page itself.
+  const page = readFileSync('app/support/SupportPage.tsx', 'utf8');
+  const status = page.slice(page.indexOf('<div className="sp-status">'), page.indexOf('<div className="sp-card">', page.indexOf('<div className="sp-status">')));
+  const rows = [...status.matchAll(/<span className="dt[^"]*" \/>\s*([^<]+?)\s*<span className="st/g)].map((m) => m[1].trim());
+  ok('the status card lists Logos 5 and the account around it', rows.join(' | ') === 'Logos 5 | Sign-in and billing', rows.join(' | '));
+  ok('  and no Core, and no surface that was archived', !/\bCore\b|Logos [1-4]\b/.test(status), rows.join(' | '));
 }
 
 console.log('\n=== every link goes somewhere this app serves ===');

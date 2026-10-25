@@ -14,6 +14,7 @@
 // chain-typed node to the derivative map would silently move it off the
 // picture the caption is describing. These assertions pin the pairing.
 
+import { readFileSync } from 'node:fs';
 import { SCENARIOS, KINDS } from './.tmp/scenarios.mjs';
 import { NODE_TYPES, RELATIONS, THINKING_CONTEXTS } from './.tmp/logos.mjs';
 import { availableLenses, leadLens } from './.tmp/logos-layout.mjs';
@@ -24,7 +25,9 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 console.log('=== every map is a map the product can actually draw ===');
 for (const s of SCENARIOS) {
   const m = s.map;
-  if (!m) { ok(`${s.id} is the map-less one by design`, s.model === 'core'); continue; }
+  // removed: "the map-less one by design" (s.model === 'core') — the Core scenario was taken off the page with the Core models; every exhibit has a map now
+  ok(`${s.id} has a map`, !!m);
+  if (!m) continue;
 
   ok(`${s.id} has a known context`, THINKING_CONTEXTS.includes(m.context), m.context);
   ok(`${s.id} has nodes`, m.nodes.length > 0);
@@ -87,9 +90,25 @@ console.log('\n=== the page holds together ===');
   ok('every filter except All matches something',
     KINDS.filter((k) => k !== 'All').every((k) => SCENARIOS.some((s) => s.kind === k)),
     KINDS.filter((k) => k !== 'All' && !SCENARIOS.some((s) => s.kind === k)).join(','));
-  ok('Logos leads and Core is present',
-    SCENARIOS.filter((s) => s.model === 'logos').length >= 4 &&
-    SCENARIOS.some((s) => s.model === 'core'));
+  // removed: "Logos leads and Core is present" — the Core scenario went with the Core models (docs/ARCHIVE.md)
+  ok('no scenario names Core, and none is left without a map',
+    SCENARIOS.every((s) => !/\bCore\b/.test(JSON.stringify(s)) && !('model' in s) && !!s.map),
+    SCENARIOS.filter((s) => /\bCore\b/.test(JSON.stringify(s))).map((s) => s.id).join(','));
+  ok('no filter is left for the scenario that went', !KINDS.includes('Conversation'), KINDS.join(','));
+  ok('there are still enough to be worth a filter', SCENARIOS.length >= 4, String(SCENARIOS.length));
+
+  // The page around them: no Core in what it says, and the count it gives is
+  // the count it shows — it said "Six things" for as long as the sixth was Core.
+  const strip = (src) => src.replace(/\{\/\*[\s\S]*?\*\/\}/g, '').replace(/\/\*[\s\S]*?\*\//g, '').replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1');
+  const page = readFileSync('app/explore/page.tsx', 'utf8');
+  const showcase = readFileSync('app/explore/ExploreShowcase.tsx', 'utf8');
+  for (const [f, src] of [['page', page], ['showcase', showcase]]) {
+    const said = strip(src).split('\n').filter((l) => /\bCore\b/.test(l));
+    ok(`the ${f} names no Core`, said.length === 0, said.join(' | '));
+  }
+  const WORD = ['No', 'One', 'Two', 'Three', 'Four', 'Five', 'Six', 'Seven', 'Eight', 'Nine', 'Ten'];
+  ok('the heading counts what the page shows', page.includes(`${WORD[SCENARIOS.length]} things people actually bring here.`), String(SCENARIOS.length));
+  ok('  and so does the description', page.includes(`'${WORD[SCENARIOS.length]} things people bring to Socria`));
 
   for (const s of SCENARIOS) {
     ok(`${s.id} has both halves of an exchange`,

@@ -87,7 +87,7 @@ export const STYLE_META: Record<ConversationStyle, StyleMeta> = {
   thinker: {
     id: 'thinker',
     label: 'The Thinker',
-    line: 'Measured and Socratic in Core, curious and inventive in Logos — Socria as it is.',
+    line: 'Curious and inventive, and it asks back — Socria as it is.',
     sample: {
       core: 'The people telling you it was the best thing they did are the ones it worked for — the others stop mentioning it. What would your own numbers have to show for you to believe it?',
       logos: 'That is a sample of survivors. Put your own numbers in — savings, a day rate, how long a first client takes — and see where the plan bends.',

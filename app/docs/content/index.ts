@@ -9,9 +9,6 @@ import { Logos5 } from './logos-5';
 import { History } from './history';
 import { UseCases } from './use-cases';
 import { Models } from './models';
-import { Core2 } from './core-2';
-import { Core3 } from './core-3';
-import { Core4 } from './core-4';
 import { Logos } from './logos';
 import { Logos2 } from './logos-2';
 import { Logos3 } from './logos-3';
@@ -32,9 +29,6 @@ export const CONTENT: Record<string, ComponentType> = {
   history: History,
   'use-cases': UseCases,
   models: Models,
-  'core-2': Core2,
-  'core-3': Core3,
-  'core-4': Core4,
   logos: Logos,
   'logos-2': Logos2,
   'logos-3': Logos3,

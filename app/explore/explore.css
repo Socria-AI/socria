@@ -123,7 +123,6 @@
   text-transform: uppercase;
   color: var(--d-moss-deep);
 }
-.exp-kind.is-core { color: var(--d-ink-45); }
 .exp-kind-sep { opacity: 0.5; }
 .exp-case-title {
   margin: 12px 0 0;
@@ -161,20 +160,6 @@
   transition: border-color 0.2s;
 }
 .exp-case-go:hover { border-color: var(--d-moss-deep); }
-
-/* Core 3.1 has no panel: the conversation takes the whole frame, which is
-   the point being made rather than an empty half. (The single column itself
-   is set inline — see ExploreShowcase — because the app's own .lg-split rule
-   sets two.) A full-width thread would run to 850px of line, so
-   the readable column is centred inside it. */
-.exp-root .exp-nopanel .lg-thread,
-.exp-root .exp-nopanel .lg-composer-box { max-width: 640px; margin-inline: auto; }
-.exp-root .exp-nopanel .lg-msg-stack { max-width: 92%; }
-.exp-corename {
-  font-family: var(--d-serif);
-  font-size: 1.15rem;
-  color: var(--d-ink);
-}
 
 /* ── the end ──────────────────────────────────────────────────────────── */
 .exp-end {

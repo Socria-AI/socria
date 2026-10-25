@@ -61,57 +61,56 @@ function Figure({ id, title, desc, viewBox, caption, children }: { id: string; t
   );
 }
 
-/** Every model, in order: two lines that met in Logos 5. Not to scale. */
+/** Every Logos, in order, each leading to the next, to Logos 5. Not to scale. */
 export function HistoryTimeline() {
   const id = 'dg-history';
-  const core = 70;
-  const logos = 205;
+  const mid = 84;
+  /** x, width, name, what it added */
+  const earlier: [number, number, string, string][] = [
+    [20, 96, 'Logos', 'the live map'],
+    [136, 96, 'Logos 2', 'models'],
+    [252, 106, 'Logos 3', 'solved, in 3D'],
+    [378, 100, 'Logos 3.5', 'displays'],
+    [498, 106, 'Logos 4', 'everyday tools'],
+  ];
+  const now = { x: 624, w: 116 };
   return (
     <Figure
       id={id}
-      viewBox="0 0 760 300"
-      title="Socria's models, from Core 2 to Logos 5"
-      desc="Two lines. The Core line: Core 2, retired on 2 October 2026 into Core 3.1, and Core 4 beside it. The Logos line: Logos, Logos 2, Logos 3, Logos 3.5 on 11 October and Logos 4 on 19 October. The Core conversations moved into Logos 5 on 21 October, and on 24 October 2026 Logos 5 became the only Socria."
+      viewBox="0 0 760 180"
+      title="Socria's models, from the first Logos to Logos 5"
+      desc="One line, each model leading to the next: Logos, Logos 2, Logos 3, Logos 3.5 on 11 October and Logos 4 on 19 October 2026, then Logos 5, which has been the only Socria since 24 October 2026."
       caption={
         <>
-          Two lines that met. The Core models were conversations; the Logos models were an environment
-          around one. Their conversations all open in Logos 5, which has been the only Socria since
-          24 October 2026. Ordered, not drawn to scale.
+          Each Logos led to the next. Every conversation from them opens in Logos 5, which has been the
+          only Socria since 24 October 2026. Ordered, not drawn to scale.
         </>
       }
     >
-      <text x={20} y={22} className="dg-t is-small">CORE — a conversation</text>
-      <text x={20} y={157} className="dg-t is-small">LOGOS — an environment around one</text>
+      <text x={20} y={30} className="dg-t is-small">LOGOS — a conversation, and an environment around it</text>
 
-      <Box x={20} y={core - 22} w={110} h={44} lines={['Core 2', 'questions only']} tone="past" />
-      <Box x={170} y={core - 22} w={120} h={44} lines={['Core 3 · 3.1', 'memory, syntheses']} tone="past" />
-      <Box x={330} y={core - 22} w={120} h={44} lines={['Core 4', 'whose work is it?']} tone="past" />
-      <path d={`M130,${core} L166,${core}`} className="dg-line" markerEnd={`url(#${id}-a)`} />
-      <text x={148} y={core - 28} textAnchor="middle" className="dg-t is-small">2 Oct</text>
-
-      {/* the Core conversations, gathered and carried across */}
-      <path d={`M230,${core + 22} L230,112 L560,112`} className="dg-line is-soft" />
-      <path d={`M390,${core + 22} L390,112`} className="dg-line is-soft" />
-      <path d="M560,112 C590,112 596,126 606,128" className="dg-line is-accent" markerEnd={`url(#${id}-g)`} />
-      <text x={470} y={106} textAnchor="middle" className="dg-t is-small">Core chats open in Logos 5 · 21 Oct</text>
-
-      <Box x={20} y={logos - 22} w={88} h={44} lines={['Logos', 'the live map']} tone="past" />
-      <Box x={122} y={logos - 22} w={86} h={44} lines={['Logos 2', 'models']} tone="past" />
-      <Box x={222} y={logos - 22} w={96} h={44} lines={['Logos 3', 'solved, in 3D']} tone="past" />
-      <Box x={332} y={logos - 22} w={92} h={44} lines={['Logos 3.5', 'displays']} tone="past" />
-      <Box x={438} y={logos - 22} w={104} h={44} lines={['Logos 4', 'everyday tools']} tone="past" />
-      {[108, 208, 318, 424].map((x, i) => (
-        <path key={i} d={`M${x},${logos} L${x + 12},${logos}`} className="dg-line" markerEnd={`url(#${id}-a)`} />
+      {earlier.map(([x, w, name, what]) => (
+        <Box key={name} x={x} y={mid - 22} w={w} h={44} lines={[name, what]} tone="past" />
       ))}
-      <path d={`M542,${logos} C580,${logos} 588,160 606,152`} className="dg-line is-accent" markerEnd={`url(#${id}-g)`} />
+      {earlier.map(([x, w], i) => {
+        const last = i === earlier.length - 1;
+        const to = last ? now.x : earlier[i + 1][0];
+        return (
+          <path
+            key={i}
+            d={`M${x + w},${mid} L${to - 2},${mid}`}
+            className={last ? 'dg-line is-accent' : 'dg-line'}
+            markerEnd={`url(#${id}-${last ? 'g' : 'a'})`}
+          />
+        );
+      })}
+      <Box x={now.x} y={mid - 29} w={now.w} h={58} lines={['Logos 5', 'the only Socria', 'since 24 Oct 2026']} tone="now" />
 
-      <Box x={610} y={108} w={130} h={58} lines={['Logos 5', 'the only Socria', 'since 24 Oct 2026']} tone="now" />
-
-      <path d="M20,262 L740,262" className="dg-line is-soft" />
-      <text x={20} y={282} className="dg-t is-small">before October 2026</text>
-      <text x={378} y={282} textAnchor="middle" className="dg-t is-small">11 Oct</text>
-      <text x={490} y={282} textAnchor="middle" className="dg-t is-small">19 Oct</text>
-      <text x={675} y={282} textAnchor="middle" className="dg-t is-accent">24 Oct</text>
+      <path d="M20,140 L740,140" className="dg-line is-soft" />
+      <text x={20} y={160} className="dg-t is-small">before October 2026</text>
+      <text x={428} y={160} textAnchor="middle" className="dg-t is-small">11 Oct</text>
+      <text x={551} y={160} textAnchor="middle" className="dg-t is-small">19 Oct</text>
+      <text x={682} y={160} textAnchor="middle" className="dg-t is-accent">24 Oct</text>
     </Figure>
   );
 }
@@ -120,45 +119,37 @@ export function HistoryTimeline() {
 export function CarriedIntoLogos5() {
   const id = 'dg-carried';
   const left: [string, string, number][] = [
-    ['Core 3.1', 'remembered the thread', 20],
-    ['Core 4', 'whose work is it?', 62],
-    ['Logos', 'the live map', 128],
-    ['Logos 2', 'models you own', 170],
-    ['Logos 3', 'solved, in 3D', 212],
-    ['Logos 3.5', 'displays, documents', 270],
-    ['Logos 4', 'everyday tools', 338],
+    ['Logos', 'the live map', 20],
+    ['Logos 2', 'models you own', 62],
+    ['Logos 3', 'solved, in 3D', 104],
+    ['Logos 3.5', 'displays, documents', 172],
+    ['Logos 4', 'everyday tools', 248],
   ];
   const right: [string, number][] = [
-    ['Synthesize', 20],
-    ['Who does which part', 54],
-    ['Answers checked, not recalled', 88],
-    ['The Logic Map', 128],
-    ['Models you move and undo', 170],
-    ['Studio: designs in 3D', 212],
-    ['Charts, plans, comparisons', 246],
-    ['Documents read and cited', 280],
-    ['Memory you can correct', 314],
-    ['Point & Ask, push to talk', 348],
+    ['The Logic Map', 20],
+    ['Models you move and undo', 62],
+    ['Studio: designs in 3D', 104],
+    ['Charts, plans, comparisons', 138],
+    ['Documents read and cited', 172],
+    ['Memory you can correct', 206],
+    ['Point & Ask, push to talk', 248],
   ];
   const links: [number, number][] = [
     [0, 0],
     [1, 1],
-    [1, 2],
-    [2, 3],
+    [2, 2],
+    [3, 3],
     [3, 4],
-    [4, 5],
-    [5, 6],
-    [5, 7],
-    [5, 8],
-    [6, 9],
+    [3, 5],
+    [4, 6],
   ];
   const H = 28;
   return (
     <Figure
       id={id}
-      viewBox="0 0 760 390"
+      viewBox="0 0 760 292"
       title="What each earlier model carried into Logos 5"
-      desc="Core 3.1 gave Logos 5 Synthesize. Core 4 gave it the decision about who does which part of the work, and answers that are checked rather than recalled. The original Logos gave it the Logic Map. Logos 2 gave models you move and undo. Logos 3 gave designs drawn in 3D. Logos 3.5 gave the everyday displays, documents read and cited, and a memory you can correct. Logos 4 gave Point & Ask and voice."
+      desc="The original Logos gave Logos 5 the Logic Map. Logos 2 gave it models you move and undo. Logos 3 gave designs drawn in 3D. Logos 3.5 gave the everyday displays, documents read and cited, and a memory you can correct. Logos 4 gave Point & Ask and voice."
       caption={<>Nothing in Logos 5 started from nothing. Each part on the right came from a model on the left, and most of them were rebuilt on the way.</>}
     >
       <text x={20} y={12} className="dg-t is-small">EARLIER</text>

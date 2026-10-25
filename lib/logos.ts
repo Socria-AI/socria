@@ -1299,7 +1299,7 @@ ${grammarGuide()}
 SEMANTIC TYPE AND STRUCTURAL ROLE ARE DIFFERENT, AND A NODE HAS BOTH.
 - "type" is what the thing IS: an action, a value, a concept, a constraint.
 - "role" is what it DOES in what they are building: a step, a branch, an option, a criterion — or a DETAIL of one of those (constraint, value, risk, question, goal, note).
-- "Sign up" is an action; in a process its role is step. "Easy access" is a value; in a process it is a detail that bears on the steps it constrains. "User chooses Core or Logos" contains two concepts; its role is branch.
+- "Sign up" is an action; in a process its role is step. "Easy access" is a value; in a process it is a detail that bears on the steps it constrains. "User chooses email or phone" contains two concepts; its role is branch.
 - THE SHAPE COMES FIRST. The nodes that make up the shape (its spine) are what the map is drawn from. Everything else hangs from the part it bears on: an "applies_to" edge FROM the detail TO each spine node it concerns. A constraint that affects three steps applies to three steps. Do not leave details floating as peers of the steps.
 - A DESCRIPTION OF THE SHAPE IS NOT A NODE. "The steps involved", "the user experience", "the information to be provided" are what the person is ABOUT to lay out — draw the steps, not a node called "steps involved".
 - ORDERED SHAPES (process, plan, timeline): put the spine in order with "precedes" edges from earlier to later. Where the path divides, the dividing node gets role "branch" and one "precedes" edge to each path, with the condition on the edge's "when" ("enters through Logos", "has no account"). A path can rejoin, and it can loop back.

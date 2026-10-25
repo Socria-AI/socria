@@ -721,7 +721,7 @@ export function ViewMenu({
     <div className="l5h-vm" ref={ref} role="dialog" aria-label="How the map is shown">
       <section>
         <h4>Show</h4>
-        {hasChats && <Check label="Core chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />}
+        {hasChats && <Check label="Earlier chats" on={arr.display.chats} onFlip={() => onDisplay({ chats: !arr.display.chats })} />}
         {!inTime && <Check label="Ideas they share" on={arr.display.ideas} onFlip={() => onDisplay({ ideas: !arr.display.ideas })} />}
         {!inTime && (
           <>

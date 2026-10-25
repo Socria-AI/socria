@@ -51,21 +51,21 @@ export function Overview() {
       </p>
       <DemoSplit />
       <p>
-        Inside it is what the earlier models built, put together:{' '}
-        <Link href="/docs/core-4">Core 4</Link>&rsquo;s decision about whose
-        work is whose; the map from the original{' '}
-        <Link href="/docs/logos">Logos</Link>; the models{' '}
+        Inside it is what the earlier models built, put together: the map
+        from the original <Link href="/docs/logos">Logos</Link>; the models{' '}
         <Link href="/docs/logos-2">Logos 2</Link> let you move and undo;
         designs in 3D, everyday displays and documents read and cited from{' '}
         <Link href="/docs/logos-3">Logos 3</Link> and{' '}
-        <Link href="/docs/logos-3-5">3.5</Link>; and a word processor for your
-        own writing. The Core models and Logos 2 were archived on{' '}
-        {ARCHIVE_DATE}; every conversation you had with them opens in Logos 5,
-        and <Link href="/docs/history">the history</Link> tells how each one
-        led to the next.
+        <Link href="/docs/logos-3-5">3.5</Link>. With them come a decision,
+        made in code on every turn, about which part of the work is yours, and
+        a word processor for your own writing. Since {ARCHIVE_DATE} it is the
+        only model; every conversation you had with an earlier one opens in
+        Logos 5, and <Link href="/docs/history">the history</Link> tells how
+        each one led to the next.
       </p>
       <p>
-        Logos 5 is free to start with an account, and it is the centerpiece of{' '}
+        Logos 5 is free to start — signed out, a guest gets one line of
+        thinking and its map with no account — and it is the centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
         {priceWithPeriod()} plan. Its free tier is not a trial but Logos 5
         itself, counted — {PLANS.free.counters.chats} lines of thinking a
@@ -104,8 +104,8 @@ export function Overview() {
         </li>
         <li>
           <strong>Nothing held hostage.</strong> Reaching a free limit — the
-          day&rsquo;s chats or messages, or the month&rsquo;s lines of thinking
-          — pauses only what is new; it never hides, deletes, or locks what you
+          day&rsquo;s messages, or the month&rsquo;s lines of thinking — pauses
+          only what is new; it never hides, deletes, or locks what you
           have already thought. Your existing maps stay visible and
           interactive, the conversations you have begun stay open, and the
           day&rsquo;s allowance comes back tomorrow.

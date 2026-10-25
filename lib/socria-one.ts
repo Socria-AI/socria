@@ -1,7 +1,7 @@
 // lib/socria-one.ts
 //
 // Socria One — the subscription that opens the complete reasoning
-// environment. Logos is the premium product; Core stays available on its own.
+// environment. Logos 5 is the one surface (docs/ARCHIVE.md).
 //
 // The shape of the free tier matters more than its size. INSIDE a line of
 // thinking it is not a trial at all — it is the product, at full strength:
@@ -108,7 +108,7 @@ export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = 
   {
     id: 'conversations',
     title: 'No daily count',
-    blurb: 'as many chats and messages as your thinking takes, in Core and in Logos.',
+    blurb: 'as many messages as your thinking takes, and lines of thinking held only by a fair-use ceiling.',
   },
   {
     id: 'history',

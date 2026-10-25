@@ -221,7 +221,7 @@ export function MindAtlas({
                         <li key={c}>
                           <button onClick={() => open(c)} disabled={c === focusChat}>
                             <span className="t">{chatTitle(c)}</span>
-                            <span className="s">{c === focusChat ? 'this one' : surfaceOf(c) === 'core' ? 'Core' : 'Logos'}</span>
+                            <span className="s">{c === focusChat ? 'this one' : surfaceOf(c) === 'core' ? 'Chat' : 'Logos'}</span>
                           </button>
                         </li>
                       ))}
@@ -254,7 +254,7 @@ export function MindAtlas({
                         <button onClick={() => open(r.id)}>
                           <span className="t">{r.label}</span>
                           <span className="s">
-                            {r.surface === 'core' ? 'Core' : 'Logos'}
+                            {r.surface === 'core' ? 'Chat' : 'Logos'}
                             {r.sameProject ? ' · same Project' : ''}
                           </span>
                           {r.shared.length > 0 && (

@@ -53,10 +53,15 @@ console.log('\n=== it runs on its own prompt ===');
   const p4 = P('core-4');
   const p3 = P('core-3');
   const p2 = P('core-2');
-  ok('it is Core 4 that answers', p4.startsWith('You are Socria Core 4'), p4.slice(0, 60));
-  ok('not Core 3.1', !p4.includes('You are Socria Core 3.1'));
+  // Each prompt introduces Socria as Socria — never by a Core model's name, since the Core models were archived —
+  // so they are told apart by their own first lines.
+  const FOUR = 'You are Socria, a Human-First AI designed to strengthen human thinking rather than replace it.';
+  const THREE = 'You are Socria, a Human-First AI designed to strengthen human thinking without replacing it.';
+  ok('it is Core 4 that answers', p4.startsWith(FOUR), p4.slice(0, 60));
+  ok('not Core 3.1', !p4.includes(THREE));
   ok('not Core 2', p4 !== p2);
-  ok('and Core 3.1 is untouched', p3.startsWith('You are Socria Core 3.1'));
+  ok('and Core 3.1 is untouched', p3.startsWith(THREE));
+  ok('no prompt introduces itself by a Core name', ![p2, p3, p4].some((p) => /You are Socria Core/.test(p)));
 
   console.log('\n  -- the prompt arrives whole --');
   for (const heading of [

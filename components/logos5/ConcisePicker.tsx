@@ -5,8 +5,8 @@
 // the chip that read "Logos 5 · Balanced" opened a menu of Core registers, Logos
 // surfaces and depths, and none of it was a choice a person in Logos 5 needed
 // to make. What is left is the one thing worth setting — how long the answers
-// run — as the same dial Core 4 uses for it (ModelPicker's Dial), kept in the
-// same place (lib/socria-model-store.ts LENGTH_KEY), so the two surfaces agree.
+// run — as a dial (components/Dial.tsx), kept where it always was
+// (lib/socria-model-store.ts LENGTH_KEY).
 //
 // The setting travels with every turn as `length` (the reply's own length
 // rule, app/api/logos/chat) and sets the depth the other Logos surfaces read,
@@ -14,7 +14,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import type { ReplyLength } from '@/lib/socria-prompt';
-import { Dial } from '../ModelPicker';
+import { Dial } from '../Dial';
 import '@/app/app-shell.css';
 
 /** Logos 5's words for the three positions: the middle is the default, and reads as one. */

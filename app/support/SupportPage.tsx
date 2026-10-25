@@ -165,31 +165,17 @@ export function SupportPage() {
             <div className="sp-card">
               <span className="lbl">Right now</span>
               {/* What is actually true of the product today. A status panel that
-                  says "Working" about everything, for ever, is decoration. */}
+                  says "Working" about everything, for ever, is decoration. It
+                  lists what exists: Logos 5 is the one surface, open to a guest
+                  as well (docs/ARCHIVE.md), and the account around it. */}
               <div className="sp-status">
                 <div>
                   <span className="dt" />
-                  Core 4<span className="st">Working</span>
-                </div>
-                <div>
-                  <span className="dt" />
-                  Core 3.1<span className="st">Working</span>
-                </div>
-                <div>
-                  <span className="dt" />
-                  Logos 3<span className="st">Open to everyone</span>
-                </div>
-                <div>
-                  <span className="dt" />
-                  Logos 2<span className="st">Working</span>
+                  Logos 5<span className="st">Open to everyone</span>
                 </div>
                 <div>
                   <span className="dt" />
                   Sign-in and billing<span className="st">Working</span>
-                </div>
-                <div>
-                  <span className="dt note" />
-                  Core 2<span className="st warn">Retiring 2 October</span>
                 </div>
               </div>
             </div>
@@ -247,8 +233,8 @@ export function SupportPage() {
             <div className="sp-card">
               <span className="lbl">Elsewhere</span>
               <p>
-                <Link href="/docs">The docs</Link> go further than this page does — what each
-                model is for, and how the parts fit together.
+                <Link href="/docs">The docs</Link> go further than this page does — how
+                Logos 5 works, and how the parts fit together.
               </p>
             </div>
           </aside>

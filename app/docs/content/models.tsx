@@ -29,16 +29,16 @@ export function Models() {
       <H2 id="one">Why one</H2>
       <p>
         For a while Socria shipped several models behind a switcher, and they were not sizes of the same
-        thing but different amounts of machinery around a conversation: Core 3.1, a voice with a memory;
-        Core 4, a voice that decided each turn which part of the work was yours; Logos, an environment
-        around the conversation. A person had to know which one a moment needed before they could begin,
-        and the parts that made each one good could not reach the others.
+        thing but different amounts of machinery around a conversation: a live map beside it, models the
+        engine builds, a workspace of designs, displays and documents. A person had to know which one a
+        moment needed before they could begin, and the parts that made each one good could not reach the
+        others.
       </p>
       <p>
-        Logos 5 ends the choice. It is the environment, and the conversation in it is the one Core 4 was:
-        the same decision about whose work is whose, made over the whole conversation, with the map, the
-        models, the displays, the documents and your writing beside it. A conversation that needs none of
-        that is just a conversation.
+        Logos 5 ends the choice. It is the environment, and the conversation in it decides in code, on
+        every turn, which part of the work is yours — over the whole conversation, not only the latest
+        message — with the map, the models, the displays, the documents and your writing beside it. A
+        conversation that needs none of that is just a conversation.
       </p>
 
       <H2 id="setting">The one setting</H2>
@@ -61,21 +61,6 @@ export function Models() {
             </tr>
           </thead>
           <tbody>
-            <tr>
-              <td><Link href="/docs/core-2">Core 2</Link></td>
-              <td>Restrained Socratic questioning; no memory, no account needed</td>
-              <td>Retired on 2 October 2026; Core 3.1 took its place</td>
-            </tr>
-            <tr>
-              <td><Link href="/docs/core-3">Core 3.1</Link></td>
-              <td>A conversation with thread memory, syntheses and four depths</td>
-              <td>Archived on {ARCHIVE_DATE}</td>
-            </tr>
-            <tr>
-              <td><Link href="/docs/core-4">Core 4</Link></td>
-              <td>Decided each turn which part of the work was yours</td>
-              <td>Archived on {ARCHIVE_DATE}; its decision runs inside Logos 5</td>
-            </tr>
             <tr>
               <td><Link href="/docs/logos">Logos</Link></td>
               <td>The conversation beside a live map of your reasoning</td>

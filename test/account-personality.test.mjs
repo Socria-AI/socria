@@ -41,7 +41,7 @@ console.log('=== one personality: the dials are gone ===');
   const app = read('components/LogosApp.tsx');
   ok('Logos sends no personality with its requests', !/persona:/.test(app) && /conversationStyle: conversationStyleRef\.current,/.test(app));
   ok('its sheet is the person\'s own words, titled for them', /<h2 className="lg-style-title">How should Socria work with you\?<\/h2>/.test(app) && !/lg-persona-grid/.test(app));
-  ok('  and says where the personality lives now', /layered over your Conversation Style — set\s+under Manage Account, and the same in Core 4 and Logos/.test(app));
+  ok('  and says where the personality lives now', /layered over your Conversation Style — set\s+under Manage Account\./.test(app) && !/Core 4/.test(app.slice(app.indexOf('lg-style-sub'), app.indexOf('lg-style-sub') + 400)));
   ok('the dial styles are gone too', !/lg-dial|lg-persona/.test(read('app/globals.css')));
 }
 
@@ -61,7 +61,7 @@ console.log('\n=== their own words: one store, two doors ===');
   const sheet = read('components/account/AccountSheet.tsx');
   const panel = read('components/account/LogosInstructions.tsx');
   const personalization = sheet.slice(sheet.indexOf('<span className="lbl">Personalization</span>'), sheet.indexOf('What Socria calls you'));
-  ok('Manage Account: the Conversation Style is the personality, for both', /Socria&rsquo;s personality: how it talks with you, the same in Core 4 and in Logos/.test(personalization));
+  ok('Manage Account: the Conversation Style is the personality', /Socria&rsquo;s personality: how it talks with you\. Kept with your account, on every device\./.test(personalization) && !/Core 4/.test(personalization));
   ok('  then their own words, in Logos', /<ConversationStylePicker signedIn=\{!!user\} \/>[\s\S]*Your own words, in Logos[\s\S]*<LogosInstructions \/>/.test(personalization));
   ok('the words save on Save, through the shared store', /storeStyle\(words\)/.test(panel) && /maxLength=\{MAX_STYLE\}/.test(panel) && !/PersonalityDial/.test(panel));
   ok('  and unsaved words survive a save made elsewhere', /setWords\(\(prev\) => \(prev\.trim\(\) === savedRef\.current\.trim\(\) \? w : prev\)\)/.test(panel));

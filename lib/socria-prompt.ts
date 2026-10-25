@@ -222,7 +222,7 @@ Its purpose is not to think for the user, but to help the user think more clearl
 
 // ===== Core 3 — language-noticing + depth modes =====
 
-const CORE_3_PROMPT = `You are Socria Core 3.1, a Human-First AI designed to strengthen human thinking without replacing it.
+const CORE_3_PROMPT = `You are Socria, a Human-First AI designed to strengthen human thinking without replacing it.
 
 Socria is rooted in the Socratic method and metacognition. It helps users clarify what they think, examine why they think it, notice assumptions, connect ideas, and reach their own conclusions.
 
@@ -1364,7 +1364,7 @@ export interface ModelConfig {
 //      Thinking Journey — its continuity is the Cognitive State, the
 //      Reasoning Ledger and the Mind Graph, and a fourth unlabelled memory
 //      only made them disagree.
-const CORE_4_PROMPT = `You are Socria Core 4, a Human-First AI designed to strengthen human thinking rather than replace it.
+const CORE_4_PROMPT = `You are Socria, a Human-First AI designed to strengthen human thinking rather than replace it.
 
 Your role is to think with the user, not for them.
 
@@ -2642,7 +2642,7 @@ export function buildMemoryExtractorPrompt(
       : `A conversation title:
 - Not yet — return "suggestedTitle": null. It's too early to name what the user is really thinking about.`;
 
-  return `You are a memory extractor for Socria Core 3, a thinking assistant. Your job is to distill important signals from the conversation into a compact structured memory that persists across turns in this single thread.
+  return `You are a memory extractor for Socria, a thinking assistant. Your job is to distill important signals from the conversation into a compact structured memory that persists across turns in this single thread.
 
 You return the FULL updated memory each call, not just changes.
 
@@ -2810,7 +2810,7 @@ export function buildSynthesisPrompt(
   fullExchange: string,
   depthLabel: string
 ): string {
-  return `You are the synthesis engine for Socria Core 3, a thinking assistant. Reflect the user's OWN thinking back to them as a structured synthesis they can see at a glance. This is a checkpoint in an ongoing conversation, not an ending.
+  return `You are the synthesis engine for Socria, a thinking assistant. Reflect the user's OWN thinking back to them as a structured synthesis they can see at a glance. This is a checkpoint in an ongoing conversation, not an ending.
 
 Thinking depth for this conversation: ${depthLabel}. Deeper depth = more precise distinctions, not more words.
 
@@ -2860,7 +2860,7 @@ export function buildInsightPrompt(
   memory: ConversationMemory,
   fullExchange: string
 ): string {
-  return `You are the Insight generator for Socria Core 3, a thinking assistant. Your job is to distill the SINGLE most meaningful realization, tension, shift, or pattern that emerged during this conversation into ONE concise insight the user will actually recognize as their own.
+  return `You are the Insight generator for Socria, a thinking assistant. Your job is to distill the SINGLE most meaningful realization, tension, shift, or pattern that emerged during this conversation into ONE concise insight the user will actually recognize as their own.
 
 The target reaction: "That's exactly what I realized." Never: "That's a nice AI quote."
 

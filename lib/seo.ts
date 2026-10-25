@@ -34,7 +34,7 @@ export const HOME_TITLE = 'Socria — Think for Yourself. AI That Sharpens Your 
 /**
  * What Socria does, in the words a search result shows. Every clause is true
  * of the product as it ships: the map shows assumptions, open questions and
- * what a view rests on, and Core runs without an account.
+ * what a view rests on, and a first line of thinking needs no account.
  */
 export const DEFAULT_DESCRIPTION =
   'Talk it through and see your reasoning take shape: what you’re assuming, what’s missing, what it rests on. Think clearer, decide better. Free, no sign-up.';
@@ -224,13 +224,6 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     priority: 0.4,
     changeFrequency: 'monthly',
   },
-  {
-    path: '/core4model',
-    name: 'Core 4, as a model',
-    summary: 'One Core 4 turn as a three-dimensional object you can turn.',
-    priority: 0.4,
-    changeFrequency: 'monthly',
-  },
   { path: '/privacy', name: 'Privacy', summary: 'What Socria collects, why, and how to get it back or deleted.', priority: 0.3, changeFrequency: 'monthly' },
   { path: '/terms', name: 'Terms', summary: 'The agreement for using Socria.', priority: 0.2, changeFrequency: 'yearly' },
   { path: '/security', name: 'Security', summary: 'How Socria protects accounts and data.', priority: 0.2, changeFrequency: 'yearly' },
@@ -302,7 +295,7 @@ export function llmsTxt(opts: { now: number }): string {
     ''
   );
   lines.push(
-    `Socria has two kinds of model. Core is a conversation that asks as well as answers, and works without an account. Logos adds a live map of your reasoning beside the conversation, models it can compute and documents it reads with every citation checked; Logos needs a free account. Socria is free to start; Socria One (${priceWithPeriod()}) removes the limits.`,
+    `Socria is Logos 5: a conversation that asks as well as answers, with a live map of your reasoning beside it, models it can compute and documents it reads with every citation checked. Without an account you get one line of thinking and its map; sign up free to start another, and the one you have comes with you. Socria is free to start; Socria One (${priceWithPeriod()}) removes the limits.`,
     ''
   );
   const link = (name: string, path: string, summary: string) => `- [${name}](${absoluteUrl(path)}): ${summary}`;

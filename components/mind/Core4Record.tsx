@@ -52,7 +52,7 @@ export function Core4Record() {
       setData(await r.json());
       setErr('');
     } catch {
-      setErr('Could not load what Core 4 recorded.');
+      setErr('Could not load what Socria recorded.');
     }
   }, []);
   useEffect(() => { void load(); }, [load]);
@@ -96,16 +96,16 @@ export function Core4Record() {
   return (
     <section className="c4-root" aria-labelledby="c4-h">
       <div className="c4-head">
-        <span className="c4-kicker">Core 4</span>
-        <h2 id="c4-h">How Core 4 read your thinking</h2>
+        <span className="c4-kicker">From earlier chats</span>
+        <h2 id="c4-h">How Socria read your thinking</h2>
         <p className="c4-deck">
-          What Core 4 recorded while thinking with you. Only what is grounded in your own words is marked <em>yours</em>; Socria&rsquo;s
+          What Socria recorded while thinking with you in chats. Only what is grounded in your own words is marked <em>yours</em>; Socria&rsquo;s
           ideas stay Socria&rsquo;s; guesses are labelled as guesses. Correct anything here, or delete it. None of it is used to train models.
         </p>
         {err && <p className="c4-err" role="alert">{err}</p>}
       </div>
 
-      {empty && <p className="c4-empty">Nothing yet. This fills in as you use Core 4.</p>}
+      {empty && <p className="c4-empty">Nothing recorded.</p>}
 
       {groups.yours.length > 0 && (
         <div className="c4-sec">
@@ -150,7 +150,7 @@ export function Core4Record() {
       {groups.socria.length > 0 && (
         <div className="c4-sec">
           <h3>What Socria contributed <span className="n">{groups.socria.length}</span></h3>
-          <p className="c4-note">Recorded so Core 4 does not repeat itself — and so none of it is ever handed back to you as your idea.</p>
+          <p className="c4-note">Recorded so Socria does not repeat itself — and so none of it is ever handed back to you as your idea.</p>
           {list('socria', groups.socria, (e) => (
             <li key={e.id} className="c4-item">
               <span className="c4-kind">{e.kind}</span>
@@ -164,7 +164,7 @@ export function Core4Record() {
       {groups.unknown.length > 0 && (
         <div className="c4-sec">
           <h3>Noticed, but not in your words <span className="n">{groups.unknown.length}</span></h3>
-          <p className="c4-note">Core 4&rsquo;s reading, not something you said. It only stops Core 4 raising the same thing again; it is never said back to you as yours.</p>
+          <p className="c4-note">Socria&rsquo;s reading, not something you said. It only stops Socria raising the same thing again; it is never said back to you as yours.</p>
           {list('unknown', groups.unknown, (e) => (
             <li key={e.id} className="c4-item">
               <span className="c4-kind">{e.kind}</span>
@@ -192,8 +192,8 @@ export function Core4Record() {
 
       {data.states.length > 0 && (
         <div className="c4-sec">
-          <h3>What Core 4 took into account <span className="n">{data.states.length}</span></h3>
-          <p className="c4-note">Per conversation. What you said is kept apart from what Core 4 inferred; an inference never decides to hold anything back from you.</p>
+          <h3>What Socria took into account <span className="n">{data.states.length}</span></h3>
+          <p className="c4-note">Per conversation. What you said is kept apart from what Socria inferred; an inference never decides to hold anything back from you.</p>
           <ul className="c4-list">
             {(all.states ? data.states : data.states.slice(0, 6)).map((s) => (
               <li key={s.conversationId} className="c4-item c4-state">

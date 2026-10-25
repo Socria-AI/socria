@@ -105,7 +105,7 @@ ok('the code never ships to the browser', !/LOGOS3['"]/.test(read('lib/feature-g
 }
 ok('the route checks it, signed in and rate-limited', /gateForCode\(body\?\.code\)/.test(read('app/api/access/gate/route.ts')) && /enforceRateLimit/.test(read('app/api/access/gate/route.ts')) && /Unauthorized|Sign in/.test(read('app/api/access/gate/route.ts')));
 ok('Manage Account has the field, shown while a model is gated or the new Socria is offered', /\{\(anyModelGated\(\) \|\| LOGOS5\.on\) && \(\s*<div className="sec">\s*<span className="lbl">Access code<\/span>\s*<AccessCode onOpened=\{onClose\} \/>/.test(read('components/account/AccountSheet.tsx')));
-ok('the model menu re-reads what it offers when a gate opens', /GATE_CHANGED/.test(read('components/ModelPicker.tsx')));
+// The model menu (components/ModelPicker.tsx), which re-read what it offered when a gate opened, was deleted with the Core models.
 // A ?model= link no longer opens a model, so there is no rule for it to obey: /chat drops it (archived with the Core chat).
 
 console.log(`\n${pass} passed, ${fail} failed`);

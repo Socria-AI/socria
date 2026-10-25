@@ -52,7 +52,8 @@ const render = (props) => renderToStaticMarkup(h(LogosRail, { ...base, ...props 
   ok('  and not the Logos brain', !html.includes('lg-mark'), html.slice(0, 200));
   ok('  with its node count', /<span class="n">3<\/span>/.test(html));
   ok('a session without a map carries the gap', (html.match(/s-gap/g) || []).length === 2);
-  ok('a chat row is there, and opens a chat', html.includes('opens in Socria chat'));
+  // A chat row's tooltip said it "opens in Socria chat"; that chat was archived and every chat opens in Logos 5, so the row is titled as itself.
+  ok('a chat row is there, titled as itself', />A chat</.test(html) && !/Socria chat/.test(html));
 }
 
 // ── projects ────────────────────────────────────────────────────────

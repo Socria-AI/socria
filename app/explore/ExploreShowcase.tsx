@@ -7,10 +7,6 @@
 // nothing is a drawing: the panel's own lens tabs switch lenses, the graph
 // settles, the plot's parameter drags. A visitor who scrolls this page has
 // used the product before deciding whether to open it.
-//
-// The Core 3.1 scenario deliberately has no map and no panel. Its whole point
-// is the absence — that the same posture exists without the apparatus — and
-// giving it a map to look busy would misrepresent the thing it is selling.
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
@@ -21,7 +17,6 @@ import { LogosMark } from '@/components/LogosMark';
 import { KINDS, SCENARIOS, type Kind, type Scenario } from './scenarios';
 
 const OPEN_LOGOS = '/chat?model=logos';
-const OPEN_CORE = '/chat';
 
 
 /** A framed slice of the product — the same chrome the other pages use. */
@@ -53,11 +48,9 @@ function Thread({ scenario }: { scenario: Scenario }) {
     <section className="lg-convo">
       <header className="lg-head">
         <span className="lg-word">
-          {scenario.model === 'logos' ? <LogosMark size={22} /> : <span className="exp-corename">Socria</span>}
+          <LogosMark size={22} />
         </span>
-        <span className="lg-head-note">
-          {scenario.model === 'logos' ? 'A reasoning environment' : 'Core 3.1'}
-        </span>
+        <span className="lg-head-note">A reasoning environment</span>
         <span className="lg-depth-btn" style={{ marginLeft: 'auto' }}>
           Balanced
         </span>
@@ -105,17 +98,17 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
   // its own and that one is the product's; a second row above the frame
   // duplicated it, and on a page whose whole claim is "this is the running
   // thing, not a picture of it", the control you reach for should be real.
-  const lens = useMemo(() => {
-    if (!scenario.map) return null;
-    return leadLens(availableLenses(scenario.map), !!scenario.map.viz);
-  }, [scenario.map]);
+  const lens = useMemo(
+    () => leadLens(availableLenses(scenario.map), !!scenario.map.viz),
+    [scenario.map],
+  );
   const lensMeta = lens ? LENSES.find((l) => l.id === lens) : null;
 
   return (
     <article className="exp-case" id={scenario.id}>
       <div className="exp-case-head">
-        <span className={`exp-kind is-${scenario.model}`}>
-          {scenario.model === 'logos' ? 'Socria Logos' : 'Socria Core 3.1'}
+        <span className="exp-kind">
+          Socria Logos
           <span className="exp-kind-sep">·</span>
           {scenario.kind}
         </span>
@@ -123,57 +116,33 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
         <p className="exp-case-who">{scenario.who}</p>
       </div>
 
-      {map ? (
-        <>
-          {lensMeta && (
-            <p className="ui-lensblurb">
-              opens on {lensMeta.label} — {lensMeta.caption.replace(/\.$/, '')}
-            </p>
-          )}
-          <Frame label={scenario.caption} height={500}>
-            <div className="lg-split lg-demo-split" style={{ height: '100%' }}>
-              <Thread scenario={scenario} />
-              <section className="lg-panel">
-                <header className="lg-panel-head">
-                  <span className="lg-panel-title">
-                    Thinking Map
-                    {scenario.contextLabel && (
-                      <em className="lg-panel-context">{scenario.contextLabel}</em>
-                    )}
-                  </span>
-                  <span className="lg-panel-state">{map.nodes.length} nodes</span>
-                </header>
-                <ThinkingMap embedded map={map} initialLens={lens ?? 'graph'} onEdit={(e) => setEdited((m) => applyMapEdits(m ?? map, [e]).map)} />
-              </section>
-            </div>
-          </Frame>
-        </>
-      ) : (
-        // One column, set inline: the app's own .lg-split rule sets two, and
-        // this is the one exhibit with nothing to put in the second — an
-        // empty right half beside a conversation reads as a panel that failed
-        // to load rather than one deliberately absent.
-        <Frame label={scenario.caption} height={620}>
-          <div
-            className="lg-split lg-demo-split exp-nopanel"
-            style={{ height: '100%', gridTemplateColumns: '1fr' }}
-          >
-            <Thread scenario={scenario} />
-          </div>
-        </Frame>
+      {lensMeta && (
+        <p className="ui-lensblurb">
+          opens on {lensMeta.label} — {lensMeta.caption.replace(/\.$/, '')}
+        </p>
       )}
+      <Frame label={scenario.caption} height={500}>
+        <div className="lg-split lg-demo-split" style={{ height: '100%' }}>
+          <Thread scenario={scenario} />
+          <section className="lg-panel">
+            <header className="lg-panel-head">
+              <span className="lg-panel-title">
+                Thinking Map
+                {scenario.contextLabel && (
+                  <em className="lg-panel-context">{scenario.contextLabel}</em>
+                )}
+              </span>
+              <span className="lg-panel-state">{map.nodes.length} nodes</span>
+            </header>
+            <ThinkingMap embedded map={map} initialLens={lens ?? 'graph'} onEdit={(e) => setEdited((m) => applyMapEdits(m ?? map, [e]).map)} />
+          </section>
+        </div>
+      </Frame>
 
       <p className="exp-case-point">{scenario.point}</p>
       {/* The conversation they just read, put into the composer — never sent.
-          Both surfaces read `start`; Core's own scenario stays on Core. */}
-      <Link
-        className="exp-case-go"
-        href={
-          scenario.model === 'logos'
-            ? `${OPEN_LOGOS}&start=${encodeURIComponent(scenario.id)}`
-            : `${OPEN_CORE}?start=${encodeURIComponent(scenario.id)}`
-        }
-      >
+          Logos 5 reads `start` (lib/first-session.ts startMessage). */}
+      <Link className="exp-case-go" href={`${OPEN_LOGOS}&start=${encodeURIComponent(scenario.id)}`}>
         Try this one <span aria-hidden="true">→</span>
       </Link>
     </article>

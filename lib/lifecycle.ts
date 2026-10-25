@@ -394,7 +394,7 @@ function paragraphs(kind: LifecycleKind, ctx: CopyContext): { subject: string; b
         subject: 'Socria One is open',
         body: [
           'Socria One is open.',
-          'Begin as many lines of thinking as you have — there is no longer a count. And Socria now carries what it learns about how you reason from each one into the next, into Core and into Logos alike, so a conversation begins where the last one ended rather than from nothing.',
+          'Begin as many lines of thinking as you have, and send as many messages as the thinking takes — there is no daily count. And Socria now carries what it learns about how you reason from each one into the next, so a conversation begins where the last one ended rather than from nothing.',
           'Nothing you have already made changes. It is all still yours, and still where you left it.',
         ],
       };

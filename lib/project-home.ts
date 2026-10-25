@@ -447,7 +447,7 @@ export function synthesisDigest(
   if (files.length) lines.push(`FILES: ${files.slice(0, 12).map((f) => f.name).join(', ')}`);
   lines.push('CONVERSATIONS (newest first):');
   for (const c of [...chats].sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 30)) {
-    lines.push(`## [${c.id}] ${c.title || 'Untitled'} (${c.kind === 'logos' ? 'Logos' : 'Core'})`);
+    lines.push(`## [${c.id}] ${c.title || 'Untitled'} (${c.kind === 'logos' ? 'Logos' : 'chat'})`);
     const nodes = (c.map?.nodes ?? []).filter((n) => theirs(n as any)).slice(0, 18);
     for (const n of nodes) lines.push(`  - (${n.type}) ${n.label.slice(0, 120)}`);
     const byId = new Map((c.map?.nodes ?? []).map((n) => [n.id, n.label]));

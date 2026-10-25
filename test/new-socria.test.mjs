@@ -58,8 +58,7 @@ console.log('\n=== what it is called ===');
 ok('Logos 5 with the code', logosName(true) === 'Logos 5');
 ok('Logos 4 without it', logosName(false) === 'Logos 4');
 {
-  const picker = read('components/ModelPicker.tsx');
-  ok('the model menu names the current Logos by it — its row, its button and its sign-in line', /id === 'logos-3' \? logosName\(newSocria\)/.test(picker) && /<span className="nm">\{short\(id\)\}<\/span>/.test(picker) && /setNeeds\(short\(id\)\)/.test(picker));
+  // The model menu that named the current Logos was deleted with the Core models; nothing else lists models.
   // The "Try Logos" pill and the Logos cover on Core were archived with the Core chat (docs/ARCHIVE.md).
   const app = read('components/LogosApp.tsx');
   // Logos's own gate, the cover naming the Logos behind it, was archived too: a guest gets Logos 5 (test/guest.test.mjs).

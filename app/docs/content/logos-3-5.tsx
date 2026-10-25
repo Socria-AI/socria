@@ -364,7 +364,7 @@ export function Logos35() {
         <li>Open a memory to see how it changed over time — the old version is kept, not erased.</li>
         <li>Proposed updates are yours to confirm or reject.</li>
         <li>
-          Core and Logos both read how your thinking has changed — a change you have not confirmed as
+          Every conversation is told how your thinking has changed — a change you have not confirmed as
           Socria’s reading, to be checked with you, never as settled.
         </li>
       </ul>

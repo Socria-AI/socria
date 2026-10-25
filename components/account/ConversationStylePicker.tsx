@@ -106,15 +106,11 @@ export function ConversationStylePicker({ signedIn = true }: { signedIn?: boolea
           {STYLE_SAMPLE_PROMPT}
         </p>
         <p className="cs-say">
-          <span className="cs-who">Core 4</span>
-          <span className="cs-q">{shown.sample.core}</span>
-        </p>
-        <p className="cs-say">
           <span className="cs-who">Logos</span>
           <span className="cs-q">{shown.sample.logos}</span>
         </p>
         <figcaption className="cs-cap">
-          {preview && preview !== style ? `${shown.label}, previewed — choose it to keep it.` : 'For example. Each product keeps its own voice in every style.'}
+          {preview && preview !== style ? `${shown.label}, previewed — choose it to keep it.` : 'For example.'}
         </figcaption>
       </figure>
 

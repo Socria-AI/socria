@@ -53,8 +53,8 @@ export default function SignUpPage({
       emphasis="every device."
       lede={
         invited
-          ? `Create your free account and get ${days === 7 ? 'seven' : days} days of Socria One — the complete environment, no card needed. Socria Core 3.1, and Logos: the map of your own reasoning, drawn beside the conversation.`
-          : 'Free account. Socria Core 3.1 with adjustable thinking depth, and Logos — the map of your own reasoning — drawn beside the conversation.'
+          ? `Create your free account and get ${days === 7 ? 'seven' : days} days of Socria One — the complete environment, no card needed. Logos 5: the conversation, and the map of your own reasoning drawn beside it.`
+          : 'Free account. Logos 5: the conversation, and the map of your own reasoning drawn beside it.'
       }
     >
       {/* A NEW account lands on the beginning, not in an empty composer.

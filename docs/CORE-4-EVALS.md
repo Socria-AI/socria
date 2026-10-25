@@ -1038,7 +1038,7 @@ reproducible from this repository and **no rate may be quoted from it** — not
 in the docs, not in the product, not to anyone else. `CORE-4-EXPERIMENTS.md`
 E19 states what it would take to make it evidence: a scripted escalation
 ladder in the corpus, a recorded first-abandonment turn per arm, blind
-grading. The public page (`/docs/core-4`) states it in words and quotes no
+grading. The public page (`/docs/core-4`, removed with the Core pages on 25 October 2026) stated it in words and quoted no
 figure from it.
 
 **The two things it does not show, which are now E20 and E21.**

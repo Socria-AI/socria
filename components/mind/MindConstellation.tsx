@@ -263,7 +263,7 @@ export function MindConstellation({
       </svg>
       <figcaption className="mc-legend">
         <span><Tile seed="legend" count={6} static /> a line of thinking, drawn as its map</span>
-        <span><svg width="14" height="14" viewBox="-7 -7 14 14" aria-hidden="true"><circle className="mc-core-chat" r={5} /></svg> a Core chat</span>
+        <span><svg width="14" height="14" viewBox="-7 -7 14 14" aria-hidden="true"><circle className="mc-core-chat" r={5} /></svg> an earlier chat</span>
         <span className="mc-key-mem">
           <i className="c-person" /> <i className="c-evidence" /> <i className="c-question" /> <i className="c-neutral" /> a memory — yours, evidence, open, an idea
         </span>

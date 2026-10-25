@@ -30,18 +30,18 @@ export function SocriaOne() {
       <H2 id="plans">The two plans</H2>
       <p>
         Socria has one paid plan: <strong>Socria One, {priceWithPeriod()}</strong>.
-        What it opens is <em>volume and continuity</em>: no daily count on
-        chats or messages, in Core or in Logos, lines of thinking held only by a
-        fair-use ceiling, and a Socria that carries what it learns about how you
-        reason from each conversation into the next — into Logos 2 as well as
-        Core. It also shares as many chats as you like, and whole Projects,
-        where the free plan shares one chat at a time. Core 3.1 needs no account
-        for a first session, kept in your browser.
+        What it opens is <em>volume and continuity</em>: no daily limit on
+        messages, lines of thinking held only by a fair-use ceiling, and a
+        Socria that carries what it learns about how you reason from each
+        conversation into the next. It also shares as many chats as you like,
+        and whole Projects, where the free plan shares one chat at a time.
+        Without an account you can still begin one line of thinking, with its
+        map, kept in your browser; signing up is free, and it comes with you.
       </p>
       <p>
         What it deliberately does <em>not</em> open is anything Socria can do
-        inside a single line of thinking. All four{' '}
-        <Link href="/docs/depth-personality">depth modes</Link>, Thinking Maps
+        inside a single line of thinking. Every{' '}
+        <Link href="/docs/depth-personality">reply length</Link>, Thinking Maps
         with unbounded branching and every lens, Research, Draft Space and
         grounding in your own material are on the free tier too, at full
         strength. That was a change, and the reasoning is in the table below:
@@ -69,21 +69,19 @@ export function SocriaOne() {
       <H2 id="free">What the free tier holds</H2>
       <p>
         Inside one line of thinking, the free tier is not a trial of Socria —
-        it <em>is</em> Socria, counted by the day. In Core — every model but
-        Logos, so Core 3.1 and Core 4 together — it holds{' '}
-        {PLANS.free.counters['core-chats']} new chats and{' '}
-        {PLANS.free.counters['core-messages']} messages a day. In Logos it
-        holds {PLANS.free.counters.chats} new lines of thinking a calendar
-        month and {PLANS.free.counters.messages} messages a day, and a message
-        to a node&rsquo;s own conversation counts; the first thought you bring
-        into Logos from onboarding costs neither. The day is the UTC day.
+        it <em>is</em> Socria, counted by the day and the month. It holds{' '}
+        {PLANS.free.counters.chats} new lines of thinking a calendar month and{' '}
+        {PLANS.free.counters.messages} messages a day, and a message to a
+        node&rsquo;s own conversation counts; the first thought you bring into
+        Logos from onboarding costs neither. The day is the UTC day.
       </p>
       <p>
-        Starting a chat and sending a message are counted apart, so going back
-        to a chat you have already started never costs a chat — only its
-        messages. Every message you send Socria counts, including as a guest in
-        somebody else&rsquo;s shared conversation, where it is your message,
-        never one of your chats, and never the host&rsquo;s. Its exact shape:
+        Starting a line of thinking and sending a message are counted apart, so
+        going back to one you have already started never costs a line of
+        thinking — only its messages. Every message you send Socria counts,
+        including as a guest in somebody else&rsquo;s shared conversation,
+        where it is your message, never one of your lines of thinking, and
+        never the host&rsquo;s. Its exact shape:
       </p>
       <DemoLimitsTable />
       <p className="d-after-table">
@@ -98,9 +96,9 @@ export function SocriaOne() {
       <Callout tag="Boundary, not wall">
         <p>
           Reaching a limit says what you have used and pauses only what
-          is <em>new</em> — a new chat, a new line of thinking, or the
-          day&rsquo;s next message. It never hides, deletes, or locks anything
-          you already thought: every map you built stays on screen, stays
+          is <em>new</em> — a new line of thinking, or the day&rsquo;s next
+          message. It never hides, deletes, or locks anything you already
+          thought: every map you built stays on screen, stays
           interactive, and stays yours, everything you have begun stays open,
           and the day&rsquo;s allowance comes back tomorrow.
         </p>
@@ -120,10 +118,9 @@ export function SocriaOne() {
       </p>
       <Defs>
         <Def term="You reached a boundary">
-          You reached one of the free counts — the day&rsquo;s messages, the
-          day&rsquo;s new chats in Core, or the month&rsquo;s lines of thinking
-          in Logos — and what you tried stopped. The prompt names what stopped
-          and how to carry on. These appear
+          You reached one of the free counts — the day&rsquo;s messages or the
+          month&rsquo;s lines of thinking — and what you tried stopped. The
+          prompt names what stopped and how to carry on. These appear
           immediately and are not rationed by the rules below — a button that
           silently does nothing is worse than an explanation — though the same
           boundary is only explained once per browser session. A fair-use
@@ -191,9 +188,10 @@ export function SocriaOne() {
       <H2 id="codes">Access codes</H2>
       <p>
         Socria One can also be opened with a typed access code — the same
-        mechanism as the Core 3.1 access key. A code is a <em>soft gate</em>,
-        not a secret: it ships in the client bundle, and it exists for handing
-        out (teams, friends, promotions), not for security.
+        mechanism as the access key that opens Logos 5 without an account. A
+        code exists for handing out (teams, friends, promotions), and only the
+        server knows it: what you type is checked there, and the browser keeps
+        a signed grant rather than the code.
       </p>
       <Defs>
         <Def term="Typed while signed out">

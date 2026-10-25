@@ -1057,7 +1057,7 @@ export function UniverseView({
             </p>
           )}
           {drawing && drawing.total > 0 && !linkFrom && !working && (
-            <p className="l5h-drawing" role="status" title="Your chats from Core are here now. Each one's map is being drawn from what was said in it — nothing of this month's allowance is spent.">
+            <p className="l5h-drawing" role="status" title="Your earlier chats are here now. Each one's map is being drawn from what was said in it — nothing of this month's allowance is spent.">
               <span className="l5h-drawing-dot" aria-hidden="true" />
               Drawing maps for your chats · {Math.min(drawing.done + 1, drawing.total)} of {drawing.total}
             </p>

@@ -17,6 +17,7 @@
 
 import { build } from 'esbuild';
 import { existsSync, mkdirSync, readFileSync, rmSync } from 'node:fs';
+import { createRequire } from 'node:module';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { createElement as h } from 'react';
@@ -129,6 +130,22 @@ console.log('\n=== the sitemap ===');
   ok('no duplicates', new Set(urls).size === urls.length);
   ok('the student page while the offer is open', urls.includes(`${SITE}/students`));
   ok('…and not after', !SEO.sitemapEntries({ now: AFTER }).some((e) => e.url.endsWith('/students')));
+  // The Core 4 model page was taken out with the archived models.
+  ok('the Core 4 model page is not a public page', !SEO.PUBLIC_PAGES.some((p) => p.path === '/core4model'));
+  ok('…nor in the sitemap', !urls.some((u) => new URL(u).pathname.startsWith('/core4model')));
+  ok('…nor on disk', !existsSync(join(root, 'app/core4model')));
+  ok('no public page is named or summed up with Core', SEO.PUBLIC_PAGES.every((p) => !/\bCore\b/.test(`${p.name} ${p.summary}`)));
+}
+
+console.log('\n=== an old address still lands ===');
+{
+  // next.config.js is CommonJS, as Next reads it; its redirects() is what Next calls.
+  const config = createRequire(import.meta.url)(join(root, 'next.config.js'));
+  const moved = typeof config.redirects === 'function' ? await config.redirects() : [];
+  const c4 = moved.find((r) => r.source === '/core4model');
+  ok('/core4model goes to the Logos 5 docs page', c4?.destination === '/docs/logos-5', JSON.stringify(moved));
+  ok('…permanently (308), so search moves the address on', c4?.permanent === true);
+  ok('…and it lands on a page the docs have', DOC_PAGES.some((d) => SEO.docPath(d.slug) === c4?.destination));
 }
 
 console.log('\n=== llms.txt ===');
@@ -138,7 +155,11 @@ console.log('\n=== llms.txt ===');
   ok('the try link', t.includes(`(${SITE}/chat)`));
   ok('every docs page, the overview at /docs', DOC_PAGES.every((d) => t.includes(`(${SEO.absoluteUrl(SEO.docPath(d.slug))})`)));
   ok('the price, from the one place it lives', t.includes('$15/month'));
-  ok('says what needs an account', /Logos needs a free account/.test(t) && /works without an account/.test(t));
+  // removed: "says what needs an account" (Logos needed one, Core worked without) — Core was archived, Logos 5 is the one surface
+  ok('says what a guest gets, and what an account adds', /Without an account you get one line of thinking and its map; sign up free to start another/.test(t));
+  // the summary and the public pages are this file's words; the docs list is the docs registry's
+  const own = t.slice(0, t.indexOf('## Docs')) + t.slice(t.indexOf('## More'));
+  ok('names no Core in its own words', !/\bCore\b/.test(own), own.match(/.{0,60}\bCore\b.{0,60}/)?.[0]);
   ok('the student page while open', t.includes('/students'));
   ok('…not after', !SEO.llmsTxt({ now: AFTER }).includes('/students'));
   const paths = [...t.matchAll(/\]\((https?:[^)]+)\)/g)].map((m) => new URL(m[1]).pathname);
@@ -167,14 +188,19 @@ console.log('\n=== preview cards ===');
   ok('the invitation, in words', inv.title === 'Seven days of Socria One, free.');
   ok('…not while referrals are off', ogCardFor(['invited'], ctx({ referral: { enabled: false, signupDays: 7 } })).kicker === 'Socria');
   ok('the One card keeps to the /one page’s own claim', /No daily count/.test(ogCardFor(['one'], ctx()).line));
+  ok('…in the words the /one page uses', /lines of thinking as you need them/.test(ogCardFor(['one'], ctx()).line) && /lines of thinking as you need them/.test(readFileSync(join(root, 'app/one/page.tsx'), 'utf8')));
   ok('fit keeps short text', fit('Short title', 20) === 'Short title');
   const f = fit('A rather long title that will not fit on the card at all', 30);
   ok('fit cuts at a word with an ellipsis', f.length <= 30 && f.endsWith('…') && !f.includes('  '), f);
   // every fixed card is worded to fit
-  for (const k of ['home', 'logos', 'explore', 'one', 'docs', 'blog', 'support', 'surfaces', 'logos2', 'core4model', 'privacy', 'terms', 'security', 'subprocessors', 'sign-up', 'sign-in']) {
+  // removed: 'core4model' from this list — its page and its card were taken out with the archived models
+  const FIXED_KEYS = ['home', 'logos', 'explore', 'one', 'docs', 'blog', 'support', 'surfaces', 'logos2', 'privacy', 'terms', 'security', 'subprocessors', 'sign-up', 'sign-in'];
+  for (const k of FIXED_KEYS) {
     const c = ogCardFor([k], ctx());
     ok(`${k}: title and line fit`, c.title.length <= 70 && c.line.length <= 120 && c.kicker.length <= 30, `${c.title} / ${c.line}`);
   }
+  ok('no fixed card says Core', FIXED_KEYS.every((k) => !/\bCore\b/.test(JSON.stringify(ogCardFor([k], ctx())))));
+  ok('the Core 4 model card is gone: its key gets the plain card', ogCardFor(['core4model'], ctx()) === DEFAULT_CARD);
 }
 
 console.log('\n=== structured data ===');

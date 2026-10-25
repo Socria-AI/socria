@@ -504,12 +504,11 @@
 .docs-root .ui-cap { letter-spacing: 0.08em; font-size: 11.5px; }
 .docs-root .ui-lenses { margin-top: 18px; }
 
-/* docs-only demo furniture: chat-side cards and the picker are not Logos
+/* docs-only demo furniture: the engine's refusal notes are not Logos
    surfaces, so they render on plain paper rather than inside .logos-root */
 .docs-root .d-demo-bare {
   padding: 22px 24px; background: var(--d-paper);
 }
-.docs-root .d-pickerdemo { position: relative; min-height: 420px; }
 .docs-root .d-pickernote {
   margin: 14px 0 0; font-size: 12.5px; color: var(--d-ink-45); font-style: italic;
 }

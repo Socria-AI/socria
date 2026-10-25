@@ -12,21 +12,20 @@
 // and read by a person in one sitting.
 //
 // WHAT I CHANGED FROM THE DESIGN'S COPY, and why. The export was written
-// against an older state of the product and four of its answers were no longer
-// true on this branch:
+// against an older state of the product and three of its answers were no
+// longer true on this branch:
 //
 //   · "email, Google or Apple" — the sign-in form has no provider buttons at
 //     all now (lib/auth-flow.ts: Google is withheld, and the form never grew
 //     Apple). Telling somebody to use the method they signed up with is still
 //     right; naming the wrong methods is not.
-//   · "Core 3.1 for almost everything" — Core 4 is the production flagship and
-//     is what the rest of the site introduces. A support page recommending the
-//     model before it reads as though nobody told support.
-//   · "Logos" as a thing you pick — Logos 1 is withdrawn in favour of Logos 2
-//     (lib/socria-prompt.ts), so the name people see is Logos 2.
+//   · a choice of models — there is one now, Logos 5, and every earlier
+//     conversation opens in it (docs/ARCHIVE.md). A support page recommending
+//     a model that has been withdrawn reads as though nobody told support,
+//     and sends somebody looking for a menu entry that is not there.
 //   · the free tier — the export did not mention its limits at all, and they
 //     are the single most likely reason somebody arrives at a support page.
-//     They are now by the day as well as the month (lib/entitlements.ts), and
+//     They are by the day as well as the month (lib/entitlements.ts), and
 //     the suite holds these answers to the plan table's own numbers.
 //
 // Answers carry inline HTML because the design's do — <em>, <b> and links are
@@ -64,22 +63,22 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'Do I need an account to use it?',
         a: [
-          'For Core 3.1, no — it works signed out for one session, and the conversation stays in this browser rather than being saved anywhere. After that, sign in to keep going.',
-          'Core 4 and Logos need an account. Core 4 keeps a record of the reasoning itself, and a Thinking Map has to be kept somewhere.',
+          'Not to begin. Signed out, you get one line of thinking and its map, kept in this browser rather than saved anywhere.',
+          'To start another, sign up free — the one you have comes with you.',
         ],
       },
       {
         q: 'Which model should I pick?',
         a: [
-          '<b>Core 4</b> for almost everything. It decides each turn which part of the work is yours, does the research and the checking in full, and hands back the step that would have made you more capable for taking it.',
-          '<b>Logos 5</b> when you want to see your reasoning drawn as a map beside the conversation, with what you describe built beside it — models you can move, and charts, plans and comparisons made from your own words — alone or with someone. <b>Core 3.1</b> if you would rather set the depth yourself.',
+          'There is one: <b>Logos 5</b>. Say what you are working through and your reasoning is drawn as a map beside the conversation, and what you describe is built there too — models you can move, and charts, plans and comparisons made from your own words — alone or with someone.',
+          'Every conversation you had before opens in it.',
         ],
       },
       {
         q: 'What do I get without paying?',
         a: [
-          'In Core — Core 3.1 and Core 4 together — 4 new chats and 20 messages a day, on the UTC day. A chat is counted when it is <em>started</em>, so going back to one you have already begun never costs a chat, only its messages.',
-          'In Logos, 2 new lines of thinking a calendar month and 10 messages a day; a message to a node’s own conversation counts too. Every lens, every depth and Draft Space are the same on both plans, and a map grows as far as the thinking does.',
+          'The free plan holds 2 new lines of thinking a calendar month and 10 messages a day, on the UTC day; a message to a node’s own conversation counts too. A line of thinking is counted when it is <em>started</em>, so going back to one you have already begun never costs another, only its messages.',
+          'Every lens, every depth and Draft Space are the same on both plans, and a map grows as far as the thinking does.',
           'Reach a limit and nothing is taken away: everything you started stays open, and the day’s allowance comes back tomorrow. You can share one chat at a time, and join anyone else’s for free — what you send Socria there counts toward your own day, never theirs.',
         ],
       },
@@ -131,7 +130,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What does Socria One add?',
         a: [
-          'No daily count on chats or messages, in Core or in Logos, and lines of thinking held only by a fair-use ceiling. Socria carries more of how you reason between conversations (160 things, against 12), reads documents up to 30 MB rather than 4 MB, and shares as many chats as you like, and whole Projects. $15 a month.',
+          'No daily count on messages, and lines of thinking held only by a fair-use ceiling. Socria carries more of how you reason between conversations (160 things, against 12), reads documents up to 30 MB rather than 4 MB, and shares as many chats as you like, and whole Projects. $15 a month.',
           '<a href="/one">See the full comparison</a>.',
         ],
       },

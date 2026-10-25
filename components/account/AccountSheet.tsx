@@ -23,7 +23,7 @@ import Link from 'next/link';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { Avatar } from './Avatar';
 import { PFP_KEY, sanitizePfp, type PfpConfig } from '@/lib/pfp';
-import { TOUR_KEY } from '@/lib/tour';
+import { LOGOS_TOUR_KEY } from '@/lib/tour';
 import { resetSeen } from '@/lib/hints';
 import { HINTS_CHANGED } from '@/components/Hint';
 import { StudentAccess } from '@/components/StudentAccess';
@@ -93,7 +93,7 @@ export function AccountSheet({
 
   const retake = useCallback(() => {
     try {
-      localStorage.removeItem(TOUR_KEY);
+      localStorage.removeItem(LOGOS_TOUR_KEY);
     } catch {}
     onClose();
     onRetakeTour?.();
@@ -179,7 +179,7 @@ export function AccountSheet({
               <span className="lbl">Personalization</span>
               <div className="sub">
                 <h3 className="sub-h">Conversation style</h3>
-                <p className="sub-d">Socria&rsquo;s personality: how it talks with you, the same in Core 4 and in Logos. Kept with your account, on every device.</p>
+                <p className="sub-d">Socria&rsquo;s personality: how it talks with you. Kept with your account, on every device.</p>
                 <ConversationStylePicker signedIn={!!user} />
               </div>
               {/* The words Logos keeps behind its own sheet, from here too.
@@ -317,7 +317,7 @@ export function AccountSheet({
 /** The free plan's day and month, read from the one table (lib/entitlements.ts) rather than typed twice. */
 function freeTerms(): string {
   const c = PLANS.free.counters;
-  return `Every model, lens and move. Each day: ${c['core-chats']} new chats and ${c['core-messages']} messages in Core, ${c.messages} messages in Logos — and ${c.chats} Logos lines of thinking a month.`;
+  return `Every lens and move: ${c.messages} messages a day, and ${c.chats} new lines of thinking a month.`;
 }
 
 /**

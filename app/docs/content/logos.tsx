@@ -104,7 +104,7 @@ export function Logos() {
       </p>
       <p>
         Signed in, sessions sync to your account and appear in the same
-        sidebar as your Core conversations, marked with the Logos glyph.
+        sidebar as your other conversations, marked with the Logos glyph.
         Unlocked by key without an account, they stay in the browser. Deep
         links work either way: <code>/chat?model=logos</code> opens Logos,
         and <code>/chat?model=logos&amp;s=&lt;session&gt;</code> opens a

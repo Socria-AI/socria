@@ -264,7 +264,7 @@ export function reviewWords(c: ChangeIn, now: number): string {
   return c.surface === 'user' ? 'Your change' : 'Confirmed by you';
 }
 
-const surfaceWord = (s?: string) => (s === 'logos' ? 'Logos' : s === 'core' ? 'Core' : s === 'file' ? 'A file' : s === 'user' ? 'You' : 'Socria');
+const surfaceWord = (s?: string) => (s === 'logos' ? 'Logos' : s === 'core' ? 'A conversation' : s === 'file' ? 'A file' : s === 'user' ? 'You' : 'Socria');
 
 /** One change: what it was, what it is, in whose words, and what it reached. */
 export function ChangeCard({
@@ -519,7 +519,7 @@ export function Inspector({
                 </span>
                 <span className="l5mm-why-t">
                   {`In “${p.title}”`}
-                  <small>{`${p.surface === 'core' ? 'Core' : 'Logos'}${firstAt.get(p.id) ? ` · ${dayOf(firstAt.get(p.id)!, now)}` : ''}`}</small>
+                  <small>{`${p.surface === 'core' ? 'Chat' : 'Logos'}${firstAt.get(p.id) ? ` · ${dayOf(firstAt.get(p.id)!, now)}` : ''}`}</small>
                 </span>
                 <button type="button" className="l5mm-lnk" onClick={() => onOpenPlace(p)}>
                   Open <Icon name="ext" size={12} />

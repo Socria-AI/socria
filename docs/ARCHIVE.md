@@ -52,9 +52,36 @@ interface entirely … but only 1 chat 1 map".
   `JoinCodeDialog`). A shared Project opens its home, a shared line of thinking
   opens together in Logos 5 (`?s=…&shared=1`), a shared Core conversation
   opens beside it (`?shared=`). Share links and emailed invites work as before.
-- **The docs.** The current product is documented first; the archived models
-  have their pages under the history section of `/docs`
-  (`app/docs/content/history.tsx`, `app/docs/registry.ts`).
+- **The docs.** The current product is documented first, and the history
+  page keeps the Logos line (`app/docs/content/history.tsx`). The Core pages
+  were removed with every other mention of Core (below); their addresses,
+  `/docs/core-2`, `/docs/core-3` and `/docs/core-4`, redirect to
+  `/docs/logos-5`.
+
+## Core, removed from everything people read (25 October 2026)
+
+The owner's words: "remove references of socria core on dev, we removed core
+lol". Nothing a person reads says "Core" any more, and
+`test/no-core.test.mjs` fails if anything does again — every screen and page
+under `app/` and `components/`, and the copy modules (the FAQ, plan blurbs,
+emails, newsletter issues, SEO and preview cards).
+
+- **Removed:** the Core pages of the docs; the Core 4 model page
+  (`/core4model`, which redirects to `/docs/logos-5` from `next.config.js`);
+  the Core scenario on `/explore`; the Core tour; the Core model picker and
+  its glyphs (`components/ModelPicker.tsx`, `ModelGlyph.tsx` — the one piece
+  Logos 5 used, the dial, is `components/Dial.tsx` now).
+- **Rewritten:** sign-up, the support page and FAQ, the privacy and
+  sub-processor pages (Logos 5 is what looks things up), plan and email copy,
+  the Universal Map's "Earlier chats", Memory's records ("From earlier
+  chats"), Manage Account's personality and plan lines. The engine's prompts
+  introduce it as Socria, so a conversation still answered by the archived
+  engine (a shared thread) never names a Core model.
+- **Kept, on purpose:** internal names (`lib/core4`, the engine Logos 5 runs
+  on; `surface: 'core'` in stored data), the model registry and the prompts'
+  own rules, the operations health check, the analytics labels for what
+  people chose before the archive, and the pages only the team opens (the
+  architecture page behind the access code, the developer dashboard).
 
 ## Found and fixed while archiving
 

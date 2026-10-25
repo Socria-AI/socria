@@ -1,12 +1,12 @@
 // The Memory page, at /memory.
 //
-// A view into Core 4's actual memory, not a picture of it. Everything here
+// A view into Socria's actual memory, not a picture of it. Everything here
 // comes from /api/mind, which hands back mind_nodes and mind_edges as they
 // are — the same rows the prompt was built from. If a node is on this screen,
-// Core can reach it; if it is not here, Core does not know it.
+// Socria can reach it; if it is not here, Socria does not know it.
 //
 // The page is a shell and nothing else. Below the graph, Core4Record shows
-// what Core 4 recorded about their thinking, from /api/core4.
+// what the earlier chats recorded about their thinking, from /api/core4.
 // MindGraphView owns the whole surface
 // including its own heading, because the heading is one of the things that
 // CHANGES with state: "What Socria remembers." is wrong on a deployment where
@@ -32,18 +32,17 @@ export default function MemoryPage() {
 
   if (!isLoaded || !isSignedIn) return null;
 
-  // The Mind Graph is what Socria knows about them; Core4Record is what Core
-  // 4 recorded about their THINKING — the reasoning ledger, what it took
-  // into account, the capability evidence — each correctable. JourneyRecord
-  // is the older Cores' store, shown last and labelled as theirs, so that one
-  // page covers everything any model reads.
+  // The Mind Graph is what Socria knows about them; Core4Record is what the
+  // earlier chats recorded about their THINKING — the reasoning ledger, what
+  // it took into account, the capability evidence — each correctable.
+  // JourneyRecord is the oldest chats' store, shown last, so that one page
+  // covers everything anything reads.
   return (
     <>
       <MindGraphView />
       <Core4Record />
-      {/* And the store the older Cores read, which is not Core 4's memory —
-          it says so itself. It is here because the sidebar link that used to
-          open it now comes here, and it carried the only per-entry forget. */}
+      {/* And the store the oldest chats read, which is not Logos's memory —
+          it says so itself. It carries the only per-entry forget. */}
       <JourneyRecord />
     </>
   );

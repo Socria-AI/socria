@@ -7396,12 +7396,12 @@ export function LogosApp({
           <div className="lg-style-back" onClick={() => setStyleOpen(false)} aria-hidden="true" />
           <div className="lg-style-sheet">
             {/* No dials here any more: Socria's personality is the account's
-                Conversation Style (Manage Account → Personalization), the same
-                one Core 4 uses. What is left is the person's own words. */}
+                Conversation Style (Manage Account → Personalization). What is
+                left is the person's own words. */}
             <h2 className="lg-style-title">How should Socria work with you?</h2>
             <p className="lg-style-sub">
               In your own words, layered over your Conversation Style — set
-              under Manage Account, and the same in Core 4 and Logos.
+              under Manage Account.
             </p>
             <textarea
               className="lg-style-input"

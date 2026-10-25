@@ -118,7 +118,7 @@ export const ENV_SPEC: Spec[] = [
     // is the honest failure. There is deliberately no scraping fallback.
     name: 'SERPER_API_KEY',
     scope: 'server',
-    needed: 'Explore sources and Core 4 checking a claim on the web',
+    needed: 'Explore sources, and Logos checking a claim on the web',
     required: 'optional',
   },
   {

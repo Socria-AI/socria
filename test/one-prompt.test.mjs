@@ -28,7 +28,7 @@ import {
   WELCOME_GAP_MS,
   welcomeVariant,
 } from './.tmp/one-prompt.mjs';
-import { COUNTERS, TIERED_COUNTERS } from './.tmp/entitlements.mjs';
+import { COUNTERS, TIERED_COUNTERS, PLANS, boundaryNote } from './.tmp/entitlements.mjs';
 
 let pass = 0,
   fail = 0;
@@ -486,8 +486,32 @@ console.log('\n=== welcome-back: the one prompt a timer is allowed to raise ==='
       !/basic|limited version|upgrade to unlock/i.test(v.body), v.body);
   }
 
+  // The free plan as the plan table holds it, in the words the copy uses —
+  // and only what is sold: the counters the Core chat had are internal now.
+  const WORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
+  const fc = PLANS.free.counters;
+  ok('the free plan is said in the table’s own numbers',
+    WELCOME_BACK.some((v) => v.body.includes(`${WORD[fc.chats]} new lines of thinking a month`) && v.body.includes(`${WORD[fc.messages]} messages a day`)),
+    WELCOME_BACK.map((v) => v.body).join(' | '));
+  ok('  and never the archived chat’s counts',
+    WELCOME_BACK.every((v) => !v.body.includes(`${WORD[fc['core-chats']]} new chats`) && !v.body.includes(`${WORD[fc['core-messages']]} messages`)));
+
   // An urgent boundary still wins if both fire in the same breath.
   ok('a spent counter outranks it', bestTrigger(['welcome-back', 'chats-spent']) === 'chats-spent');
+}
+
+console.log('\n=== nothing a person reads names Core ===');
+{
+  // The Core models and the Core chat were archived (docs/ARCHIVE.md). The
+  // trigger ids that name them stay — they are attribution — but no sheet,
+  // no welcome and no boundary may say the word.
+  const said = [
+    ...TRIGGER_REASONS.map((r) => copyFor(r)),
+    ...WELCOME_BACK.map((_, i) => copyFor('welcome-back', i)),
+  ].map((c) => `${c.title} ${c.body} ${c.primary} ${c.secondary}`);
+  const named = [...said, ...COUNTERS.map((c) => boundaryNote(c))].filter((s) => /\bCore\b/.test(s));
+  ok('no prompt, welcome or boundary says Core', named.length === 0, named.join(' | '));
+  ok('  and every one of them still has words', said.every((s) => s.trim().length > 20));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

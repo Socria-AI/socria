@@ -74,13 +74,12 @@ export function JourneyRecord() {
 
   return (
     <section className="jr-root" aria-labelledby="jr-h">
-      <span className="jr-kicker">Core 2 and Core 3.1</span>
+      <span className="jr-kicker">From earlier chats</span>
       <h2 id="jr-h">The Thinking Journey</h2>
       <p className="jr-deck">
-        The older Cores keep their own running account of how you think, and it
-        travels with every turn you spend on them. Core 4 does not read it — its
-        memory is the graph above. It is here so it is one page, and so you can
-        take any of it back.
+        Socria’s earlier chats kept their own running account of how you think.
+        Logos does not read it — its memory is the graph above. It is here so it
+        is one page, and so you can take any of it back.
       </p>
       <button type="button" className="jr-open" onClick={() => setOpen(true)}>
         Read it{kept > 0 ? ` — ${kept} ${kept === 1 ? 'thing' : 'things'} carried` : ''} →

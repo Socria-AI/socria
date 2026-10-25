@@ -4,7 +4,7 @@
 // control that is not on screen. Refusing to stop. None of them is a
 // drawing bug, which is why none of this file is about drawing.
 
-import { TOUR_STEPS, TOUR_KEY, ROMAN, shouldRunTour, nextStep, inkRect, CORE_TOUR, LOGOS_TOUR, LOGOS3_TOUR, LOGOS_TOUR_KEY, placeNote } from './.tmp/tour.mjs';
+import { TOUR_STEPS, TOUR_KEY, ROMAN, shouldRunTour, nextStep, inkRect, LOGOS_TOUR, LOGOS3_TOUR, LOGOS_TOUR_KEY, placeNote } from './.tmp/tour.mjs';
 import { readFileSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,13 +29,13 @@ console.log('=== when it runs, and the many times it does not ===');
 
 console.log('=== the steps — stupidly simple ===');
 {
-  ok('Core: three notes', CORE_TOUR.length === 3, String(CORE_TOUR.length));
+  // The Core chat's three notes were removed with it (lib/tour.ts has no Core tour).
   ok('Logos: four notes', LOGOS_TOUR.length === 4, String(LOGOS_TOUR.length));
   ok('Logos 3: four notes too', LOGOS3_TOUR.length === 4, String(LOGOS3_TOUR.length));
   ok('  the map, the one box, + View, and what to make', LOGOS3_TOUR.map((s) => s.anchor).join() === 'map,composer,views,make');
-  ok('"Take the tour again" on the chat replays the Core one', TOUR_STEPS === CORE_TOUR);
+  ok('"Take the tour again" replays the one Logos 5 runs', TOUR_STEPS === LOGOS3_TOUR);
   ok('two keys, so taking one does not spend the other', TOUR_KEY !== LOGOS_TOUR_KEY);
-  for (const [name, steps] of [['core', CORE_TOUR], ['logos', LOGOS_TOUR], ['logos3', LOGOS3_TOUR]]) {
+  for (const [name, steps] of [['logos', LOGOS_TOUR], ['logos3', LOGOS3_TOUR]]) {
     ok(`${name}: anchors are unique`, new Set(steps.map((s) => s.anchor)).size === steps.length);
     ok(`${name}: enough numerals for them`, ROMAN.length >= steps.length);
     for (const s of steps) {
@@ -54,13 +54,14 @@ console.log('=== the steps — stupidly simple ===');
       ok(`${name}/${s.anchor}: nothing is interpolated`, !s.body.includes('${'));
     }
   }
+  ok('no note names a Core model', [...LOGOS_TOUR, ...LOGOS3_TOUR].every((s) => !/\bCore\b/.test(s.title + s.body)));
   ok('the keys are versioned', /v\d+$/.test(TOUR_KEY) && /v\d+$/.test(LOGOS_TOUR_KEY), TOUR_KEY);
 }
 
 console.log('=== every anchor exists where its tour runs ===');
 {
   // Core's tour ran on the Core chat, which was archived: it has no screen left to anchor to.
-  const logos = read('components/LogosApp.tsx') + read('components/ThinkingMap.tsx') + read('components/LogosComposer.tsx') + read('components/ModelPicker.tsx');
+  const logos = read('components/LogosApp.tsx') + read('components/ThinkingMap.tsx') + read('components/LogosComposer.tsx') + read('components/logos5/MakePicker.tsx');
   for (const s of LOGOS_TOUR) {
     const lit = logos.includes(`data-tour="${s.anchor}"`) || logos.includes(`'${s.anchor}'`);
     ok(`logos: data-tour ${s.anchor} is rendered`, lit, s.anchor);

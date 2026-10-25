@@ -19,7 +19,7 @@ export const metadata: Metadata = pageMetadata({
   title: 'Explore Socria — what a reasoning environment is actually for',
   absolute: true,
   description:
-    'Six things people bring to Socria — research, learning, decisions, argument, creative work, and plain conversation — each shown in the running product rather than described.',
+    'Five things people bring to Socria — research, learning, decisions, argument and creative work — each shown in the running product rather than described.',
 });
 
 export default function ExplorePage() {
@@ -31,7 +31,7 @@ export default function ExplorePage() {
           <span>Socria</span>
         </Link>
         <nav className="exp-nav">
-          <Link href="/docs/logos">Logos</Link>
+          <Link href="/docs/logos-5">Logos 5</Link>
           <Link href="/docs">Docs</Link>
           <Link href="/chat">Open Socria</Link>
         </nav>
@@ -41,7 +41,7 @@ export default function ExplorePage() {
         <div className="exp-lede">
           <p className="exp-eyebrow">Explore</p>
           <h1 className="exp-h1">
-            Six things people actually bring here.
+            Five things people actually bring here.
           </h1>
           <p className="exp-sub">
             Every one below is the running product, not a picture of it — the
@@ -56,9 +56,9 @@ export default function ExplorePage() {
         <section className="exp-end">
           <h2>Bring the thing you are stuck on.</h2>
           <p>
-            Logos is a model, not a page — it opens inside the chat you already
-            have. Core 3.1 is there in the same picker when you want the
-            conversation without the apparatus.
+            Logos 5 opens in the chat, and it needs no account to begin: one
+            line of thinking and its map. Sign up free to start another, and
+            the one you have comes with you.
           </p>
           <div className="exp-end-actions">
             <Link className="exp-go" href="/chat?model=logos">

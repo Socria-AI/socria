@@ -16,11 +16,17 @@
 // model registry too: a withdrawn model's page is in the archive, and the
 // model on offer is documented as current.
 //
+// AND SINCE THE CORE PAGES WENT ("remove references of socria core on dev,
+// we removed core lol"): the archived chat's three model pages were taken
+// out, their addresses go to Logos 5 (app/docs/[slug]/page.tsx), and nothing a
+// reader meets in the docs — a page, a registry entry, a diagram, a demo —
+// says "Core". Code comments may; they are not read there.
+//
 // Source-read rather than rendered: these are server components full of JSX,
 // and what is being checked is the agreement between the lists, which is a
 // property of the text.
 
-import { readFileSync, existsSync } from 'node:fs';
+import { readFileSync, existsSync, readdirSync, statSync } from 'node:fs';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { DOC_PAGES, DOC_GROUPS, docPage, neighbors } from './.tmp/registry.mjs';
@@ -34,6 +40,27 @@ const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++
 
 const index = read('app/docs/content/index.ts');
 const mapped = [...index.matchAll(/^\s*'?([a-z0-9-]+)'?:\s*\w+,/gm)].map((m) => m[1]);
+
+/** Every .ts/.tsx file of the docs site. */
+const walk = (dir) =>
+  readdirSync(join(root, dir)).flatMap((name) => {
+    const rel = `${dir}/${name}`;
+    if (statSync(join(root, rel)).isDirectory()) return walk(rel);
+    return /\.tsx?$/.test(name) ? [rel] : [];
+  });
+/** A source as a reader meets it: comments (block, JSX, line) and imports gone. A URL's "//" is not a comment. */
+const readable = (src) =>
+  src
+    .replace(/\{\/\*[\s\S]*?\*\/\}/g, '')
+    .replace(/\/\*[\s\S]*?\*\//g, '')
+    .replace(/(^|[^:'"`\\])\/\/[^\n]*/g, '$1')
+    .replace(/^\s*import [^\n]*$/gm, '');
+/** The removed pages and where their addresses go: the MOVED map in the page that serves every slug. */
+const slugPage = read('app/docs/[slug]/page.tsx');
+const moved = new Map(
+  [...(slugPage.match(/const MOVED = new Map<string, string>\(\[([\s\S]*?)\]\);/)?.[1] ?? '').matchAll(/\[\s*'([a-z0-9-]+)'\s*,\s*'([^']+)'\s*\]/g)]
+    .map((m) => [m[1], m[2]])
+);
 
 console.log('=== every page exists in all three places ===');
 {
@@ -66,86 +93,45 @@ console.log('\n=== each page agrees with its own contents strip ===');
   }
 }
 
-console.log('\n=== Core 4 is documented, and documented honestly ===');
+// The Core 4 page's own checks (its claims, its measured numbers, the prompt test) went with the page.
+
+console.log('\n=== Logos 5 says which part of the work is yours, and says it honestly ===');
 {
-  const p = docPage('core-4');
-  // Archived with the Core chat, and kept as a record of how it worked: so it
-  // is in the archive, and every claim below is still checked, because the
-  // page still makes them.
-  ok('it is in the registry, kept in the archive', !!p && p.group === 'Earlier Socria' && !!p.archived, p?.group);
-  const src = read('app/docs/content/core-4.tsx');
-
-  // The four claims a reader most needs, each of which is a real property of
-  // lib/core4 rather than a way of describing it.
-  ok('  says withholding needs a reason the person gave', /own words|your own quote|explicit/i.test(src));
-  ok('  says an inference never withholds', /inference never withholds/i.test(src));
-  ok('  says attribution is enforced in code', /enforced in code/i.test(src));
-  ok('  says the safety gate suspends contracts', /suspends every contract/i.test(src));
-  ok('  and that the ladder bottoms out', /bottoms out/i.test(src));
-
-  // The honest half. A docs page that only lists strengths is marketing, and
-  // the evals document exists precisely because this one is not.
-  ok('  states what was measured, including the loss', /level — not demonstrably|not demonstrably\s*\n?\s*better/i.test(src));
-  ok('  and the cold start', /starts flat|first message there is no record/i.test(src));
-  ok('  and that no human has rated it', /no human rater|No human rater/i.test(src));
-
-  // The prompt test. The page may describe it, and may not put a number on
-  // it — the run kept no counts, and a rate quoted from a qualitative result
-  // is a fabrication with a citation attached.
-  ok('  describes the three arms of the prompt test',
-    /frozen/i.test(src) && /independent imitation/i.test(src) && /clean context/i.test(src));
-  ok('  says the frozen prompt could not be improved afterwards',
-    /not.{0,40}allowed to be improved|not<\/em> allowed to be improved/i.test(src));
-  ok('  reports the unflattering half: the imitation was good',
-    /imitated Core 4/i.test(src) && /surprisingly/i.test(src));
-  ok('  and states the claim it actually supports',
-    /Prompts break/.test(src) && /a prompt can/i.test(src));
-  ok('  names the escalation without repeating the abuse',
-    /aggressively and abusively/.test(src) && !/\bf+u+c+k/i.test(src));
-  ok('  names the mirror failure as the next benchmark',
-    /answer, explain, calculate, research, retrieve, verify or\s*\n?\s*<em>|answer, explain, calculate/i.test(src));
-  ok('  and leaves the partner question open', /open question/i.test(src));
-  ok('  quotes no rate from a run that kept no counts',
-    !/\d+%[^<]{0,40}(pressure|imitation|prompt arm)/i.test(src));
-
-  const experiments = read('docs/CORE-4-EXPERIMENTS.md');
-  ok('  the internal record carries it as an experiment', /\| E19 \|/.test(experiments));
-  ok('  with the under-help benchmark after it', /\| E20 \|/.test(experiments));
-  ok('  and UUCR after that', /\| E21 \|/.test(experiments));
-  ok('  and says plainly that no rate may be quoted from it',
-    /no rate may be quoted/i.test(experiments) && /no rate may be quoted/i.test(read('docs/CORE-4-EVALS.md')));
-
-  // Numbers on a docs page must match the source of truth for them.
-  const evals = read('docs/CORE-4-EVALS.md');
-  ok('  the question rate it quotes is the measured one',
-    /0–2% of replies against 5–11%/.test(src) && /1–2% of replies vs 5–11%/.test(evals));
-  ok('  the overreach run it quotes is the measured one',
-    /eighty-two turns/.test(src) && /0\/82/.test(evals));
+  // The decision the removed page described is Logos 5's now, and the Logos 5
+  // page is where a reader learns its rules — so the claims a reader most
+  // needs are held there, each a real property of the code, honest half too.
+  const src = read('app/docs/content/logos-5.tsx');
+  ok('withholding needs your own words, never a guess', /held back only on your own words/i.test(src) && /Never on a guess about you/.test(src));
+  ok('  practising has a floor', /Practising has a floor/.test(src) && /after repeated attempts/i.test(src));
+  ok('  harm comes first', /Harm comes first/.test(src));
+  ok('  and it says it has not been studied with the people who use it', /has not been studied with the people who use it/.test(src));
 }
 
-console.log('\n=== the models page names every model, and counts the ones a reader can pick ===');
+console.log('\n=== the models page names every model on offer, and counts them ===');
 {
   const models = read('app/docs/content/models.tsx');
-  // Every model in the registry, by the name the product gives it: the one on
-  // offer, and each one before it. A name counts only as itself — "Logos" in
-  // "Logos 5" is not the original Logos.
+  // Every model on offer, by the name the product gives it. A name counts
+  // only as itself — "Logos" in "Logos 5" is not the original Logos. The docs
+  // are production's: a dev-only model is not one a reader can pick.
   const names = (src, name) => new RegExp(`\\b${name.replace(/\./g, '\\.')}\\b(?!\\s?\\d|\\.\\d)`).test(src);
-  for (const id of Object.keys(SOCRIA_MODELS))
+  const onOffer = offeredModels().filter((id) => !SOCRIA_MODELS[id].devOnly && !SOCRIA_MODELS[id].withdrawn);
+  // Withdrawn models are no longer each held to this page by name: the archived chat's are gone from the docs, and the earlier Logos are held below as linked rows.
+  ok('a model is on offer', onOffer.length > 0, onOffer.join(','));
+  for (const id of onOffer)
     ok(`${SOCRIA_MODELS[id].short} is on the models page`, names(models, SOCRIA_MODELS[id].short));
   // The count a page states is the count on offer — read from the registry,
   // so the next retirement or launch fails here until the prose catches up,
   // in either direction. There is no menu now, and one model: "one model".
   const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven'];
-  // The docs are production's: a dev-only model is not one a reader can pick.
   // Retired models kept by name under "Other models" are not counted (none
   // are kept there since the archive).
-  const n = WORDS[offeredModels().filter((id) => !SOCRIA_MODELS[id].devOnly && !SOCRIA_MODELS[id].withdrawn).length];
+  const n = WORDS[onOffer.length];
   const said = (src) => [...src.matchAll(/\b(one|two|three|four|five|six|seven) models?\b/gi)].map((m) => m[1].toLowerCase());
   ok(`the page says there ${n === 'one' ? 'is one' : `are ${n}`}, as many as are offered`, said(models).length > 0 && said(models).every((w) => w === n), said(models).join(','));
   const overview = read('app/docs/content/overview.tsx');
   ok('the overview counts them the same way', said(overview).length > 0 && said(overview).every((w) => w === n), said(overview).join(','));
-  ok('  and links to Core 4', overview.includes('/docs/core-4'));
-  ok('  and to Logos 5, and to the history', overview.includes('/docs/logos-5') && overview.includes('/docs/history'));
+  // "and links to Core 4" went with the Core 4 page; the overview is held below to linking no removed page.
+  ok('  and links to Logos 5, and to the history', overview.includes('/docs/logos-5') && overview.includes('/docs/history'));
   // "The models before it": every page kept in the archive is a row, linked.
   const kept = DOC_PAGES.filter((p) => p.archived);
   const unlinked = kept.filter((p) => !models.includes(`href="/docs/${p.slug}"`)).map((p) => p.slug);
@@ -166,14 +152,20 @@ console.log('\n=== the archive is marked as the archive, and agrees with the mod
       [p.archived.what, p.archived.on, p.archived.replacedBy].every((s) => typeof s === 'string' && s.trim().length > 2));
 
   // Held to the models: a withdrawn model's page is in the archive, dated as
-  // the registry dates it where the registry gives a date, and the model on
-  // offer is documented as current. A model's page is the one titled with
-  // its label.
+  // the registry dates it where the registry gives a date — or, for the
+  // archived chat's models, whose pages were taken out, there is no page and
+  // its address goes to Logos 5. Either way a withdrawn model is accounted
+  // for. The model on offer is documented as current. A model's page is the
+  // one titled with its label.
   const DATE = /\b\d{1,2} (?:January|February|March|April|May|June|July|August|September|October|November|December)\b/;
   for (const id of Object.keys(SOCRIA_MODELS)) {
     const m = SOCRIA_MODELS[id];
     const page = DOC_PAGES.find((p) => p.title === m.label);
-    if (m.withdrawn) {
+    if (m.withdrawn && moved.has(id)) {
+      ok(`${m.short} is withdrawn, its page is gone, and /docs/${id} goes to Logos 5`,
+        !page && !docPage(id) && moved.get(id) === '/docs/logos-5',
+        page ? `${page.slug} is still a page` : String(moved.get(id)));
+    } else if (m.withdrawn) {
       const date = m.withdrawn.match(DATE)?.[0];
       ok(`${m.short} is withdrawn, and its page is in the archive${date ? `, dated ${date}` : ''}`,
         !!page?.archived && (!date || new RegExp(`\\b${date}\\b`).test(page.archived.on)),
@@ -187,6 +179,67 @@ console.log('\n=== the archive is marked as the archive, and agrees with the mod
   const history = read('app/docs/content/history.tsx');
   const untold = kept.filter((p) => !history.includes(`href="/docs/${p.slug}"`)).map((p) => p.slug);
   ok('the history links every archived page', untold.length === 0, untold.join(','));
+}
+
+console.log('\n=== nothing in the docs is about Core any more ===');
+{
+  const CORE = /\bCore\b/;
+  // The registry is what the sidebar, the index cards, the sitemap and
+  // llms.txt read, so an entry naming Core would put it on every one of them.
+  const named = DOC_PAGES.filter((p) => /^core-/.test(p.slug) || CORE.test(JSON.stringify(p))).map((p) => p.slug);
+  ok('no registry entry is a Core page or names Core', named.length === 0, named.join(','));
+  const files = readdirSync(join(root, 'app/docs/content'));
+  ok('no Core page is left in the content folder', !files.some((f) => /^core-/.test(f)), files.join(','));
+  ok('  and none is imported or mapped to a component', !mapped.some((s) => /^core-/.test(s)) && !/from '\.\/core-/.test(index));
+
+  // Every file of the docs site as a reader meets it: the pages, the diagrams'
+  // labels and descriptions, the demos, the archived banner, the metadata.
+  const site = walk('app/docs');
+  const said = site.flatMap((f) =>
+    readable(read(f)).split('\n').flatMap((l, i) => (CORE.test(l) ? [`${f}:${i + 1}: ${l.trim().slice(0, 120)}`] : []))
+  );
+  ok(`no page, diagram, demo or banner says "Core" (${site.length} files read)`, site.length > 20 && said.length === 0, said.join(' | '));
+  const linked = site.filter((f) => /\/docs\/core-/.test(read(f)));
+  ok('nothing links to a removed Core page', linked.length === 0, linked.join(','));
+  // The archived chat's daily counters are still in lib/entitlements (its
+  // routes read them); a docs page printing them would be selling an allowance
+  // for a screen that is gone.
+  const counted = site.filter((f) => /core-chats|core-messages/.test(readable(read(f))));
+  ok('no page prints the archived chat’s allowance', counted.length === 0, counted.join(','));
+  ok('the docs no longer import the archived model picker', site.every((f) => !/components\/ModelPicker/.test(read(f))));
+}
+
+console.log('\n=== the old Core addresses still land, on Logos 5 ===');
+{
+  for (const slug of ['core-2', 'core-3', 'core-4'])
+    ok(`/docs/${slug} goes to /docs/logos-5`, moved.get(slug) === '/docs/logos-5', String(moved.get(slug)));
+  const to = [...moved.values()].map((p) => p.replace(/^\/docs\//, ''));
+  ok('  every address moved lands on a page that exists', to.length > 0 && to.every((s) => !!docPage(s) && s !== 'overview'), to.join(','));
+  ok('  and none of them is still a page', [...moved.keys()].every((s) => !docPage(s)));
+  ok('  permanently (308)',
+    /import \{[^}]*\bpermanentRedirect\b[^}]*\} from 'next\/navigation';/.test(slugPage) &&
+      /const moved = MOVED\.get\(params\.slug\);\s*if \(moved\) permanentRedirect\(moved\);/.test(slugPage));
+  const at = slugPage.indexOf('permanentRedirect(moved)');
+  ok('  before the page can be a 404', at > 0 && at < slugPage.indexOf('notFound()'));
+  // generateStaticParams lists only the registry, so a moved slug (and
+  // /docs/overview) reaches the page only while dynamic params are allowed.
+  ok('  and a slug the static list leaves out still reaches the page', /^export const dynamicParams = true;$/m.test(slugPage) && !/dynamicParams\s*=\s*false/.test(slugPage));
+  ok('  while /docs/overview still goes to /docs', /if \(params\.slug === 'overview'\) redirect\('\/docs'\);/.test(slugPage));
+}
+
+console.log('\n=== the history has no Core entries, and keeps the Logos line ===');
+{
+  const history = read('app/docs/content/history.tsx');
+  const strip = [...history.matchAll(/\{\s*id:\s*'([\w-]+)',\s*heading:\s*'([^']*)'/g)].map((m) => ({ id: m[1], heading: m[2] }));
+  const core = strip.filter((s) => /^core/.test(s.id) || /\bCore\b/.test(s.heading)).map((s) => s.id);
+  ok('no Core entry in its contents', strip.length > 0 && core.length === 0, core.join(','));
+  ok('  nor a Core heading or link in the page', !/<H2 id="core/.test(history) && !/\/docs\/core-/.test(history) && !/\bCore\b/.test(readable(history)));
+  const line = ['logos', 'logos-2', 'logos-3', 'logos-3-5', 'logos-4', 'logos-5'];
+  const ids = strip.map((s) => s.id);
+  ok('  every Logos is there, in order', line.every((id, i) => ids.includes(id) && (i === 0 || ids.indexOf(id) > ids.indexOf(line[i - 1]))), ids.join(','));
+  const diagrams = readable(read('app/docs/Diagrams.tsx'));
+  const timeline = diagrams.slice(diagrams.indexOf('export function HistoryTimeline'), diagrams.indexOf('export function CarriedIntoLogos5'));
+  ok('  and its timeline draws the Logos line alone', /'Logos 5'/.test(timeline) && /'Logos 2'/.test(timeline) && !/\bCore\b/.test(timeline));
 }
 
 console.log('\n=== prev/next walks the whole wiki ===');

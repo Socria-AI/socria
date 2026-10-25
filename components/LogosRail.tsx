@@ -49,8 +49,8 @@ import {
   shouldShowSearch,
 } from '@/lib/session-rail';
 // The .s-* rules live in app/app-shell.css and are scoped under `.app-root`, so
-// the host wraps this in one. Imported here for the same reason ModelPicker
-// imports it: a component that needs a stylesheet should carry it.
+// the host wraps this in one. Imported here because a component that needs a
+// stylesheet should carry it.
 import '@/app/app-shell.css';
 
 /** A Project, as a rail needs it: a folder of conversations. The same shape /chat keeps. */
@@ -290,7 +290,7 @@ export function LogosRail({
           // a second line, because the Core row has one line of metadata and
           // this is the same row.
           title={
-            (isChat ? `${item.title} — opens in Socria chat` : item.title) +
+            item.title +
             (item.updatedAt ? ` · ${relTime(item.updatedAt)}` : '')
           }
         >
