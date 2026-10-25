@@ -1,4 +1,4 @@
-// app/logos-5-internal/page.tsx — how Logos 5 works, for the people who build it.
+// app/logos-5-internal/Architecture.tsx — how Logos 5 works, for the people who build it.
 //
 // One long page, read top to bottom: the system, a turn through the chat
 // route, the runtime's six subsystems, allocation, Metacognitive Regulation,
@@ -6,20 +6,13 @@
 // switches, and what is measured. The diagrams are HTML and inline SVG so they
 // reflow on a phone and need no script.
 //
-// UNLISTED: never indexed (NOINDEX), disallowed in robots.ts, not in the
-// sitemap, linked from nowhere. It describes the code and holds no data; the
+// BEHIND THE NEW SOCRIA'S ACCESS CODE (page.tsx), and unlisted: never
+// indexed, disallowed in robots.ts, not in the sitemap, linked from nowhere.
+// It describes the code and holds no data; the
 // sources it summarises are docs/LOGOS-5.md, docs/LOGOS-5-RUNTIME.md,
 // docs/MR.md and docs/CORE-4-ARCHITECTURE.md, which stay the reference.
 
-import type { Metadata } from 'next';
-import { NOINDEX } from '@/lib/seo';
 import './logos5-internal.css';
-
-export const metadata: Metadata = {
-  ...NOINDEX,
-  title: 'Logos 5 architecture (internal)',
-  description: 'How Logos 5 works: the turn, the runtime, allocation, Metacognitive Regulation, evidence, memory and data.',
-};
 
 const CONTENTS: [string, string][] = [
   ['overview', 'The system'],
@@ -305,7 +298,7 @@ function ScreenDiagram() {
   );
 }
 
-export default function Logos5InternalPage() {
+export function Architecture() {
   return (
     <div className="site-root lg-tokens l5i">
       <header className="l5i-mast">

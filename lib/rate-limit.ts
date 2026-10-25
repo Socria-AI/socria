@@ -111,6 +111,7 @@ function clientId(req: NextRequest, userId: string | null): { id: string; authed
 // and a campus network is many people behind one address.
 // 'code' is the developer dashboard's two-step code (/api/dev/dashboard-code):
 // the one place those codes can be guessed, so a handful of tries a minute.
+// The internal architecture page's code (/api/logos-5-internal) draws on it too.
 // 'rsvp' is the public event registration and the attendee's own ticket
 // link: a person registers once, so a handful a minute per address is room
 // for a typo and a retry, and a campus network gets the day's headroom.

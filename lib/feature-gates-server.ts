@@ -44,3 +44,12 @@ export function gateForCode(raw: unknown): GateId | null {
   }
   return null;
 }
+
+/**
+ * The fingerprint of the code that opens a gate, for keying what that code
+ * earns (lib/internal-pass.ts): change the code and the key changes with it.
+ * A fingerprint, never the code.
+ */
+export function gateFingerprint(gate: GateId): string | null {
+  return gates().find(([g]) => g === gate)?.[1] ?? null;
+}

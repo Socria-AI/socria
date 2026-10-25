@@ -186,3 +186,16 @@
 @media (prefers-reduced-motion: no-preference) {
   .l5i { scroll-behavior: smooth; }
 }
+
+/* the code form (InternalCodeForm.tsx) */
+.l5i-gate { display: grid; place-items: center; padding: 32px 16px; }
+.l5i-gate-card { width: 100%; max-width: 380px; display: grid; gap: 10px; background: var(--l5i-card); border: 1px solid var(--l5i-line); border-radius: 14px; padding: 28px 24px; }
+.l5i-gate-card .l5i-eb { margin: 0; }
+.l5i .l5i-gate-h { font-size: 34px; margin: 0; }
+.l5i-gate-d { margin: 0 0 6px; color: var(--l5i-ink-70); font-size: 15px; }
+.l5i-gate-label { font-size: 13px; color: var(--l5i-ink-70); }
+.l5i-gate-input { font: inherit; padding: 10px 12px; border: 1px solid var(--l5i-line); border-radius: 8px; background: var(--l5i-paper); color: var(--l5i-ink); letter-spacing: 0.08em; }
+.l5i-gate-input:focus-visible { outline: 2px solid var(--l5i-moss); outline-offset: 1px; }
+.l5i-gate-button { font: inherit; padding: 10px 14px; border: 0; border-radius: 8px; background: var(--l5i-ink); color: var(--l5i-paper); cursor: pointer; }
+.l5i-gate-button:disabled { opacity: 0.5; cursor: default; }
+.l5i-gate-msg { min-height: 1.4em; margin: 0; font-size: 14px; color: var(--l5i-amber); }
