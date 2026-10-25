@@ -794,8 +794,10 @@ The proposal's 18 required cases map as follows:
 - the deliberative loop: its gating, composition, freeze, budget and menu
   validation, the deterministic path and the model path with a stubbed model
 - the benchmark and its analysis
-- every confirmed finding of the adversarial review, as regression tests
-  (`mr-review`, `mr-route`, and the persistence suites)
+- the confirmed findings of seven adversarial review rounds, as regression
+  tests written from the reviewers' reproductions (`mr-review`, `mr-route`,
+  and the persistence suites); the ones not fixed are listed below as limits,
+  and a review of the seventh round's own fixes has not been run
 
 **Implemented, not independently verified:**
 - How a real model follows MR's prompt-level controls (strategy lines,
