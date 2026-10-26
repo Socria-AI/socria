@@ -50,6 +50,12 @@ const I = {
       <path d="M8 8l3 7M16.5 7.5 13 15" />
     </>
   ),
+  web: (
+    <>
+      <circle cx="12" cy="12" r="8.5" />
+      <path d="M3.5 12h17M12 3.5c2.4 2.4 3.4 5.3 3.4 8.5S14.4 18.1 12 20.5M12 3.5C9.6 5.9 8.6 8.8 8.6 12s1 6.1 3.4 8.5" />
+    </>
+  ),
 };
 
 function Icon({ d }: { d: ReactNode }) {
@@ -309,6 +315,30 @@ export function L5Message(p: L5MessageProps) {
             )}
           </div>
         )
+      )}
+
+      {/* the web pages this reply read, so its [1], [2] name something that can be opened */}
+      {m.role === 'assistant' && !!m.sources?.list.length && (
+        <details className="l5-web">
+          <summary>
+            <Icon d={I.web} />
+            Checked the web · {m.sources.list.length} {m.sources.list.length === 1 ? 'source' : 'sources'}
+          </summary>
+          <ol className="l5-web-list">
+            {m.sources.list.map((x) => (
+              <li key={x.n} value={x.n}>
+                <a href={x.url} target="_blank" rel="noopener noreferrer nofollow">
+                  {x.title}
+                </a>
+                <span className="l5-web-site">
+                  {' '}
+                  — {x.site}
+                  {x.published ? ` · ${x.published}` : ''}
+                </span>
+              </li>
+            ))}
+          </ol>
+        </details>
       )}
 
       {m.role === 'assistant' && p.offer && (

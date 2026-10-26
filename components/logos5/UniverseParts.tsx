@@ -13,6 +13,9 @@ import type { Attachment } from '@/lib/logos-attachments';
 import type { Look, Match, Tile } from '@/lib/logos5/universe';
 import { STUDY_ACCEPT, intentOf, type Intent } from '@/lib/logos5/study';
 import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display, type HomeMode, type LabelLevel, type SizeBy } from '@/lib/logos5/arrange';
+import { useVoiceInput } from '@/components/useVoiceInput';
+import { HoldMic, type Hold } from '@/components/LogosComposer';
+import { clock, insertSpoken } from '@/lib/logos4/voice';
 
 /** A colour key as the theme draws it. */
 export const colorVar = (key: string | null | undefined) => (key ? `var(--sc-${key})` : 'var(--sc-none)');
@@ -375,6 +378,9 @@ export function FindOrStart({
   picker,
   placeholder,
   takeRef,
+  voice = false,
+  voiceButton,
+  voiceLive = false,
 }: {
   query: string;
   onQuery: (q: string) => void;
@@ -393,8 +399,33 @@ export function FindOrStart({
   placeholder?: string;
   /** told how to take files dropped anywhere on the map */
   takeRef?: React.MutableRefObject<((files: File[]) => void) | null>;
+  /** the hold-to-talk mic: what is said lands in the box to edit, as typed (never sent by itself) */
+  voice?: boolean;
+  /** Socria Voice's button (components/logos5/SocriaVoice.tsx) — talk instead of typing */
+  voiceButton?: ReactNode;
+  /** Socria Voice is listening: one microphone at a time, so the hold-to-talk mic steps aside */
+  voiceLive?: boolean;
 }) {
   const [open, setOpen] = useState(false);
+  // VOICE TO TEXT, here as in the conversation's box (components/useVoiceInput.ts): held, the words land
+  // where the caret was, to read and edit; nothing is sent until ↑ or Enter
+  const mic = useVoiceInput((words) => {
+    const el = inputRef.current;
+    const at = insertSpoken(query, words, el?.selectionStart ?? query.length, el?.selectionEnd ?? query.length);
+    onQuery(at.text);
+    setOpen(true);
+    requestAnimationFrame(() => {
+      el?.focus();
+      el?.setSelectionRange(at.caret, at.caret);
+    });
+  });
+  const micOn = voice && mic.available && !voiceLive;
+  const [hold, setHold] = useState<Hold>({ holding: false, away: false });
+  const micCancel = mic.cancel;
+  useEffect(() => {
+    if (voiceLive) micCancel();
+  }, [voiceLive, micCancel]);
+  const recording = mic.state === 'recording' || mic.state === 'asking' || mic.state === 'transcribing';
   const [at, setAt] = useState(0);
   const [files, setFiles] = useState<BoxFile[]>([]);
   const [over, setOver] = useState(false);
@@ -573,6 +604,8 @@ export function FindOrStart({
           </button>
         )}
         {picker && <span className="l5h-find-pick">{picker}</span>}
+        {voiceButton}
+        {micOn && <HoldMic mic={mic} onHold={setHold} />}
         {canFiles && (
           <button type="button" className="l5h-find-att" aria-label="Add files — notes, documents, slides, PDFs" title="Add files — notes, documents, slides, PDFs. Or drop them anywhere on the map." onMouseDown={(e) => e.preventDefault()} onClick={() => fileRef.current?.click()}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
@@ -608,6 +641,34 @@ export function FindOrStart({
         />
       )}
       {notice && <p className="l5h-find-note">{notice}</p>}
+      {micOn && recording && (
+        <p className={`l5h-find-note l5h-voice${hold.holding && hold.away ? ' is-away' : ''}`} role="status" aria-live="polite">
+          <span className={`lg-voice-dot${mic.state === 'recording' ? ' is-live' : ''}`} aria-hidden="true" />
+          {mic.state === 'asking'
+            ? 'Waiting for the microphone…'
+            : mic.state === 'transcribing'
+              ? 'Turning that into text…'
+              : hold.holding && hold.away
+                ? 'Let go to cancel'
+                : `Listening ${clock(mic.seconds)} — let go to add it`}
+        </p>
+      )}
+      {micOn && mic.state === 'error' && mic.error && (
+        <p className="l5h-find-note l5h-voice is-err" role="alert">
+          {mic.error}{' '}
+          <button type="button" className="lg-voice-link" onClick={mic.retry}>
+            {mic.canRetryAudio ? 'Retry' : 'Try again'}
+          </button>{' '}
+          <button type="button" className="lg-voice-link" onClick={mic.dismiss}>
+            Dismiss
+          </button>
+        </p>
+      )}
+      {micOn && mic.hint && mic.state === 'idle' && (
+        <p className="l5h-find-note l5h-voice" role="status">
+          {mic.hint === 'ready' ? 'The microphone is on. Hold the mic while you talk.' : 'Hold the mic while you talk — let go and the words appear here.'}
+        </p>
+      )}
       {open && options.length > 0 && (
         <div className="l5h-find-list" id="l5h-find-list" role="listbox" aria-label="Found, or start">
           {options.map((o, i) => (

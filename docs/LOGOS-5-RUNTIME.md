@@ -1806,3 +1806,91 @@ listening"). Socria's transcription is one paid call per turn, under the voice
 rate limit (12 a minute signed in, 6 with an access key). A command is a whole
 turn: "open the map of Europe and explain it" goes to Socria, which answers in
 words and cannot press anything.
+
+## 23. Live data, and voice on the Universal Map
+
+The owner's words, with a screenshot of the Universal Map's box: "add voice
+here and allow voice to text here, as well as fix the internet access — it
+should be able to access live data".
+
+**Why live data failed.** The search machinery was there — Serper, Tavily, or
+OpenAI's own web search with only the OpenAI key (`lib/logos-explore.ts`),
+pages read by the hardened fetcher — but read turn by turn, four things kept
+a live question from being answered live:
+
+1. *The gate was narrower than the runtime.* `lib/runtime/epistemic.ts` read
+   the weather, a score, who won, a price, a rate and the news as questions
+   about something current; `lib/core4/web.ts` `webIntent`, which decides a
+   search, did not. So "what's the weather in Dallas" was marked current, not
+   searched, and the reply was told "nothing current was checked" — and said,
+   in effect, that it could not get live data.
+2. *Speech has no question mark.* The gate's question of fact about a named
+   thing required one; a turn said through Socria Voice never has one.
+3. *The reply did not know the date* — "today" and "tonight" meant nothing to
+   it, and what a search brought back could not be read against now.
+4. *A refused model ended the search.* OpenAI's web search retried with the
+   older tool name on a 400, but a model the account lacks (a 404) gave up.
+
+**What changed.**
+
+- `LIVE_SUBJECT` (`lib/core4/web.ts`): the weather and the forecast, scores
+  and who won, stocks, share prices, the markets, exchange, interest,
+  mortgage and inflation rates, crypto, gas prices, traffic, headlines and
+  breaking news, election results, the box office, what is open now. Asked as
+  a question (with or without a question mark), as an instruction ("check
+  the weather in Austin"), or in as few words as a search box takes ("weather
+  in dallas", "bitcoin price") — but not as a remark ("I love this weather",
+  "that score was unreal") or about their own material ("my essay is about
+  the stock market") — it is looked up. The runtime reads the same subjects
+  as current, so a turn it calls current is a turn the gate searches. Policy
+  still comes first: a sensitive or off-the-record turn, or a conversation
+  kept off the web, is never searched.
+- A short question of fact about a named thing is one with no question mark
+  too ("who founded Anthropic").
+- `nowLine` (`lib/runtime/epistemic.ts`): every Logos turn is told the day,
+  the date and the time where the person is, in their browser's time zone
+  (validated; anything else is UTC) — one line in the turn's own context,
+  about 30 tokens, never in the cached prompt.
+- `searchModels` (`lib/logos-explore.ts`): OpenAI's search asks the search
+  model, then `gpt-4o`, then the reply's own model, each with the tool's
+  current name and then its older one; a refused key (401) or a busy
+  provider (429) is not a model problem and stops there, named in the log.
+  The search may take up to 15 s (was 12) before the reply goes without it.
+- **Sources under the reply.** The pages a reply read (the `X-Socria-Sources`
+  header) are kept with it (`LogosMsg.sources`, saved by the conversations
+  and shared-conversation routes through `cleanWebSources`: http(s)
+  addresses, numbers and clipped titles only) and listed under it — "Checked
+  the web · 2 sources", each a link that opens apart — so its [1] and [2] can
+  be opened, now and after a reload.
+
+**Voice on the Universal Map.** The box at the map's foot has what the
+conversation's box has: the hold-to-talk mic (voice to text — held, the words
+land in the box to read and edit, never sent by themselves) and Socria Voice,
+marked Experimental. Said there, a turn is a command ("open my rent
+conversation", "go back") or begins a new line of thinking with those words,
+as typing them would. One microphone at a time: the mic steps aside while
+Voice listens. With the two, the box grows to keep the words their room; on a
+phone its tools take a second line under the words, and the build badge that
+previews and local builds show in that corner (never production) folds to its
+dot so it does not sit on them.
+
+**Checked.** `test/live-data.test.mjs` (63): every live subject in each shape
+searched, remarks and their own material not, policy first; a turn the
+runtime calls current is searched; questions said aloud; the date line, its
+time zone and what it refuses; the model chain on a 404, a 400 on both tool
+names, and a 401 that stops; the sources cleaner; the wiring from header to
+reply to save to screen; the box's mic and Voice. In the browser (a stand-in
+search that answers with two pages), desktop and a 390px phone, 14 checks
+each: the box with Voice and the mic on one row (two on a phone); held, the
+mic puts transcribed words in the box and sends nothing; Voice from the box,
+"whats the weather in dallas" said with no question mark, begins a line of
+thinking, is searched, answered from the page with [1], and lists both pages
+as links, kept after a reload; "bitcoin price" typed is looked up too; a
+question about their own plan is not.
+
+**Limits.** Production logs were not read for this (no access from here):
+the four faults above are what the code shows, fixed and tested; which of
+them a given production failure was is not known. What a real provider
+returns for a given question is not measured. A live subject not named in
+`LIVE_SUBJECT` still searches only when asked as a lookup or about something
+dated; asking "look it up" always searches, policy permitting.

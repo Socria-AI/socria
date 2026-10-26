@@ -15,7 +15,7 @@ import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
 import type { InlineState } from './inline-ui';
-import type { AboutRef, ReplyRef } from './chat-thread';
+import type { AboutRef, ReplyRef, WebSourceRef } from './chat-thread';
 import type { WriteDoc } from './write/doc';
 import { normalizeDraft } from './write/parse';
 
@@ -54,6 +54,8 @@ export interface LogosMsg {
   make?: { template?: { name: string; blocks: unknown[] } };
   /** said, not typed — Socria Voice (lib/voice/speech.ts): marked with a microphone, and read generously for a misheard word */
   via?: 'voice';
+  /** the web pages this reply was given to read (lib/chat-thread.ts cleanWebSources) — listed under it, never their text */
+  sources?: { query: string; list: WebSourceRef[] };
 }
 
 /**

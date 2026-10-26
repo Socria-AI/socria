@@ -128,6 +128,50 @@ export function aboutLine(a: AboutRef): string {
   return `[About ${what}: “${oneLine(a.label, 120).replace(/[“”]/g, '"')}”${a.of ? ` — in ${oneLine(a.of, 90)}` : ''}]`;
 }
 
+// ── the web pages a reply was given ─────────────────────────────────
+
+/** One page a reply was given to read (app/api/logos/chat X-Socria-Sources): what it cites as [n]. */
+export interface WebSourceRef {
+  n: number;
+  title: string;
+  url: string;
+  site: string;
+  published?: string;
+}
+
+/**
+ * The web pages a reply read, as kept with it and listed under it — so a
+ * citation [2] names something a person can open, now and after a reload.
+ * Display data from a header and from storage: numbers, http(s) addresses
+ * and clipped one-line titles only; never a page's text.
+ */
+export function cleanWebSources(v: unknown): { query: string; list: WebSourceRef[] } | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = v as Record<string, unknown>;
+  const raw = Array.isArray(r.list) ? r.list : Array.isArray(r.sources) ? r.sources : [];
+  const list: WebSourceRef[] = [];
+  for (const x of raw.slice(0, 8)) {
+    if (!x || typeof x !== 'object') continue;
+    const s = x as Record<string, unknown>;
+    const n = Number(s.n);
+    const url = typeof s.url === 'string' ? s.url.trim() : '';
+    if (!Number.isInteger(n) || n < 1 || n > 20 || !/^https?:\/\/[^\s<>"']{3,}$/i.test(url) || url.length > 600) continue;
+    let site = typeof s.site === 'string' ? oneLine(s.site, 80) : '';
+    if (!site) {
+      try {
+        site = new URL(url).hostname.replace(/^www\./, '');
+      } catch {
+        continue;
+      }
+    }
+    const title = typeof s.title === 'string' ? oneLine(s.title, 160) : '';
+    const published = typeof s.published === 'string' ? oneLine(s.published, 40) : '';
+    list.push({ n, title: title || site, url, site, ...(published ? { published } : {}) });
+  }
+  if (!list.length) return undefined;
+  return { query: typeof r.query === 'string' ? oneLine(r.query, 200) : '', list };
+}
+
 /** The snapshot a reply to this message carries. */
 export function replyRefOf(m: { id?: string; role: 'user' | 'assistant'; content: string }, who: string): ReplyRef {
   return cleanReplyRef({ id: m.id, role: m.role, who, excerpt: excerptOf(m.content) || '…' }) as ReplyRef;

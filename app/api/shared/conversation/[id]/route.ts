@@ -47,7 +47,7 @@ import { can, type Role } from '@/lib/share/roles';
 import { displayNameOf, isShared, noteChange, shareAccess } from '@/lib/share/server';
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
 import { sanitizeStoredDraft } from '@/lib/write/doc';
-import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef } from '@/lib/chat-thread';
+import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources } from '@/lib/chat-thread';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -144,13 +144,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const replyTo = cleanReplyRef(r.replyTo);
         const about = role === 'user' ? cleanAboutRef(r.about) : undefined;
         const synthesis = role === 'assistant' ? sanitizeSynthesis(r.synthesis) : undefined;
+        // the web pages a reply read, listed under it — addresses and titles, never their text
+        const sources = role === 'assistant' ? cleanWebSources(r.sources) : undefined;
         // said rather than typed (Socria Voice): shown with a microphone
         const via = role === 'user' && r.via === 'voice' ? ('voice' as const) : undefined;
         const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}), ...(about ? { about } : {}), ...(via ? { via } : {}) };
         // a person's turn is theirs, named; Socria's answer is Socria's
         return role === 'user'
           ? { ...extra, role, content, by }
-          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}) };
+          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}), ...(sources ? { sources } : {}) };
       }).filter((m) => m.content.trim())
     : [];
   const base = Number(body?.base) || 0;

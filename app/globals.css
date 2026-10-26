@@ -7505,6 +7505,12 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 }
 .env-badge > button:hover { color: #23241f; }
 .env-badge.is-preview > button { border-color: rgba(184, 162, 107, 0.5); }
+/* On a phone the Universal Map's box fills the bottom edge and its tools sit
+   in this corner: the badge folds to its dot (the word is still read out). */
+@media (max-width: 560px) {
+  body:has(.l5h-find) .env-badge { left: 4px; bottom: 4px; }
+  body:has(.l5h-find) .env-badge > button { font-size: 0; gap: 0; padding: 5px; }
+}
 .env-dot {
   width: 6px;
   height: 6px;

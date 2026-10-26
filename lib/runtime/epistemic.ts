@@ -33,7 +33,7 @@
 //
 // Pure. No model, no network, no clock.
 
-import { webIntent } from '../core4/web';
+import { LIVE_SUBJECT, webIntent } from '../core4/web';
 import type { ExplicitSignals } from '../core4/types';
 import { smallTalk } from '../cognition/register';
 
@@ -73,7 +73,7 @@ export function assessNeed(i: NeedInput): Need {
   // "How are you doing today?" asks after Socria, not after the world: it is
   // not a claim about anything current, and "what's up?" is not a fact.
   const chat = smallTalk(t);
-  if (!chat && CURRENT.test(t) && (t.includes('?') || FACT.test(t) || /\b(?:look up|check|find out|search)\b/i.test(t))) kinds.push('current');
+  if (!chat && (CURRENT.test(t) || LIVE_SUBJECT.test(t)) && (t.includes('?') || FACT.test(t) || /\b(?:look up|check|find out|search)\b/i.test(t))) kinds.push('current');
   else if (!chat && FACT.test(t)) kinds.push('fact');
   const w = webIntent(t, i.signals, i.policy);
   return { kinds, web: w.want ? { want: true, why: w.why, kind: w.kind, ...(w.url ? { url: w.url } : {}) } : { want: false, why: w.why } };
@@ -377,6 +377,33 @@ export function renderConflicts(c: readonly Conflict[]): string {
 
 /** What the reply is told when the turn asks for something current and no live source was checked. */
 export const UNCHECKED_CURRENT = `\n\n=== Nothing current was checked this turn ===\nThis question is about something that changes. No live source was checked, so what you know may be out of date: answer from what you know, say plainly that it may have changed, and name where to check. Never present it as current.\n`;
+
+// ── now ──────────────────────────────────────────────────────────────
+
+/** A time zone the browser named, if it is one; else UTC. */
+export function cleanTimeZone(v: unknown): string {
+  const tz = typeof v === 'string' ? v.trim() : '';
+  if (!tz || tz.length > 64 || !/^[A-Za-z][A-Za-z0-9_+\-]*(?:\/[A-Za-z0-9_+\-]+){0,2}$/.test(tz)) return 'UTC';
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz });
+    return tz;
+  } catch {
+    return 'UTC';
+  }
+}
+
+/**
+ * WHEN THIS TURN IS, where they are. The reply was never told the date, so
+ * "today", "tonight" and "this weekend" meant nothing to it, and what a search
+ * brought back could not be read against now. One line, in the turn's own
+ * context (never the cached prompt): the day, the date and the time in their
+ * own time zone, as their browser names it.
+ */
+export function nowLine(now: number, tz?: unknown): string {
+  const zone = cleanTimeZone(tz);
+  const when = new Intl.DateTimeFormat('en-US', { timeZone: zone, weekday: 'long', year: 'numeric', month: 'long', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(now));
+  return `\n\nNOW: ${when} where they are (${zone}). Read "today", "tonight", "this week" and any dates against this.\n`;
+}
 
 /** The log line for one reply: counts, never content. */
 export function epistemicLog(route: string, r: Report, removed: number, extra: Record<string, string | number> = {}): string {

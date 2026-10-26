@@ -31,8 +31,12 @@ import { runSearch, searchConfigured } from '../logos-explore';
 import { buildQuery, flatten, webIntent, type Research, type WebSource } from './web';
 import type { ExplicitSignals } from './types';
 
-/** Long enough for a search to answer (OpenAI's web search takes several seconds), short enough not to hold a reply for long. */
-const SEARCH_TIMEOUT_MS = 12000;
+/**
+ * Long enough for a search to answer (OpenAI's web search takes several
+ * seconds, and a model the account lacks is tried again with another), short
+ * enough not to hold a reply for long.
+ */
+const SEARCH_TIMEOUT_MS = 15000;
 /** A page is bigger than a snippet, and fetchWeb has its own 12 s ceiling. */
 const PAGE_TIMEOUT_MS = 9000;
 /** Four is enough to disagree with itself; ten is a wall of text. */

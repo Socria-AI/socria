@@ -101,6 +101,9 @@ export function UniverseView({
   drawing = null,
   readDocument,
   picker,
+  voice = false,
+  voiceButton,
+  voiceLive = false,
   startWith = null,
   startIn = null,
   working = null,
@@ -149,6 +152,12 @@ export function UniverseView({
   readDocument?: (file: File) => Promise<Attachment>;
   /** the model and how far it goes, in the box */
   picker?: ReactNode;
+  /** the hold-to-talk mic in the box: words spoken land in it to edit, never sent by themselves */
+  voice?: boolean;
+  /** Socria Voice's button (components/logos5/SocriaVoice.tsx), in the box */
+  voiceButton?: ReactNode;
+  /** Socria Voice is listening: the hold-to-talk mic steps aside */
+  voiceLive?: boolean;
   /** words to begin with, put in the box (an opening chosen elsewhere) */
   startWith?: string | null;
   /** the Project a new line of thinking will be begun in, by name */
@@ -636,6 +645,9 @@ export function UniverseView({
       inputRef={findRef}
       readDocument={readDocument}
       picker={picker}
+      voice={voice}
+      voiceButton={voiceButton}
+      voiceLive={voiceLive}
       placeholder={startIn ? `Search, or start something new in “${startIn}”…` : undefined}
       takeRef={takeRef}
       onPick={(t) => {

@@ -6,7 +6,7 @@
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
 import { sanitizeInlineState } from '@/lib/inline-ui';
-import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, type ReplyRef } from '@/lib/chat-thread';
+import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
@@ -69,6 +69,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
       // said rather than typed (Socria Voice): the conversation marks it with a microphone
       const via = m.role === 'user' && m.via === 'voice' ? 'voice' : undefined;
+      // the web pages a reply read, listed under it — addresses and titles, never their text
+      const sources = m.role === 'assistant' ? cleanWebSources(m.sources) : undefined;
       return {
         ...(id ? { id } : {}),
         ...(at ? { at } : {}),
@@ -77,6 +79,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(replyTo ? { replyTo } : {}),
         ...(about ? { about } : {}),
         ...(via ? { via } : {}),
+        ...(sources ? { sources } : {}),
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),

@@ -111,6 +111,7 @@ import {
   rewriteCitations,
   routeTurn,
   runtimeOn,
+  nowLine,
   UNCHECKED_CURRENT,
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
@@ -986,6 +987,8 @@ export async function POST(req: NextRequest) {
       // here, the documents themselves in the turn (with their message).
       (docRefs.length ? `\n\n${DOC_RULES}\n` : '');
     const turnContext =
+      // When this turn is, where they are: the date and time in their own time zone (lib/runtime/epistemic.ts nowLine)
+      nowLine(Date.now(), body?.tz) +
       // What they are looking at.
       //
       // TWO BLOCKS, AND ONLY ONE OF THEM AT A TIME. `vizState` is the picture

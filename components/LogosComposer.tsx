@@ -240,9 +240,9 @@ function insertAtCaret(
   });
 }
 
-type Voice = ReturnType<typeof useVoiceInput>;
+export type Voice = ReturnType<typeof useVoiceInput>;
 /** What the hand on the mic is doing: holding it, and whether it has slid off to cancel. */
-type Hold = { holding: boolean; away: boolean };
+export type Hold = { holding: boolean; away: boolean };
 
 /**
  * THE MIC, HELD: press and talk, let go and the words land in the box to edit
@@ -253,7 +253,7 @@ type Hold = { holding: boolean; away: boolean };
  * behind it — a screen reader activating the button — toggles instead: once to
  * start, again to stop.
  */
-function HoldMic({ mic, onHold }: { mic: Voice; onHold: (h: Hold) => void }) {
+export function HoldMic({ mic, onHold }: { mic: Voice; onHold: (h: Hold) => void }) {
   const holding = useRef(false);
   /** this press was a hold already handled — the click the browser sends after it is not a toggle */
   const handled = useRef(false);

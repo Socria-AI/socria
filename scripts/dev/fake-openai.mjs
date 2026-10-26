@@ -18,6 +18,9 @@
 //                                  (a map, a study's topics, journal-entry practice,
 //                                  a reading or proposed edits for the writing space)
 //   POST /v1/audio/transcriptions  {"text": …} — the voice composer's path
+//   POST /v1/responses             a web search (tools: web_search): a short answer
+//                                  citing two fixed example pages (url_citation),
+//                                  the shape OpenAI's web search returns
 //   GET  /v1/models                a short list
 
 import http from 'node:http';
@@ -32,6 +35,12 @@ const allUser = (messages) => messages.filter((m) => m?.role === 'user').map((m)
 
 /** A reply in Logos's register, chosen by what the last message is plainly doing. */
 function chatReply(messages) {
+  // pages from the web were given this turn (app/api/logos/chat renderResearch): the answer cites the first
+  const web = messages.find((m) => m?.role === 'system' && String(m.content ?? '').includes('=== From the web'));
+  if (web) {
+    const first = /\[1\] [^\n]*\n\s+([^\n]+)/.exec(String(web.content))?.[1]?.trim() ?? '';
+    return `${first ? first.replace(/[.\s]+$/, '') : 'The page says so'} [1]. Readings like this change through the day, so check again before you plan around it.`;
+  }
   const t = lastUser(messages).toLowerCase();
   if (/custom artifact/.test(t)) return 'It is in Artifacts: tick each day as you go — the days and the bar work themselves out. Which habit is the hardest to keep?';
   if (/\bchart|plot|graph\b/.test(t)) return 'Rent is most of it — three-quarters of what you listed. Is that the share you expected?';
@@ -366,6 +375,40 @@ const server = http.createServer((req, res) => {
       // the voice composer's request: multipart with a file part. The text is canned.
       const sized = raw.length > 200;
       return send(res, 200, { text: sized ? 'Okay so the new role is mostly maintaining the quarterly reports, which is basically what I do now.' : '' });
+    }
+    if (req.method === 'POST' && url.pathname.endsWith('/responses')) {
+      // OpenAI's web search (lib/logos-explore.ts openaiSearch): an answer that cites pages
+      let body;
+      try {
+        body = JSON.parse(raw.toString('utf8'));
+      } catch {
+        return send(res, 400, { error: { message: 'bad json' } });
+      }
+      const q = String(body.input ?? '').replace(/^Search the web for:\s*/i, '').split('\n')[0].trim();
+      const weather = /weather|forecast|rain|temperature/i.test(q);
+      const text = weather
+        ? `It is 72°F and sunny in Dallas right now, with a light south wind. Tonight falls to 58°F under clear skies.`
+        : `The latest reporting on ${q || 'this'} says the figures were updated this morning. Analysts expect another revision next week.`;
+      const cut = text.indexOf('.') + 1;
+      return send(res, 200, {
+        id: 'resp_local',
+        output: [
+          { type: 'web_search_call', status: 'completed' },
+          {
+            type: 'message',
+            content: [
+              {
+                type: 'output_text',
+                text,
+                annotations: [
+                  { type: 'url_citation', url: weather ? 'https://weather.example.com/dallas?utm_source=openai' : 'https://news.example.com/latest?utm_source=openai', title: weather ? 'Dallas, TX — current conditions' : 'Latest update', start_index: 0, end_index: cut },
+                  { type: 'url_citation', url: weather ? 'https://forecast.example.org/tx/dallas' : 'https://wire.example.org/story', title: weather ? 'Dallas forecast — tonight and tomorrow' : 'What comes next', start_index: cut + 1, end_index: text.length },
+                ],
+              },
+            ],
+          },
+        ],
+      });
     }
     if (req.method === 'POST' && url.pathname.endsWith('/chat/completions')) {
       let body;

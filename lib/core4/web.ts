@@ -134,6 +134,26 @@ const ASKED = new RegExp(
 /** A question whose answer moves: it is about now, not about always. */
 const CURRENT = /\b(?:latest|current(?:ly)?|right now|today|this (?:week|month|year)|as of (?:today|now|this)|recent(?:ly)?|news|just (?:announced|released|shipped)|still (?:true|the case|supported|maintained)|price of|pricing|release date|changelog|deprecat(?:ed|ion)|who (?:is|are) the current)\b/i;
 
+/**
+ * LIVE DATA, BY ITS SUBJECT: what changes by the day or the hour whatever
+ * words are round it — the weather, a score, who won, a price, a rate, the
+ * markets, the headlines, traffic, what is open. lib/runtime/epistemic.ts has
+ * always read these as questions about something current; this gate did not
+ * look them up, so a turn asking the weather was told "nothing current was
+ * checked" and answered with a warning instead of the weather.
+ */
+export const LIVE_SUBJECT =
+  /\b(?:weather|forecast|temperature (?:in|at|today|tomorrow|tonight|outside|right now)|(?:is it|will it) (?:rain|snow)|(?:live |final )?scores?|who (?:won|is winning|leads|is leading)|standings|stock(?:s| price| prices| market)?|share price|exchange rate|interest rates?|mortgage rates?|inflation rate|bitcoin|ethereum|crypto(?:currency)? prices?|gas prices?|traffic|headlines|breaking news|latest news|news today|today'?s news|election results?|box office|open now|opening hours)\b/i;
+
+/** A few words, as typed into a search box: "weather in dallas", "bitcoin price", "lakers score". */
+const SEARCH_BOX = (t: string): boolean => {
+  const words = t.replace(/[^\p{L}\p{N}'\s]/gu, ' ').split(/\s+/).filter(Boolean);
+  if (!words.length || words.length > 8) return false;
+  // a remark, not a query: "I love this weather", "the weather is lovely", "that score was unreal"
+  if (/^(?:i|i'm|im|i've|ive|we|we're|my|our|it|it's|its|this|that|these|those)$/i.test(words[0])) return false;
+  return !words.some((w) => /^(?:is|are|was|were|am|be|been|feel|feels|felt|looks?|seems?|love|loved|hate|hated|like|liked|got|had|have|has)$/i.test(w));
+};
+
 /** Anything with a year at or past the training frontier is a currency claim. */
 const FUTURE_YEAR = /\b20(?:2[5-9]|[3-9]\d)\b/;
 
@@ -142,6 +162,13 @@ const URL_IN_TEXT = /\bhttps?:\/\/[^\s<>()"']{4,}/i;
 
 /** A question of fact, put plainly: who, what, when, where, which, how much or many, is/does/did. */
 const FACT_ASKED = /^\s*(?:(?:hey|ok(?:ay)?|so|and|quick question)[,!.]?\s+)?(?:who|what(?:'s| is| are| was| were| does| did)|when|where|which|how (?:much|many|old|big|long|tall|far)|is|are|was|were|does|did|has|have)\b[^?]{0,140}\?\s*$/i;
+/**
+ * The same question said aloud: speech recognition hands it over with no
+ * question mark (Socria Voice), so a short turn that opens as a question of
+ * fact is one, mark or none.
+ */
+const FACT_SAID = /^\s*(?:(?:hey|ok(?:ay)?|so|and|quick question)[,!.]?\s+)?(?:who|what(?:'s| is| are| was| were| does| did)|when|where|which|how (?:much|many|old|big|long|tall|far))\b[^?]{0,140}[.!]?\s*$/i;
+const shortTurn = (t: string) => t.split(/\s+/).filter(Boolean).length <= 14;
 
 /** Words that are capitalised without naming anything in particular. */
 const NOT_A_NAME = /^(?:I|I'm|I've|I'd|I'll|OK|Okay|AI|The|A|An|This|That|These|Those|My|Your|Our|Their|It|Its|What|Who|When|Where|Which|How|Why|Is|Are|Was|Were|Does|Did|Has|Have|Can|Could|Should|Would|Will|Do|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December)$/;
@@ -262,16 +289,20 @@ export function webIntent(
   // adding it here only widens the CURRENT branch, which already requires the
   // answer to be one that moves.
   const asks =
-    /\?|^\s*(?:what|which|who|when|where|how much|how many|is|are|does|do|did|has|have|can)\b/i.test(t) ||
-    /^\s*(?:summari[sz]e|tell me|give me|show me|list|compare|find out|catch me up|update me|remind me)\b/i.test(t);
+    /\?|^\s*(?:(?:hey|ok(?:ay)?|so|and)[,!.]?\s+)?(?:what(?:'?s)?|which|who(?:'?s)?|when|where(?:'?s)?|how (?:much|many|long|far|old|big|tall|fast|is|are|does|did)|is|are|does|do|did|has|have|can|will)\b/i.test(t) ||
+    /^\s*(?:summari[sz]e|tell me|give me|show me|list|compare|find out|check|catch me up|update me|remind me)\b/i.test(t);
   if ((CURRENT.test(t) || FUTURE_YEAR.test(t)) && asks && !INWARD.test(t)) {
+    return { want: true, kind: 'search', why: 'the answer is one that moves' };
+  }
+  // …and live data by its subject: asked in any of those shapes, or in as few words as a search box takes
+  if (LIVE_SUBJECT.test(t) && !INWARD.test(t) && (asks || SEARCH_BOX(t))) {
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
   }
   // A FACT ABOUT A NAMED THING: "Who founded Socria?", "What does Anthropic's
   // newest model cost?", "Where is Bolt headquartered?". What a model remembers
   // about a particular person, company or product is old or missing, and an
   // answer from that memory reads exactly like one that was checked.
-  if (FACT_ASKED.test(t) && namesSomething(t) && !INWARD.test(t)) {
+  if ((FACT_ASKED.test(t) || (FACT_SAID.test(t) && shortTurn(t))) && namesSomething(t) && !INWARD.test(t)) {
     return { want: true, kind: 'search', why: 'a fact about a named thing' };
   }
   return { want: false, why: 'the material is already in the message' };

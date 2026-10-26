@@ -337,11 +337,23 @@ function citedSpan(text: string, start: number, end: number): string {
   return text.slice(from, Math.min(to + 1, from + 400)).replace(/\s+/g, ' ').trim();
 }
 
+/**
+ * The models a search is asked of, in order: the one set for it, then the
+ * others this deployment already answers with. A model an account does not
+ * have — retired, renamed, never enabled — is a 404 (or a 400 naming the
+ * model), and that used to end the search: every live question was then
+ * answered "I couldn't check", on a deployment whose key could search fine.
+ */
+export function searchModels(env: Record<string, string | undefined> = process.env): string[] {
+  const out: string[] = [];
+  for (const m of [(env.OPENAI_MODEL_SEARCH ?? '').trim() || 'gpt-4o-mini', 'gpt-4o', (env.OPENAI_MODEL_LOGOS ?? '').trim()]) if (m && !out.includes(m)) out.push(m);
+  return out;
+}
+
 async function openaiSearch(query: string): Promise<SearchBundle> {
   const key = (process.env.OPENAI_API_KEY ?? '').trim();
   const base = ((process.env.OPENAI_BASE_URL ?? '').trim() || 'https://api.openai.com/v1').replace(/\/+$/, '');
-  const model = (process.env.OPENAI_MODEL_SEARCH ?? '').trim() || 'gpt-4o-mini';
-  const ask = (tool: string) =>
+  const ask = (model: string, tool: string) =>
     post(
       `${base}/responses`,
       { Authorization: `Bearer ${key}`, 'Content-Type': 'application/json' },
@@ -352,9 +364,14 @@ async function openaiSearch(query: string): Promise<SearchBundle> {
         input: `Search the web for: ${query}\nAnswer in a few sentences, citing the pages you used.`,
       }
     );
-  // the tool's current name, then the older one some accounts still have
-  let res = await ask('web_search');
-  if (!res.json && res.status === 400) res = await ask('web_search_preview');
+  // for each model: the tool's current name, then the older one some accounts still have; a model
+  // the account cannot use (404, or a 400 on both names) gives way to the next
+  let res: { json: any; status: number | null } = { json: null, status: null };
+  for (const model of searchModels()) {
+    res = await ask(model, 'web_search');
+    if (!res.json && res.status === 400) res = await ask(model, 'web_search_preview');
+    if (res.json || (res.status !== 400 && res.status !== 404)) break;
+  }
 
   const seen = new Set<string>();
   const results: SearchBundle['results'] = [];

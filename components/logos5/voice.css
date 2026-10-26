@@ -561,3 +561,67 @@ html[data-theme='night'] .logos-root .sv-problem {
     grid-template-columns: 1fr;
   }
 }
+
+/* ── the Universal Map's box: Voice, and the mic that puts spoken words in it ── */
+/* the two make the box's row longer: the box grows by them, so the words keep their room */
+.logos-root .l5 .l5h-omni:has(.sv-btn) {
+  flex-basis: 760px;
+}
+.logos-root .l5h-find-row .sv-btn {
+  flex: none;
+}
+.logos-root .l5h-find-row .lg-mic {
+  flex: none;
+  width: 36px;
+  height: 36px;
+}
+.logos-root .l5h-voice {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.logos-root .l5h-voice.is-away {
+  color: #a33a2c;
+}
+.logos-root .l5h-voice.is-err {
+  color: #8a3a2e;
+}
+@media (max-width: 560px) {
+  /* a phone: the words have the box's whole width, and its tools a line of their own under them,
+     as the conversation's box has (the map's foot is measured, so what sits above it moves up) */
+  .logos-root .l5 .l5h-find:has(.sv-btn),
+  .logos-root .l5 .l5h.is-narrow .l5h-find:has(.sv-btn) {
+    height: auto;
+    padding-top: 4px;
+    padding-bottom: 6px;
+  }
+  .logos-root .l5h-find-row:has(.sv-btn) {
+    flex-wrap: wrap;
+    row-gap: 0;
+    gap: 4px;
+  }
+  .logos-root .l5h-find-row:has(.sv-btn) > input {
+    flex: 1 0 100%;
+    min-height: 44px;
+  }
+  /* the length first, the rest at the end, by the ↑ */
+  .logos-root .l5h-find-row:has(.sv-btn) .l5h-find-pick {
+    margin-right: auto;
+  }
+  .logos-root .l5h-find-row:has(.sv-btn) .l5h-find-pick .mp-btn .nm {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .logos-root .l5h-find-row .lg-mic,
+  .logos-root .l5h-find-row .sv-btn {
+    height: 40px;
+  }
+  .logos-root .l5h-find-row .lg-mic {
+    width: 40px;
+  }
+}

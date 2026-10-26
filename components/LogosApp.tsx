@@ -69,7 +69,7 @@ import { PLAN_CHANGED, SESSION_SAVED } from '@/components/rewards/useRewards';
 import { CollabBar } from '@/components/CollabBar';
 import { useLogosCollab } from '@/components/useLogosCollab';
 import { cleanName, joinCodeFrom } from '@/lib/collab';
-import { callsSocria, landReply, mentionsSocria, newMsgId, replyRefOf, withArrived, withoutTurn, type ReplyRef } from '@/lib/chat-thread';
+import { callsSocria, cleanWebSources, landReply, mentionsSocria, newMsgId, replyRefOf, withArrived, withoutTurn, type ReplyRef } from '@/lib/chat-thread';
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
@@ -1050,6 +1050,8 @@ export function LogosApp({
     // and the written instructions below it (lib/conversation-style.ts)
     conversationStyle: conversationStyleRef.current,
     style: styleRef.current,
+    // where they are, so the reply knows when "today" is (app/api/logos/chat nowLine)
+    tz: browserTimeZone(),
   });
 
   /**
@@ -4250,6 +4252,8 @@ export function LogosApp({
 
       // the reply is on its way: whether sources were found to check it against is known now
       setTurnInfo((t) => (t ? { ...t, headers: true, sources: sourcesIn(res.headers) } : t));
+      // …and which: kept with the reply and listed under it, so its [1], [2] can be opened (L5Message)
+      const web = webSourcesIn(res.headers);
       // The turn was accepted. Now the map may be rebuilt from it — unless all
       // it said was "ok" or "thanks", which cannot change it; the next turn
       // that says something sends the whole conversation (lib/map-skip.ts).
@@ -4303,6 +4307,7 @@ export function LogosApp({
         role: 'assistant',
         content: acc,
         ...(group ? { replyTo: replyRefOf(sent, myName) } : {}),
+        ...(web ? { sources: web } : {}),
       };
       // Into the session that SENT, which may no longer be the active one —
       // and into it as it is NOW. It used to be written as the copy taken when
@@ -8041,6 +8046,10 @@ export function LogosApp({
       drawing={drawing}
       readDocument={readDocument}
       picker={<ConcisePicker value={replyLength} onChange={pickLength} />}
+      // talking instead of typing, here too: the words into the box (held mic), or Socria Voice
+      voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
+      voiceButton={voiceButton}
+      voiceLive={voiceOn}
       startWith={homeStart}
       startIn={emptyHere && active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name ?? null : null}
       working={(organizing || sortPending) && messages.length === 0 ? 'Sorting your files into topics…' : null}
@@ -8467,6 +8476,25 @@ function LogosIntroOnce({ onStart, onSkip }: { onStart: (text: string) => void; 
     track('socria_intro_started', { surface: 'logos' });
   }, []);
   return <FirstRunIntro surface="logos" onStart={onStart} onSkip={onSkip} />;
+}
+
+/** The time zone this browser is in, as it names it (America/Chicago), or nothing. */
+function browserTimeZone(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone || undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+/** The web pages the server gave the reply to read (X-Socria-Sources), as kept with it. */
+function webSourcesIn(h: Headers): Msg['sources'] | undefined {
+  try {
+    const raw = h.get('X-Socria-Sources');
+    return raw ? cleanWebSources(JSON.parse(decodeURIComponent(raw))) : undefined;
+  } catch {
+    return undefined;
+  }
 }
 
 /** How many sources the server found to check the reply against (X-Socria-Sources, app/api/logos/chat). */
