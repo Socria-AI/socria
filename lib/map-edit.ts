@@ -205,6 +205,12 @@ export interface Command {
 }
 export interface Refusal {
   refused: string;
+  /**
+   * The command, with `{}` where the missing words go — "add a branch called {}"
+   * — when what was refused only lacked them: the next short turn fills it in
+   * (components/LogosApp.tsx), so "add a branch" … "cost" is one edit.
+   */
+  fill?: string;
 }
 
 const Q = `["“”'‘’]?`;
@@ -291,4 +297,182 @@ export function readMapCommand(text: string, map: ThinkingMap): Command | Refusa
     };
   }
   return null;
+}
+
+// ── adding, and "that" ────────────────────────────────────────────────
+//
+// "Add a branch called cost", "add another branch about time", "add a
+// question: why is rent so high?" — the map's own `add` edit, said in words.
+// A branch hangs from something: the idea named ("…to the budget"), else the
+// one last touched in the conversation; "another" makes a sibling of the last
+// one added. Typed or spoken, through the same reader.
+
+/** The idea last touched by a command or a selection — what "that", "it" and "another" mean. */
+export interface Touched {
+  id: string;
+  label: string;
+  /** the idea it hangs from, when it was added as a branch */
+  near?: string;
+}
+
+// "Add" takes any of the map's words; "make" and "create" only the ones that
+// can mean nothing but the map — "make a question about photosynthesis" asks
+// Socria to write a question, it does not put one on the map.
+const ADD_WORDS = String.raw`(?:add|put)\s+(?:a\s+|an\s+|another\s+|one more\s+)?(?:new\s+)?(node|idea|branch|card|point|question|claim|bubble|sub ?idea|child)`;
+const MAKE_WORDS = String.raw`(?:create|make)\s+(?:a\s+|an\s+|another\s+|one more\s+)?(?:new\s+)?(node|branch|card|bubble|sub ?idea|child)`;
+const ADD_REST = String.raw`\b\s*(?:(?:called|named|about|saying|that says|for|on)\s+|:\s*|,\s*)?["“']?(.*?)["”']?(?:\s+(?:to|under|from|off|onto|beside|next to|connected to|linked to|branching (?:off|from))\s+(?:the\s+)?(?:node\s+|idea\s+|branch\s+)?["“']?(.+?)["”']?)?\s*[.!]?$`;
+const ADD = new RegExp(String.raw`^(?:please\s+|can you\s+|could you\s+|now\s+|and\s+)*(?:${ADD_WORDS}|${MAKE_WORDS})${ADD_REST}`, 'i');
+
+/** The idea everything else hangs from: the one with the most connections, or the first. */
+function hubOf(map: ThinkingMap): LogosNode | null {
+  if (!map.nodes.length) return null;
+  const degree = new Map<string, number>();
+  for (const e of map.edges) {
+    degree.set(e.from, (degree.get(e.from) ?? 0) + 1);
+    degree.set(e.to, (degree.get(e.to) ?? 0) + 1);
+  }
+  return [...map.nodes].sort((a, b) => (degree.get(b.id) ?? 0) - (degree.get(a.id) ?? 0))[0];
+}
+
+/** An idea to add, in words: what it says, what kind, and what it hangs from. */
+export function readMapAdd(text: string, map: ThinkingMap, recent?: Touched | null): Command | Refusal | null {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 220) return null;
+  const r = ADD.exec(t);
+  if (!r) return null;
+  // the word (from "add …" or from "make …"), what it says, and what it hangs from
+  const m = [r[0], r[1] ?? r[2], r[3], r[4]] as const;
+  const word = m[1].toLowerCase().replace(/\s+/g, '');
+  const label = (m[2] ?? '').replace(/[.!]+$/, '').trim();
+  const another = /\b(?:another|one more)\b/i.test(t);
+  if (!label)
+    return {
+      refused: `What should the new ${word === 'question' ? 'question' : word === 'branch' ? 'branch' : 'idea'} say?`,
+      fill: `add ${another ? 'another' : 'a'} ${word} called {}${m[3] ? ` to ${m[3]}` : ''}`,
+    };
+  let near: LogosNode | null = null;
+  if (m[3]) {
+    const f = findNode(map, m[3]);
+    if (f && 'ambiguous' in f) return { refused: `${quote(m[3])} could mean more than one thing on the map: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
+    if (!f) return { refused: `Nothing on the map is called ${quote(m[3])}.` };
+    near = f.node;
+  } else if (word === 'branch' || word === 'subidea' || word === 'child' || another) {
+    const anchor = another ? (recent?.near ?? recent?.id) : recent?.id;
+    near = (anchor ? map.nodes.find((n) => n.id === anchor) : null) ?? hubOf(map);
+  }
+  const type: LogosNode['type'] = word === 'question' || /\?\s*$/.test(label) ? 'question' : word === 'claim' ? 'claim' : 'idea';
+  const clean = label.replace(/\?\s*$/, type === 'question' ? '?' : '');
+  return {
+    // the person's own idea: no origin is theirs (a Socria suggestion carries 'socria')
+    edits: [{ op: 'add', node: { label: clean, type }, ...(near ? { near: near.id } : {}) }],
+    said: `Added ${quote(clean)} to the map${near ? `, from ${quote(near.label)}` : ''}.`,
+  };
+}
+
+/**
+ * "Rename that to housing", "remove it", "mark that as resolved": the idea
+ * last touched, named. The word for it is the whole of what the command is
+ * about — "remove this idea about rent" names its idea, and is read as it is.
+ */
+const VERBS = 'rename|relabel|reword|call|remove|delete|drop|erase|mark|set|flag|resolve|reopen|close|connect|link|disconnect|unlink';
+const THAT = String.raw`(?:that|it|this|that one|this one|the last one|that (?:node|idea|branch|card)|this (?:node|idea|branch|card))`;
+const REFERS = new RegExp(
+  String.raw`^((?:(?:please|can you|could you|now|and)\s+)*(?:${VERBS})\s+)${THAT}(?=\s*(?:$|[.!?]|to\b|as\b|into\b|from\b|and\b|with\b|resolved|done|answered|settled|closed|supported|open|reopened|revised))`,
+  'i'
+);
+
+/** A map command whose "that" or "it" means the idea last touched — read with that idea named. */
+export function readMapCommandAbout(text: string, map: ThinkingMap, recent?: Touched | null): Command | Refusal | null {
+  const t = text.replace(/\s+/g, ' ').trim();
+  const m = REFERS.exec(t);
+  // "that" with nothing touched is not guessed at: it is not a label to look for
+  if (!m) return readMapCommand(t, map);
+  if (!recent || !map.nodes.some((n) => n.id === recent.id)) return null;
+  const named = t.replace(REFERS, `$1“${recent.label}”`);
+  const read = readMapCommand(named, map);
+  if (read) return read;
+  // "rename that" — what to: asked, and the next words answer it
+  if (/^(?:rename|relabel|reword|call)$/i.test(m[1].trim().split(/\s+/).pop() ?? '')) {
+    return { refused: `What should “${recent.label}” be called?`, fill: `rename “${recent.label}” to {}` };
+  }
+  return null;
+}
+
+/**
+ * A change to the map, made on the map as it is now: `from` and `to` are the
+ * map before and after it, and what differs between them is done to `now` —
+ * the ideas it added or took away, their wording and status, the connections.
+ * Undo is the change from after to before; Redo is before to after. The map
+ * may have moved on since (the map pass draws after every answer), so an idea
+ * changed since is left as it is now, and an idea taken away stays taken away
+ * from the extractor too, as a removal by hand always does (`removed`).
+ */
+export function replayMapChange(now: ThinkingMap, from: ThinkingMap, to: ThinkingMap): { map: ThinkingMap; changed: number } {
+  const inFrom = new Map(from.nodes.map((n) => [n.id, n]));
+  const inTo = new Map(to.nodes.map((n) => [n.id, n]));
+  let nodes = [...now.nodes];
+  let edges = [...now.edges];
+  let removed = [...(now.removed ?? [])];
+  let changed = 0;
+  for (const n of from.nodes) {
+    if (inTo.has(n.id) || !nodes.some((x) => x.id === n.id)) continue;
+    nodes = nodes.filter((x) => x.id !== n.id);
+    edges = edges.filter((e) => e.from !== n.id && e.to !== n.id);
+    const k = keyOf(n.label);
+    if (k && !removed.includes(k)) removed = [...removed, k].slice(-MAX_REMOVED);
+    changed++;
+  }
+  for (const n of to.nodes) {
+    if (inFrom.has(n.id) || nodes.some((x) => x.id === n.id || keyOf(x.label) === keyOf(n.label))) continue;
+    nodes = [...nodes, n];
+    removed = removed.filter((r) => r !== keyOf(n.label));
+    changed++;
+  }
+  for (const b of to.nodes) {
+    const a = inFrom.get(b.id);
+    if (!a || (a.label === b.label && a.status === b.status && a.type === b.type)) continue;
+    const i = nodes.findIndex((x) => x.id === b.id);
+    if (i < 0 || nodes[i].label !== a.label || nodes[i].status !== a.status) continue;
+    const { tex: _tex, ...rest } = nodes[i];
+    nodes[i] = { ...rest, label: b.label, status: b.status, type: b.type, ...(b.tex ? { tex: b.tex } : {}) };
+    changed++;
+  }
+  const ek = (e: { from: string; to: string }) => [e.from, e.to].sort().join('|');
+  const fromE = new Set(from.edges.map(ek));
+  const toE = new Set(to.edges.map(ek));
+  for (const e of from.edges) {
+    if (toE.has(ek(e))) continue;
+    const n = edges.length;
+    edges = edges.filter((x) => ek(x) !== ek(e));
+    if (edges.length < n) changed++;
+  }
+  const ids = new Set(nodes.map((n) => n.id));
+  for (const e of to.edges) {
+    if (fromE.has(ek(e)) || !ids.has(e.from) || !ids.has(e.to) || edges.some((x) => ek(x) === ek(e))) continue;
+    edges = [...edges, e];
+    changed++;
+  }
+  const map: ThinkingMap = { ...now, nodes, edges };
+  if (removed.length) map.removed = removed;
+  else delete map.removed;
+  return { map, changed };
+}
+
+/**
+ * "Select the rent idea", "focus on cost": the card in hand, as a press on it
+ * would put it — so what is asked next ("challenge this", "why does this one
+ * matter?") is about it (Point & Ask), and "that" means it.
+ */
+const SELECT =
+  /^(?:(?:please|can you|could you|now|and)\s+)*(?:select|focus on|point at|point to|pick|highlight)\s+(?:the\s+)?(?:(?:node|idea|card|branch|question|claim)\s+)?(?:(?:called|named|about|on)\s+)?["“']?(.+?)["”']?(?:\s+(node|idea|card|branch))?\s*[.!]?$/i;
+
+export function readMapSelect(text: string, map: ThinkingMap): { node: LogosNode } | Refusal | null {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 160 || !map.nodes.length) return null;
+  const m = SELECT.exec(t);
+  if (!m) return null;
+  const f = findNode(map, m[1]);
+  if (f && 'node' in f) return { node: f.node };
+  if (f && 'ambiguous' in f) return { refused: `${quote(m[1])} could mean more than one thing on the map: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
+  return EXPLICIT.test(t) || m[2] ? { refused: `Nothing on the map is called ${quote(m[1])}.` } : null;
 }

@@ -61,7 +61,8 @@ console.log('\n=== the workspace, asked for in words ===');
   const app = readFileSync('components/LogosApp.tsx', 'utf8');
   const view = app.indexOf('readViewRequest(content)');
   const iface = app.indexOf('readInterfaceRequest(content');
-  const cmd = app.indexOf('readMapCommand(content');
+  // a map command, read with "that" and "another" (lib/map-edit.ts readMapCommandAbout, readMapAdd)
+  const cmd = app.indexOf('readMapCommandAbout(content');
   ok('surfaces asked for by name are read in the send path', iface > 0);
   ok('  after a lens asked for by name, which keeps its own path', view > 0 && view < iface);
   ok('  and before a command to the map', iface < cmd);

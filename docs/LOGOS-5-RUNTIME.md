@@ -1610,3 +1610,199 @@ no game loop — so a "football simulator" can be a tracker or a quiz, not a gam
 Templates are kept per device. The timer's running is not saved (a countdown is
 not a change to the artifact). A choice's answer is in the state the browser
 holds, hidden only by the figure.
+
+## 22. Socria Voice (experimental)
+
+The owner's words: "make the entire Logos 5 workspace operable through natural
+speech, with full voice parity with typed chat … Route spoken instructions
+through the existing Logos 5 runtime … Do not create a separate voice chatbot
+… Socria must respond in text within the existing chat, not through
+synthesized speech … Do not simulate unsupported functionality or claim voice
+parity where underlying tools are missing."
+
+**What there was.** The composer's hold-to-talk mic (Logos 4, Voice to Text:
+`components/useVoiceInput.ts`, `app/api/transcribe`, `lib/logos4/voice.ts`):
+one recording, transcribed into the box, never sent. And one dispatcher for
+every turn — `send()` in `components/LogosApp.tsx` — which already reads the
+workspace's own commands (objects, the Live 3D scene, a lens or surface asked
+for by name, a command to the map) before anything goes to the chat route,
+where Cognitive Allocation, MR, memory, the map pass and the artifacts are. So
+parity had one rule: **a spoken turn is a typed turn**. Everything the person
+could do by typing in the conversation works said, because it is sent the
+same way. What could only be done by a press — a tab, Split View, Undo, Start
+writing, Retry — had no words; those were the gaps, and they were filled for
+typed and spoken turns alike.
+
+**The path.** Microphone → a recogniser → one turn (it ends at a pause) →
+Voice's own few words, if it is one of them → a "yes" first, if it could take
+something away → `send(text, …, 'voice')` → the workspace's commands, done
+here, or the chat route → the workspace changes on screen and Socria answers
+in text, in the conversation. Nothing is spoken back; no speech synthesis is
+used anywhere.
+
+**Two recognisers** (`components/logos5/useSocriaVoice.ts`), chosen in the
+notice before Voice first listens, and in its settings:
+
+| | Your browser's speech recognition | Socria's transcription |
+|---|---|---|
+| where | Chrome, Edge, Safari (`SpeechRecognition`) | any browser that can read the microphone |
+| words | appear as they are said (interim results) | a sentence at a time, after the pause |
+| the turn ends | after the pace's pause since the last word | after the pace's pause in the microphone's level (`lib/voice/vad.ts`) |
+| the audio goes | to the browser maker's speech service, as their own dictation does | to `/api/transcribe` (the provider already in use), one short WAV per turn (`lib/voice/wav.ts`), kept nowhere |
+
+The level detector reads the room's floor as the microphone opens (its
+quietest moment), then follows it — down at once, up only slowly, so speech,
+which dips between words, keeps it low while a fan that came on later is soon
+below the line; a turn starts after three loud frames (a click is not one),
+ends after the pause, and is thrown away as noise when too short to be words.
+400 ms from before the turn begins is kept so its first syllable is not cut;
+most of the pause that ended it is cut off. A minute of speech is under 2 MB.
+
+**Listening** (`lib/voice/speech.ts`, `lib/voice/recognizer.ts`). The pause
+that ends a turn is Short, Medium or Long (0.9, 1.4, 2.3 s). The browser's
+recogniser is started again after every turn and whenever it stops by itself
+— but one that stops again and again without hearing anything is reported
+rather than restarted forever, and a phone's (Android) is run one recognition
+per turn, since in continuous mode it repeats itself. **Pause** releases the
+microphone (the browser's red dot goes out); the tab going to the background
+pauses Voice; five minutes without a word turn it off, and the panel says why.
+Words heard when listening is paused or turned off mid-turn are not sent: they
+go into the box. Errors are said in words a person can act on — the
+microphone refused (with how to allow it), none found, the browser's service
+unreachable (with Socria's transcription offered instead), a transcription that
+failed (kept for Retry), a busy one (retried by itself after the time the
+server asks), signed out (with the browser's recogniser offered).
+
+**While Socria answers** — interruption. A turn said while an answer is
+arriving waits, shown in the panel with Drop, and is sent when the answer
+finishes; set to **Stop the answer**, speaking stops it and sends the turn.
+"Stop" stops an answer at once, either way. Moving around ("open the Logic
+Map") happens at once even then, said in the panel.
+
+**Voice's own words** (`readControl`, whole turns only): "stop", "pause
+listening", "stop listening", "what can I say", "start dictating" / "stop
+dictating", "send" (when turns go into the box), "yes" / "no" (only while a
+confirmation waits), and "…scratch that" at the end of a turn, which throws the
+turn away. "Socria, …" in a conversation with others is @socria.
+
+**Steps.** "Open the Logic Map, then add a branch called cost" is two turns:
+split at "then", "after that" or ";" when a part is one of the workspace's
+commands and every part is a real phrase ("if the rent goes up then I move" is
+whole), and at a plain "and" only when every part is a command.
+
+**The workspace in words** (`lib/logos5/commands.ts`, read in `send()` for
+typed and spoken turns alike, whole turns only, done by the function its press
+calls, and said in the conversation):
+
+| Said | Done |
+|---|---|
+| "Open the Logic Map", "Go to Content", "Show me the chat", "Show Artifacts" | the view |
+| "Put the Logic Map beside", "Split view with Content", "Show chat and the Logic Map side by side", "Close the split view" | Split View — only what this line of thinking has, as its menu offers |
+| "Open the habit tracker", "Open the chart" | an artifact, by its name or a kind there is one of |
+| "Open my rent conversation", "Go home", "Go back", "Start a new line of thinking", "Open my memory", "Search for rent", "Open quick capture" | another line of thinking, the Universal Map, Memory, search, the capture inbox |
+| "Shorter answers", "More detail", "Normal length" | the length dial |
+| "Undo the last edit", "Redo" | what is on screen: the writing's own history, an artifact's, the Logic Map's last change |
+| "Start writing", "Synthesize", "Try again", "Save this as a template", "Map this conversation", "Save the map as an image", "Hide the bars" | the press of that name |
+| "Select the rent idea", "Clear the selection" | the card in hand (Point & Ask): "challenge this" is then about it |
+| "Capture: call the landlord" | kept in Quick Capture for later |
+
+**The Logic Map in words** (`lib/map-edit.ts`). "Add a branch called cost"
+(from the idea named — "…to budget" — else the one last touched, else the
+idea at the centre), "add another branch about time" (beside the last one
+added), "add a question: why is rent so high?". "That", "it" and "this" mean
+the card selected, else the idea last touched: "rename that to housing", "mark
+it as resolved", "remove that". With nothing touched, "that" is not a label to
+look for. A command that only lacks its words asks for them — "add a branch"
+→ "What should the new branch say?" → "cost" — and the next short turn
+completes it; "never mind" lets it go. A refused edit ("“cost” is already on
+the map") is said as refused; before this, the conversation said "Added…" for
+an edit the map had refused. Undo and Redo replay the change onto the map as it
+is now (`replayMapChange`): the map pass redraws after every answer, so what it
+drew since stays, and an idea changed since is left as it is.
+
+**The writing in words** (`lib/write/voice-edit.ts`, when the writing is open;
+each edit one step of the writing's own Undo, through `WriteSpaceHandle.apply`):
+"add a heading called Results", "type: …", "add a bullet: …", "make that a
+heading", "bold that", "underline the last sentence", "change that heading to
+Methods" ("that heading" is the one it is, or the one over it), "change the
+title to …", "replace rent with housing", "delete that paragraph". The writing
+is theirs: these are their own edits, said; Socria still never writes in it.
+**Dictation** writes what is said: "comma", "period", "question mark", "new
+line", "new paragraph"; a dictation starts a paragraph of its own (after the
+block the caret is in, else at the end) and continues it, in mid-sentence lower
+case; an edit said while dictating is done, not written.
+
+**A "yes" first** (`lib/voice/risk.ts`). A spoken turn that would take
+something away is shown back and waits for "yes" (or a press): removing ideas
+from the map, deleting from the writing, an artifact's removal — each read by
+the reader that would do it, so what is confirmed is exactly what would happen
+— or plainly asking to delete or clear. Keeping something in memory, taking
+something out of it, and sharing work are sensitive and wait too. A question
+about deleting is a question; typed turns are not asked again.
+
+**Said, and marked.** A spoken turn is saved with `via: 'voice'` (kept by the
+conversations and shared-conversation routes) and shown with a microphone,
+"Said". The chat route adds one block to that turn's own context — never the
+cached prompt — telling Socria the turn was spoken: a word may be misheard and
+punctuation guessed, read it for what was meant, ask where a mishearing would
+change the meaning, and answer in text (306 characters, about 77 tokens, on
+spoken turns only).
+
+**On screen** (`components/logos5/SocriaVoice.tsx`, `voice.css`). **Voice**,
+marked **Experimental**, beside the box (on a phone, the length dial becomes
+its icon and the badge sits on the button's shoulder). The first press opens
+the notice: what Voice does, where the audio goes for each recogniser, the
+promises (the microphone off when paused, a yes before anything is taken
+away, what is said is marked), the settings, Start Voice. While on, a panel
+over the box says what it is doing — starting, listening, hearing (the words
+as they are said, the unsettled ones lighter, a bar filling through the pause
+that will end the turn, Send now, Cancel), turning a turn into text, Socria
+answering, paused, a problem — with a turn waiting, a confirmation, and what
+the last turn did; Pause/Resume, help, settings and off are one press, and all
+can be said. Over the Universal Map and Memory the panel floats at the foot of
+the screen, so Voice is never listening where it cannot be seen. The
+hold-to-talk mic steps aside while Voice is on. The status is a polite live
+region; the confirmation an alert dialog. `NEXT_PUBLIC_SOCRIA_VOICE=off` hides
+it; it is drawn only in Logos 5, for someone who may send, where the browser
+can listen.
+
+**Checked.** `test/socria-voice.test.mjs` (171): settings, Voice's words,
+steps; the level detector (start, a click, a breath, the pause filling, the
+end, noise, the limit, the room's floor and a fan that comes on later, a new
+pace); the browser's results and errors, restarts, Socria's transcription's
+answers; the WAV; what waits for a yes; every workspace command and what is
+not one; the missing words; every writing edit applied, dictation; map adds,
+"that", select, undo and redo on a map that moved on; the button, the panel in
+each state, the notice, settings and help; every example on the help card read
+by the reader that does it; and, from the source, one dispatcher, the box left
+alone, no speech synthesis, "said" saved, the microphone released. In the
+browser (local stand-ins): a scripted recogniser, desktop and a 390px phone,
+46 checks each — a question said, sent, marked and answered in text; the view
+moved; branches added, "that" renamed, undone and redone; a removal waiting
+for a yes, refused, then confirmed; the writing opened, a heading and a
+paragraph written, bolded, "change that heading" … "methods", undone; a
+delete waiting for a yes; dictation with punctuation and paragraphs; a turn
+held while Socria answered and sent after; pause, resume, the tab in the
+background; a failing recogniser; home and back; help; off; and typing still
+working, with typed words left in the box while a turn is said. Socria's
+transcription through Chromium's fake microphone (8): a turn found by its
+level, one 61 KB WAV sent, transcribed, sent as a spoken turn; Pause sends
+nothing more. These runs found five bugs the unit tests had not: dictation
+continued the heading last edited; mid-sentence capitals; a refused map edit
+said as done; the box-clearing helper calling itself (every typed send would
+have failed — the source check caught it, and the journey now types); and a
+steady hum read as speech.
+
+**Limits.** Voice cannot attach a file (the picker is a press), act on a
+reply's inline elements (a slider, a choice), or Edit, Reply to or Copy a
+particular message; it can open but not manage Memory, sharing, or export.
+Logos 5 has no way to delete an artifact, by a press or in words, so neither
+has Voice. The real
+recognisers' accuracy is not measured here: the runs use a scripted recogniser
+and the stand-in transcription's canned text. On Android the browser's
+recogniser decides when a turn ends (choose Socria's transcription to set the
+pace); on iOS a restart may need a tap ("Your browser needs a tap to keep
+listening"). Socria's transcription is one paid call per turn, under the voice
+rate limit (12 a minute signed in, 6 with an access key). A command is a whole
+turn: "open the map of Europe and explain it" goes to Socria, which answers in
+words and cannot press anything.

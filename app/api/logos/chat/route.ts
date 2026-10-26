@@ -128,6 +128,7 @@ import { carriedInOf, modelDeliberationsIn, persistAllowed, resetTurnOf, revocat
 import { loadForTurn, readIncognito, readSettings, writeRows, writeSettings } from '@/lib/mr/store';
 import type { LedgerRow, MRSettings } from '@/lib/mr/types';
 import { renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
+import { SPOKEN_TURN } from '@/lib/voice/speech';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -1010,6 +1011,8 @@ export async function POST(req: NextRequest) {
       // so "why is this negative?" is about the thing they are looking at.
       // Not on a focused node thread, which is already about one node.
       (focusLabel ? '' : focusBlock(selected)) +
+      // Socria Voice: this turn was said, through speech recognition — read it for what was meant
+      (last.via === 'voice' ? SPOKEN_TURN : '') +
       // THE OBJECTS THEY ARE WORKING ON — the matrix, the function — as the
       // workspace holds them. Re-sanitised, which RE-COMPUTES every step from
       // the state before it (lib/objects/core.ts), so nothing a browser sends

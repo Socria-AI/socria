@@ -144,7 +144,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const replyTo = cleanReplyRef(r.replyTo);
         const about = role === 'user' ? cleanAboutRef(r.about) : undefined;
         const synthesis = role === 'assistant' ? sanitizeSynthesis(r.synthesis) : undefined;
-        const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}), ...(about ? { about } : {}) };
+        // said rather than typed (Socria Voice): shown with a microphone
+        const via = role === 'user' && r.via === 'voice' ? ('voice' as const) : undefined;
+        const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}), ...(about ? { about } : {}), ...(via ? { via } : {}) };
         // a person's turn is theirs, named; Socria's answer is Socria's
         return role === 'user'
           ? { ...extra, role, content, by }

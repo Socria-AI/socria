@@ -34,6 +34,7 @@ export function GlobalSearch({
   onPick,
   onClose,
   now,
+  initial,
 }: {
   sessions: readonly LogosSession[];
   /** the documents already read for the line of thinking that is open */
@@ -45,8 +46,10 @@ export function GlobalSearch({
   onPick: (hit: Hit) => void;
   onClose: () => void;
   now: number;
+  /** what to search for as it opens — "search for rent", said (lib/logos5/commands.ts) */
+  initial?: string;
 }) {
-  const [q, setQ] = useState('');
+  const [q, setQ] = useState(initial ?? '');
   const [at, setAt] = useState(0);
   const [extra, setExtra] = useState<readonly IndexDoc[]>([]);
   const input = useRef<HTMLInputElement>(null);

@@ -335,6 +335,8 @@ const MODULES = [
   'test/helpers/split-view-under-test.tsx',
   // any artifact, from a few primitives: the custom kind, its templates, Make's "Your own", its figure
   'test/helpers/custom-under-test.tsx',
+  // Socria Voice: the turn, the ear, the yes, the workspace and the writing in words, the panel
+  'test/helpers/voice-under-test.tsx',
 ];
 
 export async function buildAll() {

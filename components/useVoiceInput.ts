@@ -30,11 +30,16 @@ export type VoiceState = 'idle' | 'asking' | 'recording' | 'transcribing' | 'err
 export type VoiceHint = 'hold' | 'ready' | null;
 
 let serverSays: Promise<boolean> | null = null;
-function serverAvailable(): Promise<boolean> {
+/** May the server transcribe at all (asked once per page) — Socria Voice asks the same (components/logos5/useSocriaVoice.ts). */
+export function serverAvailable(): Promise<boolean> {
   serverSays ??= fetch('/api/transcribe', { cache: 'no-store' })
     .then((r) => (r.ok ? r.json() : { available: false }))
     .then((j: { available?: unknown }) => j.available === true)
-    .catch(() => false);
+    .catch(() => {
+      // unreachable just now is not "no": the next one to ask asks again
+      serverSays = null;
+      return false;
+    });
   return serverSays;
 }
 

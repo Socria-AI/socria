@@ -67,6 +67,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       const replyTo = cleanReplyRef(m.replyTo);
       // Point & Ask: what the turn was about, as selected when it was sent
       const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
+      // said rather than typed (Socria Voice): the conversation marks it with a microphone
+      const via = m.role === 'user' && m.via === 'voice' ? 'voice' : undefined;
       return {
         ...(id ? { id } : {}),
         ...(at ? { at } : {}),
@@ -74,6 +76,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         content: m.content,
         ...(replyTo ? { replyTo } : {}),
         ...(about ? { about } : {}),
+        ...(via ? { via } : {}),
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),

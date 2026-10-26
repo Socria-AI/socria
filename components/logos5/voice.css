@@ -1,0 +1,563 @@
+/* components/logos5/voice.css — Socria Voice (experimental): the button, the panel, the sheet.
+   Theme tokens only (app/themes.css): Paper, White, Dark, One and Celestial alike. */
+
+/* ── the button beside the box ───────────────────────────────────── */
+.logos-root .sv-btn {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 8px 0 9px;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 13px;
+  white-space: nowrap;
+  cursor: pointer;
+}
+.logos-root .sv-btn:hover,
+.logos-root .sv-btn:focus-visible {
+  color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
+}
+.logos-root .sv-btn.is-on {
+  color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.28);
+}
+.logos-root .sv-btn.is-hearing svg {
+  color: #c0412f;
+}
+.logos-root .sv-exp {
+  display: inline-flex;
+  align-items: center;
+  height: 16px;
+  padding: 0 6px;
+  border-radius: 999px;
+  border: 1px dashed currentColor;
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--lg-tension);
+  opacity: 0.9;
+}
+.logos-root .sv-exp.is-big {
+  height: 18px;
+  font-size: 10px;
+  vertical-align: 3px;
+  margin-left: 6px;
+}
+.logos-root .sv-exp-short {
+  display: none;
+}
+
+/* a turn that was said, in the conversation */
+.logos-root .l5-spoken {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  margin: 0 0 4px;
+  font-size: 11px;
+  color: var(--lg-ink-40);
+}
+
+/* ── the panel over the box ──────────────────────────────────────── */
+.logos-root .sv-panel {
+  margin: 0 0 8px;
+  padding: 8px 8px 8px 12px;
+  border-radius: 14px;
+  border: 1px solid var(--lg-line);
+  background: var(--l5-raise, #fff);
+  box-shadow: var(--l5-shadow);
+  font-size: 13px;
+  color: var(--lg-ink);
+}
+.logos-root .sv-panel.is-floating {
+  position: fixed;
+  left: 50%;
+  bottom: calc(16px + env(safe-area-inset-bottom, 0px));
+  transform: translateX(-50%);
+  width: min(560px, calc(100vw - 24px));
+  z-index: 70;
+  margin: 0;
+}
+.logos-root .sv-panel.is-error {
+  border-color: rgba(163, 58, 44, 0.35);
+}
+.logos-root .sv-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+.logos-root .sv-dot {
+  position: relative;
+  flex: 0 0 auto;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  background: var(--lg-ink-40);
+}
+.logos-root .sv-dot.is-live {
+  background: var(--lg-primary);
+  animation: svPulse 1.6s ease-in-out infinite;
+}
+.logos-root .sv-dot.is-hearing {
+  background: #c0412f;
+  animation-duration: 0.9s;
+}
+.logos-root .sv-level {
+  position: absolute;
+  inset: -4px;
+  border-radius: 50%;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.18);
+  transition: transform 90ms linear;
+}
+@keyframes svPulse {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
+}
+.logos-root .sv-status {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  flex: 1 1 auto;
+  line-height: 1.25;
+}
+.logos-root .sv-status-k {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .sv-tag {
+  font-size: 10.5px;
+  color: var(--lg-ink-40);
+  letter-spacing: 0.02em;
+}
+.logos-root .sv-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.logos-root .sv-tools,
+.logos-root .sv-live-tools,
+.logos-root .sv-confirm-tools {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: 0 0 auto;
+}
+.logos-root .sv-chip {
+  border: 1px solid var(--lg-line);
+  background: transparent;
+  color: var(--lg-ink-60);
+  border-radius: 999px;
+  padding: 4px 12px;
+  min-height: 30px;
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.logos-root .sv-chip:hover,
+.logos-root .sv-chip:focus-visible {
+  color: var(--lg-ink);
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4);
+}
+.logos-root .sv-chip.is-primary {
+  background: var(--lg-primary);
+  border-color: var(--lg-primary);
+  color: var(--l5-on-primary, #fff);
+}
+.logos-root .sv-chip:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.logos-root .sv-icon {
+  width: 30px;
+  height: 30px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-grid;
+  place-items: center;
+  cursor: pointer;
+}
+.logos-root .sv-icon:hover,
+.logos-root .sv-icon:focus-visible {
+  color: var(--lg-ink);
+  background: rgba(var(--lg-ink-rgb, 31, 31, 31), 0.06);
+}
+.logos-root .sv-live {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 4px 10px;
+  margin-top: 8px;
+}
+.logos-root .sv-words {
+  margin: 0;
+  font-size: 15px;
+  line-height: 1.4;
+  color: var(--lg-ink);
+  max-height: 6.2em;
+  overflow-y: auto;
+  overflow-wrap: anywhere;
+}
+.logos-root .sv-interim {
+  color: var(--lg-ink-40);
+}
+.logos-root .sv-ending {
+  grid-column: 1 / -1;
+  grid-row: 2;
+  position: relative;
+  height: 3px;
+  border-radius: 3px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+  overflow: hidden;
+}
+.logos-root .sv-ending::after {
+  content: '';
+  position: absolute;
+  inset: 0 auto 0 0;
+  width: calc(var(--sv-end, 0) * 100%);
+  background: var(--lg-primary);
+  transition: width 100ms linear;
+}
+.logos-root .sv-live-tools {
+  grid-column: 2;
+  grid-row: 1;
+}
+.logos-root .sv-note,
+.logos-root .sv-problem,
+.logos-root .sv-outcome {
+  margin: 6px 0 0;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-problem {
+  color: #8a3a2e;
+}
+html[data-theme='dark'] .logos-root .sv-problem,
+html[data-theme='one'] .logos-root .sv-problem,
+html[data-theme='night'] .logos-root .sv-problem {
+  color: var(--lg-tension);
+}
+.logos-root .sv-link {
+  border: 0;
+  background: none;
+  padding: 0;
+  font: inherit;
+  color: var(--lg-primary);
+  text-decoration: underline;
+  cursor: pointer;
+}
+.logos-root .sv-outcome-heard {
+  color: var(--lg-ink-40);
+  font-style: italic;
+}
+.logos-root .sv-outcome-did {
+  color: var(--lg-ink);
+}
+.logos-root .sv-confirm {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border-left: 3px solid var(--lg-tension);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05);
+}
+.logos-root .sv-confirm.is-destructive {
+  border-left-color: #a33a2c;
+}
+.logos-root .sv-confirm-q {
+  margin: 0;
+  font-size: 14px;
+  color: var(--lg-ink);
+}
+.logos-root .sv-confirm-heard {
+  margin: 2px 0 8px;
+  font-size: 12px;
+  color: var(--lg-ink-40);
+  overflow-wrap: anywhere;
+}
+.logos-root .sv-confirm-say {
+  font-size: 12px;
+  color: var(--lg-ink-60);
+  margin-right: auto;
+}
+.logos-root .sv-confirm-tools {
+  display: flex;
+  width: 100%;
+}
+.logos-root .sv-queue {
+  list-style: none;
+  margin: 6px 0 0;
+  padding: 0;
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-queue li {
+  overflow-wrap: anywhere;
+}
+.logos-root .sv-queue-t {
+  color: var(--lg-ink);
+}
+
+/* Voice went off by itself: said where the panel was */
+.logos-root .sv-offnote {
+  margin: 0 6px 8px;
+  font-size: 12.5px;
+  color: var(--lg-ink-60);
+}
+
+/* ── the sheet: the first-use notice, settings, what can be said ──── */
+.logos-root .sv-sheet-back {
+  position: fixed;
+  inset: 0;
+  z-index: 95;
+  background: rgba(20, 24, 18, 0.32);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 12px;
+}
+.logos-root .sv-sheet {
+  display: flex;
+  flex-direction: column;
+  width: min(540px, 100%);
+  max-height: min(88vh, 760px);
+  overflow: hidden;
+  border-radius: 16px;
+  border: 1px solid var(--lg-line);
+  background: var(--l5-surface, #fffdf8);
+  color: var(--lg-ink);
+  box-shadow: 0 24px 60px -20px rgba(20, 24, 18, 0.45);
+}
+.logos-root .sv-sheet-head {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 16px 16px 4px 20px;
+}
+/* what is said scrolls; the buttons that act on it stay in view */
+.logos-root .sv-sheet-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 0 20px 4px;
+}
+.logos-root .sv-sheet-head h2 {
+  flex: 1 1 auto;
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-weight: 400;
+  font-size: 24px;
+}
+.logos-root .sv-sheet-lead {
+  margin: 10px 0 4px;
+  font-size: 14px;
+  line-height: 1.55;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-field {
+  margin: 14px 0 0;
+  padding: 0;
+  border: 0;
+}
+.logos-root .sv-field legend {
+  padding: 0;
+  margin-bottom: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-choice {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  gap: 10px;
+  align-items: start;
+  padding: 10px 12px;
+  margin-bottom: 6px;
+  border: 1px solid var(--lg-line);
+  border-radius: 12px;
+  font-size: 13.5px;
+  line-height: 1.45;
+  cursor: pointer;
+}
+.logos-root .sv-choice.is-on {
+  border-color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05);
+}
+.logos-root .sv-choice input {
+  margin-top: 3px;
+  accent-color: var(--lg-primary);
+}
+.logos-root .sv-choice small {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-seg {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  padding: 3px;
+  border-radius: 999px;
+  border: 1px solid var(--lg-line);
+}
+.logos-root .sv-seg button {
+  border: 0;
+  border-radius: 999px;
+  padding: 5px 12px;
+  min-height: 30px;
+  background: transparent;
+  color: var(--lg-ink-60);
+  font: inherit;
+  font-size: 12.5px;
+  cursor: pointer;
+}
+.logos-root .sv-seg button.is-on {
+  background: var(--lg-primary);
+  color: var(--l5-on-primary, #fff);
+}
+.logos-root .sv-promises {
+  margin: 14px 0 6px;
+  padding-left: 18px;
+  list-style: disc;
+  font-size: 12.5px;
+  line-height: 1.55;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-help {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 4px 18px;
+  margin-top: 8px;
+}
+.logos-root .sv-help h3 {
+  margin: 10px 0 4px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  color: var(--lg-ink-60);
+}
+.logos-root .sv-help ul {
+  margin: 0;
+  padding-left: 16px;
+  font-size: 13px;
+  line-height: 1.5;
+}
+.logos-root .sv-sheet-foot {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding: 12px 20px 16px;
+  border-top: 1px solid var(--lg-line);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .sv-dot.is-live {
+    animation: none;
+  }
+  .logos-root .sv-level,
+  .logos-root .sv-ending::after {
+    transition: none;
+  }
+}
+
+/* ── a phone ─────────────────────────────────────────────────────── */
+@media (max-width: 560px) {
+  .logos-root .sv-btn {
+    height: 44px;
+    padding: 0 10px;
+    gap: 4px;
+  }
+  /* the badge on the button's shoulder, so the row keeps its room */
+  .logos-root .sv-btn .sv-exp {
+    position: absolute;
+    top: 1px;
+    right: -2px;
+    height: 13px;
+    padding: 0 4px;
+    font-size: 8px;
+    background: var(--l5-raise, #fff);
+  }
+  .logos-root .sv-exp-long {
+    display: none;
+  }
+  .logos-root .sv-exp-short {
+    display: inline;
+  }
+  /* with Voice in the row, the length is its icon (its sheet says the rest) */
+  .logos-root .l5-ctools:has(.sv-btn) .l5-concise .mp-btn .nm {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .logos-root .sv-tag {
+    display: none;
+  }
+  .logos-root .sv-chip {
+    min-height: 40px;
+    padding: 6px 14px;
+  }
+  .logos-root .sv-icon {
+    width: 40px;
+    height: 40px;
+  }
+  .logos-root .sv-panel {
+    padding: 6px 6px 8px 10px;
+  }
+  /* the live words above, their buttons below */
+  .logos-root .sv-live {
+    grid-template-columns: 1fr;
+  }
+  .logos-root .sv-live-tools {
+    grid-column: 1;
+    grid-row: 3;
+    justify-content: flex-end;
+  }
+  .logos-root .sv-panel.is-floating {
+    bottom: calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .logos-root .sv-sheet-back {
+    align-items: flex-end;
+    padding: 0;
+  }
+  .logos-root .sv-sheet {
+    width: 100%;
+    max-height: 92vh;
+    border-radius: 16px 16px 0 0;
+  }
+  .logos-root .sv-sheet-foot {
+    padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
+  }
+  .logos-root .sv-sheet-foot .sv-chip {
+    flex: 1 1 0;
+  }
+  .logos-root .sv-help {
+    grid-template-columns: 1fr;
+  }
+}

@@ -37,6 +37,7 @@ import {
   seek as seekObject,
   spaceOf,
   suggestionsIn,
+  type CustomState,
   type MatrixState,
   type ObjectSpace,
   type ThoughtObject,
@@ -105,7 +106,7 @@ import { readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
 import { MakePicker } from '@/components/logos5/MakePicker';
 import { askFor, makeChoice } from '@/lib/logos5/make';
-import { templateChoice, templateOf, templatePayload } from '@/lib/logos5/templates';
+import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib/logos5/templates';
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
@@ -189,7 +190,7 @@ import './logos5/l5.css';
 import './logos5/redesign.css';
 import './logos5/l5v.css';
 import { CaptureInbox } from './CaptureInbox';
-import { forComposer, forNode, type Capture } from '@/lib/logos4/captures';
+import { cleanCaptureText, forComposer, forNode, newCaptureId, readLocalCaptures, writeLocalCaptures, type Capture } from '@/lib/logos4/captures';
 import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
 import { digestOf } from '@/lib/cognition/digest';
 import { briefOf } from '@/lib/representation';
@@ -246,7 +247,14 @@ import { computationFacts, whatChanged } from '@/lib/model/inspect';
 import { viewsFor } from '@/lib/model/views';
 import { affectedBy } from '@/lib/model/deps';
 import { readSeen, markSeen } from '@/lib/hints';
-import { applyMapEdits, dropRemoved, readMapCommand, type MapEdit } from '@/lib/map-edit';
+import { applyMapEdits, dropRemoved, keyOf as mapKeyOf, readMapAdd, readMapCommandAbout, readMapSelect, replayMapChange, type MapEdit, type Touched } from '@/lib/map-edit';
+import { besideEmpty, fillSlot, readCapture, readWorkspaceCommand, VIEW_SAID, type CommandContext, type Slot, type WorkspaceCommand } from '@/lib/logos5/commands';
+import { applyDocCommand, dictate, docDeleteOf, readDocCommand } from '@/lib/write/voice-edit';
+import { cleanUtterance, DEFAULT_VOICE, pickEngine, readControl, readVoiceSettings, splitSteps, writeVoiceSettings, type Control, type VoiceEngine, type VoiceSettings } from '@/lib/voice/speech';
+import { riskOf, type Risk } from '@/lib/voice/risk';
+import { SOCRIA_VOICE } from '@/lib/voice/flag';
+import { useEar, useSocriaVoice } from '@/components/logos5/useSocriaVoice';
+import { VoiceButton, VoiceOffNote, VoicePanel, VoiceSheet, type SheetKind, type VoiceConfirming, type VoiceOutcome, type VoiceQueued } from '@/components/logos5/SocriaVoice';
 import { forgetMapBefore, recordChange } from '@/lib/map-history';
 import type { AskExperience, WorkspaceAction, WorkspaceResult } from '@/components/objects/figures';
 import { readViewRequest, viewSaid } from '@/lib/view-request';
@@ -294,6 +302,14 @@ const JOURNEY_EVERY_TURNS = 4;
  * fresh session for it" can be decided.
  */
 let pendingStart: { id: string; message: string } | null = null;
+
+/** A change to a line of thinking's map, kept for Undo and Redo this visit (components/LogosApp.tsx undoMap). */
+interface MapChange {
+  sid: string;
+  before: TMap;
+  after: TMap;
+  said: string;
+}
 
 /** The email kind that brought them here, if one did. */
 function readVia(): string | undefined {
@@ -559,6 +575,9 @@ export function LogosApp({
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [streaming, setStreaming] = useState('');
   const [busy, setBusy] = useState(false);
+  /** Socria is answering — as of now, not as of the last render (send sets it the moment a turn goes) */
+  const busyRef = useRef(false);
+  busyRef.current = busy;
   const [mapping, setMapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -3195,6 +3214,18 @@ export function LogosApp({
     const fresh = out.map.nodes.filter((n) => !before.has(n.id)).map((n) => n.id);
     setChanged(new Set(out.applied.flatMap((a) => ('id' in a.edit ? [a.edit.id] : 'from' in a.edit ? [a.edit.from, a.edit.to] : fresh))));
     setDeltaNote(said);
+    // Undo, said or typed, takes it back (undoNow); "that" and "another" mean what it touched (recentIdea)
+    mapJournalRef.current = { past: [...mapJournalRef.current.past, { sid: current.id, before: current.map, after: edited, said }].slice(-30), future: [] };
+    lastChangeRef.current = { kind: 'map' };
+    const last = out.applied[out.applied.length - 1]?.edit;
+    if (last?.op === 'add') {
+      const n = out.map.nodes.find((x) => mapKeyOf(x.label) === mapKeyOf(last.node.label));
+      if (n) touchedRef.current = { id: n.id, label: n.label, ...(last.near ? { near: last.near } : {}) };
+    } else if (last?.op === 'remove') touchedRef.current = null;
+    else if (last) {
+      const n = out.map.nodes.find((x) => x.id === ('id' in last ? last.id : last.from));
+      if (n) touchedRef.current = { id: n.id, label: n.label };
+    }
     return said;
   }
 
@@ -3718,9 +3749,33 @@ export function LogosApp({
     chronRef.current = [...chronRef.current, turn, reply];
   }
 
-  async function send(text: string, atts: Attachment[] = [], replying: ReplyRef | null = null, make?: Msg['make']) {
-    const content = text.trim();
-    if ((!content && !atts.length) || !activeIdRef.current) return;
+  /**
+   * Every turn, typed or said (Socria Voice: `via` 'voice'), goes through here.
+   * Returns what a command did, when the turn was one of the workspace's own
+   * commands and was done here rather than sent to Socria.
+   */
+  async function send(text: string, atts: Attachment[] = [], replying: ReplyRef | null = null, make?: Msg['make'], via?: 'voice'): Promise<string | undefined> {
+    // a spoken turn is not what is in the box: whatever is typed there stays
+    const clearBox = () => {
+      if (via !== 'voice') setInput('');
+    };
+    const said0 = text.trim();
+    if ((!said0 && !atts.length) || !activeIdRef.current) return;
+    // THE WORDS A COMMAND WAS MISSING ("add a branch" … "cost"), typed or said
+    // next: the turn is read as the command they complete, and kept as said
+    const slot = slotRef.current;
+    slotRef.current = null;
+    const filled = !atts.length ? fillSlot(slot, said0, Date.now()) : null;
+    if (filled && 'dropped' in filled) {
+      setError(null);
+      clearBox();
+      postPair(
+        { id: newMsgId(), at: Date.now(), role: 'user', content: said0, ...(via ? { via } : {}) },
+        { id: newMsgId(), at: Date.now(), role: 'assistant', content: 'Left as it was.' }
+      );
+      return 'Left as it was.';
+    }
+    const content = filled && 'command' in filled ? filled.command : said0;
     if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
       setError(togetherRef.current.role === 'commenter' ? 'You can read and comment on this line of thinking, but not add to it.' : 'You can read this line of thinking, but not add to it.');
       return;
@@ -3734,15 +3789,16 @@ export function LogosApp({
     const asks = callsSocria({ group, text: content, replyTo: replying });
     if (!asks) {
       setError(null);
-      setInput('');
+      clearBox();
       setReplyTo(null);
       const turn: Msg = {
         id: newMsgId(),
         at: Date.now(),
         role: 'user',
-        content,
+        content: said0,
         ...(atts.length ? { attachments: atts } : {}),
         ...(replying ? { replyTo: replying } : {}),
+        ...(via ? { via } : {}),
       };
       const sent = postTurn(turn, true);
       chronRef.current = [...chronRef.current, sent];
@@ -3754,17 +3810,38 @@ export function LogosApp({
       return;
     }
 
-    const objTurn = takeObjects(content, atts);
     const pairOf = (said: string): [Msg, Msg] => [
-      { id: newMsgId(), at: Date.now(), role: 'user', content, ...(replying ? { replyTo: replying } : {}) },
+      { id: newMsgId(), at: Date.now(), role: 'user', content: said0, ...(replying ? { replyTo: replying } : {}), ...(via ? { via } : {}) },
       { id: newMsgId(), at: Date.now(), role: 'assistant', content: said },
     ];
+
+    // THE WORKSPACE, OPERATED IN WORDS (lib/logos5/commands.ts): a view, Split
+    // View, an artifact by name, home, Memory, search, the length, Undo, Start
+    // writing, Synthesize, Retry, Save as template… — every press, said or
+    // typed as a whole turn, done by the function the press calls. And what is
+    // on screen is edited first: the writing, when it is open (lib/write/
+    // voice-edit.ts — "make that a heading"); the Logic Map, when it is shown
+    // ("add a branch called cost", "rename that to housing"). Nothing is sent
+    // to a model, and nothing is spent.
+    if (l5 && !atts.length) {
+      const done = localCommand(content);
+      if (done) {
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        if (done.post !== false) postPair(...pairOf(done.said));
+        if (done.fill) slotRef.current = { fill: done.fill, at: Date.now() };
+        return done.said;
+      }
+    }
+
+    const objTurn = takeObjects(content, atts);
 
     // A DESCRIPTION OF THE SCENE IS A COMMAND, like a command to the map: it was built just now, and what was
     // built is written into the conversation. Nothing goes to the model, and nothing is spent.
     if (objTurn.scene) {
       setError(null);
-      setInput('');
+      clearBox();
       setReplyTo(null);
       postPair(...pairOf(objTurn.scene.said));
       return;
@@ -3787,7 +3864,7 @@ export function LogosApp({
           if (sid) setArtSel((m) => ({ ...m, [sid]: plotItem() }));
           setScreen((s) => onMade(true, s, narrowRef.current));
           setError(null);
-          setInput('');
+          clearBox();
           setReplyTo(null);
           postPair(...pairOf(viewSaid(want.lens)));
           return;
@@ -3797,7 +3874,7 @@ export function LogosApp({
         openStage();
         if (wsFacts.lenses.includes(want.lens)) {
           setError(null);
-          setInput('');
+          clearBox();
           setReplyTo(null);
           postPair(...pairOf(viewSaid(want.lens)));
           return;
@@ -3843,7 +3920,7 @@ export function LogosApp({
         setScreen(() => to.screen);
         if (asked.lens && asked.lens !== 'plot') changeLayout(showLens(wsLayout, asked.lens));
         setError(null);
-        setInput('');
+        clearBox();
         setReplyTo(null);
         postPair(...pairOf(interfaceSaid(asked)));
         return;
@@ -3852,7 +3929,7 @@ export function LogosApp({
         changeLayout(layoutForRequest(asked, wsLayout, wsFacts));
         if (asked.op !== 'close') openStage();
         setError(null);
-        setInput('');
+        clearBox();
         setReplyTo(null);
         postPair(...pairOf(interfaceSaid(asked)));
         return;
@@ -3866,14 +3943,16 @@ export function LogosApp({
     // and the extractor sees it too. A sentence that is not plainly a command
     // is not touched (lib/map-edit.ts decides, and errs toward sending).
     if (!atts.length && !objTurn.lastStep) {
-      const cmd = readMapCommand(content, mapRef.current);
+      // …and "that", "it", "another" mean the idea last touched; an idea can be added in words too
+      const cmd = readMapCommandAbout(content, mapRef.current, recentIdea()) ?? (l5 ? readMapAdd(content, mapRef.current, recentIdea()) : null);
       if (cmd) {
         setError(null);
-        setInput('');
+        clearBox();
         setReplyTo(null);
-        const said = 'edits' in cmd ? editMap(cmd.edits) ?? cmd.said : cmd.refused;
+        const said = 'edits' in cmd ? runMapCommand(cmd) : cmd.refused;
+        if (!('edits' in cmd) && cmd.fill) slotRef.current = { fill: cmd.fill, at: Date.now() };
         postPair(...pairOf(said));
-        return;
+        return said;
       }
     }
 
@@ -3908,13 +3987,15 @@ export function LogosApp({
     }
     // A GUEST: their one line of thinking, claimed before its first turn (lib/guest-pass.ts). Words
     // in another one already, or the server says so: the sign-up note, and nothing is sent.
+    // from here this turn is Socria's to answer: a spoken turn after it waits (onVoiceTurn), even across the guest check
+    busyRef.current = true;
     if (guestRef.current && (guestHasAnother(activeIdRef.current) || !(await claimGuestPass(activeIdRef.current)))) {
       setGuestWall(true);
       return;
     }
 
     setError(null);
-    setInput('');
+    clearBox();
     setReplyTo(null);
     pendingStart = null;
 
@@ -3963,6 +4044,8 @@ export function LogosApp({
       ...(askBrief ? { about: { kind: askBrief.kind, label: askBrief.label, ...(askBrief.of ? { of: askBrief.of } : {}) } } : {}),
       // a custom artifact asked for from one of their templates: the template goes with it to the map pass
       ...(make ? { make } : {}),
+      // said, not typed (Socria Voice): marked, and told to Socria with the turn
+      ...(via ? { via } : {}),
     };
     // In a shared room — and in the room's own session — the turn is stamped
     // with who wrote it and broadcast to the other person before anything
@@ -3988,6 +4071,8 @@ export function LogosApp({
     const next = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [...before, sent];
     chronRef.current = [...chronRef.current, sent];
     setBusy(true);
+    // at once, not at the next render: a spoken turn after this one waits for the answer (onVoiceTurn)
+    busyRef.current = true;
     setStreaming('');
     // everyone else sees that an answer is coming
     if (group) togetherRef.current?.asking(true);
@@ -4583,6 +4668,689 @@ export function LogosApp({
   }
   /** the workspace — the Logic Map — is what the screen shows */
   const stageOpen = l5 && !!activeId && studyTab === 'logic_map';
+
+  // ── SOCRIA VOICE (EXPERIMENTAL) ─────────────────────────────────────
+  //
+  // Logos 5, operated by speech (lib/voice/, components/logos5/useSocriaVoice.ts
+  // and SocriaVoice.tsx). It is an input, not a second chatbot: a spoken turn
+  // is a message like a typed one — through send(), so through the same
+  // commands, Cognitive Allocation, MR, memory, the map pass and the artifacts
+  // — marked as said, and Socria answers in text in the conversation. What is
+  // only Voice's is here: the few things said to Voice itself ("stop",
+  // "pause listening", "…scratch that", "yes"/"no"), a turn held while Socria
+  // is still answering, a "yes" asked for first where a misheard word could
+  // take something away or reach beyond this conversation (lib/voice/risk.ts),
+  // several commands said as one ("open the Logic Map, then add a branch
+  // called cost"), and dictation into the writing.
+  const voiceAllowed = l5 && SOCRIA_VOICE && hasAccess && !togetherReadOnly;
+  /** what search opens with, when it was asked for in words ("search for rent") */
+  const [searchFor, setSearchFor] = useState('');
+  const [voiceSet, setVoiceSet] = useState<VoiceSettings>(DEFAULT_VOICE);
+  useEffect(() => setVoiceSet(readVoiceSettings(browserStorage())), []);
+  const voiceSetRef = useRef(voiceSet);
+  voiceSetRef.current = voiceSet;
+  const [voiceSheet, setVoiceSheet] = useState<SheetKind | null>(null);
+  const [voiceConfirm, setVoiceConfirm] = useState<(VoiceConfirming & { run: () => void }) | null>(null);
+  const voiceConfirmRef = useRef(voiceConfirm);
+  voiceConfirmRef.current = voiceConfirm;
+  const [voiceQueue, setVoiceQueue] = useState<(VoiceQueued & { heard: string })[]>([]);
+  const voiceQueueRef = useRef(voiceQueue);
+  voiceQueueRef.current = voiceQueue;
+  const [voiceOutcome, setVoiceOutcome] = useState<VoiceOutcome | null>(null);
+  const [dictating, setDictating] = useState(false);
+  const dictatingRef = useRef(false);
+  dictatingRef.current = dictating;
+  const onVoiceTurnRef = useRef<(text: string) => void>(() => {});
+  const onVoiceUnsentRef = useRef<(text: string) => void>(() => {});
+  const ear = useSocriaVoice({ turn: (t) => onVoiceTurnRef.current(t), unsent: (t) => onVoiceUnsentRef.current(t) }, voiceSet.pace, voiceAllowed);
+  const voicePhase = useEar(ear, (s) => s.phase);
+  const voiceHas = useEar(ear, (s) => s.has);
+  const voiceOn = voicePhase !== 'off';
+  /** the button is drawn only where Voice can listen: this browser's recogniser, or Socria's */
+  const voiceOffered = voiceAllowed && !!ear && (voiceHas.browser || voiceHas.socria);
+
+  /**
+   * A command to the map, done — and what the conversation says: the command's
+   * own sentence when it was done ("Added “time” to the map, from “cost”."),
+   * else why not ("“cost” is already on the map.") — never a refusal said as
+   * if it had been done.
+   */
+  function runMapCommand(cmd: { edits: MapEdit[]; said: string }): string {
+    const cur = sessionsRef.current.find((x) => x.id === activeIdRef.current)?.map;
+    const trial = cur ? applyMapEdits(cur, cmd.edits) : null;
+    if (!trial || !trial.applied.length) return trial?.refused[0] ?? 'Nothing on the map could be changed.';
+    return editMap(cmd.edits) ? cmd.said : trial.refused[0] ?? cmd.said;
+  }
+
+  /** What "that", "it" and "another" mean on the map: the card selected, else the idea last touched. */
+  const touchedRef = useRef<Touched | null>(null);
+  /** what "that" means in the writing: the block last edited in words */
+  const docThatRef = useRef<string | null>(null);
+  /** the paragraph a dictation is writing into */
+  const dictIntoRef = useRef<string | null>(null);
+  /** a command waiting for its missing words (lib/logos5/commands.ts fillSlot) */
+  const slotRef = useRef<Slot | null>(null);
+  /** the map's changes made by hand or by a command, for Undo and Redo — this visit */
+  const mapJournalRef = useRef<{ past: MapChange[]; future: MapChange[] }>({ past: [], future: [] });
+  /** what a command changed last — for "undo" said with only the conversation on screen */
+  const lastChangeRef = useRef<{ kind: 'map' } | { kind: 'object'; id: string } | { kind: 'writing' } | null>(null);
+  /** what Artifacts holds, as its strip names it (set where the strip is built) */
+  const artifactListRef = useRef<{ key: string; kind: string; title: string }[]>([]);
+  // another line of thinking: what "that" meant, a command waiting for words, dictation — all of this one's
+  useEffect(() => {
+    touchedRef.current = null;
+    docThatRef.current = null;
+    slotRef.current = null;
+    lastChangeRef.current = null;
+    setDictating(false);
+  }, [activeId]);
+
+  function recentIdea(): Touched | null {
+    const f = focusRef.current;
+    if (f?.kind === 'node') {
+      const n = mapRef.current.nodes.find((x) => x.id === f.id);
+      if (n) return { id: n.id, label: n.label };
+    }
+    const t = touchedRef.current;
+    return t && mapRef.current.nodes.some((n) => n.id === t.id) ? t : null;
+  }
+  const showing = (v: Viewport) => screenRef.current.view === v || screenRef.current.beside === v;
+  /** the writing is on screen and open to edit in words */
+  const writingOnScreen = () => artShownRef.current === 'w:doc' && showing('artifacts') && !!writeRef.current;
+  /** what is over the line of thinking, where "go back" means back into it */
+  const overNow = (): 'home' | 'memory' | null => (l5Mind ? 'memory' : l5Home || !activeIdRef.current ? 'home' : null);
+  function commandContext(): CommandContext {
+    return {
+      artifacts: artifactListRef.current,
+      conversations: sessionsRef.current
+        .filter((x) => !foreignIdsRef.current.has(x.id) && x.title && x.title !== UNTITLED)
+        .map((x) => ({ id: x.id, title: x.title })),
+      over: overNow(),
+    };
+  }
+
+  /**
+   * THE TURN, IF IT IS ONE OF THE WORKSPACE'S OWN COMMANDS — read here for
+   * typed and spoken turns alike (send), and done: the press it stands for.
+   * Null when it is for Socria. `post: false` for a command that leaves the
+   * conversation (home, another line of thinking): nothing is written in it.
+   */
+  function localCommand(text: string): { said: string; post?: boolean; fill?: string } | null {
+    const wc = readWorkspaceCommand(text, commandContext());
+    if (wc) return doWorkspaceCommand(wc);
+    // "capture: call the landlord" — kept in Quick Capture for later, not sent anywhere
+    const kept = LOGOS4.capture ? readCapture(text) : null;
+    if (kept) return { said: keepCapture(kept) };
+    // "select the rent idea": the card in hand, as a press would put it (Point & Ask)
+    const sel = readMapSelect(text, mapRef.current);
+    if (sel) {
+      if ('refused' in sel) return { said: sel.refused };
+      setFocus({ kind: 'node', id: sel.node.id });
+      touchedRef.current = { id: sel.node.id, label: sel.node.label };
+      return { said: `Selected “${sel.node.label}” — what you ask next is about it.` };
+    }
+    // their writing, when it is open: an edit said instead of typed
+    if (writingOnScreen()) {
+      const dc = readDocCommand(text);
+      if (dc) return docCommand(dc);
+    }
+    // the Logic Map, when it is on screen, before anything an artifact might read in the words — but
+    // a lens or a surface asked for by name ("show it as a timeline", "close the 3D view") keeps its own reader (send)
+    const named = workspaceOn && wsLayout ? !!readViewRequest(text) || !!readInterfaceRequest(text, interfaceContext(wsFacts)) : false;
+    if (showing('logic_map') && !showing('artifacts') && !named) {
+      const mc = readMapCommandAbout(text, mapRef.current, recentIdea()) ?? readMapAdd(text, mapRef.current, recentIdea());
+      if (mc) return 'edits' in mc ? { said: runMapCommand(mc) } : { said: mc.refused, ...(mc.fill ? { fill: mc.fill } : {}) };
+    }
+    return null;
+  }
+
+  function docCommand(dc: NonNullable<ReturnType<typeof readDocCommand>>): { said: string; fill?: string } {
+    const h = writeRef.current;
+    if (!h) return { said: 'Open your writing first — say “open my writing”.' };
+    const box: { refused?: { refused: string; fill?: string } } = {};
+    const out = h.apply((doc, caret) => {
+      const r = applyDocCommand(doc, dc, { that: docThatRef.current ?? caret });
+      if ('refused' in r) {
+        box.refused = r;
+        return null;
+      }
+      return r;
+    });
+    if (out) {
+      docThatRef.current = out.block;
+      lastChangeRef.current = { kind: 'writing' };
+      return { said: out.said };
+    }
+    return { said: box.refused?.refused ?? 'That could not be done in your writing.', ...(box.refused?.fill ? { fill: box.refused.fill } : {}) };
+  }
+
+  /** A workspace command, done — by the function its press calls. What was done, in a sentence. */
+  function doWorkspaceCommand(cmd: WorkspaceCommand): { said: string; post?: boolean } {
+    const sid = activeIdRef.current;
+    const narrowNow = narrowRef.current;
+    const cap = (x: string) => x.charAt(0).toUpperCase() + x.slice(1);
+    switch (cmd.kind) {
+      case 'view':
+        setL5Home(false);
+        setL5Mind(false);
+        if (screenRef.current.view === cmd.view && !l5Home && !l5Mind) return { said: `${cap(VIEW_SAID[cmd.view])} is open.` };
+        setStudyTab(cmd.view);
+        return { said: cmd.view === 'chat' ? 'Back to the conversation.' : `Opened ${VIEW_SAID[cmd.view]}.` };
+      case 'beside':
+      case 'pair': {
+        const view = cmd.kind === 'pair' ? cmd.view : screenRef.current.view === cmd.view ? 'chat' : screenRef.current.view;
+        const beside = cmd.kind === 'pair' ? cmd.beside : cmd.view;
+        if (narrowNow) {
+          setStudyTab(beside);
+          return { said: `A phone shows one view at a time — opened ${VIEW_SAID[beside]}.` };
+        }
+        if (view === beside) return { said: `${cap(VIEW_SAID[beside])} is already open.` };
+        // Split View offers only what this line of thinking has (lib/logos5/views.ts splitMenu)
+        const empty = besideEmpty(beside, { content: contentItems.length, ideas: mapRef.current.nodes.length, artifacts: artifactListRef.current.length });
+        if (empty) return { said: empty };
+        setScreen(() => fit({ view, beside }, false));
+        return { said: `${cap(VIEW_SAID[beside])} is beside ${VIEW_SAID[view]} now.` };
+      }
+      case 'close-beside':
+        if (!screenRef.current.beside) return { said: 'Nothing is open beside — this is one view already.' };
+        setScreen((s) => ({ ...s, beside: null }));
+        return { said: 'Closed the split view.' };
+      case 'artifact':
+        showArtifact(cmd.key);
+        return { said: `Opened “${cmd.title}” in Artifacts.` };
+      case 'home':
+        goHome();
+        return { said: 'Went to the Universal Map.', post: false };
+      case 'new':
+        return newFromHome() ? { said: 'Started a new line of thinking.', post: false } : { said: 'A new line of thinking could not be started just now.', post: false };
+      case 'thinking':
+        if (cmd.id === activeIdRef.current && !l5Home && !l5Mind) return { said: `“${cmd.title}” is the one open.` };
+        openFromHome(cmd.id);
+        return { said: `Opened “${cmd.title}”.`, post: false };
+      case 'memory':
+        if (!cloud) return { said: 'Memory is kept for an account — sign in to have one.' };
+        setL5Mind(true);
+        return { said: 'Opened Memory — what Socria remembers about you.', post: false };
+      case 'back':
+        if (l5Mind) {
+          setL5Mind(false);
+          return { said: 'Back from Memory.', post: false };
+        }
+        if (activeIdRef.current) {
+          setL5Home(false);
+          return { said: 'Back to the line of thinking.', post: false };
+        }
+        return { said: 'There is no line of thinking open to go back to — say “start a new line of thinking”.', post: false };
+      case 'length':
+        pickLength(cmd.length);
+        return { said: cmd.length === 'concise' ? 'Shorter answers from now on.' : cmd.length === 'detailed' ? 'Fuller, more detailed answers from now on.' : 'Answers at their usual length from now on.' };
+      case 'undo':
+        return { said: undoNow(false) };
+      case 'redo':
+        return { said: undoNow(true) };
+      case 'writing':
+        openWriting();
+        return { said: 'Opened your writing.' };
+      case 'synthesize': {
+        if (!sid || !mapRef.current.nodes.length) return { said: 'There is nothing on the Logic Map to synthesize yet.' };
+        if (synthBusy) return { said: 'A synthesis is already on its way.' };
+        void synthesize('workspace');
+        return { said: 'Reading the Logic Map for a synthesis — it will be here in a moment.', post: false };
+      }
+      case 'retry': {
+        const list = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [];
+        const last = list[list.length - 1];
+        if (!last || last.role !== 'assistant' || busyRef.current || groupNow()) return { said: 'There is no answer to try again just now.' };
+        retryLast(last);
+        return { said: 'Asking that again.', post: false };
+      }
+      case 'template': {
+        const key = artShownRef.current;
+        const o = key?.startsWith('d:') && showing('artifacts') ? objOf(spaceOf(mapRef.current), key.slice(2)) : null;
+        if (!o || o.kind !== 'custom') return { said: 'Only a custom artifact can be kept as a template — open one in Artifacts first.' };
+        const st = currentOf(o) as CustomState;
+        const r = saveTemplate(browserStorage(), st, Date.now());
+        return { said: r ? `Saved “${r.saved.name}” as a template — it is in Make, under Yours, on this device.` : 'This one could not be kept as a template.' };
+      }
+      case 'search':
+        setSearchFor(cmd.query);
+        setSearchOpen(Date.now());
+        return { said: cmd.query ? `Searching everything for “${cmd.query}”.` : 'Opened search.', post: false };
+      case 'remap': {
+        if (!sid || !messages.some((m) => m.role === 'user')) return { said: 'There is nothing in this conversation to map yet.' };
+        if (togetherReadOnly) return { said: 'You can look at this line of thinking, but not change it.' };
+        refreshMap();
+        return { said: 'Drawing the Logic Map from this conversation.' };
+      }
+      case 'map-image': {
+        const m = mapRef.current;
+        if (!m.nodes.length) return { said: 'The Logic Map is empty — there is nothing to save yet.' };
+        void exportMapPng(m, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking');
+        return { said: 'Saved the Logic Map as an image.' };
+      }
+      case 'bars':
+        hideChrome(cmd.hide);
+        return { said: cmd.hide ? 'Hid the bars — say “show the bars” to bring them back.' : 'The bars are back.', post: false };
+      case 'captures':
+        if (!LOGOS4.capture) return { said: 'Quick Capture is not on here.' };
+        setCaptureOpen(true);
+        return { said: 'Opened Quick Capture.', post: false };
+      case 'deselect':
+        if (!focusRef.current && !writeSelRef.current) return { said: 'Nothing is selected.' };
+        clearAbout();
+        return { said: 'Cleared the selection.' };
+    }
+  }
+
+  /** A thought kept for later in Quick Capture — on this device, and moved into the account when the inbox next opens there. */
+  function keepCapture(text: string): string {
+    const t = cleanCaptureText(text);
+    if (!t) return 'There was nothing to keep.';
+    const at = Date.now();
+    const c: Capture = { id: newCaptureId(), text: t, createdAt: at, updatedAt: at };
+    const ok = writeLocalCaptures(browserStorage(), [c, ...readLocalCaptures(browserStorage())]);
+    return ok ? `Kept in Quick Capture for later: “${t.length > 80 ? `${t.slice(0, 79)}…` : t}”.` : 'This browser could not keep it — its storage is full or blocked.';
+  }
+
+  /**
+   * UNDO AND REDO, OF WHAT IS ON SCREEN. The writing has its own history,
+   * which takes back typing and spoken edits alike; an artifact on screen steps
+   * back through its own; the Logic Map takes back the last change made to it
+   * by hand or by a command (replayed onto the map as it is now — the map pass
+   * draws after every answer, lib/map-edit.ts replayMapChange). With only the
+   * conversation on screen, the last thing a command changed.
+   */
+  function undoNow(redo: boolean): string {
+    const sid = activeIdRef.current;
+    if (!sid) return 'There is nothing open to undo.';
+    const art = artShownRef.current;
+    const last = lastChangeRef.current;
+    const writing = () => {
+      const h = writeRef.current;
+      if (!h) return 'Open your writing to undo there — say “open my writing”.';
+      const ok = redo ? h.redo() : h.undo();
+      return ok ? (redo ? 'Put the last change to your writing back.' : 'Took back the last change to your writing.') : redo ? 'There is nothing to redo in your writing.' : 'There is nothing to undo in your writing.';
+    };
+    // what is on screen, first
+    if (writingOnScreen()) return writing();
+    if (showing('artifacts') && art && /^[ds]:/.test(art)) return stepObject(art.slice(2), redo);
+    if (showing('logic_map')) return undoMap(sid, redo);
+    // else what a command changed last
+    if (last?.kind === 'writing') return writing();
+    if (last?.kind === 'object') return stepObject(last.id, redo);
+    return undoMap(sid, redo);
+  }
+
+  /** An artifact one change back (or forward): every change of one description goes together. */
+  function stepObject(id: string, redo: boolean): string {
+    const space = spaceOf(mapRef.current);
+    const o = objOf(space, id);
+    const name = artifactListRef.current.find((a) => a.key.slice(2) === id)?.title ?? o?.name ?? 'it';
+    if (!o) return 'That artifact is not here any more.';
+    let at = o.at;
+    if (!redo) {
+      if (at <= 0) return `There is nothing to undo in “${name}”.`;
+      const moment = o.steps[at - 1]?.at;
+      while (at > 0 && o.steps[at - 1]?.at === moment) at--;
+    } else {
+      if (at >= o.states.length - 1) return `There is nothing to redo in “${name}”.`;
+      const moment = o.steps[at]?.at;
+      while (at < o.states.length - 1 && o.steps[at]?.at === moment) at++;
+    }
+    const next = seekObject(space, id, at);
+    commitObjects(next, objOf(next, id));
+    lastChangeRef.current = { kind: 'object', id };
+    return redo ? `Put the last change to “${name}” back.` : `Took back the last change to “${name}”.`;
+  }
+
+  function undoMap(sid: string, redo: boolean): string {
+    const j = mapJournalRef.current;
+    const from = redo ? j.future : j.past;
+    const i = from.map((e) => e.sid).lastIndexOf(sid);
+    if (i < 0) return redo ? 'There is nothing to redo on the Logic Map.' : 'There is nothing to undo here.';
+    const e = from[i];
+    const cur = sessionsRef.current.find((x) => x.id === sid)?.map;
+    if (!cur) return 'There is nothing to undo here.';
+    const r = redo ? replayMapChange(cur, e.before, e.after) : replayMapChange(cur, e.after, e.before);
+    const rest = [...from.slice(0, i), ...from.slice(i + 1)];
+    mapJournalRef.current = redo ? { past: [...j.past, e], future: rest } : { past: rest, future: [...j.future, e] };
+    if (!r.changed) return 'The Logic Map has changed since — that edit is no longer there to take back.';
+    const history = recordChange(cur.history, cur.nodes, r.map.nodes, Date.now(), 'edit');
+    const liveIds = new Set(r.map.nodes.map((n) => n.id));
+    patchSession(sid, (x) => ({ ...x, map: history ? { ...r.map, history } : r.map, contexts: Object.fromEntries(Object.entries(x.contexts ?? {}).filter(([id]) => liveIds.has(id))) }));
+    lastChangeRef.current = { kind: 'map' };
+    const what = e.said.charAt(0).toLowerCase() + e.said.slice(1);
+    return redo ? `Redone — ${what}` : `Undone — ${what}`;
+  }
+
+  /** Socria Voice's own few words (lib/voice/speech.ts readControl). */
+  function voiceControl(c: Control, heard: string, said: (did: string) => void) {
+    switch (c) {
+      case 'yes': {
+        const k = voiceConfirmRef.current;
+        setVoiceConfirm(null);
+        voiceConfirmRef.current = null;
+        if (k) k.run();
+        else said('There was nothing waiting for a yes.');
+        return;
+      }
+      case 'no':
+        setVoiceConfirm(null);
+        voiceConfirmRef.current = null;
+        said('Not done.');
+        return;
+      case 'stop':
+        if (busyRef.current) {
+          stopAnswer();
+          said('Stopped the answer.');
+        } else said('Nothing is being answered. Say “stop listening” to turn Voice off.');
+        return;
+      case 'pause':
+        ear?.pause('Paused by voice. Press Resume when you want to talk again.');
+        return;
+      case 'end':
+        voiceOff('Voice is off.');
+        return;
+      case 'help':
+        setVoiceSheet('help');
+        said('Here is what you can say.');
+        return;
+      case 'dictate':
+        startDictation(said);
+        return;
+      case 'undictate':
+        setDictating(false);
+        said(dictatingRef.current ? 'Stopped dictating.' : 'You were not dictating.');
+        return;
+      case 'send':
+        if (input.trim() || drafts.some((d) => d.status === 'ready') || makeChoice(makeId, ownChoices)) {
+          sendFromStudy();
+          said('Sent what was in the box.');
+        } else said('The box is empty — nothing to send.');
+        return;
+      case 'discard':
+        said(heard ? 'Thrown away — not sent.' : 'Thrown away.');
+        return;
+    }
+  }
+
+  function startDictation(said: (did: string) => void) {
+    if (!activeIdRef.current || overNow()) {
+      said('Open a line of thinking first — dictation writes into its writing.');
+      return;
+    }
+    if (!limits.draftSpace) {
+      said('Writing is part of Socria One.');
+      return;
+    }
+    if (!writingOnScreen()) openWriting();
+    // a dictation starts a paragraph of its own (lib/write/voice-edit.ts dictate)
+    dictIntoRef.current = null;
+    setDictating(true);
+    said('Dictating into your writing. Say “new paragraph” for a new one, and “stop dictating” to finish.');
+  }
+
+  /** What is said while dictating is written — unless it is an edit of the writing ("make that a heading"). */
+  function dictateTurn(text: string, said: (did: string) => void, tries = 0) {
+    const h = writeRef.current;
+    if (!h) {
+      // the writing is opening: a moment for it to be there
+      if (tries < 8) {
+        if (!writingOnScreen() && tries === 0) openWriting();
+        setTimeout(() => dictateTurn(text, said, tries + 1), 150);
+      } else said('Your writing did not open — say “open my writing”, then dictate again.');
+      return;
+    }
+    // the words an edit asked for ("change that heading" — to what?) complete it, rather than being written
+    const filled = fillSlot(slotRef.current, text, Date.now());
+    slotRef.current = null;
+    const dc = filled && 'command' in filled ? readDocCommand(filled.command) : filled ? null : readDocCommand(text);
+    if (filled && 'dropped' in filled) {
+      said('Left as it was.');
+      return;
+    }
+    if (dc && (dc.op !== 'append' || filled)) {
+      const r = docCommand(dc);
+      if (r.fill) slotRef.current = { fill: r.fill, at: Date.now() };
+      said(r.said);
+      return;
+    }
+    const out = h.apply((doc, caret) => {
+      const r = dictate(doc, text, { into: dictIntoRef.current, after: caret });
+      return 'doc' in r ? r : null;
+    });
+    if (out) {
+      dictIntoRef.current = out.block;
+      docThatRef.current = out.block;
+      lastChangeRef.current = { kind: 'writing' };
+      said(out.said);
+    } else said('Nothing was heard to write.');
+  }
+
+  /** A spoken turn that may not go without a "yes": what it would take away or reach, read by the readers that would do it. */
+  function voiceRisk(text: string): Risk | null {
+    const map = mapRef.current;
+    const mc = readMapCommandAbout(text, map, recentIdea());
+    const mapRemoves = mc && 'edits' in mc ? mc.edits.flatMap((e) => (e.op === 'remove' ? [map.nodes.find((n) => n.id === e.id)?.label ?? ''] : [])).filter(Boolean) : null;
+    const dc = writingOnScreen() ? readDocCommand(text) : null;
+    const docDelete = dc ? docDeleteOf(writeDocRef.current, dc, { that: docThatRef.current }) : null;
+    const op = readOperation(spaceOf(map), text, objSelRef.current?.obj);
+    const o = op ? objOf(spaceOf(map), op.id) : null;
+    const objectRemove = op && o && /remove|delete|clear|drop|erase|reset|untick/i.test(op.op) ? kindOf(o.kind)?.ops[op.op]?.say(op.args) ?? null : null;
+    return riskOf(text, { mapRemoves, docDelete, objectRemove });
+  }
+
+  /** Is this part of a turn one of the workspace's own commands? — what lets "…, then …" be split into steps. */
+  function isCommandTurn(part: string): boolean {
+    const map = mapRef.current;
+    return !!readWorkspaceCommand(part, commandContext()) || !!readMapAdd(part, map) || !!readMapCommandAbout(part, map, recentIdea()) || (writingOnScreen() && !!readDocCommand(part));
+  }
+
+  /**
+   * A SPOKEN TURN, sent as a typed one would be (sendFromStudy): with what is
+   * in the box attached (files, a reply, an artifact chosen in Make), through
+   * send(), marked as said. The words typed in the box stay there.
+   */
+  function sendSpoken(text: string, heard: string) {
+    const outcome = (did: string) => setVoiceOutcome({ heard, did, at: Date.now() });
+    if (overNow() === 'home') {
+      // over the Universal Map: a first thought begins a line of thinking, as the box at the map's foot does
+      startFromHome(text, undefined, 'voice');
+      outcome('Started a new line of thinking with it.');
+      return;
+    }
+    if (overNow() === 'memory') {
+      outcome('Memory is open — say “go back” to return to your line of thinking, or “go home”.');
+      return;
+    }
+    const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, ...rest }) => rest);
+    const choice = makeChoice(makeId, ownChoices);
+    // with others here, Socria answers when it is named (@socria): said, "Socria, …" names it
+    let words = groupNow() ? text.replace(/^(?:(?:hey|ok|okay)\s+)?socria\b[\s,:]*/i, '@socria ') : text;
+    let make: Msg['make'] | undefined;
+    if (choice) {
+      const asked = askFor(choice, words, messages.length > 0);
+      if (asked) {
+        words = asked;
+        setMakeId(null);
+        const own = templateOf(makeId, templates);
+        if (own) make = { template: templatePayload(own) };
+      }
+    }
+    if (ready.length) setDrafts([]);
+    const p = send(words, ready, replyTo, make, 'voice');
+    if (busyRef.current) outcome('Sent to Socria.');
+    void p.then((r) => r && outcome(r));
+  }
+
+  /** A turn for Socria or a command, now — after its "yes", where it needs one. */
+  function runVoice(text: string, heard: string, confirmed = false) {
+    if (!confirmed) {
+      const risk = voiceRisk(text);
+      if (risk) {
+        const k = { what: risk.what, level: risk.level, text, run: () => runVoice(text, heard, true) };
+        setVoiceConfirm(k);
+        voiceConfirmRef.current = k;
+        setVoiceOutcome(null);
+        return;
+      }
+    }
+    sendSpoken(text, heard);
+  }
+
+  /** A spoken turn while Socria is answering: moving around happens now; the rest waits for the answer — or stops it. */
+  function dispatchVoice(text: string, heard: string) {
+    if (busyRef.current || voiceQueueRef.current.length || voiceConfirmRef.current) {
+      const wc = l5 && !voiceQueueRef.current.length ? readWorkspaceCommand(text, commandContext()) : null;
+      if (wc && (wc.kind === 'view' || wc.kind === 'beside' || wc.kind === 'pair' || wc.kind === 'close-beside' || wc.kind === 'artifact')) {
+        setVoiceOutcome({ heard, did: doWorkspaceCommand(wc).said, at: Date.now() });
+        return;
+      }
+      if (busyRef.current && voiceSetRef.current.whileAnswering === 'interrupt') stopAnswer();
+      const q = [...voiceQueueRef.current, { id: `vq${Date.now().toString(36)}${voiceQueueRef.current.length}`, text, heard }];
+      voiceQueueRef.current = q;
+      setVoiceQueue(q);
+      return;
+    }
+    runVoice(text, heard);
+  }
+
+  /** The turns held while Socria answered, one at a time, once it has finished. */
+  function pumpVoice() {
+    while (voiceQueueRef.current.length && !busyRef.current && !voiceConfirmRef.current) {
+      const [next, ...rest] = voiceQueueRef.current;
+      voiceQueueRef.current = rest;
+      setVoiceQueue(rest);
+      runVoice(next.text, next.heard);
+    }
+  }
+  const pumpRef = useRef(pumpVoice);
+  pumpRef.current = pumpVoice;
+  useEffect(() => {
+    if (!busy && !voiceConfirm) pumpRef.current();
+  }, [busy, voiceConfirm]);
+
+  /** EVERY SPOKEN TURN ARRIVES HERE (components/logos5/useSocriaVoice.ts). */
+  function onVoiceTurn(raw: string) {
+    const text = cleanUtterance(raw);
+    if (!text) return;
+    const said = (did: string) => setVoiceOutcome({ heard: text, did, at: Date.now() });
+    const c = readControl(text, { confirming: !!voiceConfirmRef.current, dictating: dictatingRef.current });
+    if (c) return voiceControl(c.control, c.rest, said);
+    // a "yes" was waited for and something else was said: what waited is not done, and this goes on
+    if (voiceConfirmRef.current) {
+      setVoiceConfirm(null);
+      voiceConfirmRef.current = null;
+    }
+    if (dictatingRef.current) return dictateTurn(text, said);
+    if (!voiceSetRef.current.autoSend) {
+      putInBox(text);
+      said('In the box — say “send”, or press Send.');
+      return;
+    }
+    // over the Universal Map or Memory, the workspace's own commands (back, open, new, search…) first
+    const over = overNow();
+    if (over) {
+      const wc = readWorkspaceCommand(text, commandContext());
+      if (wc) {
+        said(doWorkspaceCommand(wc).said);
+        return;
+      }
+    }
+    // "open the Logic Map, then add a branch called cost": the steps, one after another
+    for (const step of splitSteps(text, isCommandTurn)) dispatchVoice(step, text);
+  }
+  onVoiceTurnRef.current = onVoiceTurn;
+
+  /** Words heard when listening was paused or turned off mid-turn: into the box, never sent. */
+  function putInBox(text: string) {
+    const t = cleanUtterance(text);
+    if (!t) return;
+    setInput((v) => (v.trim() ? `${v.replace(/\s+$/, '')} ${t}` : t));
+    setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+  }
+  onVoiceUnsentRef.current = (t) => {
+    putInBox(t);
+    setVoiceOutcome({ heard: cleanUtterance(t), did: 'Not sent — it is in the box.', at: Date.now() });
+  };
+
+  /** The Voice button: on (after the notice, the first time), or off. A press: phones start the microphone only from one. */
+  function pressVoice() {
+    if (!ear) return;
+    if (voiceOn) {
+      voiceOff(null);
+      return;
+    }
+    if (!voiceSetRef.current.consented) {
+      setVoiceSheet('consent');
+      return;
+    }
+    const engine = pickEngine(ear.get().has, voiceSetRef.current.engine);
+    if (!engine) {
+      setVoiceSheet('consent');
+      return;
+    }
+    setVoiceOutcome(null);
+    ear.start(engine);
+  }
+  function voiceOff(note: string | null) {
+    ear?.stop(note);
+    setDictating(false);
+    setVoiceConfirm(null);
+    voiceConfirmRef.current = null;
+    voiceQueueRef.current = [];
+    setVoiceQueue([]);
+    setVoiceOutcome(null);
+  }
+  function changeVoiceSettings(next: VoiceSettings) {
+    const was = voiceSetRef.current;
+    setVoiceSet(writeVoiceSettings(browserStorage(), next));
+    voiceSetRef.current = next;
+    // another recogniser chosen while listening: listening goes on with it
+    if (ear && voiceOn && next.engine && next.engine !== was.engine) ear.start(next.engine);
+  }
+  function startVoiceFromSheet(engine: VoiceEngine) {
+    changeVoiceSettings({ ...voiceSetRef.current, engine, consented: true });
+    setVoiceSheet(null);
+    setVoiceOutcome(null);
+    ear?.start(engine);
+  }
+  function switchVoiceEngine(engine: VoiceEngine) {
+    changeVoiceSettings({ ...voiceSetRef.current, engine });
+    ear?.start(engine);
+  }
+  const voiceButton = voiceOffered ? <VoiceButton ear={ear} onPress={pressVoice} /> : null;
+  const voicePanel = (floating: boolean) =>
+    ear && voiceOn ? (
+      <VoicePanel
+        ear={ear}
+        floating={floating}
+        busy={busy}
+        queued={voiceQueue}
+        confirming={voiceConfirm}
+        outcome={voiceOutcome}
+        dictating={dictating}
+        boxMode={!voiceSet.autoSend}
+        where={overNow() === 'home' ? 'into a new line of thinking' : 'to Socria'}
+        onSettings={() => setVoiceSheet('settings')}
+        onHelp={() => setVoiceSheet('help')}
+        onConfirm={(yes) => {
+          const k = voiceConfirmRef.current;
+          setVoiceConfirm(null);
+          voiceConfirmRef.current = null;
+          if (yes) k?.run();
+          else setVoiceOutcome({ heard: k?.text ?? '', did: 'Not done.', at: Date.now() });
+        }}
+        onDrop={(id) => {
+          const q = voiceQueueRef.current.filter((x) => x.id !== id);
+          voiceQueueRef.current = q;
+          setVoiceQueue(q);
+        }}
+        onStopAnswer={stopAnswer}
+        onOff={() => voiceOff(null)}
+        onSwitch={switchVoiceEngine}
+      />
+    ) : null;
   /** the turn just sent asked for something to be made: what the engine makes is shown (rule C) */
   const askedMakeRef = useRef(false);
   /** a question asked from a card's popover is read there: the screen does not move for it */
@@ -6481,6 +7249,9 @@ export function LogosApp({
   const l5Dock = (
       <div className="l5-dock">
       {convoNotes}
+      {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}
+      {voicePanel(false)}
+      {voiceOffered && !voiceOn && <VoiceOffNote ear={ear} onOn={pressVoice} />}
       <LogosComposer
         layout="stacked"
         value={input}
@@ -6505,6 +7276,8 @@ export function LogosApp({
         about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
         onClearAbout={clearAbout}
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
+        voiceButton={voiceButton}
+        voiceLive={voiceOn}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
         idlePlaceholder={
           makeChoice(makeId, ownChoices)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?'))
@@ -6722,6 +7495,8 @@ export function LogosApp({
   ];
   // what Artifacts shows: the one chosen, else the newest (components/logos5/Study.tsx ArtifactsView)
   artShownRef.current = (artifactItems.find((i) => i.key === artKey) ?? artifactItems[artifactItems.length - 1])?.key ?? null;
+  // what Artifacts holds, by name — for "open the habit tracker", said or typed (lib/logos5/commands.ts)
+  artifactListRef.current = artifactItems.map((a) => ({ key: a.key, kind: a.kind, title: a.title }));
   const artifactsView = (
     <>
       <ArtifactsView
@@ -7197,7 +7972,7 @@ export function LogosApp({
    * sorting is written into it). Nothing typed and nothing added begins
    * nothing: an empty line of thinking is never opened.
    */
-  function startFromHome(text: string, files?: { atts: Attachment[]; goal: Intent }) {
+  function startFromHome(text: string, files?: { atts: Attachment[]; goal: Intent }, via?: 'voice') {
     const said = text.trim();
     if (!said && !files?.atts.length) return;
     if (!newFromHome()) return;
@@ -7205,7 +7980,7 @@ export function LogosApp({
     if (files?.atts.length && activeIdRef.current) {
       sortNextRef.current = { id: activeIdRef.current, atts: files.atts, said, goal: files.goal };
       setSortPending(true);
-    } else void send(said);
+    } else void send(said, [], null, undefined, via);
   }
   /** filed from the map: a line of thinking as the rail files it, a Core chat by its host */
   function fileFromHome(id: string, kind: 'logos' | 'core', projectId: string | null) {
@@ -7623,6 +8398,8 @@ export function LogosApp({
             {!chromeHidden && !mindShown && !homeShown && l5Head}
             {!mindShown && !homeShown && <div className={`l5v-tabhost${chromeHidden ? ' is-bare' : ''}`}>{tabsEl}</div>}
             <div className="l5-body">{mindShown ? l5MindView : homeShown ? l5HomeView : l5Line}</div>
+            {/* over the Universal Map and Memory, Voice keeps listening where it can be seen and stopped */}
+            {(mindShown || homeShown) && voicePanel(true)}
           </div>
           {draftEl}
           {chromeEls}
@@ -7640,8 +8417,22 @@ export function LogosApp({
                 setSearchOpen(null);
                 openHit(h);
               }}
-              onClose={() => setSearchOpen(null)}
+              onClose={() => {
+                setSearchOpen(null);
+                setSearchFor('');
+              }}
               now={searchOpen}
+              initial={searchFor}
+            />
+          )}
+          {voiceSheet && (
+            <VoiceSheet
+              kind={voiceSheet}
+              has={voiceHas}
+              settings={voiceSet}
+              onChange={changeVoiceSettings}
+              onStart={startVoiceFromSheet}
+              onClose={() => setVoiceSheet(null)}
             />
           )}
         </div>

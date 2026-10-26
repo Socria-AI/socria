@@ -52,6 +52,8 @@ export interface LogosMsg {
    * (lib/logos5/templates.ts), read by the map pass and nowhere else.
    */
   make?: { template?: { name: string; blocks: unknown[] } };
+  /** said, not typed — Socria Voice (lib/voice/speech.ts): marked with a microphone, and read generously for a misheard word */
+  via?: 'voice';
 }
 
 /**

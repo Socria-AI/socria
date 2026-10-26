@@ -369,6 +369,8 @@ export function LogosComposer({
   sendable,
   onCapture,
   idlePlaceholder,
+  voiceButton,
+  voiceLive,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -428,6 +430,10 @@ export function LogosComposer({
   onCapture?: () => void;
   /** what the empty box says when nothing else applies */
   idlePlaceholder?: string;
+  /** Socria Voice's button (components/logos5/SocriaVoice.tsx), beside the box's other tools */
+  voiceButton?: ReactNode;
+  /** Socria Voice is listening: the hold-to-talk mic steps aside, so one microphone is in use at a time */
+  voiceLive?: boolean;
   /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
@@ -456,7 +462,12 @@ export function LogosComposer({
       grow();
     });
   });
-  const micOn = !!voice && mic.available;
+  const micOn = !!voice && mic.available && !voiceLive;
+  // Voice starting takes the microphone: a hold in progress is let go of, unrecorded
+  const micCancel = mic.cancel;
+  useEffect(() => {
+    if (voiceLive) micCancel();
+  }, [voiceLive, micCancel]);
   const listening = mic.state === 'recording' || mic.state === 'asking';
   // a hand on the mic: the bar says "let go", or "let go to cancel" once it has slid off
   const [hold, setHold] = useState<Hold>({ holding: false, away: false });
@@ -879,6 +890,7 @@ export function LogosComposer({
             />
               {footer && <span className="l5-ctools-mid">{footer}</span>}
               <span className="l5-ctools-end">
+              {voiceButton}
               {micOn && <HoldMic mic={mic} onHold={setHold} />}
               {/* Appears only when mathematics is in play, and stays put once it
                   has — see lib/math-context.ts for why that hysteresis matters. */}

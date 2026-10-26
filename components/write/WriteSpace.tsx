@@ -127,6 +127,15 @@ export interface WriteSpaceHandle {
   show(face: Face): void;
   /** hand over what is still being typed, now — before the page goes away */
   flush(): void;
+  /**
+   * An edit said in words (lib/write/voice-edit.ts, Socria Voice or typed in
+   * the conversation): worked out on the document as it is this moment, with
+   * the block the caret is in, and committed as one step Undo takes back.
+   */
+  apply<R extends { doc: WriteDoc }>(edit: (doc: WriteDoc, caretBlock: string | null) => R | null): R | null;
+  /** the document's own undo and redo, as its buttons do them: false when there was nothing to take back or put back */
+  undo(): boolean;
+  redo(): boolean;
 }
 
 // One panel beside the page at a time (a sheet on a phone).
@@ -1168,6 +1177,21 @@ export const WriteSpace = forwardRef<
     flush() {
       backupNow();
       flush();
+    },
+    apply(edit) {
+      const out = edit(docRef.current, editor.current?.range()?.from.block ?? caret?.block ?? null);
+      if (out && out.doc !== docRef.current) commit(out.doc, 'structure');
+      return out;
+    },
+    undo() {
+      if (!past.current.length) return false;
+      undo();
+      return true;
+    },
+    redo() {
+      if (!future.current.length) return false;
+      redo();
+      return true;
     },
   }));
 
