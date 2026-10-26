@@ -362,6 +362,21 @@
 .l5v-beside-body > .l5-col {
   height: 100%;
 }
+/* a view beside is drawn as its tab draws it: the map and the thread scroll themselves */
+.l5v-beside.is-logic_map .l5v-beside-body,
+.l5v-beside.is-chat .l5v-beside-body {
+  overflow: hidden;
+}
+.l5v-beside-body > .l5v-logic {
+  flex: 1 1 auto;
+  min-height: 0;
+}
+.l5v-menu-none {
+  margin: 4px 8px 8px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+}
 
 /* Chat: one centred column */
 .l5v-body.is-chat .l5-col {

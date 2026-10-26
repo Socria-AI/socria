@@ -7,8 +7,9 @@
 // drawn over its catalogue example (components/display/Gallery.tsx
 // sampleObject) — the figure the person will get, on example words, never a
 // mock-up — and, for what the engine builds itself (a plot, a simulation, a 3D
-// model), a small drawing of one. Pressing a card chooses it; the composer then
-// asks what it is about, and Socria fills the template in.
+// model, a CAD studio), a small drawing of one. Pressing a card chooses it;
+// the composer then asks what it is about, and Socria fills the template in
+// (CAD opens its studio in Artifacts, to be described).
 //
 // One button per card, stretched over it: the preview is a picture (inert,
 // hidden from assistive technology), so nothing inside it can be tabbed to or
@@ -98,6 +99,21 @@ function Drawing({ id }: { id: string }) {
         <line x1="40" y1="104" x2="160" y2="104" className="mkg-track" />
         <line x1="40" y1="104" x2="104" y2="104" className="mkg-track-on" />
         <circle cx="104" cy="104" r="5" className="mkg-dot" />
+      </svg>
+    );
+  }
+  if (id === 'cad') {
+    // a desk drawn in the studio: its top, two legs, a drawer, and a dimension line
+    return (
+      <svg className="mkg-draw" viewBox="0 0 200 120" role="presentation">
+        <path d="M40 46 L132 30 L168 42 L76 60 Z" className="mkg-face-top" />
+        <path d="M40 46 L76 60 L76 66 L40 52 Z" className="mkg-face-left" />
+        <path d="M76 60 L168 42 L168 48 L76 66 Z" className="mkg-face-right" />
+        <path d="M44 52 L44 96 M72 64 L72 106 M162 48 L162 92" className="mkg-edge" />
+        <path d="M120 54 L156 47 L156 64 L120 71 Z" className="mkg-face-right" />
+        <path d="M40 46 L132 30 L168 42 L76 60 Z M40 46 L40 52 L76 66 L168 48 L168 42 M76 60 L76 66 M120 54 L156 47 L156 64 L120 71 Z" className="mkg-edge" />
+        <line x1="40" y1="112" x2="76" y2="118" className="mkg-axis" />
+        <text x="44" y="110" className="mkg-text">120 cm</text>
       </svg>
     );
   }

@@ -9,7 +9,13 @@
 // Map holds the person's own ideas, in the shapes their thinking takes,
 // whatever the subject (lib/logos-layout.ts ideaLenses), and opens only when
 // structure is asked for.
-// "Split View" docks one more panel beside whichever view is open.
+//
+// SPLIT VIEW is two of the views side by side: whichever is open, and one more
+// beside it — the conversation, Content, the Logic Map, or Artifacts on the
+// artifact chosen. It shows the view as its tab shows it, nothing of its own:
+// what is made (a plot, a model, a 3D scene, a display) is in Artifacts, the
+// map is the Logic Map, and a model's parameters, history and inspector are
+// the model's, inside its artifact (splitMenu, below).
 //
 // What decides a view is the runtime's reading of the turn (lib/runtime/
 // orchestrate.ts routeTurn — Alex's rules A–D); this file turns that reading
@@ -18,7 +24,6 @@
 // Pure: no React, no storage, no clock (time arrives in the input).
 
 import type { TurnRoute, Viewport } from '../runtime/orchestrate';
-import type { ViewId } from '../workspace/surfaces';
 
 export type { Viewport };
 
@@ -31,43 +36,29 @@ export const VIEW_LABELS: Record<Viewport, string> = {
   logic_map: 'Logic Map',
 };
 
-/** What can be docked beside the open view: the conversation, or one of the workspace's panels. */
-export type BesideId = 'chat' | Exclude<ViewId, 'chat'>;
+/** What can be open beside the view: another of the four views. */
+export type BesideId = Viewport;
 
-/** Split View's three sections, in Alex's words, over the panels that exist. */
-export const SPLIT_SECTIONS: readonly { title: string; items: readonly Exclude<BesideId, 'chat'>[] }[] = [
-  { title: 'Visual & Generative Tools', items: ['plot', 'model', 'scene', 'display'] },
-  { title: 'Analysis & Structure', items: ['map', 'trace', 'inspector'] },
-  { title: 'System & Memory', items: ['mind', 'params'] },
-];
-
+/** What each view is called when it is beside another. */
 export const SPLIT_NAMES: Record<BesideId, string> = {
   chat: 'Conversation',
-  plot: 'Math Plotting',
-  model: 'Interactive Modeling',
-  scene: 'Studio (CAD)',
-  display: 'Displays (Tables, Checklists)',
-  map: 'Thinking Map Structure',
-  trace: 'Trace',
-  inspector: 'Inspector',
-  mind: 'Mind (Memory History)',
-  params: 'Parameters',
+  content: 'Content',
+  artifacts: 'Artifacts',
+  logic_map: 'Logic Map',
 };
 
 export interface Screen {
   view: Viewport;
-  /** docked beside the view; null for nothing */
+  /** the view open beside it; null for nothing */
   beside: BesideId | null;
 }
 
 /** Where a line of thinking opens: Chat, with nothing beside it. */
 export const OPENING: Screen = { view: 'chat', beside: null };
 
-/** A phone shows one thing: whatever would have been beside it is not. */
+/** A phone shows one thing: whatever would have been beside it is not. A view is never beside itself. */
 export function fit(s: Screen, narrow: boolean): Screen {
-  if (narrow) return { view: s.view, beside: null };
-  // the conversation docked beside Chat is Chat itself
-  if (s.view === 'chat' && s.beside === 'chat') return { view: 'chat', beside: null };
+  if (narrow || s.beside === s.view) return { view: s.view, beside: null };
   return s;
 }
 
@@ -110,16 +101,69 @@ export function onMade(asked: boolean, now: Screen, narrow: boolean): Screen {
   return fit({ view: 'artifacts', beside: narrow ? null : now.view === 'chat' || now.beside === 'chat' ? 'chat' : now.beside }, narrow);
 }
 
-/** A view chosen by hand: what was beside it stays, unless it is the view itself. */
+/**
+ * A view chosen by hand: what was beside it stays. The view that was beside,
+ * chosen, changes places with the one that was open — both stay on screen.
+ */
 export function choose(view: Viewport, now: Screen): Screen {
-  if (view === 'chat') return { view, beside: now.beside === 'chat' ? null : now.beside };
+  if (view === now.view) return now;
+  if (view === now.beside) return { view, beside: now.view };
   return { view, beside: now.beside };
 }
 
-/** Split View: dock a panel beside the view, or take it away. The conversation beside Chat is Chat. */
+/** Split View: open a view beside the one open, or take it away. A view is never beside itself. */
 export function dock(id: BesideId | null, now: Screen): Screen {
-  if (id === 'chat' && now.view === 'chat') return { ...now, beside: null };
+  if (!id || id === now.view) return { ...now, beside: null };
   return { ...now, beside: now.beside === id ? null : id };
+}
+
+/** One of Split View's choices: a view to open beside, or an artifact to open beside on. */
+export interface SplitChoice {
+  /** what is opened beside */
+  beside: BesideId;
+  /** the artifact Artifacts opens on, for an artifact chosen by name */
+  artifact?: string;
+  label: string;
+  /** what it holds, in a few words */
+  says: string;
+  /** what is beside now */
+  on: boolean;
+}
+
+/**
+ * WHAT SPLIT VIEW OFFERS: only what this line of thinking has open in its
+ * tabs. The conversation (unless it is the view); Content, when something was
+ * brought; the Logic Map, when it holds ideas; and every artifact by name —
+ * choosing one opens Artifacts beside, on it, as its own tab shows it. A view
+ * with nothing in it is not offered: there is nothing to put beside.
+ */
+export function splitMenu(i: {
+  view: Viewport;
+  beside: BesideId | null;
+  /** the artifacts here, in Artifacts' own order, and the one Artifacts has open */
+  artifacts: readonly { key: string; kind: string; title: string }[];
+  open: string | null;
+  /** cards in Content, ideas on the map */
+  content: number;
+  ideas: number;
+}): { views: SplitChoice[]; artifacts: SplitChoice[] } {
+  const views: SplitChoice[] = [];
+  const n = (k: number, one: string, many: string) => `${k} ${k === 1 ? one : many}`;
+  if (i.view !== 'chat') views.push({ beside: 'chat', label: SPLIT_NAMES.chat, says: 'the thread and the composer', on: i.beside === 'chat' });
+  if (i.view !== 'content' && i.content > 0) views.push({ beside: 'content', label: SPLIT_NAMES.content, says: n(i.content, 'thing brought', 'things brought'), on: i.beside === 'content' });
+  if (i.view !== 'logic_map' && i.ideas > 0) views.push({ beside: 'logic_map', label: SPLIT_NAMES.logic_map, says: n(i.ideas, 'idea', 'ideas'), on: i.beside === 'logic_map' });
+  // Artifacts open as the view already shows them; beside another view, each is offered by name
+  const artifacts: SplitChoice[] =
+    i.view === 'artifacts'
+      ? []
+      : i.artifacts.map((a) => ({
+          beside: 'artifacts' as const,
+          artifact: a.key,
+          label: a.title,
+          says: a.kind,
+          on: i.beside === 'artifacts' && (i.open ?? i.artifacts[i.artifacts.length - 1]?.key) === a.key,
+        }));
+  return { views, artifacts };
 }
 
 // ── time: Alex's Today ───────────────────────────────────────────────
@@ -165,57 +209,57 @@ export const TODAY_EMPTY = 'No sessions recorded today. Start a chat to begin a 
 
 // ── a surface asked for by name ──────────────────────────────────────
 
-/** Where each of the workspace's surfaces is, among the four views: what is made is in Artifacts, the rest docks beside. */
-const MADE = new Set(['model', 'scene', 'display']);
-const BESIDE_OF: Record<string, BesideId> = {
-  map: 'map',
-  model: 'model',
-  scene: 'scene',
-  display: 'display',
-  params: 'params',
-  inspector: 'inspector',
-  trace: 'trace',
-  mind: 'mind',
+/** A model's own tools, inside its artifact: its parameters, its inspector, its history. */
+export type ModelTool = 'params' | 'inspector' | 'trace';
+const TOOLS = new Set<string>(['params', 'inspector', 'trace']);
+/** Where each of the workspace's surfaces is, among the four views: the map is the Logic Map; what is made, and a model's tools, are Artifacts'. */
+const VIEW_OF: Record<string, BesideId> = {
   chat: 'chat',
+  map: 'logic_map',
+  model: 'artifacts',
+  scene: 'artifacts',
+  display: 'artifacts',
+  params: 'artifacts',
+  inspector: 'artifacts',
+  trace: 'artifacts',
 };
+const ARTIFACT_OF: Record<string, 'model' | 'scene' | 'display'> = { model: 'model', scene: 'scene', display: 'display', params: 'model', inspector: 'model', trace: 'model' };
 
 /**
  * "Open the display", "show the model beside the map", "close the 3D view"
  * (lib/workspace/interface-request.ts), on the four views: the map is the
- * Logic Map, a plot or anything made is Artifacts (on it), a second surface
- * named docks beside, and a tool (parameters, trace, inspector, memory) docks
- * beside whatever is open. Closing takes away what is beside when it is
- * named; Chat is never closed.
+ * Logic Map; a plot, anything made and a model's tools are Artifacts, on it;
+ * a second surface named opens beside. Closing takes away what is beside when
+ * it is named, and a tool closes inside its model; Chat is never closed.
+ * Memory is the account's own place (`memory`), not a view here.
  */
 export function screenForRequest(
   req: { op: string; surfaces: readonly string[]; lens?: string },
   now: Screen,
   narrow: boolean
-): { screen: Screen; artifact: 'model' | 'scene' | 'display' | 'plot' | null } {
+): { screen: Screen; artifact: 'model' | 'scene' | 'display' | 'plot' | null; tool?: ModelTool | null; memory?: boolean } {
   const plot = req.lens === 'plot';
-  const named = req.surfaces.map((s) => (s === 'map' && plot ? 'plot' : BESIDE_OF[s])).filter(Boolean) as BesideId[];
+  const viewOf = (s: string | undefined): BesideId | null => (s === 'map' && plot ? 'artifacts' : s ? (VIEW_OF[s] ?? null) : null);
+  const artifactOf = (s: string | undefined): 'model' | 'scene' | 'display' | 'plot' | null => (s === 'map' && plot ? 'plot' : s ? (ARTIFACT_OF[s] ?? null) : null);
+  const tool = req.surfaces.find((s) => TOOLS.has(s)) as ModelTool | undefined;
   if (req.op === 'close') {
+    if (tool && req.surfaces.every((s) => TOOLS.has(s))) return { screen: now, artifact: null, tool: null };
+    const named = req.surfaces.map(viewOf).filter(Boolean) as BesideId[];
     if (now.beside && (named.includes(now.beside) || req.surfaces.length > 2)) return { screen: { ...now, beside: null }, artifact: null };
-    if (now.view === 'logic_map' && named.includes('map')) return { screen: { view: 'chat', beside: null }, artifact: null };
+    if (now.view === 'logic_map' && named.includes('logic_map')) return { screen: { view: 'chat', beside: null }, artifact: null };
     return { screen: now, artifact: null };
   }
-  const [first, second] = req.surfaces;
-  const besideOf = (s: string | undefined): BesideId | null => (s ? BESIDE_OF[s] ?? null : null);
+  const [first, second] = req.surfaces.filter((s) => s !== 'mind');
+  if (!first) return { screen: now, artifact: null, ...(req.surfaces.includes('mind') ? { memory: true } : {}) };
   let next: Screen;
-  let artifact: 'model' | 'scene' | 'display' | 'plot' | null = null;
   if (first === 'chat') next = chatVisible(now, narrow);
-  else if (first === 'map' && plot) {
-    artifact = 'plot';
-    next = { view: 'artifacts', beside: besideOf(second) ?? (req.op === 'only' ? null : now.beside) };
-  } else if (first === 'map') next = { view: 'logic_map', beside: besideOf(second) ?? (req.op === 'only' || now.beside === 'map' ? null : now.beside) };
-  else if (first && MADE.has(first)) {
-    artifact = first as 'model' | 'scene' | 'display';
-    next = { view: 'artifacts', beside: besideOf(second) ?? (req.op === 'only' ? null : now.beside) };
-  } else if (first) next = { view: now.view, beside: besideOf(first) };
-  else next = now;
-  // a panel beside that is the view itself is not a second panel
-  if (next.view === 'logic_map' && next.beside === 'map') next = { ...next, beside: null };
-  return { screen: fit(next, narrow), artifact };
+  else {
+    const view = viewOf(first);
+    if (!view) return { screen: now, artifact: null };
+    const beside = viewOf(second);
+    next = { view, beside: beside && beside !== view ? beside : req.op === 'only' ? null : now.beside };
+  }
+  return { screen: fit(next, narrow), artifact: artifactOf(first) ?? artifactOf(second), ...(tool ? { tool } : {}) };
 }
 
 // ── Split View's width ───────────────────────────────────────────────

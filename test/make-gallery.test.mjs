@@ -5,8 +5,9 @@
 //               kind and view: the preview is what comes back
 //   previews    the gallery draws each template with its own figure over the
 //               catalogue's example, opened on the template's view; what the
-//               engine builds (a plot, a simulation, a 3D model) is a drawing
-//   gallery     eleven cards, one button each; the preview is a picture —
+//               engine builds (a plot, a simulation, a 3D model) and the CAD
+//               studio are drawings
+//   gallery     twelve cards, one button each; the preview is a picture —
 //               hidden from assistive technology and inert; the chosen card
 //               is pressed; the composer's sheet is the same gallery, small
 //   artifacts   what the map draws itself is listed once: no second "Plot" of
@@ -36,7 +37,7 @@ const none = () => {};
 
 console.log('=== templates: each one is what is made ===');
 const filled = M.MAKE_CHOICES.filter((c) => c.template);
-ok('eight choices fill a display; three are built by the engine', filled.length === 8 && M.MAKE_CHOICES.filter((c) => !c.template).map((c) => c.id).join() === 'plot,simulation,model3d', J(M.MAKE_CHOICES.map((c) => [c.id, c.template])));
+ok('eight choices fill a display; three are built by the engine, and CAD opens its studio', filled.length === 8 && M.MAKE_CHOICES.filter((c) => !c.template).map((c) => c.id).join() === 'plot,simulation,model3d,cad', J(M.MAKE_CHOICES.map((c) => [c.id, c.template])));
 for (const c of filled) {
   const t = c.template;
   const kind = M.kindOf(t.kind);
@@ -65,7 +66,8 @@ ok('one button per card: the card is the button', (g.match(/class="mkg-pick"/g) 
 const previews = g.match(/<div class="mkg-preview"[^>]*>/g) ?? [];
 ok('every preview is a picture: hidden from assistive technology, and inert', previews.length === M.MAKE_CHOICES.length && previews.every((p) => /aria-hidden="true"/.test(p) && /inert=""/.test(p)), J(previews.slice(0, 2)));
 ok('the eight displays are drawn by their own figure', (g.match(/class="mkg-figure"/g) ?? []).length === 8);
-ok('the plot, the simulation and the 3D model are drawings', (g.match(/<svg class="mkg-draw"/g) ?? []).length === 3);
+ok('the plot, the simulation, the 3D model and the CAD studio are drawings', (g.match(/<svg class="mkg-draw"/g) ?? []).length === 4);
+ok('  CAD is drawn as a desk in the studio, with its dimension', /data-make="cad"[\s\S]*?<svg class="mkg-draw"[\s\S]*?120 cm/.test(g));
 ok('each card says what it is and what it is for', M.MAKE_CHOICES.every((c) => g.includes(`<span class="mkg-name">${c.label}</span>`) && g.includes(c.about.replace(/'/g, '&#x27;'))));
 ok('nothing is chosen until it is', !/aria-pressed="true"/.test(g) && !/mkg-card is-on/.test(g));
 const on = html(h(M.MakeGallery, { onPick: none, selected: 'venn' }));

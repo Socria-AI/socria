@@ -80,7 +80,8 @@ console.log('\n=== what to make, chosen before asking ===');
 ok('a short list, each named once', V.MAKE_CHOICES.length >= 8 && new Set(V.MAKE_CHOICES.map((c) => c.id)).size === V.MAKE_CHOICES.length);
 ok('nothing on the list is a shape of the thinking (those are the Logic Map’s)', V.MAKE_CHOICES.every((c) => !/mind map|concept map|argument map|decision tree/i.test(c.label)));
 const DISPLAY = { chart: 'data', table: 'compare', timeline: 'plan', plan: 'plan', checklist: 'plan', flowchart: 'diagram', proscons: 'crossroads', venn: 'venn' };
-for (const c of V.MAKE_CHOICES) {
+// every choice said in words — CAD is opened, not asked for (below)
+for (const c of V.MAKE_CHOICES.filter((x) => !x.opens)) {
   for (const [typed, conv] of [['the causes of the French Revolution', false], ['rent 1200, food 400', true], ['', true]]) {
     const asked = V.askFor(c, typed, conv);
     const r = V.routeTurn({ text: asked });
@@ -93,6 +94,12 @@ for (const c of V.MAKE_CHOICES) {
 }
 ok('nothing typed and no conversation: nothing to make it from, nothing sent', V.MAKE_CHOICES.every((c) => V.askFor(c, '   ', false) === null));
 ok('an unknown choice is no choice', V.makeChoice('sculpture') === null && V.makeChoice(null) === null && V.makeChoice('chart')?.label === 'Chart');
+{
+  const cad = V.makeChoice('cad');
+  ok('CAD is an artifact: it opens a 3D studio in Artifacts, and nothing is asked for in words', cad?.opens === 'studio' && cad.template === null && V.askFor(cad, 'a desk 120 cm wide', true) === null && V.askFor(cad, '', true) === null);
+  ok('  its prompt asks for a description to build', /describe it/i.test(cad.placeholder) && /cm/.test(cad.placeholder));
+  ok('  the only choice that is opened rather than asked for', V.MAKE_CHOICES.filter((c) => c.opens).map((c) => c.id).join() === 'cad');
+}
 
 console.log(`\nlogic-map-ideas: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

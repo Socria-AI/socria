@@ -2,9 +2,10 @@
 // components/logos5/L5Views.tsx — THE LOGOS 5 SHELL (Alex Tran, Logos 5 Comments v2).
 //
 // A line of thinking is four views — Chat, Content, Artifacts, Logic Map —
-// switched in a tab row; one more panel can be docked beside whichever is
-// open (Split View); the header keeps only what is global: the way back to
-// the Universal Map, search, Split View, and the account.
+// switched in a tab row; a second can be open beside whichever is open
+// (Split View: the conversation, Content, the Logic Map, or an artifact by
+// name — only what this line of thinking has); the header keeps only what is
+// global: the way back to the Universal Map, search, Split View, and the account.
 //
 // Every control here is a button with a name, the tabs are a tablist with
 // arrow keys, the divider is a separator that takes the arrow keys, and the
@@ -12,7 +13,7 @@
 // lib/logos5/views.ts; this file only draws it.
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
-import { SPLIT_NAMES, SPLIT_SECTIONS, VIEW_LABELS, VIEW_ORDER, type BesideId, type Viewport } from '@/lib/logos5/views';
+import { VIEW_LABELS, VIEW_ORDER, type SplitChoice, type Viewport } from '@/lib/logos5/views';
 
 const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '');
 
@@ -141,21 +142,17 @@ export function L5Tabs({
 
 // ── Split View ───────────────────────────────────────────────────────
 
+/** Two views side by side: the open one, and whatever is chosen here — only what this line of thinking has (lib/logos5/views.ts splitMenu). */
 export function SplitView({
-  beside,
+  menu,
+  besideOn,
   onPick,
-  canChat,
-  says,
-  omit = [],
 }: {
-  beside: BesideId | null;
-  onPick: (id: BesideId | null) => void;
-  /** the conversation can be docked (it is not already the view) */
-  canChat: boolean;
-  /** a line per panel: what it shows */
-  says: Partial<Record<BesideId, string>>;
-  /** panels the open view already is — the map, beside the Logic Map */
-  omit?: readonly BesideId[];
+  menu: { views: SplitChoice[]; artifacts: SplitChoice[] };
+  /** something is open beside the view */
+  besideOn: boolean;
+  /** a choice, or null to close what is beside */
+  onPick: (c: SplitChoice | null) => void;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
@@ -175,13 +172,20 @@ export function SplitView({
       document.removeEventListener('keydown', esc);
     };
   }, [open]);
-  const pick = (id: BesideId | null) => {
+  const pick = (c: SplitChoice | null) => {
     setOpen(false);
-    onPick(id);
+    onPick(c);
   };
+  const item = (c: SplitChoice) => (
+    <button key={c.artifact ?? c.beside} type="button" role="menuitemradio" aria-checked={c.on} className={`l5v-mi${c.on ? ' is-on' : ''}`} onClick={() => pick(c)}>
+      <span className="l5v-mi-t">{c.label}</span>
+      <span className="l5v-mi-s">{c.says}</span>
+    </button>
+  );
+  const nothing = !menu.views.length && !menu.artifacts.length;
   return (
     <span className="l5v-split" ref={wrap}>
-      <button type="button" className={`l5v-btn${beside ? ' is-on' : ''}`} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={`l5v-btn${besideOn ? ' is-on' : ''}`} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => setOpen((v) => !v)}>
         <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
           <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
           <path d="M13 4.5v15" />
@@ -191,26 +195,17 @@ export function SplitView({
       {open && (
         <div className="l5v-menu" role="menu" id={menuId} aria-label="Open beside">
           <p className="l5v-menu-h">Open beside the view</p>
-          {canChat && (
-            <button type="button" role="menuitemradio" aria-checked={beside === 'chat'} className={`l5v-mi${beside === 'chat' ? ' is-on' : ''}`} onClick={() => pick('chat')}>
-              <span className="l5v-mi-t">{SPLIT_NAMES.chat}</span>
-              <span className="l5v-mi-s">the thread and the composer</span>
-            </button>
-          )}
-          {SPLIT_SECTIONS.map((sec) => (
-            <div key={sec.title} role="group" aria-label={sec.title} className="l5v-menu-sec">
-              <p className="l5v-menu-s">{sec.title}</p>
-              {sec.items.filter((id) => !omit.includes(id)).map((id) => (
-                <button key={id} type="button" role="menuitemradio" aria-checked={beside === id} className={`l5v-mi${beside === id ? ' is-on' : ''}`} onClick={() => pick(id)}>
-                  <span className="l5v-mi-t">{SPLIT_NAMES[id]}</span>
-                  {says[id] && <span className="l5v-mi-s">{says[id]}</span>}
-                </button>
-              ))}
+          {menu.views.map(item)}
+          {menu.artifacts.length > 0 && (
+            <div role="group" aria-label="Artifacts" className="l5v-menu-sec">
+              <p className="l5v-menu-s">Artifacts</p>
+              {menu.artifacts.map(item)}
             </div>
-          ))}
-          {beside && (
+          )}
+          {nothing && <p className="l5v-menu-none">Nothing else is open yet. What you make, bring in or map can be put here.</p>}
+          {besideOn && (
             <button type="button" role="menuitem" className="l5v-mi is-close" onClick={() => pick(null)}>
-              Close the panel beside
+              Close the view beside
             </button>
           )}
         </div>
@@ -225,6 +220,7 @@ export function L5Layout({
   view,
   primary,
   beside,
+  besideView = null,
   besideTitle,
   onCloseBeside,
   omni,
@@ -234,8 +230,9 @@ export function L5Layout({
 }: {
   view: Viewport;
   primary: ReactNode;
-  /** what is docked beside the view, drawn */
+  /** the view open beside it, drawn as its own tab draws it */
   beside: ReactNode | null;
+  besideView?: Viewport | null;
   besideTitle: string;
   onCloseBeside: () => void;
   /** the composer, when the conversation is not on screen */
@@ -286,7 +283,7 @@ export function L5Layout({
             onPointerUp={() => void (drag.current = null)}
             onPointerCancel={() => void (drag.current = null)}
           />
-          <aside className="l5v-beside" aria-label={besideTitle}>
+          <aside className={`l5v-beside${besideView ? ` is-${besideView}` : ''}`} aria-label={besideTitle}>
             <div className="l5v-beside-head">
               <span className="l5v-beside-t">{besideTitle}</span>
               <button type="button" className="l5v-icon" aria-label={`Close ${besideTitle}`} onClick={onCloseBeside}>

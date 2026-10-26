@@ -168,12 +168,13 @@ import { L5Layout, L5Tabs, L5TopBar, L5Working, SplitView } from '@/components/l
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
 import { ContentView, PlainReader, WriteUpReader } from '@/components/logos5/ContentView';
 import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/logos5/content';
-import { OPENING, SPLIT_NAMES, afterSend, chatVisible, choose, dock, fit, onMade, readBesideShare, screenForRequest, writeBesideShare, type BesideId, type Screen, type Viewport } from '@/lib/logos5/views';
+import { OPENING, SPLIT_NAMES, afterSend, chatVisible, choose, dock, fit, onMade, readBesideShare, screenForRequest, splitMenu, writeBesideShare, type ModelTool, type Screen, type SplitChoice, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
+import { ModelArtifact } from './logos5/ModelTools';
 import { L5Header, L5LinkBar, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
@@ -208,6 +209,9 @@ import { LENSES, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layo
 const WS_KEY = 'socria.logos3.workspace.v2';
 /** A scene with nothing in it: what the first description typed into the chat, with Live 3D open, is built on. */
 const EMPTY_SCENE: SceneState = { nodes: [], next: 1, unit: 'm' };
+/** A new 3D studio (CAD), open in Artifacts before anything is built in it — and the panel it is drawn in. */
+const STUDIO = 's:new';
+const STUDIO_PANEL = 'l5a-s-new';
 /** Where the conversation dock sits around the stage. */
 const DOCK_KEY = 'socria.logos3.dock.v1';
 /** the chats bar and header, hidden from the top-right control — per browser */
@@ -639,6 +643,12 @@ export function LogosApp({
   // Logos 5: what to make, chosen before asking (components/logos5/MakePicker.tsx) — spent by the message that asks for it
   const [makeId, setMakeId] = useState<string | null>(null);
   const pickMake = (id: string | null) => {
+    // CAD is built here, by describing it: the studio opens in Artifacts, and nothing is asked of a model
+    if (makeChoice(id)?.opens === 'studio') {
+      openStudio();
+      setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+      return;
+    }
     setMakeId(id);
     if (id) setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
   };
@@ -3454,6 +3464,11 @@ export function LogosApp({
             touched = obj;
             scene = { said: turn.said };
             if (!open.obj && wsLayout) changeLayout(configurePanel(wsLayout, open.panel.id, { obj: id }));
+            // the new 3D studio's first description made its scene: Artifacts shows that scene from now on
+            if (open.panel.id === STUDIO_PANEL) {
+              const sid = activeIdRef.current;
+              if (sid) setArtSel((m) => ({ ...m, [sid]: `s:${id}` }));
+            }
             const part = turn.reading.changes.added.at(-1) ?? turn.reading.changes.changed.at(-1) ?? null;
             if (part) {
               // what it made is in hand, as it would be had they clicked it — so "make it red" next is about it
@@ -3472,9 +3487,9 @@ export function LogosApp({
   /** The Live 3D panel the conversation builds in — the one showing the selected scene, else the first — and its scene, if it has one. */
   function openScene(space: ObjectSpace): { panel: PanelNode; obj: ThoughtObject | null } | null {
     if (!workspaceOn || !wsLayout) return null;
-    // Logos 5: the Live 3D panels on screen — docked beside, or the scene open in Artifacts
+    // Logos 5: the Live 3D scene on screen — open in Artifacts, as the view or beside it
     const ps = l5
-      ? [besidePanelOf(screenRef.current.beside), artShownRef.current?.startsWith('s:') && screenRef.current.view === 'artifacts' ? artPanelOf(artShownRef.current) : null].filter((p): p is PanelNode => p?.type === 'scene')
+      ? [artShownRef.current?.startsWith('s:') && (screenRef.current.view === 'artifacts' || screenRef.current.beside === 'artifacts') ? artPanelOf(artShownRef.current) : null].filter((p): p is PanelNode => p?.type === 'scene')
       : panelsOf(wsLayout).filter((p) => p.type === 'scene');
     if (!ps.length) return null;
     const objOfPanel = (p: PanelNode) => {
@@ -3817,6 +3832,9 @@ export function LogosApp({
                     })()
                   : null;
         if (sid && key) setArtSel((m) => ({ ...m, [sid]: key }));
+        // a model's parameters, inspector or history open beside it, inside its artifact; memory is the account's own place
+        if (to.tool !== undefined) setModelTool(to.tool);
+        if (to.memory && cloud) setL5Mind(true);
         setScreen(() => to.screen);
         if (asked.lens && asked.lens !== 'plot') changeLayout(showLens(wsLayout, asked.lens));
         setError(null);
@@ -4507,6 +4525,8 @@ export function LogosApp({
   const [artSel, setArtSel] = useState<Record<string, string>>({});
   /** where the reply being written is read: the conversation, or Content (a write-up they asked to keep) */
   const [pendingPlace, setPendingPlace] = useState<'chat' | 'content'>('chat');
+  /** the tool open beside a model in its artifact — its parameters, inspector or history (components/logos5/ModelTools.tsx) */
+  const [modelTool, setModelTool] = useState<ModelTool | null>(null);
   /** MADE WHEN ASKED (lib/logos5/artifacts.ts): the offers of the map's own drawings taken and declined in this line of thinking */
   const [madeRec, setMadeRec] = useState<MadeRecord>({ taken: [], declined: [] });
   useEffect(() => {
@@ -4525,12 +4545,24 @@ export function LogosApp({
   function setStudyTab(t: Viewport) {
     setScreen((s) => choose(t, s));
   }
-  /** An artifact, at full size: "w:doc", "d:<display>", "p:<practice>", "m:<model>", "v:plot". */
+  /**
+   * A NEW 3D STUDIO (CAD): an empty Live 3D scene open in Artifacts, with the conversation beside it, so
+   * the next description builds in it (openScene) — the first one makes its scene. Nothing exists until then.
+   */
+  function openStudio() {
+    const id = activeIdRef.current;
+    if (!id) return;
+    // chosen by hand: something asked for earlier and still on its way does not take its place when it arrives
+    askedMakeRef.current = false;
+    setArtSel((m) => ({ ...m, [id]: STUDIO }));
+    setScreen((s) => onMade(true, s, narrowRef.current));
+  }
+  /** An artifact, at full size: "w:doc", "d:<display>", "p:<practice>", "m:<model>", "v:plot". Artifacts open beside is already on screen. */
   function showArtifact(key: string) {
     const id = activeIdRef.current;
     if (!id) return;
     setArtSel((m) => ({ ...m, [id]: key }));
-    setStudyTab('artifacts');
+    setScreen((s) => (s.view === 'artifacts' || s.beside === 'artifacts' ? s : choose('artifacts', s)));
   }
   /**
    * The conversation on screen, or not. On a wide screen it docks beside the
@@ -5302,9 +5334,10 @@ export function LogosApp({
         setStudyTab('content');
       } else {
         // what was made is shown in Artifacts, at full size, beside the conversation (Alex's rule C),
-        // and the turn that made it says so
+        // and the turn that made it says so — unless a new 3D studio was opened by hand since: it is
+        // listed, and the studio stays open to be described
         const sid = activeIdRef.current;
-        if (sid) setArtSel((m) => ({ ...m, [sid]: `d:${displayToOpen}` }));
+        if (sid) setArtSel((m) => (m[sid] === STUDIO ? m : { ...m, [sid]: `d:${displayToOpen}` }));
         setScreen((s) => onMade(true, s, narrowRef.current));
         const asked = [...messages].reverse().find((m) => m.role === 'user' && m.id);
         if (asked?.id) setObjMsg((x) => (x[displayToOpen] ? x : { ...x, [displayToOpen]: asked.id! }));
@@ -5346,7 +5379,8 @@ export function LogosApp({
         const key = built ? `m:${wsFacts.docs[wsFacts.docs.length - 1].id}` : docs > seen.docs ? 'v:viz' : 'v:plot';
         // a plot made for a turn that asked for something to see is taken, so it is listed (lib/logos5/artifacts.ts)
         if (key === 'v:plot' && activeId) setMadeRec(writeMade(browserStorage(), activeId, 'plot', 'taken'));
-        setArtSel((m) => (activeId ? { ...m, [activeId]: key } : m));
+        // a new 3D studio opened by hand stays open; what arrived is listed beside it
+        setArtSel((m) => (activeId && m[activeId] !== STUDIO ? { ...m, [activeId]: key } : m));
         setScreen((s) => onMade(true, s, narrowRef.current));
       } else if (docs > seen.docs && screenRef.current.view !== 'artifacts') setArtFresh(true);
     }
@@ -5526,12 +5560,6 @@ export function LogosApp({
   const displayOfPanel = (p: PanelNode): ThoughtObject | null =>
     (p.config?.obj ? displaysHere.find((o) => o.id === p.config!.obj) : null) ?? displaysHere[displaysHere.length - 1] ?? null;
 
-  /** Logos 5, Split View: the panel docked beside the view — opened the way "+ View" opened it, configured for what is here. */
-  function besidePanelOf(b: BesideId | null): PanelNode | null {
-    if (!b || b === 'chat' || !wsLayout) return null;
-    const spec = viewCatalogue(wsLayout, wsFacts).find((e) => e.id === b)?.panel ?? (b === 'plot' ? { type: 'map' as const, config: { lens: 'plot' } } : { type: b });
-    return { kind: 'panel', id: `l5b-${b}`, type: spec.type, ...(spec.config ? { config: spec.config } : {}) };
-  }
   /** The artifact that draws the plot (lib/logos5/artifacts.ts). */
   function plotItem(): string {
     return plotArtifact(wsFacts.docs.map((d) => d.id), wsFacts.activeDoc, !!wsFacts.viz);
@@ -5552,22 +5580,21 @@ export function LogosApp({
         // Logos 5: the conversation is always beside the workspace, never inside it
         return <p className="l5-chatnote">The conversation is beside the workspace.</p>;
       case 'map':
-        // Logos 5: the Logic Map's map, or the map docked beside another view — never both at once
-        // Logos 5: the Logic Map (and the map docked beside) draws the person's ideas; an artifact, or
-        // the plot docked beside, draws its one made lens
+        // Logos 5: the Logic Map draws the person's ideas — as the view or beside it, the same map; an
+        // artifact (the plot, the working) draws its one made lens
         return (
           <div className="lg-panel lg-panel-in">
             {mapBody({
               lens: p.config?.lens,
-              primary: p.id === firstOf('map') || (l5 && p.id === 'l5b-map'),
-              ...(l5 ? { shapes: /^l5[ab]-/.test(p.id) && isMadeLens(p.config?.lens) ? p.config.lens : 'ideas' } : {}),
+              primary: p.id === firstOf('map'),
+              ...(l5 ? { shapes: /^l5a-/.test(p.id) && isMadeLens(p.config?.lens) ? p.config.lens : 'ideas' } : {}),
             })}
           </div>
         );
       case 'model': {
         const doc = panelDoc(p);
-        // Logos 5: the model on screen — docked beside, else the one open in Artifacts — takes the reply's moves
-        const primary = l5 ? p.id === 'l5b-model' || (screen.beside !== 'model' && p.id.startsWith('l5a-')) : p.id === firstOf('model');
+        // Logos 5: the model open in Artifacts takes the reply's moves
+        const primary = l5 ? p.id.startsWith('l5a-') : p.id === firstOf('model');
         const pinned = p.config?.view !== undefined || !primary;
         return (
           <ModelPanel
@@ -6322,8 +6349,10 @@ export function LogosApp({
   // ── the study's screens (components/logos5/Study.tsx) ──
   const studyTopicObj = study && studyTopic ? study.state.topics.find((t) => t.id === studyTopic) ?? null : null;
   const artKey = artSel[activeId ?? ''] ?? null;
-  const studyPlaceholder: string | null =
-    studyTab === 'content' && study
+  const studioOpen = artKey === STUDIO && (studyTab === 'artifacts' || screen.beside === 'artifacts');
+  const studyPlaceholder: string | null = studioOpen
+    ? 'Describe it — e.g. a desk 120 cm wide with two drawers'
+    : studyTab === 'content' && study
       ? studyTopicObj
         ? `Ask about ${studyTopicObj.title}…`
         : narrow
@@ -6622,7 +6651,20 @@ export function LogosApp({
           },
         ]
       : []),
-    ...wsFacts.docs.map((d) => ({ key: `m:${d.id}`, kind: d.dynamic ? 'Simulation' : 'Model', title: d.title || 'Model', render: () => renderPanel(artPanelOf(`m:${d.id}`)!) })),
+    // a model, with its own tools beside it inside its card: parameters, inspector, history
+    ...wsFacts.docs.map((d) => ({
+      key: `m:${d.id}`,
+      kind: d.dynamic ? 'Simulation' : 'Model',
+      title: d.title || 'Model',
+      render: () => (
+        <ModelArtifact
+          model={renderPanel(artPanelOf(`m:${d.id}`)!)}
+          tool={modelTool}
+          onTool={setModelTool}
+          renderTool={(t) => renderPanel({ kind: 'panel', id: `l5a-${t}-${d.id}`, type: t, config: { doc: d.id } })}
+        />
+      ),
+    })),
     ...(drawn.viz ? [{ key: 'v:viz', kind: wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture', title: map.viz?.title || (wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture'), render: () => renderPanel(artPanelOf('v:viz')!) }] : []),
     // The plot lens draws the picture or the model when there is one — which is already the
     // item above — so it is an artifact of its own only for functions nothing else draws.
@@ -6631,7 +6673,9 @@ export function LogosApp({
     // ideas, so here rather than on the Logic Map, which keeps to the ideas themselves
     ...(wsFacts.lenses.includes('solve') && madeShown.includes('solve') ? [{ key: 'v:solve', kind: 'Solution', title: 'The working, step by step', render: () => renderPanel(artPanelOf('v:solve')!) }] : []),
     ...(workedHere && madeShown.includes('work') ? [{ key: 'v:work', kind: 'Working', title: workedHere, render: () => renderPanel(artPanelOf('v:work')!) }] : []),
-    ...wsFacts.scenes.map((s) => ({ key: `s:${s.id}`, kind: 'Live 3D', title: s.name, render: () => renderPanel(artPanelOf(`s:${s.id}`)!) })),
+    // CAD: a Live 3D scene, built by describing it — and a new studio, while it is open and still empty
+    ...wsFacts.scenes.map((s) => ({ key: `s:${s.id}`, kind: 'CAD', title: s.name, render: () => renderPanel(artPanelOf(`s:${s.id}`)!) })),
+    ...(artKey === STUDIO ? [{ key: STUDIO, kind: 'CAD', title: 'New 3D studio', render: () => renderPanel(artPanelOf(STUDIO)!) }] : []),
     ...displaysHere
       .filter((o) => o.kind !== 'document')
       .map((o) => {
@@ -6683,7 +6727,8 @@ export function LogosApp({
             ? undefined
             : (id) => {
                 pickMake(id);
-                setScreen((s) => chatVisible(s, narrowRef.current));
+                // the studio is described from where it is; anything else is asked for in the conversation
+                if (makeChoice(id)?.opens !== 'studio') setScreen((s) => chatVisible(s, narrowRef.current));
               }
         }
       />
@@ -6938,18 +6983,37 @@ export function LogosApp({
     </div>
   ) : null;
 
-  // SPLIT VIEW: one more panel beside whichever view is open — the
-  // conversation, or any of the workspace's panels, each opened the way
-  // "+ View" opened it, configured for what is here
-  const splitSays: Partial<Record<BesideId, string>> = Object.fromEntries((wsLayout ? viewCatalogue(wsLayout, wsFacts) : []).filter((e) => e.id !== 'chat').map((e) => [e.id, e.empty ?? e.says]));
-  const besidePanel = besidePanelOf(screen.beside);
-  const primaryEl = studyTab === 'chat' ? l5Thread : studyTab === 'content' ? contentView : studyTab === 'artifacts' ? artifactsView : logicView;
-  const besideEl = screen.beside === 'chat' && studyTab !== 'chat' ? l5Thread : besidePanel ? <div className="l5v-panel">{renderPanel(besidePanel)}</div> : null;
+  // SPLIT VIEW (lib/logos5/views.ts): two of the views side by side — the one open, and beside it the
+  // conversation, Content, the Logic Map, or Artifacts on the artifact chosen — each drawn as its own
+  // tab draws it. Only what this line of thinking has is offered.
+  const splitChoices = splitMenu({
+    view: studyTab,
+    beside: screen.beside,
+    artifacts: artifactItems.map((a) => ({ key: a.key, kind: a.kind, title: a.title })),
+    open: artShownRef.current,
+    content: contentItems.length,
+    ideas: map.nodes.length,
+  });
+  const viewEl = (v: Viewport) => (v === 'chat' ? l5Thread : v === 'content' ? contentView : v === 'artifacts' ? artifactsView : logicView);
+  const primaryEl = viewEl(studyTab);
+  const besideEl = screen.beside && screen.beside !== studyTab ? viewEl(screen.beside) : null;
+  /** A Split View choice: a view beside, or Artifacts beside on an artifact named; chosen again, it goes. */
+  function pickSplit(c: SplitChoice | null) {
+    const sid = activeIdRef.current;
+    if (!c) return setScreen((s) => ({ ...s, beside: null }));
+    if (c.artifact) {
+      if (c.on) return setScreen((s) => ({ ...s, beside: null }));
+      if (sid) setArtSel((m) => ({ ...m, [sid]: c.artifact! }));
+      return setScreen((s) => fit({ ...s, beside: 'artifacts' }, narrowRef.current));
+    }
+    setScreen((s) => dock(c.beside, s));
+  }
   const l5Line = (
     <L5Layout
       view={studyTab}
       primary={primaryEl}
       beside={besideEl}
+      besideView={besideEl ? screen.beside : null}
       besideTitle={screen.beside ? SPLIT_NAMES[screen.beside] : ''}
       onCloseBeside={() => setScreen((s) => ({ ...s, beside: null }))}
       // the composer, wherever the conversation is not on screen: what is said here is still said to Socria
@@ -6995,7 +7059,7 @@ export function LogosApp({
       onNew={() => void newFromHome()}
       split={
         !narrow && activeId ? (
-          <SplitView beside={screen.beside} onPick={(id) => setScreen((s) => dock(id, s))} canChat={studyTab !== 'chat'} says={splitSays} omit={studyTab === 'logic_map' ? ['map'] : []} />
+          <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} />
         ) : null
       }
       presence={

@@ -1457,3 +1457,59 @@ has. The engine cannot build a real football game.
 write-ups are still filed in Content. Each part is its own change: the map's
 gate in `app/api/logos/map`, the routes in `routeTurn`, the write-up path in
 `presentation.ts` and `content.ts`.
+
+## 20. Split View, redone: the views side by side
+
+The owner's words: "split view is the artifact / logic map whatever the user
+chooses … split views only shows what the user has open in the tabs …
+artifacts / what's in logic map from split view into there (for example CAD
+should be artifact)".
+
+**What it was.** A drawer of ten workspace panels in three sections — Math
+Plotting, Interactive Modeling, Studio (CAD), Displays, Thinking Map
+Structure, Trace, Inspector, Mind, Parameters, the Conversation — each docked
+beside the open view as a panel of its own. Five of them were things
+Artifacts already held (a plot, a model, a 3D scene, a display) or the Logic
+Map itself, drawn a second way; the rest were a model's tools and the memory.
+
+**What it is now** (`lib/logos5/views.ts`, `components/logos5/L5Views.tsx`).
+Two of the four views side by side: the one open, and beside it the
+conversation, Content, the Logic Map, or Artifacts on an artifact chosen by
+name. The pane beside is drawn by the same body its tab draws (`viewEl`), so it
+shows exactly what that tab shows. The menu (`splitMenu`) offers only what this
+line of thinking has: Content once something is brought, the Logic Map once it
+holds ideas, each artifact by its title and kind; a view is never beside
+itself. Choosing the tab that is beside swaps the two, so both stay on screen.
+
+**Where the panels went.**
+
+| Was in Split View | Now |
+|---|---|
+| Math Plotting, Interactive Modeling, Displays | the plot, the model, each display: artifacts, in Artifacts |
+| Studio (CAD) | CAD: every 3D scene is an artifact labelled CAD; **Make → CAD** opens a new 3D studio in Artifacts, and the next description builds in it (Live 3D's own reader, no model call) |
+| Thinking Map Structure | the Logic Map, as a view beside |
+| Parameters, Inspector, Trace | the model's own tools, opened beside it inside its card (`components/logos5/ModelTools.tsx`): Parameters, Inspector, History |
+| Mind | Memory, in the account menu, where it already lived |
+
+"Show the parameters", "close the trace" and "show the model beside the map"
+still work: a model's tool opens or closes inside its artifact, and the map
+beside the model is the Logic Map with Artifacts beside it
+(`screenForRequest`). A new studio is kept open if something asked for earlier
+arrives while it is still empty; what arrived is listed beside it.
+
+**Checked.** `test/logos5-views.test.mjs` (120): choosing, swapping, opening
+and closing a view beside, `splitMenu` from every view, surface requests.
+`test/split-view.test.mjs` (30): the shell, the menu, the model's tools
+(rendered), CAD, and no trace of the old drawer. `test/logic-map-ideas`,
+`test/make-gallery` and `test/logos5-shell` updated for CAD and the new menu.
+In the browser (local stand-ins), desktop: a chart opens Artifacts with the
+conversation beside; choosing Chat swaps them and the chart is drawn beside as
+its tab draws it; the menu lists "Logic Map · 1 idea" and the chart by name and
+none of the old panels; the Logic Map opens beside; Make → CAD opens a new 3D
+studio and "a box 2 m wide, 1 m deep and 0.5 m tall" is built in it as a CAD
+scene. A 390px phone: no Split View (one view at a time), and CAD opens and
+builds in the Artifacts view from its own composer. No page errors.
+
+**Limits.** The model's tools were checked by rendering, not in the browser:
+the local stand-in cannot build a model. The 3D panel still names itself "Live
+3D" inside its card, and its messages say "Built in Live 3D".

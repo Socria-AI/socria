@@ -331,6 +331,8 @@ const MODULES = [
   'test/helpers/make-under-test.tsx',
   // four views, four jobs: routing, the shape a reply may take, Content's write-ups, made-when-asked
   'test/helpers/four-views-under-test.tsx',
+  // Split View, redone: the views beside each other, a model's tools in its artifact, CAD made
+  'test/helpers/split-view-under-test.tsx',
 ];
 
 export async function buildAll() {

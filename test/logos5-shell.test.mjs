@@ -22,7 +22,8 @@ const composer = read('components/LogosComposer.tsx');
 
 console.log('\n=== the screen is the four views ===');
 ok('a line of thinking is L5Layout over the view that is open', /<L5Layout\s+view=\{studyTab\}/.test(app) && /primary=\{primaryEl\}/.test(app));
-ok('  each view has its own body: Chat the thread, Content, Artifacts, the Logic Map', /studyTab === 'chat' \? l5Thread : studyTab === 'content' \? contentView : studyTab === 'artifacts' \? artifactsView : logicView/.test(app));
+ok('  each view has its own body: Chat the thread, Content, Artifacts, the Logic Map', /const viewEl = \(v: Viewport\) => \(v === 'chat' \? l5Thread : v === 'content' \? contentView : v === 'artifacts' \? artifactsView : logicView\)/.test(app) && /const primaryEl = viewEl\(studyTab\)/.test(app));
+ok('  …and the view beside is drawn by the same body its tab draws', /const besideEl = screen\.beside && screen\.beside !== studyTab \? viewEl\(screen\.beside\) : null/.test(app) && !/besidePanelOf/.test(app));
 ok('  the tab row is the four views, with what each holds counted', /<L5Tabs\s+value=\{studyTab\}/.test(app) && /content: contentItems\.length/.test(app) && /logic_map: map\.nodes\.length/.test(app));
 ok('  the tabs are a tablist that takes the arrow keys', /role="tablist"/.test(shell) && /ArrowRight/.test(shell) && /aria-selected=\{on\}/.test(shell) && /tabIndex=\{on \? 0 : -1\}/.test(shell));
 ok('"Components" is called Content everywhere it is said', !/label: 'Components'/.test(app) && !/'components'/.test(app));
@@ -36,7 +37,8 @@ ok('search in the middle of the bar, ⌘K / Ctrl K', /className="l5v-search"/.te
 ok('  ⌘K / Ctrl K opens it from anywhere in Logos 5', /\(e\.metaKey \|\| e\.ctrlKey\) && !e\.altKey && !e\.shiftKey && e\.key\.toLowerCase\(\) === 'k'/.test(app));
 ok('  a result opens where it lives', /function openHit\(h: Hit\)/.test(app) && /openFromHome\(sid, local\)/.test(app) && /openCite\(docId, block\)/.test(app));
 ok('Split View replaces "+ View": the Logic Map’s workspace has no "+ View"', /addViews=\{false\}/.test(app) && /props\.addViews === false \? null : addView/.test(read('components/workspace/Workspace.tsx')));
-ok('  the drawer is a menu that closes on Escape, its panels in three sections', /role="menu"/.test(shell) && /e\.key === 'Escape'/.test(shell) && /SPLIT_SECTIONS\.map/.test(shell));
+ok('  the drawer is a menu that closes on Escape: the views, then the artifacts by name', /role="menu"/.test(shell) && /e\.key === 'Escape'/.test(shell) && /\{menu\.views\.map\(item\)\}/.test(shell) && /\{menu\.artifacts\.map\(item\)\}/.test(shell) && !/SPLIT_SECTIONS/.test(shell));
+ok('  …offering only what this line of thinking has (splitMenu)', /const splitChoices = splitMenu\(\{/.test(app) && /<SplitView menu=\{splitChoices\}/.test(app));
 ok('  the panel beside is resized by a separator that takes the arrow keys', /role="separator"/.test(shell) && /aria-valuenow/.test(shell) && /ArrowLeft/.test(shell));
 ok('Synthesize is the Content and Logic Map views’ own action, not the bar’s', /\(studyTab === 'content' \|\| studyTab === 'logic_map'\) && canSynthesize\(map\)/.test(app) && !/label: synthBusy === 'workspace' \? 'Reading your map…' : 'Synthesize'/.test(app));
 ok('Memory lives in the profile: the account chip’s own menu', /label: 'Memory', hint: 'What Socria remembers about you'/.test(app) && /items\?\.length/.test(read('components/account/AccountControl.tsx')) && !/<MindButton/.test(app));

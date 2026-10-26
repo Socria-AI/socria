@@ -1005,6 +1005,100 @@
 .logos-root .l5 .l5s-art-body > * {
   flex: 1 1 auto;
 }
+/* A MODEL'S OWN TOOLS (components/logos5/ModelTools.tsx): its parameters, inspector and history,
+   beside the model inside its card — on a narrow card, under it */
+.logos-root .l5 .l5m-art {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  /* the card's own width decides the layout: a model beside another view is narrow */
+  container-type: inline-size;
+}
+.logos-root .l5 .l5m-tools {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  justify-content: flex-end;
+}
+.logos-root .l5 .l5m-tool {
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+  background: var(--l5-raise, transparent);
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.82);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5m-tool:hover,
+.logos-root .l5 .l5m-tool:focus-visible {
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45);
+}
+.logos-root .l5 .l5m-tool.is-on {
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.6);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.09);
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5m-body {
+  display: flex;
+  gap: 10px;
+  min-width: 0;
+}
+.logos-root .l5 .l5m-model {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.logos-root .l5 .l5m-model > :is(.ws-model, .lg-panel, .ws-empty),
+.logos-root .l5 .l5m-side {
+  position: relative;
+  height: clamp(360px, calc(100vh - 430px), 640px);
+  overflow: hidden;
+  border-radius: 12px;
+}
+.logos-root .l5 .l5m-side {
+  flex: 0 0 min(300px, 40%);
+  display: flex;
+  flex-direction: column;
+  border: 1px solid var(--l5-hair);
+  background: var(--lg-paper);
+}
+.logos-root .l5 .l5m-side-head {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 6px 6px 12px;
+  border-bottom: 1px solid var(--l5-hair);
+  font-size: 13px;
+  font-weight: 600;
+}
+.logos-root .l5 .l5m-x {
+  width: 32px;
+  height: 32px;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  color: inherit;
+  font-size: 18px;
+  cursor: pointer;
+}
+.logos-root .l5 .l5m-side-body {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: auto;
+}
+@container (max-width: 640px) {
+  .logos-root .l5 .l5m-body {
+    flex-direction: column;
+  }
+  .logos-root .l5 .l5m-side {
+    flex-basis: auto;
+    height: auto;
+    max-height: 320px;
+  }
+}
 .logos-root .l5 .l5s-art-body .l5s-practice {
   padding: 4px 0 0;
 }

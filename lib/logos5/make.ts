@@ -12,7 +12,8 @@
 // lib/objects/display-request.ts readDisplayRequest, the map pass), so a
 // picked chart and a typed one cannot be made differently, and the
 // conversation shows exactly what was asked. The suite checks every choice
-// against those readers (test/logic-map-ideas.test.mjs).
+// against those readers (test/logic-map-ideas.test.mjs). One is not asked for
+// at all: CAD opens a 3D studio in Artifacts, built by describing it (`opens`).
 //
 // PURE.
 
@@ -39,6 +40,12 @@ export interface MakeChoice {
   ask: (about: string) => string;
   /** the request when there is nothing typed: made from the conversation so far */
   fromHere: string;
+  /**
+   * Made here, not asked for: 'studio' opens an empty 3D studio (CAD) in
+   * Artifacts, and what is described next is built in it by Live 3D's own
+   * reader (lib/objects/scene-chat.ts) — no words are sent for the choice.
+   */
+  opens?: 'studio';
 }
 
 const make = (noun: string) => ({
@@ -83,6 +90,16 @@ export const MAKE_CHOICES: readonly MakeChoice[] = [
     ask: (about) => `Build a 3D model of ${about}`,
     fromHere: 'Build a 3D model of what we are talking about',
   },
+  {
+    id: 'cad',
+    label: 'CAD',
+    about: 'Build it in 3D by describing it — its parts, sizes and materials.',
+    template: null,
+    opens: 'studio',
+    placeholder: 'Describe it — e.g. a desk 120 cm wide with two drawers',
+    ask: (about) => about,
+    fromHere: '',
+  },
 ];
 
 export const makeChoice = (id: string | null | undefined): MakeChoice | null => MAKE_CHOICES.find((c) => c.id === id) ?? null;
@@ -93,6 +110,8 @@ export const makeChoice = (id: string | null | undefined): MakeChoice | null => 
  * and no conversation there is nothing to make it from, and nothing is sent.
  */
 export function askFor(choice: MakeChoice, typed: string, hasConversation: boolean): string | null {
+  // a studio is opened, not asked for: what is typed in it is a description, sent as written
+  if (choice.opens) return null;
   const about = typed.trim().replace(/\s+$/, '');
   if (!about) return hasConversation ? choice.fromHere : null;
   return choice.ask(about);
