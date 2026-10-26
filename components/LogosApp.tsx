@@ -105,6 +105,8 @@ import { readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
 import { MakePicker } from '@/components/logos5/MakePicker';
 import { askFor, makeChoice } from '@/lib/logos5/make';
+import { templateChoice, templateOf, templatePayload } from '@/lib/logos5/templates';
+import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
 import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
@@ -642,9 +644,12 @@ export function LogosApp({
   const [composerFocus, setComposerFocus] = useState<{ n: number; caret?: number } | null>(null);
   // Logos 5: what to make, chosen before asking (components/logos5/MakePicker.tsx) — spent by the message that asks for it
   const [makeId, setMakeId] = useState<string | null>(null);
+  // the person's own templates (lib/logos5/templates.ts): choices in Make beside the list
+  const templates = useTemplates();
+  const ownChoices = useMemo(() => templates.map(templateChoice), [templates]);
   const pickMake = (id: string | null) => {
     // CAD is built here, by describing it: the studio opens in Artifacts, and nothing is asked of a model
-    if (makeChoice(id)?.opens === 'studio') {
+    if (makeChoice(id, ownChoices)?.opens === 'studio') {
       openStudio();
       setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
       return;
@@ -3152,14 +3157,14 @@ export function LogosApp({
   }
 
   /** `asked`: the message in place of what is typed — a chosen artifact, asked for in words (lib/logos5/make.ts) */
-  function sendFromComposer(asked?: string) {
+  function sendFromComposer(asked?: string, make?: Msg['make']) {
     // Anything still being read, or that failed, is left behind rather than
     // sent as a silent blank.
     const ready: Attachment[] = drafts
       .filter((d) => d.status === 'ready')
       .map(({ id, status, error: _e, ...rest }) => rest);
     setDrafts([]);
-    void send(typeof asked === 'string' ? asked : input, ready, replyTo);
+    void send(typeof asked === 'string' ? asked : input, ready, replyTo, make);
   }
 
   /**
@@ -3713,7 +3718,7 @@ export function LogosApp({
     chronRef.current = [...chronRef.current, turn, reply];
   }
 
-  async function send(text: string, atts: Attachment[] = [], replying: ReplyRef | null = null) {
+  async function send(text: string, atts: Attachment[] = [], replying: ReplyRef | null = null, make?: Msg['make']) {
     const content = text.trim();
     if ((!content && !atts.length) || !activeIdRef.current) return;
     if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
@@ -3956,6 +3961,8 @@ export function LogosApp({
       ...(atts.length ? { attachments: atts } : {}),
       ...(replying ? { replyTo: replying } : {}),
       ...(askBrief ? { about: { kind: askBrief.kind, label: askBrief.label, ...(askBrief.of ? { of: askBrief.of } : {}) } } : {}),
+      // a custom artifact asked for from one of their templates: the template goes with it to the map pass
+      ...(make ? { make } : {}),
     };
     // In a shared room — and in the room's own session — the turn is stamped
     // with who wrote it and broadcast to the other person before anything
@@ -6366,12 +6373,14 @@ export function LogosApp({
   /** Sent from the composer: files sent from Content with no question are sorted in; anything else is asked in the conversation. */
   function sendFromStudy() {
     // WHAT TO MAKE, chosen before asking: what they typed, asked for as that artifact, and the choice is spent
-    const choice = makeChoice(makeId);
+    const choice = makeChoice(makeId, ownChoices);
     if (choice) {
       const asked = askFor(choice, input, messages.length > 0);
       if (!asked) return;
       setMakeId(null);
-      sendFromComposer(asked);
+      // one of their own templates travels with the words that ask for it
+      const own = templateOf(makeId, templates);
+      sendFromComposer(asked, own ? { template: templatePayload(own) } : undefined);
       return;
     }
     const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, ...rest }) => rest);
@@ -6498,10 +6507,10 @@ export function LogosApp({
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
         idlePlaceholder={
-          makeChoice(makeId)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?'))
+          makeChoice(makeId, ownChoices)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?'))
         }
         // a chosen artifact can be made from the conversation so far, with nothing typed
-        sendable={!!makeChoice(makeId) && messages.length > 0}
+        sendable={!!makeChoice(makeId, ownChoices) && messages.length > 0}
         footer={
           <>
             <MakePicker value={makeId} onChange={pickMake} />
@@ -6728,7 +6737,7 @@ export function LogosApp({
             : (id) => {
                 pickMake(id);
                 // the studio is described from where it is; anything else is asked for in the conversation
-                if (makeChoice(id)?.opens !== 'studio') setScreen((s) => chatVisible(s, narrowRef.current));
+                if (makeChoice(id, ownChoices)?.opens !== 'studio') setScreen((s) => chatVisible(s, narrowRef.current));
               }
         }
       />

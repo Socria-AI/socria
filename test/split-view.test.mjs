@@ -77,7 +77,7 @@ console.log('\n=== CAD is an artifact ===');
   const g = html(h(V.MakeGallery, { onPick: () => {} }));
   ok('  in the gallery, drawn as a desk in the studio, its dimension marked', /data-make="cad"/.test(g) && /data-make="cad"[\s\S]*?120 cm/.test(g));
   const app = read('components/LogosApp.tsx');
-  ok('picked, it opens a new 3D studio in Artifacts, the conversation beside', /if \(makeChoice\(id\)\?\.opens === 'studio'\) \{\s*openStudio\(\);/.test(app) && /setArtSel\(\(m\) => \(\{ \.\.\.m, \[id\]: STUDIO \}\)\);\s*setScreen\(\(s\) => onMade\(true, s, narrowRef\.current\)\);/.test(app));
+  ok('picked, it opens a new 3D studio in Artifacts, the conversation beside', /if \(makeChoice\(id, ownChoices\)\?\.opens === 'studio'\) \{\s*openStudio\(\);/.test(app) && /setArtSel\(\(m\) => \(\{ \.\.\.m, \[id\]: STUDIO \}\)\);\s*setScreen\(\(s\) => onMade\(true, s, narrowRef\.current\)\);/.test(app));
   ok('  listed as CAD while it is open, and every scene is CAD in Artifacts', /kind: 'CAD', title: s\.name/.test(app) && /artKey === STUDIO \? \[\{ key: STUDIO, kind: 'CAD', title: 'New 3D studio'/.test(app));
   ok('  a description sent with it open is built in it — the studio counts as on screen as the view or beside', /artShownRef\.current\?\.startsWith\('s:'\) && \(screenRef\.current\.view === 'artifacts' \|\| screenRef\.current\.beside === 'artifacts'\)/.test(app));
   ok('  and its first description makes its scene, which Artifacts then shows', /if \(open\.panel\.id === STUDIO_PANEL\) \{[\s\S]{0,120}setArtSel\(\(m\) => \(\{ \.\.\.m, \[sid\]: `s:\$\{id\}` \}\)\);/.test(app));

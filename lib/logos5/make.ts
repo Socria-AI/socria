@@ -15,6 +15,10 @@
 // against those readers (test/logic-map-ideas.test.mjs). One is not asked for
 // at all: CAD opens a 3D studio in Artifacts, built by describing it (`opens`).
 //
+// ANY ARTIFACT. "Your own" asks for a custom artifact — whatever they describe,
+// built from a few primitives (lib/objects/display-custom.ts) — and the
+// person's saved templates are choices too (lib/logos5/templates.ts).
+//
 // PURE.
 
 export interface MakeChoice {
@@ -91,6 +95,16 @@ export const MAKE_CHOICES: readonly MakeChoice[] = [
     fromHere: 'Build a 3D model of what we are talking about',
   },
   {
+    // ANY ARTIFACT: what they describe, built from a few primitives (lib/objects/display-custom.ts)
+    id: 'custom',
+    label: 'Your own',
+    about: 'Anything else — describe it: a tracker, a calculator, a timer.',
+    template: { kind: 'custom', view: 'board' },
+    placeholder: 'Describe it — e.g. a habit tracker for exercise, reading and sleep this week',
+    ask: (about) => `Make a custom artifact: ${about}`,
+    fromHere: 'Make a custom artifact from this conversation',
+  },
+  {
     id: 'cad',
     label: 'CAD',
     about: 'Build it in 3D by describing it — its parts, sizes and materials.',
@@ -102,7 +116,8 @@ export const MAKE_CHOICES: readonly MakeChoice[] = [
   },
 ];
 
-export const makeChoice = (id: string | null | undefined): MakeChoice | null => MAKE_CHOICES.find((c) => c.id === id) ?? null;
+/** A choice by its id — one of the list, or one of the person's own templates ("tpl:<id>", lib/logos5/templates.ts). */
+export const makeChoice = (id: string | null | undefined, own: readonly MakeChoice[] = []): MakeChoice | null => MAKE_CHOICES.find((c) => c.id === id) ?? own.find((c) => c.id === id) ?? null;
 
 /**
  * The message a choice sends: what they typed, asked for as that choice. With

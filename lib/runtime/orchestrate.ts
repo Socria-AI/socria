@@ -199,8 +199,10 @@ export function routeTurn(t: TurnInput): TurnRoute {
     (construct && `visual:${construct}`) ||
     // a display asked for BY NAME ("a decision matrix", "a study plan") — one
     // matched only by what they want ("should I take the job or stay?" fits a
-    // crossroads display) is a question, and stays in the conversation
-    (display && !display.intent && `visual:display:${display.kind ?? 'any'}`) ||
+    // crossroads display) is a question, and stays in the conversation. A
+    // custom artifact is matched only by a request to make one ("make me a
+    // pomodoro timer"), so it is asked for either way
+    (display && (!display.intent || display.kind === 'custom') && `visual:display:${display.kind ?? 'any'}`) ||
     (view?.lens === 'plot' && 'visual:plot') ||
     (PRACTICE.test(text) && 'visual:practice') ||
     (VISUAL.test(text) && 'visual:asked') ||

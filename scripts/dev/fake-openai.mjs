@@ -33,6 +33,7 @@ const allUser = (messages) => messages.filter((m) => m?.role === 'user').map((m)
 /** A reply in Logos's register, chosen by what the last message is plainly doing. */
 function chatReply(messages) {
   const t = lastUser(messages).toLowerCase();
+  if (/custom artifact/.test(t)) return 'It is in Artifacts: tick each day as you go — the days and the bar work themselves out. Which habit is the hardest to keep?';
   if (/\bchart|plot|graph\b/.test(t)) return 'Rent is most of it — three-quarters of what you listed. Is that the share you expected?';
   if (/derivative|d\/dx|differentiate/.test(t)) return 'Use the quotient rule or the chain rule — both give $-\\csc(x)\\cot(x)$. Which route do you want to check by hand?';
   if (/what is|what's|define|meaning of/.test(t)) return 'It is the share of a cost that buyers end up paying after a tax, set by how strongly each side reacts to price.';
@@ -171,6 +172,48 @@ function mapReply(messages) {
   const edges = nodes.slice(1).map((n) => ({ from: 'n1', to: n.id, relation: 'depends' }));
   void transcript;
   return { context: /offer|job|decide|should i/.test(lower) ? 'deciding' : 'reflecting', ask: { action: 'discuss', artifact: 'map' }, nodes, edges };
+}
+
+/**
+ * A custom artifact drafted (lib/objects/display-custom.ts): from their own
+ * template when one was handed over (its blocks kept, a table's rows filled
+ * from what they asked), else a habit tracker for the things they named.
+ */
+function customReply(system, transcript) {
+  // the latest request: the transcript holds every one made so far
+  const asked = [...transcript.matchAll(/Make a custom artifact[^:\n]*:\s*([^\n]+)/gi)].pop()?.[1] ?? '';
+  const things = asked
+    .replace(/^(?:a|an)\s+[\w\s]*?\bfor\s+/i, '')
+    .replace(/\bthis week\b|\bevery day\b/gi, '')
+    .split(/,\s*|\s+and\s+/)
+    .map((x) => x.trim().replace(/^and\s+/i, ''))
+    .filter(Boolean)
+    .slice(0, 6);
+  const named = things.length ? things : ['Exercise', 'Reading', 'Sleep'];
+  const cap = (x) => x.charAt(0).toUpperCase() + x.slice(1);
+  const tplName = /THEIR TEMPLATE, “([^”]+)”/.exec(system)?.[1];
+  const tpl = /Template: (\{.*\})\s*$/m.exec(system)?.[1];
+  if (tplName && tpl) {
+    const blocks = JSON.parse(tpl).blocks.map((b) => (b.type === 'table' ? { ...b, rows: named.map((n) => ({ cells: { [b.columns[0].id]: cap(n) } })) } : b));
+    return { display: { kind: 'custom', state: { title: `${tplName}: ${named.map(cap).join(', ')}`.slice(0, 80), blocks } }, gaps: [] };
+  }
+  const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri'];
+  return {
+    display: {
+      kind: 'custom',
+      state: {
+        title: 'Habit tracker',
+        about: 'Tick each day you did it.',
+        blocks: [
+          { id: 'week', type: 'table', label: 'This week', columns: [{ id: 'habit', label: 'Habit' }, ...days.map((d) => ({ id: d.toLowerCase(), label: d, kind: 'check' })), { id: 'days', label: 'Days', kind: 'calc', expr: days.map((d) => d.toLowerCase()).join(' + '), total: true }], rows: named.map((n) => ({ cells: { habit: cap(n) } })) },
+          { id: 'done', type: 'progress', label: 'This week so far', of: 'week' },
+          { id: 'goal', type: 'number', label: 'Days a week to aim for', value: 4, min: 1, max: 7, step: 1, control: 'stepper' },
+          { id: 'notes', type: 'field', label: 'What got in the way?', multiline: true, placeholder: 'A line for the week' },
+        ],
+      },
+    },
+    gaps: [],
+  };
 }
 
 /** The study sort (lib/logos5/study-ask.ts sortAsk): topics from the keyed passages' own headings. */
@@ -339,7 +382,8 @@ const server = http.createServer((req, res) => {
         const isSort = /sort a student’s files into study topics/.test(system);
         const isEntries = /journal-entry practice/.test(system);
         const isWrite = system.startsWith('You help someone with their own writing.');
-        const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : {});
+        const isCustom = system.startsWith('You draft EVERYDAY DISPLAYS') && /- "custom" —/.test(system);
+        const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
       const text = inlineReply(messages) ?? chatReply(messages.slice(1));

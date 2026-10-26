@@ -1,0 +1,439 @@
+/* components/display/CustomFigure.tsx — a custom artifact, drawn from its blocks. The display's own tokens (display.css). */
+
+.dsp-cu {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 4px 2px 8px;
+  color: var(--dsp-ink);
+  min-width: 0;
+}
+.dsp-cu-about {
+  margin: 0;
+  color: var(--dsp-60);
+  font-size: 14px;
+}
+.dsp-cu-title {
+  margin: 0;
+  font-size: 20px;
+  font-weight: 600;
+}
+.dsp-cu-head {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 14.5px;
+  font-weight: 600;
+}
+.dsp-cu-count {
+  font-weight: 500;
+  font-size: 12.5px;
+  color: var(--dsp-60);
+}
+.dsp-cu-p {
+  margin: 0;
+  font-size: 14.5px;
+  line-height: 1.55;
+  white-space: pre-line;
+}
+.dsp-cu-note {
+  margin: 0;
+  font-size: 13px;
+  color: var(--dsp-60);
+  white-space: pre-line;
+}
+.dsp-cu-label {
+  display: block;
+  font-size: 12.5px;
+  font-weight: 600;
+  letter-spacing: 0.01em;
+  color: var(--dsp-60);
+}
+.dsp-cu-saved {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 10px;
+  background: var(--dsp-tint);
+  font-size: 13px;
+}
+
+/* a list: ticks, words to change in place, a way to add */
+.dsp-cu-list ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.dsp-cu-list li {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 34px;
+  padding: 0 4px;
+  border-radius: 8px;
+}
+.dsp-cu-list li:hover {
+  background: var(--dsp-tint);
+}
+.dsp-cu-list li .dsp-edit,
+.dsp-cu-list li > span {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.dsp-cu-list li.is-done .dsp-edit,
+.dsp-cu-list li.is-done > span {
+  color: var(--dsp-60);
+  text-decoration: line-through;
+}
+.dsp-cu-list input[type='checkbox'],
+.dsp-cu-table input[type='checkbox'] {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--dsp-primary);
+  flex: 0 0 auto;
+}
+.dsp-cu-x {
+  flex: 0 0 auto;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 6px;
+  background: none;
+  color: var(--dsp-40);
+  font-size: 16px;
+  cursor: pointer;
+  opacity: 0;
+}
+li:hover > .dsp-cu-x,
+tr:hover .dsp-cu-x,
+.dsp-cu-x:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .dsp-cu-x {
+    opacity: 0.7;
+  }
+}
+
+/* a table: its own scroll, numbers right-aligned, calc cells quiet, totals under it */
+.dsp-cu-scroll {
+  overflow-x: auto;
+  border: 1px solid var(--dsp-line);
+  border-radius: 10px;
+}
+.dsp-cu-table table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13.5px;
+}
+.dsp-cu-table th,
+.dsp-cu-table td {
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--dsp-line);
+  text-align: left;
+  white-space: nowrap;
+}
+.dsp-cu-table th {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--dsp-60);
+  background: var(--dsp-tint);
+}
+.dsp-cu-table .is-num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+.dsp-cu-table .is-num .dsp-num {
+  width: 7em;
+  text-align: right;
+}
+.dsp-cu-table .is-check {
+  text-align: center;
+  width: 1%;
+}
+.dsp-cu-table .is-calc {
+  color: var(--dsp-primary);
+  font-weight: 600;
+}
+.dsp-cu-table tfoot td {
+  font-weight: 600;
+  border-bottom: 0;
+}
+.dsp-cu-table .is-x {
+  width: 1%;
+  padding: 0 4px;
+}
+.dsp-cu-table td .dsp-edit {
+  min-width: 6em;
+  width: 100%;
+}
+.dsp-cu-add {
+  margin-top: 8px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px dashed var(--dsp-24);
+  border-radius: 999px;
+  background: none;
+  color: var(--dsp-ink);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.dsp-cu-add:hover {
+  border-color: var(--dsp-primary);
+}
+
+/* a number they set, a value worked out */
+.dsp-cu-number,
+.dsp-cu-value {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 10px 12px;
+  border: 1px solid var(--dsp-line);
+  border-radius: 12px;
+}
+.dsp-cu-number .dsp-cu-label,
+.dsp-cu-value .dsp-cu-label {
+  font-size: 13.5px;
+  color: var(--dsp-ink);
+}
+.dsp-cu-number .dsp-slider {
+  flex: 1 1 220px;
+  max-width: 360px;
+}
+.dsp-cu-field {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.dsp-cu-unit {
+  color: var(--dsp-60);
+  font-size: 13px;
+}
+.dsp-cu-value {
+  background: var(--dsp-tint);
+  border-color: transparent;
+}
+.dsp-cu-big {
+  font-size: 22px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsp-primary);
+}
+
+/* progress */
+.dsp-cu-progress {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-areas: 'label pct' 'bar bar';
+  gap: 6px 12px;
+  align-items: baseline;
+}
+.dsp-cu-progress .dsp-cu-label {
+  grid-area: label;
+}
+.dsp-cu-pct {
+  grid-area: pct;
+  font-variant-numeric: tabular-nums;
+  font-weight: 600;
+  font-size: 13px;
+}
+.dsp-cu-bar {
+  grid-area: bar;
+  height: 10px;
+  border-radius: 999px;
+  background: var(--dsp-tint-2);
+  overflow: hidden;
+}
+.dsp-cu-bar i {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--dsp-primary);
+  transition: width 0.3s ease;
+}
+
+/* a choice */
+.dsp-cu-choice {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  min-width: 0;
+}
+.dsp-cu-choice legend {
+  margin-bottom: 8px;
+  padding: 0;
+}
+.dsp-cu-options {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.dsp-cu-opt {
+  min-height: 36px;
+  padding: 6px 14px;
+  border: 1px solid var(--dsp-24);
+  border-radius: 999px;
+  background: none;
+  color: var(--dsp-ink);
+  font: inherit;
+  font-size: 13.5px;
+  cursor: pointer;
+}
+.dsp-cu-opt.is-on {
+  border-color: var(--dsp-primary);
+  background: var(--dsp-tint-2);
+  font-weight: 600;
+}
+.dsp-cu-opt.is-right {
+  border-color: var(--dsp-primary);
+  box-shadow: inset 0 0 0 1px var(--dsp-primary);
+}
+.dsp-cu-opt.is-wrong {
+  border-color: var(--dsp-tension);
+  color: var(--dsp-tension);
+}
+.dsp-cu-check {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 13px;
+}
+.dsp-cu-check button,
+.dsp-cu-timer-acts button {
+  min-height: 32px;
+  padding: 4px 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--dsp-primary);
+  color: var(--dsp-paper);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.dsp-cu-timer-acts button + button {
+  background: none;
+  color: var(--dsp-ink);
+  border: 1px solid var(--dsp-24);
+}
+.dsp-cu-timer-acts button:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* a field to write in */
+.dsp-cu-fieldb {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.dsp-cu-fieldb input,
+.dsp-cu-fieldb textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 8px 10px;
+  border: 1px solid var(--dsp-line);
+  border-radius: 10px;
+  background: var(--dsp-panel);
+  color: var(--dsp-ink);
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+}
+.dsp-cu-fieldb input:focus,
+.dsp-cu-fieldb textarea:focus {
+  outline: 2px solid color-mix(in srgb, var(--dsp-primary) 35%, transparent);
+  border-color: var(--dsp-primary);
+}
+
+/* a timer */
+.dsp-cu-timer {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border: 1px solid var(--dsp-line);
+  border-radius: 12px;
+}
+.dsp-cu-clock {
+  font-size: 30px;
+  font-weight: 650;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+}
+.dsp-cu-timer.is-up .dsp-cu-clock {
+  color: var(--dsp-tension);
+}
+.dsp-cu-timer-acts {
+  display: inline-flex;
+  gap: 8px;
+}
+
+/* a chart */
+.dsp-cu-chart {
+  margin: 0;
+}
+.dsp-cu-chart svg {
+  width: 100%;
+  max-width: 520px;
+  height: auto;
+  display: block;
+}
+.dsp-cu-axis {
+  stroke: var(--dsp-24);
+}
+.dsp-cu-tick {
+  font-size: 11px;
+  fill: var(--dsp-60);
+}
+.dsp-cu-legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  margin: 6px 0 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12.5px;
+}
+.dsp-cu-legend i {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  margin-right: 6px;
+  border-radius: 3px;
+}
+
+/* a group: a few blocks side by side, one column on a narrow card */
+.dsp-cu-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  container-type: inline-size;
+}
+.dsp-cu-grid {
+  display: grid;
+  gap: 12px;
+}
+.dsp-cu-grid.is-2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+.dsp-cu-grid.is-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.dsp-cu-cell {
+  min-width: 0;
+}
+@container (max-width: 520px) {
+  .dsp-cu-grid.is-2,
+  .dsp-cu-grid.is-3 {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}

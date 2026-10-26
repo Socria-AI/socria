@@ -8,7 +8,9 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { makeChoice } from '@/lib/logos5/make';
+import { templateChoice } from '@/lib/logos5/templates';
 import { MakeGallery } from './MakeGallery';
+import { useTemplates } from './useTemplates';
 import '@/app/app-shell.css';
 
 export function MakePicker({ value, onChange }: { value: string | null; onChange: (next: string | null) => void }) {
@@ -29,7 +31,9 @@ export function MakePicker({ value, onChange }: { value: string | null; onChange
       window.removeEventListener('keydown', key);
     };
   }, [open]);
-  const now = makeChoice(value);
+  const own = useTemplates();
+  // a choice of the list, or one of their own templates
+  const now = makeChoice(value, own.map(templateChoice));
   return (
     <span className="app-root app-inline">
       <div className={`mp l5-make${now ? ' is-set' : ''}`} ref={box} data-tour="make">
@@ -60,13 +64,14 @@ export function MakePicker({ value, onChange }: { value: string | null; onChange
             <p className="mp-lbl">Make</p>
             <MakeGallery
               compact
+              own={own}
               selected={value}
               onPick={(id) => {
                 onChange(id === value ? null : id);
                 setOpen(false);
               }}
             />
-            <p className="mp-note">Each is drawn as it will be. Choose one, then say what it is about — it is kept in Artifacts.</p>
+            <p className="mp-note">Each is drawn as it will be. Choose one, then say what it is about — it is kept in Artifacts. For anything else, choose Your own and describe it.</p>
           </div>
         )}
       </div>

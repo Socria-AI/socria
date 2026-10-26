@@ -30,6 +30,8 @@ import './display-crossroads';
 import './display-untangle';
 import './display-commonground';
 import './display-timemachine';
+// anything the other kinds are not, built from a few primitives (display-custom.ts) — "any artifact"
+import './display-custom';
 import { apply, create, currentOf, kindOf, objOf, originSaid, stepWho, EMPTY_SPACE, type ObjectOrigin, type ObjectSpace, type ThoughtObject, type Step } from './core';
 import { diffCells, findMatrices, matrixTeX, readMatrixOp, type MatrixState } from './matrix';
 import { findFunctions } from './function';
@@ -50,6 +52,7 @@ export { documentFromDoc, chartFromTable, functionFromEquation, formatSaid, page
 export { numberLineFromWords, readNumberSet, unionOf, intervalNotation, inequalityOf, setBuilder, lineWindow, type NumberLineState, type Piece } from './display-numberline';
 export { BASIS_WORD, REL_WORD, type Basis, type Link } from './reasoning';
 export { timelineOf, compareStates, compareMap, keyOfStep, type TimelineEvent, type Timeline, type StateDiff } from './timeline';
+export { sanitizeCustom, computeCustom, parseFormula, evalFormula, templateShape, type CustomState, type Block as CustomBlock } from './display-custom';
 
 export const spaceOf = (map: ThinkingMap | null | undefined): ObjectSpace => map?.objects ?? EMPTY_SPACE;
 

@@ -185,3 +185,40 @@
     transition: none;
   }
 }
+
+/* THEIR OWN TEMPLATES: under their own heading, each with a way to remove it */
+.mkg-sec {
+  grid-column: 1 / -1;
+  margin: 6px 2px -2px;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--mkg-60);
+}
+.mkg-sec span {
+  margin-left: 6px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+}
+.mkg-remove {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  z-index: 2;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--mkg-hair);
+  border-radius: 999px;
+  background: var(--mkg-card);
+  color: var(--mkg-60);
+  font-size: 16px;
+  line-height: 1;
+  cursor: pointer;
+}
+.mkg-remove:hover,
+.mkg-remove:focus-visible {
+  color: var(--mkg-ink);
+  border-color: var(--mkg-40);
+}

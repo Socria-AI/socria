@@ -46,6 +46,12 @@ export interface LogosMsg {
    * (lib/inline-ui.ts InlineState). The reply's words are never changed.
    */
   ui?: Record<string, InlineState>;
+  /**
+   * What was asked to be made with this turn beyond its words: a custom
+   * artifact from one of the person's own templates carries the template
+   * (lib/logos5/templates.ts), read by the map pass and nowhere else.
+   */
+  make?: { template?: { name: string; blocks: unknown[] } };
 }
 
 /**

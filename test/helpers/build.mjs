@@ -333,6 +333,8 @@ const MODULES = [
   'test/helpers/four-views-under-test.tsx',
   // Split View, redone: the views beside each other, a model's tools in its artifact, CAD made
   'test/helpers/split-view-under-test.tsx',
+  // any artifact, from a few primitives: the custom kind, its templates, Make's "Your own", its figure
+  'test/helpers/custom-under-test.tsx',
 ];
 
 export async function buildAll() {

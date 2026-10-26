@@ -18,6 +18,7 @@ import { GroundFigure } from './GroundFigure';
 import { TimeFigure } from './TimeFigure';
 import { NumberLineFigure } from './NumberLineFigure';
 import { DocumentFigure } from './DocumentFigure';
+import { CustomFigure } from './CustomFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
@@ -36,3 +37,5 @@ registerFigure('crossroads', CrossroadsFigure);
 registerFigure('untangle', UntangleFigure);
 registerFigure('commonground', GroundFigure);
 registerFigure('timemachine', TimeFigure);
+// anything else, built from a few primitives
+registerFigure('custom', CustomFigure);

@@ -19,7 +19,9 @@ import { memo, useMemo } from 'react';
 import { ObjectFigure } from '@/components/objects/ObjectFigure';
 import { sampleObject } from '@/components/display/Gallery';
 import { MAKE_CHOICES, type MakeChoice } from '@/lib/logos5/make';
-import type { ThoughtObject } from '@/lib/objects';
+import { templateChoice, type ArtifactTemplate } from '@/lib/logos5/templates';
+import { create, EMPTY_SPACE, type ThoughtObject } from '@/lib/objects';
+import { removeTemplateHere, useTemplates } from './useTemplates';
 import './make-gallery.css';
 
 /** React 18 has no typed `inert`: a picture of the figure, not a second copy to tab through. */
@@ -37,25 +39,48 @@ export function MakeGallery({
   onPick,
   selected = null,
   compact = false,
+  own,
 }: {
   onPick: (id: string) => void;
   selected?: string | null;
   /** the composer's sheet: smaller cards, two or three to a row */
   compact?: boolean;
+  /** the person's templates — read from this device when not given */
+  own?: readonly ArtifactTemplate[];
 }) {
+  const kept = useTemplates();
+  const mine = own ?? kept;
   return (
     <ul className={`mkg${compact ? ' is-compact' : ''}`} aria-label="Choose what to make">
       {MAKE_CHOICES.map((c) => (
         <MakeCard key={c.id} c={c} on={selected === c.id} onPick={onPick} />
       ))}
+      {/* THEIR OWN: a custom artifact saved as a template, made again for what they say (lib/logos5/templates.ts) */}
+      {mine.length > 0 && (
+        <li className="mkg-sec" aria-hidden="true">
+          Yours <span>saved on this device</span>
+        </li>
+      )}
+      {mine.map((t) => (
+        <MakeCard key={t.id} c={templateChoice(t)} on={selected === `tpl:${t.id}`} onPick={onPick} template={t} />
+      ))}
     </ul>
   );
 }
 
-const MakeCard = memo(function MakeCard({ c, on, onPick }: { c: MakeChoice; on: boolean; onPick: (id: string) => void }) {
-  const sample = useMemo(() => sampleFor(c), [c]);
+/** A saved template, drawn by the custom artifact's own figure over what it held when it was saved. */
+function templateSample(t: ArtifactTemplate): ThoughtObject | null {
+  try {
+    return create(EMPTY_SPACE, 'custom', { title: t.name, about: t.about, blocks: t.blocks }, { origin: 'person', name: 'Ex' })?.obj ?? null;
+  } catch {
+    return null;
+  }
+}
+
+const MakeCard = memo(function MakeCard({ c, on, onPick, template }: { c: MakeChoice; on: boolean; onPick: (id: string) => void; template?: ArtifactTemplate }) {
+  const sample = useMemo(() => (template ? templateSample(template) : sampleFor(c)), [c, template]);
   return (
-    <li className={`mkg-card${on ? ' is-on' : ''}`} data-make={c.id}>
+    <li className={`mkg-card${on ? ' is-on' : ''}${template ? ' is-own' : ''}`} data-make={c.id}>
       <div className="mkg-preview" aria-hidden="true" {...INERT}>
         {sample ? (
           <div className="mkg-figure">
@@ -69,6 +94,11 @@ const MakeCard = memo(function MakeCard({ c, on, onPick }: { c: MakeChoice; on: 
         <span className="mkg-name">{c.label}</span>
         <span className="mkg-about">{c.about}</span>
       </button>
+      {template && (
+        <button type="button" className="mkg-remove" aria-label={`Remove the template “${template.name}”`} title="Remove this template" onClick={() => removeTemplateHere(template.id)}>
+          ×
+        </button>
+      )}
     </li>
   );
 });

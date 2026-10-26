@@ -57,6 +57,8 @@ const LEADS = [
   /^(?:what(?:'s| is| are)|who(?:'s| is)|how (?:do|does|can|should) (?:i|you|we)|how to|why (?:is|are|do|does))\s+/i,
   /^(?:please)\s+/i,
   /^(?:write|draft|compose|make|create|give|build|generate|put together)(?: me| us)?\s+(?:(?:a|an|the|some|my)\s+)?/i,
+  // Make's "Your own" and a saved template, as they are said (lib/logos5/make.ts, templates.ts): named for what it is
+  /^custom (?:artifact|display)(?: from my template\s+“[^”]*”)?(?: from this conversation)?\s*[:–-]?\s*/i,
 ];
 
 /** Endings that are the moment, not the subject. */

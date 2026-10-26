@@ -76,7 +76,8 @@ console.log('\n=== Chat converses: a small element where it carries the idea ===
 console.log('\n=== Artifacts: something to make, asked for ===');
 for (const [t, why] of [
   ['Can you build a football simulator so I can learn by playing?', 'visual:make'],
-  ['Hey, could you make me a mortgage calculator?', 'visual:make'],
+  // a calculator is something a custom artifact is built for (lib/objects/display-custom.ts): its reader answers first
+  ['Hey, could you make me a mortgage calculator?', 'visual:display:custom'],
   ['Can you show me a diagram of the field?', 'visual:show'],
   ['Draw the field', 'visual:asked'],
   ['Simulate a pendulum', 'visual:simulation'],

@@ -49,6 +49,8 @@ export function buildDisplayPrompt(opts: {
   guarded: boolean;
   /** the map's ideas, when the display is to be made from them */
   map?: MapMaterial | null;
+  /** a custom artifact asked for from the person's own template: its name and blocks, to be made again (lib/logos5/templates.ts) */
+  template?: { name: string; blocks: unknown } | null;
 }): string {
   const r = opts.request;
   const kinds = offeredKinds().filter((m) => m.spec);
@@ -75,12 +77,16 @@ export function buildDisplayPrompt(opts: {
           : ''
       }\n`
     : '';
+  // THEIR TEMPLATE: the shape they saved, made again for what they ask now
+  const theirs = opts.template
+    ? `\nTHEIR TEMPLATE, “${cleanText(opts.template.name, 60)}”. They made this artifact before and kept its shape: make it again for what they ask now, as a "custom" display. Keep its blocks — the same kinds, in the same order, with the same labels, units and formulas — and write its content (items, rows, numbers, text) for this request; what this request does not say is left empty for them to fill.\nTemplate: ${JSON.stringify({ blocks: opts.template.blocks }).slice(0, 12000)}\n`
+    : '';
   const practice = kinds.some((m) => m.practice);
   return `You draft EVERYDAY DISPLAYS for a thinking workspace — a plan, a table, a map of an argument, a chart, a worksheet. You do not answer the conversation; you write ONE display's STATE as JSON. The workspace checks it against the kind's rules, draws it, and the person edits it directly.
 
 ${asked}
 Today is ${opts.today}. A relative day ("next Friday", "in two weeks") is a real calendar day counted from today; a day the conversation does not give or plainly imply is left out, never guessed.
-${material}
+${material}${theirs}
 THE KINDS THE WORKSPACE HAS (write exactly one, using its own field names):
 ${catalogue}
 

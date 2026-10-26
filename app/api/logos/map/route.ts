@@ -44,6 +44,8 @@ import {
   kindOf,
   isoDay,
   todayDay,
+  sanitizeCustom,
+  templateShape,
   type MapMaterial,
 } from '@/lib/objects';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
@@ -441,6 +443,14 @@ export async function POST(req: NextRequest) {
     // says what came of it — and the model second pass, which would read the
     // same construction as a model nobody proposed, stands aside.
     const displayWords = readDisplayRequest(said, { stated });
+    // THEIR TEMPLATE: a custom artifact asked for from one of their own templates carries it on the
+    // message (lib/logos5/templates.ts) — read through the kind's own sanitizer, never taken as written
+    const theirTemplate = (() => {
+      const raw = (lastSaid as { make?: { template?: { name?: unknown; blocks?: unknown } } } | undefined)?.make?.template;
+      if (displayWords?.kind !== 'custom' || !raw || typeof raw !== 'object') return null;
+      const kept = sanitizeCustom({ title: raw.name, blocks: raw.blocks });
+      return kept ? { name: kept.title, blocks: templateShape(kept.blocks) } : null;
+    })();
     const displayAsked =
       !answeredByScene() &&
       (!!displayWords ||
@@ -487,6 +497,7 @@ export async function POST(req: NextRequest) {
                   today: isoDay(body?.today) ?? todayDay(),
                   guarded: resolveGuard(body?.guard) === 'guard',
                   map: displayWords?.fromMap ? mapIdeas : null,
+                  template: theirTemplate,
                 }),
               },
               { role: 'user', content: transcript },
@@ -500,7 +511,9 @@ export async function POST(req: NextRequest) {
             parsed = null;
           }
           const read = readDisplayProposal(parsed, { request: displayWords, said: personSaid });
-          if (read.ok) sealed = { kind: read.kind, state: read.state, gaps: read.gaps, origin: 'socria' };
+          // made from their template: it says so, and is theirs to save again
+          const state = read.ok && theirTemplate && read.kind === 'custom' ? (sanitizeCustom({ ...(read.state as object), from: theirTemplate.name }) ?? read.state) : read.ok ? read.state : null;
+          if (read.ok) sealed = { kind: read.kind, state, gaps: read.gaps, origin: 'socria' };
           else display = { ok: false, failure: read.failure, says: read.says };
         }
         if (sealed) {

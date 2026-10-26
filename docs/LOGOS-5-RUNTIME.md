@@ -1513,3 +1513,100 @@ builds in the Artifacts view from its own composer. No page errors.
 **Limits.** The model's tools were checked by rendering, not in the browser:
 the local stand-in cannot build a model. The 3D panel still names itself "Live
 3D" inside its card, and its messages say "Built in Live 3D".
+
+## 21. Any artifact, from a few primitives
+
+The owner's words: "the user should be able to choose what artifact on prompt,
+any artifact, it doesn't have to be in the list, the user can make their own
+artifact and save the template, it's completely generative, so make a few
+primitives but make sure it works too".
+
+**The kind** (`lib/objects/display-custom.ts`). A custom artifact is a display
+like the others — an object of thought, drawn, edited, undone, synced and read
+back to the conversation — whose state is a list of blocks, each one of eleven
+primitives:
+
+| Primitive | What it is |
+|---|---|
+| text | a title, a heading, a paragraph or a note |
+| list | items — a checklist when it can be ticked |
+| table | columns of text, numbers, ticks, or a calc (a formula over the row's own cells and the artifact's numbers), with totals |
+| number | something the person sets: a field, a stepper or a slider |
+| value | something worked out, live, from a formula |
+| chart | bars, a line or a pie, from a table's columns or its own points |
+| progress | a checklist's ticks, a table's ticks, or a formula over a maximum |
+| choice | options to pick, one or several, optionally with an answer to check |
+| field | somewhere to write |
+| timer | a countdown |
+| group | a few blocks side by side |
+
+Formulas are read by the kind alone — numbers, + − × ÷ ^ %, comparisons, the ids
+of numbers and values, a table's column (`log.kcal`, for sum, avg, min, max,
+count), a list's ticks (`steps.done`, `steps.total`) and round, floor, ceil, abs,
+sqrt, pow, clamp and if. Nothing is ever run as code; a formula that does not
+read, a division by zero or a loop of values leaning on each other is shown as
+no value ("—"), never guessed. A tick is 1 and an empty tick 0. Every change is
+an operation (set, tick, add/change/remove an item, change a cell, add/remove a
+row), so it undoes and syncs; what the person set or wrote is theirs, and
+Socria may not change it. "Set servings to 6", "tick milk" and "add bread to
+the shopping list" are read as those operations.
+
+**Asked for.** Make has **Your own** — "Describe it — e.g. a habit tracker for
+exercise, reading and sleep" — which asks, in words, "Make a custom artifact:
+…". A request for something no other kind is, by what it is ("make me a habit
+tracker", "build a grade calculator", "make a pomodoro timer"), is read as one
+too; "I want to make a tracker for my startup" is not. The map pass drafts it in
+the same proposal pass as every display (no new call), offered the custom kind
+alone when it was named, and the kind's sanitizer decides what of the draft is
+kept: no block that is not a primitive, at most forty blocks, labels and text
+capped, control characters out, ids a formula can name.
+
+**Templates** (`lib/logos5/templates.ts`). **Save as template** on a custom
+artifact keeps its blocks under its name, on this device (the 24 most recent;
+saved again under the same name, the newer replaces it). Make shows them under
+**Yours**, each drawn by the artifact's own figure as it was saved, each
+removable. Picked, the request says so in words — "Make a custom artifact from
+my template “Habit tracker”: piano practice" — and the template travels with
+the message (`LogosMsg.make`); the map pass reads it through the kind's
+sanitizer, never as written, hands it over by its shape (every block, a few of
+a table's rows and a list's items as examples) and tells the proposal pass to
+keep its blocks, kinds, labels, units and formulas and write its content for
+what is asked now. What comes back says which template it was made from.
+
+**Cost.** No model call was added: a custom artifact is drafted by the existing
+display pass. Its description adds 3,064 characters (about 770 tokens) to that
+pass's prompt only when no kind was named and every kind is offered; named, the
+pass sees the custom kind alone (4,619 characters in all). Nothing is added to
+the reply or the map instructions.
+
+**Checked.** `test/custom-artifacts.test.mjs` (106): every primitive kept, junk
+dropped, ids, limits; formulas, including code and properties that must not
+read; calc cells, totals, values, progress and charts; every operation and the
+authorship rules; words read as operations; what the conversation is told
+(answers withheld while learning); requests that are and are not custom
+artifacts; the drafting prompt with and without a template; the template store
+(save, replace, order, remove, a broken store, a stored template the kind would
+not keep, the limit); the figure drawing every primitive; Make's "Your own" and
+Yours. `test/custom-artifacts-e2e.test.mjs` (14, through the real routes): a
+custom artifact drafted and made, a pomodoro timer asked for by what it is, a
+template handed to the pass and the result saying so, a template carrying junk
+read through the kind first (mutation-checked: trusting it as written fails), a
+large template handed over by its shape, a
+draft the kind cannot hold and a declined one adding nothing, and the reply
+told something is being built. In the browser (local stand-ins), desktop and a
+390px phone: Make → Your own → "a habit tracker for exercise, reading and
+sleep" makes a table of habits by day with a calc column, progress, a stepper
+and a field; ticking updates the days, the total and the bar; the stepper
+moves and Undo takes it back; Save as template puts it under Yours in Make;
+picking it with "piano practice and stretching" makes the same columns again
+for those, saying it was made from the template; the template can be removed.
+The browser run found one bug the unit tests had missed — an empty tick read as
+no value, so a row of ticks added up to nothing — now fixed and tested.
+
+**Limits.** What the model drafts for a given description is not measured
+here: the stand-in model drafts a fixed habit tracker. The primitives cannot
+hold logic beyond formulas — no randomness, no rules that change other blocks,
+no game loop — so a "football simulator" can be a tracker or a quiz, not a game.
+Templates are kept per device. The timer's running is not saved (a countdown is
+not a change to the artifact). A choice's answer is in the state the browser
+holds, hidden only by the figure.
