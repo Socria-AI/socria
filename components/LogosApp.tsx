@@ -105,7 +105,7 @@ import { readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
 import { MakePicker } from '@/components/logos5/MakePicker';
 import { askFor, makeChoice } from '@/lib/logos5/make';
-import { mapArtifacts, pictureRepeatsDisplay, plotArtifact } from '@/lib/logos5/artifacts';
+import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
 import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
@@ -166,11 +166,11 @@ import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5Tabs, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5Views';
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
-import { ContentView, PlainReader } from '@/components/logos5/ContentView';
-import { broughtBy, contentOf } from '@/lib/logos5/content';
+import { ContentView, PlainReader, WriteUpReader } from '@/components/logos5/ContentView';
+import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/logos5/content';
 import { OPENING, SPLIT_NAMES, afterSend, chatVisible, choose, dock, fit, onMade, readBesideShare, screenForRequest, writeBesideShare, type BesideId, type Screen, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
-import { needsMap, routeTurn, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
+import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
@@ -2979,7 +2979,7 @@ export function LogosApp({
       // Accepted — the reasoning done in this node belongs on the map. Same
       // rules as the main composer: a refused turn is not extracted from, and
       // an "ok" changes nothing (lib/map-skip.ts).
-      if (mapWanted(routeTurn({ text: content, view: screenRef.current.view }), skipsMap({ text: content, lastReply: lastReplyIn(prior), mapNodes: mapRef.current.nodes.length }))) refreshMap();
+      if (mapWanted(routeTurn({ text: content, view: screenRef.current.view, lastReply: lastReplyIn(prior) }), skipsMap({ text: content, lastReply: lastReplyIn(prior), mapNodes: mapRef.current.nodes.length }))) refreshMap();
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -3758,7 +3758,8 @@ export function LogosApp({
     // Socria, whose map pass reorganizes the thinking into that shape, and
     // the view opens as soon as it can.
     if (workspaceOn && wsLayout && !atts.length && !objTurn.lastStep) {
-      const want = readViewRequest(content);
+      // a table of the answer is asked of Socria, in the conversation — not the map's comparison lens (lib/runtime/orchestrate.ts)
+      const want = tableInReply(content) ? null : readViewRequest(content);
       if (want && l5 && want.lens === 'plot') {
         // Logos 5: a plot is something to look at — Artifacts, on it, beside the conversation
         if (wsFacts.lenses.includes('plot')) {
@@ -3790,7 +3791,8 @@ export function LogosApp({
     // what was done is said in a line; nothing goes to the model and nothing
     // is spent. A lens asked for by name was read just above, as it always was.
     if (workspaceOn && wsLayout && !atts.length && !objTurn.lastStep) {
-      const asked = readInterfaceRequest(content, interfaceContext(wsFacts));
+      // a table of the answer is the conversation's, not the map in its comparison lens (lib/runtime/orchestrate.ts tableInReply)
+      const asked = tableInReply(content) ? null : readInterfaceRequest(content, interfaceContext(wsFacts));
       if (asked && l5) {
         // Logos 5: the surfaces are views and what docks beside them (lib/logos5/views.ts)
         const to = screenForRequest(asked, screenRef.current, narrowRef.current);
@@ -3898,11 +3900,13 @@ export function LogosApp({
     // documents fill Content in the background, something asked to be made
     // opens Artifacts beside the conversation, structure asked for opens the
     // Logic Map. A question asked on a card is answered on the card.
-    const route = routeTurn({ text: content, attachments: atts, view: screenRef.current.view, mapNodes: mapRef.current.nodes.length });
+    const route = routeTurn({ text: content, attachments: atts, view: screenRef.current.view, mapNodes: mapRef.current.nodes.length, lastReply: lastReplyIn(messages) });
     const fromCard = cardAskRef.current;
     cardAskRef.current = false;
     if (l5 && !fromCard) setScreen((sc) => afterSend(route, sc, narrowRef.current));
     askedMakeRef.current = route.intent === 'visual';
+    // a write-up they asked to keep is written in Content: the reply arriving says so, not the pages
+    setPendingPlace(route.intent === 'reading' ? 'content' : 'chat');
 
     // Once, here, on the message as sent — never while typing. The reply
     // proceeds regardless; this only decides whether a note appears beside it.
@@ -4501,6 +4505,13 @@ export function LogosApp({
   const studyTab: Viewport = rawScreen.view;
   /** the artifact open in Artifacts, per line of thinking */
   const [artSel, setArtSel] = useState<Record<string, string>>({});
+  /** where the reply being written is read: the conversation, or Content (a write-up they asked to keep) */
+  const [pendingPlace, setPendingPlace] = useState<'chat' | 'content'>('chat');
+  /** MADE WHEN ASKED (lib/logos5/artifacts.ts): the offers of the map's own drawings taken and declined in this line of thinking */
+  const [madeRec, setMadeRec] = useState<MadeRecord>({ taken: [], declined: [] });
+  useEffect(() => {
+    setMadeRec(activeId ? readMade(browserStorage(), activeId) : { taken: [], declined: [] });
+  }, [activeId]);
   /** the document open in Content, per line of thinking */
   const [contentSel, setContentSel] = useState<Record<string, string | null>>({});
   function setScreen(next: (s: Screen) => Screen, id = activeIdRef.current) {
@@ -5333,13 +5344,15 @@ export function LogosApp({
       const built = wsFacts.docs.length > seen.models;
       if (built || askedMakeRef.current) {
         const key = built ? `m:${wsFacts.docs[wsFacts.docs.length - 1].id}` : docs > seen.docs ? 'v:viz' : 'v:plot';
+        // a plot made for a turn that asked for something to see is taken, so it is listed (lib/logos5/artifacts.ts)
+        if (key === 'v:plot' && activeId) setMadeRec(writeMade(browserStorage(), activeId, 'plot', 'taken'));
         setArtSel((m) => (activeId ? { ...m, [activeId]: key } : m));
         setScreen((s) => onMade(true, s, narrowRef.current));
-      } else if (screenRef.current.view !== 'artifacts') setArtFresh(true);
+      } else if (docs > seen.docs && screenRef.current.view !== 'artifacts') setArtFresh(true);
     }
-    // the working, drawn by the map in the background: kept in Artifacts and marked new there, never shown unasked
+    // The working, and functions the map could plot, drawn in the background: offered under the reply
+    // (madeOffer), never listed or marked new unasked — four views, four jobs.
     const solve = wsFacts.lenses.includes('solve');
-    if (l5 && seen.id === activeId && solve && !seen.solve && screenRef.current.view !== 'artifacts') setArtFresh(true);
     wsWasSeen(activeId, docs, wsFacts.docs.length, plot, solve);
   }, [workspaceOn, wsLayout, wsFacts, wsHasModel, activeId, changeLayout]);
   // The conversation, while it is not a panel: a composer and Socria's latest
@@ -6496,6 +6509,7 @@ export function LogosApp({
       const shown = displaysHere.find((o) => o.kind === 'document' && (o.states[o.at] as DocumentState | undefined)?.doc === it.doc);
       return shown ? renderPanel({ kind: 'panel', id: `l5c-${shown.id}`, type: 'display', config: { obj: shown.id } }) : <PlainReader text={it.text} />;
     }
+    if (it.kind === 'writeup') return <WriteUpReader text={it.text ?? ''} />;
     return <PlainReader text={it.text} image={it.image} caption={it.caption} />;
   })();
   const topicsEl = study ? (
@@ -6567,6 +6581,33 @@ export function LogosApp({
   // what is being worked on as itself (a matrix, a function); displays and 3D scenes are artifacts of their own
   const worked = (map.objects?.objs ?? []).filter((o) => !isDisplayKind(o.kind) && o.kind !== 'scene' && o.kind !== 'study');
   const workedHere = wsFacts.lenses.includes('work') && worked.length ? (worked.length === 1 ? (worked[0].name ? `Working on ${worked[0].name}` : 'What you are working on') : `${worked.length} things you are working on`) : null;
+  // MADE WHEN ASKED (lib/logos5/artifacts.ts): the plot, the working and the thing worked on, drawn by the map
+  // from a mathematical conversation, are listed once asked for in words or taken from the offer under the
+  // latest reply; until then they are offered, once, never listed. One already open stays.
+  const madeAvailable: MadeKey[] = [...(drawn.plot ? (['plot'] as const) : []), ...(wsFacts.lenses.includes('solve') ? (['solve'] as const) : []), ...(workedHere ? (['work'] as const) : [])];
+  const openArt = artSel[activeId ?? ''] ?? '';
+  const madeWanted: MadeKey[] = [
+    ...new Set<MadeKey>([
+      ...madeAsked(messages.filter((m) => m.role === 'user').map((m) => m.content)),
+      ...madeRec.taken,
+      ...((['plot', 'solve', 'work'] as const).filter((k) => openArt === `v:${k}`)),
+    ]),
+  ];
+  const madeShown = madeListed(madeAvailable, madeWanted);
+  const madeOffered = madeOffer(madeAvailable, madeWanted, madeRec.declined);
+  /** An offer taken: listed from now on, and shown. Nothing is asked of a model — the map already drew it. */
+  function takeMade(k: MadeKey) {
+    const sid = activeIdRef.current;
+    if (!sid) return;
+    setMadeRec(writeMade(browserStorage(), sid, k, 'taken'));
+    setArtSel((m) => ({ ...m, [sid]: k === 'plot' ? plotItem() : `v:${k}` }));
+    setScreen((s) => onMade(true, s, narrowRef.current));
+  }
+  /** "Not now": not offered again in this line of thinking. */
+  function declineMade(k: MadeKey) {
+    const sid = activeIdRef.current;
+    if (sid) setMadeRec(writeMade(browserStorage(), sid, k, 'declined'));
+  }
   const artifactItems: ArtifactItem[] = [
     // THE WRITING: the person's own document — one artifact among the rest, there once they
     // have started it (Start writing, Write in the menu, Add to notes) and never chosen for them
@@ -6585,11 +6626,11 @@ export function LogosApp({
     ...(drawn.viz ? [{ key: 'v:viz', kind: wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture', title: map.viz?.title || (wsFacts.viz === 'simulation' ? 'Simulation' : 'Picture'), render: () => renderPanel(artPanelOf('v:viz')!) }] : []),
     // The plot lens draws the picture or the model when there is one — which is already the
     // item above — so it is an artifact of its own only for functions nothing else draws.
-    ...(drawn.plot ? [{ key: 'v:plot', kind: 'Plot', title: 'The functions, plotted', render: () => renderPanel(artPanelOf('v:plot')!) }] : []),
+    ...(drawn.plot && madeShown.includes('plot') ? [{ key: 'v:plot', kind: 'Plot', title: 'The functions, plotted', render: () => renderPanel(artPanelOf('v:plot')!) }] : []),
     // the working, step by step, and the things being worked on (a matrix, a function): made from the
     // ideas, so here rather than on the Logic Map, which keeps to the ideas themselves
-    ...(wsFacts.lenses.includes('solve') ? [{ key: 'v:solve', kind: 'Solution', title: 'The working, step by step', render: () => renderPanel(artPanelOf('v:solve')!) }] : []),
-    ...(workedHere ? [{ key: 'v:work', kind: 'Working', title: workedHere, render: () => renderPanel(artPanelOf('v:work')!) }] : []),
+    ...(wsFacts.lenses.includes('solve') && madeShown.includes('solve') ? [{ key: 'v:solve', kind: 'Solution', title: 'The working, step by step', render: () => renderPanel(artPanelOf('v:solve')!) }] : []),
+    ...(workedHere && madeShown.includes('work') ? [{ key: 'v:work', kind: 'Working', title: workedHere, render: () => renderPanel(artPanelOf('v:work')!) }] : []),
     ...wsFacts.scenes.map((s) => ({ key: `s:${s.id}`, kind: 'Live 3D', title: s.name, render: () => renderPanel(artPanelOf(`s:${s.id}`)!) })),
     ...displaysHere
       .filter((o) => o.kind !== 'document')
@@ -6755,6 +6796,13 @@ export function LogosApp({
             const latest = i === messages.length - 1 && m.role === 'assistant';
             const solo = !groupView && !togetherReadOnly;
             const brought = m.role === 'user' ? broughtBy(m, contentItems) : [];
+            // a write-up they asked to keep lives in Content: here, its title, its opening and the way to it
+            const writeUp = m.role === 'assistant' && isWriteUp(messages, i) ? { id: writeUpId(m, i), ...writeUpParts(m.content) } : null;
+            // one quiet offer of what the map could draw from this, under the latest reply — never made unasked
+            const offer =
+              latest && solo && !busy && madeOffered
+                ? { said: MADE_OFFER[madeOffered].said, take: MADE_OFFER[madeOffered].take, onTake: () => takeMade(madeOffered), onDecline: () => declineMade(madeOffered) }
+                : null;
             return (
               <Fragment key={m.id ?? i}>
               <L5Message
@@ -6784,6 +6832,9 @@ export function LogosApp({
                 {...(m.role === 'assistant' && m.id && !togetherReadOnly
                   ? { onInline: keepInline, onOpenInline: openInline, ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
                   : {})}
+                writeUp={writeUp}
+                onOpenContent={openContent}
+                offer={offer}
               />
               {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
               {brought.length > 0 && (
@@ -6812,7 +6863,7 @@ export function LogosApp({
 
           {chatNotes}
           <SocriaAnswering names={answeringOthers} />
-          {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} />}
+          {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} />}
           {synthBusy && <SynthesisPending scope={synthBusy} />}
           {busy && !streaming && (groupView ? <L5Pending text="" group to="You" /> : <L5Working steps={workingSteps} onStop={stopAnswer} />)}
           {gifted && !busy && !one && (

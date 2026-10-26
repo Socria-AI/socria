@@ -329,6 +329,8 @@ const MODULES = [
   'test/helpers/inline-under-test.tsx',
   // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws
   'test/helpers/make-under-test.tsx',
+  // four views, four jobs: routing, the shape a reply may take, Content's write-ups, made-when-asked
+  'test/helpers/four-views-under-test.tsx',
 ];
 
 export async function buildAll() {

@@ -956,6 +956,29 @@
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* a write-up they asked for: a document, drawn — its own paragraphs and headings, not pre-wrapped text */
+.l5c-writeup .l5c-rich {
+  white-space: normal;
+}
+.l5c-writeup .l5c-rich .socria-h {
+  font-family: var(--l5-serif, Georgia, serif);
+  font-weight: 400;
+  line-height: 1.2;
+  margin: 1.4em 0 0.4em;
+}
+.l5c-writeup .l5c-rich .socria-h1 {
+  font-size: 30px;
+  margin-top: 0.2em;
+}
+.l5c-writeup .l5c-rich .socria-h2 {
+  font-size: 22px;
+}
+.l5c-writeup .l5c-rich .socria-h3 {
+  font-size: 18px;
+}
+.l5c-writeup .l5c-rich p {
+  margin: 0 0 0.9em;
+}
 
 /* ── a phone ────────────────────────────────────────────────────────── */
 @media (max-width: 1023px) {

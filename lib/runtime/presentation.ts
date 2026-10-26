@@ -26,6 +26,13 @@
 // (rule D); this never competes with them. At most two forms are offered, and a
 // form the last two replies both used is not offered a third time running.
 //
+// THE VIEW DECIDES THE SHAPE. Chat converses: prose, and a small element only
+// where it carries the idea better than a sentence — never an application, a
+// simulator or a dashboard in the conversation. Content is read: a write-up
+// they asked to keep is written as a document, with headings where they help
+// someone find their way, and filed there (place: 'content'). What is made
+// belongs to Artifacts, and only when asked for.
+//
 // Pure. No model, no network, no clock.
 
 import { numbersIn, type InlineKind } from '../inline-ui';
@@ -54,6 +61,8 @@ export interface Presentation {
   forms: InlineKind[];
   /** content-free reasons, for the trace and the tests */
   reasons: string[];
+  /** where the reply is read: the conversation, or Content (a write-up they asked to keep) — absent is the conversation */
+  place?: 'chat' | 'content';
 }
 
 /**
@@ -97,6 +106,13 @@ const FIELD = /^(?:(?:can|could) you |please )?(?:explain|tell me about|what(?:'
 const LIST_ASK = /\b(?:list|lists|listing|bullet(?:ed)?|bullets|enumerate|numbered|point form)\b/i;
 /** Steps to follow, in order. */
 const STEPS_ASK = /\b(?:steps? (?:to|for|in|of)|step[- ]by[- ]step|how (?:do|can|would|should) (?:i|you|we|one) (?:go about|get started|set up|apply|register|install|prepare|start|file|enrol|enroll)|(?:the )?process (?:of|for|to)|stages of|phases of|life ?cycle of|how does an? [\w\s-]{2,30} become|procedure (?:for|to))\b/i;
+/**
+ * How a system or a game works, asked about as a whole: "how does American
+ * football work?", "how do elections work". A few ordered parts may carry it —
+ * the four downs, the stages of a bill — so a compact sequence is offered, and
+ * the reply decides; prose is still the answer.
+ */
+const HOW_IT_WORKS = /\bhow\s+(?:does|do)\s+(?:an?\s+|the\s+)?(?:[\w'’-]+\s+){0,4}?[\w'’-]+\s+work\b/i;
 /** Events in time, where the order is the point. */
 const TIMELINE_ASK = /\b(?:timeline|chronolog(?:y|ical)|sequence of events|key (?:events|dates|moments|milestones)|what happened (?:in|during|between|when|after|before)|how (?:did|has|have) [\w\s-]{2,40} (?:evolved?|developed?|changed?|unfold(?:ed)?) over time)\b/i;
 /** Work that is not reading an explanation: making something, doing it themselves, checking or fixing. */
@@ -120,6 +136,8 @@ export function planPresentation(i: PresentationInput): Presentation {
   const reasons: string[] = [];
   const none = (why: string): Presentation => ({ forms: [], reasons: [why] });
   if (!t) return none('empty');
+  // a write-up they asked to read and keep: a document, filed in Content — no inline elements in it
+  if (i.state.intent === 'reading') return { forms: [], reasons: ['place:content'], place: 'content' };
   // plain text for greetings, jokes, something personal
   if (x.kind === 'social' || x.kind === 'playful' || x.kind === 'personal') return none(`talk:${x.kind}`);
   // a thing to build, structure to see, a document to read: their own views answer those
@@ -153,6 +171,8 @@ export function planPresentation(i: PresentationInput): Presentation {
   if (!i.guard && !listAsked && TIMELINE_ASK.test(t)) offer('sequence', 'sequence:timeline');
   // steps to follow — never the steps of something that is theirs to work out
   else if (!i.guard && !listAsked && !i.ownReasoning && work !== 'creation' && STEPS_ASK.test(t)) offer('sequence', 'sequence:steps');
+  // how a system works, asked about as a whole: its ordered parts may carry it (the four downs)
+  else if (!i.guard && !listAsked && !i.ownReasoning && work !== 'creation' && x.kind !== 'brainstorm' && HOW_IT_WORKS.test(t)) offer('sequence', 'sequence:how-it-works');
   // a check, or a call Socria may weigh in on: the answer up top, the steps folded under it. Not an
   // explanation — prose is the explanation — and never reasoning that is theirs to do or a decision
   // that is theirs to make
@@ -189,8 +209,16 @@ const GRAMMAR: Record<InlineKind, string> = {
     '{"type":"sequence","kind":"steps","title":"…","items":[{"label":"…","detail":"…"}]} — 3–8 in order; kind "timeline" gives every item a "when" ("1789"). Only when the order is the point; the prose says what it shows.',
 };
 
+/**
+ * A write-up, read in Content. The core says no headings in the conversation;
+ * this one is not in the conversation — it is a document they will come back
+ * to, so its structure is how they find their way in it.
+ */
+export const WRITE_UP = `\n\nA WRITE-UP, READ IN CONTENT. They asked for something to read and keep, so this reply is filed in Content and read there as a document; the conversation shows only its title and opening. Put its title on the first line as "# Title". Then write it to be read: a short opening paragraph, sections under "## " headings where they help someone find their way, prose paragraphs, and a list only for what really is a list. No inline blocks, no preamble, no sign-off. Everything you know about accuracy and about what is theirs to do still holds.\n`;
+
 /** The turn's offer, or '' when nothing is offered — which is most turns. */
 export function renderPresentation(p: Presentation): string {
+  if (p.place === 'content') return WRITE_UP;
   if (!p.forms.length) return '';
   return `\n\nINLINE, IF IT HELPS — optional; plain prose is often better. You may include ${p.forms.length === 1 ? 'this' : 'one or both of these'}, each as a fenced block on its own lines (\`\`\`ui, the JSON on one line, \`\`\`), and keep the words around it short:\n${p.forms.map((k) => `- ${GRAMMAR[k]}`).join('\n')}\n`;
 }
@@ -202,6 +230,8 @@ export function renderPresentation(p: Presentation): string {
  * ceiling, not a cost: nothing is spent that the reply does not write.
  */
 export function presentationRoom(p: Presentation): number {
+  // a write-up is a document: room for its sections, not a chat reply's length
+  if (p.place === 'content') return 1100;
   if (!p.forms.length) return 0;
   if (p.forms.includes('draft') || p.forms.includes('concepts')) return 700;
   return p.forms.includes('sequence') ? 450 : 350;

@@ -265,8 +265,11 @@ console.log('\n=== ONE ANSWER TO ONE ASK, whatever the kind: "Venn diagram of mi
   // none comes back (components/LogosApp.tsx: json.map.viz ?? the map's) — never the new drawing.
   const back = kept.json.map?.viz;
   ok('  a picture already on screen stays as it was', kept.json.display?.ok === true && (!back || (back.kind === 'function' && back.expr === 'x^2')), JSON.stringify({ d: kept.json.display?.ok, v: back ?? null }).slice(0, 300));
+  // Four views, four jobs (test/four-views-e2e.test.mjs): a picture is made when it is asked for.
   const talk = await mapTurn('How does meiosis make four cells?', [{ ...READ, ask: { action: 'discuss', artifact: 'answer' } }]);
-  ok('  with no display asked for, the extractor’s picture is still drawn', !talk.json.display && talk.json.map?.viz?.title === 'Venn Diagram: Mitosis and Meiosis', JSON.stringify(talk.json.display ?? talk.json.map?.viz)?.slice(0, 160));
+  ok('  with nothing asked for, the extractor’s picture is not kept either — a question is answered in words', !talk.json.display && !talk.json.map?.viz, JSON.stringify(talk.json.display ?? talk.json.map?.viz)?.slice(0, 160));
+  const drawn = await mapTurn('Draw how meiosis makes four cells', [{ ...READ, ask: { action: 'represent', artifact: 'diagram' } }]);
+  ok('  asked to draw it, the picture is kept', drawn.json.map?.viz?.kind === 'diagram', JSON.stringify(drawn.json.map?.viz)?.slice(0, 160));
 }
 
 console.log('\n=== the other everyday asks, end to end ===');

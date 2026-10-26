@@ -1328,3 +1328,132 @@ no second Plot; the gallery of eleven, each drawn; choosing Venn asks "Of
 what? e.g. mitosis and meiosis"; the composer's sheet is the same gallery with
 Venn marked; the send button stays in view with a choice made; no sideways
 scroll, no page errors.
+
+## 19. Four views, four jobs
+
+The owner's brief: Chat converses, Content is read, Artifacts are made, the
+Logic Map tracks. "Artifacts should primarily be user-requested or explicitly
+accepted by the user"; ordinary explanations stay conversational; no extra
+model calls, latency or cost; Core 4's Cognitive Allocation, Behavioral and
+Epistemic Control and MR kept as they are.
+
+**Kept.** Everything that decides a view already existed and still decides it:
+the router's rules A–D (`lib/runtime/orchestrate.ts routeTurn`), what a sent
+turn does to the screen (`lib/logos5/views.ts afterSend`, `onMade`), the
+presentation planner and its inline elements (`lib/runtime/presentation.ts`),
+the map pass and its sanitizer (`app/api/logos/map`), Content's cards derived
+from the messages (`lib/logos5/content.ts`), the conversation's cards
+(`components/logos5/L5Message.tsx`), Content's readers (`ContentView.tsx`) and
+the artifact rules (`lib/logos5/artifacts.ts`). Allocation, behaviour, the
+epistemic blocks and MR were not touched; a write-up turn still carries them
+(the e2e suite checks the turn block is there).
+
+**What was wrong (the audit).**
+
+- *Pictures nobody asked for.* The map prompt said to draw "when seeing the
+  idea move would teach it", so any map pass — the background cadence included
+  — could put a picture in Artifacts. "How does American football work?" could
+  come back with a field.
+- *Made lenses listed unasked.* The plot, the working and the thing worked on,
+  drawn by the map from any mathematical conversation, appeared in Artifacts
+  with a "new" mark.
+- *Requests with no route.* "Build a football simulator so I can learn by
+  playing" and "can you show me a diagram of the field?" were conversation, so
+  nothing opened.
+- *A table swallowed.* "Can you put that in a table?" matched the Logic Map's
+  comparison lens: the browser opened the map, ran a map pass and never sent
+  the message to Socria.
+- *No place to read.* "Write me detailed study notes on…" came back as pages in
+  the conversation.
+- *The map as an encyclopedia.* A learning conversation was mapped as a concept
+  map of the subject — every term an explanation mentioned — rather than of
+  the conversation.
+
+**What changed.**
+
+- *Chat.* An explanation stays prose. "How does X work?" may now carry one
+  compact element, a sequence (`sequence:how-it-works`), which the reply may
+  use or not; the core prompt says things are built when asked, and that
+  where one would truly help (learning a game by playing it) it is offered in
+  one line, the choice theirs (`LOGOS5_CORE`, THINGS BUILT, same length as
+  before).
+- *Content.* A request for something substantial to keep — notes, a guide, a
+  report, a cheat sheet, "a detailed explanation of" — routes `reading`
+  (`READING`). The reply is told it is a write-up read in Content (`WRITE_UP`,
+  after the history), with room for it (the ceiling +1100), whatever the inline
+  switch. Content lists it as a card ("Written by Socria · N words") and reads
+  it as a document, headings drawn (`WriteUpReader`); the conversation shows
+  its title, its opening and "Read it in Content", never the pages twice; while
+  it arrives the thread says "Writing in Content" and counts words. A short
+  summary, an email or their own essay are not write-ups.
+- *Artifacts.* Rule C now also answers "show me a diagram of…" (`visual:show`),
+  "build/make/create a … simulator, game, app, calculator, tracker,
+  dashboard…" (`visual:make`, a thing named — "make a decision" is not one), and
+  a plain yes to Socria's own offer to make something (`visual:accepted`; a yes
+  to a question is not). The map pass keeps a picture only when the turn asked
+  for one or said yes to an offer of one; a picture already on screen stays and
+  is kept current while the talk is about it, the same kind
+  (`app/api/logos/map`, A PICTURE IS MADE WHEN IT IS ASKED FOR; the prompt's
+  NOT ASKED, NOT DRAWN). The map's made lenses are listed once asked for in
+  words or taken from one quiet offer under the latest reply ("The functions
+  here can be plotted. Plot them in Artifacts · Not now"); taken and declined
+  are kept per line of thinking on this device. Artifacts is marked new only
+  when a display or model was really added.
+- *Logic Map.* THE MAP TRACKS THIS CONVERSATION, NOT THE SUBJECT: an
+  explanation becomes at most one node for what it established, attached to
+  the question it answered; a learning conversation is its questions, the gist
+  of each answer, what was then understood or doubted, and the next question.
+- *Tables.* `tableInReply`: a table of the answer is asked of Socria and stays
+  in Chat; the map's comparison opens only when the map, a matrix or their
+  options are named. Both browser shortcuts ask it first.
+
+**The football example, as it runs.** "How does American football work? It's
+confusing." — conversation; Chat answers, offered a compact sequence (the four
+downs); nothing opens and Artifacts gets no mark; the map pass, when the
+cadence runs it, adds the question and the gist of the answer, and keeps no
+field it might have drawn. "And how does scoring work?" — a follow-up node.
+"Can you build a football simulator so I can learn by playing?" — `visual:make`:
+Artifacts opens beside the conversation and the map pass runs. The engine has
+no football game to build; it builds what its kinds can, and the reply says
+what it lets them do or that it could not.
+
+**Cost.** No model call was added. The write-up block (542 characters) is sent
+only on write-up turns, after the history, so the cached prefix is unchanged;
+the +1100 output ceiling is a ceiling, spent only if written. The map
+instructions grew by about 1,150 characters (1.5%), in their cached static
+prefix. LOGOS5_CORE is 13,870 characters, inside its budget (55% of the chat
+prompt). Deciding which replies are write-ups reads each request with the
+router, which reads every display a request could name — about 2 ms a request —
+so it is remembered per message and per conversation: 0.55 ms a render for a
+400-message conversation, and one reading per message added.
+
+**Checked.** `test/four-views.test.mjs` (106): prose conversations, lightweight
+elements, explicit requests to make, nothing made because it could be,
+write-ups (routing, shape, card, reader, streaming, a reply cut off, an empty
+one), the Logic Map's instructions, lists and tables, several views answering
+at once, and the cost of reading a long conversation.
+`test/four-views-e2e.test.mjs` (20, through the real map and chat routes):
+unasked pictures dropped, asked ones kept, a yes to an offer kept, a picture on
+screen kept current and never replaced by one nobody asked for; the write-up
+block, its ceiling, with inline elements off; the football explanation offered
+only a sequence. Mutation-checked: with the map's gate removed, four fail.
+`test/display-e2e.test.mjs` and `test/representation-e2e.test.mjs` now expect
+the extractor's unasked picture to be dropped. The full suite: 280 suites
+pass. In the browser (local stand-ins, desktop and a 390px phone): the football
+explanation in Chat with its four-downs sequence and no mark on Artifacts; the
+table request answered in Chat; the write-up as a card, its pages not in the
+thread, "Read it in Content" opening it with its headings; the simulator
+request opening Artifacts; the Logic Map never opening by itself; no page
+errors.
+
+**Limits.** What the model then writes is set by instructions, not measured
+live: whether the reply uses the offered sequence, how well a write-up is
+structured, how the extractor maps a learning conversation. The readers are
+English. The made-lens offers are remembered per device. "Compare X and Y in a
+table" still makes a comparison in Artifacts, as the display reader always
+has. The engine cannot build a real football game.
+
+**Switches and rollback.** `LOGOS_INLINE=off` turns off inline elements only;
+write-ups are still filed in Content. Each part is its own change: the map's
+gate in `app/api/logos/map`, the routes in `routeTurn`, the write-up path in
+`presentation.ts` and `content.ts`.

@@ -9,6 +9,7 @@
 // configured — the default — this route simply requires an account. Rate
 // limited either way.
 
+import { lastReplyIn } from '@/lib/map-skip';
 import { buildingBlock, sanitizeBrief } from '@/lib/representation';
 import { isSynthesisText, SYNTHESIS_CORRECTION } from '@/lib/logos-synthesis';
 import { NextRequest, NextResponse } from 'next/server';
@@ -195,6 +196,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: 'messages array required' }, { status: 400 });
     }
     const last = messages[messages.length - 1];
+    // Socria's reply before this turn: a yes to what it offered to make is a request (lib/runtime/orchestrate.ts)
+    const priorReply = lastReplyIn(messages.slice(0, -1));
     if (!last || last.role !== 'user' || typeof last.content !== 'string') {
       return NextResponse.json({ error: 'last message must be from user' }, { status: 400 });
     }
@@ -703,7 +706,7 @@ export async function POST(req: NextRequest) {
       // question, and a reply told something was being built would say so.
       construct: focusLabel
         ? null
-        : runtime && routeTurn({ text: String(last.content ?? '') }).intent !== 'visual'
+        : runtime && routeTurn({ text: String(last.content ?? ''), lastReply: priorReply }).intent !== 'visual'
           ? null
           : readDisplayRequest(last.content) ? 'display' : (asked ? 'simulation' : constructAsk(String(last.content ?? ''))),
       map: digest,
@@ -718,7 +721,7 @@ export async function POST(req: NextRequest) {
     // Logos 4 move inside it. The classic persona keeps the Logos 4 move alone,
     // exactly as before, so the ablation compares like with like.
     const newestAtts = (kept[kept.length - 1] as { attachments?: { kind: string }[] } | undefined)?.attachments ?? [];
-    const turnRoute = routeTurn({ text: String(last.content ?? ''), attachments: newestAtts });
+    const turnRoute = routeTurn({ text: String(last.content ?? ''), attachments: newestAtts, lastReply: priorReply });
     const turnState = readTurnState({
       text: String(last.content ?? ''),
       history: assistInput.history,
@@ -889,8 +892,10 @@ export async function POST(req: NextRequest) {
     // their grammar only when one fits, which is most turns not at all.
     // LOGOS_INLINE=off: no element is offered, and any the reply writes anyway is dropped (below)
     const inlineOn = process.env.LOGOS_INLINE !== 'off';
-    const presentation =
-      persona === 'v5' && inlineOn
+    // Where the reply is read (a write-up they asked to keep is filed in Content) does not hang on the
+    // inline switch — only the elements do.
+    const planned =
+      persona === 'v5'
         ? planPresentation({
             text: String(last.content ?? ''),
             state: turnState,
@@ -903,6 +908,7 @@ export async function POST(req: NextRequest) {
             history: assistInput.history,
           })
         : { forms: [], reasons: [] };
+    const presentation = inlineOn ? planned : { ...planned, forms: [] };
 
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the

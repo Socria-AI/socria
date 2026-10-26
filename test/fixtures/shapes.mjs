@@ -312,6 +312,8 @@ export const SCENARIOS = [
   },
   {
     name: 'modelling a physical system',
+    // what the person says when the picture is theirs to see: a picture is kept when it is asked for (app/api/logos/map)
+    said: "Model a damped spring, m x'' + c x' + k x = 0, and plot the displacement",
     expect: { kind: 'model', lens: 'plot' },
     map: {
       context: 'math',

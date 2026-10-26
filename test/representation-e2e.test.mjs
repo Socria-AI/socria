@@ -181,7 +181,8 @@ console.log('\n=== eight other pieces of thinking, through the same route ===');
 {
   const seen = new Set();
   for (const s of SCENARIOS) {
-    const { json, calls } = await mapTurn(s.name, [s.map]);
+    // a scenario's own words where it has them (a picture is kept only when asked for), its name otherwise
+    const { json, calls } = await mapTurn(s.said ?? s.name, [s.map]);
     seen.add(json.map.building?.kind);
     ok(`${s.name}: ${s.expect.kind}, opened on ${s.expect.lens}`, json.map.building?.kind === s.expect.kind && lead(json.map) === s.expect.lens, `${json.map.building?.kind} ${lead(json.map)}`);
     ok(`${s.name}: already the right shape, so no repair`, calls.length === 1, String(calls.length));

@@ -67,6 +67,8 @@ import {
 import { dropRemoved } from '@/lib/map-edit';
 import { sanitizeViz } from '@/lib/logos-viz';
 import { readPlotRequest, sameCurve } from '@/lib/plot-words';
+import { askedToSee } from '@/lib/runtime/orchestrate';
+import { lastReplyIn } from '@/lib/map-skip';
 import { isSynthesisText } from '@/lib/logos-synthesis';
 import { settle, unanswered } from '@/lib/model/ask';
 import {
@@ -738,6 +740,30 @@ export async function POST(req: NextRequest) {
       // its purest form and it is now reported rather than absorbed: the
       // extractor read a construction request and returned only a map.
       build = { ok: false, says: verdict.says, failure: verdict.failure };
+    }
+
+    // ── A PICTURE IS MADE WHEN IT IS ASKED FOR ─────────────────────
+    //
+    // Four views, four jobs (lib/runtime/orchestrate.ts): Artifacts holds what
+    // was made, and something is made when the person asked for it — or said
+    // yes to an offer of it. Told to draw "when seeing the idea move would
+    // teach it", the extractor put a picture in Artifacts on any turn the map
+    // pass ran, a background pass on the cadence included, and the workspace
+    // filled with things nobody asked for. A picture this turn drew unasked is
+    // not kept; one already on screen stays, and is kept current while the
+    // conversation is still about it — the same kind, the same simulation.
+    {
+      const at = kept.lastIndexOf(lastSaid);
+      const priorReply = lastReplyIn(at > 0 ? kept.slice(0, at) : []);
+      const askedForPicture = askedToSee(String(said ?? ''), priorReply) || !!readPlotRequest(said) || answeredByScene();
+      const was = current.viz;
+      const continuing =
+        !!was && !!next.viz && next.viz.kind === was.kind && (next.viz.kind !== 'simulation' || next.viz.sim?.object === was.sim?.object);
+      if (next.viz && !askedForPicture && !continuing) {
+        const { viz: _unasked, ...rest } = next;
+        next = (was ? { ...rest, viz: was } : rest) as typeof next;
+        console.info('logos map: a picture nobody asked for was not kept');
+      }
     }
 
     // A SIMULATION ANSWERED, SO IT IS WHAT THE SURFACE SHOWS. The plot lens

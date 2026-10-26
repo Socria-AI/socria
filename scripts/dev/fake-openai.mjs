@@ -49,6 +49,12 @@ function chatReply(messages) {
  */
 function inlineReply(messages) {
   const sys = messages.filter((m) => m?.role === 'system').map((m) => String(m.content ?? '')).join('\n');
+  // a write-up they asked to keep (lib/runtime/presentation.ts WRITE_UP): a document, title first, for Content
+  if (sys.includes('A WRITE-UP, READ IN CONTENT')) {
+    const about = (lastUser(messages).match(/\b(?:on|about|to|for)\s+(.{3,80}?)[.?!]*$/i)?.[1] ?? 'what you asked').replace(/^the\s+/i, '');
+    const title = about.charAt(0).toUpperCase() + about.slice(1);
+    return `# ${title}\n\nNo single cause explains it; several pressures met at once, and each made the others more dangerous.\n\n## Alliances\n\nTwo blocs had promised to fight for each other, so a local quarrel could not stay local.\n\n## Militarism\n\nArms races and rigid mobilisation plans made speed decisive: whoever waited risked losing.\n\n## Nationalism\n\nNew nations and old empires each had a claim the others could not accept.\n\n## The spark\n\nAn assassination in Sarajevo gave all of it a reason to start.`;
+  }
   if (!sys.includes('INLINE, IF IT HELPS')) return null;
   const t = lastUser(messages);
   const ui = (o) => '```ui\n' + JSON.stringify(o) + '\n```';
@@ -94,6 +100,14 @@ function inlineReply(messages) {
         { label: 'Declaration of the Rights of Man', when: 'Aug 1789' },
         { label: 'The monarchy is abolished', when: 'Sept 1792', detail: 'The Convention declares a republic.' },
       ] })}`;
+    }
+    if (sys.includes('sequence:how-it-works') || /football/i.test(t)) {
+      return `The whole game is a fight for ten yards: the team with the ball gets four tries, called downs, to carry it ten yards forward. Make it, and the count starts again; fail, and the ball goes to the other side.\n\n${ui({ type: 'sequence', kind: 'steps', title: 'The four downs', items: [
+        { label: '1st down — 10 yards to go', detail: 'A run or a pass; whatever is gained comes off the ten.' },
+        { label: '2nd down', detail: 'Another try from wherever the last one ended.' },
+        { label: '3rd down', detail: 'Usually the decisive one: make the rest of the ten or face fourth.' },
+        { label: '4th down', detail: 'Kick it away (a punt), try for a field goal, or gamble on going for it.' },
+      ] })}\n\nScoring is how a drive ends well — want that next?`;
     }
     return `Four steps, and the second is the one people skip.\n\n${ui({ type: 'sequence', kind: 'steps', title: 'Setting up a budget', items: [
       { label: 'Add up what comes in each month' },

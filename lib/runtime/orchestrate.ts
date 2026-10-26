@@ -19,6 +19,13 @@
 //   C  something to look at  Artifacts opens, beside the conversation
 //   D  structure asked for   the Logic Map opens
 //
+// FOUR VIEWS, FOUR JOBS: Chat converses, Content is read, Artifacts are made,
+// the Logic Map tracks the conversation. A view is opened by what the person
+// asked for, never by what could have been shown: something is made only when
+// it was asked for in words (or an offer of one was accepted), a write-up they
+// asked to read and keep is filed in Content, and structure opens only when
+// they ask to see it. Everything else is conversation.
+//
 // Pure. No model, no network, no clock (time arrives in the input).
 
 import { constructAsk } from '../cognition/assist';
@@ -38,6 +45,8 @@ export type Intent =
   | 'conversation'
   /** B: material arrived to be read */
   | 'ingest'
+  /** B, written: something substantial to read and keep — notes, a guide, a report — filed in Content */
+  | 'reading'
   /** C: something to look at or work with — a plot, a model, a chart, a plan, flashcards */
   | 'visual'
   /** D: the structure of their reasoning, explicitly */
@@ -84,6 +93,55 @@ const PRACTICE = /\b(?:flash\s*cards?|quiz\s+me|test\s+me|practice\s+(?:question
 /** Something to look at, asked for by a plain verb. Conservative: a question about a chart is not a request for one. */
 const VISUAL = /^(?:(?:can|could|would)\s+you\s+|please\s+|now\s+|let'?s\s+)?(?:plot|graph|chart|draw|sketch|diagram|visuali[sz]e|animate|simulate)\b/i;
 
+/**
+ * HOW A REQUEST BEGINS — "can you…", "please…", "build…" — so that "I want to
+ * make a game" (their project) is not taken for "make me a game" (a request).
+ * A greeting or a connective in front of it is not where it begins.
+ */
+const ASKS = String.raw`^(?:(?:hey|hi|ok(?:ay)?|so|and|also|now|great|thanks)[,!.]?\s+)?(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|please\s+|now\s+|let'?s\s+|i'?d\s+like\s+you\s+to\s+|i\s+want\s+you\s+to\s+|i\s+need\s+you\s+to\s+)?`;
+
+/**
+ * Something to look at, asked to be shown: "can you show me a diagram of the
+ * field?", "can I see a picture of it?". The thing is named — "show me how to
+ * factor this" is an explanation, and stays in the conversation.
+ */
+const VISUAL_NOUN = String.raw`(?:[\w-]+\s+){0,2}(?:diagram|picture|drawing|sketch|chart|graph|plot|visual(?:i[sz]ation)?|illustration|simulation|animation|3d\s+model)\b`;
+const SHOW = new RegExp(String.raw`\b(?:show|give)\s+(?:me|us)\s+(?:a|an|the|some)\s+${VISUAL_NOUN}|\bcan\s+(?:i|we)\s+see\s+(?:a|an|the|this|that)\s+${VISUAL_NOUN}`, 'i');
+
+/**
+ * Something to make and use, asked for in words: "build a football simulator
+ * so I can learn by playing", "make me a mortgage calculator", "create an
+ * interactive model of the heart". A thing is named — "make a decision",
+ * "build a habit" and "create a plan of attack" are not artifacts.
+ */
+const MAKE_VERB = String.raw`(?:build|make|create|generate|code|program|design|set\s+up|put\s+together)`;
+const MAKE_NOUN = String.raw`(?:an?|the|my|our|some|one)?\s*(?:(?:[\w'-]+)\s+){0,4}?(?:simulator|simulation|game|app|application|prototype|demo|widget|calculator|dashboard|tracker|visuali[sz]ation|interactive(?:\s+\w+)?|animation|diagram|chart|graph|plot|3d\s+model|model\s+of)\b`;
+const MAKE_THING = new RegExp(String.raw`${ASKS}${MAKE_VERB}\s+(?:me\s+|us\s+)?${MAKE_NOUN}|\b${MAKE_VERB}\s+(?:me|us)\s+${MAKE_NOUN}`, 'i');
+
+/**
+ * An offer of something to make, in the reply before this turn — "I can build
+ * you a simulator in Artifacts if you'd like" — and a yes to it. Saying yes is
+ * asking: the offer named the thing, the person accepted it.
+ */
+const OFFERED = /\b(?:i\s+can|i\s+could|want\s+me\s+to|shall\s+i|should\s+i|would\s+you\s+like\s+me\s+to|happy\s+to)\s+(?:build|make|draw|create|simulate|plot|sketch|chart|set\s+up|put\s+together)\b[^.?!\n]{0,90}(?:artifacts?|simulat\w*|diagram|chart|graph|plot|picture|calculator|model|game|visual\w*)/i;
+/** Only a yes — "yes please", "sure, go ahead", "can I see it?" — not a yes with a new question after it. */
+const YES = /^\s*(?:(?:yes|yeah|yep|yup|sure|ok(?:ay)?|please(?:\s+do)?|go\s+(?:for\s+it|ahead)|do\s+it|let'?s\s+(?:do\s+it|see\s+it|try\s+it|go)|build\s+it|make\s+it|draw\s+it|show\s+(?:it|me)(?:\s+it)?|can\s+(?:i|we)\s+see\s+it|that\s+would\s+(?:help|be\s+(?:great|nice|good))|sounds\s+(?:good|great)|i'?d\s+(?:like|love)\s+that|absolutely|definitely|why\s+not|thanks|thank\s+you)[\s,.!?]*)+$/i;
+
+/**
+ * Something substantial to read and keep, asked for by what it is: "write me
+ * detailed study notes on the causes of World War One", "put together a guide
+ * to the rules", "a full write-up of what we found". Filed in Content: read
+ * there, with the conversation pointing to it. A short answer, a summary in a
+ * line, an email or their own essay are not this — the first two are
+ * conversation, the last two are writing (practical, or theirs).
+ */
+const READ_VERB = String.raw`(?:write|draft|prepare|compile|put\s+together|produce|make|create|give)`;
+const READ_NOUN = String.raw`(?:an?\s+|some\s+|the\s+)?(?:(?:detailed|full|thorough|comprehensive|in-?depth|complete|proper|longer|long-?form|structured|organi[sz]ed|printable|one-?page|reference)\s+){0,3}(?:study\s+notes|revision\s+notes|notes\s+(?:on|about|for|covering)|study\s+guide|guide\s+(?:to|on|for)|report\s+(?:on|about)|write-?up|explainer|primer|briefing|handout|cheat\s*sheet|reference\s+(?:sheet|guide|page)|fact\s*sheet|reading\s+notes|summary\s+(?:document|of\s+everything)|overview\s+document|white\s*paper|literature\s+review)\b`;
+const READING = new RegExp(
+  String.raw`${ASKS}${READ_VERB}\s+(?:me\s+|us\s+)?${READ_NOUN}|\b${READ_VERB}\s+(?:me|us)\s+${READ_NOUN}|${ASKS}(?:${READ_VERB}\s+(?:me\s+|us\s+)?)?(?:an?\s+)?(?:detailed|in-?depth|comprehensive|thorough|full)\s+(?:written\s+)?(?:explanation|breakdown|write-?up|overview|summary)\s+(?:of|on|about)\b`,
+  'i'
+);
+
 export interface TurnInput {
   /** what they wrote */
   text: string;
@@ -95,6 +153,8 @@ export interface TurnInput {
   command?: boolean;
   /** how many nodes the Thinking Map holds */
   mapNodes?: number;
+  /** Socria's reply before this turn (lib/map-skip.ts lastReplyIn): a yes to what it offered to make is a request */
+  lastReply?: string | null;
 }
 
 export interface TurnRoute {
@@ -103,6 +163,17 @@ export interface TurnRoute {
   reasons: string[];
   /** which view this turn reveals; null keeps the one they are on */
   reveal: { view: Viewport; beside: 'chat' | null } | null;
+}
+
+/**
+ * "Can you put that in a table?" is a table in the reply, not the Logic Map's
+ * matrix: the map's comparison opens only when the map, a matrix or their
+ * options are what they named. The browser's own lens shortcut asks this too,
+ * so a table of the answer is never taken for the map.
+ */
+export function tableInReply(text: string): boolean {
+  const t = clean(text ?? '');
+  return readViewRequest(t)?.lens === 'matrix' && !/\b(?:matrix|map|logic|options?|criteria)\b/i.test(t);
 }
 
 /** Alex's rules A–D, read from the turn. */
@@ -114,7 +185,7 @@ export function routeTurn(t: TurnInput): TurnRoute {
   // D before C: "map out the causes of inflation" is a structure even though
   // it names a thing that could be drawn.
   const view = readViewRequest(text);
-  if (STRUCTURE.test(text) || (view && MAP_LENSES.has(view.lens))) {
+  if (STRUCTURE.test(text) || (view && MAP_LENSES.has(view.lens) && !tableInReply(text))) {
     reasons.push(view && MAP_LENSES.has(view.lens) ? `structure:lens:${view.lens}` : 'structure:asked');
     // the reply is read beside the map it draws (on a phone, the map alone)
     return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' } };
@@ -133,10 +204,20 @@ export function routeTurn(t: TurnInput): TurnRoute {
     (view?.lens === 'plot' && 'visual:plot') ||
     (PRACTICE.test(text) && 'visual:practice') ||
     (VISUAL.test(text) && 'visual:asked') ||
+    (SHOW.test(text) && 'visual:show') ||
+    (MAKE_THING.test(text) && 'visual:make') ||
+    // a yes to what the last reply offered to make
+    (t.lastReply && OFFERED.test(t.lastReply) && YES.test(text) && 'visual:accepted') ||
     null;
   if (visual) {
     reasons.push(visual);
     return { intent: 'visual', reasons, reveal: { view: 'artifacts', beside: 'chat' } };
+  }
+
+  // Something substantial to read and keep: written into Content, the screen stays where it is.
+  if (READING.test(text)) {
+    reasons.push('reading:write-up');
+    return { intent: 'reading', reasons, reveal: null };
   }
 
   const docs = (t.attachments ?? []).filter((a) => a?.kind === 'doc' || a?.kind === 'note').length;
@@ -214,6 +295,25 @@ export function turnsSince(messages: readonly { role: string; content?: unknown;
 export function memorable(text: string): boolean {
   const t = clean(text);
   return t.length >= 3 && !isAcknowledgement(t);
+}
+
+/**
+ * Whether the words could be asking for a write-up — a cheap first look, for
+ * readers of a whole conversation (lib/logos5/content.ts): routeTurn decides,
+ * since a rule before it may claim the turn, but it reads every display a
+ * request could name and costs milliseconds, so it is asked only of these.
+ */
+export function mayAskToRead(text: string): boolean {
+  return READING.test(clean(text ?? ''));
+}
+
+/**
+ * Whether this turn asked for something to look at (rule C) — the reading the
+ * map pass holds a picture to: drawn when asked, or when an offer of one was
+ * accepted; never because it could have been.
+ */
+export function askedToSee(text: string, lastReply?: string | null): boolean {
+  return routeTurn({ text, lastReply }).intent === 'visual';
 }
 
 /** The path a turn took, for the trace: decided after the server knows what it checked. */

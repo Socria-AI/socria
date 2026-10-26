@@ -23,6 +23,7 @@ import { SaidText, useCiteRender, type Side } from '@/components/LogosMessage';
 import { TeX, TexPick } from '@/components/TeX';
 import { RichText, StreamingRichText } from '@/components/RichText';
 import type { DocRef } from '@/lib/docs/render';
+import { writeUpParts } from '@/lib/logos5/content';
 
 const I = {
   copy: <path d="M9 9h11v11H9zM5 15V6a2 2 0 0 1 2-2h9" />,
@@ -102,6 +103,19 @@ export interface L5MessageProps {
   onChoose?: (text: string) => void;
   /** an inline element opened in Artifacts as a full artifact */
   onOpenInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
+  /**
+   * A write-up they asked to read and keep (lib/logos5/content.ts): filed in
+   * Content and read there, so the conversation shows its title and opening and
+   * a way in — never the same pages twice.
+   */
+  writeUp?: { id: string; title: string; opening: string; words: number } | null;
+  onOpenContent?: (id: string) => void;
+  /**
+   * Something that could be made from this, offered — never made unasked
+   * (lib/logos5/artifacts.ts madeOffer): what it is, the button that takes it,
+   * and "Not now", which is not asked again.
+   */
+  offer?: { said: string; take: string; onTake: () => void; onDecline: () => void } | null;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -271,6 +285,8 @@ export function L5Message(p: L5MessageProps) {
       ) : !m.content && m.role === 'assistant' && !m.attachments?.length ? (
         // an answer that came back with no words (held back by its own checks) says so, and can be asked again
         <p className="l5-empty">No words came back this time.</p>
+      ) : m.role === 'assistant' && p.writeUp ? (
+        <WriteUpCard w={p.writeUp} onOpen={p.onOpenContent} />
       ) : (
         m.content && (
           <div className={m.role === 'assistant' ? 'l5-prose' : 'l5-said'}>
@@ -283,6 +299,18 @@ export function L5Message(p: L5MessageProps) {
             )}
           </div>
         )
+      )}
+
+      {m.role === 'assistant' && p.offer && (
+        <div className="l5-offer" role="group" aria-label="Something that could be made from this">
+          <span className="l5-offer-s">{p.offer.said}</span>
+          <button type="button" className="l5-offer-take" onClick={p.offer.onTake}>
+            {p.offer.take}
+          </button>
+          <button type="button" className="l5-offer-no" onClick={p.offer.onDecline}>
+            Not now
+          </button>
+        </div>
       )}
 
       {(mapFx || objFx.length > 0) && (
@@ -338,8 +366,24 @@ export function L5Message(p: L5MessageProps) {
   );
 }
 
-/** Socria, still writing — formatted as it arrives (finished paragraphs as blocks), or thinking. */
-export function L5Pending({ text, group, to, mapping, onStop }: { text: string; group: boolean; to?: string | null; mapping?: boolean; onStop?: () => void }) {
+/** A write-up, in the conversation: what it is, how it opens, and the way to it in Content. */
+function WriteUpCard({ w, onOpen }: { w: { id: string; title: string; opening: string; words: number }; onOpen?: (id: string) => void }) {
+  return (
+    <div className="l5-writeup" role="group" aria-label={`Written in Content: ${w.title}`}>
+      <span className="l5-writeup-k">Written in Content</span>
+      <b className="l5-writeup-t">{w.title}</b>
+      {w.opening && <p className="l5-writeup-o">{w.opening}</p>}
+      {onOpen && (
+        <button type="button" className="l5-writeup-open" onClick={() => onOpen(w.id)}>
+          Read it in Content · {w.words} {w.words === 1 ? 'word' : 'words'} <span aria-hidden="true">→</span>
+        </button>
+      )}
+    </div>
+  );
+}
+
+/** Socria, still writing — formatted as it arrives (finished paragraphs as blocks), or thinking. A write-up is written in Content, and said so here. */
+export function L5Pending({ text, group, to, mapping, onStop, place }: { text: string; group: boolean; to?: string | null; mapping?: boolean; onStop?: () => void; place?: 'chat' | 'content' }) {
   return (
     <article className={`l5-msg l5-a is-socria is-pending${group ? ' is-group' : ''}`} aria-live="polite" aria-busy="true">
       {group && (
@@ -353,7 +397,16 @@ export function L5Pending({ text, group, to, mapping, onStop }: { text: string; 
           </span>
         </div>
       )}
-      {text ? (
+      {text && place === 'content' ? (
+        <div className="l5-writeup is-writing" role="status">
+          <span className="l5-writeup-k">Writing in Content</span>
+          <b className="l5-writeup-t">{writeUpParts(text).title}</b>
+          <span className="l5-writeup-n">
+            {writeUpParts(text).words} words so far
+            <span className="l5-caret" aria-hidden="true" />
+          </span>
+        </div>
+      ) : text ? (
         <div className="l5-prose is-streaming">
           <StreamingRichText text={text} math rich />
           <span className="l5-caret" aria-hidden="true" />

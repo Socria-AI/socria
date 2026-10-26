@@ -13,6 +13,7 @@
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import { CARD, EMPTY_BOARD, moveTo, nudge, placeAll, prune, readBoard, stackOf, stackOnto, unstack, writeBoard, type Board } from '@/lib/logos5/contentBoard';
+import { RichText } from '@/components/RichText';
 
 export interface ContentItem {
   id: string;
@@ -271,6 +272,21 @@ export function ContentView({
         </div>
       )}
     </section>
+  );
+}
+
+/**
+ * A write-up they asked to read and keep, read in Content: as a document — its
+ * headings, paragraphs and lists drawn rather than printed — and only here,
+ * since the conversation shows its title and opening (lib/logos5/content.ts).
+ */
+export function WriteUpReader({ text }: { text: string }) {
+  return (
+    <article className="l5c-plain l5c-writeup" aria-label="Written by Socria">
+      <div className="l5c-text l5c-rich">
+        <RichText text={text} rich />
+      </div>
+    </article>
   );
 }
 
