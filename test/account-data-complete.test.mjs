@@ -139,6 +139,10 @@ console.log('\n=== every storage bucket ===');
   const KNOWN = {
     UPLOAD_BUCKET: { purge: /await purgeUploads\(userId\)/ },
     MEDIA_BUCKET: { purge: /await purgeMedia\(userId\)/, exported: /out\.writingPictures = await listMedia\(userId\)/ },
+    // The relaunch's waitlist (lib/waitlist.ts) holds addresses typed by visitors with no
+    // account, keyed by the address, not a user: there is no account to empty it with. It is
+    // read only by the team, behind the dashboard's gate; a removal is by hand, on request.
+    WAITLIST_BUCKET: { notAnAccount: true },
   };
   const found = [];
   const walk = (dir) => {
@@ -154,6 +158,10 @@ console.log('\n=== every storage bucket ===');
     const k = KNOWN[b];
     ok(`${b} — known, with a decision about it`, !!k);
     if (!k) continue;
+    if (k.notAnAccount) {
+      ok(`${b} — not account data: nothing in it names a user`, !/userId|ownerPrefix/.test(read('lib/waitlist.ts')));
+      continue;
+    }
     ok(`${b} — emptied with the account`, k.purge.test(del));
     if (k.exported) ok(`${b} — in the export`, k.exported.test(exp));
   }
