@@ -348,7 +348,11 @@ ok(
       .replace(/\s+/g, ' ')
       .trim() === K.CAMPAIGN_LINE
 );
-ok('beneath it, a field and Enter — and nothing else said', JSON.stringify(text) === JSON.stringify(['WE KILLED', 'THE CHATBOT.', 'Access code', 'Enter']), JSON.stringify(text));
+ok(
+  'beneath it, a field and Enter, and the way onto the waitlist — nothing else said',
+  JSON.stringify(text) === JSON.stringify(['WE KILLED', 'THE CHATBOT.', 'Access code', 'Enter', 'No code? Join the waitlist']),
+  JSON.stringify(text)
+);
 ok(
   'the field is labelled, posts the code to the server, and works as a plain form',
   /<form[^>]*method="post"[^>]*action="\/api\/access\/enter"/.test(page) &&
@@ -369,6 +373,28 @@ for (const [s, want] of [
   [null, /Try again/],
 ])
   ok(`a ${s ?? 'network'} miss: “${K.enterError(s)}”`, want.test(K.enterError(s)) && K.enterError(s).length < 40);
+
+console.log('\n=== the waitlist ===');
+for (const [raw, want] of [
+  ['Ada@Example.com', 'ada@example.com'],
+  ['  ada.l+mav@uta.edu ', 'ada.l+mav@uta.edu'],
+  ['not an email', null],
+  ['a@b', null],
+  ['', null],
+  [42, null],
+  ['x'.repeat(250) + '@e.com', null],
+])
+  ok(`${JSON.stringify(raw).slice(0, 30)} → ${want}`, K.cleanEmail(raw) === want);
+ok('an address is its own object name, and comes back from it', K.emailFrom(K.nameFor('ada.l+mav@uta.edu')) === 'ada.l+mav@uta.edu' && /^[A-Za-z0-9_-]+$/.test(K.nameFor('ada.l+mav@uta.edu')));
+ok('the same address twice is the same name (kept once)', K.nameFor(K.cleanEmail('ADA@example.com')) === K.nameFor(K.cleanEmail('ada@example.com ')));
+ok('a name that is not an address reads as nothing', K.emailFrom('!!!') === null && K.emailFrom(K.nameFor('nope')) === null);
+ok('the waitlist route is open, and its export never asks for the code (it has its own gate)', K.decide('/api/waitlist', false).do === 'next' && K.decide('/api/waitlist/export', false).do === 'next');
+const ex = read('app/api/waitlist/export/route.ts');
+ok(
+  'the export is the dashboard’s to open: a named admin or its pass, else a 404',
+  /mayViewDashboard\(await viewer\(\)\) \|\| holds\('pass'/.test(ex) && /status: 404/.test(ex) && /filename="waitlist.txt"/.test(ex)
+);
+ok('the list is kept in a private bucket', /createBucket\(WAITLIST_BUCKET, \{ public: false \}\)/.test(read('lib/waitlist.ts')));
 
 console.log('\n=== wired in ===');
 const mw = read('middleware.ts');

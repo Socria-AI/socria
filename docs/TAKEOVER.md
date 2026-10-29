@@ -99,6 +99,24 @@ it in Node. `DELETE /api/access/enter` clears it.
   structured data, the link-preview card is `/og/campaign` (black, the
   network, the line), and the browser's chrome is black.
 
+## The waitlist
+
+Under the field, quietly: **No code? Join the waitlist**. It turns the same
+field into an email field with **Join**; a joined address reads "You’re on
+the list." **Have a code?** turns it back.
+
+- **Kept** in a private Supabase Storage bucket, `socria-waitlist`, made on
+  first use (no table, no migration): one empty object per address under
+  `entries/`, named by the address (base64url). So the same address twice is
+  kept once, and listing the bucket is reading the list. `lib/waitlist.ts`.
+- **Taken** by `POST /api/waitlist { email }`: trimmed, lower-cased, checked,
+  and rate limited on the code field's budget. Open whatever the campaign.
+- **Read** as one text file, `waitlist.txt` (an address and when it joined,
+  one per line, oldest first), at **`/api/waitlist/export`**, behind the
+  developer dashboard's gate: signed in as a `SOCRIA_DASHBOARD_ADMINS` admin,
+  or in a browser that has passed `/dev/dashboard`'s two codes. Anyone else
+  gets a 404.
+
 ## Ending it
 
 - **Switch it off**: set `SOCRIA_TAKEOVER=off` on Vercel (Production) and

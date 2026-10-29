@@ -22,7 +22,7 @@
 // anyway (campaign.css), and the field still works as a plain form.
 
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { CAMPAIGN_SEEN_KEY, ENTER_ROUTE, enterError } from '@/lib/campaign';
+import { CAMPAIGN_SEEN_KEY, ENTER_ROUTE, WAITLIST_ROUTE, enterError, waitlistError } from '@/lib/campaign';
 import { TIMELINE, buildScene, type Scene } from '@/lib/campaign/scene';
 import { drawFrame, painterFor, type Painter } from './draw';
 import './campaign.css';
@@ -41,6 +41,10 @@ export function Campaign() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  // no code yet: the same field takes an email for the waitlist (app/api/waitlist)
+  const [list, setList] = useState(false);
+  const [email, setEmail] = useState('');
+  const [joined, setJoined] = useState(false);
 
   // the opening: its clock, its scene, its loop
   useEffect(() => {
@@ -174,9 +178,46 @@ export function Campaign() {
     };
   }, []);
 
+  function shake() {
+    const field = fieldRef.current;
+    if (!field) return;
+    field.classList.remove('is-wrong');
+    void field.offsetWidth;
+    field.classList.add('is-wrong');
+  }
+
+  async function join() {
+    const typed = email.trim();
+    if (!typed) {
+      inputRef.current?.focus();
+      return;
+    }
+    setBusy(true);
+    setError(null);
+    let status: number | null = null;
+    try {
+      const res = await fetch(WAITLIST_ROUTE, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: typed }), credentials: 'same-origin' });
+      status = res.status;
+      if (res.ok) {
+        setBusy(false);
+        setJoined(true);
+        return;
+      }
+    } catch {
+      status = null;
+    }
+    setBusy(false);
+    setError(waitlistError(status));
+    shake();
+  }
+
   async function enter(e: FormEvent) {
     e.preventDefault();
     if (busy || leaving) return;
+    if (list) {
+      if (!joined) await join();
+      return;
+    }
     const typed = code.trim();
     if (!typed) {
       inputRef.current?.focus();
@@ -209,12 +250,7 @@ export function Campaign() {
     setBusy(false);
     setError(enterError(status));
     // a small shake, started over on every miss
-    const field = fieldRef.current;
-    if (field) {
-      field.classList.remove('is-wrong');
-      void field.offsetWidth;
-      field.classList.add('is-wrong');
-    }
+    shake();
     window.requestAnimationFrame(() => inputRef.current?.select());
   }
 
@@ -234,37 +270,51 @@ export function Campaign() {
         </h1>
         <form ref={formRef} className="wk-form" method="post" action={ENTER_ROUTE} onSubmit={enter} noValidate>
           <label className="wk-sr" htmlFor="wk-code">
-            Access code
+            {list ? 'Email' : 'Access code'}
           </label>
           <div ref={fieldRef} className="wk-field" onAnimationEnd={(e) => e.currentTarget.classList.remove('is-wrong')}>
             <input
               ref={inputRef}
               id="wk-code"
-              name="code"
-              className="wk-input"
-              value={code}
+              name={list ? 'email' : 'code'}
+              className={`wk-input${list ? ' is-email' : ''}`}
+              value={list ? email : code}
               onChange={(e) => {
-                setCode(e.target.value.slice(0, 64));
+                if (list) setEmail(e.target.value.slice(0, 254));
+                else setCode(e.target.value.slice(0, 64));
                 if (error) setError(null);
               }}
-              placeholder="Access code"
-              autoComplete="off"
-              autoCapitalize="characters"
+              placeholder={list ? 'Email' : 'Access code'}
+              type={list ? 'email' : 'text'}
+              inputMode={list ? 'email' : 'text'}
+              autoComplete={list ? 'email' : 'off'}
+              autoCapitalize={list ? 'none' : 'characters'}
               autoCorrect="off"
               spellCheck={false}
               enterKeyHint="go"
-              maxLength={64}
-              disabled={leaving}
+              maxLength={list ? 254 : 64}
+              disabled={leaving || (list && joined)}
               aria-invalid={error ? true : undefined}
               aria-describedby="wk-error"
             />
             <button type="submit" className="wk-go" disabled={busy || leaving} aria-busy={busy || undefined}>
-              {busy || leaving ? <span className="wk-spin" aria-label="Checking" /> : 'Enter'}
+              {busy || leaving ? <span className="wk-spin" aria-label="Checking" /> : list ? joined ? 'Joined' : 'Join' : 'Enter'}
             </button>
           </div>
-          <p id="wk-error" className={`wk-error${error ? ' is-on' : ''}`} role="status" aria-live="polite">
-            {error ?? ''}
+          <p id="wk-error" className={`wk-error${error || (list && joined) ? ' is-on' : ''}${list && joined && !error ? ' is-ok' : ''}`} role="status" aria-live="polite">
+            {error ?? (list && joined ? 'You’re on the list.' : '')}
           </p>
+          <button
+            type="button"
+            className="wk-alt"
+            onClick={() => {
+              setList((v) => !v);
+              setError(null);
+              window.requestAnimationFrame(() => inputRef.current?.focus());
+            }}
+          >
+            {list ? 'Have a code?' : 'No code? Join the waitlist'}
+          </button>
         </form>
       </main>
     </div>

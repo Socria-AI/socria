@@ -229,6 +229,38 @@ html:has(.wk) body {
     opacity 0.3s ease,
     transform 0.3s ease;
 }
+.wk-error.is-ok {
+  color: rgba(255, 255, 255, 0.78);
+}
+.wk-input.is-email {
+  letter-spacing: 0.04em;
+  text-transform: none;
+}
+.wk-input.is-email::placeholder {
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.wk-alt {
+  margin-top: 6px;
+  padding: 6px 10px;
+  border: 0;
+  background: none;
+  color: rgba(255, 255, 255, 0.42);
+  font: inherit;
+  font-size: 12.5px;
+  letter-spacing: 0.02em;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+.wk-alt:hover,
+.wk-alt:focus-visible {
+  color: rgba(255, 255, 255, 0.85);
+}
+.wk-alt:focus-visible {
+  outline: 1px solid rgba(255, 255, 255, 0.5);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
 .wk-error.is-on {
   opacity: 1;
   transform: none;

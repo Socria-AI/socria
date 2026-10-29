@@ -20,3 +20,13 @@ export function enterError(status: number | null): string {
   if (status === 503) return 'Entry is closed right now.';
   return 'Couldn’t reach Socria. Try again.';
 }
+
+/** Where an email for the waitlist is sent (app/api/waitlist). */
+export const WAITLIST_ROUTE = '/api/waitlist';
+
+/** What the field says when an email does not get on the list. */
+export function waitlistError(status: number | null): string {
+  if (status === 400) return 'That doesn’t look like an email.';
+  if (status === 429) return 'Too many tries. Wait a minute.';
+  return 'Couldn’t reach Socria. Try again.';
+}

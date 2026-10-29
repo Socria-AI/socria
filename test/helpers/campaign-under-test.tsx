@@ -6,3 +6,4 @@ export * from '@/lib/takeover';
 export * from '@/lib/campaign';
 export * as Scene from '@/lib/campaign/scene';
 export { Campaign } from '@/components/campaign/Campaign';
+export { cleanEmail, nameFor, emailFrom } from '@/lib/waitlist';

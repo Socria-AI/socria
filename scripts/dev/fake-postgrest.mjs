@@ -76,12 +76,47 @@ const send = (res, status, body, headers = {}) => {
   res.end(body === undefined ? '' : JSON.stringify(body));
 };
 
+const buckets = new Map(); // id -> Map(path -> { created_at })
+function storage(req, res, url, body) {
+  const p = url.pathname.slice('/storage/v1'.length);
+  let m;
+  if ((m = /^\/bucket\/([^/]+)$/.exec(p)) && req.method === 'GET') {
+    return buckets.has(m[1]) ? send(res, 200, { id: m[1], name: m[1], public: false }) : send(res, 400, { statusCode: '404', error: 'Bucket not found', message: 'Bucket not found' });
+  }
+  if (p === '/bucket' && req.method === 'POST') {
+    const id = JSON.parse(body || '{}').id ?? JSON.parse(body || '{}').name;
+    if (buckets.has(id)) return send(res, 400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+    buckets.set(id, new Map());
+    return send(res, 200, { name: id });
+  }
+  if ((m = /^\/object\/list\/([^/]+)$/.exec(p)) && req.method === 'POST') {
+    const b = buckets.get(m[1]);
+    const { prefix = '', limit = 100, offset = 0 } = JSON.parse(body || '{}');
+    const dir = prefix.replace(/\/$/, '') + '/';
+    const rows = b ? [...b].filter(([k]) => k.startsWith(dir)).map(([k, v]) => ({ name: k.slice(dir.length), created_at: v.created_at })) : [];
+    rows.sort((x, y) => x.created_at.localeCompare(y.created_at));
+    return send(res, 200, rows.slice(offset, offset + limit));
+  }
+  if ((m = /^\/object\/([^/]+)\/(.+)$/.exec(p)) && req.method === 'POST') {
+    const b = buckets.get(m[1]);
+    if (!b) return send(res, 400, { statusCode: '404', error: 'Bucket not found', message: 'Bucket not found' });
+    const key = decodeURIComponent(m[2]);
+    if (b.has(key) && req.headers['x-upsert'] !== 'true') return send(res, 400, { statusCode: '409', error: 'Duplicate', message: 'The resource already exists' });
+    b.set(key, { created_at: new Date().toISOString() });
+    return send(res, 200, { Key: `${m[1]}/${key}` });
+  }
+  return send(res, 404, { message: 'not found' });
+}
+
 http
   .createServer(async (req, res) => {
     const url = new URL(req.url, 'http://x');
     let body = '';
     for await (const c of req) body += c;
     const prefer = req.headers.prefer ?? '';
+    // Storage, as far as the waitlist needs it (lib/waitlist.ts): buckets, an upload that
+    // refuses to overwrite, and a listing with when each object was made.
+    if (url.pathname.startsWith('/storage/v1/')) return storage(req, res, url, body);
     const m = /^\/rest\/v1\/(rpc\/)?([a-z_]+)$/.exec(url.pathname);
     if (!m) return send(res, 404, { message: 'not found' });
     const [, rpc, name] = m;
