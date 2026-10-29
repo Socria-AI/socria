@@ -12,6 +12,7 @@ import type { NextRequest } from 'next/server';
 import { DOC_PAGES } from '@/app/docs/registry';
 import { ogCardFor } from '@/lib/og-cards';
 import { renderCard } from '@/lib/og/card';
+import { renderCampaignCard } from '@/lib/og/campaign-card';
 import { rewardsConfig } from '@/lib/rewards/rewards-config';
 import { apiVersion, dataset, projectId } from '@/sanity/env';
 
@@ -39,6 +40,8 @@ async function postFor(slug: string): Promise<{ title: string; excerpt?: string 
 
 export async function GET(_req: NextRequest, { params }: { params: { key: string[] } }) {
   const key = (params.key ?? []).slice(0, 3).map((s) => decodeURIComponent(s).toLowerCase());
+  // the relaunch's own card: black, the network, the one line (lib/og/campaign-card.tsx)
+  if (key.length === 1 && key[0] === 'campaign') return renderCampaignCard();
   const post = key[0] === 'blog' && key[1] ? await postFor(key[1]) : null;
   let referral: { enabled: boolean; signupDays: number } | null = null;
   try {

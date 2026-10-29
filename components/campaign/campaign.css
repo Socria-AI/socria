@@ -1,0 +1,328 @@
+/* components/campaign/campaign.css — the relaunch page: black, one line, one field.
+ *
+ * The page is a fixed layer over everything (the site's paper, a reader's
+ * theme, Celestial's sky), so nothing behind it shows through — not even in a
+ * phone's overscroll.
+ *
+ * THE REVEAL. With scripting on (html.js, set before first paint in
+ * app/layout.tsx) the line and the field wait for the opening to call them
+ * (.is-title, .is-form). If the script never comes alive (.is-live is never
+ * added), they show anyway after a few seconds; with scripting off they are
+ * simply there, and the field is a plain form. */
+
+html:has(.wk),
+html:has(.wk) body {
+  background: #000 !important;
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
+.wk {
+  position: fixed;
+  inset: 0;
+  z-index: 50;
+  overflow: hidden;
+  background: #000;
+  color: #fff;
+  color-scheme: dark;
+  font-family:
+    var(--font-sans),
+    Inter,
+    system-ui,
+    -apple-system,
+    'Helvetica Neue',
+    Arial,
+    sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  -webkit-tap-highlight-color: transparent;
+}
+
+.wk ::selection {
+  background: rgba(255, 255, 255, 0.26);
+  color: #fff;
+}
+
+.wk-canvas {
+  position: absolute;
+  inset: 0;
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+
+/* the edges fall away into black */
+.wk-vignette {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: radial-gradient(130% 95% at 50% 47%, rgba(0, 0, 0, 0) 52%, rgba(0, 0, 0, 0.62) 100%);
+}
+
+.wk-stage {
+  position: absolute;
+  left: 0;
+  right: 0;
+  top: 47%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 0 20px;
+  text-align: center;
+  pointer-events: none;
+  transform: translateY(-50%) translateY(var(--wk-lift, 0px));
+  transition: transform 0.35s cubic-bezier(0.2, 0.7, 0.2, 1);
+}
+
+/* WE KILLED THE CHATBOT. — one line where it fits, and otherwise broken only
+ * between its two halves; on a phone, as large as "THE CHATBOT." allows */
+.wk-title {
+  margin: 0;
+  font-weight: 600;
+  font-size: min(5.6vw, 92px);
+  line-height: 1.02;
+  letter-spacing: -0.03em;
+  text-shadow: 0 0 42px rgba(255, 255, 255, 0.14);
+  font-feature-settings:
+    'ss01' on,
+    'cv11' on;
+}
+.wk-title > span {
+  display: inline-block;
+  white-space: nowrap;
+}
+
+.wk-form {
+  pointer-events: auto;
+  width: min(360px, 100%);
+  margin-top: clamp(30px, 4.6vh, 48px);
+}
+
+.wk-field {
+  display: flex;
+  align-items: center;
+  height: 52px;
+  border: 1px solid rgba(255, 255, 255, 0.16);
+  border-radius: 999px;
+  /* solid enough that the network never shows through what is typed */
+  background: rgba(14, 14, 14, 0.82);
+  -webkit-backdrop-filter: blur(14px);
+  backdrop-filter: blur(14px);
+  transition:
+    border-color 0.25s ease,
+    background-color 0.25s ease,
+    box-shadow 0.25s ease;
+}
+.wk-field:focus-within {
+  border-color: rgba(255, 255, 255, 0.42);
+  background: rgba(20, 20, 20, 0.88);
+  box-shadow: 0 0 0 4px rgba(255, 255, 255, 0.05);
+}
+.wk-field:has(.wk-input[aria-invalid='true']) {
+  border-color: rgba(255, 150, 140, 0.4);
+}
+.wk-field.is-wrong {
+  animation: wk-shake 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+@keyframes wk-shake {
+  15%,
+  85% {
+    transform: translateX(-1px);
+  }
+  30%,
+  70% {
+    transform: translateX(3px);
+  }
+  45%,
+  55% {
+    transform: translateX(-4px);
+  }
+  50% {
+    transform: translateX(4px);
+  }
+}
+
+.wk-input {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  padding: 0 10px 0 24px;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  color: #fff;
+  caret-color: #fff;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0.3em;
+  text-transform: uppercase;
+}
+.wk-input::placeholder {
+  color: rgba(255, 255, 255, 0.34);
+  letter-spacing: 0.3em;
+}
+.wk-input:-webkit-autofill {
+  -webkit-text-fill-color: #fff;
+  -webkit-box-shadow: 0 0 0 40px #000 inset;
+}
+
+.wk-go {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  min-width: 84px;
+  height: 40px;
+  margin-right: 6px;
+  padding: 0 20px;
+  border: 0;
+  border-radius: 999px;
+  background: #fff;
+  color: #000;
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 600;
+  letter-spacing: 0.005em;
+  cursor: pointer;
+  transition:
+    background-color 0.2s ease,
+    transform 0.2s ease,
+    opacity 0.2s ease;
+}
+.wk-go:hover {
+  background: rgba(255, 255, 255, 0.86);
+}
+.wk-go:active {
+  transform: scale(0.97);
+}
+.wk-go:disabled {
+  cursor: default;
+}
+.wk-go:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+.wk-spin {
+  width: 14px;
+  height: 14px;
+  border: 1.5px solid rgba(0, 0, 0, 0.18);
+  border-top-color: #000;
+  border-radius: 50%;
+  animation: wk-spin 0.7s linear infinite;
+}
+@keyframes wk-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.wk-error {
+  min-height: 18px;
+  margin: 14px 0 0;
+  color: rgba(255, 160, 150, 0.82);
+  font-size: 13px;
+  letter-spacing: 0.01em;
+  opacity: 0;
+  transform: translateY(-3px);
+  transition:
+    opacity 0.3s ease,
+    transform 0.3s ease;
+}
+.wk-error.is-on {
+  opacity: 1;
+  transform: none;
+}
+
+.wk-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+/* ── the reveal ── */
+html.js .wk .wk-title,
+html.js .wk .wk-form {
+  opacity: 0;
+}
+html.js .wk .wk-title {
+  filter: blur(14px);
+  transform: translateY(10px) scale(0.985);
+}
+html.js .wk .wk-form {
+  /* not there to be tapped until it is shown */
+  visibility: hidden;
+  transform: translateY(12px);
+}
+html.js .wk.is-title .wk-title {
+  opacity: 1;
+  filter: blur(0);
+  transform: none;
+  transition:
+    opacity 1.4s cubic-bezier(0.2, 0.65, 0.2, 1),
+    filter 1.6s cubic-bezier(0.2, 0.65, 0.2, 1),
+    transform 1.6s cubic-bezier(0.2, 0.65, 0.2, 1);
+}
+html.js .wk.is-form .wk-form {
+  opacity: 1;
+  visibility: visible;
+  transform: none;
+  transition:
+    opacity 1s ease,
+    transform 1.1s cubic-bezier(0.2, 0.65, 0.2, 1);
+}
+/* scripting on, but the page never came alive: show the words and the field anyway */
+html.js .wk:not(.is-live) .wk-title,
+html.js .wk:not(.is-live) .wk-form {
+  animation: wk-show 0.8s ease 8.5s forwards;
+}
+@keyframes wk-show {
+  to {
+    opacity: 1;
+    visibility: visible;
+    filter: blur(0);
+    transform: none;
+  }
+}
+
+/* in: everything goes to black, then Logos 5 */
+.wk.is-leaving .wk-stage {
+  opacity: 0;
+  filter: blur(6px);
+  transition:
+    opacity 0.55s ease,
+    filter 0.55s ease;
+}
+
+@media (max-width: 600px) {
+  .wk-stage {
+    top: 44%;
+  }
+  .wk-title {
+    font-size: min(calc((100vw - 40px) / 7.4), 56px);
+    line-height: 1.04;
+  }
+  .wk-form {
+    width: min(340px, 100%);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .wk *,
+  html.js .wk .wk-title,
+  html.js .wk .wk-form {
+    transition-duration: 0.01ms !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
+  html.js .wk .wk-title {
+    filter: none;
+  }
+  .wk-spin {
+    animation: none;
+  }
+}

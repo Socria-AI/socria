@@ -337,6 +337,8 @@ const MODULES = [
   'test/helpers/custom-under-test.tsx',
   // Socria Voice: the turn, the ear, the yes, the workspace and the writing in words, the panel
   'test/helpers/voice-under-test.tsx',
+  // the relaunch: the gate, the code, the entry, the opening as numbers, the page
+  'test/helpers/campaign-under-test.tsx',
 ];
 
 export async function buildAll() {
