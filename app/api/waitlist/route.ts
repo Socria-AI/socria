@@ -22,14 +22,23 @@ function signedIn(): string | null {
 export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, signedIn(), 'enter');
   if (limited) return limited;
-  const body = (await req.json().catch(() => null)) as { email?: unknown } | null;
-  const email = cleanEmail(body?.email);
-  if (!email) return NextResponse.json({ ok: false }, { status: 400 });
+  // a plain form (no JavaScript) is answered with a redirect back to the page
+  const form = !(req.headers.get('content-type') ?? '').includes('application/json');
+  const back = () => NextResponse.redirect(new URL('/', req.url), 303);
+  let raw: unknown = null;
+  try {
+    raw = form ? (await req.formData()).get('email') : ((await req.json()) as { email?: unknown } | null)?.email;
+  } catch {
+    raw = null;
+  }
+  const email = cleanEmail(raw);
+  if (!email) return form ? back() : NextResponse.json({ ok: false }, { status: 400 });
   try {
     const r = await joinWaitlist(email);
+    if (form) return back();
     return NextResponse.json(r === 'already' ? { ok: true, already: true } : { ok: true });
   } catch (e) {
     console.error('[waitlist] could not keep an address', e instanceof Error ? e.message : e);
-    return NextResponse.json({ ok: false }, { status: 503 });
+    return form ? back() : NextResponse.json({ ok: false }, { status: 503 });
   }
 }

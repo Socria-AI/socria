@@ -42,7 +42,10 @@ export function Campaign() {
   const [error, setError] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   // no code yet: the same field takes an email for the waitlist (app/api/waitlist)
-  const [list, setList] = useState(false);
+  // the waitlist is the page's ask; the access code is the small way in for those who have one
+  const [list, setList] = useState(true);
+  const listRef = useRef(true);
+  listRef.current = list;
   const [email, setEmail] = useState('');
   const [joined, setJoined] = useState(false);
 
@@ -131,7 +134,8 @@ export function Campaign() {
       // a letter typed before the field was there still goes in it
       if (e.key.length === 1) {
         e.preventDefault();
-        setCode((c) => (c + e.key).slice(0, 64));
+        if (listRef.current) setEmail((m) => (m + e.key).slice(0, 254));
+        else setCode((c) => (c + e.key).slice(0, 64));
       }
       window.setTimeout(() => inputRef.current?.focus({ preventScroll: true }), 0);
     };
@@ -268,11 +272,11 @@ export function Campaign() {
         <h1 className="wk-title">
           <span>WE KILLED</span> <span>THE CHATBOT.</span>
         </h1>
-        <form ref={formRef} className="wk-form" method="post" action={ENTER_ROUTE} onSubmit={enter} noValidate>
+        <form ref={formRef} className={`wk-form${list ? '' : ' is-code'}`} method="post" action={list ? WAITLIST_ROUTE : ENTER_ROUTE} onSubmit={enter} noValidate>
           <label className="wk-sr" htmlFor="wk-code">
             {list ? 'Email' : 'Access code'}
           </label>
-          <div ref={fieldRef} className="wk-field" onAnimationEnd={(e) => e.currentTarget.classList.remove('is-wrong')}>
+          <div ref={fieldRef} className={`wk-field${list ? '' : ' is-code'}`} onAnimationEnd={(e) => e.currentTarget.classList.remove('is-wrong')}>
             <input
               ref={inputRef}
               id="wk-code"
@@ -298,7 +302,7 @@ export function Campaign() {
               aria-describedby="wk-error"
             />
             <button type="submit" className="wk-go" disabled={busy || leaving} aria-busy={busy || undefined}>
-              {busy || leaving ? <span className="wk-spin" aria-label="Checking" /> : list ? joined ? 'Joined' : 'Join' : 'Enter'}
+              {busy || leaving ? <span className="wk-spin" aria-label="Checking" /> : list ? joined ? 'Joined' : 'Join the waitlist' : 'Enter'}
             </button>
           </div>
           <p id="wk-error" className={`wk-error${error || (list && joined) ? ' is-on' : ''}${list && joined && !error ? ' is-ok' : ''}`} role="status" aria-live="polite">
@@ -313,7 +317,7 @@ export function Campaign() {
               window.requestAnimationFrame(() => inputRef.current?.focus());
             }}
           >
-            {list ? 'Have a code?' : 'No code? Join the waitlist'}
+            {list ? 'Have an access code?' : 'Join the waitlist instead'}
           </button>
         </form>
       </main>

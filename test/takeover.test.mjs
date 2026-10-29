@@ -349,20 +349,25 @@ ok(
       .trim() === K.CAMPAIGN_LINE
 );
 ok(
-  'beneath it, a field and Enter, and the way onto the waitlist — nothing else said',
-  JSON.stringify(text) === JSON.stringify(['WE KILLED', 'THE CHATBOT.', 'Access code', 'Enter', 'No code? Join the waitlist']),
+  'beneath it, the waitlist first, and a small way in with a code — nothing else said',
+  JSON.stringify(text) === JSON.stringify(['WE KILLED', 'THE CHATBOT.', 'Email', 'Join the waitlist', 'Have an access code?']),
   JSON.stringify(text)
 );
 ok(
-  'the field is labelled, posts the code to the server, and works as a plain form',
-  /<form[^>]*method="post"[^>]*action="\/api\/access\/enter"/.test(page) &&
-    /<label class="wk-sr" for="wk-code">/.test(page) &&
-    /<input[^>]*name="code"/.test(page) &&
-    /<button type="submit"[^>]*>Enter<\/button>/.test(page)
+  'the field is labelled, takes an email, and works as a plain form onto the waitlist',
+  /<form[^>]*method="post"[^>]*action="\/api\/waitlist"/.test(page) &&
+    /<label class="wk-sr" for="wk-code">Email<\/label>/.test(page) &&
+    /<input[^>]*name="email"/.test(page) &&
+    /<input[^>]*type="email"/.test(page) &&
+    /<button type="submit"[^>]*>Join the waitlist<\/button>/.test(page)
 );
+ok('an address is not corrected or capitalised', /autoCapitalize="none"|autocapitalize="none"/.test(page) && /spellCheck="false"|spellcheck="false"/.test(page));
+const camp = read('components/campaign/Campaign.tsx');
 ok(
-  'typed in capitals on a phone, never corrected or remembered',
-  /autoCapitalize="characters"|autocapitalize="characters"/.test(page) && /autoComplete="off"|autocomplete="off"/.test(page) && /spellCheck="false"|spellcheck="false"/.test(page)
+  'the code field, behind the small button, is the code route and the smaller field',
+  /action=\{list \? WAITLIST_ROUTE : ENTER_ROUTE\}/.test(camp) &&
+    /wk-field\$\{list \? '' : ' is-code'\}/.test(camp) &&
+    /\.wk-field\.is-code \{\s*height: 40px;/.test(read('components/campaign/campaign.css'))
 );
 ok('the animation is decoration to a screen reader', /<canvas[^>]*aria-hidden="true"/.test(page));
 ok('a miss is said quietly, in a live region under the field', /id="wk-error"[^>]*role="status"|role="status"[^>]*id="wk-error"/.test(page) && /aria-live="polite"/.test(page));

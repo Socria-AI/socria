@@ -358,3 +358,30 @@ html.js .wk:not(.is-live) .wk-form {
     animation: none;
   }
 }
+
+/* The access code: the small way in, for those who were given it — a narrower,
+ * lower field and a smaller Enter, so the waitlist stays the page's ask. */
+.wk-form.is-code {
+  width: min(250px, 100%);
+}
+.wk-field.is-code {
+  height: 40px;
+}
+.wk-field.is-code .wk-input {
+  padding-left: 16px;
+  font-size: 11.5px;
+  letter-spacing: 0.24em;
+}
+.wk-field.is-code .wk-input::placeholder {
+  letter-spacing: 0.24em;
+}
+.wk-field.is-code .wk-go {
+  min-width: 0;
+  height: 30px;
+  margin-right: 5px;
+  padding: 0 13px;
+  font-size: 12px;
+}
+.wk-form.is-code .wk-error {
+  font-size: 12px;
+}

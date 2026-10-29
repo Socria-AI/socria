@@ -101,9 +101,11 @@ it in Node. `DELETE /api/access/enter` clears it.
 
 ## The waitlist
 
-Under the field, quietly: **No code? Join the waitlist**. It turns the same
-field into an email field with **Join**; a joined address reads "You’re on
-the list." **Have a code?** turns it back.
+The page's ask. Under the line, an email field with **Join the waitlist**; a
+joined address reads "You’re on the list." The access code is the small way
+in: **Have an access code?** turns the field into a smaller code field with
+**Enter**, and **Join the waitlist instead** turns it back. Without
+JavaScript the form posts the email straight onto the list.
 
 - **Kept** in a private Supabase Storage bucket, `socria-waitlist`, made on
   first use (no table, no migration): one empty object per address under
