@@ -7,6 +7,13 @@
 /** The campaign's one message. Nothing else on the page is a message. */
 export const CAMPAIGN_LINE = 'WE KILLED THE CHATBOT.';
 
+/**
+ * The lines between the network's nodes, and the signals that run along
+ * them — on the page and on its link-preview card. Off for now: the network
+ * is its nodes alone. True brings both back.
+ */
+export const SHOW_LINKS = false;
+
 /** Set when the opening has played in this tab, so a reload goes straight to the network. */
 export const CAMPAIGN_SEEN_KEY = 'socria.campaign.seen.v1';
 

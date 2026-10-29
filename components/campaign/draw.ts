@@ -6,6 +6,7 @@
 // whole, the links, the grains in flight, the nodes, the signals.
 
 import { TIMELINE, chatAlpha, clamp01, easeInOut, easeOut, edgeGrown, grainAt, nodeAt, nodeLight, signalsAt, smooth, wordsDim, type Scene, type Shape } from '@/lib/campaign/scene';
+import { SHOW_LINKS } from '@/lib/campaign';
 
 export interface Painter {
   /** a soft white glow, drawn once and stamped under each node */
@@ -156,7 +157,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene, painter: 
 
   // the links, each drawn out from the end that lit first
   ctx.lineWidth = 0.9;
-  for (const e of scene.edges) {
+  for (const e of SHOW_LINKS ? scene.edges : []) {
     const g = edgeGrown(e, t);
     if (g <= 0) continue;
     const first = scene.nodes[e.a].form <= scene.nodes[e.b].form;
@@ -212,7 +213,7 @@ export function drawFrame(ctx: CanvasRenderingContext2D, scene: Scene, painter: 
   }
 
   // signals, running along the links once the network has settled
-  for (const s of signalsAt(scene, t)) {
+  for (const s of SHOW_LINKS ? signalsAt(scene, t) : []) {
     const e = scene.edges[s.edge];
     const p = pos[s.reverse ? e.b : e.a];
     const q = pos[s.reverse ? e.a : e.b];

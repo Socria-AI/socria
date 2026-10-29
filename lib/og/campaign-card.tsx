@@ -8,7 +8,7 @@
 // that lib/og/card.tsx uses.
 
 import { ImageResponse } from 'next/og';
-import { CAMPAIGN_LINE } from '@/lib/campaign';
+import { CAMPAIGN_LINE, SHOW_LINKS } from '@/lib/campaign';
 import { TIMELINE, buildScene, nodeAt, wordsDim } from '@/lib/campaign/scene';
 
 let face: Promise<ArrayBuffer> | null = null;
@@ -25,7 +25,7 @@ export async function renderCampaignCard(): Promise<ImageResponse> {
   return new ImageResponse(
     <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#000', position: 'relative' }}>
       <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ position: 'absolute', left: 0, top: 0 }}>
-        {scene.edges.map((e, i) => {
+        {(SHOW_LINKS ? scene.edges : []).map((e, i) => {
           const p = at[e.a];
           const q = at[e.b];
           const a = (e.strong ? 0.26 : 0.16) * wordsDim(scene, (p.x + q.x) / 2, (p.y + q.y) / 2, t);
