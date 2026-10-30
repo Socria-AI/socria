@@ -47,3 +47,33 @@ export function GuestWall({ open, signUpHref, signInHref, onClose }: { open: boo
     </div>
   );
 }
+
+/**
+ * A GUEST USING SOCRIA A LOT: a small card at the bottom centre, once a tab,
+ * after a few messages (LogosApp shows it from GUEST_NUDGE_AT). What an
+ * account adds, said truthfully — more messages and maps, and replies that
+ * build on what Socria remembers about you — with Sign up free and a close.
+ */
+export function GuestNudge({ open, signUpHref, onClose }: { open: boolean; signUpHref: string; onClose: () => void }) {
+  if (!open) return null;
+  return (
+    <div className="l5-guestnudge" role="status" aria-live="polite">
+      <span className="l5-guestnudge-spark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M12 3v4M12 17v4M3 12h4M17 12h4M6.3 6.3l2.5 2.5M15.2 15.2l2.5 2.5M6.3 17.7l2.5-2.5M15.2 8.8l2.5-2.5" />
+        </svg>
+      </span>
+      <span className="l5-guestnudge-t">
+        <b>Enjoying Socria?</b> Sign up free for better answers and more of it — keep going past {GUEST_TURNS} messages, as many maps as you like, and replies that remember you.
+      </span>
+      <a className="l5-guestnudge-go" href={signUpHref}>
+        Sign up free
+      </a>
+      <button type="button" className="l5-guestnudge-x" onClick={onClose} aria-label="Not now">
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+          <path d="M6 6l12 12M18 6L6 18" />
+        </svg>
+      </button>
+    </div>
+  );
+}

@@ -168,5 +168,8 @@ ok('the server refuses the sixth, with the sign-up note', /if \(guest && guestTu
 ok('the app shows the note before sending a sixth', /guestUsedNow\(\) >= GUEST_TURNS \|\| guestHasAnother/.test(app));
 ok('top right, a guest sees what is left and Sign in', /const accountEl = guest \?/.test(app) && /className="l5-signin" href=\{signInHref\}/.test(app) && /free left/.test(app));
 
+ok('a guest using it a lot: the sign-up card at the bottom, from the third message, once a tab', /export const GUEST_NUDGE_AT = 3;/.test(lim) && /<GuestNudge open=\{guest && !guestWall && !nudgeShut && guestUsed >= GUEST_NUDGE_AT && !busy\}/.test(app) && /socria\.guestNudge\.v1/.test(app));
+ok('  saying what an account really adds (no claim of speed)', /better answers and more of it/.test(wall) && /remember you/.test(wall) && !/faster/i.test(wall));
+
 console.log(`\nguest: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

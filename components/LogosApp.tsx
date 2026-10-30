@@ -240,8 +240,8 @@ import { lastReplyIn, skipsMap } from '@/lib/map-skip';
 import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { WhatsNew } from '@/components/onboarding/WhatsNew';
-import { GUEST_TURNS, guestTurnsUsed } from '@/lib/guest-limits';
-import { GuestWall } from '@/components/logos5/GuestWall';
+import { GUEST_NUDGE_AT, GUEST_TURNS, guestTurnsUsed } from '@/lib/guest-limits';
+import { GuestNudge, GuestWall } from '@/components/logos5/GuestWall';
 import { useFirstRun } from '@/components/useFirstRun';
 import { wantsIntro, wantsWhatsNew } from '@/lib/first-run';
 import { computationFacts, whatChanged } from '@/lib/model/inspect';
@@ -1477,6 +1477,20 @@ export function LogosApp({
   /** the messages a guest has sent, of GUEST_TURNS (lib/guest-limits.ts) */
   const guestUsed = guest ? sessions.reduce((n, x) => n + guestTurnsUsed(x.messages), 0) : 0;
   const guestUsedNow = () => sessionsRef.current.reduce((n, x) => n + guestTurnsUsed(x.messages), 0);
+  // A guest using Socria a lot: the sign-up card at the bottom, once a tab, from the third message (GuestNudge)
+  const [nudgeShut, setNudgeShut] = useState(() => {
+    try {
+      return typeof window !== 'undefined' && window.sessionStorage.getItem('socria.guestNudge.v1') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const shutNudge = () => {
+    setNudgeShut(true);
+    try {
+      window.sessionStorage.setItem('socria.guestNudge.v1', '1');
+    } catch {}
+  };
 
   // THE GUIDE NO LONGER OPENS ITSELF. A modal of miniature demonstrations
   // before a word has been said was Logos explaining itself in place of
@@ -8432,6 +8446,7 @@ export function LogosApp({
           {draftEl}
           {chromeEls}
           <GuestWall open={guestWall && guest} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />
+          <GuestNudge open={guest && !guestWall && !nudgeShut && guestUsed >= GUEST_NUDGE_AT && !busy} signUpHref={signUpHref} onClose={shutNudge} />
           {searchOpen !== null && (
             <GlobalSearch
               sessions={sessions}

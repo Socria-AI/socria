@@ -8,6 +8,9 @@
 /** Messages a guest may send in their one line of thinking. */
 export const GUEST_TURNS = 5;
 
+/** From this many messages, a guest is shown the sign-up card at the bottom of the screen (GuestNudge). */
+export const GUEST_NUDGE_AT = 3;
+
 /** How many messages a guest has sent: their own turns, across what they hold. */
 export function guestTurnsUsed(messages: readonly { role?: unknown }[] | null | undefined): number {
   return Array.isArray(messages) ? messages.filter((m) => m && m.role === 'user').length : 0;

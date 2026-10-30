@@ -1678,3 +1678,105 @@
     padding: 0 13px;
   }
 }
+
+/* A GUEST USING SOCRIA A LOT (GuestNudge): a card at the bottom centre, above
+ * the box, rising in once — what signing up adds, Sign up free, and a close. */
+.logos-root .l5-guestnudge {
+  position: fixed;
+  left: 50%;
+  bottom: calc(env(safe-area-inset-bottom, 0px) + 104px);
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: max-content;
+  max-width: min(640px, calc(100vw - 24px));
+  padding: 10px 10px 10px 14px;
+  border: 1px solid var(--l5-hair, rgba(53, 70, 32, 0.14));
+  border-radius: 16px;
+  background: var(--l5-paper-hi, #fffdf8);
+  color: var(--lg-ink);
+  font-size: 13.5px;
+  line-height: 1.4;
+  box-shadow: 0 12px 32px rgba(31, 31, 31, 0.14), 0 2px 6px rgba(31, 31, 31, 0.06);
+  transform: translateX(-50%);
+  animation: l5-guestnudge-in 0.5s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes l5-guestnudge-in {
+  from {
+    opacity: 0;
+    transform: translate(-50%, 14px) scale(0.98);
+  }
+}
+.logos-root .l5-guestnudge-spark {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: color-mix(in srgb, var(--lg-primary) 12%, transparent);
+  color: var(--lg-primary);
+}
+.logos-root .l5-guestnudge-t b {
+  font-weight: 600;
+}
+.logos-root .l5-guestnudge-go {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 15px;
+  border-radius: 999px;
+  background: var(--lg-primary);
+  color: var(--l5-on-primary, #fff);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  transition: filter 0.2s ease, transform 0.15s ease;
+}
+.logos-root .l5-guestnudge-go:hover {
+  filter: brightness(1.06);
+}
+.logos-root .l5-guestnudge-go:active {
+  transform: scale(0.97);
+}
+.logos-root .l5-guestnudge-x {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lg-ink-60);
+  cursor: pointer;
+}
+.logos-root .l5-guestnudge-x:hover {
+  background: var(--l5-hair, rgba(53, 70, 32, 0.08));
+}
+.logos-root :is(.l5-guestnudge-go, .l5-guestnudge-x):focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .logos-root .l5-guestnudge {
+    flex-wrap: wrap;
+    gap: 8px 10px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 140px);
+  }
+  .logos-root .l5-guestnudge-t {
+    flex: 1 1 calc(100% - 80px);
+    font-size: 13px;
+  }
+  .logos-root .l5-guestnudge-go {
+    margin-left: 40px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5-guestnudge {
+    animation: none;
+  }
+}
