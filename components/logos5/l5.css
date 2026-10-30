@@ -1598,3 +1598,83 @@
   outline: 2px solid var(--lg-primary);
   outline-offset: 2px;
 }
+
+/* A GUEST, TOP RIGHT: the free messages left as five small dots, and Sign in
+ * (components/LogosApp.tsx accountEl; lib/guest-limits.ts). Quiet until the
+ * last one, then the dots warm and the button leads. */
+.logos-root .l5-guestacct {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 6px;
+  flex: none;
+}
+.logos-root .l5-guestmeter {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 11px;
+  border: 1px solid var(--l5-hair, rgba(53, 70, 32, 0.14));
+  border-radius: 999px;
+  background: var(--l5-paper-hi, rgba(255, 255, 255, 0.7));
+  color: var(--lg-ink-60);
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.logos-root .l5-guestmeter-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.logos-root .l5-guestmeter-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--lg-primary);
+  transition: background-color 0.3s ease, transform 0.3s ease;
+}
+.logos-root .l5-guestmeter-dots i.is-used {
+  background: var(--l5-hair, rgba(53, 70, 32, 0.18));
+  transform: scale(0.8);
+}
+.logos-root .l5-guestmeter.is-out {
+  color: #9c5b3c;
+  border-color: rgba(156, 91, 60, 0.3);
+}
+.logos-root .l5-signin {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0 16px;
+  border-radius: 999px;
+  background: var(--lg-primary);
+  color: var(--l5-on-primary, #fff);
+  font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.08), inset 0 1px 0 rgba(255, 255, 255, 0.12);
+  transition: transform 0.15s ease, box-shadow 0.2s ease, filter 0.2s ease;
+}
+.logos-root .l5-signin:hover {
+  filter: brightness(1.06);
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.12), inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+.logos-root .l5-signin:active {
+  transform: scale(0.97);
+}
+.logos-root .l5-signin:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
+}
+@media (max-width: 600px) {
+  .logos-root .l5-guestmeter-l {
+    display: none;
+  }
+  .logos-root .l5-guestmeter {
+    padding: 0 9px;
+  }
+  .logos-root .l5-signin {
+    padding: 0 13px;
+  }
+}

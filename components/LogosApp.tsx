@@ -240,6 +240,7 @@ import { lastReplyIn, skipsMap } from '@/lib/map-skip';
 import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { WhatsNew } from '@/components/onboarding/WhatsNew';
+import { GUEST_TURNS, guestTurnsUsed } from '@/lib/guest-limits';
 import { GuestWall } from '@/components/logos5/GuestWall';
 import { useFirstRun } from '@/components/useFirstRun';
 import { wantsIntro, wantsWhatsNew } from '@/lib/first-run';
@@ -1473,6 +1474,9 @@ export function LogosApp({
   }
   /** A guest already has a line of thinking with words in it, other than this one. */
   const guestHasAnother = (id: string | null) => sessionsRef.current.some((x) => x.id !== id && x.messages.length > 0);
+  /** the messages a guest has sent, of GUEST_TURNS (lib/guest-limits.ts) */
+  const guestUsed = guest ? sessions.reduce((n, x) => n + guestTurnsUsed(x.messages), 0) : 0;
+  const guestUsedNow = () => sessionsRef.current.reduce((n, x) => n + guestTurnsUsed(x.messages), 0);
 
   // THE GUIDE NO LONGER OPENS ITSELF. A modal of miniature demonstrations
   // before a word has been said was Logos explaining itself in place of
@@ -3991,7 +3995,7 @@ export function LogosApp({
     // in another one already, or the server says so: the sign-up note, and nothing is sent.
     // from here this turn is Socria's to answer: a spoken turn after it waits (onVoiceTurn), even across the guest check
     busyRef.current = true;
-    if (guestRef.current && (guestHasAnother(activeIdRef.current) || !(await claimGuestPass(activeIdRef.current)))) {
+    if (guestRef.current && (guestUsedNow() >= GUEST_TURNS || guestHasAnother(activeIdRef.current) || !(await claimGuestPass(activeIdRef.current)))) {
       setGuestWall(true);
       return;
     }
@@ -7817,7 +7821,22 @@ export function LogosApp({
   );
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   /** the account chip opens the profile's own menu: the account, and Memory (Alex Tran: the mind graph lives in the profile) */
-  const accountEl = isSignedIn ? (
+  const accountEl = guest ? (
+    // a guest: how many free messages are left, and the way to sign in, top right
+    <div className="l5-guestacct">
+      <span className={`l5-guestmeter${guestUsed >= GUEST_TURNS ? ' is-out' : ''}`} title={`Guests get ${GUEST_TURNS} free messages and one map`}>
+        <span className="l5-guestmeter-dots" aria-hidden="true">
+          {Array.from({ length: GUEST_TURNS }, (_, i) => (
+            <i key={i} className={i < guestUsed ? 'is-used' : ''} />
+          ))}
+        </span>
+        <span className="l5-guestmeter-l">{Math.max(0, GUEST_TURNS - guestUsed)} free left</span>
+      </span>
+      <a className="l5-signin" href={signInHref}>
+        Sign in
+      </a>
+    </div>
+  ) : isSignedIn ? (
     <AccountControl
       onOpen={() => setAcctOpen(true)}
       isOne={one}

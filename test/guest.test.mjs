@@ -157,7 +157,16 @@ ok('the server refusing a guest turn puts the words back and opens the note', /i
 ok('the map pass says which line of thinking it is', /sessionId: forSession,\s*messages: chronRef\.current,/.test(app));
 ok('the first line of thinking comes with them when they sign up, once', /A GUEST WHO SIGNED UP/.test(app) && /saveLocal\(loadLocal\(\)\.filter\(\(x\) => !keptIds\.has\(x\.id\)\)\)/.test(app));
 const wall = readFileSync(join(root, 'components', 'logos5', 'GuestWall.tsx'), 'utf8');
-ok('the note: a dialog, what the limit is, free to sign up, theirs comes with them, a way to keep going', /role="dialog"/.test(wall) && /aria-modal="true"/.test(wall) && /One line of thinking, and its map/.test(wall) && /Sign up free/.test(wall) && /comes with you/.test(wall) && /Keep going with this one/.test(wall));
+ok('the note: a dialog, what the limit is, free to sign up, theirs comes with them, a way to keep going', /role="dialog"/.test(wall) && /aria-modal="true"/.test(wall) && /\{GUEST_TURNS\} messages, and one map/.test(wall) && /Sign up free/.test(wall) && /come with you/.test(wall) && /Keep going with this one/.test(wall));
+
+console.log('\n=== five messages, and the way to sign in ===');
+const lim = readFileSync(join(root, 'lib', 'guest-limits.ts'), 'utf8');
+ok('a guest gets five messages', /export const GUEST_TURNS = 5;/.test(lim));
+ok('  counted as their own turns', /m\.role === 'user'/.test(lim));
+const chatRoute = readFileSync(join(root, 'app', 'api', 'logos', 'chat', 'route.ts'), 'utf8');
+ok('the server refuses the sixth, with the sign-up note', /if \(guest && guestTurnsUsed\(messages\) > GUEST_TURNS\)/.test(chatRoute) && /guestLimit: true, guestTurns: true/.test(chatRoute));
+ok('the app shows the note before sending a sixth', /guestUsedNow\(\) >= GUEST_TURNS \|\| guestHasAnother/.test(app));
+ok('top right, a guest sees what is left and Sign in', /const accountEl = guest \?/.test(app) && /className="l5-signin" href=\{signInHref\}/.test(app) && /free left/.test(app));
 
 console.log(`\nguest: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

@@ -117,6 +117,7 @@ import {
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, gateInlineBlock, type InlineContext } from '@/lib/inline-ui';
 import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
+import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
 // METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
 import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
 import { deliberationOn, mrMode, storeOn } from '@/lib/mr/config';
@@ -163,6 +164,10 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: GUEST_LIMIT, guestLimit: true, requiresKey: true }, { status: 401 });
     }
     const messages = body?.messages;
+    // …and in it, GUEST_TURNS messages (lib/guest-limits.ts): this turn is counted with the rest
+    if (guest && guestTurnsUsed(messages) > GUEST_TURNS) {
+      return NextResponse.json({ error: GUEST_TURNS_LIMIT, guestLimit: true, guestTurns: true, requiresKey: true }, { status: 401 });
+    }
 
     const nameOf = (by: unknown): string =>
       by && typeof by === 'object' && typeof (by as { name?: unknown }).name === 'string'
