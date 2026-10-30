@@ -288,3 +288,112 @@
 .acct-sheet .mr-status.is-bad{color:var(--tension, #9c5b3c)}
 @media (max-width:440px){.acct-sheet .mr-item{flex-direction:column;gap:2px}.acct-sheet .mr-when{text-align:left;white-space:normal}}
 @media (prefers-reduced-motion:reduce){.acct-sheet .mr-switch,.acct-sheet .mr-knob{transition:none}}
+
+/* ── THE ACCOUNT, BY THE BRAND BOOK ─────────────────────────────────────
+ * Warm paper, moss, ink at its four strengths; Instrument Serif for what is
+ * said, Inter for what is operated; hairlines instead of cards. The masthead
+ * is set like the book's cover, each section opens like one of its spreads (a
+ * roman numeral in moss italic, then the name as a micro-label), and the one
+ * coloured surface is the membership — moss's hairline for free, Prussian for
+ * One, the only place blue lives. No gradients, no icon set, no gold.
+ * Everything below overrides the flat list above it. */
+.acct-sheet{--pblue:var(--one-pblue, #26485a);--pale:#b8cdd9}
+.acct-sheet .sheet{width:min(580px,100%)}
+
+/* the masthead */
+.acct-sheet .mast{flex:none;padding:14px clamp(20px,3vw,30px) 0}
+.acct-sheet .mast-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--ink)}
+.acct-sheet .mast-bar .lbl{margin:0;font-family:var(--font-sans, system-ui, sans-serif);font-size:.66rem;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:var(--ink-45)}
+.acct-sheet .mast .x{width:30px;height:30px}
+.acct-sheet .mast-who{display:flex;align-items:center;gap:18px;padding:20px 0 18px}
+.acct-sheet .mast-av{position:relative;flex:none;border-radius:50%;padding:3px;border:1px solid var(--ink-12)}
+.acct-sheet .mast-av > *{display:block;border-radius:50%}
+/* a member's picture wears the One seal's two rings: the inner one the seal, the outer fainter, the invitation */
+.acct-sheet .mast-av.is-one{border-color:var(--pblue)}
+.acct-sheet .mast-av.is-one::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(38,72,90,.3)}
+.acct-sheet .avatar.xl{width:64px;height:64px;font-size:1.9rem;display:grid;place-items:center}
+.acct-sheet .mast-id{min-width:0}
+.acct-sheet .mast .nm{font-family:var(--font-serif, Georgia, serif);font-weight:400;font-size:2.1rem;line-height:1;letter-spacing:-.025em;margin:0;
+  overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
+.acct-sheet .mast .em2{margin-top:6px;font-size:.9rem;color:var(--ink-70);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.acct-sheet .mast-meta{display:flex;flex-wrap:wrap;align-items:center;margin:9px 0 0;font-family:var(--font-sans, system-ui, sans-serif);
+  font-size:.64rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700)}
+.acct-sheet .mast-meta > span + span::before{content:"·";margin:0 .7em;color:var(--ink-45)}
+.acct-sheet .mast-meta > span:last-child:not(:first-child){color:var(--ink-45)}
+.acct-sheet .mast-one{display:inline-flex;align-items:center;gap:.7em;color:var(--pblue)}
+.acct-sheet .mast .pfp-link{margin-top:10px;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:1rem;
+  color:var(--moss-700);border-bottom:1px solid var(--moss);transition:color .2s}
+.acct-sheet .mast .pfp-link:hover{color:var(--moss)}
+
+/* the contents line: where you are in moss; the rule under it fills as you read */
+.acct-sheet .jump{position:relative;display:flex;gap:20px;overflow-x:auto;scrollbar-width:none;
+  margin:0 calc(-1 * clamp(20px,3vw,30px));padding:0 clamp(20px,3vw,30px);border-top:1px solid var(--ink-12)}
+.acct-sheet .jump::-webkit-scrollbar{display:none}
+.acct-sheet .jump::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--moss);
+  transform:scaleX(var(--read, 0));transform-origin:left;transition:transform .2s linear}
+.acct-sheet .jump-b{flex:none;position:relative;padding:13px 0 12px;background:none;border:0;cursor:pointer;
+  font-family:var(--font-sans, system-ui, sans-serif);font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-45);transition:color .2s}
+.acct-sheet .jump-b:hover{color:var(--ink)}
+.acct-sheet .jump-b.is-here{color:var(--moss-700)}
+.acct-sheet .jump-b.is-here::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--moss)}
+.acct-sheet .jump-b:focus-visible{outline:2px solid var(--moss);outline-offset:-2px}
+
+/* each section opens like a spread: a numeral in moss italic, the name as a micro-label */
+.acct-sheet .sheet .scroll{counter-reset:sec;border-top:1px solid var(--ink-12)}
+.acct-sheet .sec{counter-increment:sec;padding:24px 0 26px;scroll-margin-top:0}
+.acct-sheet .sec > .lbl{display:flex;align-items:baseline;gap:14px;margin-bottom:16px;letter-spacing:.18em;color:var(--ink-45)}
+.acct-sheet .sec > .lbl::before{content:counter(sec, upper-roman);font-family:var(--font-serif, Georgia, serif);font-style:italic;
+  font-size:1.15rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--moss-700)}
+
+/* fields sit on the paper behind a hairline; in the app only the composer is white */
+.acct-sheet .sheet .field input,
+.acct-sheet .access-form input,
+.acct-sheet .persona-words textarea{background:transparent;border-color:var(--ink-16)}
+
+/* the membership: the one surface with a colour of its own */
+.acct-sheet .plan{padding:20px 22px;border:1px solid var(--moss-200, #cad5b6);border-radius:18px;background:var(--app-paper)}
+.acct-sheet .plan .tier .t{font-size:1.6rem;line-height:1.1;letter-spacing:-.015em}
+.acct-sheet .plan .note{max-width:38ch;margin-top:6px}
+.acct-sheet .plan .link-act{flex-direction:row;align-items:center;gap:.45em;height:44px;padding:0 22px;border-radius:999px;
+  background:var(--ink);color:var(--app-paper);font-size:.92rem;font-weight:500;white-space:nowrap;
+  transition:background-color .25s var(--ease-out-expo),transform .25s var(--ease-out-expo)}
+.acct-sheet .plan .link-act:hover{background:var(--moss);transform:translateY(-2px)}
+.acct-sheet .plan.is-one{border-color:transparent;background:var(--pblue);color:var(--one-cream, #f0ead8)}
+.acct-sheet .plan.is-one .tier .t{color:var(--one-cream, #f0ead8)}
+.acct-sheet .plan.is-one .tier .t .em{color:var(--pale)}
+.acct-sheet .plan.is-one .note{color:rgba(240,234,216,.72)}
+.acct-sheet .plan.is-one .link-act{background:none;border:1px solid rgba(240,234,216,.45);color:var(--one-cream, #f0ead8)}
+.acct-sheet .plan.is-one .link-act:hover{background:var(--one-cream, #f0ead8);border-color:var(--one-cream, #f0ead8);color:var(--pblue)}
+
+/* rows that go somewhere: the name, what it does under it, and the forward arrow, which slides 3px */
+.acct-sheet .sheet .act{position:relative;flex-direction:column;align-items:flex-start;gap:3px;padding:14px 28px 14px 0;text-align:left}
+.acct-sheet .sheet .act:hover{padding-left:0}
+.acct-sheet .act .d{max-width:52ch;text-align:left;font-size:.84rem;line-height:1.4}
+.acct-sheet .act::after{content:"→";position:absolute;right:2px;top:50%;margin-top:-.6em;font-size:1rem;line-height:1.2;color:var(--ink-45);
+  transition:transform .25s var(--ease-out-expo),color .2s}
+.acct-sheet .act:hover::after{transform:translateX(3px);color:var(--moss-700)}
+.acct-sheet .act[target="_blank"]::after,
+.acct-sheet .act.src::after{content:none}
+.acct-sheet .act.danger:hover::after{color:var(--machine)}
+
+/* in: the masthead, then each section, the way ideas form — fast out of the gate, a long settle */
+@keyframes acct-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
+.acct-sheet .mast-who,
+.acct-sheet .scroll > .sec{animation:acct-up 1s var(--ease-out-expo) both}
+.acct-sheet .scroll > .sec:nth-child(1){animation-delay:.12s}
+.acct-sheet .scroll > .sec:nth-child(2){animation-delay:.24s}
+.acct-sheet .scroll > .sec:nth-child(3){animation-delay:.36s}
+.acct-sheet .scroll > .sec:nth-child(n+4){animation-delay:.48s}
+
+@media (max-width: 520px){
+  .acct-sheet .mast-who{gap:14px;padding:16px 0 14px}
+  .acct-sheet .mast .nm{font-size:1.65rem}
+  .acct-sheet .avatar.xl{width:52px;height:52px;font-size:1.55rem}
+  .acct-sheet .plan{padding:18px}
+}
+@media (prefers-reduced-motion: reduce){
+  .acct-sheet .mast-who,.acct-sheet .scroll > .sec{animation:none}
+  .acct-sheet .act::after,.acct-sheet .jump::after,.acct-sheet .plan .link-act{transition:none}
+}

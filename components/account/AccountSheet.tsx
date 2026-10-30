@@ -18,7 +18,7 @@
 // Depth is deliberately absent: it belongs beside the conversation, and the
 // product already keeps it there.
 
-import { useCallback, useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useRef, useState, type UIEvent } from 'react';
 import Link from 'next/link';
 import { useClerk, useUser } from '@clerk/nextjs';
 import { Avatar } from './Avatar';
@@ -41,6 +41,7 @@ import { NameField, RolePicker } from './RolePicker';
 import { ConversationStylePicker } from './ConversationStylePicker';
 import { LogosInstructions } from './LogosInstructions';
 import { MRSettings } from './MRSettings';
+import { OneMark } from '@/components/ds';
 
 export function AccountSheet({
   open,
@@ -66,7 +67,9 @@ export function AccountSheet({
   const { user } = useUser();
   const { signOut } = useClerk();
   const ref = useRef<HTMLDivElement>(null);
+  const navRef = useRef<HTMLElement>(null);
   const [pfp, setPfp] = useState<PfpConfig | null>(null);
+  const [here, setHere] = useState(JUMPS[0][0]);
 
   useEffect(() => {
     if (!open) return;
@@ -88,8 +91,35 @@ export function AccountSheet({
   // onClose — so any re-render of that page (a style chosen in this very
   // sheet is one) pulled focus back to the close button mid-keystroke.
   useEffect(() => {
-    if (open) ref.current?.querySelector('button')?.focus();
+    if (!open) return;
+    ref.current?.querySelector('button')?.focus();
+    setHere(JUMPS[0][0]);
   }, [open]);
+
+  // Reading down the sheet: the contents line marks the section you are in,
+  // and its rule fills with moss as far as you have read. The fill is a style
+  // on the nav, not state, so scrolling never re-renders the sheet.
+  const onScroll = useCallback((e: UIEvent<HTMLDivElement>) => {
+    const el = e.currentTarget;
+    const max = el.scrollHeight - el.clientHeight;
+    navRef.current?.style.setProperty('--read', String(max > 0 ? Math.min(1, el.scrollTop / max) : 0));
+    const top = el.getBoundingClientRect().top + 24;
+    let at = JUMPS[0][0];
+    for (const [id] of JUMPS) {
+      const sec = el.querySelector<HTMLElement>(`#${id}`);
+      if (sec && sec.getBoundingClientRect().top <= top) at = id;
+    }
+    if (max > 0 && el.scrollTop >= max - 2) at = JUMPS[JUMPS.length - 1][0];
+    setHere(at);
+  }, []);
+
+  // On a phone the contents line is wider than the screen: keep where you are in it in view.
+  useEffect(() => {
+    const nav = navRef.current;
+    const b = nav?.querySelector<HTMLElement>('.is-here');
+    if (!nav || !b) return;
+    if (b.offsetLeft < nav.scrollLeft || b.offsetLeft + b.offsetWidth > nav.scrollLeft + nav.clientWidth) nav.scrollTo({ left: b.offsetLeft - 20, behavior: 'smooth' });
+  }, [here]);
 
   const retake = useCallback(() => {
     try {
@@ -114,38 +144,64 @@ export function AccountSheet({
         }}
       >
         <div className="sheet" role="dialog" aria-modal="true" aria-label="Your account" ref={ref}>
-          <div className="head">
-            <div>
+          {/* THE MASTHEAD: the person, set the way the brand book sets a
+              cover — a micro-label over an ink rule, the name in the serif,
+              what kind of account this is as a line of metadata. Paper,
+              moss, ink; Prussian only where the membership is. */}
+          <header className="mast">
+            <div className="mast-bar">
               <p className="lbl">Your account</p>
-              <h2>Everything here is yours.</h2>
+              <button type="button" className="x" onClick={onClose} aria-label="Close">
+                ×
+              </button>
             </div>
-            <button type="button" className="x" onClick={onClose} aria-label="Close">
-              ×
-            </button>
-          </div>
-
-          <div className="scroll">
-            <div className="sec">
-              <span className="lbl">Signed in as</span>
-              <div className="person">
+            <div className="mast-who">
+              <div className={`mast-av${isOne ? ' is-one' : ''}`}>
                 {pfp ? (
-                  <Avatar cfg={pfp} size={52} className="av-sm" />
+                  <Avatar cfg={pfp} size={64} className="av-sm" />
                 ) : (
-                  <span className="avatar lg" aria-hidden="true">
+                  <span className="avatar xl" aria-hidden="true">
                     {name.charAt(0)}
                   </span>
                 )}
-                <div>
-                  <div className="nm">{name}</div>
-                  <div className="em2">{email}</div>
-                  {since && <div className="since">thinking here since {since}</div>}
-                  <Link className="pfp-link" href="/account/picture" onClick={onClose}>
-                    Change your picture →
-                  </Link>
-                </div>
+              </div>
+              <div className="mast-id">
+                <h2 className="nm">{name}</h2>
+                {email && <div className="em2">{email}</div>}
+                <p className="mast-meta">
+                  {isOne ? (
+                    <span className="mast-one">
+                      <OneMark size={15} tone="light" />
+                      Socria One
+                    </span>
+                  ) : (
+                    <span>Free plan</span>
+                  )}
+                  {since && <span>Here since {since}</span>}
+                </p>
+                <Link className="pfp-link" href="/account/picture" onClick={onClose}>
+                  Change your picture
+                </Link>
               </div>
             </div>
+            {/* The sections, as the brand book's contents line: where you are
+                in moss, and a rule under it that fills as you read down. */}
+            <nav className="jump" aria-label="Sections" ref={navRef}>
+              {JUMPS.map(([id, label]) => (
+                <button
+                  key={id}
+                  type="button"
+                  className={`jump-b${here === id ? ' is-here' : ''}`}
+                  aria-current={here === id ? 'true' : undefined}
+                  onClick={() => ref.current?.querySelector<HTMLElement>(`#${id}`)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+                >
+                  {label}
+                </button>
+              ))}
+            </nav>
+          </header>
 
+          <div className="scroll" onScroll={onScroll}>
             {plan ? (
               <Membership isOne={isOne} plan={plan} onClose={onClose} />
             ) : (
@@ -166,7 +222,7 @@ export function AccountSheet({
               </div>
             )}
 
-            <div className="sec">
+            <div className="sec" id="acct-theme">
               <span className="lbl">Theme</span>
               <ThemePicker isOne={isOne} onUpgrade={onClose} />
             </div>
@@ -175,7 +231,7 @@ export function AccountSheet({
                 to call you by. The style is the account's and follows you to
                 every device; your own words, the name and the role are kept
                 in this browser, as they always were. */}
-            <div className="sec">
+            <div className="sec" id="acct-you">
               <span className="lbl">Personalization</span>
               <div className="sub">
                 <h3 className="sub-h">Conversation style</h3>
@@ -221,13 +277,14 @@ export function AccountSheet({
               </div>
             )}
 
-            <div className="sec">
+            <div className="sec" id="acct-data">
               <span className="lbl">Your thinking</span>
               <div className="acts">
                 {/* One path to an irreversible action, and it is the one
                     that already has the confirmations. */}
                 <Link className="act" href="/memory" onClick={onClose}>
-                  Memory
+                  <span className="t">Memory</span>
+                  <span className="d">What Socria remembers about you, and why</span>
                 </Link>
                 <Link className="act" href="/account/data" onClick={onClose}>
                   <span className="t">Export or delete everything</span>
@@ -250,7 +307,7 @@ export function AccountSheet({
               </div>
             </div>
 
-            <div className="sec">
+            <div className="sec" id="acct-device">
               <span className="lbl">This device</span>
               <div className="acts">
                 <button type="button" className="act" onClick={retake}>
@@ -314,6 +371,15 @@ export function AccountSheet({
   );
 }
 
+/** The contents line under the masthead: each section's anchor and its name, in the order they come. */
+const JUMPS: [string, string][] = [
+  ['acct-plan', 'Membership'],
+  ['acct-theme', 'Theme'],
+  ['acct-you', 'Personalization'],
+  ['acct-data', 'Your thinking'],
+  ['acct-device', 'This device'],
+];
+
 /** The free plan's day and month, read from the one table (lib/entitlements.ts) rather than typed twice. */
 function freeTerms(): string {
   const c = PLANS.free.counters;
@@ -329,11 +395,12 @@ function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState 
   const promo = plan?.promo;
   const fromReward = isOne && !!promo?.only;
   return (
-    <div className="sec">
+    <div className="sec" id="acct-plan">
       <span className="lbl">Membership</span>
-      <div className="plan">
+      <div className={`plan${isOne ? ' is-one' : ''}`}>
         <div>
           <div className="tier">
+            {isOne && <OneMark size={34} tone="dark" />}
             <span className="t">
               {isOne ? (
                 <>
