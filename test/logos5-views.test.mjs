@@ -240,5 +240,30 @@ console.log('\n=== the Content canvas: placed, nested, kept ===');
   ok('a storage that throws keeps the board for the visit only', (() => { V.writeBoard({ getItem: () => '{}', setItem: () => { throw new Error('full'); } }, 's', b); return true; })());
 }
 
+console.log('\n=== where the conversation sits: any edge, as the person put it ===');
+{
+  ok('four sides, each with its opposite', J(V.SIDES) === J(['left', 'right', 'top', 'bottom']) && V.SIDES.every((s) => V.OPPOSITE[V.OPPOSITE[s]] === s && V.OPPOSITE[s] !== s));
+  ok('never chosen: the panel beside is on the right, as it always was', V.besideSide(S('artifacts', 'chat'), null) === 'right' && V.besideSide(S('chat', 'logic_map'), null) === 'right' && V.besideSide(S('content', 'logic_map'), null) === 'right');
+  ok('chosen, the conversation beside sits on that side', V.SIDES.every((s) => V.besideSide(S('logic_map', 'chat'), s) === s));
+  ok('  with the conversation the view, what is beside goes to the far side — the conversation stays where it was put', V.besideSide(S('chat', 'artifacts'), 'left') === 'right' && V.besideSide(S('chat', 'artifacts'), 'right') === 'left' && V.besideSide(S('chat', 'content'), 'top') === 'bottom');
+  ok('  two other views beside each other are not the conversation: the right, as before', V.besideSide(S('content', 'logic_map'), 'left') === 'right');
+  ok('a panel let go on an edge says where the conversation now is', V.chatSideFor(S('artifacts', 'chat'), 'left') === 'left' && V.chatSideFor(S('chat', 'artifacts'), 'left') === 'right' && V.chatSideFor(S('content', 'logic_map'), 'left') === null && V.chatSideFor(S('chat'), 'left') === null);
+  ok('  and the two agree: put there, it is drawn there', V.SIDES.every((s) => V.besideSide(S('logic_map', 'chat'), V.chatSideFor(S('logic_map', 'chat'), s)) === s && V.besideSide(S('chat', 'logic_map'), V.chatSideFor(S('chat', 'logic_map'), s)) === s));
+  ok('let go anywhere, it docks on the nearest edge', V.nearestSide(0.05, 0.5) === 'left' && V.nearestSide(0.96, 0.4) === 'right' && V.nearestSide(0.5, 0.04) === 'top' && V.nearestSide(0.45, 0.97) === 'bottom' && V.nearestSide(-3, 0.5) === 'left' && V.nearestSide(NaN, 2) === 'bottom');
+  const box = { left: 100, top: 50, width: 1000, height: 600 };
+  ok('the divider measures the panel from the side it is docked on', Math.abs(V.shareAt('right', box, 700, 0) - 0.4) < 1e-9 && Math.abs(V.shareAt('left', box, 500, 0) - 0.4) < 1e-9 && Math.abs(V.shareAt('bottom', box, 0, 410) - 0.4) < 1e-9 && Math.abs(V.shareAt('top', box, 0, 290) - 0.4) < 1e-9);
+  ok('  and keeps it between 28% and 60%', V.shareAt('right', box, 1095, 0) === 0.28 && V.shareAt('left', box, 1095, 0) === 0.6);
+  const st = new Map();
+  const store = { getItem: (k) => st.get(k) ?? null, setItem: (k, v) => st.set(k, String(v)), removeItem: (k) => st.delete(k) };
+  ok('never chosen reads as nothing chosen', V.readChatSide(store) === null && V.readChatSide(null) === null);
+  V.writeChatSide(store, 'bottom');
+  ok('kept per browser, and read back', V.readChatSide(store) === 'bottom');
+  st.set('socria.logos5.chatSide.v1', 'diagonal');
+  ok('  junk reads as nothing chosen', V.readChatSide(store) === null);
+  V.writeChatSide(store, null);
+  ok('  and cleared, it is nothing chosen again', V.readChatSide(store) === null && !st.has('socria.logos5.chatSide.v1'));
+  ok('  a storage that throws keeps it for the visit only', (() => { V.writeChatSide({ setItem: () => { throw new Error('full'); }, removeItem: () => {} }, 'left'); return V.readChatSide({ getItem: () => { throw new Error('blocked'); } }) === null; })());
+}
+
 console.log(`\nlogos5 views: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

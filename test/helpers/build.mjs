@@ -333,6 +333,8 @@ const MODULES = [
   'test/helpers/four-views-under-test.tsx',
   // Split View, redone: the views beside each other, a model's tools in its artifact, CAD made
   'test/helpers/split-view-under-test.tsx',
+  // what Socria does: the tutorials and their miniatures; Quick capture as a page of a notebook
+  'test/helpers/guide-under-test.tsx',
   // any artifact, from a few primitives: the custom kind, its templates, Make's "Your own", its figure
   'test/helpers/custom-under-test.tsx',
   // Socria Voice: the turn, the ear, the yes, the workspace and the writing in words, the panel

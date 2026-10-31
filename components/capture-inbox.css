@@ -1,0 +1,564 @@
+/* components/capture-inbox.css — Quick capture, set by the brand book.
+ *
+ * A page of a notebook, not a stack of cards: warm paper, a micro-label over
+ * an ink rule, the headline in Instrument Serif, the one white surface the
+ * box you write in (in the app only the composer is white), and what was kept
+ * set in the serif under a micro-label for its day and its time, hairlines
+ * between. Moss marks the one way forward each capture keeps and the live
+ * state; everything else is ink at its strengths. No gradients, no icon set,
+ * no gold. Motion is the book's: fast out of the gate, a long settle, and
+ * none at all with reduced motion.
+ *
+ * Every colour is a Logos token, so the dark grounds hold; the white of the
+ * box steps down with them, as the composer's does (components/logos5/l5.css
+ * --l5-raise). */
+
+.qc-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.22);
+  animation: qc-fade 0.35s ease both;
+}
+
+.qc {
+  --qc-serif: var(--serif, 'Instrument Serif', Georgia, serif);
+  --qc-ink: var(--lg-ink, #23241f);
+  --qc-ink-rgb: var(--lg-ink-rgb, 35, 36, 31);
+  --qc-moss: var(--lg-primary, #354620);
+  --qc-moss-rgb: var(--lg-primary-rgb, 53, 70, 32);
+  --qc-line: var(--lg-line, rgba(53, 70, 32, 0.14));
+  --qc-raise: #fff;
+  --qc-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  width: min(464px, 100vw);
+  height: 100%;
+  background: var(--lg-paper, #f5f3eb);
+  border-left: 1px solid var(--qc-line);
+  box-shadow: -24px 0 60px -30px rgba(var(--qc-ink-rgb), 0.35);
+  color: var(--qc-ink);
+  font-family: var(--lg-sans);
+  outline: none;
+  animation: qc-in 0.55s var(--qc-ease) both;
+}
+html[data-theme='dark'] .qc {
+  --qc-raise: #2e2f28;
+}
+html[data-theme='one'] .qc {
+  --qc-raise: #22415a;
+}
+html[data-theme='night'] .qc {
+  --qc-raise: #1a2642;
+}
+
+/* ── the masthead ──────────────────────────────────────────────────── */
+.qc-head {
+  padding: 18px 24px 0;
+}
+.qc-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--qc-ink);
+}
+.qc-lbl {
+  margin: 0;
+  font-size: 0.66rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--qc-ink-rgb), 0.5);
+}
+.qc-lbl span::before {
+  content: '·';
+  margin: 0 0.7em;
+}
+.qc-x {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 1px solid var(--qc-line);
+  border-radius: 50%;
+  background: none;
+  font-size: 1.05rem;
+  line-height: 1;
+  color: rgba(var(--qc-ink-rgb), 0.7);
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    color 0.2s;
+}
+.qc-x:hover {
+  border-color: var(--qc-ink);
+  color: var(--qc-ink);
+}
+.qc-title {
+  margin: 18px 0 0;
+  font-family: var(--qc-serif);
+  font-size: 2rem;
+  font-weight: 400;
+  line-height: 1.05;
+  letter-spacing: -0.02em;
+  color: var(--qc-ink);
+}
+.qc-title em {
+  font-style: italic;
+  color: var(--qc-moss);
+}
+.qc-where {
+  max-width: 40ch;
+  margin: 8px 0 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: rgba(var(--qc-ink-rgb), 0.7);
+}
+
+/* ── the box: the one white surface ─────────────────────────────────── */
+.qc-box {
+  margin: 18px 24px 0;
+  padding: 12px 14px 10px;
+  border: 1px solid var(--qc-line);
+  border-radius: 16px;
+  background: var(--qc-raise);
+  box-shadow:
+    0 1px 2px rgba(var(--qc-ink-rgb), 0.04),
+    0 10px 30px -22px rgba(var(--qc-ink-rgb), 0.4);
+  transition:
+    border-color 0.2s,
+    box-shadow 0.2s;
+}
+.qc-box:focus-within {
+  border-color: rgba(var(--qc-moss-rgb), 0.5);
+  box-shadow:
+    0 0 0 3px rgba(var(--qc-moss-rgb), 0.12),
+    0 10px 30px -22px rgba(var(--qc-ink-rgb), 0.4);
+}
+.qc-box textarea {
+  display: block;
+  width: 100%;
+  min-height: 72px;
+  resize: vertical;
+  border: 0;
+  outline: 0;
+  background: transparent;
+  font: inherit;
+  font-size: 16px;
+  line-height: 1.5;
+  color: var(--qc-ink);
+}
+.qc-box textarea::placeholder {
+  color: rgba(var(--qc-ink-rgb), 0.45);
+}
+.qc-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 6px;
+}
+.qc-grow {
+  flex: 1 1 auto;
+}
+.qc-photo {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 32px;
+  padding: 0 12px 0 10px;
+  border: 1px solid var(--qc-line);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: rgba(var(--qc-ink-rgb), 0.72);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    border-color 0.2s;
+}
+.qc-photo:hover:not(:disabled) {
+  border-color: rgba(var(--qc-ink-rgb), 0.4);
+  color: var(--qc-ink);
+}
+.qc-photo:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+.qc-kbd {
+  font-family: inherit;
+  font-size: 11px;
+  font-weight: 500;
+  letter-spacing: 0.04em;
+  color: rgba(var(--qc-ink-rgb), 0.45);
+}
+/* the action: ink, moss when reached for, lifted 2px — the book's primary pill */
+.qc-save {
+  height: 34px;
+  padding: 0 18px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--qc-ink);
+  color: var(--lg-paper, #f5f3eb);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.25s var(--qc-ease),
+    transform 0.25s var(--qc-ease),
+    opacity 0.2s;
+}
+.qc-save:hover:not(:disabled) {
+  background: var(--qc-moss);
+  transform: translateY(-2px);
+}
+.qc-save:disabled {
+  opacity: 0.35;
+  cursor: default;
+}
+.qc-save.is-small {
+  height: 30px;
+  padding: 0 14px;
+  font-size: 12.5px;
+}
+.qc-save:focus-visible,
+.qc-photo:focus-visible,
+.qc-x:focus-visible,
+.qc-quiet:focus-visible,
+.qc-go:focus-visible {
+  outline: 2px solid var(--qc-moss);
+  outline-offset: 2px;
+}
+.qc-pending {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: rgba(var(--qc-ink-rgb), 0.72);
+}
+.qc-pending-t {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.qc-thumb {
+  flex: none;
+  width: 52px;
+  height: 52px;
+  object-fit: cover;
+  border: 1px solid var(--qc-line);
+  border-radius: 10px;
+}
+
+/* ── what happened, said quietly ────────────────────────────────────── */
+.qc-note {
+  margin: 12px 24px 0;
+  font-size: 0.84rem;
+  line-height: 1.45;
+  color: var(--lg-tension, #9c5b3c);
+}
+.qc-toast {
+  margin: 12px 24px 0;
+  font-family: var(--qc-serif);
+  font-size: 1.02rem;
+  font-style: italic;
+  color: var(--qc-moss);
+  animation: qc-up 0.8s var(--qc-ease) both;
+}
+
+/* ── the page: days, and what was kept on them ──────────────────────── */
+.qc-page {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin-top: 18px;
+  padding: 0 24px 28px;
+  border-top: 1px solid var(--qc-line);
+}
+.qc-list,
+.qc-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.qc-day-h {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  margin: 0;
+  padding: 16px 0 8px;
+  background: var(--lg-paper, #f5f3eb);
+  font-size: 0.64rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--qc-moss);
+}
+.qc-item {
+  padding: 14px 0 13px;
+  border-top: 1px solid var(--qc-line);
+  animation: qc-up 0.9s var(--qc-ease) both;
+}
+.qc-items > .qc-item:first-child {
+  border-top: 0;
+  padding-top: 4px;
+}
+.qc-meta {
+  display: flex;
+  flex-wrap: wrap;
+  margin: 0 0 6px;
+  font-size: 0.62rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(var(--qc-ink-rgb), 0.45);
+}
+.qc-meta span + span::before {
+  content: '·';
+  margin: 0 0.7em;
+}
+.qc-item-top {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+/* what was kept is something said: the serif */
+.qc-text {
+  flex: 1 1 auto;
+  min-width: 0;
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font-family: var(--qc-serif);
+  font-size: 1.2rem;
+  line-height: 1.32;
+  letter-spacing: -0.005em;
+  color: var(--qc-ink);
+}
+.qc-text.is-clamped {
+  display: -webkit-box;
+  -webkit-line-clamp: 4;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.qc-edit {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 88px;
+  resize: vertical;
+  padding: 10px 12px;
+  border: 1px solid rgba(var(--qc-moss-rgb), 0.5);
+  border-radius: 12px;
+  outline: 0;
+  background: var(--qc-raise);
+  box-shadow: 0 0 0 3px rgba(var(--qc-moss-rgb), 0.12);
+  font: inherit;
+  font-size: 15px;
+  line-height: 1.5;
+  color: var(--qc-ink);
+}
+.qc-acts {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 6px 14px;
+  margin-top: 10px;
+}
+/* the way forward: a serif-italic link on a moss rule, its arrow sliding 3px */
+.qc-go {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.35em;
+  padding: 0 0 1px;
+  border: 0;
+  border-bottom: 1px solid var(--qc-moss);
+  background: none;
+  font-family: var(--qc-serif);
+  font-size: 1.02rem;
+  font-style: italic;
+  color: var(--qc-moss);
+  cursor: pointer;
+}
+.qc-go span {
+  display: inline-block;
+  font-style: normal;
+  transition: transform 0.25s var(--qc-ease);
+}
+.qc-go:hover span {
+  transform: translateX(3px);
+}
+.qc-more-acts {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  margin-left: auto;
+}
+.qc-more-acts .qc-quiet + .qc-quiet::before {
+  content: '·';
+  margin: 0 0.5em;
+  color: rgba(var(--qc-ink-rgb), 0.3);
+}
+.qc-quiet {
+  padding: 2px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: rgba(var(--qc-ink-rgb), 0.6);
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.qc-quiet:hover {
+  color: var(--qc-ink);
+}
+.qc-quiet.is-danger:hover {
+  color: var(--lg-tension, #9c5b3c);
+}
+.qc-more {
+  margin-top: 4px;
+}
+
+/* ── nothing kept yet ────────────────────────────────────────────────── */
+.qc-opening {
+  padding: 30px 0;
+  margin: 0;
+  font-family: var(--qc-serif);
+  font-size: 1.05rem;
+  font-style: italic;
+  color: rgba(var(--qc-ink-rgb), 0.6);
+}
+.qc-empty {
+  padding: 30px 0 8px;
+  animation: qc-up 0.9s var(--qc-ease) both;
+}
+.qc-empty-h {
+  margin: 0;
+  font-family: var(--qc-serif);
+  font-size: 1.6rem;
+  line-height: 1.1;
+  color: var(--qc-ink);
+}
+.qc-empty-b {
+  max-width: 34ch;
+  margin: 8px 0 0;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: rgba(var(--qc-ink-rgb), 0.7);
+}
+.qc-empty-tip {
+  max-width: 36ch;
+  margin: 22px 0 0;
+  padding-left: 14px;
+  border-left: 2px solid var(--qc-moss);
+  font-family: var(--qc-serif);
+  font-size: 1.02rem;
+  font-style: italic;
+  line-height: 1.45;
+  color: var(--qc-moss);
+}
+.qc-empty-tip q {
+  quotes: '“' '”';
+  font-family: var(--lg-sans);
+  font-size: 0.86em;
+  font-style: normal;
+}
+
+/* ── a phone: a sheet from the foot ─────────────────────────────────── */
+@media (max-width: 640px) {
+  .qc-veil {
+    align-items: flex-end;
+  }
+  .qc {
+    width: 100vw;
+    height: 90dvh;
+    border-left: 0;
+    border-top: 1px solid var(--qc-line);
+    border-radius: 18px 18px 0 0;
+    box-shadow: 0 -24px 60px -30px rgba(var(--qc-ink-rgb), 0.4);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+    animation-name: qc-rise;
+  }
+  .qc-head,
+  .qc-page {
+    padding-left: 18px;
+    padding-right: 18px;
+  }
+  .qc-box,
+  .qc-note,
+  .qc-toast {
+    margin-left: 18px;
+    margin-right: 18px;
+  }
+  .qc-title {
+    font-size: 1.7rem;
+  }
+  .qc-kbd {
+    display: none;
+  }
+  .qc-x {
+    width: 40px;
+    height: 40px;
+  }
+  .qc-photo,
+  .qc-save {
+    height: 40px;
+  }
+  .qc-quiet {
+    padding: 9px 0;
+  }
+  .qc-go {
+    padding-top: 8px;
+  }
+  .qc-more-acts {
+    width: 100%;
+    margin-left: 0;
+  }
+}
+
+@keyframes qc-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes qc-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes qc-rise {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+}
+@keyframes qc-up {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .qc-veil,
+  .qc,
+  .qc-item,
+  .qc-toast,
+  .qc-empty {
+    animation: none;
+  }
+  .qc-save,
+  .qc-go span,
+  .qc-box,
+  .qc-x,
+  .qc-photo,
+  .qc-quiet {
+    transition: none;
+  }
+}

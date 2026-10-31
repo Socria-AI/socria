@@ -35,11 +35,12 @@ console.log('=== one onboarding, no Logos-only sequence ===');
   ok('  with the sentence for its composer', /text,\s*intent,\s*surface: 'logos',/.test(ob));
   // The model they chose, carried to the chat and opened there, was archived with the choice: /chat opens Logos 5 alone.
   ok('the account\'s first name starts the name field', /defaultName=\{user\?\.firstName \?\? null\}/.test(ob));
-  const guide = read('components/LogosGuide.tsx');
-  ok('the "?" guide has a Logos 3 walk, and Logos 5 opens it', /edition === 3 \? STEPS_3 : STEPS/.test(guide) && /<LogosGuide open=\{guideOpen\} onClose=\{closeGuide\} edition=\{3\} name="Logos 5" \/>/.test(read('components/LogosApp.tsx')));
-  ok('  saying what Logos 3 adds, each shown in miniature', ['Describe it, and it’s built.', 'The chat works everything.', 'Open what you need beside it.', 'Think it through with someone.'].every((t) => guide.includes(`title: '${t}'`)) && /demo: Built/.test(guide) && /demo: OneBox/.test(guide) && /demo: Views/.test(guide) && /demo: Together/.test(guide));
-  ok('  sharing Logos 2\'s steps as the same objects', /const at = \(title: string\) => STEPS\.find/.test(guide) && (guide.match(/\bat\('/g) || []).length >= 5);
-  ok('  and honest that Live 3D is a preview', /a geometric preview with exact sizes and masses, not a physical simulation/.test(guide));
+  // The walk through Logos 2 and 3 (the map, "+ View", the Draft) described a screen that is gone; the ⋯ menu's
+  // "What Socria does" is short tutorials of the screen as it is (components/SocriaGuide.tsx, test/socria-guide.test.mjs).
+  const guide = read('components/SocriaGuide.tsx');
+  ok('the guide is "What Socria does": tutorials of the screen as it is, opened from the ⋯ menu', /label: 'What Socria does'/.test(read('components/LogosApp.tsx')) && /<SocriaGuide\s+open=\{guideOpen\}\s+onClose=\{closeGuide\}/.test(read('components/LogosApp.tsx')) && /export function SocriaGuide/.test(guide));
+  ok('  each shown in miniature, told in three steps', /demo: HomeDemo/.test(guide) && /demo: SplitDemo/.test(guide) && /demo: CaptureDemo/.test(guide) && /className="sg-steps"/.test(guide));
+  ok('  and honest about its limits — voice is experimental, Memory needs an account', /Socria Voice is experimental\. It can mishear, so anything that cannot be undone asks first\./.test(guide) && /Memory is kept for an account — sign in to have one\./.test(guide));
   // Logos 3's own first screen (its conversation outside Logos 5) was archived with the Logos 4 layout.
   ok('the starting points are large cards with icons and a line each', /className=\{`ob-way/.test(intro) && /ob-way-d/.test(intro) && /<ObIcon/.test(intro));
 }

@@ -4,7 +4,7 @@
 // View, an artifact's pill, the way home and back, another line of thinking,
 // a new one, Memory, search, the length dial, Undo and Redo, Start writing,
 // Synthesize, Retry, Save as template, Map this conversation, Save the map as
-// an image, Hide the bars — is also a sentence here, read whole (never a word inside a longer message) and done by
+// an image, Hide the bars, where the conversation sits — is also a sentence here, read whole (never a word inside a longer message) and done by
 // the same functions the presses call. Socria Voice needs it to operate the
 // workspace without hands; typed, the same sentences work too, because there
 // is one dispatcher (components/LogosApp.tsx send) and both kinds of turn go
@@ -17,7 +17,7 @@
 //
 // PURE.
 
-import type { Viewport } from './views';
+import type { Side, Viewport } from './views';
 import { plain } from '../voice/speech';
 
 export type ReplyLength = 'concise' | 'standard' | 'detailed';
@@ -45,6 +45,7 @@ export type WorkspaceCommand =
   | { kind: 'map-image' }
   | { kind: 'bars'; hide: boolean }
   | { kind: 'captures' }
+  | { kind: 'chat-side'; side: Side }
   | { kind: 'deselect' };
 
 export interface CommandContext {
@@ -94,6 +95,12 @@ const OPEN_SEARCH = rx(String.raw`(?:open|show)\s+(?:the )?search|search`);
 const REMAP = rx(String.raw`map (?:this|the|my) conversation|(?:redraw|refresh|update|draw) (?:the |my )?(?:logic )?map`);
 const MAP_IMAGE = rx(String.raw`save (?:the |my )?(?:logic )?map as (?:an )?(?:image|picture|png)|export (?:the |my )?(?:logic )?map(?: as (?:an )?(?:image|picture|png))?`);
 const CAPTURES = rx(String.raw`(?:open|show(?: me)?)\s+(?:my |the )?(?:quick capture|captures|capture inbox|inbox)`);
+// "put the chat on the left", "move the conversation to the bottom", "chat on top": where the conversation sits
+const CHAT = String.raw`(?:the\s+)?(?:chat|conversation|chat ?box|thread)`;
+const SIDE_WORDS = String.raw`(?:the\s+)?(left|right|top|bottom)(?:\s+(?:side|edge|of the screen))?`;
+const CHAT_SIDE = rx(
+  String.raw`(?:put|move|dock|keep|place|send|stick)\s+${CHAT}\s+(?:on|to|at|onto|over to)\s+${SIDE_WORDS}|${CHAT}\s+(?:on|to|at)\s+${SIDE_WORDS}|dock (?:it )?(?:on |to )?${SIDE_WORDS}`
+);
 const DESELECT = rx(String.raw`(?:clear|drop|forget)(?: the| my)? selection|deselect(?: (?:it|that|everything))?|select nothing|unselect(?: it| that)?`);
 const HIDE_BARS = rx(String.raw`hide (?:the )?(?:bars|toolbars|menus|chrome)|(?:go )?full ?screen`);
 const SHOW_BARS = rx(String.raw`show (?:the )?(?:bars|toolbars|menus|chrome)|exit full ?screen|leave full ?screen`);
@@ -153,6 +160,7 @@ export function readWorkspaceCommand(text: string, ctx: CommandContext): Workspa
   if (OPEN_SEARCH.test(t)) return { kind: 'search', query: '' };
   if (CAPTURES.test(t)) return { kind: 'captures' };
   if (DESELECT.test(t)) return { kind: 'deselect' };
+  if ((m = CHAT_SIDE.exec(t))) return { kind: 'chat-side', side: (m[1] ?? m[2] ?? m[3]) as Side };
   if ((m = PAIR.exec(t))) return { kind: 'pair', view: viewOf(m[1]), beside: viewOf(m[2]) };
   if ((m = BESIDE.exec(t))) return { kind: 'beside', view: viewOf(m[1]) };
   if ((m = SPLIT_WITH.exec(t))) return { kind: 'beside', view: viewOf(m[1]) };

@@ -62,7 +62,7 @@ ok('Logos 4 without it', logosName(false) === 'Logos 4');
   // The "Try Logos" pill and the Logos cover on Core were archived with the Core chat (docs/ARCHIVE.md).
   const app = read('components/LogosApp.tsx');
   // Logos's own gate, the cover naming the Logos behind it, was archived too: a guest gets Logos 5 (test/guest.test.mjs).
-  ok('the guide on Logos names the one Logos there is', /<LogosGuide [^>]*name="Logos 5"/.test(app));
+  ok('the guide names no Logos at all: it is "What Socria does"', /<SocriaGuide\s/.test(app) && !/LogosGuide|What Logos does/.test(app));
   ok('a start offered to somebody new names no version it may not open', /'logos-3': 'See it laid out \(Logos\)'/.test(read('lib/onboarding-intents.ts')));
 }
 

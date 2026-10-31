@@ -50,7 +50,7 @@ import { LogosRail, type RailProject } from '@/components/LogosRail';
 import { LogosComposer, type Draft } from '@/components/LogosComposer';
 import { MsgActions, SocriaAnswering, type Side } from '@/components/LogosMessage';
 import { WriteSpace, type SaveState, type WriteSpaceHandle } from '@/components/write/WriteSpace';
-import { LogosGuide, GUIDE_SEEN_KEY } from '@/components/LogosGuide';
+import { SocriaGuide, GUIDE_SEEN_KEY } from '@/components/SocriaGuide';
 import { Tour } from '@/components/Tour';
 import { MindAtlas } from '@/components/mind/MindAtlas';
 import { ShareDialog } from '@/components/share/ShareDialog';
@@ -171,7 +171,7 @@ import { L5Layout, L5Tabs, L5TopBar, L5Working, SplitView } from '@/components/l
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
 import { ContentView, PlainReader, WriteUpReader } from '@/components/logos5/ContentView';
 import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/logos5/content';
-import { OPENING, SPLIT_NAMES, afterSend, chatVisible, choose, dock, fit, onMade, readBesideShare, screenForRequest, splitMenu, writeBesideShare, type ModelTool, type Screen, type SplitChoice, type Viewport } from '@/lib/logos5/views';
+import { OPENING, SPLIT_NAMES, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, splitMenu, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type SplitChoice, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
@@ -4958,6 +4958,8 @@ export function LogosApp({
         if (!LOGOS4.capture) return { said: 'Quick Capture is not on here.' };
         setCaptureOpen(true);
         return { said: 'Opened Quick Capture.', post: false };
+      case 'chat-side':
+        return { said: chatSideChosen(cmd.side) };
       case 'deselect':
         if (!focusRef.current && !writeSelRef.current) return { said: 'Nothing is selected.' };
         clearAbout();
@@ -5402,6 +5404,15 @@ export function LogosApp({
   useEffect(() => {
     if (l5) setBesideShare(readBesideShare(browserStorage()));
   }, [l5]);
+  /** where the person put the conversation when it shares the screen — left, right, top or bottom — per browser; null until they have */
+  const [chatSide, setChatSide] = useState<ChatSide | null>(null);
+  useEffect(() => {
+    if (l5) setChatSide(readChatSide(browserStorage()));
+  }, [l5]);
+  function putChatSide(side: ChatSide) {
+    setChatSide(side);
+    writeChatSide(browserStorage(), side);
+  }
   /** the turn on its way: what has actually happened so far, for the thread's skeleton */
   const [turnInfo, setTurnInfo] = useState<{ files: number; headers: boolean; sources: number } | null>(null);
   /** files dropped on an empty Components, being read */
@@ -7123,7 +7134,7 @@ export function LogosApp({
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
-    { label: 'What Logos does', sep: true, onSelect: () => setGuideOpen(true) },
+    { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
   ];
@@ -7815,6 +7826,21 @@ export function LogosApp({
     }
     setScreen((s) => dock(c.beside, s));
   }
+  /** Where the conversation is now: as it was put, or — never put — where the panel beside leaves it. */
+  const chatSideNow: ChatSide = chatSide ?? (screen.view === 'chat' && screen.beside ? 'left' : 'right');
+  /**
+   * The conversation put on a side from Split View or in words: kept, and — when it is not on screen
+   * beside the view — brought beside it, so the choice is seen. On the conversation's own view, with
+   * nothing beside, there is nothing to sit beside: the side waits for when there is.
+   */
+  function chatSideChosen(side: ChatSide): string {
+    putChatSide(side);
+    if (narrowRef.current) return `On a wider screen the conversation will sit on the ${side}.`;
+    const now = screenRef.current;
+    if (now.view !== 'chat' && now.beside !== 'chat') setScreen((s) => ({ ...s, beside: 'chat' }));
+    else if (now.view === 'chat' && !now.beside) return `The conversation will sit on the ${side} when it shares the screen.`;
+    return `The conversation is on the ${side} now.`;
+  }
   const l5Line = (
     <L5Layout
       view={studyTab}
@@ -7825,11 +7851,18 @@ export function LogosApp({
       onCloseBeside={() => setScreen((s) => ({ ...s, beside: null }))}
       // the composer, wherever the conversation is not on screen: what is said here is still said to Socria
       omni={convoOpen ? null : l5Dock}
+      omniTop={chatSide === 'top'}
       share={besideShare}
       onShare={(s) => {
         setBesideShare(s);
         writeBesideShare(browserStorage(), s);
       }}
+      // THE CONVERSATION, WHERE THEY PUT IT: dragged to an edge or a side pressed — left, right, top or bottom
+      side={besideSide(screen, chatSide)}
+      onSide={screen.view === 'chat' || screen.beside === 'chat' ? (side) => {
+        const at = chatSideFor(screen, side);
+        if (at) putChatSide(at);
+      } : undefined}
       narrow={narrow}
     />
   );
@@ -7881,7 +7914,7 @@ export function LogosApp({
       onNew={() => void newFromHome()}
       split={
         !narrow && activeId ? (
-          <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} />
+          <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} chatSide={chatSideNow} onChatSide={chatSideChosen} />
         ) : null
       }
       presence={
@@ -8270,7 +8303,22 @@ export function LogosApp({
           {...(!togetherReadOnly ? { onAddToMap: captureToMap } : {})}
         />
       )}
-      <LogosGuide open={guideOpen} onClose={closeGuide} edition={3} name="Logos 5" />
+      {/* WHAT SOCRIA DOES: short tutorials of the screen as it is, each with a way to try it now */}
+      <SocriaGuide
+        open={guideOpen}
+        onClose={closeGuide}
+        actions={{
+          onHome: goHome,
+          onNew: () => void newFromHome(),
+          onSearch: () => setSearchOpen(Date.now()),
+          ...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {}),
+          ...(limits.draftSpace ? { onWrite: openWriting } : {}),
+          ...(cloud ? { onMemory: () => setL5Mind(true) } : {}),
+        }}
+        writeIncluded={!!limits.draftSpace}
+        capture={LOGOS4.capture}
+        memory={cloud}
+      />
       {shareOpen && activeId && (
         <ShareDialog
           type="conversation"

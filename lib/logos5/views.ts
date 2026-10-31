@@ -285,3 +285,74 @@ export function writeBesideShare(storage: Pick<Storage, 'setItem'> | null | unde
     /* kept for this visit only */
   }
 }
+
+// ── where the conversation sits ──────────────────────────────────────
+//
+// When the conversation shares the screen with another view it docks on the
+// side the person put it — left, right, top or bottom — by dragging its panel
+// to an edge, from the buttons on its head, from Split View, or in words
+// ("put the chat on the left"). The choice is the conversation's: with it
+// beside, it is on that side; with it the view and something else beside, the
+// other goes to the far side, so the conversation stays where it was put.
+// Until a side is chosen the panel beside is on the right, as it always was.
+// A phone shows one view at a time, so there is nothing to place.
+
+export type Side = 'left' | 'right' | 'top' | 'bottom';
+export const SIDES: readonly Side[] = ['left', 'right', 'top', 'bottom'];
+export const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
+
+/** Where the panel beside the view docks, for where the conversation was put (null: never chosen). */
+export function besideSide(s: Screen, chat: Side | null): Side {
+  if (!chat || !s.beside) return 'right';
+  if (s.beside === 'chat') return chat;
+  if (s.view === 'chat') return OPPOSITE[chat];
+  return 'right';
+}
+
+/** Where the conversation is, once the panel beside is put on `side` — null when neither of the two is the conversation. */
+export function chatSideFor(s: Screen, side: Side): Side | null {
+  if (s.beside === 'chat') return side;
+  if (s.view === 'chat' && s.beside) return OPPOSITE[side];
+  return null;
+}
+
+/** The edge nearest a point on the body, given as fractions of its width and height: where a panel let go there docks. */
+export function nearestSide(fx: number, fy: number): Side {
+  const x = Math.min(1, Math.max(0, Number.isFinite(fx) ? fx : 0.5));
+  const y = Math.min(1, Math.max(0, Number.isFinite(fy) ? fy : 0.5));
+  const near: [Side, number][] = [
+    ['left', x],
+    ['right', 1 - x],
+    ['top', y],
+    ['bottom', 1 - y],
+  ];
+  return near.reduce((a, b) => (b[1] < a[1] ? b : a))[0];
+}
+
+/** The panel beside's share, from the divider dragged to a point: measured from the side it is docked on. */
+export function shareAt(side: Side, box: { left: number; top: number; width: number; height: number }, x: number, y: number): number {
+  const along =
+    side === 'left' ? (x - box.left) / box.width : side === 'right' ? (box.left + box.width - x) / box.width : side === 'top' ? (y - box.top) / box.height : (box.top + box.height - y) / box.height;
+  return clampShare(Number.isFinite(along) ? along : DEFAULT_BESIDE);
+}
+
+const CHAT_SIDE_KEY = 'socria.logos5.chatSide.v1';
+
+/** Where the person put the conversation, per browser; null until they have. */
+export function readChatSide(storage: Pick<Storage, 'getItem'> | null | undefined): Side | null {
+  try {
+    const v = storage?.getItem(CHAT_SIDE_KEY);
+    return v && (SIDES as readonly string[]).includes(v) ? (v as Side) : null;
+  } catch {
+    return null;
+  }
+}
+
+export function writeChatSide(storage: Pick<Storage, 'setItem' | 'removeItem'> | null | undefined, side: Side | null): void {
+  try {
+    if (side) storage?.setItem(CHAT_SIDE_KEY, side);
+    else storage?.removeItem(CHAT_SIDE_KEY);
+  } catch {
+    /* kept for this visit only */
+  }
+}

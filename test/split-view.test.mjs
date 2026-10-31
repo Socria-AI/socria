@@ -32,12 +32,25 @@ const html = (el) => renderToStaticMarkup(el);
 console.log('=== the shell: a view beside another, as its tab draws it ===');
 {
   const both = html(h(V.L5Layout, { view: 'chat', primary: h('p', null, 'THE THREAD'), beside: h('p', null, 'THE ARTIFACT'), besideView: 'artifacts', besideTitle: V.SPLIT_NAMES.artifacts, onCloseBeside: () => {}, omni: null, share: 0.4, onShare: () => {}, narrow: false }));
-  ok('two views side by side: the open one, and the one beside', both.includes('THE THREAD') && both.includes('THE ARTIFACT') && /class="l5v-body is-chat has-beside"/.test(both));
+  ok('two views side by side: the open one, and the one beside', both.includes('THE THREAD') && both.includes('THE ARTIFACT') && /class="l5v-body is-chat has-beside side-right"/.test(both));
   ok('  the pane beside is marked with its view, and titled as its tab is', /<aside class="l5v-beside is-artifacts" aria-label="Artifacts"/.test(both) && /class="l5v-beside-t">Artifacts</.test(both));
   ok('  it can be resized, and closed', /role="separator"/.test(both) && /aria-label="Close Artifacts"/.test(both));
   const phone = html(h(V.L5Layout, { view: 'chat', primary: h('p', null, 'THE THREAD'), beside: h('p', null, 'THE ARTIFACT'), besideView: 'artifacts', besideTitle: 'Artifacts', onCloseBeside: () => {}, omni: null, share: 0.4, onShare: () => {}, narrow: true }));
   ok('a phone shows one view: nothing beside', phone.includes('THE THREAD') && !phone.includes('THE ARTIFACT') && !/l5v-beside/.test(phone));
+  // WHERE THE CONVERSATION SITS: the panel beside on any edge, moved by its head or its four sides
+  const at = (side, extra = {}) => html(h(V.L5Layout, { view: 'artifacts', primary: h('p', null, 'THE ARTIFACT'), beside: h('p', null, 'THE THREAD'), besideView: 'chat', besideTitle: V.SPLIT_NAMES.chat, onCloseBeside: () => {}, omni: null, share: 0.4, onShare: () => {}, side, narrow: false, ...extra }));
+  ok('the panel beside docks on the edge it was put: left, right, top or bottom', ['left', 'right', 'top', 'bottom'].every((s) => new RegExp(`class="l5v-body is-artifacts has-beside side-${s}"`).test(at(s))));
+  ok('  docked top or bottom, the divider lies across and resizes up and down', /aria-orientation="horizontal"/.test(at('bottom')) && /aria-orientation="horizontal"/.test(at('top')) && /aria-orientation="vertical"/.test(at('left')));
+  const movable = at('left', { onSide: () => {} });
+  ok('  its head says it can be dragged to any edge', /class="l5v-beside-head is-movable"/.test(movable) && /title="Drag to any edge to move the conversation"/.test(movable) && /class="l5v-grip"/.test(movable));
+  ok('  and offers the four sides as buttons, the one it is on pressed', (movable.match(/class="l5v-side(?: is-on)?"/g) || []).length === 4 && /aria-pressed="true" aria-label="Put the conversation on the left"/.test(movable) && /aria-label="Put the conversation on the bottom"/.test(movable) && /role="group" aria-label="Where the conversation sits"/.test(movable));
+  ok('  a panel that cannot move has neither', !/is-movable|l5v-side|l5v-grip/.test(at('right')));
+  const top = html(h(V.L5Layout, { view: 'logic_map', primary: h('p', null, 'THE MAP'), beside: null, besideTitle: '', onCloseBeside: () => {}, omni: h('p', null, 'THE BOX'), omniTop: true, share: 0.4, onShare: () => {}, narrow: false }));
+  ok('the conversation put at the top: the composer floats at the top of a view', /class="l5v-body is-logic_map omni-top"/.test(top));
+  ok('  but a phone keeps its composer at the foot', !/omni-top/.test(html(h(V.L5Layout, { view: 'logic_map', primary: h('p', null, 'THE MAP'), beside: null, besideTitle: '', onCloseBeside: () => {}, omni: h('p', null, 'THE BOX'), omniTop: true, share: 0.4, onShare: () => {}, narrow: true }))));
   const css = read('components/logos5/l5v.css');
+  ok('  the order on the page never changes, only the direction — nothing re-mounts when it moves', /\.l5v-body\.side-left \{\s*flex-direction: row-reverse;/.test(css) && /\.l5v-body\.side-top \{\s*flex-direction: column-reverse;/.test(css) && !/key=\{side\}/.test(read('components/logos5/L5Views.tsx')));
+  ok('  it arrives from its new edge on the brand curve, and not at all with reduced motion', /@keyframes l5v-from-left/.test(css) && /cubic-bezier\(0\.16, 1, 0\.3, 1\)/.test(css) && /prefers-reduced-motion[\s\S]*side-left, \.side-right, \.side-top, \.side-bottom\) \.l5v-beside/.test(css));
   ok('the map and the thread beside scroll themselves, as they do as the view', /\.l5v-beside\.is-logic_map \.l5v-beside-body,\s*\.l5v-beside\.is-chat \.l5v-beside-body \{\s*overflow: hidden;/.test(css));
 }
 

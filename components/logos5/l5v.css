@@ -1081,3 +1081,305 @@
 .logos-root .l5 .l5-act {
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
 }
+
+/* ── where the conversation sits: the panel beside, on any edge ─────────
+   Left, right, top or bottom, as the person put it (lib/logos5/views.ts
+   besideSide). The order on the page never changes — the view, the divider,
+   the panel — only the direction they are laid in, so a move re-mounts
+   nothing: the thread keeps its place and the composer what is typed in it.
+   It arrives from its new edge the way ideas form: fast out, a long settle. */
+.l5v-body.side-left {
+  flex-direction: row-reverse;
+}
+.l5v-body.side-bottom {
+  flex-direction: column;
+}
+.l5v-body.side-top {
+  flex-direction: column-reverse;
+}
+.l5v-body.side-left .l5v-divider {
+  border-left: 0;
+  border-right: 1px solid var(--l5-hair);
+}
+.l5v-body:is(.side-top, .side-bottom) .l5v-divider {
+  cursor: row-resize;
+  border-left: 0;
+}
+.l5v-body.side-bottom .l5v-divider {
+  border-top: 1px solid var(--l5-hair);
+}
+.l5v-body.side-top .l5v-divider {
+  border-bottom: 1px solid var(--l5-hair);
+}
+.l5v-body:is(.side-top, .side-bottom) .l5v-beside {
+  min-width: 0;
+  min-height: 220px;
+}
+.l5v-body.side-right .l5v-beside {
+  animation: l5v-from-right 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.l5v-body.side-left .l5v-beside {
+  animation: l5v-from-left 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.l5v-body.side-top .l5v-beside {
+  animation: l5v-from-top 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.l5v-body.side-bottom .l5v-beside {
+  animation: l5v-from-bottom 0.55s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes l5v-from-right {
+  from {
+    opacity: 0;
+    transform: translateX(20px);
+  }
+}
+@keyframes l5v-from-left {
+  from {
+    opacity: 0;
+    transform: translateX(-20px);
+  }
+}
+@keyframes l5v-from-top {
+  from {
+    opacity: 0;
+    transform: translateY(-20px);
+  }
+}
+@keyframes l5v-from-bottom {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* its head: a grip, the name, the four sides, the close */
+.l5v-beside-t {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+}
+.l5v-beside-head.is-movable {
+  cursor: grab;
+  touch-action: none;
+  user-select: none;
+}
+.l5v-beside-head.is-movable:active {
+  cursor: grabbing;
+}
+.l5v-grip {
+  flex: none;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.38);
+}
+.l5v-beside-head.is-movable:hover .l5v-grip {
+  color: var(--lg-primary);
+}
+.l5v-beside-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.l5v-sides {
+  display: inline-flex;
+  align-items: center;
+  gap: 1px;
+  padding: 2px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 999px;
+}
+.l5v-side {
+  display: grid;
+  place-items: center;
+  width: 26px;
+  height: 22px;
+  padding: 0;
+  border: 0;
+  border-radius: 999px;
+  background: none;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background-color 0.2s;
+}
+.l5v-side:hover {
+  color: var(--lg-ink);
+}
+.l5v-side.is-on {
+  color: var(--lg-primary);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+}
+.l5v-side:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 1px;
+}
+
+/* dragged: the four edges marked, and the one it would dock on drawn where it would be */
+.l5v-body.is-docking {
+  cursor: grabbing;
+  user-select: none;
+}
+.l5v-body.is-docking .l5v-beside {
+  opacity: 0.5;
+  transition: opacity 0.2s;
+}
+.l5v-dock {
+  position: absolute;
+  inset: 0;
+  z-index: 60;
+  pointer-events: none;
+}
+.l5v-dock-zone {
+  position: absolute;
+  border-radius: 2px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.22);
+  transition: background-color 0.2s;
+}
+.l5v-dock-zone:is(.is-left, .is-right) {
+  top: 50%;
+  width: 3px;
+  height: 72px;
+  margin-top: -36px;
+}
+.l5v-dock-zone:is(.is-top, .is-bottom) {
+  left: 50%;
+  width: 72px;
+  height: 3px;
+  margin-left: -36px;
+}
+.l5v-dock-zone.is-left {
+  left: 6px;
+}
+.l5v-dock-zone.is-right {
+  right: 6px;
+}
+.l5v-dock-zone.is-top {
+  top: 6px;
+}
+.l5v-dock-zone.is-bottom {
+  bottom: 6px;
+}
+.l5v-dock-zone.is-aim {
+  background: var(--lg-primary);
+}
+.l5v-dock-ghost {
+  position: absolute;
+  display: grid;
+  place-items: center;
+  border: 1px solid var(--lg-primary);
+  border-radius: 14px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
+  animation: l5v-ghost 0.35s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.l5v-dock-ghost:is(.is-left, .is-right) {
+  top: 14px;
+  bottom: 14px;
+  width: calc(var(--beside) - 20px);
+}
+.l5v-dock-ghost:is(.is-top, .is-bottom) {
+  left: 14px;
+  right: 14px;
+  height: calc(var(--beside) - 20px);
+}
+.l5v-dock-ghost.is-left {
+  left: 14px;
+}
+.l5v-dock-ghost.is-right {
+  right: 14px;
+}
+.l5v-dock-ghost.is-top {
+  top: 14px;
+}
+.l5v-dock-ghost.is-bottom {
+  bottom: 14px;
+}
+.l5v-dock-ghost > span {
+  padding: 7px 12px;
+  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35);
+  border-radius: 999px;
+  background: var(--l5-surface, var(--lg-paper));
+  font-family: var(--lg-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--lg-primary);
+}
+@keyframes l5v-ghost {
+  from {
+    opacity: 0;
+  }
+}
+
+/* Split View's choice of side: four little screens, the conversation's edge marked */
+.l5v-menu-sides {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 4px;
+  padding: 2px 2px 4px;
+}
+.l5v-menu-side {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  padding: 8px 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  cursor: pointer;
+  transition:
+    color 0.2s,
+    background-color 0.2s,
+    border-color 0.2s;
+}
+.l5v-menu-side:hover {
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.04);
+  color: var(--lg-ink);
+}
+.l5v-menu-side.is-on {
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
+  color: var(--lg-primary);
+}
+.l5v-menu-side:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 1px;
+}
+
+/* the conversation put at the top: the composer floats at the top of a view, and its menus open downward */
+.l5v-body.omni-top .l5v-omni {
+  top: 12px;
+  bottom: auto;
+}
+.l5v-body.omni-top .l5v-primary:has(> .l5v-omni) {
+  --omni: 0px;
+}
+.l5v-body.omni-top .l5v-primary:has(> .l5v-omni) .l5v-primary-in {
+  padding-top: 92px;
+}
+.l5v-body.omni-top.is-logic_map .l5v-primary:has(> .l5v-omni) .l5v-primary-in {
+  padding-top: 0;
+}
+.l5v-body.omni-top.is-logic_map :is(.lg-viz-surface, .ws-model) {
+  padding-top: 92px;
+}
+.logos-root .l5v-body.omni-top .l5v-omni .l5-menu-list.is-up {
+  top: calc(100% + 6px);
+  bottom: auto;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .l5v-body:is(.side-left, .side-right, .side-top, .side-bottom) .l5v-beside,
+  .l5v-dock-ghost {
+    animation: none;
+  }
+  .l5v-side,
+  .l5v-menu-side,
+  .l5v-dock-zone {
+    transition: none;
+  }
+}

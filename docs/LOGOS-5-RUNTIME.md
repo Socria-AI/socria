@@ -1894,3 +1894,76 @@ them a given production failure was is not known. What a real provider
 returns for a given question is not measured. A live subject not named in
 `LIVE_SUBJECT` still searches only when asked as a lookup or about something
 dated; asking "look it up" always searches, policy permitting.
+
+## 24. The conversation on any side; Quick capture and "What Socria does", by the brand book
+
+The owner's words: "make the chatbox moveable to any side depending on user
+choice. improve the quick capture GUI and instead make the 'what logos does'
+into what socria does and show tutorials of socria. make it beautiful" — and,
+for anything drawn, the brand book (one green, two typefaces, hairlines; no
+gradients, no gold, no icon library; motion that settles).
+
+**The conversation on any side** (`lib/logos5/views.ts` `besideSide`,
+`chatSideFor`, `nearestSide`, `shareAt`, `readChatSide`/`writeChatSide`;
+`components/logos5/L5Views.tsx` `L5Layout`, `SideGlyph`; `l5v.css`). When the
+conversation shares the screen it docks on the side the person put it — left,
+right, top or bottom — kept per browser (`socria.logos5.chatSide.v1`). With it
+beside, it is on that side; with it the view and something else beside, the
+other goes to the far side, so the conversation stays where it was put; two
+other views beside each other keep the right. Never chosen, the panel beside
+is on the right, as it was. Four ways to put it: drag its header to any edge
+(the four edges are marked and a ghost shows where it would dock; Escape lets
+it go back), the four side buttons on its header, "The conversation sits" in
+Split View, or in words — "put the chat on the left", "move the conversation
+to the bottom" (`lib/logos5/commands.ts` `chat-side`, typed or spoken). Docked
+top or bottom the divider lies across and its arrow keys go up and down. The
+order on the page never changes, only the direction it is laid in, so a move
+re-mounts nothing: the thread keeps its place and the composer what is typed in
+it. It arrives from its new edge on the book's curve; with reduced motion,
+still. Put at the top, the composer that floats over a view while the
+conversation is away floats at the top too, its menus opening downward. A phone
+shows one view at a time: nothing to place.
+
+**Quick capture** (`components/CaptureInbox.tsx`, `capture-inbox.css`). The
+same inbox — account or device, the move into the account, photos read once,
+edit, delete, Think it through, Add to map, Use in message — set as a page of a
+notebook rather than a stack of cards: a micro-label over an ink rule, "Keep it
+for *later*." in Instrument Serif, the box the one white surface (in the app
+only the composer is white), what was kept in the serif under its day (Today,
+Yesterday, the date) and time as micro-labels, hairlines between, one way
+forward each in moss (Think it through →, the optional action's serif-italic
+link) and the rest as quiet words. Empty, it says the other way in: a message
+that starts "capture:" lands there, and nothing is sent. Its old rules are gone
+from `logos4.css`.
+
+**What Socria does** (`components/SocriaGuide.tsx`, `socria-guide.css`;
+replaces `LogosGuide.tsx`, whose walk through Logos 2 and 3 — the map, cards,
+"+ View", Draft — described a screen that is gone, and whose styles left
+`app/globals.css` with it). The ⋯ menu's "What Socria does · Short tutorials,
+one at a time" opens eleven tutorials of the screen as it is: the Universal
+Map, a line of thinking, the four views, Split View and the conversation on any
+side, Make, your own material, Write, Quick capture (only where it is on),
+search, voice and words, and Memory. Each is a spread — a roman numeral in moss
+italic and its name as a micro-label, a headline with one word in moss italic —
+with its working surface in miniature (played once, the last frame held; with
+reduced motion, only the last frame), three steps, the limit said with the
+capability (Voice is experimental and asks before what cannot be undone;
+Memory needs an account; Write is Socria One's where the plan does not have
+it), and where it can be, a way to try it now by the press it stands for. Set
+like the book's contents page: the tutorials numbered, a spine that fills with
+moss as you go; ← → Home End and Escape; a phone takes the whole screen with
+the contents a press away.
+
+**Checked.** `test/logos5-views.test.mjs` (the side rules, the nearest edge, the
+divider's share from each side, storage), `test/split-view.test.mjs` (the
+layout on each side, the head's grip and side buttons, the composer at the
+top), `test/socria-voice.test.mjs` (the sentences, and what is still Split View
+or a question), `test/socria-guide.test.mjs` (48: the menu, the tutorials and
+their claims, the guide drawn, the brand book in both sheets, Quick capture
+drawn). In the browser, desktop: a chart asked for docks the conversation on
+the right; its side buttons put it left, bottom and top, kept per browser;
+dragged to the right edge it docks there with the ghost shown; Split View's
+row puts it left; with Chat the view, Artifacts goes to the far side; "put the
+chat on the bottom" said. Quick capture and the guide on desktop, a 390px
+phone, Dark and Celestial, and reduced motion; "Open Quick capture" from its
+tutorial opens it and closes the guide.

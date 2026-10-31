@@ -12,6 +12,14 @@
 // on a deployment whose database has no captures table yet — they stay in
 // this browser, and the inbox says which. Captures left on the device are
 // moved into the account the next time it can take them.
+//
+// THE LOOK (the brand book): a page of a notebook, not a stack of cards. The
+// box is the one white surface — the composer is the only white in the app —
+// and what was kept is set in the serif, because it is something said, under
+// a micro-label for its day and time, with hairlines between. Each keeps one
+// way forward in moss (Think it through →, the optional action's serif-italic
+// link) and the rest as quiet words. Things arrive the way ideas form: fast
+// out, a long settle; with reduced motion, not at all.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -28,18 +36,37 @@ import {
 import { browserStorage } from '@/lib/logos4/resume';
 import { prepareImage, isImageFile } from '@/lib/logos-upload';
 import type { Attachment } from '@/lib/logos-attachments';
-import './logos4.css';
+import './capture-inbox.css';
 
 type Where = 'account' | 'device';
 
 const MOVE_BATCH = 20;
 
-const when = (ms: number) => {
+const when = (ms: number) => new Date(ms).toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' });
+
+/** The day a capture was kept, as a notebook heads its page: Today, Yesterday, or the date. */
+function dayOf(ms: number, now = Date.now()): string {
   const d = new Date(ms);
-  const today = new Date();
-  const sameDay = d.toDateString() === today.toDateString();
-  return sameDay ? d.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' }) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
-};
+  const t = new Date(now);
+  if (d.toDateString() === t.toDateString()) return 'Today';
+  const y = new Date(t.getFullYear(), t.getMonth(), t.getDate() - 1);
+  if (d.toDateString() === y.toDateString()) return 'Yesterday';
+  return d.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric', ...(d.getFullYear() === t.getFullYear() ? {} : { year: 'numeric' }) });
+}
+
+/** The captures under their days, in the order they are listed. */
+function byDay(list: Capture[]): { day: string; items: Capture[] }[] {
+  const out: { day: string; items: Capture[] }[] = [];
+  for (const c of list) {
+    const day = dayOf(c.createdAt);
+    const last = out[out.length - 1];
+    if (last?.day === day) last.items.push(c);
+    else out.push({ day, items: [c] });
+  }
+  return out;
+}
+
+const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '');
 
 async function call(method: string, body?: unknown): Promise<{ status: number; j: any }> {
   const r = await fetch('/api/captures', {
@@ -203,7 +230,7 @@ export function CaptureInbox({
       setList((l) => orderCaptures([c, ...l]));
       setText('');
       setPhoto(null);
-      setToast('Captured.');
+      setToast('Kept for later.');
       boxRef.current?.focus();
     } finally {
       setSaving(false);
@@ -242,23 +269,31 @@ export function CaptureInbox({
 
   if (!open) return null;
   const canSave = (!!text.trim() || !!photo?.attachment) && !saving && photo?.status !== 'reading';
+  const days = byDay(list);
+  let n = 0;
 
   return (
-    <div className="lg-cap-backdrop" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
-      <div ref={panelRef} className="lg-cap" role="dialog" aria-modal="true" aria-labelledby="lg-cap-title" tabIndex={-1}>
-        <div className="lg-cap-head">
-          <h2 id="lg-cap-title" className="lg-cap-title">
-            Quick Capture
+    <div className="qc-veil" onMouseDown={(e) => e.target === e.currentTarget && onClose()}>
+      <div ref={panelRef} className="qc" role="dialog" aria-modal="true" aria-labelledby="lg-cap-title" tabIndex={-1}>
+        <header className="qc-head">
+          <div className="qc-bar">
+            <p className="qc-lbl">
+              Quick capture
+              {list.length > 0 && <span>{list.length} kept</span>}
+            </p>
+            <button type="button" className="qc-x" aria-label="Close the inbox" onClick={onClose}>
+              ×
+            </button>
+          </div>
+          <h2 id="lg-cap-title" className="qc-title">
+            Keep it for <em>later</em>.
           </h2>
-          <button type="button" className="lg-cap-x" aria-label="Close the inbox" onClick={onClose}>
-            ×
-          </button>
-        </div>
-        <p className="lg-cap-where">
-          {where === 'account' ? 'Private to your account. Nothing here is sent or filed until you choose.' : signedIn ? 'Kept on this device for now — the account inbox isn’t available here yet.' : 'Kept on this device. Sign in to keep captures in your account.'}
-        </p>
+          <p className="qc-where">
+            {where === 'account' ? 'Private to your account. Nothing here is sent or filed until you choose.' : signedIn ? 'Kept on this device for now — the account inbox isn’t available here yet.' : 'Kept on this device. Sign in to keep captures in your account.'}
+          </p>
+        </header>
 
-        <div className="lg-cap-new">
+        <div className="qc-box">
           <textarea
             id="lg-cap-text"
             aria-label="A thought, a note, anything for later"
@@ -275,17 +310,21 @@ export function CaptureInbox({
             }}
           />
           {photo && (
-            <div className="lg-cap-pending">
+            <div className="qc-pending">
               {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="lg-cap-thumb" src={photo.thumb} alt="The photo to keep" />
-              <span className="grow">{photo.status === 'reading' ? 'Reading the photo…' : photo.status === 'error' ? photo.error : 'Photo ready.'}</span>
-              <button type="button" className="lg-cap-btn" onClick={() => setPhoto(null)}>
+              <img className="qc-thumb" src={photo.thumb} alt="The photo to keep" />
+              <span className="qc-pending-t">{photo.status === 'reading' ? 'Reading the photo…' : photo.status === 'error' ? photo.error : 'Photo ready.'}</span>
+              <button type="button" className="qc-quiet" onClick={() => setPhoto(null)}>
                 Remove
               </button>
             </div>
           )}
-          <div className="lg-cap-row">
-            <button type="button" className="lg-cap-btn" onClick={() => fileRef.current?.click()} disabled={!!photo}>
+          <div className="qc-row">
+            <button type="button" className="qc-photo" onClick={() => fileRef.current?.click()} disabled={!!photo}>
+              <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M4.5 8.5h3l1.6-2.5h5.8l1.6 2.5h3a1 1 0 0 1 1 1v8a1 1 0 0 1-1 1h-15a1 1 0 0 1-1-1v-8a1 1 0 0 1 1-1z" />
+                <circle cx="12" cy="13.5" r="3.2" />
+              </svg>
               Add photo
             </button>
             <input
@@ -300,105 +339,120 @@ export function CaptureInbox({
                 e.target.value = '';
               }}
             />
-            <span className="grow" />
-            <button type="button" className="lg-cap-btn is-primary" onClick={() => void save()} disabled={!canSave}>
+            <span className="qc-grow" />
+            <kbd className="qc-kbd" aria-hidden="true">
+              {isMac() ? '⌘' : 'Ctrl'} ↵
+            </kbd>
+            <button type="button" className="qc-save" onClick={() => void save()} disabled={!canSave}>
               {saving ? 'Saving…' : 'Save'}
             </button>
           </div>
         </div>
 
         {problem && (
-          <p className="lg-cap-note" role="alert">
+          <p className="qc-note" role="alert">
             {problem}
           </p>
         )}
         {toast && !problem && (
-          <p className="lg-cap-toast" role="status">
+          <p className="qc-toast" role="status" key={toast + list.length}>
             {toast}
           </p>
         )}
 
-        {loading ? (
-          <p className="lg-cap-empty">Opening the inbox…</p>
-        ) : list.length === 0 ? (
-          <p className="lg-cap-empty">Nothing captured yet. Whatever you save here waits until you’re ready for it.</p>
-        ) : (
-          <ul className="lg-cap-list" aria-label="Captures">
-            {list.map((c) => {
-              const isEditing = editing?.id === c.id;
-              const long = c.text.length > 220 || c.text.split('\n').length > 4;
-              return (
-                <li key={c.id} className="lg-cap-item">
-                  <div className="lg-cap-item-top">
-                    {c.attachment?.kind === 'image' && c.attachment.thumb && (
-                      // eslint-disable-next-line @next/next/no-img-element
-                      <img className="lg-cap-thumb" src={c.attachment.thumb} alt={c.attachment.reading ? `Photo: ${captureTitle(c)}` : 'Captured photo'} />
-                    )}
-                    <div className="lg-cap-item-body">
-                      {isEditing ? (
-                        <div className="lg-cap-edit">
-                          <textarea
-                            aria-label="Edit the capture"
-                            autoFocus
-                            value={editing.text}
-                            maxLength={MAX_CAPTURE_TEXT}
-                            onChange={(e) => setEditing({ id: c.id, text: e.target.value })}
-                          />
-                        </div>
-                      ) : (
-                        <p className={`lg-cap-item-text${long && expanded !== c.id ? ' is-clamped' : ''}`}>{c.text || captureTitle(c)}</p>
-                      )}
-                      <div className="lg-cap-item-meta">
-                        {when(c.createdAt)}
-                        {c.attachment?.kind === 'image' ? ' · photo' : ''}
-                        {long && !isEditing && (
-                          <>
-                            {' · '}
-                            <button type="button" className="lg-voice-link" onClick={() => setExpanded(expanded === c.id ? null : c.id)}>
+        <div className="qc-page">
+          {loading ? (
+            <p className="qc-opening">Opening the inbox…</p>
+          ) : list.length === 0 ? (
+            <div className="qc-empty">
+              <p className="qc-empty-h">Nothing kept yet.</p>
+              <p className="qc-empty-b">Whatever you save here waits until you’re ready for it.</p>
+              <p className="qc-empty-tip">
+                Or start a message with <q>capture:</q> anywhere in Socria — it lands here, and nothing is sent.
+              </p>
+            </div>
+          ) : (
+            <ul className="qc-list" aria-label="Captures">
+              {days.map((d) => (
+                <li key={d.day} className="qc-day">
+                  <h3 className="qc-day-h">{d.day}</h3>
+                  <ul className="qc-items">
+                    {d.items.map((c) => {
+                      const isEditing = editing?.id === c.id;
+                      const long = c.text.length > 220 || c.text.split('\n').length > 4;
+                      const delay = Math.min(n++, 8) * 40;
+                      return (
+                        <li key={c.id} className="qc-item" style={{ animationDelay: `${delay}ms` }}>
+                          <p className="qc-meta">
+                            <span>{when(c.createdAt)}</span>
+                            {c.attachment?.kind === 'image' && <span>Photo</span>}
+                          </p>
+                          <div className="qc-item-top">
+                            {c.attachment?.kind === 'image' && c.attachment.thumb && (
+                              // eslint-disable-next-line @next/next/no-img-element
+                              <img className="qc-thumb" src={c.attachment.thumb} alt={c.attachment.reading ? `Photo: ${captureTitle(c)}` : 'Captured photo'} />
+                            )}
+                            {isEditing ? (
+                              <textarea
+                                className="qc-edit"
+                                aria-label="Edit the capture"
+                                autoFocus
+                                value={editing.text}
+                                maxLength={MAX_CAPTURE_TEXT}
+                                onChange={(e) => setEditing({ id: c.id, text: e.target.value })}
+                              />
+                            ) : (
+                              <p className={`qc-text${long && expanded !== c.id ? ' is-clamped' : ''}`}>{c.text || captureTitle(c)}</p>
+                            )}
+                          </div>
+                          {long && !isEditing && (
+                            <button type="button" className="qc-quiet qc-more" onClick={() => setExpanded(expanded === c.id ? null : c.id)} aria-expanded={expanded === c.id}>
                               {expanded === c.id ? 'Less' : 'More'}
                             </button>
-                          </>
-                        )}
-                      </div>
-                    </div>
-                  </div>
-                  <div className="lg-cap-actions">
-                    {isEditing ? (
-                      <>
-                        <button type="button" className="lg-cap-btn is-primary" onClick={() => void saveEdit()}>
-                          Save
-                        </button>
-                        <button type="button" className="lg-cap-btn" onClick={() => setEditing(null)}>
-                          Cancel
-                        </button>
-                      </>
-                    ) : (
-                      <>
-                        <button type="button" className="lg-cap-btn" onClick={() => onNewThread(c)} title="Start a new line of thinking with this in the box — nothing is sent">
-                          Think it through
-                        </button>
-                        {onAddToMap && (
-                          <button type="button" className="lg-cap-btn" onClick={() => onAddToMap(c)}>
-                            Add to map
-                          </button>
-                        )}
-                        <button type="button" className="lg-cap-btn" onClick={() => onToComposer(c)} title="Put it in the message you’re writing — nothing is sent">
-                          Use in message
-                        </button>
-                        <button type="button" className="lg-cap-btn" onClick={() => setEditing({ id: c.id, text: c.text })}>
-                          Edit
-                        </button>
-                        <button type="button" className="lg-cap-btn is-danger" onClick={() => void remove(c)}>
-                          Delete
-                        </button>
-                      </>
-                    )}
-                  </div>
+                          )}
+                          <div className="qc-acts">
+                            {isEditing ? (
+                              <>
+                                <button type="button" className="qc-save is-small" onClick={() => void saveEdit()}>
+                                  Save
+                                </button>
+                                <button type="button" className="qc-quiet" onClick={() => setEditing(null)}>
+                                  Cancel
+                                </button>
+                              </>
+                            ) : (
+                              <>
+                                <button type="button" className="qc-go" onClick={() => onNewThread(c)} title="Start a new line of thinking with this in the box — nothing is sent">
+                                  Think it through <span aria-hidden="true">→</span>
+                                </button>
+                                <span className="qc-more-acts">
+                                  {onAddToMap && (
+                                    <button type="button" className="qc-quiet" onClick={() => onAddToMap(c)}>
+                                      Add to map
+                                    </button>
+                                  )}
+                                  <button type="button" className="qc-quiet" onClick={() => onToComposer(c)} title="Put it in the message you’re writing — nothing is sent">
+                                    Use in message
+                                  </button>
+                                  <button type="button" className="qc-quiet" onClick={() => setEditing({ id: c.id, text: c.text })}>
+                                    Edit
+                                  </button>
+                                  <button type="button" className="qc-quiet is-danger" onClick={() => void remove(c)}>
+                                    Delete
+                                  </button>
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </li>
+                      );
+                    })}
+                  </ul>
                 </li>
-              );
-            })}
-          </ul>
-        )}
+              ))}
+            </ul>
+          )}
+        </div>
       </div>
     </div>
   );
