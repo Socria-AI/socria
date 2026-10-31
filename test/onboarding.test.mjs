@@ -102,23 +102,19 @@ console.log('=== the first thought goes straight through ===');
   ok('  with the send, and the tour after it', /autoSend=\{autoSend\}/.test(chat) && /tourAfter=\{tourAfter\}/.test(chat));
   const app = read('components/LogosApp.tsx');
   ok('Logos sends it once there is a session', /if \(!autoSend \|\| autoSentRef\.current \|\| !initialInput \|\| hydrating \|\| busy \|\| !activeId\) return;/.test(app));
-  ok('  marked as the first thought, only for that send', /firstThoughtRef\.current = true;/.test(app) && /firstThoughtRef\.current = false;/.test(app) && /firstThoughtRef\.current \? \{ firstThought: true \}/.test(app));
-  ok('  and a spent month does not stop it on the client — the server decides', /chatsSpent && !firstThoughtRef\.current/.test(app));
-  ok('  the free answer says so, once, quietly', /X-Socria-First-Thought/.test(app) && /This one was on us/.test(app));
+  // The first thought is one of the month's conversations like any other now
+  // (the free first thought was retired with the other free-tier gifts,
+  // October 2026, docs/FREEMIUM.md): nothing marks it, nothing says it was free.
+  ok('  and it is not marked as a free first thought', !/firstThought/.test(app) && !/This one was on us/.test(app) && !/X-Socria-First-Thought/.test(app));
 }
 
-console.log('=== free once per account, kept by the server ===');
+console.log('=== the first thought is counted like any conversation ===');
 {
   const route = read('app/api/logos/chat/route.ts');
   const usage = read('lib/usage.ts');
-  ok('the claim is the client\'s, the once-ever is the server\'s', /body\?\.firstThought === true && !!userId && !\(await firstThoughtUsed\(userId\)\)/.test(route));
-  ok('  only for a turn that would be charged', /const firstThought = willCharge &&/.test(route));
-  ok('  it skips the month\'s allowance, nothing else', /if \(willCharge && !firstThought\) \{\s*const allowance = await checkAllowance/.test(route));
-  ok('  claimed atomically: only the increment that made it 1 is free', /return data === 1;/.test(usage) && /gifted = firstThought && \(await claimFirstThought\(userId\)\);\s*if \(!gifted\) await bumpUsage\(userId, 'chats'\);/.test(route));
-  ok('  lifetime, in its own scope — not the month', /const FIRST_THOUGHT_SCOPE = 'first-thought';/.test(usage));
-  ok('  an unreadable marker is no gift', /if \(error\) return true;/.test(usage) && /if \(error\) return false;/.test(usage));
-  ok('  the conversation is still marked counted, so continuing it is free as before', /if \(!gifted\) await bumpUsage\(userId, 'chats'\);\s*await markChatCounted\(userId, sessionId\);/.test(route));
-  ok('  and the header is sent only when it was really free', /\.\.\.\(gifted \? \{ 'X-Socria-First-Thought': '1' \} : \{\}\)/.test(route));
+  ok('the route reads no first-thought claim', !/firstThought/.test(route) && !/X-Socria-First-Thought/.test(route));
+  ok('  and charges a new conversation the one way, at the charge point', /claimUnit\(userId, plan, 'chats', sessionId \?\? `turn:\$\{Date\.now\(\)\}`\)/.test(route));
+  ok('the gift is gone from the usage module, its record kept as a note', !/export async function (firstThoughtUsed|claimFirstThought)/.test(usage) && /THE FIRST THOUGHT IS FREE/.test(usage));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

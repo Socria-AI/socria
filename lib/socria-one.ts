@@ -83,14 +83,14 @@ export function isOne(plan: Plan): boolean {
 // Written as capabilities of a thinking environment, not as quantities of
 // AI. Nobody is buying tokens here.
 //
-// WHAT IS DELIBERATELY ABSENT. This list used to lead with Full Thinking
-// Maps, all four depth modes, Research as often as needed and Draft Space.
-// The free tier has every one of those now, so naming them here would be
-// selling somebody a thing they are already using — the fastest way to teach
-// a person that the pricing page is not to be believed. What is left is what
-// is actually on the other side of the price: how MANY conversations and
-// messages — the free plan counts them by the day and the month — whom you
-// can think together with, and what Socria carries between them.
+// WHAT IS ON THE OTHER SIDE OF THE PRICE. Free and Socria One think the same
+// way — every depth, every lens, the same map and the same questions asked
+// back. What the free plan counts by the month (lib/entitlements.ts: its
+// conversations, Logic Maps and their nodes, artifacts and documents), One
+// does not; and two things are One's alone: Socria Voice and sharing your own
+// conversations. Each line below is one of those, and the suite holds them to
+// the table — a line that sold somebody what the free plan already gives
+// them would teach them the pricing page is not to be believed.
 
 export type OneFeature =
   | 'map'
@@ -102,33 +102,39 @@ export type OneFeature =
   | 'images'
   | 'conversations'
   | 'history'
-  | 'together';
+  | 'together'
+  | 'voice';
 
 export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = [
   {
     id: 'conversations',
-    title: 'No daily count',
-    blurb: 'as many messages as your thinking takes, and lines of thinking held only by a fair-use ceiling.',
+    title: 'Unlimited conversations',
+    blurb: 'as many lines of thinking as the month holds — nothing counted, nothing waiting for next month.',
+  },
+  {
+    id: 'map',
+    title: 'Unlimited Logic Maps',
+    blurb: 'every conversation mapped, with as many nodes as the thinking needs.',
+  },
+  {
+    id: 'draft',
+    title: 'Unlimited artifacts and documents',
+    blurb: 'make what the work needs, and bring in or write up as many documents as you have.',
+  },
+  {
+    id: 'voice',
+    title: 'Socria Voice',
+    blurb: 'talk instead of typing, and say what to do next out loud.',
+  },
+  {
+    id: 'together',
+    title: 'Share your conversations',
+    blurb: 'every chat and whole Projects, each with its map — sharing is part of Socria One.',
   },
   {
     id: 'history',
     title: 'It remembers how you reason',
     blurb: 'the durable things about your thinking, carried into each new one.',
-  },
-  {
-    id: 'map',
-    title: 'The thread between them',
-    blurb: 'what you are working through, held across conversations.',
-  },
-  {
-    id: 'together',
-    title: 'Think together on everything',
-    blurb: 'share every chat and whole Projects — the free plan shares one chat at a time.',
-  },
-  {
-    id: 'connections',
-    title: 'Connected context',
-    blurb: 'Drive, Docs, and Notion, when available.',
   },
 ];
 

@@ -1,5 +1,11 @@
 # Socria Rewards
 
+> **RETIRED (31 October 2026).** Rewards no longer grant Socria One: it is
+> paid for or it is not held (docs/FREEMIUM.md). The programme is off unless
+> `REWARDS_ENABLED=1`, and turning it on now would show a challenge and a
+> referral link promising days that open nothing — so leave it off. The rest
+> of this page is the record of how it worked; recorded reward rows are kept.
+
 > **Create 5 nodes. Get 7 days free.**
 > **Invite a friend. Give 7 days. Get 7 days.**
 

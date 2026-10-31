@@ -14,7 +14,7 @@ import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
 import { MathViz } from '@/components/MathViz';
 import { sanitizeViz, type VizScene } from '@/lib/logos-viz';
-import { COUNTER_SCOPE, PLANS, TIERED_COUNTERS, megabytes, type Counter } from '@/lib/entitlements';
+import { COUNTER_SCOPE, FEATURE_NAME, FEATURES, PLANS, TIERED_COUNTERS, megabytes, type Counter } from '@/lib/entitlements';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import type { ThinkingMap } from '@/lib/logos';
 import { ThinkingMap as ThinkingMapView } from '@/components/ThinkingMap';
@@ -168,7 +168,11 @@ export function DemoAdAs() {
 // daily counters (`core-chats`, `core-messages`; docs/ARCHIVE.md) have no
 // chat left to begin and no message left to send, so they are not rows.
 const COUNTER_LABEL: Partial<Record<Counter, string>> = {
-  chats: 'Lines of thinking begun',
+  chats: 'Conversations begun',
+  maps: 'Logic Maps drawn',
+  nodes: 'Logic Map nodes added',
+  artifacts: 'Artifacts made',
+  documents: 'Documents brought in or written',
   messages: 'Messages',
   explore: 'Explore, on a node',
   research: 'Research runs',
@@ -194,12 +198,20 @@ function cap(n: number | null): string {
  *
  * Where a cap exists at all it is a fair-use ceiling set where nobody working
  * seriously will meet it — so printing a bare "400" next to the free tier's
- * "2" invites the reader to compare two figures that mean different things,
- * and makes a plan sold as "without the limits" look metered. The number is
- * still shown, because hiding it would be the other kind of dishonest.
+ * "10" invites the reader to compare two figures that mean different things,
+ * and makes a plan sold as unlimited look metered. On a counter the plans
+ * differ on, One is "Unlimited", with the ceiling named beside it; elsewhere
+ * the number is shown, because hiding it would be the other kind of dishonest.
  */
-function oneCap(n: number | null): ReactNode {
-  if (n === null) return 'Uncapped';
+function oneCap(n: number | null, tiered = false): ReactNode {
+  if (n === null) return tiered ? 'Unlimited' : 'Uncapped';
+  if (tiered) {
+    return (
+      <>
+        Unlimited <span className="d-dim">fair use, {n}</span>
+      </>
+    );
+  }
   return (
     <>
       {n} <span className="d-dim">fair use</span>
@@ -212,6 +224,15 @@ export function DemoLimitsTable() {
   const one = PLANS.one;
   const counters = Object.keys(COUNTER_LABEL) as Counter[];
   const tiered = (c: Counter) => (TIERED_COUNTERS as readonly Counter[]).includes(c);
+  const row = (c: Counter) => (
+    <tr key={c}>
+      <td>
+        {COUNTER_LABEL[c] ?? c} <span className="d-dim">{PERIOD[COUNTER_SCOPE[c]]}</span>
+      </td>
+      <td>{tiered(c) ? cap(free.counters[c]) : oneCap(free.counters[c])}</td>
+      <td>{oneCap(one.counters[c], tiered(c))}</td>
+    </tr>
+  );
   return (
     <div className="d-tablewrap">
       <table>
@@ -226,26 +247,21 @@ export function DemoLimitsTable() {
           </tr>
         </thead>
         <tbody>
-          {/* Most rows below are the same on both sides, and that is the
-              table telling the truth rather than the table being lazy: what
-              Socria can do is the whole product on either plan. The rows that
-              differ — conversations and messages, by the day and the month —
-              are the ones Socria One is sold on. */}
-          {counters.map((c) => (
-            <tr key={c}>
-              <td>
-                {COUNTER_LABEL[c] ?? c}{' '}
-                <span className="d-dim">{PERIOD[COUNTER_SCOPE[c]]}</span>
-              </td>
-              <td>{tiered(c) ? cap(free.counters[c]) : oneCap(free.counters[c])}</td>
-              <td>{oneCap(one.counters[c])}</td>
+          {/* The first rows are the ones Socria One is sold on — what the
+              free plan counts by the month — and then the two features only
+              One includes. The rest are the same on both sides, and that is
+              the table telling the truth rather than the table being lazy:
+              what Socria can do inside a conversation is the whole product
+              on either plan. */}
+          {counters.filter(tiered).map((c) => row(c))}
+          {FEATURES.map((f) => (
+            <tr key={f}>
+              <td>{FEATURE_NAME[f].charAt(0).toUpperCase() + FEATURE_NAME[f].slice(1)}</td>
+              <td>{free.features[f] ? 'Included' : 'Not included'}</td>
+              <td>{one.features[f] ? 'Included' : 'Not included'}</td>
             </tr>
           ))}
-          <tr>
-            <td>Nodes a map grows to</td>
-            <td>{cap(free.mapNodes)}</td>
-            <td>{cap(one.mapNodes)}</td>
-          </tr>
+          {counters.filter((c) => !tiered(c)).map((c) => row(c))}
           <tr>
             <td>Lenses onto the map</td>
             <td>{free.lenses === null ? 'All of them' : cap(free.lenses)}</td>

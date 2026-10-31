@@ -85,7 +85,9 @@ export const DISPOSABLE_DOMAINS = [
 ];
 
 export function rewardsConfig(env: Env = typeof process !== 'undefined' ? (process.env as Env) : {}): RewardsConfig {
-  const enabled = env.REWARDS_ENABLED !== '0';
+  // Off unless switched on (REWARDS_ENABLED=1): promotional time no longer
+  // opens Socria One (October 31, 2026), so a reward would promise nothing.
+  const enabled = env.REWARDS_ENABLED === '1';
   const extra = (env.REWARDS_BLOCKED_EMAIL_DOMAINS || '')
     .split(',')
     .map((s) => s.trim().toLowerCase().replace(/^@/, ''))

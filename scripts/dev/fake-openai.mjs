@@ -65,9 +65,30 @@ function inlineReply(messages) {
     const title = about.charAt(0).toUpperCase() + about.slice(1);
     return `# ${title}\n\nNo single cause explains it; several pressures met at once, and each made the others more dangerous.\n\n## Alliances\n\nTwo blocs had promised to fight for each other, so a local quarrel could not stay local.\n\n## Militarism\n\nArms races and rigid mobilisation plans made speed decisive: whoever waited risked losing.\n\n## Nationalism\n\nNew nations and old empires each had a claim the others could not accept.\n\n## The spark\n\nAn assassination in Sarajevo gave all of it a reason to start.`;
   }
+  const ui = (o) => '```ui\n' + JSON.stringify(o) + '\n```';
+  // going deeper on one thread (lib/runtime/presentation.ts SHAPES.deeper): that thread, in parts that fold
+  if (sys.includes('they asked to go deeper on one thread')) {
+    return `The first five minutes have one job: get someone from a blank screen to a map of their own thinking, without ever showing them a tour.\n\n### The first minute\n\nThey land on one question — what are you working through? — with an example under it they can take or ignore. No feature list, no wall of options. Whatever they type starts a real conversation, so the first reply has to earn its place on its own: short, specific, and plainly about what they said.\n\n### The first map\n\nAfter two or three exchanges the Logic Map draws itself beside the conversation, from their own sentences. This is the moment the product explains itself: they see that Socria was listening for the structure of their thinking, not just answering. Name it in a line and let them move a card.\n\n### What to leave out\n\nViews, Artifacts, Memory and Voice can all wait until someone reaches for them. Each earns a one-line hint the first time it would help, never before. People who used the old Logos get one extra note on their first visit: where the things they relied on have moved.\n\nOnce that first map exists, the real question is what brings them back the next day — and that is retention more than onboarding.`;
+  }
   if (!sys.includes('INLINE, IF IT HELPS')) return null;
   const t = lastUser(messages);
-  const ui = (o) => '```ui\n' + JSON.stringify(o) + '\n```';
+  // an open piece of work (SHAPES.open): the problem that matters, one starting point, the ways onward
+  if (sys.includes('"type":"paths"')) {
+    return `The hard part isn't the screens — it's that Logos 5 asks people to think *with* it, and nobody arrives knowing how.\n\nSo I'd build onboarding around one first success instead of a tour: in the first few minutes someone brings a real question of their own, talks it through, and watches their reasoning come back as a Logic Map they didn't have to draw. Views, Artifacts and Memory can wait until they reach for them.\n\nA relaunch adds one wrinkle: people who learned the old Logos will look for what moved, so they need a different first minute from someone arriving cold.\n\n${ui({ type: 'paths', title: 'Where to take it', items: [
+      { label: 'Sketch the first five minutes', gist: 'Moment by moment, from landing to their first map.' },
+      { label: 'Returning users vs. new ones', gist: 'What each needs to see first, and what to leave out.' },
+      { label: "How you'd know it's working", gist: 'The few signals that show someone got it, before retention data exists.' },
+    ] })}`;
+  }
+  // a choice that is theirs (decide): what it rests on, a first reading, and no winner named
+  if (sys.includes('"type":"decide"')) {
+    return `It turns on what the first session is for: proof that Socria works, or proof that it works on *their* thinking.\n\n${ui({ type: 'decide', title: 'Guided example or their own question', options: ['Guided example', 'Their own question'], rows: [
+      { label: 'Time to a first map', scores: [3, 2], note: 'An example maps at once; their own takes two or three turns' },
+      { label: 'Shows what Logos is for', scores: [1, 3], note: 'Only their own thinking shows the point' },
+      { label: 'Works with nothing in mind', scores: [3, 1] },
+      { label: 'Feels like theirs, not a demo', scores: [1, 3] },
+    ] })}\n\nSay how much each of these matters to you and the leaning follows from that.`;
+  }
   if (sys.includes('"type":"chart"')) {
     const pairs = [...t.matchAll(/\b([A-Za-z][A-Za-z]{1,20}|[A-Za-z]\d{1,2})\s*[:=]?\s*\$?(\d[\d,]*(?:\.\d+)?)(k?)\b(?!\s*%)/g)]
       .filter((m) => !/^(?:at|of|is|was|are|and|or|my|the|a|over|for|on|in)$/i.test(m[1]))

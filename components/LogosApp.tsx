@@ -127,7 +127,7 @@ import { addCard as addDraftCard, emptyDoc, isEmptyDoc, type CardKind, type Writ
 import { normalizeDraft, storedFrom } from '@/lib/write/parse';
 import { describeWriting, type WriteSel } from '@/lib/write/focus';
 import type { AssistInput, AssistResult } from '@/lib/write/assist';
-import { boundaryNote, DIRECT_UPLOAD_BYTES, limitsFor, type Counter } from '@/lib/entitlements';
+import { boundaryNote, COUNTER_NOUN, COUNTERS, DIRECT_UPLOAD_BYTES, FEATURE_NOTE, limitsFor, nearLimit, type Counter } from '@/lib/entitlements';
 import { failureText, sendFailure } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import {
@@ -263,7 +263,8 @@ import { cleanUtterance, DEFAULT_VOICE, pickEngine, readControl, readVoiceSettin
 import { riskOf, type Risk } from '@/lib/voice/risk';
 import { SOCRIA_VOICE } from '@/lib/voice/flag';
 import { useEar, useSocriaVoice } from '@/components/logos5/useSocriaVoice';
-import { VoiceButton, VoiceOffNote, VoicePanel, VoiceSheet, type SheetKind, type VoiceConfirming, type VoiceOutcome, type VoiceQueued } from '@/components/logos5/SocriaVoice';
+import { VoiceButton, VoiceButtonView, VoiceOffNote, VoicePanel, VoiceSheet, type SheetKind, type VoiceConfirming, type VoiceOutcome, type VoiceQueued } from '@/components/logos5/SocriaVoice';
+import { withoutArtifacts, type Made } from '@/lib/quota-map';
 import { forgetMapBefore, recordChange } from '@/lib/map-history';
 import type { AskExperience, WorkspaceAction, WorkspaceResult } from '@/components/objects/figures';
 import { readViewRequest, viewSaid } from '@/lib/view-request';
@@ -491,6 +492,8 @@ export function LogosApp({
   const [planKnown, setPlanKnown] = useState(false);
   const [oneOpen, setOneOpen] = useState(false);
   const [oneReason, setOneReason] = useState<string | undefined>();
+  /** the sheet opened at a free limit, and says so first */
+  const [oneLimited, setOneLimited] = useState(false);
   // Research runs already spent, per session id.
   // What has actually been spent, as the SERVER counts it. The client used
   // to keep this itself and post it with each request, which meant the
@@ -576,10 +579,7 @@ export function LogosApp({
   }, [initialInput]);
   /** the Mind view in place of the map: how this chat connects to everything else */
   const [mindOpen, setMindOpen] = useState(false);
-  /** this send is onboarding's sentence — the one the server lets through free, once */
-  const firstThoughtRef = useRef(false);
-  /** …and the server let it through free: one quiet line under the answer says so */
-  const [gifted, setGifted] = useState(false);
+  /** this send is onboarding's sentence (no longer a gift: one of the month's conversations like any other) */
   const autoSentRef = useRef(false);
   const [drafts, setDrafts] = useState<Draft[]>([]);
   const [streaming, setStreaming] = useState('');
@@ -587,6 +587,11 @@ export function LogosApp({
   /** Socria is answering — as of now, not as of the last render (send sets it the moment a turn goes) */
   const busyRef = useRef(false);
   busyRef.current = busy;
+  /** the line of thinking the answer in flight belongs to — its Working and Stop are shown there, and only there */
+  const [busyFor, setBusyFor] = useState<string | null>(null);
+  const busyForRef = useRef<string | null>(null);
+  /** an answer is coming, in the line on screen (another line's answer shows there) */
+  const busyHere = busy && (!busyFor || busyFor === activeId);
   const [mapping, setMapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
   /** the error is a message that failed and is back in the box: it can be sent again from the error itself */
@@ -1189,16 +1194,13 @@ export function LogosApp({
   // ONBOARDING'S SENTENCE GOES STRAIGHT THROUGH. Written on /onboarding, it is
   // sent the moment there is a session to send it in — they should land on
   // Socria answering them, not on their own sentence waiting in a box. It is
-  // marked as the first thought, which the server lets through without
-  // spending one of the month's chats (once per account, kept on the server).
+  // one of the month's conversations like any other (the free first thought
+  // was retired with the other free-tier gifts, October 2026).
   useEffect(() => {
     if (!autoSend || autoSentRef.current || !initialInput || hydrating || busy || !activeId) return;
     autoSentRef.current = true;
     seeded.current = true;
-    firstThoughtRef.current = true;
-    void send(initialInput).finally(() => {
-      firstThoughtRef.current = false;
-    });
+    void send(initialInput);
     // send reads the state it needs when it runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSend, initialInput, hydrating, busy, activeId]);
@@ -1282,7 +1284,7 @@ export function LogosApp({
   }, [streaming, busy]);
   // THE END OF THE CONVERSATION STAYS IN VIEW for someone who is at it, whatever
   // changes size. Messages and streaming were followed; nothing else was. A note
-  // that arrives after the reply (the map's share note, "This one was on us"),
+  // that arrives after the reply (the map's share note),
   // a picture that finishes loading, the dock above the box growing — a reply
   // chip, a note, Voice's panel, the box itself as it is typed in — each left
   // the newest words below the fold behind "↓ Latest". Someone who scrolled up
@@ -1712,9 +1714,10 @@ export function LogosApp({
    * about whatever just stopped.
    */
   const askOne = useCallback(
-    (reason?: string) => {
+    (reason?: string, limited = false) => {
       if (plan === 'one') return; // a member is never sold to
       setOneReason(reason);
+      setOneLimited(limited);
       setOneOpen(true);
       track('one_prompt_shown', {
         trigger: 'asked',
@@ -1766,39 +1769,9 @@ export function LogosApp({
    * function never grants the plan to itself.
    */
   async function takeOne(typed: string): Promise<boolean> {
-    if (typed) {
-      // No local judgement: /api/logos/redeem checks the code against the
-      // server's environment and is the only thing that can grant One.
-      const ok = await fetch('/api/access/unlock', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: typed }),
-      })
-        .then((r) => (r.ok ? r.json().catch(() => null) : null))
-        .then((j) => j?.ok === true && j?.scope === 'one')
-        .catch(() => false);
-      if (!ok) return false;
-      // One code, whole product: the same key also opens the Core 3 / Logos
-      // access gate, so nobody unlocks One and then hits a second door.
-      setUnlocked(true);
-      try {
-        localStorage.setItem(KEY_STORAGE, '1');
-      } catch {}
-      // Redeem through the server too: signed in, the grant is written to the
-      // account and follows them to their next device. Fire-and-forget — the
-      // local unlock works either way, and syncPlan reconciles later.
-      void fetch('/api/logos/redeem', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ code: typed }),
-      }).catch(() => {});
-      setPlan('one');
-      setOneOpen(false);
-      try {
-        localStorage.setItem(ONE_KEY_STORAGE, '1');
-      } catch {}
-      return true;
-    }
+    // A typed code no longer opens Socria One (October 31, 2026): there is no
+    // field for one, and nothing here may grant the plan to itself.
+    if (typed) return false;
 
     setOneBusy(true);
     setOneError(null);
@@ -1946,6 +1919,44 @@ export function LogosApp({
   /** the shared-session sync for the active line of thinking (useSharedSession) */
   const togetherRef = useRef<ReturnType<typeof useSharedSession> | null>(null);
 
+  // ── WHICH VERSION OF EACH CONVERSATION THIS TAB HAS SEEN ───────────
+  //
+  // The server checks a save against the version it was made from
+  // (app/api/conversations PUT): a copy that is behind is merged rather than
+  // written over turns said since, and a conversation deleted elsewhere is
+  // not written back into existence. `savedAt` is that version, as last read
+  // or saved here; after a save the server had to merge, it is left where it
+  // was, so every save from this (still behind) copy is merged too, and
+  // nothing the other writer added is ever written away. `known`: rows this
+  // tab has had from the server, so a missing one is recognised as deleted.
+  const savedAtRef = useRef(new Map<string, number>());
+  const knownRef = useRef(new Set<string>());
+  // One save in flight per conversation, and the next one carries the latest
+  // state: two saves sent in the same moment used to land in either order,
+  // and the older one could erase the reply the newer one carried.
+  const saveChainRef = useRef(new Map<string, Promise<boolean | null>>());
+  const saveQueuedRef = useRef(new Map<string, Promise<boolean | null>>());
+  // switchSession is declared further down; this render's one, for the callbacks above it
+  const switchSessionRef = useRef<((id: string) => void) | null>(null);
+  switchSessionRef.current = (id: string) => switchSession(id);
+
+  /** A conversation the server no longer has — deleted on another tab or device — leaves this one too. */
+  const dropGone = useCallback(
+    (id: string) => {
+      const remaining = sessionsRef.current.filter((x) => x.id !== id);
+      if (remaining.length === sessionsRef.current.length) return;
+      applySessions(remaining.length ? remaining : [emptySession()]);
+      knownRef.current.delete(id);
+      savedAtRef.current.delete(id);
+      if (activeIdRef.current === id) {
+        const next = (remaining.length ? remaining : sessionsRef.current)[0];
+        if (next) switchSessionRef.current?.(next.id);
+        setError('That line of thinking was deleted somewhere else, so it was closed here.');
+      }
+    },
+    [applySessions]
+  );
+
   /** Save a session: true when it landed, false when it did not, null where this device does not save it as a row. */
   const persist = useCallback(
     async (s: LogosSession): Promise<boolean | null> => {
@@ -1972,22 +1983,57 @@ export function LogosApp({
         saveLocal(sessionsRef.current);
         return true;
       }
-      try {
-        const res = await fetch('/api/conversations', {
-          method: 'PUT',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ conversation: { ...s, kind: 'logos' } }),
+      const queued = saveQueuedRef.current.get(s.id);
+      if (queued) return queued;
+      const before = saveChainRef.current.get(s.id) ?? Promise.resolve(null);
+      const run: Promise<boolean | null> = before
+        .catch(() => null)
+        .then(async () => {
+          saveQueuedRef.current.delete(s.id);
+          // the latest state when this save goes, not the state when it was asked for
+          const latest = sessionsRef.current.find((x) => x.id === s.id) ?? s;
+          try {
+            const res = await fetch('/api/conversations', {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                conversation: { ...latest, kind: 'logos', base: savedAtRef.current.get(s.id) ?? null, known: knownRef.current.has(s.id) },
+              }),
+            });
+            if (res.status === 410) {
+              dropGone(s.id);
+              return false;
+            }
+            if (res.ok) {
+              const j = await res.json().catch(() => null);
+              knownRef.current.add(s.id);
+              if (j && typeof j.updatedAt === 'number' && !j.merged) savedAtRef.current.set(s.id, j.updatedAt);
+              // artifacts the month had no room for were not kept by the server: take them back here, and say why
+              const refusedArt = j?.refused?.artifacts as Made | undefined;
+              if (refusedArt) {
+                patchSession(s.id, (sn) => ({ ...sn, map: withoutArtifacts(sn.map ?? EMPTY_MAP, null, refusedArt) }), false);
+                if (s.id === activeIdRef.current) mapRef.current = withoutArtifacts(mapRef.current, null, refusedArt);
+                void refreshUsage(s.id);
+                if (!ask('artifacts-spent')) setError(String(j?.refused?.note || boundaryNote('artifacts')));
+              }
+              // the stored map changed: Socria Rewards reads progress from it (components/rewards/useRewards)
+              window.dispatchEvent(new Event(SESSION_SAVED));
+            }
+            return res.ok;
+          } catch {
+            // A failed save must never interrupt thinking. The session stays in
+            // memory and the next turn tries again.
+            return false;
+          }
         });
-        // the stored map changed: Socria Rewards reads progress from it (components/rewards/useRewards)
-        if (res.ok) window.dispatchEvent(new Event(SESSION_SAVED));
-        return res.ok;
-      } catch {
-        // A failed save must never interrupt thinking. The session stays in
-        // memory and the next turn tries again.
-        return false;
-      }
+      saveQueuedRef.current.set(s.id, run);
+      saveChainRef.current.set(s.id, run);
+      void run.finally(() => {
+        if (saveChainRef.current.get(s.id) === run) saveChainRef.current.delete(s.id);
+      });
+      return run;
     },
-    [cloud]
+    [cloud, dropGone]
   );
 
   /**
@@ -2146,6 +2192,12 @@ export function LogosApp({
                 projectId: typeof c.projectId === 'string' ? c.projectId : null,
                 updatedAt: Number(c.updatedAt) || 0,
               }));
+            // the version each one was read at — what a save from this tab is checked against
+            for (const c of json.conversations || []) {
+              if (typeof c?.id !== 'string') continue;
+              knownRef.current.add(c.id);
+              savedAtRef.current.set(c.id, Number(c.updatedAt) || 0);
+            }
           }
         } catch {
           // Fall through to an empty list rather than blocking the page.
@@ -2568,9 +2620,7 @@ export function LogosApp({
     try {
       localStorage.setItem(KEY_STORAGE, '1');
     } catch {}
-    // The One code opens everything at once, and a signed-in redemption is
-    // written to the account so it follows them.
-    if (scope === 'one') void takeOne(typed);
+    // (A `one` code once opened Socria One here too; it opens the site, like any other, now.)
     return true;
   }
 
@@ -2581,9 +2631,10 @@ export function LogosApp({
     // or a switch and a send — could resolve out of order and the older map
     // overwrote the newer, models included.
     const seq = ++mapSeqRef.current;
-    // What was SENT, so the echo can be told from news: the server hands the
-    // request-time workspace back unchanged when the turn proposed nothing.
-    const sentModels = JSON.stringify(mapRef.current.models ?? null);
+    // What was SENT. The person can go on editing while this runs — rename a
+    // card, mark one resolved, add one, move a slider — and the extractor saw
+    // none of it, so the answer is built from this, never from what is live.
+    const sentMap = mapRef.current;
     setMapping(true);
     void (async () => {
       try {
@@ -2603,8 +2654,27 @@ export function LogosApp({
             ...guidance(),
           }),
         });
+        // A free allowance stopped the map (lib/entitlements.ts): the map they
+        // have stays exactly as it is, and the boundary is said once, beside it.
+        if (res.status === 402) {
+          const body = await res.json().catch(() => ({}));
+          void refreshUsage(forSession);
+          const c = body?.upgrade === 'nodes' ? 'nodes' : 'maps';
+          if (forSession === activeIdRef.current && !ask(reasonForCounter(c))) setBuildNote(body?.error || boundaryNote(c));
+          return;
+        }
         if (res.ok) {
           const json = await res.json();
+          // the map grew as far as the month's allowance let it: said, never silent
+          if (json?.limit?.counter && forSession === activeIdRef.current) {
+            void refreshUsage(forSession);
+            const c = (COUNTERS as readonly string[]).includes(json.limit.counter) ? (json.limit.counter as Counter) : 'nodes';
+            if (!ask(reasonForCounter(c))) setBuildNote(String(json.limit.note || boundaryNote(c)).slice(0, 300));
+          }
+          // Checked as a stored map is when it is read back: what lands here is
+          // saved at once, and a malformed card would otherwise throw on every
+          // render — and on every reload after (lib/logos.ts sanitizeMap).
+          if (json?.map) json.map = sanitizeMap(json.map, { trust: 'stored' });
           // A map that arrives after the reader has moved on belongs to a
           // different line of thinking — drop it rather than cross the wires.
           if (json?.map && activeIdRef.current === forSession && seq === mapSeqRef.current) {
@@ -2642,19 +2712,11 @@ export function LogosApp({
                 cancelPending();
               }
             }
-            const delta = diffMaps(mapRef.current, json.map);
-            const liveIds = new Set(json.map.nodes.map((n: any) => n.id));
+            const before = mapRef.current;
+            // what landed, after the person's own edits were replayed onto it (set inside, synchronously)
+            let landed: TMap | null = null;
             patchActive((s) => {
-              // A node the extractor merged or dropped takes its id with it;
-              // grounding keyed on that id would linger invisibly. Only prune
-              // when the map genuinely has nodes (never on an empty blip).
               let contexts = s.contexts ?? {};
-              if (json.map.nodes.length) {
-                const kept = Object.fromEntries(
-                  Object.entries(contexts).filter(([id]) => liveIds.has(id))
-                );
-                if (Object.keys(kept).length !== Object.keys(contexts).length) contexts = kept;
-              }
               // A turn that produced no scene is not a request to remove the
               // one already on screen — the extractor simply had nothing new
               // to say about the picture. Carry it across, so a graph someone
@@ -2683,8 +2745,9 @@ export function LogosApp({
               // the extraction landed. The live workspace wins over an echo
               // of what was sent; a workspace the server changed wins over
               // both.
-              const echoed = JSON.stringify(json.map.models ?? null) === sentModels;
-              const models = echoed ? s.map?.models : json.map.models;
+              // The server says so when the turn changed the workspace
+              // (modelsChanged); anything else it sent back is the echo.
+              const models = json.modelsChanged ? json.map.models : s.map?.models;
               // THE LIVE OBJECTS WIN, too. An operation taken while the
               // extraction was in flight is the person's; the server may only
               // ADD an object, never roll one back (lib/objects/core.ts).
@@ -2698,7 +2761,20 @@ export function LogosApp({
               const map = bindNodes(unbound as TMap, s.messages.filter((m) => m.role === 'user').map((m) => m.content).join('\n'));
               // What the person took off stays off, whatever the extractor
               // made of a transcript that still mentions it (lib/map-edit.ts).
-              const kept = dropRemoved(map, s.map?.removed);
+              // AND WHAT THEY DID WHILE IT RAN STANDS. A rename, a status, a
+              // card added or taken off, a link drawn or cut while the
+              // extraction was in flight is replayed onto what it returned —
+              // the extractor never saw it, and must not undo it.
+              const kept = replayMapChange(dropRemoved(map, s.map?.removed), sentMap, s.map ?? sentMap, { personWins: true }).map;
+              // A node the extractor merged or dropped takes its id with it;
+              // grounding keyed on that id would linger invisibly. Pruned
+              // against what LANDED, so a card the person kept keeps what they
+              // attached to it; never on an empty blip.
+              if (kept.nodes.length) {
+                const liveIds = new Set(kept.nodes.map((n) => n.id));
+                const still = Object.fromEntries(Object.entries(contexts).filter(([id]) => liveIds.has(id)));
+                if (Object.keys(still).length !== Object.keys(contexts).length) contexts = still;
+              }
               // WHAT CHANGED, AND WHEN — kept for the Time Machine, with the
               // person's own words on the turn that changed it (lib/map-history.ts)
               const words = [...s.messages].reverse().find((m) => m.role === 'user')?.content;
@@ -2713,8 +2789,10 @@ export function LogosApp({
                   : kept;
               // when it was drawn: the Logic Map knows whether it is behind the conversation (lib/runtime/orchestrate.ts)
               const shown = { ...(history ? { ...drawn, history } : drawn), drawnAt: Date.now() };
+              landed = shown as TMap;
               return { ...s, map: shown, contexts };
             });
+            const delta = diffMaps(before, landed ?? json.map);
             setChanged(new Set(delta.changed));
             setDeltaNote(summarizeDelta(delta));
             // …and what the engine did with a model this turn proposed. A
@@ -3113,6 +3191,8 @@ export function LogosApp({
     // so the extractor knows which node the person was looking at.
     const marked: Msg = { role: 'user', content: `[on “${node.label}”] ${content}` };
     chronRef.current = [...chronRef.current, marked];
+    // the line of thinking this was asked in — its transcript, not whichever is open when the answer lands
+    const sid = activeIdRef.current;
 
     const payload = [...messages.slice(-8), ...nextThread];
 
@@ -3170,16 +3250,16 @@ export function LogosApp({
         }
       }
       acc = absorbRemember(acc);
-      applyVizOps(parseVizOps(acc, sentViz));
+      applyVizOps(parseVizOps(acc, sentViz), sid);
       acc = stripVizOps(acc);
       setFocusStream('');
       setThreads((t) => ({ ...t, [key]: [...nextThread, { role: 'assistant', content: acc }] }));
-      chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
+      if (sid === activeIdRef.current) chronRef.current = [...chronRef.current, { role: 'assistant', content: acc }];
     } catch (e: any) {
       setFocusStream('');
       setFocusError(e?.message || 'Something went wrong.');
       setThreads((t) => ({ ...t, [key]: prior }));
-      chronRef.current = chronRef.current.filter((m) => m !== marked);
+      if (sid === activeIdRef.current) chronRef.current = chronRef.current.filter((m) => m !== marked);
     } finally {
       setFocusBusy(false);
     }
@@ -3338,6 +3418,13 @@ export function LogosApp({
   function editMap(edits: MapEdit[]): string | null {
     const current = sessionsRef.current.find((x) => x.id === activeIdRef.current);
     if (!current) return null;
+    // THE FREE PLAN'S NODES (lib/entitlements.ts): ten a month across every map, the ones added by hand
+    // included. Past them, an addition is refused here, with the paywall; the rest of an edit is not.
+    const counting = !one && !!isSignedIn;
+    if (counting && edits.some((e) => e.op === 'add') && spentOf('nodes')) {
+      if (!ask('nodes-spent')) setError(boundaryNote('nodes'));
+      return null;
+    }
     const out = applyMapEdits(current.map, edits);
     if (!out.applied.length) {
       if (out.refused.length) setError(out.refused[0]);
@@ -3355,6 +3442,15 @@ export function LogosApp({
     const said = out.applied.map((a) => a.said).join(' ');
     const before = new Set(current.map.nodes.map((n) => n.id));
     const fresh = out.map.nodes.filter((n) => !before.has(n.id)).map((n) => n.id);
+    // …and what was added is taken from the month's allowance on the server (app/api/logos/allowance)
+    if (counting && fresh.length) {
+      void fetch('/api/logos/allowance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ counter: 'nodes', n: fresh.length }) })
+        .then((r) => {
+          if (r.status === 402) ask('nodes-spent');
+          void refreshUsage(current.id);
+        })
+        .catch(() => {});
+    }
     setChanged(new Set(out.applied.flatMap((a) => ('id' in a.edit ? [a.edit.id] : 'from' in a.edit ? [a.edit.from, a.edit.to] : fresh))));
     setDeltaNote(said);
     // Undo, said or typed, takes it back (undoNow); "that" and "another" mean what it touched (recentIdea)
@@ -3457,6 +3553,31 @@ export function LogosApp({
   }
 
   /**
+   * A turn that did not go, given back to the line of thinking that SENT it.
+   *
+   * On screen, its words go back in the box. Not on screen — the person has
+   * moved on while it was in flight — they are kept as that line's unsent
+   * message, to be there when it is opened again, and nothing of it is put in
+   * the box of the line they are in now: before, the failed question of one
+   * conversation appeared in another's box, and Try again answered it there.
+   */
+  function giveBack(sid: string | null, content: string, replying: ReplyRef | null, atts: readonly Attachment[] = []): boolean {
+    if (sid && sid !== activeIdRef.current) {
+      if (LOGOS4.resume) {
+        const store = browserStorage();
+        const was = readResume(store).views[sid];
+        const { at: _at, ...rest } = was ?? { at: 0 };
+        writeView(store, sid, { ...rest, draft: content, ...(replying ? { replyTo: replying } : {}) }, Date.now(), false);
+      }
+      return false;
+    }
+    setInput(content);
+    setReplyTo(replying);
+    if (atts.length) setDrafts((prev) => [...prev, ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const }))]);
+    return true;
+  }
+
+  /**
    * A line of thinking opens as this screen left it. On a switch, the
    * composer is its own (the one left kept its draft); on a reload, a draft
    * comes back only into an empty composer — never over a sentence onboarding
@@ -3556,7 +3677,17 @@ export function LogosApp({
   })();
 
   /** The objects of thought, written back into the active line of thinking. */
-  function commitObjects(space: ObjectSpace, touched?: ThoughtObject | null) {
+  function commitObjects(space: ObjectSpace, touched?: ThoughtObject | null): boolean {
+    // THE FREE PLAN'S ARTIFACTS (lib/entitlements.ts): a commit that would make a new artifact past
+    // the month's two is not made, and the paywall says why. Changing what is already there always
+    // goes through. The save holds the same line on the server (app/api/conversations holdArtifacts).
+    if (!one && isSignedIn && spentOf('artifacts')) {
+      const had = new Set(spaceOf(mapRef.current).objs.map((o) => o.id));
+      if (space.objs.some((o) => !had.has(o.id))) {
+        if (!ask('artifacts-spent')) setError(boundaryNote('artifacts'));
+        return false;
+      }
+    }
     // A 2 × 2 matrix whose plane picture is on screen: the picture is the
     // same object seen another way, so it follows the object — computed from
     // the new entries, never redrawn from a description.
@@ -3568,6 +3699,7 @@ export function LogosApp({
     }
     mapRef.current = { ...mapRef.current, objects: space, ...(viz ? { viz } : {}) };
     patchActive((s) => ({ ...s, map: { ...(s.map ?? EMPTY_MAP), objects: space, ...(viz ? { viz } : {}) } }));
+    return true;
   }
 
   /**
@@ -3948,8 +4080,15 @@ export function LogosApp({
       return;
     }
     // One answer at a time from this screen. Talking to the others never waits.
-    if (busy) {
-      if (group) setError('Socria is still answering — send this again in a moment.');
+    // Read at once (busyRef), not from the last render: two quick sends were
+    // both let through. And whatever asked for this send — the start box on
+    // the Universal Map, "move this to a new chat" — may already have cleared
+    // its own box, so the words go back where they can be seen and sent again
+    // rather than nowhere.
+    if (busyRef.current || busy) {
+      if (via !== 'voice') setInput(text);
+      const elsewhere = busyForRef.current && busyForRef.current !== activeIdRef.current;
+      setError(elsewhere ? 'Socria is still answering in another line of thinking — send this when it is done.' : 'Socria is still answering — send this again in a moment.');
       return;
     }
 
@@ -4116,16 +4255,11 @@ export function LogosApp({
     // prompts were never rationed, and the once-per-tab rule only holds
     // because this line keeps the promise the sheet used to.
     // Onboarding's sentence is exempt — the server decides whether it still is.
-    if (!one && chatsSpent && !firstThoughtRef.current && !messages.some((m) => m.role === 'user')) {
+    // (The month's conversations are the only count a turn can meet now: there
+    // is no day's count of messages, and onboarding's first thought is one of
+    // the month's conversations like any other — October 31, 2026.)
+    if (!one && chatsSpent && !messages.some((m) => m.role === 'user')) {
       if (!ask('chats-spent')) setError(boundaryNote('chats'));
-      return;
-    }
-    // The day's messages are spent: the same reasoning, for every turn that
-    // would go to Socria. A command to the map or the scene never reaches
-    // here — those spend nothing — and neither does a word said to the others
-    // in a group. The count can be a turn stale; the server holds the line.
-    if (!one && messagesSpent && !firstThoughtRef.current) {
-      if (!ask('messages-spent')) setError(boundaryNote('messages'));
       return;
     }
     // A GUEST: their one line of thinking, claimed before its first turn (lib/guest-pass.ts). Words
@@ -4215,6 +4349,8 @@ export function LogosApp({
     const next = sessionsRef.current.find((x) => x.id === sid)?.messages ?? [...before, sent];
     chronRef.current = [...chronRef.current, sent];
     setBusy(true);
+    setBusyFor(sid);
+    busyForRef.current = sid;
     // at once, not at the next render: a spoken turn after this one waits for the answer (onVoiceTurn)
     busyRef.current = true;
     setStreaming('');
@@ -4267,10 +4403,8 @@ export function LogosApp({
     /** stopped before a word arrived: the turn is taken back, unsent */
     const takeBack = () => {
       patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
-      chronRef.current = withoutTurn(chronRef.current, sent);
-      setInput(content);
-      setReplyTo(replying);
-      if (atts.length) setDrafts((prev) => [...prev, ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const }))]);
+      if (sid === activeIdRef.current) chronRef.current = withoutTurn(chronRef.current, sent);
+      giveBack(sid, content, replying, atts);
     };
     try {
       const res = await fetch('/api/logos/chat', {
@@ -4333,9 +4467,6 @@ export function LogosApp({
           ...(workspaceOn && cloud && !shared
             ? { mind: true, ...(active?.projectId ? { projectId: active.projectId } : {}) }
             : {}),
-          // the sentence onboarding sent for them: free, once per account
-          // (the server keeps the once — lib/usage.ts firstThoughtUsed)
-          ...(firstThoughtRef.current ? { firstThought: true } : {}),
           ...(objTurn.lastStep ? { objectStep: objTurn.lastStep } : {}),
           ...(objTurn.refused ? { objectRefused: objTurn.refused } : {}),
           ...(objTurn.claims.length ? { objectClaims: objTurn.claims } : {}),
@@ -4362,14 +4493,20 @@ export function LogosApp({
         void refreshUsage(activeIdRef.current);
         if (!group) {
           patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
-          chronRef.current = withoutTurn(chronRef.current, sent);
-          setInput(content);
-          setReplyTo(replying);
+          if (sid === activeIdRef.current) chronRef.current = withoutTurn(chronRef.current, sent);
+          giveBack(sid, content, replying);
         }
         setBusy(false);
         // Same rule as the pre-flight above: the sheet once, then in place —
         // for whichever boundary the server named.
-        const reached: Counter = body?.upgrade === 'messages' ? 'messages' : 'chats';
+        // Which allowance stopped it, as the server named it — a conversation, a document — or a
+        // feature only Socria One has; each raises its own prompt (lib/one-prompt.ts).
+        const up = typeof body?.upgrade === 'string' ? body.upgrade : 'chats';
+        if (up === 'voice' || up === 'share') {
+          if (!ask(up === 'voice' ? 'voice-locked' : 'share-locked')) setError(body?.error || FEATURE_NOTE[up as 'voice' | 'share']);
+          return;
+        }
+        const reached: Counter = (COUNTERS as readonly string[]).includes(up) ? (up as Counter) : 'chats';
         if (!ask(reasonForCounter(reached))) setError(body?.error || boundaryNote(reached));
         return;
       }
@@ -4378,9 +4515,8 @@ export function LogosApp({
         if (body?.guestLimit) {
           guestClaimRef.current = null;
           patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
-          chronRef.current = withoutTurn(chronRef.current, sent);
-          setInput(content);
-          setReplyTo(replying);
+          if (sid === activeIdRef.current) chronRef.current = withoutTurn(chronRef.current, sent);
+          giveBack(sid, content, replying);
           setBusy(false);
           setGuestWall(true);
           return;
@@ -4404,12 +4540,9 @@ export function LogosApp({
       // ...and it was one of the day's messages: the count is re-read, so the
       // next send knows where the free day stands before it goes.
       if (!one) void refreshUsage(activeIdRef.current);
-      // The server says when this was onboarding's free first thought, so the
-      // free plan's count can be read honestly under the answer.
-      if (res.headers.get('X-Socria-First-Thought') === '1') {
-        setGifted(true);
-        void refreshUsage(activeIdRef.current);
-      }
+      // A write-up they asked to keep, answered in the conversation because the
+      // month's document is spent: the words come, and the boundary is said.
+      if (res.headers.get('X-Socria-Limit') === 'documents' && !ask('documents-spent')) setError(boundaryNote('documents'));
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -4421,7 +4554,8 @@ export function LogosApp({
             const { done, value } = await reader.read();
             if (done) break;
             acc += decoder.decode(value, { stream: true });
-            setStreaming(visibleStream(acc));
+            // the answer streams where it was asked; another line on screen shows its own
+            if (sid === activeIdRef.current) setStreaming(visibleStream(acc));
           }
         } catch (e) {
           if ((e as Error)?.name !== 'AbortError') throw e;
@@ -4458,7 +4592,11 @@ export function LogosApp({
       // through the room's record, which is what puts it on both screens.
       if (inShared) roomRef.current.onLocalReply(reply);
       else patchSession(sid, (s) => ({ ...s, messages: landReply(s.messages, sent, reply) }));
-      chronRef.current = [...chronRef.current, reply];
+      // The transcript the map is drawn from is the line ON SCREEN. A reply
+      // that lands after the person moved on is in its own session above, and
+      // is read back from there when that line is opened (switchSession);
+      // appended here, it was drawn into the other line's Logic Map.
+      if (sid === activeIdRef.current) chronRef.current = [...chronRef.current, reply];
       if (u && u.entries.length) recurrenceSaidRef.current.add(sid);
       // A thought completed. The proactive check runs from an effect rather
       // than here, so it sees the map this turn produced instead of the one
@@ -4548,24 +4686,21 @@ export function LogosApp({
         // Said to everyone already; only Socria's answer failed. Ask again with @socria.
         setError(`${sendFailure(e, { online, kept: false })} Your message is posted — mention @socria to ask again.`);
       } else {
-        setError(sendFailure(e, { online }));
-        setRetryable(true);
         // The turn that never landed, taken out by its own name — whatever
-        // else arrived meanwhile stays.
+        // else arrived meanwhile stays — and given back to its own line,
+        // attachments and all. The failure and its Try again are said only
+        // where they can be acted on: in the line that sent it.
         patchSession(sid, (s) => ({ ...s, messages: withoutTurn(s.messages, sent) }), false);
-        chronRef.current = withoutTurn(chronRef.current, sent);
-        setInput(content);
-        setReplyTo(replying);
-        // Hand the attachments back so a failed turn doesn't lose them.
-        if (atts.length) {
-          setDrafts((prev) => [
-            ...prev,
-            ...atts.map((a, i) => ({ ...a, id: `re_${Date.now()}_${i}`, status: 'ready' as const })),
-          ]);
+        if (sid === activeIdRef.current) chronRef.current = withoutTurn(chronRef.current, sent);
+        if (giveBack(sid, content, replying, atts)) {
+          setError(sendFailure(e, { online }));
+          setRetryable(true);
         }
       }
     } finally {
       setBusy(false);
+      setBusyFor(null);
+      busyForRef.current = null;
       setTurnInfo(null);
       togetherRef.current?.asking(false);
       if (abortRef.current === ctrl) abortRef.current = null;
@@ -4596,6 +4731,9 @@ export function LogosApp({
 
   /** Stop the answer that is arriving (Logos 5). */
   function stopAnswer() {
+    // Stop is offered only where the answer is coming; from anywhere else it
+    // would stop an answer the person cannot see, in another line of thinking.
+    if (busyForRef.current && busyForRef.current !== activeIdRef.current) return;
     abortRef.current?.abort();
   }
 
@@ -4844,7 +4982,10 @@ export function LogosApp({
   // take something away or reach beyond this conversation (lib/voice/risk.ts),
   // several commands said as one ("open the Logic Map, then add a branch
   // called cost"), and dictation into the writing.
-  const voiceAllowed = l5 && SOCRIA_VOICE && hasAccess && !togetherReadOnly;
+  // Socria Voice is Socria One's (lib/entitlements.ts features.voice): the engine runs only there; on the
+  // free plan the button stays where it is and opens the paywall instead (voiceLocked, below)
+  const voiceAllowed = l5 && SOCRIA_VOICE && hasAccess && !togetherReadOnly && one;
+  const voiceLocked = l5 && SOCRIA_VOICE && hasAccess && !togetherReadOnly && !one;
   /** what search opens with, when it was asked for in words ("search for rent") */
   const [searchFor, setSearchFor] = useState('');
   const [voiceSet, setVoiceSet] = useState<VoiceSettings>(DEFAULT_VOICE);
@@ -5483,7 +5624,17 @@ export function LogosApp({
     changeVoiceSettings({ ...voiceSetRef.current, engine });
     ear?.start(engine);
   }
-  const voiceButton = voiceOffered ? <VoiceButton ear={ear} onPress={pressVoice} /> : null;
+  const voiceButton = voiceOffered ? (
+    <VoiceButton ear={ear} onPress={pressVoice} />
+  ) : voiceLocked ? (
+    <VoiceButtonView
+      phase="off"
+      locked
+      onPress={() => {
+        if (!ask('voice-locked')) askOne(FEATURE_NOTE.voice);
+      }}
+    />
+  ) : null;
   const voicePanel = (floating: boolean) =>
     ear && voiceOn ? (
       <VoicePanel
@@ -5727,7 +5878,7 @@ export function LogosApp({
     if (!a) return;
     const made = makeDisplay(space, a.kind, a.state, 'socria');
     if (!made.ok) return setError(made.says);
-    commitObjects(made.space, objOf(made.space, made.obj.id));
+    if (!commitObjects(made.space, objOf(made.space, made.obj.id))) return;
     keepInline(msg, n, { artifact: made.obj.id });
     showObject(made.obj.id);
   }
@@ -7329,22 +7480,30 @@ export function LogosApp({
       ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
       : []),
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
-    ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
+    ...(!one ? [{ label: 'Socria One', hint: 'Unlimited, with Voice and sharing', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
   ];
-  // The meter, only when it is about to matter: at three or fewer left, or at the limit.
+  // The meter, only when it is about to matter: the free allowance closest to
+  // its end, said once and quietly — the last two of ten, the last of two —
+  // with the way past it beside it. A conversation not yet begun is asked
+  // about conversations first; one under way, about its map and what it makes.
   const l5Meter = (() => {
-    if (one || !usage.chats) return null;
-    const chatsLeft = Math.max(0, (usage.chats.limit ?? 0) - usage.chats.used);
-    const msgsLeft = usage.messages?.limit != null ? Math.max(0, usage.messages.limit - usage.messages.used) : null;
-    const low = (msgsLeft !== null && msgsLeft <= 3) || (messages.length === 0 && chatsLeft <= 1);
-    if (!low) return null;
+    if (one || !isSignedIn) return null;
+    const order: Counter[] = messages.length === 0 ? ['chats', 'maps', 'nodes', 'artifacts', 'documents'] : ['nodes', 'maps', 'artifacts', 'documents', 'chats'];
+    const near = order.find((c) => {
+      const u = usage[c];
+      return !!u && u.limit !== null && (u.used >= u.limit || nearLimit('free', c, u.used));
+    });
+    if (!near) return null;
+    const u = usage[near]!;
+    const limit = u.limit ?? 0;
+    const left = Math.max(0, limit - u.used);
+    const noun = COUNTER_NOUN[near] ?? { one: near, many: near };
     return (
-      <p className={`l5-meter${msgsLeft === 0 ? ' is-out' : ''}`} role="note">
-        {msgsLeft !== null && (msgsLeft === 0 ? 'No free messages left today.' : `${msgsLeft} free ${msgsLeft === 1 ? 'message' : 'messages'} left today.`)}
-        {messages.length === 0 && ` ${chatsLeft} of ${usage.chats.limit} new lines of thinking left this month.`}{' '}
-        <button type="button" className="l5-link" onClick={() => askOne()}>
-          Socria One
+      <p className={`l5-meter${left === 0 ? ' is-out' : ''}`} role="note">
+        {left === 0 ? `You’ve used all ${limit} free ${limit === 1 ? noun.one : noun.many} this month.` : `${left} of ${limit} free ${limit === 1 ? noun.one : noun.many} left this month.`}{' '}
+        <button type="button" className="l5-link" onClick={() => askOne(left === 0 ? boundaryNote(near) : undefined, left === 0)}>
+          Unlimited with Socria One
         </button>
       </p>
     );
@@ -7498,10 +7657,10 @@ export function LogosApp({
         drafts={drafts}
         setDrafts={setDrafts}
         onSend={sendFromStudy}
-        busy={busy}
+        busy={busyHere}
         // sent, and nothing has arrived yet: the button spins and nothing more is sent (alone; in a
         // group the others can still be talked to while Socria answers)
-        waiting={busy && !streaming && !groupLive}
+        waiting={busyHere && !streaming && !groupLive}
         onStop={stopAnswer}
         readImage={readImage}
         readDocument={readDocument}
@@ -7511,7 +7670,7 @@ export function LogosApp({
         group={groupLive}
         about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
         onClearAbout={clearAbout}
-        voice={LOGOS4.voice && hasAccess && !togetherReadOnly}
+        voice={LOGOS4.voice && hasAccess && !togetherReadOnly && one}
         voiceButton={voiceButton}
         voiceLive={voiceOn}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
@@ -7912,7 +8071,7 @@ export function LogosApp({
                 onShowNodes={showNodes}
                 onOpenObject={showObject}
                 {...(m.role === 'assistant' && m.id && !togetherReadOnly
-                  ? { onInline: keepInline, onOpenInline: openInline, ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
+                  ? { onInline: keepInline, onOpenInline: openInline, ...(solo && !busy ? { onExplore: chooseInline } : {}), ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
                   : {})}
                 writeUp={writeUp}
                 onOpenContent={openContent}
@@ -7947,18 +8106,7 @@ export function LogosApp({
           <SocriaAnswering names={answeringOthers} />
           {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} />}
           {synthBusy && <SynthesisPending scope={synthBusy} />}
-          {busy && !streaming && (groupView ? <L5Pending text="" group to="You" /> : <L5Working steps={workingSteps} onStop={stopAnswer} />)}
-          {gifted && !busy && !one && (
-            <p className="l5-note" role="note">
-              This one was on us.{' '}
-              {usage.chats?.limit != null
-                ? (() => {
-                    const left = Math.max(0, usage.chats.limit - usage.chats.used);
-                    return `You still have ${left} free Logos ${left === 1 ? 'chat' : 'chats'} this month.`;
-                  })()
-                : 'Your free Logos chats this month are all still there.'}
-            </p>
-          )}
+          {busyHere && !streaming && (groupView ? <L5Pending text="" group to="You" /> : <L5Working steps={workingSteps} onStop={stopAnswer} />)}
           {error && (
             <p className="l5-error" role="alert">
               {error}
@@ -8702,6 +8850,7 @@ export function LogosApp({
         onClose={() => setOneOpen(false)}
         onUnlock={takeOne}
         reason={oneReason}
+        limited={oneLimited}
         busy={oneBusy}
         error={oneError}
       />
@@ -8721,6 +8870,7 @@ export function LogosApp({
         }}
         busy={oneBusy}
         error={oneError}
+        usage={usage}
       />
 
       <ConnectionsModal

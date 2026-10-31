@@ -9,9 +9,8 @@
 // beside the button.
 //
 // THE BUTTON TELLS THE TRUTH ABOUT WHAT YOU HOLD. A member is shown the way
-// in, not sold what they already have. Socria One from a reward alone is not
-// a membership: the button still sells it, and says what becomes of the
-// reward's days (saved, not lost — lib/rewards/promo-engine.ts).
+// in, not sold what they already have. (Socria One from a reward, a code or
+// a student month is no longer given, so there is no third case to explain.)
 
 import { useCallback, useState } from 'react';
 import Link from 'next/link';
@@ -23,8 +22,7 @@ export function OneJoin({ place }: { place: 'mast' | 'cover' | 'join' }) {
   const plan = usePlan();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
-  const fromReward = plan.known && plan.plan === 'one' && !!plan.promo?.only;
-  const isOne = plan.known && plan.plan === 'one' && !fromReward;
+  const isOne = plan.known && plan.plan === 'one';
 
   const subscribe = useCallback(async () => {
     if (busy) return;
@@ -91,7 +89,6 @@ export function OneJoin({ place }: { place: 'mast' | 'cover' | 'join' }) {
     );
   }
 
-  const days = plan.promo?.daysLeft ?? 0;
   return (
     <div>
       <button type="button" className={size} onClick={subscribe} disabled={busy}>
@@ -100,12 +97,6 @@ export function OneJoin({ place }: { place: 'mast' | 'cover' | 'join' }) {
       {err && (
         <p className="s-pill-err" role="alert">
           {err}
-        </p>
-      )}
-      {fromReward && plan.promo && (
-        <p className="s-one-note">
-          You have Socria One from Socria Rewards for {days} more {days === 1 ? 'day' : 'days'}. Subscribing keeps it
-          — and the days still to come are saved, not lost.
         </p>
       )}
     </div>

@@ -218,7 +218,8 @@ console.log('\n=== the day is a namespace of its own ===');
     { counter: 'messages', scope: MONTH, n: 99 },
   ];
   const out = foldUsageRows(rows, MONTH, CHAT, DAY);
-  ok('the day is read from the day', out.messages === 7 && out['core-messages'] === 19 && out['core-chats'] === 3, JSON.stringify(out));
+  // Core's own counters were retired (October 31, 2026): rows under those names speak for nothing, like any unknown counter
+  ok('the day is read from the day, and retired counters are skipped', out.messages === 7 && !('core-messages' in out) && !('core-chats' in out), JSON.stringify(out));
   ok('  and the month from the month', out.chats === 1);
   const same = (a, b) => JSON.stringify(Object.entries(a).sort()) === JSON.stringify(Object.entries(b).sort());
   ok('  in either order', same(foldUsageRows([...rows].reverse(), MONTH, CHAT, DAY), out));

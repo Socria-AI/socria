@@ -10,8 +10,9 @@
 //
 // It decides nothing. Every change is a request to /api/share, which checks
 // the role and the plan on the server; this only draws what came back — and
-// that includes the free plan's one shared chat: the server says whether this
-// owner may open a door here, and if not, which chat they already share.
+// that includes the plan: sharing your own conversations is part of Socria
+// One, so the server says whether this owner may open a door here, and if not,
+// why. Joining what somebody else shares is free on every plan.
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import {
@@ -187,15 +188,8 @@ export function ShareDialog({
                 {state.sharing && (
                   <a className="sh-btn ghost" href={state.sharing.open}>Open “{state.sharing.title || 'Untitled'}”</a>
                 )}
-                {onUpgrade && <button className="sh-btn" onClick={onUpgrade}>Get Socria One</button>}
+                {onUpgrade && <button className="sh-btn" onClick={onUpgrade}>Upgrade to Socria One</button>}
               </div>
-            )}
-            {owner && state.mayHost && state.plan === 'free' && (
-              <p className="sh-quiet sh-freeline">
-                {state.members.length > 0 || state.link || state.code
-                  ? 'This is the one chat you can share on the free plan. Stop sharing it to share another — or Socria One shares as many as you like.'
-                  : 'On the free plan you can share one chat at a time.'}
-              </p>
             )}
 
             {owner && (

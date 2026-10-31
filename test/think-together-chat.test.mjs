@@ -24,7 +24,8 @@ ok('a group is anyone else here right now — a room, or a shared line of thinki
 ok('the rule is the shared one: @socria, or a reply to Socria', /const asks = callsSocria\(\{ group, text: content, replyTo: replying \}\);/.test(send));
 const plain = send.slice(send.indexOf('if (!asks) {'), send.indexOf('// One answer at a time'));
 ok('anything else is posted to everyone and nothing more — no model, no map pass', /postTurn\(turn, true\)/.test(plain) && !/fetch\(|refreshMap\(|takeObjects\(/.test(plain) && /return;\s*\}$/.test(plain.trim()));
-ok('talking to the others never waits on Socria; asking it again does, and says so', send.indexOf('if (!asks)') < send.indexOf('if (busy)') && /Socria is still answering — send this again in a moment\./.test(send));
+// the in-flight check reads the ref (two quick sends were both let through on the last render's state)
+ok('talking to the others never waits on Socria; asking it again does, and says so', send.indexOf('if (!asks)') < send.indexOf('if (busyRef.current || busy)') && send.indexOf('if (busyRef.current || busy)') > 0 && /Socria is still answering — send this again in a moment\./.test(send));
 ok('in a group the question is posted at once, so it is there while Socria answers', /const sent = postTurn\(turn, group\);/.test(send));
 ok('Socria is told who asked, and how', /how: replying\?\.role === 'assistant' && !mentionsSocria\(content\) \? 'reply' : 'mention'/.test(send) && /\.\.\.\(addressed && people\.length >= 2 \? \{ addressed \} : \{\}\)/.test(send));
 ok('everyone else sees an answer is coming', /if \(group\) togetherRef\.current\?\.asking\(true\);/.test(send) && /togetherRef\.current\?\.asking\(false\);/.test(send));
@@ -62,7 +63,8 @@ ok('"@so" is finished as @socria, by Tab or Enter', /if \(offering && \(e\.key =
 ok('a quote goes to its message by scrolling the thread itself, never scrollIntoView', /t\.scrollTop \+= el\.getBoundingClientRect\(\)\.top/.test(app) && !/scrollIntoView/.test(app.slice(app.indexOf('function jumpTo('), app.indexOf('const mapBody'))));
 // The Core chat's own Reply and Copy (TurnActions), and the reply it carried to the model, were archived with it.
 const att = read('lib/chat-attachments.ts');
-ok('forRequest carries the reply, and the route folds it into one quoted line', /\.\.\.ref\(m\)/.test(att) && /content: withQuote\(m\),/.test(att) && /content: withQuote\(m\) \}\)\)/.test(read('app/api/chat/route.ts')));
+// the route clips earlier turns to a bound (SEC-2), and every turn — the newest whole — still carries its quote
+ok('forRequest carries the reply, and the route folds it into one quoted line', /\.\.\.ref\(m\)/.test(att) && /content: withQuote\(m\),/.test(att) && /content: i === all\.length - 1 \? withQuote\(m\) : withQuote\(m\)\.slice\(/.test(read('app/api/chat/route.ts')));
 
 console.log('=== Core, together ===');
 const st = read('components/share/SharedThread.tsx');

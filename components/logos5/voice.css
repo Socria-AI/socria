@@ -46,6 +46,18 @@
   text-transform: uppercase;
   color: var(--lg-ink-60);
 }
+/* on the free plan the button says whose it is — Socria One's — in Socria One's blue, and opens the paywall */
+.logos-root .sv-exp.is-one {
+  border-color: transparent;
+  background: #1d3a4a;
+  color: #f0ead8;
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 11px;
+  letter-spacing: 0;
+  text-transform: none;
+}
 .logos-root .sv-exp.is-big {
   height: 18px;
   font-size: 10px;

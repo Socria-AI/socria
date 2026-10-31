@@ -189,9 +189,12 @@ console.log('\n=== but each boundary is explained once per tab, not once per pre
       reason: r,
       state: { ...EMPTY_PROMPT_STATE, shownTriggers: [r] },
     });
+    // A feature only Socria One has (Voice, sharing) is a request each time it is pressed — a press that
+    // does nothing is the worse failure — so it is answered again; a spent allowance is said once a tab.
+    const locked = r === 'voice-locked' || r === 'share-locked';
     ok(
-      `${r}: the second press is not`,
-      again.show === false && again.why === 'said-already',
+      locked ? `${r}: a locked feature is answered every time it is pressed` : `${r}: the second press is not`,
+      locked ? again.show === true : again.show === false && again.why === 'said-already',
       JSON.stringify(again)
     );
   }
@@ -490,11 +493,13 @@ console.log('\n=== welcome-back: the one prompt a timer is allowed to raise ==='
   // and only what is sold: the counters the Core chat had are internal now.
   const WORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
   const fc = PLANS.free.counters;
+  // (October 31, 2026: the free plan is its monthly allowances, said from the table; there is no day's count to mention.)
+  void WORD;
   ok('the free plan is said in the table’s own numbers',
-    WELCOME_BACK.some((v) => v.body.includes(`${WORD[fc.chats]} new lines of thinking a month`) && v.body.includes(`${WORD[fc.messages]} messages a day`)),
+    WELCOME_BACK.some((v) => v.body.includes(`${fc.chats} conversations`) && v.body.includes(`${fc.maps} Logic Maps`)),
     WELCOME_BACK.map((v) => v.body).join(' | '));
-  ok('  and never the archived chat’s counts',
-    WELCOME_BACK.every((v) => !v.body.includes(`${WORD[fc['core-chats']]} new chats`) && !v.body.includes(`${WORD[fc['core-messages']]} messages`)));
+  ok('  and never a daily count, or the archived chat’s counts',
+    WELCOME_BACK.every((v) => !/a day at a time|messages a day|new chats/.test(v.body)), WELCOME_BACK.map((v) => v.body).join(' | '));
 
   // An urgent boundary still wins if both fire in the same breath.
   ok('a spent counter outranks it', bestTrigger(['welcome-back', 'chats-spent']) === 'chats-spent');

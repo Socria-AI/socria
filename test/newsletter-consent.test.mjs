@@ -113,7 +113,7 @@ console.log('\n=== the sign-up page, as each place sees it ===');
   ok('the page names Logos 5', us.includes('Logos 5: the conversation, and the map of your own reasoning drawn beside it.'));
   globalThis.__headers = {};
   const invited = renderToStaticMarkup(h(T.SignUpPage, { searchParams: { invited: '1' } }));
-  ok('…and so does the invitation', /days of Socria One/.test(invited) && invited.includes('Logos 5: the conversation'));
+  ok('…and so does the invitation, which promises no days of Socria One', !/days of Socria One/.test(invited) && invited.includes('Logos 5: the conversation'));
   ok('…and neither version names Core', !/\bCore\b/.test(us) && !/\bCore\b/.test(invited));
 }
 

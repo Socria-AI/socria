@@ -248,6 +248,32 @@ export async function GET(req: NextRequest) {
   const mrLedgerErr = missingTable(mrLedgerRaw) ? null : mrLedgerRaw;
   out.mrLedger = mrLedger ?? [];
 
+  // Rooms (supabase/rooms.sql): the seats they took, the rooms those seats
+  // were in, and their own words there. The other person's words in a room
+  // are that person's, so they are not in this file — just as deleting this
+  // account leaves them standing (lib/logos-rooms-server.ts purgeUserFromRooms).
+  const { data: roomSeats, error: roomSeatsRaw } = await db
+    .from('logos_room_members').select('room_id, seat, display_name, joined_at, left_at').eq('user_id', userId);
+  const roomSeatsErr = missingTable(roomSeatsRaw) ? null : roomSeatsRaw;
+  out.roomSeats = roomSeats ?? [];
+  const seatRooms = Array.from(new Set((roomSeats ?? []).map((r: { room_id: string }) => r.room_id)));
+  let roomsErr: unknown = null;
+  out.rooms = [];
+  if (seatRooms.length) {
+    const { data: rooms, error: roomsRaw } = await db
+      .from('logos_rooms').select('id, code, host_user_id, seed_session, created_at, closed_at').in('id', seatRooms);
+    roomsErr = missingTable(roomsRaw) ? null : roomsRaw;
+    // A room's opening session is its host's words: in the host's export, and nobody else's.
+    out.rooms = (rooms ?? []).map((r: { host_user_id?: string | null; seed_session?: unknown }) => {
+      const { host_user_id, seed_session, ...rest } = r;
+      return host_user_id === userId ? { ...rest, hosted: true, seed_session } : { ...rest, hosted: false };
+    });
+  }
+  const { data: roomWords, error: roomWordsRaw } = await db
+    .from('logos_room_events').select('room_id, id, kind, payload, created_at').eq('user_id', userId).order('created_at', { ascending: true });
+  const roomWordsErr = missingTable(roomWordsRaw) ? null : roomWordsRaw;
+  out.yourRoomEvents = roomWords ?? [];
+
   // Event RSVPs under this account's verified addresses (attendees need no
   // account, so these are found by email, not by user id). The secret behind
   // their check-in link is not included — only its hash was ever stored.
@@ -319,6 +345,9 @@ export async function GET(req: NextRequest) {
     ['friendsYouInvited', youInvitedErr],
     ['captures', capturesErr],
     ['mrLedger', mrLedgerErr],
+    ['roomSeats', roomSeatsErr],
+    ['rooms', roomsErr],
+    ['yourRoomEvents', roomWordsErr],
     ['eventRegistrations', eventRegistrationsErr],
     ['writingPictures', writingPicturesErr],
   ]

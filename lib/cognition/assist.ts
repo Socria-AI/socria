@@ -171,6 +171,26 @@ export function asksForDecision(text: string, s: ExplicitSignals): boolean {
  * offered for checking, and the reply was told to VERIFY it. So "I got" counts
  * only when what follows is a result: a number, an expression, "the answer".
  */
+/**
+ * "Just tell me the answer", "what's the answer?", "answer please": a demand
+ * about the problem already on the table, carrying no question of its own.
+ * Under the Answer Guard it is about the guarded work even though it holds no
+ * mathematics itself — read as a fresh question, it was answered outright,
+ * the guard the person set bypassed by five words. "Just tell me what time it
+ * is in Tokyo" is a new question, and is answered.
+ */
+export function asksForTheAnswer(text: string): boolean {
+  const t = clean(text).toLowerCase().replace(/[.!?…]+$/, '').replace(/,/g, ' ').replace(/\s+/g, ' ').trim();
+  if (!t || t.length > 80) return false;
+  const tail = String.raw`(?:\s+(?:please|pls|already|now|then|to (?:it|this|that)|for (?:it|this|that)(?: one)?))*`;
+  return (
+    new RegExp(String.raw`^(?:(?:ok(?:ay)?|please|pls|come on|look|so|fine)[\s,]+)*(?:(?:can|could|would) you\s+)?(?:just\s+)?(?:tell|give|show)\s+(?:me|us)\s+(?:the\s+)?(?:final\s+|actual\s+|real\s+)?(?:answer|solution|result)${tail}$`).test(t) ||
+    new RegExp(String.raw`^(?:so\s+)?what(?:'s|’s| is)\s+the\s+(?:final\s+|actual\s+)?(?:answer|solution|result)${tail}$`).test(t) ||
+    new RegExp(String.raw`^(?:the\s+)?(?:answer|solution)${tail}$`).test(t) ||
+    /^just (?:tell me|say it|give it to me|tell me already)$/.test(t)
+  );
+}
+
 export function offersWork(text: string): boolean {
   return /\b(?:is\s+(?:this|that|my\s+\w+)\s+(?:right|correct)\b|did\s+i\s+(?:get|do)\s+(?:it|this|that)\s+right\b|check\s+(?:my|this|it)\b|here'?s\s+my\s+(?:answer|working|work|solution|attempt)\b|i\s+got\s+(?:[-−+]?\s*[\d.(]|[a-z]\s*[=≈<>]|\$|an?\s+(?:answer|result|value|total)\s+of\b|the\s+(?:same\s+)?(?:answer|result|value|total)\b|that\s+(?:it|the|x|y)\b)|my\s+answer\s+is\b)/i.test(clean(text));
 }
@@ -336,8 +356,9 @@ export function chooseAssist(input: AssistInput): AssistDecision {
   // 8. "Just tell me" / "answers only": honoured — unless the Answer Guard is
   //    up, which they set; then the next step, and a word that the guard can be
   //    lowered.
-  if (s.directness === 'answer' || s.answersOnly) {
-    if (input.guard && (acc?.math || acc?.computed)) return decide('explain', true, { questions: 0, scaffold: 'hint', reasons: ['answer-asked:guarded'] });
+  const demanded = asksForTheAnswer(said);
+  if (s.directness === 'answer' || s.answersOnly || demanded) {
+    if (input.guard && (acc?.math || acc?.computed || demanded)) return decide('explain', true, { questions: 0, scaffold: 'hint', reasons: ['answer-asked:guarded'] });
     return decide('inform', true, { questions: 0, reasons: ['answer-asked'] });
   }
 

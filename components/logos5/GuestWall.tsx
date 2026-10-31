@@ -9,6 +9,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GUEST_TURNS } from '@/lib/guest-limits';
+import { allowanceLabel } from '@/lib/entitlements';
 
 export function GuestWall({
   open,
@@ -100,7 +101,7 @@ export function GuestNudge({
           </>
         ) : (
           <>
-            <b>Enjoying Socria?</b> Sign up free for better answers and more of it — keep going past {GUEST_TURNS} messages, as many maps as you like, and replies that remember you.
+            <b>Enjoying Socria?</b> Sign up free for better answers and more of it — keep going past {GUEST_TURNS} messages, {allowanceLabel('chats')} with {allowanceLabel('maps').replace(/ a month$/, '')}, and replies that remember you.
           </>
         )}
       </span>

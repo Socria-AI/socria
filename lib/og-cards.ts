@@ -9,14 +9,14 @@
 // page this file knows — a fixed page, a docs page by its slug, a blog post by
 // the title Sanity holds for it — and every other key gets the plain card.
 //
-// The offers obey the same rule as their pages: the student card only while
-// a free month can still begin, the invitation only while referrals run.
+// No card offers anything free of Socria One: the student month and the
+// referral days were retired, and a card never promises what a page cannot
+// give. The invitation card is said only while referrals run.
 //
 // Pure: the route passes in the clock, the docs list, the post it fetched and
 // the referral settings.
 
 import { TAGLINE } from './seo';
-import { STUDENT_OFFER } from './socria-edu';
 import { priceWithPeriod } from './socria-one';
 
 export interface OgCard {
@@ -63,8 +63,8 @@ const FIXED: Record<string, OgCard> = {
   },
   one: {
     kicker: 'Socria One',
-    title: 'Everything Socria does, without the ceiling.',
-    line: `No daily count, and lines of thinking as you need them — ${priceWithPeriod()}.`,
+    title: 'Unlimited Socria, with Voice and sharing.',
+    line: `Conversations, Logic Maps, artifacts and documents, none of them counted — ${priceWithPeriod()}.`,
   },
   charter: {
     kicker: 'Socria',
@@ -116,10 +116,6 @@ const EVENT_CARDS: Record<string, OgCard> = {
   },
 };
 
-const WORDS = ['zero', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve', 'thirteen', 'fourteen'];
-const days = (n: number) => (Number.isInteger(n) && n >= 0 && n < WORDS.length ? WORDS[n] : String(n));
-const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
-
 /** Shorten to a card's room, at a word, with an ellipsis. */
 export function fit(s: string, max: number): string {
   const t = s.replace(/\s+/g, ' ').trim();
@@ -134,20 +130,16 @@ export function ogCardFor(key: readonly string[], ctx: OgContext): OgCard {
   const k = key.filter(Boolean);
   if (k.length === 0) return DEFAULT_CARD;
   if (k.length === 1) {
-    if (k[0] === 'students') {
-      if (ctx.now >= STUDENT_OFFER.closes) return DEFAULT_CARD;
-      return {
-        kicker: 'For UTA students',
-        title: 'Your first month of Socria One, free.',
-        line: 'Verify your UTA email by 9 December. No card, and nothing renews.',
-      };
-    }
+    // The student month and the referral's free days of Socria One were
+    // both retired (31 October 2026): neither card promises them now. A
+    // student link reads as the home page; an invitation is still said, as
+    // an invitation to a free account and nothing more.
+    if (k[0] === 'students') return DEFAULT_CARD;
     if (k[0] === 'invited') {
-      const r = ctx.referral;
-      if (!r?.enabled) return FIXED['sign-up'];
+      if (!ctx.referral?.enabled) return FIXED['sign-up'];
       return {
         kicker: 'A friend invited you',
-        title: `${cap(days(r.signupDays))} days of Socria One, free.`,
+        title: 'Think it through with Socria.',
         line: 'Create your free account — no card needed.',
       };
     }

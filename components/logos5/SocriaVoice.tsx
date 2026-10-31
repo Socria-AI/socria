@@ -59,23 +59,29 @@ export function VoiceButton({ ear, onPress }: { ear: Ear | null; onPress: () => 
 }
 
 /** The button, drawn from where Voice is. */
-export function VoiceButtonView({ phase, onPress }: { phase: EarState['phase']; onPress: () => void }) {
-  const on = phase !== 'off';
+export function VoiceButtonView({ phase, onPress, locked }: { phase: EarState['phase']; onPress: () => void; /** on the free plan: Voice is Socria One's, and pressing says so */ locked?: boolean }) {
+  const on = phase !== 'off' && !locked;
   return (
     <button
       type="button"
-      className={`sv-btn${on ? ' is-on' : ''}${phase === 'hearing' ? ' is-hearing' : ''}`}
+      className={`sv-btn${on ? ' is-on' : ''}${phase === 'hearing' && !locked ? ' is-hearing' : ''}${locked ? ' is-locked' : ''}`}
       onClick={onPress}
-      aria-pressed={on}
-      aria-label={on ? 'Socria Voice (experimental) is on — turn it off' : 'Socria Voice (experimental) — talk instead of typing'}
-      title={on ? 'Socria Voice is on — press to turn it off' : 'Socria Voice — talk instead of typing'}
+      {...(locked ? {} : { 'aria-pressed': on })}
+      aria-label={locked ? 'Socria Voice — part of Socria One' : on ? 'Socria Voice (experimental) is on — turn it off' : 'Socria Voice (experimental) — talk instead of typing'}
+      title={locked ? 'Socria Voice is part of Socria One' : on ? 'Socria Voice is on — press to turn it off' : 'Socria Voice — talk instead of typing'}
     >
       <Wave />
       <span className="sv-btn-l">Voice</span>
-      <span className="sv-exp" aria-hidden="true">
-        <span className="sv-exp-long">Experimental</span>
-        <span className="sv-exp-short">Exp.</span>
-      </span>
+      {locked ? (
+        <span className="sv-exp is-one" aria-hidden="true">
+          One
+        </span>
+      ) : (
+        <span className="sv-exp" aria-hidden="true">
+          <span className="sv-exp-long">Experimental</span>
+          <span className="sv-exp-short">Exp.</span>
+        </span>
+      )}
     </button>
   );
 }

@@ -6851,6 +6851,33 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-one-gl svg circle { fill: none; stroke: var(--one-pale); stroke-width: 1.5; }
 .logos-root .lg-one-item:hover .lg-one-gl svg circle { fill: rgba(184,205,217,0.22); }
 
+.logos-root .lg-one-limit {
+  margin: 18px 0 -4px;
+  font-size: 11.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase;
+  color: var(--one-pale);
+}
+/* the two plans, side by side — the free plan's allowances beside Socria One's */
+.logos-root .lg-one-cmp {
+  width: 100%; margin: 24px 0 0; border-collapse: collapse;
+  border-top: 1px solid rgba(240,234,216,0.16);
+  font-size: 14px; line-height: 1.4; text-align: left;
+}
+.logos-root .lg-one-cmp :is(th, td) { padding: 9px 4px; border-bottom: 1px solid rgba(240,234,216,0.1); vertical-align: middle; }
+.logos-root .lg-one-cmp thead th { padding-top: 12px; font-size: 11.5px; font-weight: 600; letter-spacing: 0.06em; text-transform: uppercase; color: rgba(240,234,216,0.62); }
+.logos-root .lg-one-cmp thead th.is-one { color: var(--one-cream); }
+.logos-root .lg-one-cmp tbody th { font-weight: 400; color: rgba(240,234,216,0.78); }
+.logos-root .lg-one-cmp tbody td { color: rgba(240,234,216,0.72); white-space: nowrap; }
+.logos-root .lg-one-cmp tbody td.is-one {
+  font-family: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
+  font-style: italic; font-size: 15.5px; color: var(--one-cream);
+}
+.logos-root .lg-one-cmp tbody td.is-no { color: rgba(240,234,216,0.45); }
+.logos-root .lg-one-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+@media (max-width: 420px) {
+  .logos-root .lg-one-cmp { font-size: 13px; }
+  .logos-root .lg-one-cmp tbody td { white-space: normal; }
+}
+
 .logos-root .lg-one-err {
   margin: 18px 0 0; padding: 9px 12px;
   border: 1px solid rgba(184,205,217,0.35); border-radius: 2px;
@@ -7314,6 +7341,16 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   font-size: 17px; line-height: 1.42;
   color: var(--op-pale);
 }
+:is(.logos-root, .lg-tokens) .lg-op-meter {
+  display: flex; flex-direction: column; align-items: center; gap: 7px;
+  margin: 14px auto 0; max-width: 340px;
+}
+:is(.logos-root, .lg-tokens) .lg-op-meter-bar {
+  display: block; width: 100%; height: 4px; overflow: hidden;
+  border-radius: 2px; background: rgba(240,234,216,0.16);
+}
+:is(.logos-root, .lg-tokens) .lg-op-meter-bar > i { display: block; height: 100%; border-radius: 2px; background: #f0ead8; }
+:is(.logos-root, .lg-tokens) .lg-op-meter-l { font-size: 12.5px; line-height: 1.4; color: rgba(240,234,216,0.72); }
 
 :is(.logos-root, .lg-tokens) .lg-op-err {
   position: relative; z-index: 1;

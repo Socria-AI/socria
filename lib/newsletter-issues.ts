@@ -109,10 +109,12 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     link: { label: 'Try it in Logos', path: '/chat?model=logos-3' },
   },
   {
-    // LIVE ON PRODUCTION (the UTA student month, lib/socria-edu.ts). Time
-    // sensitive: a month can begin until the end of 9 December 2026. Pull it
-    // if it has not gone out by early December.
+    // WITHDRAWN — NEVER APPROVE. The UTA student month (lib/socria-edu.ts)
+    // was retired on 31 October 2026 with every other free grant of Socria
+    // One; nothing begins one now, so this issue would promise a month nobody
+    // can start. Kept, as a draft, only so its id still reads in the send log.
     id: '2026-11-students',
+    draft: true,
     subject: 'UTA students: your first month of Socria One is free',
     preheader: 'Add your @mavs.uta.edu address before December 9 and a free month starts. No card needed.',
     paragraphs: [
@@ -183,9 +185,10 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     link: { label: 'Try it in Logos', path: '/chat?model=logos-3' },
   },
   {
-    // APPROVE ONLY ONCE the Rewards tables exist on production ("Socria
-    // Rewards" in supabase/schema.sql, plus rls.sql) and the challenge ring
-    // shows there (docs/REWARDS.md).
+    // WITHDRAWN — NEVER APPROVE. Rewards no longer grant Socria One (31
+    // October 2026: Socria One is paid for or it is not held), so every line
+    // below would promise something the product does not give. Kept, as a
+    // draft, only so its id still reads in the send log.
     id: '2026-11-rewards',
     draft: true,
     subject: 'Build a five-card map, get a week of Socria One',

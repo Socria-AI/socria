@@ -88,9 +88,15 @@ console.log('\n=== it recommends what the product actually ships ===');
   // stopped being true.
   const f = PLANS.free.counters;
   // removed: the Core half of this check ("4 new chats and 20 messages a day") — the Core chat was archived and its counters are internal now
+  // THE FREE PLAN, IN THE TABLE'S OWN NUMBERS (lib/entitlements.ts): every
+  // monthly allowance, and none of the retired daily message count.
   ok('the free tier is stated rather than left to be discovered',
-    PROSE.includes(`${f.chats} new lines of thinking a calendar month and ${f.messages} messages a day`),
-    PROSE.match(/.{0,60}messages a day.{0,20}/g)?.join(' || ') ?? 'no daily limit is stated');
+    PROSE.includes(`${f.chats} conversations, ${f.maps} logic maps, ${f.nodes} logic map nodes, ${f.artifacts} artifacts and ${f.documents} document a month`),
+    PROSE.match(/.{0,60}a month.{0,20}/g)?.join(' || ') ?? 'no monthly allowance is stated');
+  ok('  and the retired daily message count is not promised',
+    f.messages === null && !/messages a day/.test(PROSE), PROSE.match(/.{0,60}messages a day.{0,20}/g)?.join(' || ') ?? '');
+  ok('  and Voice and sharing are said to be Socria One',
+    /socria voice and sharing your own conversations are part of socria one/.test(PROSE));
   ok('  and the archived counters are not advertised',
     !PROSE.includes(`${f['core-chats']} new chats`) && !PROSE.includes(`${f['core-messages']} messages a day`),
     PROSE.match(/.{0,60}(new chats|messages a day).{0,20}/g)?.join(' || ') ?? '');
@@ -100,8 +106,14 @@ console.log('\n=== it recommends what the product actually ships ===');
   // SOCRIA ONE, IN THE SAME TABLE'S NUMBERS: no daily message count, and the
   // memory carried between conversations against the free plan's.
   const one = TOPICS.find((t) => t.id === 'one').qs[0];
-  ok('One has no daily count on messages, and the answer says so',
-    PLANS.one.counters.messages === null && /no daily count on messages/.test(plainText(one)), plainText(one));
+  ok('One counts nothing the free plan counts, and the answer says so',
+    /unlimited conversations, logic maps, artifacts and documents, with socria voice and chat sharing/.test(plainText(one)) && /nothing is counted by the month/.test(plainText(one)), plainText(one));
+  ok('  and it never sells the retired daily count',
+    !/no daily count/.test(plainText(one)), plainText(one));
+  ok('  and the price is the price', plainText(one).includes('$15 a month'), plainText(one));
+  ok('no answer offers a free month, a code or a reward',
+    !/first month of socria one is free|free month|access code|socria rewards|week of socria one/.test(PROSE),
+    PROSE.match(/.{0,40}(free month|access code|socria rewards).{0,40}/g)?.join(' || ') ?? '');
   ok('  and its memory is the table’s',
     plainText(one).includes(`${PLANS.one.memoryEntries} things, against ${PLANS.free.memoryEntries}`), plainText(one));
   // SIGNED OUT: one line of thinking and its map; another needs a free account,

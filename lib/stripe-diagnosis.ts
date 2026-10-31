@@ -97,3 +97,22 @@ export function isMissingCustomer(e: unknown): boolean {
   const where = `${err?.param ?? err?.raw?.param ?? ''} ${err?.raw?.message ?? err?.message ?? ''}`;
   return /customer/i.test(where);
 }
+
+/**
+ * Whether the price Stripe will charge is the one the pages state — Socria One
+ * at $15 a month (lib/socria-one.ts SOCRIA_ONE). The amount lives in Stripe and
+ * the words live here, so this is where a mismatch between them is caught:
+ * null when they agree, else what differs.
+ */
+export function priceMatchesPlan(
+  price: { unit_amount?: number | null; currency?: string | null; recurring?: { interval?: string | null; interval_count?: number | null } | null },
+  plan: { price: number; currency: string; period: string }
+): string | null {
+  const wantCents = Math.round(plan.price * 100);
+  const wantCurrency = plan.currency === '$' ? 'usd' : plan.currency.toLowerCase();
+  const problems: string[] = [];
+  if (price.unit_amount !== wantCents) problems.push(`charges ${typeof price.unit_amount === 'number' ? (price.unit_amount / 100).toFixed(2) : 'an unknown amount'}, the pages say ${plan.price.toFixed(2)}`);
+  if ((price.currency ?? '').toLowerCase() !== wantCurrency) problems.push(`is in ${(price.currency ?? '?').toUpperCase()}, the pages say ${wantCurrency.toUpperCase()}`);
+  if (price.recurring?.interval !== plan.period || (price.recurring?.interval_count ?? 1) !== 1) problems.push(`renews every ${price.recurring?.interval_count ?? 1} ${price.recurring?.interval ?? '?'}, the pages say every ${plan.period}`);
+  return problems.length ? `The price ${problems.join('; ')}.` : null;
+}

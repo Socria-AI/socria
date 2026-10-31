@@ -34,14 +34,8 @@ import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
 import { sanitizeViz, sceneBlock } from '@/lib/logos-viz';
 import { sanitizeModelState, vizModelBlock } from '@/lib/viz-model';
-import {
-  bumpUsage,
-  chatAlreadyCounted,
-  checkAllowance,
-  firstThoughtUsed,
-  markChatCounted,
-  claimFirstThought,
-} from '@/lib/usage';
+import { bumpUsage, chatAlreadyCounted, checkAllowance } from '@/lib/usage';
+import { claimUnit } from '@/lib/quota';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { planTurn, checkDraft, correctionFor, repairDraft } from '@/lib/accuracy/accuracy';
@@ -139,6 +133,18 @@ export const dynamic = 'force-dynamic';
 // arrives as a note attachment instead, which has its own budget.
 const MAX_INPUT_LEN = 12_000;
 const MAX_HISTORY = 24;
+/**
+ * WHAT CAME BEFORE IS BOUNDED TOO. Only the newest message was checked for
+ * length, so anyone who could send one turn — a guest included — could send
+ * any amount of "history" with it, and every word of it went to the model at
+ * Socria's cost. A turn the person wrote is held to the length a message may
+ * have; Socria's own replies, which can carry a worked solution, to three
+ * times that; the whole window to a bound no real conversation reaches; and
+ * no more turns than a long one holds.
+ */
+const MAX_HISTORY_REPLY_LEN = MAX_INPUT_LEN * 3;
+const MAX_HISTORY_TOTAL = 160_000;
+const MAX_MESSAGES_ACCEPTED = 400;
 /** Characters of documents shown to the model on one turn — the most relevant passages of a long one. */
 const DOC_BUDGET = 36_000;
 
@@ -153,8 +159,12 @@ export async function POST(req: NextRequest) {
     // A Clerk session, the typed access key — or a GUEST: signed out, in the
     // one line of thinking their pass names (lib/guest-pass.ts), checked as
     // soon as the body says which. Rate-limited first, by address.
-    const keyUnlocked = mayUse(req, userId);
-    const guest = !userId && !keyUnlocked;
+    // Every signed-out caller is a guest, with a guest's pass — the typed access
+    // key included. It used to stand in for an account, and an account it was
+    // not: nothing was counted against it, which made it the free plan without
+    // the free plan's limits (October 31, 2026).
+    void mayUse;
+    const guest = !userId;
 
     const limited = await enforceRateLimit(req, userId, 'chat');
     if (limited) return limited;
@@ -215,12 +225,24 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    const usable = messages.filter(
+    if (messages.length > MAX_MESSAGES_ACCEPTED) {
+      return NextResponse.json({ error: 'This conversation is too long to send in one piece.' }, { status: 413 });
+    }
+    // Each earlier turn clipped to its bound, then the window cut from the
+    // oldest end to the total — the newest message is kept whole (checked above).
+    const filtered = messages.filter(
       (m: any) =>
         m &&
         (m.role === 'user' || m.role === 'assistant') &&
         typeof m.content === 'string'
     );
+    const clipped = filtered.map((m: any, i: number) =>
+      i === filtered.length - 1 ? m : { ...m, content: m.content.slice(0, m.role === 'user' ? MAX_INPUT_LEN : MAX_HISTORY_REPLY_LEN) }
+    );
+    let budget = MAX_HISTORY_TOTAL;
+    let from = clipped.length;
+    while (from > 0 && budget - clipped[from - 1].content.length >= 0) budget -= clipped[--from].content.length;
+    const usable = clipped.slice(Math.min(from, clipped.length - 1));
     // THE LOGOS RUNTIME (lib/runtime), unless LOGOS_RUNTIME=off. With it the
     // history window moves in steps of sixteen rather than one, so a long
     // conversation's history stays in the provider's prompt cache
@@ -372,6 +394,20 @@ export async function POST(req: NextRequest) {
         { status: sharedCtx.refuse.status }
       );
     }
+    // DOCUMENTS ARE COUNTED HERE (lib/entitlements.ts): once each, the first
+    // time a document's reading reaches a conversation — read in the browser or
+    // on the server, attached here or carried in from Content, one document is
+    // one document wherever it goes (lib/quota.ts claimUnit, keyed by its id).
+    // Every later turn that carries it again costs nothing. A guest's turn in
+    // somebody else's shared conversation is never charged.
+    if (userId && docsSent.size && !sharedCtx.guest) {
+      for (const id of docsSent.keys()) {
+        const claim = await claimUnit(userId, plan, 'documents', id);
+        if (!claim.ok) {
+          return NextResponse.json({ error: boundaryNote('documents'), upgrade: 'documents', used: claim.used, limit: claim.limit }, { status: 402 });
+        }
+      }
+    }
     // METACOGNITIVE REGULATION's prior (docs/MR.md), started HERE so its reads
     // overlap the allowance checks below rather than adding a wait before the
     // first token: their settings, this conversation's ledger rows and its
@@ -421,13 +457,11 @@ export async function POST(req: NextRequest) {
     const alreadyCounted = isNewChat && (await chatAlreadyCounted(userId, sessionId));
     // Whether THIS request is the one that will pay for the conversation.
     // Checked here, charged further down — see the note at the charge itself.
+    // (The first conversation is no longer a gift: every one counts against
+    // the month's ten, October 31, 2026.)
     const willCharge = isNewChat && !alreadyCounted && !sharedCtx.guest;
-    // The sentence written in onboarding, sent for them on landing: free, once
-    // per account ever (lib/usage.ts firstThoughtUsed). The claim is the
-    // client's; the once-ever is the server's.
-    const firstThought = willCharge && body?.firstThought === true && !!userId && !(await firstThoughtUsed(userId));
 
-    if (willCharge && !firstThought) {
+    if (willCharge) {
       const allowance = await checkAllowance(userId, plan, 'chats');
       if (!allowance.ok) {
         // A note about this boundary may go by email — a day from now, not
@@ -458,22 +492,10 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // ── the day's messages ────────────────────────────────────────
-    //
-    // Ten a day in Logos on the free plan (lib/entitlements.ts `messages`),
-    // every turn sent to Socria — a node's own conversation and a turn in
-    // somebody else's shared line of thinking included. Checked here, before
-    // the model; charged beside the chat, once the model has taken the turn.
-    // Onboarding's first thought is a gift in this count too.
-    if (!firstThought) {
-      const today = await checkAllowance(userId, plan, 'messages');
-      if (!today.ok) {
-        return NextResponse.json(
-          { error: boundaryNote('messages'), upgrade: 'messages', used: today.used, limit: today.limit },
-          { status: 402 }
-        );
-      }
-    }
+    // (A day's messages were counted here — ten a day on the free plan. The
+    // free plan is its monthly allowances and nothing beside them now, so a
+    // conversation, once begun, is never cut off mid-thought by a daily count.
+    // The rate limiter above is what bounds a runaway client, on every plan.)
 
     // Files are counted on the turn that carries them — only the newest one,
     // since the history repeats every earlier attachment on every request and
@@ -915,7 +937,17 @@ export async function POST(req: NextRequest) {
             history: assistInput.history,
           })
         : { forms: [], reasons: [] };
-    const presentation = inlineOn ? planned : { ...planned, forms: [] };
+    // A write-up filed in Content is a document (lib/entitlements.ts): claimed
+    // for this turn before it is written. With the month's documents spent it
+    // is answered in the conversation instead, and the page is told why
+    // (X-Socria-Limit) — the words still come; the document does not.
+    let writeUpRefused: { used: number; limit: number } | null = null;
+    if (planned.place === 'content' && userId && !sharedCtx.guest) {
+      const claim = await claimUnit(userId, plan, 'documents', `${sessionId ?? 'chat'}:writeup:${userTurns}`);
+      if (!claim.ok) writeUpRefused = { used: claim.used, limit: claim.limit };
+    }
+    const placed = writeUpRefused ? { ...planned, place: undefined, reasons: [...planned.reasons, 'documents-spent'] } : planned;
+    const presentation = inlineOn ? placed : { ...placed, forms: [] };
 
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the
@@ -1164,16 +1196,17 @@ export async function POST(req: NextRequest) {
     // answer is being written, and a connection that drops halfway through
     // one is a turn the person had. The marker goes with it, so the retry of
     // an answered turn is still free.
-    let gifted = false;
     if (willCharge && userId && limitOf(plan, 'chats') !== null) {
-      // the gift is claimed atomically; a request that lost the race to
-      // another tab is an ordinary chat and is counted as one
-      gifted = firstThought && (await claimFirstThought(userId));
-      if (!gifted) await bumpUsage(userId, 'chats');
-      await markChatCounted(userId, sessionId);
+      // Atomic (lib/quota.ts claimUnit): the check and the charge are one
+      // statement, so two first turns racing for the last conversation of the
+      // month cannot both be counted as within it — and the marker means a
+      // retried first turn of THIS conversation is never charged again. A
+      // claim refused here lost exactly that race after the check above let
+      // it through; the model already has the turn, so it is answered and the
+      // log says so, rather than cutting off a reply mid-word.
+      const claim = await claimUnit(userId, plan, 'chats', sessionId ?? `turn:${Date.now()}`);
+      if (!claim.ok) console.warn('[quota] a first turn lost the race for the last conversation of the month');
     }
-    // ...and the day's message, under the same rule: the model has the turn.
-    if (!gifted && userId && limitOf(plan, 'messages') !== null) await bumpUsage(userId, 'messages');
 
     // A citation that names no source given this turn, and a deep link no
     // source carried, are taken out of the sentence before it is sent
@@ -1470,10 +1503,10 @@ export async function POST(req: NextRequest) {
         'Content-Type': 'text/plain; charset=utf-8',
         'Cache-Control': 'no-cache, no-transform',
         'X-Content-Type-Options': 'nosniff',
-        // onboarding's first thought, let through free — the client says so once
-        ...(gifted ? { 'X-Socria-First-Thought': '1' } : {}),
         // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
         'X-Socria-Assist': assistTrace(assist),
+        // a write-up they asked for, answered here because the month's documents are spent (above)
+        ...(writeUpRefused ? { 'X-Socria-Limit': 'documents', 'X-Socria-Limit-Used': String(writeUpRefused.used), 'X-Socria-Limit-Of': String(writeUpRefused.limit) } : {}),
         // Metacognitive Regulation's decision this turn: content-free codes (lib/mr/index.ts traceOf)
         ...(mrRun ? { 'X-Socria-MR': mrRun.trace } : {}),
         // the runtime's reading of the turn: content-free, for the client and the evals

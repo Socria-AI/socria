@@ -58,9 +58,15 @@ export const STUDENT_OFFER = {
   closes: Date.UTC(2026, 11, 10, 6, 0, 0),
 } as const;
 
-/** Whether a free month can still begin. */
+/**
+ * Whether a free month can still begin: never, now. The offer was retired
+ * with the other free grants of Socria One (October 31, 2026) — Socria One is
+ * paid for or it is not held. STUDENT_OFFER stays so a recorded month still
+ * reads, and the /students page says plainly that it has ended.
+ */
 export function studentOfferOpen(now = Date.now()): boolean {
-  return now < STUDENT_OFFER.closes;
+  void now;
+  return false;
 }
 
 /**
@@ -80,9 +86,15 @@ export function eduDomains(now = Date.now()): string[] {
   return studentOfferOpen(now) ? [...STUDENT_OFFER.domains] : [];
 }
 
-/** Whether the programme is switched on at all here. */
+/**
+ * Whether the programme is switched on at all here: never, now. A student
+ * month was a free month of Socria One, and Socria One is paid for or it is
+ * not held (October 31, 2026). The pieces stay so a recorded month can still
+ * be read; nothing begins one.
+ */
 export function eduProgrammeOn(now = Date.now()): boolean {
-  return eduDomains(now).length > 0;
+  void now;
+  return false;
 }
 
 /**

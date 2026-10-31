@@ -37,18 +37,13 @@ export async function GET(req: NextRequest) {
   // surfaces must treat differently: Socria One that comes from a reward alone, which /one must
   // still sell and "Manage membership" has nothing behind.
   const base = plan === 'one' ? await resolveBasePlanForRequest(req, userId) : 'free';
-  const snap = userId ? await promoSnapshot(userId) : null;
-  const now = Date.now();
-  const promo =
-    snap && ((snap.until ?? 0) > now || snap.bankedMs > 0)
-      ? {
-          active: (snap.until ?? 0) > now,
-          until: snap.until,
-          daysLeft: daysOf(Math.max(0, (snap.until ?? 0) - now), 86_400_000),
-          bankedDays: daysOf(snap.bankedMs, 86_400_000),
-          only: plan === 'one' && base === 'free',
-        }
-      : undefined;
+  // Promotional Socria One (Rewards) no longer opens anything (October 31,
+  // 2026), so no promotion is reported: a "days left" for time that grants
+  // nothing would be a promise the plan does not keep.
+  const promo = undefined as undefined | { active: boolean; until: number | null; daysLeft: number; bankedDays: number; only: boolean };
+  void base;
+  void promoSnapshot;
+  void daysOf;
   // Only a real Stripe customer has anything to manage — an access-code or
   // complimentary unlock has no billing behind it and shouldn't be offered
   // a portal it can't open.

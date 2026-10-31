@@ -18,6 +18,8 @@ import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse, unauthorized } from '@/lib/route-guard';
 import { audioExtension, audioRefusal, cleanTranscript } from '@/lib/logos4/voice';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { FEATURE_NOTE, hasFeature } from '@/lib/entitlements';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -65,6 +67,11 @@ export async function POST(req: NextRequest) {
   if (!mayUse(req, uid)) return unauthorized();
   const limited = await enforceRateLimit(req, uid, 'voice');
   if (limited) return limited;
+  // Socria Voice — the voice conversation and Hold to talk both arrive here —
+  // is part of Socria One (lib/entitlements.ts features.voice), checked on the
+  // server whatever the page shows. Signed out has no plan to hold it.
+  const plan = uid ? await resolvePlanForRequest(req, uid) : 'free';
+  if (!hasFeature(plan, 'voice')) return json({ error: FEATURE_NOTE.voice, upgrade: 'voice' }, 402);
 
   let form: FormData;
   try {

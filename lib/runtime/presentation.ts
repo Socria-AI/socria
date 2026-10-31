@@ -21,6 +21,17 @@
 // events whose order is the point a sequence. A list asked for in so many
 // words is a list: nothing is offered in its place.
 //
+// THE SHAPE OF THE ANSWER, TOO (logos5-v4). Two kinds of turn get a line on
+// how the reply itself is shaped, because a model's habit there is the
+// chatbot's: an OPEN PIECE OF WORK ("I need to redesign our onboarding") gets
+// the problem that matters and one concrete starting point, with the ways it
+// could go next offered as paths to open — not a five-section plan of advice
+// that would fit anyone's project; and a request to GO DEEPER on a thread
+// ("Go deeper: …", "say more about…") gets that thread in full, in parts that
+// can be read one at a time (the page folds the later ones, lib/reply-layout.ts).
+// A choice that is theirs between named options is offered a decision they
+// weigh themselves (decide), instead of a comparison that leans for them.
+//
 // NEVER FORCED. Small talk, joking and something personal are plain text. A
 // thing to be built opens in Artifacts (rule C) and structure in the Logic Map
 // (rule D); this never competes with them. At most two forms are offered, and a
@@ -63,6 +74,8 @@ export interface Presentation {
   reasons: string[];
   /** where the reply is read: the conversation, or Content (a write-up they asked to keep) — absent is the conversation */
   place?: 'chat' | 'content';
+  /** how the reply itself is shaped this turn: an open piece of work, or going deeper on one thread — absent is the core's default */
+  shape?: 'open' | 'deeper';
 }
 
 /**
@@ -115,6 +128,36 @@ const STEPS_ASK = /\b(?:steps? (?:to|for|in|of)|step[- ]by[- ]step|how (?:do|can
 const HOW_IT_WORKS = /\bhow\s+(?:does|do)\s+(?:an?\s+|the\s+)?(?:[\w'’-]+\s+){0,4}?[\w'’-]+\s+work\b/i;
 /** Events in time, where the order is the point. */
 const TIMELINE_ASK = /\b(?:timeline|chronolog(?:y|ical)|sequence of events|key (?:events|dates|moments|milestones)|what happened (?:in|during|between|when|after|before)|how (?:did|has|have) [\w\s-]{2,40} (?:evolved?|developed?|changed?|unfold(?:ed)?) over time)\b/i;
+/**
+ * AN OPEN PIECE OF WORK, said as one: "I need to redesign our onboarding",
+ * — a request for help with it, never a statement of what they will do ("we
+ * should launch in March" is a claim to talk about, not work to scope) —
+ * "we're planning to launch in the spring", "help me think through the
+ * offsite", "how should I approach the migration?". Not a concrete task with
+ * a deliverable ("write an email", "fix this function") — that is done, not
+ * scoped.
+ */
+const OPEN_WORK =
+  /^(?:(?:so|ok(?:ay)?|right|hey|hi|well),?\s+)?(?:(?:(?:i|we)(?:'m| am|'re| are)?\s+(?:need|want|have|got|would like|'d like|plan(?:ning)?|trying|going|hoping|looking|been asked|being asked|asked)\s+to\s+|(?:i|we)'ve been asked to\s+|help (?:me|us) (?:to )?)(?:re-?)?(?:design|build|plan|launch|create|start|set up|develop|improve|rethink|overhaul|figure out|come up with|put together|structure|organi[sz]e|run|prepare|scale|grow|rework|define|map out|think through|work out|approach|restructure|relaunch|reposition)|let'?s\s+(?:re-?)?(?:design|plan|think through|figure out|work out|map out|structure|come up with|rethink))\b/i;
+const HOW_APPROACH = /\bhow (?:should|would|do|can|could) (?:i|we) (?:approach|start|begin|tackle|think about|go about|structure|plan)\b|\bwhere (?:do|should) (?:i|we) (?:start|begin)\b/i;
+/** …and the concrete tasks that open the same way but are done, not scoped. */
+const CONCRETE = /\b(?:e-?mail|message|letter|note|post|tweet|caption|reply|code|function|regex|script|sql|query|formula|spreadsheet|pivot|table|chart|graph|bug|error|class|component|endpoint|cv|resume|invoice)\b/i;
+/**
+ * A choice that is theirs, between named options: "should I take the offer or
+ * stay?", "help me decide between the two flats", "I'm torn between Lisbon and
+ * Porto". Weighed by them — their weights decide the leaning — not decided for
+ * them.
+ */
+const DECIDE_ASK =
+  /\b(?:should (?:i|we)\b[^?.!]{0,90}\bor\b|help (?:me|us) (?:decide|choose|pick)|(?:i'?m|we'?re|i am|we are) (?:torn|deciding|trying to decide|choosing|stuck) between|can'?t decide (?:between|whether)|which (?:one )?should (?:i|we) (?:pick|choose|go (?:with|for)|take)|decide between|choose between|weigh(?:ing)? (?:up )?(?:my|the|our) options)/i;
+/**
+ * Going deeper on one thread: a way deeper opened ("Go deeper: …", lib/inline-ui.ts
+ * pathAsk), an overview's part followed ("Take me further into …"), or said in
+ * words — "say more about the second one", "expand on that", "walk me through
+ * it in detail".
+ */
+const DEEPER =
+  /^(?:(?:ok(?:ay)?|great|yes|yeah|sure|right|nice|good|perfect|cool),?\s+)?(?:let'?s\s+)?(?:go deeper|dig (?:deeper|into)|say more about|tell me more(?: about)?|expand on|elaborate on|unpack|more on|take me further into|go further (?:on|into)|explain (?:that|this|it) (?:in more detail|further|more)|walk me through (?:that|this|it)(?: in detail)?|go into (?:more )?detail)\b/i;
 /** Work that is not reading an explanation: making something, doing it themselves, checking or fixing. */
 const NOT_READING = new Set(['creation', 'practice', 'verification', 'diagnosis', 'execution']);
 
@@ -152,17 +195,28 @@ export function planPresentation(i: PresentationInput): Presentation {
   };
   const work = i.state.work;
   const nums = numbersIn(t).filter((n) => Math.abs(n) >= 1);
+  // the shape of the reply itself, before what may be drawn in it
+  const deeper = DEEPER.test(t);
+  const openWork =
+    !deeper && x.kind !== 'brainstorm' && !CONCRETE.test(t) && (OPEN_WORK.test(t) || HOW_APPROACH.test(t)) && !['verification', 'diagnosis', 'practice', 'information'].includes(work);
+  const shape: Presentation['shape'] = deeper ? 'deeper' : openWork ? 'open' : undefined;
+  if (shape) reasons.push(`shape:${shape}`);
+  // a choice that is theirs, between options they named: a decision they weigh, not one that leans for them
+  const deciding = DECIDE_ASK.test(t) && (VERSUS.test(t) || /\bbetween\b[\s\S]+\band\b/i.test(t)) && work !== 'creation';
 
   // a list of their own amounts, with names: a small chart says it at a glance
   if (namedAmounts(t) >= 3 && nums.length <= 24) offer('chart', 'chart:their-numbers');
-  // options set against each other
-  if (COMPARE_ASK.test(t) && (VERSUS.test(t) || /\band\b/i.test(t)) && work !== 'creation') offer('compare', 'compare:options');
+  if (deciding) offer('decide', 'decide:their-choice');
+  // options set against each other — the facts side by side, when the choice is not theirs to weigh here
+  else if (COMPARE_ASK.test(t) && (VERSUS.test(t) || /\band\b/i.test(t)) && work !== 'creation') offer('compare', 'compare:options');
   // a quantity that moves with something they can vary
   if (!i.guard && ((WHAT_IF.test(t) && nums.length >= 1) || (FORMULA.test(t) && /\b(?:change|vary|depends?|how does|what happens)\b/i.test(t)))) offer('slider', 'slider:what-if');
   // practical writing they handed over: editable in place
   if (work === 'creation' && PRACTICAL_TEXT.test(t) && !i.ownWriting) offer('draft', 'draft:practical-writing');
+  // an open piece of work: the ways it could go next, to open one at a time — after the useful part, never instead of it
+  if (openWork && !offered.includes('draft')) offer('paths', 'paths:open-work');
   // an open request: a few directions to tap instead of typing — a question, so only where one may go
-  if (i.questions > 0 && words(t) <= 8 && OPEN_ASK.test(t) && !t.includes('?')) offer('options', 'options:open-request');
+  else if (i.questions > 0 && words(t) <= 8 && OPEN_ASK.test(t) && !t.includes('?')) offer('options', 'options:open-request');
   // A list asked for is a list; and under the guard, nothing laid out to read instead of working it.
   const listAsked = LIST_ASK.test(t);
   // the parts of a subject, to explore one at a time — an overview, not a list of terms and definitions
@@ -177,14 +231,14 @@ export function planPresentation(i: PresentationInput): Presentation {
   // explanation — prose is the explanation — and never reasoning that is theirs to do or a decision
   // that is theirs to make
   // A comparison already lays the reasoning out, and a quick call ("what tip should I leave?") needs none.
-  const call = work === 'judgment' && !i.ownJudgment && words(t) >= 10 && !offered.includes('compare');
+  const call = work === 'judgment' && !i.ownJudgment && words(t) >= 10 && !offered.includes('compare') && !offered.includes('decide');
   if (!i.guard && !i.ownReasoning && ((work === 'verification' && words(t) >= 6) || call) && x.kind !== 'brainstorm') offer('reasoning', 'reasoning:steps');
 
   // not the same form a third time running
   const recent = usedRecently(i.history);
   const forms = offered.filter((k) => !(recent.length === 2 && recent.every((r) => r.includes(k))));
   if (forms.length < offered.length) reasons.push('repeat-held');
-  return { forms, reasons: reasons.length ? reasons : ['nothing-fits'] };
+  return { forms, reasons: reasons.length ? reasons : ['nothing-fits'], ...(shape ? { shape } : {}) };
 }
 
 // ── what the reply is told ───────────────────────────────────────────
@@ -207,6 +261,22 @@ const GRAMMAR: Record<InlineKind, string> = {
     '{"type":"concepts","title":"…","items":[{"name":"Supply and demand","gist":"what it is, in a line","detail":"two or three sentences, read when opened","links":["Market structure"]}]} — 3–7 parts of the subject; links name other items. Your prose is a short introduction: what holds the parts together. Do not also list them.',
   sequence:
     '{"type":"sequence","kind":"steps","title":"…","items":[{"label":"…","detail":"…"}]} — 3–8 in order; kind "timeline" gives every item a "when" ("1789"). Only when the order is the point; the prose says what it shows.',
+  paths:
+    '{"type":"paths","items":[{"label":"Sketch the first five minutes","gist":"what opening it would give them, in a line"}]} — 2–4 ways the work could go next, each a few words; opening one sends it as their next message. Ways to explore, not questions; the useful part stays in your prose above it.',
+  decide:
+    '{"type":"decide","title":"…","options":["…","…"],"rows":[{"label":"Cost over five years","scores":[2,1],"note":"why, in a few words"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), and your honest first reading of each option on each (0 poor – 3 strong, in option order). They set how much each matters and can change any reading; the leaning is computed from their weights, so name no winner in your prose.',
+};
+
+/**
+ * How the reply itself is shaped, on the two kinds of turn where a model's
+ * habit is the chatbot's. A starting point, never a word limit: the deeper
+ * shape takes as long as the thread needs.
+ */
+const SHAPES: Record<NonNullable<Presentation['shape']>, (paths: boolean) => string> = {
+  open: (paths) =>
+    `\n\nTHE SHAPE OF THIS REPLY — an open piece of work. Don't write the plan. Open with the problem that actually matters here, in a sentence or two: the thing that will make or break it, which they may not have put into words — not a restatement of what they asked. Then the one starting point you would take, concrete and particular to their situation, in a short paragraph. Then ${paths ? 'the ways it could go next as a paths block (below) — two to four, each a few words and a line on what opening it gives them — and stop there' : 'name the two or three ways it could go next, in a sentence, and stop there'}. No headings, no bolded sections, no generic best practice, and no closing question unless one answer would change everything you would say.\n`,
+  deeper: () =>
+    `\n\nTHE SHAPE OF THIS REPLY — they asked to go deeper on one thread. Go deep on that thread and only that: the reasoning in full, worked through for their situation, as long as it needs. You have the whole conversation, so build on it rather than repeating it. Open with the most important thing about it, in a sentence. If it has distinct parts, give each a short heading line of its own (### A few words) — here, unlike most replies — so it can be read a part at a time. End on what it opens up next, in a sentence; no summary.\n`,
 };
 
 /**
@@ -216,11 +286,12 @@ const GRAMMAR: Record<InlineKind, string> = {
  */
 export const WRITE_UP = `\n\nA WRITE-UP, READ IN CONTENT. They asked for something to read and keep, so this reply is filed in Content and read there as a document; the conversation shows only its title and opening. Put its title on the first line as "# Title". Then write it to be read: a short opening paragraph, sections under "## " headings where they help someone find their way, prose paragraphs, and a list only for what really is a list. No inline blocks, no preamble, no sign-off. Everything you know about accuracy and about what is theirs to do still holds.\n`;
 
-/** The turn's offer, or '' when nothing is offered — which is most turns. */
+/** The turn's shape and offer, or '' when there is neither — which is most turns. */
 export function renderPresentation(p: Presentation): string {
   if (p.place === 'content') return WRITE_UP;
-  if (!p.forms.length) return '';
-  return `\n\nINLINE, IF IT HELPS — optional; plain prose is often better. You may include ${p.forms.length === 1 ? 'this' : 'one or both of these'}, each as a fenced block on its own lines (\`\`\`ui, the JSON on one line, \`\`\`), and keep the words around it short:\n${p.forms.map((k) => `- ${GRAMMAR[k]}`).join('\n')}\n`;
+  const shape = p.shape ? SHAPES[p.shape](p.forms.includes('paths')) : '';
+  if (!p.forms.length) return shape;
+  return `${shape}\n\nINLINE, IF IT HELPS — optional; plain prose is often better. You may include ${p.forms.length === 1 ? 'this' : 'one or both of these'}, each as a fenced block on its own lines (\`\`\`ui, the JSON on one line, \`\`\`), and keep the words around it short:\n${p.forms.map((k) => `- ${GRAMMAR[k]}`).join('\n')}\n`;
 }
 
 /**
@@ -232,7 +303,9 @@ export function renderPresentation(p: Presentation): string {
 export function presentationRoom(p: Presentation): number {
   // a write-up is a document: room for its sections, not a chat reply's length
   if (p.place === 'content') return 1100;
-  if (!p.forms.length) return 0;
-  if (p.forms.includes('draft') || p.forms.includes('concepts')) return 700;
-  return p.forms.includes('sequence') ? 450 : 350;
+  // going deeper on a thread takes the room the thread needs: a cut-off part is worse than a long one
+  const deeper = p.shape === 'deeper' ? 600 : 0;
+  if (!p.forms.length) return deeper;
+  if (p.forms.includes('draft') || p.forms.includes('concepts')) return 700 + deeper;
+  return (p.forms.includes('sequence') || p.forms.includes('decide') ? 450 : 350) + deeper;
 }

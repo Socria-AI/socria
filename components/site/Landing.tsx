@@ -13,6 +13,7 @@
 // beside it is real text; the cards repeat it.
 
 import { Button, LogosNode, SpreadHead } from '@/components/ds';
+import { freePlanSentence, onePlanSentence } from '@/lib/entitlements';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
 import { CHARTER, DOCS, ONE, PRIVACY, SiteFoot, SiteMast, SitePage, START, TERMS } from './chrome';
 import { Ico } from './icons';
@@ -370,7 +371,7 @@ export function Landing() {
             <div className="s-plans">
               <div className="s-plan">
                 <h3>Free</h3>
-                <p>Free to start, with a free account. Bring a document and watch the map fill in.</p>
+                <p>A free account, with {freePlanSentence()}. Bring a document and watch the map fill in.</p>
                 <div className="s-plan-go">
                   <Button as="a" href={START} variant="primary" size="md" arrow>
                     Start a conversation
@@ -385,8 +386,7 @@ export function Landing() {
                   </span>
                 </h3>
                 <p>
-                  No daily count. Lines of thinking as you need them, longer documents, and personalisation that learns
-                  how you reason.
+                  {onePlanSentence()}. Longer documents, and personalisation that learns how you reason.
                 </p>
                 <div className="s-plan-go">
                   <Button as="a" href={ONE.href} variant="link" arrow>

@@ -36,7 +36,8 @@ import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type 
 import { checkDraft, correctionFor } from '@/lib/accuracy/accuracy';
 import { fabricatedToolClaim } from '@/lib/core4/guard2';
 import { boundaryNote } from '@/lib/entitlements';
-import { bumpUsage, chatAlreadyCounted, checkAllowance, markChatCounted } from '@/lib/usage';
+import { chatAlreadyCounted, checkAllowance } from '@/lib/usage';
+import { claimUnit } from '@/lib/quota';
 import { encodeActivity, type Activity } from '@/lib/core4/activity';
 import { renderDisclosure } from '@/lib/core4/web';
 import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
@@ -150,7 +151,15 @@ export async function POST(req: NextRequest) {
     // meant a new model both skipped its own auth requirement and ran on the
     // wrong prompt. resolveModel is the single place that decides.
     const requestedConfig = SOCRIA_MODELS[resolveModel(requestedModelId)];
-    if (requestedConfig.requiresAuth && !userId && !keyUnlocked) {
+    // A WITHDRAWN Core answers only where it is still read — a shared Core
+    // thread, which takes an account to open — and is no longer anyone's way
+    // in: the way in without an account is Logos 5's one guest line of
+    // thinking, with its own signed pass and limit. Core 2 and Core 3.1 keep
+    // `requiresAuth: false` from the days they were that door, and while this
+    // read only that flag, anyone with curl was served them here, around the
+    // guest limit and with no account behind the cost.
+    const needsAccount = requestedConfig.requiresAuth || !!requestedConfig.withdrawn;
+    if (needsAccount && !userId && !keyUnlocked) {
       return NextResponse.json(
         {
           error: `Sign in to use ${requestedConfig.label}.`,
@@ -285,8 +294,13 @@ export async function POST(req: NextRequest) {
           typeof m.content === 'string'
       )
       .slice(-MAX_HISTORY)
-      // a turn that replies to a particular message says which, in one quoted line
-      .map((m: any) => ({ role: m.role, content: withQuote(m) }));
+      // a turn that replies to a particular message says which, in one quoted line —
+      // and the earlier turns are bounded too: only the newest was checked, so any
+      // amount of "history" could ride along with one message, at Socria's cost
+      .map((m: any, i: number, all: any[]) => ({
+        role: m.role,
+        content: i === all.length - 1 ? withQuote(m) : withQuote(m).slice(0, m.role === 'user' ? MAX_INPUT_LEN : MAX_INPUT_LEN * 3),
+      }));
 
     const socriaModel = resolveModel(body?.model);
 
@@ -355,43 +369,27 @@ export async function POST(req: NextRequest) {
     // through (lib/usage.ts fails open) — a limit that eats somebody's
     // conversation during a database blip is worse than a few turns over.
     const metered = !!userId && plan !== 'one';
-    const beginsChat =
-      metered && !sharedCtx.guest && rawUserTurns <= 1 && !(await chatAlreadyCounted(userId, conversationId, 'core-chats'));
-    // What the free day holds after this turn, said back in a header so the
-    // page can say it quietly once it is nearly spent — nobody should meet a
-    // limit they could not see coming. Null on Socria One and signed out.
-    let messagesLeft: number | null = null;
-    if (metered) {
-      const messagesToday = await checkAllowance(userId, plan, 'core-messages');
-      if (messagesToday.limit !== null) messagesLeft = Math.max(0, messagesToday.limit - messagesToday.used - 1);
-      const chatsToday = beginsChat ? await checkAllowance(userId, plan, 'core-chats') : null;
-      const refused = !messagesToday.ok
-        ? { counter: 'core-messages' as const, at: messagesToday }
-        : chatsToday && !chatsToday.ok
-          ? { counter: 'core-chats' as const, at: chatsToday }
-          : null;
-      if (refused) {
+    // One count for conversations wherever they begin (lib/entitlements.ts):
+    // a Core conversation is one of the month's conversations, under the same
+    // marker as a Logos one, so a conversation carried from one to the other
+    // is never counted twice. There are no Core limits of their own any more,
+    // and no daily count of messages (October 31, 2026).
+    const beginsChat = metered && !sharedCtx.guest && rawUserTurns <= 1 && !(await chatAlreadyCounted(userId, conversationId));
+    if (beginsChat) {
+      const room = await checkAllowance(userId, plan, 'chats');
+      if (!room.ok) {
         return NextResponse.json(
-          {
-            error: boundaryNote(refused.counter),
-            // the counter's own name, so the client raises the Socria One
-            // prompt it has for exactly this boundary
-            upgrade: refused.counter,
-            used: refused.at.used,
-            limit: refused.at.limit,
-          },
+          // the counter's own name, so the client raises the Socria One prompt it has for exactly this boundary
+          { error: boundaryNote('chats'), upgrade: 'chats', used: room.used, limit: room.limit },
           { status: 402 }
         );
       }
     }
-    const leftHeader: Record<string, string> = messagesLeft === null ? {} : { 'X-Socria-Left': String(messagesLeft) };
+    const leftHeader: Record<string, string> = {};
     const charge = async () => {
-      if (!metered || !userId) return;
-      await bumpUsage(userId, 'core-messages');
-      if (beginsChat) {
-        await bumpUsage(userId, 'core-chats');
-        await markChatCounted(userId, conversationId, 'core-chats');
-      }
+      if (!beginsChat || !userId) return;
+      // atomic, and once per conversation (lib/quota.ts)
+      await claimUnit(userId, plan, 'chats', conversationId ?? `core:${Date.now()}`);
     };
 
     if (socriaModel === 'core-4') {

@@ -62,15 +62,28 @@ export type Auth = { userId: string | null };
 
 let gEnvCache: { token: string; exp: number } | null = null;
 
-// A Google access token for the acting user: their stored OAuth grant first,
-// then deployment env credentials as a fallback.
+/**
+ * Whether the deployment's OWN credentials may stand in for a person's grant.
+ *
+ * Only on a developer's machine, for quick local testing. In production they
+ * are the operator's own Drive, Gmail, Calendar and Notion, and handing them
+ * to whoever has not connected an account of their own served the operator's
+ * mail to any signed-in stranger who asked to search it.
+ */
+function deploymentCredentialsAllowed(): boolean {
+  return process.env.NODE_ENV !== 'production';
+}
+
+// A Google access token for the acting user: their stored OAuth grant, and
+// outside production only, the deployment's env credentials for testing.
 async function googleToken(auth: Auth): Promise<string> {
   if (auth.userId) {
     const { googleAccessTokenFor } = await import('./logos-oauth');
     const t = await googleAccessTokenFor(auth.userId);
     if (t) return t;
   }
-  // Fallback: deployment-wide env credentials.
+  if (!deploymentCredentialsAllowed()) throw new ConnectError('Google is not connected.', 400);
+  // Local testing only: deployment-wide env credentials.
   if (process.env.GOOGLE_ACCESS_TOKEN) return process.env.GOOGLE_ACCESS_TOKEN;
   const id = process.env.GOOGLE_OAUTH_CLIENT_ID;
   const secret = process.env.GOOGLE_OAUTH_CLIENT_SECRET;
@@ -101,7 +114,7 @@ async function notionToken(auth: Auth): Promise<string> {
     const t = await notionTokenFor(auth.userId);
     if (t) return t;
   }
-  if (process.env.NOTION_API_KEY) return process.env.NOTION_API_KEY;
+  if (deploymentCredentialsAllowed() && process.env.NOTION_API_KEY) return process.env.NOTION_API_KEY;
   throw new ConnectError('Notion is not connected.', 400);
 }
 
@@ -316,11 +329,24 @@ function notionTitle(page: any): string {
   return 'Untitled';
 }
 
+/** The sources that read a third party's account: dormant unless connectors are on. */
+const THIRD_PARTY: ReadonlySet<string> = new Set(['drive', 'sheets', 'calendar', 'gmail', 'notion']);
+
+/**
+ * Dormant means dormant. listSources hides these while connectors are off,
+ * but search and fetch never asked — so a hidden source still answered
+ * anyone who named it.
+ */
+function refuseDormant(kind: SourceKind): void {
+  if (THIRD_PARTY.has(kind) && !connectorsEnabled()) throw new ConnectError('Connected sources are turned off for now.', 403);
+}
+
 export async function searchSource(
   kind: SourceKind,
   query: string,
   auth: Auth
 ): Promise<SourceItem[]> {
+  refuseDormant(kind);
   switch (kind) {
     case 'drive':
       return searchDrive(query, false, auth);
@@ -920,6 +946,7 @@ export async function fetchSource(
   ref: { id?: string; url?: string },
   auth: Auth
 ): Promise<FetchedContext> {
+  refuseDormant(kind);
   switch (kind) {
     case 'drive':
     case 'sheets':

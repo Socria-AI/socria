@@ -153,7 +153,8 @@ const app = readFileSync(join(root, 'components', 'LogosApp.tsx'), 'utf8');
 ok('no cover for a guest: everyone has Logos 5 once the account has answered', /const hasAccess = unlocked \|\| !!isSignedIn \|\| authSettled;/.test(app) && !/<LogosCover/.test(app));
 ok('a guest is signed out with no access key', /const guest = authSettled && !isSignedIn && !unlocked;/.test(app));
 ok('a second line of thinking opens the sign-up note, from newSession and from send', /if \(guestRef\.current && sessionsRef\.current\.some\(\(x\) => x\.messages\.length > 0\)\) \{\s*setGuestWall\(true\);/.test(app) && /guestHasAnother\(activeIdRef\.current\) \|\| !\(await claimGuestPass\(activeIdRef\.current\)\)/.test(app));
-ok('the server refusing a guest turn puts the words back and opens the note', /if \(body\?\.guestLimit\) \{[\s\S]{0,400}setInput\(content\);[\s\S]{0,200}setGuestWall\(true\);/.test(app));
+// the words go back to the line that sent them (giveBack), which is the one on screen unless the person moved on
+ok('the server refusing a guest turn puts the words back and opens the note', /if \(body\?\.guestLimit\) \{[\s\S]{0,400}giveBack\(sid, content, replying\);[\s\S]{0,200}setGuestWall\(true\);/.test(app) && /function giveBack\([\s\S]{0,1200}setInput\(content\);/.test(app));
 ok('the map pass says which line of thinking it is', /sessionId: forSession,\s*messages: chronRef\.current,/.test(app));
 ok('the first line of thinking comes with them when they sign up, once', /A GUEST WHO SIGNED UP/.test(app) && /saveLocal\(loadLocal\(\)\.filter\(\(x\) => !keptIds\.has\(x\.id\)\)\)/.test(app));
 const wall = readFileSync(join(root, 'components', 'logos5', 'GuestWall.tsx'), 'utf8');

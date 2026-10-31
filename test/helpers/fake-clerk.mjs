@@ -34,6 +34,19 @@ export const clerkClient = () => ({
       const u = (globalThis.__users ?? {})[id];
       return u ? shape(id, u) : null;
     },
+    // Clerk merges privateMetadata one level deep, and refuses a user it does not have.
+    updateUserMetadata: async (id, { privateMetadata = {} } = {}) => {
+      const u = (globalThis.__users ?? {})[id];
+      if (!u) throw Object.assign(new Error('Not Found'), { status: 404 });
+      u.privateMetadata = { ...(u.privateMetadata ?? {}), ...privateMetadata };
+      return shape(id, u);
+    },
+    deleteUser: async (id) => {
+      calls.push(['deleteUser', id]);
+      if (!(globalThis.__users ?? {})[id]) throw Object.assign(new Error('Not Found'), { status: 404 });
+      delete globalThis.__users[id];
+      return { id, deleted: true };
+    },
     getCount: async () => {
       calls.push(['getCount']);
       return Object.keys(globalThis.__users ?? {}).length;
@@ -54,3 +67,5 @@ export const clerkClient = () => ({
     },
   },
 });
+// Clerk 5 also answers as an object (`clerkClient.users.getUser`), which some routes still use.
+Object.defineProperty(clerkClient, 'users', { get: () => clerkClient().users });

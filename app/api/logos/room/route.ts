@@ -11,6 +11,8 @@ import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { createRoom, nameFor } from '@/lib/logos-rooms-server';
 import { sanitizeSeedSession } from '@/lib/logos-rooms-shared';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { FEATURE_NOTE, hasFeature } from '@/lib/entitlements';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -22,6 +24,11 @@ export async function POST(req: NextRequest) {
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
+  // Opening a room is sharing a conversation, and sharing is Socria One;
+  // joining a room someone opened (room/join) is free on every plan.
+  if (!hasFeature(await resolvePlanForRequest(req, userId), 'share')) {
+    return NextResponse.json({ error: FEATURE_NOTE.share, upgrade: 'share' }, { status: 402 });
+  }
 
   // The host may open the room around the line of thinking they are already
   // in. Sanitised like any stored session, and captured once — from here on

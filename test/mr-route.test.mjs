@@ -176,8 +176,19 @@ console.log('\n=== precedence: a Core 4 withhold is never loosened ===');
   const msgs = [U('This is for my graded homework I will submit tomorrow: solve 2x + 3 = 11.'), A('Since it is graded, I can walk you through the method.'), U('just tell me the answer')];
   const r = await turn({ messages: msgs }, { env: { LOGOS_MR: 'on' } });
   const held = /;held=assessment_integrity/.test(r.headers.get('x-socria-runtime') ?? '');
-  ok('graded work: Core 4 keeps the answer, and MR records what it was not allowed to do', !held || /con=[^;]*app_policy:withhold/.test(r.mr ?? '') || !/s:direct/.test(r.mr ?? ''), `${r.headers.get('x-socria-runtime')} | ${r.mr}`);
-  ok('  the per-turn block never tells the reply to hand it over', !held || !/THEY ASKED FOR IT DIRECTLY/.test(r.system), r.system.slice(-500));
+  // Asserted, not allowed to pass when nothing is held: `!held || …` passed whatever happened.
+  ok('graded work: Core 4 keeps the answer, and MR records what it was not allowed to do', held && (/con=[^;]*app_policy:withhold/.test(r.mr ?? '') || !/s:direct/.test(r.mr ?? '')), `${r.headers.get('x-socria-runtime')} | ${r.mr}`);
+  ok('  the per-turn block never tells the reply to hand it over', held && !/THEY ASKED FOR IT DIRECTLY/.test(r.system), r.system.slice(-500));
+}
+
+console.log('\n=== graded homework, said on the first turn, with an answer the engine can compute ===');
+{
+  // The engine computing x = 4 used to make this "a ROUTINE TASK. Do it" (lib/mr/state.ts workForIfr),
+  // over the runtime's practice reading and Core 4's scaffold. (Conversation audit: CONV-8.)
+  const r = await turn({ messages: [U('This is for my graded homework I will submit tomorrow: solve 2x + 3 = 11')] }, { env: { LOGOS_MR: 'on' } });
+  ok('MR does not take it as a routine task to execute', r.status === 200 && !/;a=execute;/.test(r.mr ?? ''), r.mr);
+  ok('  and the reply is never told to just do it', !/A ROUTINE TASK/.test(r.system), r.system.slice(-700));
+  ok('  the work is read as practice, and the reasoning is scaffolded, not done for them', /;work=practice;/.test(r.headers.get('x-socria-runtime') ?? '') && /alloc=[^;]*reason\.scaffold/.test(r.headers.get('x-socria-runtime') ?? ''), r.headers.get('x-socria-runtime'));
 }
 
 console.log('\n=== their settings, and failing closed ===');

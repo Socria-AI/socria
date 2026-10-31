@@ -59,6 +59,7 @@ export const ENTRY_TTL_S = 90 * 24 * 60 * 60;
 export function takeoverEnv(): Env {
   return {
     SOCRIA_TAKEOVER: process.env.SOCRIA_TAKEOVER,
+    VERCEL_ENV: process.env.VERCEL_ENV,
     SOCRIA_TAKEOVER_CODE: process.env.SOCRIA_TAKEOVER_CODE,
     SOCRIA_TAKEOVER_SECRET: process.env.SOCRIA_TAKEOVER_SECRET,
     CLERK_SECRET_KEY: process.env.CLERK_SECRET_KEY,
@@ -66,10 +67,20 @@ export function takeoverEnv(): Env {
   };
 }
 
-/** Whether the campaign runs: on, unless SOCRIA_TAKEOVER says off. */
+/**
+ * Whether the campaign runs. SOCRIA_TAKEOVER decides when it is set (on/off,
+ * 1/0, true/false, yes/no). Unset, the campaign runs on the PRODUCTION
+ * deployment only (VERCEL_ENV=production): the public site there is the one
+ * page, while every preview — the dev branch's included — and a machine
+ * running the site locally show the whole site, the landing page and every
+ * other page, as they were. (October 31, 2026: "on the dev branch, add back
+ * the landing page and all the other pages", without touching production.)
+ */
 export function takeoverOn(env: Env = takeoverEnv()): boolean {
   const v = (env.SOCRIA_TAKEOVER ?? '').trim().toLowerCase();
-  return !['off', '0', 'false', 'no'].includes(v);
+  if (['off', '0', 'false', 'no'].includes(v)) return false;
+  if (['on', '1', 'true', 'yes'].includes(v)) return true;
+  return (env.VERCEL_ENV ?? '').trim().toLowerCase() === 'production';
 }
 
 // ── where a request goes ─────────────────────────────────────────────

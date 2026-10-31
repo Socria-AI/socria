@@ -33,9 +33,9 @@ export default function SignUpPage({
   const back = isSafeRedirect(searchParams?.redirect_url)
     ? searchParams!.redirect_url!
     : undefined;
-  // Arrived through a friend's referral link (app/r/[code]). Only the copy changes here: whether the
-  // seven days are given is decided by the server once the account exists (lib/rewards/), so this
-  // promises what a new account receives and nothing on the friend's behalf.
+  // Arrived through a friend's referral link (app/r/[code]). Only the eyebrow changes: a referral
+  // gives no days of Socria One now (October 2026, docs/FREEMIUM.md), so the page promises the free
+  // account and nothing more.
   const cfg = rewardsConfig();
   const invited = searchParams?.invited === '1' && cfg.enabled;
   // The newsletter box starts ticked only where the law allows a ticked box,
@@ -43,7 +43,6 @@ export default function SignUpPage({
   // lib/newsletter-consent.ts — by the country Vercel's edge reads from the
   // visitor's IP. With no header (a local run) it starts unticked.
   const newsletterDefault = newsletterTickedByDefault(headers().get('x-vercel-ip-country'));
-  const days = cfg.referral.signupDays;
   return (
     <AuthPlate
       kind="sign-up"
@@ -53,7 +52,7 @@ export default function SignUpPage({
       emphasis="every device."
       lede={
         invited
-          ? `Create your free account and get ${days === 7 ? 'seven' : days} days of Socria One — the complete environment, no card needed. Logos 5: the conversation, and the map of your own reasoning drawn beside it.`
+          ? 'Your friend is on Socria. Create your free account — no card needed. Logos 5: the conversation, and the map of your own reasoning drawn beside it.'
           : 'Free account. Logos 5: the conversation, and the map of your own reasoning drawn beside it.'
       }
     >

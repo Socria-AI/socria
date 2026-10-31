@@ -25,13 +25,17 @@
 //     and sends somebody looking for a menu entry that is not there.
 //   · the free tier — the export did not mention its limits at all, and they
 //     are the single most likely reason somebody arrives at a support page.
-//     They are by the day as well as the month (lib/entitlements.ts), and
-//     the suite holds these answers to the plan table's own numbers.
+//     They are by the calendar month (lib/entitlements.ts), and every number
+//     below is READ from the plan table rather than typed, so an answer here
+//     cannot disagree with the paywall the first time a limit changes.
 //
 // Answers carry inline HTML because the design's do — <em>, <b> and links are
 // part of how these read. It is OUR OWN STRING in OUR OWN SOURCE, never
 // anything a person typed, which is what makes rendering it as HTML safe here
 // and would not make it safe anywhere else.
+
+import { freePlanSentence, limitOf, megabytes, onePlanSentence, PLANS } from './entitlements';
+import { priceLabel, priceWithPeriod } from './socria-one';
 
 export interface FaqItem {
   q: string;
@@ -77,9 +81,9 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What do I get without paying?',
         a: [
-          'The free plan holds 2 new lines of thinking a calendar month and 10 messages a day, on the UTC day; a message to a node’s own conversation counts too. A line of thinking is counted when it is <em>started</em>, so going back to one you have already begun never costs another, only its messages.',
-          'Every lens, every depth and Draft Space are the same on both plans, and a map grows as far as the thinking does.',
-          'Reach a limit and nothing is taken away: everything you started stays open, and the day’s allowance comes back tomorrow. You can share one chat at a time, and join anyone else’s for free — what you send Socria there counts toward your own day, never theirs.',
+          `A free account has ${freePlanSentence()}, by the calendar month (UTC). A conversation is counted when it is <em>started</em>, so going back to one you have already begun never costs another. A Logic Map is counted once for its conversation however often it is redrawn, and an artifact or a document once however often it comes back.`,
+          'Every lens, every depth and Draft Space are the same on both plans. Socria Voice and sharing your own conversations are part of Socria One; joining a conversation somebody shares with you is free.',
+          'Reach a limit and nothing is taken away: everything you started stays open, every map keeps what it has, and the month’s allowance comes back on the first.',
         ],
       },
       {
@@ -130,7 +134,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'What does Socria One add?',
         a: [
-          'No daily count on messages, and lines of thinking held only by a fair-use ceiling. Socria carries more of how you reason between conversations (160 things, against 12), reads documents up to 30 MB rather than 4 MB, and shares as many chats as you like, and whole Projects. $15 a month.',
+          `${onePlanSentence()}: nothing is counted by the month. Socria carries more of how you reason between conversations (${PLANS.one.memoryEntries} things, against ${PLANS.free.memoryEntries}), reads documents up to ${megabytes(PLANS.one.uploadBytes)} rather than ${megabytes(PLANS.free.uploadBytes)}, and shares whole Projects as well as chats. ${priceLabel()} a month.`,
           '<a href="/one">See the full comparison</a>.',
         ],
       },
@@ -150,7 +154,7 @@ export const TOPICS: FaqTopic[] = [
       {
         q: 'Is there a student or team price?',
         a: [
-          'For UT Arlington students, this semester: your first month of Socria One is free. Verify your UTA email (@mavs.uta.edu) under Manage Account by 9 December and the month starts — no card, and nothing renews.',
+          `No. Socria One is ${priceWithPeriod()} for everyone, and Socria is free to start. (The UT Arlington student month has ended.)`,
           'There is no team price yet. When there is, it will be on the Socria One page — not buried in a sales call.',
         ],
       },
@@ -189,10 +193,10 @@ export const TOPICS: FaqTopic[] = [
     t: 'Logos and the map',
     qs: [
       {
-        q: 'Logos says I’ve used today’s messages.',
+        q: 'Logos says I’ve reached my free limit.',
         a: [
-          'On the free plan Logos holds 10 messages a day, on the UTC day, and a message to a node’s own conversation counts. Your lines of thinking stay open and stay yours, and the day’s messages come back tomorrow; Socria One has no daily count.',
-          'The map itself never stops growing. On both plans it grows as far as the thinking does.',
+          `Each month the free plan holds ${freePlanSentence()}. When one runs out, what you have stays open and stays yours — your conversations, your maps and everything in Artifacts — and the allowance comes back on the first of the month (UTC). Socria One counts none of them.`,
+          `A Logic Map keeps every node it has. On the free plan, once the month’s ${limitOf('free', 'nodes')} nodes are used, new ones wait for next month.`,
         ],
       },
       {

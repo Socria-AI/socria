@@ -284,7 +284,15 @@ const T = async (blob, extra) => {
   const anon = await T(audio());
   ok('signed out, no access key → 401, no provider call', anon.status === 401 && openai.calls.length === 0, J(anon));
 
+  // Socria Voice is part of Socria One (lib/entitlements.ts features.voice):
+  // a free account is refused on the server, before anything is read or paid for.
   as('user_a');
+  const freeTry = await T(audio());
+  ok('a free account → 402 voice, before any provider call', freeTry.status === 402 && freeTry.j.upgrade === 'voice' && /part of Socria One/.test(freeTry.j.error) && openai.calls.length === 0, J(freeTry));
+
+  // Everything below is a Socria One member (the operator's list, lib/socria-one-server.ts).
+  process.env.SOCRIA_ONE_USER_IDS = 'user_one';
+  as('user_one');
   const wrong = await T(audio(9000, 'text/plain'));
   ok('not audio → 415 before any paid call', wrong.status === 415 && openai.calls.length === 0, J(wrong));
   const tiny = await T(audio(100));
@@ -319,6 +327,7 @@ const T = async (blob, extra) => {
   ok('provider unreachable → 502, not a crash', down.status === 502, J(down));
 }
 
+delete process.env.SOCRIA_ONE_USER_IDS;
 globalThis.fetch = realFetch;
 console.log(`\n${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

@@ -29,7 +29,7 @@
     "heic-to": "1.6.7",
     "katex": "^0.16.47",
     "mathlive": "^0.110.0",
-    "next": "14.2.25",
+    "next": "14.2.35",
     "next-sanity": "^9.8.0",
     "openai": "^4.67.0",
     "qrcode-generator": "^2.0.4",
@@ -40,6 +40,7 @@
     "stripe": "^22.5.0",
     "styled-components": "^6.1.13",
     "three": "^0.173.0",
+    "undici": "6.29.1",
     "unpdf": "^1.8.1"
   },
   "devDependencies": {
@@ -49,6 +50,7 @@
     "@types/react-dom": "^18.3.0",
     "@types/three": "^0.173.0",
     "autoprefixer": "^10.4.20",
+    "axe-core": "4.13.0",
     "esbuild": "^0.25.6",
     "playwright-core": "^1.63.0",
     "postcss": "^8.4.47",

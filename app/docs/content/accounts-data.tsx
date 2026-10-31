@@ -42,9 +42,10 @@ export function AccountsData() {
         <Def term="Your account (cloud)">
           Conversations and Logos sessions (each holding its messages, map,
           draft and grounded contexts), your cross-conversation Thinking
-          Journey, your Conversation Style, redeemed grants, the free
-          plan&rsquo;s counts of the chats you start and the messages you send
-          — kept on the server, never in the browser — and, if you subscribe,
+          Journey, your Conversation Style, any grant redeemed before codes
+          were retired, the free plan&rsquo;s monthly counts — conversations,
+          Logic Maps and their nodes, artifacts and documents — kept on the
+          server, never in the browser — and, if you subscribe,
           the billing projection Stripe writes.
         </Def>
         <Def term="Your browser (local)">

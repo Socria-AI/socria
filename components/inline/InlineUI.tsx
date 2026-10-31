@@ -1,9 +1,11 @@
 'use client';
 // components/inline/InlineUI.tsx — THE INLINE ELEMENTS, DRAWN IN THE CONVERSATION.
 //
-// Eight small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
+// Ten small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
 // comparison, reasoning folded under its conclusion, choices to tap, a draft to
-// edit, the parts of a subject to explore, steps or events in order. Each is drawn from a validated description, in the reading column,
+// edit, the parts of a subject to explore, steps or events in order, the ways
+// an open piece of work could go next, and a decision they weigh themselves.
+// Each is drawn from a validated description, in the reading column,
 // quietly — a thin rule, the conversation's own type, nothing that looks like
 // a dashboard. What the person does with one (a slider moved, a choice tapped,
 // a draft edited) is kept with the message (`host.onState`); the larger ones
@@ -16,7 +18,7 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import type { ChartSpec, CompareSpec, ConceptsSpec, DraftSpec, InlineSpec, InlineState, OptionsSpec, ReasoningSpec, SequenceSpec, SliderSpec } from '@/lib/inline-ui';
+import { decideLeaning, decideTally, pathAsk, SCORE_SAID, WEIGHT_SAID, type ChartSpec, type CompareSpec, type ConceptsSpec, type DecideSpec, type DraftSpec, type InlineSpec, type InlineState, type OptionsSpec, type PathsSpec, type ReasoningSpec, type SequenceSpec, type SliderSpec } from '@/lib/inline-ui';
 import { copyText } from '@/lib/copy-text';
 import './inline.css';
 
@@ -30,6 +32,13 @@ export interface InlineHost {
   onOpen?: (n: number, spec: InlineSpec) => void;
   /** choices can still be tapped — nothing has been said since this reply */
   live?: boolean;
+  /**
+   * Going deeper from any reply, not only the latest (a way it could go, a
+   * decision talked through): sent as their next message, so the whole
+   * conversation comes with it. Absent while something is being written, and
+   * where the conversation cannot be added to.
+   */
+  onExplore?: (text: string) => void;
 }
 
 type RenderInline = (text: string, key: string) => ReactNode;
@@ -65,6 +74,10 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
       return <InlineConcepts spec={spec} state={state} onState={setState} onAsk={host?.live ? host?.onChoose : undefined} renderInline={renderInline} />;
     case 'sequence':
       return <InlineSequence spec={spec} state={state} onState={setState} renderInline={renderInline} />;
+    case 'paths':
+      return <InlinePaths spec={spec} state={state} onState={setState} onExplore={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} renderInline={renderInline} />;
+    case 'decide':
+      return <InlineDecide spec={spec} state={state} onState={host?.onState ? setState : undefined} onAsk={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} onOpen={host?.onOpen ? (s) => host.onOpen!(n, s) : undefined} />;
   }
 }
 
@@ -592,6 +605,180 @@ function InlineSequence({ spec, state, onState, renderInline }: { spec: Sequence
           </span>
         </div>
       )}
+    </div>
+  );
+}
+
+// ── ways deeper ──────────────────────────────────────────────────────
+
+/**
+ * Where an open piece of work could go next: each way a row — its name and a
+ * line on what opening it gives them — never a card. Opening one sends it as
+ * their next message, so the conversation carries on with everything said so
+ * far; an explored way is marked and the others stay, to come back to. Where
+ * nothing can be sent (read-only, or a reply is being written) they are the
+ * words they are.
+ */
+function InlinePaths({ spec, state, onState, onExplore, renderInline }: { spec: PathsSpec; state?: InlineState; onState: (s: InlineState) => void; onExplore?: (text: string) => void; renderInline: RenderInline }) {
+  const done = new Set(state?.done ?? []);
+  const title = spec.title || 'Where it could go next';
+  const explore = (i: number) => {
+    if (!onExplore) return;
+    onState({ ...state, done: [...new Set([...done, i])].sort((a, b) => a - b) });
+    onExplore(pathAsk(spec.items[i]));
+  };
+  return (
+    <div className="ln ln-paths" role="group" aria-label={title}>
+      <p className="ln-paths-h" aria-hidden="true">
+        {title}
+      </p>
+      <ul className="ln-paths-list">
+        {spec.items.map((x, i) => {
+          const words = (
+            <>
+              <span className="ln-path-l">
+                {onExplore && <span className="ln-sr">Go deeper: </span>}
+                {renderInline(x.label, `l${i}`)}
+              </span>
+              {x.gist && <span className="ln-path-g">{renderInline(x.gist, `g${i}`)}</span>}
+            </>
+          );
+          return (
+            <li key={i} className={done.has(i) ? 'is-done' : undefined}>
+              {onExplore ? (
+                <button type="button" className="ln-path" onClick={() => explore(i)}>
+                  {words}
+                  <span className="ln-path-go" aria-hidden="true">
+                    {done.has(i) ? 'Explored' : '→'}
+                  </span>
+                  {done.has(i) && <span className="ln-sr"> (explored)</span>}
+                </button>
+              ) : (
+                <div className="ln-path is-still">{words}</div>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+}
+
+// ── a decision, weighed by them ──────────────────────────────────────
+
+function Dots({ n }: { n: number }) {
+  return (
+    <span className="ln-dots" aria-hidden="true">
+      {[0, 1, 2].map((i) => (
+        <i key={i} className={i < n ? 'is-on' : undefined} />
+      ))}
+    </span>
+  );
+}
+
+/**
+ * A decision laid out to be weighed: the options across, what it rests on
+ * down, and in each cell Socria's first reading (three dots, poor to strong).
+ * How much each thing matters is theirs — tap to change it — and so is any
+ * reading they see differently; the leaning under it is the arithmetic of
+ * their weights, said in a sentence and never more. "Talk it through" carries
+ * their weighing into the conversation; it opens in Artifacts as a full
+ * comparison, with the ranking and the sensitivity view.
+ */
+function InlineDecide({ spec, state, onState, onAsk, onOpen }: { spec: DecideSpec; state?: InlineState; onState?: (s: InlineState) => void; onAsk?: (text: string) => void; onOpen?: (spec: DecideSpec) => void }) {
+  // with nowhere to keep it (a shared, read-only view), weighing still works — for this visit
+  const [local, setLocal] = useState<InlineState | undefined>(undefined);
+  const st = onState ? state : local ?? state;
+  const set = (s: InlineState) => (onState ? onState(s) : setLocal(s));
+  const t = decideTally(spec, st);
+  const leaning = decideLeaning(spec, t);
+  const changed = (ri: number, oi: number) => t.scores[ri][oi] !== spec.rows[ri].scores[oi];
+  const weigh = (ri: number) => set({ ...st, weights: t.weights.map((w, i) => (i === ri ? (w + 1) % 4 : w)) });
+  const rate = (ri: number, oi: number) => set({ ...st, scores: t.scores.map((row, i) => (i === ri ? row.map((v, j) => (j === oi ? (v + 1) % 4 : v)) : row)) });
+  const said = () =>
+    `Here is how I weighed it: ${spec.rows.map((r, ri) => `${r.label} ${WEIGHT_SAID[t.weights[ri]]}`).join('; ')}. ${leaning.replace(/ Say what matters more and it may change\.$/, '')} What am I not seeing?`;
+  const handOff = (): DecideSpec => ({
+    ...spec,
+    ...(st?.weights ? { weights: t.weights } : {}),
+    rows: spec.rows.map((r, ri) => {
+      const theirs = r.scores.map((_v, oi) => (changed(ri, oi) ? oi : -1)).filter((oi) => oi >= 0);
+      return { ...r, scores: t.scores[ri], ...(theirs.length ? { theirs } : {}) };
+    }),
+  });
+  const pct = (v: number) => (t.most ? Math.round((v / t.most) * 100) : 0);
+  return (
+    <div className="ln ln-decide" role="group" aria-label={spec.title || `Deciding: ${spec.options.join(' or ')}`}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <div className="ln-scroll">
+        <table className="ln-table ln-decide-t">
+          <thead>
+            <tr>
+              <td className="ln-decide-k">
+                <span className="ln-basis">What it rests on</span>
+              </td>
+              {spec.options.map((o, oi) => (
+                <th key={oi} scope="col" className={t.leaders.length === 1 && t.leaders[0] === oi && t.most > 0 ? 'is-lead' : undefined}>
+                  {o}
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {spec.rows.map((r, ri) => (
+              <tr key={ri} className={t.weights[ri] === 0 ? 'is-off' : undefined}>
+                <th scope="row">
+                  <span className="ln-decide-l">{r.label}</span>
+                  {r.note && <span className="ln-decide-note">{r.note}</span>}
+                  <button type="button" className="ln-weight" onClick={() => weigh(ri)} aria-label={`How much ${r.label} matters to you: ${WEIGHT_SAID[t.weights[ri]]}. Press to change.`}>
+                    <Dots n={t.weights[ri]} />
+                    <span>{WEIGHT_SAID[t.weights[ri]]}</span>
+                  </button>
+                </th>
+                {spec.options.map((o, oi) => (
+                  <td key={oi}>
+                    <button
+                      type="button"
+                      className={`ln-rate${changed(ri, oi) ? ' is-theirs' : ''}`}
+                      onClick={() => rate(ri, oi)}
+                      aria-label={`${o} on ${r.label}: ${SCORE_SAID[t.scores[ri][oi]]}${changed(ri, oi) ? ', your reading' : ''}. Press to change.`}
+                    >
+                      <Dots n={t.scores[ri][oi]} />
+                    </button>
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+          <tfoot>
+            <tr>
+              <th scope="row">
+                <span className="ln-basis">{t.weighed ? 'With your weights' : 'Weighted evenly'}</span>
+              </th>
+              {spec.options.map((o, oi) => (
+                <td key={oi}>
+                  <span className={`ln-decide-bar${t.leaders.length === 1 && t.leaders[0] === oi && t.most > 0 ? ' is-lead' : ''}`} role="img" aria-label={`${o}: ${t.totals[oi]} of ${t.most}`}>
+                    <i style={{ width: `${pct(t.totals[oi])}%` }} />
+                  </span>
+                </td>
+              ))}
+            </tr>
+          </tfoot>
+        </table>
+      </div>
+      <p className="ln-decide-lean" aria-live="polite">
+        {leaning}
+      </p>
+      <div className="ln-foot">
+        <span className="ln-basis">The first reading in each cell is Socria’s; tap any you see differently.</span>
+        <span className="ln-acts">
+          {onAsk && (
+            <button type="button" className="ln-open" onClick={() => onAsk(said())}>
+              Talk it through
+            </button>
+          )}
+          <OpenButton onOpen={onOpen ? () => onOpen(handOff()) : undefined} what="decision" />
+        </span>
+      </div>
     </div>
   );
 }

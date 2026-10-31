@@ -11,6 +11,7 @@
 //   node scripts/dev/fake-postgrest.mjs            # :54321
 //   SUPABASE_URL=http://localhost:54321 SUPABASE_SERVICE_ROLE_KEY=dev next dev
 
+import { usageFunctions } from './usage-functions.mjs';
 import http from 'node:http';
 
 const PORT = Number(process.env.PORT || 54321);
@@ -121,6 +122,9 @@ http
     if (!m) return send(res, 404, { message: 'not found' });
     const [, rpc, name] = m;
     if (rpc) {
+      // the free plan's usage functions (supabase/schema.sql), the same as the suites use
+      const usage = usageFunctions((tables.logos_usage ??= []));
+      if (usage[name]) return send(res, 200, usage[name](JSON.parse(body || '{}')));
       if (name !== 'bump_product_event') return send(res, 404, { message: 'no such function' });
       const a = JSON.parse(body || '{}');
       const t = tables.product_events;

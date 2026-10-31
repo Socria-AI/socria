@@ -9,7 +9,7 @@
 // to, so they get the same thing in localStorage.
 
 import { topicTitle } from './logos5/title';
-import { EMPTY_MAP, type ThinkingMap } from './logos';
+import { EMPTY_MAP, sanitizeMap, type ThinkingMap } from './logos';
 import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
@@ -142,6 +142,20 @@ export function sortSessions(list: LogosSession[]): LogosSession[] {
   return [...list].sort((a, b) => b.updatedAt - a.updatedAt);
 }
 
+/**
+ * A stored turn, only if it is one: a role, words that are words, and
+ * attachments that are a list. This browser's copy is read back on every
+ * load, so ONE malformed turn — a null, words stored as an array — used to
+ * throw while the page rendered, and threw again on every reload after: the
+ * whole app gone, for good, with no way back short of clearing site data.
+ */
+export function cleanLocalMessages(raw: unknown): LogosMsg[] {
+  if (!Array.isArray(raw)) return [];
+  return raw
+    .filter((m: any) => m && typeof m === 'object' && (m.role === 'user' || m.role === 'assistant') && typeof m.content === 'string')
+    .map((m: any) => (m.attachments === undefined || Array.isArray(m.attachments) ? m : { ...m, attachments: undefined })) as LogosMsg[];
+}
+
 export function loadLocal(): LogosSession[] {
   if (typeof window === 'undefined') return [];
   try {
@@ -154,8 +168,9 @@ export function loadLocal(): LogosSession[] {
       .map((s: any) => ({
         id: s.id,
         title: typeof s.title === 'string' ? s.title : UNTITLED,
-        messages: s.messages,
-        map: s.map && Array.isArray(s.map.nodes) ? s.map : { ...EMPTY_MAP },
+        messages: cleanLocalMessages(s.messages),
+        // the same check the account's copy gets when it is read back (LogosApp's cloud load)
+        map: s.map && Array.isArray(s.map.nodes) ? sanitizeMap(s.map, { trust: 'stored' }) : { ...EMPTY_MAP },
         // an old draft opens as a document, every word kept (lib/write/parse.ts)
         draft: normalizeDraft(s.draft),
         contexts: sanitizeContexts(s.contexts),

@@ -143,7 +143,7 @@ console.log('\n=== the copy: what each says, and what none may say ===');
   // limit-chats repeats the boundary verbatim — no second opinion.
   ok('limit-chats is the boundary’s own two sentences', all['limit-chats'].text.includes(boundaryNote('chats')));
   ok('...and the reset date', all['limit-chats'].text.includes('1 October 2026'));
-  ok('limit-chats subject', all['limit-chats'].subject === 'Your free lines of thinking for this month');
+  ok('limit-chats subject', all['limit-chats'].subject === 'Your free conversations for this month');
 
   // welcome says what One does, and that nothing moved. What it says had to
   // change when the free tier stopped being clipped: it used to promise a map
@@ -152,7 +152,8 @@ console.log('\n=== the copy: what each says, and what none may say ===');
   ok('welcome opens with the volume', /as many lines of thinking as you have/.test(all['welcome-one'].text));
   ok('welcome promises the continuity', /carries what it learns about how you reason/.test(all['welcome-one'].text));
   // removed: "...on both surfaces" (/into Core and into Logos/) — Core was archived; Logos 5 is the one surface
-  ok('welcome says what is not counted', /there is no daily count/.test(all['welcome-one'].text));
+  ok('welcome says what is not counted', /nothing is counted by the month any more/.test(all['welcome-one'].text));
+  ok('welcome says what is unlimited, from the plan table', all['welcome-one'].text.includes('Unlimited conversations, Logic Maps, artifacts and documents, with Socria Voice and chat sharing'));
   ok('welcome reassures', /Nothing you have already made changes/.test(all['welcome-one'].text));
   // No email names Core: the Core models and the Core chat were archived (docs/ARCHIVE.md).
   for (const k of LIFECYCLE_KINDS) {

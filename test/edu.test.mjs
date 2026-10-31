@@ -13,8 +13,12 @@
 //   in answers no to everything and the code is inert rather than merely
 //   unused.
 //
-// And the offer itself: the FIRST MONTH free, once per account, begun when a
-// verified address is first seen while the offer is open.
+// And the offer itself, which was the FIRST MONTH free, once per account —
+// RETIRED on 31 October 2026 with every other free grant of Socria One. What
+// is pinned now is that nothing switches it back on: no date, no domain in
+// the environment, no verified address. A month recorded while it ran still
+// reads back (the record is the account's), and grants nothing (that is
+// lib/socria-one-grant.ts, pinned in test/billing.test.mjs).
 
 import {
   eduDomains, eduProgrammeOn, isEduEmail, verifiedEduEmail, hasEduAccess, eduDomainLabel,
@@ -54,42 +58,44 @@ console.log('=== off unless switched on — once the offer has closed ===');
   }
 }
 
-console.log('\n=== this semester’s offer switches it on, for UTA alone ===');
+console.log('\n=== the offer is retired: nothing switches it on ===');
 {
-  ok('the offer is for UT Arlington’s student domain', JSON.stringify(STUDENT_OFFER.domains) === JSON.stringify(['mavs.uta.edu']));
+  ok('the record of the offer: UT Arlington’s student domain', JSON.stringify(STUDENT_OFFER.domains) === JSON.stringify(['mavs.uta.edu']));
   ok('  a month of thirty days', STUDENT_OFFER.days === 30);
-  ok('  closing at the end of 9 December 2026, Central time', new Date(STUDENT_OFFER.closes).toISOString() === '2026-12-10T06:00:00.000Z');
-  ok('open now, closed after', studentOfferOpen(OPEN) && !studentOfferOpen(AFTER));
+  ok('  that was to close at the end of 9 December 2026, Central time', new Date(STUDENT_OFFER.closes).toISOString() === '2026-12-10T06:00:00.000Z');
+  ok('closed now, before its date, and after it', !studentOfferOpen(OPEN) && !studentOfferOpen(AFTER));
   withDomains(undefined, () => {
-    ok('unset, while open: the programme is on', eduProgrammeOn(OPEN) === true);
-    ok('  for the offer’s domain', JSON.stringify(eduDomains(OPEN)) === JSON.stringify(['mavs.uta.edu']));
-    ok('  named as UT Arlington', eduSchool(OPEN)?.short === 'UTA');
-    ok('  and a verified UTA address qualifies', hasEduAccess([verified('a@mavs.uta.edu')], OPEN) === true);
+    ok('unset, before the old close: the programme is off', eduProgrammeOn(OPEN) === false);
+    ok('  no domain is read from the old offer', JSON.stringify(eduDomains(OPEN)) === '[]');
+    ok('  no school is named', eduSchool(OPEN) === null);
+    ok('  and a verified UTA address qualifies for nothing', hasEduAccess([verified('a@mavs.uta.edu')], OPEN) === false);
     ok('  but not the staff domain, nor another school', !isEduEmail('a@uta.edu', OPEN) && !isEduEmail('a@other.edu', OPEN));
     ok('  and still verified, not typed', hasEduAccess([unverified('a@mavs.uta.edu')], OPEN) === false);
   });
   withDomains('example.edu', () => {
-    ok('the variable, when set, decides instead', JSON.stringify(eduDomains(OPEN)) === JSON.stringify(['example.edu']) && !isEduEmail('a@mavs.uta.edu', OPEN));
+    ok('the variable, when set, is still read as a list', JSON.stringify(eduDomains(OPEN)) === JSON.stringify(['example.edu']) && !isEduEmail('a@mavs.uta.edu', OPEN));
     ok('  whatever the date', JSON.stringify(eduDomains(AFTER)) === JSON.stringify(['example.edu']));
+  });
+  withDomains('mavs.uta.edu', () => {
+    ok('and setting it no longer switches the programme on', eduProgrammeOn(OPEN) === false && eduProgrammeOn(AFTER) === false);
+    ok('  a verified address on a listed domain qualifies for nothing', hasEduAccess([verified('a@mavs.uta.edu')], OPEN) === false && verifiedEduEmail([verified('a@mavs.uta.edu')], OPEN) === null);
   });
 }
 
-console.log('\n=== the first month, free — once ===');
+console.log('\n=== no month begins now; one recorded while it ran still reads ===');
 {
   withDomains(undefined, () => {
     const uta = [verified('me@gmail.com'), verified('ella@mavs.uta.edu')];
     const first = studentStanding({ emails: uta, recorded: null, now: OPEN });
-    ok('a verified student with no month begins one now', first.begins && first.active && first.month?.since === OPEN);
-    ok('  thirty days long', first.month?.until === OPEN + 30 * DAY);
-    ok('  with the address that began it', first.month?.email === 'ella@mavs.uta.edu' && first.email === 'ella@mavs.uta.edu');
+    ok('a verified student with no month begins nothing', !first.begins && !first.active && first.month === null);
 
     const recorded = readStudentMonth({ email: 'ella@mavs.uta.edu', since: OPEN });
     ok('the record reads back as the same month', recorded?.until === OPEN + 30 * DAY && recorded?.email === 'ella@mavs.uta.edu');
     const day12 = studentStanding({ emails: uta, recorded, now: OPEN + 12 * DAY });
-    ok('day twelve: Socria One, and nothing new to record', day12.active && !day12.begins);
+    ok('day twelve: the recorded month reads as running, and nothing new to record (it grants nothing: lib/socria-one-grant.ts)', day12.active && !day12.begins);
     const day31 = studentStanding({ emails: uta, recorded, now: OPEN + 30 * DAY + 1 });
     ok('day thirty-one: over', !day31.active && !day31.begins && day31.month?.until === OPEN + 30 * DAY);
-    ok('  and never a second month, while the offer is still open', studentOfferOpen(OPEN + 31 * DAY) && !studentStanding({ emails: uta, recorded, now: OPEN + 31 * DAY }).begins);
+    ok('  and never a second month', !studentStanding({ emails: uta, recorded, now: OPEN + 31 * DAY }).begins);
 
     const removed = studentStanding({ emails: [verified('me@gmail.com')], recorded, now: OPEN + 5 * DAY });
     ok('removing the address pauses it', !removed.active && !removed.begins);
@@ -112,8 +118,10 @@ console.log('\n=== the first month, free — once ===');
 console.log('\n=== verified, not typed ===');
 {
   withDomains('mavs.uta.edu', () => {
-    ok('a verified university address qualifies', hasEduAccess([verified('ella@mavs.uta.edu')]) === true);
-    ok('and it says which one', verifiedEduEmail([verified('ella@mavs.uta.edu')]) === 'ella@mavs.uta.edu');
+    // With the programme retired a verified address qualifies for nothing
+    // either; what stays pinned is that typing was never enough.
+    ok('a verified university address qualifies for nothing now', hasEduAccess([verified('ella@mavs.uta.edu')]) === false);
+    ok('and none is named', verifiedEduEmail([verified('ella@mavs.uta.edu')]) === null);
 
     // The whole point: typing is not evidence.
     ok('an UNVERIFIED one does not', hasEduAccess([unverified('ella@mavs.uta.edu')]) === false);
@@ -125,10 +133,10 @@ console.log('\n=== verified, not typed ===');
     ok('a null verification does not', hasEduAccess([{ emailAddress: 'a@mavs.uta.edu', verification: null }]) === false);
 
     // Their ordinary account, with the university address added alongside.
-    ok('a personal address beside a verified one still qualifies',
-      hasEduAccess([verified('me@gmail.com'), verified('ella@mavs.uta.edu')]) === true);
-    ok('and the university one is the one named',
-      verifiedEduEmail([verified('me@gmail.com'), verified('ella@mavs.uta.edu')]) === 'ella@mavs.uta.edu');
+    ok('a personal address beside a verified one qualifies for nothing either',
+      hasEduAccess([verified('me@gmail.com'), verified('ella@mavs.uta.edu')]) === false);
+    ok('and nothing is named',
+      verifiedEduEmail([verified('me@gmail.com'), verified('ella@mavs.uta.edu')]) === null);
     ok('a verified personal address alone does not qualify',
       hasEduAccess([verified('me@gmail.com')]) === false);
     ok('nor does an unverified university one beside a verified personal one',
@@ -262,9 +270,9 @@ console.log('\n=== naming the school, and knowing when not to ===');
   // The naming must never be what decides access.
   withDomains('example.edu', () => {
     ok('an unnamed school still qualifies', isEduEmail('a@example.edu') === true);
-    ok('and still grants access', hasEduAccess([
+    ok('and, retired, grants nothing — named or not', hasEduAccess([
       { emailAddress: 'a@example.edu', verification: { status: 'verified' } },
-    ]) === true);
+    ]) === false);
   });
 }
 

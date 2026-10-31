@@ -368,7 +368,9 @@ export function useLogosCollab(opts: {
           body: JSON.stringify({ session: current ?? null }),
         });
         if (!res.ok) {
-          setError(res.status === 401 ? 'Sign in to think together.' : 'Could not open a room.');
+          // opening a room is sharing, and sharing is Socria One: the server says so in its own words
+          const said = res.status === 402 ? ((await res.json().catch(() => null)) as { error?: string } | null)?.error : null;
+          setError(res.status === 401 ? 'Sign in to think together.' : said || 'Could not open a room.');
           return;
         }
         const json = await res.json();

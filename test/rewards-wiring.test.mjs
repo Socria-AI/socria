@@ -14,14 +14,15 @@ const read = (p) => readFileSync(join(root, p), 'utf8');
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 
-console.log('=== the plan: paid first, promotional only when nothing else holds ===');
+console.log('=== the plan: paid, or nothing — promotional time opens nothing ===');
 {
+  // Rewards no longer grant Socria One (October 31, 2026, docs/FREEMIUM.md):
+  // the plan every gated route reads is the base plan, and nothing more.
   const s = read('lib/socria-one-server.ts');
-  const resolve = s.slice(s.indexOf('export async function resolvePlanForRequest'));
-  ok('the plan asks the base plan first and returns it when it is One', /const base = await resolveBasePlanForRequest\(req, userId\);\s*if \(base === 'one' \|\| !userId\) return base;/.test(resolve));
-  ok('…and only then promotional time', /return \(await promoOn\(userId\)\) \? 'one' : 'free';/.test(resolve));
-  ok('the base plan never consults rewards', !/promo/i.test(s.slice(s.indexOf('export async function resolveBasePlanForRequest'), s.indexOf('/** Promotional Socria One running right now'))));
-  ok('a reward write clears the remembered plan', /promoMemo\.delete\(userId\)/.test(s));
+  const resolve = s.slice(s.indexOf('export async function resolvePlanForRequest'), s.indexOf('export async function baseEntitledForRewards'));
+  ok('the plan is the base plan, with no promotional branch', /return resolveBasePlanForRequest\(req, userId\);/.test(resolve) && !/promo/i.test(resolve.replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')));
+  ok('…and the plan module reads no promotional time at all', !/promoActiveNow|promoOn|promoMemo/.test(s));
+  ok('the base plan never consults rewards', !/promo/i.test(s.slice(s.indexOf('export async function resolveBasePlanForRequest'), s.indexOf('export async function resolvePlanForRequest')).replace(/\/\/[^\n]*|\/\*[\s\S]*?\*\//g, '')));
   ok('for rewards, "could not tell" means "still entitled" — banked days never start by accident', /return !sub\.ok \|\| grant === null;/.test(s));
   const pa = read('lib/rewards/promo-access.ts');
   ok('the per-request check only reads', /getAccount\(userId\)/.test(pa) && !/casAccount|insertLedger|updateLedger|createAccount|resolvePromo/.test(pa));
@@ -42,14 +43,14 @@ console.log('=== billing: never sells twice, never refuses someone on a reward, 
   ok('nothing in Socria Rewards calls Stripe', !/stripe\(|from '@\/lib\/stripe'|from '\.\.\/stripe'|subscriptions\.(update|create|cancel)/.test(all));
   ok('nothing in Socria Rewards writes the subscriptions table', !/socria_subscriptions/.test(all));
   const plan = read('app/api/logos/plan/route.ts');
-  ok('the plan endpoint says when One comes from a reward alone', /only: plan === 'one' && base === 'free'/.test(plan));
+  ok('the plan endpoint reports no promotional time — none grants anything', /const promo = undefined/.test(plan));
   const up = read('components/usePlan.ts');
   ok('a reward is never cached in the browser as a membership', /plan === 'one' && !promo\?\.only/.test(up));
   ok('…in Logos either', /json\.plan === 'one' && !json\?\.promo\?\.only/.test(read('components/LogosApp.tsx')));
   const one = read('components/site/OneJoin.tsx');
-  ok('/one still sells to someone on a reward, and says what happens to their days', /const isOne = plan\.known && plan\.plan === 'one' && !fromReward;/.test(one) && /saved, not lost/.test(one));
+  ok('/one has no reward case to explain', /const isOne = plan\.known && plan\.plan === 'one';/.test(one) && !/fromReward|Socria Rewards/.test(one));
   const sheet = read('components/account/AccountSheet.tsx');
-  ok('the account says "from Socria Rewards", not "manage membership", for reward-only One', /fromReward \? 'Keep Socria One →'/.test(sheet));
+  ok('the account never says "from Socria Rewards"', !/fromReward|From Socria Rewards/.test(sheet));
 }
 
 console.log('=== the server decides, the browser asks ===');

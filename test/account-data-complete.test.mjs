@@ -15,19 +15,28 @@ import { fileURLToPath } from 'node:url';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const read = (p) => readFileSync(join(root, p), 'utf8');
 
-const schema = read('supabase/schema.sql');
+// Every migration file, not only schema.sql: rooms.sql made three tables of
+// people's words that this test never saw, and account deletion never reached.
+const SQL = readdirSync(join(root, 'supabase')).filter((f) => f.endsWith('.sql')).sort();
+const schema = SQL.map((f) => read(`supabase/${f}`)).join('\n');
 const del = read('app/api/account/delete/route.ts');
 const exp = read('app/api/account/export/route.ts');
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
 
-const tables = [...schema.matchAll(/create table if not exists (\w+)/g)].map((m) => m[1]);
+const tables = [...new Set([...schema.matchAll(/create table if not exists (\w+)/g)].map((m) => m[1]))];
 
 // Tables keyed by owner AND member rather than by one user_id: sharing.
 // They are not in OWNED_TABLES (a flat `.eq('user_id')` would miss the
 // shares someone owns); they are reached by purgeSharing instead.
 const SHARED = new Set(['shares', 'share_members', 'share_comments', 'share_activity', 'share_presence']);
+
+// Rooms (supabase/rooms.sql): two people in one room, so not a flat delete
+// either. Reached by purgeUserFromRooms — their own events and seats go, a
+// room they hosted is closed with the host cleared, and the other person's
+// words stay that person's. Exported as their own seats and their own events.
+const ROOMS = new Set(['logos_rooms', 'logos_room_members', 'logos_room_events']);
 
 // Tables that hold nothing about any one person: no user id, no row that is
 // anyone's. product_events is one integer per (environment, day, event,
@@ -103,6 +112,8 @@ ok('the schema declares tables', tables.length > 0, `${tables.length}`);
 for (const t of tables) {
   if (SHARED.has(t)) {
     ok(`${t} — reached by the sharing purge`, /await purgeSharing\(userId\)/.test(del));
+  } else if (ROOMS.has(t)) {
+    ok(`${t} — reached by the room purge`, /await purgeUserFromRooms\(userId, /.test(del));
   } else if (EVENT_TABLES[t]) {
     ok(`${t} — about events, not people: exactly its columns`, JSON.stringify(columnsOf(t)) === JSON.stringify(EVENT_TABLES[t]), JSON.stringify(columnsOf(t)));
   } else if (t === 'event_registrations') {
@@ -122,6 +133,10 @@ for (const t of tables) {
 console.log('\n=== every table is in the export ===');
 for (const t of tables) {
   if (ANONYMOUS[t] || EVENT_TABLES[t]) continue; // nobody's, checked above
+  if (t === 'logos_rooms') {
+    ok(`${t} — the rooms they sat in are exported with their seats`, /from\('logos_rooms'\)/.test(exp) && /from\('logos_room_members'\)/.test(exp));
+    continue;
+  }
   if (t === 'event_registrations') {
     ok(`${t} — exported, by verified address`, /exportRegistrationsForEmails\(verified\)/.test(exp));
     continue;

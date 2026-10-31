@@ -162,14 +162,21 @@ const isBare = (v: SessionView): boolean => !v.draft && !v.replyTo && !v.focus &
  * Keep this session's view, and that it is the one open. Returns the store
  * written. Never throws: a full or blocked storage just means no resume.
  */
-export function writeView(storage: StorageLike | null | undefined, id: string, view: Omit<SessionView, 'at'>, now = Date.now()): ResumeStore {
+export function writeView(
+  storage: StorageLike | null | undefined,
+  id: string,
+  view: Omit<SessionView, 'at'>,
+  now = Date.now(),
+  /** false: keep this view without making it the one a reload reopens — a line of thinking written to while another is on screen */
+  visit = true
+): ResumeStore {
   const store = readResume(storage);
   if (!ID.test(id)) return store;
   const clean = cleanView({ ...view, at: now });
   const views = { ...store.views };
   if (clean && !isBare(clean)) views[id] = clean;
   else delete views[id];
-  const next: ResumeStore = { last: id, views: prune(views) };
+  const next: ResumeStore = { last: visit ? id : store.last, views: prune(views) };
   try {
     storage?.setItem(RESUME_KEY, JSON.stringify(next));
   } catch {

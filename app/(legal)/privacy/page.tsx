@@ -363,7 +363,13 @@ export default function PrivacyPage() {
 
       <h2 id="students">Students</h2>
       <p>
-        Students at universities we have approved can have their first month
+        The student month was retired on 31 October 2026: nothing begins one
+        now, and adding a university address does nothing beyond adding an
+        email address. What follows is how we treat an address that was
+        verified for it while it ran.
+      </p>
+      <p>
+        Students at universities we have approved could have their first month
         of Socria One free &mdash; this semester, at UT Arlington &mdash; and
         the way we check is a <strong>verified</strong> email address at that
         university &mdash; added to your ordinary account the way anyone adds a
@@ -413,7 +419,7 @@ export default function PrivacyPage() {
       <p>
         Socria is not affiliated with, endorsed by, or acting on behalf of any
         university. Remove the address from{' '}
-        <a href="/account">your account</a> and the free month pauses with it;
+        <a href="/account">your account</a> whenever you like;
         nothing else about your account changes, and everything you have
         written stays yours. The age rule below applies to students in exactly
         the same way as to everyone else.

@@ -2,14 +2,15 @@
 // components/site/One.tsx, from the design project's `Socria One`.
 import type { Metadata } from 'next';
 import { One } from '@/components/site/One';
+import { onePlanSentence } from '@/lib/entitlements';
 import { priceWithPeriod } from '@/lib/socria-one';
 import { pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
   path: '/one',
-  title: 'Socria One — everything Socria does, without the ceiling',
+  title: 'Socria One — unlimited Socria, with Voice and sharing',
   absolute: true,
-  description: `Socria One: no daily count, lines of thinking as you need them, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Socria is free to start.`,
+  description: `Socria One: ${onePlanSentence().replace(/^U/, 'u')}, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Socria is free to start.`,
 });
 
 export default function OnePage() {

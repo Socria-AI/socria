@@ -28,7 +28,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import type Stripe from 'stripe';
 import { stripe } from '@/lib/stripe';
-import { recordAttribution, upsertSubscription, userForCustomer } from '@/lib/subscriptions';
+import { entitles, getSubscription, recordAttribution, upsertSubscription, userForCustomer } from '@/lib/subscriptions';
+import { isMissingResource } from '@/lib/stripe-diagnosis';
 import { writeStripeMirror } from '@/lib/socria-one-grant';
 import { attributionFromMetadata, type Attribution } from '@/lib/checkout-attribution';
 import { trackServer } from '@/lib/analytics-server';
@@ -161,6 +162,29 @@ async function resolveUserId(
   return null;
 }
 
+/**
+ * The subscription as Stripe holds it NOW — never as the event remembers it.
+ *
+ * Stripe does not deliver events in order, and retries a failed one for days:
+ * an 'updated' that says 'active' can land after the 'deleted' that ended it,
+ * and written as sent it would hand back what was taken away (an 'active'
+ * entitles whatever its period says). So an event only says WHICH subscription
+ * moved; what it now is, is read from Stripe — as checkout already does.
+ *
+ * If Stripe no longer has it, an ending is applied as sent (nothing can undo
+ * one) and anything else is dropped rather than believed. Any other failure
+ * throws, and the 500 has Stripe deliver the event again later.
+ */
+async function currentSubscription(sub: Stripe.Subscription, ending: boolean): Promise<Stripe.Subscription | null> {
+  try {
+    return await stripe().subscriptions.retrieve(sub.id);
+  } catch (e) {
+    if (!isMissingResource(e)) throw e;
+    console.warn('stripe webhook: Stripe has no subscription', sub.id);
+    return ending ? sub : null;
+  }
+}
+
 async function applySubscription(sub: Stripe.Subscription): Promise<void> {
   const customerId = customerIdOf(sub.customer);
   const userId = await resolveUserId(sub.metadata, customerId);
@@ -168,6 +192,21 @@ async function applySubscription(sub: Stripe.Subscription): Promise<void> {
     console.warn('stripe webhook: no user for subscription', sub.id);
     return;
   }
+
+  // One row per person. A subscription that does not entitle must not
+  // overwrite access that stands on something else — a different, live
+  // subscription, or a complimentary month kept over a dead one: the late
+  // ending of the one they cancelled last month is not the end of the one
+  // they hold today. Access it grants always lands (a real subscription
+  // replaces a comp row), and the subscription they hold ending is written.
+  if (!entitledBy(sub.status, periodEndOf(sub))) {
+    const held = await getSubscription(userId);
+    if (held && entitles(held) && (held.status === 'comp' || held.subscriptionId !== sub.id)) {
+      console.warn('stripe webhook: not ending access held another way', sub.id);
+      return;
+    }
+  }
+
   // The instance that took the payment must not keep saying 'free' for
   // half a minute from its memo.
   forgetPlanMemo(userId);
@@ -282,7 +321,11 @@ export async function POST(req: NextRequest) {
       }
     } else {
       const sub = event.data.object as Stripe.Subscription;
-      await applySubscription(sub);
+      const latest = await currentSubscription(sub, event.type === 'customer.subscription.deleted');
+      // Stripe has no record and this was not an ending: nothing to grant.
+      if (!latest) return NextResponse.json({ received: true, dropped: sub.id });
+      // Metadata we set at checkout names the person; a retrieved object carries it too.
+      await applySubscription(latest);
       // The other end of the funnel. Attribution rides on the subscription's
       // own metadata (set at checkout), so a cancellation is counted against
       // the same trigger that earned the subscription — which is how a

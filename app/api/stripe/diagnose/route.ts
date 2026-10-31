@@ -17,7 +17,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { stripe, stripeConfigured, siteUrl, usableCustomer } from '@/lib/stripe';
-import { priceIdProblem, stripeFailure } from '@/lib/stripe-diagnosis';
+import { priceIdProblem, priceMatchesPlan, stripeFailure } from '@/lib/stripe-diagnosis';
+import { SOCRIA_ONE } from '@/lib/socria-one';
 import { getSubscription } from '@/lib/subscriptions';
 import { enforceRateLimit } from '@/lib/rate-limit';
 
@@ -82,6 +83,9 @@ export async function GET(req: NextRequest) {
     const price = await stripe().prices.retrieve(process.env.STRIPE_PRICE_SOCRIA_ONE!);
     const recurring = !!price.recurring;
     priceOk = price.active && recurring;
+    // …and that it is what the pages say: Socria One, $15 a month
+    const mismatch = priceMatchesPlan(price, SOCRIA_ONE);
+    add('The price matches the pages', !mismatch, mismatch ?? `$${SOCRIA_ONE.price} a ${SOCRIA_ONE.period}, as stated.`);
     add(
       'The price, at Stripe',
       priceOk,

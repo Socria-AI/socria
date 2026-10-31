@@ -35,7 +35,7 @@ import { ThemePicker } from './ThemePicker';
 import { AccessCode } from './AccessCode';
 import { anyModelGated } from '@/lib/socria-model-store';
 import { LOGOS5 } from '@/lib/logos5/flags';
-import { PLANS } from '@/lib/entitlements';
+import { freePlanSentence, onePlanSentence } from '@/lib/entitlements';
 import { TestingTools } from './TestingTools';
 import { NameField, RolePicker } from './RolePicker';
 import { ConversationStylePicker } from './ConversationStylePicker';
@@ -208,7 +208,9 @@ export function AccountSheet({
               <MembershipAsked isOne={isOne} onClose={onClose} />
             )}
 
-            {/* Socria Rewards: the 5-Node Challenge, Give 7 / Get 7, and what each reward did. */}
+            {/* Socria Rewards — dark: the server answers { enabled: false } unless
+                REWARDS_ENABLED=1, so this renders nothing. Its days no longer
+                grant Socria One (docs/FREEMIUM.md); leave it off. */}
             <RewardsPanel enabled={!!user} />
 
             {/* Only while something waits behind a code — a model, or the
@@ -380,20 +382,15 @@ const JUMPS: [string, string][] = [
   ['acct-device', 'This device'],
 ];
 
-/** The free plan's day and month, read from the one table (lib/entitlements.ts) rather than typed twice. */
+/** The free plan's month, read from the one table (lib/entitlements.ts) rather than typed twice. */
 function freeTerms(): string {
-  const c = PLANS.free.counters;
-  return `Every lens and move: ${c.messages} messages a day, and ${c.chats} new lines of thinking a month.`;
+  const s = freePlanSentence();
+  return `${s.charAt(0).toUpperCase()}${s.slice(1)}. Socria Voice and sharing a chat are part of Socria One.`;
 }
 
-/**
- * The membership line. Socria One from a REWARD alone is said as such — with
- * how long is left and the way to keep it — rather than as a membership with
- * something to manage, because there is no billing behind it.
- */
+/** The membership line: what this account's plan holds, from the same table. */
 function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState | null; onClose: () => void }) {
-  const promo = plan?.promo;
-  const fromReward = isOne && !!promo?.only;
+  void plan;
   return (
     <div className="sec" id="acct-plan">
       <span className="lbl">Membership</span>
@@ -412,15 +409,11 @@ function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState 
             </span>
           </div>
           <p className="note">
-            {fromReward
-              ? `From Socria Rewards — ${promo!.daysLeft} ${promo!.daysLeft === 1 ? 'day' : 'days'} left. A membership keeps it, and saves the days still to come.`
-              : isOne
-                ? 'No daily count, every chat shared if you like, and how you reason carried between conversations.'
-                : freeTerms()}
+            {isOne ? `${onePlanSentence()}, and how you reason carried between conversations.` : freeTerms()}
           </p>
         </div>
         <Link className="link-act" href="/one" onClick={onClose}>
-          {fromReward ? 'Keep Socria One →' : isOne ? 'Manage membership' : 'Continue with One →'}
+          {isOne ? 'Manage membership' : 'Upgrade to Socria One →'}
         </Link>
       </div>
     </div>

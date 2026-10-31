@@ -25,6 +25,7 @@
 // price. The parent decides whether to render at all; this only decides how.
 
 import { useCallback, useState } from 'react';
+import { onePlanSentence } from '@/lib/entitlements';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
 import { billingError, billingLine } from '@/lib/billing-message';
 import type { PlanState } from './usePlan';
@@ -158,9 +159,6 @@ export function OneCard({ state }: { state: PlanState }) {
   }, [busy]);
 
   const member = state.plan === 'one';
-  const student = state.student;
-  // Access that came from a verified university address rather than a card.
-  const byStudy = member && !!student?.email;
 
   return (
     <section className={`one-mark is-card${member ? ' is-member' : ''}`} id="plan" aria-labelledby="one-card-title">
@@ -171,18 +169,14 @@ export function OneCard({ state }: { state: PlanState }) {
       </h2>
       {member ? (
         <p className="one-mark-line">
-          {byStudy
-            ? `${student?.school ? `${student.school.short} student` : 'Student'} access. Everything Socria does, without the ceiling, free while that address stays verified.`
-            : state.manageable
-              ? 'You are a member. Everything Socria does, without the ceiling.'
-              : 'You hold a complimentary membership. Everything Socria does, without the ceiling.'}
+          {state.manageable ? 'You are a member.' : 'This account holds Socria One.'} {onePlanSentence()}.
         </p>
       ) : (
         <>
           <Price />
           <p className="one-mark-line">
-            As many lines of thinking as you have, and a Socria that carries how
-            you reason from each one into the next.
+            {onePlanSentence()}, and a Socria that carries how you reason from
+            each conversation into the next.
           </p>
         </>
       )}
@@ -217,26 +211,7 @@ export function OneCard({ state }: { state: PlanState }) {
           </>
         )}
       </div>
-      {/* Say WHICH address qualified. "You have student access" is something
-          they have to take on trust; naming the address is a fact they can
-          check, and it is also the thing to look at when it stops working. */}
-      {byStudy && (
-        <p className="one-mark-foot">Verified as {student!.email}.</p>
-      )}
-
-      {/* The offer, to somebody who has not taken it up. Shown only where the
-          programme actually runs — a deployment that has not switched it on
-          says nothing about it. */}
-      {!member && student?.on && (
-        <p className="one-mark-foot">
-          Studying somewhere with a {student.domains} address? Add and verify it in
-          your account and Socria One is free.
-        </p>
-      )}
-
-      {!member && !student?.on && (
-        <p className="one-mark-foot">Cancel anytime. Your maps stay yours.</p>
-      )}
+      {!member && <p className="one-mark-foot">Cancel anytime. Your maps stay yours.</p>}
     </section>
   );
 }

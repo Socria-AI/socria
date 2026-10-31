@@ -253,8 +253,15 @@ console.log('\n=== a withdrawn model: still there, not offered, not stranding an
     'app/api/logos/chat/route.ts',
     'app/api/logos/map/route.ts',
   ];
-  ok('no API route reads the withdrawn flag',
-    routes.every((f) => !/withdrawn/.test(readFile(f))));
+  // One exception, and only one way round: /api/chat asks an ACCOUNT of a
+  // withdrawn Core. A withdrawn model is no longer anyone's way in — the way in
+  // without an account is Logos 5's guest line — so a stranger is no longer
+  // served it; a signed-in person mid-conversation in it is never bounced.
+  const chatRoute = readFile('app/api/chat/route.ts');
+  ok('no API route reads the withdrawn flag to refuse a signed-in person',
+    routes.filter((f) => f !== 'app/api/chat/route.ts').every((f) => !/withdrawn/.test(readFile(f))) &&
+    /const needsAccount = requestedConfig\.requiresAuth \|\| !!requestedConfig\.withdrawn;\s*if \(needsAccount && !userId && !keyUnlocked\)/.test(chatRoute) &&
+    !/withdrawn[^\n]*userId \&\&|userId[^\n]*withdrawn[^\n]*(403|401)/.test(chatRoute));
 
   // The successor is found by SHAPE. A withdrawn Logos surface hands over to a
   // Logos surface; a withdrawn Core hands over to a Core while one is offered,

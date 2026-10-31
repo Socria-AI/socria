@@ -16,10 +16,17 @@
 // MATH is opt-in. Logos carries equations and Core does not, and running the
 // KaTeX splitter over every sentence of a chat that will never contain a `$`
 // is work for nothing — so the surface says whether to look.
+//
+// EDITORIAL is opt-in too: Logos 5's replies in the conversation, laid out to
+// be read (lib/reply-layout.ts) — the opening statement as a standfirst,
+// labelled lists as terms, the later parts of a long reply folded under their
+// titles, the closing question and the ways onward always in view. A document
+// read in Content is not a reply and is not laid out as one.
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copyText } from '@/lib/copy-text';
 import { parseBlocks, splitInline, stripMarks, type Block } from '@/lib/rich-text';
+import { editorialBlocks, layoutReply, streamingSplit } from '@/lib/reply-layout';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
 import { InlineBlock, type InlineHost } from '@/components/inline/InlineUI';
@@ -193,6 +200,25 @@ function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?
         </ol>
       );
 
+    // Labelled items, laid out as terms: the label, then what it says (Logos 5's editorial reading).
+    case 'terms': {
+      const List = block.ordered ? 'ol' : 'ul';
+      return (
+        <List key={k} className={`socria-terms${block.ordered ? ' is-ordered' : ''}`}>
+          {block.items.map((it, i) => (
+            <li key={i}>
+              <span className="socria-term">
+                <Inline text={it.label} math={math} keyBase={`${k}-t${i}`} code={rich} />
+              </span>
+              <span className="socria-term-body">
+                <Inline text={it.body} math={math} keyBase={`${k}-d${i}`} cite={cite} code={rich} />
+              </span>
+            </li>
+          ))}
+        </List>
+      );
+    }
+
     // A labelled list is a set of small sections, not a wall of bullets.
     case 'groups':
       return (
@@ -276,7 +302,8 @@ function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?
  * (lib/inline-ui.ts), whose state and actions `inline` carries. A surface that
  * does not draw those reads each one as the words it stands for.
  */
-export function RichText({ text, math, cite, rich, askLast, inline }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean; inline?: InlineHost }) {
+export function RichText({ text, math, cite, rich, askLast, inline, editorial }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean; inline?: InlineHost; editorial?: boolean }) {
+  if (editorial) return <EditorialText text={text} math={math} cite={cite} askLast={askLast} inline={inline} />;
   const blocks = parseBlocks(!rich && text.includes('```') ? contentAsText(text) : text, { rich });
   const last = blocks.length - 1;
   const apart = !!askLast && setsApart(text);
@@ -300,6 +327,112 @@ export function RichText({ text, math, cite, rich, askLast, inline }: { text: st
         );
       })}
     </>
+  );
+}
+
+/**
+ * A Logos 5 reply, laid out to be read (lib/reply-layout.ts): the lead, terms,
+ * folded parts, the closing question in view. Rich reading throughout. While
+ * it streams, `tail` is the paragraph still being written: it is laid out
+ * where it will land — inside a fold when its part is folded, so a part being
+ * written under a folded title says "Writing…" instead of spilling out and
+ * then jumping in.
+ */
+function EditorialText({ text, tail, math, cite, askLast, inline, streaming }: { text: string; tail?: string; math?: boolean; cite?: CiteRender; askLast?: boolean; inline?: InlineHost; streaming?: boolean }) {
+  const blocks = editorialBlocks(parseBlocks(text, { rich: true }), { more: !!streaming });
+  const pieces = layoutReply(blocks, { streaming, tail });
+  const apart = !!askLast && setsApart(text);
+  const folds = pieces.filter((p) => p.kind === 'fold').length;
+  const lastFold = pieces.map((p) => p.kind).lastIndexOf('fold');
+  const [openFolds, setOpenFolds] = useState(0);
+  const draw = (i: number, key: string): ReactNode => {
+    if (i === blocks.length)
+      return tail ? (
+        <p key={key} className="is-tail">
+          <Inline text={tail} math={math} code />
+        </p>
+      ) : null;
+    const b = blocks[i];
+    // a part of a reply is a section under the page's one heading (the conversation's title): h2, whatever it was written as
+    if (b.kind === 'h')
+      return (
+        <h2 key={key} className={`socria-h socria-h${b.level}`}>
+          <Inline text={b.text} math={math} keyBase={key} code />
+        </h2>
+      );
+    return BlockNode({ block: b, math, k: key, cite, rich: true, inline });
+  };
+  return (
+    <>
+      {pieces.map((p, pi) => {
+        if (p.kind === 'block') {
+          const b = blocks[p.i];
+          if (p.lead && b?.kind === 'p') {
+            return (
+              <p key={`b${p.i}`} className="socria-lead">
+                <Inline text={b.text} math={math} keyBase={`b${p.i}`} cite={cite} code />
+              </p>
+            );
+          }
+          return draw(p.i, `b${p.i}`);
+        }
+        if (p.kind === 'ask') {
+          const b = blocks[p.i];
+          const split = apart && b.kind === 'p' ? closingQuestion(b.text) : null;
+          if (!split) return draw(p.i, `b${p.i}`);
+          return (
+            <p key={`b${p.i}`} className="socria-asks">
+              {split.body && (
+                <>
+                  <Inline text={split.body} math={math} keyBase={`b${p.i}a`} cite={cite} code />{' '}
+                </>
+              )}
+              <em className="socria-ask">
+                <Inline text={split.question} math={math} keyBase={`b${p.i}q`} cite={cite} code />
+              </em>
+            </p>
+          );
+        }
+        const head = blocks[p.head];
+        return (
+          <Fragment key={`f${p.head}`}>
+            <details
+              className={`socria-fold${p.writing ? ' is-writing' : ''}`}
+              onToggle={(e) => {
+                // counted from the page, not kept in step by hand: one press or "Open all", the count is what is open
+                const root = e.currentTarget.closest('.l5-prose') ?? e.currentTarget.parentElement;
+                setOpenFolds(root ? root.querySelectorAll('details.socria-fold[open]').length : 0);
+              }}
+            >
+              <summary className="socria-fold-sum">
+                <span className="socria-fold-t">{head?.kind === 'h' ? <Inline text={head.text} math={math} keyBase={`f${p.head}t`} code /> : null}</span>
+                <span className="socria-fold-p" aria-hidden="true">
+                  {p.writing ? 'Writing…' : p.preview}
+                </span>
+              </summary>
+              <div className="socria-fold-body">{p.body.map((i) => draw(i, `b${i}`))}</div>
+            </details>
+            {pi === lastFold && folds >= 2 && !streaming && <FoldAll count={folds} allOpen={openFolds >= folds} />}
+          </Fragment>
+        );
+      })}
+    </>
+  );
+}
+
+/** Every folded part of this reply opened, or closed again — one press for someone who wants all of it. */
+function FoldAll({ count, allOpen }: { count: number; allOpen: boolean }) {
+  const ref = useRef<HTMLButtonElement>(null);
+  const toggle = () => {
+    const root = ref.current?.closest('.l5-prose') ?? ref.current?.parentElement;
+    root?.querySelectorAll<HTMLDetailsElement>('details.socria-fold').forEach((d) => {
+      d.open = !allOpen;
+    });
+  };
+  return (
+    <button ref={ref} type="button" className="socria-foldall" onClick={toggle} aria-expanded={allOpen}>
+      {allOpen ? 'Close all' : `Open all ${count}`}
+    </button>
   );
 }
 
@@ -342,12 +475,10 @@ export function closingQuestion(text: string): { body: string; question: string 
  * the paragraph still being written stays inline — so a list or a table forms
  * once, when its paragraph ends, rather than flickering token by token.
  */
-export function StreamingRichText({ text, math, rich }: { text: string; math?: boolean; rich?: boolean }) {
-  const cut = text.lastIndexOf('\n\n');
-  // inside an unclosed fence the whole tail is the block still being written
-  const fences = (text.match(/^\s*```/gm) ?? []).length;
-  const settled = fences % 2 === 1 ? text : cut > 0 ? text.slice(0, cut) : '';
-  const tail = fences % 2 === 1 ? '' : cut > 0 ? text.slice(cut + 2) : text;
+export function StreamingRichText({ text, math, rich, editorial }: { text: string; math?: boolean; rich?: boolean; editorial?: boolean }) {
+  // inside an unclosed fence the whole tail is the block still being written (lib/reply-layout.ts streamingSplit)
+  const { settled, tail } = streamingSplit(text, !!editorial);
+  if (editorial) return <EditorialText text={settled} tail={tail} math={math} streaming />;
   return (
     <>
       {settled && <RichText text={settled} math={math} rich={rich} />}

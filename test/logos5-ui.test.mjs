@@ -29,8 +29,11 @@ console.log('\n=== a turn ===');
 {
   const a = html(h(U.L5Message, { ...base, m: msg({ content: '## A plan\n\nFirst, **this**.\n\n```js\nconst x = 1;\n```\n\n> said once' }) }));
   ok('keeps the anchor the resume and jump code read', a.includes('id="lg-m-m_1"'));
-  ok('Socria’s words are prose, not a bubble', a.includes('class="l5-prose"') && !a.includes('l5-said'));
-  ok('a heading is drawn as one', /<h4[^>]*socria-h2[^>]*>(<span>)?A plan/.test(a), a);
+  // A reply is set to be read (lib/reply-layout.ts, components/logos5/reply.css):
+  // the prose carries is-reply, and a heading in the conversation is an h2 —
+  // the message's own outline, so the page's heading order never skips a level.
+  ok('Socria’s words are prose, not a bubble', a.includes('class="l5-prose is-reply"') && !a.includes('l5-said'));
+  ok('a heading is drawn as one', /<h2[^>]*socria-h2[^>]*>(<span>)?A plan/.test(a), a);
   ok('a fenced block is code, with a copy button', a.includes('socria-codeblock') && a.includes('const x = 1;') && a.includes('Copy this block'));
   ok('a quotation is a blockquote', /<blockquote class="socria-quote">(<span>)?said once/.test(a));
   ok('bold is bold', a.includes('<strong class="socria-strong">this</strong>'));

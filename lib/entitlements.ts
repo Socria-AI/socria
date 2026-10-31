@@ -8,47 +8,45 @@
 // will disagree with itself the first time it changes, and these numbers are
 // meant to change as we learn what they should be.
 //
-// THE SHAPE OF THE FREE TIER, AND WHY IT CHANGED.
+// THE FREE TIER AND SOCRIA ONE (October 31, 2026).
 //
-// It used to clip every dimension at once: eight nodes, one lens, one depth,
-// one Explore, one Research, twelve turns of memory — AND two lines of
-// thinking a month. The intention was a real trial. The effect was that
-// nobody on the free tier ever saw Socria be good. They saw a truncated
-// version of everything, which reads as "this product is thin" rather than
-// "I want more of this" — and people pay for more of a thing they have
-// watched be excellent, never to upgrade something they have only seen be
-// mediocre.
+// Logos 5 is the one product, and Socria One is the one subscription:
 //
-// So the axis moved. INSIDE a line of thinking, the free tier now gets
-// exactly what a member gets: the map grows as far as the thinking does,
-// every lens, every depth, Draft Space, Explore and Challenge and grounding
-// whenever they help, and a thread whose memory is carried the whole way.
-// What Socria One sells is no longer a better version of one conversation. It
-// is MORE of them — two a month against as many as you have — and what runs
-// BETWEEN them: the durable things Socria comes to know about how you reason,
-// carried into every later conversation and into Logos.
+//                         Free          Socria One ($15 a month)
+//   Conversations         10 a month    unlimited (fair use)
+//   Logic Maps            2 a month     unlimited
+//   Logic Map nodes       10 a month    unlimited
+//   Artifacts             2 a month     unlimited
+//   Documents             1 a month     unlimited
+//   Socria Voice          not included  included
+//   Sharing a chat        not included  included
 //
-// That is the whole difference, and it is meant to be sayable in a sentence.
-// If a number below ever makes the free tier feel small inside a single
-// conversation again, it is the wrong number.
+// That table is the whole of the free plan: there is no daily message count,
+// no free month, no code, no reward and no gift beside it. Every number above
+// is in PLANS below and nowhere else — the routes refuse from it (lib/quota.ts),
+// the UI says what is left from it, and the copy is written from it. Changing
+// a limit is changing one number here.
 //
-// AND NOW BY THE DAY AS WELL (October 2026). The free plan also counts what
-// a day holds — a decision about what the free plan costs to run and what
-// Socria One is for, made knowing what it trades away:
+// HOW EACH ONE IS COUNTED. A conversation is counted once, when its first turn
+// is answered — never per message, so going back to one already started costs
+// nothing. A Logic Map is counted once per conversation, the first time a map
+// is drawn for it. Nodes are counted as a map gains them — the ideas Socria
+// draws from the conversation and the ones added by hand — and a map already
+// drawn keeps every node it has. An artifact is counted once, when it is made
+// (a display, a built model, a picture asked for, an Easy view, an element
+// opened in Artifacts). A document is counted once, when one is brought into
+// Content or written into it. Monthly counters reset on the first of the month,
+// UTC.
 //
-//   Core (every model but Logos)   4 new chats a day, 20 messages a day
-//   Logos                          2 new lines of thinking a month, 10 messages a day
+// WHAT IS NEVER TAKEN. Nothing already made is removed or hidden when a limit
+// is reached or a subscription ends: every conversation, map, artifact and
+// document stays open and editable. A limit only stops something NEW from
+// being made. Two things are never gated at any tier: TRACE (where a thought
+// came from) and CORRECTION (telling Logos it read you wrong).
 //
-// A message limit CAN end a conversation mid-thought, which the paragraphs
-// above were written to avoid. So the boundary says the three things a person
-// needs when they meet it: what they have used, that everything they started
-// stays open and comes back tomorrow, and that Socria One lifts it. Starting
-// a chat and sending a message are counted separately, so going back to a
-// chat already started never costs a chat — only its messages.
-//
-// Two things are never gated at any tier: TRACE (where a thought came from)
-// and CORRECTION (telling Logos it read you wrong). Charging to see your own
-// reasoning, or to fix it, would make the product dishonest.
+// Core is not a product here. Its reasoning runs inside Logos 5, and its
+// conversations are counted against the same monthly conversations as
+// everything else — there are no separate Core limits.
 
 import type { Plan } from './socria-one';
 
@@ -57,14 +55,18 @@ import type { Plan } from './socria-one';
  * resets it — deliberate, and the reason they read as stable nouns.
  */
 export const COUNTERS = [
-  /** Logos conversations begun, per calendar month */
+  /** conversations begun, per calendar month */
   'chats',
-  /** messages sent to Socria in Logos, per day (UTC) */
+  /** messages sent to Socria, per day (UTC) — kept for the record; neither plan limits it */
   'messages',
-  /** Core conversations begun — every model but Logos — per day (UTC) */
-  'core-chats',
-  /** messages sent to Socria in Core, per day (UTC) */
-  'core-messages',
+  /** Logic Maps drawn — one per conversation, per calendar month */
+  'maps',
+  /** nodes added to Logic Maps, per calendar month */
+  'nodes',
+  /** artifacts made — one per artifact, per calendar month */
+  'artifacts',
+  /** documents brought into or written into Content — one per document, per calendar month */
+  'documents',
   /** Explore actions on a node, per conversation */
   'explore',
   /** Research runs, per conversation */
@@ -84,8 +86,10 @@ export type Counter = (typeof COUNTERS)[number];
 export const COUNTER_SCOPE: Record<Counter, 'month' | 'day' | 'chat'> = {
   chats: 'month',
   messages: 'day',
-  'core-chats': 'day',
-  'core-messages': 'day',
+  maps: 'month',
+  nodes: 'month',
+  artifacts: 'month',
+  documents: 'month',
   explore: 'chat',
   research: 'chat',
   challenge: 'chat',
@@ -94,10 +98,28 @@ export const COUNTER_SCOPE: Record<Counter, 'month' | 'day' | 'chat'> = {
   files: 'chat',
 };
 
+/**
+ * The counters charged once per THING rather than once per action: a
+ * conversation, its Logic Map, an artifact, a document. Each has a marker
+ * beside the month's count (lib/quota.ts unitMark) so the same thing is never
+ * charged twice — a retried first turn, a map redrawn, an artifact saved
+ * again, a document read twice.
+ */
+export const UNIT_COUNTERS = ['chats', 'maps', 'artifacts', 'documents'] as const;
+export type UnitCounter = (typeof UNIT_COUNTERS)[number];
+
+/** Features one plan has and the other does not — not counted, simply open or not. */
+export const FEATURES = ['voice', 'share'] as const;
+export type Feature = (typeof FEATURES)[number];
+
 export interface Limits {
   /** null means no limit — both plans are bounded by fair use, not by a counter */
   readonly counters: Readonly<Record<Counter, number | null>>;
-  /** nodes a map will grow to before it stops taking on new ones; null is no ceiling */
+  /**
+   * nodes ONE map will grow to before it stops taking on new ones; null is no
+   * ceiling. Neither plan has one now: the free plan's nodes are a monthly
+   * count across every map (`nodes` above), not a size for each.
+   */
   readonly mapNodes: number | null;
   /** how many lenses onto the map are offered; null is all of them */
   readonly lenses: number | null;
@@ -132,6 +154,8 @@ export interface Limits {
    * the moment they are read (app/api/files/upload, app/api/files/read).
    */
   readonly uploadBytes: number;
+  /** Socria Voice (and Hold to talk), and opening a share on something you own */
+  readonly features: Readonly<Record<Feature, boolean>>;
 }
 
 /** The most a file may weigh and still travel to our server in the request itself. */
@@ -141,26 +165,22 @@ export const DIRECT_UPLOAD_BYTES = 4 * 1024 * 1024;
 export const megabytes = (bytes: number) => `${Math.round(bytes / (1024 * 1024))} MB`;
 
 /**
- * Fair use rather than infinity, on BOTH plans.
+ * Both plans, in full.
  *
- * Every per-conversation ceiling below is identical for the two tiers and is
- * set where nobody working seriously will ever meet it: they are a guard
- * against a runaway loop, not a boundary a person notices, and the rate
- * limiter is the real defence against abuse. The rows that differ are the
- * ones the product is sold on — how many conversations and messages
- * (`chats` a month in Logos; `messages` a day in Logos; `core-chats` and
- * `core-messages` a day in Core) and `memoryEntries`, which is how much of
- * you is carried between them.
+ * The per-conversation ceilings (explore … files) are identical on the two
+ * plans and set where nobody working seriously meets them: a guard against a
+ * runaway loop, not a boundary anyone is sold past. The rows that differ are
+ * TIERED_COUNTERS, mapNodes, memoryEntries, uploadBytes and features.
  */
 export const PLANS: Record<Plan, Limits> = {
   free: {
     counters: {
-      // The limits anybody meets: conversations and messages. Everything
-      // else here matches One.
-      chats: 2,
-      messages: 10,
-      'core-chats': 4,
-      'core-messages': 20,
+      chats: 10,
+      messages: null,
+      maps: 2,
+      nodes: 10,
+      artifacts: 2,
+      documents: 1,
       explore: null,
       research: 120,
       challenge: null,
@@ -173,18 +193,23 @@ export const PLANS: Record<Plan, Limits> = {
     allDepths: true,
     draftSpace: true,
     memoryTurns: null,
-    // The other half of what One is: twelve things carried about you rather
-    // than everything. See lib/person-memory.ts — this is a WINDOW onto one
-    // store, not a smaller store, so nothing is lost by being on this plan.
+    // twelve things carried about you rather than everything — a WINDOW onto
+    // one store (lib/person-memory.ts), so nothing is lost by being on this plan
     memoryEntries: 12,
     uploadBytes: DIRECT_UPLOAD_BYTES,
+    features: { voice: false, share: false },
   },
   one: {
     counters: {
+      // Unlimited as sold. The one number here is a fair-use ceiling far past
+      // any person's month — a guard against a script, not a plan boundary —
+      // and it says so if it is ever met (boundaryNote with plan 'one').
       chats: 400,
       messages: null,
-      'core-chats': null,
-      'core-messages': null,
+      maps: null,
+      nodes: null,
+      artifacts: null,
+      documents: null,
       explore: null,
       research: 120,
       challenge: null,
@@ -199,6 +224,7 @@ export const PLANS: Record<Plan, Limits> = {
     memoryTurns: null,
     memoryEntries: 160,
     uploadBytes: 30 * 1024 * 1024,
+    features: { voice: true, share: true },
   },
 };
 
@@ -209,7 +235,7 @@ export const PLANS: Record<Plan, Limits> = {
  * ceiling would be selling somebody something they already have. The suite
  * asserts this list is the truth rather than a comment.
  */
-export const TIERED_COUNTERS: readonly Counter[] = ['chats', 'messages', 'core-chats', 'core-messages'];
+export const TIERED_COUNTERS: readonly Counter[] = ['chats', 'maps', 'nodes', 'artifacts', 'documents'];
 
 export function limitsFor(plan: Plan): Limits {
   return PLANS[plan];
@@ -232,6 +258,38 @@ export function remaining(plan: Plan, counter: Counter, used: number): number | 
   return cap === null ? null : Math.max(0, cap - used);
 }
 
+/** Does this plan include this feature? */
+export function hasFeature(plan: Plan, feature: Feature): boolean {
+  return PLANS[plan].features[feature];
+}
+
+/**
+ * When a counter next starts again, in epoch milliseconds: the first of next
+ * month for monthly counters, the next midnight for daily ones, both UTC; null
+ * for per-conversation counters, which never reset.
+ */
+export function resetsAt(counter: Counter, at = Date.now()): number | null {
+  const d = new Date(at);
+  if (COUNTER_SCOPE[counter] === 'month') return Date.UTC(d.getUTCFullYear(), d.getUTCMonth() + 1, 1);
+  if (COUNTER_SCOPE[counter] === 'day') return Date.UTC(d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate() + 1);
+  return null;
+}
+
+/**
+ * Whether this many used is close enough to the limit to say so ahead of
+ * time: the last of a small allowance (two maps, one document), the last two
+ * of ten conversations or ten nodes. Never on an uncapped counter, never once
+ * it is spent (that is the boundary, said by boundaryNote), and never for a
+ * fair-use ceiling.
+ */
+export function nearLimit(plan: Plan, counter: Counter, used: number): boolean {
+  if (!TIERED_COUNTERS.includes(counter)) return false;
+  const left = remaining(plan, counter, used);
+  const cap = limitOf(plan, counter);
+  if (left === null || left === 0 || cap === null || plan === 'one') return false;
+  return left <= (cap >= 10 ? 2 : 1);
+}
+
 // ── how a boundary is said ──────────────────────────────────────────
 //
 // One sentence for what has been reached, one for what follows from it. Calm,
@@ -243,53 +301,117 @@ export function remaining(plan: Plan, counter: Counter, used: number): number | 
 // — offering somebody Socria One at a ceiling Socria One also has is a lie,
 // and a small lie at a moment of friction is the most expensive kind.
 
-/**
- * "both", for two — the free month's count read from the table rather than
- * written down a second time in prose that would then go stale.
- */
-function freeChats(): string {
-  const n = PLANS.free.counters.chats;
-  if (n === null) return 'all';
-  return n === 2 ? 'both' : `all ${n}`;
+/** A number from the free plan, as the copy says it. */
+const free = (c: Counter) => PLANS.free.counters[c] ?? 0;
+const plural = (n: number, one: string, many: string) => `${n} ${n === 1 ? one : many}`;
+
+/** What one unit of each tiered counter is called, for the panel and the paywall. */
+export const COUNTER_NOUN: Partial<Record<Counter, { one: string; many: string }>> = {
+  chats: { one: 'conversation', many: 'conversations' },
+  maps: { one: 'Logic Map', many: 'Logic Maps' },
+  nodes: { one: 'Logic Map node', many: 'Logic Map nodes' },
+  artifacts: { one: 'artifact', many: 'artifacts' },
+  documents: { one: 'document', many: 'documents' },
+};
+
+/** "10 conversations a month", "2 Logic Maps a month" — a free allowance, as it is said. */
+export function allowanceLabel(counter: Counter, plan: Plan = 'free'): string {
+  const noun = COUNTER_NOUN[counter];
+  const n = PLANS[plan].counters[counter];
+  if (!noun) return counter;
+  if (n === null || (plan === 'one' && TIERED_COUNTERS.includes(counter))) return `Unlimited ${noun.many}`;
+  const per = COUNTER_SCOPE[counter] === 'day' ? ' a day' : COUNTER_SCOPE[counter] === 'month' ? ' a month' : '';
+  return `${plural(n, noun.one, noun.many)}${per}`;
 }
 
-/** A daily number from the table, as the copy says it. */
-const perDay = (c: Counter) => PLANS.free.counters[c] ?? 0;
+/** The headline at any free limit — the same sentence wherever one is met. */
+export const LIMIT_HEADLINE = 'You’ve reached your free limit.';
+export const LIMIT_OFFER = 'Unlock unlimited access with Socria One.';
 
 const REACHED: Record<Counter, string> = {
-  chats:
-    `That is ${freeChats()} of your free lines of thinking for this month. ` +
-    'The ones you have stay open, and stay yours.',
-  messages:
-    `That is today’s ${perDay('messages')} Logos messages on the free plan. ` +
-    'Your lines of thinking stay open, and stay yours — they pick up again tomorrow.',
-  'core-chats':
-    `That is today’s ${perDay('core-chats')} new chats on the free plan. ` +
-    'The ones you have started stay open — keep going in any of them.',
-  'core-messages':
-    `That is today’s ${perDay('core-messages')} messages on the free plan. ` +
-    'Everything you have started stays here, and picks up again tomorrow.',
+  chats: `That’s ${plural(free('chats'), 'free conversation', 'free conversations')} this month. Every one you’ve started stays open.`,
+  messages: 'That’s as many messages as fair use covers today.',
+  maps: `That’s ${plural(free('maps'), 'free Logic Map', 'free Logic Maps')} this month. This conversation keeps going; the maps you have stay yours.`,
+  nodes: `That’s ${plural(free('nodes'), 'free Logic Map node', 'free Logic Map nodes')} this month. Your maps keep every idea they have; new ones wait for next month.`,
+  artifacts: `That’s ${plural(free('artifacts'), 'free artifact', 'free artifacts')} this month. Everything already made stays in Artifacts.`,
+  documents: `That’s ${plural(free('documents'), 'free document', 'free documents')} this month. Your writing so far is kept.`,
   explore: 'Explore has run as far as it goes on this map.',
-  research: 'Research has run as far as it goes in this line of thinking.',
-  challenge: 'Challenge has run as far as it goes in this line of thinking.',
-  context: 'This line of thinking is holding as much outside material as it can.',
+  research: 'Research has run as far as it goes in this conversation.',
+  challenge: 'Challenge has run as far as it goes in this conversation.',
+  context: 'This conversation is holding as much outside material as it can.',
   images: 'Logos has read as many images as it can hold in this conversation.',
   files: 'Logos has read as many files as it can hold in this conversation.',
 };
 
-/** Only where the plans differ. Keys here must be exactly TIERED_COUNTERS. */
-const OFFERS: Partial<Record<Counter, string>> = {
-  chats: 'Socria One keeps as many lines of thinking as you have.',
-  messages: 'Upgrade to Socria One to keep going today.',
-  'core-chats': 'Upgrade to Socria One to start as many as you like.',
-  'core-messages': 'Upgrade to Socria One to keep going today.',
+/** Said where the plans do not differ, or at Socria One's own fair-use ceiling: there is nothing to buy. */
+const FAIR_USE = 'Socria One stops in the same place — this is a guard against a runaway loop, not a thing to buy.';
+const ONE_FAIR_USE: Partial<Record<Counter, string>> = {
+  chats: 'That’s a great many new conversations for one month — more than fair use covers. The ones you have stay open; new ones start again on the first.',
 };
 
-/** Said where they do not: the truth, which is that there is nothing to buy. */
-const FAIR_USE =
-  'Socria One stops in the same place — this is a guard against a runaway loop, not a thing to buy.';
+/**
+ * The two-sentence note when a counter runs out: what was reached, then what
+ * follows. On Socria One, or at a ceiling both plans share, it never offers
+ * Socria One — selling somebody what they already have is a lie.
+ */
+export function boundaryNote(counter: Counter, plan: Plan = 'free'): string {
+  if (plan === 'one') return ONE_FAIR_USE[counter] ?? `${REACHED[counter]} ${FAIR_USE}`;
+  return `${REACHED[counter]} ${TIERED_COUNTERS.includes(counter) ? LIMIT_OFFER : FAIR_USE}`;
+}
 
-/** The two-sentence note shown when a counter runs out. */
-export function boundaryNote(counter: Counter): string {
-  return `${REACHED[counter]} ${OFFERS[counter] ?? FAIR_USE}`;
+/** What a premium-only feature says to somebody without it. */
+export const FEATURE_NOTE: Record<Feature, string> = {
+  voice: 'Socria Voice is part of Socria One.',
+  share: 'Sharing a conversation is part of Socria One.',
+};
+
+/** The rows of the Free / Socria One comparison, in the order they are shown. */
+export function comparisonRows(): { id: Counter | Feature; label: string; free: string; one: string }[] {
+  const cell = (plan: Plan, c: Counter) => {
+    const n = PLANS[plan].counters[c];
+    if (n === null || (plan === 'one' && TIERED_COUNTERS.includes(c))) return 'Unlimited';
+    return COUNTER_SCOPE[c] === 'day' ? `${n} a day` : `${n} a month`;
+  };
+  const yes = (plan: Plan, f: Feature) => (PLANS[plan].features[f] ? 'Included' : 'Not included');
+  return [
+    { id: 'chats', label: 'Conversations', free: cell('free', 'chats'), one: cell('one', 'chats') },
+    { id: 'maps', label: 'Logic Maps', free: cell('free', 'maps'), one: cell('one', 'maps') },
+    { id: 'nodes', label: 'Logic Map nodes', free: cell('free', 'nodes'), one: cell('one', 'nodes') },
+    { id: 'artifacts', label: 'Artifacts', free: cell('free', 'artifacts'), one: cell('one', 'artifacts') },
+    { id: 'documents', label: 'Documents', free: cell('free', 'documents'), one: cell('one', 'documents') },
+    { id: 'voice', label: 'Socria Voice', free: yes('free', 'voice'), one: yes('one', 'voice') },
+    { id: 'share', label: 'Sharing a chat', free: yes('free', 'share'), one: yes('one', 'share') },
+  ];
+}
+
+/**
+ * The free plan in one sentence, from the table — for the account sheet, the
+ * docs, the FAQ and the pages, so no copy ever states a number of its own.
+ */
+export function freePlanSentence(): string {
+  const parts = TIERED_COUNTERS.map((c) => allowanceLabel(c, 'free').replace(/ a month$/, ''));
+  const last = parts.pop();
+  return `${parts.join(', ')} and ${last} a month`;
+}
+
+/** What each premium-only feature is called in a sentence. */
+export const FEATURE_NAME: Record<Feature, string> = {
+  voice: 'Socria Voice',
+  share: 'chat sharing',
+};
+
+/**
+ * Socria One in one sentence, from the same table: what is unlimited on it
+ * that the free plan counts, then the features only it includes —
+ * "Unlimited conversations, Logic Maps, artifacts and documents, with Socria
+ * Voice and chat sharing". Nodes are part of "Logic Maps" here; the
+ * comparison table names them on their own row.
+ */
+export function onePlanSentence(): string {
+  const open = TIERED_COUNTERS.filter((c) => c !== 'nodes' && limitOf('free', c) !== null && allowanceLabel(c, 'one').startsWith('Unlimited')).map(
+    (c) => COUNTER_NOUN[c]?.many ?? c
+  );
+  const only = FEATURES.filter((f) => PLANS.one.features[f] && !PLANS.free.features[f]).map((f) => FEATURE_NAME[f]);
+  const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
+  return `Unlimited ${list(open)}${only.length ? `, with ${list(only)}` : ''}`;
 }

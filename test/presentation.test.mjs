@@ -74,7 +74,7 @@ ok('…prose is the default, and an explanation is never a list of bolded terms 
 ok('…no headings, no "Key points" or "In summary"', /Never # headings/.test(I.LOGOS5_CORE) && /No "Key points" or "In summary"/.test(I.LOGOS5_CORE));
 ok('…and a short answer stays short', /a short answer stays short/.test(I.LOGOS5_CORE));
 ok('…and the offer marker is never in the cached core (it travels only on a turn that is offered something)', !I.LOGOS5_CORE.includes('INLINE, IF IT HELPS'));
-ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v3');
+ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v4');
 
 console.log('\n=== 4. several related concepts: an overview to explore ===');
 for (const t of ['Explain the key concepts in statistics', 'teach me the basics of organic chemistry', 'What does macroeconomics cover?', 'give me an introduction to machine learning'])

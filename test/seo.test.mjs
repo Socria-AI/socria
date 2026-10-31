@@ -128,8 +128,10 @@ console.log('\n=== the sitemap ===');
   ok('no private path', !urls.some((u) => PRIVATE.test(new URL(u).pathname)));
   ok('all on the site', urls.every((u) => u.startsWith(SITE)));
   ok('no duplicates', new Set(urls).size === urls.length);
-  ok('the student page while the offer is open', urls.includes(`${SITE}/students`));
-  ok('…and not after', !SEO.sitemapEntries({ now: AFTER }).some((e) => e.url.endsWith('/students')));
+  // The student month was retired (31 October 2026): its page says so and
+  // leaves the sitemap, before the old close as well as after it.
+  ok('the student page is not listed, now the month is retired', !urls.includes(`${SITE}/students`));
+  ok('…nor after the old close', !SEO.sitemapEntries({ now: AFTER }).some((e) => e.url.endsWith('/students')));
   // The Core 4 model page was taken out with the archived models.
   ok('the Core 4 model page is not a public page', !SEO.PUBLIC_PAGES.some((p) => p.path === '/core4model'));
   ok('…nor in the sitemap', !urls.some((u) => new URL(u).pathname.startsWith('/core4model')));
@@ -156,12 +158,13 @@ console.log('\n=== llms.txt ===');
   ok('every docs page, the overview at /docs', DOC_PAGES.every((d) => t.includes(`(${SEO.absoluteUrl(SEO.docPath(d.slug))})`)));
   ok('the price, from the one place it lives', t.includes('$15/month'));
   // removed: "says what needs an account" (Logos needed one, Core worked without) — Core was archived, Logos 5 is the one surface
-  ok('says what a guest gets, and what an account adds', /Without an account you get one line of thinking and its map; sign up free to start another/.test(t));
+  ok('says what a guest gets, and what an account adds', /Without an account you get one line of thinking and its map; a free account has 10 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month/.test(t));
+  ok('…and what Socria One is, from the plan table', t.includes('Socria One ($15/month) is unlimited conversations, Logic Maps, artifacts and documents, with Socria Voice and chat sharing.'));
   // the summary and the public pages are this file's words; the docs list is the docs registry's
   const own = t.slice(0, t.indexOf('## Docs')) + t.slice(t.indexOf('## More'));
   ok('names no Core in its own words', !/\bCore\b/.test(own), own.match(/.{0,60}\bCore\b.{0,60}/)?.[0]);
-  ok('the student page while open', t.includes('/students'));
-  ok('…not after', !SEO.llmsTxt({ now: AFTER }).includes('/students'));
+  ok('the retired student page is not listed', !t.includes('/students'));
+  ok('…nor after the old close', !SEO.llmsTxt({ now: AFTER }).includes('/students'));
   const paths = [...t.matchAll(/\]\((https?:[^)]+)\)/g)].map((m) => new URL(m[1]).pathname);
   ok('no private link but the chat', paths.every((p) => p === '/chat' || !PRIVATE.test(p)), paths.join(' '));
 }
@@ -182,13 +185,14 @@ console.log('\n=== preview cards ===');
   ok('a post by the title Sanity holds', ogCardFor(['blog', 'p'], ctx({ post: { title: 'On steelmanning', excerpt: 'e' } })).title === 'On steelmanning');
   ok('a post Sanity does not have', ogCardFor(['blog', 'p'], ctx({ post: null })).title === 'Notes on thinking clearly.');
   const st = ogCardFor(['students'], ctx());
-  ok('the student card while open', st.kicker === 'For UTA students' && /9 December/.test(st.line));
-  ok('…the plain card after', ogCardFor(['students'], ctx({ now: AFTER })) === DEFAULT_CARD);
+  ok('the student card is the plain card, now the month is retired', st === DEFAULT_CARD);
+  ok('…and after the old close', ogCardFor(['students'], ctx({ now: AFTER })) === DEFAULT_CARD);
   const inv = ogCardFor(['invited'], ctx({ referral: { enabled: true, signupDays: 7 } }));
-  ok('the invitation, in words', inv.title === 'Seven days of Socria One, free.');
+  ok('the invitation, in words — and no days of Socria One', inv.kicker === 'A friend invited you' && !/Socria One/.test(`${inv.title} ${inv.line}`), JSON.stringify(inv));
   ok('…not while referrals are off', ogCardFor(['invited'], ctx({ referral: { enabled: false, signupDays: 7 } })).kicker === 'Socria');
-  ok('the One card keeps to the /one page’s own claim', /No daily count/.test(ogCardFor(['one'], ctx()).line));
-  ok('…in the words the /one page uses', /lines of thinking as you need them/.test(ogCardFor(['one'], ctx()).line) && /lines of thinking as you need them/.test(readFileSync(join(root, 'app/one/page.tsx'), 'utf8')));
+  const oneCard = ogCardFor(['one'], ctx());
+  ok('the One card keeps to the /one page’s own claim', oneCard.title === 'Unlimited Socria, with Voice and sharing.' && /Unlimited Socria, with Voice and sharing/.test(readFileSync(join(root, 'components/site/One.tsx'), 'utf8')), JSON.stringify(oneCard));
+  ok('…and never the retired daily count', !/daily count/i.test(`${oneCard.title} ${oneCard.line}`) && !/daily count|without the ceiling/i.test(readFileSync(join(root, 'app/one/page.tsx'), 'utf8')));
   ok('fit keeps short text', fit('Short title', 20) === 'Short title');
   const f = fit('A rather long title that will not fit on the card at all', 30);
   ok('fit cuts at a word with an ellipsis', f.length <= 30 && f.endsWith('…') && !f.includes('  '), f);
@@ -342,8 +346,10 @@ console.log('\n=== Socria One ===');
   ok('exactly one h1', h1Count(html) === 1 && /Socria One/.test(h1Of(html)), h1Of(html));
   ok('the price and its period, from lib/socria-one', html.includes('<span class="s-one-amt">$15</span>') && html.includes('<span class="s-one-per">a month</span>') && html.includes('$15 a month.'));
   ok('the memory line is the plan table’s, not the design’s', html.includes('Free remembers twelve things about you') && html.includes('One remembers 160') && !html.includes('Free remembers the conversation'));
-  ok('sharing, from the share rules', html.includes('Free shares one at a time'));
-  ok('five chapters', (html.match(/class="s-chapter"/g) ?? []).length === 5);
+  ok('the free allowances, from the plan table', html.includes('Free starts ten conversations a month') && html.includes('Free draws two maps and ten nodes a month') && html.includes('Free makes two artifacts and reads one document a month'));
+  ok('Voice and sharing are One’s alone', html.includes('Socria Voice') && html.includes('Free does not include it') && html.includes('Free joins what others share'));
+  ok('six chapters', (html.match(/class="s-chapter"/g) ?? []).length === 6);
+  ok('no retired promise on the page', !/without the ceiling|No daily count|free month|access code/i.test(html));
   ok('the cover and the join band can subscribe', (html.match(/<button type="button" class="s-pill is-cream[^"]*"/g) ?? []).length === 2);
   ok('the masthead goes to the join band', /<a class="s-pill is-deep" href="#join">Become a member<\/a>/.test(html) && html.includes('id="join"'));
   ok('the free tier opens Logos', /<a class="s-free" href="\/logos">continue with the free tier<\/a>/.test(html));
@@ -362,17 +368,12 @@ console.log('\n=== the Charter ===');
 
 console.log('\n=== the student page ===');
 {
-  const open = renderToStaticMarkup(h(UI.StudentsBody, { open: true }));
-  ok('open: the offer', open.includes('Your first month of Socria One') && open.includes('@mavs.uta.edu'));
-  ok('open: the real days', open.includes(`${STUDENT_OFFER.days} days`));
-  ok('open: the close', open.includes(UI.CLOSES) && UI.CLOSES === '9 December 2026', UI.CLOSES);
-  ok('open: no card, nothing renews', /No card, and nothing renews/.test(open));
-  ok('open: sign-up returns to the account', open.includes('/sign-up?redirect_url=%2Faccount'));
-  ok('open: a try link that needs no account', /Try it first — no account needed/.test(open));
-  ok('open: one h1', (open.match(/<h1[\s>]/g) ?? []).length === 1);
-  const closed = renderToStaticMarkup(h(UI.StudentsBody, { open: false }));
-  ok('closed: says so', closed.includes('has <span class="em">closed.</span>'));
-  ok('closed: promises no month', !closed.includes('@mavs.uta.edu') && !/Create my free account/.test(closed));
+  const ended = renderToStaticMarkup(h(UI.StudentsBody, {}));
+  ok('it says the month has ended', ended.includes('has <span class="em">ended.</span>'));
+  ok('…and promises no month', !ended.includes('@mavs.uta.edu') && !/Create my free account|first month of Socria One/.test(ended));
+  ok('…and says what Socria is now, from the plan table', ended.includes('10 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month') && ended.includes('$15/month'));
+  ok('…with a way in and the plan page', ended.includes('href="/chat"') && ended.includes('href="/one"'));
+  ok('one h1', (ended.match(/<h1[\s>]/g) ?? []).length === 1);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

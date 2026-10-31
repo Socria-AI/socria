@@ -6,17 +6,29 @@
 // asserted them one by one, which meant it was the thing standing behind a
 // free tier nobody could watch be good.
 //
-// It asserts the SHAPE now rather than a list of figures: that what Socria
-// can do is identical on both plans, that exactly the rows the product is sold
-// on differ — conversations and messages, by the month and by the day — and,
-// the assertion that keeps the copy honest, that no boundary note offers
-// Socria One at a ceiling Socria One also has.
+// It asserts the SHAPE: that what Socria can do is the same Socria on both
+// plans, that exactly the rows the product is sold on differ — the free
+// plan's monthly allowances (October 31, 2026: ten conversations, two Logic
+// Maps, ten Logic Map nodes, two artifacts, one document) and the two
+// features only Socria One has (Voice, sharing) — and, the assertion that
+// keeps the copy honest, that no boundary note offers Socria One at a ceiling
+// Socria One also has.
 
 import {
   PLANS,
   COUNTERS,
   COUNTER_SCOPE,
   TIERED_COUNTERS,
+  UNIT_COUNTERS,
+  FEATURES,
+  hasFeature,
+  nearLimit,
+  comparisonRows,
+  freePlanSentence,
+  allowanceLabel,
+  LIMIT_HEADLINE,
+  LIMIT_OFFER,
+  FEATURE_NOTE,
   limitsFor,
   limitOf,
   isSpent,
@@ -50,18 +62,22 @@ console.log('=== the axis: what differs is volume, not quality ===');
     f.memoryTurns === null && o.memoryTurns === null);
 }
 
-console.log('\n=== ...and exactly these rows differ: conversations, messages, memory, document size ===');
+console.log('\n=== ...and exactly these rows differ: the monthly allowances, Voice and sharing, memory, document size ===');
 {
-  ok('two free lines of thinking a month in Logos', f.counters.chats === 2);
-  ok('ten free Logos messages a day', f.counters.messages === 10 && COUNTER_SCOPE.messages === 'day');
-  ok('four free new chats a day in Core', f.counters['core-chats'] === 4 && COUNTER_SCOPE['core-chats'] === 'day');
-  ok('twenty free Core messages a day', f.counters['core-messages'] === 20 && COUNTER_SCOPE['core-messages'] === 'day');
-  ok('Socria One counts none of the day', o.counters.messages === null && o.counters['core-chats'] === null && o.counters['core-messages'] === null);
-  ok('the conversations and the messages are the tiered counters',
-    TIERED_COUNTERS.join() === 'chats,messages,core-chats,core-messages');
+  ok('ten conversations a month', f.counters.chats === 10 && COUNTER_SCOPE.chats === 'month');
+  ok('two Logic Maps a month', f.counters.maps === 2 && COUNTER_SCOPE.maps === 'month');
+  ok('ten Logic Map nodes a month — across every map, not a size for each', f.counters.nodes === 10 && COUNTER_SCOPE.nodes === 'month' && f.mapNodes === null);
+  ok('two artifacts a month', f.counters.artifacts === 2 && COUNTER_SCOPE.artifacts === 'month');
+  ok('one document a month', f.counters.documents === 1 && COUNTER_SCOPE.documents === 'month');
+  ok('no daily count of messages on either plan', f.counters.messages === null && o.counters.messages === null);
+  ok('no Core counters any more', !COUNTERS.includes('core-chats') && !COUNTERS.includes('core-messages'));
+  ok('Socria One: every monthly allowance unlimited (conversations under fair use)', ['maps', 'nodes', 'artifacts', 'documents'].every((c) => o.counters[c] === null) && (o.counters.chats ?? 0) >= 100);
+  ok('the tiered counters are exactly the five allowances', TIERED_COUNTERS.join() === 'chats,maps,nodes,artifacts,documents');
   ok('TIERED_COUNTERS is the truth, not a comment',
     COUNTERS.filter((c) => f.counters[c] !== o.counters[c]).join() === TIERED_COUNTERS.join());
-  ok('One holds far more of them', (o.counters.chats ?? 0) >= 100);
+  ok('a conversation, a map, an artifact and a document are each charged once', UNIT_COUNTERS.join() === 'chats,maps,artifacts,documents');
+  ok('Voice and sharing are Socria One’s, and only Socria One’s', FEATURES.join() === 'voice,share' && FEATURES.every((x) => !hasFeature('free', x) && hasFeature('one', x)));
+  ok('One holds far more conversations', (o.counters.chats ?? 0) >= 100);
   ok('memory carried between them is the other half',
     (f.memoryEntries ?? 0) > 0 && (o.memoryEntries ?? 0) > (f.memoryEntries ?? 0));
   // and the size of a document: the platform's request limit on free, more
@@ -69,6 +85,17 @@ console.log('\n=== ...and exactly these rows differ: conversations, messages, me
   ok('free documents are capped at what a request can carry (4 MB)', f.uploadBytes === DIRECT_UPLOAD_BYTES && DIRECT_UPLOAD_BYTES === 4 * 1024 * 1024);
   ok('Socria One reads documents up to 30 MB', o.uploadBytes === 30 * 1024 * 1024);
   ok('  said in megabytes', megabytes(o.uploadBytes) === '30 MB' && megabytes(f.uploadBytes) === '4 MB');
+}
+
+console.log('\n=== the comparison and the sentence are written from the table ===');
+{
+  const rows = comparisonRows();
+  ok('the comparison has the seven rows the plans differ on', rows.map((r) => r.id).join() === 'chats,maps,nodes,artifacts,documents,voice,share', rows.map((r) => r.id).join());
+  ok('  free: the monthly numbers', rows[0].free === '10 a month' && rows[1].free === '2 a month' && rows[2].free === '10 a month' && rows[3].free === '2 a month' && rows[4].free === '1 a month', JSON.stringify(rows.map((r) => r.free)));
+  ok('  Socria One: unlimited, and the features included', rows.slice(0, 5).every((r) => r.one === 'Unlimited') && rows[5].one === 'Included' && rows[6].one === 'Included' && rows[5].free === 'Not included');
+  ok('the free plan in one sentence', freePlanSentence() === '10 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month', freePlanSentence());
+  ok('an allowance, as it is said', allowanceLabel('maps') === '2 Logic Maps a month' && allowanceLabel('documents') === '1 document a month' && allowanceLabel('nodes', 'one') === 'Unlimited Logic Map nodes');
+  ok('the features say they are Socria One’s', /Socria Voice is part of Socria One/.test(FEATURE_NOTE.voice) && /part of Socria One/.test(FEATURE_NOTE.share));
 }
 
 console.log('\n=== no plan is a smaller product than the other ===');
@@ -83,14 +110,16 @@ console.log('\n=== no plan is a smaller product than the other ===');
 
 console.log('\n=== the month, counted ===');
 {
-  ok('1st and 2nd allowed, 3rd is the boundary',
-    !isSpent('free', 'chats', 0) && !isSpent('free', 'chats', 1) && isSpent('free', 'chats', 2));
-  ok('a member is not stopped at three', !isSpent('one', 'chats', 3));
-  ok('2 left at zero used', remaining('free', 'chats', 0) === 2);
-  ok('0 left at two used', remaining('free', 'chats', 2) === 0);
+  ok('the 1st to the 10th conversation allowed, the 11th is the boundary',
+    !isSpent('free', 'chats', 0) && !isSpent('free', 'chats', 9) && isSpent('free', 'chats', 10));
+  ok('a member is not stopped at eleven', !isSpent('one', 'chats', 11));
+  ok('10 left at zero used', remaining('free', 'chats', 0) === 10);
+  ok('0 left at ten used', remaining('free', 'chats', 10) === 0);
   ok('never negative', remaining('free', 'chats', 99) === 0);
   ok('limitOf agrees with the table', limitOf('free', 'chats') === f.counters.chats);
   ok('limitsFor returns the row', limitsFor('one') === o);
+  ok('near the end is said ahead of time: the last two of ten, the last of two', nearLimit('free', 'chats', 8) && !nearLimit('free', 'chats', 7) && nearLimit('free', 'maps', 1) && !nearLimit('free', 'maps', 0) && nearLimit('free', 'documents', 0));
+  ok('  never once spent (that is the boundary) and never on Socria One', !nearLimit('free', 'chats', 10) && !nearLimit('one', 'chats', 399));
 }
 
 console.log('\n=== the fair-use ceilings are guards, not boundaries ===');
@@ -109,11 +138,11 @@ console.log('\n=== the fair-use ceilings are guards, not boundaries ===');
 
 console.log('\n=== scopes ===');
 {
-  const daily = ['messages', 'core-chats', 'core-messages'];
-  ok('chats reset monthly', COUNTER_SCOPE.chats === 'month');
-  ok('the messages and Core\'s chats reset daily', daily.every((c) => COUNTER_SCOPE[c] === 'day'));
+  const monthly = ['chats', 'maps', 'nodes', 'artifacts', 'documents'];
+  ok('the allowances reset monthly', monthly.every((c) => COUNTER_SCOPE[c] === 'month'));
+  ok('the messages, kept for the record, reset daily', COUNTER_SCOPE.messages === 'day');
   ok('everything else lives with one conversation',
-    COUNTERS.filter((c) => c !== 'chats' && !daily.includes(c)).every((c) => COUNTER_SCOPE[c] === 'chat'));
+    COUNTERS.filter((c) => !monthly.includes(c) && c !== 'messages').every((c) => COUNTER_SCOPE[c] === 'chat'));
 }
 
 console.log('\n=== the boundary is said calmly, and only sold where there is something to sell ===');
@@ -127,12 +156,12 @@ console.log('\n=== the boundary is said calmly, and only sold where there is som
   // THE ONE THAT MATTERS. A shared ceiling must never be dressed as a reason
   // to pay: offering somebody a thing they already hold, at the exact moment
   // they are annoyed, is the most expensive sentence in the product.
-  ok('the month names One', boundaryNote('chats').includes('Socria One keeps as many'));
-  // The day's boundaries say what was used, that nothing is lost and it comes
-  // back, and that Socria One lifts it — with the numbers read from the table.
-  ok('the Logos day: its number, what stays, and One', /today’s 10 Logos messages/.test(boundaryNote('messages')) && /stay open/.test(boundaryNote('messages')) && /tomorrow/.test(boundaryNote('messages')) && /Upgrade to Socria One/.test(boundaryNote('messages')), boundaryNote('messages'));
-  ok('Core\'s new chats: its number, that started chats stay open, and One', /today’s 4 new chats/.test(boundaryNote('core-chats')) && /stay open/.test(boundaryNote('core-chats')) && /Upgrade to Socria One/.test(boundaryNote('core-chats')), boundaryNote('core-chats'));
-  ok('Core\'s messages: its number, that nothing is lost, and One', /today’s 20 messages/.test(boundaryNote('core-messages')) && /tomorrow/.test(boundaryNote('core-messages')) && /Upgrade to Socria One/.test(boundaryNote('core-messages')), boundaryNote('core-messages'));
+  // Every monthly allowance says what was used, that what was made stays, and that Socria One lifts it.
+  for (const [c, n] of [['chats', /10 free conversations this month/], ['maps', /2 free Logic Maps this month/], ['nodes', /10 free Logic Map nodes this month/], ['artifacts', /2 free artifacts this month/], ['documents', /1 free document this month/]]) {
+    const note = boundaryNote(c);
+    ok(`${c}: its number from the table, what stays, and Socria One`, n.test(note) && /(stays|stay yours|is kept|keep every)/.test(note) && note.endsWith(LIMIT_OFFER), note);
+  }
+  ok('one headline at every free limit', LIMIT_HEADLINE === 'You’ve reached your free limit.' && LIMIT_OFFER === 'Unlock unlimited access with Socria One.');
   for (const c of shared) {
     const note = boundaryNote(c);
     ok(`${c}: does not offer One as the fix`, !/Socria One (gives|opens|lets|grounds|reads|keeps)/.test(note), note);
@@ -140,8 +169,7 @@ console.log('\n=== the boundary is said calmly, and only sold where there is som
   }
 
   // And the count itself is read from the table rather than written twice.
-  ok('the month’s copy matches the table',
-    f.counters.chats !== 2 || boundaryNote('chats').includes('both of your free lines'));
+  ok('the month’s copy matches the table', boundaryNote('chats').includes(`${f.counters.chats} free conversations`));
 }
 
 console.log('\n  the month:', boundaryNote('chats'));
@@ -159,18 +187,16 @@ console.log('\n=== a line of thinking costs one, however many times it is sent =
   // is the arithmetic the fix depends on, so the shape of the boundary is
   // pinned even though the de-duplication lives in lib/usage.ts.
   const cap = PLANS.free.counters.chats;
-  ok('two free lines of thinking', cap === 2);
-  ok('one conversation leaves one', remaining('free', 'chats', 1) === 1);
-  ok('two conversations leave none', remaining('free', 'chats', 2) === 0);
-  ok('and the third is the boundary', isSpent('free', 'chats', 2));
+  ok('ten free conversations', cap === 10);
+  ok('one conversation leaves nine', remaining('free', 'chats', 1) === 9);
+  ok('ten conversations leave none', remaining('free', 'chats', 10) === 0);
+  ok('and the eleventh is the boundary', isSpent('free', 'chats', 10));
 
   // The number that was wrong on screen: charged twice for one conversation.
-  ok('being charged twice for one would read as spent',
-    isSpent('free', 'chats', 2) && remaining('free', 'chats', 2) === 0);
+  ok('being charged twice for each would read as spent at five', remaining('free', 'chats', 10) === 0 && !isSpent('free', 'chats', 5));
 
-  // Core is not metered by THIS counter: it has its own (core-chats, by the
-  // day), and nothing outside the Logos route may spend a Logos chat.
-  ok('Core counts its own chats, not Logos\'s', PLANS.free.counters.chats === 2 && PLANS.free.counters['core-chats'] === 4);
+  // Core and Logos share the month now: one count of conversations, wherever they begin.
+  ok('one count of conversations, Core’s included', !COUNTERS.includes('core-chats'));
   ok('a member is not stopped', !isSpent('one', 'chats', 50));
 }
 
@@ -190,18 +216,12 @@ console.log('\n=== a conversation that never happened is not one ===');
   // The route owns that ordering; what is pinned here is the arithmetic it
   // depends on, so the boundary's shape cannot drift underneath it.
   ok('a failed first turn should leave the month untouched',
-    remaining('free', 'chats', 0) === 2 && !isSpent('free', 'chats', 0));
+    remaining('free', 'chats', 0) === 10 && !isSpent('free', 'chats', 0));
   ok('...and a second failure too', !isSpent('free', 'chats', 0));
   ok('one answered conversation costs exactly one',
-    remaining('free', 'chats', 1) === 1);
-  ok('two answered conversations reach the boundary',
-    isSpent('free', 'chats', 2) && remaining('free', 'chats', 2) === 0);
-
-  // The old behaviour, stated so nobody restores it by accident: two errored
-  // attempts read as spent, which is what put a paying-nothing visitor at a
-  // wall he had never touched.
-  ok('charging for failures would have read as spent at two',
-    isSpent('free', 'chats', 2));
+    remaining('free', 'chats', 1) === 9);
+  ok('ten answered conversations reach the boundary',
+    isSpent('free', 'chats', 10) && remaining('free', 'chats', 10) === 0);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

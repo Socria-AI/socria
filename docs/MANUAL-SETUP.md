@@ -27,10 +27,13 @@ question, but a paying user locked out by an unrun migration is a broken
 product. So the failure is silent and generous.
 
 The consequence: **free-tier limits are not being enforced.** Free accounts
-currently get unlimited chats and messages: none of the free plan's counts —
-4 new chats and 20 messages a day in Core, 2 lines of thinking a month and 10
-messages a day in Logos — is held, and neither are the fair-use ceilings both
-plans share (Research, images, files).
+get unlimited use: none of the free plan's monthly counts — 10 conversations,
+2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document (lib/entitlements.ts)
+— is held, and neither are the fair-use ceilings both plans share (Research,
+images, files). With the table but without the freemium functions
+(`supabase/freemium.sql`), limits are counted but not atomically: two
+requests racing for the last free unit can both win. docs/FREEMIUM.md has the
+whole migration.
 
 It also broke checkout, until it was made not to. `socria_subscriptions` is
 in this file, so recording a customer before checkout threw, and every attempt
@@ -272,11 +275,16 @@ Worth doing while you are in the Clerk dashboard:
 
 ---
 
-## 4b. Socria One for students (optional, off by default)
+## 4b. Socria One for students — RETIRED (October 2026)
 
-Set `SOCRIA_EDU_DOMAINS` to a comma-separated list of university domains and
-anyone holding a **verified** email address at one of them has Socria One,
-free, for as long as they hold it.
+**This no longer grants anything.** Socria One is paid for or it is not held
+(docs/FREEMIUM.md): `eduProgrammeOn()` answers no whatever
+`SOCRIA_EDU_DOMAINS` says, and `/students` says the month has ended. What
+follows is the record of how it worked.
+
+Setting `SOCRIA_EDU_DOMAINS` to a comma-separated list of university domains
+gave anyone holding a **verified** email address at one of them Socria One,
+free.
 
 ```
 SOCRIA_EDU_DOMAINS=mavs.uta.edu

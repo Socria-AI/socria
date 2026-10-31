@@ -468,6 +468,13 @@ export function foldConversation(f: FoldInput): FoldOutput {
  * reading is passed as 'research', which IFR does not treat as routine.
  */
 export function workForIfr(input: MRTurnInput, text: string): string {
+  // GRADED WORK, AND WORK THEY SAID THEY WANT TO DO THEMSELVES, IS THEIRS —
+  // whatever the engine computed. The computed-answer shortcut below ran
+  // first, so "this is for my graded homework: solve 2x + 3 = 11" became a
+  // routine task and the reply was told to do it, over the runtime's own
+  // reading (practice) and Core 4's (scaffold).
+  const w0 = String(input.turnState.work);
+  if (w0 === 'practice' || input.signals?.assessment === true || input.signals?.practiceIntent === true) return 'practice';
   const last = sentencesOf(text.trim()).filter((x) => x.trim()).pop()?.trim() ?? '';
   const routine = isFactQuestion(text) || (!!last && last !== text.trim() && isFactQuestion(last)) || input.context.accuracy.computed;
   if (routine) return 'information';

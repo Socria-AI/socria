@@ -22,7 +22,7 @@
 // Enforcement lives on the server and is unaffected by any of this. A prompt
 // is UX. If this file were deleted, every limit would still hold.
 
-import { boundaryNote, TIERED_COUNTERS, type Counter } from './entitlements';
+import { allowanceLabel, boundaryNote, FEATURE_NOTE, LIMIT_HEADLINE, PLANS, TIERED_COUNTERS, type Counter, freePlanSentence } from './entitlements';
 import type { Plan } from './socria-one';
 import type { ThinkingContext } from './logos';
 
@@ -81,6 +81,16 @@ export const TRIGGER_REASONS = [
   'context-spent',
   'images-spent',
   'files-spent',
+  // the free tier's October 31, 2026 allowances: Logic Maps, their nodes, artifacts and documents a month
+  'maps-spent',
+  'nodes-spent',
+  'artifacts-spent',
+  'documents-spent',
+  // pressed a feature only Socria One has — a request, answered every time it is pressed
+  'voice-locked',
+  'share-locked',
+  // an allowance nearly spent, said ahead of time beside the thing it counts (never a sheet)
+  'near-limit',
   // high — reached for something One holds. The first four are retired:
   // nothing can raise them any more (see the note above on why they stay).
   'map-full',
@@ -142,16 +152,16 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
   {
     title: 'Pick it back up',
     body:
-      'The free plan holds two new lines of thinking a month and ten messages ' +
-      'a day. Socria One holds as many as you have, and carries what it learns ' +
+      `The free plan holds ${allowanceLabel('chats')} and ${allowanceLabel('maps')}. ` +
+      'Socria One holds as many as you have, and carries what it learns ' +
       'about how you reason from each one into the next.',
   },
   {
     title: 'What stays between conversations',
     body:
-      'The free tier gives you the whole of Socria, a day at a time. What Socria ' +
-      'One adds is continuity: your positions, what you have already settled, ' +
-      'and how you tend to think, carried forward instead of restarting.',
+      `The free plan gives you ${freePlanSentence()}. What Socria One adds is ` +
+      'room and continuity: as much as you need, with your positions, what you ' +
+      'have settled and how you tend to think carried forward instead of restarting.',
   },
   {
     title: 'Where this goes next',
@@ -164,8 +174,8 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
     title: 'Everything you have made stays yours',
     body:
       'Nothing here expires and nothing is taken back: every conversation and ' +
-      'every map you have made stays open on the free tier. Socria One is ' +
-      'simply more of them, and more carried between them.',
+      'every map you have made stays open on the free plan. Socria One is ' +
+      'unlimited, with Socria Voice and sharing.',
   },
 ];
 
@@ -186,25 +196,70 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     category: 'entitlement',
     intent: 'urgent',
     counter: 'chats',
-    title: 'Keep this line of thinking',
+    title: LIMIT_HEADLINE,
   },
   'messages-spent': {
     category: 'entitlement',
     intent: 'urgent',
     counter: 'messages',
-    title: 'Keep thinking today',
+    title: LIMIT_HEADLINE,
   },
+  'maps-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'maps',
+    title: LIMIT_HEADLINE,
+  },
+  'nodes-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'nodes',
+    title: LIMIT_HEADLINE,
+  },
+  'artifacts-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'artifacts',
+    title: LIMIT_HEADLINE,
+  },
+  'documents-spent': {
+    category: 'entitlement',
+    intent: 'urgent',
+    counter: 'documents',
+    title: LIMIT_HEADLINE,
+  },
+  'voice-locked': {
+    category: 'entitlement',
+    intent: 'high',
+    title: 'Socria Voice',
+    body: `${FEATURE_NOTE.voice} Say your thinking out loud — Socria takes it down as you speak and answers in the conversation.`,
+  },
+  'share-locked': {
+    category: 'entitlement',
+    intent: 'high',
+    title: 'Share this conversation',
+    body: `${FEATURE_NOTE.share} Invite people in by link, by code or by email, and think it through together.`,
+  },
+  'near-limit': {
+    category: 'proactive',
+    intent: 'high',
+    title: 'Almost at your free limit',
+    body: 'Socria One has no monthly limits on conversations, Logic Maps, artifacts or documents.',
+  },
+  // Retired with Core's own limits (October 31, 2026): Core's turns are counted
+  // against Logos' conversations and messages now. Kept for attribution, with
+  // copy that would still be true if one were ever raised.
   'core-chats-spent': {
     category: 'entitlement',
     intent: 'urgent',
-    counter: 'core-chats',
-    title: 'Start something new today',
+    title: LIMIT_HEADLINE,
+    body: boundaryNote('chats'),
   },
   'core-messages-spent': {
     category: 'entitlement',
     intent: 'urgent',
-    counter: 'core-messages',
-    title: 'Keep this conversation going',
+    title: LIMIT_HEADLINE,
+    body: boundaryNote('messages'),
   },
   'explore-spent': {
     category: 'entitlement',
@@ -255,8 +310,8 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     intent: 'high',
     title: 'This map has more in it',
     body:
-      'This line of thinking has grown past what the map will hold. Everything ' +
-      'here stays — Socria One simply lets it keep growing with you.',
+      'A free Logic Map holds {mapNodes} ideas, and this one is full. Everything ' +
+      'on it stays — Socria One lets it keep growing with you.',
   },
   'depth-locked': {
     category: 'entitlement',
@@ -367,7 +422,7 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
  * rather than writing it down a second time.
  */
 function fill(text: string): string {
-  return text;
+  return text.replace(/\{mapNodes\}/g, String(PLANS.free.mapNodes ?? ''));
 }
 
 /**
@@ -383,16 +438,13 @@ export function copyFor(reason: TriggerReason, shown = 0): PromptCopy {
   return {
     title: variant?.title ?? spec.title,
     body: variant ? variant.body : spec.counter ? boundaryNote(spec.counter) : fill(spec.body ?? ''),
-    // One action. "Continue" rather than "Upgrade", because what they are
-    // doing is continuing — the transaction is incidental to it.
-    primary:
-      spec.category === 'entitlement' ? 'Continue with Socria One' : 'Become a member',
-    // The way out is the /one cover's own phrasing, and it is set in the same
-    // quiet serif italic. It says what actually happens next rather than
-    // deferring the question — "not now" implies we will ask again, and for
-    // an entitlement prompt we will not.
-    secondary:
-      spec.category === 'entitlement' ? 'continue with the free tier' : 'maybe later',
+    // One action, said plainly: at a limit the way past it is to upgrade, and
+    // the button says so with the plan's name (October 31, 2026 — it said
+    // "Continue with Socria One", which read as a step in what they were doing
+    // rather than a purchase, and an upgrade should never be mistaken for one).
+    primary: spec.category === 'entitlement' ? 'Upgrade to Socria One' : 'Become a member',
+    // The way out says what actually happens next: the free plan, kept.
+    secondary: spec.category === 'entitlement' ? 'keep the free plan' : 'maybe later',
   };
 }
 
@@ -615,6 +667,9 @@ export function decide(input: DecideInput): Decision {
     // behaviour the rest of this file exists to prevent. The allowance
     // panel and the boundary note say the same sentence, in place, for as
     // long as it is true.
+    // A locked feature pressed is a request, like the Socria One button: it is
+    // answered every time, never "said already".
+    if (reason === 'voice-locked' || reason === 'share-locked') return yes();
     if (saidAlready(state, reason)) return no('said-already');
     return yes();
   }
@@ -651,6 +706,8 @@ export function decide(input: DecideInput): Decision {
   // subject to the once-per-tab rule either — pressing a button labelled
   // Socria One is a request, and a request is answered every time.
   if (reason === 'asked') return yes();
+  // Said beside the allowance it counts, never as a sheet over the work.
+  if (reason === 'near-limit') return no('said-already');
 
   // ── from here down: nobody asked ──────────────────────────────────
 

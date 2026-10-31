@@ -4,4 +4,4 @@
 export { Landing } from '@/components/site/Landing';
 export { One } from '@/components/site/One';
 export { Charter, CHARTER_TEXT } from '@/components/site/Charter';
-export { StudentsBody, CLOSES } from '@/app/students/StudentsBody';
+export { StudentsBody } from '@/app/students/StudentsBody';

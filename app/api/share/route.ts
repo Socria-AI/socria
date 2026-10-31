@@ -12,9 +12,9 @@
 // ENFORCED HERE, NOT IN THE DIALOG. Every action but leaving is the owner's,
 // checked against the database (lib/share/server.ts). Opening a door — a
 // link, a code, an invitation — is hosting. On Socria One, anything; on the
-// free plan, one chat at a time and no Projects (lib/share/roles.ts
-// hostRefusal). Closing a door is never paywalled, so an owner whose plan
-// lapsed can still take everyone out.
+// free plan, nothing — sharing is part of Socria One (lib/share/roles.ts
+// hostRefusal). Joining is free on every plan, and closing a door is never
+// paywalled, so an owner whose plan lapsed can still take everyone out.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -50,7 +50,7 @@ interface Hosting {
 
 /**
  * May this owner open a door on this thing — and if not, why. Socria One
- * hosts anything; the free plan, one conversation at a time and no Project.
+ * hosts anything; the free plan, nothing — sharing is part of Socria One.
  * Read from the database each time, never from the dialog.
  */
 async function hosting(req: NextRequest, userId: string, type: ResourceType, id: string): Promise<Hosting> {

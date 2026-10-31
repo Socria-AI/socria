@@ -1,45 +1,63 @@
-// The free plan's day, end to end, through the real routes.
+// The free plan, end to end, through the real routes (October 31, 2026).
 //
-//   Core (every model but Logos)   4 new chats a day, 20 messages a day
-//   Logos                          2 new lines of thinking a month, 10 messages a day
+//                         Free          Socria One
+//   Conversations         10 a month    unlimited (fair use)
+//   Logic Maps            2 a month     unlimited
+//   Logic Map nodes       10 a month    unlimited
+//   Artifacts             2 a month     unlimited
+//   Documents             1 a month     unlimited
+//   Socria Voice          —             included
+//   Sharing a chat        —             included
 //
-// The chat routes are the real ones, bundled from app/api, against the
-// in-memory database — with the usage counter (bump_logos_usage) supplied, so
-// a turn really is counted — a Clerk that knows these people, and a scripted
-// model that records every call. What is proved is what a person meets: the
-// boundary arrives where the table says, with its own sentence and the word
-// the client raises Socria One for; a refused turn never reaches the model and
-// costs nothing; going back to a chat never costs a chat; a retried first turn
-// is not charged twice; a guest's turn is their message and never their chat;
-// Socria One and signed-out visitors are not counted here at all.
+// The routes are the real ones, bundled from app/api, against the in-memory
+// database with the usage functions supplied (scripts/dev/usage-functions.mjs —
+// the same semantics as supabase/freemium.sql), a Clerk that knows these
+// people, and a scripted model that records every call. What is proved is what
+// a person meets: each boundary arrives where the table says, with its own
+// sentence and the word the page raises Socria One for; a refused turn or map
+// never reaches the model; nothing is charged twice; nothing already made is
+// taken away; and none of the old ways to Socria One without paying for it —
+// a complimentary grant, a comped account, a redeemed code, promotional time —
+// opens anything any more. Socria One is not counted.
 //
-//   fiona  free, Core
-//   liam   free, Logos
-//   gina   free, arrives with onboarding's first thought
-//   olga   Socria One
-//   alice  Socria One, shares a Core conversation
-//   bob    free, joins it
+//   liam   free — conversations
+//   fiona  free — a Core conversation is one of the month's conversations
+//   mira   free — Logic Maps and their nodes
+//   ada    free — artifacts, by the save
+//   dora   free — documents
+//   vic    free — Voice and sharing
+//   carl   free, with a complimentary grant and a comp row from before
+//   olga   Socria One (the operator's allowlist)
+//   paula  Socria One (a paid Stripe subscription)
 
 import { build } from 'esbuild';
 import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join, resolve as res } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
+import * as T from './.tmp/docs-under-test.mjs';
+import * as I from './.tmp/inline-under-test.mjs';
+import { usageFunctions } from '../scripts/dev/usage-functions.mjs';
+import { systemOf } from './helpers/prompt.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
 const OUT = join(here, '.tmp', 'e2e-free-limits');
-const FAKE_DB = join(here, 'helpers', 'fake-supabase.mjs');
-const FAKE_CLERK = join(here, 'helpers', 'fake-clerk.mjs');
-const FAKE_OPENAI = join(here, 'helpers', 'fake-openai.mjs');
-const SHIM = join(here, 'helpers', 'server-only-shim.mjs');
+const H = (f) => join(here, 'helpers', f);
 
 const ROUTES = {
   chat: 'app/api/chat/route.ts',
   logos: 'app/api/logos/chat/route.ts',
+  map: 'app/api/logos/map/route.ts',
   usage: 'app/api/logos/usage/route.ts',
+  plan: 'app/api/logos/plan/route.ts',
+  allowance: 'app/api/logos/allowance/route.ts',
+  redeem: 'app/api/logos/redeem/route.ts',
   conversations: 'app/api/conversations/route.ts',
   share: 'app/api/share/route.ts',
   accept: 'app/api/share/accept/route.ts',
+  room: 'app/api/logos/room/route.ts',
+  transcribe: 'app/api/transcribe/route.ts',
+  read: 'app/api/files/read/route.ts',
 };
 
 rmSync(OUT, { recursive: true, force: true });
@@ -49,203 +67,263 @@ const swap = {
   setup(b) {
     b.onResolve({ filter: /(^|\/)supabase$/ }, (a) => {
       const p = a.path.startsWith('@/') ? join(root, a.path.slice(2)) : res(a.resolveDir, a.path);
-      if (p === join(root, 'lib', 'supabase')) return { path: pathToFileURL(FAKE_DB).href, external: true };
+      if (p === join(root, 'lib', 'supabase')) return { path: pathToFileURL(H('fake-supabase.mjs')).href, external: true };
       return undefined;
     });
-    b.onResolve({ filter: /^@clerk\/nextjs\/server$/ }, () => ({ path: pathToFileURL(FAKE_CLERK).href, external: true }));
-    b.onResolve({ filter: /^openai$/ }, () => ({ path: pathToFileURL(FAKE_OPENAI).href, external: true }));
-    b.onResolve({ filter: /^server-only$/ }, () => ({ path: SHIM }));
+    b.onResolve({ filter: /^@clerk\/nextjs\/server$/ }, () => ({ path: pathToFileURL(H('fake-clerk.mjs')).href, external: true }));
+    b.onResolve({ filter: /^openai$/ }, () => ({ path: pathToFileURL(H('fake-openai-logos.mjs')).href, external: true }));
+    b.onResolve({ filter: /^server-only$/ }, () => ({ path: H('server-only-shim.mjs') }));
     b.onResolve({ filter: /^next\/(server|headers)$/ }, (a) => ({ path: `${a.path}.js`, external: true }));
   },
 };
-await Promise.all(Object.entries(ROUTES).map(([name, file]) => build({
-  entryPoints: [join(root, file)],
-  bundle: true, format: 'esm', platform: 'node',
-  outfile: join(OUT, `${name}.mjs`),
-  tsconfig: join(root, 'tsconfig.json'),
-  plugins: [swap],
-  external: ['next', 'next/*', 'undici', '@supabase/*', 'stripe', 'resend', '@vercel/functions'],
-  logLevel: 'error',
-})));
+await Promise.all(
+  Object.entries(ROUTES).map(([name, file]) =>
+    build({
+      entryPoints: [join(root, file)],
+      bundle: true,
+      format: 'esm',
+      platform: 'node',
+      outfile: join(OUT, `${name}.mjs`),
+      tsconfig: join(root, 'tsconfig.json'),
+      plugins: [swap],
+      external: ['next', 'next/*', 'undici', '@supabase/*', 'stripe', 'resend', '@vercel/functions', 'unpdf'],
+      logLevel: 'error',
+    })
+  )
+);
 
-const quietLog = (orig) => (...a) => {
-  const first = typeof a[0] === 'string' ? a[0] : '';
-  if (first.startsWith('[') || first.startsWith('conversations') || first.startsWith('email') || first.startsWith('usage')) return;
-  orig(...a);
-};
-console.log = quietLog(console.log.bind(console));
-console.error = quietLog(console.error.bind(console));
-console.warn = quietLog(console.warn.bind(console));
-
+const quiet = () => {};
+console.info = quiet;
+console.warn = quiet;
+console.error = quiet;
 process.env.OPENAI_API_KEY = 'test';
 process.env.RATE_LIMIT_DISABLED = '1';
 process.env.SHARE_SECRET = 'test-share-secret';
-process.env.SOCRIA_ONE_USER_IDS = 'olga,alice';
+process.env.SOCRIA_ONE_USER_IDS = 'olga';
 
 const load = (n) => import(pathToFileURL(join(OUT, `${n}.mjs`)).href);
 const R = Object.fromEntries(await Promise.all(Object.keys(ROUTES).map(async (k) => [k, await load(k)])));
-const { db } = await import(pathToFileURL(FAKE_DB).href);
+const { db } = await import(pathToFileURL(H('fake-supabase.mjs')).href);
 const { NextRequest } = await import('next/server.js');
 
-let pass = 0, fail = 0;
-const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + x)));
+let pass = 0,
+  fail = 0;
+const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + String(x).slice(0, 400))));
 
-const as = (uid) => { globalThis.__uid = uid; };
-const call = async (handler, method, url, body, params) => {
+const as = (uid) => {
+  globalThis.__uid = uid;
+};
+const call = async (handler, method, url, body, opts = {}) => {
   const req = new NextRequest(`http://localhost${url}`, {
     method,
-    headers: { 'content-type': 'application/json' },
-    ...(body !== undefined ? { body: JSON.stringify(body) } : {}),
+    headers: opts.form ? {} : { 'content-type': 'application/json' },
+    ...(opts.form ? { body: opts.form } : body !== undefined ? { body: JSON.stringify(body) } : {}),
   });
-  const r = await handler(req, params ? { params } : undefined);
+  const r = await handler(req);
   const text = await r.text();
   let json = null;
-  try { json = JSON.parse(text); } catch {}
+  try {
+    json = JSON.parse(text);
+  } catch {}
   return { status: r.status, json, text, headers: r.headers };
 };
 
 db.reset();
-// The real function, in memory: insert or add, and answer the new total.
-db.rpcs.bump_logos_usage = ({ p_user, p_scope, p_counter, p_by }) => {
-  const rows = db.rows('logos_usage');
-  let row = rows.find((x) => x.user_id === p_user && x.scope === p_scope && x.counter === p_counter);
-  if (!row) {
-    row = { id: `${p_user}|${p_scope}|${p_counter}`, user_id: p_user, scope: p_scope, counter: p_counter, n: 0 };
-    rows.push(row);
+const fns = usageFunctions(db.rows('logos_usage'));
+for (const [name, fn] of Object.entries(fns)) db.rpcs[name] = (args) => ({ data: fn(args), error: null });
+const month = new Date().toISOString().slice(0, 7);
+const count = (uid, counter) => db.rows('logos_usage').find((x) => x.user_id === uid && x.scope === month && x.counter === counter)?.n ?? 0;
+const streams = () => (globalThis.__logosCalls ?? []).filter((p) => p.stream).length;
+// A chat turn leaves work running after it answers (memory, the turn's ledger) that may call the
+// model later; wait until nothing has called it for a moment, so a scripted map pass gets its own answer.
+const settle = async () => {
+  let n = -1;
+  while (n !== (globalThis.__logosCalls ?? []).length) {
+    n = (globalThis.__logosCalls ?? []).length;
+    await new Promise((r) => setTimeout(r, 150));
   }
-  row.n += p_by;
-  return { data: row.n, error: null };
 };
-const count = (uid, counter) => {
-  const day = `day:${new Date().toISOString().slice(0, 10)}`;
-  const month = new Date().toISOString().slice(0, 7);
-  const scope = counter === 'chats' ? month : day;
-  return db.rows('logos_usage').find((x) => x.user_id === uid && x.scope === scope && x.counter === counter)?.n ?? 0;
-};
-const modelCalls = () => (globalThis.__calls ?? []).filter((p) => p.stream).length;
+const passes = () => (globalThis.__logosCalls ?? []).filter((p) => !p.stream).length;
 
-globalThis.__users = {
-  fiona: { firstName: 'Fiona', emails: ['fiona@example.com'] },
-  liam: { firstName: 'Liam', emails: ['liam@example.com'] },
-  gina: { firstName: 'Gina', emails: ['gina@example.com'] },
-  olga: { firstName: 'Olga', emails: ['olga@example.com'] },
-  alice: { firstName: 'Alice', emails: ['alice@example.com'] },
-  bob: { firstName: 'Bob', emails: ['bob@example.com'] },
-};
+globalThis.__users = Object.fromEntries(
+  ['liam', 'fiona', 'mira', 'ada', 'dora', 'vic', 'olga', 'paula'].map((u) => [u, { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] }])
+);
+// carl: a complimentary grant on the account, and a comp row, from before
+globalThis.__users.carl = { firstName: 'Carl', emails: ['carl@example.com'], privateMetadata: { socriaOne: 'comp' } };
+db.rows('socria_subscriptions').push({ user_id: 'carl', customer_id: 'comp_carl', subscription_id: 'comp_carl', status: 'comp', current_period_end: null, price_id: null, cancel_at_period_end: false, updated_at: Date.now() });
+// paula: a paid Stripe subscription
+db.rows('socria_subscriptions').push({ user_id: 'paula', customer_id: 'cus_paula', subscription_id: 'sub_paula', status: 'active', current_period_end: Math.floor(Date.now() / 1000) + 20 * 86400, price_id: 'price_one', cancel_at_period_end: false, updated_at: Date.now() });
 
-// A Core turn: the history so far, then what they say now.
 const turns = (n) => {
   const out = [];
   for (let i = 0; i < n - 1; i++) out.push({ role: 'user', content: `Earlier thought ${i}` }, { role: 'assistant', content: 'Noted.' });
   out.push({ role: 'user', content: 'And what about this?' });
   return out;
 };
-const core = (conversationId, userTurns = 1, model = 'core-3') =>
-  call(R.chat.POST, 'POST', '/api/chat', { model, conversationId, messages: turns(userTurns) });
-const logos = (sessionId, userTurns = 1, extra = {}) =>
-  call(R.logos.POST, 'POST', '/api/logos/chat', { sessionId, messages: turns(userTurns), ...extra });
+const logos = (sessionId, userTurns = 1, extra = {}) => call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId, messages: turns(userTurns), ...extra });
+const core = (conversationId, userTurns = 1) => call(R.chat.POST, 'POST', '/api/chat', { model: 'core-4', conversationId, messages: turns(userTurns) });
 
-console.log('=== Core: four new chats a day ===');
-as('fiona');
-for (let i = 1; i <= 4; i++) {
-  const r = await core(`c${i}`);
-  ok(`new chat ${i} of 4 is answered`, r.status === 200, r.text.slice(0, 200));
-}
-ok('four chats counted', count('fiona', 'core-chats') === 4, String(count('fiona', 'core-chats')));
-let before = modelCalls();
-const fifth = await core('c5');
-ok('a fifth new chat is refused', fifth.status === 402 && fifth.json?.upgrade === 'core-chats', fifth.text.slice(0, 300));
-ok('  with the boundary’s own sentence: what was used, what stays open, and Socria One',
-  /today’s 4 new chats/.test(fifth.json?.error ?? '') && /stay open/.test(fifth.json?.error ?? '') && /Socria One/.test(fifth.json?.error ?? ''), fifth.json?.error);
-ok('  and the count it was refused at', fifth.json?.used === 4 && fifth.json?.limit === 4);
-ok('  without the model ever being called', modelCalls() === before);
-ok('  and without costing anything', count('fiona', 'core-chats') === 4 && count('fiona', 'core-messages') === 4);
-const back = await core('c1', 2);
-ok('going back to a chat already started is answered — no chat to spend', back.status === 200, back.text.slice(0, 200));
-ok('  and costs a message, never a chat', count('fiona', 'core-chats') === 4 && count('fiona', 'core-messages') === 5);
-const retry = await core('c2', 1);
-ok('a first turn sent again (a retry) is answered', retry.status === 200);
-ok('  and not charged as a second chat', count('fiona', 'core-chats') === 4);
-const core4 = await core('c3', 2, 'core-4');
-ok('Core 4 is counted too — every Core model shares the day', core4.status === 200 && count('fiona', 'core-messages') === 7, `${core4.status} ${count('fiona', 'core-messages')}`);
-
-console.log('\n=== Core: twenty messages a day ===');
-let n = count('fiona', 'core-messages');
-let i = 3;
-while (n < 20) {
-  const r = await core('c1', i++);
-  if (r.status !== 200) break;
-  n = count('fiona', 'core-messages');
-}
-ok('twenty messages answered in all', n === 20, String(n));
-before = modelCalls();
-const over = await core('c1', i);
-ok('the twenty-first is refused', over.status === 402 && over.json?.upgrade === 'core-messages', over.text.slice(0, 300));
-ok('  saying the day, that nothing is lost, and Socria One',
-  /today’s 20 messages/.test(over.json?.error ?? '') && /tomorrow/.test(over.json?.error ?? '') && /Upgrade to Socria One/.test(over.json?.error ?? ''), over.json?.error);
-ok('  before the model is called', modelCalls() === before);
-ok('  and costs nothing', count('fiona', 'core-messages') === 20);
-ok('the messages run out before the chats are asked about', (await core('c9')).json?.upgrade === 'core-messages');
-// tomorrow: yesterday's rows speak for nothing
-for (const r of db.rows('logos_usage')) if (r.user_id === 'fiona' && r.scope.startsWith('day:')) r.scope = 'day:2000-01-01';
-ok('a new day starts again', (await core('c10')).status === 200 && count('fiona', 'core-messages') === 1 && count('fiona', 'core-chats') === 1);
-
-console.log('\n=== Socria One, and signed-out visitors, are not counted here ===');
-as('olga');
-let oneOk = true;
-for (let k = 1; k <= 6; k++) oneOk = oneOk && (await core(`o${k}`)).status === 200;
-for (let k = 0; k < 20; k++) oneOk = oneOk && (await core('o1', k + 2)).status === 200;
-ok('Socria One: six new chats and twenty-six messages in a day', oneOk);
-ok('  and nothing written down for it', count('olga', 'core-messages') === 0 && count('olga', 'core-chats') === 0);
-as(null);
-let anonOk = true;
-for (let k = 0; k < 24; k++) anonOk = anonOk && (await core(null, k + 1)).status === 200;
-ok('signed out, Core 3.1 is bounded by the rate limiter, not by an account it does not have', anonOk);
-as(null);
-ok('  and Core 4 still asks them to sign in', (await core('x', 1, 'core-4')).status === 401);
-
-console.log('\n=== Logos: ten messages a day ===');
+console.log('\n=== conversations: ten a month ===');
 as('liam');
-const first = await logos('s1');
-ok('a line of thinking begins', first.status === 200, first.text.slice(0, 200));
-ok('  costing one of the month’s two, and one of the day’s ten', count('liam', 'chats') === 1 && count('liam', 'messages') === 1);
-for (let k = 2; k <= 10; k++) await logos('s1', k);
-ok('ten messages answered', count('liam', 'messages') === 10, String(count('liam', 'messages')));
-ok('  still one line of thinking', count('liam', 'chats') === 1);
-before = modelCalls();
-const eleventh = await logos('s1', 11);
-ok('the eleventh is refused', eleventh.status === 402 && eleventh.json?.upgrade === 'messages', eleventh.text.slice(0, 300));
-ok('  with the Logos day’s sentence', /today’s 10 Logos messages/.test(eleventh.json?.error ?? '') && /Upgrade to Socria One/.test(eleventh.json?.error ?? ''), eleventh.json?.error);
-ok('  before the model is called, and at no cost', modelCalls() === before && count('liam', 'messages') === 10);
-ok('a node’s own conversation is a message too', (await logos('s1', 1, { focus: { label: 'Rent', type: 'idea' } })).json?.upgrade === 'messages');
-const panel = await call(R.usage.GET, 'GET', '/api/logos/usage?chat=s1');
-ok('the allowance panel reads the same count the route refused at',
-  panel.json?.counters?.messages?.used === 10 && panel.json?.counters?.messages?.limit === 10 && panel.json?.counters?.chats?.used === 1, JSON.stringify(panel.json?.counters ?? {}).slice(0, 300));
-ok('  and Core’s day separately', panel.json?.counters?.['core-messages']?.used === 0 && panel.json?.counters?.['core-messages']?.limit === 20);
-ok('Logos and Core keep separate days: Liam can still use Core', (await core('l1')).status === 200);
+globalThis.__logosReply = 'Noted.';
+for (let k = 1; k <= 10; k++) {
+  const r = await logos(`s${k}`);
+  if (r.status !== 200) ok(`conversation ${k} of 10 is answered`, false, r.text);
+}
+ok('ten conversations begun, ten counted', count('liam', 'chats') === 10, String(count('liam', 'chats')));
+let before = streams();
+const eleventh = await logos('s11');
+ok('the eleventh is refused, with the word the page raises Socria One for', eleventh.status === 402 && eleventh.json?.upgrade === 'chats', eleventh.text);
+ok('  and the boundary’s own sentence: ten this month, every one still open, Socria One', /10 free conversations this month/.test(eleventh.json?.error ?? '') && /stays open/.test(eleventh.json?.error ?? '') && /Unlock unlimited access with Socria One/.test(eleventh.json?.error ?? ''), eleventh.json?.error);
+ok('  at the count it was refused at, and before the model is asked', eleventh.json?.used === 10 && eleventh.json?.limit === 10 && streams() === before);
+const back = await logos('s3', 4);
+ok('going back to a conversation already begun costs nothing', back.status === 200 && count('liam', 'chats') === 10, back.text);
+let long = true;
+for (let k = 2; k <= 16; k++) long = long && (await logos('s1', k)).status === 200;
+ok('no daily count of messages: fifteen more turns in one conversation, all answered', long);
+ok('  and none of them is counted as a message the plan limits', count('liam', 'chats') === 10);
+ok('a first turn sent again is not a second conversation', (await logos('s2', 1)).status === 200 && count('liam', 'chats') === 10);
+const gift = await logos('s12', 1, { firstThought: true });
+ok('onboarding’s "first thought" is no longer a gift: past the ten, it is refused like any other', gift.status === 402 && gift.json?.upgrade === 'chats' && !gift.headers.get('X-Socria-First-Thought'), gift.text);
 
-as('gina');
-const gift = await logos('g1', 1, { firstThought: true });
-ok('onboarding’s first thought is answered and marked as the gift', gift.status === 200 && gift.headers.get('X-Socria-First-Thought') === '1', gift.text.slice(0, 200));
-ok('  costing neither a line of thinking nor a message', count('gina', 'chats') === 0 && count('gina', 'messages') === 0);
+console.log('\n=== Core and Logos share the month ===');
+as('fiona');
+for (let k = 1; k <= 9; k++) await logos(`f${k}`);
+const c1 = await core('core-1');
+ok('a Core conversation is answered — and is one of the month’s ten', c1.status === 200 && count('fiona', 'chats') === 10, `${c1.status} ${count('fiona', 'chats')}`);
+const c2 = await core('core-2');
+ok('the next, in Core, is refused at the same boundary', c2.status === 402 && c2.json?.upgrade === 'chats', c2.text);
+ok('  no Core counters are written any more', !db.rows('logos_usage').some((x) => x.user_id === 'fiona' && /^core-/.test(x.counter)));
+ok('a Core conversation going on costs nothing', (await core('core-1', 3)).status === 200 && count('fiona', 'chats') === 10);
+
+console.log('\n=== Logic Maps: two a month, ten nodes a month ===');
+await settle();
+as('mira');
+const N = (ids) => ids.map((id) => ({ id, type: 'claim', label: `Idea ${id}`, status: 'open' }));
+const extraction = (ids, edges = []) => ({ context: 'reflecting', nodes: N(ids), edges });
+const map = (sessionId, current, script, messages = [{ role: 'user', content: 'I think rent is too high. Moving might help. Or a roommate.' }]) => {
+  globalThis.__logosScript = [script];
+  return call(R.map.POST, 'POST', '/api/logos/map', { sessionId, messages, map: current });
+};
+const EMPTY = { nodes: [], edges: [] };
+const m1 = await map('m1', EMPTY, extraction(['a', 'b', 'c']));
+ok('a first Logic Map is drawn: three nodes kept', m1.status === 200 && m1.json?.map?.nodes?.length === 3, m1.text.slice(0, 300));
+ok('  one of the month’s two maps, three of its ten nodes', count('mira', 'maps') === 1 && count('mira', 'nodes') === 3, `${count('mira', 'maps')} ${count('mira', 'nodes')}`);
+const m2 = await map('m2', EMPTY, extraction(['d', 'e', 'f', 'g']));
+ok('a second map: four more nodes', m2.status === 200 && m2.json?.map?.nodes?.length === 4 && count('mira', 'maps') === 2 && count('mira', 'nodes') === 7);
+before = passes();
+const m3 = await map('m3', EMPTY, extraction(['x']));
+ok('a third conversation’s map is refused before any model is asked', m3.status === 402 && m3.json?.upgrade === 'maps' && passes() === before, m3.text.slice(0, 300));
+ok('  saying so in the boundary’s words, with the map it was sent kept', /2 free Logic Maps this month/.test(m3.json?.error ?? '') && JSON.stringify(m3.json?.map?.nodes) === '[]');
+const grow = await map('m1', m1.json.map, extraction(['a', 'b', 'c', 'h', 'i', 'j', 'k', 'l'], [{ from: 'a', to: 'h', relation: 'relates' }, { from: 'c', to: 'l', relation: 'relates' }]));
+const kept = (grow.json?.map?.nodes ?? []).map((n) => n.id);
+ok('a map already drawn keeps growing — until the month’s ten nodes: three of five new kept', grow.status === 200 && kept.length === 6 && ['h', 'i', 'j'].every((id) => kept.includes(id)) && !kept.includes('k') && !kept.includes('l'), JSON.stringify(kept));
+ok('  a connection to a node not kept goes with it; one to a kept node stays', (grow.json?.map?.edges ?? []).some((e) => e.to === 'h') && !(grow.json?.map?.edges ?? []).some((e) => e.to === 'l'), JSON.stringify(grow.json?.map?.edges));
+ok('  the page is told which allowance stopped the map, and in what words', grow.json?.limit?.counter === 'nodes' && grow.json?.limit?.used === 10 && /10 free Logic Map nodes this month/.test(grow.json?.limit?.note ?? ''), JSON.stringify(grow.json?.limit));
+ok('  and the count is exactly ten', count('mira', 'nodes') === 10);
+const still = await map('m1', grow.json.map, extraction(['a', 'b', 'c', 'h', 'i', 'j', 'z']));
+ok('past the ten, the map keeps every node it has and gains none', still.status === 200 && still.json?.map?.nodes?.length === 6 && !still.json.map.nodes.some((n) => n.id === 'z') && count('mira', 'nodes') === 10, JSON.stringify(still.json?.map?.nodes?.map((n) => n.id)));
+const hand = await call(R.allowance.POST, 'POST', '/api/logos/allowance', { counter: 'nodes' });
+ok('a node added by hand is refused too, once the month’s nodes are spent', hand.status === 402 && hand.json?.upgrade === 'nodes', hand.text);
 as('olga');
-let logosOne = true;
-for (let k = 1; k <= 12; k++) logosOne = logosOne && (await logos('os1', k)).status === 200;
-ok('Socria One: twelve Logos messages in a day', logosOne && count('olga', 'messages') === 0);
+const oneMap = await map('o1', EMPTY, extraction(Array.from({ length: 14 }, (_, k) => `n${k}`)));
+ok('Socria One: a map of fourteen nodes, kept whole, nothing counted', oneMap.status === 200 && oneMap.json?.map?.nodes?.length === 14 && count('olga', 'nodes') === 0 && count('olga', 'maps') === 0);
 
-console.log('\n=== a guest’s turn is their message, never their chat ===');
-as('alice');
-await call(R.conversations.PUT, 'PUT', '/api/conversations', { conversation: { id: 'c-shared', title: 'Our plan', messages: [{ role: 'user', content: 'Where do we start?' }, { role: 'assistant', content: 'With the question.' }], updatedAt: Date.now() } });
-const link = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'c-shared', action: 'link', role: 'editor' });
-ok('alice shares a chat by link', link.status === 200 && !!link.json?.link?.token, link.text.slice(0, 200));
-as('bob');
+console.log('\n=== artifacts: two a month, held at the save ===');
+as('ada');
+// real workspace objects, made the way an element opened in Artifacts is (lib/inline-ui.ts artifactFromSpec)
+const chart = (title) => I.artifactFromSpec({ type: 'chart', kind: 'bar', title, x: ['Rent', 'Food', 'Transport'], series: [{ values: [1200, 400, 150] }], basis: 'given' });
+const space = (titles) => titles.reduce((sp, t) => { const a = chart(t); const made = I.makeDisplay(sp, a.kind, a.state, 'socria'); return made.ok ? made.space : sp; }, I.EMPTY_SPACE);
+const objIds = (sp) => sp.objs.map((o) => o.id);
+const save = (id, sp, extra = {}) =>
+  call(R.conversations.PUT, 'PUT', '/api/conversations', {
+    conversation: { id, title: 'Budget', messages: [{ role: 'user', content: 'My costs' }, { role: 'assistant', content: 'Here.' }], map: { nodes: [], edges: [], objects: sp }, updatedAt: Date.now(), base: null, ...extra },
+  });
+const two = space(['One', 'Two']);
+const three = I.makeDisplay(two, chart('Three').kind, chart('Three').state, 'socria').space;
+const s1 = await save('conv-a', two);
+ok('two artifacts saved: both kept, two counted', s1.status === 200 && !s1.json?.refused && count('ada', 'artifacts') === 2, s1.text);
+const third = objIds(three).find((x) => !objIds(two).includes(x));
+const s2 = await save('conv-a', three, { base: db.rows('conversations').find((r) => r.id === 'conv-a')?.updated_at ?? null });
+const stored = db.rows('conversations').find((r) => r.id === 'conv-a');
+const storedObjs = JSON.stringify(stored?.map ?? stored?.memory ?? {});
+ok('a third is not kept — and the save says which, and why', s2.status === 200 && JSON.stringify(s2.json?.refused?.artifacts?.objects) === JSON.stringify([third]) && /2 free artifacts this month/.test(s2.json?.refused?.note ?? ''), s2.text);
+ok('  the two already made are untouched, and the third is not in what was stored', objIds(two).every((x) => storedObjs.includes(`"${x}"`)) && !storedObjs.includes(`"${third}"`), storedObjs.slice(0, 300));
+const s3 = await save('conv-a', two, { base: db.rows('conversations').find((r) => r.id === 'conv-a')?.updated_at ?? null });
+ok('saving the same two again costs nothing', s3.status === 200 && !s3.json?.refused && count('ada', 'artifacts') === 2);
+as('paula');
+const ps = await save('conv-p', space(['A', 'B', 'C', 'D']));
+ok('Socria One (a paid subscription): four artifacts, all kept, nothing counted', ps.status === 200 && !ps.json?.refused && count('paula', 'artifacts') === 0, ps.text);
+
+console.log('\n=== documents: one a month ===');
+as('dora');
+const { doc } = await T.readDocument('report.md', Buffer.from('# Q3 report\n\nRevenue rose 12% on the quarter.\n\nCosts held flat.'));
+const { doc: other } = await T.readDocument('notes.txt', Buffer.from('Second document.\n\nThe launch moved to March.'));
+const attach = (d) => ({ kind: 'doc', name: d.name, doc: d.id, text: T.renderDocAsNote(d, 24000).text, pages: d.pageCount, format: d.format, origin: 'source' });
+const withDoc = (sessionId, d, n = 1) => call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId, messages: [{ role: 'user', content: 'What does this say?', attachments: [attach(d)] }, ...turns(n).slice(1)], docs: [d] });
+const d1 = await withDoc('d1', doc);
+ok('a first document brought into a conversation: read, and counted once', d1.status === 200 && count('dora', 'documents') === 1, d1.text.slice(0, 200));
+ok('  carried on later turns, it costs nothing more', (await withDoc('d1', doc, 3)).status === 200 && count('dora', 'documents') === 1);
+before = streams();
+const d2 = await withDoc('d2', other);
+ok('a second document this month is refused, before the model is asked', d2.status === 402 && d2.json?.upgrade === 'documents' && streams() === before, d2.text.slice(0, 300));
+ok('  in the boundary’s words', /1 free document this month/.test(d2.json?.error ?? ''), d2.json?.error);
+const form = new FormData();
+form.append('file', new Blob(['Third document'], { type: 'text/plain' }), 'third.txt');
+const read = await call(R.read.POST, 'POST', '/api/files/read', undefined, { form });
+ok('reading another file is refused before any reading is done', read.status === 402 && read.json?.upgrade === 'documents', read.text.slice(0, 200));
+globalThis.__logosReply = '# A short history\n\nIt began with a question.';
+const wu = await call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId: 'd3', messages: [{ role: 'user', content: 'Make me a study guide on the causes of World War One' }] });
+const wuPrompt = (globalThis.__logosCalls ?? []).filter((p) => p.stream).pop();
+ok('a write-up asked for with the month’s document spent: answered here, and the page told why', wu.status === 200 && wu.headers.get('X-Socria-Limit') === 'documents' && !systemOf(wuPrompt ?? { messages: [] }).includes('A WRITE-UP, READ IN CONTENT'), `${wu.status} ${wu.headers.get('X-Socria-Limit')}`);
+globalThis.__logosReply = 'Noted.';
+
+console.log('\n=== Socria Voice and sharing are Socria One ===');
+as('vic');
+const voice = await call(R.transcribe.POST, 'POST', '/api/transcribe', undefined, { form: new FormData() });
+ok('Voice on the free plan: refused, with the word the page raises Socria One for', voice.status === 402 && voice.json?.upgrade === 'voice' && /Socria Voice is part of Socria One/.test(voice.json?.error ?? ''), voice.text);
+as(null);
+ok('  and signed out', (await call(R.transcribe.POST, 'POST', '/api/transcribe', undefined, { form: new FormData() })).status !== 200);
+as('olga');
+const oneVoice = await call(R.transcribe.POST, 'POST', '/api/transcribe', undefined, { form: new FormData() });
+ok('Socria One passes the gate (and is told no recording arrived)', oneVoice.status === 400, oneVoice.text);
+as('vic');
+await call(R.conversations.PUT, 'PUT', '/api/conversations', { conversation: { id: 'c-vic', title: 'Mine', messages: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], updatedAt: Date.now() } });
+const vshare = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'c-vic', action: 'link', role: 'viewer' });
+ok('sharing a conversation on the free plan: refused', vshare.status === 402 && vshare.json?.upgrade === 'share' && vshare.json?.refusal === 'plan', vshare.text);
+ok('  saying sharing is Socria One, and that joining stays open', /Sharing a conversation is part of Socria One/.test(vshare.json?.refusalNote ?? '') && /join what others share/.test(vshare.json?.refusalNote ?? ''), vshare.json?.refusalNote);
+const vroom = await call(R.room.POST, 'POST', '/api/logos/room', {});
+ok('opening a room on the free plan: refused', vroom.status === 402 && vroom.json?.upgrade === 'share', vroom.text);
+as('olga');
+await call(R.conversations.PUT, 'PUT', '/api/conversations', { conversation: { id: 'c-olga', title: 'Ours', messages: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], updatedAt: Date.now() } });
+const link = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'c-olga', action: 'link', role: 'editor' });
+ok('Socria One shares by link', link.status === 200 && !!link.json?.link?.token, link.text.slice(0, 200));
+as('vic');
 const joined = await call(R.accept.POST, 'POST', '/api/share/accept', { token: link.json?.link?.token });
-ok('bob, on the free plan, joins it — joining is free', joined.status === 200, joined.text.slice(0, 200));
-const asked = await call(R.chat.POST, 'POST', '/api/chat', { model: 'core-4', conversationId: 'c-shared', messages: [{ role: 'user', content: 'What would you change?' }] });
-ok('bob asks Socria in alice’s chat', asked.status === 200, asked.text.slice(0, 200));
-ok('  one of his messages', count('bob', 'core-messages') === 1);
-ok('  never one of his chats — the conversation is not his', count('bob', 'core-chats') === 0);
-ok('  and nothing of alice’s spent', count('alice', 'core-messages') === 0 && count('alice', 'core-chats') === 0);
+ok('a free account joins what Socria One shared — joining is free', joined.status === 200, joined.text.slice(0, 200));
 
-console.log(`\n${pass} passed, ${fail} failed`);
+console.log('\n=== no free way to Socria One ===');
+as('carl');
+const carlPlan = await call(R.plan.GET, 'GET', '/api/logos/plan');
+ok('a complimentary grant and a comp row from before no longer open Socria One', carlPlan.json?.plan === 'free', carlPlan.text);
+ok('  and no promotional time is reported', !carlPlan.json?.promo, carlPlan.text);
+const redeem = await call(R.redeem.POST, 'POST', '/api/logos/redeem', { code: 'ANYTHING-AT-ALL' });
+ok('redeeming a code: retired, said plainly', redeem.status === 410 && /no longer offered/.test(redeem.json?.error ?? ''), redeem.text);
+ok('  and nothing is written to the account', !db.rows('socria_subscriptions').some((r) => r.user_id === 'carl' && r.status !== 'comp'));
+as('paula');
+ok('a paid subscription is Socria One', (await call(R.plan.GET, 'GET', '/api/logos/plan')).json?.plan === 'one');
+as(null);
+ok('signed out, Logos is a guest’s pass — the typed access key no longer stands in for an account', (await logos('anon-1')).status === 401);
+
+console.log('\n=== the panel reads the same counts the routes refuse at ===');
+as('mira');
+const panel = await call(R.usage.GET, 'GET', '/api/logos/usage');
+const c = panel.json?.counters ?? {};
+ok('maps 2 of 2, nodes 10 of 10', c.maps?.used === 2 && c.maps?.limit === 2 && c.nodes?.used === 10 && c.nodes?.limit === 10, JSON.stringify(c));
+ok('  and the free plan has no daily message limit', c.messages?.limit === null);
+as('olga');
+const onePanel = await call(R.usage.GET, 'GET', '/api/logos/usage');
+ok('Socria One: every tiered allowance unlimited', ['maps', 'nodes', 'artifacts', 'documents'].every((k) => onePanel.json?.counters?.[k]?.limit === null), JSON.stringify(onePanel.json?.counters));
+
+console.log(`\nfree-limits-e2e: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

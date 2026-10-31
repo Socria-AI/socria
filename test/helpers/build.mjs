@@ -336,6 +336,8 @@ const MODULES = [
   // Split View, redone: the views beside each other, a model's tools in its artifact, CAD made
   'test/helpers/split-view-under-test.tsx',
   // what Socria does: the tutorials and their miniatures; Quick capture as a page of a notebook
+  // what a page that broke says, and the root layout's last net (app/error.tsx, app/global-error.tsx)
+  'test/helpers/errors-under-test.tsx',
   'test/helpers/guide-under-test.tsx',
   // any artifact, from a few primitives: the custom kind, its templates, Make's "Your own", its figure
   'test/helpers/custom-under-test.tsx',

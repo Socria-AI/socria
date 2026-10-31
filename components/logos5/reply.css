@@ -1,0 +1,271 @@
+/* components/logos5/reply.css — A REPLY, SET TO BE READ.
+ *
+ * Logos 5's replies in the conversation (`.l5-prose.is-reply`, laid out by
+ * lib/reply-layout.ts and drawn by components/RichText.tsx). Editorial, in the
+ * conversation's own tokens: a reading measure; the opening statement in the
+ * serif as a standfirst; quiet list marks; labelled items as terms; the later
+ * parts of a long reply folded under hairlines, their titles in the serif and
+ * their first words in grey. No cards, no shadows, nothing that moves except
+ * what a press opens.
+ */
+
+/* the measure: prose reads best at sixty-odd characters a line — elements and tables keep the column */
+/* (a heading keeps the column: its hairline runs the full width, like the folds under it) */
+.logos-root .l5-prose.is-reply > :is(p, ul:not(.socria-terms), ol:not(.socria-terms), blockquote),
+.logos-root .l5-prose.is-reply .socria-fold-body > :is(p, ul:not(.socria-terms), ol:not(.socria-terms), blockquote) {
+  max-width: 66ch;
+}
+.logos-root .l5-prose.is-reply > .socria-lead {
+  max-width: 30em;
+}
+
+/* ── the lead ─────────────────────────────────────────────────────── */
+
+.logos-root .l5-prose.is-reply .socria-lead {
+  max-width: 30em;
+  margin: 0 0 0.62em;
+  font-family: var(--l5-serif);
+  font-size: 1.4em;
+  font-weight: 400;
+  line-height: 1.3;
+  letter-spacing: -0.004em;
+  color: var(--lg-ink);
+  text-wrap: pretty;
+}
+/* the serif has one weight: a bold word in the lead is the primary colour, not a faked bold */
+.logos-root .l5-prose.is-reply .socria-lead .socria-strong {
+  font-weight: 400;
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose.is-reply .socria-lead .socria-em {
+  font-size: 1em;
+}
+.logos-root .l5-prose.is-reply .socria-lead:last-child {
+  margin-bottom: 0;
+}
+
+/* ── lists, quietly ───────────────────────────────────────────────── */
+
+/* a short rule for a bullet, in the margin — not a dot shouting each line */
+.logos-root .l5-prose.is-reply ul:not([class]) {
+  list-style: none;
+  padding-left: 1.15em;
+}
+.logos-root .l5-prose.is-reply ul:not([class]) > li {
+  position: relative;
+}
+.logos-root .l5-prose.is-reply ul:not([class]) > li::before {
+  content: '';
+  position: absolute;
+  left: -1.05em;
+  top: 0.8em;
+  width: 0.5em;
+  height: 1.5px;
+  border-radius: 1px;
+  background: var(--lg-ink-40);
+}
+/* numbers in the serif, in the green: the order is part of what is said */
+.logos-root .l5-prose.is-reply ol:not([class]) {
+  list-style: decimal;
+  padding-left: 1.45em;
+}
+.logos-root .l5-prose.is-reply ol:not([class]) > li::marker {
+  font-family: var(--l5-serif);
+  font-size: 1.08em;
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose.is-reply li {
+  margin: 0.3em 0;
+  padding-left: 0.1em;
+}
+
+/* ── terms: a label, and what it says ─────────────────────────────── */
+
+.logos-root .l5-prose.is-reply .socria-terms {
+  max-width: 66ch;
+  margin: 0.15em 0 1em;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--l5-hair);
+  counter-reset: rx-term;
+}
+.logos-root .l5-prose.is-reply .socria-terms > li {
+  display: grid;
+  grid-template-columns: minmax(7.5em, 11.5em) 1fr;
+  column-gap: 1.3em;
+  margin: 0;
+  padding: 0.62em 0 0.66em;
+  border-bottom: 1px solid var(--l5-hair);
+  counter-increment: rx-term;
+}
+.logos-root .l5-prose.is-reply .socria-term {
+  font-family: var(--l5-serif);
+  font-size: 1.1em;
+  line-height: 1.35;
+  color: var(--lg-ink);
+}
+.logos-root .l5-prose.is-reply .socria-terms.is-ordered .socria-term::before {
+  content: counter(rx-term) '  ';
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose.is-reply .socria-term .socria-strong {
+  font-weight: 400;
+}
+.logos-root .l5-prose.is-reply .socria-term-body {
+  line-height: 1.55;
+}
+
+/* ── headings in the flow: a part's title, after a hairline ───────── */
+
+.logos-root .l5-prose.is-reply .socria-h {
+  margin: 1.35em 0 0.42em;
+  font-size: 1.2em;
+}
+.logos-root .l5-prose.is-reply > .socria-h:not(:first-child) {
+  padding-top: 0.85em;
+  border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5-prose.is-reply > .socria-lead + .socria-h {
+  margin-top: 0.9em;
+}
+
+/* ── folds: the later parts of a long reply, a press away ─────────── */
+
+.logos-root .l5-prose.is-reply .socria-fold {
+  margin: 0;
+  border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5-prose.is-reply > .socria-h + * + .socria-fold,
+.logos-root .l5-prose.is-reply > :not(.socria-fold) + .socria-fold {
+  margin-top: 1.1em;
+}
+.logos-root .l5-prose.is-reply .socria-fold:not(:has(+ .socria-fold)) {
+  border-bottom: 1px solid var(--l5-hair);
+  margin-bottom: 1em;
+}
+.logos-root .l5-prose.is-reply .socria-fold-sum {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 14px;
+  align-items: center;
+  padding: 0.62em 2px 0.66em 0;
+  list-style: none;
+  cursor: pointer;
+  border-radius: 6px;
+}
+.logos-root .l5-prose.is-reply .socria-fold-sum::-webkit-details-marker {
+  display: none;
+}
+.logos-root .l5-prose.is-reply .socria-fold-t {
+  grid-column: 1;
+  font-family: var(--l5-serif);
+  font-size: 1.16em;
+  line-height: 1.3;
+  color: var(--lg-ink);
+  transition: color 0.15s;
+}
+.logos-root .l5-prose.is-reply .socria-fold-t .socria-strong {
+  font-weight: 400;
+}
+.logos-root .l5-prose.is-reply .socria-fold-p {
+  grid-column: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 0.86em;
+  line-height: 1.45;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
+}
+.logos-root .l5-prose.is-reply .socria-fold.is-writing .socria-fold-p {
+  font-style: italic;
+}
+/* a plus that becomes a minus: open and closed, drawn, not a triangle */
+.logos-root .l5-prose.is-reply .socria-fold-sum::after {
+  content: '';
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  width: 11px;
+  height: 11px;
+  background:
+    linear-gradient(currentColor, currentColor) center / 11px 1.5px no-repeat,
+    linear-gradient(currentColor, currentColor) center / 1.5px 11px no-repeat;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-prose.is-reply .socria-fold[open] > .socria-fold-sum::after {
+  background: linear-gradient(currentColor, currentColor) center / 11px 1.5px no-repeat;
+}
+.logos-root .l5-prose.is-reply .socria-fold-sum:hover .socria-fold-t,
+.logos-root .l5-prose.is-reply .socria-fold-sum:hover::after {
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose.is-reply .socria-fold-sum:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
+}
+/* open, the first words are the words: no need to show them twice */
+.logos-root .l5-prose.is-reply .socria-fold[open] > .socria-fold-sum .socria-fold-p {
+  display: none;
+}
+.logos-root .l5-prose.is-reply .socria-fold-body {
+  padding: 0.1em 0 0.85em;
+}
+.logos-root .l5-prose.is-reply .socria-fold-body > :last-child {
+  margin-bottom: 0;
+}
+.logos-root .l5-prose.is-reply .socria-foldall {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  margin: -0.35em 0 0.9em;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
+  font: inherit;
+  font-size: 0.84em;
+  cursor: pointer;
+  text-decoration: underline;
+  text-decoration-color: var(--l5-hair);
+  text-underline-offset: 3px;
+}
+.logos-root .l5-prose.is-reply .socria-foldall:hover {
+  color: var(--lg-primary);
+  text-decoration-color: currentColor;
+}
+
+/* ── the closing question, in view ────────────────────────────────── */
+
+.logos-root .l5-prose.is-reply .socria-asks {
+  margin-top: 1em;
+}
+
+/* ── a phone ──────────────────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .logos-root .l5-prose.is-reply .socria-lead {
+    font-size: 1.32em;
+  }
+  .logos-root .l5-prose.is-reply .socria-terms > li {
+    grid-template-columns: 1fr;
+    row-gap: 0.08em;
+  }
+  .logos-root .l5-prose.is-reply .socria-fold-sum {
+    min-height: 48px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5-prose.is-reply * {
+    transition: none !important;
+  }
+}
+
+@media (forced-colors: active) {
+  .logos-root .l5-prose.is-reply ul:not([class]) > li::before {
+    background: CanvasText;
+  }
+  .logos-root .l5-prose.is-reply .socria-fold-sum::after {
+    color: CanvasText;
+  }
+}

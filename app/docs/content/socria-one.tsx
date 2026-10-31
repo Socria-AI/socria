@@ -11,7 +11,7 @@ import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { DemoLimitsTable } from '../demos';
 import { priceWithPeriod } from '@/lib/socria-one';
-import { PLANS, megabytes } from '@/lib/entitlements';
+import { PLANS, freePlanSentence, megabytes, onePlanSentence } from '@/lib/entitlements';
 import { docPage } from '../registry';
 
 const page = docPage('socria-one')!;
@@ -20,7 +20,7 @@ const sections = [
   { id: 'free', heading: 'What the free tier holds' },
   { id: 'asking', heading: 'When Socria asks' },
   { id: 'never', heading: 'What is never gated' },
-  { id: 'codes', heading: 'Access codes' },
+  { id: 'codes', heading: 'No codes, no free months' },
   { id: 'billing', heading: 'How billing behaves' },
 ];
 
@@ -30,11 +30,11 @@ export function SocriaOne() {
       <H2 id="plans">The two plans</H2>
       <p>
         Socria has one paid plan: <strong>Socria One, {priceWithPeriod()}</strong>.
-        What it opens is <em>volume and continuity</em>: no daily limit on
-        messages, lines of thinking held only by a fair-use ceiling, and a
-        Socria that carries what it learns about how you reason from each
-        conversation into the next. It also shares as many chats as you like,
-        and whole Projects, where the free plan shares one chat at a time.
+        What it opens is <em>volume, voice and company</em>: {onePlanSentence().replace(/^U/, 'u')},
+        and a Socria that carries what it learns about how you reason from each
+        conversation into the next. Socria Voice and sharing your own
+        conversations — a chat or a whole Project — are part of Socria One
+        only; joining what somebody shares with you is free.
         Without an account you can still begin one line of thinking, with its
         map, kept in your browser; signing up is free, and it comes with you.
       </p>
@@ -50,8 +50,8 @@ export function SocriaOne() {
         they have only watched be mediocre.
       </p>
       <p>
-        Inside a line of thinking, two things differ: how many messages a day
-        holds, counted below, and the size of a document. Anything up to{' '}
+        Inside a line of thinking, one more thing differs: the size of a
+        document. Anything up to{' '}
         {megabytes(PLANS.free.uploadBytes)} travels
         straight to our server and is read there, on either plan. Socria One
         carries larger documents, up to {megabytes(PLANS.one.uploadBytes)},
@@ -69,19 +69,17 @@ export function SocriaOne() {
       <H2 id="free">What the free tier holds</H2>
       <p>
         Inside one line of thinking, the free tier is not a trial of Socria —
-        it <em>is</em> Socria, counted by the day and the month. It holds{' '}
-        {PLANS.free.counters.chats} new lines of thinking a calendar month and{' '}
-        {PLANS.free.counters.messages} messages a day, and a message to a
-        node&rsquo;s own conversation counts; the first thought you bring into
-        Logos from onboarding costs neither. The day is the UTC day.
+        it <em>is</em> Socria, counted by the calendar month (UTC). Each month
+        it holds {freePlanSentence()}. Messages are not counted on either plan.
       </p>
       <p>
-        Starting a line of thinking and sending a message are counted apart, so
-        going back to one you have already started never costs a line of
-        thinking — only its messages. Every message you send Socria counts,
-        including as a guest in somebody else&rsquo;s shared conversation,
-        where it is your message, never one of your lines of thinking, and
-        never the host&rsquo;s. Its exact shape:
+        Each is counted once, when it is made: a conversation when it is
+        started, so going back to one never costs another; a Logic Map once
+        for its conversation, however often it is redrawn; a node when a map
+        gains it; an artifact once, however often it is saved; a document
+        once, the first time its reading reaches a conversation or a write-up
+        is filed in Content. A turn in somebody else&rsquo;s shared
+        conversation is never one of yours. Its exact shape:
       </p>
       <DemoLimitsTable />
       <p className="d-after-table">
@@ -96,11 +94,11 @@ export function SocriaOne() {
       <Callout tag="Boundary, not wall">
         <p>
           Reaching a limit says what you have used and pauses only what
-          is <em>new</em> — a new line of thinking, or the day&rsquo;s next
-          message. It never hides, deletes, or locks anything you already
-          thought: every map you built stays on screen, stays
-          interactive, and stays yours, everything you have begun stays open,
-          and the day&rsquo;s allowance comes back tomorrow.
+          is <em>new</em> — a new conversation, a new map, new nodes, a new
+          artifact or document. It never hides, deletes, or locks anything you already thought:
+          every map you built stays on screen, stays interactive, and stays
+          yours, everything you have begun stays open, and the month&rsquo;s
+          allowance comes back on the first.
         </p>
       </Callout>
 
@@ -118,8 +116,8 @@ export function SocriaOne() {
       </p>
       <Defs>
         <Def term="You reached a boundary">
-          You reached one of the free counts — the day&rsquo;s messages or the
-          month&rsquo;s lines of thinking — and what you tried stopped. The
+          You reached one of the free plan&rsquo;s monthly counts, or pressed
+          Voice or Share, and what you tried stopped. The
           prompt names what stopped and how to carry on. These appear
           immediately and are not rationed by the rules below — a button that
           silently does nothing is worse than an explanation — though the same
@@ -185,38 +183,23 @@ export function SocriaOne() {
         answer you are working toward is never a paid action.
       </p>
 
-      <H2 id="codes">Access codes</H2>
+      <H2 id="codes">No codes, no free months</H2>
       <p>
-        Socria One can also be opened with a typed access code — the same
-        mechanism as the access key that opens Logos 5 without an account. A
-        code exists for handing out (teams, friends, promotions), and only the
-        server knows it: what you type is checked there, and the browser keeps
-        a signed grant rather than the code.
+        Socria One is paid for, or it is not held. It used to be opened by
+        typed access codes, complimentary grants, a student month and Socria
+        Rewards; none of those opens it now, and a code typed today is told
+        so plainly. Everyone already paying keeps exactly what they have. The
+        access key that opens Logos 5 for a signed-out visitor is a different
+        thing and is unaffected: it opens the product, never the plan.
       </p>
-      <Defs>
-        <Def term="Typed while signed out">
-          Unlocks One in that browser, stored locally.
-        </Def>
-        <Def term="Typed while signed in">
-          Also redeemed to the account (via <code>/api/logos/redeem</code>),
-          so it follows you across devices. Codes are case-insensitive.
-        </Def>
-        <Def term="Comp grants">
-          A deployment can grant One to specific accounts with no billing
-          attached — by user id or email. A comp&rsquo;d person who later
-          subscribes for real gets a normal Stripe relationship; a comp is
-          never allowed to overwrite one.
-        </Def>
-      </Defs>
 
       <H2 id="billing">How billing behaves</H2>
       <p>
         Stripe is the source of truth for paid subscriptions, and its signed
         webhook events are the only writer of Stripe lifecycle state. Socria
-        itself writes just two other kinds of row: a pre-checkout customer
-        stub (status <code>incomplete</code>, which never entitles anyone)
-        and complimentary grants from redeemed codes. The rules the
-        projection enforces:
+        itself writes one other kind of row: a pre-checkout customer stub
+        (status <code>incomplete</code>, which never entitles anyone). The
+        rules the projection enforces:
       </p>
       <ul>
         <li>

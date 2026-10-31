@@ -51,7 +51,10 @@ import {
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
-import { capMapForFree, depthForPlan } from '@/lib/socria-one';
+import { depthForPlan } from '@/lib/socria-one';
+import { boundaryNote, type Counter } from '@/lib/entitlements';
+import { claimUnit, consume, left, unitClaimed } from '@/lib/quota';
+import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
@@ -120,9 +123,10 @@ THIS TURN ONLY: omit "viz" entirely. The previous attempt ran out of room. Retur
 
 export async function POST(req: NextRequest) {
   const { userId } = auth();
-  const keyUnlocked = mayUse(req, userId);
-  // a guest draws the map of their one line of thinking (lib/guest-pass.ts), and no other
-  const guest = !userId && !keyUnlocked;
+  // a guest draws the map of their one line of thinking (lib/guest-pass.ts), and no
+  // other — every signed-out caller, the typed access key included (October 31, 2026)
+  void mayUse;
+  const guest = !userId;
   if (guest && !req.cookies.get(GUEST_COOKIE)?.value) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
@@ -154,6 +158,77 @@ export async function POST(req: NextRequest) {
   const plan = await resolvePlanForRequest(req, userId);
   const depth = depthForPlan(resolveDepth(body?.depth), plan);
   const guidance = guidanceBlock(depth, resolveGuard(body?.guard), 'surface');
+
+  // ── THE FREE PLAN'S LOGIC MAPS (lib/entitlements.ts, lib/quota.ts) ──
+  //
+  // Two Logic Maps a month, and ten nodes a month across them; artifacts are
+  // their own two. A conversation with no map yet needs one of the month's
+  // maps — and room for at least one node — before any model is asked, so a
+  // free account past its maps costs no extraction. A map it already has (drawn
+  // this month, or before these limits existed) keeps growing until the
+  // month's nodes are spent. Signed out is a guest's one map, not counted here.
+  const sessionKey = typeof body?.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim().slice(0, 80) : '';
+  const metered = !!userId && plan === 'free';
+  const hadMap = current.nodes.length > 0;
+  if (metered && !hadMap) {
+    const claimed = await unitClaimed(userId, 'maps', sessionKey);
+    const maps = claimed ? null : await left(userId, plan, 'maps');
+    const nodes = await left(userId, plan, 'nodes');
+    const refused: { counter: Counter; used: number; limit: number | null } | null =
+      maps && maps.left === 0 ? { counter: 'maps', used: maps.used, limit: maps.limit } : nodes.left === 0 ? { counter: 'nodes', used: nodes.used, limit: nodes.limit } : null;
+    if (refused) return NextResponse.json({ map: current, error: boundaryNote(refused.counter), upgrade: refused.counter, used: refused.used, limit: refused.limit }, { status: 402 });
+  }
+
+  /**
+   * Every answer that hands back a map passes through here. On Socria One it is
+   * the map, as it was. On the free plan: a first map is claimed as one of the
+   * month's maps (atomically — two passes racing for the last map cannot both
+   * win), new nodes are kept while the month's nodes last and the rest are
+   * taken back out with their connections, and each artifact the pass made is
+   * claimed or taken back out — the display, model or picture they asked for
+   * then says why, in the words of the boundary. Nothing they already had is
+   * touched. `limit` tells the page which allowance stopped the map, so it can
+   * say so beside the map instead of the map just going still.
+   */
+  const meter = async (out: ThinkingMap, extras: Record<string, unknown> = {}): Promise<NextResponse> => {
+    if (!metered || !userId) return NextResponse.json({ map: out, ...extras });
+    let map = out;
+    let reached: { counter: Counter; used: number; limit: number | null } | null = null;
+    const added = addedNodes(current, map);
+    if (added.length) {
+      if (!hadMap) {
+        const claim = await claimUnit(userId, plan, 'maps', sessionKey || `map:${added[0]}`);
+        if (!claim.ok) return NextResponse.json({ map: current, error: boundaryNote('maps'), upgrade: 'maps', used: claim.used, limit: claim.limit }, { status: 402 });
+      }
+      const took = await consume(userId, plan, 'nodes', added.length, { upTo: true });
+      if (took.granted < added.length) {
+        map = keepAddedNodes(map, current, took.granted).map;
+        reached = { counter: 'nodes', used: took.used, limit: took.limit };
+      }
+    }
+    const made = madeArtifacts(current, map);
+    if (madeAny(made)) {
+      const refused: Made = { objects: [], models: [], picture: false };
+      const key = (what: string) => `${sessionKey || 'map'}:${what}`;
+      const take = async (what: string) => {
+        const c = await claimUnit(userId, plan, 'artifacts', key(what));
+        if (!c.ok) reached = { counter: 'artifacts', used: c.used, limit: c.limit };
+        return c.ok;
+      };
+      for (const id of made.objects) if (!(await take(`obj:${id}`))) refused.objects.push(id);
+      for (const id of made.models) if (!(await take(`model:${id}`))) refused.models.push(id);
+      if (made.picture && !(await take('picture'))) refused.picture = true;
+      if (madeAny(refused)) {
+        map = withoutArtifacts(map, current, refused);
+        const said = { ok: false, failure: 'limit', says: boundaryNote('artifacts') };
+        const display = extras.display as { id?: string } | null | undefined;
+        if (display && (!display.id || refused.objects.includes(display.id))) extras = { ...extras, display: said };
+        if (extras.build && refused.models.length) extras = { ...extras, build: said };
+      }
+    }
+    const stop = reached as { counter: Counter; used: number; limit: number | null } | null;
+    return NextResponse.json({ map, ...extras, ...(stop ? { limit: { ...stop, note: boundaryNote(stop.counter) } } : {}) });
+  };
 
   const kept = messages
     .filter(
@@ -297,7 +372,7 @@ export async function POST(req: NextRequest) {
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) {
       console.warn('logos map: empty completion');
-      return NextResponse.json({ map: salvage(asked) });
+      return meter(salvage(asked));
     }
 
     let parsed: any;
@@ -311,7 +386,7 @@ export async function POST(req: NextRequest) {
         completion.choices?.[0]?.finish_reason,
         raw.slice(0, 200)
       );
-      return NextResponse.json({ map: salvage(asked) });
+      return meter(salvage(asked));
     }
 
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
@@ -358,7 +433,22 @@ export async function POST(req: NextRequest) {
         const got = text ? JSON.parse(text) : null;
         const fixed = got && typeof got === 'object' ? sanitizeMap({ ...got, context: next.context, building: next.building }) : null;
         if (fixed && satisfies(fixed, claimed) && keptEverything(next, fixed)) {
-          next = { ...next, nodes: fixed.nodes, edges: fixed.edges };
+          // THE RESTRUCTURE GIVES SHAPE, NOT CONTENT. It is shown each card's
+          // id, type, role and label — never its status, whose idea it is, or
+          // what was merged into it — so what it returns for those is a guess,
+          // and taken whole it reopened every resolved card and stripped
+          // Socria's mark from its own suggestions. Each card keeps everything
+          // it had and takes only its role from here (and anything newly
+          // folded into it); a step the restructure added that nobody named is
+          // kept, as Socria's reading, never as the person's words.
+          const had = new Map(next.nodes.map((n) => [n.id, n]));
+          const nodes = fixed.nodes.map((n) => {
+            const was = had.get(n.id);
+            if (!was) return { ...n, origin: 'socria' as const };
+            const merged = Array.from(new Set([...(was.merged ?? []), ...(n.merged ?? [])]));
+            return { ...was, ...(n.role ? { role: n.role } : {}), ...(merged.length ? { merged } : {}) };
+          });
+          next = { ...next, nodes, edges: fixed.edges };
           const settled = readBuilding({ map: next, proposed: proposedShape, stated, prev: asked.building ?? null });
           if (settled) next.building = settled;
           console.info('logos map: restructured as a %s — the first pass had no %s in it', claimed, GRAMMARS[claimed].label.toLowerCase());
@@ -409,7 +499,7 @@ export async function POST(req: NextRequest) {
 
     // Never let a malformed extraction blank a map the user has built up.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
-      return NextResponse.json({ map: salvage(asked) });
+      return meter(salvage(asked));
     }
     // What the person took off the map stays off, whatever the extractor made
     // of the transcript that still mentions it. The client does this too; the
@@ -785,23 +875,17 @@ export async function POST(req: NextRequest) {
     // Their documents are kept; none of them is the one on screen.
     if (bySimulation && models.active) models = { ...models, active: null };
     const withModels = models.docs.length ? { ...next, models } : next;
+    // Whether this turn changed the workspace. Every other answer hands back
+    // the one it was sent — re-sanitised, so never byte-for-byte the same — and
+    // a person moving a slider while this ran must not see it moved back.
+    const modelsChanged = models !== carried ? { modelsChanged: true } : {};
 
-    // A free map stops taking on NEW nodes at its boundary; everything already
-    // on it — including anything the extractor has since refined — is kept.
-    // `capped` tells the client the thinking outgrew the free map, so it can
-    // say so once, quietly, instead of the map just going still.
-    if (plan === 'free') {
-      const held = capMapForFree(withModels, current);
-      return NextResponse.json({
-        map: { ...held.map, ...(models.docs.length ? { models } : {}), ...(next.objects ? { objects: next.objects } : {}) },
-        capped: held.capped,
-        ...(build ? { build } : {}),
-        ...(display ? { display } : {}),
-      });
-    }
-    return NextResponse.json({ map: withModels, ...(build ? { build } : {}), ...(display ? { display } : {}) });
+    // The free plan's allowances are held in `meter` (above): new nodes while
+    // the month's last, artifacts while the month's last — nothing already on
+    // the map is ever taken off it.
+    return meter(withModels, { ...modelsChanged, ...(build ? { build } : {}), ...(display ? { display } : {}) });
   } catch (e) {
     console.error('logos map error:', e);
-    return NextResponse.json({ map: salvage(current ?? EMPTY_MAP) });
+    return meter(salvage(current ?? EMPTY_MAP)).catch(() => NextResponse.json({ map: current ?? EMPTY_MAP }));
   }
 }

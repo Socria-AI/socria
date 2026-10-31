@@ -30,9 +30,13 @@ const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++
 const said = (d) => (d.do === 'go' ? `go:${d.to}` : d.do);
 
 console.log('=== on, unless it is turned off ===');
-ok('on by default (nothing set)', K.takeoverOn({}));
-for (const v of ['off', 'OFF', ' off ', '0', 'false', 'no']) ok(`SOCRIA_TAKEOVER=${JSON.stringify(v)} turns it off`, !K.takeoverOn({ SOCRIA_TAKEOVER: v }));
-for (const v of ['on', '1', 'true', 'yes', '']) ok(`SOCRIA_TAKEOVER=${JSON.stringify(v)} leaves it on`, K.takeoverOn({ SOCRIA_TAKEOVER: v }));
+// On the production deployment by default; the dev branch's previews and a local run show the whole site.
+ok('on by default on the production deployment (VERCEL_ENV=production, nothing else set)', K.takeoverOn({ VERCEL_ENV: 'production' }));
+ok('off by default on a preview — the dev branch — so the landing page and the other pages are back there', !K.takeoverOn({ VERCEL_ENV: 'preview' }));
+ok('  and off when nothing at all is set (a local run)', !K.takeoverOn({}));
+for (const v of ['off', 'OFF', ' off ', '0', 'false', 'no']) ok(`SOCRIA_TAKEOVER=${JSON.stringify(v)} turns it off, production included`, !K.takeoverOn({ SOCRIA_TAKEOVER: v, VERCEL_ENV: 'production' }));
+for (const v of ['on', '1', 'true', 'yes']) ok(`SOCRIA_TAKEOVER=${JSON.stringify(v)} turns it on, on a preview too`, K.takeoverOn({ SOCRIA_TAKEOVER: v, VERCEL_ENV: 'preview' }));
+ok('SOCRIA_TAKEOVER="" is unset: production decides', K.takeoverOn({ SOCRIA_TAKEOVER: '', VERCEL_ENV: 'production' }) && !K.takeoverOn({ SOCRIA_TAKEOVER: '' }));
 
 console.log('\n=== every address: without the code, and with it ===');
 const pages = [

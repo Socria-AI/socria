@@ -70,25 +70,23 @@ export function mayHost(plan: 'free' | 'one'): boolean {
 }
 
 /**
- * THE FREE PLAN SHARES ONE CHAT. A Core conversation or a Logos line of
- * thinking, one at a time: a person can think together with others on the
- * free plan, and Socria One is what shares as many as they have. A Project
- * holds many conversations, so sharing one is Socria One.
- *
- * "At a time", not "ever": stopping sharing frees the slot, and closing a
- * door is never paywalled. "Open" means a link on, a code on, or anybody in
- * it — an invitation nobody has accepted yet is still a door left open.
+ * SHARING IS SOCRIA ONE (October 31, 2026). The free plan used to share one
+ * chat at a time; it shares none now. Nothing already shared is closed — a
+ * door a free owner opened before stays open, and closing a door is never
+ * paywalled — but opening one (a link, a code, an invitation, a Project) to
+ * someone new needs Socria One. Joining something somebody else shared is
+ * free on every plan: the person who shares is the one who pays.
  */
-export const FREE_SHARED_CHATS = 1;
-
-/** Why a free owner may not open a door here: a Project, or a second chat. */
-export type HostRefusal = 'project' | 'one-chat';
+export const FREE_SHARED_CHATS = 0;
 
 /**
- * May this owner open a door (a link, a code, an invitation) on this thing?
- * Null when they may; otherwise the reason. Opening another door on a chat
- * that is already shared never takes a second slot.
+ * Why a free owner may not open a door here: sharing is Socria One ('plan'), or
+ * a Project. ('one-chat' was the old one-at-a-time rule; it is kept so a
+ * stored answer still reads, and is never given now.)
  */
+export type HostRefusal = 'project' | 'one-chat' | 'plan';
+
+/** May this owner open a door (a link, a code, an invitation) on this thing? Null when they may; otherwise the reason. */
 export function hostRefusal(input: {
   plan: 'free' | 'one';
   type: ResourceType;
@@ -98,18 +96,14 @@ export function hostRefusal(input: {
   othersOpen: number;
 }): HostRefusal | null {
   if (mayHost(input.plan)) return null;
-  if (input.type === 'project') return 'project';
-  if (input.open) return null;
-  return input.othersOpen >= FREE_SHARED_CHATS ? 'one-chat' : null;
+  return input.type === 'project' ? 'project' : 'plan';
 }
 
 /** What a refused owner is told, in one place for the route and the sheet. */
 export function hostRefusalNote(refusal: HostRefusal, sharing: string | null): string {
-  if (refusal === 'project') {
-    return 'Sharing a Project is part of Socria One — it shares every conversation in it. On the free plan you can share one chat at a time.';
-  }
-  const which = sharing ? `“${sharing}”` : 'another chat';
-  return `You’re already sharing ${which}. On the free plan you can share one chat at a time — stop sharing that one to share this, or Socria One shares as many as you like.`;
+  void sharing;
+  if (refusal === 'project') return 'Sharing a Project is part of Socria One — it shares every conversation in it.';
+  return 'Sharing a conversation is part of Socria One. Anything you shared before stays shared, and you can still join what others share with you.';
 }
 
 // ── who may be invited, and how ────────────────────────────────────

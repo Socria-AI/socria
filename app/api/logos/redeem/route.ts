@@ -1,59 +1,18 @@
-// app/api/logos/redeem/route.ts
-// POST { code } → { ok, account } — redeem a Socria One access code.
+// POST /api/logos/redeem — retired (October 31, 2026).
 //
-// Anyone with a valid code gets a yes (the client then holds it locally, the
-// same soft gate the header uses). What this route ADDS is permanence: a
-// signed-in redemption is written to the account as a complimentary grant,
-// so One follows the person to their next device instead of living in one
-// browser's storage.
+// A typed code used to be redeemed here into a permanent, complimentary Socria
+// One on the account. Socria One is paid for or it is not held now, so nothing
+// is redeemed: the route answers, plainly, that codes are no longer offered —
+// a page from before this change that still calls it is told so instead of
+// failing silently. Grants written before are left where they are, and no
+// longer entitle anyone (lib/entitlement-rule.ts RETIRED_STATUSES,
+// lib/socria-one-grant.ts).
 
-import { NextRequest, NextResponse } from 'next/server';
-import { auth } from '@clerk/nextjs/server';
-import { scopeForCode } from '@/lib/access-codes-server';
-import { grantComplimentary } from '@/lib/subscriptions';
-import { writeAccountGrant } from '@/lib/socria-one-grant';
-import { forgetPlanMemo } from '@/lib/socria-one-server';
-import { enforceRateLimit } from '@/lib/rate-limit';
+import { NextResponse } from 'next/server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: NextRequest) {
-  const { userId } = auth();
-  // Rate-limited hard: this is the only surface a code can be guessed against.
-  const limited = await enforceRateLimit(req, userId, 'aux');
-  if (limited) return limited;
-
-  const body = await req.json().catch(() => null);
-  const code = typeof body?.code === 'string' ? body.code : '';
-  // Checked against the environment on the server, in constant time. The old
-  // check compared against a constant that shipped in the browser bundle.
-  if (scopeForCode(code) !== 'one') {
-    return NextResponse.json({ ok: false }, { status: 400 });
-  }
-
-  let account = false;
-  if (userId) {
-    // Clerk is the store that always exists — if they could sign in to
-    // redeem, this write can land. It is what resolvePlanForRequest reads.
-    try {
-      await writeAccountGrant(userId);
-      // The instance that redeemed the code must not keep answering 'free'
-      // from its memo for the next half minute.
-      forgetPlanMemo(userId);
-      account = true;
-    } catch (e) {
-      console.error('redeem: could not write Clerk grant', e);
-    }
-    // The subscriptions row is best-effort enrichment: when the database has
-    // been migrated it lets billing-side logic see the comp too. Its absence
-    // never fails a redemption.
-    try {
-      await grantComplimentary(userId);
-      account = true;
-    } catch {
-      // Supabase down or unmigrated — the Clerk grant above already holds.
-    }
-  }
-  return NextResponse.json({ ok: true, account });
+export async function POST() {
+  return NextResponse.json({ error: 'Codes for Socria One are no longer offered. Socria One is $15 a month.', retired: true }, { status: 410 });
 }

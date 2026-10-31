@@ -24,7 +24,7 @@
 // clock and a string.
 
 import { createHmac, timingSafeEqual } from 'node:crypto';
-import { boundaryNote } from './entitlements';
+import { boundaryNote, onePlanSentence } from './entitlements';
 import type { Plan } from './socria-one';
 import type { Surface } from './checkout-attribution';
 
@@ -394,7 +394,7 @@ function paragraphs(kind: LifecycleKind, ctx: CopyContext): { subject: string; b
         subject: 'Socria One is open',
         body: [
           'Socria One is open.',
-          'Begin as many lines of thinking as you have, and send as many messages as the thinking takes — there is no daily count. And Socria now carries what it learns about how you reason from each one into the next, so a conversation begins where the last one ended rather than from nothing.',
+          `${onePlanSentence()}: begin as many lines of thinking as you have, and nothing is counted by the month any more. And Socria now carries what it learns about how you reason from each one into the next, so a conversation begins where the last one ended rather than from nothing.`,
           'Nothing you have already made changes. It is all still yours, and still where you left it.',
         ],
       };
@@ -403,10 +403,10 @@ function paragraphs(kind: LifecycleKind, ctx: CopyContext): { subject: string; b
       // person saw on screen a day ago, so the email is a reminder of a
       // fact and not a second pitch. Then the calendar.
       return {
-        subject: 'Your free lines of thinking for this month',
+        subject: 'Your free conversations for this month',
         body: [
           boundaryNote('chats'),
-          `Your free lines of thinking open again on ${ctx.resetDate ?? 'the first of next month'}.`,
+          `Your free conversations open again on ${ctx.resetDate ?? 'the first of next month'}.`,
         ],
       };
   }

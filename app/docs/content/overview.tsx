@@ -7,7 +7,7 @@ import { Article, H2, Callout } from '../Article';
 import { DemoSplit } from '../demos';
 import { ARCHIVE_DATE, DOC_PAGES, docPage } from '../registry';
 import { priceWithPeriod } from '@/lib/socria-one';
-import { PLANS } from '@/lib/entitlements';
+import { freePlanSentence } from '@/lib/entitlements';
 
 const page = docPage('overview')!;
 const sections = [
@@ -68,10 +68,10 @@ export function Overview() {
         thinking and its map with no account — and it is the centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
         {priceWithPeriod()} plan. Its free tier is not a trial but Logos 5
-        itself, counted — {PLANS.free.counters.chats} lines of thinking a
-        month and {PLANS.free.counters.messages} messages a day: what Socria
-        One sells is how much a day and a month can hold, and what is carried
-        between conversations, never a better version of any one of them.
+        itself, counted by the month — {freePlanSentence()}: what Socria One
+        sells is having none of that counted, Socria Voice, sharing, and what
+        is carried between conversations, never a better version of any one
+        of them.
       </p>
 
       <H2 id="principles">What never changes</H2>

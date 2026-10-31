@@ -20,11 +20,8 @@
 
 import type { NextRequest } from 'next/server';
 import { type Plan } from './socria-one';
-import { requestScope } from './route-guard';
-import { scopeSatisfies } from './access-codes-server';
 import { entitles, isSubscribed, readSubscription } from './subscriptions';
 import { accountGrantKnown, hasAccountGrant } from './socria-one-grant';
-import { promoActiveNow } from './rewards/promo-access';
 
 /**
  * The answer, remembered briefly per account.
@@ -43,11 +40,9 @@ import { promoActiveNow } from './rewards/promo-access';
  */
 const PLAN_MEMO_MS = 30_000;
 const planMemo = new Map<string, { plan: Plan; at: number }>();
-const promoMemo = new Map<string, { on: boolean; at: number }>();
 
 export function forgetPlanMemo(userId: string): void {
   planMemo.delete(userId);
-  promoMemo.delete(userId);
 }
 
 async function accountPlan(userId: string): Promise<Plan> {
@@ -75,53 +70,36 @@ function allowlisted(userId: string): boolean {
 }
 
 /**
- * What the person holds WITHOUT promotional time: paid, complimentary,
- * student, allowlisted or a typed code. Checkout asks this — somebody on a
- * reward has not bought Socria One and must still be able to.
+ * What the person holds: a paid subscription, or the operator's allowlist.
+ * (Complimentary grants, student months, typed codes and promotional time no
+ * longer count — October 31, 2026.) Checkout asks this, and so does every
+ * gated route, through resolvePlanForRequest below.
  */
 export async function resolveBasePlanForRequest(
   req: NextRequest,
   userId: string | null
 ): Promise<Plan> {
+  void req;
   if (userId && (await accountPlan(userId)) === 'one') return 'one';
+  // The operator's list (SOCRIA_ONE_USER_IDS): staff and testing accounts, set
+  // in the environment and empty by default — not an offer anyone can take.
+  // A typed code no longer opens Socria One (October 31, 2026): the `one`
+  // scope of an access cookie opens the site, as `core` does, and no more.
   if (userId && allowlisted(userId)) return 'one';
-
-  // A verified unlock grant of scope 'one'. This replaces the old
-  // `x-socria-one` header, which compared a caller-supplied string against a
-  // constant that shipped in the browser bundle — so reading the bundle was
-  // enough to hold the paid plan for free. The grant is an httpOnly cookie
-  // this server signed after checking a typed code against SOCRIA_ONE_CODE,
-  // and it cannot be minted client-side.
-  if (scopeSatisfies(requestScope(req), 'one')) return 'one';
-
   return 'free';
 }
 
-/** Promotional Socria One running right now — remembered as briefly as the plan is. */
-async function promoOn(userId: string): Promise<boolean> {
-  const hit = promoMemo.get(userId);
-  const now = Date.now();
-  if (hit && now - hit.at < PLAN_MEMO_MS) return hit.on;
-  const on = await promoActiveNow(userId);
-  promoMemo.set(userId, { on, at: now });
-  if (promoMemo.size > 5000) {
-    const oldest = promoMemo.keys().next().value;
-    if (oldest !== undefined) promoMemo.delete(oldest);
-  }
-  return on;
-}
-
 /**
- * The plan every gated route clamps against: what they hold, and — only when
- * that is nothing — promotional Socria One from a reward.
+ * The plan every gated route clamps against: a paid subscription (or the
+ * operator's allowlist), and nothing else.
  */
 export async function resolvePlanForRequest(
   req: NextRequest,
   userId: string | null
 ): Promise<Plan> {
-  const base = await resolveBasePlanForRequest(req, userId);
-  if (base === 'one' || !userId) return base;
-  return (await promoOn(userId)) ? 'one' : 'free';
+  // Promotional time from Socria Rewards no longer opens Socria One (October
+  // 31, 2026): what someone holds is what they pay for.
+  return resolveBasePlanForRequest(req, userId);
 }
 
 /**

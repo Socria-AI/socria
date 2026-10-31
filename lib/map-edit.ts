@@ -25,6 +25,7 @@
 // a suggestion.
 
 import type { LogosNodeStatus, LogosRelation, LogosNode, ThinkingMap } from './logos';
+import { MAP_LABEL_MAX, mapCaps } from './logos';
 
 export type MapEdit =
   | { op: 'remove'; id: string }
@@ -37,13 +38,38 @@ export type MapEdit =
 
 /** The most labels a map remembers removing. Past this the oldest is forgotten. */
 export const MAX_REMOVED = 40;
-const MAX_LABEL = 160;
+// What a saved card keeps (lib/logos.ts). It was 160 here and 100 there, so a
+// rename of 104 characters was confirmed whole and then stored cut short.
+const MAX_LABEL = MAP_LABEL_MAX;
 
-/** One label, as it is compared: case, quotes, punctuation and spacing do not count. */
+/**
+ * One label, as it is compared: case, quotes, punctuation and spacing do not
+ * count — but a sign and a comparison do. "x = −3" and "x = 3", "Profit ≤ 0"
+ * and "Profit ≥ 0" are different cards: keyed alike, taking one off the map
+ * deleted the other at the next landing, and adding it back was refused as a
+ * duplicate. A hyphen inside a word ("long-term") is still only a space.
+ */
+const SIGNS: [RegExp, string][] = [
+  [/≤|<=/g, ' le '],
+  [/≥|>=/g, ' ge '],
+  [/≠|!=/g, ' ne '],
+  [/≈/g, ' approx '],
+  [/</g, ' lt '],
+  [/>/g, ' gt '],
+  [/=/g, ' eq '],
+  [/[−–](?=\s*[\p{N}.(\p{L}])/gu, ' minus '],
+  [/(^|[\s=(+×*/^])-(?=\s*[\p{N}.(\p{L}])/gu, '$1 minus '],
+  [/(\p{N})\s*-\s*(?=\p{N})/gu, '$1 minus '],
+  [/\+/g, ' plus '],
+  [/[×*]/g, ' times '],
+  [/÷|\//g, ' over '],
+  [/\^/g, ' pow '],
+  [/%/g, ' pct '],
+];
 export function keyOf(label: string): string {
-  return label
-    .toLowerCase()
-    .replace(/[“”"'‘’`]/g, '')
+  let t = label.toLowerCase().replace(/[“”"'‘’`]/g, '');
+  for (const [re, word] of SIGNS) t = t.replace(re, word);
+  return t
     .replace(/[^\p{L}\p{N}\s]/gu, ' ')
     .replace(/\s+/g, ' ')
     .trim();
@@ -67,6 +93,7 @@ export interface EditOutcome {
 const quote = (s: string) => `“${s}”`;
 
 export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): EditOutcome {
+  const caps = mapCaps(map);
   let nodes = [...map.nodes];
   let edges = [...map.edges];
   let removed = [...(map.removed ?? [])];
@@ -93,6 +120,9 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       // they want to see, so the typeset form goes with the old label.
       const { tex: _tex, ...rest } = n;
       nodes = nodes.map((x) => (x.id === n.id ? { ...rest, label } : x));
+      // A card renamed to wording once taken off the map is not taken off again
+      // at the next landing: they chose this wording, now (as an add does).
+      removed = removed.filter((r) => r !== keyOf(label));
       applied.push({ edit, said: `Renamed ${quote(was)} to ${quote(label)}.` });
     } else if (edit.op === 'status') {
       const n = byId(edit.id);
@@ -108,12 +138,16 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       if (a.id === b.id) { refused.push(`A node cannot be connected to itself.`); continue; }
       const relation = edit.relation ?? 'relates';
       const dup = edges.some((e) => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id));
+      if (!dup && edges.length >= caps.edges) { refused.push(`The map holds ${caps.edges} connections, and has them. Cut one first, and this one can go in.`); continue; }
       if (!dup) edges = [...edges, { from: a.id, to: b.id, relation, strength: 'normal' }];
       applied.push({ edit, said: dup ? `${quote(a.label)} and ${quote(b.label)} were already connected.` : `Connected ${quote(a.label)} to ${quote(b.label)}.` });
     } else if (edit.op === 'add') {
       const label = edit.node.label.replace(/\s+/g, ' ').trim().slice(0, MAX_LABEL);
       if (!label) { refused.push(`A node cannot be called nothing.`); continue; }
       if (nodes.some((x) => keyOf(x.label) === keyOf(label))) { refused.push(`${quote(label)} is already on the map.`); continue; }
+      // At the limit a card added would be dropped by the next save, silently.
+      // Say so now, while it can still be acted on.
+      if (nodes.length >= caps.nodes) { refused.push(`The map holds ${caps.nodes} cards, and has them. Take one off or merge two, and ${quote(label)} can go in.`); continue; }
       let id = 'n_' + keyOf(label).replace(/\s+/g, '_').slice(0, 24);
       while (byId(id)) id += '_';
       nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}) }];
@@ -407,7 +441,14 @@ export function readMapCommandAbout(text: string, map: ThinkingMap, recent?: Tou
  * changed since is left as it is now, and an idea taken away stays taken away
  * from the extractor too, as a removal by hand always does (`removed`).
  */
-export function replayMapChange(now: ThinkingMap, from: ThinkingMap, to: ThinkingMap): { map: ThinkingMap; changed: number } {
+/**
+ * `personWins`: the change from→to is the person's own, made after `now` was
+ * computed from `from` — an extraction that was in flight while they edited.
+ * Their rename or status then stands even where `now` reworded the same card,
+ * and a card they touched that `now` dropped comes back: what they said last
+ * is what they meant. Without it (undo), a card changed since is left alone.
+ */
+export function replayMapChange(now: ThinkingMap, from: ThinkingMap, to: ThinkingMap, opts: { personWins?: boolean } = {}): { map: ThinkingMap; changed: number } {
   const inFrom = new Map(from.nodes.map((n) => [n.id, n]));
   const inTo = new Map(to.nodes.map((n) => [n.id, n]));
   let nodes = [...now.nodes];
@@ -432,7 +473,13 @@ export function replayMapChange(now: ThinkingMap, from: ThinkingMap, to: Thinkin
     const a = inFrom.get(b.id);
     if (!a || (a.label === b.label && a.status === b.status && a.type === b.type)) continue;
     const i = nodes.findIndex((x) => x.id === b.id);
-    if (i < 0 || nodes[i].label !== a.label || nodes[i].status !== a.status) continue;
+    if (i < 0 && opts.personWins && !nodes.some((x) => keyOf(x.label) === keyOf(b.label))) {
+      nodes = [...nodes, b];
+      removed = removed.filter((r) => r !== keyOf(b.label));
+      changed++;
+      continue;
+    }
+    if (i < 0 || (!opts.personWins && (nodes[i].label !== a.label || nodes[i].status !== a.status))) continue;
     const { tex: _tex, ...rest } = nodes[i];
     nodes[i] = { ...rest, label: b.label, status: b.status, type: b.type, ...(b.tex ? { tex: b.tex } : {}) };
     changed++;
@@ -476,3 +523,26 @@ export function readMapSelect(text: string, map: ThinkingMap): { node: LogosNode
   if (f && 'ambiguous' in f) return { refused: `${quote(m[1])} could mean more than one thing on the map: ${f.ambiguous.map((n) => quote(n.label)).join(', ')}. Which one?` };
   return EXPLICIT.test(t) || m[2] ? { refused: `Nothing on the map is called ${quote(m[1])}.` } : null;
 }
+
+/**
+ * Two copies of one map, the second written from an older view of it —
+ * another tab, another device, or a save of this one that landed late.
+ * Nothing either holds is lost: every card and connection in the stored copy
+ * stays as it is, and the older copy's cards and connections that the stored
+ * one lacks are added — except a card the person took off, which stays off.
+ * The rest of the map (its picture, models, objects, history) is the stored
+ * copy's: it is the newer of the two. (app/api/conversations PUT)
+ */
+export function mergeStaleMap(stored: ThinkingMap, older: ThinkingMap): ThinkingMap {
+  const gone = new Set(stored.removed ?? []);
+  const ids = new Set(stored.nodes.map((n) => n.id));
+  const keys = new Set(stored.nodes.map((n) => keyOf(n.label)));
+  const add = older.nodes.filter((n) => !ids.has(n.id) && !keys.has(keyOf(n.label)) && !gone.has(keyOf(n.label)));
+  const nodes = [...stored.nodes, ...add];
+  const live = new Set(nodes.map((n) => n.id));
+  const ek = (e: { from: string; to: string }) => [e.from, e.to].sort().join('|');
+  const have = new Set(stored.edges.map(ek));
+  const edges = [...stored.edges, ...older.edges.filter((e) => !have.has(ek(e)) && live.has(e.from) && live.has(e.to))];
+  return { ...stored, nodes, edges };
+}
+

@@ -70,7 +70,13 @@ export type Block =
    * `n`, its position among the reply's inline blocks, which keys its state.
    * `open` while the reply is still writing it.
    */
-  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number };
+  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number }
+  /**
+   * A list whose every item is a bold label and its text — never produced by
+   * parseBlocks itself, only by Logos 5's editorial reading of a reply
+   * (lib/reply-layout.ts editorialBlocks), which lays it out as terms.
+   */
+  | { kind: 'terms'; ordered: boolean; items: { label: string; body: string }[] };
 
 /**
  * RICH READING — Logos 5's thread, and nowhere else unless asked.

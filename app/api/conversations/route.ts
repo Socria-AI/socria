@@ -18,6 +18,11 @@ import { MAX_FILE_TEXT } from '@/lib/file-kinds';
 import { sanitizeContexts } from '@/lib/logos-sources';
 import { MindStoreError, listProjects, loadGraph, persistGraph } from '@/lib/mind/store';
 import { adoptConversation, releaseConversation } from '@/lib/mind/projects';
+import { mergeStaleMap } from '@/lib/map-edit';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { boundaryNote } from '@/lib/entitlements';
+import { claimUnit } from '@/lib/quota';
+import { madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { sanitizeStoredDraft, type StoredDraft } from '@/lib/write/doc';
 
 export const runtime = 'nodejs';
@@ -297,6 +302,26 @@ export async function GET() {
  * reordered the list would move the row out from under the cursor that just
  * finished using it.
  */
+/**
+ * A narrow write that still says it was one. Renaming, filing under a Project
+ * or moving between surfaces leaves updated_at where it was — the history
+ * keeps its order — so a whole-row save from a copy that never saw the change
+ * could not tell it was behind, and wrote the old title or Project back. The
+ * version moves on by one millisecond: no list reorders, and that save is
+ * merged instead (PUT, below). Best effort: a failure here leaves the change
+ * made, with only the older protection.
+ */
+async function bumpVersion(id: string, userId: string): Promise<void> {
+  try {
+    const db = supabaseAdmin();
+    const { data } = await db.from('conversations').select('updated_at').eq('id', id).eq('user_id', userId).maybeSingle();
+    const at = Number((data as { updated_at?: unknown } | null)?.updated_at);
+    if (Number.isFinite(at)) await db.from('conversations').update({ updated_at: at + 1 }).eq('id', id).eq('user_id', userId).eq('updated_at', at);
+  } catch {
+    /* the change itself is made */
+  }
+}
+
 export async function PATCH(req: NextRequest) {
   const { userId } = auth();
   if (!userId) {
@@ -349,6 +374,7 @@ export async function PATCH(req: NextRequest) {
         );
       }
       if (!count) return NextResponse.json({ error: 'Not found' }, { status: 404 });
+      await bumpVersion(id, userId);
       return NextResponse.json({ ok: true, kind });
     } catch (e: any) {
       console.error('PATCH conversation kind threw:', e);
@@ -384,6 +410,7 @@ export async function PATCH(req: NextRequest) {
     if (!count) {
       return NextResponse.json({ error: 'Not found' }, { status: 404 });
     }
+    await bumpVersion(id, userId);
     return NextResponse.json({ ok: true, title });
   } catch (e: any) {
     console.error('PATCH conversation threw:', e);
@@ -505,6 +532,7 @@ async function moveToProject(userId: string, id: string, raw: unknown) {
     const { error: upErr } = await db
       .from('conversations').update({ project_id: target }).eq('id', id).eq('user_id', userId);
     if (upErr) return NextResponse.json({ error: `Supabase: ${upErr.message}` }, { status: 500 });
+    await bumpVersion(id, userId);
 
     const now = Date.now();
     let seq = 0;
@@ -537,6 +565,33 @@ async function moveToProject(userId: string, id: string, raw: unknown) {
     console.error('PATCH conversation move threw:', e);
     return NextResponse.json({ error: e?.message || 'Internal error' }, { status: 500 });
   }
+}
+
+/**
+ * THE FREE PLAN'S ARTIFACTS, HELD AT THE SAVE (lib/entitlements.ts).
+ *
+ * Most artifacts are made by the map route, which claims them as it makes
+ * them; some are made in the browser — an element opened in Artifacts, an Easy
+ * view, a study board — and reach the server only here. So every artifact a
+ * save carries that the stored conversation did not have is claimed: once
+ * each, keyed by the conversation and the artifact (lib/quota.ts), so what the
+ * map route already counted is not counted again. One that the month has no
+ * room for is not kept, and the answer says which, so the page can take it
+ * back and say why. Nothing the conversation already had is touched. Socria
+ * One is not counted.
+ */
+async function holdArtifacts(userId: string, plan: 'free' | 'one', id: string, before: unknown, after: ReturnType<typeof sanitizeMap>) {
+  if (plan === 'one') return { map: after, refused: null as Made | null };
+  const was = before && typeof before === 'object' ? sanitizeMap(before, { trust: 'stored' }) : EMPTY_MAP;
+  const made = madeArtifacts(was, after);
+  if (!madeAny(made)) return { map: after, refused: null as Made | null };
+  const refused: Made = { objects: [], models: [], picture: false };
+  const take = async (what: string) => (await claimUnit(userId, plan, 'artifacts', `${id}:${what}`)).ok;
+  for (const o of made.objects) if (!(await take(`obj:${o}`))) refused.objects.push(o);
+  for (const m of made.models) if (!(await take(`model:${m}`))) refused.models.push(m);
+  if (made.picture && !(await take('picture'))) refused.picture = true;
+  if (!madeAny(refused)) return { map: after, refused: null as Made | null };
+  return { map: withoutArtifacts(after, was, refused) as ReturnType<typeof sanitizeMap>, refused };
 }
 
 export async function PUT(req: NextRequest) {
@@ -625,75 +680,169 @@ export async function PUT(req: NextRequest) {
       /* sharing unreadable: save as before */
     }
 
-    const projectId = sanitizeProjectId(c.projectId);
-    // Where the project id goes when its column is missing along with the
-    // older ones: into the sidecar, like them, so it is not dropped.
-    const sidecar = { ...extras, ...(projectId ? { projectId } : {}) };
+    let projectId = sanitizeProjectId(c.projectId);
 
-    let { error, count } = await supabaseAdmin()
-      .from('conversations')
-      .update({ ...base, ...extras, project_id: projectId }, { count: 'exact' })
-      .eq('id', c.id)
-      .eq('user_id', userId);
-
-    // Without project_id first, so a database that only lacks THAT column
-    // keeps kind/map/draft/contexts in their real columns.
-    let projectColumn = true;
-    if (error && missingColumn(error)) {
-      ({ error, count } = await supabaseAdmin()
-        .from('conversations')
-        .update({ ...base, ...extras }, { count: 'exact' })
-        .eq('id', c.id)
-        .eq('user_id', userId));
-      if (!error) { projectColumn = false; warnProjectColumn(); }
+    // ── WHICH VERSION THIS WRITE REPLACES ─────────────────────────────
+    //
+    // A save carries the whole conversation, so a copy written from an older
+    // view of it — another tab, another device, or a save of this one that
+    // landed late — used to write its messages back over turns said since,
+    // put back a title renamed elsewhere, and re-file a conversation moved to
+    // another Project. And a copy of a conversation deleted elsewhere wrote it
+    // back into existence: the update matched nothing, so it was inserted.
+    //
+    // A client that says which version it last saw (`base`, the stored
+    // updated_at; `known`, that it has had this row from the server) is
+    // checked against it. Behind: the other writer's turns are kept and this
+    // copy's new ones follow them, the map gains what this copy added and
+    // keeps what it did not see, and the title, Project and surface stay as
+    // they were set. The write itself only lands on the version it was
+    // merged with (compare-and-swap on updated_at), and is merged again if
+    // another arrived in between. A row it has had and can no longer find was
+    // deleted: 410, and it is not brought back. A client that says nothing
+    // (an open tab from before this shipped) is saved exactly as before.
+    const versioned = 'base' in c;
+    const seen = typeof c.base === 'number' && Number.isFinite(c.base) ? c.base : null;
+    const sent = { messages: base.messages, map: extras.map, title: base.title, kind: extras.kind, projectId };
+    let merged = false;
+    // the plan, once: a free account's new artifacts are claimed before the write (holdArtifacts)
+    const plan = (await resolvePlanForRequest(req, userId)) === 'one' ? 'one' : 'free';
+    let refusedArtifacts: Made | null = null;
+    // what the stored row held, for a save that does not read it below (an older client's)
+    let storedMap: unknown = null;
+    if (plan === 'free' && !versioned) {
+      const { data } = await supabaseAdmin().from('conversations').select('*').eq('id', c.id).eq('user_id', userId).maybeSingle();
+      storedMap = data ? shape(data).map : null;
     }
 
-    let legacy = false;
-    if (error && missingColumn(error)) {
-      warnLegacy('PUT');
-      legacy = true;
-      ({ error, count } = await supabaseAdmin()
-        .from('conversations')
-        .update({ ...base, memory: { ...(await memoryForSidecar()), [SIDECAR]: sidecar } }, { count: 'exact' })
-        .eq('id', c.id)
-        .eq('user_id', userId));
-    }
-
-    if (!error && !count) {
-      // Annotated, or the ternary infers a union the client's generics reject.
-      const row: Record<string, unknown> = legacy
-        ? { ...base, memory: { ...fresh.memory, [SIDECAR]: sidecar } }
-        : { ...base, ...fresh, ...extras, ...(projectColumn ? { project_id: projectId } : {}) };
-      ({ error } = await supabaseAdmin().from('conversations').insert(row));
-
-      if (error && missingColumn(error) && !legacy && projectColumn) {
-        ({ error } = await supabaseAdmin().from('conversations').insert({ ...base, ...fresh, ...extras }));
-        if (!error) warnProjectColumn();
+    for (let attempt = 0; attempt < 3; attempt++) {
+      let expected: number | null = null;
+      if (versioned) {
+        const { data: stored, error: readErr } = await supabaseAdmin().from('conversations').select('*').eq('id', c.id).eq('user_id', userId).maybeSingle();
+        if (readErr) {
+          console.error('PUT conversation: could not read the stored version', readErr);
+          return NextResponse.json({ error: 'Could not save just now — try again.' }, { status: 500 });
+        }
+        if (!stored) {
+          if (c.known === true) return NextResponse.json({ error: 'This conversation was deleted.', gone: true }, { status: 410 });
+        } else {
+          const was = shape(stored);
+          expected = Number.isFinite(was.updatedAt) ? was.updatedAt : 0;
+          if (seen === expected) {
+            Object.assign(base, { messages: sent.messages, title: sent.title });
+            Object.assign(extras, { map: sent.map, kind: sent.kind });
+            projectId = sent.projectId;
+          } else {
+            merged = true;
+            base.messages = mergeTurns(sanitizeMessages(was.messages), sent.messages);
+            extras.map = sanitizeMap(mergeStaleMap(sanitizeMap(was.map ?? EMPTY_MAP, { trust: 'stored' }), sent.map), { trust: 'stored' });
+            if (typeof was.title === 'string' && was.title.trim()) base.title = was.title;
+            extras.kind = was.kind;
+            projectId = was.projectId;
+          }
+          // never lower: a collaborator's poll asks for anything newer than what it holds
+          base.updated_at = Math.max(Number(c.updatedAt) || Date.now(), expected + 1);
+          storedMap = was.map ?? null;
+        }
       }
+      if (plan === 'free') {
+        const held = await holdArtifacts(userId, plan, c.id, storedMap, extras.map);
+        extras.map = held.map;
+        refusedArtifacts = held.refused;
+      }
+
+      // Where the project id goes when its column is missing along with the
+      // older ones: into the sidecar, like them, so it is not dropped.
+      const sidecar = { ...extras, ...(projectId ? { projectId } : {}) };
+      const scoped = <T extends { eq: (col: string, v: unknown) => T }>(q: T): T => (expected === null ? q : q.eq('updated_at', expected));
+
+      let { error, count } = await scoped(
+        supabaseAdmin()
+          .from('conversations')
+          .update({ ...base, ...extras, project_id: projectId }, { count: 'exact' })
+          .eq('id', c.id)
+          .eq('user_id', userId)
+      );
+
+      // Without project_id first, so a database that only lacks THAT column
+      // keeps kind/map/draft/contexts in their real columns.
+      let projectColumn = true;
+      if (error && missingColumn(error)) {
+        ({ error, count } = await scoped(
+          supabaseAdmin()
+            .from('conversations')
+            .update({ ...base, ...extras }, { count: 'exact' })
+            .eq('id', c.id)
+            .eq('user_id', userId)
+        ));
+        if (!error) { projectColumn = false; warnProjectColumn(); }
+      }
+
+      let legacy = false;
       if (error && missingColumn(error)) {
         warnLegacy('PUT');
-        ({ error } = await supabaseAdmin()
-          .from('conversations')
-          .insert({ ...base, memory: { ...fresh.memory, [SIDECAR]: sidecar } }));
+        legacy = true;
+        ({ error, count } = await scoped(
+          supabaseAdmin()
+            .from('conversations')
+            .update({ ...base, memory: { ...(await memoryForSidecar()), [SIDECAR]: sidecar } }, { count: 'exact' })
+            .eq('id', c.id)
+            .eq('user_id', userId)
+        ));
       }
 
-      // A primary-key collision here means the id exists and is not yours.
-      if (error && /duplicate key|23505/i.test(`${error.code} ${error.message}`)) {
+      if (!error && !count) {
+        // Another write landed between the read and this one: read it, and merge again.
+        if (expected !== null) continue;
+        // Annotated, or the ternary infers a union the client's generics reject.
+        const row: Record<string, unknown> = legacy
+          ? { ...base, memory: { ...fresh.memory, [SIDECAR]: sidecar } }
+          : { ...base, ...fresh, ...extras, ...(projectColumn ? { project_id: projectId } : {}) };
+        ({ error } = await supabaseAdmin().from('conversations').insert(row));
+
+        if (error && missingColumn(error) && !legacy && projectColumn) {
+          ({ error } = await supabaseAdmin().from('conversations').insert({ ...base, ...fresh, ...extras }));
+          if (!error) warnProjectColumn();
+        }
+        if (error && missingColumn(error)) {
+          warnLegacy('PUT');
+          ({ error } = await supabaseAdmin()
+            .from('conversations')
+            .insert({ ...base, memory: { ...fresh.memory, [SIDECAR]: sidecar } }));
+        }
+
+        // A primary-key collision here means the id exists. Two first saves of
+        // one new conversation, racing, both reach the insert: the second is
+        // this person's own row after all, and is merged into it. Anybody
+        // else's is refused.
+        if (error && /duplicate key|23505/i.test(`${error.code} ${error.message}`)) {
+          if (versioned) {
+            const { data: mine } = await supabaseAdmin().from('conversations').select('id').eq('id', c.id).eq('user_id', userId).maybeSingle();
+            if (mine) continue;
+          }
+          return NextResponse.json(
+            { error: 'That conversation belongs to another account.' },
+            { status: 403 }
+          );
+        }
+      }
+
+      if (error) {
+        console.error('PUT conversation error:', error);
         return NextResponse.json(
-          { error: 'That conversation belongs to another account.' },
-          { status: 403 }
+          { error: `Supabase: ${error.message}` },
+          { status: 500 }
         );
       }
+      return NextResponse.json({
+        ok: true,
+        updatedAt: base.updated_at,
+        ...(merged ? { merged: true } : {}),
+        // artifacts the month had no room for, not kept — for the page to take back and say why
+        ...(refusedArtifacts ? { refused: { artifacts: refusedArtifacts, note: boundaryNote('artifacts'), upgrade: 'artifacts' } } : {}),
+      });
     }
-
-    if (error) {
-      console.error('PUT conversation error:', error);
-      return NextResponse.json(
-        { error: `Supabase: ${error.message}` },
-        { status: 500 }
-      );
-    }
-    return NextResponse.json({ ok: true });
+    return NextResponse.json({ error: 'This conversation is being saved from somewhere else at the same moment — it will be saved with the next change.' }, { status: 409 });
   } catch (e: any) {
     console.error('PUT conversation threw:', e);
     return NextResponse.json(

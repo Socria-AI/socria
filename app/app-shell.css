@@ -81,6 +81,12 @@
 .app-root .gone .routes .t{font-family:var(--font-serif, Georgia, serif);font-size:1.25rem}
 .app-root .gone .routes .d{font-size:.88rem;color:var(--ink-70);text-align:right}
 .app-root .gone .routes a:hover .t{color:var(--moss-700)}
+/* The error page's ways back are buttons, drawn as the 404's rows. */
+.app-root .gone .routes button{display:flex;align-items:baseline;justify-content:space-between;gap:16px;width:100%;text-align:left;
+  padding:15px 0;border-bottom:1px solid var(--ink-12);transition:padding-left .25s var(--ease-out-expo)}
+.app-root .gone .routes button:hover{padding-left:8px}
+.app-root .gone .routes button:hover .t{color:var(--moss-700)}
+.app-root .gone .routes button:focus-visible, .app-root .gone .routes a:focus-visible{outline:2px solid var(--moss-700);outline-offset:3px}
 .app-root .gone .close-line{font-family:var(--font-serif, Georgia, serif);font-size:clamp(1.2rem,2.4vw,1.7rem);line-height:1.2}
 .app-root .gone .close-line .em{font-style:italic;color:var(--moss-700)}
 

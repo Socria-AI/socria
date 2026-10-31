@@ -13,7 +13,7 @@ import Link from 'next/link';
 import { Article, H2, Callout, Defs, Def } from '../Article';
 import { LineOfThinking, OneTurn } from '../Diagrams';
 import { docPage } from '../registry';
-import { PLANS } from '@/lib/entitlements';
+import { PLANS, freePlanSentence, onePlanSentence } from '@/lib/entitlements';
 
 const page = docPage('logos-5')!;
 const FREE = PLANS.free;
@@ -254,13 +254,12 @@ export function Logos5() {
       <H2 id="plans">Plans and access</H2>
       <p>
         Signed out, Logos 5 is open to you as a guest: one line of thinking and its map, with no account.
-        Starting a second asks you to sign up, which is free, and the one you have comes with you. On the
-        free plan it holds {FREE.counters.chats} new lines of thinking a calendar month and{' '}
-        {FREE.counters.messages} messages a day; going back to a line of thinking you have begun costs only
-        its messages, and reaching either count leaves everything you started open.{' '}
-        <Link href="/docs/socria-one">Socria One</Link> has no daily limit on messages, and holds lines of
-        thinking only by a fair-use ceiling. A line of thinking or a Project can be shared by invitation, by
-        link or by code; on the free plan, one chat at a time.
+        Starting a second asks you to sign up, which is free, and the one you have comes with you. The free
+        plan holds {freePlanSentence()}; going back to a conversation you have begun costs nothing, and
+        reaching any count leaves everything you started open.{' '}
+        <Link href="/docs/socria-one">Socria One</Link> is {onePlanSentence().replace(/^U/, 'u')}. A line of
+        thinking or a Project can be shared by invitation, by link or by code — sharing your own is part of
+        Socria One, and joining what somebody shares with you is free.
       </p>
 
       <H2 id="limits">What it does not do</H2>

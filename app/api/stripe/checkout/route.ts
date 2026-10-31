@@ -171,7 +171,8 @@ export async function POST(req: NextRequest) {
         client_reference_id: userId,
         metadata: { clerkUserId: userId, ...attributionMeta },
         subscription_data: { metadata: { clerkUserId: userId, ...attributionMeta } },
-        allow_promotion_codes: true,
+        // No promotion codes: Socria One is $15 a month for everyone (October 31, 2026).
+        allow_promotion_codes: false,
         success_url: `${base}/chat?one=welcome&session_id={CHECKOUT_SESSION_ID}`,
         cancel_url: `${base}/chat?one=cancelled`,
       });

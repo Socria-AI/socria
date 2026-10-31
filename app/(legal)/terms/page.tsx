@@ -4,6 +4,7 @@
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
+import { freePlanSentence } from '@/lib/entitlements';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
 import { pageMetadata } from '@/lib/seo';
 
@@ -24,7 +25,7 @@ export default function TermsPage() {
         here needs a lawyer to decode, that is our failure, not yours.
       </p>
       <p className="lg-dates">
-        Effective August 2026 · Provided by Socria —{' '}
+        Effective August 2026 · Last updated October 2026 · Provided by Socria —{' '}
         <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
@@ -122,9 +123,10 @@ export default function TermsPage() {
 
       <h2 id="free">The free tier</h2>
       <p>
-        The free tier has limits on how many conversations you start and
-        messages you send each day, and how many lines of thinking you begin
-        each month. Reaching a limit stops new
+        The free tier has monthly limits — {freePlanSentence()} — and does not
+        include Socria Voice or sharing your own conversations, which are part
+        of Socria One. Socria One is not offered free: not by code, reward or
+        promotion. Reaching a limit stops new
         growth; <strong>it never hides or deletes what you already made.</strong>{' '}
         Your maps stay visible and interactive at every tier, including after a
         subscription ends.

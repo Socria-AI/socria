@@ -314,8 +314,8 @@ export interface OpenShare {
 /**
  * Everything of this kind the owner has open to other people now — a link
  * on, a code on, or anybody in it, an invitation not yet accepted included.
- * The free plan shares one chat at a time (lib/share/roles.ts hostRefusal),
- * and this is the count it is held to. A share left behind by a conversation
+ * (The free plan used to share one chat at a time against this count; sharing
+ * is part of Socria One now — lib/share/roles.ts hostRefusal.) A share left behind by a conversation
  * that has since been deleted opens nothing, and is not counted.
  */
 export async function openShares(ownerId: string, type: ResourceType): Promise<OpenShare[]> {

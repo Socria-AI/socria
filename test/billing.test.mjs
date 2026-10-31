@@ -12,7 +12,7 @@
 // normally read cannot be reached at all.
 
 import { entitles, isCompCustomer } from './.tmp/subscriptions.mjs';
-import { entitledBy, LIVE_STATUSES } from './.tmp/entitlement-rule.mjs';
+import { entitledBy, LIVE_STATUSES, RETIRED_STATUSES } from './.tmp/entitlement-rule.mjs';
 import { billingError, billingLine } from './.tmp/billing-message.mjs';
 import {
   stripeFailure, priceIdProblem, isMissingResource, isMissingCustomer,
@@ -36,7 +36,7 @@ console.log('=== the account mirror agrees with the table it backs up ===');
   // Every status the table treats as live, the mirror must treat as live —
   // they are two records of one fact, and a disagreement between them is a
   // person whose entitlement depends on which one happened to be readable.
-  for (const status of ['active', 'trialing', 'past_due', 'comp']) {
+  for (const status of ['active', 'trialing', 'past_due']) {
     const row = entitles({ status, currentPeriodEnd: null });
     const mir = mirrorEntitles({ status, periodEnd: null });
     ok(`${status}: the table entitles`, row === true);
@@ -44,7 +44,7 @@ console.log('=== the account mirror agrees with the table it backs up ===');
   }
 
   // And every status neither of them does.
-  for (const status of ['canceled', 'incomplete', 'incomplete_expired', 'unpaid', '']) {
+  for (const status of ['canceled', 'incomplete', 'incomplete_expired', 'unpaid', 'comp', '']) {
     const row = entitles({ status, currentPeriodEnd: null });
     const mir = mirrorEntitles({ status, periodEnd: null });
     ok(`${status}: the table refuses`, row === false);
@@ -63,6 +63,23 @@ console.log('\n=== a cancelled subscription is entitled until it is paid through
   ok('seconds, not milliseconds', mirrorEntitles({ status: 'canceled', periodEnd: soon * 1000 }) === true);
   ok('and a millisecond value read as seconds is far future, not past',
     mirrorEntitles({ status: 'canceled', periodEnd: Date.now() }) === true);
+}
+
+console.log('\n=== a subscription nobody has paid for is not entitled, whatever its period says ===');
+{
+  // THE BUG THIS HOLDS. Stripe sets current_period_end the moment a
+  // subscription exists, paid or not. The rule used to grant any status whose
+  // period had not ended, so a subscription whose first payment never went
+  // through ('incomplete', then 'incomplete_expired' a day later), one whose
+  // retries ran out ('unpaid') or one paused held Socria One for a month
+  // without a payment. Only a cancellation keeps its paid-for period.
+  for (const status of ['incomplete', 'incomplete_expired', 'unpaid', 'paused']) {
+    const row = entitles({ status, currentPeriodEnd: soon });
+    const mir = mirrorEntitles({ status, periodEnd: soon });
+    ok(`${status} with a period still running: the table refuses`, row === false);
+    ok(`${status} with a period still running: and so does the mirror`, mir === false);
+  }
+  ok('a cancellation still keeps the period it paid for', entitles({ status: 'canceled', currentPeriodEnd: soon }) === true);
 }
 
 console.log('\n=== a cancellation revokes through the mirror too ===');
@@ -120,7 +137,9 @@ console.log('\n=== the rule is written once ===');
   // live would be accepting a status Stripe never sends.
   ok('the match is exact', entitledBy('ACTIVE', null) === false);
   ok('and past_due is deliberately live', LIVE_STATUSES.includes('past_due'));
-  ok('as is our own comp', LIVE_STATUSES.includes('comp'));
+  // A complimentary grant was ours and entitled with no Stripe subscription behind it. Socria One is paid
+  // for or it is not held (October 31, 2026): 'comp' no longer entitles, whatever period a row carries.
+  ok('our own comp no longer entitles', !LIVE_STATUSES.includes('comp') && RETIRED_STATUSES.includes('comp') && entitledBy('comp', null) === false && entitledBy('comp', Math.floor(Date.now() / 1000) + 86400) === false);
 }
 
 console.log('\n=== a failure says what it was ===');

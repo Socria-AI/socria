@@ -451,6 +451,25 @@ function resolveNodeType(raw: unknown): LogosNodeType {
   return 'idea';
 }
 
+/** The longest label a card keeps — the edits that write one (lib/map-edit.ts) use the same. */
+export const MAP_LABEL_MAX = MAX_LABEL;
+
+/**
+ * How many cards and connections this map keeps when it is saved: what the
+ * sanitizer below enforces, said once so an edit by hand can be refused AT
+ * the limit, with a sentence, rather than taken and then quietly dropped on
+ * the next save (lib/map-edit.ts).
+ */
+export function mapCaps(map: { context?: unknown; building?: unknown }): { nodes: number; edges: number } {
+  const isMath = map?.context === 'math';
+  const building = sanitizeBuilding(map?.building);
+  const shaped = !!building && ['process', 'plan', 'timeline'].includes(building.kind);
+  return {
+    nodes: isMath ? MAX_NODES_MATH : shaped ? MAX_NODES_SHAPED : MAX_NODES,
+    edges: isMath ? MAX_EDGES_MATH : shaped ? MAX_EDGES_SHAPED : MAX_EDGES,
+  };
+}
+
 export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_MAP };
 
@@ -459,9 +478,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     : undefined;
   const isMath = context === 'math';
   const building = sanitizeBuilding(raw.building);
-  const shaped = !!building && ['process', 'plan', 'timeline'].includes(building.kind);
-  const nodeCap = isMath ? MAX_NODES_MATH : shaped ? MAX_NODES_SHAPED : MAX_NODES;
-  const edgeCap = isMath ? MAX_EDGES_MATH : shaped ? MAX_EDGES_SHAPED : MAX_EDGES;
+  const { nodes: nodeCap, edges: edgeCap } = mapCaps({ context, building: raw.building });
   const intent: MathIntent | undefined =
     isMath && MATH_INTENTS.includes(raw.intent) ? (raw.intent as MathIntent) : undefined;
   const str = (v: any, n: number) =>

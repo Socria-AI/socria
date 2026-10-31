@@ -26,7 +26,28 @@
 
 import { useEffect, useRef } from 'react';
 import { SOCRIA_ONE } from '@/lib/socria-one';
+import { COUNTER_NOUN, COUNTERS, resetsAt, type Counter } from '@/lib/entitlements';
 import type { OnePromptView } from './useOnePrompt';
+
+/**
+ * The allowance a limit prompt is about, as a count — "10 of 10 conversations
+ * used this month · starts again on 1 November" — from the same numbers the
+ * server refused at (/api/logos/usage). Null for anything but a spent monthly
+ * allowance.
+ */
+export function promptMeter(view: Pick<OnePromptView, 'reason'> | null, usage?: Partial<Record<string, { used: number; limit: number | null }>>, at = Date.now()): { line: string; used: number; limit: number } | null {
+  const reason = view?.reason ?? '';
+  const c = reason.endsWith('-spent') ? reason.slice(0, -'-spent'.length) : '';
+  if (!(COUNTERS as readonly string[]).includes(c)) return null;
+  const counter = c as Counter;
+  const u = usage?.[counter];
+  const noun = COUNTER_NOUN[counter];
+  if (!u || u.limit === null || u.limit <= 0 || !noun) return null;
+  const when = resetsAt(counter, at);
+  const day = when ? new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' }) : null;
+  const used = Math.min(u.used, u.limit);
+  return { used, limit: u.limit, line: `${used} of ${u.limit} free ${u.limit === 1 ? noun.one : noun.many} used this month${day ? ` · starts again on ${day}` : ''}` };
+}
 
 export function OnePrompt({
   view,
@@ -34,6 +55,7 @@ export function OnePrompt({
   onAccept,
   busy,
   error,
+  usage,
 }: {
   view: OnePromptView | null;
   onDismiss: () => void;
@@ -41,6 +63,8 @@ export function OnePrompt({
   onAccept: () => void;
   busy?: boolean;
   error?: string | null;
+  /** the month's counts (/api/logos/usage), for a limit prompt's meter */
+  usage?: Partial<Record<string, { used: number; limit: number | null }>>;
 }) {
   const goRef = useRef<HTMLButtonElement>(null);
   const open = !!view?.open;
@@ -92,6 +116,19 @@ export function OnePrompt({
         <p id="lg-op-body" className="lg-op-body">
           {view.body}
         </p>
+
+        {(() => {
+          const m = promptMeter(view, usage);
+          if (!m) return null;
+          return (
+            <div className="lg-op-meter">
+              <span className="lg-op-meter-bar" role="img" aria-label={`${m.used} of ${m.limit} used`}>
+                <i style={{ width: `${Math.round((m.used / m.limit) * 100)}%` }} />
+              </span>
+              <span className="lg-op-meter-l">{m.line}</span>
+            </div>
+          );
+        })()}
 
         {error && (
           <p className="lg-op-err" role="alert">

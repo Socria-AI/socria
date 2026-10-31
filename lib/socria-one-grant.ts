@@ -72,13 +72,11 @@ export function readMirror(meta: Record<string, unknown> | null | undefined): St
   };
 }
 
-// Accounts that hold Socria One unconditionally — no code to type, no
-// environment to configure, nothing to redeem. Checked against EVERY email
-// on the Clerk user (people sign in with Google one day and email the
-// next), case-insensitively. Server-side only; this list never reaches the
-// client bundle. A match is also written through to the account's metadata
-// grant, so the entitlement survives even this list changing later.
-const COMPED_EMAILS = new Set(['tiffanylin096@gmail.com']);
+// (A list of accounts that held Socria One unconditionally lived here, and was
+// written through to the account as a permanent grant. Socria One is paid for
+// or it is not held — the freemium change of October 31, 2026 — so it is gone,
+// and a grant already written to an account's metadata is no longer read as
+// one. Nothing is deleted: the metadata stays where it is.)
 
 // resolvePlanForRequest runs on every gated request, and asking Clerk's API
 // each time would put a network round-trip in front of every map extraction.
@@ -102,39 +100,14 @@ async function readGrant(userId: string): Promise<{ v: boolean; ok: boolean }> {
   try {
     const user = await clerkClient().users.getUser(userId);
     const meta = user?.privateMetadata as Record<string, unknown> | null;
-    const granted = meta?.[GRANT_KEY] === GRANT_VALUE;
-    // VERIFIED, not merely present. An address can be added to an account
-    // before it is confirmed, so matching on the string alone would hand
-    // Socria One to anyone willing to type a comped person's email into their
-    // own settings. What cannot be faked is receiving the code sent to it.
-    const comped = (user?.emailAddresses ?? []).some(
-      (e) =>
-        e?.verification?.status === 'verified' &&
-        COMPED_EMAILS.has(e.emailAddress?.toLowerCase?.() ?? '')
-    );
-    // A student at an approved university, by verified address: their one
-    // free month, begun the first time it is seen while the offer is open
-    // (lib/socria-edu.ts STUDENT_OFFER). Inert where neither SOCRIA_EDU_DOMAINS
-    // nor an open offer names a domain.
-    const standing = studentStanding({
-      emails: (user?.emailAddresses ?? []) as EmailLike[],
-      recorded: readStudentMonth(meta?.[STUDENT_KEY]),
-      now: Date.now(),
-    });
-    if (standing.begins && standing.month) void recordStudentMonth(userId, standing.month);
-    const student = standing.active;
-    // A paid subscription, as the webhook last saw it. Checked here so that
+    // A paid subscription, as the webhook last saw it — checked here so that
     // somebody who has actually paid is entitled even when the subscriptions
-    // table cannot be read.
+    // table cannot be read. It is the ONLY account-level grant: complimentary
+    // grants (GRANT_KEY), comped addresses and student months no longer
+    // entitle anyone (October 31, 2026).
     const paid = mirrorEntitles(readMirror(meta));
-    const v = granted || comped || paid || student;
+    const v = paid;
     cache.set(userId, { v, at: Date.now() });
-    // Make a list match permanent on the account itself.
-    //
-    // Deliberately NOT done for a student: what is written for them is when
-    // their month BEGAN (recordStudentMonth), never a grant — a grant would
-    // outlive the address it came from and the month it was for.
-    if (comped && !granted) void writeAccountGrant(userId).catch(() => {});
     return { v, ok: true };
   } catch {
     // Clerk unreachable: answer from the stale cache if we have one, and

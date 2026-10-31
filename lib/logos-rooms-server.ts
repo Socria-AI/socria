@@ -436,9 +436,11 @@ export async function purgeUserFromRooms(userId: string, now: number): Promise<v
   const { error: memErr } = await db.from('logos_room_members').delete().eq('user_id', userId);
   if (memErr) fail('deleting memberships', memErr);
 
+  // The seed is the session the room was opened around, captured when the
+  // room was empty — so every word in it is the host's own, and goes with them.
   const { error: hostErr } = await db
     .from('logos_rooms')
-    .update({ host_user_id: null, closed_at: now })
+    .update({ host_user_id: null, closed_at: now, seed_session: null })
     .eq('host_user_id', userId);
   if (hostErr) fail('clearing hosted rooms', hostErr);
 

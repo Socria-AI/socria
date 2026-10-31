@@ -16,6 +16,7 @@ import { useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNod
 import type { LogosMsg } from '@/lib/logos-sessions';
 import { contentAsText, sanitizeInlineState, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import type { InlineHost } from '@/components/inline/InlineUI';
+import './reply.css';
 import { copyText } from '@/lib/copy-text';
 import { initialOf } from '@/lib/collab';
 import { AttachmentList } from '@/components/LogosComposer';
@@ -107,6 +108,8 @@ export interface L5MessageProps {
   onInline?: (m: LogosMsg, n: number, s: InlineState) => void;
   /** a choice tapped in the latest reply, sent as their next message */
   onChoose?: (text: string) => void;
+  /** going deeper from this reply, whichever it is (a way it could go, a decision talked through): sent as their next message */
+  onExplore?: (text: string) => void;
   /** an inline element opened in Artifacts as a full artifact */
   onOpenInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
   /**
@@ -212,7 +215,7 @@ export function L5Message(p: L5MessageProps) {
   const objFx = m.role === 'assistant' ? p.effect?.objects ?? [] : [];
   const whose = p.who === 'You' ? 'your' : `${p.who}’s`;
   // the reply's inline elements: what was done with them, and where their actions go
-  const { onInline, onChoose, onOpenInline, latest } = p;
+  const { onInline, onChoose, onExplore, onOpenInline, latest } = p;
   const inline = useMemo<InlineHost | undefined>(
     () =>
       m.role === 'assistant'
@@ -220,11 +223,12 @@ export function L5Message(p: L5MessageProps) {
             state: sanitizeInlineState(m.ui),
             onState: onInline ? (n, s) => onInline(m, n, s) : undefined,
             onChoose: latest ? onChoose : undefined,
+            onExplore,
             onOpen: onOpenInline ? (n, spec) => onOpenInline(m, n, spec) : undefined,
             live: !!latest,
           }
         : undefined,
-    [m, onInline, onChoose, onOpenInline, latest]
+    [m, onInline, onChoose, onExplore, onOpenInline, latest]
   );
 
   return (
@@ -305,10 +309,10 @@ export function L5Message(p: L5MessageProps) {
         <WriteUpCard w={p.writeUp} onOpen={p.onOpenContent} />
       ) : (
         m.content && (
-          <div className={m.role === 'assistant' ? 'l5-prose' : 'l5-said'}>
+          <div className={m.role === 'assistant' ? 'l5-prose is-reply' : 'l5-said'}>
             {m.role === 'assistant' ? (
               <TexPick.Provider value={p.onPickTex ?? null}>
-                <RichText text={m.content} math rich cite={cite} askLast inline={inline} />
+                <RichText text={m.content} math rich cite={cite} askLast inline={inline} editorial />
               </TexPick.Provider>
             ) : (
               <SaidText text={m.content} />
@@ -447,8 +451,8 @@ export function L5Pending({ text, group, to, mapping, onStop, place }: { text: s
           </span>
         </div>
       ) : text ? (
-        <div className="l5-prose is-streaming">
-          <StreamingRichText text={text} math rich />
+        <div className="l5-prose is-reply is-streaming">
+          <StreamingRichText text={text} math rich editorial />
           <span className="l5-caret" aria-hidden="true" />
         </div>
       ) : (

@@ -316,9 +316,12 @@ const mv = await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id
 ok('moving it into Socria succeeds', mv.status === 200 && mv.json?.projectId === SOC, mv.text);
 ok('the chat is filed', db.rows('conversations').find((c) => c.id === 'loose-1')?.project_id === SOC);
 ok('and what it taught is now tied to Socria', tiesTo('hint pacing', SOC_NODE).some((e) => e.relationship === 'belongs_to'));
+// A move moves the version on by one millisecond, so a save from a copy that
+// missed it is merged rather than filing it back (app/api/conversations
+// bumpVersion) — and by no more, so its place in the list is kept.
 ok('its title was not touched, nor its place in the list',
    db.rows('conversations').find((c) => c.id === 'loose-1')?.title === 'Hint pacing' &&
-   db.rows('conversations').find((c) => c.id === 'loose-1')?.updated_at === 9);
+   [9, 10].includes(db.rows('conversations').find((c) => c.id === 'loose-1')?.updated_at));
 const back = await call(R.conversations.PATCH, 'PATCH', '/api/conversations', { id: 'loose-1', projectId: null });
 ok('moving it out succeeds', back.status === 200 && db.rows('conversations').find((c) => c.id === 'loose-1')?.project_id === null, back.text);
 ok('and unties what it alone had tied', tiesTo('hint pacing', SOC_NODE).length === 0);

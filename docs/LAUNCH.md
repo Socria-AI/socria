@@ -107,7 +107,11 @@ conversation, a document with its checked citations, the preview card.
 
 ---
 
-## Students — UTA, until 9 December
+## Students — UTA — WITHDRAWN, DO NOT POST
+
+The student month was retired on 31 October 2026 with every other free grant
+of Socria One (docs/FREEMIUM.md); `/students` now says it has ended. The copy
+below is kept only as a record of what was posted.
 
 For campus channels, group chats and flyers (a QR code to the link works):
 

@@ -21,6 +21,7 @@ import { purgeRegistrationsForEmails } from '@/lib/events/privacy';
 import { purgeUploads } from '@/lib/upload-store';
 import { purgeMedia } from '@/lib/write/media-store';
 import { purgeReferrer } from '@/lib/rewards/supabase-rewards-store';
+import { purgeUserFromRooms } from '@/lib/logos-rooms-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -225,6 +226,32 @@ export async function DELETE(req: NextRequest) {
       },
       { status: 500 }
     );
+  }
+
+  // Rooms (supabase/rooms.sql), the other place two people's words sit side
+  // by side: their own events and seats go, a room they hosted is closed with
+  // the host cleared, and the other participant's words stay that person's
+  // (lib/logos-rooms-server.ts). It was written for this and never called, so
+  // a deleted account's words in a room outlived it with no way to reach
+  // them. Fails closed like the rest; only a database that never had the
+  // rooms migration — so holds nothing of theirs there — is stepped over.
+  try {
+    await purgeUserFromRooms(userId, Date.now());
+    deleted.push('logos_room_events', 'logos_room_members', 'logos_rooms');
+  } catch (e) {
+    const why = e instanceof Error ? e.message : String(e);
+    if (!/"code":"(42P01|PGRST205)"/i.test(why)) {
+      console.error('account delete: room purge failed', e);
+      return NextResponse.json(
+        {
+          error:
+            'Could not delete everything, so nothing further was removed and your account still exists. Please email hellosocria@gmail.com and we will finish it by hand.',
+          failedAt: 'rooms',
+          deleted,
+        },
+        { status: 500 }
+      );
+    }
   }
 
   // Socria Rewards: the people they invited keep their own rows, with this

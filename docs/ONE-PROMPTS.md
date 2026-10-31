@@ -94,8 +94,10 @@ like paranoia below is aimed at these.
 
 | Trigger | Intent | Category |
 |---|---|---|
-| `messages-spent` "Keep thinking today" (Logos, the day's 10 messages) · `core-chats-spent` "Start something new today" (Core, the day's 4 new chats) · `core-messages-spent` "Keep this conversation going" (Core, the day's 20 messages) | urgent | entitlement |
-| `chats-spent` "Keep this line of thinking" (Logos, the month's 2) `explore-spent` `research-spent` `challenge-spent` `context-spent` `images-spent` `files-spent` | urgent | entitlement |
+| `chats-spent` (the month's 10 conversations) · `maps-spent` (2 Logic Maps) · `nodes-spent` (10 Logic Map nodes) · `artifacts-spent` (2 artifacts) · `documents-spent` (1 document) — the numbers are read from `PLANS.free` | urgent | entitlement |
+| `voice-locked` (pressed Socria Voice) · `share-locked` (pressed Share on their own conversation) | urgent | entitlement |
+| `explore-spent` `research-spent` `challenge-spent` `context-spent` `images-spent` `files-spent` (fair-use ceilings both plans share) | urgent | entitlement |
+| `messages-spent` `core-chats-spent` `core-messages-spent` — retired with the daily message count and the archived Core chat (October 2026); kept so stored dismissals and checkout attribution still read, never fired | — | — |
 | `map-full` `depth-locked` `lenses-locked` `draft-locked` `connections-locked` | high | entitlement |
 | `returning-thinker` | medium | proactive |
 | `asked` (they pressed the Socria One button) | low | — |
@@ -105,10 +107,13 @@ every other counter: what was used, that everything already started stays
 open, and the line Socria One answers it with — "Upgrade to Socria One to
 keep going today" for the messages, "…to start as many as you like" for new
 chats. Only the
-four counters in `TIERED_COUNTERS` — `chats`, `messages`, `core-chats`,
-`core-messages` — are things Socria One lifts; the other `-spent` triggers
-are fair-use ceilings shared by both plans, and say so instead of offering
-anything. `map-full`, `depth-locked`, `lenses-locked` and `draft-locked` can
+five counters in `TIERED_COUNTERS` — `chats`, `maps`, `nodes`, `artifacts`,
+`documents` — and the two features in `FEATURES` — `voice`, `share` — are
+things Socria One lifts (docs/FREEMIUM.md); the other `-spent` triggers are
+fair-use ceilings shared by both plans, and say so instead of offering
+anything. At any free limit the sheet leads with the same headline,
+"You’ve reached your free limit.", the Free / Socria One comparison, and
+"Upgrade to Socria One — $15/month"; dismissing it keeps the free plan. `map-full`, `depth-locked`, `lenses-locked` and `draft-locked` can
 no longer fire — maps do not fill, and every depth, lens and Draft Space is
 open on both plans — and are kept for checkout attribution.
 

@@ -4,19 +4,20 @@
 // thing says it better than a paragraph: a little chart of the numbers they
 // gave, a slider over a formula, two options side by side, the reasoning folded
 // under its conclusion, a few choices to tap, a draft they can edit in place,
-// the parts of a subject to explore one at a time, steps or events in order.
-// Those are drawn INSIDE the conversation, from a structured description the
-// reply writes in a fenced block:
+// the parts of a subject to explore one at a time, steps or events in order,
+// the ways an open piece of work could go next, a decision they weigh
+// themselves. Those are drawn INSIDE the conversation, from a structured
+// description the reply writes in a fenced block:
 //
 //   ```ui
 //   {"type":"compare","options":["Rent","Buy"],"rows":[{"label":"Monthly","values":["$1,900","$2,350"]}]}
 //   ```
 //
-// A DESCRIPTION, NEVER CODE. Eight kinds, each with a fixed shape and limits;
+// A DESCRIPTION, NEVER CODE. Ten kinds, each with a fixed shape and limits;
 // anything else is not drawn. Every string is cleaned and capped, every number
 // is finite, a formula is compiled by the same safe parser the math engine
 // uses (lib/logos-math.ts compileExpr — no eval), and nothing in a spec can run.
-// The renderer (components/inline/InlineUI.tsx) knows these eight and no others.
+// The renderer (components/inline/InlineUI.tsx) knows these ten and no others.
 //
 // CHECKED BEFORE IT IS SHOWN (Epistemic Control). The route runs every block
 // through `checkInlineSpec` as it streams (lib/core4/stream-gate.ts `block`):
@@ -32,14 +33,17 @@
 //   • a draft is never offered for writing that is theirs to write;
 //   • under the Answer Guard, no steps laid out and no overview to read
 //     instead of working (concepts, sequence), and no steps when working it
-//     out is theirs.
+//     out is theirs;
+//   • a decision drawn to be weighed carries no weights from the reply: how
+//     much each thing matters is theirs to say, so the leaning it shows is
+//     arithmetic on THEIR weights, never a verdict handed to them.
 //
 // PURE: the route, the parser (lib/rich-text.ts), the renderer and the tests
 // share it.
 
 import { compileExpr, freeNames } from './logos-math';
 
-export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence'] as const;
+export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide'] as const;
 export type InlineKind = (typeof INLINE_KINDS)[number];
 
 export type ChartBasis = 'given' | 'source' | 'illustrative';
@@ -116,7 +120,37 @@ export interface SequenceSpec {
   /** `when` on every item of a timeline ("1789", "Week 3"); never on steps */
   items: { label: string; when?: string; detail?: string }[];
 }
-export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec;
+/**
+ * WAYS DEEPER. Where an open piece of work could go next: two to four
+ * directions, each a few words and a line on what opening it would give them.
+ * Opened, one becomes their next message in this same conversation — so going
+ * deeper never loses what was said — and is marked as explored; the others
+ * stay there to come back to. An offer, not a question and not a menu the
+ * reply hides behind: the useful part is already said in the prose above it.
+ */
+export interface PathsSpec {
+  type: 'paths';
+  title?: string;
+  items: { label: string; gist?: string }[];
+}
+/**
+ * A DECISION, WEIGHED BY THEM. Two to four options against what the decision
+ * rests on, with Socria's first reading of how each option does on each thing
+ * (0 poor – 3 strong, `scores` in option order). They say how much each thing
+ * matters and can change any reading; the leaning is computed from their
+ * weights, live. `weights` is never taken from a reply (sanitizeInlineSpec
+ * drops it): it rides only on the spec handed to Artifacts, carrying the
+ * weights THEY set.
+ */
+export interface DecideSpec {
+  type: 'decide';
+  title?: string;
+  options: string[];
+  rows: { label: string; scores: number[]; note?: string; /** options whose reading they changed — set only when it is opened in Artifacts */ theirs?: number[] }[];
+  /** the person's own weights (0–3, one per row) — set only when it is opened in Artifacts */
+  weights?: number[];
+}
+export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec;
 
 export const INLINE_LIMITS = {
   points: 24,
@@ -145,6 +179,16 @@ export const INLINE_LIMITS = {
   /** steps or events in order */
   sequence: 8,
   when: 24,
+  /** ways deeper: one is not a choice, more than four is a syllabus */
+  paths: 4,
+  pathLabel: 60,
+  pathGist: 140,
+  /** a decision weighed: options across, what it rests on down */
+  decideOptions: 4,
+  decideRows: 6,
+  /** a reading of an option on one thing: 0 poor, 1 weak, 2 good, 3 strong */
+  maxScore: 3,
+  note: 120,
   /** inline blocks in one reply: more than two is a dashboard */
   perReply: 2,
 } as const;
@@ -307,7 +351,47 @@ function sanitizeSequence(r: Record<string, unknown>): SequenceSpec | null {
   return { type: 'sequence', kind, ...(title ? { title } : {}), items };
 }
 
-/** Anything at all in, one of the eight canonical shapes out — or null, and nothing is drawn. */
+function sanitizePaths(r: Record<string, unknown>): PathsSpec | null {
+  const items: PathsSpec['items'] = [];
+  for (const it of (Array.isArray(r.items) ? r.items : []).slice(0, L.paths + 2)) {
+    const o = typeof it === 'string' ? { label: it } : it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
+    const label = line(o?.label, L.pathLabel).replace(/[.:;,]+$/, '');
+    if (!label || items.some((x) => x.label.toLowerCase() === label.toLowerCase())) continue;
+    const gist = line(o?.gist, L.pathGist);
+    items.push({ label, ...(gist && gist.toLowerCase() !== label.toLowerCase() ? { gist } : {}) });
+    if (items.length === L.paths) break;
+  }
+  if (items.length < 2) return null;
+  const title = line(r.title, L.title);
+  return { type: 'paths', ...(title ? { title } : {}), items };
+}
+
+/** A reading on the 0–3 scale, or null: a whole number, a half rounded away, nothing outside it clamped into it. */
+function score(v: unknown): number | null {
+  if (!fin(v) || v < 0 || v > L.maxScore) return null;
+  return Math.round(v);
+}
+
+function sanitizeDecide(r: Record<string, unknown>): DecideSpec | null {
+  const options = (Array.isArray(r.options) ? r.options : []).slice(0, L.decideOptions).map((v) => line(v, L.label));
+  if (options.length < 2 || options.some((v) => !v) || new Set(options.map((v) => v.toLowerCase())).size !== options.length) return null;
+  const rows: DecideSpec['rows'] = [];
+  for (const row of (Array.isArray(r.rows) ? r.rows : []).slice(0, L.decideRows)) {
+    const o = row && typeof row === 'object' ? (row as Record<string, unknown>) : null;
+    const label = line(o?.label, L.label);
+    const scores = Array.isArray(o?.scores) ? (o!.scores as unknown[]).slice(0, options.length).map(score) : [];
+    if (!label || scores.length !== options.length || scores.some((v) => v === null) || rows.some((x) => x.label.toLowerCase() === label.toLowerCase())) continue;
+    const note = line(o!.note, L.note);
+    rows.push({ label, scores: scores as number[], ...(note ? { note } : {}) });
+  }
+  // one thing to weigh is not a framework; it is a sentence
+  if (rows.length < 2) return null;
+  const title = line(r.title, L.title);
+  // `weights` is theirs to set: whatever a reply wrote there is not read
+  return { type: 'decide', ...(title ? { title } : {}), options, rows };
+}
+
+/** Anything at all in, one of the ten canonical shapes out — or null, and nothing is drawn. */
 export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
@@ -328,6 +412,10 @@ export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
       return sanitizeConcepts(r);
     case 'sequence':
       return sanitizeSequence(r);
+    case 'paths':
+      return sanitizePaths(r);
+    case 'decide':
+      return sanitizeDecide(r);
     default:
       return null;
   }
@@ -490,6 +578,13 @@ export function inlinePlainText(spec: InlineSpec): string {
       return [spec.title ?? '', ...spec.items.map((x) => `${x.name}: ${x.gist}${x.detail ? ` ${x.detail}` : ''}${x.links ? ` (connects to ${x.links.join(', ')})` : ''}`)].filter(Boolean).join('\n');
     case 'sequence':
       return [spec.title ?? '', ...spec.items.map((x, i) => `${spec.kind === 'timeline' ? x.when : i + 1}${spec.kind === 'timeline' ? ':' : '.'} ${x.label}${x.detail ? ` — ${x.detail}` : ''}`)].filter(Boolean).join('\n');
+    case 'paths':
+      return [spec.title ?? 'Where it could go next', ...spec.items.map((x) => `- ${x.label}${x.gist ? ` — ${x.gist}` : ''}`)].join('\n');
+    case 'decide':
+      return [
+        spec.title ?? `Deciding: ${spec.options.join(' or ')}`,
+        ...spec.rows.map((r, ri) => `${r.label}${spec.weights ? ` (matters ${spec.weights[ri] ?? 2}/3)` : ''}: ${r.scores.map((v, i) => `${spec.options[i]} ${v}/3`).join(', ')}${r.note ? ` — ${r.note}` : ''}`),
+      ].join('\n');
   }
 }
 
@@ -547,6 +642,10 @@ export interface InlineState {
   done?: number[];
   /** the artifact it was opened as, in this line of thinking's workspace — pressed again, that opens */
   artifact?: string;
+  /** a decision's weights as they set them, one per thing it rests on (0–3) */
+  weights?: number[];
+  /** a decision's readings as they changed them: [row][option], 0–3 */
+  scores?: number[][];
 }
 
 /** One block's state, cleaned; null when nothing usable is left. */
@@ -572,6 +671,14 @@ export function sanitizeInlineStateOne(raw: unknown): InlineState | null {
   }
   // an object id as lib/objects/core.ts keeps them
   if (typeof r.artifact === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(r.artifact)) out.artifact = r.artifact;
+  if (Array.isArray(r.weights)) {
+    const weights = r.weights.slice(0, L.decideRows).map(score);
+    if (weights.length && weights.every((v) => v !== null)) out.weights = weights as number[];
+  }
+  if (Array.isArray(r.scores)) {
+    const rows = r.scores.slice(0, L.decideRows).map((row) => (Array.isArray(row) ? row.slice(0, L.decideOptions).map(score) : []));
+    if (rows.length && rows.every((row) => row.length >= 2 && row.every((v) => v !== null))) out.scores = rows as number[][];
+  }
   return Object.keys(out).length ? out : null;
 }
 
@@ -587,6 +694,54 @@ export function sanitizeInlineState(raw: unknown): Record<string, InlineState> |
   return Object.keys(out).length ? out : undefined;
 }
 
+
+// ── going deeper, and a decision weighed ─────────────────────────────
+
+/**
+ * What opening a way deeper says, as their next message: plain words in their
+ * voice, which the planner reads as a request to go deeper on that thread
+ * (lib/runtime/presentation.ts) — the conversation comes with it.
+ */
+export const pathAsk = (item: { label: string }): string => `Go deeper: ${item.label}`;
+
+/** How much a thing matters (0–3), and a reading of an option on it (0–3), in words. */
+export const WEIGHT_SAID = ['doesn’t count', 'matters a little', 'matters', 'matters most'] as const;
+export const SCORE_SAID = ['poor', 'weak', 'good', 'strong'] as const;
+
+/** The arithmetic of a decision as they have weighed it: totals, who leads, and what puts them there. Pure. */
+export function decideTally(spec: DecideSpec, state?: InlineState) {
+  const weights = spec.rows.map((_r, ri) => state?.weights?.[ri] ?? 2);
+  const scores = spec.rows.map((r, ri) => r.scores.map((v, oi) => state?.scores?.[ri]?.[oi] ?? v));
+  const totals = spec.options.map((_o, oi) => spec.rows.reduce((t, _r, ri) => t + weights[ri] * scores[ri][oi], 0));
+  const most = spec.rows.reduce((t, _r, ri) => t + weights[ri] * 3, 0);
+  const top = Math.max(...totals);
+  const leaders = totals.map((t, i) => (t === top ? i : -1)).filter((i) => i >= 0);
+  let driver: number | null = null;
+  if (most > 0 && leaders.length === 1) {
+    const lead = leaders[0];
+    const next = totals.map((t, i) => (i === lead ? -1 : t)).reduce((b, t, i, a) => (t > a[b] ? i : b), lead === 0 ? 1 : 0);
+    let best = 0;
+    spec.rows.forEach((_r, ri) => {
+      const pull = weights[ri] * (scores[ri][lead] - scores[ri][next]);
+      if (pull > best) {
+        best = pull;
+        driver = ri;
+      }
+    });
+  }
+  return { weights, scores, totals, most, leaders, driver: driver as number | null, weighed: !!state?.weights };
+}
+
+/** The leaning, said: arithmetic on their weights, never a verdict. */
+export function decideLeaning(spec: DecideSpec, t: ReturnType<typeof decideTally>): string {
+  if (t.most === 0) return 'Give at least one thing some weight to see where it leans.';
+  const how = t.weighed ? 'With your weights' : 'Weighted evenly';
+  if (t.leaders.length > 1) return `${how}, it’s even between ${t.leaders.map((i) => spec.options[i]).join(' and ')}.`;
+  const lead = spec.options[t.leaders[0]];
+  const why = t.driver !== null ? ` — mostly on ${spec.rows[t.driver].label.charAt(0).toLowerCase()}${spec.rows[t.driver].label.slice(1)}` : '';
+  return `${how}, ${lead} comes out ahead${why}.${t.weighed ? '' : ' Say what matters more and it may change.'}`;
+}
+
 // ── into the Artifacts view ──────────────────────────────────────────
 
 export type InlineArtifact = { kind: 'data'; state: Record<string, unknown> } | { kind: 'compare'; state: Record<string, unknown> };
@@ -598,8 +753,11 @@ export type InlineArtifact = { kind: 'data'; state: Record<string, unknown> } | 
  * a score nobody gave stays empty (lib/objects/display-compare.ts). Null for the
  * kinds that have no larger form there: a slider is already the calculator
  * (Artifacts has no view of a lone function with its parameters), and
- * reasoning, choices, a draft, an overview and a sequence belong to the reply
- * they are in (an overview's larger form is the Logic Map, asked for in words).
+ * reasoning, choices, a draft, an overview, a sequence and the ways deeper
+ * belong to the reply they are in (an overview's larger form is the Logic Map,
+ * asked for in words). A decision weighed opens as a comparison with its
+ * scores and THEIR weights — on the comparison's 0–10 scale, each marked as
+ * whose it is — so the ranking and the sensitivity view can take it further.
  */
 export function artifactFromSpec(spec: InlineSpec): InlineArtifact | null {
   if (spec.type === 'chart') {
@@ -615,6 +773,14 @@ export function artifactFromSpec(spec: InlineSpec): InlineArtifact | null {
     const criteria = spec.rows.map((r, i) => ({ id: `c${i + 1}`, name: r.label }));
     const scores = spec.rows.flatMap((r, ci) => r.values.map((note, oi) => ({ option: `o${oi + 1}`, criterion: `c${ci + 1}`, value: null, note })).filter((s) => s.note));
     return { kind: 'compare', state: { title: spec.title ?? 'Comparison', options, criteria, scores, view: 'matrix' } };
+  }
+  if (spec.type === 'decide') {
+    // 0–3 onto the comparison's 0–10: 0, 3, 7, 10
+    const ten = (v: number) => Math.round((v * 10) / 3);
+    const options = spec.options.map((name, i) => ({ id: `o${i + 1}`, name }));
+    const criteria = spec.rows.map((r, i) => ({ id: `c${i + 1}`, name: r.label, weight: ten(spec.weights?.[i] ?? 2), by: spec.weights ? 'person' : 'socria' }));
+    const scores = spec.rows.flatMap((r, ci) => r.scores.map((v, oi) => ({ option: `o${oi + 1}`, criterion: `c${ci + 1}`, value: ten(v), by: r.theirs?.includes(oi) ? 'person' : 'socria' })));
+    return { kind: 'compare', state: { title: spec.title ?? 'Decision', options, criteria, scores, view: 'ranking' } };
   }
   return null;
 }

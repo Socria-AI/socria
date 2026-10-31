@@ -135,3 +135,16 @@ JavaScript the form posts the email straight onto the list.
 The sitemap, robots.txt and llms.txt are unchanged on purpose. The redirects
 are temporary (307), so search engines keep the pages for when the site comes
 back.
+
+## Where it runs (October 31, 2026)
+
+Unset, `SOCRIA_TAKEOVER` now means **the production deployment only**
+(`VERCEL_ENV=production`, lib/takeover.ts `takeoverOn`). Every preview — the
+`dev` branch's included — and a local run show the whole site again: the
+landing page at `/`, `/one`, `/charter`, `/docs` and every other page, exactly
+as before the relaunch. Production is unchanged: the public site there is still
+the one page.
+
+`SOCRIA_TAKEOVER` set still decides everywhere: `on` (or 1/true/yes) runs the
+campaign on a preview too; `off` (or 0/false/no) ends it on production. Ending
+the campaign is still one variable and a redeploy.

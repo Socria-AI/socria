@@ -28,6 +28,8 @@
   --ln-ink: var(--lg-ink, #23241f);
   --ln-ink-60: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
   --ln-ink-40: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+  /* small secondary words that still read at AA on every ground */
+  --ln-ink-70: color-mix(in srgb, var(--ln-ink) 72%, transparent);
   --ln-primary: var(--lg-primary, #354620);
   --ln-ground: var(--lg-paper, #f5f3eb);
   position: relative;
@@ -813,6 +815,237 @@ html[data-theme="night"] .logos-root .ln-options {
   cursor: pointer;
 }
 
+/* ── ways deeper ──────────────────────────────────────────────────── */
+
+/* Not a card: a quiet, hairline-ruled list under the reply — where the
+   thinking could go next, each way its name in the serif and a line on what
+   opening it gives. The whole row is the button. */
+.logos-root .ln.ln-paths,
+html[data-theme="night"] .logos-root .ln.ln-paths {
+  margin: 1.15em 0 0.3em;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+}
+.logos-root .ln .ln-paths-h {
+  margin: 0 0 7px;
+  font-size: 11.5px;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-paths-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  border-top: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-paths-list > li {
+  margin: 0;
+  border-bottom: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-path {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  column-gap: 16px;
+  align-items: center;
+  width: 100%;
+  padding: 11px 2px 12px 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .ln .ln-path.is-still {
+  cursor: default;
+}
+.logos-root .ln .ln-path-l {
+  grid-column: 1;
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 17.5px;
+  line-height: 1.25;
+  color: var(--ln-ink);
+  transition: color 0.15s;
+}
+.logos-root .ln .ln-path-g {
+  grid-column: 1;
+  margin-top: 2px;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-path-go {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  font-size: 15px;
+  color: var(--ln-ink-40);
+  transition: color 0.15s, transform 0.15s;
+}
+.logos-root .ln button.ln-path:hover .ln-path-l,
+.logos-root .ln button.ln-path:hover .ln-path-go {
+  color: var(--ln-primary);
+}
+.logos-root .ln button.ln-path:hover .ln-path-go {
+  transform: translateX(2px);
+}
+.logos-root .ln button.ln-path:focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.logos-root .ln .ln-paths-list > li.is-done .ln-path-l {
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-paths-list > li.is-done .ln-path-go {
+  font-size: 11.5px;
+  letter-spacing: 0.02em;
+  color: var(--ln-ink-70);
+}
+
+/* ── a decision, weighed by them ──────────────────────────────────── */
+
+.logos-root .ln .ln-decide-t thead th {
+  text-align: center;
+}
+.logos-root .ln .ln-decide-t thead th.is-lead {
+  color: var(--ln-primary);
+}
+.logos-root .ln .ln-decide-t .ln-decide-k {
+  vertical-align: bottom;
+}
+.logos-root .ln .ln-decide-t td {
+  text-align: center;
+  vertical-align: middle;
+}
+.logos-root .ln .ln-decide-t tbody th {
+  min-width: 9.5em;
+  color: var(--ln-ink);
+  font-weight: 500;
+}
+.logos-root .ln .ln-decide-l {
+  display: block;
+}
+.logos-root .ln .ln-decide-note {
+  display: block;
+  margin-top: 1px;
+  font-size: 12px;
+  font-weight: 400;
+  line-height: 1.4;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-weight {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 26px;
+  margin-top: 5px;
+  padding: 0 9px 0 7px;
+  border: 1px solid var(--ln-hair);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ln-ink-70);
+  font: inherit;
+  font-size: 11.5px;
+  font-weight: 400;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.15s, border-color 0.15s;
+}
+.logos-root .ln .ln-weight:hover {
+  border-color: rgba(var(--ln-tint), 0.32);
+  color: var(--ln-ink);
+}
+.logos-root .ln .ln-rate {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 44px;
+  min-height: 32px;
+  padding: 0 6px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  cursor: pointer;
+  transition: background-color 0.15s;
+}
+.logos-root .ln .ln-rate:hover {
+  background: rgba(var(--ln-tint), 0.06);
+}
+/* a reading they changed: theirs, and marked as theirs */
+.logos-root .ln .ln-rate.is-theirs {
+  outline: 1px dashed rgba(var(--ln-tint), 0.5);
+  outline-offset: -3px;
+}
+.logos-root .ln :is(.ln-weight, .ln-rate):focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+}
+.logos-root .ln .ln-dots {
+  display: inline-flex;
+  gap: 3px;
+}
+.logos-root .ln .ln-dots i {
+  width: 7px;
+  height: 7px;
+  box-sizing: border-box;
+  border: 1.25px solid var(--ln-ink-40);
+  border-radius: 50%;
+}
+.logos-root .ln .ln-dots i.is-on {
+  border-color: var(--ln-primary);
+  background: var(--ln-primary);
+}
+.logos-root .ln .ln-weight .ln-dots i {
+  width: 6px;
+  height: 6px;
+}
+/* a thing they said doesn't count: struck through, still legible; its readings recede */
+.logos-root .ln .ln-decide-t tr.is-off .ln-decide-l {
+  color: var(--ln-ink-70);
+  text-decoration: line-through;
+  text-decoration-color: var(--ln-ink-40);
+}
+.logos-root .ln .ln-decide-t tr.is-off .ln-rate {
+  opacity: 0.45;
+}
+.logos-root .ln .ln-decide-t tfoot :is(th, td) {
+  padding-top: 10px;
+  border-top: 1px solid var(--ln-hair);
+  border-bottom: 0;
+}
+.logos-root .ln .ln-decide-bar {
+  display: block;
+  max-width: 84px;
+  height: 5px;
+  margin: 0 auto;
+  overflow: hidden;
+  border-radius: 3px;
+  background: rgba(var(--ln-tint), 0.1);
+}
+.logos-root .ln .ln-decide-bar > i {
+  display: block;
+  height: 100%;
+  border-radius: 3px;
+  background: var(--ln-ink-40);
+  transition: width 0.2s;
+}
+.logos-root .ln .ln-decide-bar.is-lead > i {
+  background: var(--ln-primary);
+}
+.logos-root .ln .ln-decide-lean {
+  margin: 10px 0 0;
+  font-family: var(--l5-serif, Georgia, serif);
+  font-style: italic;
+  font-size: 16.5px;
+  line-height: 1.4;
+  color: var(--ln-ink);
+}
+
 /* ── a phone ──────────────────────────────────────────────────────── */
 
 @media (max-width: 560px) {
@@ -871,6 +1104,39 @@ html[data-theme="night"] .logos-root .ln-options {
   .logos-root .ln .ln-result-v {
     font-size: 24px;
   }
+  .logos-root .ln.ln-paths {
+    padding: 0;
+  }
+  .logos-root .ln .ln-path {
+    min-height: 48px;
+  }
+  /* a decision on a phone: the options' names wrap rather than push the table sideways */
+  .logos-root .ln .ln-decide-t {
+    min-width: 0;
+  }
+  .logos-root .ln .ln-decide-t :is(th, td) {
+    padding: 7px 5px;
+  }
+  .logos-root .ln .ln-decide-t thead th {
+    white-space: normal;
+    font-size: 12.5px;
+    line-height: 1.3;
+    vertical-align: bottom;
+  }
+  .logos-root .ln .ln-decide-t tbody th {
+    min-width: 0;
+    width: 48%;
+  }
+  .logos-root .ln .ln-decide-note {
+    font-size: 11.5px;
+  }
+  .logos-root .ln .ln-rate {
+    min-width: 40px;
+    min-height: 40px;
+  }
+  .logos-root .ln .ln-weight {
+    min-height: 32px;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -888,5 +1154,10 @@ html[data-theme="night"] .logos-root .ln-options {
   }
   .logos-root .ln .ln-line {
     stroke: CanvasText;
+  }
+  .logos-root .ln .ln-dots i.is-on,
+  .logos-root .ln .ln-decide-bar > i {
+    background: CanvasText;
+    border-color: CanvasText;
   }
 }
