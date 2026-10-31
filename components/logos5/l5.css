@@ -1063,6 +1063,30 @@
   color: var(--l5-no-ink);
   font-size: 14px;
 }
+/* send it again, from the sentence that said it failed */
+.logos-root .l5-error-retry {
+  display: inline-flex;
+  align-items: center;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  vertical-align: baseline;
+}
+.logos-root .l5-error-retry:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .logos-root .l5-error-retry:hover {
+    background: rgba(var(--l5-no-rgb), 0.08);
+  }
+}
 .logos-root .l5-empty {
   margin: 0;
   font-size: 14px;
@@ -1471,6 +1495,12 @@
     width: 44px;
     height: 44px;
   }
+  /* Make and the length dial were 32px tall in a row of 44px buttons */
+  .logos-root .l5-ctools .mp-btn {
+    height: 44px;
+    min-width: 44px;
+    justify-content: center;
+  }
   .logos-root .l5-hello {
     padding-top: 2vh;
   }
@@ -1626,6 +1656,9 @@
   display: inline-flex;
   gap: 3px;
 }
+.logos-root .l5-guestmeter-s {
+  display: none;
+}
 .logos-root .l5-guestmeter-dots i {
   width: 6px;
   height: 6px;
@@ -1668,14 +1701,24 @@
   outline-offset: 2px;
 }
 @media (max-width: 600px) {
-  .logos-root .l5-guestmeter-l {
+  .logos-root .l5-guestmeter-l,
+  .logos-root .l5-guestmeter-dots {
     display: none;
   }
+  .logos-root .l5-guestmeter-s {
+    display: inline;
+    font-size: 13px;
+    white-space: nowrap;
+  }
   .logos-root .l5-guestmeter {
-    padding: 0 9px;
+    padding: 0 11px;
   }
   .logos-root .l5-signin {
-    padding: 0 13px;
+    height: 40px;
+    padding: 0 14px;
+  }
+  .logos-root .l5-guestmeter {
+    height: 40px;
   }
 }
 
@@ -1706,6 +1749,26 @@
   from {
     opacity: 0;
     transform: translate(-50%, 14px) scale(0.98);
+  }
+}
+/* in the conversation's dock: part of the column above the box, a hairline
+   card like the dock's other notes, and nothing beneath it is hidden */
+.logos-root .l5-guestnudge.is-inline {
+  position: relative;
+  left: auto;
+  bottom: auto;
+  z-index: auto;
+  width: auto;
+  max-width: none;
+  margin: 0 0 8px;
+  box-shadow: none;
+  transform: none;
+  animation: l5-guestnudge-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both;
+}
+@keyframes l5-guestnudge-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
   }
 }
 .logos-root .l5-guestnudge-spark {

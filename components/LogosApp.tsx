@@ -84,6 +84,7 @@ import { nthBucket } from '@/lib/analytics';
 import {
   FIRST_MAP_KEY,
   FIRST_MAP_NOTE,
+  FIRST_MAP_NOTE_ELSEWHERE,
   openingsFor,
   firstMapCrossed,
   openingValue,
@@ -127,7 +128,7 @@ import { normalizeDraft, storedFrom } from '@/lib/write/parse';
 import { describeWriting, type WriteSel } from '@/lib/write/focus';
 import type { AssistInput, AssistResult } from '@/lib/write/assist';
 import { boundaryNote, DIRECT_UPLOAD_BYTES, limitsFor, type Counter } from '@/lib/entitlements';
-import { failureText } from '@/lib/upstream-error';
+import { failureText, sendFailure } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import {
   activeDoc,
@@ -588,6 +589,11 @@ export function LogosApp({
   busyRef.current = busy;
   const [mapping, setMapping] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  /** the error is a message that failed and is back in the box: it can be sent again from the error itself */
+  const [retryable, setRetryable] = useState(false);
+  useEffect(() => {
+    if (!error) setRetryable(false);
+  }, [error]);
 
   // What the last extraction actually reorganized, so it can be seen happening.
   const [changed, setChanged] = useState<Set<string>>(new Set());
@@ -1263,6 +1269,8 @@ export function LogosApp({
   // whoever scrolled up to read is left where they are.
   const threadRef = useRef<HTMLDivElement>(null);
   const atEndRef = useRef(true);
+  /** where the thread was scrolled to at the last scroll event — which way a scroll went */
+  const lastTopRef = useRef(0);
   useEffect(() => {
     const t = threadRef.current;
     if (t) t.scrollTop = t.scrollHeight;
@@ -1272,6 +1280,40 @@ export function LogosApp({
     const t = threadRef.current;
     if (t && atEndRef.current) t.scrollTop = t.scrollHeight;
   }, [streaming, busy]);
+  // THE END OF THE CONVERSATION STAYS IN VIEW for someone who is at it, whatever
+  // changes size. Messages and streaming were followed; nothing else was. A note
+  // that arrives after the reply (the map's share note, "This one was on us"),
+  // a picture that finishes loading, the dock above the box growing — a reply
+  // chip, a note, Voice's panel, the box itself as it is typed in — each left
+  // the newest words below the fold behind "↓ Latest". Someone who scrolled up
+  // to read is left where they are (atEndRef).
+  //
+  // And "↓ Latest" is placed just above the dock from --l5-dock-h, which
+  // nothing ever set: it sat at a fixed 130px and landed on the dock whenever
+  // the dock was taller.
+  const pinObserver = useRef<ResizeObserver | null>(null);
+  const pinRef = useCallback((el: HTMLDivElement | null) => {
+    // One observer for everything watched: React attaches a new element before
+    // it detaches the old one, so a ref that disconnected on null took the new
+    // element's observer with it. An element gone from the page is let go here.
+    if (!el || typeof ResizeObserver !== 'function') return;
+    pinObserver.current ??= new ResizeObserver((entries) => {
+      for (const e of entries) {
+        const watched = e.target as HTMLElement;
+        if (!watched.isConnected) {
+          pinObserver.current?.unobserve(watched);
+          continue;
+        }
+        if (watched.classList.contains('l5-dock')) {
+          watched.parentElement?.style.setProperty('--l5-dock-h', `${Math.round(watched.getBoundingClientRect().height)}px`);
+        }
+      }
+      const t = threadRef.current;
+      if (t && atEndRef.current) t.scrollTop = t.scrollHeight;
+    });
+    pinObserver.current.observe(el);
+  }, []);
+  useEffect(() => () => pinObserver.current?.disconnect(), []);
   // INSTANT RESUME: a line of thinking opens where its thread was left — the
   // message that was at the top, as far into it as it was — or at its end.
   // Opening one with as many messages as the last no longer keeps the last
@@ -1963,9 +2005,21 @@ export function LogosApp({
       if (!id) return;
       const current = sessionsRef.current.find((s) => s.id === id);
       if (!current) return;
-      const updated = { ...fn(current), updatedAt: Date.now() };
+      const next = fn(current);
+      const updated = { ...next, updatedAt: Date.now() };
+      // An automatic title follows the messages it came from; a title somebody
+      // gave (a rename, the topic named after the first reply) is kept. Before,
+      // a first message that failed and was taken back left its title on an
+      // empty line of thinking.
+      const auto = current.title === UNTITLED || current.title === titleFor(current.messages);
       updated.title =
-        updated.title && updated.title !== UNTITLED ? updated.title : titleFor(updated.messages);
+        next.title !== current.title && next.title && next.title !== UNTITLED
+          ? next.title
+          : auto
+            ? titleFor(updated.messages)
+            : updated.title && updated.title !== UNTITLED
+              ? updated.title
+              : titleFor(updated.messages);
       applySessions(sessionsRef.current.map((s) => (s.id === id ? updated : s)));
       if (save) void persist(updated);
     },
@@ -4098,6 +4152,7 @@ export function LogosApp({
     cardAskRef.current = false;
     if (l5 && !fromCard) setScreen((sc) => afterSend(route, sc, narrowRef.current));
     askedMakeRef.current = route.intent === 'visual';
+    sentAtRef.current = Date.now();
     // a write-up they asked to keep is written in Content: the reply arriving says so, not the pages
     setPendingPlace(route.intent === 'reading' ? 'content' : 'chat');
 
@@ -4488,11 +4543,13 @@ export function LogosApp({
         if (!group) takeBack();
         return;
       }
+      const online = typeof navigator === 'undefined' ? true : navigator.onLine;
       if (group) {
         // Said to everyone already; only Socria's answer failed. Ask again with @socria.
-        setError(`${e?.message || 'Something went wrong.'} Your message is posted — mention @socria to ask again.`);
+        setError(`${sendFailure(e, { online, kept: false })} Your message is posted — mention @socria to ask again.`);
       } else {
-        setError(e?.message || 'Something went wrong.');
+        setError(sendFailure(e, { online }));
+        setRetryable(true);
         // The turn that never landed, taken out by its own name — whatever
         // else arrived meanwhile stays.
         patchSession(sid, (s) => ({ ...s, messages: withoutTurn(s.messages, sent) }), false);
@@ -5460,6 +5517,14 @@ export function LogosApp({
     ) : null;
   /** the turn just sent asked for something to be made: what the engine makes is shown (rule C) */
   const askedMakeRef = useRef(false);
+  // A VIEW CHOSEN BY HAND IS NOT TAKEN AWAY. Something made arrives a moment
+  // after the turn that asked for it — often after the map pass, which opening
+  // the Logic Map can start — and opening Artifacts for it then moved somebody
+  // off the view they had just picked, 700ms after they picked it. Chosen since
+  // the last message, the view stays; Artifacts gets its "new" dot instead.
+  const sentAtRef = useRef(0);
+  const handChoseRef = useRef(0);
+  const choseSinceSent = () => handChoseRef.current > sentAtRef.current;
   /** a question asked from a card's popover is read there: the screen does not move for it */
   const cardAskRef = useRef(false);
   /** the lines of thinking whose topic has been asked for a name, this visit (lib/logos5/title.ts) */
@@ -5528,6 +5593,16 @@ export function LogosApp({
   const [awayFromEnd, setAwayFromEnd] = useState(false);
   /** narrower than a desktop: the stage is a sheet over the conversation, not a column beside it */
   const [narrow, setNarrow] = useState(false);
+  /** a phone's width, where the line's header keeps only what the title can share a row with */
+  const [phone, setPhone] = useState(false);
+  useEffect(() => {
+    if (typeof window === 'undefined' || !window.matchMedia) return;
+    const mq = window.matchMedia('(max-width: 560px)');
+    const on = () => setPhone(mq.matches);
+    on();
+    mq.addEventListener?.('change', on);
+    return () => mq.removeEventListener?.('change', on);
+  }, []);
   const narrowRef = useRef(false);
   narrowRef.current = narrow;
   /** what the screen shows: on a phone, one thing at a time */
@@ -6229,7 +6304,8 @@ export function LogosApp({
         // listed, and the studio stays open to be described
         const sid = activeIdRef.current;
         if (sid) setArtSel((m) => (m[sid] === STUDIO ? m : { ...m, [sid]: `d:${displayToOpen}` }));
-        setScreen((s) => onMade(true, s, narrowRef.current));
+        if (!choseSinceSent()) setScreen((s) => onMade(true, s, narrowRef.current));
+        else if (screenRef.current.view !== 'artifacts' && screenRef.current.beside !== 'artifacts') setArtFresh(true);
         const asked = [...messages].reverse().find((m) => m.role === 'user' && m.id);
         if (asked?.id) setObjMsg((x) => (x[displayToOpen] ? x : { ...x, [displayToOpen]: asked.id! }));
       }
@@ -6272,7 +6348,8 @@ export function LogosApp({
         if (key === 'v:plot' && activeId) setMadeRec(writeMade(browserStorage(), activeId, 'plot', 'taken'));
         // a new 3D studio opened by hand stays open; what arrived is listed beside it
         setArtSel((m) => (activeId && m[activeId] !== STUDIO ? { ...m, [activeId]: key } : m));
-        setScreen((s) => onMade(true, s, narrowRef.current));
+        if (!choseSinceSent()) setScreen((s) => onMade(true, s, narrowRef.current));
+        else if (screenRef.current.view !== 'artifacts' && screenRef.current.beside !== 'artifacts') setArtFresh(true);
       } else if (docs > seen.docs && screenRef.current.view !== 'artifacts') setArtFresh(true);
     }
     // The working, and functions the map could plot, drawn in the background: offered under the reply
@@ -6693,17 +6770,38 @@ export function LogosApp({
         )}
         {firstMapNote && (
           <p className="lg-annot" role="note">
-            <span className="lg-annot-t">{FIRST_MAP_NOTE}</span>
-            <button
-              type="button"
-              className="lg-annot-act"
-              onClick={() => {
-                void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking');
-                setFirstMapNote(false);
-              }}
-            >
-              Save as image
-            </button>
+            {/* Out of view, the drawing is pointed to: offering to save a picture of a map nobody
+                has seen yet asked them to skip the thing that makes Socria different */}
+            {l5 && screen.view !== 'logic_map' && screen.beside !== 'logic_map' ? (
+              <>
+                <span className="lg-annot-t">{FIRST_MAP_NOTE_ELSEWHERE}</span>
+                <button
+                  type="button"
+                  className="lg-annot-act"
+                  onClick={() => {
+                    handChoseRef.current = Date.now();
+                    setStudyTab('logic_map');
+                    setFirstMapNote(false);
+                  }}
+                >
+                  See your Logic Map
+                </button>
+              </>
+            ) : (
+              <>
+                <span className="lg-annot-t">{FIRST_MAP_NOTE}</span>
+                <button
+                  type="button"
+                  className="lg-annot-act"
+                  onClick={() => {
+                    void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking');
+                    setFirstMapNote(false);
+                  }}
+                >
+                  Save as image
+                </button>
+              </>
+            )}
             <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => setFirstMapNote(false)}>
               ×
             </button>
@@ -7214,11 +7312,22 @@ export function LogosApp({
   // Universal Map (components/logos5/UniverseParts.tsx PreviewCard), where it
   // lives, rather than in a list brought back from here.
   const l5Menu: L5MenuItem[] = [
+    // On a phone the line's header holds the way back, the title and ⋯: a new
+    // line of thinking and search are here, so the title is not "Sh…".
+    ...(phone && activeId && !l5Home
+      ? [
+          { label: 'New line of thinking', onSelect: () => void newFromHome() },
+          { label: 'Search everything', hint: 'Conversations, content and artifacts', onSelect: () => setSearchOpen(Date.now()) },
+        ]
+      : []),
     { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
-    { label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) },
+    // a phone is never a big screen: offered where it can apply, and always where it is on to be left
+    ...(!phone || cabin
+      ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
+      : []),
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
@@ -7365,9 +7474,17 @@ export function LogosApp({
     );
   };
   const userTurns = messages.filter((m) => m.role === 'user').length;
+  // A guest using Socria a lot: the sign-up card. With the conversation on
+  // screen it sits in the dock above the box, in the flow, so it covers neither
+  // the box nor the end of the conversation; anywhere else it floats, lifted
+  // clear of whatever box is there.
+  // Out of messages, it stays — the one thing to say until they sign up — and cannot be closed.
+  const guestSpent = guest && guestUsed >= GUEST_TURNS;
+  const nudgeOpen = guest && !guestWall && !busy && (guestSpent || (!nudgeShut && guestUsed >= GUEST_NUDGE_AT));
   const l5Dock = (
-      <div className="l5-dock">
+      <div className="l5-dock" ref={pinRef}>
       {convoNotes}
+      {nudgeOpen && <GuestNudge inline open spent={guestSpent} signUpHref={signUpHref} onClose={shutNudge} />}
       {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}
       {voicePanel(false)}
       {voiceOffered && !voiceOn && <VoiceOffNote ear={ear} onOn={pressVoice} />}
@@ -7656,7 +7773,10 @@ export function LogosApp({
   const tabsEl = (
     <L5Tabs
       value={studyTab}
-      onChange={setStudyTab}
+      onChange={(t) => {
+        handChoseRef.current = Date.now();
+        setStudyTab(t);
+      }}
       counts={{
         content: contentItems.length,
         // a blank document is not something made yet
@@ -7684,6 +7804,16 @@ export function LogosApp({
         onScroll={(e) => {
           const t = e.currentTarget;
           const atEnd = t.scrollHeight - t.scrollTop - t.clientHeight < 48;
+          const wasTop = lastTopRef.current;
+          lastTopRef.current = t.scrollTop;
+          // Only scrolling UP leaves the end. The browser also fires a scroll as
+          // the conversation grows under someone already there (a note after the
+          // reply, a picture loading), and reading that as "they scrolled away"
+          // stranded the newest words below the fold behind "↓ Latest".
+          if (!atEnd && atEndRef.current && t.scrollTop >= wasTop - 1) {
+            t.scrollTop = t.scrollHeight;
+            return;
+          }
           atEndRef.current = atEnd;
           setAwayFromEnd(!atEnd);
           if (LOGOS4.resume) {
@@ -7692,7 +7822,7 @@ export function LogosApp({
           }
         }}
       >
-        <div className="l5-thread-in">
+        <div className="l5-thread-in" ref={pinRef}>
           {messages.length === 0 && !streaming && !busy && (organizing || sortPending) && (
             <L5Working
               steps={[
@@ -7832,6 +7962,21 @@ export function LogosApp({
           {error && (
             <p className="l5-error" role="alert">
               {error}
+              {retryable && !busy && (input.trim() || drafts.some((d) => d.status === 'ready')) && (
+                <>
+                  {' '}
+                  <button
+                    type="button"
+                    className="l5-error-retry"
+                    onClick={() => {
+                      setRetryable(false);
+                      sendFromStudy();
+                    }}
+                  >
+                    Try again
+                  </button>
+                </>
+              )}
             </p>
           )}
           <div ref={bottomRef} />
@@ -7967,6 +8112,8 @@ export function LogosApp({
           ))}
         </span>
         <span className="l5-guestmeter-l">{Math.max(0, GUEST_TURNS - guestUsed)} free left</span>
+        {/* a phone's meter, said in words: dots alone said nothing to anyone, a screen reader least of all */}
+        <span className="l5-guestmeter-s">{Math.max(0, GUEST_TURNS - guestUsed)} left</span>
       </span>
       <a className="l5-signin" href={signInHref}>
         Sign in
@@ -7999,8 +8146,8 @@ export function LogosApp({
     <L5TopBar
       title={[study?.state.course || projectName, active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : ''].filter(Boolean).join(' · ')}
       onHome={goHome}
-      onSearch={() => setSearchOpen(Date.now())}
-      onNew={() => void newFromHome()}
+      onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
+      onNew={phone ? undefined : () => void newFromHome()}
       split={
         !narrow && activeId ? (
           <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} chatSide={chatSideNow} onChatSide={chatSideChosen} />
@@ -8379,6 +8526,7 @@ export function LogosApp({
       )}
       {introWanted && (
         <LogosIntroOnce
+          signedIn={!!isSignedIn}
           onStart={(text) => {
             firstRun.reach('socria.intro');
             // straight through: the answer to their own question is the welcome
@@ -8599,8 +8747,9 @@ export function LogosApp({
           </div>
           {draftEl}
           {chromeEls}
-          <GuestWall open={guestWall && guest} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />
-          <GuestNudge open={guest && !guestWall && !nudgeShut && guestUsed >= GUEST_NUDGE_AT && !busy} signUpHref={signUpHref} onClose={shutNudge} />
+          <GuestWall open={guestWall && guest} spent={guest && guestUsed >= GUEST_TURNS} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />
+          {/* floating only where the conversation's dock is not on screen to hold it */}
+          <GuestNudge open={nudgeOpen && !(convoOpen && !homeShown && !mindShown)} spent={guestSpent} signUpHref={signUpHref} onClose={shutNudge} />
           {searchOpen !== null && (
             <GlobalSearch
               sessions={sessions}
@@ -8659,11 +8808,11 @@ function docAttachment(doc: SourceDoc): Attachment {
  * The first-run screen over Logos — and its own "started" event, fired once
  * per showing rather than per render.
  */
-function LogosIntroOnce({ onStart, onSkip }: { onStart: (text: string) => void; onSkip: () => void }) {
+function LogosIntroOnce({ onStart, onSkip, signedIn }: { onStart: (text: string) => void; onSkip: () => void; signedIn: boolean }) {
   useEffect(() => {
     track('socria_intro_started', { surface: 'logos' });
   }, []);
-  return <FirstRunIntro surface="logos" onStart={onStart} onSkip={onSkip} />;
+  return <FirstRunIntro surface="logos" onStart={onStart} onSkip={onSkip} signedIn={signedIn} />;
 }
 
 /** The time zone this browser is in, as it names it (America/Chicago), or nothing. */

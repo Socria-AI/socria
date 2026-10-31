@@ -301,3 +301,44 @@ export function isModelRejection(err: unknown): boolean {
     /unsupported (?:parameter|value)|is not supported with|does not support|max_completion_tokens/.test(msg)
   );
 }
+
+/**
+ * A request that never reached us: the browser's own words for it, which are
+ * the error, not an explanation — "Failed to fetch" (Chrome), "NetworkError
+ * when attempting to fetch resource." (Firefox), "Load failed" (Safari).
+ */
+export function isNetworkFailure(err: unknown): boolean {
+  const e = err as { name?: unknown; message?: unknown } | null;
+  const msg = typeof e?.message === 'string' ? e.message : '';
+  return /failed to fetch|networkerror|load failed|network request failed|fetch failed|network connection was lost/i.test(msg);
+}
+
+/** Bodies that say only that something failed — never a sentence to show as it is. */
+const BARE = /^(internal( server)? error|something went wrong\.?|error|bad gateway|service unavailable|gateway time-?out)$/i;
+
+/**
+ * What a person reads when a message could not be sent or answered.
+ *
+ * "Failed to fetch" and "Internal error" were shown as they came, which tells
+ * nobody what happened or what to do. Offline and unreachable are said as
+ * themselves; a failure with a real sentence from the server (an upstream
+ * problem, with its reference) is kept; a bare one becomes plain words. And
+ * the message they wrote is said to be safe — it is put back in the box.
+ */
+export function sendFailure(err: unknown, opts: { online?: boolean; kept?: boolean } = {}): string {
+  const kept = opts.kept !== false;
+  if (opts.online === false) {
+    return kept ? 'You look offline. Your message is back in the box — send it again once you’re connected.' : 'You look offline. Try again once you’re connected.';
+  }
+  if (isNetworkFailure(err)) {
+    return kept ? 'Socria couldn’t be reached. Your message is back in the box — try sending it again.' : 'Socria couldn’t be reached. Try again in a moment.';
+  }
+  const e = err as { message?: unknown } | null;
+  const raw = typeof e?.message === 'string' ? e.message.trim() : '';
+  // a reference the server gave is kept with whatever is said
+  const ref = raw.match(/\(ref [a-z0-9]{4,12}\)$/)?.[0] ?? '';
+  const said = ref ? raw.slice(0, -ref.length).trim() : raw;
+  const sentence = !said || BARE.test(said) ? 'Socria couldn’t answer just now.' : said;
+  const tail = kept ? ' Your message is back in the box — try sending it again.' : '';
+  return `${/[.!?]$/.test(sentence) ? sentence : `${sentence}.`}${ref ? ` ${ref}` : ''}${tail}`;
+}

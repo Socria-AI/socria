@@ -92,6 +92,13 @@ export const FIRST_MAP_KEY = 'socria.firstMap.v1';
 /** The one line at the share moment. It belongs to the drawing, not to One. */
 export const FIRST_MAP_NOTE = 'That’s your thinking, drawn. Save it as an image.';
 
+/**
+ * The same moment in Logos 5 while the map is not on screen: the drawing is in
+ * another view, so the note points to it rather than offering to save a
+ * picture nobody has seen yet. Saving it is in the ⋯ menu and on the map.
+ */
+export const FIRST_MAP_NOTE_ELSEWHERE = 'That’s your thinking, drawn — your Logic Map has its first shape.';
+
 export const OPENINGS: Opening[] = [
   {
     id: 'limit',

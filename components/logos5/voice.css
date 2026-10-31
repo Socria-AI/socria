@@ -31,19 +31,20 @@
 .logos-root .sv-btn.is-hearing svg {
   color: #c0412f;
 }
+/* Experimental, said quietly: a hairline tag in the ink's own grey. It used to
+   be a dashed tension-coloured badge, the loudest thing in the composer. */
 .logos-root .sv-exp {
   display: inline-flex;
   align-items: center;
   height: 16px;
   padding: 0 6px;
   border-radius: 999px;
-  border: 1px dashed currentColor;
+  border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
   font-size: 9.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  color: var(--lg-tension);
-  opacity: 0.9;
+  color: var(--lg-ink-60);
 }
 .logos-root .sv-exp.is-big {
   height: 18px;
@@ -506,6 +507,27 @@ html[data-theme='night'] .logos-root .sv-problem {
   }
   .logos-root .sv-exp-short {
     display: inline;
+  }
+  /* A phone's tool row holds icons. Voice is its wave, 44px like the buttons
+     beside it — its name stays in its label and its title, and "Experimental"
+     in the panel it opens. With the word and the tag beside it, the button ran
+     over the length dial at 375–414px, so pressing the dial's chevron started
+     Voice and asked for the microphone. */
+  .logos-root .l5-ctools .sv-btn {
+    width: 44px;
+    padding: 0;
+    justify-content: center;
+  }
+  .logos-root .l5-ctools .sv-btn .sv-btn-l {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .logos-root .l5-ctools .sv-btn .sv-exp {
+    display: none;
   }
   /* with Voice in the row, the length is its icon (its sheet says the rest) */
   .logos-root .l5-ctools:has(.sv-btn) .l5-concise .mp-btn .nm {

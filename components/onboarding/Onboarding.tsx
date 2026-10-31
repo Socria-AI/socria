@@ -61,6 +61,7 @@ export function Onboarding() {
     <FirstRunIntro
       surface={surface}
       defaultName={user?.firstName ?? null}
+      signedIn={!!isSignedIn}
       onStart={(text, intent) => {
         firstRun.reach('socria.intro');
         carry(typeof sessionStorage !== 'undefined' ? sessionStorage : null, {

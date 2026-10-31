@@ -57,9 +57,12 @@ export function FirstRunIntro({
   onStart,
   onSkip,
   defaultName,
+  signedIn = false,
 }: {
   /** which surface mounted it — kept for callers; the questions are the same everywhere */
   surface: 'core' | 'logos';
+  /** an account to change the answers in later; a guest has none, and is not told to look for one */
+  signedIn?: boolean;
   /** the thought, verbatim, and the starting point they picked */
   onStart: (text: string, intent: string | null) => void;
   onSkip: () => void;
@@ -232,7 +235,7 @@ export function FirstRunIntro({
               <Rise text={first ? `Good to meet you, ${first}. What do you mostly think about?` : 'What do you mostly think about?'} />
             </h1>
             <p className="ob-sub ob-fade" style={{ '--d': '.35s' } as React.CSSProperties}>
-              So the examples fit. Change it any time in Manage Account.
+              So the examples fit.{signedIn ? ' Change it any time in Manage Account.' : ''}
             </p>
             <div className="ob-roles ob-fade" style={{ '--d': '.5s' } as React.CSSProperties} role="list">
               {ROLES.map((r) => (

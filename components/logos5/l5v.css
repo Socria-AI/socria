@@ -420,6 +420,19 @@
   border-color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.24);
   box-shadow: 0 1px 2px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06), 0 8px 26px -12px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.28);
 }
+/* A phone's width goes to the box, not to padding round it. Three paddings
+   used to stack here — the dock's 16px (this file's rule outranks l5.css's
+   phone 10px), the shared .lg-composer's 22px, and the box's own — 100px of a
+   375px screen, which left the tool row too narrow for its six buttons. */
+@media (max-width: 560px) {
+  .logos-root .l5 .l5-dock {
+    padding: 6px 10px calc(10px + env(safe-area-inset-bottom, 0px));
+  }
+  .logos-root .l5 .l5-dock .lg-composer {
+    padding-left: 0;
+    padding-right: 0;
+  }
+}
 
 /* ── what is happening, truthfully ──────────────────────────────────── */
 .l5v-working {
@@ -1381,5 +1394,29 @@
   .l5v-menu-side,
   .l5v-dock-zone {
     transition: none;
+  }
+}
+
+/* a phone's header (after the tablet rules above, which it narrows): the way back, the title, ⋯ and the account — each a 44px target */
+@media (max-width: 560px) {
+  .l5v-top {
+    height: 56px;
+    gap: 8px;
+  }
+  .l5v-home {
+    flex: none;
+    width: 44px;
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    justify-content: center;
+    border-radius: 12px;
+  }
+  .l5v-title {
+    font-size: 15px;
+  }
+  .l5v-search {
+    width: 44px;
+    height: 44px;
   }
 }

@@ -109,6 +109,7 @@
   cursor: pointer;
 }
 .logos-root .l5 .l5h-find-n {
+  white-space: nowrap;
   min-width: 20px;
   padding: 0 6px;
   border-radius: 999px;
@@ -3382,14 +3383,26 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   padding: 0 6px;
   font-size: 17px;
 }
+/* One row, as the 640px rules intend: the lenses, then undo and View beside
+   them. The tools used to be pinned to the top corner, which put them on top
+   of "All" — a tap on View chose All time instead. */
+.logos-root .l5 .l5h.is-narrow .l5h-right {
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
+}
+.logos-root .l5 .l5h.is-narrow .l5h-right > .l5h-lens {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+}
 .logos-root .l5 .l5h.is-narrow .l5h-tools {
-  position: absolute;
-  top: 16px;
-  right: 14px;
+  position: static;
+  flex: none;
 }
 .logos-root .l5 .l5h.is-narrow .l5h-tools .l5h-tool {
-  height: 32px;
-  min-width: 32px;
+  height: 40px;
+  min-width: 40px;
   padding: 0 8px;
 }
 .logos-root .l5 .l5h.is-narrow .l5h-foot {

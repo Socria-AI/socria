@@ -168,7 +168,11 @@ ok('the server refuses the sixth, with the sign-up note', /if \(guest && guestTu
 ok('the app shows the note before sending a sixth', /guestUsedNow\(\) >= GUEST_TURNS \|\| guestHasAnother/.test(app));
 ok('top right, a guest sees what is left and Sign in', /const accountEl = guest \?/.test(app) && /className="l5-signin" href=\{signInHref\}/.test(app) && /free left/.test(app));
 
-ok('a guest using it a lot: the sign-up card at the bottom, from the third message, once a tab', /export const GUEST_NUDGE_AT = 3;/.test(lim) && /<GuestNudge open=\{guest && !guestWall && !nudgeShut && guestUsed >= GUEST_NUDGE_AT && !busy\}/.test(app) && /socria\.guestNudge\.v1/.test(app));
+ok('a guest using it a lot: the sign-up card, from the third message, once a tab', /export const GUEST_NUDGE_AT = 3;/.test(lim) && /const nudgeOpen = guest && !guestWall && !busy && \(guestSpent \|\| \(!nudgeShut && guestUsed >= GUEST_NUDGE_AT\)\);/.test(app) && /socria\.guestNudge\.v1/.test(app));
+ok('  in the dock above the box, in its flow, with the conversation on screen', /\{nudgeOpen && <GuestNudge inline open spent=\{guestSpent\}/.test(app));
+ok('  floating only where no dock holds it, and lifted clear of the box', /<GuestNudge open=\{nudgeOpen && !\(convoOpen && !homeShown && !mindShown\)\}/.test(app) && /function useComposerLift/.test(wall) && /'\.logos-root \.lg-composer'/.test(wall));
+ok('  messages used up: said for as long as it is true, with no close', /const guestSpent = guest && guestUsed >= GUEST_TURNS;/.test(app) && /You&rsquo;ve used your \{GUEST_TURNS\} free messages\./.test(wall) && /\{!spent && \(/.test(wall));
+ok('  and the wall, out of messages, says "Not now" rather than promising more', /\{spent \? 'Not now' : 'Keep going with this one'\}/.test(wall) && /<GuestWall open=\{guestWall && guest\} spent=\{guest && guestUsed >= GUEST_TURNS\}/.test(app));
 ok('  saying what an account really adds (no claim of speed)', /better answers and more of it/.test(wall) && /remember you/.test(wall) && !/faster/i.test(wall));
 
 console.log(`\nguest: ${pass} passed, ${fail} failed`);

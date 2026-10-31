@@ -2174,3 +2174,65 @@ Tesla user agent at 1920×1200: the dock and its one-time note, 84px places,
 reopened on its Logic Map after a reload, "Usual layout" kept off after a
 reload, the ⋯ menu turning it back on, an ordinary browser off, `?bigscreen=1`
 on.
+
+## 28. The launch UX pass: what got in the way, taken out of it
+
+A pass over Logos 5 as a guest and on a phone (1440px, and 430 / 414 / 390 /
+375 / 360px), fixing what a person actually met. Nothing was redesigned; each
+fix is the smallest change that removes the friction.
+
+**The box can always be reached.** The guest sign-up card sat a fixed 104px
+from the bottom and covered the top of the box at the third message, so a click
+meant for the box landed on the card. With the conversation on screen it is now
+part of the dock above the box, in its flow, covering nothing; elsewhere it
+floats, lifted clear of the box by its measured height
+(`components/logos5/GuestWall.tsx` `useComposerLift`). On a phone, Voice's word
+and badge ran over the length dial at 375–414px, so pressing the dial started
+Voice and asked for the microphone: on a phone Voice is now its icon, and three
+paddings that ate 100px of a 375px screen around the box are one
+(`voice.css`, `l5v.css`). Every control in the box's row is 44px on a phone.
+
+**A chosen view stays chosen.** Something made arriving after a map pass —
+which opening the Logic Map can start — moved Artifacts in front of the view
+picked 700ms earlier. A view chosen by hand since the last message now stays;
+Artifacts gets its "new" dot instead (`choseSinceSent`).
+
+**The end of the conversation stays in view** for someone at it, whatever
+changes size — a note after the reply, the dock as the box grows, a picture
+loading — and only scrolling up leaves the end. "↓ Latest" is placed above the
+dock from its measured height (`--l5-dock-h`, which nothing set before).
+
+**Failures say what happened.** "Failed to fetch" and "Internal error" were
+shown as they came. A failed message now says it plainly — offline, Socria
+could not be reached, or Socria could not answer — keeps a reference the server
+gave, says the message is back in the box, and offers Try again
+(`lib/upstream-error.ts` `sendFailure`). A first message that failed no longer
+leaves its title on an empty line of thinking: an automatic title follows its
+messages; a title someone gave is kept.
+
+**A guest's limit is honest.** Out of messages, the card in the dock says so for
+as long as it is true and cannot be closed, and the wall's way out is "Not now"
+— "Keep going with this one" promised what the next send took back.
+
+**A phone's header has room for its title.** A new line of thinking and search
+are in ⋯ on a phone, so the title is not "Sh…"; the way back is 44px; the guest
+meter is "4 left" in words rather than dots. On the Universal Map, undo and View
+sit beside the lenses instead of on top of "All". Big-screen mode is not offered
+on a phone.
+
+**A chart is readable on a phone.** `PlotFrame` draws at the width it is shown
+at when that is narrower than its design width, so a tick label stays the size
+the stylesheet gives it (it was about 5px at 290px wide).
+
+**Smaller things.** The first map's note, while the map is out of view, points
+to it ("See your Logic Map") rather than offering to save a picture nobody has
+seen. Voice's mark is a wave, so it is not a second microphone beside Hold to
+talk, and "Experimental" is a quiet hairline tag. The Universal Map box says
+how many lines of thinking match in words, and nothing at none. Secondary text
+(`--lg-ink-60`) is 4.8:1 on the paper (it was 4.1:1). Onboarding no longer tells
+a guest to look in an account they do not have.
+
+**Checked.** `test/ux-polish.test.mjs` (36) and the guest suite's checks of the
+card and wall; in the browser (`.journeys/uxfix`), each fix before and after —
+including a control run with the view guard switched off, in which choosing the
+Logic Map still ended on Artifacts.

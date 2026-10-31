@@ -10,7 +10,7 @@
 // in words, which a chart without cannot be read by. It draws nothing of its
 // own beyond the axes, and computes nothing.
 
-import type { ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 
 export interface Tick {
   /** where along the axis, 0..1 */
@@ -55,10 +55,32 @@ export function PlotFrame({
   children: (p: Plot) => ReactNode;
   pad?: { l: number; r: number; t: number; b: number };
 }) {
+  // DRAWN AT THE WIDTH IT IS SHOWN AT, when that is narrower than the design.
+  // The drawing used to keep its 560-wide viewBox and be scaled to fit, which
+  // scaled its words with it: on a phone a tick label of 10.5 came out about
+  // 5px tall. Narrower, the frame is drawn at the width it actually has — the
+  // kinds place everything as fractions through px/py, so nothing else changes
+  // — and the words stay the size the stylesheet gives them. Wider, it scales
+  // up as before.
+  const ref = useRef<SVGSVGElement>(null);
+  const [fit, setFit] = useState<number | null>(null);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el || typeof ResizeObserver !== 'function') return;
+    const ro = new ResizeObserver(() => {
+      const w = Math.round(el.getBoundingClientRect().width);
+      setFit(w > 0 && w < width ? Math.max(240, w) : null);
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [width]);
+  const W = fit ?? width;
+  // a narrower drawing keeps enough height to read: never squashed below 200
+  const H = fit ? Math.round(Math.min(height, Math.max(200, (height * fit) / width + 48))) : height;
   const left = pad.l;
-  const right = width - pad.r;
+  const right = W - pad.r;
   const top = pad.t;
-  const bottom = height - pad.b;
+  const bottom = H - pad.b;
   const p: Plot = {
     px: (f) => left + f * (right - left),
     py: (f) => bottom - f * (bottom - top),
@@ -69,7 +91,7 @@ export function PlotFrame({
   };
   const clamp = (f: number) => Math.min(1, Math.max(0, f));
   return (
-    <svg className="dsp-plot" viewBox={`0 0 ${width} ${height}`} role="img" aria-label={label} preserveAspectRatio="xMidYMid meet">
+    <svg ref={ref} className="dsp-plot" viewBox={`0 0 ${W} ${H}`} role="img" aria-label={label} preserveAspectRatio="xMidYMid meet">
       <g className="dsp-plot-grid" aria-hidden="true">
         {yTicks.map((t, i) => (
           <line key={`gy${i}`} x1={left} x2={right} y1={p.py(clamp(t.at))} y2={p.py(clamp(t.at))} />
@@ -97,7 +119,7 @@ export function PlotFrame({
       {(xTitle || yTitle) && (
         <g className="dsp-plot-titles" aria-hidden="true">
           {xTitle && (
-            <text x={(left + right) / 2} y={height - 6} textAnchor="middle">
+            <text x={(left + right) / 2} y={H - 6} textAnchor="middle">
               {xTitle}
             </text>
           )}

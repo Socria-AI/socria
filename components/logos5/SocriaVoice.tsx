@@ -39,6 +39,20 @@ function Mic({ size = 16 }: { size?: number }) {
   );
 }
 
+/**
+ * Voice's own mark: a sound wave, not a microphone. Hold to talk sits beside it
+ * with the microphone, and two identical microphones side by side asked which
+ * one was which; the wave says "a conversation out loud", the microphone
+ * "dictate into the box".
+ */
+function Wave({ size = 16 }: { size?: number }) {
+  return (
+    <svg viewBox="0 0 24 24" width={size} height={size} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 10v4M8 6.5v11M12 3.5v17M16 6.5v11M20 10v4" />
+    </svg>
+  );
+}
+
 /** "Voice", marked Experimental, beside the box. On while Voice is listening or paused. */
 export function VoiceButton({ ear, onPress }: { ear: Ear | null; onPress: () => void }) {
   return <VoiceButtonView phase={useEar(ear, (s) => s.phase)} onPress={onPress} />;
@@ -56,7 +70,7 @@ export function VoiceButtonView({ phase, onPress }: { phase: EarState['phase']; 
       aria-label={on ? 'Socria Voice (experimental) is on — turn it off' : 'Socria Voice (experimental) — talk instead of typing'}
       title={on ? 'Socria Voice is on — press to turn it off' : 'Socria Voice — talk instead of typing'}
     >
-      <Mic />
+      <Wave />
       <span className="sv-btn-l">Voice</span>
       <span className="sv-exp" aria-hidden="true">
         <span className="sv-exp-long">Experimental</span>

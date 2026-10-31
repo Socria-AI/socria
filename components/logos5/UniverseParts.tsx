@@ -588,7 +588,13 @@ export function FindOrStart({
           }}
           style={{ fontSize: 16 }}
         />
-        {q && !files.length && <span className="l5h-find-n">{found.length}</span>}
+        {/* how many lines of thinking match, said in words — a bare "0" beside a box that also
+            starts something new read as an error; with none found, the offer above says what Enter does */}
+        {q && !files.length && found.length > 0 && (
+          <span className="l5h-find-n" title="Lines of thinking on the map that match">
+            {found.length} found
+          </span>
+        )}
         {query && (
           <button
             type="button"

@@ -32,7 +32,8 @@ export function L5TopBar({
 }: {
   title: string;
   onHome: () => void;
-  onSearch: () => void;
+  /** search, here — absent on a phone, where it is in the ⋯ menu so the title has room */
+  onSearch?: () => void;
   onNew?: () => void;
   /** Split View — desktop only */
   split?: ReactNode;
@@ -64,14 +65,16 @@ export function L5TopBar({
         )}
       </div>
       <div className="l5v-top-c">
-        <button type="button" className="l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K">
-          <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-            <circle cx="11" cy="11" r="6.5" />
-            <path d="M20 20l-4.2-4.2" />
-          </svg>
-          {!narrow && <span className="l5v-search-l">Search conversations, content, artifacts…</span>}
-          {!narrow && <kbd className="l5v-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
-        </button>
+        {onSearch && (
+          <button type="button" className="l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="M20 20l-4.2-4.2" />
+            </svg>
+            {!narrow && <span className="l5v-search-l">Search conversations, content, artifacts…</span>}
+            {!narrow && <kbd className="l5v-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
+          </button>
+        )}
       </div>
       <div className="l5v-top-r">
         {split}
