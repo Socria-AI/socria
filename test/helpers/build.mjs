@@ -345,6 +345,8 @@ const MODULES = [
   'test/helpers/campaign-under-test.tsx',
   // an easy view: a photo of small print, read, kept, drawn large and clear; the sheet; Make's card
   'test/helpers/easy-under-test.tsx',
+  // big-screen mode: a car's centre screen, parked, or any large touchscreen — when it is on, and its dock
+  'test/helpers/cabin-under-test.tsx',
 ];
 
 export async function buildAll() {

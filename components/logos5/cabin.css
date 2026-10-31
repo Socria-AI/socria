@@ -1,0 +1,277 @@
+/* components/logos5/cabin.css — BIG-SCREEN MODE: Logos on a car's centre screen, parked, or any large touchscreen.
+ *
+ * The brand book, for a finger at arm's length: the dock on the paper's
+ * second tone with a hairline, places 92px with a word under each drawing,
+ * the one you are in held in moss; and across the app every control at least
+ * 56px, the words a size up, the composer voice-first. The app moves right by
+ * the dock's width; nothing else about it changes. */
+
+.cab-dock {
+  position: fixed;
+  left: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 60;
+  width: 112px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: calc(18px + env(safe-area-inset-top, 0px)) 0 18px;
+  background: #eeebe0;
+  border-right: 1px solid rgba(35, 36, 31, 0.1);
+  color: #23241f;
+  font-family: var(--lg-sans, var(--sans, system-ui, sans-serif));
+}
+.cab-brand {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 2px;
+}
+.cab-brand img {
+  width: 40px;
+  height: auto;
+  opacity: 0.9;
+}
+.cab-brand span {
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 19px;
+}
+.cab-places {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 22px;
+  overflow-y: auto;
+  scrollbar-width: none;
+}
+.cab-place {
+  width: 92px;
+  min-height: 84px;
+  padding: 10px 4px 9px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  border: 0;
+  border-radius: 22px;
+  background: none;
+  color: rgba(35, 36, 31, 0.66);
+  font: inherit;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition:
+    background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.cab-place svg {
+  width: 30px;
+  height: 30px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.7;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.cab-place.is-on {
+  background: rgba(53, 70, 32, 0.11);
+  color: #354620;
+  font-weight: 600;
+}
+.cab-place:disabled {
+  opacity: 0.32;
+  cursor: default;
+}
+.cab-place:focus-visible,
+.cab-leave:focus-visible,
+.cab-note button:focus-visible {
+  outline: 3px solid #354620;
+  outline-offset: 2px;
+}
+@media (hover: hover) {
+  .cab-place:not(:disabled):not(.is-on):hover {
+    background: rgba(35, 36, 31, 0.05);
+    color: #23241f;
+  }
+}
+.cab-rule {
+  display: block;
+  width: 40px;
+  height: 1px;
+  margin: 6px auto;
+  background: rgba(35, 36, 31, 0.14);
+}
+.cab-leave {
+  margin-top: auto;
+  min-height: 48px;
+  padding: 6px 8px;
+  border: 0;
+  background: none;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.15;
+  color: #354620;
+  text-decoration: underline;
+  text-decoration-color: rgba(53, 70, 32, 0.4);
+  text-underline-offset: 4px;
+  cursor: pointer;
+}
+
+/* the one-time word: for when the car is parked */
+.cab-note {
+  position: fixed;
+  left: 132px;
+  bottom: 24px;
+  z-index: 61;
+  max-width: 460px;
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  padding: 14px 14px 14px 20px;
+  border: 1px solid rgba(53, 70, 32, 0.18);
+  border-radius: 20px;
+  background: #fffdf8;
+  box-shadow: 0 24px 48px -28px rgba(35, 36, 31, 0.45);
+  color: #23241f;
+  font-family: var(--lg-sans, system-ui, sans-serif);
+  font-size: 16px;
+  line-height: 1.4;
+  animation: cab-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.cab-note p {
+  margin: 0;
+}
+.cab-note button {
+  flex: none;
+  min-height: 52px;
+  padding: 0 22px;
+  border: 0;
+  border-radius: 26px;
+  background: #23241f;
+  color: #f5f3eb;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+@keyframes cab-rise {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+}
+
+/* ── the app beside the dock, sized for a finger ───────────────────── */
+.logos-root.is-cabin {
+  left: 112px;
+}
+/* the bar above */
+.logos-root.is-cabin .l5-head {
+  min-height: 76px;
+}
+.logos-root.is-cabin .l5-title {
+  font-size: 26px;
+}
+.logos-root.is-cabin .l5-iconbtn,
+.logos-root.is-cabin .l5-unibtn,
+.logos-root.is-cabin .l5-stagebtn {
+  min-width: 56px;
+  min-height: 56px;
+  font-size: 17px;
+}
+.logos-root.is-cabin .l5-menu-list button {
+  min-height: 58px;
+  font-size: 17px;
+}
+/* the line of thinking's own bar: the way back, the title, search, Split View, ⋯ */
+.logos-root.is-cabin .l5v-top {
+  height: 80px;
+  padding: 0 20px;
+}
+.logos-root.is-cabin .l5v-home,
+.logos-root.is-cabin .l5v-btn,
+.logos-root.is-cabin .l5v-top-r > button {
+  height: 56px;
+  min-width: 56px;
+  padding: 0 18px;
+  border-radius: 28px;
+  font-size: 17px;
+}
+.logos-root.is-cabin .l5v-search {
+  width: min(520px, 34vw);
+  height: 56px;
+  padding: 0 14px 0 20px;
+  border-radius: 28px;
+  font-size: 17px;
+}
+/* the four views' tabs */
+.logos-root.is-cabin .l5v-tab {
+  min-height: 62px;
+  padding-left: 22px;
+  padding-right: 22px;
+  font-size: 18px;
+}
+/* the conversation, a size up */
+.logos-root.is-cabin .l5-prose {
+  font-size: 19px;
+}
+.logos-root.is-cabin .l5-said {
+  font-size: 18px;
+}
+/* each message's own actions: copy, reply, edit, retry */
+.logos-root.is-cabin .l5-acts button {
+  min-height: 48px;
+  padding: 0 14px;
+  font-size: 15px;
+}
+/* the box: say it, or type it */
+.logos-root.is-cabin .lg-composer textarea {
+  font-size: 20px;
+  line-height: 1.4;
+}
+.logos-root.is-cabin .l5-ctools .l5-iconbtn,
+.logos-root.is-cabin .l5-ctools .lg-attach,
+.logos-root.is-cabin .l5-ctools .lg-send,
+.logos-root.is-cabin .l5-ctools .lg-mic,
+.logos-root.is-cabin .l5-ctools .lg-plus .l5-iconbtn {
+  width: 56px;
+  height: 56px;
+}
+.logos-root.is-cabin .l5-ctools .mp-btn,
+.logos-root.is-cabin .sv-btn {
+  height: 56px;
+  padding: 0 14px;
+  font-size: 18px;
+}
+.logos-root.is-cabin .l5-ctools .mp-btn .nm {
+  font-size: 19px;
+}
+/* the map's own controls */
+.logos-root.is-cabin .lg-zoom button {
+  min-width: 56px;
+  min-height: 56px;
+  font-size: 20px;
+}
+.logos-root.is-cabin .mp-tabs button,
+.logos-root.is-cabin .lg-lens button {
+  min-height: 52px;
+  font-size: 17px;
+}
+/* attachments and the Make gallery, pressable */
+.logos-root.is-cabin .lg-att {
+  min-height: 64px;
+}
+.logos-root.is-cabin .mkg-pick {
+  min-height: 64px;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cab-note {
+    animation: none;
+  }
+  .cab-place {
+    transition: none;
+  }
+}

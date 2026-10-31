@@ -195,6 +195,8 @@ import './logos5/redesign.css';
 import './logos5/l5v.css';
 import { CaptureInbox } from './CaptureInbox';
 import { EasyCapture } from './logos5/EasyCapture';
+import { CabinDock } from './logos5/CabinDock';
+import { CABIN_FIT_MAX, CABIN_MIN_K, cabinOn, choiceFromQuery, readCabinChoice, writeCabinChoice, type CabinPlace } from '@/lib/logos5/cabin';
 import { cleanCaptureText, forComposer, forNode, newCaptureId, readLocalCaptures, writeLocalCaptures, type Capture } from '@/lib/logos4/captures';
 import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
 import { digestOf } from '@/lib/cognition/digest';
@@ -4701,7 +4703,20 @@ export function LogosApp({
   // turn (lib/runtime/orchestrate.ts routeTurn). Which view, and what is
   // beside it, belong to this visit only.
   const [screens, setScreens] = useState<Record<string, Screen>>({});
-  const rawScreen: Screen = screens[activeId ?? ''] ?? OPENING;
+  // BIG-SCREEN MODE (lib/logos5/cabin.ts): a car's centre screen, parked, or any large touchscreen —
+  // on in a car's own browser or when asked for (?bigscreen=1, the ⋯ menu), kept in this browser
+  const [cabin, setCabin] = useState(false);
+  useEffect(() => {
+    const query = choiceFromQuery(window.location.search);
+    if (query) writeCabinChoice(browserStorage(), query);
+    setCabin(cabinOn({ ua: navigator.userAgent, query, stored: readCabinChoice(browserStorage()) }));
+  }, []);
+  function setCabinMode(on: boolean) {
+    writeCabinChoice(browserStorage(), on ? 'on' : 'off');
+    setCabin(on);
+  }
+  // on a big screen a line of thinking with ideas on its map opens on its Logic Map, the box floating over it
+  const rawScreen: Screen = screens[activeId ?? ''] ?? (cabin && map.nodes.length > 0 ? { view: 'logic_map', beside: null } : OPENING);
   const studyTab: Viewport = rawScreen.view;
   /** the artifact open in Artifacts, per line of thinking */
   const [artSel, setArtSel] = useState<Record<string, string>>({});
@@ -7024,6 +7039,8 @@ export function LogosApp({
             key={`tm-${lens ?? ''}`}
             // where the person put this line of thinking's cards, kept for it
             layoutKey={activeId}
+            // on a big screen the cards are drawn larger, and a big map is never fitted below pressable
+            {...(cabin && !narrow ? { fitMax: CABIN_FIT_MAX, fitMinK: CABIN_MIN_K } : {})}
             // THE OBJECTS OF THOUGHT, worked on in place: every operation is
             // computed here (lib/objects/) and comes back as the next state.
             onObject={onObject}
@@ -7201,6 +7218,7 @@ export function LogosApp({
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
+    { label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) },
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'No daily limit', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
@@ -8342,8 +8360,23 @@ export function LogosApp({
   return (
     <DocsContext.Provider value={docsApi}>
     <div
-      className="logos-root"
+      className={`logos-root${cabin && !narrow ? ' is-cabin' : ''}`}
     >
+      {/* BIG-SCREEN MODE: the dock down the left — the Universal Map, the four views, Write, Memory */}
+      {cabin && !narrow && (
+        <CabinDock
+          at={homeShown || l5Mind || !activeId ? 'map' : (studyTab as CabinPlace)}
+          hasLine={!!activeId}
+          onMap={goHome}
+          onView={(v) => {
+            if ((homeShown || l5Mind) && activeId) openFromHome(activeId);
+            setScreen((s) => choose(v, s));
+          }}
+          onWrite={openWriting}
+          onMemory={cloud ? () => setL5Mind(true) : undefined}
+          onLeave={() => setCabinMode(false)}
+        />
+      )}
       {introWanted && (
         <LogosIntroOnce
           onStart={(text) => {

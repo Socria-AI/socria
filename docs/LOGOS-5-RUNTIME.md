@@ -2132,3 +2132,45 @@ a JPEG with no type and no name, a real HEIC (converted, upright), a JPEG stored
 on its side (EXIF 6, turned upright), a 48-megapixel 12.9 MB JPEG, and a PDF
 called .jpg (refused, no empty chip); sent, four pictures at 540×720, ~25 KB
 each; opened large, full size, closed.
+
+## 27. Big-screen mode: Logos on a car's screen while it is parked, or any large touchscreen
+
+The same Logos — the same lines of thinking, maps, artifacts and words — laid
+out for a finger at arm's length. Nothing in it reads or controls the car: it is
+a web page in the car's browser, for when the car is parked, and it says so
+once, the first time it opens.
+
+**On when** (`lib/logos5/cabin.ts`). The browser is a car's own — Tesla's says
+`Tesla/<version>` in its user agent, its older one `QtCarBrowser` — or it is
+asked for: `?bigscreen` (or `=1`, `on`, `true`) in the address, or "Big-screen
+mode" in the ⋯ menu. `?bigscreen=0` (or `off`, `false`), the menu's "Leave
+big-screen mode" or the dock's "Usual layout" turn it off. Either way the choice
+is kept in this browser (`socria.bigscreen.v1`) until it is changed: the address
+first, then what was chosen, then whether this is a car's browser. On a phone
+width it stays the usual layout.
+
+**The dock** (`components/logos5/CabinDock.tsx`, `cabin.css`). Down the left,
+112px on the paper's second tone with a hairline: the mark, then the Universal
+Map, then the line of thinking's four views — Thinking (its Logic Map), Chat,
+Artifacts, Content — then Write and Memory (signed in), each a 92×84px place
+with a word under its drawing, the one you are in held in moss and marked
+`aria-current`. With no line of thinking open the four views are there but
+cannot be pressed. At its foot, "Usual layout". The app moves right by the
+dock's width; nothing else about it changes.
+
+**Sized for a finger.** Every control in the bar, the views' tabs, the box and
+the map at least 56px (tabs 62px, each message's actions 48px), the words a
+size up (the conversation 19px, the box 20px). A line of thinking opens on its
+Logic Map rather than the conversation, and the map is fitted up to 150%
+(`CABIN_FIT_MAX`, through ThinkingMap's `fitMax`) and never below 75%
+(`CABIN_MIN_K`, `fitMinK`), so a card stays readable and pressable from the
+seat. A focus you can see (3px moss), still for reduced motion, no gradient.
+
+**Checked.** `test/bigscreen.test.mjs` (40: the car's browser by its user
+agent, the address, which wins, the storage, the dock as drawn, the app's
+wiring, ThinkingMap's defaults unchanged, the sizes). In the browser with a
+Tesla user agent at 1920×1200: the dock and its one-time note, 84px places,
+62px tabs, the send button 56px, the Logic Map at 150% (cards 145px), the line
+reopened on its Logic Map after a reload, "Usual layout" kept off after a
+reload, the ⋯ menu turning it back on, an ordinary browser off, `?bigscreen=1`
+on.

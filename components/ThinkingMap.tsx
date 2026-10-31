@@ -222,8 +222,14 @@ export function ThinkingMap({
   linked,
   reveal,
   shapes,
+  fitMax = FIT_MAX,
+  fitMinK,
 }: {
   map: TMap;
+  /** how large a few cards are fitted, at most — big-screen mode draws them larger (lib/logos5/cabin.ts) */
+  fitMax?: number;
+  /** the smallest a big map is fitted — big-screen mode keeps cards pressable from arm's length */
+  fitMinK?: number;
   initialLens?: LensId;
   /** a card is never inert: pick what to do with this piece of reasoning */
   onAction?: (mode: NodeMode, node: MapNodeRef) => void;
@@ -520,14 +526,14 @@ export function ThinkingMap({
     const b = contentBounds();
     if (!b) return null;
     const graph = lensRef.current === 'graph';
-    if (fitAllRef.current) return fitCamera(b, vpRef.current.w, vpRef.current.h, { pad: 28, insets: insetsRef.current, maxK: FIT_MAX, minK: ZOOM_MIN });
+    if (fitAllRef.current) return fitCamera(b, vpRef.current.w, vpRef.current.h, { pad: 28, insets: insetsRef.current, maxK: fitMax, minK: ZOOM_MIN });
     return fitCamera(b, vpRef.current.w, vpRef.current.h, {
       pad: graph ? 44 : 28,
       insets: insetsRef.current,
-      maxK: FIT_MAX,
+      maxK: fitMax,
       // Fitting a hundred cards into a panel makes them unreadable; past this
       // floor the map is shown legibly from its centre (graph) or its start.
-      minK: graph ? 0.45 : 0.6,
+      minK: fitMinK ?? (graph ? 0.45 : 0.6),
       align: graph ? 'center' : 'start',
     });
   };
