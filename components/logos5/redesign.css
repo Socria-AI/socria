@@ -1104,7 +1104,10 @@
 }
 
 /* ── home: the contents column (components/logos5/Universe.tsx) ──── */
-.logos-root .l5 .l5c {
+/* aside.l5c, not .l5c: the line's Content view is a section.l5c too
+   (ContentView.tsx), and this rule's 334px basis held that view to 334px
+   tall in its column — its drop zone was cut off halfway down. */
+.logos-root .l5 aside.l5c {
   flex: 0 0 334px;
   min-height: 0;
   display: flex;
@@ -1318,7 +1321,7 @@
   .logos-root .l5 .l5x-canvas .l5s-start {
     bottom: 160px;
   }
-  .logos-root .l5 .l5c {
+  .logos-root .l5 aside.l5c {
     position: absolute;
     inset: 0 auto 0 0;
     z-index: 9;

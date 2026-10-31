@@ -2224,6 +2224,11 @@ on a phone.
 at when that is narrower than its design width, so a tick label stays the size
 the stylesheet gives it (it was about 5px at 290px wide).
 
+**The Content view is not cut short.** The home's old contents column and the
+line's Content view share the class `l5c`, and the column's `flex: 0 0 334px`
+held the Content view to 334px tall, cutting its drop zone off halfway down.
+The column's rules are scoped to `aside.l5c` (`redesign.css`).
+
 **Smaller things.** The first map's note, while the map is out of view, points
 to it ("See your Logic Map") rather than offering to save a picture nobody has
 seen. Voice's mark is a wave, so it is not a second microphone beside Hold to

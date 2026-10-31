@@ -106,6 +106,8 @@ const wall = read('components/logos5/GuestWall.tsx');
 ok('the guest card is lifted clear of the box, measured', /function useComposerLift/.test(wall));
 const intro = read('components/onboarding/FirstRunIntro.tsx');
 ok('a guest is not told to look in an account they do not have', /\{signedIn \? ' Change it any time in Manage Account\.' : ''\}/.test(intro));
+const redesign = read('components/logos5/redesign.css');
+ok('the Content view is not held to the home column’s 334px', /\.logos-root \.l5 aside\.l5c \{\s*flex: 0 0 334px;/.test(redesign) && !/\.logos-root \.l5 \.l5c \{/.test(redesign));
 const css = read('app/globals.css');
 ok('secondary words are dark enough to read (4.8:1 on the paper)', /--lg-ink-60: rgba\(var\(--lg-ink-rgb, 35, 36, 31\), 0\.66\);/.test(css));
 
