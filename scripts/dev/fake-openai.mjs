@@ -272,6 +272,28 @@ function entriesReply(user) {
   return { title: 'Record the adjustments for March 31', events: events.slice(0, 4), balance };
 }
 
+/** An easy view, as a vision model would read a photo of a café menu — unless the photo was never sent. */
+function easyReply(messages) {
+  const user = messages.find((m) => m?.role === 'user');
+  const sawPhoto = Array.isArray(user?.content) && user.content.some((p) => p?.type === 'image_url' && /^data:image\//.test(p.image_url?.url ?? ''));
+  if (!sawPhoto) return { title: '', kind: 'other', summary: '', sections: [] };
+  return {
+    title: 'Rosa’s Kitchen',
+    kind: 'menu',
+    summary: 'A restaurant menu with starters, mains and desserts.',
+    sections: [
+      { title: 'Starters', items: [{ name: 'Tomato soup', detail: 'with warm sourdough', value: '$6.50', tags: ['vegetarian'] }, { name: 'Garlic prawns', detail: 'chilli, lemon, parsley', value: '$9.00', tags: ['spicy'] }] },
+      { title: 'Mains', items: [{ name: 'Mushroom risotto', detail: 'parmesan, thyme', value: '$14.50', tags: ['vegetarian', 'gluten free'] }, { name: 'Grilled salmon', detail: 'new potatoes, green beans', value: '$19.00' }, { name: 'Steak frites', detail: 'peppercorn sauce', value: '$24.00' }] },
+      { title: 'Desserts', items: [{ name: 'Apple crumble', detail: 'custard or ice cream', value: '$7.00', tags: ['vegetarian'] }] },
+    ],
+    facts: [{ label: 'Open', value: 'Tue–Sun, 12 – 10 pm' }, { label: 'Phone', value: '(555) 014-2290' }],
+    steps: [],
+    times: [],
+    warnings: ['Garlic prawns contain shellfish.', 'Please tell us about any allergies.'],
+    unclear: ['The line under Desserts is too faint to read.'],
+  };
+}
+
 /** The writing assist route (lib/write/assist.ts): canned, but always about the words it was given. */
 function writeReply(system) {
   const op = /^You help someone with their own writing\. Task: (\w+)\./.exec(system)?.[1] ?? '';
@@ -426,7 +448,9 @@ const server = http.createServer((req, res) => {
         const isEntries = /journal-entry practice/.test(system);
         const isWrite = system.startsWith('You help someone with their own writing.');
         const isCustom = system.startsWith('You draft EVERYDAY DISPLAYS') && /- "custom" —/.test(system);
-        const content = JSON.stringify(isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : {});
+        // an easy view of a photo (app/api/logos/easy): the stand-in reads every photo as the same café menu
+        const isEasy = system.startsWith('You make an EASY VIEW of a photo');
+        const content = JSON.stringify(isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
       const text = inlineReply(messages) ?? chatReply(messages.slice(1));

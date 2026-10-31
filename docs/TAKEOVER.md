@@ -18,13 +18,14 @@ account, billing or backend code, and is switched off with one variable.
 | What has to keep working — `/sign-in`, `/sign-up`, `/sso-callback`, `/account/…` (billing, data export, deletion, email switches), `/privacy`, `/terms`, `/security`, `/subprocessors`, `/events/…` (RSVPs, emailed tickets, the door), `/r/…` (referral links), `/og/…` (link previews), `/dev/…`, `/studio`, the platform's own paths | unchanged | unchanged |
 
 The API is untouched except the routes that do Logos 5's thinking — a turn
-(`/api/logos/chat`), the map, organize, practice, read, write, synthesize,
-explore, experience, the guest pass, sources, live rooms, `/api/chat`,
-`/api/mr`, `/api/transcribe` and the background passes (`extract-memory`,
-`update-understanding`, `generate-insight`, `generate-synthesis`). Without the
-code they answer `403 { locked: true }`, so the gate cannot be stepped round
-by calling the engine directly. Data, the account, billing and Stripe's
-webhook, email, cron, events and every other route never ask for the code.
+(`/api/logos/chat`), the map, organize, practice, read, an easy view of a
+photo, write, synthesize, explore, experience, the guest pass, sources, live
+rooms, `/api/chat`, `/api/mr`, `/api/transcribe` and the background passes
+(`extract-memory`, `update-understanding`, `generate-insight`,
+`generate-synthesis`). Without the code they answer `403 { locked: true }`, so
+the gate cannot be stepped round by calling the engine directly. Data, the
+account, billing and Stripe's webhook, email, cron, events and every other
+route never ask for the code.
 
 The list is in one place, `lib/takeover.ts` (`APP`, `OPEN`, `THINKING_API`),
 and `test/takeover.test.mjs` walks every API route on disk to prove that only

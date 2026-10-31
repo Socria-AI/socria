@@ -406,6 +406,8 @@ export interface DisplayMeta {
   intents?: readonly RegExp[];
   /** an experience (Crossroads, Untangle…) rather than an everyday display — the gallery shows it in its own section */
   experience?: boolean;
+  /** what it was made from, when that is not the conversation — "made from your photo" — said above it in Artifacts */
+  madeFrom?: string;
   /** things a person might say to start one — shown in the gallery, and put into the composer when chosen */
   prompts?: readonly string[];
   /**

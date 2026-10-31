@@ -341,6 +341,8 @@ const MODULES = [
   'test/helpers/voice-under-test.tsx',
   // the relaunch: the gate, the code, the entry, the opening as numbers, the page
   'test/helpers/campaign-under-test.tsx',
+  // an easy view: a photo of small print, read, kept, drawn large and clear; the sheet; Make's card
+  'test/helpers/easy-under-test.tsx',
 ];
 
 export async function buildAll() {

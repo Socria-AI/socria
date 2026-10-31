@@ -1,0 +1,550 @@
+/* components/display/easy.css — AN EASY VIEW: large, clear, simple.
+ *
+ * Set for eyes that find small print hard: everything here is in em, from a
+ * base the person sets (A− / A+, --ez, four steps from 19px), so the whole of
+ * it grows together. The brand book's paper, moss and ink — with the words in
+ * Inter, the most legible face we have, at weights that hold up at a distance,
+ * and only the title in Instrument Serif. Hairlines between lines, not cards;
+ * every control a real button with a word on it, 48px tall at least; and high
+ * contrast is the brand's own dark pair — paper on ink, the accent sage — at
+ * 14:1, the same on every theme. */
+
+.dsp[data-kind='easy'] {
+  --dsp-body-max: 640px;
+}
+/* a measure for reading: a name stays near its price on a wide screen, and the measure grows with the words */
+.ez-read,
+.ez-glance,
+.ez-check {
+  max-width: 34em;
+}
+
+.ez {
+  --ez-ink: var(--dsp-ink, #23241f);
+  --ez-ink-rgb: var(--lg-ink-rgb, 35, 36, 31);
+  --ez-moss: var(--dsp-primary, #354620);
+  --ez-line: var(--dsp-line, rgba(35, 36, 31, 0.12));
+  --ez-bg: transparent;
+  --ez-raise: var(--dsp-panel, #faf8f2);
+  --ez-warn: var(--dsp-tension, #9c5b3c);
+  font-family: var(--lg-sans);
+  font-size: calc(var(--ez, 1.2) * 19px);
+  line-height: 1.45;
+  color: var(--ez-ink);
+  background: var(--ez-bg);
+  border-radius: 14px;
+}
+/* high contrast: the brand's dark pair, fixed whatever the theme */
+.ez.is-hc {
+  --ez-ink: #f4f1e8;
+  --ez-ink-rgb: 244, 241, 232;
+  --ez-moss: #c8dd9e;
+  --ez-line: rgba(244, 241, 232, 0.28);
+  --ez-bg: #20201b;
+  --ez-raise: #2b2b24;
+  --ez-warn: #f2b48e;
+  padding: 0.6em 0.7em 0.8em;
+}
+
+/* ── what makes it easier ──────────────────────────────────────────── */
+.ez-bar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0.35em 0 0.6em;
+  font-size: 16px;
+}
+.ez-size {
+  display: inline-flex;
+  gap: 6px;
+}
+.ez-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.45em;
+  min-height: 48px;
+  padding: 0 1em;
+  border: 1.5px solid rgba(var(--ez-ink-rgb), 0.28);
+  border-radius: 999px;
+  background: var(--ez-raise);
+  color: var(--ez-ink);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    border-color 0.2s,
+    background-color 0.2s,
+    color 0.2s;
+}
+/* a finger leaves no hover behind: only a pointer that can hover shows one */
+@media (hover: hover) {
+  .ez-btn:hover:not(:disabled) {
+    border-color: var(--ez-ink);
+  }
+  .ez .is-press:hover {
+    background: rgba(var(--ez-ink-rgb), 0.05);
+  }
+}
+.ez-btn:disabled {
+  opacity: 0.38;
+  cursor: default;
+}
+.ez-btn.is-on {
+  border-color: var(--ez-moss);
+  background: var(--ez-moss);
+  color: var(--ez-bg, #fff);
+}
+.ez:not(.is-hc) .ez-btn.is-on {
+  color: #f4f1e8;
+}
+.ez-a {
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-weight: 400;
+  line-height: 1;
+}
+.ez-a.is-sm {
+  font-size: 1em;
+}
+.ez-a.is-lg {
+  font-size: 1.45em;
+}
+.ez-glyph {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 0.1em;
+}
+.ez-btn-l,
+.ez-short {
+  display: none;
+}
+.ez-only {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px;
+  padding: 0 0 0.7em;
+  font-size: 16px;
+}
+.ez-only-l {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: rgba(var(--ez-ink-rgb), 0.62);
+}
+.ez-chip {
+  min-height: 48px;
+  padding: 0 1em;
+  border: 1.5px solid rgba(var(--ez-ink-rgb), 0.28);
+  border-radius: 999px;
+  background: none;
+  color: var(--ez-ink);
+  font: inherit;
+  font-weight: 600;
+  text-transform: capitalize;
+  cursor: pointer;
+}
+.ez-chip.is-on {
+  border-color: var(--ez-moss);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.12);
+  color: var(--ez-ink);
+  box-shadow: inset 0 0 0 1px var(--ez-moss);
+}
+.ez.is-hc .ez-chip.is-on {
+  background: rgba(200, 221, 158, 0.16);
+}
+.ez :focus-visible {
+  outline: 3px solid var(--ez-moss);
+  outline-offset: 2px;
+}
+
+/* ── read it: everything, large, in its own order ──────────────────── */
+.ez-kind {
+  margin: 0.2em 0 0;
+  font-size: 0.62em;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: rgba(var(--ez-ink-rgb), 0.62);
+}
+.ez-title {
+  margin: 0.1em 0 0;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 1.75em;
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.01em;
+  color: var(--ez-ink);
+  text-wrap: balance;
+}
+.ez-summary {
+  max-width: 40ch;
+  margin: 0.45em 0 0;
+  color: rgba(var(--ez-ink-rgb), 0.82);
+}
+.ez-warn {
+  margin: 0.8em 0 0;
+  padding: 0.6em 0.8em;
+  border: 2px solid var(--ez-warn);
+  border-radius: 12px;
+}
+.ez-warn-h {
+  display: flex;
+  align-items: center;
+  gap: 0.4em;
+  margin: 0;
+  font-weight: 700;
+  color: var(--ez-warn);
+}
+.ez-warn ul {
+  margin: 0.25em 0 0;
+  padding-left: 1.1em;
+}
+.ez-warn li + li {
+  margin-top: 0.2em;
+}
+.ez-facts {
+  margin: 0.8em 0 0;
+  border-top: 1px solid var(--ez-line);
+}
+.ez-fact {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.15em 0.8em;
+  padding: 0.45em 0;
+  border-bottom: 1px solid var(--ez-line);
+}
+.ez-fact dt {
+  min-width: 6em;
+  font-weight: 600;
+}
+.ez-fact dd {
+  margin: 0;
+}
+.ez-sec {
+  margin-top: 1.1em;
+}
+.ez-sec-h {
+  margin: 0;
+  padding-bottom: 0.25em;
+  border-bottom: 2px solid var(--ez-ink);
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 1.35em;
+  font-weight: 400;
+  line-height: 1.15;
+}
+.ez-items {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.ez-items > li + li {
+  border-top: 1px solid var(--ez-line);
+}
+.ez-item {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15em;
+  width: 100%;
+  min-height: 2.6em;
+  padding: 0.55em 0.25em;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.ez .is-press {
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+.ez .is-press.is-saying {
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+  box-shadow: inset 4px 0 0 var(--ez-moss);
+}
+.ez.is-hc .is-press.is-saying {
+  background: rgba(200, 221, 158, 0.14);
+}
+.ez-item-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8em;
+}
+.ez-name {
+  font-weight: 600;
+  line-height: 1.25;
+}
+.ez-value {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+  white-space: nowrap;
+}
+.ez-detail {
+  font-size: 0.84em;
+  line-height: 1.4;
+  color: rgba(var(--ez-ink-rgb), 0.78);
+}
+.ez-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35em;
+  margin-top: 0.15em;
+}
+.ez-tag {
+  padding: 0.05em 0.6em;
+  border: 1.5px solid var(--ez-moss);
+  border-radius: 999px;
+  font-size: 0.72em;
+  font-weight: 600;
+  color: var(--ez-moss);
+  text-transform: capitalize;
+}
+.ez-none {
+  margin: 1em 0 0;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-style: italic;
+  color: rgba(var(--ez-ink-rgb), 0.7);
+}
+.ez-unclear {
+  margin: 1.1em 0 0;
+  padding-left: 0.7em;
+  border-left: 3px solid rgba(var(--ez-ink-rgb), 0.35);
+  font-size: 0.86em;
+  color: rgba(var(--ez-ink-rgb), 0.78);
+}
+.ez-unclear span {
+  display: block;
+  font-size: 0.72em;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+/* what a model read is checked where it matters: said once, at the foot, in the serif's quiet voice */
+.ez-check {
+  margin: 1.2em 0 0;
+  padding-top: 0.7em;
+  border-top: 1px solid var(--ez-line);
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 0.95em;
+  font-style: italic;
+  line-height: 1.35;
+  color: rgba(var(--ez-ink-rgb), 0.78);
+}
+
+/* steps: a number you can see from across the room, and the words beside it */
+.ez-steps {
+  margin: 1em 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ez-steps > li + li {
+  margin-top: 0.4em;
+}
+.ez-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.7em;
+  width: 100%;
+  padding: 0.4em 0.25em;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.ez-step-n {
+  display: grid;
+  place-items: center;
+  flex: none;
+  width: 1.9em;
+  height: 1.9em;
+  border-radius: 50%;
+  background: var(--ez-moss);
+  color: var(--ez-bg, #fff);
+  font-weight: 700;
+}
+.ez:not(.is-hc) .ez-step-n {
+  color: #f4f1e8;
+}
+.ez-step-t {
+  padding-top: 0.25em;
+  line-height: 1.4;
+}
+
+/* times: the hour large, what it is for beside it, the next one marked */
+.ez-times {
+  margin: 1em 0 0;
+  padding: 0;
+  list-style: none;
+  border-top: 1px solid var(--ez-line);
+}
+.ez-times > li {
+  border-bottom: 1px solid var(--ez-line);
+}
+.ez-time-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0.2em 0.8em;
+  width: 100%;
+  padding: 0.5em 0.25em;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.ez-time {
+  min-width: 4.2em;
+  font-size: 1.3em;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ez-time-l {
+  flex: 1 1 8em;
+}
+.ez-next {
+  padding: 0.1em 0.7em;
+  border-radius: 999px;
+  background: var(--ez-moss);
+  color: var(--ez-bg, #fff);
+  font-size: 0.78em;
+  font-weight: 700;
+}
+.ez:not(.is-hc) .ez-next {
+  color: #f4f1e8;
+}
+.ez-times > li.is-next {
+  box-shadow: inset 4px 0 0 var(--ez-moss);
+}
+
+/* ── at a glance: the prices as bars, lowest first ─────────────────── */
+.ez-glance {
+  padding-top: 0.3em;
+}
+.ez-glance-h {
+  margin: 0;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 1.35em;
+  line-height: 1.15;
+}
+.ez-bars {
+  margin: 0.6em 0 0;
+  padding: 0;
+  list-style: none;
+}
+.ez-bars > li + li {
+  border-top: 1px solid var(--ez-line);
+}
+.ez-bar-row {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25em;
+  width: 100%;
+  padding: 0.5em 0.25em;
+  border: 0;
+  border-radius: 10px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  text-align: left;
+}
+.ez-bar-top {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.8em;
+}
+.ez-bar-name {
+  font-weight: 600;
+  line-height: 1.25;
+}
+.ez-bar-name em {
+  display: block;
+  font-size: 0.7em;
+  font-style: normal;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: rgba(var(--ez-ink-rgb), 0.6);
+}
+.ez-bar-value {
+  flex: none;
+  font-weight: 700;
+  font-variant-numeric: tabular-nums;
+}
+.ez-bar-track {
+  display: block;
+  height: 0.6em;
+  border-radius: 4px;
+  background: rgba(var(--ez-ink-rgb), 0.08);
+}
+.ez-bar-track i {
+  display: block;
+  height: 100%;
+  border-radius: 4px;
+  background: var(--ez-moss);
+}
+.ez-glance-foot {
+  margin: 0.8em 0 0;
+  font-size: 0.86em;
+  color: rgba(var(--ez-ink-rgb), 0.82);
+}
+
+/* a narrow screen: the four ways to make it easier as two pairs — the size of the words, then contrast
+ * and the voice — each a wide button with its word whole, at the bar's own 16px, never shrunk to fit */
+@container (max-width: 560px) {
+  .ez-bar {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 8px;
+  }
+  .ez-size {
+    display: contents;
+  }
+  .ez-btn {
+    justify-content: center;
+    min-height: 56px;
+    padding: 4px 8px;
+    border-radius: 16px;
+    line-height: 1.15;
+    text-align: center;
+  }
+  /* where the browser has no voice, contrast takes the whole second row */
+  .ez-bar > .ez-btn:last-child:nth-child(2) {
+    grid-column: 1 / -1;
+  }
+  .ez-btn svg {
+    flex: none;
+    width: 22px;
+    height: 22px;
+  }
+  .ez-btn-l,
+  .ez-short {
+    display: inline;
+  }
+  .ez-long {
+    display: none;
+  }
+  /* the marks wrap under their label, every one in sight — nothing hidden past the edge, to be found by a swipe */
+  .ez-only-l {
+    flex-basis: 100%;
+  }
+  /* high contrast's dark ground gives back some of its margin here, so the words keep their room */
+  .ez.is-hc {
+    padding: 0.5em 0.45em 0.7em;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ez-btn,
+  .ez .is-press {
+    transition: none;
+  }
+}

@@ -1,0 +1,282 @@
+/* components/logos5/easy-capture.css — EASY VIEW: the photo it is made from.
+ *
+ * The brand book's masthead (a micro-label over an ink rule, the headline in
+ * Instrument Serif with one word in moss italic), on warm paper, for the people
+ * this is for: type that is large to begin with, two buttons a thumb cannot
+ * miss (64px, a word on each), and "Reading the photo…" said, not spun. A sheet
+ * from the foot on a phone, from the right on a wider screen. */
+
+.ec-veil {
+  position: fixed;
+  inset: 0;
+  z-index: 85;
+  display: flex;
+  justify-content: flex-end;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.28);
+  animation: ec-fade 0.3s ease both;
+}
+
+.ec {
+  --ec-serif: var(--serif, 'Instrument Serif', Georgia, serif);
+  --ec-ink: var(--lg-ink, #23241f);
+  --ec-ink-rgb: var(--lg-ink-rgb, 35, 36, 31);
+  --ec-moss: var(--lg-primary, #354620);
+  --ec-moss-rgb: var(--lg-primary-rgb, 53, 70, 32);
+  --ec-line: var(--lg-line, rgba(53, 70, 32, 0.14));
+  --ec-paper: var(--lg-paper, #f5f3eb);
+  --ec-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  display: flex;
+  flex-direction: column;
+  width: min(480px, 100vw);
+  height: 100%;
+  overflow-y: auto;
+  padding: 22px 26px 28px;
+  border-left: 1px solid var(--ec-line);
+  background: var(--ec-paper);
+  box-shadow: -24px 0 60px -30px rgba(var(--ec-ink-rgb), 0.35);
+  color: var(--ec-ink);
+  font-family: var(--lg-sans);
+  font-size: 18px;
+  line-height: 1.45;
+  outline: none;
+  animation: ec-in 0.55s var(--ec-ease) both;
+}
+
+.ec-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--ec-ink);
+}
+.ec-lbl {
+  margin: 0;
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--ec-ink-rgb), 0.6);
+}
+.ec-x {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid var(--ec-line);
+  border-radius: 50%;
+  background: none;
+  font-size: 1.3rem;
+  line-height: 1;
+  color: rgba(var(--ec-ink-rgb), 0.75);
+  cursor: pointer;
+}
+.ec-x:hover:not(:disabled) {
+  border-color: var(--ec-ink);
+  color: var(--ec-ink);
+}
+.ec-x:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ec-title {
+  margin: 20px 0 0;
+  font-family: var(--ec-serif);
+  font-size: 2.2rem;
+  font-weight: 400;
+  line-height: 1.04;
+  letter-spacing: -0.02em;
+  text-wrap: balance;
+}
+.ec-title em {
+  font-style: italic;
+  color: var(--ec-moss);
+}
+.ec-lead {
+  margin: 12px 0 0;
+  color: rgba(var(--ec-ink-rgb), 0.78);
+}
+
+/* the two ways in: a thumb cannot miss them */
+.ec-ways {
+  display: grid;
+  gap: 12px;
+  margin-top: 26px;
+}
+.ec-go {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  min-height: 64px;
+  padding: 0 24px;
+  border: 1.5px solid var(--ec-ink);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--ec-ink);
+  font: inherit;
+  font-size: 1.12rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition:
+    background-color 0.25s var(--ec-ease),
+    color 0.25s var(--ec-ease),
+    transform 0.25s var(--ec-ease);
+}
+.ec-go:hover:not(:disabled) {
+  background: rgba(var(--ec-ink-rgb), 0.05);
+}
+/* the first way: the book's primary pill — ink, moss when reached for, lifted 2px */
+.ec-go.is-main {
+  border-color: var(--ec-ink);
+  background: var(--ec-ink);
+  color: var(--ec-paper);
+}
+.ec-go.is-main:hover:not(:disabled) {
+  border-color: var(--ec-moss);
+  background: var(--ec-moss);
+  transform: translateY(-2px);
+}
+.ec-go:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+.ec-go:focus-visible,
+.ec-x:focus-visible {
+  outline: 3px solid var(--ec-moss);
+  outline-offset: 3px;
+}
+.ec-tip {
+  margin: 18px 0 0;
+  padding-left: 12px;
+  border-left: 2px solid var(--ec-moss);
+  font-family: var(--ec-serif);
+  font-size: 1.15rem;
+  font-style: italic;
+  line-height: 1.35;
+  color: var(--ec-moss);
+}
+
+/* reading: the photo, and what is happening, in words */
+.ec-reading {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  margin-top: 26px;
+}
+.ec-thumb {
+  width: 120px;
+  height: 120px;
+  object-fit: cover;
+  border: 1px solid var(--ec-line);
+  border-radius: 14px;
+}
+.ec-thumb.is-small {
+  width: 64px;
+  height: 64px;
+  border-radius: 10px;
+}
+.ec-reading-t {
+  margin: 16px 0 0;
+  font-family: var(--ec-serif);
+  font-size: 1.7rem;
+  line-height: 1.1;
+}
+.ec-reading-s {
+  margin: 4px 0 0;
+  color: rgba(var(--ec-ink-rgb), 0.7);
+}
+/* a moss rule that fills slowly: what is happening, without a spinner */
+.ec-line {
+  position: relative;
+  display: block;
+  width: 100%;
+  height: 2px;
+  margin-top: 18px;
+  overflow: hidden;
+  background: var(--ec-line);
+}
+.ec-line::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: var(--ec-moss);
+  transform-origin: left;
+  animation: ec-fill 9s var(--ec-ease) both;
+}
+
+.ec-failed {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-top: 22px;
+  padding: 12px 14px;
+  border: 1.5px solid var(--lg-tension, #9c5b3c);
+  border-radius: 14px;
+}
+.ec-failed p {
+  margin: 0;
+  color: var(--ec-ink);
+}
+.ec-again {
+  margin: 18px 0 -14px;
+  font-weight: 600;
+}
+
+@media (max-width: 640px) {
+  .ec-veil {
+    align-items: flex-end;
+  }
+  .ec {
+    width: 100vw;
+    height: auto;
+    max-height: 92dvh;
+    padding: 20px 20px calc(24px + env(safe-area-inset-bottom, 0px));
+    border-left: 0;
+    border-top: 1px solid var(--ec-line);
+    border-radius: 20px 20px 0 0;
+    box-shadow: 0 -24px 60px -30px rgba(var(--ec-ink-rgb), 0.4);
+    animation-name: ec-rise;
+  }
+  .ec-title {
+    font-size: 1.95rem;
+  }
+}
+
+@keyframes ec-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes ec-in {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+}
+@keyframes ec-rise {
+  from {
+    opacity: 0;
+    transform: translateY(32px);
+  }
+}
+@keyframes ec-fill {
+  from {
+    transform: scaleX(0);
+  }
+  to {
+    transform: scaleX(0.92);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .ec-veil,
+  .ec,
+  .ec-line::after {
+    animation: none;
+  }
+  .ec-go {
+    transition: none;
+  }
+}

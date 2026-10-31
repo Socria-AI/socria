@@ -26,6 +26,8 @@ import {
   discover,
   displayMeta,
   documentFromDoc,
+  easySaid,
+  easyText,
   forgetBefore,
   isDisplayKind,
   kindOf,
@@ -34,6 +36,7 @@ import {
   mergeSpaces,
   objOf,
   readOperation,
+  sanitizeEasy,
   seek as seekObject,
   spaceOf,
   suggestionsIn,
@@ -115,7 +118,8 @@ import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
 import { ConnectionsModal } from '@/components/ConnectionsModal';
-import { MAX_ATTACHMENTS, MAX_NOTE_CHARS, type Attachment, type AttachmentOrigin } from '@/lib/logos-attachments';
+import { MAX_ATTACHMENTS, MAX_NOTE_CHARS, MAX_READING_CHARS, type Attachment, type AttachmentOrigin } from '@/lib/logos-attachments';
+import type { PreparedImage } from '@/lib/logos-upload';
 import { MAX_CONTEXTS_PER_NODE, sanitizeContexts, type NodeContext } from '@/lib/logos-sources';
 import { relevantNodes } from '@/lib/write/links';
 import { addCard as addDraftCard, emptyDoc, isEmptyDoc, type CardKind, type WriteDoc } from '@/lib/write/doc';
@@ -190,6 +194,7 @@ import './logos5/l5.css';
 import './logos5/redesign.css';
 import './logos5/l5v.css';
 import { CaptureInbox } from './CaptureInbox';
+import { EasyCapture } from './logos5/EasyCapture';
 import { cleanCaptureText, forComposer, forNode, newCaptureId, readLocalCaptures, writeLocalCaptures, type Capture } from '@/lib/logos4/captures';
 import { anchorOf, browserStorage, forgetView, partStands, pickUp, readResume, selectionStands, writeView, type ScrollAt, type SessionView } from '@/lib/logos4/resume';
 import { digestOf } from '@/lib/cognition/digest';
@@ -667,11 +672,18 @@ export function LogosApp({
   // the person's own templates (lib/logos5/templates.ts): choices in Make beside the list
   const templates = useTemplates();
   const ownChoices = useMemo(() => templates.map(templateChoice), [templates]);
+  // EASY VIEW: the sheet that takes the photo it is made from (components/logos5/EasyCapture.tsx)
+  const [easyOpen, setEasyOpen] = useState(false);
   const pickMake = (id: string | null) => {
     // CAD is built here, by describing it: the studio opens in Artifacts, and nothing is asked of a model
     if (makeChoice(id, ownChoices)?.opens === 'studio') {
       openStudio();
       setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 }));
+      return;
+    }
+    // an easy view is made from a photo: the photo is the ask
+    if (makeChoice(id, ownChoices)?.opens === 'photo') {
+      setEasyOpen(true);
       return;
     }
     setMakeId(id);
@@ -2297,6 +2309,61 @@ export function LogosApp({
     switchSession(fresh.id);
     // A brand-new empty session isn't worth a round trip until it has content.
     return true;
+  }
+
+  // ── EASY VIEW (lib/objects/display-easy.ts, app/api/logos/easy) ──────
+  // A photo of small print — a menu, a label, a timetable — read once and made
+  // an artifact in big, clear type. The photo and what was typed beside it are
+  // the person's turn (the photo kept as source material, its reading the easy
+  // view's own text, so nothing reads it twice); Socria's answer says what it
+  // is and how to make it easier still; and the easy view opens in Artifacts.
+  async function makeEasy(photo: PreparedImage, said: string): Promise<string | null> {
+    if (togetherReadOnly) return 'You can look at this line of thinking, but not add to it.';
+    let sid = activeIdRef.current;
+    if (!sid && newSession()) sid = activeIdRef.current;
+    if (!sid) return 'A new line of thinking could not be started just now.';
+    const typed = said.replace(/\s+/g, ' ').trim().slice(0, 300);
+    let res: Response;
+    try {
+      res = await fetch('/api/logos/easy', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({ image: photo.full, said: typed, sessionId: sid }),
+      });
+    } catch {
+      return 'Socria could not be reached — check your connection and try again.';
+    }
+    const json = (await res.json().catch(() => ({}))) as { easy?: unknown; error?: unknown };
+    if (res.status === 401) return 'Sign in to make an easy view of a photo.';
+    if (!res.ok) return typeof json.error === 'string' ? json.error : 'That photo could not be read just now — try again in a moment.';
+    // held to the kind again on this side: only what it keeps is kept
+    const easy = sanitizeEasy(json.easy);
+    if (!easy) return 'Nothing on that photo could be read clearly. Try again a little closer, in more light.';
+    const att: Attachment = { kind: 'image', name: photo.name, origin: 'source', thumb: photo.thumb, ...(photo.preview ? { preview: photo.preview } : {}), reading: easyText(easy, MAX_READING_CHARS) };
+    const turn: Msg = { id: newMsgId(), at: Date.now(), role: 'user', content: typed || 'Make this easy to read.', attachments: [att] };
+    const answer: Msg = { id: newMsgId(), at: Date.now() + 1, role: 'assistant', content: easySaid(easy) };
+    const kept = (m: TMap) => {
+      const made = makeDisplay(spaceOf(m), 'easy', easy, 'source');
+      return made.ok ? made : null;
+    };
+    if (sid === activeIdRef.current) {
+      postPair(turn, answer);
+      const made = kept(mapRef.current);
+      if (made) {
+        commitObjects(made.space, made.obj);
+        showArtifact(`d:${made.obj.id}`);
+      } else setError('That photo was read, but this line of thinking already holds as many things as it keeps — what it says is in the conversation.');
+    } else {
+      // it began in another line of thinking: it is kept there
+      patchSession(sid, (x) => {
+        const made = kept(x.map ?? EMPTY_MAP);
+        return { ...x, messages: [...x.messages, turn, answer], ...(made ? { map: { ...(x.map ?? EMPTY_MAP), objects: made.space } } : {}) };
+      });
+    }
+    if (typed) setInput('');
+    setMakeId(null);
+    setEasyOpen(false);
+    return null;
   }
 
   // ── QUICK CAPTURE (Logos 4, components/CaptureInbox.tsx) ─────────
@@ -7495,10 +7562,14 @@ export function LogosApp({
     ...displaysHere
       .filter((o) => o.kind !== 'document')
       .map((o) => {
-        const noun = displayMeta(o.kind)?.noun ?? o.kind;
+        const meta = displayMeta(o.kind);
+        const noun = meta?.noun ?? o.kind;
+        const Noun = noun[0].toUpperCase() + noun.slice(1);
         return {
           key: `d:${o.id}`,
-          kind: noun[0].toUpperCase() + noun.slice(1),
+          kind: Noun,
+          // what it was made from, when that is not the conversation (a photo, for an easy view)
+          ...(meta?.madeFrom ? { eyebrow: `Artifact · ${Noun} · ${meta.madeFrom}` } : {}),
           title: String((o.states[o.at] as { title?: unknown } | undefined)?.title ?? o.name),
           render: () => renderPanel({ kind: 'panel', id: `art-${o.id}`, type: 'display', config: { obj: o.id } }),
         };
@@ -7545,8 +7616,8 @@ export function LogosApp({
             ? undefined
             : (id) => {
                 pickMake(id);
-                // the studio is described from where it is; anything else is asked for in the conversation
-                if (makeChoice(id, ownChoices)?.opens !== 'studio') setScreen((s) => chatVisible(s, narrowRef.current));
+                // the studio is described from where it is, an easy view made from a photo; anything else is asked for in the conversation
+                if (!makeChoice(id, ownChoices)?.opens) setScreen((s) => chatVisible(s, narrowRef.current));
               }
         }
       />
@@ -8303,6 +8374,8 @@ export function LogosApp({
           {...(!togetherReadOnly ? { onAddToMap: captureToMap } : {})}
         />
       )}
+      {/* EASY VIEW: the photo it is made from — taken on a phone, or chosen */}
+      <EasyCapture open={easyOpen} onClose={() => setEasyOpen(false)} touch={narrow} said={input} onPhoto={makeEasy} />
       {/* WHAT SOCRIA DOES: short tutorials of the screen as it is, each with a way to try it now */}
       <SocriaGuide
         open={guideOpen}

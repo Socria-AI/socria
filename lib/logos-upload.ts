@@ -8,6 +8,8 @@
 // database row helps nobody.
 
 export const READ_MAX_EDGE = 1400;
+/** An easy view reads small print, so its photo keeps more of it (app/api/logos/easy). */
+export const EASY_READ_EDGE = 2048;
 export const THUMB_MAX_EDGE = 220;
 /** The picture as shown in a conversation — big enough to look at, small enough to keep. */
 export const PREVIEW_MAX_EDGE = 960;
@@ -79,7 +81,7 @@ export interface PreparedImage {
  * sent, because every image is resized here before it leaves the browser —
  * Socria One accepts originals up to its document limit.
  */
-export async function prepareImage(file: File, maxBytes = MAX_FILE_BYTES): Promise<PreparedImage> {
+export async function prepareImage(file: File, maxBytes = MAX_FILE_BYTES, readEdge = READ_MAX_EDGE): Promise<PreparedImage> {
   if (file.size > maxBytes) {
     throw new Error(`That image is too large — ${Math.round(maxBytes / (1024 * 1024))} MB is the limit.`);
   }
@@ -90,7 +92,7 @@ export async function prepareImage(file: File, maxBytes = MAX_FILE_BYTES): Promi
     if (preview.length <= PREVIEW_MAX_CHARS) break;
   }
   return {
-    full: resize(img, READ_MAX_EDGE, 0.82),
+    full: resize(img, readEdge, 0.82),
     thumb: resize(img, THUMB_MAX_EDGE, 0.62),
     preview: preview.length <= PREVIEW_MAX_CHARS ? preview : '',
     name: file.name || 'image',

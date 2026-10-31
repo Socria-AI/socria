@@ -23,7 +23,7 @@ let pass = 0,
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + String(x).slice(0, 400))));
 const J = JSON.stringify;
 const html = (el) => renderToStaticMarkup(el);
-const text = (node) => html(h('div', null, node)).replace(/<[^>]+>/g, '');
+const text = (node) => html(h('div', null, ...[node].flat())).replace(/<[^>]+>/g, '');
 const app = read('components/LogosApp.tsx');
 const guideSrc = read('components/SocriaGuide.tsx');
 

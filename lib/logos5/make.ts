@@ -15,6 +15,9 @@
 // against those readers (test/logic-map-ideas.test.mjs). One is not asked for
 // at all: CAD opens a 3D studio in Artifacts, built by describing it (`opens`).
 //
+// A PHOTO. "Easy view" is made from a photo — a menu, a label, a timetable —
+// taken or chosen, for whoever finds small print hard to read (`opens: 'photo'`).
+//
 // ANY ARTIFACT. "Your own" asks for a custom artifact — whatever they describe,
 // built from a few primitives (lib/objects/display-custom.ts) — and the
 // person's saved templates are choices too (lib/logos5/templates.ts).
@@ -48,8 +51,10 @@ export interface MakeChoice {
    * Made here, not asked for: 'studio' opens an empty 3D studio (CAD) in
    * Artifacts, and what is described next is built in it by Live 3D's own
    * reader (lib/objects/scene-chat.ts) — no words are sent for the choice.
+   * 'photo' asks for a photo — taken, or chosen — and makes an easy view of
+   * it (lib/objects/display-easy.ts, app/api/logos/easy): the photo is the ask.
    */
-  opens?: 'studio';
+  opens?: 'studio' | 'photo';
 }
 
 const make = (noun: string) => ({
@@ -59,6 +64,18 @@ const make = (noun: string) => ({
 
 /** The choices, in the order they are offered. Each one is something Artifacts can hold. */
 export const MAKE_CHOICES: readonly MakeChoice[] = [
+  {
+    // A PHOTO, MADE EASY TO READ: a menu, a label, a timetable — taken on the phone or chosen, read
+    // once, and shown in big type, high contrast and aloud, its prices, times or steps drawn plainly
+    id: 'easy',
+    label: 'Easy view',
+    about: 'A photo of small print — made big, clear, and read aloud.',
+    template: { kind: 'easy', view: 'read' },
+    opens: 'photo',
+    placeholder: 'Anything to look out for? e.g. what is vegetarian',
+    ask: (about) => about,
+    fromHere: '',
+  },
   { id: 'chart', label: 'Chart', about: 'Your numbers at a glance — as bars, a line or a pie.', template: { kind: 'data' }, placeholder: 'What should it show? e.g. rent 1200, food 400, transport 90', ...make('chart') },
   { id: 'table', label: 'Comparison table', about: 'Options side by side, on what matters to you.', template: { kind: 'compare', view: 'matrix' }, placeholder: 'What are you comparing? e.g. three laptops on price, weight, battery', ...make('comparison table') },
   { id: 'timeline', label: 'Timeline', about: 'What happens when, in order.', template: { kind: 'plan', view: 'timeline' }, placeholder: 'What happened, or what is coming? e.g. my semester deadlines', ...make('timeline') },

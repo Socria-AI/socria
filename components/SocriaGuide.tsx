@@ -462,7 +462,8 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
           Choose what to make, <em>then</em> say what it’s about.
         </>
       ),
-      stand: 'A chart, a comparison, a timeline, a study plan, a checklist, a flowchart — each drawn as it will be before you pick it, and made from your words.',
+      stand:
+        'A chart, a comparison, a timeline, a study plan, a checklist, a flowchart — each drawn as it will be before you pick it, and made from your words. Easy view is made from a photo instead: small print, shown big and clear.',
       steps: [<>Press Make, under the box.</>, <>Pick one from the gallery — or one of your own, under Yours.</>, <>Say what it is about. What is made is kept in Artifacts.</>],
       note: 'The templates you save are kept on this device.',
       demo: MakeDemo,

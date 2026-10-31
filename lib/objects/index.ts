@@ -25,6 +25,8 @@ import './display-numberline';
 import './display-document';
 // the person's files sorted into topics, and the practice made from them — made only by Logos 5's "Organize it" (display-study.ts)
 import './display-study';
+// a photo made large, clear and simple — made only by taking or choosing a photo (display-easy.ts)
+import './display-easy';
 // the human-first experiences (Logos 3.5): objects of thought too, sharing one vocabulary of reasoning (reasoning.ts)
 import './display-crossroads';
 import './display-untangle';
@@ -53,6 +55,7 @@ export { numberLineFromWords, readNumberSet, unionOf, intervalNotation, inequali
 export { BASIS_WORD, REL_WORD, type Basis, type Link } from './reasoning';
 export { timelineOf, compareStates, compareMap, keyOfStep, type TimelineEvent, type Timeline, type StateDiff } from './timeline';
 export { sanitizeCustom, computeCustom, parseFormula, evalFormula, templateShape, type CustomState, type Block as CustomBlock } from './display-custom';
+export { sanitizeEasy, glanceOf, priceOf, minutesOf, nextTime, tagsOf, easyShape, easySpoken, itemSpoken, easyText, easySaid, EASY_KINDS, EASY_KIND_WORD, EASY_LIMITS, type EasyState, type EasyItem, type EasyGlance } from './display-easy';
 
 export const spaceOf = (map: ThinkingMap | null | undefined): ObjectSpace => map?.objects ?? EMPTY_SPACE;
 

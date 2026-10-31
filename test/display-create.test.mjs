@@ -167,7 +167,9 @@ console.log('\n=== every kind’s example is a state it keeps ===');
     if (!m.example) continue;
     const s = kindOf(m.kind)?.sanitize(m.example);
     ok(`${m.kind}: its example is kept by its own sanitizer`, !!s && kindOf(m.kind).parts(s).length > 0);
-    ok(`${m.kind}: it has a spec for the pass and words a person uses`, !!m.spec && (m.called?.length ?? 0) > 0);
+    // made only by the person (an easy view, from a photo): never drafted, never asked for in words — its example is its preview
+    if (m.internal) ok(`${m.kind}: made only by the person, so no spec for the pass and no words`, !m.spec && !m.called?.length);
+    else ok(`${m.kind}: it has a spec for the pass and words a person uses`, !!m.spec && (m.called?.length ?? 0) > 0);
   }
 }
 

@@ -19,6 +19,7 @@ import { TimeFigure } from './TimeFigure';
 import { NumberLineFigure } from './NumberLineFigure';
 import { DocumentFigure } from './DocumentFigure';
 import { CustomFigure } from './CustomFigure';
+import { EasyFigure } from './EasyFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
@@ -39,3 +40,5 @@ registerFigure('commonground', GroundFigure);
 registerFigure('timemachine', TimeFigure);
 // anything else, built from a few primitives
 registerFigure('custom', CustomFigure);
+// a photo made large, clear and simple
+registerFigure('easy', EasyFigure);

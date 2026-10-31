@@ -80,7 +80,7 @@ console.log('\n=== what to make, chosen before asking ===');
 ok('a short list, each named once', V.MAKE_CHOICES.length >= 8 && new Set(V.MAKE_CHOICES.map((c) => c.id)).size === V.MAKE_CHOICES.length);
 ok('nothing on the list is a shape of the thinking (those are the Logic Map’s)', V.MAKE_CHOICES.every((c) => !/mind map|concept map|argument map|decision tree/i.test(c.label)));
 const DISPLAY = { chart: 'data', table: 'compare', timeline: 'plan', plan: 'plan', checklist: 'plan', flowchart: 'diagram', proscons: 'crossroads', venn: 'venn' };
-// every choice said in words — CAD is opened, not asked for (below)
+// every choice said in words — the CAD studio and the easy view's photo are opened, not asked for (below)
 for (const c of V.MAKE_CHOICES.filter((x) => !x.opens)) {
   for (const [typed, conv] of [['the causes of the French Revolution', false], ['rent 1200, food 400', true], ['', true]]) {
     const asked = V.askFor(c, typed, conv);
@@ -98,7 +98,12 @@ ok('an unknown choice is no choice', V.makeChoice('sculpture') === null && V.mak
   const cad = V.makeChoice('cad');
   ok('CAD is an artifact: it opens a 3D studio in Artifacts, and nothing is asked for in words', cad?.opens === 'studio' && cad.template === null && V.askFor(cad, 'a desk 120 cm wide', true) === null && V.askFor(cad, '', true) === null);
   ok('  its prompt asks for a description to build', /describe it/i.test(cad.placeholder) && /cm/.test(cad.placeholder));
-  ok('  the only choice that is opened rather than asked for', V.MAKE_CHOICES.filter((c) => c.opens).map((c) => c.id).join() === 'cad');
+  ok('  the choices opened rather than asked for: the easy view\'s photo, and the CAD studio', V.MAKE_CHOICES.filter((c) => c.opens).map((c) => c.id).join() === 'easy,cad');
+}
+{
+  const easy = V.makeChoice('easy');
+  ok('Easy view is made from a photo: it opens the camera, and nothing is asked for in words', easy?.opens === 'photo' && easy.template?.kind === 'easy' && V.askFor(easy, 'what is vegetarian', true) === null && V.askFor(easy, '', true) === null);
+  ok('  its prompt asks what to look out for', /look out for/i.test(easy.placeholder));
 }
 
 console.log(`\nlogic-map-ideas: ${pass} passed, ${fail} failed`);

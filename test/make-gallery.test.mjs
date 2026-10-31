@@ -2,12 +2,13 @@
 //
 //   templates   every choice that fills a display names a real kind and one
 //               of its views, and the words it sends are read as exactly that
-//               kind and view: the preview is what comes back
+//               kind and view: the preview is what comes back; the easy view
+//               is made from a photo, so no words are read as one
 //   previews    the gallery draws each template with its own figure over the
 //               catalogue's example, opened on the template's view; what the
 //               engine builds (a plot, a simulation, a 3D model) and the CAD
 //               studio are drawings
-//   gallery     thirteen cards, one button each; the preview is a picture —
+//   gallery     fourteen cards, one button each; the preview is a picture —
 //               hidden from assistive technology and inert; the chosen card
 //               is pressed; the composer's sheet is the same gallery, small
 //   artifacts   what the map draws itself is listed once: no second "Plot" of
@@ -37,16 +38,19 @@ const none = () => {};
 
 console.log('=== templates: each one is what is made ===');
 const filled = M.MAKE_CHOICES.filter((c) => c.template);
-ok('nine choices fill a display — "Your own" among them, the custom kind — three are built by the engine, and CAD opens its studio', filled.length === 9 && filled.some((c) => c.id === 'custom' && c.template.kind === 'custom') && M.MAKE_CHOICES.filter((c) => !c.template).map((c) => c.id).join() === 'plot,simulation,model3d,cad', J(M.MAKE_CHOICES.map((c) => [c.id, c.template])));
+ok('ten choices fill a display — "Your own" among them, the custom kind, and the easy view, made from a photo — three are built by the engine, and CAD opens its studio', filled.length === 10 && filled.some((c) => c.id === 'custom' && c.template.kind === 'custom') && filled.some((c) => c.id === 'easy' && c.template.kind === 'easy' && c.opens === 'photo') && M.MAKE_CHOICES.filter((c) => !c.template).map((c) => c.id).join() === 'plot,simulation,model3d,cad', J(M.MAKE_CHOICES.map((c) => [c.id, c.template])));
 for (const c of filled) {
   const t = c.template;
   const kind = M.kindOf(t.kind);
   ok(`${c.label}: a display kind (${t.kind})`, M.isDisplayKind(t.kind) && !!kind);
   if (t.view) ok(`  …and one of its views (${t.view})`, (kind?.views ?? []).some((v) => v.id === t.view), J((kind?.views ?? []).map((v) => v.id)));
-  for (const asked of [c.ask('mitosis and meiosis'), c.ask('rent 1200, food 400, transport 90'), c.fromHere]) {
-    const r = M.readDisplayRequest(asked);
-    ok(`  "${asked}" is read as that kind${t.view ? ', on that view' : ''}`, r?.kind === t.kind && (t.view ? r.view === t.view : !r.view), J(r && { kind: r.kind, view: r.view }));
-  }
+  // made from a photo: words never make one
+  if (c.opens) ok(`  opened, not asked for: no words are read as ${t.kind}`, [c.ask('mitosis and meiosis'), c.ask('rent 1200, food 400, transport 90'), c.fromHere].every((asked) => M.readDisplayRequest(asked)?.kind !== t.kind));
+  else
+    for (const asked of [c.ask('mitosis and meiosis'), c.ask('rent 1200, food 400, transport 90'), c.fromHere]) {
+      const r = M.readDisplayRequest(asked);
+      ok(`  "${asked}" is read as that kind${t.view ? ', on that view' : ''}`, r?.kind === t.kind && (t.view ? r.view === t.view : !r.view), J(r && { kind: r.kind, view: r.view }));
+    }
   ok(`  has a line saying what it is for`, typeof c.about === 'string' && c.about.length > 12 && c.about.length < 70, c.about);
 }
 for (const c of M.MAKE_CHOICES.filter((x) => !x.template)) ok(`${c.label}: built by the engine, said in a line`, typeof c.about === 'string' && c.about.length > 12);
@@ -65,7 +69,7 @@ ok('a card for every choice, in order', cards.length === M.MAKE_CHOICES.length &
 ok('one button per card: the card is the button', (g.match(/class="mkg-pick"/g) ?? []).length === M.MAKE_CHOICES.length);
 const previews = g.match(/<div class="mkg-preview"[^>]*>/g) ?? [];
 ok('every preview is a picture: hidden from assistive technology, and inert', previews.length === M.MAKE_CHOICES.length && previews.every((p) => /aria-hidden="true"/.test(p) && /inert=""/.test(p)), J(previews.slice(0, 2)));
-ok('the nine displays are drawn by their own figure', (g.match(/class="mkg-figure"/g) ?? []).length === 9);
+ok('the ten displays are drawn by their own figure', (g.match(/class="mkg-figure"/g) ?? []).length === 10);
 ok('the plot, the simulation, the 3D model and the CAD studio are drawings', (g.match(/<svg class="mkg-draw"/g) ?? []).length === 4);
 ok('  CAD is drawn as a desk in the studio, with its dimension', /data-make="cad"[\s\S]*?<svg class="mkg-draw"[\s\S]*?120 cm/.test(g));
 ok('each card says what it is and what it is for', M.MAKE_CHOICES.every((c) => g.includes(`<span class="mkg-name">${c.label}</span>`) && g.includes(c.about.replace(/'/g, '&#x27;'))));

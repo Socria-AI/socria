@@ -1967,3 +1967,116 @@ row puts it left; with Chat the view, Artifacts goes to the far side; "put the
 chat on the bottom" said. Quick capture and the guide on desktop, a 390px
 phone, Dark and Celestial, and reduced motion; "Open Quick capture" from its
 tutorial opens it and closes the guide.
+
+## 25. Easy view: a photo of small print, made large, clear and simple
+
+The owner's words: "for mobile … you can take a picture on ur phone of like a
+restaurant menu for example and then use it. it can show stuff and show
+diagrams of stuff in easier ui's for ppl with bad eyes or older ppl, it's an
+artifact."
+
+**Made from a photo** (`lib/logos5/make.ts` — the first choice in Make,
+`opens: 'photo'`; `components/logos5/EasyCapture.tsx`, `easy-capture.css`).
+Choosing "Easy view" asks for nothing in words: it opens a sheet — from the
+foot on a phone, from the right on a computer — with the brand book's masthead
+("Point your phone at the *small print*.") and two buttons a thumb cannot miss
+(64px, a word on each). "Take a photo" opens the phone's back camera straight
+away (`capture="environment"`); "Choose a photo" takes any the phone keeps,
+HEIC too; on a computer a photo can be dropped on the sheet. Whatever is typed
+in the composer goes with it ("Anything to look out for? e.g. what is
+vegetarian"). The photo keeps 2048px on its long edge (`EASY_READ_EDGE`), more
+than the 1400 a photo in the conversation keeps, because small print needs it.
+While it is read the sheet says "Reading the photo…" in words over a moss rule
+that fills, not a spinner; what goes wrong is said plainly, with the way to try
+again. "What Socria does" says it in its Make tutorial: Easy view is made from
+a photo, not from words.
+
+**Read once** (`app/api/logos/easy`, `lib/easy-view.ts`). The vision model is
+asked to copy, never to interpret: every name, price, time, amount and step as
+written, in the photo's own order; marks (vegetarian, spicy) only where the
+photo makes them; warnings word for word; and what it cannot read, said in
+`unclear` — never a guessed price, time or dose. One JSON object, temperature
+0, the full picture (`detail: 'high'`). It costs what reading any photo costs —
+one image from the same allowance as `/api/logos/read`, with the same note when
+it is used up (402) — sits behind the takeover's gate with the other routes
+that think (`lib/takeover.ts`), and is logged as `logos/easy`. What comes back
+is held to the kind before anything is returned; nothing to read is a 422 with
+what to try ("a little closer, in more light").
+
+**The kind** (`lib/objects/display-easy.ts`, `easy`). What the photo says: its
+kind (menu, label, timetable, sign, letter, receipt, instructions, list,
+other), a summary, sections of items (name, detail, value as written, marks),
+facts, steps, times, warnings and what could not be read — within limits (80
+items, 40 to a section, 20 steps, 40 times). It is `internal`: made only from a
+photo, never offered to the drafting pass, never read from words, and a draft
+claiming to be one is refused. Everything drawn from it is computed here, not
+asked of a model: `priceOf` reads "$6.50", "6,50 €", "2 for $5", "1,200";
+`minutesOf` reads "08:15", "8.15 pm", "20h45"; `glanceOf` decides what there is
+to draw (two prices or more as bars, else two times on a line, else two steps
+in order); `nextTime` finds the next departure. Its two views are Read it and
+At a glance — At a glance is not offered when there is nothing to draw, and
+says why.
+
+**The turn, and the artifact** (`components/LogosApp.tsx` `makeEasy`). The
+photo and what was typed are the person's turn — the photo kept as source
+material, with the easy view's own text as its reading, so the conversation is
+given what it says and nothing reads the picture twice (`easyText`). Socria's
+answer says what it is, the range of its prices, how to make it easier still,
+and what could not be read (`easySaid`). The easy view is kept as material you
+attached and opens in Artifacts, said above it: "Artifact · Easy view · made
+from your photo" (`DisplayMeta.madeFrom`). Asked about it in the conversation
+("what is vegetarian?"), Socria is given its text and told to answer from it,
+keep prices and times exactly as written, and say when a line could not be
+read.
+
+**Drawn** (`components/display/EasyFigure.tsx`, `easy.css`). Big type from the
+start — 19px times the size chosen, the second of four steps — and everything
+in em, so the whole of it grows together. A− / A+ (four steps, kept per browser
+in `socria.easy.v1`), High contrast (paper on ink with the accent sage, 14:1,
+the same on every theme), Read it to me (the browser's own voice, a little
+slower than usual, only where the browser has one; a press on any line reads
+that line), and Show only (what the photo marks: vegetarian, gluten free).
+Read it sets out, in order, its kind and name (the name in Instrument Serif),
+what it is, the warnings first as "Please note", the facts, each section under
+its heading with each line's name, price, small print and marks, the steps
+numbered, the times with the next one marked by this device's clock, and what
+could not be read. At a glance draws its prices as bars from the lowest, each
+as long as its price against the highest, with the lowest and the highest said
+beneath; its times in order with the next marked; or its steps one at a time.
+Under both, once: "Read from your photo. For anything that matters — a dose, a
+date, an allergy — check the original too." Every control is a real button,
+48px at least, with a word on it; on a narrow card (a container query, so it is
+the space it is given, not the screen) the four controls become two pairs of
+wide buttons — the size of the words, then contrast and the voice — every word
+whole at 16px, and the marks to show only wrap under their label rather than
+hide past the edge; a finger leaves no hover behind; with reduced motion
+nothing moves. On a wide screen what is read keeps a measure of 34em, so a name
+stays near its price.
+
+**Not here.** The photo is read by a model, which can misread a faint or
+curved line; it is told to leave out what it cannot read and say so, and the
+figure says to check what matters. The photo itself is not kept beyond its
+thumbnail and preview in the conversation, as for any photo. Reading aloud uses
+the browser's voice; where a browser has none, the button is not shown. On a
+phone narrower than 360px the composer's row does not fit its controls (Voice
+covers Make), which is older than this and is the composer's to fix; there,
+the Artifacts tab offers the same gallery (its own "+ Make"), Easy view first.
+
+**Checked.** `test/easy-view.test.mjs` (149: what the kind keeps and in one
+form; prices, times, the glance and the next time; what is said, read aloud
+and given to a model; the kind made only from a photo; the figure drawn in both
+views and small; the sheet on a phone and on a computer; the route, its
+allowance and the takeover gate; the wiring in Logos 5; contrast at 7:1 or
+more, 48px controls, the measure, the two pairs on a narrow card, hover and
+reduced motion), `test/display-create.test.mjs` (a kind made only by the
+person has an example for its preview, and no spec or words),
+`test/make-gallery.test.mjs` (Easy view among the fourteen cards, drawn by its
+own figure; no words read as one), `test/logic-map-ideas.test.mjs` (opened,
+not asked for), `test/takeover.test.mjs` (`logos/easy` gated). In the browser,
+on a 390px phone through the stand-in model (`scripts/dev/fake-openai.mjs`
+reads every photo as the same café menu): Make → Easy view → the sheet →
+choose a photo of a menu → the easy view opens in Artifacts, made from the
+photo; A+ kept; High contrast; Show only vegetarian; At a glance with the bars
+lowest first; the turn and Socria's answer in the conversation — and the same
+on a 1440px desktop. Every word on the toolbar measured inside its button at
+390px and 320px, in both modes.
