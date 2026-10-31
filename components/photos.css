@@ -1,0 +1,266 @@
+/* components/photos.css — photos in the conversation, and a photo opened large.
+ *
+ * In a message a photo is a picture, not a chip: as wide as a phone allows,
+ * its whole frame (never cropped), a hairline round it, its name under it —
+ * pressed, it opens large (components/PhotoViewer.tsx). Opened, it sits on ink
+ * with the brand's dark pair (paper on ink), the name in Instrument Serif,
+ * and what Socria read in it behind a quiet line. */
+
+/* ── in a message ──────────────────────────────────────────────────── */
+.logos-root .lg-pics {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.logos-root .l5-u .lg-pics {
+  justify-content: flex-end;
+}
+.logos-root .l5-u.is-other .lg-pics {
+  justify-content: flex-start;
+}
+.logos-root .lg-pic {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+  max-width: min(300px, 100%);
+  margin: 0;
+}
+.logos-root .lg-pic.is-small {
+  max-width: min(170px, 100%);
+}
+/* two or more side by side: each takes a share of the row */
+.logos-root .lg-pics.is-many .lg-pic {
+  max-width: calc(50% - 4px);
+}
+.logos-root .lg-pic-open {
+  display: block;
+  padding: 0;
+  border: 1px solid var(--lg-line);
+  border-radius: 12px;
+  overflow: hidden;
+  background: var(--l5-surface, #fff);
+  cursor: zoom-in;
+  transition:
+    transform 0.25s cubic-bezier(0.16, 1, 0.3, 1),
+    box-shadow 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.logos-root .lg-pic-open img {
+  display: block;
+  width: auto;
+  max-width: 100%;
+  height: auto;
+  max-height: 340px;
+}
+.logos-root .lg-pic.is-small .lg-pic-open img {
+  max-height: 180px;
+}
+.logos-root .lg-pic-open:focus-visible {
+  outline: 2px solid var(--lg-primary, #354620);
+  outline-offset: 3px;
+}
+@media (hover: hover) {
+  .logos-root .lg-pic-open:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 10px 24px -14px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.4);
+  }
+}
+.logos-root .lg-pic-cap {
+  display: flex;
+  align-items: baseline;
+  gap: 6px;
+  min-width: 0;
+  padding: 0 2px;
+  font-size: 11.5px;
+  color: var(--lg-ink-40);
+}
+.logos-root .l5-u:not(.is-other) .lg-pic-cap {
+  justify-content: flex-end;
+}
+.logos-root .lg-pic-name {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ── in the box, before it is sent: the chip's thumbnail opens it ─── */
+.logos-root .lg-att-look {
+  flex: 0 0 auto;
+  padding: 0;
+  border: 0;
+  border-radius: 8px;
+  background: none;
+  cursor: zoom-in;
+}
+.logos-root .lg-att-look .lg-att-thumb {
+  display: block;
+  width: 48px;
+  height: 48px;
+}
+.logos-root .lg-att-look:focus-visible {
+  outline: 2px solid var(--lg-primary, #354620);
+  outline-offset: 2px;
+}
+/* a photo still being opened: a moss tile that breathes, no spinner */
+.logos-root .lg-att-thumb.is-busy {
+  width: 48px;
+  height: 48px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.12);
+  animation: lg-pic-wait 1.4s ease-in-out infinite alternate;
+}
+@keyframes lg-pic-wait {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+/* ── opened large ──────────────────────────────────────────────────── */
+.pv {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  background: rgba(32, 32, 27, 0.94);
+  color: #f4f1e8;
+  font-family: var(--lg-sans, var(--sans, system-ui, sans-serif));
+  animation: pv-in 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+.pv-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: calc(10px + env(safe-area-inset-top, 0px)) 16px 10px;
+  border-bottom: 1px solid rgba(244, 241, 232, 0.16);
+}
+.pv-lbl {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(244, 241, 232, 0.66);
+}
+.pv-x {
+  display: grid;
+  place-items: center;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border: 1px solid rgba(244, 241, 232, 0.3);
+  border-radius: 50%;
+  background: none;
+  color: #f4f1e8;
+  cursor: pointer;
+}
+.pv-x:focus-visible,
+.pv-photo:focus-visible,
+.pv-read summary:focus-visible {
+  outline: 2px solid #c8dd9e;
+  outline-offset: 3px;
+}
+.pv-stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  overflow: hidden;
+}
+.pv-photo {
+  display: block;
+  max-width: 100%;
+  max-height: 100%;
+  padding: 0;
+  border: 0;
+  background: none;
+  cursor: zoom-in;
+}
+.pv-photo img {
+  display: block;
+  max-width: 100%;
+  max-height: calc(100dvh - 210px);
+  width: auto;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 6px;
+  object-fit: contain;
+  user-select: none;
+}
+/* at full size: the photo as large as it is, panned with a finger */
+.pv-stage.is-full {
+  display: block;
+  overflow: auto;
+  -webkit-overflow-scrolling: touch;
+}
+.pv-stage.is-full .pv-photo {
+  max-width: none;
+  max-height: none;
+  margin: 0 auto;
+  cursor: zoom-out;
+}
+.pv-stage.is-full .pv-photo img {
+  max-width: none;
+  max-height: none;
+}
+.pv-foot {
+  padding: 12px 18px calc(16px + env(safe-area-inset-bottom, 0px));
+  border-top: 1px solid rgba(244, 241, 232, 0.16);
+}
+.pv-name {
+  margin: 0;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 21px;
+  line-height: 1.2;
+  overflow-wrap: anywhere;
+}
+.pv-hint {
+  margin: 3px 0 0;
+  font-size: 13px;
+  color: rgba(244, 241, 232, 0.66);
+}
+.pv-read {
+  margin-top: 10px;
+}
+.pv-read summary {
+  display: inline-block;
+  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-size: 16px;
+  font-style: italic;
+  color: #c8dd9e;
+  border-bottom: 1px solid rgba(200, 221, 158, 0.5);
+  cursor: pointer;
+  list-style: none;
+}
+.pv-read summary::-webkit-details-marker {
+  display: none;
+}
+.pv-read p {
+  max-height: 28vh;
+  margin: 8px 0 0;
+  overflow: auto;
+  font-size: 14px;
+  line-height: 1.55;
+  white-space: pre-wrap;
+  color: rgba(244, 241, 232, 0.86);
+}
+
+@keyframes pv-in {
+  from {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .pv,
+  .logos-root .lg-att-thumb.is-busy {
+    animation: none;
+  }
+  .logos-root .lg-pic-open {
+    transition: none;
+  }
+}

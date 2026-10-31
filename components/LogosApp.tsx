@@ -3268,7 +3268,7 @@ export function LogosApp({
     // sent as a silent blank.
     const ready: Attachment[] = drafts
       .filter((d) => d.status === 'ready')
-      .map(({ id, status, error: _e, ...rest }) => rest);
+      .map(({ id, status, error: _e, phase: _p, ...rest }) => rest);
     setDrafts([]);
     void send(typeof asked === 'string' ? asked : input, ready, replyTo, make);
   }
@@ -5255,7 +5255,7 @@ export function LogosApp({
       outcome('Memory is open — say “go back” to return to your line of thinking, or “go home”.');
       return;
     }
-    const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, ...rest }) => rest);
+    const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, phase: _p, ...rest }) => rest);
     const choice = makeChoice(makeId, ownChoices);
     // with others here, Socria answers when it is named (@socria): said, "Socria, …" names it
     let words = groupNow() ? text.replace(/^(?:(?:hey|ok|okay)\s+)?socria\b[\s,:]*/i, '@socria ') : text;
@@ -7252,7 +7252,7 @@ export function LogosApp({
       sendFromComposer(asked, own ? { template: templatePayload(own) } : undefined);
       return;
     }
-    const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, ...rest }) => rest);
+    const ready: Attachment[] = drafts.filter((d) => d.status === 'ready').map(({ id, status, error: _e, phase: _p, ...rest }) => rest);
     if (studyTab === 'content' && !input.trim() && ready.some((a) => a.kind === 'doc')) {
       setDrafts([]);
       const said = input.trim();

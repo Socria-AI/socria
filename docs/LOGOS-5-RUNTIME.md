@@ -2080,3 +2080,55 @@ photo; A+ kept; High contrast; Show only vegetarian; At a glance with the bars
 lowest first; the turn and Socria's answer in the conversation — and the same
 on a 1440px desktop. Every word on the toolbar measured inside its button at
 390px and 320px, in both modes.
+
+## 26. Photos from a phone: taken however they come, shown as pictures
+
+The owner's words: "can you improve image upload on mobile cant read jpegs or
+heic / convert, improve the image preview too".
+
+**Why they were refused.** A photo was taken only when the browser called it
+one of four exact types. A phone often does not: HEIC is `image/heic`, a JPEG
+from Files, Drive or a chat app may come as `image/jpg`, as `.jfif`, or with no
+type at all; and the composer's own preview, made for every photo, was never
+attached, so a conversation showed a 40px chip.
+
+**Known by its type, its name, or its bytes** (`lib/image-kind.ts`). The type
+first (the standard names and the ones seen in the wild), the name when the type
+says nothing, and — for a file with neither — its first bytes (JPEG, PNG, GIF,
+WebP, BMP, HEIC/HEIF, AVIF). A type that names something else is believed: a PDF
+called photo.jpg is not a photo, and says so ("That file isn't a photo this can
+open — choose a JPEG, PNG, HEIC or WebP picture."). Every photo picker asks for
+`image/*`, so a phone offers every photo it has and an iPhone hands its HEIC
+photos over as JPEGs.
+
+**Opened, the right way up, and converted where it must be**
+(`lib/logos-upload.ts`). The browser's own decoder first, from an object URL
+rather than a base64 copy of a 20 MB file — it turns a phone photo the right way
+up (EXIF) and opens HEIC where it can (Safari); then a bitmap; then, for a HEIC
+the browser cannot open (Chrome, Firefox, Android), libheif compiled to
+WebAssembly (`heic-to`, pinned at 1.6.7, LGPL-3.0), loaded only then (about
+3 MB, in a worker). Each size is stepped down by halves so a small one stays
+sharp (`stepSizes`), never a step larger than a phone's canvas. Up to 30 MB is
+taken: a 50-megapixel JPEG is made small before anything is sent. The same
+converter makes a profile picture and a picture in the writing a JPEG when they
+were HEIC, AVIF or BMP.
+
+**Shown as a picture** (`components/LogosComposer.tsx`, `PhotoViewer.tsx`,
+`photos.css`). The chip is there the moment a photo is chosen and says what is
+happening — opening, converting from HEIC, reading, read — and its thumbnail
+opens it large. Sent, a photo is a picture in the message (720px on its long
+side, at most ~75 KB stored, so a conversation of photos still saves in one
+request and in a signed-out browser's storage), two to a row, its whole frame.
+Pressed, it opens on ink with its name and what Socria read in it; a press shows
+it at full size to pan across small print; Escape, the close button or the
+ground around it close it, and the focus goes back. Quick capture, the context
+panel and Easy view say "Opening the photo…" / "Converting the HEIC photo…" too,
+and Quick capture waits for a photo still opening before it saves.
+
+**Checked.** `test/photo-upload.test.mjs` (79: type, name and bytes; the
+stepping; the pipeline; every picker; the byte check where a file says nothing;
+the chip's words; the picture and the viewer). In the browser on a 390px phone:
+a JPEG with no type and no name, a real HEIC (converted, upright), a JPEG stored
+on its side (EXIF 6, turned upright), a 48-megapixel 12.9 MB JPEG, and a PDF
+called .jpg (refused, no empty chip); sent, four pictures at 540×720, ~25 KB
+each; opened large, full size, closed.

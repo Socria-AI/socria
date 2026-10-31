@@ -12,6 +12,8 @@
 
 import { dataUrlBytes, imageSize, jpegInfo, jpegOrientation, MAX_EDGE, MAX_MEDIA_BYTES, MEDIA_ID, newMediaId, sniffImage, srcOf, type MediaType } from '@/lib/write/media';
 import type { PdfPicture } from '@/lib/write/pdf';
+import { sniffPhoto } from '@/lib/image-kind';
+import { toJpegBlob } from '@/lib/logos-upload';
 
 interface Rec {
   id: string;
@@ -138,7 +140,11 @@ function hasAlpha(ctx: CanvasRenderingContext2D, w: number, h: number): boolean 
 async function prepare(input: Blob): Promise<{ blob: Blob; type: MediaType; w: number; h: number }> {
   const bytes = new Uint8Array(await input.arrayBuffer());
   const type = sniffImage(bytes);
-  if (!type) throw new Error('That is not a picture that can go in the writing — PNG, JPEG, GIF or WebP can.');
+  if (!type) {
+    // a phone's HEIC (or an AVIF, a BMP) is made a JPEG first, then kept like any other (lib/logos-upload.ts)
+    if (sniffPhoto(bytes.subarray(0, 64))) return prepare(await toJpegBlob(input, MAX_EDGE));
+    throw new Error('That is not a picture that can go in the writing — a JPEG, PNG, HEIC, GIF or WebP can.');
+  }
   const size = imageSize(bytes, type);
   const upright = type !== 'image/jpeg' || jpegOrientation(bytes) === 1;
   if (size && upright && size.w <= MAX_EDGE && size.h <= MAX_EDGE && bytes.length <= 1_500_000) return { blob: new Blob([bytes], { type }), type, ...size };

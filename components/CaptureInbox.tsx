@@ -34,7 +34,7 @@ import {
   type Capture,
 } from '@/lib/logos4/captures';
 import { browserStorage } from '@/lib/logos4/resume';
-import { prepareImage, isImageFile } from '@/lib/logos-upload';
+import { IMAGE_ACCEPT, prepareImage, isImageFile, isPhotoByBytes, saysNothing } from '@/lib/logos-upload';
 import type { Attachment } from '@/lib/logos-attachments';
 import './capture-inbox.css';
 
@@ -103,7 +103,9 @@ export function CaptureInbox({
   const [problem, setProblem] = useState<string | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [text, setText] = useState('');
-  const [photo, setPhoto] = useState<{ status: 'reading' | 'ready' | 'error'; attachment?: Attachment; thumb: string; error?: string } | null>(null);
+  const [photo, setPhoto] = useState<{ status: 'opening' | 'converting' | 'reading' | 'ready' | 'error'; attachment?: Attachment; thumb: string; error?: string } | null>(null);
+  // a photo not yet ready is waited for: saving now would keep the words and lose it
+  const photoBusy = photo?.status === 'opening' || photo?.status === 'converting' || photo?.status === 'reading';
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
@@ -192,10 +194,12 @@ export function CaptureInbox({
   }, [open, onClose, editing]);
 
   async function takePhoto(file: File) {
-    if (!isImageFile(file)) return setProblem('That isn’t a photo.');
+    if (!isImageFile(file) && !(saysNothing(file) && (await isPhotoByBytes(file)))) return setProblem('That isn’t a photo — choose a JPEG, PNG, HEIC or WebP picture.');
     setProblem(null);
+    // said at once: opening it, or converting a HEIC, before there is a thumbnail to show
+    setPhoto({ status: 'opening', thumb: '' });
     try {
-      const p = await prepareImage(file);
+      const p = await prepareImage(file, undefined, undefined, { onConvert: () => setPhoto({ status: 'converting', thumb: '' }) });
       setPhoto({ status: 'reading', thumb: p.thumb });
       try {
         const reading = await readImage(p.full);
@@ -205,6 +209,7 @@ export function CaptureInbox({
         setPhoto({ status: 'error', thumb: p.thumb, attachment: cleanCaptureAttachment({ kind: 'image', name: p.name, thumb: p.thumb }), error: e?.message || 'It couldn’t be read, but it can still be kept.' });
       }
     } catch (e: any) {
+      setPhoto(null);
       setProblem(e?.message || 'That photo couldn’t be added.');
     }
   }
@@ -212,7 +217,7 @@ export function CaptureInbox({
   async function save() {
     const now = Date.now();
     const c = cleanCapture({ id: newCaptureId(), text, attachment: photo?.attachment, createdAt: now, updatedAt: now }, now);
-    if (!c || saving || photo?.status === 'reading') return;
+    if (!c || saving || photoBusy) return;
     setSaving(true);
     setProblem(null);
     try {
@@ -268,7 +273,7 @@ export function CaptureInbox({
   }
 
   if (!open) return null;
-  const canSave = (!!text.trim() || !!photo?.attachment) && !saving && photo?.status !== 'reading';
+  const canSave = (!!text.trim() || !!photo?.attachment) && !saving && !photoBusy;
   const days = byDay(list);
   let n = 0;
 
@@ -311,9 +316,23 @@ export function CaptureInbox({
           />
           {photo && (
             <div className="qc-pending">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img className="qc-thumb" src={photo.thumb} alt="The photo to keep" />
-              <span className="qc-pending-t">{photo.status === 'reading' ? 'Reading the photo…' : photo.status === 'error' ? photo.error : 'Photo ready.'}</span>
+              {photo.thumb ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="qc-thumb" src={photo.thumb} alt="The photo to keep" />
+              ) : (
+                <span className="qc-thumb is-busy" aria-hidden="true" />
+              )}
+              <span className="qc-pending-t" role="status">
+                {photo.status === 'opening'
+                  ? 'Opening the photo…'
+                  : photo.status === 'converting'
+                    ? 'Converting the HEIC photo…'
+                    : photo.status === 'reading'
+                      ? 'Reading the photo…'
+                      : photo.status === 'error'
+                        ? photo.error
+                        : 'Photo ready.'}
+              </span>
               <button type="button" className="qc-quiet" onClick={() => setPhoto(null)}>
                 Remove
               </button>
@@ -330,7 +349,7 @@ export function CaptureInbox({
             <input
               ref={fileRef}
               type="file"
-              accept="image/png,image/jpeg,image/webp,image/gif,image/heic"
+              accept={IMAGE_ACCEPT}
               capture="environment"
               hidden
               onChange={(e) => {

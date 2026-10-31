@@ -29,7 +29,7 @@ import {
   guessOrigin,
   type AttachmentOrigin,
 } from '@/lib/logos-attachments';
-import { isImageFile, isTextFile, prepareImage, readTextFile } from '@/lib/logos-upload';
+import { IMAGE_ACCEPT, isImageFile, isPhotoByBytes, isTextFile, prepareImage, readTextFile, saysNothing } from '@/lib/logos-upload';
 import { NodeGlyph } from './NodeGlyph';
 
 interface SourceInfo {
@@ -268,7 +268,7 @@ export function ContextPanel({
       }
       setError(null);
       try {
-        if (isImageFile(f)) {
+        if (isImageFile(f) || (saysNothing(f) && (await isPhotoByBytes(f)))) {
           setAttaching(f.name);
           const prepared = await prepareImage(f);
           const reading = await readImage(prepared.full);
@@ -477,7 +477,7 @@ export function ContextPanel({
               ref={fileRef}
               type="file"
               multiple
-              accept="image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json"
+              accept={`${IMAGE_ACCEPT},text/plain,text/markdown,.txt,.md,.csv,.log,.json`}
               className="lg-file"
               onChange={(e) => {
                 if (e.target.files?.length) void attachFiles(e.target.files);

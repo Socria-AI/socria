@@ -255,6 +255,25 @@ html[data-theme='night'] .qc {
   border: 1px solid var(--qc-line);
   border-radius: 10px;
 }
+/* a photo still being opened: a moss tile that breathes, no spinner */
+.qc-thumb.is-busy {
+  display: inline-block;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.12);
+  animation: qc-wait 1.4s ease-in-out infinite alternate;
+}
+@keyframes qc-wait {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .qc-thumb.is-busy {
+    animation: none;
+  }
+}
 
 /* ── what happened, said quietly ────────────────────────────────────── */
 .qc-note {

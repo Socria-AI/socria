@@ -440,8 +440,8 @@ console.log('\n=== the photo: Make, the sheet, the route ===');
     /class="ec-go is-main"[^>]*>[\s\S]*?Take a photo<\/button><button type="button" class="ec-go"[^>]*>[\s\S]*?Choose a photo/.test(phone)
   );
   ok(
-    '  the camera is the back one; a photo chosen may be any the phone keeps, HEIC too',
-    /accept="image\/\*" capture="environment"/.test(phone) && /accept="image\/png,image\/jpeg,image\/webp,image\/gif,image\/heic,image\/heif"/.test(phone)
+    '  the camera is the back one; a photo chosen may be any the phone keeps (image/*: an iPhone hands its HEIC over as JPEG)',
+    /accept="image\/\*" capture="environment"/.test(phone) && (phone.match(/accept="image\/\*"/g) ?? []).length === 2
   );
   ok('  what it is for, and how to take a good one', /A menu, a medicine label, a timetable, a letter\./.test(phone) && /class="ec-tip">Hold it steady/.test(phone));
   ok('  a close button with a name', /aria-label="Close"/.test(phone));
@@ -452,7 +452,12 @@ console.log('\n=== the photo: Make, the sheet, the route ===');
   );
   ok('the photo keeps more of the small print than a photo in the conversation', E.EASY_READ_EDGE === 2048 && E.EASY_READ_EDGE > E.READ_MAX_EDGE);
   const cap = read('components/logos5/EasyCapture.tsx');
-  ok('  and the sheet asks for that much', /prepareImage\(file, undefined, EASY_READ_EDGE\)/.test(cap) && /full: resize\(img, readEdge, 0\.82\)/.test(read('lib/logos-upload.ts')));
+  ok(
+    '  and the sheet asks for that much — saying so while a HEIC is converted',
+    /prepareImage\(file, undefined, EASY_READ_EDGE, \{ onConvert:/.test(cap) &&
+      /const full = scaled\(pic\.src, pic\.w, pic\.h, readEdge\)/.test(read('lib/logos-upload.ts')) &&
+      /Converting the HEIC photo…/.test(cap)
+  );
   ok(
     '  while it is read, it says so in words — and a failure says what to try',
     /Reading the photo…/.test(cap) && /role="status" aria-live="polite"/.test(cap) && /role="alert"/.test(cap) && /Try another photo:/.test(cap)

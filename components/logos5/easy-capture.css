@@ -172,6 +172,12 @@
   border: 1px solid var(--ec-line);
   border-radius: 14px;
 }
+/* the photo still being opened: a moss tile that breathes, no spinner */
+.ec-thumb.is-busy {
+  display: block;
+  background: rgba(var(--ec-moss-rgb), 0.12);
+  animation: ec-wait 1.4s ease-in-out infinite alternate;
+}
 .ec-thumb.is-small {
   width: 64px;
   height: 64px;
@@ -261,6 +267,14 @@
     transform: translateY(32px);
   }
 }
+@keyframes ec-wait {
+  from {
+    opacity: 0.45;
+  }
+  to {
+    opacity: 1;
+  }
+}
 @keyframes ec-fill {
   from {
     transform: scaleX(0);
@@ -273,7 +287,8 @@
 @media (prefers-reduced-motion: reduce) {
   .ec-veil,
   .ec,
-  .ec-line::after {
+  .ec-line::after,
+  .ec-thumb.is-busy {
     animation: none;
   }
   .ec-go {

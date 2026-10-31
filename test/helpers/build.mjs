@@ -226,6 +226,8 @@ const MODULES = [
   'lib/checkout-attribution.ts',
   'lib/person-memory.ts',
   'lib/file-kinds.ts',
+  // what a phone's photo is, by its type, its name and its first bytes; how it is stepped down (lib/image-kind.ts)
+  'lib/image-kind.ts',
   'lib/upload-paths.ts',
   'lib/chat-attachments.ts',
   'lib/file-extract.ts',

@@ -107,6 +107,7 @@ import { PDF_TYPE, pdfCoverage, toPdf, type PdfPicture } from '@/lib/write/pdf';
 import { IMPORT_ACCEPT, importFile, type Imported } from '@/lib/write/import';
 import { settleImages } from '@/lib/write/parse';
 import { bytesToDataUrl, mediaIdOf } from '@/lib/write/media';
+import { IMAGE_ACCEPT } from '@/lib/logos-upload';
 import { richWriting } from '@/lib/write/flags';
 import type { WriteSel } from '@/lib/write/focus';
 import { Editor, pasteInto, type EditorHandle, type EditorRange, type EditorSelection, type FormatOp, type FormatState, type Marked } from './Editor';
@@ -1633,7 +1634,7 @@ export const WriteSpace = forwardRef<
         <input
           ref={pictureRef}
           type="file"
-          accept="image/png,image/jpeg,image/gif,image/webp"
+          accept={IMAGE_ACCEPT}
           multiple
           hidden
           onChange={(e) => {

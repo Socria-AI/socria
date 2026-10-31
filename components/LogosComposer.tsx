@@ -22,22 +22,28 @@ import {
   guessOrigin,
   wordCount,
 } from '@/lib/logos-attachments';
-import { isImageFile, isTextFile, prepareImage, readTextFile } from '@/lib/logos-upload';
+import { IMAGE_ACCEPT, isImageFile, isPhotoByBytes, isTextFile, prepareImage, readTextFile, saysNothing } from '@/lib/logos-upload';
 import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, TEXT_EXTENSIONS, kindOfFile, refusalFor } from '@/lib/file-kinds';
 
 /** What the attach button offers: pictures, documents (a zip is opened in Core) and anything that is text. */
-const DOC_ACCEPT = [...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e !== 'zip'), ...TEXT_EXTENSIONS].map((e) => `.${e}`).join(',');
+// every photo the phone has ("image/*" — HEIC too, which an iPhone then hands over as JPEG), then the rest by name
+const DOC_ACCEPT = [IMAGE_ACCEPT, ...[...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e !== 'zip'), ...TEXT_EXTENSIONS].map((e) => `.${e}`)].join(',');
+const PLAIN_ACCEPT = `${IMAGE_ACCEPT},text/plain,text/markdown,.txt,.md,.csv,.log,.json`;
 import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
 import { TeX } from './TeX';
 import { useVoiceInput } from './useVoiceInput';
 import { MAX_RECORD_SECONDS, SLIDE_CANCEL_PX, clock, insertSpoken } from '@/lib/logos4/voice';
+import { PhotoViewer } from './PhotoViewer';
 import './logos-thread.css';
+import './photos.css';
 import './logos4.css';
 
 export interface Draft extends Attachment {
   id: string;
   status: 'reading' | 'ready' | 'error';
   error?: string;
+  /** a photo before it is read: being opened, or converted from HEIC first (lib/logos-upload.ts) */
+  phase?: 'opening' | 'converting';
 }
 
 let seq = 0;
@@ -52,7 +58,7 @@ export function AttachmentList({
   onOrigin,
   onOpenDoc,
 }: {
-  items: (Attachment & { id?: string; status?: string; error?: string })[];
+  items: (Attachment & { id?: string; status?: string; error?: string; phase?: string })[];
   onRemove?: (id: string) => void;
   /** correcting whose thinking a note is — only offered while it's a draft */
   onOrigin?: (id: string, origin: AttachmentOrigin) => void;
@@ -62,12 +68,36 @@ export function AttachmentList({
   const [openNote, setOpenNote] = useState<string | null>(null);
   /** the document being looked at under its chip */
   const [preview, setPreview] = useState<string | null>(null);
+  /** the photo opened large (components/PhotoViewer.tsx) */
+  const [viewing, setViewing] = useState<string | null>(null);
   if (!items.length) return null;
+  const keyed = items.map((a, i) => ({ a, id: a.id ?? String(i) }));
+  // In a message a photo is a picture, pressed to open large; in the box it stays a chip until it is sent
+  const inMessage = !onRemove;
+  const pictures = inMessage ? keyed.filter(({ a }) => a.kind === 'image' && (a.preview || a.thumb)) : [];
+  const open = keyed.find(({ id }) => id === viewing)?.a;
+  const openSrc = open ? open.preview || open.thumb : '';
 
   return (
     <div className="lg-atts">
-      {items.map((a, i) => {
-        const id = a.id ?? String(i);
+      {pictures.length > 0 && (
+        <div className={`lg-pics${pictures.length > 1 ? ' is-many' : ''}`}>
+          {pictures.map(({ a, id }) => (
+            <figure key={id} className={`lg-pic${a.preview ? '' : ' is-small'}`}>
+              <button type="button" className="lg-pic-open" onClick={() => setViewing(id)} aria-label={`${a.name || 'Photo'} — open it large`}>
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img src={a.preview || a.thumb} alt={a.name || 'Attached photo'} loading="lazy" decoding="async" />
+              </button>
+              <figcaption className="lg-pic-cap">
+                <span className="lg-pic-name">{a.name || 'Photo'}</span>
+                {a.reading ? <span aria-label="Socria read it">· read</span> : null}
+              </figcaption>
+            </figure>
+          ))}
+        </div>
+      )}
+      {keyed.map(({ a, id }) => {
+        if (pictures.some((p) => p.id === id)) return null;
         const isOpen = openNote === id;
         if (a.kind === 'doc') {
           const unit = UNIT[a.format ?? ''] ?? ['page', 'pages'];
@@ -132,21 +162,27 @@ export function AttachmentList({
             {a.kind === 'image' ? (
               <>
                 {a.thumb ? (
-                  // eslint-disable-next-line @next/next/no-img-element
-                  <img className="lg-att-thumb" src={a.thumb} alt={a.name || 'Attached image'} />
+                  <button type="button" className="lg-att-look" onClick={() => setViewing(id)} aria-label={`See ${a.name || 'the photo'} large`}>
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img className="lg-att-thumb" src={a.thumb} alt="" />
+                  </button>
                 ) : (
-                  <span className="lg-att-thumb is-blank" aria-hidden="true" />
+                  <span className={`lg-att-thumb is-blank${a.phase ? ' is-busy' : ''}`} aria-hidden="true" />
                 )}
                 <span className="lg-att-meta">
-                  <span className="lg-att-name">{a.name || 'Image'}</span>
+                  <span className="lg-att-name">{a.name || 'Photo'}</span>
                   <span className="lg-att-sub">
-                    {a.status === 'reading'
-                      ? 'reading…'
-                      : a.status === 'error'
-                        ? (a.error ?? 'could not be read')
-                        : a.reading
-                          ? 'read'
-                          : 'attached'}
+                    {a.phase === 'converting'
+                      ? 'converting from HEIC…'
+                      : a.phase === 'opening'
+                        ? 'opening…'
+                        : a.status === 'reading'
+                          ? 'reading…'
+                          : a.status === 'error'
+                            ? (a.error ?? 'could not be read')
+                            : a.reading
+                              ? 'read'
+                              : 'attached'}
                   </span>
                 </span>
               </>
@@ -213,6 +249,7 @@ export function AttachmentList({
           </div>
         );
       })}
+      {open && openSrc && <PhotoViewer src={openSrc} name={open.name || 'Photo'} reading={open.reading} onClose={() => setViewing(null)} />}
     </div>
   );
 }
@@ -592,15 +629,12 @@ export function LogosComposer({
 
   async function addImage(file: File) {
     const id = nextId();
+    // the chip is there at once, saying what is happening: opening it, converting a HEIC, reading it
+    addDraft({ id, kind: 'image', name: file.name || 'Photo', status: 'reading', phase: 'opening' });
+    const patch = (d: Partial<Draft>) => setDrafts((prev) => prev.map((x) => (x.id === id ? { ...x, ...d } : x)));
     try {
-      const prepared = await prepareImage(file);
-      addDraft({
-        id,
-        kind: 'image',
-        name: prepared.name,
-        thumb: prepared.thumb,
-        status: 'reading',
-      });
+      const prepared = await prepareImage(file, undefined, undefined, { onConvert: () => patch({ phase: 'converting' }) });
+      patch({ name: prepared.name, thumb: prepared.thumb, ...(prepared.preview ? { preview: prepared.preview } : {}), phase: undefined });
       try {
         const reading = await readImage(prepared.full);
         setDrafts((prev) =>
@@ -616,7 +650,8 @@ export function LogosComposer({
         );
       }
     } catch (e: any) {
-      setNotice(e?.message || 'That file could not be added.');
+      setDrafts((prev) => prev.filter((d) => d.id !== id));
+      setNotice(e?.message || 'That photo could not be added.');
     }
   }
 
@@ -635,7 +670,8 @@ export function LogosComposer({
     setNotice(null);
     const list = Array.from(files).slice(0, MAX_ATTACHMENTS);
     for (const f of list) {
-      if (isImageFile(f)) await addImage(f);
+      // a photo by its type or name — or, when the file says nothing about itself, by its first bytes
+      if (isImageFile(f) || (saysNothing(f) && (kindOfFile(f.name, f.type) === 'unsupported' || !readDocument) && (await isPhotoByBytes(f)))) await addImage(f);
       else if (readDocument) {
         const kind = kindOfFile(f.name, f.type);
         if (kind === 'secret' || (kind === 'unsupported' && !isTextFile(f)) || /\.zip$/i.test(f.name)) setNotice(/\.zip$/i.test(f.name) ? 'Attach the files inside the zip one by one.' : refusalFor(f.name));
@@ -881,7 +917,7 @@ export function LogosComposer({
               ref={fileRef}
               type="file"
               multiple
-              accept={readDocument ? DOC_ACCEPT : 'image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json'}
+              accept={readDocument ? DOC_ACCEPT : PLAIN_ACCEPT}
               className="lg-file"
               onChange={(e) => {
                 if (e.target.files?.length) void takeFiles(e.target.files);
@@ -954,7 +990,7 @@ export function LogosComposer({
               ref={fileRef}
               type="file"
               multiple
-              accept={readDocument ? DOC_ACCEPT : 'image/png,image/jpeg,image/webp,image/gif,text/plain,text/markdown,.txt,.md,.csv,.log,.json'}
+              accept={readDocument ? DOC_ACCEPT : PLAIN_ACCEPT}
               className="lg-file"
               onChange={(e) => {
                 if (e.target.files?.length) void takeFiles(e.target.files);
@@ -1065,7 +1101,15 @@ export function LogosComposer({
 
       {(notice || readying) && (
         <p className="lg-composer-note">
-          {readying ? (drafts.some((d) => d.status === 'reading' && d.kind === 'doc') ? 'Reading the document…' : 'Reading the image…') : notice}
+          {readying
+            ? drafts.some((d) => d.status === 'reading' && d.kind === 'doc')
+              ? 'Reading the document…'
+              : drafts.some((d) => d.phase === 'converting')
+                ? 'Converting the HEIC photo…'
+                : drafts.some((d) => d.phase === 'opening')
+                  ? 'Opening the photo…'
+                  : 'Reading the photo…'
+            : notice}
         </p>
       )}
     </div>

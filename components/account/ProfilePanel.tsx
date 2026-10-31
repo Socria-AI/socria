@@ -5,11 +5,14 @@
 import { useEffect, useRef, useState } from 'react';
 import Image from 'next/image';
 import { useUser } from '@clerk/nextjs';
+import { IMAGE_ACCEPT, isImageFile, photoAsJpeg } from '@/lib/logos-upload';
 import { Button, Field, Note, Panel, usePanel } from './kit';
 
 /** Pictures Clerk accepts, and a ceiling it will reject above anyway. */
 const IMAGE_TYPES = ['image/png', 'image/jpeg', 'image/gif', 'image/webp'];
 const MAX_BYTES = 10 * 1024 * 1024;
+/** A converted picture: plenty for a face shown at most a few hundred pixels across. */
+const AVATAR_EDGE = 1024;
 
 export function ProfilePanel() {
   const { user } = useUser();
@@ -43,15 +46,14 @@ export function ProfilePanel() {
     if (!f) return;
     // Checked here so an obviously wrong file is refused instantly, rather
     // than after an upload that was always going to be rejected.
-    if (!IMAGE_TYPES.includes(f.type)) {
-      setErr('That needs to be a PNG, JPEG, GIF or WebP image.');
+    if (!isImageFile(f)) {
+      setErr('That needs to be a photo — a JPEG, PNG, HEIC, GIF or WebP.');
       return;
     }
-    if (f.size > MAX_BYTES) {
-      setErr('That image is larger than 10MB. Try a smaller one.');
-      return;
-    }
-    run('avatar', async () => void (await user.setProfileImage({ file: f })), {
+    // what Clerk takes goes as it is; a phone's HEIC, a file that does not say what it is, or a
+    // photo too large for it is made a JPEG here first (lib/logos-upload.ts)
+    const asIs = IMAGE_TYPES.includes(f.type) && f.size <= MAX_BYTES;
+    run('avatar', async () => void (await user.setProfileImage({ file: asIs ? f : await photoAsJpeg(f, AVATAR_EDGE) })), {
       fallback: 'Could not upload that picture.',
       done: 'Picture updated.',
     });
@@ -77,14 +79,14 @@ export function ProfilePanel() {
           />
           <div>
             <div className="acct-row-label">Picture</div>
-            <div className="acct-row-meta">PNG, JPEG, GIF or WebP, up to 10MB.</div>
+            <div className="acct-row-meta">A JPEG, PNG, HEIC, GIF or WebP photo.</div>
           </div>
         </div>
         <div className="acct-row-actions">
           <input
             ref={file}
             type="file"
-            accept={IMAGE_TYPES.join(',')}
+            accept={IMAGE_ACCEPT}
             hidden
             onChange={(e) => {
               pick(e.target.files?.[0]);

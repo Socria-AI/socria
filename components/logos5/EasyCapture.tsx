@@ -11,10 +11,10 @@
 // control.
 
 import { useEffect, useRef, useState } from 'react';
-import { EASY_READ_EDGE, isImageFile, prepareImage, type PreparedImage } from '@/lib/logos-upload';
+import { EASY_READ_EDGE, IMAGE_ACCEPT, isImageFile, isPhotoByBytes, prepareImage, saysNothing, type PreparedImage } from '@/lib/logos-upload';
 import './easy-capture.css';
 
-type Phase = { at: 'choose' } | { at: 'reading'; thumb: string } | { at: 'failed'; why: string; thumb?: string };
+type Phase = { at: 'choose' } | { at: 'reading'; thumb: string; step?: 'opening' | 'converting' } | { at: 'failed'; why: string; thumb?: string };
 
 export function EasyCapture({
   open,
@@ -63,10 +63,12 @@ export function EasyCapture({
 
   async function take(file: File | undefined) {
     if (!file) return;
-    if (!isImageFile(file)) return setPhase({ at: 'failed', why: 'That is not a photo. Choose a picture — a JPEG, PNG or HEIC.' });
+    if (!isImageFile(file) && !(saysNothing(file) && (await isPhotoByBytes(file)))) return setPhase({ at: 'failed', why: 'That is not a photo. Choose a picture — a JPEG, PNG, HEIC or WebP.' });
     let photo: PreparedImage;
+    // said at once — a HEIC is converted here first, which takes a moment on a phone
+    setPhase({ at: 'reading', thumb: '', step: 'opening' });
     try {
-      photo = await prepareImage(file, undefined, EASY_READ_EDGE);
+      photo = await prepareImage(file, undefined, EASY_READ_EDGE, { onConvert: () => setPhase({ at: 'reading', thumb: '', step: 'converting' }) });
     } catch (e: any) {
       return setPhase({ at: 'failed', why: e?.message || 'That photo could not be opened.' });
     }
@@ -110,7 +112,7 @@ export function EasyCapture({
       <input
         ref={library}
         type="file"
-        accept="image/png,image/jpeg,image/webp,image/gif,image/heic,image/heif"
+        accept={IMAGE_ACCEPT}
         hidden
         onChange={(e) => {
           void take(e.target.files?.[0]);
@@ -163,9 +165,13 @@ export function EasyCapture({
 
         {phase.at === 'reading' ? (
           <div className="ec-reading" role="status" aria-live="polite">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img className="ec-thumb" src={phase.thumb} alt="The photo being read" />
-            <p className="ec-reading-t">Reading the photo…</p>
+            {phase.thumb ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img className="ec-thumb" src={phase.thumb} alt="The photo being read" />
+            ) : (
+              <span className="ec-thumb is-busy" aria-hidden="true" />
+            )}
+            <p className="ec-reading-t">{phase.step === 'converting' ? 'Converting the HEIC photo…' : phase.step === 'opening' ? 'Opening the photo…' : 'Reading the photo…'}</p>
             <p className="ec-reading-s">This takes a few seconds.</p>
             <span className="ec-line" aria-hidden="true" />
           </div>
