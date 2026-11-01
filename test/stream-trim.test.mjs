@@ -363,5 +363,41 @@ console.log('\n=== the same reply, the same bytes, however it arrives ===');
   })());
 }
 
+// ─────────────────────────────────────────────────────────────────────────
+console.log('\n=== review: a list item keeps its second sentence; a recap that adds something stays ===');
+{
+  // The list-sibling rule kept an item that follows another only when the
+  // sentence STARTED the line, so the second sentence of the third requested
+  // sign-off ("3. Thank you for your time. Let me know if you have any
+  // questions.") was read as Socria's closing offer and deleted — through the
+  // real route too, where `phrasing` is not wired and "How should I end an
+  // email to my professor?" does not fire requestsPhrasing anyway.
+  for (const reply of [
+    '1. Thanks in advance.\n2. Best regards.\n3. Thank you for your time. Let me know if you have any questions.',
+    '- Thanks in advance.\n- Best regards.\n- Thank you for your time. Let me know if you have any questions.',
+  ]) {
+    const outs = [1, 3, 6, 0].flatMap((n) => [run(reply, n), run(reply, n, { block: false, opts: { trim: 'on', asked: 'How should I end an email to my professor?', exchange: 'task' } })]);
+    ok(`a sibling item's second sentence is content: ${J(reply.slice(0, 3))} verbatim at 1/3/6/whole`, outs.every((o) => o.sent === reply && o.stats.removed.offer === 0), J(outs.map((o) => o.sent)));
+  }
+  // the rule is still only for items: Socria's own offer after the list goes
+  const own = run('- Thanks in advance.\n- Best regards.\n\nLet me know if you want more options.', 3);
+  ok('  a trailing offer on its own line after the list still goes', own.sent.trim() === '- Thanks in advance.\n- Best regards.' && own.stats.removed.offer === 1, J(own.sent));
+
+  // "Says nothing new" was read with similarity(), which divides by the
+  // SHORTER text's terms: a long recap that adds a caveat and a price scored
+  // as covered by a short reply, and was deleted under LOGOS_TRIM=on (and
+  // counted as a would-be recap under safe, inflating the shadow rate).
+  const base = 'The cheaper plan saves $40. It covers the same things. Both have the same support. ';
+  const caveat = base + 'Overall, the cheaper plan wins, but only if you never need weekend support, which costs $15 extra.';
+  const on = run(caveat, 3, { block: false, opts: { trim: 'on', asked: 'Which plan?', exchange: 'task' } });
+  ok('on: a recap that adds a caveat and a new figure stays', on.sent === caveat && on.stats.removed.recap === 0, J([on.sent, on.stats]));
+  const safe = run(caveat, 0, { block: false, opts: { trim: 'safe', asked: 'Which plan?', exchange: 'task' } });
+  ok('  safe: and it is not counted as a recap that would have gone', safe.sent === caveat && safe.stats.would.recap === 0, J(safe.stats));
+  const newNumber = base + 'Overall, the cheaper plan saves $55 on support.';
+  ok('  a recap with a figure the reply never gave stays', run(newNumber, 0, { block: false, opts: { trim: 'on' } }).sent === newNumber);
+  const plain = run(base + 'Overall, the cheaper plan saves the same support.', 3, { block: false, opts: { trim: 'on' } });
+  ok('  a recap that only repeats still goes', plain.sent === base && plain.stats.removed.recap === 1, J(plain));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
