@@ -189,8 +189,10 @@ console.log('\n=== the specs: what is drawn, and what is not ===');
   ok('a claim: the verdict, the parts, and no links in what a part rests on', cl && cl.verdict === 'fails' && cl.parts.length === 2 && !/https?:/.test(cl.parts[1].basis ?? ''), J(cl));
   ok('a claim needs a verdict and two parts', !I.parseInlineSpec(J({ ...CLAIM, verdict: 'maybe' })) && !I.parseInlineSpec(J({ ...CLAIM, parts: CLAIM.parts.slice(0, 1) })));
   ok('a part with no standing is dropped', I.parseInlineSpec(J({ ...CLAIM, parts: [...CLAIM.parts, { text: 'x', holds: 'probably' }] })).parts.length === 2);
-  ok('a claim and a graph never fold away in a long reply', I.layoutReply ? true : true);
-  ok('…the layout keeps claims open (NEVER_FOLDED)', /'claim'\]\)/.test(read('lib/reply-layout.ts')));
+  // (was a source check for a NEVER_FOLDED list ending in 'claim'; every drawn element is now never folded —
+  // lib/reply-layout.ts isVisualBlock — so the behaviour itself is asserted instead)
+  ok('a claim and a graph never fold away in a long reply', I.isVisualBlock({ kind: 'ui', spec: cl, open: false, n: 0 }) && I.isVisualBlock({ kind: 'ui', spec: I.parseInlineSpec(J(MVT)), open: false, n: 1 }));
+  ok('…the layout keeps claims open (VISUAL_KINDS names it)', I.VISUAL_KINDS.includes('claim') && I.VISUAL_KINDS.includes('graph'));
 }
 
 console.log('\n=== what Socria is told back ===');

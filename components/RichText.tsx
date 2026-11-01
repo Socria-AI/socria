@@ -19,14 +19,17 @@
 //
 // EDITORIAL is opt-in too: Logos 5's replies in the conversation, laid out to
 // be read (lib/reply-layout.ts) — the opening statement as a standfirst,
-// labelled lists as terms, the later parts of a long reply folded under their
-// titles, the closing question and the ways onward always in view. A document
-// read in Content is not a reply and is not laid out as one.
+// labelled lists as terms, short lists in columns, groups side by side, a
+// comparison table as one, the later parts of a long reply (or the rest of a
+// long reply with no parts) folded under a row that says what it holds, every
+// element and the closing question always in view. `disclose={false}` — the
+// person asked for depth — folds nothing. A document read in Content is not a
+// reply and is not laid out as one.
 
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copyText } from '@/lib/copy-text';
-import { parseBlocks, splitInline, stripMarks, type Block } from '@/lib/rich-text';
-import { editorialBlocks, layoutReply, streamingSplit } from '@/lib/reply-layout';
+import { isTableRule, listLine, parseBlocks, splitInline, splitTableRow, stripMarks, type Block } from '@/lib/rich-text';
+import { editorialBlocks, layoutReply, plainTermOf, streamingSplit, tableShape, tailShape, termOf, type TailShape } from '@/lib/reply-layout';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
 import { InlineBlock, type InlineHost } from '@/components/inline/InlineUI';
@@ -154,7 +157,49 @@ function CodeBlock({ lang, text, open }: { lang: string | null; text: string; op
   );
 }
 
-function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?: boolean; k: string; cite?: CiteRender; rich?: boolean; inline?: InlineHost }): ReactNode {
+/**
+ * The points nested under a list item, as one muted line under it rather than
+ * a second, deeper list: what was written stays together and the page gains
+ * no new depth. `tail`: the point still being written, while a reply streams.
+ */
+function Subs({ items, tail, math, k, cite, rich }: { items: string[]; tail?: string; math?: boolean; k: string; cite?: CiteRender; rich?: boolean }) {
+  const all = tail !== undefined ? [...items, tail] : items;
+  if (!all.length) return null;
+  return (
+    <span className="socria-sub">
+      {all.map((x, j) => (
+        <Fragment key={j}>
+          {j > 0 && (
+            <span className="socria-sub-sep" aria-hidden="true">
+              {' · '}
+            </span>
+          )}
+          <span className={tail !== undefined && j === all.length - 1 ? 'is-tail' : undefined}>
+            <Inline text={x} math={math} keyBase={`${k}-s${j}`} cite={cite} code={rich} />
+          </span>
+        </Fragment>
+      ))}
+    </span>
+  );
+}
+
+/** The text still being written, when it continues a block: that block's next item, a line under its last one, its next row. */
+interface TailIn {
+  shape: TailShape;
+  text: string;
+}
+
+/** A list line still being written, without its mark — nothing yet when only the mark has arrived. */
+const itemText = (t: string) => listLine(t)?.text ?? (/^\s*(?:[-•*]|\d{1,3}[.)]?)\s*$/.test(t) ? '' : t.trim());
+
+/** A table's cells as they stand, the separator rule and any half-typed one skipped. */
+function rowsOf(lines: string[]): string[][] {
+  return lines.filter((l) => l.includes('|') && !isTableRule(l) && !(l.includes('-') && /^[\s|:-]*$/.test(l))).map(splitTableRow);
+}
+
+function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block; math?: boolean; k: string; cite?: CiteRender; rich?: boolean; inline?: InlineHost; tail?: TailIn }): ReactNode {
+  const tailLi = tail?.shape === 'li' ? itemText(tail.text) : null;
+  const tailSub = tail?.shape === 'sub' ? itemText(tail.text) : undefined;
   switch (block.kind) {
     case 'p':
       return <p key={k}>{<Inline text={block.text} math={math} keyBase={k} cite={cite} code={rich} />}</p>;
@@ -178,71 +223,98 @@ function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?
         </blockquote>
       );
 
+    // a list of many short items sits in columns (lib/reply-layout.ts listShape) — columns, never chips
     case 'ul':
+    case 'ol': {
+      const List = block.kind;
+      const last = block.items.length - 1;
       return (
-        <ul key={k}>
+        <List
+          key={k}
+          className={block.kind === 'ul' && block.compact ? 'socria-list is-short' : undefined}
+          start={block.kind === 'ol' && block.start ? block.start : undefined}
+        >
           {block.items.map((it, i) => (
             <li key={i}>
               <Inline text={it} math={math} keyBase={`${k}-${i}`} cite={cite} code={rich} />
+              <Subs items={block.subs?.[i] ?? []} tail={i === last ? tailSub : undefined} math={math} k={`${k}-${i}`} cite={cite} rich={rich} />
             </li>
           ))}
-        </ul>
-      );
-
-    case 'ol':
-      return (
-        <ol key={k}>
-          {block.items.map((it, i) => (
-            <li key={i}>
-              <Inline text={it} math={math} keyBase={`${k}-${i}`} cite={cite} />
+          {tailLi !== null && (
+            <li className="is-tail">
+              <Inline text={tailLi} math={math} keyBase={`${k}-t`} code={rich} />
             </li>
-          ))}
-        </ol>
+          )}
+        </List>
       );
+    }
 
     // Labelled items, laid out as terms: the label, then what it says (Logos 5's editorial reading).
+    // (an item with no label came after the list was read as terms and is not written that way: a plain row of it)
     case 'terms': {
       const List = block.ordered ? 'ol' : 'ul';
+      const last = block.items.length - 1;
+      const next = tailLi !== null ? termOf(tailLi) ?? plainTermOf(tailLi) ?? { label: '', body: tailLi } : null;
+      const row = (it: { label: string; body: string; sub?: string[] }, i: number | 't', more?: string) => (
+        <li key={i} className={[it.label ? '' : 'is-plain', i === 't' ? 'is-tail' : ''].filter(Boolean).join(' ') || undefined}>
+          {it.label && (
+            <span className="socria-term">
+              <Inline text={it.label} math={math} keyBase={`${k}-t${i}`} cite={cite} code={rich} />
+            </span>
+          )}
+          <span className="socria-term-body">
+            <Inline text={it.body} math={math} keyBase={`${k}-d${i}`} cite={cite} code={rich} />
+            <Subs items={it.sub ?? []} tail={more} math={math} k={`${k}-${i}`} cite={cite} rich={rich} />
+          </span>
+        </li>
+      );
       return (
-        <List key={k} className={`socria-terms${block.ordered ? ' is-ordered' : ''}`}>
-          {block.items.map((it, i) => (
-            <li key={i}>
-              <span className="socria-term">
-                <Inline text={it.label} math={math} keyBase={`${k}-t${i}`} code={rich} />
-              </span>
-              <span className="socria-term-body">
-                <Inline text={it.body} math={math} keyBase={`${k}-d${i}`} cite={cite} code={rich} />
-              </span>
-            </li>
-          ))}
+        <List
+          key={k}
+          className={`socria-terms${block.ordered ? ' is-ordered' : ''}`}
+          style={block.ordered && block.start ? { counterReset: `rx-term ${block.start - 1}` } : undefined}
+        >
+          {block.items.map((it, i) => row(it, i, i === last ? tailSub : undefined))}
+          {next && row(next, 't')}
         </List>
       );
     }
 
     // A labelled list is a set of small sections, not a wall of bullets.
-    case 'groups':
+    // (two to four short groups — Pros and Cons, two options and their points — are set side by side)
+    case 'groups': {
+      const lastG = block.groups.length - 1;
       return (
-        <div key={k} className="socria-groups">
-          {block.groups.map((g, gi) => (
-            <div key={gi} className="socria-group">
-              {g.header && (
-                <div className="socria-group-head">
-                  {stripMarks(g.header).replace(/:$/, '')}
-                </div>
-              )}
-              {g.items.length > 0 && (
-                <ul>
-                  {g.items.map((it, ii) => (
-                    <li key={ii}>
-                      <Inline text={it} math={math} keyBase={`${k}-${gi}-${ii}`} cite={cite} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </div>
-          ))}
+        <div key={k} className={`socria-groups${block.side ? ' is-side' : ''}`}>
+          {block.groups.map((g, gi) => {
+            const more = gi === lastG && tailLi !== null ? tailLi : null;
+            return (
+              <div key={gi} className="socria-group">
+                {g.header && (
+                  <div className="socria-group-head">
+                    {stripMarks(g.header).replace(/:$/, '')}
+                  </div>
+                )}
+                {(g.items.length > 0 || more !== null) && (
+                  <ul>
+                    {g.items.map((it, ii) => (
+                      <li key={ii}>
+                        <Inline text={it} math={math} keyBase={`${k}-${gi}-${ii}`} cite={cite} code={rich} />
+                      </li>
+                    ))}
+                    {more !== null && (
+                      <li className="is-tail">
+                        <Inline text={more} math={math} keyBase={`${k}-${gi}-t`} code={rich} />
+                      </li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            );
+          })}
         </div>
       );
+    }
 
     // What the turn read, drawn as what it read rather than as a column of
     // addresses. See components/SourceCards.tsx.
@@ -264,35 +336,88 @@ function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?
       );
 
     case 'table':
-      return (
-        // The wrapper scrolls on its own so a wide table never makes the
-        // whole conversation scroll sideways.
-        <div key={k} className="socria-table-wrap">
-          <table>
-            <thead>
-              <tr>
-                {block.header.map((c, ci) => (
-                  <th key={ci}>
-                    <Inline text={c} math={math} keyBase={`${k}-h${ci}`} />
-                  </th>
-                ))}
-              </tr>
-            </thead>
-            <tbody>
-              {block.rows.map((r, ri) => (
-                <tr key={ri}>
-                  {r.map((c, ci) => (
-                    <td key={ci}>
-                      <Inline text={c} math={math} keyBase={`${k}-${ri}-${ci}`} cite={cite} />
-                    </td>
-                  ))}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      );
+      return <Table key={k} block={block} math={math} k={k} cite={cite} rich={rich} pending={tail?.shape === 'row' ? splitTableRow(tail.text) : undefined} />;
   }
+}
+
+/**
+ * A table. One that compares things on the same points (lib/reply-layout.ts
+ * tableShape) names each point in a row header, so a screen reader says which
+ * point a value is on, and on a phone each row stacks into a small card of
+ * its own — every value labelled with the column it came from — rather than
+ * squeezing four columns into the width of one. `pending`: the row still
+ * being written, while a reply streams.
+ */
+function Table({ block, math, k, cite, rich, pending, writing }: { block: Extract<Block, { kind: 'table' }>; math?: boolean; k: string; cite?: CiteRender; rich?: boolean; pending?: string[]; writing?: boolean }) {
+  const cmp = !!block.compare;
+  const labels = block.header.map((c) => stripMarks(c));
+  const row = (r: string[], ri: number | 't') => (
+    <tr key={ri} className={ri === 't' ? 'is-tail' : undefined}>
+      {r.map((c, ci) =>
+        cmp && ci === 0 ? (
+          <th key={ci} scope="row">
+            <Inline text={c} math={math} keyBase={`${k}-${ri}-${ci}`} cite={cite} code={rich} />
+          </th>
+        ) : (
+          <td key={ci} data-label={cmp ? labels[ci] || undefined : undefined}>
+            {/* one box for the value, so a phone's stacked row lays label and value side by side (reply.css) */}
+            <span className={cmp ? 'socria-cell' : undefined}>
+              <Inline text={c} math={math} keyBase={`${k}-${ri}-${ci}`} cite={cite} code={rich} />
+            </span>
+          </td>
+        )
+      )}
+    </tr>
+  );
+  return (
+    // The wrapper scrolls on its own so a wide table never makes the
+    // whole conversation scroll sideways.
+    <div className={`socria-table-wrap${cmp ? ' is-compare' : ''}${cmp && block.header.length <= 4 ? ' is-stack' : ''}${writing ? ' is-tail' : ''}`}>
+      <table className={cmp ? 'socria-table is-compare' : undefined}>
+        <thead>
+          <tr>
+            {block.header.map((c, ci) => (
+              <th key={ci} scope={cmp ? 'col' : undefined}>
+                <Inline text={c} math={math} keyBase={`${k}-h${ci}`} cite={cite} code={rich} />
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {block.rows.map((r, ri) => row(r, ri))}
+          {pending && row(pending, 't')}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+/**
+ * The text still being written, drawn as what it will be — the first item of
+ * a list, a table whose rule has not arrived — or, for prose, the paragraph as
+ * it stands, its line breaks kept (l5.css), never a run-on line of marks.
+ */
+function TailNode({ text, shape, math, k }: { text: string; shape: TailShape; math?: boolean; k: string }): ReactNode {
+  if (shape === 'list') {
+    const item = listLine(text);
+    const List = item?.ordered ? 'ol' : 'ul';
+    return (
+      <List key={k} start={item?.ordered && item.n !== 1 ? item.n : undefined}>
+        <li className="is-tail">
+          <Inline text={item?.text ?? text} math={math} code />
+        </li>
+      </List>
+    );
+  }
+  if (shape === 'table') {
+    const [head, ...rows] = rowsOf(text.split('\n'));
+    if (head) return <Table key={k} block={tableShape({ kind: 'table', header: head, rows })} math={math} k={k} rich writing />;
+  }
+  return (
+    <p key={k} className="is-tail">
+      <Inline text={text} math={math} code />
+    </p>
+  );
 }
 
 /**
@@ -302,8 +427,8 @@ function BlockNode({ block, math, k, cite, rich, inline }: { block: Block; math?
  * (lib/inline-ui.ts), whose state and actions `inline` carries. A surface that
  * does not draw those reads each one as the words it stands for.
  */
-export function RichText({ text, math, cite, rich, askLast, inline, editorial }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean; inline?: InlineHost; editorial?: boolean }) {
-  if (editorial) return <EditorialText text={text} math={math} cite={cite} askLast={askLast} inline={inline} />;
+export function RichText({ text, math, cite, rich, askLast, inline, editorial, disclose }: { text: string; math?: boolean; cite?: CiteRender; rich?: boolean; askLast?: boolean; inline?: InlineHost; editorial?: boolean; disclose?: boolean }) {
+  if (editorial) return <EditorialText text={text} math={math} cite={cite} askLast={askLast} inline={inline} disclose={disclose} />;
   const blocks = parseBlocks(!rich && text.includes('```') ? contentAsText(text) : text, { rich });
   const last = blocks.length - 1;
   const apart = !!askLast && setsApart(text);
@@ -338,20 +463,18 @@ export function RichText({ text, math, cite, rich, askLast, inline, editorial }:
  * written under a folded title says "Writing…" instead of spilling out and
  * then jumping in.
  */
-function EditorialText({ text, tail, math, cite, askLast, inline, streaming }: { text: string; tail?: string; math?: boolean; cite?: CiteRender; askLast?: boolean; inline?: InlineHost; streaming?: boolean }) {
+function EditorialText({ text, tail, joins, math, cite, askLast, inline, streaming, disclose }: { text: string; tail?: string; joins?: boolean; math?: boolean; cite?: CiteRender; askLast?: boolean; inline?: InlineHost; streaming?: boolean; disclose?: boolean }) {
   const blocks = editorialBlocks(parseBlocks(text, { rich: true }), { more: !!streaming });
-  const pieces = layoutReply(blocks, { streaming, tail });
+  // what the text still being written is: the next item of the list above it, a row of the table, a paragraph…
+  const shape = tail ? tailShape(blocks, tail, !!joins) : null;
+  const tailIn = shape === 'li' || shape === 'sub' || shape === 'row';
+  const pieces = layoutReply(blocks, { streaming, tail, tailIn, disclose: disclose !== false });
   const apart = !!askLast && setsApart(text);
   const folds = pieces.filter((p) => p.kind === 'fold').length;
   const lastFold = pieces.map((p) => p.kind).lastIndexOf('fold');
   const [openFolds, setOpenFolds] = useState(0);
   const draw = (i: number, key: string): ReactNode => {
-    if (i === blocks.length)
-      return tail ? (
-        <p key={key} className="is-tail">
-          <Inline text={tail} math={math} code />
-        </p>
-      ) : null;
+    if (i === blocks.length) return tail && shape ? <TailNode key={key} text={tail} shape={shape} math={math} k={key} /> : null;
     const b = blocks[i];
     // a part of a reply is a section under the page's one heading (the conversation's title): h2, whatever it was written as
     if (b.kind === 'h')
@@ -360,7 +483,7 @@ function EditorialText({ text, tail, math, cite, askLast, inline, streaming }: {
           <Inline text={b.text} math={math} keyBase={key} code />
         </h2>
       );
-    return BlockNode({ block: b, math, k: key, cite, rich: true, inline });
+    return BlockNode({ block: b, math, k: key, cite, rich: true, inline, tail: tailIn && tail && shape && i === blocks.length - 1 ? { shape, text: tail } : undefined });
   };
   return (
     <>
@@ -393,11 +516,15 @@ function EditorialText({ text, tail, math, cite, askLast, inline, streaming }: {
             </p>
           );
         }
-        const head = blocks[p.head];
+        // a part's fold is titled by its heading; a fold the paragraphs earned, by the sentence it opens on
+        // (or "More"); the rest of a fold an element interrupted is the same part carrying on, untitled
+        const head = p.head >= 0 && !p.cont ? blocks[p.head] : undefined;
+        const fk = p.cont ? `fc${p.body[0]}` : p.head >= 0 ? `f${p.head}` : `fs${p.body[0]}`;
+        const titled = head?.kind === 'h' ? <Inline text={head.text} math={math} keyBase={`${fk}t`} code /> : p.title && !p.cont ? <Inline text={p.title} math={math} keyBase={`${fk}t`} code /> : 'More';
         return (
-          <Fragment key={`f${p.head}`}>
+          <Fragment key={fk}>
             <details
-              className={`socria-fold${p.writing ? ' is-writing' : ''}`}
+              className={`socria-fold${p.writing ? ' is-writing' : ''}${p.head < 0 ? ' is-prose' : ''}${p.cont ? ' is-cont' : ''}`}
               onToggle={(e) => {
                 // counted from the page, not kept in step by hand: one press or "Open all", the count is what is open
                 const root = e.currentTarget.closest('.l5-prose') ?? e.currentTarget.parentElement;
@@ -405,7 +532,10 @@ function EditorialText({ text, tail, math, cite, askLast, inline, streaming }: {
               }}
             >
               <summary className="socria-fold-sum">
-                <span className="socria-fold-t">{head?.kind === 'h' ? <Inline text={head.text} math={math} keyBase={`f${p.head}t`} code /> : null}</span>
+                <span className="socria-fold-t">
+                  {titled}
+                  {p.count && <span className="socria-fold-n"> · {p.count}</span>}
+                </span>
                 <span className="socria-fold-p" aria-hidden="true">
                   {p.writing ? 'Writing…' : p.preview}
                 </span>
@@ -473,12 +603,17 @@ export function closingQuestion(text: string): { body: string; question: string 
  * A reply still arriving, read richly without jumping: every paragraph that
  * has finished (a blank line after it) is drawn as the blocks it is, and only
  * the paragraph still being written stays inline — so a list or a table forms
- * once, when its paragraph ends, rather than flickering token by token.
+ * once, when its paragraph ends, rather than flickering token by token. In a
+ * Logos 5 reply (`editorial`), a list or a table forms a line at a time
+ * instead: each complete item or row is drawn where it will stay, and only the
+ * line still being written is drawn as it stands, inside the list or table it
+ * belongs to.
  */
-export function StreamingRichText({ text, math, rich, editorial }: { text: string; math?: boolean; rich?: boolean; editorial?: boolean }) {
-  // inside an unclosed fence the whole tail is the block still being written (lib/reply-layout.ts streamingSplit)
-  const { settled, tail } = streamingSplit(text, !!editorial);
-  if (editorial) return <EditorialText text={settled} tail={tail} math={math} streaming />;
+export function StreamingRichText({ text, math, rich, editorial, disclose }: { text: string; math?: boolean; rich?: boolean; editorial?: boolean; disclose?: boolean }) {
+  // inside an unclosed fence the whole tail is the block still being written (lib/reply-layout.ts streamingSplit);
+  // in a Logos 5 reply, a list or a table settles a line at a time
+  const { settled, tail, joins } = streamingSplit(text, !!editorial);
+  if (editorial) return <EditorialText text={settled} tail={tail} joins={joins} math={math} streaming disclose={disclose} />;
   return (
     <>
       {settled && <RichText text={settled} math={math} rich={rich} />}

@@ -33,3 +33,6 @@ export { quickPlot } from '@/lib/runtime/plot-ask';
 export { sanitizeKept, keptFrom, keptText, keptName } from '@/lib/objects/display-kept';
 export { kindOf } from '@/lib/objects/core';
 export { displayMeta, offeredKinds } from '@/lib/objects/display-base';
+// a reply still being written, and how the parser reads a list line (vx-render: disclosure, density, streaming)
+export { L5Pending } from '@/components/logos5/L5Message';
+export { listLine, isTableRule, bulletBlock } from '@/lib/rich-text';

@@ -5,8 +5,10 @@
  * conversation's own tokens: a reading measure; the opening statement in the
  * serif as a standfirst; quiet list marks; labelled items as terms; the later
  * parts of a long reply folded under hairlines, their titles in the serif and
- * their first words in grey. No cards, no shadows, nothing that moves except
- * what a press opens.
+ * their first words in grey; many short items in columns, labelled groups side
+ * by side, a comparison table with its points as row headers. No cards, no
+ * shadows, nothing that moves except what a press opens — and nothing drawn
+ * to look pressable that is not.
  */
 
 /* the measure: prose reads best at sixty-odd characters a line — elements and tables keep the column */
@@ -47,14 +49,14 @@
 /* ── lists, quietly ───────────────────────────────────────────────── */
 
 /* a short rule for a bullet, in the margin — not a dot shouting each line */
-.logos-root .l5-prose.is-reply ul:not([class]) {
+.logos-root .l5-prose.is-reply :is(ul:not([class]), ul.socria-list, .socria-group > ul) {
   list-style: none;
   padding-left: 1.15em;
 }
-.logos-root .l5-prose.is-reply ul:not([class]) > li {
+.logos-root .l5-prose.is-reply :is(ul:not([class]), ul.socria-list, .socria-group > ul) > li {
   position: relative;
 }
-.logos-root .l5-prose.is-reply ul:not([class]) > li::before {
+.logos-root .l5-prose.is-reply :is(ul:not([class]), ul.socria-list, .socria-group > ul) > li::before {
   content: '';
   position: absolute;
   left: -1.05em;
@@ -77,6 +79,37 @@
 .logos-root .l5-prose.is-reply li {
   margin: 0.3em 0;
   padding-left: 0.1em;
+}
+
+/* many short items — places, names, ingredients — in columns rather than a
+   tall line each: the set read at a glance. Columns, not chips: nothing here
+   is a button, so nothing is drawn like one. */
+.logos-root .l5-prose.is-reply ul.socria-list.is-short {
+  columns: auto 12em;
+  column-gap: 2em;
+  max-width: 66ch;
+}
+.logos-root .l5-prose.is-reply ul.socria-list.is-short > li {
+  break-inside: avoid;
+  margin: 0 0 0.3em;
+}
+
+/* the points nested under an item: one muted run under it, not a second list */
+.logos-root .l5-prose.is-reply .socria-sub {
+  display: block;
+  margin-top: 0.08em;
+  font-size: 0.92em;
+  line-height: 1.5;
+  color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
+}
+.logos-root .l5-prose.is-reply .socria-sub-sep {
+  color: var(--lg-ink-40);
+}
+
+/* the line still being written, inside the list or table it belongs to */
+.logos-root .l5-prose.is-reply li.is-tail,
+.logos-root .l5-prose.is-reply tr.is-tail {
+  color: color-mix(in srgb, var(--lg-ink) 82%, transparent);
 }
 
 /* ── terms: a label, and what it says ─────────────────────────────── */
@@ -113,6 +146,71 @@
 }
 .logos-root .l5-prose.is-reply .socria-term-body {
   line-height: 1.55;
+}
+/* a later item not written as a term: a plain row of the same list, across both columns */
+.logos-root .l5-prose.is-reply .socria-terms > li.is-plain {
+  grid-template-columns: 1fr;
+}
+
+/* ── groups: Pros and Cons, two options and their points ──────────── */
+
+.logos-root .l5-prose.is-reply .socria-groups {
+  max-width: 66ch;
+  margin: 0.15em 0 1em;
+}
+.logos-root .l5-prose.is-reply .socria-group + .socria-group {
+  margin-top: 0.7em;
+}
+.logos-root .l5-prose.is-reply .socria-group-head {
+  margin: 0 0 0.12em;
+  font-family: var(--l5-serif);
+  font-size: 1.08em;
+  line-height: 1.35;
+  color: var(--lg-primary);
+}
+.logos-root .l5-prose.is-reply .socria-group > ul {
+  margin: 0;
+}
+/* side by side: the groups are read against each other, so they sit together */
+.logos-root .l5-prose.is-reply .socria-groups.is-side {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(12em, 1fr));
+  gap: 0 1.6em;
+  padding-top: 0.55em;
+  border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5-prose.is-reply .socria-groups.is-side > .socria-group + .socria-group {
+  margin-top: 0;
+}
+
+/* ── a comparison table: the points it compares on as row headers ─── */
+
+.logos-root .l5-prose.is-reply .socria-table-wrap.is-compare {
+  border: 0;
+  border-radius: 0;
+  border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5-prose.is-reply .socria-table.is-compare {
+  font-size: 14px;
+  line-height: 1.45;
+}
+.logos-root .l5-prose.is-reply .socria-table.is-compare :is(th, td) {
+  padding: 7px 10px;
+  background: none;
+}
+.logos-root .l5-prose.is-reply .socria-table.is-compare :is(th, td):first-child {
+  padding-left: 0;
+}
+.logos-root .l5-prose.is-reply .socria-table.is-compare thead th {
+  font-weight: 600;
+  color: var(--lg-ink);
+}
+.logos-root .l5-prose.is-reply .socria-table.is-compare tbody th {
+  font-weight: 500;
+  color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
+}
+.logos-root .l5-prose.is-reply .socria-table.is-compare tbody tr:last-child :is(th, td) {
+  border-bottom: 0;
 }
 
 /* ── headings in the flow: a part's title, after a hairline ───────── */
@@ -179,6 +277,16 @@
 }
 .logos-root .l5-prose.is-reply .socria-fold.is-writing .socria-fold-p {
   font-style: italic;
+}
+/* how much a fold with no heading holds — "More · 3 paragraphs" */
+.logos-root .l5-prose.is-reply .socria-fold-n {
+  font-family: var(--l5-sans, inherit);
+  font-size: 0.74em;
+  color: color-mix(in srgb, var(--lg-ink) 60%, transparent);
+}
+/* a fold the paragraphs earned, and the rest of a part after an element, read as the prose they hold */
+.logos-root .l5-prose.is-reply .socria-fold:is(.is-prose, .is-cont) .socria-fold-t {
+  font-size: 1.04em;
 }
 /* a plus that becomes a minus: open and closed, drawn, not a triangle */
 .logos-root .l5-prose.is-reply .socria-fold-sum::after {
@@ -253,6 +361,65 @@
   .logos-root .l5-prose.is-reply .socria-fold-sum {
     min-height: 48px;
   }
+  .logos-root .l5-prose.is-reply ul.socria-list.is-short {
+    columns: 2;
+    column-gap: 1.4em;
+  }
+  .logos-root .l5-prose.is-reply .socria-groups.is-side {
+    grid-template-columns: 1fr;
+  }
+  .logos-root .l5-prose.is-reply .socria-groups.is-side > .socria-group + .socria-group {
+    margin-top: 0.7em;
+  }
+}
+
+/* a comparison of two or three on a phone: each row a small card of its own,
+   every value labelled with the column it came from, rather than three
+   columns squeezed into the width of one */
+@media (max-width: 560px) {
+  .logos-root .l5-prose.is-reply .socria-table-wrap.is-stack {
+    overflow-x: visible;
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare thead {
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare,
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare tbody,
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare tr {
+    display: block;
+    width: 100%;
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare tr {
+    padding: 0.5em 0 0.55em;
+    border-bottom: 1px solid var(--l5-hair);
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare tr:last-child {
+    border-bottom: 0;
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare :is(th, td) {
+    display: grid;
+    grid-template-columns: minmax(6em, 38%) 1fr;
+    column-gap: 0.9em;
+    padding: 0.12em 0;
+    border: 0;
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare tbody th {
+    display: block;
+    margin-bottom: 0.15em;
+    font-family: var(--l5-serif);
+    font-size: 1.1em;
+    font-weight: 400;
+    color: var(--lg-ink);
+  }
+  .logos-root .l5-prose.is-reply .is-stack .socria-table.is-compare td::before {
+    content: attr(data-label);
+    color: color-mix(in srgb, var(--lg-ink) 60%, transparent);
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -262,7 +429,7 @@
 }
 
 @media (forced-colors: active) {
-  .logos-root .l5-prose.is-reply ul:not([class]) > li::before {
+  .logos-root .l5-prose.is-reply :is(ul:not([class]), ul.socria-list, .socria-group > ul) > li::before {
     background: CanvasText;
   }
   .logos-root .l5-prose.is-reply .socria-fold-sum::after {

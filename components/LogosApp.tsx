@@ -183,6 +183,7 @@ import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
 import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
+import { depthAsked } from '@/lib/reply-layout';
 import { ModelArtifact } from './logos5/ModelTools';
 import { L5Header, L5LinkBar, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
@@ -8180,6 +8181,10 @@ export function LogosApp({
               );
             }
             const prev = i > 0 ? messages[i - 1] : null;
+            // depth they asked for is shown in full, never folded (lib/reply-layout.ts depthAsked): read from the message this reply answers
+            let askedAt = i - 1;
+            while (m.role === 'assistant' && askedAt >= 0 && messages[askedAt].role !== 'user') askedAt--;
+            const disclose = m.role !== 'assistant' || !depthAsked(askedAt >= 0 ? messages[askedAt].content : '', replyLength);
             const side: Side = m.role === 'assistant' ? 'socria' : isMine(m) ? 'mine' : 'other';
             const latest = i === messages.length - 1 && m.role === 'assistant';
             const solo = !groupView && !togetherReadOnly;
@@ -8223,6 +8228,7 @@ export function LogosApp({
                 writeUp={writeUp}
                 onOpenContent={openContent}
                 offer={offer}
+                disclose={disclose}
               />
               {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
               {brought.length > 0 && (
@@ -8251,7 +8257,7 @@ export function LogosApp({
 
           {chatNotes}
           <SocriaAnswering names={answeringOthers} />
-          {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} />}
+          {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />}
           {synthBusy && <SynthesisPending scope={synthBusy} />}
           {busyHere && !streaming && (groupView ? <L5Pending text="" group to="You" /> : <L5Working steps={workingSteps} onStop={stopAnswer} />)}
           {error && (
