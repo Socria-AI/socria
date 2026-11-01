@@ -173,8 +173,16 @@ export interface Interrogatives {
   offers: string[];
 }
 
-export function interrogatives(text: string): Interrogatives {
+/**
+ * `lineHead` is what the line held before this text began (the stream gate
+ * sees sentences without their line), and `draft` says the text lies inside
+ * a draft written for somebody else (see quotedOrDraft). Either way, quoted
+ * material is not a question or an offer put to the person, and nothing in it
+ * is counted. Unset: the text is read as it stands.
+ */
+export function interrogatives(text: string, lineHead = '', draft = false): Interrogatives {
   const out: Interrogatives = { explicit: [], disguised: [], offers: [] };
+  if ((lineHead || draft) && quotedOrDraft(lineHead, text, draft)) return out;
   for (const raw of sentencesOf(prose(text))) {
     // A sentence that opens a blockquote line (the stream gate sees sentences
     // without their line) is quoted material, not a question to them.
@@ -295,4 +303,240 @@ export function stripSycophanticOpener(text: string): string | null {
   if (!hasSycophanticOpener(t)) return t;
   const rest = t.replace(SYCOPHANCY, '').replace(/^[\s,.!—-]+/, '');
   return rest.trim() ? rest.charAt(0).toUpperCase() + rest.slice(1) : null;
+}
+
+// ── Somebody else's words: quotations, tables, drafts and lists ──────
+//
+// THE CLOSING-OFFER RULE WAS DELETING WHAT THEY ASKED FOR. The stream gate
+// reads a reply a sentence at a time, and a sentence does not carry its line
+// with it: the second sentence of a blockquote line ("> Hi Sam, … Could you
+// send someone this week? Let me know if you have any questions.") reached
+// interrogatives() without its ">", was read as Socria's own closing offer,
+// and was dropped from the end of the draft the person had asked for. The
+// same went for the last line of an unquoted email, a table cell, and the
+// third of "three polite ways to end a work email". So the line a sentence
+// sits on, and whether it lies inside a draft written for somebody else, are
+// decided here, once, and the gate and interrogatives() both read the answer.
+// A miss keeps a sentence that might have gone; that is the safe direction,
+// because keeping content beats deleting it.
+
+/** A line that is quoted (a blockquote) or a row of a table: somebody else's words, or cells. */
+export function quotedOrTableLine(line: string): boolean {
+  return /^[ \t]{0,3}(?:>|\|)/.test(line);
+}
+
+/** A line of a markdown list: "- item", "* item", "2. item", "3) item". */
+export const LIST_ITEM = /^[ \t]*(?:[-*+•]|\d{1,3}[.)])[ \t]+/;
+
+/** The line this text starts on, given what the line held before it (`lineHead`). */
+function lineAt(lineHead: string, piece: string): string {
+  const text = lineHead + piece;
+  const first = text.search(/\S/);
+  if (first < 0) return '';
+  const start = text.lastIndexOf('\n', first - 1) + 1;
+  const end = text.indexOf('\n', first);
+  return text.slice(start, end < 0 ? undefined : end);
+}
+
+/**
+ * Is this piece somebody else's words rather than Socria speaking to them?
+ * True when the line it starts on is a blockquote or a table row, or when it
+ * lies inside a draft (`draft`, which only the caller following the whole
+ * reply can know: see draftStep).
+ */
+export function quotedOrDraft(lineHead: string, piece: string, draft = false): boolean {
+  if (draft) return true;
+  return quotedOrTableLine(lineAt(lineHead, piece));
+}
+
+/**
+ * Where a reply stands with respect to a draft written for somebody else.
+ *
+ *   none     Socria speaking to them
+ *   armed    a line that hands them words ("Here's a draft:") was just read;
+ *            the draft starts at the next line that is not blank
+ *   body     inside the draft: nothing here is trimmed or held
+ *   signoff  the draft's sign-off was read ("Best,"); its name line follows,
+ *            and the draft ends at the next blank line
+ *
+ * A draft begins at a label line, a "Subject:" line or a salutation line on
+ * its own ("Hi Sam,"). It ends at a heading, a rule, a paragraph that talks
+ * about the draft ("This keeps it short…", "Feel free to tweak…"), or the
+ * blank line after its sign-off. A draft that never signs off runs to the end
+ * of the reply, which may keep a genuine trailing offer in place after it:
+ * acceptable, since keeping content beats deleting it. A label followed by a
+ * blockquote or a fence is left to that quote or fence, which already marks
+ * where the draft ends.
+ */
+export type DraftState = 'none' | 'armed' | 'body' | 'signoff';
+
+// Words that name a piece of writing for somebody else. The generic ones
+// ("text", "note", "reply", "version") count only beside a verb of sending or
+// using it, so "A note on units:" and "Note:" do not start a draft.
+const DRAFT_NOUN = String.raw`(?:draft|e-?mail|message|letter|script|template|caption|bio|toast|speech|invitation|invite|dm|voicemail|sign-?off|cover letter)s?`;
+const SENDABLE = String.raw`(?:text|note|reply|response|post|version|line|wording|opener)s?`;
+/** "Here's a draft:", "Here is a short email you could send:", "**Email:**", "A version you could send:", "You could say:", "Something like:". */
+const DRAFT_LABEL = new RegExp(
+  String.raw`^(?:\*\*|__)?(?:[^\n:?]{0,100}\b${DRAFT_NOUN}\b[^\n:?]{0,60}|[^\n:?]{0,60}\b${SENDABLE}\b[^\n:?]{0,30}\b(?:send|use|post|say|try|copy|paste)\b[^\n:?]{0,30}|(?:you (?:could|can|might) |try )?(?:say(?:ing)?|writ(?:e|ing)|send(?:ing)?|text(?:ing)?|reply(?:ing)?)(?: (?:something like|this|them|him|her))?|something like)(?:\*\*|__)?\s*:\s*(?:\*\*|__)?\s*$`,
+  'i'
+);
+const SUBJECT = /^(?:\*\*|__)?subject(?:\*\*|__)?\s*:/i;
+const SALUTATION = /^(?:hi|hello|dear|hey|good (?:morning|afternoon|evening))\b[^\n]{0,40},\s*$/i;
+const SIGNOFF = /^(?:best(?: regards| wishes)?|kind regards|warm regards|regards|many thanks|thanks(?: so much| again| in advance)?|thank you(?: so much| again)?|cheers|sincerely|yours sincerely|yours truly|warmly|all the best|talk soon|take care)\s*[,!.]?\s*$/i;
+/** A paragraph that steps out of the draft to talk about it, a heading, or a rule. */
+const DRAFT_ENDS = /^(?:#{1,6}\s|-{3,}\s*$|\*{3,}\s*$|_{3,}\s*$|this (?:draft|version|wording|keeps|stays|reads)\b|(?:feel free to|you (?:can|could|may|might want to)) (?:adjust|tweak|change|edit|swap|personali[sz]e|shorten|cut|replace|add)\b)/i;
+
+/** The draft state after one line (or the start of one) of a reply. Pure. */
+export function draftStep(state: DraftState, line: string): DraftState {
+  const t = line.trim();
+  if (!t) return state === 'signoff' ? 'none' : state;
+  if (state === 'armed') {
+    // a quoted or fenced draft marks its own end; a table is cells, not a draft
+    if (/^(?:>|\||```|~~~)/.test(t)) return 'none';
+    state = 'body';
+  }
+  if (state === 'body' || state === 'signoff') {
+    if (DRAFT_ENDS.test(t)) return 'none';
+    if (state === 'body' && SIGNOFF.test(t)) return 'signoff';
+    return state;
+  }
+  if (SUBJECT.test(t) || SALUTATION.test(t)) return 'body';
+  if (isDraftLabel(t)) return 'armed';
+  return 'none';
+}
+
+/**
+ * A label that hands them words to use. One that explains something about a
+ * piece of writing is not one: "Here's what the error message means:" is
+ * followed by Socria's own explanation, which the offer rule still reads.
+ */
+function isDraftLabel(t: string): boolean {
+  return DRAFT_LABEL.test(t) && !/\b(?:what|why|how|where|when|which|whether)\b/i.test(t);
+}
+
+/** A line that hands them words to use: never trimmed as an announcement ("Here's a draft:"). */
+export function labelsContent(line: string): boolean {
+  const t = line.trim();
+  return isDraftLabel(t) || SUBJECT.test(t) || /\b(?:code|example|examples|script|snippet|query|command|formula|table|chart|graph|template|version)\b/i.test(t);
+}
+
+// ── Filler, by class (the stream gate decides when each may go) ──────
+//
+// THE PROMPT ALREADY BANS ALL OF THIS, AND THE MODEL STILL WRITES IT. "Sure!",
+// "Certainly! Let's dive in.", "Here's a breakdown of the key differences…",
+// "In summary, …" and "I hope this helps!" were all received unchanged on the
+// real route. Each class below is a pattern only; whether it may be removed
+// is the stream gate's decision (position, what follows, the trim mode), so
+// that nothing here can delete text on its own. English pattern lists only:
+// the gate runs none of them on a reply that is not English-dominant, where
+// they would misfire without a corpus. Each pattern is anchored to the whole
+// piece or to its start, never a match in the middle of a sentence.
+
+/** Class A: an interjection in front of the answer. Never "Yes" or "No", which are the answer. */
+const INTERJECTION = /^(?:sure|certainly|absolutely|of course|definitely|alright|all right|got it|perfect|happy to help)\s*[!.,—–-]+[ \t]*/i;
+
+/**
+ * The Class A interjection a piece opens with, if any: the text it takes and
+ * what remains. Read on the raw piece, so a quoted '"Sure!" she said' (which
+ * opens with a quotation mark) and "Sure is the word to use there" (no
+ * punctuation after it) never match.
+ */
+export function openerInterjection(piece: string): { cut: string; rest: string } | null {
+  const m = INTERJECTION.exec(piece);
+  return m ? { cut: m[0], rest: piece.slice(m[0].length) } : null;
+}
+
+/**
+ * Class B: a whole line (or a whole first sentence) that only announces what
+ * follows. "Here's a breakdown of the key differences between TCP and UDP.",
+ * "Let's dive in.", "Let's break it down." — never "Let's take a look at your
+ * budget." (it names something), and never a line that labels content they
+ * asked for (labelsContent).
+ */
+const ANNOUNCE = /^(?:here(?:'s| is) (?:a |an |the )?(?:quick |brief |short |detailed |simple |clear )?(?:breakdown|overview|rundown|summary|structured approach|step-by-step (?:guide|breakdown|explanation)|explanation)(?: of [^\n:]{0,80})?|let(?:'s| us) (?:dive (?:right |straight )?in(?:to (?:it|this|that))?|break (?:it|this|that) down(?: step by step)?|unpack (?:it|this|that)|take a (?:closer )?look(?: at (?:it|this|that))?|get started|walk through (?:it|this|that)))\s*[:.!]\s*$/i;
+export function isAnnouncement(line: string): boolean {
+  const t = line.trim();
+  return ANNOUNCE.test(t) && !labelsContent(t);
+}
+
+/** A recap that opens a sentence: "In summary, …", "To sum up, …", "Overall, …". */
+const RECAP = /^(?:in (?:summary|conclusion|short|a nutshell|sum)|to (?:summari[sz]e|sum up|recap|conclude)|overall|all in all|ultimately|in the end)\s*,\s*/i;
+export function recapOf(piece: string): string | null {
+  const t = piece.trim();
+  const m = RECAP.exec(t);
+  return m && t.length > m[0].length ? t.slice(m[0].length) : null;
+}
+
+/**
+ * A pleasantry tail: "Happy studying!", "Enjoy your eggs!", "Have fun!". Never
+ * "Good luck", which is something a person says and means.
+ */
+const PLEASANTRY = /^(?:happy (?:studying|coding|learning|reading|writing|cooking|baking|hacking|exploring|building|revising|gardening|travels|travelling|traveling)|enjoy(?: (?:your|the) [\w' -]{1,30})?|have fun(?: (?:with (?:it|that|this|the [\w' -]{1,24}))?)?)\s*[!.]*\s*$/i;
+/** "I hope this helps!", "I really hope that helps.", "Hope it clarifies things." — the whole sentence, nothing after it. */
+const HOPE = /^(?:i (?:really |do |truly )?)?hope (?:this|that|it) (?:helps|clarifies(?: things)?|answers (?:your|the) question|makes (?:things|it) clearer)(?: (?:a bit|a little|somewhat))?\s*[!.]*\s*$/i;
+export function pleasantryOf(piece: string): 'pleasantry' | 'hope' | null {
+  const t = piece.trim();
+  if (/\bgood luck\b/i.test(t)) return null;
+  if (HOPE.test(t)) return 'hope';
+  if (PLEASANTRY.test(t)) return 'pleasantry';
+  return null;
+}
+
+/**
+ * The textbook opener: "Opportunity cost is a fundamental concept in
+ * economics." Nothing may follow the field's name — "Entropy is a key concept
+ * because it sets the direction of heat flow" says something.
+ */
+const DEFINITIONAL = /^[^.,;:\n]{1,60} (?:is|are) (?:a|an|one of the most) (?:fundamental|fascinating|important|key|core|central|crucial|powerful|foundational)(?: \w+)? (?:concept|idea|topic|principle|tool)s?((?: (?:in|of|within) [^.,;:\n]{1,40})?)[.!]$/i;
+export function isDefinitionalOpener(piece: string): boolean {
+  const t = piece.trim();
+  const m = DEFINITIONAL.exec(t);
+  if (!m) return false;
+  return !/\b(?:because|that|which|since|so|when|where|as|if|but|and)\b|\d|\$/i.test(m[1]);
+}
+
+/** A question that can be answered yes or no: "Can I freeze rice?" — where "Absolutely." is the answer, not an opener. */
+const POLAR = /^(?:can|could|is|are|am|do|does|did|should|will|would|has|have|had|was|were|may|might|shall|must|isn'?t|aren'?t|don'?t|doesn'?t|didn'?t|won'?t|can'?t|couldn'?t|shouldn'?t|wouldn'?t)\b/i;
+export function isPolarQuestion(text: string): boolean {
+  const parts = sentencesOf(prose(text).trim()).map((s) => s.trim());
+  return parts.some((s) => POLAR.test(s) && (/\?["'’”)\]]*$/.test(s) || parts.length === 1));
+}
+
+/**
+ * Mostly English? The filler lists are English, so a reply (or a message)
+ * that is not stays exactly as written: "¡Claro! La derivada…", "J'espère que
+ * cela vous aide !". Short texts with no telling words count as English; the
+ * test is what the words are, not how many.
+ */
+const OTHER_WORDS = new Set('el la los las que es por para una del al con como pero muy le les est et des une pour vous nous avec dans sur pas cette der die das und ist nicht ein eine ich sie mit auf il che di per sono della non um uma com não você está são'.split(' '));
+const EN_WORDS = new Set('the and is are of to it you that this with for in on was be not have what your'.split(' '));
+export function englishDominant(text: string): boolean {
+  if (/[¡¿]/.test(text)) return false;
+  const letters = text.match(/\p{L}/gu) ?? [];
+  if (letters.length >= 8 && letters.filter((c) => /[A-Za-z]/.test(c)).length / letters.length < 0.9) return false;
+  let en = 0;
+  let other = 0;
+  for (const w of text.toLowerCase().match(/[\p{L}]+/gu) ?? []) {
+    if (EN_WORDS.has(w)) en++;
+    else if (OTHER_WORDS.has(w)) other++;
+  }
+  return other < 2 || other <= en;
+}
+
+/**
+ * A sentence that tells them to work an element: "Drag a and watch the
+ * vertex.", "Pick one to open.", "Set b to 0 and see what happens." Only ever
+ * read on the sentence directly after an element the gate dropped, where it
+ * would point at nothing. "Drag" and "Slide" only make sense of an element;
+ * the other verbs need a word for one ("Try restarting the router" is advice
+ * and stays).
+ */
+const ELEMENT_VERB = /^(?:\*\*|__)?(drag|move|slide|tap|press|pick|try|change|set|open)\b/i;
+const ELEMENT_WORD = /\b(?:sliders?|handles?|points?|dots?|curves?|graph|chart|plot|table|bars?|lines?|cards?|options?|steps?|toggle|button|box|values?|one|any|each|either|above|below|watch|see (?:how|what|where|when|which|whether)|and see|to see|vertex|markers?|knob|tabs?|panel)\b/i;
+export function elementImperative(piece: string, kind = ''): boolean {
+  const t = piece.trim();
+  const m = ELEMENT_VERB.exec(t);
+  if (!m) return false;
+  if (/^(?:drag|slide)$/i.test(m[1])) return true;
+  return ELEMENT_WORD.test(t) || (/^[a-z][a-z-]{1,30}$/.test(kind) && new RegExp(String.raw`\b${kind}\b`, 'i').test(t));
 }

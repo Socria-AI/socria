@@ -51,6 +51,7 @@ export const NO_SIGNALS: ExplicitSignals = {
   answersOnly: false,
   explainAsked: false,
   requestsQuestions: false,
+  requestsPhrasing: false,
   delegate: false,
   ownWork: false,
   urgent: false,
@@ -301,6 +302,30 @@ const REVISION = /\b(i was (?:computing|calculating|doing|asking|solving|answeri
 
 const REQUESTS_QUESTIONS = /\b((?:write|give|make|draft|generate|come up with|list|suggest)(?: me)? (?:\w+ ){0,3}(?:questions|quiz|exam items|practice problems|interview questions|test items|flashcards|faq)|quiz me|test me|drill me|interview questions)\b/i;
 
+// The request is FOR wordings: "three polite ways to end a work email", "ways
+// to say no", "how else could I sign off", "give me 5 lines for a toast". The
+// phrasings that come back are content, even the ones shaped like Socria's
+// own closers ("Let me know if you have any questions." as the third way to
+// end an email), so on such a turn the stream gate holds no closing offer and
+// trims no list item (lib/core4/stream-gate.ts, the `phrasing` option). A miss leaves the gate's ordinary list rule in
+// place, which already keeps an item that follows another; a false positive
+// only keeps a list item that might have gone.
+const NUMBER_WORD = String.raw`(?:a few|some|several|a couple of|\d{1,2}|one|two|three|four|five|six|seven|eight|nine|ten)`;
+const REQUESTS_PHRASING = new RegExp(
+  [
+    String.raw`\b(?:\w+ ){0,3}ways? (?:to|i (?:can|could)) (?:say|end|start|open|close|sign off|finish|phrase|word|put|ask|decline|say no|turn down|respond|reply|thank|apologi[sz]e|tell|introduce|greet)\b`,
+    String.raw`\b(?:give|write|suggest|list|draft|offer|come up with|send)(?: me| us)? (?:${NUMBER_WORD} )?(?:more |other |different |alternative |short |shorter |polite |good |nice |catchy |funny |better |professional |friendly |formal |casual )*(?:lines|one-?liners|phrasings|phrases|wordings|openers|opening lines|closers|closing lines|sign-?offs|taglines|slogans|captions|headlines|subject lines|greetings|toasts)\b`,
+    String.raw`\bhow (?:else )?(?:can|could|should|do|would) i (?:say|phrase|word|put|sign off)\b`,
+    String.raw`\b(?:other|another|different|alternative) ways? (?:of|to) (?:saying|say|phrasing|phrase|wording|word|putting|put)\b`,
+  ].join('|'),
+  'i'
+);
+
+/** Did they ask for wordings — ways to say or end something, N lines, sign-offs? (see REQUESTS_PHRASING) */
+export function requestsPhrasing(message: string): boolean {
+  return REQUESTS_PHRASING.test(speech(message));
+}
+
 interface Hit {
   at: number;
   end: number;
@@ -418,6 +443,7 @@ export function readSignals(message: string): ExplicitSignals {
     requestedTokens: requestedTokensOf(text),
     flagOnly: !!note(lastIndex(FLAG_ONLY, text)),
     requestsQuestions: !!lastIndex(REQUESTS_QUESTIONS, text),
+    requestsPhrasing: REQUESTS_PHRASING.test(text),
     expertise: expert ? 'expert' : novice ? 'novice' : null,
     assessment: !!note(lastIndex(ASSESSMENT, text)),
     redundancy: !!note(lastIndex(REDUNDANT, text)),
