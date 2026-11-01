@@ -75,6 +75,29 @@ const VAR = String.raw`(?:theta|phi|alpha|beta|gamma|omega|lambda|mu|sigma|rho|t
 const MATH_CHARS = new Set([...`0123456789+-*/^=≈≠<>≤≥()[]|'∫∞→±∓∈∪∖ℝ⦃⦄≡_,°`]);
 
 /**
+ * Every way of writing "and so on" — three full stops, the ellipsis character,
+ * the centred and vertical ellipses, and LaTeX's \cdots, \ldots, \dots and
+ * friends — as the one character … that the tokenizer treats as a break.
+ *
+ * WHY THIS MATTERS. "1 + 2 + ... + n = n(n+1)/2" is a true identity, but the
+ * full stops used to end the run of mathematics at "1 + 2 +" and start a new
+ * one at "+ n = n(n+1)/2", which was then checked as if "+n" were the whole
+ * left side — and reported, to the reply, as an identity that does not hold,
+ * "checked: state it as settled". A sum with an ellipsis in it has terms the
+ * engine was never shown, so nothing on either side of the ellipsis is a claim
+ * it can decide. Marking the break is what lets tokenize() say so.
+ *
+ * \cdotp and \ldotp are a single dot (a product, a full stop), not an
+ * ellipsis, and are left alone; so are two full stops, which are a typo.
+ */
+function markEllipses(s: string): string {
+  return s
+    .replace(/\\(?:ldots|cdots|dots[bcimo]?|vdots|ddots|hdots)(?![a-zA-Z])/g, ' … ')
+    .replace(/[⋯⋮⋰⋱]/g, ' … ')
+    .replace(/\.(?:\s?\.){2,}/g, ' … ');
+}
+
+/**
  * A text as lines of plain notation: code removed, every LaTeX span
  * converted and fenced in ⟦…⟧ so a formula is one unit however it was typed.
  */
@@ -84,13 +107,13 @@ export function flatten(text: string): string {
   for (const seg of splitMath(noCode)) {
     if (seg.kind === 'text') {
       // An em dash in prose is punctuation, not a minus sign.
-      let body = stripMarkdown(seg.body).replace(/[’‘]/g, "'").replace(/\s*—\s*/g, ' ; ');
+      let body = markEllipses(stripMarkdown(seg.body)).replace(/[’‘]/g, "'").replace(/\s*—\s*/g, ' ; ');
       if (/\\[a-zA-Z]/.test(body)) body = latexToPlain(body);
       out += unicodeToPlain(body);
     } else if (seg.kind === 'inline') {
-      out += `⟦${unicodeToPlain(latexToPlain(seg.body))}⟧`;
+      out += `⟦${unicodeToPlain(latexToPlain(markEllipses(seg.body)))}⟧`;
     } else {
-      out += '\n' + latexToPlain(seg.body).split('\n').map((l) => `⟦${unicodeToPlain(l)}⟧`).join('\n') + '\n';
+      out += '\n' + latexToPlain(markEllipses(seg.body)).split('\n').map((l) => `⟦${unicodeToPlain(l)}⟧`).join('\n') + '\n';
     }
   }
   return out;
@@ -108,9 +131,19 @@ function tokenize(line: string): Token[] {
   const toks: Token[] = [];
   let buf = '';
   let cut = false;
+  // The last run in this sentence ended on an operator ("1 - 2 + 3 - 4 +").
+  // A later run that opens on one is the rest of the same expression, whatever
+  // came between: two full stops, "etc", "and so on". A leading minus would
+  // otherwise pass for a whole side: "- 2n = -n" out of
+  // "1 - 2 + 3 - 4 + .. - 2n = -n", a true identity, was reported false.
+  let dangling = false;
   const flush = (glued = false) => {
     const t = buf.replace(/^[,\s]+|[,\s]+$/g, '').replace(/\s+/g, ' ');
-    if (t && /[0-9a-zA-Z∞]/.test(t)) toks.push({ t: 'math', v: t, ...(cut || glued ? { cut: true } : {}) });
+    if (t && /[0-9a-zA-Z∞]/.test(t)) {
+      const tail = dangling && /^[-+*/^·]/.test(t);
+      toks.push({ t: 'math', v: t, ...(cut || glued || tail ? { cut: true } : {}) });
+      dangling = /[-+*/^·]$/.test(t);
+    }
     buf = '';
     cut = false;
   };
@@ -119,8 +152,27 @@ function tokenize(line: string): Token[] {
     const c = line[i];
     if (c === '⟦') {
       const j = line.indexOf('⟧', i);
-      buf += ` ${j < 0 ? line.slice(i + 1) : line.slice(i + 1, j)} `;
+      const span = j < 0 ? line.slice(i + 1) : line.slice(i + 1, j);
+      // A formula with an ellipsis inside it ($1 + 2 + \cdots + n = …$) has
+      // terms nobody wrote down: the whole run is a fragment (markEllipses).
+      if (span.includes('…')) cut = true;
+      buf += ` ${span} `;
       i = j < 0 ? line.length : j + 1;
+      continue;
+    }
+    if (c === '…') {
+      // "and so on" in prose. The run of mathematics just before it is the
+      // first few terms of something longer ("1 + 2 +", "2, 4, 6,", and even
+      // "0.333", which is a third only with the dots), so it is cut. The run
+      // just after it is the tail of the same thing when the ellipsis sat
+      // inside mathematics, or when the run opens on an operator or a comma
+      // ("… + n = n(n+1)/2", "…, 2n"); "Hmm… so 1 + 2 = 3" keeps its claim,
+      // because a word comes between and resets the cut.
+      const before = /[0-9a-zA-Z∞]/.test(buf);
+      flush(before);
+      toks.push({ t: 'punct', v: '…' });
+      i++;
+      cut = before || /^\s*[-+*/^=,]/.test(line.slice(i));
       continue;
     }
     if (/[A-Za-z]/.test(c)) {
@@ -174,13 +226,37 @@ interface Sentence { tokens: Token[]; text: string; standalone: boolean }
 
 function sentences(flat: string): Sentence[] {
   const out: Sentence[] = [];
+  let carried = false;
   for (const rawLine of flat.split('\n')) {
-    const line = rawLine.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '').trim();
+    // A line after one that ends on an operator ("1 + 2 + 3 +") carries on
+    // the same formula. Its opening "+ " is the sum continuing, not a list
+    // bullet, and its first run of mathematics is the tail of something the
+    // line before began — so it is a fragment, like the run after an
+    // ellipsis. (Stripping the "+" as a bullet turned "+ n = n(n+1)/2" into
+    // "n = n(n+1)/2", and that was reported as false.)
+    const continues = carried;
+    const trimmed = rawLine.replace(/[⟧\s]+$/, '');
+    // A term before the operator: a rule line ("---") carries nothing.
+    // So does a line that ends on an ellipsis after a term, an operator or a
+    // comma ("1 + 2 + 3 + ...", then "+ n = n(n+1)/2" on the next line); one
+    // after a word ("The options are these…") does not.
+    if (trimmed) carried = /[0-9a-zA-Z)\]]\s*[-+*/^=]$/.test(trimmed) || /(?:[-+*/^=,]|[0-9)\]])\s*…$/.test(trimmed);
+    const line = (continues ? rawLine : rawLine.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')).trim();
     if (!line) continue;
     const standalone = /^⟦[^⟧]*⟧[\s.,;:]*$/.test(line);
     // Sentence ends: a full stop, ? or ! followed by a space and a capital, outside ⟦…⟧.
-    const parts = line.split(/(?<=[.?!])\s+(?=[A-Z⟦])/);
-    for (const p of parts) out.push({ tokens: tokenize(p), text: p.replace(/[⟦⟧]/g, ' '), standalone });
+    // An ellipsis ends one only before a capital letter ("Wait… Then x = 2"),
+    // never before a formula: "1 + 2 + … $+ n$" is one sum, not two sentences.
+    const parts = line.split(/(?<=[.?!])\s+(?=[A-Z⟦])|(?<=…)\s+(?=[A-Z])/);
+    parts.forEach((p, k) => {
+      const tokens = tokenize(p);
+      if (continues && k === 0) {
+        const first = tokens.findIndex((t) => t.t === 'math');
+        // Only when the formula starts the line: "and so n = 2" begins anew.
+        if (first >= 0 && tokens.slice(0, first).every((t) => t.t === 'punct')) tokens[first] = { ...(tokens[first] as { t: 'math'; v: string }), cut: true };
+      }
+      out.push({ tokens, text: p.replace(/[⟦⟧]/g, ' '), standalone });
+    });
   }
   return out;
 }
@@ -210,6 +286,21 @@ function splitTop(s: string, rels: string[]): { parts: string[]; ops: string[] }
 }
 
 const strip = (s: string) => s.trim().replace(/^[,;:\s]+|[,;:.\s]+$/g, '');
+
+/**
+ * Sides of an equation that cannot be whole: a left side that opens on a
+ * binary operator ("+ n", "* 2", "^ 3"), or any side that ends on one ("1 + 2 +").
+ * Both mean the run was cut out of something longer — by an ellipsis the
+ * tokenizer missed, a line break, punctuation inside a sum — and the part that
+ * is left says nothing the writer said. "+ n = n(n+1)/2" is the tail of
+ * "1 + 2 + … + n = n(n+1)/2", a true identity, and checking the tail reported
+ * it false. A leading minus is left alone: "−sin x = sin(−x)" is whole.
+ */
+function fragmentary(parts: string[]): boolean {
+  const first = strip(parts[0] ?? '');
+  if (/^[+*/^·]/.test(first)) return true;
+  return parts.some((p) => /[-+*/^·]$/.test(strip(p)));
+}
 
 /** Remove one pair of brackets around the whole of s, if they enclose all of it. */
 function unwrap(s: string): string {
@@ -449,6 +540,8 @@ function formulaClaims(raw: string, ctx: Ctx, out: Extracted, role: 'reply' | 'p
     posedFromBare(raw, ctx, out);
     return;
   }
+  // The tail or head of something longer: no claim, no problem, no definition.
+  if (fragmentary(parts)) return;
   const [lhs, ...rhs] = parts;
 
   // An operator the words supplied: "the derivative of csc x = −csc x cot x".
@@ -528,10 +621,14 @@ function chainClaims(parts: string[], ops: string[], text: string, ctx: Ctx, out
       continue;
     }
     // One constant side is an equation to solve — unless the sentence calls
-    // it an identity: "sin²x + cos²x = 1 always holds".
+    // it an identity: "sin²x + cos²x = 1 always holds". A bare variable
+    // against a constant is never one, whatever the sentence says: in
+    // "x = y = 0 always" the link "y = 0" pins y down, and checking it as an
+    // identity in y reported it false.
     if (!na.length || !nb.length) {
       const names = na.length ? na : nb;
-      if (IDENTITY_SAID.test(ctx.sentence) && !SOLVE_WORDS.test(ctx.sentence) && names.every(isSymbolName)) out.claims.push({ kind: 'equal', text, left: a, right: b, why: 'identity' });
+      const lone = /^\(?\s*[a-z]\w*\s*\)?$/i.test((na.length ? a : b).trim());
+      if (!lone && IDENTITY_SAID.test(ctx.sentence) && !SOLVE_WORDS.test(ctx.sentence) && names.every(isSymbolName)) out.claims.push({ kind: 'equal', text, left: a, right: b, why: 'identity' });
       continue;
     }
     if (na.slice().sort().join() !== nb.slice().sort().join() || !na.every(isSymbolName)) continue;
@@ -851,7 +948,7 @@ export function extract(text: string, opts: ExtractOptions): Extracted {
       for (const tok of s.tokens) {
         if (tok.t !== 'math' || tok.cut) continue;
         const { parts } = splitTop(tok.v, ['=']);
-        if (parts.length === 2) posedEquation(parts[0], parts[1], tok.v.slice(0, 160), out);
+        if (parts.length === 2 && !fragmentary(parts)) posedEquation(parts[0], parts[1], tok.v.slice(0, 160), out);
       }
     }
     // "is csc x = 1/sin x?", "prove that sin^2 x + cos^2 x = 1": an identity to settle.
@@ -866,7 +963,7 @@ export function extract(text: string, opts: ExtractOptions): Extracted {
       for (const tok of s.tokens) {
         if (tok.t !== 'math' || tok.cut || /\bmod\b/.test(tok.v)) continue;
         const { parts } = splitTop(tok.v, ['=', '≡']);
-        if (parts.length !== 2 || readOperator(strip(parts[0]), out.defs)) continue;
+        if (parts.length !== 2 || fragmentary(parts) || readOperator(strip(parts[0]), out.defs)) continue;
         const l = toGrammar(strip(parts[0]));
         const r = toGrammar(strip(parts[1]));
         if (!l || !r) continue;

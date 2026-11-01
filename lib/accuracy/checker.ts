@@ -734,6 +734,14 @@ export function computePosed(p: Posed): Computed {
       return { posed: p, result: roots.length ? roots.map((r) => `${p.variable} = ${show(r)}`).join(', ') : 'no real solutions', how: `numerical root finding ${window}`, alternatives: [] };
     }
     if (p.kind === 'identity') {
+      // Nobody writes a whole side of an identity that opens on "+" or ends on
+      // an operator; one that does is the tail of a sum the extractor should
+      // have dropped ("+ n" from "1 + 2 + … + n"). The extractor drops these
+      // (claims.ts, fragmentary); this is the second lock on the same door,
+      // because the line this produces is read as settled.
+      if ([p.left, p.right].some((s) => /^\s*[+*/^]/.test(s) || /[-+*/^]\s*$/.test(s))) {
+        return { posed: p, result: null, how: 'evaluation', alternatives: [], note: 'one side is a fragment of a longer expression' };
+      }
       const all = [...new Set([...names(p.left, 'x'), ...names(p.right, 'x')])].filter((n) => /\bx\b/.test(`${p.left} ${p.right}`) || n !== 'x');
       const main = all.includes('x') ? 'x' : all[0];
       const el = main ? compile(p.left, all) : null;
