@@ -1033,11 +1033,22 @@ function sanitizeDiagram(r: Record<string, unknown>): DiagramSpec | null {
   if (rawNodes.length > L.diagramNodes) return null;
   const nodes: DiagramNode[] = [];
   const byKey = new Map<string, string>();
+  const givenId = (v: unknown) => {
+    const rid = field(asObj(v), 'id');
+    return rid !== undefined && NODE_ID.test(String(rid).trim()) ? String(rid).trim() : null;
+  };
+  // a part without a usable id is given one no other part was given: "n2" for the second part, unless a part is called "n2"
+  const taken = new Set(rawNodes.map(givenId).filter((x): x is string => !!x));
+  const freshId = (i: number) => {
+    let id = `n${i + 1}`;
+    for (let k = 2; taken.has(id); k++) id = `n${i + 1}_${k}`;
+    taken.add(id);
+    return id;
+  };
   rawNodes.forEach((v, i) => {
     const o = typeof v === 'string' ? { label: v } : asObj(v);
     const label = line(field(o, 'label', 'text', 'name', 'title'), L.nodeLabel);
-    const rid = field(o, 'id');
-    const id = rid !== undefined && NODE_ID.test(String(rid).trim()) ? String(rid).trim() : `n${i + 1}`;
+    const id = givenId(v) ?? freshId(i);
     if (!label || nodes.some((x) => x.id === id || x.label.toLowerCase() === label.toLowerCase())) return;
     const detail = line(field(o, 'detail', 'description', 'gist'), L.nodeDetail);
     const role = view === 'causes' && typeof o?.role === 'string' ? ROLE_WORDS[wordOf(o.role)] : undefined;
@@ -1480,9 +1491,15 @@ export function gateInlineBlock(chunk: string, ctx: InlineContext, open = false)
   }
   if (!spec) return '';
   const v = checkInlineSpec(spec, ctx);
+  // a json block the reply has no room to draw (inline elements off — the route gates with nothing left to
+  // show —, the reply's elements used up, a second thing to work with, no question left for its choices) is
+  // what was written before it could be read as one: the code block, untouched. Only what protects the
+  // person (the guard, work that is theirs, figures from nowhere) takes a json block out
+  if (!v.ok && lang !== 'ui' && JSON_FENCE_ROOM.has(v.why)) return chunk;
   if (!v.ok) return v.notice ? `${v.notice}\n\n` : '';
   return `${fenceOf(v.spec)}\n\n`;
 }
+const JSON_FENCE_ROOM = new Set(['too-many', 'one-at-a-time', 'no-questions']);
 
 // ── as words, where a picture cannot go ──────────────────────────────
 

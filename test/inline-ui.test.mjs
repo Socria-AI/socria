@@ -338,6 +338,14 @@ console.log('\n=== lenient where it costs nothing: what a model writes instead i
   ok('…and when the turn asked for code, a json block is theirs to read, never an element', I.gateInlineBlock(asked, { ...c(), code: true }) === asked);
   ok('…nor while the stream is still inside it', I.gateInlineBlock('```json\n{"type":"chart"', c(), true) === '```json\n{"type":"chart"');
   ok('…and any other language is untouched', I.gateInlineBlock('```python\n' + J(CHART) + '\n```', c()) === '```python\n' + J(CHART) + '\n```');
+  // a json block the reply has no room to draw is the code it was written as — never deleted for want of room
+  const room = '```json\n' + J(CHART) + '\n```';
+  ok('…with inline elements off (the route gates with nothing left to show), a json block is untouched', I.gateInlineBlock(room, { ...c(), shown: { n: Infinity } }) === room, I.gateInlineBlock(room, { ...c(), shown: { n: Infinity } }));
+  ok('…nor when the reply has used up its elements', I.gateInlineBlock(room, { ...c(), shown: { n: 99 } }) === room);
+  const opts = '```json\n{"type":"options","options":["Small","Large"]}\n```';
+  ok('…nor when there is no question left for its choices', I.gateInlineBlock(opts, ctx({ questions: 0 })) === opts);
+  const guarded = '```json\n' + J({ type: 'steps', lines: [{ tex: 'x+1=2' }, { tex: 'x=1' }] }) + '\n```';
+  ok('…but what protects the person still takes it out: guarded working in a json fence is not shown', I.gateInlineBlock(guarded, ctx({ guard: true })) === '');
   const out = [];
   const g = new I.SentenceGate((x) => out.push(x), { block: (chunk, open) => I.gateInlineBlock(chunk, c(), open) });
   // the block arrives in one piece here: a block split across pieces is the stream gate's to reassemble (lib/core4/stream-gate.ts)
