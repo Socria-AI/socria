@@ -45,7 +45,7 @@
   animation: qc-in 0.55s var(--qc-ease) both;
 }
 html[data-theme='dark'] .qc {
-  --qc-raise: #2e2f28;
+  --qc-raise: #242424;
 }
 html[data-theme='one'] .qc {
   --qc-raise: #22415a;

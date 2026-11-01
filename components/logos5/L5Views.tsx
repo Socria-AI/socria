@@ -24,6 +24,7 @@ export function L5TopBar({
   onHome,
   onSearch,
   onNew,
+  zoom,
   split,
   presence,
   menu,
@@ -35,6 +36,8 @@ export function L5TopBar({
   /** search, here — absent on a phone, where it is in the ⋯ menu so the title has room */
   onSearch?: () => void;
   onNew?: () => void;
+  /** the way to the line of thinking zoomed out (components/logos5/L5Canvas.tsx) */
+  zoom?: ReactNode;
   /** Split View — desktop only */
   split?: ReactNode;
   presence?: ReactNode;
@@ -77,6 +80,7 @@ export function L5TopBar({
         )}
       </div>
       <div className="l5v-top-r">
+        {zoom}
         {split}
         {presence}
         {menu}

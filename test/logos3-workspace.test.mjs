@@ -210,7 +210,8 @@ console.log('\n=== simple at rest, powerful on demand ===');
   const app = read('components/LogosApp.tsx');
   ok('Logos 3 starts on one surface — the model if there is one, else the map', /singleLayout\(wsHasModel \? 'model' : 'map'\)/.test(app));
   // Logos 5: the composer sits under whichever view is open (L5Layout's omni) until the conversation is opened, as Chat or beside
-  ok('the conversation is a composer beneath the stage until it is asked for', /const convoOpen = l5 && !!activeId && \(screen\.view === 'chat' \|\| screen\.beside === 'chat'\);/.test(app) && /omni=\{convoOpen \? null : l5Dock\}/.test(app) && /\{omni && <div className="l5v-omni">\{omni\}<\/div>\}/.test(read('components/logos5/L5Views.tsx')));
+  // (and while zoomed out, the canvas docks it instead)
+  ok('the conversation is a composer beneath the stage until it is asked for', /const convoOpen = l5 && !!activeId && \(screen\.view === 'chat' \|\| screen\.beside === 'chat'\);/.test(app) && /omni=\{convoOpen \|\| zoomed \? null : l5Dock\}/.test(app) && /\{omni && <div className="l5v-omni">\{omni\}<\/div>\}/.test(read('components/logos5/L5Views.tsx')));
   // Logos 4: only what the inspector can describe opens it — a parameter, an input, a part of a model
   ok('the inspector appears for a selection, and only then', /focus && \(focus\.kind === 'param' \|\| focus\.kind === 'input' \|\| focus\.kind === 'object'\)/.test(app) && /overlay=\{wsCard\}/.test(app));
   // by the count it used to keep, or by the build itself (lib/workspace/surfaces.ts afterBuild, tested in logos3-interface)

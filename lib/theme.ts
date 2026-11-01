@@ -42,7 +42,7 @@ export interface Theme {
 export const THEMES: Record<ThemeId, Theme> = {
   paper: { id: 'paper', label: 'Paper', says: 'Socria’s own ground', one: false, swatch: ['#F5F3EB', '#1F1F1F', '#5e7633'], scheme: 'light' },
   white: { id: 'white', label: 'White', says: 'Clean and bright', one: true, swatch: ['#FFFFFF', '#1A1A1A', '#4f6a2a'], scheme: 'light' },
-  dark: { id: 'dark', label: 'Dark', says: 'Easy on the eyes at night', one: false, swatch: ['#191A17', '#ECE9DF', '#A9C27A'], scheme: 'dark' },
+  dark: { id: 'dark', label: 'Dark', says: 'True dark, no tint', one: false, swatch: ['#121212', '#E8E8E8', '#8A8A8A'], scheme: 'dark' },
   // CELESTIAL. Its key is still 'night' — the name it was first chosen under —
   // so everyone who chose it keeps it (lib/celestial.ts, app/celestial.css).
   night: { id: 'night', label: 'Celestial', says: 'Deep space, and your map as a star chart', one: false, swatch: ['#060A1A', '#E9E6F2', '#F0D79B'], scheme: 'dark' },

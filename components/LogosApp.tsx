@@ -115,7 +115,7 @@ import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
-import { artifactFromSpec, describeInline, inlineFrom, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { artifactFromSpec, describeInline, inlineFrom, sanitizeInlineState, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -173,11 +173,15 @@ import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-r
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
-import { L5Layout, L5Tabs, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5Views';
+import { L5Layout, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5Views';
+import { L5Canvas, MapPreview, type CanvasCard } from '@/components/logos5/L5Canvas';
+import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
+import { InlineBlock } from '@/components/inline/InlineUI';
+import { Inline as RichInline } from '@/components/RichText';
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
 import { ContentView, PlainReader, WriteUpReader } from '@/components/logos5/ContentView';
 import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/logos5/content';
-import { OPENING, SPLIT_NAMES, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, splitMenu, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type SplitChoice, type Viewport } from '@/lib/logos5/views';
+import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, splitMenu, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type SplitChoice, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
@@ -5811,6 +5815,38 @@ export function LogosApp({
   const [awayFromEnd, setAwayFromEnd] = useState(false);
   /** narrower than a desktop: the stage is a sheet over the conversation, not a column beside it */
   const [narrow, setNarrow] = useState(false);
+  /** THE CANVAS (components/logos5/L5Canvas.tsx): the line of thinking zoomed out — the turns and what they made, laid out */
+  const [zoomed, setZoomed] = useState(false);
+  /** whether the conversation is the screen now, so Escape or a pinch can zoom out (kept fresh each render) */
+  const zoomOkRef = useRef(false);
+  const pinchRef = useRef(0);
+  useEffect(() => {
+    const blocked = () => !!document.querySelector('[role="dialog"], [aria-modal="true"], [role="menu"]');
+    const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape' || e.defaultPrevented || !zoomOkRef.current || editable(e.target) || blocked()) return;
+      e.preventDefault();
+      setZoomed(true);
+    };
+    // a trackpad's pinch arrives as a small wheel with ctrl; a mouse's ctrl-wheel stays the browser's zoom
+    const onWheel = (e: WheelEvent) => {
+      if (!e.ctrlKey || !zoomOkRef.current || Math.abs(e.deltaY) >= 40) return;
+      if (e.deltaY <= 0) return void (pinchRef.current = 0);
+      e.preventDefault();
+      pinchRef.current += e.deltaY;
+      if (pinchRef.current > 60) {
+        pinchRef.current = 0;
+        setZoomed(true);
+      }
+    };
+    window.addEventListener('keydown', onKey);
+    window.addEventListener('wheel', onWheel, { passive: false });
+    return () => {
+      window.removeEventListener('keydown', onKey);
+      window.removeEventListener('wheel', onWheel);
+    };
+  }, []);
+  useEffect(() => setZoomed(false), [activeId]);
   /** a phone's width, where the line's header keeps only what the title can share a row with */
   const [phone, setPhone] = useState(false);
   useEffect(() => {
@@ -8078,23 +8114,6 @@ export function LogosApp({
         {synthBusy === 'workspace' ? 'Reading…' : 'Synthesize'}
       </button>
     ) : null;
-  const tabsEl = (
-    <L5Tabs
-      value={studyTab}
-      onChange={(t) => {
-        handChoseRef.current = Date.now();
-        setStudyTab(t);
-      }}
-      counts={{
-        content: contentItems.length,
-        // a blank document is not something made yet
-        artifacts: artifactItems.length - (artifactItems[0]?.key === 'w:doc' && isEmptyDoc(writeDoc) ? 1 : 0),
-        logic_map: map.nodes.length,
-      }}
-      fresh={{ chat: chatFresh, artifacts: artFresh, logic_map: stageFresh }}
-      actions={synthAction}
-    />
-  );
   /** the turn on its way, said truthfully: only what has actually happened (Alex Tran: real loading feedback) */
   const workingSteps: { label: string; state: 'done' | 'now' | 'next' }[] = [
     ...(turnInfo?.files ? [{ label: `Read ${turnInfo.files} ${turnInfo.files === 1 ? 'file' : 'files'} on this device`, state: 'done' as const }] : []),
@@ -8297,7 +8316,7 @@ export function LogosApp({
           ↓ Latest
         </button>
       )}
-      {l5Dock}
+      {zoomed ? null : l5Dock}
     </section>
   );
   // LOGIC MAP: the person's own ideas, in whatever shape the thinking takes — a
@@ -8390,7 +8409,7 @@ export function LogosApp({
       besideTitle={screen.beside ? SPLIT_NAMES[screen.beside] : ''}
       onCloseBeside={() => setScreen((s) => ({ ...s, beside: null }))}
       // the composer, wherever the conversation is not on screen: what is said here is still said to Socria
-      omni={convoOpen ? null : l5Dock}
+      omni={convoOpen || zoomed ? null : l5Dock}
       omniTop={chatSide === 'top'}
       share={besideShare}
       onShare={(s) => {
@@ -8406,6 +8425,174 @@ export function LogosApp({
       narrow={narrow}
     />
   );
+  // THE CANVAS (components/logos5/L5Canvas.tsx, lib/logos5/canvas.ts): the line of thinking zoomed out. The turns
+  // down the middle; beside each, what it made — the elements its reply drew (live, the same component as the
+  // conversation), the notes and files it brought, the practice it set — and the Logic Map beside the turns that
+  // drew it. The chatbox stays docked: what is said here is said to Socria, and the reply arrives on the spine.
+  const zoomOut = () => {
+    setZoomed(true);
+    setArtFresh(false);
+    setStageFresh(false);
+  };
+  /** a full view — the Logic Map, Content, Artifacts — from the canvas, with the way back to the chat above it */
+  const openFull = (v: Viewport) => {
+    handChoseRef.current = Date.now();
+    setStudyTab(v);
+    setZoomed(false);
+  };
+  const canvasEl = zoomed
+    ? (() => {
+        const turns = canvasTurns(messages, { pending: busyHere || !!streaming });
+        const firstReply = turns.find((t) => t.replyId)?.index ?? 0;
+        const aim = (label: string, of: string, lines: string[]) => {
+          setObjSel(null);
+          setFocus({ kind: 'element', label, of, lines: lines.filter(Boolean).slice(0, 10) });
+          focusComposer();
+        };
+        const cards: CanvasCard[] = [];
+        // the ideas, beside the first turn that drew them
+        if (map.nodes.length) {
+          const mapEl = <MapPreview nodes={map.nodes.map((n) => ({ id: n.id, type: n.type, label: n.label }))} edges={map.edges} />;
+          cards.push({
+            key: 'map',
+            lane: 'ideas',
+            tone: 'map',
+            kicker: `Logic Map · ${map.nodes.length} ${map.nodes.length === 1 ? 'idea' : 'ideas'}`,
+            title: '',
+            turn: firstReply,
+            preview: mapEl,
+            full: () => mapEl,
+            onAsk: () => aim('the Logic Map', 'this line of thinking', map.nodes.slice(0, 10).map((n) => `${n.type}: ${n.label}`)),
+            onOpen: () => openFull('logic_map'),
+          });
+        }
+        // what the replies drew, beside the turn that drew each — live in focus, as it was left
+        const kept = new Set<string>();
+        for (const el of canvasElements(messages, turns)) {
+          const msg = messages.find((m) => m.id === el.replyId);
+          if (!msg) continue;
+          if (el.kept) kept.add(el.kept);
+          const state = sanitizeInlineState(msg.ui);
+          const noun = ELEMENT_NOUN[el.spec.type] ?? 'Element';
+          const draw = (live: boolean) => (
+            <InlineBlock
+              spec={el.spec}
+              open={false}
+              n={el.n}
+              host={{
+                state,
+                live,
+                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec) } : {}),
+              }}
+              renderInline={(t, k) => <RichInline text={t} math keyBase={`cv-${el.key}-${k}`} />}
+            />
+          );
+          const said = describeInline(el.spec, state?.[el.n]);
+          cards.push({
+            key: el.key,
+            lane: el.lane,
+            tone: el.lane === 'practice' ? 'practice' : 'artifact',
+            kicker: el.lane === 'practice' ? 'Practice' : `Artifact · ${noun}`,
+            title: el.title,
+            turn: el.turn,
+            preview: draw(false),
+            full: () => draw(true),
+            ...(el.kept ? { note: 'Kept in Artifacts, as you left it' } : said ? { note: `As you left it: ${said}` } : {}),
+            onAsk: () => aim(el.title, `the ${noun.toLowerCase()} Socria drew in turn ${el.turn + 1}`, [`${noun}: ${el.title}`, ...(said ? [`as they left it: ${said}`] : [])]),
+            ...(workspaceOn
+              ? {
+                  onOpen: () => {
+                    openInline(msg, el.n, el.spec);
+                    setZoomed(false);
+                  },
+                }
+              : {}),
+          });
+        }
+        // what else was made — models, kept things, the writing, practice — each opened large in place
+        for (const a of artifactItems) {
+          if (a.key.startsWith('d:') && kept.has(a.key.slice(2))) continue;
+          if (a.key === 'w:doc' && isEmptyDoc(writeDoc)) continue;
+          const practice = a.key.startsWith('p:');
+          cards.push({
+            key: `a:${a.key}`,
+            lane: practice ? 'practice' : 'made',
+            tone: practice ? 'practice' : 'artifact',
+            kicker: practice ? 'Practice' : `Artifact · ${a.kind}`,
+            title: a.title,
+            turn: null,
+            preview: (
+              <div className="lcv-art">
+                <span className="lcv-art-g" aria-hidden="true">
+                  {practice ? '✓' : a.kind === 'Writing' ? '¶' : '◇'}
+                </span>
+                <span>{practice ? 'Questions to try' : `${a.kind} — open it here to use it`}</span>
+              </div>
+            ),
+            full: () => a.render(),
+            onAsk: () => aim(a.title, 'Artifacts', [`${a.kind.toLowerCase()} in this line of thinking`]),
+            onOpen: () => {
+              showArtifact(a.key);
+              openFull('artifacts');
+            },
+          });
+        }
+        // what was read and written: files brought, notes and write-ups — beside the turn they came with
+        for (const c of contentItems) {
+          cards.push({
+            key: `c:${c.id}`,
+            lane: 'made',
+            tone: 'content',
+            kicker: `Content · ${c.meta || 'Document'}`,
+            title: c.title,
+            turn: turnOfEntry(c.id, turns),
+            preview: c.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={c.image} alt="" className="lcv-img" />
+            ) : c.snippet ? (
+              <p className="lcv-text">{canvasExcerpt(c.snippet, 260)}</p>
+            ) : (
+              <p className="lcv-meta">{c.meta}</p>
+            ),
+            onAsk: () => aim(c.title, 'Content', [c.meta, c.snippet ?? '']),
+            onOpen: () => {
+              openContent(c.id);
+              setZoomed(false);
+            },
+          });
+        }
+        return (
+          <L5Canvas
+            turns={turns}
+            cards={cards}
+            composer={l5Dock}
+            narrow={narrow}
+            onBack={() => setZoomed(false)}
+            onJump={(t: CanvasTurn) => {
+              setZoomed(false);
+              const id = t.askedId ?? t.replyId;
+              if (id) window.setTimeout(() => jumpTo(id), 60);
+            }}
+          />
+        );
+      })()
+    : null;
+  /** where the tab row was: on a full view, the way back to the chat and that view's own actions; on the chat, nothing */
+  const viewBarEl =
+    studyTab !== 'chat' ? (
+      <div className="l5v-viewbar">
+        <button type="button" className="l5v-btn" onClick={() => openFull('chat')}>
+          <span aria-hidden="true">‹</span> Back to chat
+        </button>
+        <span className="l5v-viewbar-t">{VIEW_LABELS[studyTab]}</span>
+        <div className="l5v-viewbar-a">
+          {synthAction}
+          <button type="button" className="l5v-btn" onClick={zoomOut}>
+            Zoom out
+          </button>
+        </div>
+      </div>
+    ) : null;
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   /** the account chip opens the profile's own menu: the account, and Memory (Alex Tran: the mind graph lives in the profile) */
   const accountEl = guest ? (
@@ -8454,6 +8641,20 @@ export function LogosApp({
       onHome={goHome}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
       onNew={phone ? undefined : () => void newFromHome()}
+      zoom={
+        activeId && !zoomed && studyTab === 'chat' && messages.length > 0 ? (
+          <button type="button" className="l5v-btn l5v-zoomout" onClick={zoomOut} aria-label="Zoom out: the whole line of thinking, and what it made" title="Zoom out (Esc)">
+            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
+              <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
+              <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
+              <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
+            </svg>
+            {!narrow && <span>Zoom out</span>}
+            {(artFresh || stageFresh) && <span className="l5v-dot" aria-label="new" />}
+          </button>
+        ) : null
+      }
       split={
         !narrow && activeId ? (
           <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} chatSide={chatSideNow} onChatSide={chatSideChosen} />
@@ -8498,6 +8699,7 @@ export function LogosApp({
     });
   /** Memory is its own place: over home and over a line of thinking alike */
   const mindShown = l5 && l5Mind && !hydrating && !room.active;
+  zoomOkRef.current = !!l5 && !!activeId && !homeShown && !mindShown && studyTab === 'chat' && !zoomed && messages.length > 0;
   function goHome() {
     setL5Home(true);
     setL5Mind(false);
@@ -9048,8 +9250,19 @@ export function LogosApp({
           {railEl}
           <div className="l5-main">
             {!chromeHidden && !mindShown && !homeShown && l5Head}
-            {!mindShown && !homeShown && <div className={`l5v-tabhost${chromeHidden ? ' is-bare' : ''}`}>{tabsEl}</div>}
-            <div className="l5-body">{mindShown ? l5MindView : homeShown ? l5HomeView : l5Line}</div>
+            {!mindShown && !homeShown && !zoomed && viewBarEl && <div className={`l5v-tabhost${chromeHidden ? ' is-bare' : ''}`}>{viewBarEl}</div>}
+            <div className={`l5-body${zoomed && !mindShown && !homeShown ? ' is-zoomed' : ''}`}>
+              {mindShown ? (
+                l5MindView
+              ) : homeShown ? (
+                l5HomeView
+              ) : (
+                <>
+                  {l5Line}
+                  {canvasEl}
+                </>
+              )}
+            </div>
             {/* over the Universal Map and Memory, Voice keeps listening where it can be seen and stopped */}
             {(mindShown || homeShown) && voicePanel(true)}
           </div>

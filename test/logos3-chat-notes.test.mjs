@@ -19,7 +19,8 @@ ok('  each can still be put away', (app.match(/className="lg-annot-x"/g) ?? []).
 console.log('=== the chats bar and header, put away ===');
 // Logos 5: the Logos 4 header's own button is gone with that header; the top bar's More menu carries "Hide the bars"
 ok('a control in the header hides both', /\{ label: 'Hide the bars', sep: true, onSelect: \(\) => hideChrome\(true\) \}/.test(app) && /const moreEl = \(\s*<L5Menu\s+label="More"\s+items=\{l5Menu\}/.test(app) && /menu=\{moreEl\}/.test(app));
-ok('  at the right, beside the account control', /<div className="l5v-top-r">\s*\{split\}\s*\{presence\}\s*\{menu\}\s*\{account\}\s*<\/div>/.test(shell) && /account=\{accountEl\}/.test(app));
+// the canvas: Zoom out sits before Split View in the same corner
+ok('  at the right, beside the account control', /<div className="l5v-top-r">\s*\{zoom\}\s*\{split\}\s*\{presence\}\s*\{menu\}\s*\{account\}\s*<\/div>/.test(shell) && /account=\{accountEl\}/.test(app));
 ok('  the rail closes with it', /const listOpen = l5Manage && railOpen && !chromeHidden;/.test(app) && /\$\{listOpen \? ' list-open' : ' rail-closed'\}/.test(app) && /open=\{railOpen && !chromeHidden\}/.test(app));
 ok('  the header goes, in Logos 2 and in Logos 3', /\.lg-split\.chrome-hidden \.lg-head,\s*\n\.logos-root \.lg-split\.chrome-hidden \.ws-top \{ display: none; \}/.test(css));
 ok('  one button in the corner brings them back', /chromeHidden && \(\s*<button[\s\S]{0,60}className="lg-chrome-show"[\s\S]{0,60}onClick=\{\(\) => hideChrome\(false\)\}/.test(app) && /\.lg-chrome-show \{\s*\n\s*position: fixed; top: 10px; right: 12px;/.test(css));

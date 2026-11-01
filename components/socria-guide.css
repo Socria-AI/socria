@@ -52,7 +52,7 @@
   animation: sg-in 0.6s var(--sg-ease) both;
 }
 html[data-theme='dark'] .sg {
-  --sg-raise: #2e2f28;
+  --sg-raise: #242424;
 }
 html[data-theme='one'] .sg {
   --sg-raise: #22415a;

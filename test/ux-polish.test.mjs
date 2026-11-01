@@ -58,8 +58,8 @@ ok(
     (app.match(/if \(!choseSinceSent\(\)\) setScreen\(\(s\) => onMade\(true, s, narrowRef\.current\)\);/g) || []).length === 2
 );
 ok(
-  '  the tabs say when they were chosen; a send says when it went',
-  /onChange=\{\(t\) => \{\s*handChoseRef\.current = Date\.now\(\);\s*setStudyTab\(t\);/.test(app) && /sentAtRef\.current = Date\.now\(\);/.test(app)
+  '  a view opened from the canvas says when it was chosen (the tab row is gone); a send says when it went',
+  /const openFull = \(v: Viewport\) => \{\s*handChoseRef\.current = Date\.now\(\);\s*setStudyTab\(v\);/.test(app) && /sentAtRef\.current = Date\.now\(\);/.test(app)
 );
 ok(
   '  and Artifacts gets its "new" dot instead',

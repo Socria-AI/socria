@@ -34,6 +34,8 @@ export type Focus =
   | { kind: 'part'; obj: string; part: string }
   /** Logos 4: a mathematical expression they pointed at — in a reply, a node, a display */
   | { kind: 'expression'; tex: string; where: string }
+  /** something on the zoomed-out canvas (components/logos5/L5Canvas.tsx), described by the canvas itself */
+  | { kind: 'element'; label: string; of: string; lines: string[] }
   | null;
 
 /** What the conversation is told about the focus. Small, plain, bounded. */
@@ -57,6 +59,7 @@ const MAX_LINE = 220;
  * own words come from there, never from a model.
  */
 export function describeFocus(focus: Focus, map: ThinkingMap | null | undefined, docs?: ReadonlyMap<string, SourceDoc>): FocusBrief | null {
+  if (focus && focus.kind === 'element') return clip({ kind: 'object', label: focus.label, of: focus.of, lines: focus.lines });
   if (!focus || !map) return null;
   if (focus.kind === 'expression') return describeExpression(focus.tex, focus.where);
   if (focus.kind === 'part') {

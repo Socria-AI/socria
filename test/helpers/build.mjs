@@ -349,6 +349,8 @@ const MODULES = [
   'test/helpers/easy-under-test.tsx',
   // big-screen mode: a car's centre screen, parked, or any large touchscreen — when it is on, and its dock
   'test/helpers/cabin-under-test.tsx',
+  // the line of thinking zoomed out: the turns as a spine, what each made beside it, the chatbox docked
+  'test/helpers/canvas-under-test.tsx',
 ];
 
 export async function buildAll() {

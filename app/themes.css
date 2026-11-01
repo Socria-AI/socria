@@ -24,31 +24,31 @@ html[data-theme="white"] :is(.logos-root, .lg-tokens) { --lg-paper: #FFFFFF; --l
 html[data-theme="white"] .app-root { --app-paper: #FFFFFF; --app-border: #E6E6E2; }
 html[data-theme="white"] .app-root:not(.app-inline) { background: #FFFFFF; }
 
-/* ── Dark: warm, low glare, the same moss turned up to be read on it ─── */
+/* ── Dark: a true dark, monochrome — neutral greys, no tint; the lit fill is near-white ─── */
 html[data-theme="dark"] {
-  --paper: #191A17; --paper-2: #22231F; --border: #34352E;
-  --ink: #ECE9DF;
-  --ink-rgb: 236, 233, 223; --lg-ink-rgb: 236, 233, 223; --lg-primary-rgb: 169, 194, 122; --moss-rgb: 143, 174, 92; --shadow-rgb: 0, 0, 0;
-  --ink-70: rgba(236, 233, 223, 0.7); --ink-60: rgba(236, 233, 223, 0.6); --ink-45: rgba(236, 233, 223, 0.45);
-  --ink-40: rgba(236, 233, 223, 0.4); --ink-25: rgba(236, 233, 223, 0.25); --ink-16: rgba(236, 233, 223, 0.16); --ink-12: rgba(236, 233, 223, 0.12);
-  --moss: #8FAE5C; --moss-50: #262C1E; --moss-100: #2E3622; --moss-200: #404E2C; --moss-600: #8FAE5C; --moss-700: #A9C27A; --moss-800: #BED296;
-  --accent: #8FAE5C; --accent-700: #A9C27A;
-  --app-paper: #191A17; --app-border: #34352E;
-  --surface: #25261F;
-  --c-paper: 25 26 23; --c-paper-2: 34 35 31; --c-ink: 236 233 223; --c-surface: 37 38 31; --c-border: 52 53 46;
-  --c-moss-50: 38 44 30; --c-moss-100: 46 54 34; --c-moss-200: 64 78 44; --c-moss-600: 143 174 92; --c-moss-700: 169 194 122; --c-moss-800: 190 210 150;
+  --paper: #121212; --paper-2: #1A1A1A; --border: #2C2C2C;
+  --ink: #E8E8E8;
+  --ink-rgb: 232, 232, 232; --lg-ink-rgb: 232, 232, 232; --lg-primary-rgb: 242, 242, 242; --moss-rgb: 217, 217, 217; --shadow-rgb: 0, 0, 0;
+  --ink-70: rgba(232, 232, 232, 0.7); --ink-60: rgba(232, 232, 232, 0.6); --ink-45: rgba(232, 232, 232, 0.45);
+  --ink-40: rgba(232, 232, 232, 0.4); --ink-25: rgba(232, 232, 232, 0.25); --ink-16: rgba(232, 232, 232, 0.16); --ink-12: rgba(232, 232, 232, 0.12);
+  --moss: #D9D9D9; --moss-50: #1C1C1C; --moss-100: #242424; --moss-200: #333333; --moss-600: #D9D9D9; --moss-700: #EDEDED; --moss-800: #F5F5F5;
+  --accent: #D9D9D9; --accent-700: #EDEDED;
+  --app-paper: #121212; --app-border: #2C2C2C;
+  --surface: #1C1C1C;
+  --c-paper: 18 18 18; --c-paper-2: 26 26 26; --c-ink: 232 232 232; --c-surface: 28 28 28; --c-border: 44 44 44;
+  --c-moss-50: 28 28 28; --c-moss-100: 36 36 36; --c-moss-200: 51 51 51; --c-moss-600: 217 217 217; --c-moss-700: 237 237 237; --c-moss-800: 245 245 245;
 }
 html[data-theme="dark"] :is(.logos-root, .lg-tokens) {
-  --lg-paper: #191A17; --lg-panel: #1E1F1B;
+  --lg-paper: #121212; --lg-panel: #171717;
   /* the light a model's figure sits in (components/surfaces/surfaces.css): a breath, not a lamp */
-  --sfx-glow: rgba(236, 233, 223, 0.045);
-  --lg-primary: #A9C27A; --lg-accent: #8FB3C4; --lg-secondary: #C9B47E; --lg-tension: #D18A68;
-  --lg-ink: #ECE9DF; --lg-ink-60: rgba(236, 233, 223, 0.6); --lg-ink-40: rgba(236, 233, 223, 0.4); --lg-ink-24: rgba(236, 233, 223, 0.24);
-  --lg-line: rgba(236, 233, 223, 0.12);
+  --sfx-glow: rgba(232, 232, 232, 0.045);
+  --lg-primary: #F2F2F2; --lg-accent: #8FB3C4; --lg-secondary: #C9B47E; --lg-tension: #D18A68;
+  --lg-ink: #E8E8E8; --lg-ink-60: rgba(232, 232, 232, 0.6); --lg-ink-40: rgba(232, 232, 232, 0.4); --lg-ink-24: rgba(232, 232, 232, 0.24);
+  --lg-line: rgba(232, 232, 232, 0.12);
   --lg-one: #8FB3C4; --lg-one-soft: rgba(143, 179, 196, 0.12); --lg-one-line: rgba(143, 179, 196, 0.35);
-  --node-idea-bg: rgba(143, 174, 92, 0.14);
+  --node-idea-bg: rgba(232, 232, 232, 0.07);
 }
-html[data-theme="dark"] .app-root { --app-paper: #191A17; --app-border: #34352E; }
+html[data-theme="dark"] .app-root { --app-paper: #121212; --app-border: #2C2C2C; }
 
 /* ── Socria One: the One blue, with cream ink and the pale blue as the accent ─ */
 html[data-theme="one"] {
@@ -156,14 +156,14 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   --l5s-review-ink: var(--lg-secondary);
 }
 html[data-theme="dark"] .logos-root .l5 {
-  --l5-surface: #25261F; --l5-surface-rgb: 37, 38, 31; --l5-paper-hi: #25261F; --l5-raise: #2E2F28;
-  --l5-card: #2E2F28; --l5-bubble: #33342C; --l5-code-bg: #1E1F1B; --l5s-drop-over: #2E2F28;
-  --l5-hair: rgba(236, 233, 223, 0.12); --l5-tint-rgb: 236, 233, 223;
-  --l5-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px -14px rgba(0, 0, 0, 0.5);
-  --l5-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 50px -20px rgba(0, 0, 0, 0.6);
-  --l5-on-primary-rgb: 25, 26, 23;
+  --l5-surface: #1C1C1C; --l5-surface-rgb: 28, 28, 28; --l5-paper-hi: #1C1C1C; --l5-raise: #242424;
+  --l5-card: #242424; --l5-bubble: #2A2A2A; --l5-code-bg: #171717; --l5s-drop-over: #242424;
+  --l5-hair: rgba(232, 232, 232, 0.12); --l5-tint-rgb: 232, 232, 232;
+  --l5-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px -14px rgba(0, 0, 0, 0.6);
+  --l5-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 50px -20px rgba(0, 0, 0, 0.7);
+  --l5-on-primary-rgb: 18, 18, 18;
   --l5-no-rgb: 209, 138, 104;
-  --l5s-ok: #A9C27A; --l5s-ok-rgb: 169, 194, 122; --l5s-ok-soft: rgba(169, 194, 122, 0.14);
+  --l5s-ok: #9CCB9F; --l5s-ok-rgb: 156, 203, 159; --l5s-ok-soft: rgba(156, 203, 159, 0.13);
   --l5s-no-soft: rgba(209, 138, 104, 0.14); --l5s-no-fill: rgba(209, 138, 104, 0.16); --l5s-no-wash: rgba(209, 138, 104, 0.08);
   --l5s-gold-rgb: 201, 180, 126;
 }
@@ -198,3 +198,6 @@ html[data-theme="night"] .logos-root .l5 :is(.l5-head, .l5x-tabs) { background: 
 /* the map's foot, where its legend sits (.mp-bot, globals.css), is a cream veil
    over the map on paper; under Logos 5 on a dark ground it is the surface's */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .mp-bot { background: rgba(var(--l5-surface-rgb), 0.86); }
+/* the build's badge (preview and local only): paper's white pill read as a blank on a dark ground */
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .env-badge > button { background: rgba(0, 0, 0, 0.55); border-color: rgba(var(--lg-ink-rgb), 0.18); }
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .env-badge > button:hover { color: var(--ink); }

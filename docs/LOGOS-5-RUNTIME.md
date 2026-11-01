@@ -2851,3 +2851,77 @@ that fits, none on the turns that should stay prose, with no raw JSON,
 overflow or page error. Pinned suites updated where the change is the
 point, each with its reason: presentation, minimum-explanation,
 interactive-chat, inline-ui, reply-shape, runtime-route, runtime-register.
+
+## 33. The line of thinking, zoomed out — and Dark made dark
+
+The four-tab row over a conversation (Chat · Content · Artifacts · Logic Map)
+is gone. The conversation and what it made are one thing at two distances:
+close in it is the chat; pulled back it is a canvas. Nothing is merged into a
+single chatbot view — each thing keeps its own place, and the canvas shows
+where each one came from.
+
+- **Getting there.** *Zoom out* in the header of a conversation (a dot on it
+  when something new was made), **Esc**, or a trackpad pinch out. Esc and the
+  pinch are ignored while typing, over a dialog or a menu, on the Universal
+  Map and in Memory. Opening another conversation starts close in again.
+- **What it shows** (`lib/logos5/canvas.ts`, pure; `components/logos5/L5Canvas.tsx`).
+  The turns run down the middle as a spine: what was asked, in the chat's own
+  bubble, with the gist of the reply under it. TeX is turned into plain type
+  (`\frac{f(b)-f(a)}{b-a}` reads as `(f(b) - f(a))/(b - a)`, `x^2 ≤ 3` as
+  `x² ≤ 3`). A synthesis is a turn of its own. Beside each turn is what it
+  made: the elements its reply drew (drawn by the conversation's own
+  component, as they were left), the notes and files it brought, and the
+  practice it set. The Logic Map sits beside the turn that first drew it.
+  Thin lines are measured from where the cards actually land. Anything that
+  belongs to no particular turn (a model, the writing) is gathered at the end.
+  The ways onward and choices to tap are never shown: they belong to the
+  moment.
+- **Doing things there.** Filters (Everything · Ideas · Made · Practice) and
+  zoom from 50% to 100%; on a phone it is one column, with a pinch left to the
+  page. Clicking a card brings it into focus, large and live. **Ask about
+  this** aims the docked chatbox at it, and Socria is told what it is and which
+  turn made it (Focus kind `element`, `lib/workspace/focus.ts`). **Jump to turn
+  N** goes back into the conversation at that turn. **Open full** opens the
+  full view (Logic Map, Content, Artifacts). The chatbox stays docked
+  throughout, so what is said here is said to Socria and arrives as a new turn
+  on the spine.
+- **The full views** are reached from the canvas, or when a reply opens them.
+  In place of the tab row they carry **Back to chat**, their own name, their
+  own action (Synthesize) and Zoom out.
+- **Dark is dark.** The Dark theme (`app/themes.css`) was a warm olive: an
+  olive-black ground (#191A17), olive surfaces, and moss green as its lit
+  colour. It is now monochrome: neutral greys with no tint (ground #121212,
+  surfaces #1C1C1C and #242424, hairlines in the ink's own light), neutral
+  ink (#E8E8E8), and a near-white primary, so a lit button is white with dark
+  words. The colours that carry meaning are kept: the Logic Map's kinds, the
+  subject colours on the Universal Map, and right and wrong (right is a
+  cleaner green). The same goes for the component sheets that named the olive
+  directly (Quick capture, the guide, What's new), and the build badge is now
+  readable on a dark ground.
+
+**Tested.** `test/logos5-canvas.test.mjs` (55 checks) covers:
+- TeX read as type, and money not mistaken for maths;
+- turns and their pairing: pending turns, synthesis, replies with no question
+  before them;
+- elements beside their turns: keys, titles, what was kept, practice in its
+  own lane, ways onward left off;
+- filters, sides, where notes sit, zoom bounds;
+- the canvas markup: spine, wires, previews to look at only, keyboard-openable
+  cards, the bar, the docked chatbox, the phone column with its short way
+  back, the empty state;
+- what Socria is told when the chatbox is aimed at something;
+- the wiring: no tab row, Back to chat on a full view, Zoom out with its dot,
+  Esc and pinch guards, the chatbox never shown twice, the bubble colour.
+
+`logos5-shell` and `ux-polish` were updated for the removed tab row. In the
+browser, a guest line of thinking was run through the stand-in model in Paper
+and Dark, on desktop and phone:
+- two turns with a live graph and a claim beside them;
+- the graph live in focus;
+- Ask about this setting the chatbox to "Average slope, matched · the live
+  graph Socria drew in turn 1";
+- Back to chat restoring the thread;
+- no page errors.
+
+The Universal Map, the chat and the canvas were checked in Dark with no green
+cast.

@@ -24,7 +24,7 @@ console.log('\n=== the screen is the four views ===');
 ok('a line of thinking is L5Layout over the view that is open', /<L5Layout\s+view=\{studyTab\}/.test(app) && /primary=\{primaryEl\}/.test(app));
 ok('  each view has its own body: Chat the thread, Content, Artifacts, the Logic Map', /const viewEl = \(v: Viewport\) => \(v === 'chat' \? l5Thread : v === 'content' \? contentView : v === 'artifacts' \? artifactsView : logicView\)/.test(app) && /const primaryEl = viewEl\(studyTab\)/.test(app));
 ok('  …and the view beside is drawn by the same body its tab draws', /const besideEl = screen\.beside && screen\.beside !== studyTab \? viewEl\(screen\.beside\) : null/.test(app) && !/besidePanelOf/.test(app));
-ok('  the tab row is the four views, with what each holds counted', /<L5Tabs\s+value=\{studyTab\}/.test(app) && /content: contentItems\.length/.test(app) && /logic_map: map\.nodes\.length/.test(app));
+ok('  the tab row is gone: a full view is left by Back to chat, and the canvas (Zoom out) holds what each view holds', !/<L5Tabs\b/.test(app) && /const viewBarEl =/.test(app) && /<L5Canvas\b/.test(app) && /map\.nodes\.length/.test(app) && /for \(const c of contentItems\)/.test(app));
 ok('  the tabs are a tablist that takes the arrow keys', /role="tablist"/.test(shell) && /ArrowRight/.test(shell) && /aria-selected=\{on\}/.test(shell) && /tabIndex=\{on \? 0 : -1\}/.test(shell));
 ok('"Components" is called Content everywhere it is said', !/label: 'Components'/.test(app) && !/'components'/.test(app));
 ok('the floating, draggable conversation box is retired: Split View docks it instead', !existsSync(join(root, 'components/logos5/L5Line.tsx')) && !existsSync(join(root, 'lib/logos5/box.ts')) && !/<L5Line/.test(app));
