@@ -2824,18 +2824,30 @@ not:
 - Below 560px, a comparison table stacks into cards; some older Safari and
   VoiceOver pairs may read those cards without table semantics.
 
-**Tested.** `test/presentation-selection.test.mjs` (427): maths, comparisons,
+**Tested.** `test/presentation-selection.test.mjs` (739): maths, comparisons,
 claims, business, the parts of something, two sides and timelines, everyday
 prose, one live element, the contract, said once, lookups, depth, the core —
-and the review's cases as regressions: somebody's own life answered in prose,
-bare words that are not structures, the same reading however it is asked,
-each thing said once. `test/inline-contract.test.mjs` (202): every example
+and both review rounds' cases as regressions: somebody's own life answered in
+prose however it is asked, bare words that are not structures, the same
+reading however it is typed or phrased, each thing said once, and a turn
+that agrees with itself. `test/inline-contract.test.mjs` (328): every example
 the reply is shown parses, passes the gate and draws, for every kind and
-variant. `test/inline-kinds.test.mjs`, `test/stream-trim.test.mjs`,
+variant — the check of their work by verdict, the next ways by thread, and
+under the guard, an example that shows only what the gate lets through.
+`test/mr-route.test.mjs` (98) holds the second round's coherence cases
+through the real route: no routine task on a hard situation, no slip shown
+on an answer that holds, the read given once after the block, the chart
+carrying their numbers, a polite procedure's steps, a trip's days.
+`test/inline-kinds.test.mjs`, `test/stream-trim.test.mjs`,
 `test/stream-route.test.mjs`, `test/reply-review.test.mjs`,
 `test/accuracy-fragments.test.mjs` hold the elements, the gate, the renderer
-and the checker. The full suite (316 suites) and the typecheck pass; the
-route sweep and the desktop and phone journeys are re-run on the final
-commit. Pinned suites updated where the change is the point, each with its
-reason: presentation, minimum-explanation, interactive-chat, inline-ui,
-reply-shape, runtime-route, runtime-register.
+and the checker. On the final commit the full suite (all 316 suites), the
+typecheck and `next build` pass; the 59-case route sweep offers an element on
+41 turns (20 before the overhaul) with no lookup block left on a turn that
+needs none (2 before), unchanged by the second round except where a phone's
+typing now reads as its typed-out form; and the desktop and phone journeys
+(30 turns in the real app through the stand-in model) draw every element
+that fits, none on the turns that should stay prose, with no raw JSON,
+overflow or page error. Pinned suites updated where the change is the
+point, each with its reason: presentation, minimum-explanation,
+interactive-chat, inline-ui, reply-shape, runtime-route, runtime-register.
