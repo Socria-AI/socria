@@ -116,6 +116,8 @@ export interface ExplicitSignals {
   sensitive: boolean;
   /** the request is FOR questions (quiz items, interview questions, practice problems): they are content, not interrogation */
   requestsQuestions: boolean;
+  /** the request is FOR wordings ("three polite ways to end a work email", "give me 5 lines"): a listed phrasing is content, never trimmed. Optional so a hand-built signal set is still complete. */
+  requestsPhrasing?: boolean;
   /** "you do it", "write it for me" */
   delegate: boolean;
   /** "don't rewrite it", "I want to write it myself", "don't tell me what to conclude" */
