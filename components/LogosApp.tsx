@@ -5815,8 +5815,9 @@ export function LogosApp({
   const [awayFromEnd, setAwayFromEnd] = useState(false);
   /** narrower than a desktop: the stage is a sheet over the conversation, not a column beside it */
   const [narrow, setNarrow] = useState(false);
-  /** THE CANVAS (components/logos5/L5Canvas.tsx): the line of thinking zoomed out — the turns and what they made, laid out */
-  const [zoomed, setZoomed] = useState(false);
+  /** THE CANVAS (components/logos5/L5Canvas.tsx): the line of thinking zoomed out — the turns and what they made, laid out.
+   *  It is the default: a line of thinking opens zoomed out; Back to chat (or a turn) brings the conversation close. */
+  const [zoomed, setZoomed] = useState(true);
   /** whether the conversation is the screen now, so Escape or a pinch can zoom out (kept fresh each render) */
   const zoomOkRef = useRef(false);
   const pinchRef = useRef(0);
@@ -5846,7 +5847,14 @@ export function LogosApp({
       window.removeEventListener('wheel', onWheel);
     };
   }, []);
-  useEffect(() => setZoomed(false), [activeId]);
+  // every line of thinking opens zoomed out — the canvas is the default view
+  useEffect(() => setZoomed(true), [activeId]);
+  // …but a full view opened by anything else — a reply that reveals the Logic Map, Make, a voice command — is shown, not hidden under it
+  const prevTabRef = useRef(studyTab);
+  useEffect(() => {
+    if (prevTabRef.current !== studyTab && studyTab !== 'chat') setZoomed(false);
+    prevTabRef.current = studyTab;
+  }, [studyTab]);
   /** a phone's width, where the line's header keeps only what the title can share a row with */
   const [phone, setPhone] = useState(false);
   useEffect(() => {

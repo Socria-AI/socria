@@ -2959,3 +2959,16 @@ cast.
   - `free-limits-e2e` covers it: a listed, verified address (in any case) is
     Socria One; the same address unverified is not; and the list holds only
     hashes.
+
+### 33.2 The canvas is the default view
+
+A line of thinking now opens zoomed out (`zoomed` starts true, and every
+change of conversation sets it again). What is said in the docked chatbox
+arrives as a new turn on the spine. **Back to chat**, or clicking a turn,
+brings the conversation close until another one is opened. A full view
+opened by anything else (a reply that reveals the Logic Map, Make, a voice
+command) leaves the canvas so it is seen, not hidden under it. In the browser,
+on desktop and phone: a new conversation opens on the canvas's empty state;
+two questions asked from the canvas land as two turns with their graph and
+claim beside them; Back to chat shows the four messages; reopening the
+conversation opens zoomed out again.
