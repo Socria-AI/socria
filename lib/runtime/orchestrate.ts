@@ -28,6 +28,7 @@
 //
 // Pure. No model, no network, no clock (time arrives in the input).
 
+import { quickPlot } from './plot-ask';
 import { constructAsk } from '../cognition/assist';
 import { readViewRequest } from '../view-request';
 import { wantedSimulation } from '../model/wants';
@@ -189,6 +190,13 @@ export function routeTurn(t: TurnInput): TurnRoute {
     reasons.push(view && MAP_LENSES.has(view.lens) ? `structure:lens:${view.lens}` : 'structure:asked');
     // the reply is read beside the map it draws (on a phone, the map alone)
     return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' } };
+  }
+
+  // A QUICK PLOT — one function, a range at most — is drawn in the conversation as a graph to change, and
+  // kept in Artifacts only if they press Keep (lib/runtime/plot-ask.ts)
+  if (quickPlot(text)) {
+    reasons.push('inline:plot');
+    return { intent: 'conversation', reasons, reveal: null };
   }
 
   const sim = wantedSimulation(text);

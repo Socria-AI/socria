@@ -20,6 +20,7 @@ import { NumberLineFigure } from './NumberLineFigure';
 import { DocumentFigure } from './DocumentFigure';
 import { CustomFigure } from './CustomFigure';
 import { EasyFigure } from './EasyFigure';
+import { KeptFigure } from './KeptFigure';
 
 registerFigure('plan', PlanFigure);
 registerFigure('venn', VennFigure);
@@ -42,3 +43,5 @@ registerFigure('timemachine', TimeFigure);
 registerFigure('custom', CustomFigure);
 // a photo made large, clear and simple
 registerFigure('easy', EasyFigure);
+// an element kept from the conversation, as it was left
+registerFigure('kept', KeptFigure);

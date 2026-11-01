@@ -23,7 +23,7 @@
     { "text": "lay out the argument so I can see where it is weak", "intent": "structure" },
     { "text": "give me a dependency map of the project tasks", "intent": "structure" },
     { "text": "stress-test my thesis on the minimum wage", "intent": "structure" },
-    { "text": "plot y = sin(x) + x/2", "intent": "visual" },
+    { "text": "plot y = sin(x) + x/2", "intent": "conversation" },
     { "text": "graph the supply and demand curves", "intent": "visual" },
     { "text": "make me a study plan for my finals", "intent": "visual" },
     { "text": "quiz me on the krebs cycle", "intent": "visual" },

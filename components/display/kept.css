@@ -1,0 +1,17 @@
+/* components/display/kept.css — an element kept from the conversation */
+.logos-root .kp-from {
+  margin: 0 0 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--lg-ink-60, #6b6b63);
+}
+.logos-root .kp-from q {
+  font-style: italic;
+  quotes: '“' '”';
+}
+.logos-root .kp-when {
+  white-space: nowrap;
+}
+.logos-root .kp-body .ln {
+  margin: 0;
+}

@@ -98,6 +98,10 @@ function inlineReply(messages) {
   }
   if (!sys.includes('INLINE, IF IT HELPS')) return null;
   const t = lastUser(messages);
+  // a quick plot of one function: drawn in place, kept only if they press Keep
+  if (sys.includes('"type":"graph"') && /^(?:plot|graph|sketch|draw)\b/i.test(t.trim())) {
+    return `Here it is — watch where it turns.\n\n${ui({ type: 'graph', title: 'y = x²', expr: 'x^2', x: [-3, 3], params: [], features: ['turning', 'roots', 'intercept'] })}`;
+  }
   // minimum explanation, maximum understanding: the insight, one thing to see it in, the ways deeper
   if (sys.includes('"type":"graph"') && /mean value|mvt|rolle/i.test(t)) {
     return `If a curve is unbroken on [a, b] and smooth in between, then somewhere inside it its slope at one instant equals its average slope over the whole stretch: $f'(c) = \\frac{f(b) - f(a)}{b - a}$.\n\n${ui({ type: 'graph', title: 'Average slope, matched', expr: 'x^3 - 3*x', x: [-2.5, 2.5], params: [{ name: 'a', label: 'a', value: -1.5, min: -2.5, max: 2.5, step: 0.1 }, { name: 'b', label: 'b', value: 2, min: -2.5, max: 2.5, step: 0.1 }], chord: ['a', 'b'], features: ['mean-value'] })}\n\nDrag either end: the chord tilts, and c slides to wherever the tangent runs parallel to it.${sys.includes('"type":"paths"') ? `\n\n${ui({ type: 'paths', title: 'Deeper, when you want it', items: [{ label: 'Why it needs a smooth curve', gist: 'What a corner like |x| does to it.' }, { label: 'Where c comes from', gist: 'The proof from Rolle’s theorem, in three lines.' }, { label: 'Where it is used', gist: 'Why an average speed can prove you sped.' }] })}` : ''}`;

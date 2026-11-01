@@ -26,8 +26,11 @@ for (const t of ['what is tax incidence', 'why is the sky blue?', 'I think we sh
   ok(`A conversation: "${t}" stays in Chat`, route(t).intent === 'conversation' && route(t).reveal === null, J(route(t)));
 for (const t of ['map out my argument for moving to Berlin', 'audit my reasoning here', 'break down the logic of this argument', 'show me the structure', 'make a causal diagram of the causes', 'draw a decision tree for this', 'what does my plan rest on?', 'what does my whole plan rest on?', 'open the logic map', 'turn this into a mind map', 'stress-test my thesis'])
   ok(`D structure: "${t}" opens the Logic Map`, route(t).intent === 'structure' && route(t).reveal?.view === 'logic_map', J(route(t)));
-for (const t of ['plot y = x^2', 'build a model of a pendulum', 'simulate a falling ball', 'make me flashcards for chapter 3', 'quiz me on the French revolution', 'graph sin(x) from 0 to 2pi', 'make a study plan for finals', 'visualize the data'])
+for (const t of ['plot y = x^2 and y = 2x + 1', 'build a model of a pendulum', 'simulate a falling ball', 'make me flashcards for chapter 3', 'quiz me on the French revolution', 'graph sin(x) and cos(x) from 0 to 2pi', 'make a study plan for finals', 'visualize the data'])
   ok(`C visual: "${t}" opens Artifacts beside the conversation`, route(t).intent === 'visual' && route(t).reveal?.view === 'artifacts' && route(t).reveal?.beside === 'chat', J(route(t)));
+// a quick plot of one function is drawn in the reply as a graph to change, and kept in Artifacts only if they press Keep
+for (const t of ['plot y = x^2', 'graph sin(x) from 0 to 2pi', 'can you plot f(x) = x^3 - 3x for x between -2 and 2'])
+  ok(`a quick plot: "${t}" stays in Chat, drawn inline`, route(t).intent === 'conversation' && route(t).reveal === null && route(t).reasons.includes('inline:plot'), J(route(t)));
 ok('B ingest: a document arriving keeps Chat (Content fills in the background)', route('here are my notes', { attachments: [{ kind: 'doc' }] }).intent === 'ingest' && route('here are my notes', { attachments: [{ kind: 'doc' }] }).reveal === null);
 ok('  an image alone is conversation, not ingestion', route('what is this?', { attachments: [{ kind: 'image' }] }).intent === 'conversation');
 ok('  a structure request with a document is still structure', route('map out the argument in this paper', { attachments: [{ kind: 'doc' }] }).intent === 'structure');

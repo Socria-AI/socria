@@ -32,6 +32,7 @@ import {
   isDisplayKind,
   kindOf,
   makeDisplay,
+  keptFrom,
   localDay,
   mergeSpaces,
   objOf,
@@ -5944,6 +5945,13 @@ export function LogosApp({
    * can be edited, re-viewed and kept. Made once; pressed again, what it made
    * opens.
    */
+  /** A reply's opening words, to say where something kept came from: the first sentence, without marks or blocks. */
+  function replyOpening(content: string): string {
+    const prose = content.replace(/```[\s\S]*?```/g, ' ').replace(/\$\$[\s\S]*?\$\$/g, ' ').replace(/[*_#>`]/g, '').replace(/\s+/g, ' ').trim();
+    const first = prose.split(/(?<=[.!?])\s/)[0] ?? prose;
+    return first.length > 140 ? `${first.slice(0, 137).trimEnd()}…` : first;
+  }
+
   function openInline(msg: Msg, n: number, spec: InlineSpec) {
     if (!workspaceOn) return;
     const space = spaceOf(mapRef.current);
@@ -5953,8 +5961,12 @@ export function LogosApp({
       setError('You can look at this line of thinking, but not change it.');
       return;
     }
-    const a = artifactFromSpec(spec);
+    // KEEP: a chart, a comparison or a decision opens as its larger form; anything else is kept as it was left,
+    // with the reply it came from (lib/objects/display-kept.ts)
+    const kept = keptFrom(spec, msg.ui?.[String(n)], { session: activeIdRef.current ?? undefined, message: msg.id, said: replyOpening(msg.content), at: Date.now() });
+    const a = artifactFromSpec(spec) ?? (kept ? { kind: 'kept' as const, state: kept as unknown as Record<string, unknown> } : null);
     if (!a) return;
+    // Socria made the element in the conversation; Keep files it — its footer says so ("read from the conversation by Socria")
     const made = makeDisplay(space, a.kind, a.state, 'socria');
     if (!made.ok) return setError(made.says);
     if (!commitObjects(made.space, objOf(made.space, made.obj.id))) return;

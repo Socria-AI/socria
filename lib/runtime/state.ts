@@ -18,6 +18,7 @@ import type { ExplicitSignals, WorkKind } from '../core4/types';
 import type { MapDigest } from '../cognition/digest';
 import { asksForDecision, isFactQuestion, offersWork, wantsExplanation } from '../cognition/assist';
 import { claimCheck } from '../cognition/claims';
+import { quickPlot } from './plot-ask';
 import { onlyAboutSocria, readExchange, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
 import type { Intent } from './orchestrate';
 
@@ -117,6 +118,8 @@ export function readWork(text: string, signals: ExplicitSignals, intent: Intent,
   const t = withoutGreeting(said);
   // a claim put up to be checked is a question with an answer — the verdict — not their work to correct
   if (!checkedWork && claimCheck(t)) return 'information';
+  // a quick plot of one function (lib/runtime/plot-ask.ts) is something to do, drawn in the reply
+  if (quickPlot(t)) return 'execution';
   if (checkedWork || offersWork(t)) return 'verification';
   if (LEADS_WITH_DOING.test(t)) return CREATION.test(t) ? 'creation' : 'execution';
   if (DIAGNOSIS.test(t)) return 'diagnosis';

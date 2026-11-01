@@ -327,6 +327,13 @@ export function fitWindowAll(curves: readonly CompiledExpr[], values: readonly R
   const ys: number[] = [...extra.filter(Number.isFinite)];
   for (const v of values) {
     ys.push(...curveFeatures(first, v, x0, x1).map((p) => p.y));
+    // where most of the curve is (its 10th to 90th percentile): x² on [−3, 3] marks only (0, 0), and a window
+    // fitted to that alone was ±0.3 tall; the far tails of a steep curve still go off the edge, clipped
+    const body = sampleCurve(first, v, x0, x1, 200);
+    if (body) {
+      const sorted = body.pts.map((p) => p.y).filter(Number.isFinite).sort((a, b) => a - b);
+      if (sorted.length > 10) ys.push(sorted[Math.floor(sorted.length * 0.1)], sorted[Math.floor(sorted.length * 0.9)]);
+    }
     for (const g of rest) {
       ys.push(...crossingsOf(first, g, v, x0, x1).map((p) => p.y));
       const s = sampleCurve(g, v, x0, x1, 120);

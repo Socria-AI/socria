@@ -61,6 +61,33 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
   if (!spec) return null;
   const state = host?.state?.[String(n)];
   const setState = (s: InlineState) => host?.onState?.(n, s);
+  const el = drawn(spec, n, host, state, setState, renderInline);
+  // KEEP (lib/objects/display-kept.ts): anything worth coming back to goes into Artifacts as it was left,
+  // with the reply it came from. A chart, a comparison and a decision carry their own larger form's button.
+  if (!host?.onOpen || !KEEPABLE.has(spec.type)) return el;
+  const kept = !!state?.artifact;
+  return (
+    <div className="ln-keepable">
+      {el}
+      <button
+        type="button"
+        className={`ln-keep${kept ? ' is-kept' : ''}`}
+        onClick={() => host.onOpen!(n, spec)}
+        title={kept ? 'Open what you kept, in Artifacts' : 'Keep this in Artifacts, as you left it'}
+      >
+        <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+          {kept ? <path d="M3.5 8.5 6.5 11.5 12.5 4.5" /> : <path d="M4 2.5h8v11l-4-2.8-4 2.8z" />}
+        </svg>
+        {kept ? 'Kept — open in Artifacts' : 'Keep'}
+      </button>
+    </div>
+  );
+}
+
+/** Kept with a press of Keep: everything but the ways onward (they are only ever a next message), and the three with larger forms of their own. */
+const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft']);
+
+function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state: InlineState | undefined, setState: (s: InlineState) => void, renderInline: RenderInline) {
   switch (spec.type) {
     case 'chart':
       return <InlineChart spec={spec} onOpen={host?.onOpen ? () => host.onOpen!(n, spec) : undefined} />;

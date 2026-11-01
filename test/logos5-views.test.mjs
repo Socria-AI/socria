@@ -48,11 +48,13 @@ console.log('\n=== rule B: documents go to Content in the background; the screen
 }
 
 console.log('\n=== rule C: something asked to be made — Artifacts, beside the conversation ===');
-for (const t of ['plot y = x^2', 'make me flashcards for chapter 3', 'make a study plan for finals', 'simulate a falling ball']) {
+for (const t of ['plot y = x^2 and y = 2x + 1', 'make me flashcards for chapter 3', 'make a study plan for finals', 'simulate a falling ball']) {
   const r = after(t, S('chat'));
   ok(`"${t}" → Artifacts with Chat beside`, same(r, S('artifacts', 'chat')), J(r));
 }
-ok('…on a phone: Artifacts alone', same(after('plot y = x^2', S('chat'), true), S('artifacts')));
+ok('…on a phone: Artifacts alone', same(after('plot y = x^2 and y = 2x + 1', S('chat'), true), S('artifacts')));
+// a quick plot of one function is drawn in the reply (lib/runtime/plot-ask.ts): the screen stays
+ok('a quick plot stays in Chat', same(after('plot y = x^2', S('chat')), S('chat')), J(after('plot y = x^2', S('chat'))));
 ok('made in the background (not asked): the screen stays', same(V.onMade(false, S('chat'), false), S('chat')));
 ok('made because it was asked: Artifacts, the conversation beside', same(V.onMade(true, S('chat'), false), S('artifacts', 'chat')));
 ok('…from the Logic Map with the conversation beside: still beside', same(V.onMade(true, S('logic_map', 'chat'), false), S('artifacts', 'chat')));

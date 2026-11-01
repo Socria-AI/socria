@@ -2482,3 +2482,42 @@ crossing from (4, 6) to (3, 7); sliding along demand takes the elasticity
 from 2.33 to 1; on a phone the 10% claim shows "Doesn't hold", its basis on
 a press, and a doubt that goes as a chip. Paper and night, desktop and
 phone: no sideways scroll, no page errors.
+
+## 31. Keep: what the conversation thinks with, and what Artifacts keep
+
+The conversation is for thinking with something now: a graph, a simulation, a
+claim, a question — one to a reply, done when it has done its job. Artifacts
+are for what is kept and built on. The bridge is **Keep**.
+
+- **Keep** sits under every element worth coming back to (graph, simulation,
+  claim, question, working, slider, folded reasoning, overview, sequence,
+  draft). It files the element in Artifacts exactly as it was left — where the
+  point was dragged, which part was doubted, what was answered — with where it
+  came from: the reply's opening words and the day (`lib/objects/display-kept.ts`,
+  kind `kept`, made only by Keep, never offered or proposed). Pressed again it
+  opens what was kept; it never makes a second copy.
+- In Artifacts it is drawn by the same component as in the conversation
+  (`components/display/KeptFigure.tsx`), live: what is changed there is kept
+  with it, as a step like any display's, and the reply model reads it as it
+  was left. A chart, a comparison and a decision keep their larger forms (a
+  data display, a comparison), as before. The ways onward (paths, options) are
+  never kept: they are only ever a next message. A kept element counts as an
+  artifact against the free plan's allowance, like anything opened there.
+- **A quick plot is drawn in the conversation** (`lib/runtime/plot-ask.ts`):
+  "plot y = x² from −3 to 3" — one function, a range at most — no longer opens
+  Artifacts; it is a graph in the reply (variant `plot`: the function as
+  written, over their range, no parameters unless asked), with Keep under it.
+  Two functions, a surface, a simulation, or anything to make, build or keep
+  still opens Artifacts. A graph's window now also covers where most of the
+  curve is (x² on [−3, 3] marked only its vertex, and was ±0.3 tall).
+
+**Tested.** `test/keep.test.mjs` (40): quick plots and what is not one; what
+Keep makes, its name, what is never kept, malformed input; the kind is
+internal; changes in Artifacts kept; what the model reads; the button (and
+"Kept — open in Artifacts"), none on a chart or the ways onward or where
+nothing can be kept; the app's wiring. Routing and view suites updated for the
+quick plot. In the browser: the Mean Value graph moved to b = 2.3, kept, opens
+in Artifacts at 2.3 with "Kept from the conversation — 'If a curve is
+unbroken…' · Nov 1"; changed there and kept; after a reload the reply's button
+reads "Kept — open in Artifacts". "plot y = x^2 from -3 to 3" stays in Chat
+with the parabola drawn 0 to 9 and Keep under it.

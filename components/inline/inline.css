@@ -1749,3 +1749,26 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   .logos-root .ln .ln-handle circle { stroke: Highlight; }
   .logos-root .ln :is(.ln-verdict-chip, .ln-mark, .ln-doubt) { border-color: CanvasText; }
 }
+
+/* ── keep: into Artifacts as it was left ── */
+.logos-root .ln-keepable { display: grid; gap: 6px; }
+.logos-root .ln-keepable > .ln-keep {
+  justify-self: start;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 4px 12px;
+  border: 1px solid var(--lg-line, rgba(0, 0, 0, 0.14));
+  border-radius: 999px;
+  background: transparent;
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: var(--lg-ink-60, #5d5d55);
+  cursor: pointer;
+}
+.logos-root .ln-keepable > .ln-keep:hover { color: var(--lg-ink, #1f1f1b); border-color: var(--lg-ink-40, rgba(0, 0, 0, 0.3)); }
+.logos-root .ln-keepable > .ln-keep.is-kept { color: var(--lg-primary, #354620); border-color: currentColor; }
+.logos-root .ln-keepable > .ln-keep:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: 2px; }
+@media (forced-colors: active) { .logos-root .ln-keepable > .ln-keep { border-color: ButtonText; } }

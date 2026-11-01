@@ -28,3 +28,8 @@ export { readExchange } from '@/lib/cognition/register';
 export { allocate, renderAllocation } from '@/lib/runtime/allocation';
 export { LOGOS5_MATH } from '@/lib/runtime/behavior';
 export { NO_LOOKUP_FACT } from '@/lib/core4/web';
+// keep: an element into Artifacts as it was left; a quick plot drawn inline
+export { quickPlot } from '@/lib/runtime/plot-ask';
+export { sanitizeKept, keptFrom, keptText, keptName } from '@/lib/objects/display-kept';
+export { kindOf } from '@/lib/objects/core';
+export { displayMeta, offeredKinds } from '@/lib/objects/display-base';

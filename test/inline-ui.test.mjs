@@ -186,8 +186,10 @@ const plan = (text, o = {}) => {
 {
   for (const t of ['hi', 'hey, how are you?', 'good morning!', 'lol that is hilarious', 'thanks so much', 'I feel really low today and I do not know why', 'ok'])
     ok(`plain talk, plain text: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
-  for (const t of ['map out my argument for moving to Berlin', 'plot y = x^2 from -3 to 3', 'build a model of a pendulum'])
+  for (const t of ['map out my argument for moving to Berlin', 'plot y = x^2 and y = 2x from -3 to 3', 'build a model of a pendulum'])
     ok(`another view answers it: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
+  // a quick plot of one function is drawn in the reply, as a graph to change (lib/runtime/plot-ask.ts)
+  ok('a quick plot: "plot y = x^2 from -3 to 3" is drawn inline', plan('plot y = x^2 from -3 to 3').forms.includes('graph') && plan('plot y = x^2 from -3 to 3').graph === 'plot', J(plan('plot y = x^2 from -3 to 3')));
   for (const t of ['Why did the Roman Republic fall?', 'tell me about the history of jazz in New Orleans'])
     ok(`an explanation is prose: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
   // …unless the idea is a relationship that can be seen: who bears a tax is where two curves meet as one shifts

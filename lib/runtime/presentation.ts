@@ -68,6 +68,7 @@
 
 import { numbersIn, type InlineKind } from '../inline-ui';
 import { claimCheck } from '../cognition/claims';
+import { quickPlot } from './plot-ask';
 import type { ExplicitSignals } from '../core4/types';
 import type { TurnState } from './state';
 
@@ -100,7 +101,7 @@ export interface Presentation {
   /** which graph fits the idea, when a graph is offered: a curve's shape, rates on it, curves that meet, a point along one */
   graph?: GraphVariant;
 }
-export type GraphVariant = 'curve' | 'rate' | 'tangent' | 'market' | 'point';
+export type GraphVariant = 'plot' | 'curve' | 'rate' | 'tangent' | 'market' | 'point';
 
 /**
  * A list of amounts with names on them — "rent 1200, food 400, transport 150",
@@ -277,9 +278,11 @@ export function planPresentation(i: PresentationInput): Presentation {
   // nothing that would be the answer is marked on it). Which graph follows the idea: rates on a curve
   // (the chord and the tangent that matches it), curves that meet (a tax shifting supply), a point along
   // a curve (elasticity), or the curve's own shape.
-  const variant: GraphVariant | null = RATE.test(t) ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : MARKET.test(t) ? 'market' : ELASTIC.test(t) ? 'point' : MATH_REL.test(t) ? 'curve' : null;
+  // a quick plot of one function asked for (lib/runtime/plot-ask.ts): that function, drawn in place
+  const plotted = quickPlot(t);
+  const variant: GraphVariant | null = plotted ? 'plot' : RATE.test(t) ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : MARKET.test(t) ? 'market' : ELASTIC.test(t) ? 'point' : MATH_REL.test(t) ? 'curve' : null;
   let graph: GraphVariant | undefined;
-  if (variant && work !== 'creation' && x.kind !== 'brainstorm' && !claim && (understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
+  if (variant && work !== 'creation' && x.kind !== 'brainstorm' && !claim && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
     offer('graph', `graph:${variant}`);
     graph = variant;
   }
@@ -370,6 +373,8 @@ const GRAMMAR: Record<InlineKind, string> = {
  */
 const GRAPH_TAIL = ' Everything marked on it — turning points, roots, crossings, slopes, where a tangent matches a chord, the readings — is computed on the curve as it is now, so state no value you have not computed. One or two lines of prose around it: what to try.';
 const GRAPH_GRAMMAR: Record<GraphVariant, string> = {
+  plot:
+    '{"type":"graph","title":"y = x²","expr":"x^2","x":[-3,3],"params":[],"features":["turning","roots","intercept"]} — the function exactly as they wrote it, over the range they gave (or one that shows its shape); no parameters unless they asked to vary something. One line of prose at most: what to notice, never a value you have not computed. If they want to come back to it, Keep files it in Artifacts.' + GRAPH_TAIL,
   curve: GRAMMAR.graph,
   rate:
     '{"type":"graph","title":"Average slope, matched","expr":"x^3-3*x","x":[-2.5,2.5],"params":[{"name":"a","value":-1.5,"min":-2.5,"max":2.5,"step":0.1},{"name":"b","value":2,"min":-2.5,"max":2.5,"step":0.1}],"chord":["a","b"],"features":["mean-value"]} — rates on a curve: y over x and up to three single-letter parameters. "chord" names two parameters that are x positions: the chord between them and its slope (the average rate) are drawn, and they drag its ends along the curve; "mean-value" marks where a tangent runs parallel to the chord — or says why none does (a corner, a break). For the rate at one point: "tangent":"p" with a parameter p, the tangent there and its slope, live. Pick a curve that shows the idea at a glance.' + GRAPH_TAIL,
