@@ -19,7 +19,7 @@ import type { MapDigest } from '../cognition/digest';
 import { asksForDecision, isFactQuestion, offersWork, wantsExplanation } from '../cognition/assist';
 import { claimCheck } from '../cognition/claims';
 import { quickPlot } from './plot-ask';
-import { LIST_LEAD, PERSONAL_HOW, adviceAsk, comparisonAsk, topicAsk } from './asks';
+import { BASE_RATE, LIST_LEAD, PERSONAL_HOW, adviceAsk, comparisonAsk, topicAsk } from './asks';
 import { looksMath } from '../tex-split';
 import { onlyAboutSocria, readExchange, saysFeeling, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
 import type { Intent } from './orchestrate';
@@ -30,7 +30,7 @@ export type Domain = (typeof DOMAINS)[number];
 /** Words that place a conversation, weighed together — one word decides nothing. */
 const DOMAIN_WORDS: Record<Exclude<Domain, 'everyday'>, RegExp> = {
   business:
-    /\b(?:revenue|customers?|clients?|pricing|market(?:ing)?|marketers?|sales|startup|investors?|funding|roi|kpis?|margins?|profit|competitors?|stakeholders?|budget|hiring|hire|runway|headcount|payroll|co-?founders?|valuation|okrs?|b2b|saas|churn|go[- ]to[- ]market|business|company|quarter(?:ly)?|forecast)\b/gi,
+    /\b(?:revenue|customers?|clients?|pricing|market(?:ing)?|marketers?|sales|startup|investors?|funding|roi|kpis?|margins?|profit|competitors?|stakeholders?|budget|hiring|hire|runway|headcount|payroll|co-?founders?|valuation|marketplace|seed[- ]stage|gmv|okrs?|b2b|saas|churn|go[- ]to[- ]market|business|company|quarter(?:ly)?|forecast)\b/gi,
   research:
     /\b(?:research|stud(?:y|ies) (?:found|shows?|suggests?)|papers?|literature|journal|hypothes[ie]s|evidence|sources?|citations?|methodology|dataset|data set|survey|experiment|findings|peer[- ]review(?:ed)?|meta-analysis|sample size|confound\w*)\b/gi,
   engineering:
@@ -142,7 +142,7 @@ export function readWork(text: string, signals: ExplicitSignals, intent: Intent,
   // sleeping better" were read as idle reflection — so nothing was shaped, and the reply wrote its habit.
   // Each asks for something with an answer: a comparison, a topic, a list, practical advice. Before
   // writing and doing: "how do I write a cover letter?" asks how, not for the letter.
-  if (comparisonAsk(t) || topicAsk(t) || LIST_LEAD.test(t) || adviceAsk(t)) return 'information';
+  if (comparisonAsk(t) || topicAsk(t) || LIST_LEAD.test(t) || adviceAsk(t) || BASE_RATE.test(t)) return 'information';
   if (CREATION.test(t)) return 'creation';
   if (EXECUTION.test(t)) return 'execution';
   // A QUESTION THAT IS NOTHING ELSE IS STILL A QUESTION: "is nuclear power good or bad?", "does sugar

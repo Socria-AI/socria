@@ -66,6 +66,8 @@ export function comparisonAsk(text: string): boolean {
   if (/^(?:(?:can|could|would)\s+you\s+|please\s+|let'?s\s+)?(?:compare|contrast)\s+\S/i.test(t)) return true;
   const asked = /\?\s*$/.test(t) || /^(?:(?:can|could)\s+you\s+)?(?:compare|contrast)\b/i.test(t);
   if (!asked) return false;
+  // "Agile vs waterfall, which should my team use for a fixed-scope contract?": named against each other, and asked
+  if (/\b(?:vs\.?|versus)\s+\S/i.test(t)) return true;
   return OR_FOR.test(t) || DIFFER.test(t) || ALIKE.test(t) || (COMPARE_ASK.test(t) && twoNamed(t));
 }
 
@@ -89,7 +91,7 @@ export const PROS_CONS =
 export const PERSONAL_HOW =
   /\bhow\s+(?:do|can|should|would|could)\s+(?:i|we|you|one)\s+(?:feel|cope|deal\s+with|get\s+over|stop\s+feeling|forgive|apologi[sz]e|tell\s+(?:my|him|her|them|someone|people|a\s+friend)|talk\s+to\s+(?:my|him|her|them)|know\s+if\s+(?:he|she|they|someone)|convince\s+(?:my|him|her|them)|make\s+(?:him|her|them)\b|break\s+up|move\s+on)\b/i;
 const ADVICE_LEAD =
-  /^(?:(?:so|ok(?:ay)?|hey|hi|quick question|honestly),?\s+)?(?:how\s+(?:do|can|should|would|could)\s+(?:i|we|you|one)\s+(?!(?:feel|cope|deal\s+with|get\s+over|stop\s+feeling|forgive|apologi[sz]e|tell\s+(?:my|him|her|them|someone|people|a\s+friend)|talk\s+to\s+(?:my|him|her|them)|know\s+if\s+(?:he|she|they|someone)|convince\s+(?:my|him|her|them)|make\s+(?:him|her|them)\b|break\s+up|move\s+on)\b)|what(?:'s|\s+is)\s+the\s+best\s+way\s+to|(?:any\s+|some\s+|good\s+)?tips?\s+(?:for|on)\b|how\s+to\b|what\s+(?:metrics|kpis|numbers|signals)\s+should\b|what\s+should\s+(?:i|we|a|an|my|our)\s+[\w\s'’-]{2,30}?\s+(?:track|measure|charge|look\s+for|focus\s+on|prioriti[sz]e|know)\b)/i;
+  /^(?:(?:so|ok(?:ay)?|hey|hi|quick question|honestly),?\s+)?(?:how\s+(?:do|can|should|would|could)\s+(?:i|we|you|one)\s+(?!(?:feel|cope|deal\s+with|get\s+over|stop\s+feeling|forgive|apologi[sz]e|tell\s+(?:my|him|her|them|someone|people|a\s+friend)|talk\s+to\s+(?:my|him|her|them)|know\s+if\s+(?:he|she|they|someone)|convince\s+(?:my|him|her|them)|make\s+(?:him|her|them)\b|break\s+up|move\s+on)\b)|what(?:'s|\s+is)\s+the\s+best\s+way\s+to|(?:any\s+|some\s+|good\s+)?tips?\s+(?:for|on)\b|how\s+to\b|(?:what|which)\s+(?:metrics|kpis|numbers|signals)\s+should\b|what\s+should\s+(?:i|we|a|an|my|our)\s+[\w\s'’-]{2,30}?\s+(?:track|measure|charge|look\s+for|focus\s+on|prioriti[sz]e|know)\b)/i;
 /** …asked of Socria itself, or of the person's own feelings: not advice. */
 const NOT_ADVICE = /\b(?:you\s+(?:feel|think)|are\s+you|do\s+you\s+(?:like|feel|think))\b/i;
 export function adviceAsk(text: string): boolean {
@@ -172,9 +174,18 @@ export function topicAsk(text: string): boolean {
   return !!t && t.length <= 160 && (TOPIC.test(t) || BARE_VS.test(t));
 }
 
+/**
+ * A BASE RATE, asked about with its numbers: "a test is 99% accurate and the
+ * disease affects 1 in 1000 — if I test positive, what are the chances?". The
+ * answer surprises because it turns on the base rate; a slider with their
+ * numbers in it shows why in a way no paragraph does.
+ */
+export const BASE_RATE =
+  /\b(?:\d+(?:\.\d+)?\s?%\s+accurate|accuracy\s+of\s+\d+(?:\.\d+)?\s?%|false\s+positives?|tests?\s+positive|base\s+rates?)\b[\s\S]{0,240}?\b(?:chances?|probability|likely|odds|how\s+sure)\b/i;
+
 /** A list asked for in so many words: they get one — the few that matter most — and nothing in its place. */
 export const LIST_ASK = /\b(?:list|lists|listing|bullet(?:ed)?|bullets|enumerate|numbered|point\s+form)\b/i;
 /** …or an imperative for one: "list the causes of…", "name three…", "give me the main…". */
 export const LIST_LEAD = /^(?:(?:can|could)\s+you\s+|please\s+)?(?:list|enumerate|name\s+(?:the|some|a\s+few|\d+|three|five|ten)|give\s+me\s+(?:a\s+list\s+of|the\s+(?:main|key|top|biggest)|some|a\s+few|\d+|three|five|ten))\b/i;
 /** Asking for several of something: tips, ways, reasons, ideas. The rest of them can wait behind paths. */
-export const MANY_ASK = /\b(?:tips?\s+(?:for|on|to)|ways\s+to|reasons\s+(?:why|for|to)|causes\s+of|signs\s+of|mistakes\s+to\s+avoid|things\s+to\s+(?:know|consider|avoid|do))\b/i;
+export const MANY_ASK = /\b(?:tips?\s+(?:for|on|to)|ways\s+to|reasons\s+(?:why|for|to)|causes\s+of|signs\s+of|mistakes\s+to\s+avoid|things\s+to\s+(?:know|consider|avoid|do)|(?:metrics|kpis|numbers)\s+(?:should|to\s+track|that\s+matter))\b/i;

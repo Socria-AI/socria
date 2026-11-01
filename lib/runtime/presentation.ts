@@ -113,6 +113,7 @@ import { LIVE_KINDS, numbersIn, type InlineKind } from '../inline-ui';
 import { TRIP, claimCheck, pickAsk } from '../cognition/claims';
 import { quickPlot } from './plot-ask';
 import {
+  BASE_RATE,
   COMPARE_ASK,
   LIST_ASK,
   LIST_LEAD,
@@ -456,7 +457,10 @@ export function planPresentation(i: PresentationInput): Presentation {
   const variant: GraphVariant | null = plotted ? 'plot' : rate ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : market ? 'market' : elastic ? 'point' : mathRel ? 'curve' : null;
   let graph: GraphVariant | undefined;
   // (not where steps were asked for: the steps are the answer, and a second picture of the same thing is not)
-  if (variant && work !== 'creation' && work !== 'diagnosis' && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
+  // (and never on a problem they are working or a proof: "prove by induction that 1 + 2 + … + n = n(n+1)/2" has
+  // an equals sign, not a curve to see — the working is the answer there)
+  const proving = /\b(?:prove|proof|induction|show\s+that)\b/i.test(t);
+  if (variant && work !== 'creation' && work !== 'diagnosis' && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
     if (offer('graph', `graph:${variant}`)) graph = variant;
   }
   // motion, or something that unfolds in time, asked why or how: one small simulation to try
@@ -478,6 +482,8 @@ export function planPresentation(i: PresentationInput): Presentation {
   if (!i.guard && !offered.includes('graph') && !offered.includes('sim')) {
     const whatIf = WHAT_IF.test(t) || (WHAT_IF_WEAK.test(t) && MONEY_OR_PCT.test(t));
     if ((whatIf && nums.length >= 1) || (FORMULA.test(t) && /\b(?:change|vary|depends?|how does|what happens)\b/i.test(t))) offer('slider', 'slider:what-if');
+    // a base rate with their numbers: the posterior moves as they move the rate, which is the whole surprise
+    else if (BASE_RATE.test(t)) offer('slider', 'slider:base-rate');
     // a known relationship, asked to understand: sensible defaults to move, said to be defaults
     else if (SLIDER_FORMULA.test(t) && (work === 'explanation' || work === 'information' || work === 'execution')) offer('slider', 'slider:formula', understanding ? 'strong' : 'soft');
   }
@@ -692,8 +698,9 @@ const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
     const deeperWays = paths
       ? '; the ways deeper go in the paths block — two or three, a few words each, such as the formal statement, why a condition matters, where it is used — to open one at a time'
       : '';
-    // the answer is a set of parts: there is no single central sentence, and the element carries them
-    if (element && PARTS_FORMS.has(element)) {
+    // the answer is a set of parts: there is no single central sentence, and the element carries them — when
+    // the parts ARE the answer (the form that fits), not when a sequence is only offered beside an idea
+    if (element && PARTS_FORMS.has(element) && p.strong?.includes(element)) {
       return `\n\nTHE SHAPE OF THIS REPLY — they want to understand something made of parts. Minimum explanation, maximum understanding:\n- Open with one plain sentence on what ties the parts together — what drives it, or the principle that organises it — not the topic's name, its history, or "X is a fundamental concept in…". Keep everything as true as you can state it: where it is contested, say so.\n- Then the ${NOUN[element] ?? 'element'} below carries the parts: do not also write them out, in sentences or a list.\n- Then stop. No headings or sections, no applications or history they did not ask for${deeperWays}.\nIf a sentence carries it, that is the whole reply.\n`;
     }
     const after =
