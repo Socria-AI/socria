@@ -127,6 +127,9 @@ import { NO_LOOKUP_FACT, renderNoResearch, renderResearch, type Research } from 
 import { LIST_ASK } from '@/lib/runtime/asks';
 import { SPOKEN_TURN } from '@/lib/voice/speech';
 
+/** The turn asked for code, JSON, a schema or a config: a fenced json block in the reply is then theirs (lib/inline-ui.ts InlineContext.code). */
+const CODE_ASKED = /\b(?:json|yaml|toml|schema|config(?:uration)?\s+file|payload|api\s+response|code|snippet|script|regex|sql|function|class|endpoint)\b/i;
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -1250,6 +1253,8 @@ export async function POST(req: NextRequest) {
       ownJudgment: allocation?.split.judgment === 'human',
       ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
       shown: { n: 0 },
+      // they asked for code, JSON or a config: a ```json block is theirs to read and copy, never an element
+      code: CODE_ASKED.test(lastText) || turnState.domain === 'engineering',
     };
     const inlineBlock = (chunk: string, open: boolean) => (inlineOn ? gateInlineBlock(chunk, inlineCtx, open) : gateInlineBlock(chunk, { ...inlineCtx, shown: { n: Infinity } }, open));
     // MR's reply filters (lib/mr/index.ts replyGate): every interrogative
