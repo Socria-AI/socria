@@ -2521,3 +2521,141 @@ in Artifacts at 2.3 with "Kept from the conversation — 'If a curve is
 unbroken…' · Nov 1"; changed there and kept; after a reload the reply's button
 reads "Kept — open in Artifacts". "plot y = x^2 from -3 to 3" stays in Chat
 with the parabola drawn 0 to 9 and Keep under it.
+
+## 32. Text walls the exception, not the default: the form that fits
+
+The brief: maximum understanding, minimum reading. Concise, immediately
+useful replies; comparisons side by side; diagrams, equations and structured
+elements where they say it better; no generic introductions, recaps or
+information dumps; progressive disclosure; natural conversation left as
+conversation; and every element the reply is offered must actually be drawn.
+Not word limits — the reply chooses the form that fits what was asked.
+
+**The causes, from an audit of the whole pipeline** (planner, prompt, stream
+gate, renderer, component contract, and the real route run over 59 phrasings):
+
+1. *Most turns were never read.* "TCP vs UDP" was too short to be anything
+   but talk; "how do I hire my first sales rep?", "causes of inflation" and
+   "tips for sleeping better" fell through to "reflection". With no reading,
+   nothing was offered and nothing was shaped — and the reply wrote its
+   habit: a paragraph each, then bolded terms.
+2. *When something was offered, the offer undercut itself.* Every element
+   arrived as "optional; plain prose is often better", so the model wrote the
+   comparison in prose and the table, or the prose alone; and only three of
+   fifteen grammars told the prose not to restate the element. Five of the
+   fifteen examples failed their own sanitizers.
+3. *The per-turn instructions asked for essays.* Core 4's six-part "what you
+   owe them" checklist for a decision, a five-item domain line ("numbers,
+   trade-offs, customers, risks, and the next step"), "the steps numbered in
+   order" beside a sequence block, and a page of "where to look" on
+   "weather vs climate" because "weather" names something live.
+4. *The stream gate skipped its check* whenever a block arrived over more
+   than one delta, and *the renderer folded only replies with headings*;
+   both are covered under their own items below.
+
+**How selection works now.** Deterministic, from readers the route already
+runs — no extra model call, and the cached prompt does not change per turn.
+
+- *What the turn is asking for* (`lib/runtime/asks.ts`, read by
+  `readWork` and the planner alike): a comparison of named things ("X vs Y",
+  "X or Y for/if Z?", "how is X different from Y?", "which is better…, X or
+  Y?"); practical advice ("how do I…", "what's the best way to…", "tips for…",
+  even when the question follows what it is about); a pick ("recommend me a
+  sci-fi book", three days in Lisbon); the parts of something — a cycle, a
+  hierarchy, causes, effects, types; one subject's two sides; a timeline or a
+  history; a bare topic ("causes of inflation"); a list asked for; a base
+  rate with its numbers. A plain question that is nothing else is still a
+  question (`plainQuestion`) — never one put to Socria, a feeling, or a
+  personal how ("how do I tell my mum…").
+- *The form that fits* (`lib/runtime/presentation.ts planPresentation`):
+
+  | The turn | The form | Header |
+  |---|---|---|
+  | options set against each other | `compare` (a pick only when what they said settles it) | fits |
+  | a choice that is theirs, or a team's change against the status quo | `decide` (their weights; no winner named) | fits |
+  | one subject's two sides | `balance` (for, against, what it turns on) | fits |
+  | a cycle, a hierarchy, causes, effects | `diagram` (cycle, tree, causes, flow) | fits |
+  | the types of something, a subject's parts | `concepts` | fits |
+  | a ratio or a formula's definition | `equation` (terms, one worked example) | fits |
+  | a relationship to see (MVT, a derivative, a tax, elasticity) | `graph`, in the variant the idea needs | fits |
+  | a known relationship (compound interest, Bayes), a base rate | `slider` (defaults said to be defaults) | fits |
+  | their own named amounts | `chart` | fits |
+  | a claim to check | `claim` (verdict first, parts to doubt) | fits |
+  | steps asked for, a procedure, a trip's days | `sequence` | fits |
+  | a timeline asked for | `sequence` timeline (the turning point in prose) | fits |
+  | a history, how a game works, a call to weigh in on | `sequence`, `reasoning` | optional |
+  | the ways onward, directions to tap | `paths`, `options` | optional |
+
+  "The form that fits" says: use it unless one sentence fully answers them;
+  it carries the parts, the prose frames it. Every grammar ends on what the
+  prose around it is for ("Your prose: the difference that decides most
+  cases"), and the header says once that words never repeat a block. Every
+  example is a valid instance of its element.
+- *One live element per reply* (graph, simulation, slider, decision, working,
+  claim): the first that fits wins — the working asked for before a graph
+  inferred, a graph before a slider; a second form is only ever a quiet one.
+- *Precision*: bare nouns never force a visual. "Graph", "curve" and
+  "function" count only beside another mathematical word or in a mathematical
+  conversation (not "change the graph colours in Excel", "my JavaScript
+  function", "the curve in this poem"); "tangent" only as a tangent line; a
+  derivative in finance is a contract; "supply chain" is not a market; "or
+  not", "or so" and "good or bad" name no second option; "rate my ideas" is
+  not a rate; four numbers of four different things are not a chart; "how
+  does that work for you on Tuesday?" is a diary. A proof or a problem they
+  are working is never given a graph.
+- *The shape of the reply*: an idea to understand (the central insight in a
+  sentence, with the conditions it needs — or, when the answer is a set of
+  parts, one sentence on what ties them together); a practical question (the
+  one thing it hinges on and a concrete default, then the few levers, the
+  rest behind paths); an open piece of work (as before); and depth one layer
+  at a time — a way deeper, opened, goes one layer down and offers the next;
+  the whole thread in parts only when asked in so many words ("in detail",
+  "step by step") or with a Detailed length.
+- *Said once* (`lib/runtime/allocation.ts`, `lib/cognition/assist.ts`): the
+  move names itself and leaves the how to the shape; the idea line keeps only
+  what the shape does not say; INFORM no longer caps a practical answer at "a
+  sentence or two"; one rule about winners. What is owed is a line: beside a
+  block, "the block carries what it rests on; your prose, the one thing it
+  turns on"; for their own reasoning, the method, a hint where they are stuck,
+  and a check of each step. One priority per domain; runnable code only for
+  work that makes or fixes something. Core 4's own wording stays Core 4's.
+- *Lookups* (`lib/core4/web.ts`, `lib/runtime/epistemic.ts`, the route): a
+  live word inside a comparison, a definition or a how-or-why is not a lookup
+  unless the question is pinned to now or to a place; a time word on their
+  own plans ("what should I cook tonight?") is not "current"; where to look
+  is said only when a lookup was asked for — a fact about a named thing is
+  answered from memory, an answer that moves with a clause that it may have
+  changed.
+- *Kept in the conversation* (`lib/runtime/orchestrate.ts`): "pros and cons
+  of remote work" and "give me a timeline of the French Revolution" are drawn
+  in the reply, and Keep files them; made in so many words ("make me a pros
+  and cons table"), or a timeline of their own plans, they open Artifacts.
+- *The core* (`lib/runtime/behavior.ts`, logos5-v6): a list only when the
+  content is one or they ask, and then the few that matter most, a line each.
+  The cached core grew by five characters and stays under its budget.
+
+**Before and after, on the real route** (the audit's 59 phrasings, through
+`vx-audit/sweep`): an element fitting the turn's structure was offered on 41
+turns, from 20; "where to look" or "nothing current was checked" on
+conceptual turns, from 2 to 0; Core 4's judgment checklist (3 turns) and its
+analogous-worked-case line (3 turns) gone; "TCP vs UDP", "SQL or NoSQL for a
+social app?", "index funds vs individual stocks", "Does sugar make kids
+hyperactive?", "the 10,000 hour rule", "How do I hire my first sales rep?",
+"Our signups have plateaued…", "How do I cook rice on the stove?" and
+"three days in Lisbon" went from nothing to the form that fits; greetings,
+news, a rough day, a joke, thanks and quick facts are unchanged.
+
+**Deliberately not changed.** "Solve 2x² − 8x + 6 = 0" and "prove that √2 is
+irrational", said with no learning signal, are still read as practice — the
+person works it, with support — rather than being handed the full solution.
+Whether an imperative "solve…" should be answered outright is a Human-First
+decision for the product owner, not a presentation fix; the Answer Guard
+remains the switch.
+
+**Tested.** `test/presentation-selection.test.mjs` (176): maths, comparisons,
+claims, business, the parts of something, two sides and timelines, everyday
+prose, one live element, the contract (the form that fits, nothing restated,
+every grammar's prose clause, every paths variant and diagram view), said
+once, lookups, depth, the core. Pinned suites updated where the change is the
+point, each with its reason: presentation, minimum-explanation,
+interactive-chat, inline-ui, reply-shape, runtime-route, runtime-register.
