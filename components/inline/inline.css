@@ -1531,3 +1531,221 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
     border-color: CanvasText;
   }
 }
+
+/* ── an idea, drawn: more curves, a chord and the tangent that matches it, points to drag (November 2026) ── */
+.logos-root .ln .ln-eqs {
+  display: grid;
+  gap: 2px;
+}
+.logos-root .ln .ln-eq-name {
+  margin-right: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--ln-ink-60);
+}
+.logos-root .ln .ln-eq.is-second .ln-eq-name { color: var(--ln-c2); }
+.logos-root .ln .ln-eq.is-third .ln-eq-name { color: var(--ln-c3); }
+.logos-root .ln .ln-curve.is-second { stroke: var(--ln-c2); }
+.logos-root .ln .ln-curve.is-third { stroke: var(--ln-c3); }
+.logos-root .ln .ln-curve.is-ghost.is-second,
+.logos-root .ln .ln-curve.is-ghost.is-third { stroke-opacity: 0.45; }
+.logos-root .ln .ln-curve-name {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.06em;
+  fill: var(--ln-primary);
+  paint-order: stroke;
+  stroke: var(--ln-ground);
+  stroke-width: 3px;
+}
+.logos-root .ln .ln-curve-name.is-second { fill: var(--ln-c2); }
+.logos-root .ln .ln-curve-name.is-third { fill: var(--ln-c3); }
+/* the chord (the average rate) and the tangent that matches it share an ink: solid, then dashed */
+.logos-root .ln .ln-chord line {
+  stroke: var(--ln-c1);
+  stroke-width: 2;
+  stroke-linecap: round;
+}
+.logos-root .ln .ln-mv line {
+  stroke: var(--ln-c1);
+  stroke-width: 1.75;
+  stroke-dasharray: 6 4;
+  stroke-linecap: round;
+}
+.logos-root .ln .ln-mv circle {
+  fill: var(--ln-c1);
+  stroke: var(--ln-ground);
+  stroke-width: 2;
+}
+.logos-root .ln .ln-mv text {
+  font-size: 12px;
+  font-style: italic;
+  font-weight: 600;
+  fill: var(--ln-c1);
+  paint-order: stroke;
+  stroke: var(--ln-ground);
+  stroke-width: 3px;
+}
+.logos-root .ln .ln-tan line {
+  stroke: var(--ln-c1);
+  stroke-width: 1.75;
+  stroke-linecap: round;
+}
+.logos-root .ln .ln-feat.is-crossing .ln-pt { fill: var(--ln-ink); }
+/* a point dragged along the curve */
+.logos-root .ln .ln-plot.has-handles svg { touch-action: pan-y; }
+.logos-root .ln .ln-plot.is-dragging svg { cursor: grabbing; }
+.logos-root .ln .ln-handle circle {
+  fill: var(--ln-ground);
+  stroke: var(--ln-c1);
+  stroke-width: 2.5;
+  cursor: grab;
+}
+.logos-root .ln .ln-handle.is-hot circle,
+.logos-root .ln .ln-handle.is-drag circle {
+  fill: var(--ln-c1);
+}
+.logos-root .ln .ln-handle.is-locked circle {
+  stroke: var(--ln-ink-40);
+  cursor: default;
+}
+.logos-root .ln .ln-handle text {
+  font-size: 11.5px;
+  font-style: italic;
+  font-weight: 600;
+  fill: var(--ln-ink);
+  paint-order: stroke;
+  stroke: var(--ln-ground);
+  stroke-width: 3px;
+  pointer-events: none;
+}
+.logos-root .ln .ln-graph-read .ln-reading {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 6px;
+}
+.logos-root .ln .ln-graph-read .ln-reading .ln-k {
+  display: inline;
+  margin: 0;
+}
+.logos-root .ln .ln-graph-read .ln-reading.is-note b {
+  font-weight: 500;
+  color: var(--ln-ink);
+}
+
+/* ── a claim, inspected ── */
+.logos-root .ln.ln-claim { padding-bottom: 10px; }
+.logos-root .ln .ln-claim-head {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
+  gap: 2px 12px;
+}
+.logos-root .ln .ln-claim-head .ln-k { grid-column: 1 / -1; }
+.logos-root .ln .ln-claim-text {
+  margin: 0;
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 17px;
+  line-height: 1.35;
+  color: var(--ln-ink);
+}
+.logos-root .ln .ln-verdict-chip {
+  align-self: center;
+  padding: 3px 10px;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 12px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.logos-root .ln .ln-verdict-chip.is-holds { color: var(--ln-primary); background: rgba(var(--ln-tint), 0.08); }
+.logos-root .ln .ln-verdict-chip.is-fails { color: var(--lg-tension, #a14b2a); }
+.logos-root .ln .ln-verdict-chip.is-partly { color: var(--ln-c2); }
+.logos-root .ln .ln-verdict-chip.is-unsettled { color: var(--ln-ink-60); }
+.logos-root .ln .ln-claim-parts {
+  list-style: none;
+  margin: 10px 0 0;
+  padding: 0;
+}
+.logos-root .ln .ln-part { border-top: 1px solid var(--ln-hair); }
+.logos-root .ln .ln-part-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  min-height: 40px;
+  padding: 9px 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  font-size: 14.5px;
+  line-height: 1.45;
+  color: var(--ln-ink);
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .ln .ln-part-row:focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.logos-root .ln .ln-mark {
+  flex: none;
+  display: inline-grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border-radius: 50%;
+  font-size: 11px;
+  font-weight: 700;
+  border: 1.5px solid currentColor;
+}
+.logos-root .ln .ln-mark.is-yes { color: var(--ln-primary); }
+.logos-root .ln .ln-mark.is-no { color: var(--lg-tension, #a14b2a); }
+.logos-root .ln .ln-mark.is-partly { color: var(--ln-c2); }
+.logos-root .ln .ln-mark.is-unclear { color: var(--ln-ink-60); }
+.logos-root .ln .ln-part-text { flex: 1; }
+.logos-root .ln .ln-part-more {
+  flex: none;
+  width: 18px;
+  color: var(--ln-ink-60);
+  font-weight: 600;
+  text-align: center;
+}
+.logos-root .ln .ln-part-basis {
+  margin: -2px 0 8px 30px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-doubt {
+  margin: 0 0 9px 30px;
+  padding: 3px 10px;
+  border: 1px solid var(--ln-hair);
+  border-radius: 999px;
+  background: none;
+  font: inherit;
+  font-size: 12px;
+  color: var(--ln-ink-70);
+  cursor: pointer;
+}
+.logos-root .ln .ln-doubt:hover { border-color: var(--ln-ink-40); color: var(--ln-ink); }
+.logos-root .ln .ln-doubt.is-on {
+  border-color: var(--lg-tension, #a14b2a);
+  color: var(--lg-tension, #a14b2a);
+  background: rgba(161, 75, 42, 0.07);
+}
+.logos-root .ln .ln-part.is-doubted .ln-part-text { text-decoration: underline wavy rgba(161, 75, 42, 0.55); text-underline-offset: 3px; }
+@media (max-width: 560px) {
+  .logos-root .ln .ln-claim-head { grid-template-columns: 1fr; }
+  .logos-root .ln .ln-verdict-chip { justify-self: start; margin-top: 6px; }
+  .logos-root .ln .ln-part-row { font-size: 14px; }
+}
+@media (forced-colors: active) {
+  .logos-root .ln :is(.ln-chord line, .ln-mv line, .ln-tan line) { stroke: CanvasText; }
+  .logos-root .ln .ln-handle circle { stroke: Highlight; }
+  .logos-root .ln :is(.ln-verdict-chip, .ln-mark, .ln-doubt) { border-color: CanvasText; }
+}

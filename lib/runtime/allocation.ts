@@ -165,11 +165,13 @@ export function reconcile(assist: AssistDecision, a: Allocation): AssistDecision
 const HANDED = new Set(['answer.requested', 'answer.requested.overrides_contract', 'judgment.theirs.asked', 'creation.asked.to.finish']);
 
 /** The split in words a reply can act on. */
-function wordsFor(split: CognitiveSplit): Pick<RuntimeAllocation, 'does' | 'supports' | 'theirs'> {
+function wordsFor(split: CognitiveSplit, work?: TurnState['work']): Pick<RuntimeAllocation, 'does' | 'supports' | 'theirs'> {
   const does = ['look things up from what you were given, check, organise and format, and do the arithmetic'];
   const supports: string[] = [];
   const theirs: string[] = [];
-  if (split.reasoning === 'perform') does.push('work the problem through');
+  // an idea to understand, or a question to answer, is not a problem to work: "work the problem through"
+  // on "what does a derivative mean?" asked for a derivation
+  if (split.reasoning === 'perform') does.push(work === 'explanation' ? 'explain the idea' : work === 'information' ? 'answer it' : 'work the problem through');
   else if (split.reasoning === 'scaffold') supports.push('their reasoning: the next step, or a check of theirs — the full solution only if they ask for it');
   else supports.push('the reasoning, worked through together');
   if (split.judgment === 'human') theirs.push('the decision: lay out what it rests on and the alternatives; give your own read if they ask; the call is theirs');
@@ -194,7 +196,7 @@ export function allocate(i: AllocateInput): RuntimeAllocation {
       split: a.split,
       ownership: a.ownership,
       assist: reconcile(chosen, a),
-      ...wordsFor(a.split),
+      ...wordsFor(a.split, i.state.work),
       core: { mode: a.mode, reasonCode: a.reasonCode, withhold: a.withhold, announce: a.announce },
     };
   }
@@ -205,7 +207,7 @@ export function allocate(i: AllocateInput): RuntimeAllocation {
     // Core 4 performs a handed-over task with its supporting split; the same here.
     split = { ...split, creativity: 'share', judgment: 'share', reasoning: split.reasoning === 'scaffold' && i.state.preferences.learning ? 'scaffold' : 'perform' };
   }
-  return { split, ownership, assist: chosen, ...wordsFor(split), core: null };
+  return { split, ownership, assist: chosen, ...wordsFor(split, i.state.work), core: null };
 }
 
 /**
@@ -272,6 +274,18 @@ const DOMAIN_LINE: Record<TurnState['domain'], string> = {
   math: 'Show the reasoning step by step; exact results come from the engine when it gives them.',
   everyday: 'Be practical and warm: the useful answer first.',
 };
+
+/**
+ * …and when the turn is an idea to understand or a question to answer, what
+ * the subject asks of it is not what a problem asks. "Show the reasoning step
+ * by step" rode on "I need to understand the Mean Value Theorem" and asked for
+ * a derivation where one sentence and a picture were the answer.
+ */
+const IDEA_LINE: Partial<Record<TurnState['domain'], string>> = {
+  math: 'The idea before any working: what it says and why it holds, in a sentence, with the conditions it needs; step-by-step working only when there is a problem to work. Exact results come from the engine when it gives them.',
+  learning: 'Work like a good tutor: the central idea first, in their terms, one idea at a time; check understanding only when it helps.',
+};
+const domainLine = (st: TurnState): string => ((st.work === 'explanation' || st.work === 'information') && IDEA_LINE[st.domain]) || DOMAIN_LINE[st.domain];
 
 /**
  * What an exchange that is not a task asks for, in a line. Each names the kind
@@ -344,7 +358,7 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState): string {
   const lines: string[] = [];
   const core = renderCore(a, st);
   if (x.kind === 'task') {
-    lines.push(DOMAIN_LINE[st.domain], `You do: ${a.does.join('; ')}.`);
+    lines.push(domainLine(st), `You do: ${a.does.join('; ')}.`);
     if (a.supports.length) lines.push(`You support: ${a.supports.join('; ')}.`);
     if (a.theirs.length) lines.push(`Theirs: ${a.theirs.join('; ')}.`);
     // "They asked for the answer" beside a withhold is one instruction arguing with another.

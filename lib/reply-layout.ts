@@ -30,7 +30,7 @@
 
 
 /** Elements that stay in view whatever heading they fall under: where the reply could go next, and anything the person works with. */
-const NEVER_FOLDED = new Set<string>(['paths', 'graph', 'sim', 'slider', 'decide', 'steps', 'check']);
+const NEVER_FOLDED = new Set<string>(['paths', 'graph', 'sim', 'slider', 'decide', 'steps', 'check', 'claim']);
 import { stripMarks, type Block } from './rich-text';
 
 /** A lead is a sentence or two: longer than this and it is a paragraph. */

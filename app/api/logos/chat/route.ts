@@ -123,7 +123,7 @@ import { recordPieces } from '@/lib/mr/ifr';
 import { carriedInOf, modelDeliberationsIn, persistAllowed, resetTurnOf, revocationsOf, rowsForTurn } from '@/lib/mr/ledger';
 import { loadForTurn, readIncognito, readSettings, writeRows, writeSettings } from '@/lib/mr/store';
 import type { LedgerRow, MRSettings } from '@/lib/mr/types';
-import { renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
+import { NO_LOOKUP_FACT, renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
 import { SPOKEN_TURN } from '@/lib/voice/speech';
 
 export const runtime = 'nodejs';
@@ -983,7 +983,10 @@ export async function POST(req: NextRequest) {
       : (research
           ? renderResearch(research)
           : need.web.want
-            ? renderNoResearch(true, '')
+            ? // a settled fact about a named thing is answered from memory, not with a page of where to look
+              (need.web as { why?: string }).why === 'a fact about a named thing'
+              ? NO_LOOKUP_FACT
+              : renderNoResearch(true, '')
             : need.kinds.includes('current')
               ? UNCHECKED_CURRENT
               : '') + renderConflicts(conflicts(evidence.sources));

@@ -60,9 +60,9 @@
 // share it.
 
 import { compileExpr, freeNames } from './logos-math';
-import { answerOf, checkTyped, compileOver, compileOverT, curveFeatures, exprWithValues, fmtPoint, fmtVal, sampleCurve, timeAt, type Feature } from './inline-math';
+import { answerOf, checkTyped, compileOver, compileOverT, crossingsOf, curveFeatures, exprWithValues, fmtPoint, fmtVal, meanValue, sampleCurve, slopeAt, timeAt, type Feature } from './inline-math';
 
-export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps'] as const;
+export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps', 'claim'] as const;
 export type InlineKind = (typeof INLINE_KINDS)[number];
 
 export type ChartBasis = 'given' | 'source' | 'illustrative';
@@ -184,6 +184,13 @@ export interface PredictSpec {
   prompt: string;
   options: string[];
 }
+/** A reading: a formula in the parameters, computed live as they change. */
+export interface ReadoutSpec {
+  label: string;
+  expr: string;
+  unit?: string;
+  digits?: number;
+}
 /**
  * A GRAPH TO CHANGE. y as an expression of x and up to three parameters
  * ("a*x^2 + b*x + c"), drawn across a window. The parameters are the numbers
@@ -191,18 +198,44 @@ export interface PredictSpec {
  * the curve — its turning points, where it crosses zero, where it meets the
  * y-axis — is found on the curve as it is now, never written by the reply.
  * The curve it started as stays, faintly, once it has been changed.
+ *
+ * AN IDEA, NOT ONLY A SHAPE (November 2026). The relationship a person asked
+ * to understand is often not the curve but something on it: the slope at a
+ * point against the average slope over an interval (the mean value theorem,
+ * what a derivative is), or where two curves meet as one shifts (a tax on
+ * sellers). So a parameter can be an x position on the curve — a point they
+ * drag along it ("at") — two of them a chord whose slope is the average rate,
+ * one a tangent whose slope is the rate there; "mean-value" marks where a
+ * tangent runs parallel to the chord, or says why none does; more curves meet
+ * at "crossings"; readings are formulas in the parameters. Every number on it
+ * is computed on the curve as it is now (lib/inline-math.ts).
  */
 export interface GraphSpec {
   type: 'graph';
   title?: string;
   expr: string;
+  /** what the first curve is called, when there are several ("demand") */
+  label?: string;
+  /** one or two more curves over the same x and parameters ("supply") */
+  curves?: { expr: string; label?: string }[];
   /** the window: x from–to; y from–to, or fitted to the curve as it starts */
   x: [number, number];
   y?: [number, number];
   params: ParamSpec[];
-  features: ('turning' | 'roots' | 'intercept')[];
+  features: GraphFeature[];
+  /** parameters that are x positions on the first curve: points they drag along it */
+  at?: string[];
+  /** two such positions: the chord between them and its slope — the average rate over the interval */
+  chord?: [string, string];
+  /** one such position: the tangent there and its slope — the rate at that point */
+  tangent?: string;
+  /** formulas in the parameters, computed live */
+  readouts?: ReadoutSpec[];
+  /** under the Answer Guard: the lines are drawn, the numbers that would answer it are not */
+  quiet?: true;
   predict?: PredictSpec;
 }
+export type GraphFeature = 'turning' | 'roots' | 'intercept' | 'crossings' | 'mean-value';
 /**
  * A SIMULATION, SMALL. A path traced over time — x(t) and y(t) over up to
  * three parameters (a throw: the angle, the speed) — from t0 to t1, either an
@@ -218,7 +251,7 @@ export interface SimSpec {
   t: [number | string, number | string];
   view: { x: [number, number]; y: [number, number] };
   params: ParamSpec[];
-  readouts?: { label: string; expr: string; unit?: string; digits?: number }[];
+  readouts?: ReadoutSpec[];
   predict?: PredictSpec;
 }
 /** A question with an answer they work out: the answer is a formula the engine evaluates, never a number asserted. */
@@ -249,10 +282,28 @@ export interface StepsSpec {
   lines: { tex: string; why?: string }[];
   check?: CheckPart;
 }
-export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec;
+/**
+ * A CLAIM, INSPECTED. Somebody's claim, or the world's, put up to be checked:
+ * the verdict, and the parts it rests on, each marked as holding or not, with
+ * what that rests on — opened one at a time. They can say which part they
+ * doubt, and that goes to Socria with their next message. The basis is the
+ * kind of evidence, never a study or a figure the reply is not sure of.
+ */
+export interface ClaimSpec {
+  type: 'claim';
+  claim: string;
+  verdict: ClaimVerdict;
+  parts: { text: string; holds: ClaimHolds; basis?: string }[];
+}
+export type ClaimVerdict = 'holds' | 'fails' | 'partly' | 'unsettled';
+export type ClaimHolds = 'yes' | 'no' | 'partly' | 'unclear';
+export const CLAIM_VERDICTS: readonly ClaimVerdict[] = ['holds', 'fails', 'partly', 'unsettled'];
+export const CLAIM_HOLDS: readonly ClaimHolds[] = ['yes', 'no', 'partly', 'unclear'];
+
+export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec | ClaimSpec;
 
 /** The kinds a person works with — one to a reply: more than one is a dashboard. */
-export const LIVE_KINDS: readonly InlineKind[] = ['graph', 'sim', 'slider', 'decide', 'steps'];
+export const LIVE_KINDS: readonly InlineKind[] = ['graph', 'sim', 'slider', 'decide', 'steps', 'claim'];
 
 export const INLINE_LIMITS = {
   points: 24,
@@ -296,6 +347,13 @@ export const INLINE_LIMITS = {
   /** a graph's or a simulation's numbers to change */
   params: 3,
   readouts: 3,
+  /** more curves on one graph: supply beside demand */
+  curves: 2,
+  /** a claim inspected: what it rests on */
+  claim: 200,
+  claimParts: 5,
+  claimPart: 180,
+  basis: 240,
   /** what may be answered before anything is moved */
   predictOptions: 4,
   prompt: 200,
@@ -539,24 +597,97 @@ function sanitizePredict(raw: unknown): PredictSpec | undefined {
   return prompt && options.length >= 2 ? { prompt, options } : undefined;
 }
 const valuesOf = (params: readonly ParamSpec[]): Record<string, number> => Object.fromEntries(params.map((p) => [p.name, p.value]));
-const FEATURES = ['turning', 'roots', 'intercept'] as const;
+const FEATURES: readonly GraphFeature[] = ['turning', 'roots', 'intercept', 'crossings', 'mean-value'];
+/** What a graph marks when the reply named nothing: its shape, and where its curves meet. Never the mean value point unasked. */
+const DEFAULT_FEATURES: readonly GraphFeature[] = ['turning', 'roots', 'intercept', 'crossings'];
+
+/** Readings that are formulas in the parameters: compiled by the engine's parser, finite as it starts — or left off. */
+function sanitizeReadouts(raw: unknown, names: readonly string[], vals: Record<string, number>): ReadoutSpec[] {
+  const out: ReadoutSpec[] = [];
+  for (const ro of (Array.isArray(raw) ? raw : []).slice(0, L.readouts)) {
+    const o = ro && typeof ro === 'object' ? (ro as Record<string, unknown>) : null;
+    const label = line(o?.label, L.label);
+    const expr = typeof o?.expr === 'string' ? o.expr.trim() : '';
+    const c = expr && expr.length <= L.formula ? compileExpr(expr, [...names]) : null;
+    if (!label || !c || !Number.isFinite(c.eval(vals))) continue;
+    const unit = line(o!.unit, L.unit);
+    const digits = fin(o!.digits) && o!.digits >= 0 && o!.digits <= 6 ? Math.round(o!.digits) : undefined;
+    out.push({ label, expr, ...(unit ? { unit } : {}), ...(digits !== undefined ? { digits } : {}) });
+  }
+  return out;
+}
 
 function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   const expr = typeof r.expr === 'string' ? r.expr.trim() : '';
   if (!expr || expr.length > L.formula) return null;
   const x = range(r.x);
   if (!x) return null;
-  const params = sanitizeParams(r.params, ['x'], 0);
+  const params = sanitizeParams(r.params, ['x', 'y'], 0);
   if (!params) return null;
+  const names = params.map((p) => p.name);
+  const vals = valuesOf(params);
   // compiled by the math engine's parser over x and exactly these names, and drawable as it starts — or not drawn
-  const c = compileOver(expr, params.map((p) => p.name));
+  const c = compileOver(expr, names);
   if (!c || !c.vars.includes('x')) return null;
-  if (!sampleCurve(c, valuesOf(params), x[0], x[1], 120)) return null;
+  if (!sampleCurve(c, vals, x[0], x[1], 120)) return null;
+  // more curves over the same x and parameters: each drawable, or left off
+  const curves: NonNullable<GraphSpec['curves']> = [];
+  for (const v of (Array.isArray(r.curves) ? r.curves : []).slice(0, L.curves)) {
+    const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    const e = typeof o?.expr === 'string' ? o.expr.trim() : '';
+    const cc = e && e.length <= L.formula ? compileOver(e, names) : null;
+    if (!cc || !sampleCurve(cc, vals, x[0], x[1], 120)) continue;
+    const lab = line(o!.label, L.label);
+    curves.push({ expr: e, ...(lab ? { label: lab } : {}) });
+  }
+  // positions on the curve: parameters named, each at most once
+  const isParam = (v: unknown): v is string => typeof v === 'string' && names.includes(v.toLowerCase());
+  const chordRaw = Array.isArray(r.chord) && r.chord.length === 2 && r.chord.every(isParam) ? (r.chord as string[]).map((v) => v.toLowerCase()) : null;
+  const chord = chordRaw && chordRaw[0] !== chordRaw[1] ? (chordRaw as [string, string]) : null;
+  const tangent = isParam(r.tangent) ? r.tangent.toLowerCase() : null;
+  const at = [...new Set([...(Array.isArray(r.at) ? (r.at as unknown[]).filter(isParam).map((v) => (v as string).toLowerCase()) : []), ...(chord ?? []), ...(tangent ? [tangent] : [])])].slice(0, L.params);
   const y = r.y === undefined ? null : range(r.y);
-  const features = Array.isArray(r.features) ? FEATURES.filter((f) => (r.features as unknown[]).includes(f)) : [...FEATURES];
+  const asked = Array.isArray(r.features) ? FEATURES.filter((f) => (r.features as unknown[]).includes(f)) : [...DEFAULT_FEATURES];
+  // crossings need a second curve; the mean value point needs a chord
+  const features = asked.filter((f) => (f !== 'crossings' || curves.length > 0) && (f !== 'mean-value' || !!chord));
+  const readouts = sanitizeReadouts(r.readouts, names, vals);
   const predict = sanitizePredict(r.predict);
   const title = line(r.title, L.title);
-  return { type: 'graph', ...(title ? { title } : {}), expr, x, ...(y ? { y } : {}), params, features, ...(predict ? { predict } : {}) };
+  const label = curves.length ? line(r.label, L.label) : '';
+  return {
+    type: 'graph',
+    ...(title ? { title } : {}),
+    expr,
+    ...(label ? { label } : {}),
+    ...(curves.length ? { curves } : {}),
+    x,
+    ...(y ? { y } : {}),
+    params,
+    features,
+    ...(at.length ? { at } : {}),
+    ...(chord ? { chord } : {}),
+    ...(tangent ? { tangent } : {}),
+    ...(readouts.length ? { readouts } : {}),
+    ...(r.quiet === true ? { quiet: true as const } : {}),
+    ...(predict ? { predict } : {}),
+  };
+}
+
+/** A claim inspected: the claim, a verdict, and two to five parts it rests on — no links (a source comes from a search, cited). */
+function sanitizeClaim(r: Record<string, unknown>): ClaimSpec | null {
+  const claim = line(r.claim, L.claim);
+  const verdict = CLAIM_VERDICTS.find((v) => v === r.verdict);
+  if (!claim || !verdict) return null;
+  const parts: ClaimSpec['parts'] = [];
+  for (const v of (Array.isArray(r.parts) ? r.parts : []).slice(0, L.claimParts)) {
+    const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    const text = line(o?.text, L.claimPart);
+    const holds = CLAIM_HOLDS.find((h) => h === o?.holds);
+    if (!text || !holds) continue;
+    const basis = line(String(o!.basis ?? '').replace(/\bhttps?:\/\/\S+/gi, '').replace(/\bwww\.\S+/gi, ''), L.basis);
+    parts.push({ text, holds, ...(basis ? { basis } : {}) });
+  }
+  return parts.length >= 2 ? { type: 'claim', claim, verdict, parts } : null;
 }
 
 function sanitizeSim(r: Record<string, unknown>): SimSpec | null {
@@ -581,17 +712,7 @@ function sanitizeSim(r: Record<string, unknown>): SimSpec | null {
   const vo = r.view && typeof r.view === 'object' ? (r.view as Record<string, unknown>) : null;
   const vx = range(vo?.x), vy = range(vo?.y);
   if (!vx || !vy) return null;
-  const readouts: NonNullable<SimSpec['readouts']> = [];
-  for (const ro of (Array.isArray(r.readouts) ? r.readouts : []).slice(0, L.readouts)) {
-    const o = ro && typeof ro === 'object' ? (ro as Record<string, unknown>) : null;
-    const label = line(o?.label, L.label);
-    const expr = typeof o?.expr === 'string' ? o.expr.trim() : '';
-    const c = expr && expr.length <= L.formula ? compileExpr(expr, names) : null;
-    if (!label || !c || !Number.isFinite(c.eval(vals))) continue;
-    const unit = line(o!.unit, L.unit);
-    const digits = fin(o!.digits) && o!.digits >= 0 && o!.digits <= 6 ? Math.round(o!.digits) : undefined;
-    readouts.push({ label, expr, ...(unit ? { unit } : {}), ...(digits !== undefined ? { digits } : {}) });
-  }
+  const readouts = sanitizeReadouts(r.readouts, names, vals);
   const predict = sanitizePredict(r.predict);
   const title = line(r.title, L.title);
   return { type: 'sim', ...(title ? { title } : {}), x: xe, y: ye, t: [t0, t1], view: { x: vx, y: vy }, params, ...(readouts.length ? { readouts } : {}), ...(predict ? { predict } : {}) };
@@ -662,6 +783,8 @@ export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
     }
     case 'steps':
       return sanitizeSteps(r);
+    case 'claim':
+      return sanitizeClaim(r);
     default:
       return null;
   }
@@ -779,8 +902,12 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
     if (ctx.guard) return { ok: false, why: 'guarded' };
     if (ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'graph') {
-    // a graph is theirs to explore; under the guard nothing is marked on it that would be the answer
-    if (ctx.guard) out = { ...spec, features: [] };
+    // a graph is theirs to explore; under the guard nothing is marked on it that would be the answer:
+    // no features, no readings, and the chord and tangent drawn without their slopes
+    if (ctx.guard) {
+      const { readouts: _r, ...rest } = spec;
+      out = { ...rest, features: [], ...(spec.chord || spec.tangent ? { quiet: true as const } : {}) };
+    }
   } else if (spec.type === 'sim') {
     // the same: the picture to try things in, without the readings that would answer it
     if (ctx.guard) {
@@ -819,6 +946,10 @@ export function gateInlineBlock(chunk: string, ctx: InlineContext, open = false)
 
 // ── as words, where a picture cannot go ──────────────────────────────
 
+/** A claim's verdict and a part's standing, as words: what is copied and read back, and what a screen reader hears. */
+export const CLAIM_SAID: Record<ClaimVerdict, string> = { holds: 'holds', fails: 'does not hold', partly: 'partly holds', unsettled: 'not settled' };
+export const HOLDS_SAID: Record<ClaimHolds, string> = { yes: 'Holds', no: 'Does not hold', partly: 'Partly', unclear: 'Unclear' };
+
 const num = (v: number) => (Number.isInteger(v) ? v.toLocaleString('en-US') : String(r6(v)));
 
 /** A spec in plain words: what is copied, what the model reads back, what memory sees. */
@@ -854,13 +985,19 @@ export function inlinePlainText(spec: InlineSpec): string {
         spec.title ?? `Deciding: ${spec.options.join(' or ')}`,
         ...spec.rows.map((r, ri) => `${r.label}${spec.weights ? ` (matters ${spec.weights[ri] ?? 2}/3)` : ''}: ${r.scores.map((v, i) => `${spec.options[i]} ${v}/3`).join(', ')}${r.note ? ` — ${r.note}` : ''}`),
       ].join('\n');
-    case 'graph':
-      return `${spec.title ? `${spec.title}: ` : ''}y = ${exprWithValues(spec.expr, valuesOf(spec.params))}${spec.params.length ? ` (${spec.params.map((p) => `${p.label} = ${num(p.value)}`).join(', ')})` : ''}, x from ${num(spec.x[0])} to ${num(spec.x[1])}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
+    case 'graph': {
+      const vals = valuesOf(spec.params);
+      const curves = spec.curves?.length ? `${spec.label ? `${spec.label}: ` : ''}y = ${exprWithValues(spec.expr, vals)}; ${spec.curves.map((c) => `${c.label ? `${c.label}: ` : ''}y = ${exprWithValues(c.expr, vals)}`).join('; ')}` : `y = ${exprWithValues(spec.expr, vals)}`;
+      const marks = [spec.chord ? `the chord from x = ${spec.chord[0]} to x = ${spec.chord[1]} and its slope` : '', spec.tangent ? `the tangent at x = ${spec.tangent} and its slope` : '', spec.features.includes('mean-value') ? 'where a tangent runs parallel to the chord' : '', spec.features.includes('crossings') ? 'where the curves cross' : '', ...(spec.readouts ?? []).map((ro) => `${ro.label} = ${ro.expr}`)].filter(Boolean);
+      return `${spec.title ? `${spec.title}: ` : ''}${curves}${spec.params.length ? ` (${spec.params.map((p) => `${p.label} = ${num(p.value)}`).join(', ')})` : ''}, x from ${num(spec.x[0])} to ${num(spec.x[1])}${marks.length ? `; showing ${marks.join(', ')}` : ''}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
+    }
     case 'sim':
       return `${spec.title ? `${spec.title}: ` : 'A simulation: '}x(t) = ${spec.x}, y(t) = ${spec.y}; ${spec.params.map((p) => `${p.label} ${num(p.value)}${p.unit ?? ''}`).join(', ')}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
     case 'check':
       // the question, never its answer: this is what is copied, and what a reader would see
       return spec.prompt;
+    case 'claim':
+      return [`The claim: “${spec.claim}” — ${CLAIM_SAID[spec.verdict]}`, ...spec.parts.map((x) => `- ${HOLDS_SAID[x.holds]}: ${x.text}${x.basis ? ` (${x.basis})` : ''}`)].join('\n');
     case 'steps':
       return [spec.title ?? '', ...spec.lines.map((l, i) => `${i + 1}. ${l.tex}${l.why ? ` — ${l.why}` : ''}`), spec.check ? `Your turn: ${spec.check.prompt}` : ''].filter(Boolean).join('\n');
   }
@@ -955,6 +1092,8 @@ export interface InlineState {
   attempts?: number;
   /** the lines of the working whose why they opened */
   whys?: number[];
+  /** the parts of a claim they said they doubt */
+  doubted?: number[];
 }
 
 /** One block's state, cleaned; null when nothing usable is left. */
@@ -1006,6 +1145,10 @@ export function sanitizeInlineStateOne(raw: unknown): InlineState | null {
   if (Array.isArray(r.whys)) {
     const whys = [...new Set(r.whys.filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < L.lines))].sort((a, b) => a - b);
     if (whys.length) out.whys = whys;
+  }
+  if (Array.isArray(r.doubted)) {
+    const doubted = [...new Set(r.doubted.filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < L.claimParts))].sort((a, b) => a - b);
+    if (doubted.length) out.doubted = doubted;
   }
   return Object.keys(out).length ? out : null;
 }
@@ -1137,6 +1280,8 @@ export function inlineFrom(spec: InlineSpec): string {
       return spec.kind === 'timeline' ? 'the timeline' : 'the steps';
     case 'concepts':
       return 'the overview';
+    case 'claim':
+      return 'the claim';
     default:
       return 'the element';
   }
@@ -1151,6 +1296,74 @@ function moved(params: readonly ParamSpec[], values?: Record<string, number>): s
 function turningOf(spec: GraphSpec, values: Record<string, number>): Feature | null {
   const c = compileOver(spec.expr, spec.params.map((p) => p.name));
   return c ? curveFeatures(c, values, spec.x[0], spec.x[1], ['turning'])[0] ?? null : null;
+}
+
+/** What a graph shows at a setting, beyond its shape: the chord and where a tangent matches it, a tangent, where its curves meet, its readings. */
+export interface GraphReadings {
+  chord?: { a: number; b: number; ya: number; yb: number; slope: number };
+  mean?: import('./inline-math').MeanValue;
+  tangent?: { x: number; y: number; slope: number | null };
+  crossings: Feature[];
+  readouts: { label: string; value: number; unit?: string; digits?: number }[];
+}
+/** All of it computed on the curve as it is at these values (lib/inline-math.ts) — the same numbers the page draws and Socria is told. */
+export function graphReadings(spec: GraphSpec, values: Record<string, number>): GraphReadings {
+  const names = spec.params.map((p) => p.name);
+  const c = compileOver(spec.expr, names);
+  const out: GraphReadings = { crossings: [], readouts: [] };
+  if (!c) return out;
+  const span = spec.x[1] - spec.x[0];
+  const f = (x: number) => c.eval({ ...values, x });
+  if (spec.chord) {
+    const a = values[spec.chord[0]], b = values[spec.chord[1]];
+    const ya = f(a), yb = f(b);
+    if (Number.isFinite(a) && Number.isFinite(b) && a !== b && Number.isFinite(ya) && Number.isFinite(yb)) {
+      out.chord = { a, b, ya, yb, slope: (yb - ya) / (b - a) };
+      if (spec.features.includes('mean-value')) out.mean = meanValue(c, values, a, b) ?? undefined;
+    }
+  }
+  if (spec.tangent) {
+    const x = values[spec.tangent];
+    const y = f(x);
+    if (Number.isFinite(x) && Number.isFinite(y)) out.tangent = { x, y, slope: slopeAt(c, values, x, span) };
+  }
+  if (spec.features.includes('crossings')) {
+    for (const g of spec.curves ?? []) {
+      const cg = compileOver(g.expr, names);
+      if (cg) out.crossings.push(...crossingsOf(c, cg, values, spec.x[0], spec.x[1]));
+    }
+  }
+  for (const ro of spec.readouts ?? []) {
+    const cr = compileExpr(ro.expr, names);
+    const v = cr ? cr.eval(values) : NaN;
+    if (Number.isFinite(v)) out.readouts.push({ label: ro.label, value: v, ...(ro.unit ? { unit: ro.unit } : {}), ...(ro.digits !== undefined ? { digits: ro.digits } : {}) });
+  }
+  return out;
+}
+const fmtAt = (v: number) => fmtVal(v, Math.abs(v) >= 100 ? 0 : 2);
+/** Where a tangent matches the chord, or why none does — said the way the page says it. */
+export function meanSaid(m: import('./inline-math').MeanValue): string {
+  if (m.fails === 'break') return 'the curve breaks between the ends, so no point is promised';
+  if (m.fails === 'corner') return 'no tangent between the ends matches it — the curve turns a corner, where it has no single slope';
+  if (m.everywhere) return 'every point between the ends matches it — the curve is straight there';
+  if (!m.at.length) return 'no tangent between the ends matches it';
+  return `the tangent matches that slope at x = ${m.at.map(fmtAt).join(' and x = ')}`;
+}
+/** A graph's readings, said — the numbers left out under the Answer Guard (quiet). */
+function readingsSaid(spec: GraphSpec, start: Record<string, number>, now: Record<string, number>): string[] {
+  const was = graphReadings(spec, start);
+  const r = graphReadings(spec, now);
+  const out: string[] = [];
+  if (r.chord) out.push(spec.quiet ? `the chord runs from x = ${fmtAt(r.chord.a)} to x = ${fmtAt(r.chord.b)}` : `the chord from x = ${fmtAt(r.chord.a)} to x = ${fmtAt(r.chord.b)} has slope ${fmtAt(r.chord.slope)} (the average rate${was.chord && was.chord.slope !== r.chord.slope ? `; it was ${fmtAt(was.chord.slope)}` : ''})`);
+  if (r.mean && !spec.quiet) out.push(meanSaid(r.mean));
+  if (r.tangent) out.push(spec.quiet || r.tangent.slope === null ? (r.tangent.slope === null ? `at x = ${fmtAt(r.tangent.x)} the curve has no single slope (a corner)` : `the tangent is at x = ${fmtAt(r.tangent.x)}`) : `the tangent at x = ${fmtAt(r.tangent.x)} has slope ${fmtAt(r.tangent.slope)}`);
+  if (r.crossings.length && !spec.quiet) {
+    const pts = r.crossings.map(fmtPoint).join(' and ');
+    const before = was.crossings.map(fmtPoint).join(' and ');
+    out.push(`the curves cross at ${pts}${before && before !== pts ? ` (they crossed at ${before})` : ''}`);
+  }
+  if (!spec.quiet) for (const ro of r.readouts) out.push(`${ro.label} is ${fmtVal(ro.value, ro.digits)}${ro.unit ? ` ${ro.unit}` : ''}`);
+  return out;
 }
 /** A simulation's readings at a setting: "range 8.8 m". */
 function readingsAt(spec: SimSpec, values: Record<string, number>): string {
@@ -1201,15 +1414,29 @@ export function describeInline(spec: InlineSpec, state?: InlineState): string | 
       const m = moved(spec.params, state.values);
       if (m.length) {
         parts.push(`changed ${m.join(', ')}`);
-        const now = { ...valuesOf(spec.params), ...state.values };
-        const before = turningOf(spec, valuesOf(spec.params));
-        const after = turningOf(spec, now);
-        parts.push(`the curve is now y = ${exprWithValues(spec.expr, now)}`);
-        if (before && after && (before.x !== after.x || before.y !== after.y)) parts.push(`its turning point moved from ${fmtPoint(before)} to ${fmtPoint(after)}`);
-        else if (after) parts.push(`turning point ${fmtPoint(after)}`);
+        const start = valuesOf(spec.params);
+        const now = { ...start, ...state.values };
+        // a point moved along the curve changes no curve: only the parameters in an equation reshape it
+        const reshaped = spec.params.some((q) => !(spec.at ?? []).includes(q.name) && now[q.name] !== start[q.name]);
+        if (reshaped) {
+          parts.push(spec.curves?.length ? `the curves are now ${[spec.expr, ...spec.curves.map((c) => c.expr)].map((e, i) => `${(i === 0 ? spec.label : spec.curves![i - 1].label) ?? ''}${(i === 0 ? spec.label : spec.curves![i - 1].label) ? ' ' : ''}y = ${exprWithValues(e, now)}`).join(', ')}` : `the curve is now y = ${exprWithValues(spec.expr, now)}`);
+          if (spec.features.includes('turning')) {
+            const before = turningOf(spec, start);
+            const after = turningOf(spec, now);
+            if (before && after && (before.x !== after.x || before.y !== after.y)) parts.push(`its turning point moved from ${fmtPoint(before)} to ${fmtPoint(after)}`);
+            else if (after) parts.push(`turning point ${fmtPoint(after)}`);
+          }
+        }
+        parts.push(...readingsSaid(spec, start, now));
       }
       break;
     }
+    case 'claim':
+      if (state.doubted?.length) {
+        const doubted = state.doubted.map((i) => spec.parts[i]).filter(Boolean);
+        if (doubted.length) parts.push(`doubted ${doubted.map((x) => `“${x.text}” (marked ${HOLDS_SAID[x.holds].toLowerCase()})`).join(' and ')} — on the claim “${spec.claim}”`);
+      }
+      break;
     case 'sim': {
       const p = predicted(spec.predict);
       if (p) parts.push(p);

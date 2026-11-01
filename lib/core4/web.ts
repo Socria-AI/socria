@@ -442,6 +442,22 @@ export function renderNoResearch(wanted: boolean, query: string, refusedBecause?
   );
 }
 
+/**
+ * A FACT ABOUT A NAMED THING, NOT LOOKED UP. "What's the capital of Peru?" is
+ * sent to search because Peru is a name; with no page back, the reply was told
+ * to spend itself on databases, queries to paste and people to follow — a page
+ * of where-to-look for "Lima" (November 2026). Most such facts are settled. The
+ * reply answers from what it knows, first, and says in a clause that it is from
+ * memory only where the fact could have moved since: who holds a post, a price,
+ * a schedule, anything recent. Where to look stays the answer when they asked
+ * for something to be looked up, or for something current (renderNoResearch).
+ */
+export const NO_LOOKUP_FACT =
+  `\n=== Not looked up this turn ===\n` +
+  `No search ran, so there are no pages and no citations. Answer from what you know, plainly and first. ` +
+  `Only where the fact could have changed since you learned it — who holds a post now, a price, a schedule, a figure that moves, anything recent — add one clause that it is from memory and worth checking; a settled fact gets no caveat. ` +
+  `Never say or imply you are unable to search.\n`;
+
 export function renderResearch(r: Research | null): string {
   if (!r || !r.sources.length) return '';
   const lines = r.sources

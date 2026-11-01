@@ -113,11 +113,11 @@ const kinds = (pieces) => pieces.map((p) => (p.kind === 'block' ? (p.lead ? 'lea
 console.log('\n=== the ask: what comes first, and what a reply is not ===');
 {
   const core = I.LOGOS5_CORE;
-  ok('the persona says it changed: logos5-v4', I.PERSONA_VERSION === 'logos5-v4');
+  ok('the persona says it changed: logos5-v5', I.PERSONA_VERSION === 'logos5-v5');
   // The core says the rule in a line each; the detail of an open request and
   // of going deeper travels in that turn's own shape note (presentation.ts
   // SHAPES, pinned below), so the cached core stays inside its budget.
-  ok('the first sentence is the answer, or the real problem underneath', /Lead with what matters: the answer, the finding, or the real problem under the request/.test(core));
+  ok('the first sentence is the answer, the insight, or the real problem underneath', /Lead with what matters: the answer, the insight, the finding, or the real problem under the request/.test(core));
   ok('no preamble, no announced structure', /No preamble or announced structure \("Here's a structured approach"\)/.test(core));
   ok('length follows the work — no word limit', /Length follows the work, never a habit/.test(core) && !/one to five sentences/.test(core));
   ok('each thing said once; no generic advice, no recap', /say each thing once — no generic advice, no recap/.test(core));
@@ -161,8 +161,12 @@ const plan = (text, o = {}) => {
   ok('  the facts side by side are still a comparison', plan('compare Postgres and MySQL for a small startup').forms.includes('compare'));
   ok('  its grammar: no winner named in the prose, their weights decide', /name no winner in your prose/.test(I.renderPresentation({ forms: ['decide'], reasons: [] })));
 
-  for (const t of ['hi', 'what is tax incidence', 'Why did the Roman Republic fall?', 'I need to fix this function, it throws on empty arrays', 'thanks so much'])
+  for (const t of ['hi', 'I need to fix this function, it throws on empty arrays', 'thanks so much'])
     ok(`left alone: "${t}"`, !plan(t).shape && !plan(t).forms.includes('paths') && !plan(t).forms.includes('decide'), J(plan(t)));
+  // an idea to understand is not left alone any more: the insight first, and (where it has depth) the ways deeper
+  // to open one at a time (test/minimum-explanation.test.mjs) — never an open-work plan or a decision
+  for (const t of ['what is tax incidence', 'Why did the Roman Republic fall?'])
+    ok(`an idea to understand: "${t}" — the understanding shape, no plan, no decision`, plan(t).shape === 'understand' && !plan(t).forms.includes('decide'), J(plan(t)));
   const email = plan('I need to write an email to my landlord about the heater');
   ok('  a practical email is written, not scoped: a draft, no paths', email.forms.includes('draft') && !email.forms.includes('paths') && !email.shape, J(email));
   ok('  "help me with my essay" still gets its few directions to tap', plan('help me with my essay').forms.includes('options') && !plan('help me with my essay').shape);

@@ -21,3 +21,10 @@ export * from '@/lib/reply-layout';
 // the arithmetic of the live elements (lib/inline-math.ts) and the Logic Map under a reply (lib/logos5/mapSlice.ts)
 export * from '@/lib/inline-math';
 export * from '@/lib/logos5/mapSlice';
+// minimum explanation, maximum understanding: how a turn is read, what it is told, what is drawn
+export { claimCheck, PRACTICAL_SHOULD } from '@/lib/cognition/claims';
+export { wantsExplanation, asksForDecision, isFactQuestion, chooseAssist, renderAssist } from '@/lib/cognition/assist';
+export { readExchange } from '@/lib/cognition/register';
+export { allocate, renderAllocation } from '@/lib/runtime/allocation';
+export { LOGOS5_MATH } from '@/lib/runtime/behavior';
+export { NO_LOOKUP_FACT } from '@/lib/core4/web';

@@ -65,6 +65,11 @@ function didReply(messages) {
   const said = /\[What they did with the elements in your replies before writing this — (.+?)\. Take it into account\.\]/.exec(lastUser(messages))?.[1];
   if (!said) return null;
   const guess = /predicted “([^”]+)”/.exec(said)?.[1];
+  const doubt = /doubted “([^”]+)”/.exec(said)?.[1];
+  if (doubt) return `Fair to press on “${doubt}”. The strongest version of it is the one worth testing — what would you expect to see if it were true?`;
+  const chord = /the chord from x = (\S+) to x = (\S+) has slope (\S+)/.exec(said);
+  const match = /the tangent matches that slope at x = ([^;]+)/.exec(said)?.[1];
+  if (chord) return `With the ends at ${chord[1]} and ${chord[2]}, the average slope is ${chord[3]}${match ? `, and the tangent matches it at x = ${match.replace(/ and x = /g, ' and ')}` : ''}: some instant always keeps the average pace, wherever you put the ends.`;
   const moved = /turning point moved from (\([^)]*\)) to (\([^)]*\))/.exec(said);
   if (moved) return `${guess ? `You said ${guess.toLowerCase()}` : 'You moved it'}, and the turning point went from ${moved[1]} to ${moved[2]}: x = −b/2a, so doubling b doubles how far left it sits. Why did it drop as well?`;
   const tried = /tried (.+?)(?:;|$)/.exec(said)?.[1];
@@ -93,6 +98,23 @@ function inlineReply(messages) {
   }
   if (!sys.includes('INLINE, IF IT HELPS')) return null;
   const t = lastUser(messages);
+  // minimum explanation, maximum understanding: the insight, one thing to see it in, the ways deeper
+  if (sys.includes('"type":"graph"') && /mean value|mvt|rolle/i.test(t)) {
+    return `If a curve is unbroken on [a, b] and smooth in between, then somewhere inside it its slope at one instant equals its average slope over the whole stretch: $f'(c) = \\frac{f(b) - f(a)}{b - a}$.\n\n${ui({ type: 'graph', title: 'Average slope, matched', expr: 'x^3 - 3*x', x: [-2.5, 2.5], params: [{ name: 'a', label: 'a', value: -1.5, min: -2.5, max: 2.5, step: 0.1 }, { name: 'b', label: 'b', value: 2, min: -2.5, max: 2.5, step: 0.1 }], chord: ['a', 'b'], features: ['mean-value'] })}\n\nDrag either end: the chord tilts, and c slides to wherever the tangent runs parallel to it.${sys.includes('"type":"paths"') ? `\n\n${ui({ type: 'paths', title: 'Deeper, when you want it', items: [{ label: 'Why it needs a smooth curve', gist: 'What a corner like |x| does to it.' }, { label: 'Where c comes from', gist: 'The proof from Rolle’s theorem, in three lines.' }, { label: 'Where it is used', gist: 'Why an average speed can prove you sped.' }] })}` : ''}`;
+  }
+  if (sys.includes('"type":"graph"') && /derivative|tangent|slope at/i.test(t)) {
+    return `A derivative is the slope of the curve at a single point — how fast y is changing right there, as the gap you measure it over shrinks to nothing.\n\n${ui({ type: 'graph', title: 'The slope at a point', expr: 'x^2', x: [-3, 3], params: [{ name: 'p', label: 'p', value: 1, min: -2.5, max: 2.5, step: 0.1 }], tangent: 'p' })}\n\nDrag the point: on $x^2$ the slope is always twice where you stand.`;
+  }
+  if (sys.includes('"type":"graph"') && /tax|supply|price ceiling|tariff|subsid/i.test(t)) {
+    return `Because the tax opens a gap between what buyers pay and what sellers keep, and the price settles where both sides still trade — so buyers carry only part of it, and the less they can walk away, the more they carry.\n\n${ui({ type: 'graph', title: 'A tax on sellers', expr: '10 - x', label: 'demand', curves: [{ expr: '2 + x + t', label: 'supply' }], x: [0, 10], params: [{ name: 't', label: 'tax', value: 0, min: 0, max: 4, step: 0.5 }], features: ['crossings'] })}\n\nRaise the tax and watch the price where the curves meet: it climbs by half of it here.`;
+  }
+  if (sys.includes('"type":"graph"') && /elastic/i.test(t)) {
+    return `Elasticity is how strongly the quantity people buy reacts to price, in percentages: a 10% price rise that cuts sales by 20% is an elasticity of 2.\n\n${ui({ type: 'graph', title: 'Elasticity along a demand curve', expr: '10 - x', label: 'demand', x: [0, 10], params: [{ name: 'q', label: 'quantity', value: 3, min: 0.5, max: 9.5, step: 0.5 }], at: ['q'], readouts: [{ label: 'elasticity', expr: '(10-q)/q', digits: 2 }] })}\n\nSlide the point down the line: the same straight curve is elastic near the top and inelastic near the bottom.`;
+  }
+  if (sys.includes('"type":"claim"')) {
+    if (/brain/i.test(t)) return `No — over a day virtually the whole brain is active; the 10% figure was never a finding.\n\n${ui({ type: 'claim', claim: 'We only use 10% of our brains', verdict: 'fails', parts: [{ text: 'Imaging shows activity across virtually every region over a day', holds: 'yes', basis: 'brain scans of ordinary activity, awake and asleep' }, { text: 'Not every neuron fires at once', holds: 'yes', basis: 'that would be a seizure; activity moves around' }, { text: 'The 10% figure comes from research', holds: 'no', basis: 'no study found it; it traces to misquoted popular accounts' }] })}`;
+    return `Not as a rule: it depends on the setup — hybrid work shows little or no loss in the better studies, while fully remote work can cost the newest staff the most.\n\n${ui({ type: 'claim', claim: 'Remote work kills productivity', verdict: 'partly', parts: [{ text: 'Hybrid arrangements show little or no productivity loss', holds: 'yes', basis: 'randomised trials of hybrid schedules' }, { text: 'Fully remote work can slow new staff and mentoring', holds: 'partly', basis: 'field studies of onboarding and feedback' }, { text: 'Remote work lowers productivity everywhere', holds: 'no', basis: 'results differ by task, team and how it is run' }] })}`;
+  }
   // the conversation as something to reason with (GRAMMAR graph / sim / check / steps)
   if (sys.includes('"type":"graph"') && /vertex|parabola|b\/2a/i.test(t)) {
     return `No — c only lifts the whole curve; where it turns depends on a and b. Guess first, then try it.\n\n${ui({ type: 'graph', title: 'Where the vertex sits', expr: 'a*x^2 + b*x + c', x: [-6, 4], params: [{ name: 'a', value: 1, min: -3, max: 3, step: 0.5 }, { name: 'b', value: 2, min: -6, max: 6, step: 1 }, { name: 'c', value: -1, min: -5, max: 5, step: 1 }], features: ['turning', 'roots', 'intercept'], predict: { prompt: 'If b doubles, which way does the vertex move?', options: ['Left', 'Right', 'It stays put'] } })}`;

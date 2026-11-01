@@ -17,6 +17,7 @@
 import type { ExplicitSignals, WorkKind } from '../core4/types';
 import type { MapDigest } from '../cognition/digest';
 import { asksForDecision, isFactQuestion, offersWork, wantsExplanation } from '../cognition/assist';
+import { claimCheck } from '../cognition/claims';
 import { onlyAboutSocria, readExchange, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
 import type { Intent } from './orchestrate';
 
@@ -34,7 +35,7 @@ const DOMAIN_WORDS: Record<Exclude<Domain, 'everyday'>, RegExp> = {
   writing:
     /\b(?:essay|draft|paragraph|thesis statement|chapter|outline|cover letter|personal statement|blog post|article|proofread\w*|rewrite|prose|wording|my sentence|introduction|conclusion|word count)\b/gi,
   learning:
-    /\b(?:exam|quiz|homework|assignment|class|course|lecture|syllabus|studying|study for|learn\w*|understand\w*|revision|tutor|professor|teacher|semester|midterm|finals?)\b/gi,
+    /\b(?:exam|quiz|homework|assignment|class|course|lecture|syllabus|studying|study for|learn\w*|understand\w*|revision|tutor|professor|teacher|semester|midterm|finals?|economics|microeconomics|macroeconomics|elasticity|equilibrium|supply and demand|marginal (?:cost|revenue|utility|product)|opportunity cost|tax incidence|deadweight loss|inflation)\b/gi,
   creative:
     /\b(?:story|stories|novel|poem|poetry|characters?|screenplay|song|lyrics|worldbuilding|brainstorm\w*|creative|game idea|name ideas|plot twist|fiction)\b/gi,
   math:
@@ -90,7 +91,10 @@ export function looksMathematical(texts: readonly string[]): boolean {
   return texts.some((t) => re.test(t) || /\$[^$\n]{1,80}\$|\\(?:frac|int|sum|sqrt)\b/.test(t));
 }
 
-const PROBLEM = /\b(?:solve|prove|derive|integrate|differentiate|factor|simplify|show that|work (?:out|through)|my (?:homework|assignment|problem set))\b/i;
+// "find the derivative of x³ sin x" is a problem to work, said the way a problem set says it — it was read as
+// nothing in particular and reached the reply with no move (November 2026). "Calculate 18% of 340" is a quick
+// sum, answered (isFactQuestion), so "calculate" and "compute" are not here.
+const PROBLEM = /\b(?:solve|prove|derive|integrate|differentiate|factor|simplify|show that|work (?:out|through)|my (?:homework|assignment|problem set)|find (?:the )?(?:derivative|integral|antiderivative|limit|roots?|zeros?|area under|slope of|equation of|maximum|minimum|inverse)|evaluate (?:the )?(?:integral|limit|derivative))\b/i;
 /** Their own thing is broken — code, a build, a device, a formula — not a broken thing mentioned in passing. */
 const DIAGNOSIS = /\b(?:bug|stack ?trace|exception|traceback|segfault|crash(?:es|ed|ing)?|throws?|(?:my|the|this) (?:code|script|program|app|build|test|tests|query|formula|function|setup|config)\b[^.?!]{0,40}\b(?:broken|fails?|failing|doesn'?t work|isn'?t working|not working|errors?)|(?:it|this) (?:doesn'?t|won'?t|isn'?t) (?:work|working|compile|run|load)|why (?:won'?t|doesn'?t|isn'?t) (?:it|this|my))\b/i;
 const RESEARCH = /\b(?:find (?:me )?(?:sources|studies|papers|evidence)|look (?:it |this )?up|research (?:this|the|how|whether)|what does the (?:research|evidence|literature) say|is there (?:evidence|research))\b/i;
@@ -111,6 +115,8 @@ export function readWork(text: string, signals: ExplicitSignals, intent: Intent,
   // The readers below look at how a request begins; a greeting in front of it
   // ("good morning! what is the capital of Peru?") is not where it begins.
   const t = withoutGreeting(said);
+  // a claim put up to be checked is a question with an answer — the verdict — not their work to correct
+  if (!checkedWork && claimCheck(t)) return 'information';
   if (checkedWork || offersWork(t)) return 'verification';
   if (LEADS_WITH_DOING.test(t)) return CREATION.test(t) ? 'creation' : 'execution';
   if (DIAGNOSIS.test(t)) return 'diagnosis';
@@ -194,7 +200,7 @@ export function readTurnState(i: StateInput): TurnState {
     intent: i.intent,
     domain: readDomain(userTexts, i.map?.context ?? null),
     work,
-    exchange: readExchange({ text: i.text, history: i.history, task, work, signals: s, mapContext: i.map?.context ?? null }),
+    exchange: readExchange({ text: i.text, history: i.history, task, work, signals: s, mapContext: i.map?.context ?? null, claim: work === 'information' && claimCheck(i.text) }),
     workspace: {
       docs: i.workspace?.docs ?? 0,
       artifacts: i.workspace?.artifacts ?? 0,

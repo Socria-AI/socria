@@ -38,7 +38,7 @@ export function sampleCurve(c: CompiledExpr, values: Readonly<Record<string, num
 }
 
 export interface Feature {
-  kind: 'turning' | 'root' | 'intercept';
+  kind: 'turning' | 'root' | 'intercept' | 'crossing' | 'match';
   x: number;
   y: number;
   /** a turning point at the top of a hill, not the bottom of a valley */
@@ -170,6 +170,177 @@ export function fmtVal(v: number, digits?: number): string {
   return v < 0 ? `−${s}` : s;
 }
 export const fmtPoint = (p: { x: number; y: number }) => `(${fmtVal(p.x)}, ${fmtVal(p.y)})`;
+
+// ── rates on a curve, and where curves meet ──────────────────────────
+//
+// What a graph of an IDEA needs beyond its shape: the slope at a point (the
+// tangent), the average slope over an interval (the chord), where the two
+// agree (the mean value theorem's c), and where two curves meet (supply and
+// demand). All found on the curve as it is now, never written by the reply —
+// and honest where the mathematics says no: a corner has no single slope, and
+// a curve that breaks between a and b is promised nothing.
+
+/**
+ * The slope at x, read from both sides to second order: null where there is no
+ * single slope — a corner (|x| at 0), a break, a point off the curve.
+ */
+export function slopeAt(c: CompiledExpr, values: Readonly<Record<string, number>>, x: number, span: number): number | null {
+  const h = Math.max(Math.abs(span) * 1e-4, 1e-6);
+  const f = (t: number) => c.eval({ ...values, x: t });
+  const y0 = f(x), yl = f(x - h), yr = f(x + h), yl2 = f(x - 2 * h), yr2 = f(x + 2 * h);
+  if (![y0, yl, yr, yl2, yr2].every(Number.isFinite)) return null;
+  const left = (3 * y0 - 4 * yl + yl2) / (2 * h);
+  const right = (-3 * y0 + 4 * yr - yr2) / (2 * h);
+  if (Math.abs(left - right) > 1e-3 * (1 + Math.abs(left) + Math.abs(right))) return null;
+  return (yr - yl) / (2 * h);
+}
+
+/**
+ * Whether the curve runs unbroken from a to b: defined throughout, with no
+ * pole and no jump. Sampled, so a break narrower than the grid can hide; a
+ * jump shows as one step far larger than the steady ones.
+ */
+export function unbrokenOn(c: CompiledExpr, values: Readonly<Record<string, number>>, a: number, b: number, n = 400): boolean {
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  if (!(hi > lo)) return false;
+  const ys: number[] = [];
+  for (let i = 0; i <= n; i++) {
+    const y = c.eval({ ...values, x: lo + ((hi - lo) * i) / n });
+    if (!Number.isFinite(y)) return false;
+    ys.push(y);
+  }
+  const steps = ys.slice(1).map((y, i) => Math.abs(y - ys[i]));
+  const typical = [...steps].sort((p, q) => p - q)[Math.floor(steps.length * 0.9)] ?? 0;
+  const spread = Math.max(...ys) - Math.min(...ys);
+  return !steps.some((d) => d > 25 * typical + 1e-9 && d > 0.2 * spread);
+}
+
+export interface MeanValue {
+  /** the chord's slope: (f(b) − f(a)) / (b − a), the average rate over the interval */
+  slope: number;
+  /** where between a and b the tangent runs parallel to the chord (at most three) */
+  at: number[];
+  /** a straight stretch: every point between a and b matches */
+  everywhere?: true;
+  /** why no point is promised: the curve breaks between a and b, or turns a corner where the slopes would have to match */
+  fails?: 'break' | 'corner';
+}
+
+/**
+ * THE MEAN VALUE THEOREM, on the curve as it is. g(x) = f(x) − m·x has the
+ * same height at a and at b, so where its slope changes sign, f′ = m: the
+ * tangent runs parallel to the chord. Each such point is checked to have a
+ * single slope there; a sign change across a corner is not one. When the
+ * curve breaks between a and b, the theorem promises nothing, and that is
+ * said rather than a point drawn anyway.
+ */
+export function meanValue(c: CompiledExpr, values: Readonly<Record<string, number>>, a: number, b: number): MeanValue | null {
+  const lo = Math.min(a, b), hi = Math.max(a, b);
+  const span = hi - lo;
+  if (!(span > 1e-9)) return null;
+  const fa = c.eval({ ...values, x: lo }), fb = c.eval({ ...values, x: hi });
+  if (!Number.isFinite(fa) || !Number.isFinite(fb)) return null;
+  const m = (fb - fa) / span;
+  if (!unbrokenOn(c, values, lo, hi)) return { slope: tidy(m), at: [], fails: 'break' };
+  const tol = 1e-3 * (1 + Math.abs(m));
+  const g = (x: number) => {
+    const s = slopeAt(c, values, x, span);
+    return s === null ? null : s - m;
+  };
+  const N = 400;
+  const xs: number[] = [];
+  const gs: (number | null)[] = [];
+  for (let i = 1; i < N; i++) {
+    const x = lo + (span * i) / N;
+    xs.push(x);
+    gs.push(g(x));
+  }
+  const known = gs.filter((v): v is number => v !== null);
+  if (known.length > N * 0.9 && known.every((v) => Math.abs(v) <= tol)) return { slope: tidy(m), at: [tidy((lo + hi) / 2)], everywhere: true };
+  const at: number[] = [];
+  let corner = gs.some((v) => v === null);
+  for (let i = 1; i < xs.length && at.length < 3; i++) {
+    const p = gs[i - 1], q = gs[i];
+    if (p === null || q === null) continue;
+    if (q === 0 || (p < 0) !== (q < 0)) {
+      let l = xs[i - 1], r = xs[i], lv = p;
+      let broke = false;
+      for (let k = 0; k < 60 && q !== 0; k++) {
+        const mid = (l + r) / 2;
+        const mv = g(mid);
+        if (mv === null) {
+          broke = true;
+          break;
+        }
+        if ((mv < 0) === (lv < 0) && mv !== 0) {
+          l = mid;
+          lv = mv;
+        } else r = mid;
+      }
+      const x = q === 0 ? xs[i] : (l + r) / 2;
+      const s = broke ? null : slopeAt(c, values, x, span);
+      if (s !== null && Math.abs(s - m) <= tol) {
+        if (!at.some((v) => Math.abs(v - x) < span / 200)) at.push(tidy(x));
+      } else corner = true;
+    }
+  }
+  if (!at.length) return { slope: tidy(m), at: [], ...(corner ? { fails: 'corner' as const } : {}) };
+  return { slope: tidy(m), at };
+}
+
+/** Where two curves meet across a window, as points; a sign change across a pole is not a meeting. */
+export function crossingsOf(f: CompiledExpr, g: CompiledExpr, values: Readonly<Record<string, number>>, x0: number, x1: number, max = 3): Feature[] {
+  const d = (x: number) => f.eval({ ...values, x }) - g.eval({ ...values, x });
+  const N = 400;
+  const xs: number[] = [];
+  const ds: number[] = [];
+  for (let i = 0; i <= N; i++) {
+    const x = x0 + ((x1 - x0) * i) / N;
+    xs.push(x);
+    ds.push(d(x));
+  }
+  const finite = ds.filter(Number.isFinite);
+  if (finite.length < 8) return [];
+  const spread = Math.max(...finite) - Math.min(...finite);
+  const out: Feature[] = [];
+  for (let i = 0; i < N && out.length < max; i++) {
+    const a = ds[i], b = ds[i + 1];
+    if (!Number.isFinite(a) || !Number.isFinite(b)) continue;
+    let x: number | null = null;
+    if (a === 0) x = xs[i];
+    else if ((a < 0) !== (b < 0) && b !== 0 && Math.abs(a - b) < spread / 4) x = root(d, xs[i], xs[i + 1]);
+    if (x === null) continue;
+    const y = f.eval({ ...values, x });
+    if (Number.isFinite(y) && !out.some((p) => Math.abs(p.x - x!) < (x1 - x0) / 400)) out.push({ kind: 'crossing', x: tidy(x), y: tidy(y) });
+  }
+  return out;
+}
+
+/**
+ * A window that holds what matters on every curve, as it starts and as it is
+ * now: the features of the first, the points on it they drag, the meetings —
+ * with zero, and room around them.
+ */
+export function fitWindowAll(curves: readonly CompiledExpr[], values: readonly Readonly<Record<string, number>>[], x0: number, x1: number, extra: readonly number[] = []): [number, number] {
+  const [first, ...rest] = curves;
+  if (!first) return [-10, 10];
+  const ys: number[] = [...extra.filter(Number.isFinite)];
+  for (const v of values) {
+    ys.push(...curveFeatures(first, v, x0, x1).map((p) => p.y));
+    for (const g of rest) {
+      ys.push(...crossingsOf(first, g, v, x0, x1).map((p) => p.y));
+      const s = sampleCurve(g, v, x0, x1, 120);
+      if (s) ys.push(s.yMin, s.yMax);
+    }
+  }
+  if (!ys.length) return fitWindow(first, values, x0, x1);
+  const lo = Math.min(...ys, 0);
+  const hi = Math.max(...ys, 0);
+  const span = Math.max(hi - lo, 4);
+  // room around what matters — but where it all sits on one side of zero (a price, a quantity), only enough
+  // past the axis for its numbers, not a quarter of the picture spent on nothing
+  return [tidy(lo - span * (lo >= 0 ? 0.08 : 0.25)), tidy(hi + span * (hi <= 0 ? 0.08 : 0.25))];
+}
 
 // ── a simulation: a path traced over time ────────────────────────────
 

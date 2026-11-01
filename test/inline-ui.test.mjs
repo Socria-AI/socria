@@ -188,8 +188,11 @@ const plan = (text, o = {}) => {
     ok(`plain talk, plain text: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
   for (const t of ['map out my argument for moving to Berlin', 'plot y = x^2 from -3 to 3', 'build a model of a pendulum'])
     ok(`another view answers it: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
-  for (const t of ['Why did the Roman Republic fall?', 'what is tax incidence', 'tell me about the history of jazz in New Orleans'])
+  for (const t of ['Why did the Roman Republic fall?', 'tell me about the history of jazz in New Orleans'])
     ok(`an explanation is prose: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
+  // …unless the idea is a relationship that can be seen: who bears a tax is where two curves meet as one shifts
+  // (minimum explanation, maximum understanding — November 2026); the graph stays optional
+  ok('tax incidence: a graph of the market, offered, never required', plan('what is tax incidence').forms.includes('graph') && plan('what is tax incidence').graph === 'market' && /optional; plain prose is often better/.test(I.renderPresentation(plan('what is tax incidence'))), J(plan('what is tax incidence')));
   const costs = plan('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?');
   ok('their own named amounts: a chart is offered', costs.forms.includes('chart'), J(costs));
   ok('  "$90 on gas, $50 on food, $30 on parking" reads as a list too', plan('I spent $90 on gas, $50 on food and $30 on parking this week').forms.includes('chart'));

@@ -49,6 +49,7 @@ import { conceptTerms } from '@/lib/core4/considered';
 import type { ExplicitSignals } from '@/lib/core4/types';
 import type { MapDigest } from './digest';
 import { TALK, withoutGreeting, type ExchangeKind } from './register';
+import { claimCheck, PRACTICAL_SHOULD } from './claims';
 
 export { sanitizeDigest, digestOf, type MapDigest } from './digest';
 
@@ -123,7 +124,10 @@ const ABOUT_THEM = /\b(?:should\s+i|do\s+i|am\s+i|can\s+i|would\s+i|will\s+i|wha
  */
 export function isFactQuestion(text: string): boolean {
   const t = clean(text).toLowerCase();
-  if (!t || t.length > 260 || ABOUT_THEM.test(t)) return false;
+  if (!t || t.length > 260) return false;
+  // "how long should I boil an egg?" has an answer; "should I" there asks for it (lib/cognition/claims.ts)
+  if (PRACTICAL_SHOULD.test(t) && !/\bor\b/.test(t)) return true;
+  if (ABOUT_THEM.test(t)) return false;
   if (/^(?:what(?:'s|\s+is|\s+are|\s+was|\s+were|\s+does|\s+do|\s+(?:year|day|date|time|century|decade|month|country|city|language|currency|percentage|percent))|who(?:'s|\s+is|\s+was|\s+were)?|when(?:'s|\s+is|\s+was|\s+did)|where(?:'s|\s+is|\s+are)|which\s+(?:year|country|city|element|planet|is\s+the)|how\s+(?:many|much|long|far|old|big|tall|heavy))\b/.test(t)) {
     // "what is the meaning of my life" is not a fact; "what does X mean" is
     if (/\b(?:my|our)\s+(?:life|purpose|future|career|relationship|goal)/.test(t)) return false;
@@ -144,13 +148,25 @@ export function isFactQuestion(text: string): boolean {
  */
 const HOW_ABOUT_YOU = /^how\s+(?:are|r)\s+(?:you|u|ya|things)\b|^how\s+(?:do|did)\s+you\s+(?:feel|do|sleep)\b|^how\s+(?:have|'ve)\s+you\s+been\b|^how(?:'s|\s+is|\s+was)\s+(?:your\s+(?:day|week|weekend|morning|evening|night)|it\s+going|life|everything)\b/;
 
-/** They want the reasoning: how or why something works. */
+/**
+ * Wanting to understand something, said as a need rather than a question —
+ * "I need to understand the Mean Value Theorem", "I'm confused about
+ * elasticity", "what's the intuition behind eigenvectors?". Read as nothing in
+ * particular, the first of these reached the reply with no move, no shape and
+ * nothing to draw (November 2026), and the reply fell back on a textbook.
+ */
+const UNDERSTAND =
+  /^(?:i\s+(?:really\s+|still\s+|just\s+|honestly\s+)?(?:need|want|'d\s+like|would\s+like|am\s+trying|'m\s+trying|have|got|wanna)\s+to\s+(?:understand|get\s+(?:what|why|how)|grasp|learn\s+(?:what|why|how)|figure\s+out\s+(?:what|why|how)|make\s+sense\s+of|wrap\s+my\s+head\s+around|get\s+my\s+head\s+around)|(?:can|could|would)\s+you\s+(?:please\s+)?(?:help\s+me\s+)?(?:understand|explain|make\s+sense\s+of)|help\s+me\s+(?:get|grasp|make\s+sense\s+of|wrap\s+my\s+head\s+around|get\s+my\s+head\s+around)|i'?m\s+(?:so\s+|really\s+|still\s+|a\s+bit\s+|kind\s+of\s+|kinda\s+)?(?:confused|lost|stuck|struggling)\s+(?:about|on|with|by)|i\s+(?:still\s+)?(?:can'?t|cannot|don'?t|do\s+not)\s+(?:really\s+)?(?:get|understand|grasp|see\s+(?:why|how)|wrap\s+my\s+head\s+around|get\s+my\s+head\s+around)|what(?:'s|\s+is)\s+the\s+(?:intuition|idea|point|logic|reasoning|meaning)\s+(?:behind|of|for)|what\s+(?:is|are)\s+.{2,60}?\s+(?:really|actually|intuitively)\b|teach\s+me|eli5|explain\s+like|what\s+does\s+.+\s+(?:actually\s+|really\s+)?mean)/;
+const SOFT_LEAD = /^(?:(?:so|ok(?:ay)?|hey|hi|hello|please|honestly|um+|well|right),?\s+)+/;
+
+/** They want the reasoning: how or why something works — or to understand it, said as a need. */
 export function wantsExplanation(text: string, s: ExplicitSignals): boolean {
-  const t = clean(text).toLowerCase();
+  const t = clean(text).toLowerCase().replace(SOFT_LEAD, '');
   if (HOW_ABOUT_YOU.test(t)) return false;
   if (s.explainAsked) return true;
+  if (UNDERSTAND.test(t)) return true;
   if (ABOUT_THEM.test(t)) return false;
-  return /^(?:how\s+(?:does|do|did|is|are|can|come)|why\s+(?:does|do|did|is|are|would|can|was)|explain|walk\s+me\s+through|help\s+me\s+understand|i\s+don'?t\s+(?:get|understand)|what\s+does\s+.+\s+mean)\b/.test(t);
+  return /^(?:how\s+(?:does|do|did|is|are|can|come)|why\s+(?:does|do|did|is|are|would|can|was|were|should)|explain|walk\s+me\s+through|help\s+me\s+understand|i\s+don'?t\s+(?:get|understand)|what\s+does\s+.+\s+mean)\b/.test(t);
 }
 
 /**
@@ -160,7 +176,11 @@ export function wantsExplanation(text: string, s: ExplicitSignals): boolean {
  */
 export function asksForDecision(text: string, s: ExplicitSignals): boolean {
   if (s.recommendationRequested) return true;
-  return /\b(?:should\s+i\b|which\s+(?:one\s+)?should\s+i|what\s+would\s+you\s+(?:do|pick|choose)|help\s+me\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+i\s+should|i\s+should\s+[^.?!]{1,80}\bor\b)/i.test(clean(text));
+  const t = clean(text);
+  // "how long should I boil an egg?" is a question with an answer, not a decision (lib/cognition/claims.ts)
+  if (PRACTICAL_SHOULD.test(t) && !/\bor\b/i.test(t)) return false;
+  // a team's choice is a decision too: "should we hire an engineer or a marketer?"
+  return /\b(?:should\s+i\b|should\s+we\b[^.?!]{1,90}\bor\b|which\s+(?:one\s+)?should\s+(?:i|we)|what\s+would\s+you\s+(?:do|pick|choose)|help\s+(?:me|us)\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+(?:i|we)\s+should|(?:i|we)\s+should\s+[^.?!]{1,80}\bor\b)/i.test(t);
 }
 
 /**
@@ -344,7 +364,9 @@ export function chooseAssist(input: AssistInput): AssistDecision {
   const checked = acc?.theirs ?? [];
   const wrong = checked.some((v) => v.status === 'refuted');
   const right = checked.some((v) => v.status === 'verified');
-  if (checked.length || offersWork(said)) {
+  // (a claim somebody made, asked whether it holds, is not their work: "my manager says X — is that right?")
+  const claim = claimCheck(said);
+  if (checked.length || (offersWork(said) && !claim)) {
     const selfExplain = learn && right && !wrong && questions === 1 && !askedWhyRecently(input.history);
     return decide('verify', true, {
       scaffold: wrong ? (s.expertise === 'novice' || s.dontKnow ? 'steps' : 'hint') : 'none',
@@ -362,7 +384,8 @@ export function chooseAssist(input: AssistInput): AssistDecision {
     return decide('inform', true, { questions: 0, reasons: ['answer-asked'] });
   }
 
-  // 9. A question of fact, or a quick calculation: answered plainly.
+  // 9. A question of fact, or a quick calculation: answered plainly. A claim to check is one: the verdict first.
+  if (claim && !(input.guard && acc?.math)) return decide('inform', true, { reasons: ['claim'] });
   if (isFactQuestion(said)) {
     if (input.guard && acc?.math) return decide('explain', true, { questions: 0, scaffold: 'hint', reasons: ['fact:guarded'] });
     return decide('inform', true, { reasons: ['fact'] });
@@ -404,7 +427,7 @@ export function chooseAssist(input: AssistInput): AssistDecision {
 
 const MODE_LINE: Record<AssistMode, string> = {
   inform: 'INFORM. Give the answer or the fact plainly, first, in a sentence or two. Do not turn it into a question, and do not make them work for something they could look up.',
-  explain: 'EXPLAIN. Give the reasoning plainly. Understanding is not authorship: explaining a concept takes nothing from them.',
+  explain: 'EXPLAIN. The central idea first, in one plain sentence — what it says and why it holds, with any condition it cannot do without — then only what makes that sentence land. Understanding is not authorship: explaining a concept takes nothing from them.',
   verify: 'VERIFY. Check what they put down and say plainly what holds and what does not. Where something is wrong, name the FIRST place it goes wrong and help them repair that step — do not silently replace their work with a clean solution.',
   construct: 'CONSTRUCT. What they asked for is being built beside this conversation by the engine. In one or two sentences, point them at what they can change in it (a value to move, a row to add, a part to drag) — let them work it rather than read about it. Do not describe it, and do not claim it exists.',
   challenge: 'CHALLENGE. Push on the point named below — plainly and first, at the reasoning and never the person. Once: if it was already conceded, press somewhere further along instead.',
@@ -420,12 +443,15 @@ const SCAFFOLD_LINE: Record<Scaffold, string> = {
   steps: 'SUPPORT: smaller steps than usual, one idea at a time, in plain words; check the first step lands before stacking the next.',
 };
 
+const UNDERSTAND_STEPS = 'SUPPORT: plain words and one idea at a time — the central one now, the next only when that one has landed or they ask.';
+
 /** The block appended to the system prompt. '' when nothing is imposed and the budget is open. */
 export function renderAssist(d: AssistDecision): string {
   const lines: string[] = [];
   if (d.mode !== 'open') lines.push(`${d.forced ? 'The move this turn' : 'The move this turn, unless you see a clearly stronger one'} — ${MODE_LINE[d.mode]}`);
   if (d.target) lines.push(`ABOUT: "${d.target.slice(0, 160)}"${d.reasons.some((r) => r.startsWith('focus:')) ? ' — what they selected in the workspace; answer about it, never ask which one they mean.' : ''}`);
-  const sl = SCAFFOLD_LINE[d.scaffold];
+  // wanting to understand an idea is not a problem to break into steps: one idea at a time, the central one first
+  const sl = d.mode === 'explain' && d.scaffold === 'steps' && d.reasons.includes('explain') ? UNDERSTAND_STEPS : SCAFFOLD_LINE[d.scaffold];
   if (sl) lines.push(sl);
   if (d.reasons.includes('safety')) lines.push('SAFETY: what they wrote may mean they are in danger now. Put everything else aside — the map, the topic, the method. Respond with care, plainly and directly. If they might harm themselves, say you are glad they told you, and urge them to reach someone right now: in the US, call or text 988 (Suicide & Crisis Lifeline); elsewhere, their local emergency number. If someone is in immediate danger, emergency services first.');
   if (d.retrieval) lines.push('THEY ARE BACK after a gap on something they were learning. Before adding anything new, ask them — in one short question — to recall the key idea from last time in their own words. Then stop and let them answer.');

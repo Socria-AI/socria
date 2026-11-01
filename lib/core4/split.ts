@@ -220,7 +220,9 @@ export function splitFor({ state: s, signals, text, ownership }: SplitInput): Co
   const creating = s.work === 'creation' || s.taskKind === 'create'
     ? ownership !== 'scoped'
     : (ORIGINATION.test(t) && !mechanicalAsk &&
-        s.work !== 'information' && s.work !== 'execution' && s.work !== 'diagnosis') ||
+        // "why do onions make you cry?" asks for an explanation: "make" there originates nothing
+        s.work !== 'information' && s.work !== 'explanation' && s.work !== 'verification' &&
+        s.work !== 'execution' && s.work !== 'diagnosis') ||
       (carried.includes('creativity') && !elsewhere && !mechanicalAsk);
 
   // Judgement: the choice is theirs whenever the turn is a decision. Their

@@ -71,6 +71,8 @@ export interface ExchangeInput {
   signals?: { vent?: boolean; safety?: boolean; correction?: boolean; recommendationRequested?: boolean };
   /** the map's reading of the thinking, when there is one */
   mapContext?: string | null;
+  /** the caller read a claim put up to be checked (lib/cognition/claims.ts): a verdict to give, not two sides to weigh */
+  claim?: boolean;
 }
 
 /** Their words without code, quotations or attachment blocks: what they said to Socria. */
@@ -341,6 +343,7 @@ export function readExchange(i: ExchangeInput): Exchange {
   const asksView = ASKS_VIEW.test(t) && !THEIR_WORK.test(t);
   if (i.task) {
     if (i.work === 'judgment' || i.work === 'verification') return done('task', 'work');
+    if (i.claim) return done('task', 'claim');
     if (BRAINSTORM.test(t) && !s.recommendationRequested) return done('brainstorm', 'ideas');
     if (asksView || (OPINION.test(t) && !THEIR_PLAN.test(t))) return done('discussion', 'opinion');
     return done('task', 'work');

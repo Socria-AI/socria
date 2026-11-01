@@ -2354,3 +2354,131 @@ words and reads the graph back as it was left ("— now: … its turning point
 moved from (−1, −2) to (−2, −5)"), and it answered by what they did; all of it
 is there after a reload. On a phone, three angles tried on the throw stay as
 tagged traces and go as one chip; no sideways scroll, no page errors.
+
+## 30. Minimum explanation, maximum understanding
+
+Asked to understand something, Logos wrote a textbook: the topic's name, a
+definition, conditions, a proof, examples, applications. The brief: lead with
+the insight; no generic introductions or information dumps; interactive
+understanding where it helps; progressive disclosure; simple questions get
+simple answers; never trade correctness or a necessary condition for brevity;
+all of it inside the conversation.
+
+**The root causes were in how a turn is read, not in the wording of a rule.**
+Running the real route for each test case (what the reply model is sent)
+showed, before:
+
+| They wrote | What the turn was told |
+|---|---|
+| I need to understand the Mean Value Theorem | nothing: read as talk, not a request — no move, no shape, nothing to draw; the model fell back on its habit |
+| What does a derivative actually mean? | "Show the reasoning step by step" (the maths line for problems) and "work the problem through"; the only graph on offer was a parabola |
+| Why does a tax on sellers raise the price buyers pay by less than the tax? | an explanation, with no way to draw two curves that meet |
+| How long should I boil an egg for a runny yolk? | a consequential decision ("should I"): lay out what it rests on, what each way costs if it goes wrong, the strongest case against |
+| Why do onions make you cry? | creative writing that is theirs ("make" in the question): "do not hand them a finished piece… a person they can still picture" |
+| Is it true that we only use 10% of our brains? | a discussion: "the other side at its strongest" — of a myth |
+| My manager says remote work kills productivity. Is that right? | their own work to verify: "where their attempt first goes wrong" |
+| Should we hire a second engineer or our first marketer? | not a decision ("should we" was not read), so no "the call is theirs" |
+| What's the capital of Peru? (no search configured) | spend the reply on databases, queries to paste and people to follow |
+
+**What changed, in the pipeline:**
+
+- *Reading* (`lib/cognition/assist.ts`, `lib/cognition/claims.ts`,
+  `lib/runtime/state.ts`, `lib/cognition/register.ts`, `lib/core4/split.ts`):
+  wanting to understand, said as a need ("I need to understand…", "I'm
+  confused about…", "what's the intuition behind…"), is an explanation; a
+  practical "should I" (how long, how much, when, where) is a question with an
+  answer; "should we X or Y" is a decision; a claim put up to be checked —
+  "is it true that…", somebody's claim and "is that right?" — is a question
+  with a verdict, never a discussion and never their attempt (their own
+  working, "I got x = 4", still is); "make" in an explanation originates
+  nothing; "find the derivative of…" is a problem to work.
+- *The turn's lines* (`lib/runtime/allocation.ts`, `lib/cognition/assist.ts`):
+  on an idea or a question, maths and learning say the idea before any
+  working ("show the reasoning step by step" stays for problems), "You do"
+  says "explain the idea" or "answer it" rather than "work the problem
+  through", and the EXPLAIN move asks for the central idea in one sentence
+  with any condition it cannot do without.
+- *The shape* (`lib/runtime/presentation.ts`, shape `understand`): the central
+  insight in one plain sentence — the relationship, not the topic's name —
+  with the conditions that make it true; then only what makes it land (the
+  element offered, or one example); then stop, the ways deeper as paths to
+  open one at a time (each opens the deeper shape). "If a sentence or two
+  carries it, that is the whole reply." A lookup, a claim, a choice, small
+  talk and a discussion never take it.
+- *What is drawn* — the graph learned the constructions ideas need
+  (`lib/inline-ui.ts`, `lib/inline-math.ts`, `components/inline/InlineUI.tsx`):
+  a parameter can be an x position, a point dragged along the curve; two of
+  them a chord whose slope is the average rate; one a tangent whose slope is
+  the rate there; `mean-value` marks where a tangent runs parallel to the
+  chord; more curves meet at `crossings`; readings are formulas in the
+  parameters. The planner shows the reply the construction its idea needs:
+  the chord and the matched tangent for the mean value theorem, the tangent
+  at a point for a derivative, supply and demand with the tax to drag, a
+  point along demand with its elasticity, the curve's own shape otherwise.
+- *A claim, inspected* (new kind `claim`): the verdict (holds, fails, partly,
+  not settled), the parts it rests on marked yes / no / partly / unclear,
+  what each rests on behind a press, and — in the conversation — "I doubt
+  this", which goes to Socria with the next message like any other change.
+- *A settled fact with no search* (`lib/core4/web.ts` `NO_LOOKUP_FACT`): answered
+  from memory, with a clause only where the fact can move; where to look stays
+  the answer when a lookup was asked for.
+- *Rendering*: the lines of a graph and a simulation are clipped to the plot
+  (a steep curve used to run out of the card, across the reply); the window
+  holds the chord's ends and the crossings; a business decision's prose is
+  told to say only what it turns on — the rows carry the rest.
+
+**Accuracy is computed, not asserted.** Every slope, crossing and mean value
+point is found on the curve as it is (a second-order slope from both sides; a
+chord's slope; bisection on f′ − m). Where the theorem promises nothing, the
+graph says so instead of drawing a point anyway: a corner (|x|: "No tangent
+matches: the curve turns a corner, where it has no single slope") or a break
+(1/x: "The curve breaks between the ends, so the theorem promises no point").
+The shape tells the reply never to drop a condition for brevity or state
+something more strongly than it is true; a claim's parts carry the kind of
+evidence, never a study or figure the reply is not sure of, and links are
+stripped (sources come from a search, cited); claims are checked for accuracy
+like prose. Under the Answer Guard the chord is drawn without its slope, the
+mean value point and readings are left off, and claims are not laid out.
+
+**Cost.** The core prompt grew by two words (it stays inside its budget,
+runtime.test); the understanding shape and a graph's grammar ride only on the
+turns that need them, after the history.
+
+**What remains unsupported.**
+- The real model was not run here (no key in this environment): what it is
+  *sent* is asserted for every case through the real route, and the replies
+  in the browser came from the stand-in model. A live evaluation of the
+  reply model's adherence is still to do.
+- The readers are deterministic: an understanding request phrased outside
+  them (another language, an unusual phrasing) gets the old default.
+- Graphs are y = f(x) only: no parametric or polar curves, no implicit
+  curves, no shaded areas (an integral, consumer surplus, deadweight loss),
+  no Riemann sums, no vector fields, nothing in 3D in the conversation.
+- No general diagrams (flowcharts, node-link pictures) inline; structure is
+  still the Logic Map's, and overviews and sequences the existing kinds.
+- A claim's verdict is the model's reading unless a search ran; doubting a
+  part sends context, it does not fetch counter-evidence.
+- Length is not cut: the ceiling is a safety net, not a word limit, and a
+  reply that ignores its shape can still run long. The decision allocation
+  (Core 4's "what you owe them") still asks for a broad frame; the decide
+  block carries it, but it was not rewritten.
+
+**Tested.** `test/minimum-explanation.test.mjs` (the readers for every case,
+the turn's lines, the shape and the graph each idea gets, the arithmetic of a
+chord, a tangent, the mean value point and its failures and of crossings, the
+specs and the guard, what is said back, the drawn elements, the clipping, and
+— through the real chat route — what the reply model is sent for the mean
+value theorem, a derivative, a tax, a business decision, two claims, an egg,
+an onion, the capital of Peru and a lookup); the suites whose expectations
+this changed (inline-ui, reply-shape, runtime, runtime-register,
+runtime-route, presentation) updated with the reason. In the browser, a
+fresh guest's own line each time, through the stand-in model: "I need to
+understand the Mean Value Theorem" answers with one sentence and the
+formula, a graph of x³ − 3x with the chord from −1.5 to 2 (average slope
+0.25) and the tangent matching it at x = ±1.04, and three ways deeper;
+dragging the end b to 2.3 by hand gives 1.09 and ±1.17 live, says so once,
+puts it on the box, and the next reply answers by it. A tax of 2 moves the
+crossing from (4, 6) to (3, 7); sliding along demand takes the elasticity
+from 2.33 to 1; on a phone the 10% claim shows "Doesn't hold", its basis on
+a press, and a doubt that goes as a chip. Paper and night, desktop and
+phone: no sideways scroll, no page errors.

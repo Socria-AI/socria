@@ -48,9 +48,26 @@
 // someone find their way, and filed there (place: 'content'). What is made
 // belongs to Artifacts, and only when asked for.
 //
+// MINIMUM EXPLANATION, MAXIMUM UNDERSTANDING (November 2026). Asked to
+// understand something — "I need to understand the Mean Value Theorem", "why
+// does a tax raise prices by less than the tax?" — the reply opened with the
+// topic's name and wrote a textbook: definition, conditions, proof, examples,
+// applications. The turn reached the reply with nothing to say otherwise:
+// "I need to understand…" was not read as a request at all, maths was told to
+// "show the reasoning step by step", and the only graph on offer was a
+// parabola. Now such a turn is read (lib/cognition/assist.ts), and gets a
+// shape: the central insight in a sentence, with the conditions it cannot do
+// without; then one thing that lets them see it — a graph of the relationship
+// itself (the chord and the tangent that matches it, a supply curve a tax
+// shifts, a point along a demand curve), drawn and computed by the page; then
+// the ways deeper, to open one at a time. A simple question stays a sentence.
+// A claim to check gets its verdict first, and the parts it rests on to
+// inspect (claim) — not two sides of a myth.
+//
 // Pure. No model, no network, no clock.
 
 import { numbersIn, type InlineKind } from '../inline-ui';
+import { claimCheck } from '../cognition/claims';
 import type { ExplicitSignals } from '../core4/types';
 import type { TurnState } from './state';
 
@@ -78,9 +95,12 @@ export interface Presentation {
   reasons: string[];
   /** where the reply is read: the conversation, or Content (a write-up they asked to keep) — absent is the conversation */
   place?: 'chat' | 'content';
-  /** how the reply itself is shaped this turn: an open piece of work, or going deeper on one thread — absent is the core's default */
-  shape?: 'open' | 'deeper';
+  /** how the reply itself is shaped this turn: an open piece of work, going deeper on one thread, or an idea to understand — absent is the core's default */
+  shape?: 'open' | 'deeper' | 'understand';
+  /** which graph fits the idea, when a graph is offered: a curve's shape, rates on it, curves that meet, a point along one */
+  graph?: GraphVariant;
 }
+export type GraphVariant = 'curve' | 'rate' | 'tangent' | 'market' | 'point';
 
 /**
  * A list of amounts with names on them — "rent 1200, food 400, transport 150",
@@ -164,7 +184,22 @@ const DEEPER =
   /^(?:(?:ok(?:ay)?|great|yes|yeah|sure|right|nice|good|perfect|cool),?\s+)?(?:let'?s\s+)?(?:go deeper|dig (?:deeper|into)|say more about|tell me more(?: about)?|expand on|elaborate on|unpack|more on|take me further into|go further (?:on|into)|explain (?:that|this|it) (?:in more detail|further|more)|walk me through (?:that|this|it)(?: in detail)?|go into (?:more )?detail)\b/i;
 /** A relationship in maths or science, asked about: something they could see by changing a number. */
 const MATH_REL = /\b(?:parabolas?|quadratics?|vertex|vertices|slope|gradient|intercepts?|linear functions?|exponential|logarithm(?:s|ic)?|sine|cosine|sin\s*\(|cos\s*\(|amplitude|period|asymptotes?|derivatives?|tangent line|functions?|graphs?|curves?|y\s*=|f\s*\(\s*x\s*\))/i;
-const WHY_HOW = /\b(?:why|how|what happens|what does|explain|understand|get it|don'?t get|mean|means|change|changes|affect|affects|shift|shifts|move|moves|depend|depends|look like)\b/i;
+const WHY_HOW = /\b(?:why|how|what happens|what does|explain|understand|intuition|make sense|confused|get it|don'?t get|mean|means|change|changes|affect|affects|shift|shifts|move|moves|depend|depends|look like)\b/i;
+/**
+ * Rates on a curve: the slope at a point against the average over an interval —
+ * the mean value theorem, what a derivative is, marginal against average.
+ */
+/** …of which the average over an interval, set against the rate at a point: the chord and the tangent that matches it. */
+const AVERAGE_RATE = /\b(?:mean value theorem|mvt|rolle'?s theorem|average (?:rate|slope|velocity|speed)|secant(?: lines?)?)\b/i;
+const RATE = /\b(?:mean value theorem|mvt|rolle'?s theorem|derivatives?|differentiat\w*|tangent(?: lines?)?|secant(?: lines?)?|rates? of change|instantaneous|average (?:rate|slope|velocity|speed)|slope of (?:a|the) (?:curve|tangent|graph)|limit definition|first principles|marginal (?:cost|revenue|product|utility))\b/i;
+/** Curves that meet and shift: a market, a tax, a price control. */
+const MARKET = /\b(?:supply|demand curve|demand and supply|equilibrium|price (?:ceiling|floor|controls?)|tax(?:es)? on (?:sellers|buyers|producers|consumers|suppliers)|tax incidence|tariffs?|subsid(?:y|ies)|shortages?|surplus(?:es)?|deadweight(?: loss)?|break[- ]even)\b/i;
+/** A quantity that changes along a curve: elasticity. */
+const ELASTIC = /\b(?:elasticit(?:y|ies)|(?:price[- ])?(?:in)?elastic)\b/i;
+/** What a concept question asks about — a subject's idea, not a lookup ("what's the capital of Peru?" is not one). */
+const SUBJECT = /\b(?:theorem|lemma|law|principle|effect|theory|paradox|equation|formula|function|derivative|integral|limit|vector|matrix|probability|distribution|variance|entropy|energy|momentum|force|evolution|photosynthesis|elasticit(?:y|ies)|opportunity cost|inflation|interest|equilibrium|supply|demand|marginal|algorithm|recursion|statistic\w*|correlation|causation|regression|hypothesis)\b/i;
+/** A question of what an idea is or means: "what is a derivative?", "what does elasticity mean?". */
+const CONCEPT_Q = /^(?:(?:so|ok(?:ay)?|hey|hi),?\s+)?(?:what(?:'s|\s+is|\s+are|\s+does)|what\s+exactly\s+is|define)\b/i;
 /**
  * Motion, asked about: a small simulation to try. Physics by its own words
  * (a projectile, a pendulum, an orbit), or a throw, a jump or a fall WITH the
@@ -220,10 +255,18 @@ export function planPresentation(i: PresentationInput): Presentation {
   const deeper = DEEPER.test(t);
   const openWork =
     !deeper && x.kind !== 'brainstorm' && !CONCRETE.test(t) && (OPEN_WORK.test(t) || HOW_APPROACH.test(t)) && !['verification', 'diagnosis', 'practice', 'information'].includes(work);
-  const shape: Presentation['shape'] = deeper ? 'deeper' : openWork ? 'open' : undefined;
-  if (shape) reasons.push(`shape:${shape}`);
   // a choice that is theirs, between options they named: a decision they weigh, not one that leans for them
   const deciding = DECIDE_ASK.test(t) && (VERSUS.test(t) || /\bbetween\b[\s\S]+\band\b/i.test(t)) && work !== 'creation';
+  // a claim put up to be checked (lib/cognition/claims.ts): the verdict first, the parts it rests on to inspect
+  const claim = claimCheck(t);
+  // an idea to understand: wanting the reasoning (lib/cognition/assist.ts wantsExplanation, said as a need
+  // or a question), or asking what an idea in a subject is — never a lookup, a claim, a choice or a discussion
+  const subject = SUBJECT.test(t) || MATH_REL.test(t) || RATE.test(t) || MARKET.test(t) || ELASTIC.test(t) || i.state.domain === 'math';
+  const understanding =
+    !deeper && !openWork && !deciding && !claim && x.kind === 'task' &&
+    (work === 'explanation' || (work === 'information' && CONCEPT_Q.test(t) && subject));
+  const shape: Presentation['shape'] = deeper ? 'deeper' : openWork ? 'open' : understanding ? 'understand' : undefined;
+  if (shape) reasons.push(`shape:${shape}`);
 
   // a list of their own amounts, with names: a small chart says it at a glance
   if (namedAmounts(t) >= 3 && nums.length <= 24) offer('chart', 'chart:their-numbers');
@@ -231,8 +274,17 @@ export function planPresentation(i: PresentationInput): Presentation {
   // options set against each other — the facts side by side, when the choice is not theirs to weigh here
   else if (COMPARE_ASK.test(t) && (VERSUS.test(t) || /\band\b/i.test(t)) && work !== 'creation') offer('compare', 'compare:options');
   // a relationship they could discover by changing a number: a graph to change (under the guard too —
-  // nothing that would be the answer is marked on it)
-  if (work !== 'creation' && x.kind !== 'brainstorm' && MATH_REL.test(t) && (WHY_HOW.test(t) || FORMULA.test(t))) offer('graph', 'graph:relationship');
+  // nothing that would be the answer is marked on it). Which graph follows the idea: rates on a curve
+  // (the chord and the tangent that matches it), curves that meet (a tax shifting supply), a point along
+  // a curve (elasticity), or the curve's own shape.
+  const variant: GraphVariant | null = RATE.test(t) ? (AVERAGE_RATE.test(t) ? 'rate' : 'tangent') : MARKET.test(t) ? 'market' : ELASTIC.test(t) ? 'point' : MATH_REL.test(t) ? 'curve' : null;
+  let graph: GraphVariant | undefined;
+  if (variant && work !== 'creation' && x.kind !== 'brainstorm' && !claim && (understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
+    offer('graph', `graph:${variant}`);
+    graph = variant;
+  }
+  // a claim to check: the verdict, and the parts it rests on to open and doubt (not laid out under the guard)
+  if (claim && !i.guard) offer('claim', 'claim:inspect');
   // motion, or something that unfolds in time, asked why or how: one small simulation to try
   if (work !== 'creation' && simAsk(t) && WHY_HOW.test(t)) offer('sim', 'sim:try-it');
   // the working, asked for — never the working that is theirs, never under the guard
@@ -246,6 +298,9 @@ export function planPresentation(i: PresentationInput): Presentation {
   if (work === 'creation' && PRACTICAL_TEXT.test(t) && !i.ownWriting) offer('draft', 'draft:practical-writing');
   // an open piece of work: the ways it could go next, to open one at a time — after the useful part, never instead of it
   if (openWork && !offered.includes('draft')) offer('paths', 'paths:open-work');
+  // an idea with depth to it: the ways deeper (the formal statement, why a condition matters, where it is used),
+  // opened one at a time instead of written out unasked — not for an everyday why, which a sentence answers
+  else if (understanding && (offered.includes('graph') || subject || i.state.domain === 'learning' || i.state.domain === 'research')) offer('paths', 'paths:deeper');
   // an open request: a few directions to tap instead of typing — a question, so only where one may go
   else if (i.questions > 0 && words(t) <= 8 && OPEN_ASK.test(t) && !t.includes('?')) offer('options', 'options:open-request');
   // A list asked for is a list; and under the guard, nothing laid out to read instead of working it.
@@ -269,7 +324,7 @@ export function planPresentation(i: PresentationInput): Presentation {
   const recent = usedRecently(i.history);
   const forms = offered.filter((k) => !(recent.length === 2 && recent.every((r) => r.includes(k))));
   if (forms.length < offered.length) reasons.push('repeat-held');
-  return { forms, reasons: reasons.length ? reasons : ['nothing-fits'], ...(shape ? { shape } : {}) };
+  return { forms, reasons: reasons.length ? reasons : ['nothing-fits'], ...(shape ? { shape } : {}), ...(graph && forms.includes('graph') ? { graph } : {}) };
 }
 
 // ── what the reply is told ───────────────────────────────────────────
@@ -295,9 +350,11 @@ const GRAMMAR: Record<InlineKind, string> = {
   paths:
     '{"type":"paths","items":[{"label":"Sketch the first five minutes","gist":"what opening it would give them, in a line"}]} — 2–4 ways the work could go next, each a few words; opening one sends it as their next message. Ways to explore, not questions; the useful part stays in your prose above it.',
   decide:
-    '{"type":"decide","title":"…","options":["…","…"],"rows":[{"label":"Cost over five years","scores":[2,1],"note":"why, in a few words"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), and your honest first reading of each option on each (0 poor – 3 strong, in option order). They set how much each matters and can change any reading; the leaning is computed from their weights, so name no winner in your prose.',
+    '{"type":"decide","title":"…","options":["…","…"],"rows":[{"label":"Cost over five years","scores":[2,1],"note":"why, in a few words"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), and your honest first reading of each option on each (0 poor – 3 strong, in option order). They set how much each matters and can change any reading; the leaning is computed from their weights, so name no winner in your prose. Your prose: the one thing it turns on, in a sentence or two; the rows carry the rest, so do not also list them.',
   graph:
     '{"type":"graph","title":"…","expr":"a*x^2+b*x+c","x":[-6,4],"params":[{"name":"a","value":1,"min":-3,"max":3,"step":0.5},{"name":"b","value":2,"min":-6,"max":6,"step":1},{"name":"c","value":-1,"min":-5,"max":5,"step":1}],"features":["turning","roots","intercept"],"predict":{"prompt":"If b doubles, which way does the vertex move?","options":["Left","Right","It stays put"]}} — y over x and 0–3 single-letter parameters they drag; turning points, roots and the y-intercept are found on the curve live, so state none you have not computed. "predict" (optional) has them commit before they move anything: use it when the point is a relationship they can discover. One or two lines of prose around it.',
+  claim:
+    '{"type":"claim","claim":"We only use 10% of our brains","verdict":"fails","parts":[{"text":"Imaging shows activity across virtually every region over a day","holds":"yes","basis":"brain scans of ordinary activity"},{"text":"The 10% figure comes from research","holds":"no","basis":"no study found it; it traces to misquoted popular accounts"}]} — the claim inspected: verdict "holds", "fails", "partly" or "unsettled"; 2–5 parts it rests on, each "yes", "no", "partly" or "unclear", with what that rests on in a few words — the kind of evidence, never a study, figure or source you are not sure of. Your prose: the verdict and the one reason that settles it, in a sentence or two; the parts carry the rest, so do not also list them. They can open each part and say which one they doubt.',
   sim:
     '{"type":"sim","title":"Throw at 10 m/s","x":"v*cos(a*pi/180)*t","y":"v*sin(a*pi/180)*t-4.9*t^2","t":[0,"2*v*sin(a*pi/180)/9.8"],"view":{"x":[0,12],"y":[0,5]},"params":[{"name":"a","label":"angle","value":45,"min":5,"max":85,"step":1,"unit":"°"},{"name":"v","label":"speed","value":10,"min":2,"max":20,"step":1,"unit":"m/s"}],"readouts":[{"label":"range","expr":"v^2*sin(2*a*pi/180)/9.8","unit":"m","digits":1}],"predict":{"prompt":"Which angle lands as far as 30°?","options":["60°","15°","None"]}} — a path over time t with 1–3 parameters; when it ends and its readings are formulas, computed live, and each setting they try stays on the picture. Only for one relationship worth trying, never a dashboard.',
   check:
@@ -307,13 +364,39 @@ const GRAMMAR: Record<InlineKind, string> = {
 };
 
 /**
- * How the reply itself is shaped, on the two kinds of turn where a model's
- * habit is the chatbot's. A starting point, never a word limit: the deeper
- * shape takes as long as the thread needs.
+ * Which graph fits the idea: the same element, shown the construction the
+ * idea needs — so a question about the mean value theorem is shown a chord
+ * and the tangent that matches it, not a parabola to reshape.
  */
-const SHAPES: Record<NonNullable<Presentation['shape']>, (paths: boolean) => string> = {
-  open: (paths) =>
-    `\n\nTHE SHAPE OF THIS REPLY — an open piece of work. Don't write the plan. Open with the problem that actually matters here, in a sentence or two: the thing that will make or break it, which they may not have put into words — not a restatement of what they asked. Then the one starting point you would take, concrete and particular to their situation, in a short paragraph. Then ${paths ? 'the ways it could go next as a paths block (below) — two to four, each a few words and a line on what opening it gives them — and stop there' : 'name the two or three ways it could go next, in a sentence, and stop there'}. No headings, no bolded sections, no generic best practice, and no closing question unless one answer would change everything you would say.\n`,
+const GRAPH_TAIL = ' Everything marked on it — turning points, roots, crossings, slopes, where a tangent matches a chord, the readings — is computed on the curve as it is now, so state no value you have not computed. One or two lines of prose around it: what to try.';
+const GRAPH_GRAMMAR: Record<GraphVariant, string> = {
+  curve: GRAMMAR.graph,
+  rate:
+    '{"type":"graph","title":"Average slope, matched","expr":"x^3-3*x","x":[-2.5,2.5],"params":[{"name":"a","value":-1.5,"min":-2.5,"max":2.5,"step":0.1},{"name":"b","value":2,"min":-2.5,"max":2.5,"step":0.1}],"chord":["a","b"],"features":["mean-value"]} — rates on a curve: y over x and up to three single-letter parameters. "chord" names two parameters that are x positions: the chord between them and its slope (the average rate) are drawn, and they drag its ends along the curve; "mean-value" marks where a tangent runs parallel to the chord — or says why none does (a corner, a break). For the rate at one point: "tangent":"p" with a parameter p, the tangent there and its slope, live. Pick a curve that shows the idea at a glance.' + GRAPH_TAIL,
+  tangent:
+    '{"type":"graph","title":"The slope at a point","expr":"x^2","x":[-3,3],"params":[{"name":"p","label":"point","value":1,"min":-2.5,"max":2.5,"step":0.1}],"tangent":"p"} — the rate at a point: "tangent" names a parameter that is an x position; the tangent there and its slope are drawn live, and they drag the point along the curve. For the average over an interval instead, "chord":["a","b"] draws the chord between two such positions and its slope. Pick a curve that shows the idea at a glance.' + GRAPH_TAIL,
+  market:
+    '{"type":"graph","title":"A tax on sellers","expr":"10-x","label":"demand","curves":[{"expr":"2+x+t","label":"supply"}],"x":[0,10],"params":[{"name":"t","label":"tax","value":0,"min":0,"max":4,"step":0.5}],"features":["crossings"]} — curves that meet: the first curve and one or two more ("curves") over the same x and parameters (quantity across, price up), each with a label; "crossings" marks where they meet, live, and where they met at first stays visible as they change things.' + GRAPH_TAIL,
+  point:
+    '{"type":"graph","title":"Elasticity along a demand curve","expr":"10-x","label":"demand","x":[0,10],"params":[{"name":"q","label":"quantity","value":3,"min":0.5,"max":9.5,"step":0.5}],"at":["q"],"readouts":[{"label":"elasticity","expr":"(10-q)/q","digits":2}]} — a point they drag along the curve ("at" names a parameter that is an x position), with readings that are formulas in the parameters ("readouts"), computed live.' + GRAPH_TAIL,
+};
+
+/**
+ * How the reply itself is shaped, on the kinds of turn where a model's habit
+ * is the chatbot's. A starting point, never a word limit: the deeper shape
+ * takes as long as the thread needs, and an idea to understand takes the
+ * one sentence that carries it and what makes that sentence land.
+ */
+const SHAPES: Record<NonNullable<Presentation['shape']>, (p: Presentation) => string> = {
+  understand: (p) => {
+    const element = p.forms.find((k) => k !== 'paths');
+    const paths = p.forms.includes('paths');
+    return `\n\nTHE SHAPE OF THIS REPLY — they want to understand an idea. Minimum explanation, maximum understanding:\n- Open with the central insight in one plain sentence: what it says and why it holds — the relationship itself, not the topic's name, its history, or "X is a fundamental concept in…". A condition it is false without (continuity, a sign, a domain, all else equal) belongs in that sentence or the next: never drop one for brevity, and never state something more strongly than it is true.\n- Then only what makes that sentence land: ${element === 'graph' ? 'the graph below, with one line on what to try in it' : element ? 'the element below, with a line on what to do with it' : 'one concrete example or image, if the sentence needs one'} — not a second explanation of the same thing.\n- Then stop. No headings or sections, no list of properties, no applications, history or proof they did not ask for${paths ? '; the ways deeper go in the paths block — two or three, a few words each, such as the formal statement, why a condition matters, where it is used — to open one at a time' : ''}.\nIf a sentence or two carries it, that is the whole reply.\n`;
+  },
+  open: (p) => {
+    const paths = p.forms.includes('paths');
+    return `\n\nTHE SHAPE OF THIS REPLY — an open piece of work. Don't write the plan. Open with the problem that actually matters here, in a sentence or two: the thing that will make or break it, which they may not have put into words — not a restatement of what they asked. Then the one starting point you would take, concrete and particular to their situation, in a short paragraph. Then ${paths ? 'the ways it could go next as a paths block (below) — two to four, each a few words and a line on what opening it gives them — and stop there' : 'name the two or three ways it could go next, in a sentence, and stop there'}. No headings, no bolded sections, no generic best practice, and no closing question unless one answer would change everything you would say.\n`;
+  },
   deeper: () =>
     `\n\nTHE SHAPE OF THIS REPLY — they asked to go deeper on one thread. Go deep on that thread and only that: the reasoning in full, worked through for their situation, as long as it needs. You have the whole conversation, so build on it rather than repeating it. Open with the most important thing about it, in a sentence. If it has distinct parts, give each a short heading line of its own (### A few words) — here, unlike most replies — so it can be read a part at a time. End on what it opens up next, in a sentence; no summary.\n`,
 };
@@ -328,9 +411,10 @@ export const WRITE_UP = `\n\nA WRITE-UP, READ IN CONTENT. They asked for somethi
 /** The turn's shape and offer, or '' when there is neither — which is most turns. */
 export function renderPresentation(p: Presentation): string {
   if (p.place === 'content') return WRITE_UP;
-  const shape = p.shape ? SHAPES[p.shape](p.forms.includes('paths')) : '';
+  const shape = p.shape ? SHAPES[p.shape](p) : '';
   if (!p.forms.length) return shape;
-  return `${shape}\n\nINLINE, IF IT HELPS — optional; plain prose is often better. You may include ${p.forms.length === 1 ? 'this' : 'one or both of these'}, each as a fenced block on its own lines (\`\`\`ui, the JSON on one line, \`\`\`), and keep the words around it short:\n${p.forms.map((k) => `- ${GRAMMAR[k]}`).join('\n')}\n`;
+  const grammar = (k: InlineKind) => (k === 'graph' ? GRAPH_GRAMMAR[p.graph ?? 'curve'] : GRAMMAR[k]);
+  return `${shape}\n\nINLINE, IF IT HELPS — optional; plain prose is often better. You may include ${p.forms.length === 1 ? 'this' : 'one or both of these'}, each as a fenced block on its own lines (\`\`\`ui, the JSON on one line, \`\`\`), and keep the words around it short:\n${p.forms.map((k) => `- ${grammar(k)}`).join('\n')}\n`;
 }
 
 /**
@@ -348,5 +432,5 @@ export function presentationRoom(p: Presentation): number {
   if (p.forms.includes('draft') || p.forms.includes('concepts')) return 700 + deeper;
   // a graph, a simulation or the working is one longer line of JSON: a cut-off one is not drawn at all
   if (p.forms.includes('graph') || p.forms.includes('sim') || p.forms.includes('steps')) return 550 + deeper;
-  return (p.forms.includes('sequence') || p.forms.includes('decide') ? 450 : 350) + deeper;
+  return (p.forms.includes('sequence') || p.forms.includes('decide') || p.forms.includes('claim') ? 450 : 350) + deeper;
 }

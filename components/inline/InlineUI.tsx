@@ -20,8 +20,8 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import { decideLeaning, decideTally, pathAsk, SCORE_SAID, WEIGHT_SAID, type ChartSpec, type CheckPart, type CompareSpec, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
-import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
+import { CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
+import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWindowAll, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
 import { TeX } from '@/components/TeX';
 import { copyText } from '@/lib/copy-text';
 import './inline.css';
@@ -94,6 +94,8 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
       );
     case 'steps':
       return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} />;
+    case 'claim':
+      return <InlineClaim spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
   }
 }
 
@@ -1072,6 +1074,25 @@ function SharedNote({ what }: { what: string }) {
   );
 }
 
+/**
+ * The plot's own rectangle, as a clip for what is drawn in it. The picture's
+ * SVG lets its labels spill past the edge (overflow: visible), so a steep curve
+ * — x³ at the window's ends — once ran out of the card, across the reply and
+ * the ways deeper under it. The lines are clipped to the plot; labels are not.
+ */
+function useClipId(): string {
+  return `lnclip${useId().replace(/[^A-Za-z0-9_-]/g, '')}`;
+}
+function PlotClip({ id, W, H }: { id: string; W: number; H: number }) {
+  return (
+    <defs>
+      <clipPath id={id}>
+        <rect x={0} y={-1} width={W} height={H + 2} />
+      </clipPath>
+    </defs>
+  );
+}
+
 /** A polyline through points, the pen lifted where a point is undefined; a value far off the window is held at its edge, not drawn to infinity. */
 function pathOf(pts: readonly Pt[], X: (x: number) => number, Y: (y: number) => number, y0: number, y1: number): string {
   const lo = y0 - 3 * (y1 - y0), hi = y1 + 3 * (y1 - y0);
@@ -1120,16 +1141,30 @@ function Grid({ x0, x1, y0, y1, X, Y, W, H }: { x0: number; x1: number; y0: numb
 
 // ── a graph to change ────────────────────────────────────────────────
 
-const FEATURE_KINDS: Record<GraphSpec['features'][number], Feature['kind']> = { turning: 'turning', roots: 'root', intercept: 'intercept' };
+const FEATURE_KINDS: Partial<Record<GraphFeature, Feature['kind']>> = { turning: 'turning', roots: 'root', intercept: 'intercept' };
+/** The second and third curves on one graph: each its own ink, named at its end. */
+const CURVE_TONE = ['', 'is-second', 'is-third'];
+type Compiled = NonNullable<ReturnType<typeof compileOver>>;
 
 function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: GraphSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline }) {
   const names = useMemo(() => spec.params.map((p) => p.name), [spec]);
   const c = useMemo(() => compileOver(spec.expr, names), [spec, names]);
   const segs = useMemo(() => prettyExpr(spec.expr, names), [spec, names]);
+  // more curves over the same x and parameters (supply beside demand), each drawable or left off
+  const others = useMemo(
+    () => (spec.curves ?? []).flatMap((g) => {
+      const cc = compileOver(g.expr, names);
+      return cc ? [{ label: g.label, expr: g.expr, c: cc as Compiled, segs: prettyExpr(g.expr, names) }] : [];
+    }),
+    [spec, names]
+  );
   const start = useMemo(() => Object.fromEntries(spec.params.map((p) => [p.name, p.value])), [spec]);
+  // parameters that are x positions on the curve: points dragged along it, never part of an equation
+  const positions = useMemo(() => new Set(spec.at ?? []), [spec]);
   const [values, setValues] = useState<Record<string, number>>(() => ({ ...start, ...(state?.values ?? {}) }));
   const [hot, setHot] = useState<string | null>(null);
   const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
+  const [drag, setDrag] = useState<string | null>(null);
   const [picked, setPicked] = useState<number | undefined>(state?.predicted);
   const [skipped, setSkipped] = useState(!!state?.skipped);
   const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -1139,32 +1174,40 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     if (saveTimer.current) clearTimeout(saveTimer.current);
   }, []);
   const [ref, width] = useWidth<HTMLDivElement>(560);
+  const clip = useClipId();
   const W = Math.max(240, width);
-  const H = W < 420 ? 200 : 250;
+  const H = W < 420 ? 210 : 260;
   const [x0, x1] = spec.x;
-  const fit = useMemo(() => (c ? sampleCurve(c, start, x0, x1, 200) : null), [c, start, x0, x1]);
-  // the window: as the reply gave it, or around what matters on the curve as it started — widened, never
+  const f = (x: number, v: Record<string, number> = values) => (c ? c.eval({ ...v, x }) : NaN);
+  const curves = useMemo(() => [c, ...others.map((o) => o.c)].filter(Boolean) as Compiled[], [c, others]);
+  const pointYs = (v: Record<string, number>) => (spec.at ?? []).map((n) => (c ? c.eval({ ...v, x: v[n] }) : NaN)).filter(Number.isFinite);
+  // the window: as the reply gave it, or around what matters on every curve as it started — widened, never
   // narrowed, when what they change takes it further
-  const auto = useMemo(() => (c ? fitWindow(c, [start], x0, x1) : ([-10, 10] as [number, number])), [c, start, x0, x1]);
-  const reach = useMemo(() => (c ? fitWindow(c, [values], x0, x1) : auto), [c, values, x0, x1, auto]);
+  const auto = useMemo(() => (c ? fitWindowAll(curves, [start], x0, x1, pointYs(start)) : ([-10, 10] as [number, number])), [c, curves, start, x0, x1]);
+  const reach = useMemo(() => (c ? fitWindowAll(curves, [values], x0, x1, pointYs(values)) : auto), [c, curves, values, x0, x1, auto]);
   const [y0, y1] = spec.y ?? [Math.min(auto[0], reach[0]), Math.max(auto[1], reach[1])];
   const X = (x: number) => ((x - x0) / (x1 - x0)) * W;
   const Y = (y: number) => ((y1 - y) / (y1 - y0)) * H;
+  const fit = useMemo(() => (c ? sampleCurve(c, start, x0, x1, 200) : null), [c, start, x0, x1]);
   const cur = useMemo(() => (c ? sampleCurve(c, values, x0, x1) : null), [c, values, x0, x1]);
   const changed = names.some((n) => values[n] !== start[n]);
-  const kinds = spec.features.map((f) => FEATURE_KINDS[f]);
+  // only a parameter in an equation reshapes a curve: a point moved along it changes no curve
+  const reshaped = names.some((n) => !positions.has(n) && values[n] !== start[n]);
+  const kinds = spec.features.map((k) => FEATURE_KINDS[k]).filter((k): k is Feature['kind'] => !!k);
   const feats = useMemo(() => (c && kinds.length ? curveFeatures(c, values, x0, x1, kinds) : []), [c, values, x0, x1, kinds.join()]);
   const startTurn = useMemo(() => (c && kinds.includes('turning') ? curveFeatures(c, start, x0, x1, ['turning'])[0] ?? null : null), [c, start, x0, x1, kinds.join()]);
-  const nowTurn = feats.find((f) => f.kind === 'turning') ?? null;
-  const ordered = [...feats.filter((f) => f.kind === 'turning').slice(0, 2), ...feats.filter((f) => f.kind === 'intercept'), ...feats.filter((f) => f.kind === 'root').slice(0, 2)].filter((f) => f.y >= y0 && f.y <= y1);
+  const nowTurn = feats.find((k) => k.kind === 'turning') ?? null;
+  // the chord, where a tangent matches it, a tangent, where the curves meet, the readings — on the curve as it is now
+  const readings = useMemo(() => graphReadings(spec, values), [spec, values]);
+  const was = useMemo(() => graphReadings(spec, start), [spec, start]);
+  const ordered = [...feats.filter((k) => k.kind === 'turning').slice(0, 2), ...feats.filter((k) => k.kind === 'intercept'), ...feats.filter((k) => k.kind === 'root').slice(0, 2), ...(spec.quiet ? [] : readings.crossings)].filter((k) => k.y >= y0 && k.y <= y1);
   // every point is drawn; a label that would sit on another's is left off (its point says enough)
   const labelled: Feature[] = [];
-  for (const f of ordered) {
+  for (const k of ordered) {
     if (labelled.length >= 4) break;
-    const crowd = labelled.some((g) => Math.abs(X(g.x) - X(f.x)) < 64 && Math.abs(Y(g.y) - Y(f.y)) < 30);
-    if (!crowd) labelled.push(f);
+    const crowd = labelled.some((g) => Math.abs(X(g.x) - X(k.x)) < 64 && Math.abs(Y(g.y) - Y(k.y)) < 30);
+    if (!crowd) labelled.push(k);
   }
-  const shown = ordered;
   const locked = !!spec.predict && picked === undefined && !skipped;
   const save = (next: InlineState) => onState({ ...latest.current, ...next });
   const set = (name: string, v: number) => {
@@ -1174,34 +1217,115 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
     if (saveTimer.current) clearTimeout(saveTimer.current);
     saveTimer.current = setTimeout(() => save({ values: next }), 400);
   };
-  const observe = (() => {
-    if (!changed || !startTurn || !nowTurn || (startTurn.x === nowTurn.x && startTurn.y === nowTurn.y)) return null;
+  // what changed, said once: the turning point, the average slope and where it is matched, where the curves meet
+  const observe: string[] = [];
+  if (reshaped && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y)) {
     const dx = nowTurn.x - startTurn.x, dy = nowTurn.y - startTurn.y;
     const way = [dx < 0 ? 'left' : dx > 0 ? 'right' : '', dy < 0 ? 'down' : dy > 0 ? 'up' : ''].filter(Boolean).join(' and ');
-    return `The turning point moved ${way}, from ${fmtPoint(startTurn)} to ${fmtPoint(nowTurn)}.`;
-  })();
-  const at = (e: React.PointerEvent<SVGSVGElement>) => {
-    if (!c) return;
+    observe.push(`The turning point moved ${way}, from ${fmtPoint(startTurn)} to ${fmtPoint(nowTurn)}.`);
+  }
+  if (!spec.quiet && changed && was.chord && readings.chord && fmtVal(was.chord.slope) !== fmtVal(readings.chord.slope)) {
+    observe.push(`The average slope went from ${fmtVal(was.chord.slope)} to ${fmtVal(readings.chord.slope)}${readings.mean?.at.length ? ` — and the tangent still matches it, now at x = ${readings.mean.at.map((v) => fmtVal(v)).join(' and x = ')}` : ''}.`);
+  }
+  if (!spec.quiet && reshaped && was.crossings[0] && readings.crossings[0] && fmtPoint(was.crossings[0]) !== fmtPoint(readings.crossings[0])) {
+    observe.push(`Where the curves meet moved from ${fmtPoint(was.crossings[0])} to ${fmtPoint(readings.crossings[0])}.`);
+  }
+  // the readings, in a row under the picture: none under the Answer Guard
+  const rows: { k: string; v: string }[] = [];
+  if (!spec.quiet) {
+    if (readings.chord) rows.push({ k: 'average slope', v: fmtVal(readings.chord.slope) });
+    if (readings.mean) {
+      if (readings.mean.at.length && !readings.mean.everywhere) rows.push({ k: 'tangent matches at', v: readings.mean.at.map((v) => `x = ${fmtVal(v)}`).join(', ') });
+      else rows.push({ k: '', v: readings.mean.everywhere ? 'Every point matches: the curve is straight between the ends.' : readings.mean.fails === 'break' ? 'The curve breaks between the ends, so the theorem promises no point.' : readings.mean.fails === 'corner' ? 'No tangent matches: the curve turns a corner, where it has no single slope.' : 'No tangent between the ends matches it.' });
+    }
+    if (readings.tangent) rows.push({ k: `slope at x = ${fmtVal(readings.tangent.x)}`, v: readings.tangent.slope === null ? 'none — a corner' : fmtVal(readings.tangent.slope) });
+    for (const ro of readings.readouts) rows.push({ k: ro.label, v: `${fmtVal(ro.value, ro.digits)}${ro.unit ? ` ${ro.unit}` : ''}` });
+  }
+  const toPlot = (e: React.PointerEvent<SVGSVGElement>) => {
     const r = e.currentTarget.getBoundingClientRect();
-    const x = x0 + ((e.clientX - r.left) / r.width) * (x1 - x0);
-    const y = c.eval({ ...values, x });
+    return { x: x0 + ((e.clientX - r.left) / r.width) * (x1 - x0), px: ((e.clientX - r.left) / r.width) * W, py: ((e.clientY - r.top) / r.height) * H };
+  };
+  /** The point on the curve under the pointer, within reach of a finger. */
+  const near = (px: number, py: number): string | null => {
+    if (locked) return null;
+    let best: string | null = null, bd = 22;
+    for (const n of spec.at ?? []) {
+      const y = f(values[n]);
+      if (!Number.isFinite(y)) continue;
+      const d = Math.hypot(X(values[n]) - px, Y(y) - py);
+      if (d < bd) {
+        bd = d;
+        best = n;
+      }
+    }
+    return best;
+  };
+  const moveTo = (n: string, x: number) => {
+    const p = spec.params.find((q) => q.name === n);
+    if (!p) return;
+    const v = Math.min(p.max, Math.max(p.min, Math.round((x - p.min) / p.step) * p.step + p.min));
+    set(n, Number(v.toFixed(6)));
+  };
+  const probeAt = (x: number) => {
+    if (!c) return;
+    const y = f(x);
     setProbe(Number.isFinite(y) ? { x, y } : null);
   };
-  const label = (f: Feature) => {
-    const px = X(f.x), py = Y(f.y);
+  const label = (k: Feature) => {
+    const px = X(k.x), py = Y(k.y);
     const right = px > W - 90;
-    return { px, py, tx: right ? px - 9 : px + 9, ty: f.kind === 'turning' && !f.max ? py + 18 : py - 9, anchor: right ? ('end' as const) : ('start' as const) };
+    return { px, py, tx: right ? px - 9 : px + 9, ty: k.kind === 'turning' && !k.max ? py + 18 : py - 9, anchor: right ? ('end' as const) : ('start' as const) };
   };
+  /** A curve's name at its right end, where it is inside the window. */
+  const endLabel = (cc: Compiled, text: string, key: string, tone: string) => {
+    for (let i = 0; i <= 40; i++) {
+      const x = x1 - ((x1 - x0) * i) / 80;
+      const y = cc.eval({ ...values, x });
+      if (Number.isFinite(y) && y >= y0 && y <= y1) {
+        return (
+          <text key={key} className={`ln-curve-name ${tone}`} x={X(x) - 4} y={Math.max(12, Y(y) - 8)} textAnchor="end">
+            {text}
+          </text>
+        );
+      }
+    }
+    return null;
+  };
+  /** A straight line through (x, y) with slope m, a fraction of the window wide each side. */
+  const through = (x: number, y: number, m: number, frac = 0.18) => {
+    const L = (x1 - x0) * frac;
+    return { x1: X(x - L), y1: Y(y - m * L), x2: X(x + L), y2: Y(y + m * L) };
+  };
+  const shapeParams = spec.params.filter((p) => !positions.has(p.name));
+  const ariaParts = [
+    `Graph of ${[spec.label ? `${spec.label}, y = ${spec.expr}` : `y = ${spec.expr}`, ...others.map((o) => `${o.label ? `${o.label}, ` : ''}y = ${o.expr}`)].join('; ')}`,
+    nowTurn ? `turning point ${fmtPoint(nowTurn)}` : '',
+    readings.chord ? `chord from x = ${fmtVal(readings.chord.a)} to x = ${fmtVal(readings.chord.b)}${spec.quiet ? '' : `, average slope ${fmtVal(readings.chord.slope)}`}` : '',
+    readings.mean && !spec.quiet ? meanSaid(readings.mean) : '',
+    readings.tangent && !spec.quiet ? `slope at x = ${fmtVal(readings.tangent.x)}: ${readings.tangent.slope === null ? 'none, a corner' : fmtVal(readings.tangent.slope)}` : '',
+    !spec.quiet && readings.crossings.length ? `the curves meet at ${readings.crossings.map(fmtPoint).join(' and ')}` : '',
+  ].filter(Boolean);
   return (
     <div className="ln ln-graph" role="group" aria-label={spec.title || 'A graph you can change'}>
       {spec.title && <p className="ln-title">{spec.title}</p>}
       <div className="ln-graph-head">
-        <p className="ln-eq">
-          <i className="ln-eq-v">y</i>
-          <span className="ln-eq-op">=</span>
-          {segs ? <Expr segs={segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{spec.expr}</code>}
-        </p>
-        {spec.params.length > 0 && !locked && <span className="ln-hint">Drag a number</span>}
+        <div className="ln-eqs">
+          <p className="ln-eq">
+            {spec.label && others.length > 0 && <span className="ln-eq-name">{spec.label}</span>}
+            <i className="ln-eq-v">y</i>
+            <span className="ln-eq-op">=</span>
+            {segs ? <Expr segs={segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{spec.expr}</code>}
+          </p>
+          {others.map((o, i) => (
+            <p key={i} className={`ln-eq ${CURVE_TONE[i + 1]}`}>
+              {o.label && <span className="ln-eq-name">{o.label}</span>}
+              <i className="ln-eq-v">y</i>
+              <span className="ln-eq-op">=</span>
+              {o.segs ? <Expr segs={o.segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{o.expr}</code>}
+            </p>
+          ))}
+        </div>
+        {!locked && (positions.size > 0 ? <span className="ln-hint">Drag the points along the curve</span> : shapeParams.length > 0 ? <span className="ln-hint">Drag a number</span> : null)}
       </div>
       {spec.predict && picked === undefined && !skipped && (
         <Predict
@@ -1216,35 +1340,114 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           }}
         />
       )}
-      <div ref={ref} className="ln-plot">
+      <div ref={ref} className={`ln-plot${positions.size ? ' has-handles' : ''}${drag ? ' is-dragging' : ''}`}>
         <svg
           viewBox={`0 0 ${W} ${H}`}
           width="100%"
           height={H}
           role="img"
-          aria-label={`Graph of y = ${spec.expr}${nowTurn ? `, turning point ${fmtPoint(nowTurn)}` : ''}`}
-          onPointerMove={at}
-          onPointerDown={at}
-          onPointerLeave={() => setProbe(null)}
+          aria-label={ariaParts.join('; ')}
+          onPointerDown={(e) => {
+            const p = toPlot(e);
+            const n = near(p.px, p.py);
+            if (n) {
+              e.currentTarget.setPointerCapture?.(e.pointerId);
+              setDrag(n);
+              setHot(n);
+              setProbe(null);
+              moveTo(n, p.x);
+            } else probeAt(p.x);
+          }}
+          onPointerMove={(e) => {
+            const p = toPlot(e);
+            if (drag) moveTo(drag, p.x);
+            else probeAt(p.x);
+          }}
+          onPointerUp={() => {
+            if (drag) {
+              setDrag(null);
+              setHot(null);
+            }
+          }}
+          onPointerCancel={() => {
+            setDrag(null);
+            setHot(null);
+          }}
+          onPointerLeave={() => {
+            if (!drag) setProbe(null);
+          }}
         >
+          <PlotClip id={clip} W={W} H={H} />
           <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} />
-          {changed && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
+          <g clipPath={`url(#${clip})`}>
+          {reshaped && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
+          {reshaped &&
+            others.map((o, i) => {
+              const s = sampleCurve(o.c, start, x0, x1, 200);
+              return s ? <path key={`g${i}`} className={`ln-curve is-ghost ${CURVE_TONE[i + 1]}`} d={pathOf(s.pts, X, Y, y0, y1)} /> : null;
+            })}
           {cur && <path className="ln-curve" d={pathOf(cur.pts, X, Y, y0, y1)} />}
-          {changed && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y) && <circle className="ln-pt is-ghost" cx={X(startTurn.x)} cy={Y(startTurn.y)} r={4} />}
-          {shown.map((f, i) => {
-            const l = label(f);
+          {others.map((o, i) => {
+            const s = sampleCurve(o.c, values, x0, x1);
+            return s ? <path key={`c${i}`} className={`ln-curve ${CURVE_TONE[i + 1]}`} d={pathOf(s.pts, X, Y, y0, y1)} /> : null;
+          })}
+          {c && spec.label && others.length > 0 && endLabel(c, spec.label, 'n0', '')}
+          {others.map((o, i) => (o.label ? endLabel(o.c, o.label, `n${i + 1}`, CURVE_TONE[i + 1]) : null))}
+          {readings.chord && (
+            <g className="ln-chord">
+              <line x1={X(readings.chord.a)} y1={Y(readings.chord.ya)} x2={X(readings.chord.b)} y2={Y(readings.chord.yb)} />
+            </g>
+          )}
+          {readings.chord &&
+            !spec.quiet &&
+            readings.mean?.at.map((cx, i) => {
+              const cy = f(cx);
+              if (!Number.isFinite(cy)) return null;
+              const l = through(cx, cy, readings.chord!.slope, 0.16);
+              return (
+                <g key={`mv${i}`} className="ln-mv">
+                  <line {...l} />
+                  <circle cx={X(cx)} cy={Y(cy)} r={4.5} />
+                  <text x={X(cx) + 7} y={Y(cy) + 16}>{readings.mean!.at.length > 1 ? `c${i + 1}` : 'c'}</text>
+                </g>
+              );
+            })}
+          {readings.tangent && readings.tangent.slope !== null && (
+            <g className="ln-tan">
+              <line {...through(readings.tangent.x, readings.tangent.y, readings.tangent.slope, 0.22)} />
+            </g>
+          )}
+          </g>
+          {reshaped && !spec.quiet && was.crossings.map((k, i) => (fmtPoint(k) !== fmtPoint(readings.crossings[i] ?? { x: NaN, y: NaN }) ? <circle key={`gx${i}`} className="ln-pt is-ghost" cx={X(k.x)} cy={Y(k.y)} r={4} /> : null))}
+          {reshaped && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y) && <circle className="ln-pt is-ghost" cx={X(startTurn.x)} cy={Y(startTurn.y)} r={4} />}
+          {ordered.map((k, i) => {
+            const l = label(k);
             return (
-              <g key={i} className={`ln-feat is-${f.kind}`}>
-                <circle className="ln-pt" cx={l.px} cy={l.py} r={f.kind === 'turning' ? 5 : 3.5} />
-                {labelled.includes(f) && (
+              <g key={i} className={`ln-feat is-${k.kind}`}>
+                <circle className="ln-pt" cx={l.px} cy={l.py} r={k.kind === 'turning' || k.kind === 'crossing' ? 5 : 3.5} />
+                {labelled.includes(k) && (
                   <text x={l.tx} y={l.ty} textAnchor={l.anchor}>
-                    {fmtPoint(f)}
+                    {fmtPoint(k)}
                   </text>
                 )}
               </g>
             );
           })}
-          {probe && probe.y >= y0 && probe.y <= y1 && (
+          {(spec.at ?? []).map((n) => {
+            const x = values[n];
+            const y = f(x);
+            if (!Number.isFinite(y) || y < y0 || y > y1) return null;
+            const p = spec.params.find((q) => q.name === n);
+            return (
+              <g key={`h${n}`} className={`ln-handle${drag === n ? ' is-drag' : ''}${hot === n ? ' is-hot' : ''}${locked ? ' is-locked' : ''}`} aria-hidden="true">
+                <circle cx={X(x)} cy={Y(y)} r={7} />
+                <text x={X(x)} y={Y(y) - 12} textAnchor="middle">
+                  {p?.label && p.label.length <= 8 ? p.label : n}
+                </text>
+              </g>
+            );
+          })}
+          {probe && !drag && probe.y >= y0 && probe.y <= y1 && (
             <g className="ln-probe" aria-hidden="true">
               <circle cx={X(probe.x)} cy={Y(probe.y)} r={3.5} />
               <text x={Math.min(W - 6, X(probe.x) + 8)} y={Math.max(14, Y(probe.y) - 8)} textAnchor={X(probe.x) > W - 90 ? 'end' : 'start'}>
@@ -1254,10 +1457,20 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           )}
         </svg>
       </div>
-      {changed && (
+      {reshaped && (
         <p className="ln-was" aria-hidden="true">
           <span className="is-now">now</span>
           <span className="is-ghost">as it started</span>
+        </p>
+      )}
+      {rows.length > 0 && (
+        <p className="ln-read ln-graph-read" aria-live="polite">
+          {rows.map((r, i) => (
+            <span key={i} className={`ln-reading${r.k ? '' : ' is-note'}`}>
+              {r.k && <span className="ln-k">{r.k}</span>}
+              <b>{r.v}</b>
+            </span>
+          ))}
         </p>
       )}
       {spec.params.length > 0 && (
@@ -1275,6 +1488,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
                 step={p.step}
                 value={values[p.name] ?? p.value}
                 disabled={locked}
+                aria-label={positions.has(p.name) ? `${p.label}: a point on the curve` : p.label}
                 aria-valuetext={fmtWith(values[p.name] ?? p.value, p.unit)}
                 onChange={(e) => set(p.name, Number(e.target.value))}
                 onFocus={() => setHot(p.name)}
@@ -1284,13 +1498,73 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
           ))}
         </div>
       )}
-      {(picked !== undefined || observe) && (
+      {(picked !== undefined || observe.length > 0) && (
         <div className="ln-after" aria-live="polite">
           {spec.predict && picked !== undefined && <Predict predict={spec.predict} picked={picked} />}
-          {observe && <p className="ln-observe">{renderInline(observe, 'obs')}</p>}
+          {observe.map((o, i) => (
+            <p key={i} className="ln-observe">
+              {renderInline(o, `obs${i}`)}
+            </p>
+          ))}
         </div>
       )}
       {shared && spec.params.length > 0 && <SharedNote what="change" />}
+    </div>
+  );
+}
+
+// ── a claim, inspected ───────────────────────────────────────────────
+
+const VERDICT_LABEL: Record<ClaimSpec['verdict'], string> = { holds: 'Holds', fails: 'Doesn’t hold', partly: 'Partly holds', unsettled: 'Not settled' };
+const HOLDS_MARK: Record<ClaimSpec['parts'][number]['holds'], string> = { yes: '✓', no: '✕', partly: '◐', unclear: '?' };
+
+/**
+ * A claim put up to be checked: the verdict, and the parts it rests on — each
+ * marked as holding or not, its basis opened on a press — and, in the
+ * conversation, a way to say which part they doubt, which goes to Socria with
+ * their next message. The evidence is one press away, never a wall of it.
+ */
+function InlineClaim({ spec, state, onState, shared, renderInline }: { spec: ClaimSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline }) {
+  const [open, setOpen] = useState<number | null>(null);
+  const doubted = new Set(state?.doubted ?? []);
+  const toggle = (i: number) => {
+    const next = new Set(doubted);
+    if (next.has(i)) next.delete(i);
+    else next.add(i);
+    onState({ ...state, doubted: [...next].sort((a, b) => a - b) });
+  };
+  return (
+    <div className="ln ln-claim" role="group" aria-label={`The claim: ${spec.claim} — ${CLAIM_SAID[spec.verdict]}`}>
+      <div className="ln-claim-head">
+        <p className="ln-k">The claim</p>
+        <p className="ln-claim-text">“{spec.claim}”</p>
+        <span className={`ln-verdict-chip is-${spec.verdict}`}>{VERDICT_LABEL[spec.verdict]}</span>
+      </div>
+      <ul className="ln-claim-parts">
+        {spec.parts.map((p, i) => (
+          <li key={i} className={`ln-part is-${p.holds}${doubted.has(i) ? ' is-doubted' : ''}`}>
+            <button type="button" className="ln-part-row" aria-expanded={p.basis ? open === i : undefined} onClick={() => p.basis && setOpen(open === i ? null : i)}>
+              <span className={`ln-mark is-${p.holds}`} aria-hidden="true">
+                {HOLDS_MARK[p.holds]}
+              </span>
+              <span className="ln-sr">{HOLDS_SAID[p.holds]}: </span>
+              <span className="ln-part-text">{renderInline(p.text, `p${i}`)}</span>
+              {p.basis && (
+                <span className="ln-part-more" aria-hidden="true">
+                  {open === i ? '−' : '+'}
+                </span>
+              )}
+            </button>
+            {open === i && p.basis && <p className="ln-part-basis">{renderInline(p.basis, `b${i}`)}</p>}
+            {shared && (
+              <button type="button" className={`ln-doubt${doubted.has(i) ? ' is-on' : ''}`} aria-pressed={doubted.has(i)} onClick={() => toggle(i)}>
+                {doubted.has(i) ? 'You doubt this' : 'I doubt this'}
+              </button>
+            )}
+          </li>
+        ))}
+      </ul>
+      {shared && <SharedNote what="mark" />}
     </div>
   );
 }
@@ -1313,6 +1587,7 @@ function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: In
     if (timer.current) clearTimeout(timer.current);
   }, []);
   const [ref, width] = useWidth<HTMLDivElement>(560);
+  const clip = useClipId();
   const W = Math.max(240, width);
   const H = W < 420 ? 170 : 210;
   const [x0, x1] = spec.view.x;
@@ -1365,7 +1640,9 @@ function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: In
       )}
       <div ref={ref} className="ln-plot">
         <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${spec.title || 'A simulation'}: ${spec.params.map((p) => `${p.label} ${fmtWith(values[p.name], p.unit)}`).join(', ')}${reading(values).map((r) => `, ${r.label} ${r.shown}`).join('')}`}>
+          <PlotClip id={clip} W={W} H={H} />
           {y0 <= 0 && 0 <= y1 && <line className="ln-ground" x1={0} x2={W} y1={Y(0)} y2={Y(0)} />}
+          <g clipPath={`url(#${clip})`}>
           {ghosts.map((t, i) => {
             const pts = pathAt(t);
             const end = endOf(pts);
@@ -1381,6 +1658,7 @@ function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: In
             );
           })}
           <path className="ln-curve" d={pathOf(nowPath, X, Y, y0, y1)} />
+          </g>
           {nowEnd && <circle className="ln-pt" cx={X(nowEnd.x)} cy={Y(nowEnd.y)} r={4.5} />}
         </svg>
       </div>
