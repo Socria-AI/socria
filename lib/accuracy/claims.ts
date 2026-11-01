@@ -131,9 +131,19 @@ function tokenize(line: string): Token[] {
   const toks: Token[] = [];
   let buf = '';
   let cut = false;
+  // The last run in this sentence ended on an operator ("1 - 2 + 3 - 4 +").
+  // A later run that opens on one is the rest of the same expression, whatever
+  // came between: two full stops, "etc", "and so on". A leading minus would
+  // otherwise pass for a whole side: "- 2n = -n" out of
+  // "1 - 2 + 3 - 4 + .. - 2n = -n", a true identity, was reported false.
+  let dangling = false;
   const flush = (glued = false) => {
     const t = buf.replace(/^[,\s]+|[,\s]+$/g, '').replace(/\s+/g, ' ');
-    if (t && /[0-9a-zA-Z∞]/.test(t)) toks.push({ t: 'math', v: t, ...(cut || glued ? { cut: true } : {}) });
+    if (t && /[0-9a-zA-Z∞]/.test(t)) {
+      const tail = dangling && /^[-+*/^·]/.test(t);
+      toks.push({ t: 'math', v: t, ...(cut || glued || tail ? { cut: true } : {}) });
+      dangling = /[-+*/^·]$/.test(t);
+    }
     buf = '';
     cut = false;
   };
@@ -227,7 +237,10 @@ function sentences(flat: string): Sentence[] {
     const continues = carried;
     const trimmed = rawLine.replace(/[⟧\s]+$/, '');
     // A term before the operator: a rule line ("---") carries nothing.
-    if (trimmed) carried = /[0-9a-zA-Z)\]]\s*[-+*/^=]$/.test(trimmed);
+    // So does a line that ends on an ellipsis after a term, an operator or a
+    // comma ("1 + 2 + 3 + ...", then "+ n = n(n+1)/2" on the next line); one
+    // after a word ("The options are these…") does not.
+    if (trimmed) carried = /[0-9a-zA-Z)\]]\s*[-+*/^=]$/.test(trimmed) || /(?:[-+*/^=,]|[0-9)\]])\s*…$/.test(trimmed);
     const line = (continues ? rawLine : rawLine.replace(/^\s*(?:[-*+]|\d+[.)])\s+/, '')).trim();
     if (!line) continue;
     const standalone = /^⟦[^⟧]*⟧[\s.,;:]*$/.test(line);

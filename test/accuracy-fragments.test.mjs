@@ -133,6 +133,37 @@ console.log('=== near-misses: a dangling operator after a split ===');
   ok('…and a whole identity is still computed', /holds/.test(computePosed({ kind: 'identity', left: 'x^2 - 1', right: '(x-1)(x+1)', text: '' }).result ?? ''));
 }
 
+console.log('=== review: a tail after a break the tokenizer does not call an ellipsis ===');
+{
+  // "1 - 2 + 3 - 4 + .. - 2n = -n" is true for every n. Two full stops, "etc"
+  // or "and so on" are not marked as an ellipsis, and the leading minus made
+  // the tail "- 2n = -n" look whole: it was refuted and, for "Prove that",
+  // put in front of the model as "does not hold".
+  const tails = {
+    'two full stops': 'For all n, 1 - 2 + 3 - 4 + .. - 2n = -n always.',
+    '"etc"': 'For all n, 1 - 2 + 3 - 4 + etc - 2n = -n always.',
+    '"and so on"': 'For all n, 1 - 2 + 3 - 4 + and so on - 2n = -n always.',
+  };
+  for (const [name, text] of Object.entries(tails)) {
+    ok(`reply: a minus tail after ${name} is not refuted`, refutedIn(text).length === 0, JSON.stringify(refutedIn(text)));
+    const q = `Prove that ${text.replace(/^For all n, | always\.$/g, '')}`;
+    ok(`person: "${q}" computes nothing`, silent(q), said(plan(q)));
+  }
+  // A line that ends on an ellipsis continues the formula just as a line that
+  // ends on an operator does: its "+ " or "- " is not a list bullet.
+  const lines = {
+    '"+" after "+ ..."': 'For all n:\n1 + 2 + 3 + ...\n+ n = n(n+1)/2 always.',
+    '"-" after "+ ..."': 'For all n:\n1 - 2 + 3 - 4 + ...\n- 2n = -n always.',
+    '"+" after "\\cdots"': 'For all n:\n1 + 2 + 3 + \\cdots\n+ n = n(n+1)/2 always.',
+  };
+  for (const [name, text] of Object.entries(lines)) ok(`reply: a line opening on ${name} is not refuted`, refutedIn(text).length === 0, JSON.stringify(refutedIn(text)));
+  // What sits next to the fix is still read.
+  ok('a word between two whole claims still lets the second be checked', refutedIn('So 2 + 2 = 4 and then 3 - 1 = 5.').length === 1, JSON.stringify(refutedIn('So 2 + 2 = 4 and then 3 - 1 = 5.')));
+  ok('a leading minus after a whole formula is still checked', refutedIn('We have x = 2, and -3 + 1 = 2.').length === 1, JSON.stringify(refutedIn('We have x = 2, and -3 + 1 = 2.')));
+  const bullets = 'The options are these…\n- 2 + 2 = 5\n- 3 + 3 = 6';
+  ok('a prose line ending on an ellipsis does not swallow the bullets after it', refutedIn(bullets).length === 1, JSON.stringify(refutedIn(bullets)));
+}
+
 console.log('=== near-misses: chains and inequalities ===');
 {
   // "x = y = 0 always": the link y = 0 pins y down; it is not an identity in y.
