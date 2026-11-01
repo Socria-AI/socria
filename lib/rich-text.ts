@@ -17,7 +17,7 @@
 // because parsing is where the bugs are and JSX cannot be tested by the
 // plain-node harness in test/. Everything below returns plain data.
 
-import { parseInlineSpec, type InlineSpec } from './inline-ui';
+import { INLINE_KINDS, parseInlineSpec, type InlineSpec } from './inline-ui';
 
 /** One run of inline text, and what it is. */
 export interface Inline {
@@ -145,8 +145,35 @@ const UI_ONE_LINE_RE = /^\s*```[ \t]*ui[ \t]*(\{.*\})[ \t]*```[ \t]*(.*)$/i;
 const UI_OPEN_INLINE_RE = /^\s*```[ \t]*ui[ \t]+(\{.*)$/i;
 const CLOSE_RE = /^\s*```(?!`)[ \t]*(.*)$/;
 const UI_CLOSE_INSIDE_RE = /^(.*\})[ \t]*```[ \t]*(.*)$/;
-/** a bare language word after a closing fence is what it always was — the fence closing — not a sentence */
-const LANG_WORD_RE = /^[\w+#-]{1,20}$/;
+/**
+ * a bare language tag after a closing fence is what it always was — the fence closing — not a sentence.
+ * Tags are lower case: a capitalised word run on ("```Next") is the reply's next word, and is kept.
+ */
+const LANG_WORD_RE = /^[a-z][a-z0-9+#-]{0,19}$/;
+/** Element kinds an open bare fence may still turn out to be: the vocabulary, and the kinds being added to it. */
+const ARRIVING_KINDS: readonly string[] = [...INLINE_KINDS, 'diagram', 'balance', 'equation'];
+/**
+ * Whether what an open fence holds so far could still be an inline element's
+ * spec: nothing yet, or JSON that opens on its "type" naming (or still
+ * spelling) an element kind. A bare fence of ordinary JSON — a package.json,
+ * an API's reply, `"type": "module"` — is code from its first key on: it was
+ * drawn as an element's placeholder, its text nowhere on the page, for as long
+ * as it was written, and for good in a reply that stopped inside it.
+ */
+function mayBeSpec(said: string): boolean {
+  if (!said) return true;
+  if (!said.startsWith('{')) return false;
+  const rest = said.slice(1).trimStart();
+  // still writing its first key
+  if ('"type"'.startsWith(rest)) return true;
+  const m = /^"type"\s*:?\s*("?)([a-z]*)("?)/.exec(rest);
+  if (!m) return false;
+  const [all, q1, word, q2] = m;
+  // the kind named in full: one of the vocabulary's
+  if (q1 && q2) return ARRIVING_KINDS.includes(word);
+  // still being spelled, with nothing written after it yet
+  return all.length === rest.length && (!word || ARRIVING_KINDS.some((k) => k.startsWith(word)));
+}
 const HEADING_RE = /^(#{1,3})\s+(\S.*)$/;
 const QUOTE_RE = /^\s*>\s?(.*)$/;
 
@@ -512,7 +539,7 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
         // the very first characters of an inline block — "```", "```u" — while the reply is still
         // writing it: a placeholder, never a code block that flashes and then turns into the element
         const said = body.join('\n').trim();
-        const uiArriving = open && 'ui'.startsWith(lang) && (!said || said.startsWith('{'));
+        const uiArriving = open && 'ui'.startsWith(lang) && mayBeSpec(said);
         if (isUi || uiArriving) {
           const kind = open ? said.match(/"type"\s*:\s*"([a-z]+)"/)?.[1] : undefined;
           blocks.push({ kind: 'ui', spec: open ? null : parseInlineSpec(body.join('\n')), open, n: uiSeen++, ...(kind ? { pending: kind } : {}) });

@@ -193,7 +193,7 @@ const GROUP_ITEM_WORDS = 10;
  *     sentence: columns, not a tall line each. Columns, never chips: nothing
  *     here should look like something to press.
  */
-function listShape(b: Extract<Block, { kind: 'ul' | 'ol' }>): Block {
+function listShape(b: Extract<Block, { kind: 'ul' | 'ol' }>, live = false): Block {
   const { items } = b;
   const subs = b.subs;
   const sub = (k: number) => (subs?.[k]?.length ? { sub: subs[k] } : {});
@@ -201,19 +201,23 @@ function listShape(b: Extract<Block, { kind: 'ul' | 'ol' }>): Block {
   const head = items.slice(0, DECIDED_BY);
   const shortWords = (t: string) => wordCount(stripMarks(t)) <= GROUP_ITEM_WORDS;
 
-  if (b.kind === 'ul' && subs && items.length >= 2 && items.length <= 4) {
+  // (a fifth option, or a long point further down, would undo it: decided once the list is whole)
+  if (b.kind === 'ul' && subs && !live && items.length >= 2 && items.length <= 4) {
     const firstTwo = [0, 1].every((k) => (subs[k]?.length ?? 0) >= 2 && subs[k].slice(0, DECIDED_BY).every(shortWords));
     if (firstTwo && items.every((it) => wordCount(stripMarks(it)) <= 8 && !/[.!?…]$/.test(stripMarks(it)))) {
       return { kind: 'groups', side: true, groups: items.map((h, k) => ({ header: h, items: subs[k] ?? [] })) };
     }
   }
-  if (items.length >= 2 && head.every((it) => !!termOf(it))) {
+  // two bold items say terms only once the list is whole — a third, still to come, could be a plain point
+  if (items.length >= (live ? DECIDED_BY : 2) && head.every((it) => !!termOf(it))) {
     return { kind: 'terms', ordered: b.kind === 'ol', ...start, items: items.map((it, k) => ({ ...(termOf(it) ?? plainTermOf(it) ?? { label: '', body: it }), ...sub(k) })) };
   }
   if (items.length >= DECIDED_BY && head.every((it) => !!plainTermOf(it))) {
     return { kind: 'terms', ordered: b.kind === 'ol', ...start, items: items.map((it, k) => ({ ...(plainTermOf(it) ?? termOf(it) ?? { label: '', body: it }), ...sub(k) })) };
   }
-  if (b.kind === 'ul' && !subs && items.length >= COMPACT_MIN_ITEMS && items.slice(0, COMPACT_MIN_ITEMS).every(shortItem)) {
+  // nothing nested under the items before the fifth: known by the time the fifth arrives, so it holds
+  const plainHead = !subs || subs.slice(0, COMPACT_MIN_ITEMS - 1).every((x) => !x.length);
+  if (b.kind === 'ul' && plainHead && items.length >= COMPACT_MIN_ITEMS && items.slice(0, COMPACT_MIN_ITEMS).every(shortItem)) {
     return { ...b, compact: true };
   }
   return b;
@@ -225,9 +229,11 @@ function listShape(b: Extract<Block, { kind: 'ul' | 'ol' }>): Block {
  * longer point further down still fits in its column; only a fifth group, or
  * a long point near the top, keeps them stacked.
  */
-function groupsShape(b: Extract<Block, { kind: 'groups' }>): Block {
+function groupsShape(b: Extract<Block, { kind: 'groups' }>, live = false): Block {
   const g = b.groups;
+  // a fifth group, or a long point still to come, would undo it: decided once the groups are whole
   const side =
+    !live &&
     g.length >= 2 &&
     g.length <= 4 &&
     g.every((x) => !!x.header) &&
@@ -243,11 +249,12 @@ function groupsShape(b: Extract<Block, { kind: 'groups' }>): Block {
  * top-left cell says so outright, or the first rows' labels are a few words
  * each. Drawn with row headers, like the comparison element.
  */
-export function tableShape(b: Extract<Block, { kind: 'table' }>): Extract<Block, { kind: 'table' }> {
+export function tableShape(b: Extract<Block, { kind: 'table' }>, live = false): Extract<Block, { kind: 'table' }> {
   const values = b.header.length - 1;
   if (values < 2 || values > 4) return b;
   // an empty corner says it before any row has arrived; otherwise the first rows' labels do
-  const named = b.header[0].trim() === '' || (b.rows.length > 0 && b.rows.slice(0, DECIDED_BY).every((r) => wordCount(stripMarks(r[0] ?? '')) <= 4 && (r[0] ?? '').trim() !== ''));
+  // (while rows are still arriving, by the first three — a second row's label could still be a sentence)
+  const named = b.header[0].trim() === '' || (b.rows.length >= (live ? DECIDED_BY : 1) && b.rows.slice(0, DECIDED_BY).every((r) => wordCount(stripMarks(r[0] ?? '')) <= 4 && (r[0] ?? '').trim() !== ''));
   return named ? { ...b, compare: true } : b;
 }
 
@@ -327,6 +334,8 @@ function splitLead(blocks: Block[]): Block[] {
   if (n < LEAD_SPLIT_WORDS[0] || n > LEAD_SPLIT_WORDS[1] || !rest || !balanced(lead) || !balanced(rest)) return blocks;
   // an abbreviation is not the end of a sentence ("e.g. the…", "Dr. Smith")
   if (/\b(?:e\.g|i\.e|etc|vs|Dr|Mr|Mrs|Ms|St|No|approx)\.$/i.test(lead)) return blocks;
+  // nor are initials: "the U.S. Government", "John F. Kennedy"
+  if (/(?:^|[\s(])(?:[A-Za-z]\.)+$/.test(lead)) return blocks;
   return [{ kind: 'p', text: lead }, { kind: 'p', text: rest, split: true }, ...blocks.slice(1)];
 }
 
@@ -347,9 +356,11 @@ export function editorialBlocks(input: Block[], opts: { more?: boolean } = {}): 
       const h = followed ? fakeHeading(b.text) : null;
       return h ? { kind: 'h', level: 3, text: h } : b;
     }
-    if (b.kind === 'ul' || b.kind === 'ol') return listShape(b);
-    if (b.kind === 'groups') return groupsShape(b);
-    if (b.kind === 'table') return tableShape(b);
+    // the last block of a reply still arriving may yet grow: what its later lines could undo is not decided yet
+    const live = !!opts.more && i === blocks.length - 1;
+    if (b.kind === 'ul' || b.kind === 'ol') return listShape(b, live);
+    if (b.kind === 'groups') return groupsShape(b, live);
+    if (b.kind === 'table') return tableShape(b, live);
     return b;
   });
 }
@@ -747,8 +758,8 @@ function finishFold(p: Fold, blocks: Block[], writing: boolean): Fold {
  * "No need to go into detail" is not a request for detail.
  */
 const DEPTH_ASK =
-  /\b(?:in (?:great |full |more |real |much |a lot of |lots of )?detail|detailed|step[- ]by[- ]step|go(?:ing)? (?:deeper|further|in depth)|take me (?:deeper|further)|deep(?:er)? dive|in[- ]depth|explain (?:[\w'’-]+ ){0,6}?(?:fully|in full|thoroughly|completely)|(?:fully|thoroughly|completely) explain|full explanation|everything (?:about|on|there is)|tell me everything|walk me through|take me through)\b/i;
-const NOT_DEPTH = /\b(?:no|not|without|don['’]t|do not|no need to|skip(?: the)?)\s+(?:[\w'’-]+\s+){0,3}?(?:detail|depth|step[- ]by[- ]step|deeper)\b/i;
+  /\b(?:in(?:to)? (?:great |full |more |real |much |a lot of |lots of |(?:a )?bit more )?details?|more details?|(?:the |all the )?full details|detailed|be thorough|(?:a )?thorough (?:explanation|answer|breakdown|overview|walkthrough)|step[- ]by[- ]step|go(?:ing)? (?:deeper|further|in depth)|take me (?:deeper|further)|deep(?:er)? dive|in[- ]depth|explain (?:[\w'’-]+ ){0,6}?(?:fully|in full|thoroughly|completely)|(?:fully|thoroughly|completely) explain|full explanation|everything (?:about|on|there is)|tell me everything|walk me through|take me through)\b/i;
+const NOT_DEPTH = /\b(?:no|not|without|don['’]t|do not|no need to|skip(?: the)?)\s+(?:[\w'’-]+\s+){0,3}?(?:detail(?:ed|s)?|depth|step[- ]by[- ]step|deeper|thorough)\b/i;
 
 export function depthAsked(asked?: string | null, length?: string | null): boolean {
   if (length === 'detailed') return true;
