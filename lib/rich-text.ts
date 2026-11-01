@@ -82,7 +82,8 @@ export interface SourcesBlock {
  * many short items laid out in columns instead of a tall line each.
  */
 export type Block =
-  | { kind: 'p'; text: string }
+  /** `split`: the rest of an opening paragraph whose first sentence was set apart as the lead (Logos 5's editorial reading only) */
+  | { kind: 'p'; text: string; split?: boolean }
   | { kind: 'ul'; items: string[]; subs?: string[][]; compact?: boolean }
   | { kind: 'ol'; items: string[]; subs?: string[][]; start?: number }
   | GroupsBlock

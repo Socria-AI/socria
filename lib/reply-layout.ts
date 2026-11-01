@@ -47,6 +47,10 @@
 //     detail", "step by step", "walk me through", going deeper from a path, or
 //     a Detailed length setting — nothing is folded at all (`disclose: false`;
 //     depthAsked below). Folding is for what nobody asked to read in full.
+//   • A LONG OPENING STILL LEADS. An opening paragraph too long to be a
+//     lead, whose first sentence is a short statement, has that sentence set
+//     apart as the lead (splitLead) — the same words, cut at their own full
+//     stop.
 //   • DENSITY. The markdown a model still writes is drawn as tightly as what
 //     it says allows: a loose numbered list is one list with its own numbers;
 //     many short items sit in columns; "Term — what it means" lines become
@@ -292,6 +296,40 @@ function joinLists(blocks: Block[]): Block[] {
   return out;
 }
 
+/** A lead set apart from a long opening paragraph is one sentence of this many words. */
+export const LEAD_SPLIT_WORDS: readonly [number, number] = [6, 30];
+
+/**
+ * A LONG OPENING PARAGRAPH STILL HAS A LEAD. A reply that opens with a clean
+ * one-sentence answer and runs straight on for sixty words lost its standfirst
+ * altogether — the answer was set as body text on exactly the verbose replies
+ * that most need it marked. When the opening paragraph is too long to be a
+ * lead but its first sentence is a statement of six to thirty words, that
+ * sentence is set apart as the lead and the rest follows as a paragraph of its
+ * own. Nothing is reworded: it is the same text, cut where its own full stop
+ * is. Only a paragraph that has finished arriving is cut (one still streaming
+ * is the tail, not a block), so the cut is made once and never undone; and
+ * not where the cut would leave bold, code, maths or a link open on either side.
+ */
+function splitLead(blocks: Block[]): Block[] {
+  const first = blocks[0];
+  if (!first || first.kind !== 'p' || first.split) return blocks;
+  const raw = first.text.trim();
+  if (raw.includes('\n') || raw.includes('$$') || wordCount(stripMarks(raw)) <= LEAD_MAX_WORDS) return blocks;
+  const m = /^(.+?[.!…])\s+(?=["'“‘(]?[A-Z0-9*_])/.exec(raw);
+  if (!m) return blocks;
+  const lead = m[1].trim();
+  const rest = raw.slice(m[0].length).trim();
+  // a question before the first full stop: the opening is a question, not a statement to lead with
+  if (/[?]/.test(lead)) return blocks;
+  const n = wordCount(stripMarks(lead));
+  const balanced = (x: string) => (x.match(/\*\*/g) ?? []).length % 2 === 0 && (x.match(/`/g) ?? []).length % 2 === 0 && (x.match(/\$/g) ?? []).length % 2 === 0 && (x.match(/\[/g) ?? []).length === (x.match(/\]/g) ?? []).length;
+  if (n < LEAD_SPLIT_WORDS[0] || n > LEAD_SPLIT_WORDS[1] || !rest || !balanced(lead) || !balanced(rest)) return blocks;
+  // an abbreviation is not the end of a sentence ("e.g. the…", "Dr. Smith")
+  if (/\b(?:e\.g|i\.e|etc|vs|Dr|Mr|Mrs|Ms|St|No|approx)\.$/i.test(lead)) return blocks;
+  return [{ kind: 'p', text: lead }, { kind: 'p', text: rest, split: true }, ...blocks.slice(1)];
+}
+
 /**
  * Rich blocks read the way Logos 5 lays a reply out: a bold line standing
  * alone over what follows becomes a heading; a loose list becomes one list;
@@ -301,7 +339,7 @@ function joinLists(blocks: Block[]): Block[] {
  * under it.
  */
 export function editorialBlocks(input: Block[], opts: { more?: boolean } = {}): Block[] {
-  const blocks = joinLists(input);
+  const blocks = splitLead(joinLists(input));
   return blocks.map((b, i) => {
     if (b.kind === 'p') {
       const next = blocks[i + 1];
@@ -625,7 +663,8 @@ export function layoutReply(blocks: Block[], o: LayoutOptions = {}): Piece[] {
       pieces.push({ kind: 'block', i });
       if (prose(i)) {
         openWords += words(i);
-        openBlocks++;
+        // the rest of an opening paragraph whose lead was set apart is still that one paragraph
+        if (!(b?.kind === 'p' && b.split)) openBlocks++;
       }
     }
     before += words(i);

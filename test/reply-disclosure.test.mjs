@@ -55,7 +55,9 @@ console.log('\n=== a reply with no headings: two paragraphs, then a fold ===');
 {
   ok(`the fixture: six paragraphs, ${words(TEXTBOOK)} words, the first two ${words(P1) + words(P2)}`, words(TEXTBOOK) >= 300 && words(P1) + words(P2) >= I.PARAGRAPH_FOLD_WORDS);
   const L = layout(TEXTBOOK);
-  ok('two paragraphs in view, the rest folded under one row (its closing line kept out)', kinds(L) === 'b b more b', kinds(L));
+  // (the opening paragraph's first sentence is set apart as the lead — lib/reply-layout.ts splitLead — and
+  // the rest of that paragraph is still one paragraph as far as folding goes)
+  ok('two paragraphs in view, the rest folded under one row (its closing line kept out)', kinds(L) === 'lead b b more b', kinds(L));
   const f = L.find((p) => p.kind === 'fold');
   ok('  a fold with no heading of its own (head -1)', f.head === -1 && !f.cont);
   ok('  titled by the sentence it opens on, being short', f.title === 'The rate depends on three things at once', f.title);
@@ -65,9 +67,22 @@ console.log('\n=== a reply with no headings: two paragraphs, then a fold ===');
   const lf = longFirst.find((p) => p.kind === 'fold');
   ok('  an opening sentence over twelve words: titled "More"', lf?.title === 'More' && lf.preview.length > 10, J(lf));
   const drawn = reply(TEXTBOOK);
-  ok('drawn: a details row, "More · …" style, with the count', /<details class="socria-fold is-prose">/.test(drawn) && /class="socria-fold-n"> · (?:<!-- -->)?3 paragraphs/.test(drawn), drawn.slice(drawn.indexOf('<details'), drawn.indexOf('<details') + 500));
+  ok('drawn: a details row, "More · …" style, with the count', /<details class="socria-fold is-prose"[ >]/.test(drawn) && /class="socria-fold-n"> · (?:<!-- -->)?3 paragraphs/.test(drawn), drawn.slice(drawn.indexOf('<details'), drawn.indexOf('<details') + 500));
   ok('  every word is still on the page, inside the fold (find-in-page, screen readers)', drawn.includes('CAM plants such as cacti') && drawn.includes('Different plants have found'));
   ok('  and copying the reply copies all of it, folded or not', I.contentAsText(TEXTBOOK).includes('CAM plants such as cacti') && drawn.includes('aria-label="Copy Socria’s message"'));
+}
+
+console.log('\n=== a long opening paragraph still leads ===');
+{
+  const b = read(TEXTBOOK);
+  ok('its first sentence, a short statement, is set apart as the lead', b[0].kind === 'p' && b[0].text === 'Photosynthesis is how a plant turns light into chemical energy it can store and use later.' && b[1].split === true && b[1].text.startsWith('Inside each chloroplast'), J(b.slice(0, 2)));
+  ok('  the same words, cut at their own full stop — nothing reworded', `${b[0].text} ${b[1].text}` === P1);
+  ok('  drawn as the standfirst', reply(TEXTBOOK).startsWith('<article') && /<p class="socria-lead"><span>Photosynthesis is how a plant/.test(reply(TEXTBOOK)));
+  ok('a long opening sentence (over thirty words) is not cut', read(`${'word '.repeat(34)}ends here. And then the rest of it goes on for a while longer still.`)[0].split === undefined && read(`${'word '.repeat(34)}ends here. And then the rest goes on.`).length === 1);
+  ok('a question first is not a lead', read(`Why does a leaf look green to us? ${P2}`).length === 1);
+  ok('a cut that would leave bold open is not made', read(`This is **the point. And the** rest of it, which runs on for a good while longer than any lead ever should, well past forty words, so it is long.`).length === 1);
+  ok('"e.g." is not the end of a sentence', read(`Some plants do this well, e.g. Maize and sugar cane both do it in hot weather, which lets them keep working where ordinary plants close up and stall for the afternoon until it cools down again.`).length === 1);
+  ok('a short opening is left as it was (the lead rule as before)', read('A short opening statement here.\n\nThen more.')[0].split === undefined && read('A short opening statement here.\n\nThen more.').length === 2);
 }
 
 console.log('\n=== what is not folded ===');
@@ -134,7 +149,7 @@ console.log('\n=== elements are never folded ===');
   ok('  drawn: the comparison is in the page flow, not inside a <details>', (() => { const at = drawn.indexOf('ln-compare'); const before = drawn.slice(0, at); return at > 0 && (before.match(/<details/g) ?? []).length === (before.match(/<\/details>/g) ?? []).length; })(), drawn.slice(0, 300));
   ok('  and the continuation is marked as one', drawn.includes('socria-fold is-cont'));
   const g = read(`${P1}\n\n${P2}\n\n${P3}\n\n${fence(GRAPH)}\n\n${P4}`);
-  ok('a graph inside what would be folded: drawn open', !folded(I.layoutReply(g)).has(3) && I.parseInlineSpec(J(GRAPH)));
+  ok('a graph inside what would be folded: drawn open', !folded(I.layoutReply(g)).has(g.findIndex((b) => b.kind === 'ui')) && g.some((b) => b.kind === 'ui' && b.spec?.type === 'graph'));
 }
 
 console.log('\n=== no fold row is blank ===');
@@ -204,6 +219,21 @@ console.log('\n=== streaming: laid out as it will land ===');
   ok('the paragraph that opens the fold, still being written: inside it, "Writing…", titled "More" until its sentence ends', last.kind === 'fold' && last.writing && last.head === -1 && last.title === 'More', J(last));
   const drawn = html(h(I.StreamingRichText, { text: TEXTBOOK.slice(0, at), rich: true, editorial: true }));
   ok('  drawn: the writing row, the text inside it', /Writing…<\/span><\/summary><div class="socria-fold-body"><p class="is-tail">/.test(drawn), drawn.slice(-300));
+}
+
+console.log('\n=== a fold opened while the reply was arriving stays open when it lands ===');
+{
+  const partial = TEXTBOOK.slice(0, TEXTBOOK.indexOf(P5) + 30);
+  const pending = html(h(I.L5Pending, { text: partial, group: false }));
+  const fk = pending.match(/<details[^>]*data-fold="([^"]+)"/)?.[1];
+  ok('every fold carries its place in the reply', !!fk && !/<details[^>]* open=""/.test(pending), pending.slice(pending.indexOf('<details'), pending.indexOf('<details') + 160));
+  I.keepFoldOpen(partial, fk, true);
+  ok('  opened mid-stream: still open in the reply being written', /<details[^>]* open=""/.test(html(h(I.L5Pending, { text: partial + ' more', group: false }))));
+  const landed = reply(TEXTBOOK);
+  ok('  and open in the reply once it has landed — a different component, the same fold', new RegExp(`<details[^>]*data-fold="${fk}"[^>]* open=""`).test(landed), landed.slice(landed.indexOf('<details'), landed.indexOf('<details') + 200));
+  I.keepFoldOpen(TEXTBOOK, fk, false);
+  ok('  closed again, it stays closed', !/<details[^>]* open=""/.test(reply(TEXTBOOK)));
+  ok('another reply is not affected', !/ open=""/.test(reply(TEXTBOOK.replace('Photosynthesis is how', 'Respiration is how'))));
 }
 
 console.log(`\nreply disclosure: ${pass} passed, ${fail} failed`);

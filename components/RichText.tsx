@@ -471,6 +471,7 @@ function EditorialText({ text, tail, joins, math, cite, askLast, inline, streami
   const pieces = layoutReply(blocks, { streaming, tail, tailIn, disclose: disclose !== false });
   const apart = !!askLast && setsApart(text);
   const folds = pieces.filter((p) => p.kind === 'fold').length;
+  const reply = replyKey(text);
   const lastFold = pieces.map((p) => p.kind).lastIndexOf('fold');
   const [openFolds, setOpenFolds] = useState(0);
   const draw = (i: number, key: string): ReactNode => {
@@ -525,7 +526,10 @@ function EditorialText({ text, tail, joins, math, cite, askLast, inline, streami
           <Fragment key={fk}>
             <details
               className={`socria-fold${p.writing ? ' is-writing' : ''}${p.head < 0 ? ' is-prose' : ''}${p.cont ? ' is-cont' : ''}`}
+              data-fold={fk}
+              open={OPENED.get(`${reply}#${fk}`) ?? false}
               onToggle={(e) => {
+                keepOpened(`${reply}#${fk}`, e.currentTarget.open);
                 // counted from the page, not kept in step by hand: one press or "Open all", the count is what is open
                 const root = e.currentTarget.closest('.l5-prose') ?? e.currentTarget.parentElement;
                 setOpenFolds(root ? root.querySelectorAll('details.socria-fold[open]').length : 0);
@@ -548,6 +552,29 @@ function EditorialText({ text, tail, joins, math, cite, askLast, inline, streami
       })}
     </>
   );
+}
+
+/**
+ * WHAT WAS OPENED STAYS OPEN WHEN A REPLY LANDS. A reply being written and
+ * the same reply landed are drawn by different components (L5Pending, then
+ * L5Message), so a fold someone opened while it was still arriving used to
+ * close under them the moment it finished. Which folds are open is kept here,
+ * by the reply's opening words and the fold's place in it — the same for the
+ * reply mid-stream and landed — for as long as the page is open. Memory only:
+ * nothing is stored, and a reload starts with every fold closed, as before.
+ */
+const OPENED = new Map<string, boolean>();
+const OPENED_MAX = 400;
+const replyKey = (text: string) => text.replace(/\s+/g, ' ').trim().slice(0, 160);
+/** A fold opened (or closed) in the reply that begins with `text` — exported for the suite, which cannot press. */
+export function keepFoldOpen(text: string, fold: string, open: boolean) {
+  keepOpened(`${replyKey(text)}#${fold}`, open);
+}
+function keepOpened(key: string, open: boolean) {
+  OPENED.delete(key);
+  if (open) OPENED.set(key, true);
+  // the oldest go first: a long session never grows this without end
+  while (OPENED.size > OPENED_MAX) OPENED.delete(OPENED.keys().next().value as string);
 }
 
 /** Every folded part of this reply opened, or closed again — one press for someone who wants all of it. */
