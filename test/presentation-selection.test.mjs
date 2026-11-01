@@ -529,5 +529,14 @@ console.log('\n=== 20. coherence, second round: what the turn is told agrees wit
   ok('a scaffolded maths turn: the domain line works it with them', !/the full working/.test(scaffold.block), scaffold.block.slice(0, 1500));
 }
 
+console.log('\n=== 21. a third pass: a length of time is not a trip ===');
+{
+  const itinerary = (t) => plan(t).reasons.includes('sequence:itinerary');
+  for (const t of ['what should I see in Tokyo in 4 days?', 'what should I visit in Lisbon if I only have 2 days?', 'what should we do in Barcelona over a long weekend?', 'We have 5 days in Japan, what should we do?', "I'm going to Lisbon for 3 days. What should I do?", "I'm going to Japan for 10 days, any recommendations?", 'a weekend in Paris, what should we see?', 'I have 3 days in the Alps, what should I do?', 'what should I do in New York for 2 days?', '3 days in Rome, what should I see?'])
+    ok(`a trip, with a place named: "${t}" — the days in order`, itinerary(t), J(plan(t)));
+  for (const t of ['My exam is in 3 days, what should I do?', 'I have a presentation in 2 days. What should I do to prepare?', 'my visa expires in 5 days, what should I do?', 'I start a new job in two days, any recommendations?', 'my rent is due in 3 days and I am short, what should I do?', 'The baby is due in 4 days, what should we do?', 'I have had a headache 3 days in a row, what should I do?', 'my dog has not eaten for 2 days, what should I do?', 'I have been awake for two days, any tips?', 'what should I do for 3 days at home with the flu?', 'I have had a fever for 3 days in Bangkok, what should I do?', 'I am going to Mexico for surgery in 3 days, what should I do?', 'I have an interview at Google in 3 days, any tips?', 'I have my Physics exam in 3 days, what should I do?', 'I have to finish my thesis over the weekend, what should I do?'])
+    ok(`a deadline, a symptom, an emergency: no itinerary: "${t}"`, !itinerary(t) && !R.pickAsk(t), J(plan(t)));
+}
+
 console.log(`\npresentation selection: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

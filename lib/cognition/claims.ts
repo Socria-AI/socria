@@ -150,8 +150,25 @@ export function claimCheck(text: string): boolean {
  */
 export const PRACTICAL_SHOULD =
   /\b(?:how\s+(?:long|much|many|often|far|hot|cold|big|early|late|soon|tight|deep|high|low)|what\s+(?:temperature|temp|time|size|age|setting|dose|dosage|amount|day|year|grit|gauge|pressure|speed)|when|where|at\s+what\s+(?:age|point|temperature|time))\s+(?:\w+\s+)?should\s+(?:i|we)\b|\bhow\s+should\s+(?:i|we)\s+(?:price|charge|grow|market|promote|hire|name|learn|study|format|pitch|sell)\b(?!\s+(?:to\s+)?(?:myself|my\s+(?:life|self|feelings|grief)|to\s+(?:love|live|cope|forgive)))|\bwhat\s+should\s+(?:i|we)\s+(?:see|eat|pack|read|watch|cook|bring|wear|order|visit)\b/i;
-/** A trip: "three days in Lisbon", "a weekend in Rome", "visiting Tokyo". */
-export const TRIP = /\bin\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\bover\s+(?:a|the)\s+(?:long\s+)?weekend\b|\bif\s+(?:i|we)\s+(?:only\s+)?have\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\b(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\s+(?:in|at|around|on)\b|\bfor\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\b(?:a\s+)?(?:weekend|trip|holiday|vacation|day\s+trip|city\s+break)\s+(?:to|in)\b/i;
+/**
+ * A trip: "three days in Lisbon", "a weekend in Rome", "what should I see in
+ * Tokyo in 4 days?". A length of time alone is not one — "my exam is in 3
+ * days", "a headache 3 days in a row", "my dog hasn't eaten for 2 days" are
+ * not plans to fill (third adversarial pass, November 2026) — so a duration
+ * or a trip word counts only beside a place named as one, or travel to it.
+ */
+const N_DAYS = String.raw`(?:\d+|one|two|three|four|five|six|seven|eight|nine|ten|a\s+few|a\s+couple\s+of)`;
+const DURATION = new RegExp(
+  String.raw`\b(?:in|for)\s+${N_DAYS}\s+(?:days?|nights?)\b|\b${N_DAYS}\s+(?:days?|nights?)\s+(?:in|at|around|on)\b|\bover\s+(?:a|the)\s+(?:long\s+)?weekend\b|\bif\s+(?:i|we)\s+(?:only\s+)?have\s+${N_DAYS}\s+(?:days?|nights?)\b`,
+  'i'
+);
+const TRIP_WORD = /\b(?:(?:long\s+)?weekend|trip|holiday|vacation|day\s+trip|city\s+break|honeymoon|road\s+trip|layover|stopover|getaway)\s+(?:to|in|around|at)\b/i;
+/** A place, named as one: "in Tokyo", "around Lisbon", "to New York", "in the Alps" — a capital, so "in a row" and "in class" are not; nor a month, a day or a school subject. */
+const PLACE =
+  /\b(?:[Ii]n|[Aa]round|[Tt]o|[Aa]t|[Vv]isit(?:ing)?|[Ee]xplor(?:e|ing))\s+(?:the\s+)?(?!(?:I|I'm|I've|I'll|The|My|Our|Your|His|Her|Their|A|An|It|This|That|Mom|Mum|Dad|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December|Christmas|Easter|Ramadan|Physics|Chemistry|Biology|Maths?|English|History|Spanish|French|German|Economics|Calculus|Algebra|Geometry|Statistics)\b)[A-Z][\w'’-]+/;
+export const TRIP: { test(text: string): boolean } = {
+  test: (text: string) => (DURATION.test(text) || TRIP_WORD.test(text)) && (PLACE.test(text) || TRAVEL.test(text)),
+};
 /** …or a place named, travelled to: "going to Lisbon", "visiting Tokyo" (a capital, so "going to bed" is not one). */
 const TRAVEL = /\b(?:going|heading|travelling|traveling|flying|visiting|off)\s+(?:to\s+)?[A-Z][a-z]+\b(?!['’]s\b)/;
 /**
@@ -167,7 +184,8 @@ const PICK = /\b(?:recommend|suggest)\s+(?:me\s+|us\s+)?(?:a|an|some|one|two|thr
  * "with my savings?", "in this situation?" are not picks (adversarial review,
  * November 2026), and "going to Sarah's wedding" is not travel.
  */
-const NOT_A_TRIP = /\b(?:my\s+(?:life|savings|money|career|future|marriage|relationship|ex)|this\s+situation|wedding|funeral|party|interview|hospital|court)\b/i;
+const NOT_A_TRIP =
+  /\b(?:my\s+(?:life|savings|money|career|future|marriage|relationship|ex)|this\s+situation|wedding|funeral|party|interview|hospital|court|surgery|operation|treatment|chemo|in\s+a\s+row|straight|headache|migraine|fever|sick|ill|unwell|pain|hurts?|bleeding|vomit\w*|throwing\s+up|cough\w*|rash|flu|covid|diarrh\w*|infection|injur\w*|food\s+poisoning|(?:hasn'?t|not|stopped)\s+eat\w*|awake|insomnia|can'?t\s+sleep|exam|test|deadline|due|expires?|rent|bills?|lost\s+my|stolen|robbed|arrested|stranded|missed\s+my\s+(?:flight|train))\b/i;
 export function pickAsk(text: string): boolean {
   const t = clean(text);
   return PICK.test(t) || ((/\bwhat\s+should\s+(?:i|we)\s+(?:do|see|visit|try|buy|get)\b/i.test(t) || /\b(?:any|some)\s+(?:recommendations|suggestions|tips|ideas)\b/i.test(t)) && (TRIP.test(t) || TRAVEL.test(t)) && !NOT_A_TRIP.test(t));
