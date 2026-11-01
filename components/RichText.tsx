@@ -162,17 +162,25 @@ function CodeBlock({ lang, text, open }: { lang: string | null; text: string; op
  * a second, deeper list: what was written stays together and the page gains
  * no new depth. `tail`: the point still being written, while a reply streams.
  */
+/** Read by a screen reader, not drawn: inline, so it needs no stylesheet on any surface. */
+const SR_ONLY = { position: 'absolute', width: 1, height: 1, margin: -1, padding: 0, overflow: 'hidden', clip: 'rect(0 0 0 0)', whiteSpace: 'nowrap', border: 0 } as const;
+
 function Subs({ items, tail, math, k, cite, rich }: { items: string[]; tail?: string; math?: boolean; k: string; cite?: CiteRender; rich?: boolean }) {
   const all = tail !== undefined ? [...items, tail] : items;
   if (!all.length) return null;
   return (
     <span className="socria-sub">
+      {/* a word break from the item above, for what reads the text rather than the layout (it collapses on the page) */}{' '}
       {all.map((x, j) => (
         <Fragment key={j}>
           {j > 0 && (
-            <span className="socria-sub-sep" aria-hidden="true">
-              {' · '}
-            </span>
+            <>
+              <span className="socria-sub-sep" aria-hidden="true">
+                {' · '}
+              </span>
+              {/* the dot is for the eye; a screen reader hears a pause between two points, not one run-on word */}
+              <span style={SR_ONLY}>, </span>
+            </>
           )}
           <span className={tail !== undefined && j === all.length - 1 ? 'is-tail' : undefined}>
             <Inline text={x} math={math} keyBase={`${k}-s${j}`} cite={cite} code={rich} />
