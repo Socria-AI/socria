@@ -154,7 +154,7 @@ export function reconcile(assist: AssistDecision, a: Allocation): AssistDecision
     return { ...assist, reasons: why };
   }
   // Their attempt, and nothing they asked to keep: the correction itself, not a hint toward it.
-  if (a.reasonCode === 'verify.correct' && assist.mode === 'verify') return { ...assist, scaffold: 'none', reasons: why };
+  if ((a.reasonCode === 'verify.correct' || a.reasonCode === 'verify.check') && assist.mode === 'verify') return { ...assist, scaffold: 'none', reasons: why };
   // They handed it over in so many words — "you decide", "just write it", "just
   // tell me": nothing is asked (Core 4: "what changes when they ask this way is
   // that nothing is held back and nothing is asked").
@@ -166,6 +166,7 @@ const HANDED = new Set(['answer.requested', 'answer.requested.overrides_contract
 
 /** The split in words a reply can act on. */
 function wordsFor(split: CognitiveSplit, work?: TurnState['work']): Pick<RuntimeAllocation, 'does' | 'supports' | 'theirs'> {
+  // (the decision's line is fitted to the turn's decide block at render time: see renderAllocation)
   const does = ['look things up from what you were given, check, organise and format, and do the arithmetic'];
   const supports: string[] = [];
   const theirs: string[] = [];
@@ -218,6 +219,7 @@ export function allocate(i: AllocateInput): RuntimeAllocation {
 const REASON_LINE: Record<string, string> = {
   'verify.confirm': 'Their attempt is right: say so plainly, first, and why.',
   'verify.correct': 'Their attempt gets the correction: where it first goes wrong, and what is right.',
+  'verify.check': 'Their attempt, not yet checked: check it and say plainly whether it holds — if it does, say so first and why; if not, where it first goes wrong.',
   'verify.practice': 'They are practising this: say whether it is right, and exactly where and what kind of error — the redo is theirs.',
   'practice.goal': 'Producing it is the point for them: support at the exact point they are stuck — a check, a pointer, a hint — never the answer.',
   'practice.bottom_out': 'Several attempts on this one have not landed: work it through fully, name the principle, and give the next one back to them.',
@@ -266,7 +268,8 @@ function renderCore(a: RuntimeAllocation, st: TurnState, view: AssistView = {}):
   if (!c) return [];
   const lines: string[] = [];
   const reason = reasonLine(c.reasonCode);
-  if (reason) lines.push(reason);
+  // a read asked for beside a decide block that already asks for it, once: said by the block (second round)
+  if (reason && !(c.reasonCode === 'judgment.theirs.asked' && view.forms?.includes('decide'))) lines.push(reason);
   if (c.withhold) {
     const w = c.withhold;
     lines.push(
@@ -323,9 +326,16 @@ const IDEA_SHAPED: Partial<Record<TurnState['domain'], string>> = {
   research: 'Work like a careful researcher: how strong the evidence is, in a word, where it matters.',
   engineering: 'Work like a senior engineer: concrete and correct.',
 };
-const domainLine = (st: TurnState, view: AssistView = {}): string => {
+/** A maths problem they are working with Socria: the method and the next step; the engine checks, never states. */
+const MATH_SCAFFOLD = "Work it with them: name the method, then the next step; the engine's results are for checking their steps, not for stating.";
+const domainLine = (st: TurnState, view: AssistView = {}, reasoning?: string): string => {
   const idea = st.work === 'explanation' || st.work === 'information';
-  if (idea && view.shape === 'understand' && IDEA_SHAPED[st.domain]) return IDEA_SHAPED[st.domain]!;
+  // "show the reasoning step by step" beside "the next step, or a check of theirs" argued with the scaffold
+  // (second adversarial round, November 2026)
+  if (st.domain === 'math' && (reasoning === 'scaffold' || reasoning === 'human' || st.preferences.guard)) return MATH_SCAFFOLD;
+  // a thread gone into in full is not "one idea at a time"
+  if (view.shape === 'deeper' && st.domain === 'learning') return 'Work like a good tutor: in their terms; check understanding only when it helps.';
+  if (idea && view.shape && IDEA_SHAPED[st.domain]) return IDEA_SHAPED[st.domain]!;
   if (idea && IDEA_LINE[st.domain]) return IDEA_LINE[st.domain]!;
   if (st.domain === 'engineering' && CODE_WORK.has(st.work)) return `${DOMAIN_LINE.engineering} Runnable code in fenced blocks; the edge cases that bite.`;
   return DOMAIN_LINE[st.domain];
@@ -409,12 +419,15 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState, view: Assi
   const x = st.exchange;
   const lines: string[] = [];
   const core = renderCore(a, st, view);
+  // with a decide block offered, what the decision rests on and any read asked for are the block's to say
+  const decideOffered = !!view.forms?.includes('decide');
+  const theirs = decideOffered ? a.theirs.map((t) => t.replace('give your own read if they ask; ', '')) : a.theirs;
   if (x.kind === 'task') {
-    lines.push(domainLine(st, view), `You do: ${a.does.join('; ')}.`);
+    lines.push(domainLine(st, view, a.split?.reasoning), `You do: ${a.does.join('; ')}.`);
     // "their reasoning: the next step… the full solution only if they ask" is about a problem they are
     // working; a decision and a question of evidence are not one, and it read as a reason to hold back
     if (a.supports.length && st.work !== 'judgment' && st.work !== 'research') lines.push(`You support: ${a.supports.join('; ')}.`);
-    if (a.theirs.length) lines.push(`Theirs: ${a.theirs.join('; ')}.`);
+    if (theirs.length) lines.push(`Theirs: ${theirs.join('; ')}.`);
     // "They asked for the answer" beside a withhold is one instruction arguing with another.
     if (st.preferences.answerFirst && !a.core?.withhold) lines.push('They asked for the answer: give it first.');
     lines.push(...core);
@@ -422,15 +435,16 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState, view: Assi
     else if (x.joking) lines.push(ON_TASK.joking);
   } else {
     const line = exchangeLine(x);
-    if (line) lines.push(line);
+    // a position offered beside a decision laid out for them to weigh argues with it
+    if (line) lines.push(decideOffered && !view.lean ? line.replace('a position if you have one, and why; ', '') : line);
     if (x.aboutSocria) lines.push(ABOUT_SOCRIA_LINE);
     if (a.supports.length && !TALK.has(x.kind)) lines.push(`You support: ${a.supports.join('; ')}.`);
-    if (a.theirs.length && x.kind !== 'social' && x.kind !== 'playful') lines.push(`Theirs: ${a.theirs.join('; ')}.`);
+    if (theirs.length && x.kind !== 'social' && x.kind !== 'playful') lines.push(`Theirs: ${theirs.join('; ')}.`);
     // Talk gets Core 4's lines only when they hold something back or ask to be heard.
     if (a.core?.withhold || a.core?.reasonCode === 'reflect.heard') lines.push(...core);
     const manner = mannerLine(x);
     if (manner) lines.push(manner);
-    if (x.kind === 'conversation' && x.manner.words >= 4 && view.question) lines.push(QUESTION_LINE);
+    if (x.kind === 'conversation' && x.manner.words >= 4 && view.question && !decideOffered) lines.push(QUESTION_LINE);
   }
   const move = renderAssist(a.assist, view).replace(/^\s+/, '');
   if (!lines.length && !move) return '';

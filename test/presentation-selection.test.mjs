@@ -66,6 +66,8 @@ const turn = (text, o = {}) => {
   return { p, state, block: R.renderAllocation(a, state, view) + R.renderPresentation(p) };
 };
 const has = (p, k) => p.forms.includes(k);
+const U = (content) => ({ role: 'user', content });
+const A = (content) => ({ role: 'assistant', content });
 const strong = (p, k) => !!p.strong?.includes(k);
 
 console.log('\n=== 1. mathematics: the relationship shown, the working when asked ===');
@@ -331,7 +333,7 @@ console.log('\n=== 16. recall: the same reading however it is phrased ===');
   ok('"Is it better to rent or buy a house?" asks for the comparison, not a debate', read('Is it better to rent or buy a house?').state.exchange.kind === 'task');
   for (const t of ['Do you think I should take the job or stay?', 'what would you do, take the offer or stay?', 'React or Vue, which should I use?', 'do I take the job in Denver or stay in Austin?', 'would it be better to rent or buy in my situation?', 'pros and cons of quitting my job'])
     ok(`their own choice, however it is asked: "${t}" — weighed by them`, has(plan(t), 'decide'), J(plan(t)));
-  for (const t of ["what's the debt-to-income ratio?", 'what is the Sharpe ratio?', 'what is ROAS?', 'how is GDP calculated?', 'how do you calculate churn?', 'what is working capital?', 'how do I calculate a weighted average?', 'what is kinetic energy?', 'how do you calculate speed?'])
+  for (const t of ["what's the debt-to-income ratio?", 'what is the Sharpe ratio?', 'what is ROAS?', 'how is GDP calculated?', 'how do you calculate churn?', 'what is working capital?', 'how do I calculate a weighted average?', 'what is kinetic energy?', 'how do you calculate speed?', 'what is ROI in marketing?'])
     ok(`a ratio or formula asked what it is: "${t}" — its equation`, has(plan(t), 'equation'), J(plan(t)));
   for (const t of ['what does E=mc^2 mean?', "what is Newton's second law?", "what is Ohm's law?", 'what is the ideal gas law?'])
     ok(`a named law asked what it means: "${t}" — its equation, not a curve to reshape`, has(plan(t), 'equation') && !has(plan(t), 'graph'), J(plan(t)));
@@ -364,7 +366,7 @@ console.log('\n=== 17. coherence: each thing said once, by the one that owns it 
   const photosynthesis = plan('how does photosynthesis work?');
   ok('an optional element is optional in the shape too', !strong(photosynthesis, 'sequence') && /if it shows it better/.test(R.renderPresentation(photosynthesis)), R.renderPresentation(photosynthesis).slice(0, 900));
   const layer = R.renderPresentation(plan('Go deeper: Why the tangent line matches the chord'));
-  ok('one layer down: a graph that fits is shown, not "if it shows it better"; the next ways deeper only if there is more', /shown in the graph below/.test(layer) && /if there is more worth going into, the next ways deeper as a paths block/.test(layer), layer.slice(0, 900));
+  ok('one layer down: a graph that fits is shown, not "if it shows it better"; the next ways deeper only if there is more', /shown in the graph below/.test(layer) && /if there is more worth going into, the next ways in as a paths block/.test(layer), layer.slice(0, 900));
   const detail = plan('explain the Mean Value Theorem in detail, with the proof', { length: 'detailed' });
   ok('depth asked for on a first turn: no order to stop after a sentence', detail.depth === true && !/Then stop/.test(R.renderPresentation(detail)) && /They asked for it in detail/.test(R.renderPresentation(detail)) && R.presentationRoom(detail) >= 400, R.renderPresentation(detail).slice(0, 1200));
   const guarded = plan('explain the water cycle', { guard: true });
@@ -385,14 +387,146 @@ console.log('\n=== 17. coherence: each thing said once, by the one that owns it 
   const bizIdea = turn('how is a company organized?');
   ok('an idea in a business conversation gets an idea line, not "the next concrete step"', !/the next concrete step/.test(bizIdea.block), bizIdea.block.slice(0, 600));
   ok('an open piece of work: the ways onward are the form that fits', strong(plan('I need to redesign our onboarding'), 'paths'));
-  for (const [t, re] of [['explain Bayes theorem', /"title":"Money left to grow"|"title":"A positive test, read right"/], ['how does compound interest work?', /"title":"Money left to grow"/], ['I got x = 3 for 2x + 3 = 9, is that right?', /"summary":"The second step is where it slips"/]])
+  for (const [t, re] of [['explain Bayes theorem', /"title":"Money left to grow"|"title":"A positive test, read right"/], ['how does compound interest work?', /"title":"Money left to grow"/], ['I got x = 3 for 2x + 3 = 9, is that right?', /It may well be right: check it before you say either/]])
     ok(`the example fits the reason: "${t}"`, re.test(R.renderPresentation(plan(t))), R.renderPresentation(plan(t)).slice(0, 600));
   // no example's topic is a canonical ask, so a copying model cannot pass a sweep by reproducing it
   const all = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'claim', 'sim', 'check', 'steps', 'diagram', 'balance', 'equation'].map((k) => R.renderPresentation({ forms: [k], reasons: [] })).join('\n') +
     ['cycle', 'tree', 'flow', 'causes'].map((v) => R.renderPresentation({ forms: ['diagram'], reasons: [], diagram: v })).join('\n') + R.renderPresentation({ forms: ['sequence'], reasons: ['sequence:timeline'] }) + R.renderPresentation({ forms: ['paths'], reasons: ['paths:deeper'] }) + R.renderPresentation({ forms: ['paths'], reasons: ['paths:more'] });
-  for (const topic of ['French Revolution', 'Microeconomics', 'The startup', '10% of our brains', 'The heater', 'Why continuity matters', 'Pricing for teams', 'The water cycle', '2008 crash', 'Index funds', 'CAC', 'Monthly costs', 'Sketch the first five minutes'])
+  for (const topic of ['French Revolution', 'Microeconomics', 'The startup', '10% of our brains', 'The heater', 'Why continuity matters', 'Pricing for teams', 'The water cycle', '2008 crash', 'Index funds', 'CAC', 'Monthly costs', 'Sketch the first five minutes',
+    // the second round's: each the answer to a plausible question, and the Titanic's with a fact a copying model would repeat
+    'Titanic', 'Bats are blind', 'Music theory', 'A four-day week', 'Apollo', 'Which flat', 'Paper notes', 'average speed', 'Draft a first version', '(-360)'])
     ok(`no grammar example is a canonical ask: "${topic}"`, !all.includes(topic));
   ok('no placeholder value is left in an example', !/a few words why|two or three sentences, read when opened/.test(all));
+}
+
+console.log('\n=== 18. precision, second round: somebody\'s own life, asked any way ===');
+{
+  const forms = (t, o) => plan(t, o).forms;
+  for (const t of ["My dad told me it's my fault they divorced. Is that true?", "My mom says I'm the reason she drinks. Is that true?", 'Did Mom really say I was a mistake?', 'Was the breakup really my fault?', 'Did mom really love me?', 'Is grandma really dying?', 'Is Tom really cheating on me?', "My sister says I'm selfish. Is that true?", "My teacher says I'll never amount to anything. True?", "It always gets better, doesn't it?", 'Grief always gets easier with time, right?', 'is this right? I told my mom I hate her'])
+    ok(`their own life is not a claim to inspect or work to check: "${t}"`, !has(plan(t), 'claim') && !has(plan(t), 'reasoning') && !R.claimCheck(t) && read(t).state.work !== 'verification', J({ w: read(t).state.work, p: plan(t) }));
+  for (const t of ['my dad died today. what do I do now?', 'my grandpa died this week. what do I do now?', 'Is Grandma going to be okay?', "When is Mom's surgery?", 'Does Jake like me?', 'Did Tom cheat on me?', 'Was Dad proud of me?', "I've been feeling down recently, is that normal?", "is it bad that I'm crying right now?", 'how do I tell my family some bad news?'])
+    ok(`grief, a family's health, a relationship never leave the machine: "${t}"`, !R.webIntent(t, R.readSignals(t)).want, J(R.webIntent(t, R.readSignals(t))));
+  for (const t of ['should I keep the baby or give it up for adoption?', 'should we put our dog down or try another treatment?', 'should we cremate mom or bury her?', 'should I come out to my parents now or wait until college?', 'should I put my mom in assisted living or have her live with us?', 'should I move my mom into a nursing home or hire a carer?', 'should I go no contact with my mother or try once more?', 'should I forgive my dad or cut him off?', 'should I visit my sick grandma or stay for finals?', 'should we have a second kid or stop at one?', "I'm so sad. should I call my mom or wait?"])
+    ok(`a family's, a pregnancy's, a pet's end is never scored 0–3: "${t}"`, !forms(t).some((k) => k === 'decide' || k === 'compare' || k === 'balance'), J(plan(t)));
+  for (const t of ["I need to plan my mom's funeral", "I have to organize my dad's memorial", "I'm trying to figure out how to cope with my mom's death", 'help me think through whether to leave my husband', 'I need to figure out what to do about my marriage', "I'm trying to work out whether I still love him", "help me figure out why I'm so sad", "how should I think about my mom's diagnosis?", 'how should I approach my dad about his drinking?', 'what does planning a funeral involve?', 'what does hospice care involve?'])
+    ok(`a funeral, a marriage, grief: no project shape, no menu, no overview: "${t}"`, plan(t).shape !== 'open' && !forms(t).some((k) => k === 'paths' || k === 'concepts'), J(plan(t)));
+  for (const t of ['how do I fix a broken heart?', 'how do I start healing?', 'how do I go about leaving an abusive relationship?', 'how do I start dating again after being widowed?', 'what are the five stages of loss?', 'what are the stages of losing a parent?', 'steps to getting over someone', 'how do I make my parents trust me again?', 'how do I make amends with my brother?', 'how do I fix the relationship with my dad?', 'how do I make a long distance relationship work?', 'how can I make peace with my dad before he dies?'])
+    ok(`heartbreak, loss, a family bond: no recipe: "${t}"`, plan(t).shape !== 'practical' && !forms(t).some((k) => k === 'sequence' || k === 'paths' || k === 'concepts'), J(plan(t)));
+  for (const t of ["what if my mom doesn't survive the surgery? she's 78", 'what if he leaves me after 10 years?', "what if I'm still single at 40?", 'my husband drained our savings of 20k, what do I do?', 'how much does a funeral for 100 guests cost?', 'why do my feelings oscillate so much?', 'why does my life orbit around my boyfriend?', 'why does my mood swing like a pendulum?', 'how do I get my life back on a better trajectory?', 'how do I survive on minimum wage?', 'how do you differentiate between love and lust?'])
+    ok(`no live element on a worry, a feeling or a hardship: "${t}"`, !forms(t).some((k) => LIVE.has(k) || k === 'equation'), J(plan(t)));
+  for (const t of ["what caused grandma's stroke?", "what led to Grandpa's heart attack?", "why did mom and dad's marriage end?", 'what triggered the fight between Mom and Aunt Lisa?', 'what happens if grandma stops eating?', "what happens if dad doesn't get the transplant?", 'what happens when you die?', 'what happened when he left?', 'what happened after she moved out?', 'what caused the outage?', 'why did sales decline last quarter?'])
+    ok(`a family's story, a death, their own outage: no diagram or dated timeline: "${t}"`, !forms(t).some((k) => k === 'diagram' || k === 'sequence'), J(plan(t)));
+  for (const t of ['Is my son different from other kids?', 'How are my son and daughter so different?', 'How are my parents and my in-laws different?', 'What sets my brother apart from me?', 'is it better to tell my mom or my dad first?', 'cremation or burial for my dad?', 'Is it better to be loved or respected?', 'Is it better to be feared or loved?', "what's the difference between a lawyer and a catfish? lol", "Tell me a joke: what's the difference between a cat and a frog?", 'whats the difference between my mom and a drill sergeant lol'])
+    ok(`their children, their parents, a value, a joke: no table: "${t}"`, !forms(t).some((k) => k === 'compare' || k === 'decide'), J(plan(t)));
+  for (const t of ['is having kids worth it?', 'is marriage worth it?', 'is a long distance relationship worth it?', 'is IVF worth it?', 'is staying friends with an ex worth it?', 'is crying good or bad?', 'is being alone good or bad?', 'pros and cons of having a baby at 40', 'pros and cons of putting my mom in a nursing home'])
+    ok(`a life course or a feeling is not weighed in two columns: "${t}"`, !has(plan(t), 'balance') && !has(plan(t), 'compare'), J(plan(t)));
+  for (const t of ['what is peer pressure?', 'what is blood pressure?', 'what is a CPA?', 'what is speed dating?', "what's the speed limit in Texas?", 'what is a zoning variance?', 'what is first principles thinking?', 'what is a derivative work in copyright?', 'how do I differentiate my brand from competitors?', 'how big is a 20 m² bedroom?', 'how much is a 12 pack of beer?', 'how much is the iPhone 16 Pro?'])
+    ok(`a bare noun never forces a visual: "${t}"`, !forms(t).some((k) => k === 'equation' || k === 'graph' || k === 'slider' || k === 'sim'), J(plan(t)));
+  for (const t of ['is tom hanks still alive?', 'is chatgpt down?', 'who is the prime minister of the uk?', 'did the warriors win?', 'is it going to rain tomorrow?', 'do I need a jacket tonight?', "I'd like to know who won the game last night", 'I need the latest news on the hurricane'])
+    ok(`a question about now keeps its lookup however it is typed: "${t}"`, R.webIntent(t, R.readSignals(t)).want, J(R.webIntent(t, R.readSignals(t))));
+  for (const t of ['how do I make chicken stock?', 'what is alternating current?', 'how do I forecast revenue?', 'what is a z-score?'])
+    ok(`a concept or a recipe with a live word in it is not a lookup: "${t}"`, !R.webIntent(t, R.readSignals(t)).want, J(R.webIntent(t, R.readSignals(t))));
+  for (const t of ['should I get pizza or tacos tonight?', 'should I salt the water before or after it boils?', 'should I laugh or cry at this point?', 'which is cuter, puppies or kittens?', 'who directed Kramer vs Kramer?', 'when did Roe vs Wade get overturned?', 'what time is Lakers vs Warriors?', 'what channel is Arsenal vs Chelsea on?', 'Trump vs Harris polls'])
+    ok(`small talk, a title, a case, a fixture: answered as one thing: "${t}"`, !forms(t).some((k) => k === 'compare' || k === 'decide'), J(plan(t)));
+  for (const t of ['what time is Lakers vs Warriors?', 'what channel is Arsenal vs Chelsea on?', 'Trump vs Harris polls'])
+    ok(`  …and the fixture's time, channel or polls are still looked up: "${t}"`, R.webIntent(t, R.readSignals(t)).want, J(R.webIntent(t, R.readSignals(t))));
+}
+
+console.log('\n=== 19. recall, second round: the same reading however it is typed or asked ===');
+{
+  const same = (a, b) => { const x = plan(a), y = plan(b); return x.shape === y.shape && J(x.forms) === J(y.forms) && J(x.strong ?? []) === J(y.strong ?? []); };
+  for (const t of ['what should I do if someone is choking?', 'what should I do if my dog ate chocolate?', "what should I do if there's a grease fire in my kitchen?", 'what should I do if I get stung by a bee?', 'what should I do if I spill coffee on my laptop?', 'what should I do if I lose my passport abroad?', 'should I wash chicken before cooking it?', 'should I take ibuprofen or paracetamol for a hangover?', 'Should I stretch before or after running?', 'should I use who or whom in this sentence?', 'Should I use tu or vous with my host family in France?', 'what should you do in an earthquake?'])
+    ok(`a question with an answer, not their own decision: "${t}" — no scoring, the call not "theirs"`, !has(plan(t), 'decide') && read(t).state.work !== 'judgment', J({ w: read(t).state.work, p: plan(t) }));
+  for (const t of ['what should I do if someone is choking?', "what should I do if there's a grease fire in my kitchen?", 'what should I do if I get stung by a bee?', 'what should I do if I spill coffee on my laptop?', 'what should you do in an earthquake?'])
+    ok(`  an emergency's steps, in order: "${t}"`, strong(plan(t), 'sequence'), J(plan(t)));
+  for (const [curly, straight] of [['what’s a derivative?', "what's a derivative?"], ['What’s EBITDA?', "What's EBITDA?"], ['What’s the formula for kinetic energy?', "What's the formula for kinetic energy?"], ['What’s the best way to learn Spanish?', "What's the best way to learn Spanish?"], ['I’d like to know what caused World War 1', "I'd like to know what caused World War 1"], ['I don’t understand how the water cycle works', "I don't understand how the water cycle works"], ['I’m confused about the krebs cycle', "I'm confused about the krebs cycle"], ['What’s better, a Roth or a traditional IRA?', "What's better, a Roth or a traditional IRA?"], ['I’m torn between Lisbon and Porto for a weekend', "I'm torn between Lisbon and Porto for a weekend"], ['whats a derivative?', "what's a derivative?"]])
+    ok(`a phone's curly apostrophe reads the same: "${curly}"`, same(curly, straight), J([plan(curly), plan(straight)]));
+  for (const [curly, straight] of [['What’s Tesla’s market cap?', "What's Tesla's market cap?"], ['What’s the newest Claude model?', "What's the newest Claude model?"]])
+    ok(`  …and looks up the same: "${curly}"`, R.webIntent(curly, R.readSignals(curly)).want === R.webIntent(straight, R.readSignals(straight)).want && R.webIntent(straight, R.readSignals(straight)).want);
+  ok('  "don’t ask me questions" is read as asking for none', read('Just tell me, don’t ask me questions').signals.stopQuestions === read("Just tell me, don't ask me questions").signals.stopQuestions);
+  for (const t of ['how do we price our SaaS?', 'how can we reduce churn in our app?', 'how can we improve our conversion rate?', 'how do we get more signups?', 'how do you negotiate a raise?', 'how do u make pancakes', 'tips to learn japanese faster', 'best way to learn japanese', 'ways to improve my credit score', 'how much should I charge for freelance web design?', "I'm going to Japan for 10 days, any recommendations?", 'give me a recipe for lasagna'])
+    ok(`practical however it is asked: "${t}"`, plan(t).shape === 'practical', J(plan(t)));
+  for (const t of ['how do u make pancakes', 'give me a recipe for lasagna']) ok(`  a recipe's steps: "${t}"`, has(plan(t), 'sequence'), J(plan(t)));
+  ok('  the pricing models, side by side', plan('how do we price our SaaS?').reasons.includes('compare:pricing-models'), J(plan('how do we price our SaaS?')));
+  ok('  the trip\'s days', plan("I'm going to Japan for 10 days, any recommendations?").reasons.includes('sequence:itinerary'), J(plan("I'm going to Japan for 10 days, any recommendations?")));
+  for (const [t, k] of [['explain the krebs cycle to me', 'diagram'], ['could you explain the causes of WW1 to me?', 'diagram'], ['Walk me through the krebs cycle', 'diagram'], ['explain the krebs cycle for my biology exam', 'diagram'], ["we're learning about the water cycle in class, can you explain it?", 'diagram'], ['Can you help us understand the carbon cycle?', 'diagram'], ['What were the causes of WW1 and why did they matter so much?', 'diagram'], ["How is the UK parliament structured? I'm writing a report", 'diagram'], ['I have a history test tomorrow. What caused World War 1?', 'diagram'], ['explain the mean value theorem to me', 'graph']])
+    ok(`the asker's own framing changes nothing: "${t}" — ${k}`, has(plan(t), k) && plan(t).shape === 'understand', J(plan(t)));
+  for (const t of ['can you fact check this: the Great Wall of China is visible from space', 'verify this claim: vaccines cause autism', 'true or false: bats are blind', 'bats are blind, true or false?', 'apparently goldfish only have a 3 second memory?', 'is there any truth to the idea that sugar makes kids hyper?', 'they say an apple a day keeps the doctor away. any truth to that?', 'someone told me we only use 10 percent of our brain', 'my friend says 90% of startups fail', 'my friend says 90 percent of startups fail'])
+    ok(`a claim put up politely is inspected, never checked as their work: "${t}"`, has(plan(t), 'claim') && !has(plan(t), 'slider') && read(t).state.work !== 'verification', J({ w: read(t).state.work, p: plan(t) }));
+  ok('  "2%" and "2 percent" read the same', same('explain what happens to a population growing at 2% a year', 'explain what happens to a population growing at 2 percent a year'), J([plan('explain what happens to a population growing at 2% a year'), plan('explain what happens to a population growing at 2 percent a year')]));
+  for (const [t, k, v] of [['Describe the water cycle', 'diagram', 'cycle'], ['Describe the causes of World War 1', 'diagram', 'causes'], ['Describe the structure of the US government', 'diagram', 'tree'], ['Outline the causes of the French Revolution', 'diagram', 'causes'], ['Discuss the effects of deforestation', 'diagram', 'flow'], ['Identify the main causes of climate change', 'diagram', 'causes'], ['Analyse the causes of the 2008 financial crisis', 'diagram', 'causes'], ['Illustrate the nitrogen cycle', 'diagram', 'cycle'], ['Run me through the causes of WW2', 'diagram', 'causes'], ['describe the menstrual cycle', 'diagram', 'cycle'], ['Distinguish between mitosis and meiosis', 'compare'], ['Differentiate between DNA and RNA', 'compare']])
+    ok(`an exam's command verb: "${t}" — ${k}${v ? ` (${v})` : ''}`, strong(plan(t), k) && (!v || plan(t).diagram === v), J(plan(t)));
+  for (const [hedged, direct] of [['I was wondering how the US government is organized', 'how is the US government organized?'], ['I was wondering how to change a flat tire', 'how do I change a flat tire?'], ['I was wondering what EBITDA means', 'what does EBITDA mean?'], ["I'm curious about how vaccines work", 'how do vaccines work?'], ['wondering how compound interest works', 'how does compound interest work?'], ['Can you tell me how the US government is organized?', 'how is the US government organized?'], ['Please explain what the Sharpe ratio is', 'what is the Sharpe ratio?'], ['ok so what are the layers of the earth', 'what are the layers of the earth?'], ['um what causes inflation?', 'what causes inflation?'], ["in layman's terms, what is a derivative?", 'what is a derivative?']])
+    ok(`a hedge or a filler changes nothing: "${hedged}"`, J(plan(hedged).forms) === J(plan(direct).forms), J([plan(hedged), plan(direct)]));
+  for (const t of ['Which language is faster, Go or Rust?', 'Which country is bigger, Canada or the US?', 'Is coffee healthier than tea?', 'Is Linux more secure than Windows?', 'whats the diff between a hurricane and a typhoon', 'What are the differences of DNA and RNA?', 'Could you explain how a virus is different from bacteria?', 'Would you mind comparing Spanish and Portuguese?', 'are hurricanes and typhoons the same thing?', 'What do DNA and RNA have in common?'])
+    ok(`compared however it is phrased: "${t}"`, strong(plan(t), 'compare'), J(plan(t)));
+  for (const t of ['how are supply and demand related?', 'how are voltage and current related?'])
+    ok(`a relationship is not a side-by-side table: "${t}"`, !has(plan(t), 'compare'), J(plan(t)));
+  for (const [t, shape] of [['could you elaborate on that?', 'layer'], ['please elaborate on that', 'layer'], ['can you expand on the part about mitochondria?', 'layer'], ['could you say more about the treaty of versailles part?', 'layer'], ['can you tell me more about the second cause?', 'layer'], ['can we dig deeper into the causes?', 'layer'], ['dive deeper into the causes', 'layer'], ['would you mind going deeper on that?', 'layer'], ["I'd like to go deeper into the proof", 'layer'], ['could you expand on that in detail please?', 'deeper'], ['could you walk me through it in detail?', 'deeper']])
+    ok(`depth asked for politely: "${t}" — ${shape}`, plan(t).shape === shape, J(plan(t)));
+  for (const [bare, asked] of [['what causes earthquakes', 'what causes earthquakes?'], ['what caused the 2008 crash', 'what caused the 2008 crash?'], ['what led to the fall of rome', 'what led to the fall of rome?'], ['how is DNA different than RNA', 'how is DNA different than RNA?'], ['is spanish or italian easier', 'is spanish or italian easier?']])
+    ok(`with or without its question mark: "${bare}"`, J(plan(bare).forms) === J(plan(asked).forms) && plan(bare).forms.length > 0, J([plan(bare), plan(asked)]));
+  for (const [t, k] of [['ww1 causes', 'diagram'], ['climate change effects', 'diagram'], ['butterfly life cycle', 'diagram'], ['ROI formula', 'equation']])
+    ok(`search-box word order: "${t}" — ${k}`, has(plan(t), k), J(plan(t)));
+  for (const t of ['what is a hyperbola?', 'what does the graph of 1/x look like?', 'what is direct proportion?', 'what does inversely proportional mean?', 'what is a reciprocal function?', 'what is a square root function?', 'what does the area under a curve mean?'])
+    ok(`a relationship with an obvious graph: "${t}"`, has(plan(t), 'graph'), J(plan(t)));
+}
+
+console.log('\n=== 20. coherence, second round: what the turn is told agrees with itself ===');
+{
+  const said = (t, o) => R.renderPresentation(plan(t, o));
+  // the check of their work follows the engine's verdict
+  const check = (u) => R.renderPresentation({ forms: ['reasoning'], reasons: ['reasoning:steps', 'reasoning:check-work', u] });
+  ok('an unchecked attempt is shown a check that may go either way', /It may well be right/.test(check('check:open')) && !/The first step is where it slips","steps"/.test(check('check:open')));
+  ok('  a confirmed one, that it holds — nothing to correct', /"summary":"It holds/.test(check('check:holds')) && /nothing to correct/.test(check('check:holds')));
+  ok('  a refuted one, where it slips', /"summary":"The first step is where it slips"/.test(check('check:slips')));
+  ok('  and none of them is a linear equation', !/2x|both sides/.test(check('check:open') + check('check:holds') + check('check:slips')));
+  for (const t of ['I got 3x^2 for the derivative of x^3. Is that right?', 'I worked out 12 * 15 = 180. Did I get it right?'])
+    ok(`checking their work draws no graph unless they ask to see it: "${t}"`, !has(plan(t), 'graph'), J(plan(t)));
+  // under the guard, what the gate takes off is never shown
+  const g = said('what is the derivative of x^3?', { guard: true });
+  ok('under the guard the idea opens on what it rests on, never the result', /never the result they are working toward/.test(g) && !/Open with the central insight/.test(g), g.slice(0, 900));
+  ok('  the graph example has no marks or readings, and says why', !/"features"|"readouts"/.test(g) && /Under the Answer Guard nothing on it is marked or read out/.test(g), g);
+  const ke = said('what is kinetic energy?', { guard: true });
+  ok('  the equation example has no worked example', has(plan('what is kinetic energy?', { guard: true }), 'equation') && !/"example"/.test(ke) && /no worked example/.test(ke), ke);
+  ok('  …and without the guard both are shown', /"features"/.test(R.renderPresentation({ forms: ['graph'], reasons: [] })) && /"example"/.test(R.renderPresentation({ forms: ['equation'], reasons: [] })));
+  // Socria's read, asked for indirectly
+  for (const t of ['If you were me, would you take the remote job or the office one?', "I'm torn between a Kindle and a Kobo. What would you get?", "Should I do my master's in Edinburgh or Toronto? Your honest opinion please.", "Should I take the 9-5 or keep freelancing? tell me what you'd do"])
+    ok(`their read asked for, however indirectly: "${t}" — given once, after the block`, plan(t).lean === true && /They asked for your read/.test(said(t)) && !/name no winner/.test(said(t)), J(plan(t)));
+  // the open-work shape defers to the block that is the point of the turn
+  const budget = said('We need to rework our budget: rent 3000, salaries 20000, software 1500, ads 4000');
+  ok('open work with their numbers: the chart shows them, the prose does not list them', /the chart below shows their numbers/.test(budget), budget.slice(0, 1200));
+  ok('  two blocks that fit: the header says what each carries', /THE FORM THAT FITS — their numbers, and the ways it could go next in the blocks below/.test(budget), budget.slice(0, 1600));
+  ok('  a launch choice between two named options is a decision, not open work', has(plan('We need to launch our app — should we launch on iOS or Android first?'), 'decide') && plan('We need to launch our app — should we launch on iOS or Android first?').shape !== 'open');
+  const noq = said('help me plan a product launch', { questions: 0 });
+  ok('  no question this turn: the shape licenses none', /and no question\./.test(noq) && !/no closing question unless/.test(noq), noq.slice(0, 900));
+  ok('  with a question allowed, one only if it would change everything', /no closing question unless one answer would change everything/.test(said('help me plan a product launch')));
+  // depth fitted to what carries it, and said where it came from
+  const cyc = said('explain the nitrogen cycle in detail');
+  ok('in detail, a diagram\'s parts: a paragraph each in its order — no proof or worked case', /each part in a short paragraph, in the order the diagram connects them/.test(cyc) && !/the proof, the conditions/.test(cyc), cyc.slice(0, 1200));
+  ok('  an idea in detail: the proof, the conditions, a worked case', /the proof, the conditions, a worked case/.test(said('explain the mean value theorem in detail')));
+  ok('  depth from the length setting says so', /Their replies are set to Detailed/.test(said('what caused the French Revolution?', { length: 'detailed' })) && !/They asked for it in detail/.test(said('what caused the French Revolution?', { length: 'detailed' })));
+  // one layer down follows what the thread was about, and never re-offers the example's paths
+  const work = [U('I need to redesign our onboarding flow'), A('The problem is…\n```ui\n{"type":"paths","items":[{"label":"Map who decides","gist":"x"},{"label":"Choose the first test","gist":"y"}]}\n```')];
+  const more = [U('how do I grow tomatoes on a balcony?'), A('Sun first…\n```ui\n{"type":"paths","items":[{"label":"Watering in a heatwave","gist":"x"},{"label":"Feeding the soil","gist":"y"}]}\n```')];
+  const idea = [U('what does the mean value theorem say?'), A('Somewhere between two points…\n```ui\n{"type":"paths","items":[{"label":"Where it breaks down","gist":"x"},{"label":"Why the condition matters","gist":"y"}]}\n```')];
+  const lw = plan('Go deeper: Map who decides', { history: work }), lm = plan('Go deeper: Feeding the soil', { history: more }), li = plan('Go deeper: Why the condition matters', { history: idea });
+  ok('one layer down on open work: the work\'s next moves', lw.shape === 'layer' && lw.reasons.includes('layer:work') && /the next ways the work could go/.test(R.renderPresentation(lw)), J(lw));
+  ok('  on practical advice: what else matters', lm.reasons.includes('layer:more') && /what else matters from here/.test(R.renderPresentation(lm)), J(lm));
+  ok('  on an idea: further in', li.reasons.includes('layer:idea') && /the mechanism under it/.test(R.renderPresentation(li)), J(li));
+  for (const [p, opened] of [[lw, ['Map who decides', 'Choose the first test']], [lm, ['Watering in a heatwave', 'Feeding the soil']], [li, ['Where it breaks down', 'Why the condition matters']]])
+    ok(`  the next ways' example never shows the first turn's: ${opened.join(', ')}`, !opened.some((x) => R.renderPresentation(p).includes(x)), R.renderPresentation(p));
+  // a procedure asked politely, and a trip asked another way
+  for (const t of ['walk me through replacing a bike chain', 'could you explain how to change the oil in my car?', 'explain how to brew beer at home', 'can you explain how to file a tax return?'])
+    ok(`a procedure asked politely is practical, its steps in order: "${t}"`, plan(t).shape === 'practical' && strong(plan(t), 'sequence'), J(plan(t)));
+  for (const t of ['what should I see in Tokyo in 4 days?', 'what should I visit in Lisbon if I only have 2 days?', 'what should we do in Barcelona over a long weekend?'])
+    ok(`a trip asked another way keeps its days: "${t}"`, plan(t).shape === 'practical' && plan(t).reasons.includes('sequence:itinerary'), J(plan(t)));
+  for (const t of ['whats the difference between standard deviation and variance', 'what is the difference between standard deviation and variance?'])
+    ok(`the difference between two formulas: side by side, one block — not an equation as well: "${t}"`, strong(plan(t), 'compare') && !has(plan(t), 'equation'), J(plan(t)));
+  ok('  and the practical shape is never "a sentence or two" as the move', /MODE|inform/i.test('inform') && !/in a sentence or two\b.*\bINFORM/.test(turn('what should I see in Tokyo in 4 days?').block));
+  // the domain line agrees with a scaffold
+  const scaffold = turn('Solve 3x + 2 = 14');
+  ok('a scaffolded maths turn: the domain line works it with them', !/the full working/.test(scaffold.block), scaffold.block.slice(0, 1500));
 }
 
 console.log(`\npresentation selection: ${pass} passed, ${fail} failed`);

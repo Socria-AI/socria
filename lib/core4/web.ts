@@ -27,7 +27,8 @@
 // and the provider lives there.
 
 import type { ExplicitSignals } from './types';
-import { smallTalk } from '../cognition/register';
+import { saysFeeling, smallTalk } from '../cognition/register';
+import { normalizeTyping, requestBody, tenderText } from '../runtime/asks';
 
 /** One result, as the prompt sees it. */
 export interface WebSource {
@@ -132,7 +133,7 @@ const ASKED = new RegExp(
 );
 
 /** A question whose answer moves: it is about now, not about always. */
-const CURRENT = /\b(?:latest|current(?:ly)?|right now|today|this (?:week|month|year)|as of (?:today|now|this)|recent(?:ly)?|news|just (?:announced|released|shipped)|still (?:true|the case|supported|maintained)|price of|pricing|release date|changelog|deprecat(?:ed|ion)|who (?:is|are) the current)\b/i;
+const CURRENT = /\b(?:latest|(?<!\b(?:alternating|direct|electric|electrical|ocean|rip|air|jet|eddy|induced)\s)current(?!\s+(?:density|flow|divider|source|law|limiting|transformer|meter))(?:ly)?|right now|today|this (?:week|month|year)|as of (?:today|now|this)|recent(?:ly)?|news|just (?:announced|released|shipped)|still (?:true|the case|supported|maintained)|price of|pricing|release date|changelog|deprecat(?:ed|ion)|who (?:is|are) the current)\b/i;
 
 /**
  * LIVE DATA, BY ITS SUBJECT: what changes by the day or the hour whatever
@@ -143,7 +144,7 @@ const CURRENT = /\b(?:latest|current(?:ly)?|right now|today|this (?:week|month|y
  * checked" and answered with a warning instead of the weather.
  */
 export const LIVE_SUBJECT =
-  /\b(?:weather|forecast|temperature (?:in|at|today|tomorrow|tonight|outside|right now)|(?:is it|will it) (?:rain|snow)|(?:live |final )?scores?|who (?:won|is winning|leads|is leading)|standings|stock(?:s| price| prices| market)?|share price|exchange rate|interest rates?|mortgage rates?|inflation rate|bitcoin|ethereum|crypto(?:currency)? prices?|gas prices?|traffic|headlines|breaking news|latest news|news today|today'?s news|election results?|box office|open now|opening hours)\b/i;
+  /\b(?:weather|(?:weather\s+)?forecast(?!\s+(?:revenue|sales|demand|cash(?:\s*flow)?|budget|growth|earnings|costs?|expenses|model|accuracy|error|period|horizon))|temperature (?:in|at|today|tomorrow|tonight|outside|right now)|(?:is it|will it) (?:rain|snow)|(?:is\s+it|will\s+it\s+be)\s+(?:going\s+to|gonna)\s+(?:rain|snow|be\s+(?:sunny|cold|hot|warm|windy|nice))|will\s+it\s+be\s+(?:sunny|cold|hot|warm|windy|nice)|need\s+(?:a\s+jacket|an\s+umbrella|a\s+coat|sunscreen)\s+(?:today|tonight|tomorrow|this)|how\s+(?:cold|hot|warm)\s+is\s+it|is\s+[\w.]+(?:\s+[\w.]+)?\s+(?:down|still\s+alive|still\s+open|open\s+(?:now|today))|who\s+is\s+the\s+(?:current\s+)?(?:prime\s+minister|president|ceo|chancellor|mayor|governor|king|queen|pope|leader|speaker)\s+of|did\s+the\s+[\w.]+(?:\s+[\w.]+)?\s+win|(?:what\s+time\s+(?:is|are|does|do)|when\s+(?:is|are|does|do)|what\s+channel\s+(?:is|are)|where\s+(?:can\s+i|to)\s+(?:watch|stream))\s+(?:the\s+)?[\w.]+(?:\s+[\w.]+)?\s+(?:vs\.?|versus|v\.?)\s+[\w.]+|kick[- ]?off\s+time|polls\b|poll\s+(?:numbers|results|leads?)|(?<!\b(?:z|t|credit|test|sat|act|iq|fico|promoter|nps|health|risk|f1|bleu|propensity|exam|quiz|raw|standard)[\s-])(?:live |final )?scores?|who (?:won|is winning|leads|is leading)|standings|(?<!\b(?:chicken|beef|vegetable|veggie|fish|soup|bone|pork|turkey|mushroom|in|out\s+of|of)\s)stock(?:s| price| prices| market)?|share price|exchange rate|interest rates?|mortgage rates?|inflation rate|bitcoin|ethereum|crypto(?:currency)? prices?|gas prices?|traffic|headlines|breaking news|latest news|news today|today'?s news|election results?|box office|open now|opening hours)\b/i;
 
 /**
  * A CONCEPT, NAMING SOMETHING LIVE IN PASSING (November 2026). "What is the
@@ -163,7 +164,7 @@ export const LIVE_SUBJECT =
 const CONCEPTUAL =
   /\b(?:differences?\s+between|different\s+(?:from|than)|differ\s+from|compared?\s+(?:to|with)|vs\.?|versus|how\s+(?:do|does|would|can)\s+[^?]{1,40}?\s+(?:work|affect|influence|impact|determine|relate|differ|interact)\b|why\s+(?:do|does|would)\s+[^?]{1,40}?\s+(?:matter|affect|exist|work)\b|what\s+(?:is|are)\s+(?:a|an|the)?\s*(?:difference|point|idea|purpose|role)\b|explain|meaning|definition|pros\s+and\s+cons|better\s+(?:for|than)|in\s+general)\b/i;
 const LIVE_FRAME =
-  /\b(?:today|tonight|tomorrow|now|right\s+now|currently|current|latest|lately|recently|yesterday|last\s+night|so\s+far|this\s+(?:week|weekend|morning|afternoon|evening|month|year|season)|the\s+weekend|weekend|at\s+the\s+moment|forecast|what'?s\s+happening|what\s+is\s+happening|going\s+on\s+(?:with|in)|the\s+news)\b/i;
+  /\b(?:today|tonight|tomorrow|now|right\s+now|currently|current|latest|lately|recently|yesterday|last\s+night|so\s+far|this\s+(?:week|weekend|morning|afternoon|evening|month|year|season)|the\s+weekend|weekend|at\s+the\s+moment|forecast|what'?s\s+happening|what\s+is\s+happening|going\s+on\s+(?:with|in)|the\s+news|polls?|poll\s+(?:numbers|results)|what\s+time\s+(?:is|are|does|do)|what\s+channel|where\s+(?:can\s+i|to)\s+(?:watch|stream)|kick[- ]?off)\b/i;
 const LIVE_PLACE =
   /\b(?:in|at|for|near)\s+(?!(?:the|a|an|my|your|our|their|his|her|its|this|that|these|those|general|terms|practice|theory|principle|short|simple|plain|detail|english|words|other|some|any|each|every|order|fact|particular|real|life|time|use|example|investing|finance|economics|business|beginners?|kids|children|people|me|us|you|them|him|it|retirement|school|class|college|long|summary|brief|most|many|all|both|savings|stocks|bonds|crypto|inflation|interest|weather|climate|science|math|maths|physics|chemistry|biology|history)\b)[a-z][\w.'’-]{2,}/i;
 export function liveInPassing(t: string): boolean {
@@ -196,7 +197,7 @@ const FACT_SAID = /^\s*(?:(?:hey|ok(?:ay)?|so|and|quick question)[,!.]?\s+)?(?:w
 const shortTurn = (t: string) => t.split(/\s+/).filter(Boolean).length <= 14;
 
 /** Words that are capitalised without naming anything in particular. */
-const NOT_A_NAME = /^(?:I|I'm|I've|I'd|I'll|OK|Okay|AI|The|A|An|This|That|These|Those|My|Your|Our|Their|It|Its|What|Who|When|Where|Which|How|Why|Is|Are|Was|Were|Does|Did|Has|Have|Can|Could|Should|Would|Will|Do|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December)$/;
+const NOT_A_NAME = /^(?:I|I'm|I've|I'd|I'll|OK|Okay|AI|The|A|An|This|That|These|Those|My|Your|Our|Their|It|Its|Mom|Mum|Mommy|Mummy|Dad|Daddy|Grandma|Grandpa|Granny|Nan|Nana|Papa|Auntie|Aunt|Uncle|Grandad|Granddad|What|Who|When|Where|Which|How|Why|Is|Are|Was|Were|Does|Did|Has|Have|Can|Could|Should|Would|Will|Do|Monday|Tuesday|Wednesday|Thursday|Friday|Saturday|Sunday|January|February|March|April|May|June|July|August|September|October|November|December)$/;
 
 /** A capitalised word inside a sentence (not its first word): a name, a company, a product. */
 function namesSomething(t: string): boolean {
@@ -211,6 +212,14 @@ function namesSomething(t: string): boolean {
 
 /** The turn is about the person, not about the world. */
 const INWARD = /\b(?:i (?:feel|think|wonder|keep|can'?t)|should i|am i|my (?:draft|essay|code|plan|idea|résumé|resume|cv))\b/i;
+/**
+ * …and somebody's own life, or a question about the person asking: "my dad
+ * died today. what do I do now?", "does Jake like me?", "is it bad that I'm
+ * crying right now?". Sent to a search provider, each left as a query with a
+ * name and a loss in it (second adversarial round, November 2026).
+ */
+const ABOUT_ME = /(?<!\b(?:near|nearby|around|to|for|by|from)\s)\b(?:me|myself)\s*\??\s*$|\bis\s+it\s+(?:bad|normal|ok|okay|weird|wrong)\s+(?:that|if|to)\b|\bwhat\s+do\s+i\s+do\s+now\b/i;
+const theirOwn = (t: string): boolean => tenderText(t) || saysFeeling(t) || ABOUT_ME.test(t);
 
 /**
  * Does this turn want the internet, and for what?
@@ -275,7 +284,7 @@ export function webIntent(
    */
   policy?: 'full' | 'conversation_only' | 'none' | 'unknown'
 ): WebIntent {
-  const t = (text ?? '').trim();
+  const t = normalizeTyping(text ?? '').trim();
   if (!t) return { want: false, why: 'nothing to look up' };
   if (signals?.sensitive) return { want: false, why: 'a sensitive turn does not leave this machine' };
   if (policy === 'conversation_only') return { want: false, why: 'a sensitive conversation does not leave this machine' };
@@ -301,6 +310,9 @@ export function webIntent(
   }
 
   if (ASKED.test(t)) return { want: true, kind: 'search', why: 'they asked for it' };
+  if (theirOwn(t)) return { want: false, why: 'their own life is not a lookup' };
+  // "I'd like to know who won the game last night": the request under its lead-in, as the readers below see it
+  const q = requestBody(t);
 
   // A QUESTION MARK IS NOT THE ONLY WAY TO ASK FOR SOMETHING.
   //
@@ -314,13 +326,13 @@ export function webIntent(
   // adding it here only widens the CURRENT branch, which already requires the
   // answer to be one that moves.
   const asks =
-    /\?|^\s*(?:(?:hey|ok(?:ay)?|so|and)[,!.]?\s+)?(?:what(?:'?s)?|which|who(?:'?s)?|when|where(?:'?s)?|how (?:much|many|long|far|old|big|tall|fast|is|are|does|did)|is|are|does|do|did|has|have|can|will)\b/i.test(t) ||
-    /^\s*(?:summari[sz]e|tell me|give me|show me|list|compare|find out|check|catch me up|update me|remind me)\b/i.test(t);
+    /\?|^\s*(?:(?:hey|ok(?:ay)?|so|and)[,!.]?\s+)?(?:what(?:'?s)?|which|who(?:'?s)?|when|where(?:'?s)?|how (?:much|many|long|far|old|big|tall|fast|is|are|does|did)|is|are|does|do|did|has|have|can|will)\b/i.test(q) ||
+    /^\s*(?:summari[sz]e|tell me|give me|show me|list|compare|find out|check|catch me up|update me|remind me|i\s+need\s+(?:the|to\s+know)|i'?d\s+like\s+(?:the|to\s+know))\b/i.test(t);
   if ((CURRENT.test(t) || FUTURE_YEAR.test(t)) && asks && !INWARD.test(t)) {
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
   }
   // …and live data by its subject: asked in any of those shapes, or in as few words as a search box takes
-  if (LIVE_SUBJECT.test(t) && !INWARD.test(t) && !liveInPassing(t) && (asks || SEARCH_BOX(t))) {
+  if (LIVE_SUBJECT.test(t) && !INWARD.test(t) && !liveInPassing(t) && (asks || SEARCH_BOX(q))) {
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
   }
   // A FACT ABOUT A NAMED THING: "Who founded Socria?", "What does Anthropic's

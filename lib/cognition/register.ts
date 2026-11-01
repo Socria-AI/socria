@@ -227,8 +227,9 @@ const PREFACE = /^(?:(?:quick|random|silly|dumb|serious|small|one|another|real q
  * begins see where the request begins. Unchanged when it is all greeting, or
  * there is nothing in front.
  */
+const DISCOURSE = /^(?:(?:ok(?:ay)?|so|um+|uh+|erm+|hmm+|yeah|alright|right|well|like)(?:\s+(?:so|like|basically|um+|uh+))*\s+(?=(?:what|how|why|which|who|when|where|is|are|can|could|explain|tell|describe|compare)\b)|in\s+(?:simple|plain|layman'?s?|basic)\s+terms,?\s+|simply\s+put,?\s+|eli5:?\s+)/i;
 export function withoutGreeting(text: string): string {
-  const t = (text ?? '').trim();
+  const t = (text ?? '').trim().replace(DISCOURSE, '');
   let rest = t;
   for (let i = 0; i < 3; i++) {
     const m = /^([^,.!?;:—–\n]{1,40})(?:[,.!?;:]+|\s[—–-]\s)\s*/.exec(rest);
@@ -282,7 +283,7 @@ const PUSHBACK_OPENS =
 const PUSHBACK_ANYWHERE = /\b(?:i (?:disagree|don'?t agree|do not agree)|i (?:don'?t|do not) (?:buy (?:it|that)|think (?:that'?s|that is) (?:right|true|fair))|you(?:'re| are) wrong|that(?:'s| is) (?:wrong|not (?:right|true)|absurd|ridiculous|a stretch)|i(?:'m| am) not convinced|(?:doesn'?t|does not) (?:follow|hold up|add up))\b/i;
 
 const BRAINSTORM = /\b(?:brainstorm\w*|spitball\w*|riff(?:ing)? on|bounce (?:some )?ideas|throw (?:out )?(?:some )?ideas|(?:give me|need|want|got|any|some|more|other|fresh|wild|crazy|fun) (?:\w+ )?(?:ideas|suggestions|names|angles|ways to|twists|options for)\b|ideas? (?:for|about|on) |names? for\b|come up with (?:some |a few |more |\w+ )?(?:ideas|names|ways|options|titles|slogans|taglines)|let'?s (?:think of|come up with|brainstorm|generate|dream up)|what if (?:we|i|you|it|they)\b|how might we\b)/i;
-const OPINION = /\b(?:what do you (?:think|make) (?:about|of)|what(?:'s| is) your (?:take|view|opinion|stance|read)\b|do you (?:think|believe|reckon|agree)\b|would you (?:say|agree)\b|(?:any |your )thoughts on\b|hot take|unpopular opinion|controversial opinion|is it (?:true|possible|ethical|wrong|right|fair|moral|immoral|better|worse) (?:that|to)\b|(?:is|are) (?:\w+ ){1,4}(?:overrated|underrated|real|a myth|worth (?:it|the hype)|the future|dead|inevitable)\b|which is (?:better|worse)\b|why do (?:people|we|humans)\b)/i;
+const OPINION = /\b(?:what do you (?:think|make) (?:about|of)|what(?:'s| is) your (?:take|view|opinion|stance|read)\b|do you (?:think|believe|reckon|agree)\b|would you (?:say|agree)\b|(?:any |your )thoughts on\b|hot take|unpopular opinion|controversial opinion|is it (?:true|possible|ethical|wrong|right|fair|moral|immoral|better|worse) (?:that|to)\b(?! (?:explain|describe|tell|show|summari[sz]e|break down|outline|teach|walk))|(?:is|are) (?:\w+ ){1,4}(?:overrated|underrated|real|a myth|worth (?:it|the hype)|the future|dead|inevitable)\b|which is (?:better|worse)\b|why do (?:people|we|humans)\b)/i;
 const BIG_IDEAS = /\b(?:free will|determinism|consciousness|the meaning of life|meaning of (?:it all|life)|morality|moral|ethic(?:s|al)|justice|philosoph\w*|existential|god|religion|truth|beauty|human nature|society|democracy|capitalism|socialism|the future of|purpose|identity|the mind|reality|the universe|art)\b/i;
 /**
  * "Why do we have seasons?", "why do we yawn?", "why do people get colds more

@@ -170,6 +170,7 @@ export function enforceDecision(
     length: input.context.length,
     maxReply: input.context.maxReply,
     recentAsking: recentAskingOf(r.turns),
+    scaffold: input.acs.split?.reasoning === 'scaffold',
   });
   // The integrity monitor's claim filter runs on every regulated turn,
   // whether or not an adjustment is in force (a claim that they improved

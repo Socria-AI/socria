@@ -59,6 +59,11 @@ export interface AccuracyInput {
   history: readonly Turn[];
   /** the answer to what they are working on is theirs to find */
   withhold: boolean;
+  /**
+   * They are working it through with Socria (Core 4's split: reasoning, scaffold): what was computed is for
+   * checking each step they take, not to state as the reply's own (second adversarial round, November 2026).
+   */
+  scaffold?: boolean;
 }
 
 /** What the draft check needs to know about the turn. */
@@ -281,7 +286,9 @@ export function planTurn(input: AccuracyInput): AccuracyPlan {
 
   const lines = computedLines(computed);
   if (lines.length) {
-    blocks.push(reveal
+    blocks.push(reveal && input.scaffold
+      ? `=== Computed by Socria's math engine this turn — for checking their steps ===\n${lines.join('\n')}\nThey are working this through with you: use these to check each step they take and to know when they have it. Do not state the final result unless they ask for it; anything you do state from here is settled, not hedged.`
+      : reveal
       ? `=== Computed by Socria's math engine this turn (deterministic, not recalled) ===\n${lines.join('\n')}\nThese results are checked: state them as settled, without hedging. If your own working disagrees with a line here, the slip is in the working — find it rather than reporting both. You may say a result here was checked; do not claim any other tool, calculation or check was run.`
       : `=== The answer to what they are working on has been computed — and is deliberately not shown to you ===\nThey are working it out themselves. Do not state the result. Every mathematical statement in your reply is checked against the computed answer before it is sent, so say nothing about it you are not sure of.`);
   }

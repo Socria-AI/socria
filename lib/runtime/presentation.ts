@@ -110,12 +110,15 @@
 // Pure. No model, no network, no clock.
 
 import { LIVE_KINDS, numbersIn, type InlineKind } from '../inline-ui';
-import { TRIP, claimCheck, pickAsk } from '../cognition/claims';
-import { withoutGreeting } from '../cognition/register';
+import { TRIP, claimCheck, pickAsk, practicalShould } from '../cognition/claims';
+import { saysFeeling, withoutGreeting } from '../cognition/register';
 import { quickPlot } from './plot-ask';
 import {
   BASE_RATE,
+  CASUAL_PICK,
   COMPARE_ASK,
+  JOKE,
+  TASTE,
   LIFE_VALUES,
   LIST_ASK,
   LIST_LEAD,
@@ -123,18 +126,21 @@ import {
   MATH_OBJECT,
   NOT_A_PROBLEM,
   OWN_EVENT,
-  PERSONAL_LIFE,
   PROS_CONS,
   TIMELINE_ASK,
   TIMELINE_NAMED,
   VERSUS,
+  ASKS_PICK,
   aboutAPerson,
   adviceAsk,
   adviceKind,
   comparisonAsk,
   ownTimeline,
   partsShape,
+  personInRequest,
+  normalizeTyping,
   requestBody,
+  tenderText,
   twoNamed,
   type PartsShape,
 } from './asks';
@@ -195,6 +201,10 @@ export interface Presentation {
   lean?: boolean;
   /** no question may be asked this turn: nothing in a block asks one either */
   noQuestion?: boolean;
+  /** the Answer Guard is up: nothing drawn or said is the answer they are working toward */
+  guard?: boolean;
+  /** the depth came from their Detailed length setting, not their words */
+  depthFromLength?: boolean;
 }
 
 /**
@@ -237,6 +247,10 @@ const WHAT_IF =
   /\b(?:what if|how much (?:would|will|do|does|is|can)|how (?:does|would) (?:it|that|the \w+) change|depends on|if i (?:change|raise|lower|increase|decrease|put|save|invest|borrow)|monthly payments?|compound(?:ing|ed)?|loans?|mortgages?|savings?|invest(?:ing|ment)?|growth rate|break[- ]?even|salary|wages?|commission|(?:raise|raising|cut|cutting|increase|increasing|lower|lowering)\s+(?:the\s+|our\s+|my\s+)?prices?)\b/i;
 /** …and words that are only sometimes a quantity: "rate my ideas", "a tip for beginners", "tax law". With a percentage, a currency or "how much", they are. */
 const WHAT_IF_WEAK = /\b(?:interest|discount|tip|tax(?:es)?|percent|percentage|rate)\b/i;
+/** An amount or a rate of the thing varied: a currency, a percentage, thousands, per month. */
+const AMOUNT = /[$£€¥₹]\s?\d|\d\s?%|\b\d[\d,.]*\s?(?:k|m|bn|dollars|pounds|euros|percent|grand)\b|\b\d[\d,.]*\s*(?:a|per|\/)\s*(?:month|year|week|hour|mo|yr)\b/i;
+/** …two of them: their own numbers, enough to make the slider the form that fits. */
+const AMOUNT_TWO = new RegExp(String.raw`(?:${AMOUNT.source})[\s\S]*?(?:${AMOUNT.source})`, 'i');
 const MONEY_OR_PCT = /[$£€¥₹]\s?\d|\d\s?%|\b\d[\d,.]*\s?(?:k|m|bn|dollars|pounds|euros|percent)\b|\bhow much\b/i;
 /**
  * A known relationship people ask to understand, with nothing they gave to
@@ -245,7 +259,7 @@ const MONEY_OR_PCT = /[$£€¥₹]\s?\d|\d\s?%|\b\d[\d,.]*\s?(?:k|m|bn|dollars|
  * defaults, so a number is never mistaken for advice.
  */
 const SLIDER_FORMULA =
-  /\b(?:compound\s+interest|compounding|rule\s+of\s+72|doubling\s+time|break[- ]?even(?:\s+point)?|payback\s+period|(?:cash|financial|startup)\s+runway|months?\s+of\s+runway|runway\s+(?:left|in\s+months)|net\s+present\s+value|npv|present\s+value|future\s+value|bayes(?:'|’)?s?(?:\s+(?:theorem|rule))?|base\s+rates?|growing\s+(?:at\s+)?\d+(?:\.\d+)?\s?%|grows?\s+(?:by|at)\s+\d+(?:\.\d+)?\s?%|how\s+long\s+(?:until|to|for|before)\s+[^?]{0,40}?\b(?:doubles?|doubling|pay(?:s)?\s+(?:it\s+)?off|paid\s+off|breaks?\s+even|reach(?:es)?\s+\$?\d)|loan\s+payments?|amorti[sz]ation)\b/i;
+  /\b(?:compound\s+interest|compounding|rule\s+of\s+72|doubling\s+time|break[- ]?even(?:\s+point)?|payback\s+period|(?:cash|financial|startup)\s+runway|months?\s+of\s+runway|runway\s+(?:left|in\s+months)|net\s+present\s+value|npv|present\s+value|future\s+value|bayes(?:'|’)?s?(?:\s+(?:theorem|rule))?|base\s+rates?|how\s+long\s+(?:until|to|for|before)\s+[^?]{0,40}?\b(?:doubles?|doubling|pay(?:s)?\s+(?:it\s+)?off|paid\s+off|breaks?\s+even|reach(?:es)?\s+\$?\d)|loan\s+payments?|amorti[sz]ation)\b|(?:growing\s+(?:at\s+)?|grows?\s+(?:by|at)\s+)\d+(?:\.\d+)?\s?(?:percent\b|%)/i;
 /** A ratio or a definition by formula, asked what it is: one equation and its terms says it — nothing in it is there to vary. */
 const EQUATION_NAME =
   /\b(?:ebitda|cac|customer\s+acquisition\s+costs?|c?ltv|(?:customer\s+)?lifetime\s+value|gross\s+margin|net\s+margin|operating\s+margin|profit\s+margin|contribution\s+margin|markup|roi|return\s+on\s+investment|churn\s+rate|conversion\s+rate|arpu|mrr|arr|burn\s+rate|p\/?e\s+ratio|price[- ]to[- ]earnings(?:\s+ratio)?|debt[- ]to[- ]equity(?:\s+ratio)?|current\s+ratio|quick\s+ratio|bmi|body\s+mass\s+index|z-?scores?|standard\s+deviation|variance|churn|roas|return\s+on\s+ad\s+spend|nps|net\s+promoter\s+score|gdp|ctr|click-?through\s+rate|eps|earnings\s+per\s+share|cpa|cpc|cpm|cost\s+per\s+(?:acquisition|click|lead|mille|thousand)|working\s+capital|free\s+cash\s+flow|percentage\s+change|weighted\s+average|sharpe\s+ratio|debt[- ]to[- ]income(?:\s+ratio)?|cagr|compound\s+annual\s+growth\s+rate|kinetic\s+energy|potential\s+energy|density|unemployment\s+rate|inventory\s+turnover|gross\s+profit|(?:average\s+)?speed|velocity|acceleration|momentum|pressure)\b/i;
@@ -256,15 +270,23 @@ const EQUATION_NAME =
  * or a benchmark, and an equation is not one (adversarial review, November 2026).
  */
 const EQUATION_VALUE =
-  /\b(?:a|an)\s+(?:good|healthy|normal|typical|average|reasonable|realistic|decent|bad|high|low|safe|ideal)\s+|\b(?:my|our)\s+(?:\w+\s+)?(?:rate|ratio|margin|markup|roi|bmi|churn|cac|ltv|score|nps|ctr|eps|cpa|density|deviation)\b|\b(?:usually|typically|normally|right\s+now|today|currently|current)\b|\b(?:rate|ratio|margin|markup|roi|bmi|deviation|score|value|churn|gdp|yield|density|speed|velocity|acceleration|momentum|pressure)\s+(?:of|for|on|from|in|at)\s+/i;
+  /\b(?:a|an)\s+(?:good|healthy|normal|typical|average|reasonable|realistic|decent|bad|high|low|safe|ideal)\s+|\b(?:my|our)\s+(?:\w+\s+)?(?:rate|ratio|margin|markup|roi|bmi|churn|cac|ltv|score|nps|ctr|eps|cpa|density|deviation)\b|\b(?:usually|typically|normally|right\s+now|today|currently|current)\b|\b(?:rate|ratio|margin|markup|roi|bmi|deviation|score|value|churn|gdp|yield|density|speed|velocity|acceleration|momentum|pressure)\s+(?:of|for|on|from|at)\s+/i;
+/**
+ * …and the term as the thing asked about, not a word inside another thing:
+ * "speed dating", "the speed limit", "blood pressure", "peer pressure", "a
+ * zoning variance", "momentum investing", and the CPA or EPS that is an
+ * accountant or a foam (second adversarial round, November 2026).
+ */
+const NOT_THE_TERM =
+  /\b(?:blood|peer|air|water|tire|tyre|cabin|social|time|oil|bone|population|zoning|signal|sound|voice|food|road|line)\s+(?:pressure|density|variance|speed)\b|\b(?:speed|pressure|density|momentum|markup|variance|velocity)\s+(?:dating|limits?|camera|cameras|trap|bump|bumps|cooker|cookers|washer|gauge|readings?|tests?|chess|reading|investing|language|ulcers?|sores?|points?|groups?|foam|orders?|bag|stockings|socks|skating|boat|train|run|dial|test|ticket|tickets)\b|\bcpa\b(?![^?]*\b(?:marketing|ads?|campaign|acquisition|cost|per\s+action)\b)|\beps\b(?![^?]*\b(?:earnings|shares?|stock|company|per\s+share)\b)/i;
 /** A named law or identity, asked what it means: "what does E=mc² mean?" — its equation and terms, not a curve to reshape. */
 const NAMED_LAW =
   /\be\s*=\s*mc\s*(?:\^\s*2|²|2)|\bf\s*=\s*ma\b|\bv\s*=\s*ir\b|\bpv\s*=\s*nrt\b|\b(?:ohm|newton|hooke|boyle|coulomb|charles)(?:'s|’s|s)?\s+(?:second\s+|third\s+|first\s+)?law\b|\bpythagor(?:as|ean)(?:'s|’s)?\s+theorem\b|\bideal\s+gas\s+law\b|\ba\s*\^?\s*2\s*\+\s*b\s*\^?\s*2\s*=\s*c\s*\^?\s*2/i;
 const DEFINITION_ASK =
-  /^(?:(?:so|ok(?:ay)?|hey|hi|quick question),?\s+)?(?:what(?:'s|\s+is|\s+are|\s+does)|define|explain|how\s+(?:do|would|can|should)\s+(?:i|you|we|one)\s+(?:calculate|compute|work\s+out|measure|figure\s+out|find)|how\s+(?:is|are)\s+.{2,40}?\s+(?:calculated|computed|measured|worked\s+out))\b/i;
+  /^[\w\s'’-]{2,30}\s+formula\s*\??$|^(?:what\s+.{2,40}?\s+(?:means|is)\s*\??$)|^(?:(?:so|ok(?:ay)?|hey|hi|quick question|please),?\s+)?(?:what(?:'s|\s+is|\s+are|\s+does)|define|explain|how\s+(?:do|would|can|should)\s+(?:i|you|we|one)\s+(?:calculate|compute|work\s+out|measure|figure\s+out|find)|how\s+(?:is|are)\s+.{2,40}?\s+(?:calculated|computed|measured|worked\s+out))\b/i;
 const FORMULA = /\b[a-z]\s*=\s*[^=\n]*[a-z][^=\n]*$|\bf\s*\(\s*x\s*\)\s*=/im;
 /** Mathematics written as such: y =, f(x), x^2, x². */
-const MATH_MARK = /\by\s*=|\bf\s*\(\s*x\s*\)|(?<![a-z])[a-z]\s*\^\s*\d|[a-z]²/i;
+const MATH_MARK = /\by\s*=|\bf\s*\(\s*x\s*\)|(?<![a-z])[a-z]\s*\^\s*\d|(?<![a-z])(?!(?:m|cm|km|mm|ft|in)²)[a-z]²/i;
 /**
  * A request for help too open to start on without knowing which way it goes —
  * "help me with my essay". Said as a plan ("I want to start a bakery"), it is
@@ -277,6 +299,8 @@ const PRACTICAL_TEXT = /\b(?:e-?mail|message|text|reply|note|post|caption|announ
 const OVERVIEW = /\b(?:overview|introduction to|intro to|primer on|basics of|fundamentals of|crash course|big picture|(?:main|key|major|core|basic|central|important|different) (?:concepts|ideas|areas|branches|parts|components|principles|theories|topics|elements|themes|schools|types|kinds)|(?:branches|areas|schools|subfields|fields) of|what (?:does|do) [\w\s-]{2,40} (?:cover|involve|include)|teach me (?:about )?(?:the )?basics)\b/i;
 /** A field of study named on its own: "what is microeconomics?", "explain statistics", "tell me about organic chemistry". */
 const FIELD = /^(?:(?:can|could) you |please )?(?:explain|tell me about|what(?:'s| is)|describe|walk me through)\s+(?:the (?:field|subject|study) of\s+)?(?!(?:\S+\s+){0,2}?in\s)(?:[a-z-]+\s){0,2}[a-z-]*(?:ics|ology|onomy|istry|osophy|ography|calculus|algebra|geometry|theory|science|engineering|law|medicine)\s*\??$/i;
+/** History by its own words: a war, a revolution, an empire, a century, a year. */
+const HISTORY = /\b(?:war|wars|revolution|empire|crisis|depression|collapse|dynasty|treaty|reign|century|ancient|medieval|independence|civil\s+rights|movement|era|coup|invasion|plague|cold\s+war|1[0-9]{3}|20[0-2][0-9]|[0-9]{3}\s?(?:bc|ad|bce|ce))\b/i;
 /** Steps to follow, in order. */
 const STEPS_ASK = /\b(?:steps? (?:to|for|in|of)|step[- ]by[- ]step|walk me through \w+ing|teach me how to|show me how to|explain how to|how (?:do|can|would|should) (?:i|you|we|one) (?:go about|get started|set up|apply|register|install|start|file|enrol|enroll)|(?:the )?process (?:of|for|to)|stages of|phases of|how does an? [\w\s-]{2,30} become|procedure (?:for|to))\b/i;
 /**
@@ -287,7 +311,7 @@ const STEPS_ASK = /\b(?:steps? (?:to|for|in|of)|step[- ]by[- ]step|walk me throu
  * you on Tuesday?": a pronoun is no system, and "for you" is a diary.
  */
 const HOW_IT_WORKS =
-  /\bhow\s+(?:does|do)\s+(?!(?:it|that|this|they|you|he|she|we|i|things|everything|anything)\b)(?:an?\s+|the\s+)?(?:[\w'’-]+\s+){0,4}?[\w'’-]+\s+work\b(?!\s+(?:for|with)\s+(?:you|me|us|them|him|her)\b)/i;
+  /\bhow\s+(?:does|do)\s+(?!(?:it|that|this|they|you|he|she|we|i|things|everything|anything)\b)(?:an?\s+|the\s+)?(?:[\w'’-]+\s+){0,4}?[\w'’-]+\s+work\b(?!\s+(?:for|with)\s+(?:you|me|us|them|him|her)\b)|(?:^|\b(?:about|know|wondering|wonder|understand|explain|learn|curious)\s+)how\s+(?!(?:it|that|this|they|you|he|she|we|i|things|everything|anything|my|our|your|his|her|their)\b)(?:an?\s+|the\s+)?(?:[\w'’-]+\s+){0,4}?[\w'’-]+\s+works?\b(?!\s+(?:for|with)\s+(?:you|me|us|them|him|her)\b)/i;
 /**
  * AN OPEN PIECE OF WORK, said as one: "I need to redesign our onboarding",
  * — a request for help with it, never a statement of what they will do ("we
@@ -317,7 +341,6 @@ const DECIDE_ASK =
  * never a block that weighs it and a rule that gags it (adversarial review,
  * November 2026).
  */
-const ASKS_PICK = /\b(?:what\s+would\s+you\s+(?:do|pick|choose|go\s+with)|which\s+(?:one\s+)?would\s+you\s+(?:recommend|pick|choose|go\s+with|take)|what\s+do\s+you\s+recommend|you\s+(?:decide|pick|choose)\b|just\s+tell\s+me|your\s+(?:pick|call|recommendation)|what'?s\s+your\s+(?:pick|call|take|read))/i;
 /** One subject's two sides that are a course of their own: "pros and cons of quitting my job". */
 const OWN_COURSE = /\b(?:quitting|leaving|taking|moving|buying|selling|starting|switching|joining|accepting|renting|hiring|launching|going\s+back|staying|dropping\s+out|retiring|changing)\b/i;
 /** …or a team's change set against how things are: "should we raise prices?" is the change against the status quo. */
@@ -339,7 +362,7 @@ const WHICH_SHOULD = /\bwhich\s+(?:one\s+)?(?:should\s+(?:i|we)\s+(?:use|get|buy
  * it in detail".
  */
 const DEEPER =
-  /^(?:(?:ok(?:ay)?|great|yes|yeah|sure|right|nice|good|perfect|cool),?\s+)?(?:let'?s\s+)?(?:go deeper|dig (?:deeper|into)|say more about|tell me more(?: about)?|expand on|elaborate on|unpack|more on|take me further into|go further (?:on|into)|explain (?:that|this|it) (?:in more detail|further|more)|walk me through (?:that|this|it)(?: in detail)?|go into (?:more )?detail)\b/i;
+  /^(?:(?:ok(?:ay)?|great|yes|yeah|sure|right|nice|good|perfect|cool),?\s+)?(?:(?:can|could|would|will)\s+(?:you|we)\s+(?:please\s+)?|please\s+|i'?d\s+(?:love|like)\s+(?:you\s+)?to\s+(?:(?:hear|know)\s+)?|let'?s\s+)?(?:would you mind (?:going deeper|digging (?:deeper|into)|diving (?:deeper|into)|expanding on|elaborating(?: on)?|saying more about|unpacking)|go deeper|dig (?:deeper|into)|dive (?:deeper|into)|say more about|tell me more(?: about)?|expand on|elaborate(?: on)?|unpack|more on|(?:go|get) into (?:more )?detail|more detail on|take me further into|go further (?:on|into)|explain (?:that|this|it) (?:in more detail|further|more)|walk me through (?:that|this|it)(?: in detail)?|go into (?:more )?detail)\b/i;
 /** …and depth asked for in so many words: the whole thread, in parts. Anything less goes one layer at a time. */
 const FULL_DEPTH = /\b(?:in\s+(?:full|more|great|much\s+more|real|proper)?\s*detail|step[- ]by[- ]step|fully|in[- ]depth|everything\s+(?:about|on)|thoroughly|comprehensive(?:ly)?|the\s+whole\s+(?:thing|story|picture)|all\s+of\s+it|properly)\b/i;
 /**
@@ -350,9 +373,9 @@ const FULL_DEPTH = /\b(?:in\s+(?:full|more|great|much\s+more|real|proper)?\s*det
  * Excel?", "why does my JavaScript function return undefined?" and "what is
  * the meaning of the curve in this poem?" are not.
  */
-const MATH_SURE = /\b(?:parabolas?|quadratics?|polynomials?|cubics?|asymptotes?|logarithm(?:s|ic)?|sine|cosine|sinusoid\w*|linear\s+functions?|exponential\s+(?:functions?|curves?|graphs?)|tangent\s+lines?|y-?intercepts?|x-?intercepts?|turning\s+points?|sine\s+waves?|normal\s+distributions?|bell\s+curves?|gaussian|slope\s+of\s+a\s+line|(?:positive|negative)\s+slope)\b|\b(?:sin|cos|tan)\s*(?:\(|x\b)/i;
+const MATH_SURE = /\b(?:parabolas?|quadratics?|polynomials?|cubics?|asymptotes?|logarithm(?:s|ic)?|sine|cosine|sinusoid\w*|linear\s+functions?|exponential\s+(?:functions?|curves?|graphs?)|tangent\s+lines?|y-?intercepts?|x-?intercepts?|turning\s+points?|sine\s+waves?|normal\s+distributions?|bell\s+curves?|gaussian|slope\s+of\s+a\s+line|(?:positive|negative)\s+slope|hyperbolas?|reciprocal\s+functions?|square\s+root\s+functions?|(?:inversely|directly)\s+proportional|(?:direct|inverse)\s+proportion(?:ality)?|area\s+under\s+(?:a|the)\s+curve)\b|\b(?:sin|cos|tan)\s*(?:\(|x\b)|\b\d+\s*\/\s*x\b/i;
 const EXP_CURVE = /\bexponential\s+(?:growth|decay)\b/i;
-const MATH_MAYBE = /\b(?:slopes?|gradients?|vertex|vertices|intercepts?|amplitudes?|graphs?|curves?|functions?|exponential|derivatives?)\b/gi;
+const MATH_MAYBE = /\b(?:slopes?|gradients?|vertex|vertices|intercepts?|amplitudes?|graphs?|curves?|functions?|exponential|derivatives?(?!\s+(?:works?|markets?|trading|contracts?)))\b/gi;
 const mathWords = (t: string) => (t.match(MATH_MAYBE) ?? []).length;
 const WHY_HOW = /\b(?:why|how|what happens|what does|explain|understand|intuition|make sense|confused|get it|don'?t get|mean|means|change|changes|affect|affects|shift|shifts|move|moves|depend|depends|look like)\b/i;
 /**
@@ -361,6 +384,7 @@ const WHY_HOW = /\b(?:why|how|what happens|what does|explain|understand|intuitio
  * derivative in finance is a contract, not a slope.
  */
 const RATE_SURE = /\b(?:mean\s+value\s+theorem|mvt|rolle'?s\s+theorem|derivatives?|differentiat\w*|tangent\s+lines?|tangent\s+to\s+(?:a|the)\s+(?:curve|graph|function|parabola|circle)|slope\s+of\s+(?:a|the)\s+(?:curve|tangent|graph)|slope\s+of\s+\S+(?:\s+\S+){0,3}?\s+at\s+(?:x\s*=\s*)?-?\d|secant(?:\s+lines?)?|limit\s+definition|first\s+principles)\b/i;
+const NOT_RATE = /\bderivative\s+works?\b|\bfirst\s+principles\s+(?:thinking|reasoning|approach)\b|\bdifferentiat\w*\s+(?:my|our|your|their|his|her|myself|yourself|ourselves|itself|between|from|the\s+brand|a\s+brand|us|them|you)\b/i;
 const RATE_SOFT = /\b(?:rates?\s+of\s+change|instantaneous\s+(?:rate|speed|velocity)|average\s+(?:rate|slope|velocity|speed)|marginal\s+(?:cost|revenue|product|utility|benefit))\b/i;
 const FINANCE = /\b(?:finance|financial|trading|traders?|options|futures|swaps|hedg\w*|securities|bank(?:s|ing)?|exchange-traded)\b/i;
 /** …of which the average over an interval, set against the rate at a point: the chord and the tangent that matches it. */
@@ -389,7 +413,8 @@ const LOOKUP = /^(?:(?:so|ok(?:ay)?|hey|hi),?\s+)?(?:define\b|definition\s+of\b|
 const SIM_CORE = /\b(?:projectiles?|trajector(?:y|ies)|pendulums?|orbit(?:s|al|ing)?|oscillat\w*|simple harmonic)\b/i;
 const SIM_MOVE = /\b(?:throw(?:n|ing|s)?|launch(?:ed|es|ing)?|kick(?:ed|ing|s)?|toss(?:ed|ing)?|shoot(?:ing|s)?|jump(?:s|ed|ing)?|bounc\w*|swing(?:s|ing)?|springs?|falls?|falling|dropp?(?:ed|ing|s)?)\b/i;
 const SIM_PHYS = /\b(?:angles?|degrees?|°|speed|velocity|gravity|heights?|metres?|meters?|m\/s|ball|arrow|cannon|rocket|mass|air resistance|farthest|furthest|highest|range|seconds?|feather|stone)/i;
-const simAsk = (t: string) => SIM_CORE.test(t) || (SIM_MOVE.test(t) && SIM_PHYS.test(t));
+const SIM_SUBJECT = /\b(?:planets?|moons?|satellites?|earth|sun|electrons?|comets?|asteroids?|spacecraft|rockets?|springs?|mass|masses|bob|balls?|projectiles?|cannon(?:ball)?s?|arrows?|bullets?|missiles?|waves?|particles?|objects?|pendulums?|clock)\b/i;
+const simAsk = (t: string) => (SIM_CORE.test(t) && (SIM_SUBJECT.test(t) || SIM_PHYS.test(t))) || (SIM_MOVE.test(t) && SIM_PHYS.test(t));
 /** The working, asked for — of mathematics. "Mitosis vs meiosis, step by step" is steps to follow, not TeX. */
 const WORKING_ASK = /\b(?:how do (?:i|you|we) (?:solve|find|work out|calculate|complete|factor|simplify|integrate|differentiate)|explain how to (?:solve|find|calculate|factor|simplify|integrate|differentiate|derive|complete)|(?:understand|know|learn) how to (?:solve|integrate|differentiate|factor|simplify|find|complete)|show (?:me )?(?:the )?(?:working|steps|how)|work (?:it |this |that )?(?:out|through)|walk me through (?:solving|the (?:maths|math|algebra|derivation|working))|derive|derivation|complete the square|solve (?:for|this|it|the)|step[- ]by[- ]step)\b/i;
 const WORKING_MATH = /\b(?:solve|solving|integrate|differentiate|factori[sz]e|factor|simplify|derive|derivation|complete the square|completing the square|algebra|equation)\b/i;
@@ -419,7 +444,7 @@ export function planPresentation(i: PresentationInput): Presentation {
   // the request under its greeting and its polite lead-in ("tell me about the water cycle"), the way the
   // turn's work was read (lib/runtime/state.ts readWork) — a field named is read as said ("tell me about
   // organic chemistry")
-  const raw = i.text.trim();
+  const raw = normalizeTyping(i.text).trim();
   const t = requestBody(withoutGreeting(raw));
   const x = i.state.exchange;
   const reasons: string[] = [];
@@ -456,48 +481,64 @@ export function planPresentation(i: PresentationInput): Presentation {
   const mathy = domain === 'math' || domain === 'learning' || FORMULA.test(t) || MATH_MARK.test(t);
   const mathRel =
     MATH_SURE.test(t) || MATH_MARK.test(t) || FORMULA.test(t) || (EXP_CURVE.test(t) && domain !== 'business') || (!FINANCE.test(t) && (mathWords(t) >= 2 || (mathWords(t) >= 1 && (domain === 'math' || domain === 'learning') && !technical)));
-  const rate = (RATE_SURE.test(t) && !FINANCE.test(t)) || (RATE_SOFT.test(t) && mathy);
-  const market = MARKET_SURE.test(t) || (MARKET_SOFT.test(t) && (ECON.test(t) || domain === 'learning' || domain === 'business'));
+  const rate = ((RATE_SURE.test(t) && !FINANCE.test(t)) || (RATE_SOFT.test(t) && mathy)) && !NOT_RATE.test(t);
+  const livedOn = /\bhow\s+(?:do|can|could|would|will)\s+(?:i|we|you)\s+(?:survive|live|get\s+by|pay|qualify|earn|make\s+ends\s+meet|afford)\b/i.test(t);
+  const market = !livedOn && (MARKET_SURE.test(t) || (MARKET_SOFT.test(t) && (ECON.test(t) || domain === 'learning' || domain === 'business')));
   const elastic = ELASTIC.test(t) && (mathy || /\b(?:demand|supply|price|prices|pricing)\b/i.test(t));
   const subject = SUBJECT.test(t) || ((domain === 'math' || domain === 'learning' || domain === 'research') && SUBJECT_GENERIC.test(t)) || mathRel || rate || market || elastic || domain === 'math';
   const listAsked = LIST_ASK.test(t) || LIST_LEAD.test(t);
   // somebody's own life — their relationships, grief, feelings, self: no table, no recipe, no diagram of it
   // (lib/runtime/asks.ts PERSONAL_LIFE) — and with a sensitive subject (a diagnosis, debt, a divorce) no
   // scoring block and no balance sheet either
-  const personal = PERSONAL_LIFE.test(t);
-  const tender = personal || !!i.signals.sensitive;
+  const personal = tenderText(t);
+  // …and what they said they feel ("I'm so sad. should I call my mom or wait?"), which readExchange leaves to the
+  // task when a task was read (second adversarial round, November 2026)
+  const felt = saysFeeling(raw);
+  const tender = personal || !!i.signals.sensitive || felt;
+  // …and a person's own life or a feeling, not a sensitive subject: the Great Depression keeps its timeline
+  const own = personal || felt;
+  // one person's story: never a verdict, a scoring block, a live element or a diagram
+  const story = aboutAPerson(t);
   const kind = adviceKind(t, domain);
 
   // ── the shape of the reply itself, before what may be drawn in it ──
   const deeper = DEEPER.test(t);
   const fullDepth = deeper && (FULL_DEPTH.test(t) || i.length === 'detailed');
-  const openWork =
-    !deeper && x.kind !== 'brainstorm' && !CONCRETE.test(t) && (OPEN_WORK.test(t) || HOW_APPROACH.test(t)) && !['verification', 'diagnosis', 'practice', 'information'].includes(work);
+  const openWork0 =
+    !deeper && !own && !aboutAPerson(t) && x.kind !== 'brainstorm' && !CONCRETE.test(t) && (OPEN_WORK.test(t) || HOW_APPROACH.test(t)) && !['verification', 'diagnosis', 'practice', 'information'].includes(work);
   // a claim put up to be checked (lib/cognition/claims.ts): the verdict first, the parts it rests on to inspect
-  const claim = claimCheck(t) || claimCheck(raw);
+  const claim = (claimCheck(t) || claimCheck(raw)) && !story && !tender;
   const two = twoNamed(t);
   // a choice that is theirs, between options they named (or a team's change to the business against the
   // status quo): weighed by them. Their decision however they phrase it — "do you think I should take the
   // job or stay?", "what would you do, take the offer or stay?" (read as judgment, lib/cognition/assist.ts)
   // — and never their relationships, their family's grief or a sensitive subject.
   const changing = CHANGE_ASK.test(t) && (domain === 'business' || BUSINESS_OBJECT.test(t));
-  const deciding = !claim && !tender && work !== 'creation' && ((two && (DECIDE_ASK.test(t) || WHICH_SHOULD.test(t) || work === 'judgment')) || changing);
+  // …and never a dinner choice or a sigh ("should I laugh or cry at this point?")
+  const casual = CASUAL_PICK.test(t) || /\b(?:laugh\s+or\s+cry|scream\s+or\s+cry|cry\s+or\s+laugh)\b/i.test(t);
+  const deciding = !claim && !tender && !casual && !practicalShould(t) && work !== 'creation' && ((two && (DECIDE_ASK.test(t) || WHICH_SHOULD.test(t) || work === 'judgment')) || changing);
+  // a choice between options they named is weighed, not scoped as open work ("we need to launch — iOS or Android
+  // first?") (second adversarial round, November 2026)
+  const openWork = openWork0 && !deciding;
   // options set against each other, as people phrase it — "TCP vs UDP", "Postgres or MongoDB for a chat app?"
   const comparing =
-    !deciding && !claim && !personal && !LIFE_VALUES.test(t) && work !== 'creation' && x.kind !== 'brainstorm' && (comparisonAsk(t) || (COMPARE_ASK.test(t) && (two || (task && /\band\b/i.test(t)))));
+    !deciding && !claim && !personal && !LIFE_VALUES.test(t) && !JOKE.test(t) && !TASTE.test(t) && !casual && work !== 'creation' && x.kind !== 'brainstorm' && (comparisonAsk(t) || (COMPARE_ASK.test(t) && (two || (task && /\band\b/i.test(t)))));
   // one subject's two sides ("pros and cons of remote work"); two subjects are a comparison
   const prosCons = !claim && !deciding && !tender && work !== 'creation' && PROS_CONS.test(t);
   // the parts of something: a cycle, a hierarchy, causes, effects, types (lib/runtime/asks.ts)
   const parts = task && (work === 'explanation' || work === 'information') && x.kind !== 'brainstorm' ? partsShape(t) : null;
   // a ratio, or a relationship with a name, asked what it is — never for a value or a benchmark of it
-  const equationAsk = EQUATION_NAME.test(t) && DEFINITION_ASK.test(t) && !EQUATION_VALUE.test(t);
+  const equationAsk = EQUATION_NAME.test(t) && DEFINITION_ASK.test(t) && !EQUATION_VALUE.test(t) && !NOT_THE_TERM.test(t);
   const namedLaw = NAMED_LAW.test(t) && !/\b(?:change|vary|varies|what\s+if|depends?|graph|plot|draw)\b/i.test(t);
   const formulaAsk = equationAsk || namedLaw || SLIDER_FORMULA.test(t);
   // a practical question with an answer: the one thing it hinges on, a default, the few levers
   // (a pick asked for is one too: "recommend me a sci-fi book", "three days in Lisbon — what should I do?")
   const picking = pickAsk(t);
+  // "walk me through replacing a bike chain", "could you explain how to file a tax return?": a procedure, asked
+  // politely, gets the practical shape the direct "how do I…?" gets
+  const procedural = (kind === 'procedure' || kind === 'setup') && work === 'explanation';
   const practical =
-    !deeper && !openWork && !claim && !deciding && !comparing && !prosCons && !parts && !formulaAsk && task && work === 'information' && (adviceAsk(t) || picking);
+    !deeper && !openWork && !claim && !deciding && !comparing && !prosCons && !parts && !formulaAsk && !own && task && (work === 'information' || procedural) && (adviceAsk(t) || picking || procedural);
   // an idea to understand: wanting the reasoning (lib/cognition/assist.ts wantsExplanation, said as a need
   // or a question), or asking what an idea in a subject is — never a lookup, a claim, a choice or a discussion
   const understanding =
@@ -528,11 +569,12 @@ export function planPresentation(i: PresentationInput): Presentation {
   // (and never on a problem they are working or a proof: "prove by induction that 1 + 2 + … + n = n(n+1)/2" has
   // an equals sign, not a curve to see — the working is the answer there)
   const proving = /\b(?:prove|proof|induction|show\s+that)\b/i.test(t);
-  if (variant && !namedLaw && work !== 'creation' && work !== 'diagnosis' && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
+  const liveOk = !tender && !story;
+  if (variant && liveOk && !namedLaw && work !== 'creation' && work !== 'diagnosis' && (work !== 'verification' || /\b(?:plot|graph|draw|sketch|show)\b/i.test(t)) && (plotted || (work !== 'practice' && !proving)) && x.kind !== 'brainstorm' && !claim && !comparing && (plotted || !STEPS_ASK.test(t)) && (plotted || understanding || WHY_HOW.test(t) || FORMULA.test(t))) {
     if (offer('graph', `graph:${variant}`)) graph = variant;
   }
   // motion, or something that unfolds in time, asked why or how: one small simulation to try
-  if (work !== 'creation' && simAsk(t) && WHY_HOW.test(t)) offer('sim', 'sim:try-it');
+  if (liveOk && work !== 'creation' && simAsk(t) && WHY_HOW.test(t)) offer('sim', 'sim:try-it');
   // a claim to check: the verdict, and the parts it rests on to open and doubt (not laid out under the guard)
   if (claim && !i.guard) offer('claim', 'claim:inspect', /\?\s*$/.test(t) ? 'strong' : 'soft');
   // a choice that is theirs: a decision they weigh, not one that leans for them — with Socria's read, once, when asked
@@ -549,11 +591,15 @@ export function planPresentation(i: PresentationInput): Presentation {
   // (offered, not fitted, when it is about something of theirs: "pros and cons of remote work for my team")
   else if (prosCons && !i.guard) offer('balance', 'balance:one-subject', THEIR_OWN.test(t) ? 'soft' : 'strong', true);
   // a quantity that moves with something they can vary — unless a graph or a simulation already shows it
-  if (!i.guard && !offered.includes('graph') && !offered.includes('sim')) {
+  if (!i.guard && liveOk && !offered.includes('graph') && !offered.includes('sim')) {
     // "do I need to file taxes if I made $5000?" asks whether, not what if: a threshold, said in a sentence
     const eligibility = /^(?:do|does|can|is|are|am|will)\s+(?:i|we|you|my)\s+(?:\w+\s+)?(?:need|have\s+to|qualify|owe|pay|count|get\s+taxed)\b/i.test(t);
-    const whatIf = !eligibility && (WHAT_IF.test(t) || (WHAT_IF_WEAK.test(t) && MONEY_OR_PCT.test(t)));
-    if ((whatIf && nums.length >= 1) || (FORMULA.test(t) && /\b(?:change|vary|depends?|how does|what happens)\b/i.test(t))) offer('slider', 'slider:what-if');
+    const whatIf = !eligibility && (WHAT_IF.test(t) || (WHAT_IF_WEAK.test(t.replace(/\d\s?percent\b/gi, '%')) && MONEY_OR_PCT.test(t)));
+    // "how much is a 12 pack of beer?" and "the iPhone 16 Pro" ask a price, which is looked up, not varied
+    const priceAsked = /^how\s+much\s+(?:is|are|does|do)\s+(?:a|an|the|one)?\s*[^?$£€%]{2,60}?(?:\s+cost)?\s*\??\s*$/i.test(t);
+    const amounts = AMOUNT.test(t);
+    if ((whatIf && amounts && !priceAsked) || (FORMULA.test(t) && /\b(?:change|vary|depends?|how does|what happens)\b/i.test(t)))
+      offer('slider', 'slider:what-if', AMOUNT_TWO.test(t) || FORMULA.test(t) ? 'strong' : 'soft');
     // a base rate with their numbers: the posterior moves as they move the rate, which is the whole surprise
     else if (BASE_RATE.test(t)) offer('slider', 'slider:base-rate');
     // a known relationship, asked to understand: sensible defaults to move, said to be defaults
@@ -561,7 +607,9 @@ export function planPresentation(i: PresentationInput): Presentation {
   }
   // a ratio or a formula's definition, asked — or a named law, asked what it means: the equation and its
   // terms, nothing in it to vary
-  if ((equationAsk || namedLaw) && !offered.includes('slider') && !offered.includes('graph')) offer('equation', namedLaw ? 'equation:named-law' : 'equation:definition');
+  // (not beside a comparison: "the difference between standard deviation and variance" is answered side by side,
+  // the formulas in its rows — an equation as well said it twice)
+  if ((equationAsk || namedLaw) && !offered.includes('slider') && !offered.includes('graph') && !offered.includes('compare')) offer('equation', namedLaw ? 'equation:named-law' : 'equation:definition');
   // practising, asked for in so many words ("let me try one"): a question they work out and check, their
   // own work — a question, so only where one may go. A problem handed over ("solve 2x + 3 = 7") is not this.
   if (i.questions > 0 && PRACTICE_ASK.test(t)) offer('check', 'check:practice');
@@ -577,16 +625,16 @@ export function planPresentation(i: PresentationInput): Presentation {
     else if (offer('diagram', `diagram:${DIAGRAM_OF[parts]}`)) reasons.push(`parts:${parts}`);
   }
   // the parts of a subject, to explore one at a time — an overview, not a list of terms and definitions
-  if (reading && !NOT_READING.has(work) && (OVERVIEW.test(t) || FIELD.test(raw))) offer('concepts', 'concepts:overview');
+  if (reading && !own && !NOT_READING.has(work) && (OVERVIEW.test(t) || FIELD.test(raw))) offer('concepts', 'concepts:overview');
   // events whose order is the point (not under the guard: the gate would drop it, lib/inline-ui.ts) — a
   // timeline asked for by name is the form that fits; a history may be told as a story, so it is offered
   // a timeline of their own events ("what happened in the meeting?") is theirs: Socria was not there
-  const timeline = TIMELINE_ASK.test(t) && !ownTimeline(t);
+  const timeline = TIMELINE_ASK.test(t) && !ownTimeline(t) && !personInRequest(t) && !own;
   // a cycle's stages are its diagram, and a method's lines are its working: shown once, not twice
   const partsShown = offered.some((k) => PARTS_FORMS.has(k) || k === 'steps');
-  if (partsShown || personal) {
+  if (partsShown || own) {
     // the parts are already shown, or the turn is somebody's own life: no steps or timeline beside it
-  } else if (reading && timeline && !shown) offer('sequence', 'sequence:timeline', TIMELINE_NAMED.test(t) || /\bwhat\s+happened\b/i.test(t) ? 'strong' : 'soft', TIMELINE_NAMED.test(t));
+  } else if (reading && timeline && !shown) offer('sequence', 'sequence:timeline', TIMELINE_NAMED.test(t) || (/\bwhat\s+happened\b/i.test(t) && HISTORY.test(t)) ? 'strong' : 'soft', TIMELINE_NAMED.test(t));
   // steps to follow — never the steps of something that is theirs to work out
   else if (!i.guard && !listAsked && !i.ownReasoning && work !== 'creation' && STEPS_ASK.test(t)) offer('sequence', 'sequence:steps', 'strong', true);
   // a trip's days, in order: Day 1, Day 2 — the picks laid out where they happen
@@ -605,16 +653,20 @@ export function planPresentation(i: PresentationInput): Presentation {
   // explanation — prose is the explanation — and never reasoning that is theirs to do or a decision
   // that is theirs to make. A comparison already lays the reasoning out, and a quick call ("what tip
   // should I leave?") needs none.
-  const call = work === 'judgment' && !i.ownJudgment && !personal && words(t) >= 10 && !offered.includes('compare') && !offered.includes('decide');
+  const call = work === 'judgment' && !i.ownJudgment && !tender && words(t) >= 10 && !offered.includes('compare') && !offered.includes('decide');
   if (!i.guard && !i.ownReasoning && ((work === 'verification' && words(t) >= 6) || call) && x.kind !== 'brainstorm' && offer('reasoning', 'reasoning:steps', 'soft') && work === 'verification')
-    reasons.push('reasoning:check-work');
+    reasons.push('reasoning:check-work', i.state.understanding.wrong > 0 ? 'check:slips' : i.state.understanding.right > 0 ? 'check:holds' : 'check:open');
 
   // ── the ways onward, after the useful part, never instead of it ──
   const sideBySide = offered.includes('compare') || offered.includes('balance');
   // an open piece of work: the ways it could go next, to open one at a time
   if (openWork && !offered.includes('draft')) offer('paths', 'paths:open-work');
   // one layer down: the next layers, to choose how far to go
-  else if (shape === 'layer') offer('paths', 'paths:next-layer', 'soft');
+  else if (shape === 'layer' && offer('paths', 'paths:next-layer', 'soft')) {
+    // the next ways onward are of the thread's kind: what the work could do next, what else matters, or deeper
+    const prev = [...i.history].reverse().find((m) => m.role === 'user')?.content ?? '';
+    reasons.push(OPEN_WORK.test(prev) || HOW_APPROACH.test(prev) ? 'layer:work' : adviceAsk(prev) ? 'layer:more' : 'layer:idea');
+  }
   // a practical question: the rest of what matters, to open when they want it — not every tip there is
   else if (practical && !picking && (['price', 'grow', 'setup'].includes(kind) || MANY_ASK.test(t) || listAsked || domain === 'business')) offer('paths', 'paths:more', 'soft');
   // an idea with depth to it: the ways deeper (the formal statement, why a condition matters, where it is used),
@@ -638,7 +690,8 @@ export function planPresentation(i: PresentationInput): Presentation {
     ...(graph && forms.includes('graph') ? { graph } : {}),
     ...(parts && parts !== 'types' && forms.includes('diagram') ? { diagram: DIAGRAM_OF[parts] } : {}),
     ...(fits.length ? { strong: fits } : {}),
-    ...(shape === 'understand' && (FULL_DEPTH.test(t) || i.length === 'detailed') ? { depth: true } : {}),
+    ...(shape === 'understand' && (FULL_DEPTH.test(t) || i.length === 'detailed') ? { depth: true, ...(FULL_DEPTH.test(t) ? {} : { depthFromLength: true }) } : {}),
+    ...(i.guard ? { guard: true } : {}),
     ...(shape === 'understand' && parts ? { parts } : {}),
     ...(lean && forms.includes('decide') ? { lean: true } : {}),
     ...(i.questions <= 0 ? { noQuestion: true } : {}),
@@ -668,9 +721,9 @@ const GRAMMAR: Record<InlineKind, string> = {
   chart:
     '{"type":"chart","kind":"bar","title":"Hours this week","x":["Reading","Running","Cooking"],"series":[{"name":"Hours","values":[6,4,3]}],"unit":"h","basis":"given"} — kind bar, line or pie; values exactly as they gave them (basis "given") or from a source this turn ("source"); figures from anywhere else are not drawn. Your prose: what stands out, in a sentence.',
   slider:
-    '{"type":"slider","title":"Monthly payment","formula":"p*(r/1200)/(1-(1+r/1200)^(-360))","result":{"label":"Monthly payment","unit":"$","digits":0},"vars":[{"name":"p","label":"Loan","min":50000,"max":1000000,"step":5000,"value":300000,"unit":"$"},{"name":"r","label":"Rate","min":1,"max":12,"step":0.25,"value":6,"unit":"%"}]} — 1–3 single-letter variables at their numbers, or sensible defaults said to be defaults; the result is computed live (plain arithmetic, ^ for powers), so state none you have not computed. Your prose: what moves it most.',
+    '{"type":"slider","title":"Monthly payment","formula":"p*(r/1200)/(1-(1+r/1200)^(-n))","result":{"label":"Monthly payment","unit":"$","digits":0},"vars":[{"name":"p","label":"Loan","min":1000,"max":60000,"step":500,"value":12000,"unit":"$"},{"name":"r","label":"Rate","min":1,"max":15,"step":0.25,"value":6,"unit":"%"},{"name":"n","label":"Months","min":12,"max":84,"step":12,"value":48}]} — 1–3 single-letter variables at their numbers, or sensible defaults said to be defaults; the result is computed live (plain arithmetic, ^ for powers), so state none you have not computed. Your prose: what moves it most.',
   compare:
-    '{"type":"compare","options":["Paper notes","A notes app"],"rows":[{"label":"Remembering","values":["Better","Weaker"]},{"label":"Finding later","values":["Hard","Search"]}]} — 2–4 options and the 2–6 points that separate them, a few words a cell; "pick" (an option\'s index) only when what they told you settles it; figures you are unsure of marked unchecked. Your prose: the difference that decides most cases, and the pick if there is one.',
+    '{"type":"compare","options":["A fountain pen","A ballpoint"],"rows":[{"label":"Writing feel","values":["Glides, no pressure","Needs pressure"]},{"label":"Upkeep","values":["Ink and cleaning","None"]}]} — 2–4 options and the 2–6 points that separate them, a few words a cell; "pick" (an option\'s index) only when what they told you settles it; figures you are unsure of marked unchecked. Your prose: the difference that decides most cases, and the pick if there is one.',
   reasoning:
     '{"type":"reasoning","summary":"It pays only if you stay past the break-even","steps":["The closing costs come back through the lower payment","Three years is shorter than that"]} — the reasoning folds under the answer. Your prose: the answer, in a sentence.',
   options:
@@ -678,17 +731,17 @@ const GRAMMAR: Record<InlineKind, string> = {
   draft:
     '{"type":"draft","kind":"email","title":"Running late","text":"Hi,\\n\\nI am running about ten minutes late. Please start without me and I will catch up.\\n\\nThanks"} — the text they asked for, whole, editable in place, with only what they told you in it. Your prose: a line around it at most.',
   concepts:
-    '{"type":"concepts","title":"Music theory","items":[{"name":"Rhythm","gist":"when notes fall","detail":"Long and short sounds against a steady beat.","links":["Melody"]},{"name":"Melody","gist":"notes as one line"},{"name":"Harmony","gist":"notes together"}]} — 3–7 parts of the subject; "detail" is read when one is opened; links name other items. Your prose: a short introduction, what holds the parts together. Do not also list them.',
+    '{"type":"concepts","title":"Bookbinding","items":[{"name":"Signatures","gist":"folded sheets in groups","detail":"Folded, nested, then sewn through the fold.","links":["Sewing"]},{"name":"Sewing","gist":"thread through the folds"},{"name":"Casing in","gist":"the book into its cover"}]} — 3–7 parts of the subject; "detail" is read when one is opened; links name other items. Your prose: a short introduction, what holds the parts together. Do not also list them.',
   sequence:
-    '{"type":"sequence","kind":"steps","title":"Repotting a plant","items":[{"label":"Water it the day before"},{"label":"Ease it out of the old pot","detail":"tip it and tap the rim"},{"label":"Set it at the same depth in fresh soil"}]} — 3–8 in order, only when the order is the point; kind "timeline" gives each a "when" ("1969"). Your prose: why the order matters, in a line; the items are not numbered again in prose.',
+    '{"type":"sequence","kind":"steps","title":"Waxing a snowboard","items":[{"label":"Clean the base"},{"label":"Drip wax from a warm iron","detail":"keep the iron moving"},{"label":"Iron it in, let it cool, scrape it thin"}]} — 3–8 in order, only when the order is the point; kind "timeline" gives each a "when" ("1840"). Your prose: why the order matters, in a line; the items are not numbered again in prose.',
   paths:
-    '{"type":"paths","items":[{"label":"Map who decides","gist":"the people whose yes it needs"},{"label":"Draft a first version","gist":"something concrete to react to"}]} — 2–4 ways the work could go next, a few words each; opening one sends it as their next message. Ways to explore, not questions. Your prose: the useful part, above it.',
+    '{"type":"paths","items":[{"label":"Map who decides","gist":"the people whose yes it needs"},{"label":"Choose the first test","gist":"the smallest thing that shows it works"}]} — 2–4 ways the work could go next, a few words each; opening one sends it as their next message. Ways to explore, not questions. Your prose: the useful part, above it.',
   decide:
-    '{"type":"decide","title":"Which flat","options":["The one in town","The one with a garden"],"rows":[{"label":"Rent","scores":[1,3]},{"label":"The commute","scores":[3,1],"note":"ten minutes against fifty"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), your honest first reading of each (0 poor – 3 strong, in option order). They set how much each matters; the leaning is computed from their weights, so name no winner in your prose. Your prose: the one thing it turns on, in a sentence or two; the rows carry the rest.',
+    '{"type":"decide","title":"Which allotment plot","options":["The sunny plot","The plot by the tap"],"rows":[{"label":"Sun","scores":[3,1]},{"label":"Carrying water","scores":[1,3],"note":"the tap is a few steps away"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), your honest first reading of each (0 poor – 3 strong, in option order). They set how much each matters; the leaning is computed from their weights, so name no winner in your prose. Your prose: the one thing it turns on, in a sentence or two; the rows carry the rest.',
   graph:
     '{"type":"graph","title":"Reshape a parabola","expr":"a*x^2+b*x+c","x":[-6,4],"params":[{"name":"a","value":1,"min":-3,"max":3,"step":0.5},{"name":"b","value":2,"min":-6,"max":6,"step":1},{"name":"c","value":-1,"min":-5,"max":5,"step":1}],"features":["turning","roots","intercept"],"predict":{"prompt":"If b doubles, which way does the vertex move?","options":["Left","Right","It stays put"]}} — y over x and 0–3 single-letter parameters they drag; turning points, roots and the y-intercept are found on the curve live, so state none you have not computed. "predict" (optional) has them commit before they move anything: use it when the point is a relationship they can discover. Your prose: one or two lines — what to try in it.',
   claim:
-    '{"type":"claim","claim":"Bats are blind","verdict":"fails","parts":[{"text":"Bats have working eyes, and many see well in dim light","holds":"yes","basis":"studies of bat vision"},{"text":"Echolocation replaced their sight","holds":"no","basis":"most bats use both"}]} — the claim inspected: verdict "holds", "fails", "partly" or "unsettled"; 2–5 parts it rests on, each "yes", "no", "partly" or "unclear", with what that rests on in a few words — the kind of evidence, never a study, figure or source you are not sure of. Your prose: the verdict and the one reason that settles it, in a sentence or two; the parts carry the rest, so do not also list them. They can open each part and say which one they doubt.',
+    '{"type":"claim","claim":"Ostriches bury their heads in the sand","verdict":"fails","parts":[{"text":"They lower their heads to the nest to turn their eggs","holds":"yes","basis":"observations of nesting birds"},{"text":"They hide by burying their heads","holds":"no","basis":"threatened birds lie flat or run"}]} — the claim inspected: verdict "holds", "fails", "partly" or "unsettled"; 2–5 parts it rests on, each "yes", "no", "partly" or "unclear", with what that rests on in a few words — the kind of evidence, never a study, figure or source you are not sure of. Your prose: the verdict and the one reason that settles it, in a sentence or two; the parts carry the rest, so do not also list them. They can open each part and say which one they doubt.',
   sim:
     '{"type":"sim","title":"Throw at 10 m/s","x":"v*cos(a*pi/180)*t","y":"v*sin(a*pi/180)*t-4.9*t^2","t":[0,"2*v*sin(a*pi/180)/9.8"],"view":{"x":[0,15],"y":[0,8]},"params":[{"name":"a","label":"angle","value":45,"min":5,"max":85,"step":1,"unit":"°"},{"name":"v","label":"speed","value":10,"min":2,"max":12,"step":1,"unit":"m/s"}],"readouts":[{"label":"range","expr":"v^2*sin(2*a*pi/180)/9.8","unit":"m","digits":1}],"predict":{"prompt":"Throw it half as fast again. How much further does it land?","options":["Half as far again","Over twice as far","About the same"]}} — a path over time t with 1–3 parameters; the view holds the path at every setting; when it ends and its readings are formulas, computed live, and each setting they try stays on the picture. Only for one relationship worth trying, never a dashboard. Your prose: what to try, in a line.',
   check:
@@ -698,9 +751,9 @@ const GRAMMAR: Record<InlineKind, string> = {
   diagram:
     '{"type":"diagram","view":"flow","title":"How a fever starts","nodes":[{"id":"a","label":"An infection"},{"id":"b","label":"Immune signals released","detail":"they reach the brain through the blood"},{"id":"c","label":"The brain raises its set point"},{"id":"d","label":"Shivering heats the body"}],"edges":[["a","b"],["b","c"],["c","d"]]} — a chain from cause to effect (it may branch); 3–9 nodes, labels a few words, "detail" a line read when opened. Your prose: what drives it, in a sentence; the nodes carry the parts — do not also list them.',
   balance:
-    '{"type":"balance","subject":"A four-day week","for":[{"text":"More time to rest","detail":"a whole day, every week"},{"text":"Fewer, shorter meetings"}],"against":[{"text":"Longer days"},{"text":"Harder to cover customers"}],"turns_on":"whether the work fits in four days"} — one subject, 2–4 points each side, a few words each, "detail" read when opened; "turns_on" is the one thing that decides which side wins for most people. Your prose: that one thing, in a sentence; do not also list the sides.',
+    '{"type":"balance","subject":"Owning a hot tub","for":[{"text":"Unwinding without leaving home","detail":"no booking, no travel"},{"text":"Warmth for stiff muscles"}],"against":[{"text":"Power and water bills"},{"text":"Weekly cleaning and chemicals"}],"turns_on":"how often you would really use it"} — one subject, 2–4 points each side, a few words each, "detail" read when opened; "turns_on" is the one thing that decides which side wins for most people. Your prose: that one thing, in a sentence; do not also list the sides.',
   equation:
-    '{"type":"equation","tex":"\\\\bar{v} = \\\\frac{\\\\text{distance}}{\\\\text{time}}","terms":[{"sym":"distance","means":"how far, in one unit"},{"sym":"time","means":"how long it took, in one unit"}],"example":{"tex":"\\\\frac{120\\\\text{ km}}{2\\\\text{ h}} = 60\\\\text{ km/h}"}} — the definition as one equation (TeX), each term a line, and one worked example (TeX, optional). Your prose: what it tells you, in a sentence.',
+    '{"type":"equation","tex":"\\\\text{mpg} = \\\\frac{\\\\text{miles}}{\\\\text{gallons}}","terms":[{"sym":"miles","means":"how far you drove"},{"sym":"gallons","means":"the fuel it took"}],"example":{"tex":"\\\\frac{300\\\\text{ miles}}{10\\\\text{ gallons}} = 30\\\\text{ mpg}"}} — the definition as one equation (TeX), each term a line, and one worked example (TeX, optional). Your prose: what it tells you, in a sentence.',
 };
 
 /** A known relationship to understand, at sensible defaults: the quantity grows, and they move what it grows with. */
@@ -709,16 +762,26 @@ const SLIDER_FORMULA_EX =
 /** A base rate, with their numbers: the chance a positive is real moves as they move the rate. */
 const SLIDER_BASE_RATE =
   '{"type":"slider","title":"A positive test, read right","formula":"100*s*b/(s*b+f*(100-b))","result":{"label":"Chance it is real","unit":"%","digits":1},"vars":[{"name":"b","label":"Base rate","min":0.1,"max":20,"step":0.1,"value":1,"unit":"%"},{"name":"s","label":"Sensitivity","min":50,"max":100,"step":1,"value":99,"unit":"%"},{"name":"f","label":"False positives","min":0.5,"max":20,"step":0.5,"value":5,"unit":"%"}]} — their numbers at their values (a rate of 1 in 1000 is 0.1%); the result is computed live, so state none you have not computed. Your prose: why the answer surprises, in a sentence.';
-/** Their own work, checked: where it holds and the first place it slips, folded under the verdict. */
-const REASONING_CHECK =
-  '{"type":"reasoning","summary":"The second step is where it slips","steps":["Taking 3 from both sides holds","Dividing only one side by 2 breaks the equality"]} — the check folds under the verdict: what holds, then the first place it goes wrong. Your prose: the verdict, in a sentence.';
+/**
+ * Their own work, checked — shown the shape of the verdict the engine reached
+ * (lib/core4 verify): a slip only when the engine refuted their answer, that it
+ * holds when it confirmed it, and when it checked nothing, a check that may go
+ * either way. An example that always slipped taught every check to find a slip
+ * (adversarial review, November 2026).
+ */
+const CHECK_SLIPS =
+  '{"type":"reasoning","summary":"The first step is where it slips","steps":["Multiplying 90 by 40 counts the minutes as hours","90 minutes is 1.5 hours, so it is 1.5 × 40 = 60 miles"]} — the check folds under the verdict: the first place it goes wrong, then what holds from there. Your prose: the verdict, in a sentence.';
+const CHECK_HOLDS =
+  '{"type":"reasoning","summary":"It holds: 60 miles","steps":["90 minutes is 1.5 hours","1.5 hours at 40 mph is 1.5 × 40 = 60 miles"]} — the check folds under the verdict: that it holds, and why. Your prose: that it holds, first, in a sentence; there is nothing to correct.';
+const CHECK_OPEN =
+  '{"type":"reasoning","summary":"It holds: 60 miles","steps":["90 minutes is 1.5 hours","1.5 hours at 40 mph is 1.5 × 40 = 60 miles"]} — the check folds under the verdict: whether it holds and why, or, only if something does not, the first place it goes wrong ("The first step is where it slips"). It may well be right: check it before you say either. Your prose: the verdict, in a sentence.';
 /** A decision they asked Socria's read on: still weighed by them, with Socria's lean said once and marked as its own. */
 const DECIDE_LEAN =
-  '{"type":"decide","title":"Which flat","options":["The one in town","The one with a garden"],"rows":[{"label":"Rent","scores":[1,3]},{"label":"The commute","scores":[3,1],"note":"ten minutes against fifty"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), your honest first reading of each (0 poor – 3 strong, in option order). They set how much each matters, and the leaning is computed from their weights. They asked for your read, so give it once, after the block, marked as yours and tied to what matters to them ("If the commute decides it, the one in town"). Your prose: the one thing it turns on, and that read.';
+  '{"type":"decide","title":"Which allotment plot","options":["The sunny plot","The plot by the tap"],"rows":[{"label":"Sun","scores":[3,1]},{"label":"Carrying water","scores":[1,3],"note":"the tap is a few steps away"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), your honest first reading of each (0 poor – 3 strong, in option order). They set how much each matters, and the leaning is computed from their weights. They asked for your read, so give it once, after the block, marked as yours and tied to what matters to them ("If carrying water decides it, the plot by the tap"). Your prose: the one thing it turns on, and that read.';
 
 /** A timeline is a sequence too: what changes is that every item has its date, and the prose names the turning point. */
 const SEQUENCE_TIMELINE =
-  '{"type":"sequence","kind":"timeline","title":"The Apollo program","items":[{"label":"Kennedy sets the goal","when":"1961"},{"label":"Apollo 8 orbits the Moon","when":"1968"},{"label":"Apollo 11 lands","when":"1969"}]} — 3–8 events in order, each with its "when"; "detail" (optional) is read when opened. Your prose: the turning point, in a sentence; the items carry the dates.';
+  '{"type":"sequence","kind":"timeline","title":"The first postage stamp","items":[{"label":"Rowland Hill proposes prepaid post","when":"1837"},{"label":"The Penny Black goes on sale","when":"1840"},{"label":"The Penny Red replaces it","when":"1841"}]} — 3–8 events in order, each with its "when"; "detail" (optional) is read when opened. Your prose: the turning point, in a sentence; the items carry the dates.';
 
 /**
  * The ways onward, by what they lead to: for an idea, the ways deeper into it;
@@ -732,13 +795,26 @@ const PATHS_DEEPER =
   '{"type":"paths","items":[{"label":"Where it breaks down","gist":"the case it does not cover"},{"label":"Why the condition matters","gist":"what goes wrong without it"}]} — 2–4 ways deeper into this idea, a few words each, such as the formal statement, why a condition matters, where it is used; never the way they just opened; opening one sends it as their next message. Ways to explore, not questions. Your prose: the idea itself, above them.';
 const PATHS_MORE =
   '{"type":"paths","items":[{"label":"Watering in a heatwave","gist":"when twice a day beats once"},{"label":"Feeding the soil","gist":"what to add, and when"}]} — 2–4 of what else matters here, a few words each; opening one sends it as their next message. Your prose: the few that matter most; what you left out goes here.';
+/**
+ * One layer down, the next ways onward follow what the thread is: the work's
+ * next moves, the rest of the practical question, or further into the idea —
+ * each on its own example, so the way just opened (copied, perhaps, from the
+ * first turn's example) is never the one offered again.
+ */
+const PATHS_NEXT_WORK =
+  '{"type":"paths","items":[{"label":"Who holds the keys","gist":"and who opens up on Saturdays"},{"label":"A watering rota","gist":"so August is covered"}]} — 2–4 ways the work could go from here, a few words each — never the way they just opened; opening one sends it as their next message. Ways to explore, not questions. Your prose: the useful part, above it.';
+const PATHS_NEXT_MORE =
+  '{"type":"paths","items":[{"label":"Checking the queen","gist":"what a healthy brood looks like"},{"label":"Feeding in winter","gist":"what to give them, and when"}]} — 2–4 of what else matters from here, a few words each — never the way they just opened; opening one sends it as their next message. Your prose: what to do, above it.';
+const PATHS_NEXT_IDEA =
+  '{"type":"paths","items":[{"label":"Why the gnomon tilts","gist":"it points at the pole"},{"label":"The equation of time","gist":"why sundial noon drifts"}]} — 2–4 ways further in from here, a few words each — never the way they just opened, nor one the conversation already took; opening one sends it as their next message. Ways to explore, not questions. Your prose: the layer itself, above them.';
 
 /**
  * Which graph fits the idea: the same element, shown the construction the
  * idea needs — so a question about the mean value theorem is shown a chord
  * and the tangent that matches it, not a parabola to reshape.
  */
-const GRAPH_TAIL = ' Everything marked on it — turning points, roots, crossings, slopes, where a tangent matches a chord, the readings — is computed on the curve as it is now, so state no value you have not computed. Your prose: one or two lines — what to try in it.';
+const GRAPH_MARKS = ' Everything marked on it — turning points, roots, crossings, slopes, where a tangent matches a chord, the readings — is computed on the curve as it is now, so state no value you have not computed.';
+const GRAPH_TAIL = GRAPH_MARKS + ' Your prose: one or two lines — what to try in it.';
 const GRAPH_GRAMMAR: Record<GraphVariant, string> = {
   plot:
     '{"type":"graph","title":"y = x²","expr":"x^2","x":[-3,3],"params":[],"features":["turning","roots","intercept"]} — the function exactly as they wrote it, over the range they gave (or one that shows its shape); no parameters unless they asked to vary something. One line of prose at most: what to notice, never a value you have not computed. If they want to come back to it, Keep files it in Artifacts.' + GRAPH_TAIL,
@@ -766,20 +842,81 @@ const DIAGRAM_GRAMMAR: Record<DiagramVariant, string> = {
     '{"type":"diagram","view":"tree","title":"A school district","nodes":[{"id":"a","label":"School board"},{"id":"b","label":"Superintendent"},{"id":"c","label":"Principals","detail":"one for each school"},{"id":"d","label":"Operations"},{"id":"e","label":"Finance"}],"edges":[["a","b"],["b","c"],["b","d"],["b","e"]]} — a hierarchy: one root, edges parent → child, three levels at most.' + DIAGRAM_TAIL,
   flow: GRAMMAR.diagram,
   causes:
-    '{"type":"diagram","view":"causes","title":"Why the Titanic sank","nodes":[{"id":"a","label":"Full speed in an ice field","role":"underlying"},{"id":"b","label":"Too few lifeboats","role":"amplifier"},{"id":"c","label":"Brittle hull rivets","role":"amplifier"},{"id":"d","label":"The iceberg strike","role":"trigger"},{"id":"e","label":"The sinking","role":"effect"}],"edges":[["a","e"],["b","e"],["c","e"],["d","e"]]} — causes converging on what they brought about: each node a role — "underlying", "trigger", "amplifier" or "effect" — and edges pointing to the effect; only causes you could defend, and where historians disagree, say so in your prose.' + DIAGRAM_TAIL,
+    '{"type":"diagram","view":"causes","title":"Why the loaf did not rise","nodes":[{"id":"a","label":"Old yeast","role":"underlying"},{"id":"b","label":"A cold kitchen","role":"amplifier"},{"id":"c","label":"Salt poured onto the yeast","role":"trigger"},{"id":"d","label":"A flat loaf","role":"effect"}],"edges":[["a","d"],["b","d"],["c","d"]]} — causes converging on what they brought about: each node a role — "underlying", "trigger", "amplifier" or "effect" — and edges pointing to the effect; only causes you could defend, and where the causes are disputed, say so in your prose.' + DIAGRAM_TAIL,
 };
 
 /** The grammar for a form as this turn needs it. */
 function grammarFor(k: InlineKind, p: Presentation): string {
+  const g = grammarOf(k, p);
+  return p.guard && GUARDED[k] ? guarded(g, k) : g;
+}
+function grammarOf(k: InlineKind, p: Presentation): string {
+  const r = p.reasons;
   if (k === 'graph') return GRAPH_GRAMMAR[p.graph ?? 'curve'];
   if (k === 'diagram') return DIAGRAM_GRAMMAR[p.diagram ?? 'flow'];
-  if (k === 'sequence' && p.reasons.includes('sequence:timeline')) return SEQUENCE_TIMELINE;
-  if (k === 'slider' && p.reasons.includes('slider:formula')) return SLIDER_FORMULA_EX;
-  if (k === 'slider' && p.reasons.includes('slider:base-rate')) return SLIDER_BASE_RATE;
-  if (k === 'reasoning' && p.reasons.includes('reasoning:check-work')) return REASONING_CHECK;
+  if (k === 'sequence' && r.includes('sequence:timeline')) return SEQUENCE_TIMELINE;
+  if (k === 'slider' && r.includes('slider:formula')) return SLIDER_FORMULA_EX;
+  if (k === 'slider' && r.includes('slider:base-rate')) return SLIDER_BASE_RATE;
+  if (k === 'reasoning' && r.includes('reasoning:check-work')) return r.includes('check:slips') ? CHECK_SLIPS : r.includes('check:holds') ? CHECK_HOLDS : CHECK_OPEN;
   if (k === 'decide' && p.lean) return DECIDE_LEAN;
-  if (k === 'paths') return p.reasons.includes('paths:more') ? PATHS_MORE : p.reasons.includes('paths:deeper') || p.reasons.includes('paths:next-layer') ? PATHS_DEEPER : GRAMMAR.paths;
+  if (k === 'paths' && r.includes('paths:next-layer')) return r.includes('layer:work') ? PATHS_NEXT_WORK : r.includes('layer:more') ? PATHS_NEXT_MORE : PATHS_NEXT_IDEA;
+  if (k === 'paths') return r.includes('paths:more') ? PATHS_MORE : r.includes('paths:deeper') ? PATHS_DEEPER : GRAMMAR.paths;
   return GRAMMAR[k];
+}
+
+/**
+ * UNDER THE GUARD, THE EXAMPLE IS WHAT IS DRAWN. The gate takes off a graph's
+ * marks and readings, a simulation's readings, an equation's worked example and
+ * a check's explanation (lib/inline-ui.ts checkInlineSpec) — the answer, in each.
+ * Shown them in the example, the reply wrote them, and said them in prose when
+ * the block came back without them (adversarial review, November 2026). So the
+ * example loses what the gate would take, and the grammar says why.
+ */
+const GUARDED: Partial<Record<InlineKind, { drop: string[]; cut: [string, string][]; why: string }>> = {
+  graph: {
+    drop: ['features', 'readouts'],
+    cut: [
+      [GRAPH_MARKS, ''],
+      [', so state none you have not computed', ''],
+      [' and its slope (the average rate) are drawn', ' is drawn'],
+      [' and its slope are drawn live', ' is drawn live'],
+      [' between two such positions and its slope.', ' between two such positions.'],
+      ['the tangent there and its slope, live', 'the tangent there, live'],
+      ['; "mean-value" marks where a tangent runs parallel to the chord — or says why none does (a corner, a break)', ''],
+      ['; turning points, roots and the y-intercept are found on the curve live', ''],
+      ['; "crossings" marks where they meet, live, and where they met at first stays visible as they change things', ''],
+      [', with readings that are formulas in the parameters ("readouts"), computed live', ''],
+    ],
+    why: 'Under the Answer Guard nothing on it is marked or read out — no turning points, roots, crossings, slopes or readings, whatever is said above — because finding them is their work.',
+  },
+  sim: { drop: ['readouts'], cut: [['when it ends and its readings are formulas, computed live', 'when it ends is a formula, computed live']], why: 'Under the Answer Guard it shows no readings: what they would read off it is theirs to find.' },
+  equation: { drop: ['example'], cut: [[', and one worked example (TeX, optional)', '']], why: 'Under the Answer Guard, no worked example: it would be the worked answer.' },
+  check: { drop: ['explain'], cut: [[', and "explain" shows only after they try', '']], why: 'Under the Answer Guard, no "explain": how it comes out is theirs.' },
+};
+function guarded(g: string, k: InlineKind): string {
+  const rule = GUARDED[k]!;
+  const at = g.indexOf('{"type"');
+  let end = -1;
+  for (let i = at, d = 0, str = false, esc = false; at >= 0 && i < g.length; i++) {
+    const c = g[i];
+    if (str) {
+      if (esc) esc = false;
+      else if (c === '\\') esc = true;
+      else if (c === '"') str = false;
+    } else if (c === '"') str = true;
+    else if (c === '{') d++;
+    else if (c === '}' && !--d) {
+      end = i + 1;
+      break;
+    }
+  }
+  if (end < 0) return g;
+  const ex = JSON.parse(g.slice(at, end)) as Record<string, unknown>;
+  for (const key of rule.drop) delete ex[key];
+  const rest = rule.cut.reduce((r, [from, to]) => r.split(from).join(to), g.slice(end));
+  const cut = rest.search(/\s*Your prose:/);
+  const prose = k === 'graph' || k === 'sim' ? ' Your prose: what to try in it, in a line — never what they would find.' : cut >= 0 ? rest.slice(cut) : '';
+  return `${g.slice(0, at)}${JSON.stringify(ex)}${cut >= 0 ? rest.slice(0, cut) : rest} ${rule.why}${prose}`;
 }
 
 /** What the element is called in the reply's instructions: "the comparison below". */
@@ -795,6 +932,14 @@ const NOUN: Partial<Record<InlineKind, string>> = {
   equation: 'equation',
   steps: 'working',
   chart: 'chart',
+};
+
+/** In detail, by the block that carries the parts: each part a short paragraph, in the block's own order. */
+const PARTS_IN_DETAIL: Partial<Record<InlineKind, string>> = {
+  diagram: 'each part in a short paragraph, in the order the diagram connects them: what it does and how it bears on the rest',
+  sequence: 'each step or event in a short paragraph, in the sequence\'s order: what happens and why it comes there',
+  concepts: 'each part in a short paragraph, in the order that builds the subject: what it is and how it ties to the others',
+  balance: 'each point in a short paragraph, one side and then the other, as the block sets them out',
 };
 
 /** What a block that fits carries, in the header's words: "the options side by side go in the block below". */
@@ -850,12 +995,20 @@ const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
     const deeperWays = paths
       ? '; if there is more worth going into, the ways deeper go in the paths block — two or three, a few words each, such as the formal statement, why a condition matters, where it is used — to open one at a time'
       : '';
-    const stop = p.depth
-      ? `They asked for it in detail: after that, go through what they asked for — the proof, the conditions, a worked case — in order, a short paragraph each, built on what is drawn and never restating it. No headings, no summary${deeperWays}.`
-      : null;
+    // in detail, by what carries it: the parts each get a paragraph, the working's lines carry themselves, and
+    // only an idea has a proof, its conditions and a worked case (adversarial review, November 2026)
+    const asked = p.depthFromLength ? 'Their replies are set to Detailed' : 'They asked for it in detail';
+    const partsLed = (!!element && PARTS_FORMS.has(element) && fits) || (!element && !!p.parts);
+    const stop = !p.depth
+      ? null
+      : partsLed
+        ? `${asked}: after that, ${PARTS_IN_DETAIL[element ?? 'concepts'] ?? PARTS_IN_DETAIL.concepts} — never a label repeated as a line of its own. No headings, no summary${deeperWays}.`
+        : element === 'steps' && fits
+          ? `${asked}: the lines carry the working, so after them only what the lines cannot hold — why the method works, and the step most often got wrong — in a short paragraph each. No headings, no summary${deeperWays}.`
+          : `${asked}: after that, go through what they asked for — the proof, the conditions, a worked case — in order, a short paragraph each, built on what is drawn and never restating it. No headings, no summary${deeperWays}.`;
     // the answer is a set of parts: there is no single central sentence, and the element carries them — when
     // the parts ARE the answer (the form that fits), not when a sequence is only offered beside an idea
-    if ((element && PARTS_FORMS.has(element) && fits) || (!element && p.parts)) {
+    if (partsLed) {
       const carried = element
         ? `Then the ${NOUN[element] ?? 'element'} below carries the parts.`
         : 'Then the parts themselves, briefly, in the order they connect — a sentence each, in prose.';
@@ -872,7 +1025,11 @@ const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
             : element === 'equation'
               ? 'the equation below and its terms, with one line on what it tells you'
               : `the ${NOUN[element] ?? 'element'} below, with a line on what to do with it`;
-    return `\n\nTHE SHAPE OF THIS REPLY — they want to understand an idea. Minimum explanation, maximum understanding:\n- Open with the central insight in one plain sentence: what it says and why it holds — the relationship itself, not the topic's name, its history, or "X is a fundamental concept in…". A condition it is false without (continuity, a sign, a domain, all else equal) belongs in that sentence or the next: never drop one for brevity, and never state something more strongly than it is true.\n- Then only what makes that sentence land: ${after} — not a second explanation of the same thing.\n- ${stop ?? `Then stop. No headings or sections${element === 'compare' ? '' : ', no list of properties'}, no applications, history or proof they did not ask for${deeperWays}.`}\n${stop ? '' : 'If a sentence or two carries it, that is the whole reply.\n'}`;
+    // under the guard the central insight may be the very result they are working toward: open on what it rests on
+    const opening = p.guard
+      ? 'Open with what the idea rests on, in one plain sentence — never the result they are working toward, which is theirs to reach; not the topic\'s name, its history, or "X is a fundamental concept in…".'
+      : 'Open with the central insight in one plain sentence: what it says and why it holds — the relationship itself, not the topic\'s name, its history, or "X is a fundamental concept in…".';
+    return `\n\nTHE SHAPE OF THIS REPLY — they want to understand an idea. Minimum explanation, maximum understanding:\n- ${opening} A condition it is false without (continuity, a sign, a domain, all else equal) belongs in that sentence or the next: never drop one for brevity, and never state something more strongly than it is true.\n- Then only what makes that sentence land: ${after} — not a second explanation of the same thing.\n- ${stop ?? `Then stop. No headings or sections${element === 'compare' ? '' : ', no list of properties'}, no applications, history or proof they did not ask for${deeperWays}.`}\n${stop ? '' : 'If a sentence or two carries it, that is the whole reply.\n'}`;
   },
   practical: (p) => {
     const element = p.forms.find((k) => k !== 'paths');
@@ -881,14 +1038,28 @@ const SHAPES: Record<ReplyShape, (p: Presentation) => string> = {
   },
   open: (p) => {
     const paths = p.forms.includes('paths');
-    return `\n\nTHE SHAPE OF THIS REPLY — an open piece of work. Don't write the plan. Open with the problem that actually matters here, in a sentence or two: the thing that will make or break it, which they may not have put into words — not a restatement of what they asked. Then the one starting point you would take, concrete and particular to their situation, in a short paragraph. Then ${paths ? 'the ways it could go next as a paths block (below) — two to four, each a few words and a line on what opening it gives them — and stop there' : 'name the two or three ways it could go next, in a sentence, and stop there'}. No headings, no bolded sections, no generic best practice, and no closing question unless one answer would change everything you would say.\n`;
+    // a block that is the point of the turn says its part: a choice laid out is theirs to call, their numbers are drawn
+    const start = p.forms.includes('decide')
+      ? 'Then what the choice turns on, in a short paragraph: the options are weighed in the decide block below, and the call is theirs.'
+      : `Then the one starting point you would take, concrete and particular to their situation, in a short paragraph${p.forms.includes('chart') ? ' — the chart below shows their numbers, so do not list them again' : ''}.`;
+    const question = p.noQuestion ? ', and no question' : ', and no closing question unless one answer would change everything you would say';
+    return `\n\nTHE SHAPE OF THIS REPLY — an open piece of work. Don't write the plan. Open with the problem that actually matters here, in a sentence or two: the thing that will make or break it, which they may not have put into words — not a restatement of what they asked. ${start} Then ${paths ? 'the ways it could go next as a paths block (below) — two to four, each a few words and a line on what opening it gives them — and stop there' : 'name the two or three ways it could go next, in a sentence, and stop there'}. No headings, no bolded sections, no generic best practice${question}.\n`;
   },
   layer: (p) => {
     const element = p.forms.find((k) => k !== 'paths');
     const fits = !!element && !!p.strong?.includes(element);
     const paths = p.forms.includes('paths');
     const shown = !element ? '' : fits ? `, shown in the ${NOUN[element] ?? 'element'} below` : `, or the ${NOUN[element] ?? 'element'} below if it shows it better`;
-    return `\n\nTHE SHAPE OF THIS REPLY — they opened one way deeper. Go one layer down, not the whole of it: the mechanism under it, or the one result that matters, in a few sentences${shown} — built on what the conversation already said, never repeating it. ${paths ? 'Then, if there is more worth going into, the next ways deeper as a paths block — two or three, a few words each, never the one just opened — so they choose how far to go.' : 'End on what it opens up next, in a sentence.'} No headings, no summary.\n`;
+    const r = p.reasons;
+    const down = r.includes('layer:work')
+      ? 'what to do on that part first and what it depends on, particular to their situation'
+      : r.includes('layer:more')
+        ? 'what to do and when, for their situation'
+        : r.includes('layer:idea')
+          ? 'the mechanism under it, or the one result that matters'
+          : 'how it works under the surface, or what to do next';
+    const next = r.includes('layer:work') ? 'the next ways the work could go' : r.includes('layer:more') ? 'what else matters from here' : 'the next ways in';
+    return `\n\nTHE SHAPE OF THIS REPLY — they opened one way further. Go one layer down, not the whole of it: ${down}, in a few sentences${shown} — built on what the conversation already said, never repeating it. ${paths ? `Then, if there is more worth going into, ${next} as a paths block — two or three, a few words each, never the one just opened — so they choose how far to go.` : 'End on what it opens up next, in a sentence.'} No headings, no summary.\n`;
   },
   deeper: () =>
     `\n\nTHE SHAPE OF THIS REPLY — they asked to go deeper on one thread. Go deep on that thread and only that: the reasoning in full, worked through for their situation, as long as it needs. You have the whole conversation, so build on it rather than repeating it. Open with the most important thing about it, in a sentence. If it has distinct parts, give each a short heading line of its own (### A few words) — here, unlike most replies — so it can be read a part at a time. End on what it opens up next, in a sentence; no summary.\n`,
@@ -932,7 +1103,7 @@ export function renderPresentation(p: Presentation, ctx: PresentationContext = {
   let out = shape;
   if (fits.length) {
     const one = fits.length === 1;
-    const what = one ? `${CARRIES[fits[0]] ?? 'the parts'} in the block below` : 'the parts in the blocks below';
+    const what = one ? `${CARRIES[fits[0]] ?? 'the parts'} in the block below` : `${fits.map((k) => CARRIES[k] ?? 'the parts').join(', and ')} in the blocks below`;
     out += `\n\nTHE FORM THAT FITS — ${what}: use ${one ? 'it' : 'them'}${p.shape ? '' : ' unless one sentence fully answers them'}, and let your prose frame ${one ? 'it' : 'them'}. ${NO_RESTATE} Each ${FENCED}:\n${fits.map(line).join('\n')}\n`;
     if (maybe.length) out += `Optional, after it, if it helps:\n${maybe.map(line).join('\n')}\n`;
   } else {

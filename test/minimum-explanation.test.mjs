@@ -90,9 +90,11 @@ console.log('\n=== what the turn is told: the move and the subject ===');
   ok('…and nothing tells it to work a problem through', !/work the problem through/.test(mvt) && /explain the idea/.test(mvt), mvt);
   const why = block('Why is the derivative of x^2 equal to 2x?');
   ok('maths on an idea: the idea before any working, not "step by step"', /The idea before any working/.test(why) && !/^Show the reasoning step by step/m.test(why), why);
-  ok('maths on a problem still shows the working', /Show the reasoning step by step/.test(block('Solve for x: 3x^2 - 12 = 0')), block('Solve for x: 3x^2 - 12 = 0'));
+  // a problem handed over is practice (the Human-First owner decision): the domain line works it with them, as the
+  // scaffold does, instead of telling the reply to show the working the scaffold keeps theirs (second adversarial round)
+  ok('maths on a problem: worked with them, method then the next step — the same as the scaffold', /Work it with them: name the method, then the next step/.test(block('Solve for x: 3x^2 - 12 = 0')) && !/Show the reasoning step by step/.test(block('Solve for x: 3x^2 - 12 = 0')), block('Solve for x: 3x^2 - 12 = 0'));
   const find = block('Find the derivative of x^3 sin x');
-  ok('"find the derivative of…" is a problem to work, not idle talk', /Show the reasoning step by step/.test(find) && /=== This turn ===/.test(find), find);
+  ok('"find the derivative of…" is a problem to work, not idle talk', /Work it with them/.test(find) && /=== This turn ===/.test(find), find);
   ok('…while "calculate 18% of 340" is still a quick sum, answered', /INFORM/.test(block('calculate 18% of 340')), block('calculate 18% of 340'));
   const egg = block('How long should I boil an egg for a runny yolk?');
   ok('the egg is answered, not deliberated', /INFORM/.test(egg) && !/PERSPECTIVE/.test(egg) && !/Theirs: the decision/.test(egg), egg);

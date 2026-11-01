@@ -2572,11 +2572,11 @@ runs — no extra model call, and the cached prompt does not change per turn.
   | The turn | The form | Header |
   |---|---|---|
   | options set against each other | `compare` (a pick only when what they said settles it) | fits |
-  | a choice that is theirs, or a team's change against the status quo | `decide` (their weights; no winner named) | fits |
+  | a choice that is theirs, or a team's change to the business | `decide` (their weights; no winner named — Socria's read once, marked as its own, only when they ask for it) | fits |
   | one subject's two sides | `balance` (for, against, what it turns on) | fits |
   | a cycle, a hierarchy, causes, effects | `diagram` (cycle, tree, causes, flow) | fits |
   | the types of something, a subject's parts | `concepts` | fits |
-  | a ratio or a formula's definition | `equation` (terms, one worked example) | fits |
+  | a ratio or a formula's definition, or a named law asked what it means | `equation` (terms, one worked example) | fits |
   | a relationship to see (MVT, a derivative, a tax, elasticity) | `graph`, in the variant the idea needs | fits |
   | a known relationship (compound interest, Bayes), a base rate | `slider` (defaults said to be defaults) | fits |
   | their own named amounts | `chart` | fits |
@@ -2584,13 +2584,22 @@ runs — no extra model call, and the cached prompt does not change per turn.
   | steps asked for, a procedure, a trip's days | `sequence` | fits |
   | a timeline asked for | `sequence` timeline (the turning point in prose) | fits |
   | a history, how a game works, a call to weigh in on | `sequence`, `reasoning` | optional |
-  | the ways onward, directions to tap | `paths`, `options` | optional |
+  | the ways an open piece of work could go | `paths` | fits |
+  | the ways deeper, the rest of a practical answer, directions to tap | `paths`, `options` | optional |
 
-  "The form that fits" says: use it unless one sentence fully answers them;
-  it carries the parts, the prose frames it. Every grammar ends on what the
-  prose around it is for ("Your prose: the difference that decides most
-  cases"), and the header says once that words never repeat a block. Every
-  example is a valid instance of its element.
+  The header names what the block carries ("THE FORM THAT FITS — the options,
+  side by side in the block below"), and says once that words never repeat a
+  block beyond the one point the prose is for. Without a shape it adds "use it
+  unless one sentence fully answers them"; with one, the shape's own "if a
+  sentence or two carries it, that is the whole reply" is the only threshold.
+  What the prose is for is said once: by the shape when there is one, else by
+  the first form's grammar ("Your prose: the difference that decides most
+  cases"). Every example is a valid instance of its element, on a topic nobody
+  is likely to ask about in the same breath (a habit loop, a school district,
+  the Titanic, the Apollo programme, music theory, bats), with no placeholder
+  values a model would copy as content; the slider and reasoning examples are
+  chosen by reason (a what-if, a known formula, a base rate; a call, a check
+  of their work).
 - *One live element per reply* (graph, simulation, slider, decision, working,
   claim): the first that fits wins — the working asked for before a graph
   inferred, a graph before a slider; a second form is only ever a quiet one.
@@ -2652,10 +2661,181 @@ Whether an imperative "solve…" should be answered outright is a Human-First
 decision for the product owner, not a presentation fix; the Answer Guard
 remains the switch.
 
-**Tested.** `test/presentation-selection.test.mjs` (176): maths, comparisons,
+### The new elements: diagram, the two sides, an equation
+
+`lib/inline-ui.ts`, `lib/inline-diagram.ts`, `components/inline/InlineUI.tsx`.
+Three kinds join the vocabulary because the audit's turns kept needing them:
+`diagram` (four views — a cycle that returns to its start, a tree with one
+root, a flow that may branch, causes converging on an effect, each node a
+role), `balance` (one subject, for and against, and the one thing it turns
+on) and `equation` (TeX, a line per term, one worked example). Their
+sanitizers are lenient where a model is usually nearly right (a cycle missing
+its closing edge is closed; ids that collide are renamed, never dropped; a
+causes link that would cross a box it does not join is routed round it) and
+strict where it matters (a tree with two roots, a branch in a cycle). Each
+renders contained: an error in one never takes the reply with it. At 640px
+and under, or wherever the picture would squeeze its labels, the diagram is a
+list with connectors and the same parts to open — and a fenced
+```json or bare block that is wholly a valid element is read as the element
+it was meant to be, unless the turn asked for code.
+
+### The stream gate: every block checked, their words kept, filler shadow-first
+
+`lib/core4/stream-gate.ts`, `lib/core4/questions.ts`. The gate looked for a
+block's closing fence from its opening one, so a ```ui block that arrived
+over more than one delta went out unchecked as sentences; now every block is
+checked whatever the delta size, and the output is identical at one
+character, three, six, seven, fifty or whole (a 42-reply corpus and a
+4,000-reply fuzz, byte for byte). Its rule against a closing offer ("Let me
+know if…") no longer touches their own words: a quotation, a table row, a
+draft (from "Here's a draft:", a `Subject:` line or a salutation to the
+sign-off), a list item after another, or the wordings they asked for go out
+as written. A dropped element takes its own instruction with it ("Drag the
+slider…"), and nothing after. Filler is trimmed shadow-first: openers
+("Certainly!"), announcements ("Here's a breakdown of…"), trailing recaps
+that add nothing, pleasantries and "X is a fundamental concept in Y" are
+classified on every reply; `LOGOS_TRIM` decides what is removed — `safe` (the
+default: announcement lines only, the rest counted), `on`, `shadow`, `off` —
+and `[logos] gate` logs the counts, so the next class switched on is chosen
+from what would have gone.
+
+### The renderer: disclosure without headings, and nothing undone mid-stream
+
+`lib/rich-text.ts`, `lib/reply-layout.ts`, `components/RichText.tsx`. A long
+reply folds its later parts whether or not it has headings, with the opening
+always shown; density rules lay out what models still write as markdown — a
+run of bold labels as terms, a short comparison table as columns, pros and
+cons side by side — and decide only once a decision cannot be undone by the
+next line, so nothing flips back while a reply arrives. JSON in a code fence
+stays code; depth is read in people's words ("can you go into more detail?",
+"be thorough", and not "I don't need a detailed answer").
+
+### Accuracy: a fragment of a longer sum is not a claim
+
+`lib/accuracy/claims.ts`. "1 + 2 + 3 + … + n = n(n+1)/2" was checked as
+"3 + … + n = …" and refuted. A run of mathematics that continues past an
+ellipsis, a line break or an operator is a fragment now, never checked as
+whole; the cost is a few missed checks right beside an ellipsis, never a
+wrong one.
+
+### The adversarial review
+
+Two rounds, each through three independent lenses — precision (a structure
+forced where it does not belong), recall (a structure the turn needed and did
+not get), coherence (the whole text the reply receives, read for
+contradictions) — 822 phrasings in the first round and fresh ones in the
+second, every finding reproduced on the planner before it was fixed.
+What the first round found, and what changed:
+
+- *Somebody's own life got a structure.* "Why did he end things with me?"
+  got a causes diagram, "is he worth it?" a balance sheet, "how do I fix my
+  marriage?" a recipe, "should we stop trying for a baby?" a 0–3 scoring
+  block, "my therapist says…" a verdict. Every reader that puts a structure
+  on a turn now stands down for a person's relationships, grief, feelings or
+  self (`PERSONAL_LIFE`), for a person named instead of a subject, for one of
+  their own events ("the meeting", "last night"), and — for scoring and
+  balance — for a sensitive subject. A team's change is weighed only when it
+  is the business's. "Give me three reasons to live" is read as danger.
+- *A bare word became a structure.* A dishwasher's rinse cycle, "Kramer vs
+  Kramer", pizza or tacos, growing tomatoes, "how long until Christmas?", an
+  airport runway, a healthy BMI, "solve a conflict with my roommate". Each
+  reader now needs the shape of a request around the word.
+- *Current questions lost their lookup.* "Why is bitcoin crashing?" and
+  "how did the stock market do?" were treated as concepts because they began
+  with how or why; a how or a why is a concept now only about a mechanism.
+- *Polite and indirect phrasings got nothing.* "Tell me about the water
+  cycle", "can you tell me how to change a tyre?", "how do you make
+  pancakes?", "do we only use 10% of our brains?", "how do mitosis and meiosis
+  differ?", "is it better to rent or buy?", "do I take the job or stay?" now
+  get the reading their direct forms get. "World War I" and "the US" are
+  subjects, not the person.
+- *The turn said things twice, or argued with itself.* One line ordered a stop
+  after a sentence while another asked for depth; the decision block gagged a
+  winner on turns that asked for Socria's pick; optional elements were
+  written into the shape as required; the business line asked for "the next
+  concrete step" on an idea turn; grammar examples were the very turns the
+  sweep asked. Each is said once now, by the one that owns it (above).
+
+The second round (1,341 fresh phrasings: 421 precision, 740 recall, 180
+coherence; 36 findings, 35 confirmed by an independent verifier) found the
+first round's rules held where they were written and leaked where they were
+not:
+
+- *Somebody's own life, asked another way.* A bare kin word or a given name
+  ("Is grandma really dying?", "Is Tom really cheating on me?"), a reported
+  slight ("My sister says I'm selfish. Is that true?") and a comfort-seeking
+  tag ("It always gets better, doesn't it?") got a claim verdict; "my dad died
+  today. what do I do now?" was sent to the search provider; keeping a baby,
+  putting a dog down and cremating a parent got a 0–3 scoring block; planning
+  a funeral got the open-work shape; healing and making amends got a recipe;
+  a mother's surgery got a slider; a grandmother's stroke got a causes
+  diagram; one's own children got a comparison table. The person readers are
+  now shared (`lib/runtime/asks.ts`: `PERSONAL_LIFE`, `FAMILY`, `tenderText`,
+  `aPerson`) and consulted by the planner, the claim reader, the web gate and
+  MR alike, two-sided so that "the Black Death", "gene therapy" and "teach
+  myself" stay subjects.
+- *Typing and phrasing.* A phone's curly apostrophe turned every reader off;
+  "explain X to me", "for my exam", "I was wondering…", "um", "in layman's
+  terms", exam verbs (describe, outline, distinguish between), "u", "we",
+  "tips to", "give me a recipe for", "Which language is faster, Go or Rust?",
+  "whats the diff between", a voice turn with no question mark and search-box
+  order ("ww1 causes") all lost their reading. Every reader now starts from
+  `normalizeTyping` and the request under its lead-in (`requestBody`).
+  "What should I do if someone is choking?" is a question with an answer and
+  its steps, not the person's decision.
+- *The turn argued with itself.* "What do you suggest?" on a hard situation
+  made MR call it a routine lookup; an attempt the engine had not checked was
+  told it "gets the correction" and shown a slip; under the Answer Guard the
+  understanding shape opened on the answer being withheld and the examples
+  showed marks the gate removes; the decide block gagged a winner while other
+  lines asked for Socria's read; the open-work shape ignored a chart or a
+  decision and licensed a question on a no-question turn; depth wording asked
+  for a proof on a diagram; the next-layer paths re-offered the way just
+  opened; a polite procedure or a trip "in 4 days" lost its shape; and the
+  Titanic example carried a contested cause a copying model would repeat.
+  Now: the check follows the engine's verdict (`check:open`, `check:holds`,
+  `check:slips`, Core 4's `verify.check`); guarded examples lose exactly what
+  the gate takes off; the read, when asked, is given once, after the block;
+  the open-work shape defers to the block that is the point; depth is worded
+  by the element; the next ways follow what the thread was about
+  (`layer:work`, `layer:more`, `layer:idea`), each on its own example; and
+  every example is on a low-frequency topic, held by the canonical-topic
+  test.
+
+### Remaining limitations
+
+- Solving and proving, asked with no learning signal, stay practice (the
+  owner's Human-First call, above); and a maths method question under the
+  Human-First scaffold gets its method in prose, not worked steps, because
+  the working is theirs to do.
+- Selection is deterministic: phrasings no reader knows are left as prose —
+  the safe miss. "Tell me about TCP and UDP" is explained without a table.
+  The misses the other way are known and small: a bare case or title with
+  two capitalised names ("Roe vs Wade", "Depp vs Heard") and a taste question
+  ("which is better, summer or winter?") still get a comparison, and "what
+  happened between Sam and Jess?" is offered an optional timeline.
+- The check of someone's work is shown an arithmetic example whatever was
+  checked; an essay's reasoning gets the same shape of verdict.
+- The browser journeys run the real app against a stand-in model; how a
+  production model uses each instruction is measured by the trim counts and
+  the `[logos] gate` log, not here.
+- `LOGOS_TRIM` removes only announcement lines by default; the other classes
+  are counted until their shadow rate says they are safe to switch on.
+- Below 560px, a comparison table stacks into cards; some older Safari and
+  VoiceOver pairs may read those cards without table semantics.
+
+**Tested.** `test/presentation-selection.test.mjs` (427): maths, comparisons,
 claims, business, the parts of something, two sides and timelines, everyday
-prose, one live element, the contract (the form that fits, nothing restated,
-every grammar's prose clause, every paths variant and diagram view), said
-once, lookups, depth, the core. Pinned suites updated where the change is the
-point, each with its reason: presentation, minimum-explanation,
-interactive-chat, inline-ui, reply-shape, runtime-route, runtime-register.
+prose, one live element, the contract, said once, lookups, depth, the core —
+and the review's cases as regressions: somebody's own life answered in prose,
+bare words that are not structures, the same reading however it is asked,
+each thing said once. `test/inline-contract.test.mjs` (202): every example
+the reply is shown parses, passes the gate and draws, for every kind and
+variant. `test/inline-kinds.test.mjs`, `test/stream-trim.test.mjs`,
+`test/stream-route.test.mjs`, `test/reply-review.test.mjs`,
+`test/accuracy-fragments.test.mjs` hold the elements, the gate, the renderer
+and the checker. The full suite (316 suites) and the typecheck pass; the
+route sweep and the desktop and phone journeys are re-run on the final
+commit. Pinned suites updated where the change is the point, each with its
+reason: presentation, minimum-explanation, interactive-chat, inline-ui,
+reply-shape, runtime-route, runtime-register.

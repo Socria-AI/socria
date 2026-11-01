@@ -51,6 +51,7 @@ import type {
   TypedControls,
 } from './types';
 import { MR_STATE_VERSION } from './types';
+import { tenderText } from '../runtime/asks';
 
 export interface FoldInput {
   input: MRTurnInput;
@@ -476,7 +477,16 @@ export function workForIfr(input: MRTurnInput, text: string): string {
   const w0 = String(input.turnState.work);
   if (w0 === 'practice' || input.signals?.assessment === true || input.signals?.practiceIntent === true) return 'practice';
   const last = sentencesOf(text.trim()).filter((x) => x.trim()).pop()?.trim() ?? '';
-  const routine = isFactQuestion(text) || (!!last && last !== text.trim() && isFactQuestion(last)) || input.context.accuracy.computed;
+  // "My dad has dementia… Should we move him in with us? What do you suggest?" is a decision and a hard thing,
+  // whatever its last sentence: the last-sentence reading is for a question of fact asked after its context, and
+  // somebody's own life or a sensitive turn is never a routine task; a check of their work is not one either
+  // (second adversarial round, November 2026)
+  // A sum asked after its context ("I spend $95 a week on groceries. What is that per month?") is routine whatever
+  // the coarse reading; a decision or a check of their work never is, whatever its last sentence asks.
+  const tender = tenderText(text) || !!input.signals?.sensitive;
+  const theirCall = w0 === 'judgment' || w0 === 'verification';
+  const routine =
+    !tender && ((isFactQuestion(text) && w0 !== 'judgment') || (!!last && last !== text.trim() && !theirCall && isFactQuestion(last)) || (input.context.accuracy.computed && w0 !== 'verification'));
   if (routine) return 'information';
   const w = String(input.turnState.work);
   return w === 'information' || w === 'execution' ? 'research' : w;

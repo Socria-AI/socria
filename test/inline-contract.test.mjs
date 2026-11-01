@@ -70,9 +70,19 @@ for (const g of ['plot', 'curve', 'rate', 'tangent', 'market', 'point']) offers.
 for (const v of ['cycle', 'tree', 'flow', 'causes']) offers.push({ label: `diagram:${v}`, p: { forms: ['diagram'], reasons: [], diagram: v } });
 offers.push({ label: 'sequence:timeline', p: { forms: ['sequence'], reasons: ['sequence:timeline'] } });
 for (const r of ['paths:deeper', 'paths:more', 'paths:open-work', 'paths:next-layer']) offers.push({ label: r, p: { forms: ['paths'], reasons: [r] } });
+// one layer down, by what the thread was about (second adversarial round)
+for (const l of ['layer:work', 'layer:more', 'layer:idea']) offers.push({ label: `paths:next-layer ${l}`, p: { forms: ['paths'], reasons: ['paths:next-layer', l] } });
+// their work checked, by the engine's verdict
+for (const v of ['check:open', 'check:holds', 'check:slips']) offers.push({ label: `reasoning:check-work ${v}`, p: { forms: ['reasoning'], reasons: ['reasoning:steps', 'reasoning:check-work', v] } });
+offers.push({ label: 'slider:formula', p: { forms: ['slider'], reasons: ['slider:formula'] } }, { label: 'slider:base-rate', p: { forms: ['slider'], reasons: ['slider:base-rate'] } });
+offers.push({ label: 'decide (their read asked)', p: { forms: ['decide'], reasons: [], lean: true } });
+// under the Answer Guard: the example is what the gate would let through
+const GUARD_DROPS = { graph: ['features', 'readouts'], sim: ['readouts'], equation: ['example'], check: ['explain'] };
+for (const g of ['plot', 'curve', 'rate', 'tangent', 'market', 'point']) offers.push({ label: `graph:${g} (guard)`, p: { forms: ['graph'], reasons: [], graph: g, guard: true }, guard: true });
+for (const k of ['sim', 'equation', 'check']) offers.push({ label: `${k} (guard)`, p: { forms: [k], reasons: [], guard: true }, guard: true });
 
 console.log('\n=== every example the reply is shown parses, passes the gate and draws ===');
-for (const { label, p } of offers) {
+for (const { label, p, guard } of offers) {
   const told = I.renderPresentation(p);
   const exs = jsonsIn(told);
   const kind = p.forms[0];
@@ -89,8 +99,12 @@ for (const { label, p } of offers) {
     const spec = I.parseInlineSpec(ex);
     ok(`${label}: parses`, !!spec, ex.slice(0, 200));
     if (!spec) continue;
-    const v = I.checkInlineSpec(spec, ctx());
+    const v = I.checkInlineSpec(spec, ctx(guard ? { guard: true } : {}));
     ok(`${label}: passes the gate`, v.ok, J(v));
+    if (guard) {
+      ok(`${label}: shows nothing the guard takes off`, !(GUARD_DROPS[kind] ?? []).some((key) => key in raw), ex.slice(0, 200));
+      ok(`${label}: …so what is drawn is what was shown`, v.ok && J(v.spec) === J(spec) || (kind === 'graph' && J({ ...v.spec, features: undefined, quiet: undefined }) === J({ ...spec, features: undefined, quiet: undefined })), J({ shown: spec, drawn: v.spec }).slice(0, 400));
+    }
     const html = draw(spec);
     ok(`${label}: draws, a root of class "ln"`, !html.startsWith('THROW') && /class="ln(?:\s|")/.test(html), html.slice(0, 200));
   }

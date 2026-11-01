@@ -24,10 +24,14 @@
 //   a sci-fi book" was read as a decision to lay out and not make; a pick asked
 //   for is a pick.
 //
-// Pure. No imports: lib/cognition/assist.ts and lib/cognition/register.ts both
-// read these, and assist already imports register.
+// Pure. One import, lib/runtime/asks.ts (somebody's own life), which imports
+// nothing: lib/cognition/assist.ts and lib/cognition/register.ts both read
+// these, and assist already imports register.
 
-const clean = (t: string) => t.replace(/```[\s\S]*?```/g, ' ').replace(/^\s*>.*$/gm, ' ').replace(/\s+/g, ' ').trim();
+import { firstPerson, normalizeTyping, tenderText } from '../runtime/asks';
+
+const cleanTyped = (t: string) => t.replace(/```[\s\S]*?```/g, ' ').replace(/^\s*>.*$/gm, ' ').replace(/\s+/g, ' ').trim();
+const clean = (t: string) => cleanTyped(normalizeTyping(t));
 
 /** Somebody's claim, reported: "my manager says…", "I read that…", "people keep saying…". */
 const REPORTED = /\b(?:says?|said|claims?|claimed|told\s+(?:me|us)|tells\s+(?:me|us)|thinks?|believes?|insists?|swears?|heard|read|keeps?\s+saying|argues?|argued)\b(?:\s+that)?\s+\S[^?]{2,220}/i;
@@ -35,9 +39,9 @@ const REPORTED = /\b(?:says?|said|claims?|claimed|told\s+(?:me|us)|tells\s+(?:me
 const IS_IT_SO = /\b(?:is\s+(?:that|this|it|he|she|they)\s+(?:really\s+)?(?:right|true|correct|accurate|so|a\s+myth|legit|real)|are\s+they\s+(?:right|correct)|(?:is|was)\s+(?:he|she|my\s+\w+)\s+right|true\s+or\s+(?:false|not)|fact\s+or\s+(?:fiction|myth)|does\s+that\s+hold\s+up)\b|(?:^|[.!?]\s+)(?:true|real|legit|right|correct|accurate|fact)\s*\?\s*$|[.!]\s+(?:is|was|are|were|does|did|do)\s+(?:he|she|it|they|that|this)(?:\s+really)?\s*\?\s*$/i;
 /** A claim asked about directly: "is it true that…", "is there evidence that…", "fact-check this". */
 const CLAIM_ASK =
-  /^(?:(?:so|ok(?:ay)?|hey|hi|honestly|quick question),?\s+)?(?:is\s+it\s+(?:really\s+)?(?:true|a\s+myth|a\s+fact|correct)\s+(?:that\s+)?\S|(?:is|are)\s+there\s+(?:any\s+)?(?:evidence|proof)\s+(?:that|for)\b|fact[- ]?check\b|does\s+(?:the\s+)?(?:research|science|evidence|data)\s+(?:say|show|support|back(?:\s+up)?)\b)|\bis\s+it\s+(?:really\s+)?(?:true|a\s+myth)\s+that\b|\b(?:is|was)\s+(?:that|this|it)\s+a\s+myth\b/i;
+  /^(?:(?:so|ok(?:ay)?|hey|hi|honestly|quick question),?\s+)?(?:(?:(?:can|could|would)\s+you\s+)?(?:please\s+)?(?:fact[- ]?check|verify|double[- ]check)\b(?:\s+(?:this|that|the))?(?:\s+(?:claim|statement|fact))?\s*:?\s*\S|true\s+or\s+false\s*[:\-]|(?:is\s+there\s+)?any\s+truth\s+(?:to|in)\b|is\s+it\s+(?:really\s+)?(?:true|a\s+myth|a\s+fact|correct)\s+(?:that\s+)?\S|(?:is|are)\s+there\s+(?:any\s+)?(?:evidence|proof)\s+(?:that|for)\b|fact[- ]?check\b|does\s+(?:the\s+)?(?:research|science|evidence|data)\s+(?:say|show|support|back(?:\s+up)?)\b)|\bis\s+it\s+(?:really\s+)?(?:true|a\s+myth)\s+that\b|\b(?:is|was)\s+(?:that|this|it)\s+a\s+myth\b/i;
 /** "Coffee stunts your growth. True?" — a statement, then the question whether it holds. */
-const SAID_THEN_ASKED = /^[^?]{8,220}[.!]\s*(?:is\s+(?:that|this|it)\s+)?(?:really\s+)?(?:true|real|legit|correct|accurate|a\s+myth|fact\s+or\s+(?:fiction|myth))\s*\?\s*$/i;
+const SAID_THEN_ASKED = /^[^?]{8,220}(?:[.!]|,)\s*(?:is\s+(?:that|this|it)\s+)?(?:really\s+)?(?:true|real|legit|correct|accurate|a\s+myth|fact\s+or\s+(?:fiction|myth)|true\s+or\s+false|any\s+truth\s+to\s+(?:that|this|it))\s*\?\s*$/i;
 /**
  * "Does sugar make kids hyperactive?", "does coffee stunt your growth?", "does
  * vaping cause cancer?" — an effect on people, asked whether it is real. Not a
@@ -59,8 +63,8 @@ const DID_THEY_SAY = /\bdid\s+[\w\s.'’-]{2,40}?\s+(?:actually|really|ever)\s+s
  * says I should call more"), which are not put up to be checked.
  */
 const REPORTED_ONLY =
-  /^(?:(?:so|ok(?:ay)?|hey|hi|honestly),?\s+)?(?:my\s+[\w-]+|people|everyone|someone|they|a\s+(?:friend|coworker|colleague|teacher|guy|book|video|post|article))\s+(?:says?|said|claims?|claimed|told\s+me|insists?|swears?|keeps?\s+saying|thinks?)\s+(?:that\s+)?([^?]{6,220}?)[.!]?\s*$/i;
-const WORLD_CLAIM = /\b(?:visible\s+from|causes?|cures?|prevents?|is\s+(?:bad|good|healthy|unhealthy|dangerous|safe|toxic)\s+for|only\s+use|never|always|every(?:one|body)?|all\s+\w+s\b|most\s+\w+s\b|\d+\s*(?:%|percent|times)|myth|scientifically|proven|studies\s+show|science\s+says|can'?t\s+be|doesn'?t\s+exist)\b/i;
+  /^(?:(?:so|ok(?:ay)?|hey|hi|honestly),?\s+)?(?:(?:my\s+[\w-]+|people|everyone|someone|they|a\s+(?:friend|coworker|colleague|teacher|guy|book|video|post|article))\s+(?:says?|said|claims?|claimed|told\s+(?:me|us)|insists?|swears?|keeps?\s+saying|thinks?)|apparently,?|supposedly,?|i\s+(?:heard|read)(?:\s+somewhere)?)\s+(?:that\s+)?([^?]{6,220}?)[.!?]?\s*$/i;
+const WORLD_CLAIM = /\b(?:visible\s+from|causes?|cures?|prevents?|is\s+(?:bad|good|healthy|unhealthy|dangerous|safe|toxic)\s+for|only\s+(?:use|have|has)|never|always|every(?:one|body)?|all\s+\w+s\b|most\s+\w+s\b|\d+\s*(?:percent|times)|myth|scientifically|proven|studies\s+show|science\s+says|can'?t\s+be|doesn'?t\s+exist|keeps?\s+the\s+doctor\s+away)\b|\d+\s*%/i;
 const PERSONAL_CLAUSE = /\b(?:i|me|my|we|us|our|you|your|should|need|needs|have\s+to|has\s+to|must|wants?|will|gonna|going\s+to|tonight|tomorrow|today)\b/i;
 /**
  * …and not a clinician's word in their own care ("my therapist says anxiety
@@ -72,7 +76,9 @@ const CARE_SOURCE = /^(?:(?:so|ok(?:ay)?|hey|hi|honestly),?\s+)?my\s+(?:therapis
 const ABOUT_LOVE = /\b(?:cheat\w*|love|loves|relationships?|dating|marriage|exes|guys|girls|boyfriends?|girlfriends?|husbands?|wives|partners?|soulmates?)\b/i;
 function reportedOnly(t: string): boolean {
   const m = REPORTED_ONLY.exec(t);
-  return !!m && !CARE_SOURCE.test(t) && WORLD_CLAIM.test(m[1]) && !PERSONAL_CLAUSE.test(m[1]) && !ABOUT_LOVE.test(m[1]);
+  if (!m || CARE_SOURCE.test(t) || !WORLD_CLAIM.test(m[1]) || ABOUT_LOVE.test(m[1])) return false;
+  // a generic "we" or "our" in a claim about the world is everyone's ("we only use 10 percent of our brain")
+  return !PERSONAL_CLAUSE.test(m[1].replace(/\b(?:we|our|us)\b/gi, 'people'));
 }
 /**
  * One person's private conduct or feelings: "my ex said he never cheated.
@@ -81,7 +87,18 @@ function reportedOnly(t: string): boolean {
  * it would be a judgement of a person (adversarial review, November 2026).
  */
 const PRIVATE =
-  /\b(?:he|she|they|him|her|my\s+(?:ex|boyfriend|girlfriend|bf|gf|husband|wife|partner|crush|date|best\s+friend|friend|boss|mom|mum|dad|mother|father|sister|brother|son|daughter))\b[^.?!]{0,60}?\b(?:cheat\w*|loves?|loved|lying|lied|lies|was\s+at|were\s+at|feelings?|likes?\s+me|into\s+me|faithful|single|seeing\s+someone|over\s+(?:me|him|her|them)|meant\s+it|means\s+it|sorry|miss(?:es|ed)?\s+me)\b|\bi\s+think\s+i(?:'m|\s+am)\b/i;
+  /\b(?:he|she|they|him|her|(?:my\s+)?(?:ex|boyfriend|girlfriend|bf|gf|husband|wife|partner|crush|date|best\s+friend|friend|boss|teacher|mom|mum|mother|dad|father|parents|grandma|grandpa|nan|sister|brother|son|daughter|kids|aunt|uncle))\b[^.?!]{0,60}?\b(?:cheat\w*|loves?|loved|lying|lied|lies|was\s+at|were\s+at|feelings?|likes?\s+me|into\s+me|faithful|single|seeing\s+someone|over\s+(?:me|him|her|them)|meant\s+it|means\s+it|sorry|miss(?:es|ed)?\s+me|dying|die|dies|sick|proud|cares?\s+about|hates?|hated|selfish|a\s+mistake|amount\s+to)\b|\bi\s+think\s+i(?:'m|\s+am)\b|\b(?:my|our|your)\s+fault\b|\bi'?m\s+the\s+reason\b|\babout\s+me\b/i;
+/** …or somebody named, and what they feel about the person asking: "is Tom really cheating on me?". Case matters: a name is capitalised. */
+const PRIVATE_NAMED =
+  /\b(?!(?:Is|Was|Does|Did|Do|Are|Were|The|My|I|What|Who|Why|How|When|Where|Can|Could|Should|Would|Will|Has|Have)\b)[A-Z][a-z]+\b[^.?!]{0,40}?\b(?:cheat\w*\s+on\s+me|cheating|loves?\s+me|loved\s+me|lying\s+to\s+me|lied\s+to\s+me|likes?\s+me|into\s+me|proud\s+of\s+me|hates?\s+me|miss(?:es|ed)?\s+me|over\s+me|faithful|seeing\s+someone)\b/;
+/** Comfort, not a claim: "it always gets better, doesn't it?" asks to be heard, not for a verdict. */
+const COMFORT = /\b(?:gets?|getting|will\s+get|it'?ll\s+get)\s+(?:better|easier)\b|\btime\s+heals\b|\bit'?ll\s+be\s+(?:ok|okay|fine|alright)\b|\beverything\s+happens\s+for\s+a\s+reason\b/i;
+/** The clause reported, after "says", "told me", "thinks": the claim itself, checked for whose it is. */
+const REPORTED_CLAUSE = /\b(?:says?|said|claims?|claimed|told\s+(?:me|us)|tells\s+(?:me|us)|thinks?|believes?|insists?|swears?|keeps?\s+saying|argues?|read|heard|saw|seen)\b(?:\s+that)?\s+([^?]{2,220})/i;
+const aboutThem = (t: string): boolean => {
+  const m = REPORTED_CLAUSE.exec(t);
+  return firstPerson(m ? m[1] : t.replace(/[.!]\s*(?:is\s+(?:that|this|it)\s+)?(?:really\s+)?(?:true|real|legit|correct|accurate)\s*\?\s*$/i, ''));
+};
 /**
  * The plainest yes/no forms of an everyday claim (adversarial review, November
  * 2026): "was Napoleon actually short?", "do goldfish really have a 3-second
@@ -104,7 +121,7 @@ const TAG_Q = /^([^?]{8,200}?),?\s*(?:right|isn'?t\s+it|aren'?t\s+they|don'?t\s+
 const WORLD_FACT = /\b(?:invented|discovered|failed|was\s+born|died|wrote|said|built|is\s+the\s+(?:largest|biggest|tallest|oldest|first|only|smallest|fastest)|are\s+the\s+(?:largest|biggest|only)|only\s+(?:have|has|use|uses|need|needs|live|lives|see|sees|hear|remember|remembers)|(?:five|5|seven|7)\s+senses)\b/i;
 function tagClaim(t: string): boolean {
   const m = TAG_Q.exec(t);
-  return !!m && (WORLD_CLAIM.test(m[1]) || WORLD_FACT.test(m[1])) && !PERSONAL_CLAUSE.test(m[1]) && !/\b(?:the\s+(?:meeting|party|game|match|flight|train|bus|deadline|plan)|tonight|tomorrow)\b/i.test(m[1]);
+  return !!m && (WORLD_CLAIM.test(m[1]) || WORLD_FACT.test(m[1])) && !PERSONAL_CLAUSE.test(m[1]) && !COMFORT.test(m[1]) && !ABOUT_LOVE.test(m[1]) && !/\b(?:the\s+(?:meeting|party|game|match|flight|train|bus|deadline|plan)|tonight|tomorrow)\b/i.test(m[1]);
 }
 /** Their own work, handed over: that is checking their attempt (offersWork), not a claim. */
 const OWN_WORK = /\b(?:i\s+got\b|my\s+(?:answer|working|work|solution|attempt|proof|code|essay|draft|result)\b|here'?s\s+my\b|check\s+my\b|did\s+i\s+(?:get|do)\b)/i;
@@ -118,9 +135,10 @@ const BIG_QUESTION = /\b(?:free\s+will|consciousness|the\s+meaning\s+of|god|gods
  */
 export function claimCheck(text: string): boolean {
   const t = clean(text);
-  if (!t || t.length > 700 || OWN_WORK.test(t) || BIG_QUESTION.test(t) || PRIVATE.test(t)) return false;
-  if (CLAIM_ASK.test(t) || (REPORTED.test(t) && IS_IT_SO.test(t) && !CARE_SOURCE.test(t))) return true;
-  if (SAID_THEN_ASKED.test(t) || NAMED_RULE.test(t) || DID_THEY_SAY.test(t) || reportedOnly(t)) return true;
+  // somebody's own life, or a private matter, has no verdict (second adversarial round, November 2026)
+  if (!t || t.length > 700 || OWN_WORK.test(t) || BIG_QUESTION.test(t) || PRIVATE.test(t) || PRIVATE_NAMED.test(t) || tenderText(t) || COMFORT.test(t)) return false;
+  if (CLAIM_ASK.test(t) || (REPORTED.test(t) && IS_IT_SO.test(t) && !CARE_SOURCE.test(t) && !aboutThem(t))) return true;
+  if ((SAID_THEN_ASKED.test(t) && !aboutThem(t)) || NAMED_RULE.test(t) || DID_THEY_SAY.test(t) || reportedOnly(t)) return true;
   if (CODE.test(t)) return false;
   return DOES_IT_CAUSE.test(t) || REALLY_Q.test(t) || CAUSE_Q.test(t) || ONLY_Q.test(t) || YOU_REALLY.test(t) || CATCH_FROM.test(t) || tagClaim(t);
 }
@@ -133,7 +151,7 @@ export function claimCheck(text: string): boolean {
 export const PRACTICAL_SHOULD =
   /\b(?:how\s+(?:long|much|many|often|far|hot|cold|big|early|late|soon|tight|deep|high|low)|what\s+(?:temperature|temp|time|size|age|setting|dose|dosage|amount|day|year|grit|gauge|pressure|speed)|when|where|at\s+what\s+(?:age|point|temperature|time))\s+(?:\w+\s+)?should\s+(?:i|we)\b|\bhow\s+should\s+(?:i|we)\s+(?:price|charge|grow|market|promote|hire|name|learn|study|format|pitch|sell)\b(?!\s+(?:to\s+)?(?:myself|my\s+(?:life|self|feelings|grief)|to\s+(?:love|live|cope|forgive)))|\bwhat\s+should\s+(?:i|we)\s+(?:see|eat|pack|read|watch|cook|bring|wear|order|visit)\b/i;
 /** A trip: "three days in Lisbon", "a weekend in Rome", "visiting Tokyo". */
-export const TRIP = /\b(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\s+(?:in|at|around|on)\b|\bfor\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\b(?:a\s+)?(?:weekend|trip|holiday|vacation|day\s+trip|city\s+break)\s+(?:to|in)\b/i;
+export const TRIP = /\bin\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\bover\s+(?:a|the)\s+(?:long\s+)?weekend\b|\bif\s+(?:i|we)\s+(?:only\s+)?have\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\b(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\s+(?:in|at|around|on)\b|\bfor\s+(?:\d+|one|two|three|four|five|six|seven|a\s+few|a\s+couple\s+of)\s+(?:days?|nights?)\b|\b(?:a\s+)?(?:weekend|trip|holiday|vacation|day\s+trip|city\s+break)\s+(?:to|in)\b/i;
 /** …or a place named, travelled to: "going to Lisbon", "visiting Tokyo" (a capital, so "going to bed" is not one). */
 const TRAVEL = /\b(?:going|heading|travelling|traveling|flying|visiting|off)\s+(?:to\s+)?[A-Z][a-z]+\b(?!['’]s\b)/;
 /**
@@ -152,10 +170,13 @@ const PICK = /\b(?:recommend|suggest)\s+(?:me\s+|us\s+)?(?:a|an|some|one|two|thr
 const NOT_A_TRIP = /\b(?:my\s+(?:life|savings|money|career|future|marriage|relationship|ex)|this\s+situation|wedding|funeral|party|interview|hospital|court)\b/i;
 export function pickAsk(text: string): boolean {
   const t = clean(text);
-  return PICK.test(t) || (/\bwhat\s+should\s+(?:i|we)\s+(?:do|see|visit|try|buy|get)\b/i.test(t) && (TRIP.test(t) || TRAVEL.test(t)) && !NOT_A_TRIP.test(t));
+  return PICK.test(t) || ((/\bwhat\s+should\s+(?:i|we)\s+(?:do|see|visit|try|buy|get)\b/i.test(t) || /\b(?:any|some)\s+(?:recommendations|suggestions|tips|ideas)\b/i.test(t)) && (TRIP.test(t) || TRAVEL.test(t)) && !NOT_A_TRIP.test(t));
 }
 /** "How long should I boil an egg?", a pick asked for, or what to do with three days in Lisbon: a question with an answer. */
+const WHEN_TO = /\bshould\s+(?:i|we)\s+[^?]{1,60}?\b(?:before|after)\s+or\s+(?:before|after)\b/i;
+/** "Should I wash chicken before cooking it?", "should I use who or whom here?": a question with an answer. */
+const HOW_TO_SHOULD = /^should\s+(?:i|you|we|u)\s+(?:wash|rinse|refrigerate|freeze|store|reheat|stretch|warm\s+up|water|salt|peel|soak|preheat|tip|capitali[sz]e|take\s+(?:ibuprofen|paracetamol|acetaminophen|tylenol|advil|aspirin|vitamin\s+\w+|a\s+(?:painkiller|supplement)|antibiotics|melatonin)|use\s+(?:who|whom|tu|vous|a|an|affect|effect|its|it'?s|their|there|they'?re|semicolons?|commas?|apostrophes?|capitals?|the\s+word|"[^"]+"|'[^']+'))\b/i;
 export function practicalShould(text: string): boolean {
   const t = clean(text);
-  return (PRACTICAL_SHOULD.test(t) && !/\bor\b/i.test(t)) || pickAsk(t);
+  return (PRACTICAL_SHOULD.test(t) && !/\bor\b/i.test(t)) || WHEN_TO.test(t) || HOW_TO_SHOULD.test(t) || pickAsk(t);
 }

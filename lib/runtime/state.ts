@@ -19,7 +19,7 @@ import type { MapDigest } from '../cognition/digest';
 import { asksForDecision, isFactQuestion, offersWork, wantsExplanation } from '../cognition/assist';
 import { claimCheck } from '../cognition/claims';
 import { quickPlot } from './plot-ask';
-import { BASE_RATE, LIST_LEAD, PERSONAL_HOW, adviceAsk, adviceKind, comparisonAsk, mathProblem, requestBody, topicAsk } from './asks';
+import { BASE_RATE, CONTINGENCY, LIST_LEAD, PERSONAL_HOW, adviceAsk, adviceKind, comparisonAsk, mathProblem, normalizeTyping, requestBody, tenderText, topicAsk } from './asks';
 import { looksMath } from '../tex-split';
 import { onlyAboutSocria, readExchange, saysFeeling, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
 import type { Intent } from './orchestrate';
@@ -34,7 +34,7 @@ const DOMAIN_WORDS: Record<Exclude<Domain, 'everyday'>, RegExp> = {
   research:
     /\b(?:research|stud(?:y|ies) (?:found|shows?|suggests?)|papers?|literature|journal|hypothes[ie]s|evidence|sources?|citations?|methodology|dataset|data set|survey|experiment|findings|peer[- ]review(?:ed)?|meta-analysis|sample size|confound\w*)\b/gi,
   engineering:
-    /\b(?:code|coding|bug|debug\w*|error|exception|stack ?trace|api|endpoint|function|compile\w*|deploy\w*|database|sql|query|server|frontend|backend|react|python|javascript|typescript|java|rust|golang|docker|kubernetes|algorithm|latency|refactor\w*|repo|git|circuit|cad|tolerance|beam|torque|voltage)\b/gi,
+    /\b(?:code|coding|bug|debug\w*|error|exception|stack ?trace|api|endpoint|function(?=[^.?!]{0,50}\b(?:return\w*|call\w*|javascript|python|js|ts|typescript|code|api|parameters?|arguments?|undefined|null|class|method|throws?|compile\w*)\b)|compile\w*|deploy\w*|database|sql|query|server|frontend|backend|react|python|javascript|typescript|java|rust|golang|docker|kubernetes|algorithm|latency|refactor\w*|repo|git|circuit|cad|tolerance|beam|torque|voltage)\b/gi,
   writing:
     /\b(?:essay|draft|paragraph|thesis statement|chapter|outline|cover letter|personal statement|blog post|article|proofread\w*|rewrite|prose|wording|my sentence|introduction|conclusion|word count)\b/gi,
   learning:
@@ -48,7 +48,7 @@ const DOMAIN_WORDS: Record<Exclude<Domain, 'everyday'>, RegExp> = {
   // ceremony" are not mathematics, and once read as it the MATHEMATICS block stayed on for the rest of
   // the conversation (adversarial review, November 2026).
   math:
-    /\b(?:derivative|integral|equation|solve for|matri(?:x|ces)|eigen\w*|probabilit\w*|theorem|proof|limit|calculus|algebra|geometry|statistics|regression|variance|polynomial|quadratic|parabola|logarithm|irrational numbers?|(?:by|proof by|mathematical|strong) induction|p-?values?|chain rule)\b|\bsolve\s+(?:the\s+(?:equation|quadratic|system|inequality|integral)|this\s+(?:equation|integral|quadratic)|-?\d|[a-z]\s*[=^+\-<>²])|\bprove\s+that\b[^.?!]{0,80}?(?:=|\d|\b(?:numbers?|primes?|sqrt|integers?|irrational|divisible|even|odd|triangles?|angles?)\b)|\bsquare\s+roots?\s+of\s+(?:\d|[a-z]\b)|[∫∑√]|(?<![a-z])[a-z]\s*\^\s*\d/gi,
+    /\b(?:derivative(?!\s+(?:works?|markets?|trading|contracts?))|integral|equation|solve for|matri(?:x|ces)|eigen\w*|probabilit\w*|theorem|proof|limit\s+(?:of|as)|limits\s+(?:of|in\s+calculus)|one-?sided\s+limits?|calculus|algebra|geometry|statistics|regression|(?:sample|population)\s+variance|variance\s+(?:of|and|formula)|polynomial|quadratic|parabola|logarithm|irrational numbers?|(?:by|proof by|mathematical|strong) induction|p-?values?|chain rule)\b|\bsolve\s+(?:the\s+(?:equation|quadratic|system|inequality|integral)|this\s+(?:equation|integral|quadratic)|-?\d|[a-z]\s*[=^+\-<>²])|\bprove\s+that\b[^.?!]{0,80}?(?:=|\d|\b(?:numbers?|primes?|sqrt|integers?|irrational|divisible|even|odd|triangles?|angles?)\b)|\bsquare\s+roots?\s+of\s+(?:\d|[a-z]\b)|[∫∑√]|(?<![a-z])[a-z]\s*\^\s*\d/gi,
 };
 
 /** The map's own reading of the thinking, where it has one. */
@@ -123,7 +123,7 @@ const CREATION = /\b(?:write|draft|compose|create|generate|make|invent|come up w
 
 /** What they want done this turn, read deterministically — Core 4's `work`, without the model call. */
 export function readWork(text: string, signals: ExplicitSignals, intent: Intent, checkedWork: boolean): WorkKind {
-  const said = text.trim();
+  const said = normalizeTyping(text).trim();
   if (!said) return 'conversation';
   if (signals.vent) return 'reflection';
   // "how are you?", "thanks!", "what's up?", "what's your favourite book?" —
@@ -137,24 +137,32 @@ export function readWork(text: string, signals: ExplicitSignals, intent: Intent,
   const t0 = withoutGreeting(said);
   const t = requestBody(t0);
   const asked = t !== t0;
-  // a claim put up to be checked is a question with an answer — the verdict — not their work to correct
-  if (!checkedWork && (claimCheck(t0) || claimCheck(t))) return 'information';
-  // a quick plot of one function (lib/runtime/plot-ask.ts) is something to do, drawn in the reply
-  if (quickPlot(t0) || quickPlot(t)) return 'execution';
-  if (checkedWork || offersWork(t)) return 'verification';
   // a feeling said in so many words: the readers that would make the turn a task stand down below
   const felt = saysFeeling(t0);
+  // a claim put up to be checked is a question with an answer — the verdict — not their work to correct (never
+  // a question about the person, or what they feel)
+  if (!checkedWork && !felt && !PERSONAL_Q.test(t) && (claimCheck(t0) || claimCheck(t))) return 'information';
+  // a quick plot of one function (lib/runtime/plot-ask.ts) is something to do, drawn in the reply
+  if (quickPlot(t0) || quickPlot(t)) return 'execution';
+  // their work, handed over to be checked — not a confession ("is this right? I told my mom I hate her")
+  // (work brought on a rough day is still work: "I'm so stressed, can you check my proof?")
+  if (checkedWork || (offersWork(t) && !tenderText(t))) return 'verification';
   if (LEADS_WITH_DOING.test(t)) return CREATION.test(t) ? 'creation' : 'execution';
   if (DIAGNOSIS.test(t)) return 'diagnosis';
   if (intent === 'visual' || intent === 'structure') return 'execution';
   if (signals.practiceIntent || (problemIn(t) && signals.learningGoal !== false)) return 'practice';
+  // "what should I do if someone is choking?" has an answer, often steps — never theirs to weigh
+  if (!felt && CONTINGENCY.test(t) && !tenderText(t)) return 'information';
   if (asksForDecision(t, signals)) return 'judgment';
   if (RESEARCH.test(t)) return 'research';
   // a procedure asked how to do — "how do you make pancakes?", "how does one apply for a mortgage?" — has
   // steps, not one idea to understand: the single-idea shape forbade the list the answer is
-  if (!felt && adviceAsk(t) && ['procedure', 'setup'].includes(adviceKind(t))) return 'information';
+  // …and practical advice, asked however it is asked ("how do we price our SaaS?", "how do you negotiate a raise?"),
+  // unless it asks how something works
+  if (!felt && adviceAsk(t) && (['procedure', 'setup'].includes(adviceKind(t)) || !/\bwork(?:s|ed)?\b/i.test(t))) return 'information';
   if (wantsExplanation(t, signals)) return 'explanation';
-  if (isFactQuestion(t) || /^(?:what|which|who|whom|whose|when|where)\b[^?]{0,160}\?\s*$/i.test(t)) return 'information';
+  // a question of fact, mark or none: typed in lowercase, or said aloud (Socria Voice), a short wh-question is one
+  if (isFactQuestion(t) || /^(?:what|which|who|whom|whose|when|where)\b[^?]{0,160}\?\s*$/i.test(t) || (/^(?:what|which|who|whom|whose|when|where)\b[^?]{0,120}[.!]?\s*$/i.test(t) && t.split(/\s+/).length <= 14)) return 'information';
   // ASKED, THOUGH NOT IN THE WORDS OF A QUESTION (November 2026, lib/runtime/asks.ts). "TCP vs UDP" was
   // too short to be anything but talk; "Postgres or MongoDB for a chat app?", "causes of inflation",
   // "list the main causes of the First World War", "how do I hire my first engineer?" and "tips for
@@ -168,6 +176,13 @@ export function readWork(text: string, signals: ExplicitSignals, intent: Intent,
   // A QUESTION THAT IS NOTHING ELSE IS STILL A QUESTION: "is nuclear power good or bad?", "does sugar
   // make kids hyperactive?". Not one put to Socria ("do you like jazz?"), not a feeling, not a request
   // for help ("can you help me with…"), and not their own decision ("should I…" is judged above).
+  // a sentence of context, then the question: "I have a history test tomorrow. What caused World War 1?" — the
+  // question is read as itself
+  const lastQ = t.split(/(?<=[.!?])\s+/).filter(Boolean).pop() ?? t;
+  if (lastQ !== t && /\?\s*$/.test(lastQ) && !felt) {
+    const w = readWork(lastQ, signals, intent, false);
+    if (w !== 'conversation' && w !== 'reflection') return w;
+  }
   if (plainQuestion(t)) return 'information';
   // "tell me about photosynthesis", "teach me calculus": asked to be told, by the lead-in — an explanation
   if (asked && !felt) return 'explanation';
@@ -249,7 +264,9 @@ export interface TurnState {
 
 const line = (t: string, n: number) => t.replace(/\s+/g, ' ').trim().slice(0, n);
 
-export function readTurnState(i: StateInput): TurnState {
+export function readTurnState(input: StateInput): TurnState {
+  // how people type, read once (lib/runtime/asks.ts normalizeTyping): the readers below see "what's" for "what’s"
+  const i: StateInput = { ...input, text: normalizeTyping(input.text) };
   const userTexts = [...i.history.filter((m) => m.role === 'user').map((m) => m.content), i.text];
   const first = userTexts.find((t) => t.trim().length > 12) ?? userTexts[0] ?? '';
   const checked = i.checked ?? [];

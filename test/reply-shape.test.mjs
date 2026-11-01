@@ -155,7 +155,8 @@ const plan = (text, o = {}) => {
     ok(`going deeper: "${t}" — one layer down, the next layers offered`, plan(t).shape === 'layer' && plan(t).forms.includes('paths'), J(plan(t)));
   const layer = plan(I.pathAsk({ label: 'Sketch the first five minutes' }));
   const layerSaid = I.renderPresentation(layer);
-  ok('  told: one layer down, built on the conversation, the next ways deeper as paths — no headings', /one way deeper/.test(layerSaid) && /one layer down/.test(layerSaid) && /next ways deeper as a paths block/.test(layerSaid) && /No headings, no summary/.test(layerSaid) && !/### A few words/.test(layerSaid), layerSaid);
+  // the next ways are worded by what the thread was about (second adversarial round): with no history, further in
+  ok('  told: one layer down, built on the conversation, the next ways as paths — no headings', /one way further/.test(layerSaid) && /one layer down/.test(layerSaid) && /the next ways in as a paths block/.test(layerSaid) && /No headings, no summary/.test(layerSaid) && !/### A few words/.test(layerSaid), layerSaid);
   ok('  and a little room for the ways onward', I.presentationRoom(layer) === 200 + 350);
   for (const t of ['walk me through it in detail', 'explain that in more detail', 'go deeper on that, step by step'])
     ok(`depth asked for in words: "${t}" — that thread, in parts`, plan(t).shape === 'deeper' && !plan(t).forms.includes('paths'), J(plan(t)));

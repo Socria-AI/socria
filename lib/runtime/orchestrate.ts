@@ -36,6 +36,7 @@ import { wantedSimulation } from '../model/wants';
 import { readDisplayRequest } from '../objects/display-request';
 import { isAcknowledgement } from '../map-skip';
 import { LOGOS_MAP_MODEL, LOGOS_MODEL } from '../logos';
+import { normalizeTyping } from './asks';
 
 export const VIEWPORTS = ['chat', 'content', 'artifacts', 'logic_map'] as const;
 export type Viewport = (typeof VIEWPORTS)[number];
@@ -201,7 +202,7 @@ function inlineInstead(text: string, display: { noun: string; fromMap: boolean }
 
 /** Alex's rules A–D, read from the turn. */
 export function routeTurn(t: TurnInput): TurnRoute {
-  const text = clean(t.text ?? '');
+  const text = clean(normalizeTyping(t.text ?? ''));
   const reasons: string[] = [];
   if (t.command) return { intent: 'command', reasons: ['command'], reveal: null };
 

@@ -20,6 +20,7 @@
 // Pure. No model, no network.
 
 import type { Directness, ExplicitSignals } from './types';
+import { normalizeTyping } from '../runtime/asks';
 
 export const NO_SIGNALS: ExplicitSignals = {
   directness: 'none',
@@ -249,7 +250,7 @@ const ON_RECORD = /\b(you can remember (?:this|that|again)|back on the record|ok
 
 // Council D14's deterministic backstop for sensitive conversations. It only
 // ever REDUCES what is kept (conversation-only), never what is said.
-const SENSITIVE = /\b(diagnos(?:is|ed)|my (?:therapist|psychiatrist)|depress(?:ion|ed)|anxiety disorder|panic attacks?|bipolar|adhd|ptsd|eating disorder|chemo(?:therapy)?|cancer|hiv|miscarriage|pregnan(?:t|cy)|abortion|medication|antidepressants?|grief|griev(?:e|ing)|passed away|funeral|divorce|custody|separat(?:ed|ion) from my|my (?:ex|abuser)|abus(?:e|ive)|sexuality|coming out|gay|lesbian|trans(?:gender)?|religio(?:n|us)|faith|immigration status|visa (?:status|overstay)|undocumented|asylum|deport\w*|arrest(?:ed)?|criminal record|lawsuit against me|bankrupt\w*|debt collectors?|in debt|can'?t pay (?:rent|my))\b/i;
+const SENSITIVE = /\b((?:my|our)\s+(?:mom|mum|dad|mother|father|parents?|grand(?:ma|pa|mother|father)|son|daughter|brother|sister|husband|wife|partner|boyfriend|girlfriend|baby|child)\s+(?:died|passed(?:\s+away)?|is\s+dying|has\s+(?:cancer|dementia)|was\s+diagnosed)|hospice|terminally\s+ill|cheat(?:ed|ing)\s+on\s+me|(?:had|having)\s+an\s+affair|diagnos(?:is|ed)|my (?:therapist|psychiatrist)|depress(?:ion|ed)|anxiety disorder|panic attacks?|bipolar|adhd|ptsd|eating disorder|chemo(?:therapy)?|cancer|hiv|miscarriage|pregnan(?:t|cy)|abortion|medication|antidepressants?|grief|griev(?:e|ing)|passed away|funeral|divorce|custody|separat(?:ed|ion) from my|my (?:ex|abuser)|abus(?:e|ive)|sexuality|coming out|gay|lesbian|trans(?:gender)?|religio(?:n|us)|faith|immigration status|visa (?:status|overstay)|undocumented|asylum|deport\w*|arrest(?:ed)?|criminal record|lawsuit against me|bankrupt\w*|debt collectors?|in debt|can'?t pay (?:rent|my))\b/i;
 
 const FLAG_ONLY = new RegExp(
   [
@@ -363,7 +364,8 @@ function negated(h: Hit, refusals: Hit[], text: string): boolean {
  * out myself, but honestly just tell me").
  */
 export function readSignals(message: string): ExplicitSignals {
-  const text = speech(message);
+  // how people type, read once: "don’t ask me questions" is "don't ask me questions" (lib/runtime/asks.ts)
+  const text = speech(normalizeTyping(message ?? ''));
   if (!text) return NO_SIGNALS;
   const evidence: string[] = [];
   const note = (m: { match: string } | null) => {

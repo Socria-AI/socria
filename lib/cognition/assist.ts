@@ -50,6 +50,7 @@ import type { ExplicitSignals } from '@/lib/core4/types';
 import type { MapDigest } from './digest';
 import { TALK, withoutGreeting, type ExchangeKind } from './register';
 import { claimCheck, practicalShould } from './claims';
+import { ASKS_PICK, CONTINGENCY, normalizeTyping } from '../runtime/asks';
 
 export { sanitizeDigest, digestOf, type MapDigest } from './digest';
 
@@ -111,10 +112,10 @@ export interface AssistDecision {
 
 // ── reading the turn ──────────────────────────────────────────────────
 
-const clean = (t: string) => t.replace(/```[\s\S]*?```/g, ' ').replace(/^\s*>.*$/gm, ' ').replace(/\s+/g, ' ').trim();
+const clean = (t: string) => normalizeTyping(t).replace(/```[\s\S]*?```/g, ' ').replace(/^\s*>.*$/gm, ' ').replace(/\s+/g, ' ').trim();
 
 /** A question asking ABOUT them, their choice or their opinion — never a question of fact. */
-const ABOUT_THEM = /\b(?:should\s+i|do\s+i|am\s+i|can\s+i|would\s+i|will\s+i|what\s+(?:do|would|should)\s+(?:you|i)\s+(?:think|do|pick|choose|recommend)|which\s+(?:one\s+)?(?:should|would)|is\s+it\s+(?:worth|better|a\s+good\s+idea)|what'?s\s+best\s+for\s+me|help\s+me\s+decide|my\s+(?:essay|story|argument|thesis|plan)\b)/i;
+const ABOUT_THEM = /\b(?:should\s+i|do\s+i|am\s+i|can\s+i|would\s+i|will\s+i|what\s+(?:do|would|should)\s+(?:you|i)\s+(?:think|do|pick|choose|recommend)|what\s+(?:do|would)\s+you\s+(?:suggest|say|reckon|advise|propose|make\s+of|get|go\s+for|go\s+with)|what'?s\s+your\s+(?:take|view|advice|opinion|pick|call)|who'?s\s+(?:right|wrong|in\s+the\s+wrong)|if\s+you\s+were\s+me|your\s+honest\s+(?:opinion|take|view)|which\s+(?:one\s+)?(?:should|would)|is\s+it\s+(?:worth|better|a\s+good\s+idea)|what'?s\s+best\s+for\s+me|help\s+me\s+decide|my\s+(?:essay|story|argument|thesis|plan)\b)/i;
 
 /**
  * A question of FACT, or a quick calculation: something with a plain answer
@@ -167,7 +168,7 @@ export function wantsExplanation(text: string, s: ExplicitSignals): boolean {
   if (s.explainAsked) return true;
   if (UNDERSTAND.test(t)) return true;
   if (ABOUT_THEM.test(t)) return false;
-  return /^(?:how\s+(?:does|do|did|is|are|can|come)|why\s+(?:does|do|did|is|are|would|can|was|were|should)|explain|walk\s+me\s+through|help\s+me\s+understand|i\s+don'?t\s+(?:get|understand)|what\s+does\s+.+\s+mean)\b/.test(t);
+  return /^(?:how\s+(?:does|do|did|is|are|can|come)|why\s+(?:does|do|did|is|are|would|can|was|were|should)|explain|walk\s+me\s+through|help\s+me\s+understand|i\s+don'?t\s+(?:get|understand)|what\s+does\s+.+\s+mean|describe|outline|discuss|identify|analy[sz]e|illustrate|examine|go\s+over|(?:run|talk)\s+(?:me|us)\s+through)\b/.test(t);
 }
 
 /**
@@ -180,7 +181,12 @@ export function asksForDecision(text: string, s: ExplicitSignals): boolean {
   // "how long should I boil an egg?" is a question with an answer, not a decision — and "recommend me a
   // sci-fi book" asks for a pick, not for what the choice rests on (lib/cognition/claims.ts)
   if (practicalShould(t)) return false;
+  // "what should I do if my dog ate chocolate?" asks what to do, not for a decision weighed
+  if (CONTINGENCY.test(t)) return false;
   if (s.recommendationRequested) return true;
+  // …and Socria's read asked for on two options, however it is asked ("if you were me, would you take the remote
+  // job or the office one?", "what would you get?")
+  if (ASKS_PICK.test(t) && /\bor\b|\bbetween\b/i.test(t)) return true;
   // a team's choice is a decision too: "should we hire an engineer or a marketer?"
   // …and a team's change, weighed against how things are: "should we raise prices?"
   return /\b(?:should\s+i\b|should\s+we\b[^.?!]{1,90}\bor\b|should\s+we\s+(?:raise|cut|lower|increase|reduce|switch|keep|change|drop|stop|start|move|expand|delay)\b|which\s+(?:one\s+)?should\s+(?:i|we)|what\s+would\s+you\s+(?:do|pick|choose)|help\s+(?:me|us)\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+(?:i|we)\s+should|(?:i|we)\s+should\s+[^.?!]{1,80}\bor\b)/i.test(t) || FIRST_PERSON_CHOICE.test(t);
@@ -304,7 +310,9 @@ export const RETRIEVAL_GAP_MS = 20 * 60 * 60 * 1000;
 
 // ── the decision ──────────────────────────────────────────────────────
 
-export function chooseAssist(input: AssistInput): AssistDecision {
+export function chooseAssist(given: AssistInput): AssistDecision {
+  // how people type, read once (lib/runtime/asks.ts normalizeTyping)
+  const input: AssistInput = { ...given, lastUserText: normalizeTyping(given.lastUserText ?? '') };
   const s = input.signals ?? readSignals(input.lastUserText);
   // What they asked, without the greeting in front of it: the readers below
   // look at how a request begins ("hi! what's 15% of 240?" is a fact).
@@ -492,9 +500,11 @@ const PERSPECTIVE_LEAN = 'PERSPECTIVE. They asked for your read: the decide bloc
 function modeLine(mode: AssistMode, v: AssistView): string {
   // one layer down, or a thread in full, is a shape too: the move names itself and leaves the how to it
   if (mode === 'explain' && v.shape) return MODE_SHAPED.explain!;
-  if (mode === 'inform' && (v.shape === 'practical' || v.shape === 'understand')) return MODE_SHAPED.inform!;
+  // a decision laid out to weigh is a perspective, whatever made the move "inform" (Socria's direct strategy): the
+  // read, if asked, once, marked as Socria's
+  if ((mode === 'perspective' || mode === 'inform') && v.forms?.includes('decide')) return v.lean ? PERSPECTIVE_LEAN : MODE_SHAPED.perspective!;
+  if (mode === 'inform' && (v.shape === 'practical' || v.shape === 'understand' || v.shape === 'open')) return MODE_SHAPED.inform!;
   if (mode === 'inform' && v.strong?.length) return INFORM_BLOCK;
-  if (mode === 'perspective' && v.forms?.includes('decide')) return v.lean ? PERSPECTIVE_LEAN : MODE_SHAPED.perspective!;
   return MODE_LINE[mode];
 }
 

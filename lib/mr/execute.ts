@@ -72,6 +72,8 @@ export interface ExecuteInput {
   maxReply: number;
   /** Socria's recent replies that asked something, newest last (for questionWindow) */
   recentAsking: readonly boolean[];
+  /** working it out is theirs, with Socria's support (Core 4's split: reasoning, scaffold) */
+  scaffold?: boolean;
 }
 
 export interface Executed {
@@ -139,8 +141,11 @@ export function constrain(i: ExecuteInput): { controls: TypedControls; constrain
   // one where loosening it matters most.
   const guarded = i.guard;
   const withheld = !!i.core?.withhold;
-  if (guarded || withheld) {
-    const layer = withheld ? 'app_policy:withhold' : 'app_policy:guard';
+  // …and a turn they are working through with Socria keeps its scaffold, unless their words this turn ask for the
+  // whole answer or the full working (second adversarial round, November 2026)
+  const scaffolded = !!i.scaffold && !said.has('explicit.direct_answer') && !said.has('explicit.show_steps');
+  if (guarded || withheld || scaffolded) {
+    const layer = withheld ? 'app_policy:withhold' : guarded ? 'app_policy:guard' : 'app_policy:scaffold';
     if (c.strategy === 'direct' || c.strategy === 'execute') {
       delete c.strategy;
       by.push(`${layer}:strategy`);
@@ -165,6 +170,25 @@ export function constrain(i: ExecuteInput): { controls: TypedControls; constrain
   return { controls: c, constrainedBy: by };
 }
 
+/**
+ * MR decides before the reply's shape is planned, so its direct line names "the answer, or the steps in order"
+ * whatever is offered. Fitted to the block the turn offers (second adversarial round, November 2026): a decision
+ * laid out to weigh gets the read once, after it; steps get the steps; any other block carries the rest; with
+ * nothing offered, the answer.
+ */
+const DIRECT_LINE = 'THEY ASKED FOR IT DIRECTLY. Give it now and first — the answer, or the steps in order (as the block below, when one is offered) — with no diagnostic question before it.';
+export function fitControlsToForms(block: string, p: { forms: readonly string[]; lean?: boolean }): string {
+  if (!block || !block.includes(DIRECT_LINE)) return block;
+  const line = p.forms.includes('decide')
+    ? 'THEY ASKED FOR IT DIRECTLY. The decide block below lays out what it rests on; give your read once, after it, marked as yours — with no diagnostic question before it.'
+    : p.forms.some((k) => k === 'sequence' || k === 'steps')
+      ? 'THEY ASKED FOR IT DIRECTLY. Give it now and first — the steps in order, as the block below — with no diagnostic question before it.'
+      : p.forms.length
+        ? 'THEY ASKED FOR IT DIRECTLY. The answer now and first; the block below carries the rest — with no diagnostic question before it.'
+        : 'THEY ASKED FOR IT DIRECTLY. Give it now and first — the answer, or the steps in order — with no diagnostic question before it.';
+  return block.replace(DIRECT_LINE, line);
+}
+
 /** The few lines the turn's context carries for controls that live in the prompt. '' when none. */
 export function renderControls(c: TypedControls, ctx: { withheld: boolean; hardNoQuestions: boolean; ceiling: number | null }): string {
   const lines: string[] = [];
@@ -172,7 +196,7 @@ export function renderControls(c: TypedControls, ctx: { withheld: boolean; hardN
     case 'direct':
       // "the steps in order", not "numbered": with a sequence offered this turn the steps are the block's
       // (lib/runtime/presentation.ts), and a numbered list beside it said them twice
-      lines.push('THEY ASKED FOR IT DIRECTLY. Give it now and first — the answer, or the steps in order (as the block below, when one is offered) — with no diagnostic question before it.');
+      lines.push(DIRECT_LINE);
       break;
     case 'execute':
       lines.push('A ROUTINE TASK. Do it, plainly and correctly. Do not turn it into an exercise or ask them to work it out.');

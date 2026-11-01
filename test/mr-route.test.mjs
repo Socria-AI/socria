@@ -84,6 +84,7 @@ const { NextRequest } = await import('next/server.js');
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? (pass++, console.log('  ok   ' + n)) : (fail++, console.log('  FAIL ' + n + '  ' + String(x).slice(0, 400))));
+const J = JSON.stringify;
 const U = (content) => ({ role: 'user', content });
 const A = (content) => ({ role: 'assistant', content });
 const ASKING = 'What do you think the first move is? Have you seen equations like this before?';
@@ -612,6 +613,32 @@ console.log('\n=== round 4, through the route ===');
   ok('(a limit) an incognito revocation whose write failed is not written later from older words: the stop is carried again', lost && !(db.tables.user_profiles[0]?.mr?.revokedStanding ?? []).length && /q0h/.test(later.mr ?? ''), `${lost} ${JSON.stringify(db.tables.user_profiles[0]?.mr?.revokedStanding)} ${later.mr}`);
   db.tables.conversations = [];
   db.tables.user_profiles = [];
+}
+
+console.log('\n=== the response-selection review, second round, through the route ===');
+{
+  const on = { LOGOS_MR: 'on' };
+  const move = (sys) => /The move this turn[^\n]*/.exec(sys)?.[0] ?? '';
+  // a hard thing with "what do you suggest?" on the end is not a lookup to answer in a sentence
+  for (const [i, t] of ['My dad has dementia and lives alone. Should we move him in with us or into a care home? What do you suggest?', 'My mum has dementia and keeps wandering at night. What do you suggest?', 'Should I quit my job to look after my mum? What do you say?'].entries()) {
+    const r = await turn({ sessionId: `conv_r2_p${i}`, messages: [U(t)] }, { env: on });
+    ok(`"${t.slice(0, 60)}…": never a routine task, never INFORM in a sentence or two`, r.status === 200 && !/A ROUTINE TASK/.test(r.system) && !/INFORM/.test(move(r.system)), `${move(r.system)} | ${r.mr}`);
+  }
+  // their work, checked: the verdict the engine reached, never a slip it did not find
+  const right = await turn({ sessionId: 'conv_r2_c1', messages: [U('I got x = 4 for 2x + 3 = 11. Did I get it right?')] }, { env: on });
+  ok('a right answer checked: no slip example, no "gets the correction", not a routine task', !/The first step is where it slips","steps"/.test(right.system) && !/(?:attempt|Their work)[^\n]*gets the correction/.test(right.system) && !/A ROUTINE TASK/.test(right.system), J([/The first step is where it slips","steps"/.test(right.system), (/[^\n]*(?:attempt|Their work)[^\n]*gets the correction[^\n]*/.exec(right.system) ?? [''])[0], (/[^\n]*A ROUTINE TASK[^\n]*/.exec(right.system) ?? [''])[0], right.headers.get('x-socria-runtime')]));
+  ok('  …and it is told the attempt holds, or to check it — never that it is wrong', /Their attempt is right|Their attempt, not yet checked/.test(right.system), (/[^\n]*Their attempt[^\n]*/.exec(right.system) ?? [''])[0]);
+  // their read asked for: once, after the block, everywhere it is mentioned
+  const lean = await turn({ sessionId: 'conv_r2_l', messages: [U('Should I go with the MacBook Air or the Pro? What would you pick?')] }, { env: on });
+  ok('their read asked for: given once, after the decide block, and no line says to name no winner', /They asked for your read/.test(lean.system) && !/name no winner/.test(lean.system) && !/your read first/.test(lean.system), lean.system.slice(-1800));
+  // open work with their numbers: the chart carries them
+  const budget = await turn({ sessionId: 'conv_r2_b', messages: [U('We need to rework our budget: rent 3000, salaries 20000, software 1500, ads 4000')] }, { env: on });
+  ok('open work with their numbers: the chart shows them', /the chart below shows their numbers/.test(budget.system), budget.system.slice(-1800));
+  // a procedure asked politely, and a trip asked another way
+  const chain = await turn({ sessionId: 'conv_r2_s', messages: [U('walk me through replacing a bike chain')] }, { env: on });
+  ok('"walk me through replacing a bike chain": the practical shape and its steps', /a practical question with an answer/.test(chain.system) && /the steps in order, in the sequence below/.test(chain.system), chain.system.slice(-1500));
+  const trip = await turn({ sessionId: 'conv_r2_t', messages: [U('what should I see in Tokyo in 4 days?')] }, { env: on });
+  ok('"what should I see in Tokyo in 4 days?": the days in order, and the move is not "a sentence or two"', /the days in order — Day 1, Day 2/.test(trip.system) && !/in a sentence or two/.test(move(trip.system)), `${move(trip.system)}`);
 }
 
 console.log('\n=== MR\'s own time ===');

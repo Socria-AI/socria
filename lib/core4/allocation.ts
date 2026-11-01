@@ -488,11 +488,15 @@ function allocateFor(ctx: Ctx): Allocation {
         1, ['the corrected answer'], ['the verdict', 'where and what kind of error'],
         { what: 'the corrected final answer', reason: 'practice_goal', evidence: s.learningGoal.evidence ?? '', source: sourceOf(s.learningGoal, signals.learningGoal === true) }, s);
     }
-    return alloc('AI_VERIFIES', s.attempt === 'right' ? 'verify.confirm' : 'verify.correct',
+    // "Did I get it right?" with nothing decided yet is a check, not a correction: told it "gets the correction",
+    // a right answer was treated as wrong (second adversarial round, November 2026)
+    return alloc('AI_VERIFIES', s.attempt === 'right' ? 'verify.confirm' : s.attempt === 'none' ? 'verify.check' : 'verify.correct',
       s.attempt === 'right'
         ? 'Their attempt is right: say so plainly and specifically.'
-        : 'A wrong or partial attempt gets the correction: where it goes wrong and what is right.',
-      0.8, [], ['the verdict', 'the correction'], null, s);
+        : s.attempt === 'none'
+          ? 'Their attempt, not yet checked: check it and say plainly whether it holds — if it does, say so first and why; if not, where it first goes wrong.'
+          : 'A wrong or partial attempt gets the correction: where it goes wrong and what is right.',
+      0.8, [], s.attempt === 'none' ? ['the verdict', 'the correction if one is needed'] : ['the verdict', 'the correction'], null, s);
   }
 
   // ── they are practising, said so, and are working a problem ──

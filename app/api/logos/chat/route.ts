@@ -114,6 +114,7 @@ import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
 // METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
 import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
+import { fitControlsToForms } from '@/lib/mr/execute';
 import { deliberationOn, mrMode, storeOn } from '@/lib/mr/config';
 import { deliberate } from '@/lib/mr/deliberate';
 import { resolveCondition } from '@/lib/mr/experiment';
@@ -801,6 +802,15 @@ export async function POST(req: NextRequest) {
         history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
         withhold: true,
       });
+    } else if (!assistInput.guard && allocation?.split?.reasoning === 'scaffold' && accuracy.block) {
+      // …and when they are working it through with Socria, what was computed checks their steps: it is not the
+      // reply's to state (second adversarial round, November 2026)
+      accuracy = planTurn({
+        lastUserText: String(last.content ?? ''),
+        history: clean.slice(0, -1).map((m) => ({ role: m.role, content: m.content })),
+        withhold: false,
+        scaffold: true,
+      });
     }
     // The exchange (small talk, joking, something personal…) keeps the engine
     // from imposing a task's move on a hello; LOGOS_RUNTIME=off is the route as
@@ -1127,7 +1137,7 @@ export async function POST(req: NextRequest) {
       // says — the central idea first, a decision laid out to weigh — is said once, by the shape.
       (allocationShown ? renderAllocation(allocationShown, turnState, turnView) : renderAssist(assist, turnView)) +
       // …adjusted, when MR is regulating this turn (lib/mr/execute.ts): only the lines its prompt-level controls need
-      (mrRun?.block ?? '') +
+      fitControlsToForms(mrRun?.block ?? '', presentation) +
       // …and what shape it may take: the inline elements on offer, if any
       renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block) }) +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
