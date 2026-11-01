@@ -48,7 +48,7 @@
 import { splitFor, mustNotPerform, CONTRIBUTION } from '../core4/split';
 import { ownershipRead } from '../core4/allocation';
 import { EMPTY_STATE, type CognitiveState } from '../cognition/state';
-import { chooseAssist, renderAssist, type AssistDecision, type AssistInput } from '../cognition/assist';
+import { chooseAssist, renderAssist, type AssistDecision, type AssistInput, type AssistView } from '../cognition/assist';
 import { TALK, type Exchange } from '../cognition/register';
 import { EVIDENCE_WITHHELD, type Allocation, type AllocationMode, type CognitiveSplit, type ExplicitSignals } from '../core4/types';
 import type { TurnState } from './state';
@@ -236,8 +236,32 @@ function reasonLine(code: string): string {
   return '';
 }
 
+/**
+ * WHAT IS OWED, IN A LINE THE REPLY CAN KEEP (November 2026). Core 4's
+ * contribution for a decision that is theirs is a six-part checklist — the
+ * frame, what each way costs, the assumption each needs, the evidence there is
+ * and is not, what would settle it, the strongest case against — and for their
+ * own reasoning a five-part one ending in a fully worked analogous case. Read
+ * as instructions, each became a section of the reply. Logos 5 keeps what they
+ * protect and says it in a line; and where a block already carries what the
+ * choice rests on (a decision to weigh, a comparison, a claim's parts), the
+ * prose owes only the one thing it turns on. Core 4's own wording stays Core
+ * 4's (lib/core4/split.ts).
+ */
+const BLOCK_NAME: Record<string, string> = { decide: 'decide', compare: 'comparison', claim: 'claim', reasoning: 'reasoning', balance: 'two-sides' };
+function owed(lead: keyof typeof CONTRIBUTION, view: AssistView): string {
+  const block = (view.forms ?? []).find((k) => k in BLOCK_NAME);
+  if (lead === 'judgment')
+    return block
+      ? `the ${BLOCK_NAME[block]} block carries what it rests on; your prose, the one thing it turns on`
+      : 'the one or two things the choice actually turns on, and the strongest case against the way they are leaning';
+  if (lead === 'reasoning')
+    return 'what kind of problem it is and the method that fits, a hint at the exact point they are stuck, and a check of each step they take — a worked example only of an analogous problem';
+  return CONTRIBUTION[lead];
+}
+
 /** Core 4's lines for this turn: the reason, the withhold in their words, the announcement, what is owed. */
-function renderCore(a: RuntimeAllocation, st: TurnState): string[] {
+function renderCore(a: RuntimeAllocation, st: TurnState, view: AssistView = {}): string[] {
   const c = a.core;
   if (!c) return [];
   const lines: string[] = [];
@@ -259,15 +283,17 @@ function renderCore(a: RuntimeAllocation, st: TurnState): string[] {
   // that keeps something with them owes a specific contribution, named. Under
   // a withhold, THEY CAN HAVE has already named it.
   const [lead] = mustNotPerform(a.split);
-  if (lead && !c.withhold && st.exchange.kind === 'task') lines.push(`What you owe them instead: ${CONTRIBUTION[lead]}.`);
+  if (lead && !c.withhold && st.exchange.kind === 'task') lines.push(`What you owe them instead: ${owed(lead, view)}.`);
   return lines;
 }
 
 /** What a domain asks of a colleague, in a line. */
+// One priority each (November 2026): a list of five things to cover — "numbers, trade-offs, customers,
+// risks, and the next concrete step" — was read as five sections to write.
 const DOMAIN_LINE: Record<TurnState['domain'], string> = {
-  business: 'Work like a sharp operator: numbers, trade-offs, customers, risks, and the next concrete step.',
-  research: 'Work like a careful researcher: what the evidence shows, how strong it is, and what would change the conclusion.',
-  engineering: 'Work like a senior engineer: concrete, correct and runnable; name assumptions and edge cases; code in fenced blocks.',
+  business: 'Work like a sharp operator: the number or trade-off that decides it, then the next concrete step.',
+  research: 'Work like a careful researcher: what the evidence shows and how strong it is, a sentence each; the studies themselves only if asked.',
+  engineering: 'Work like a senior engineer: concrete and correct; name the assumption that matters.',
   writing: 'Work like a good editor: specific changes to their text, in their voice.',
   learning: 'Work like a good tutor: meet them where they are, explain plainly, and check understanding only when it helps.',
   creative: 'Work like a creative collaborator: build on their idea, offer real options, and keep it theirs.',
@@ -285,7 +311,28 @@ const IDEA_LINE: Partial<Record<TurnState['domain'], string>> = {
   math: 'The idea before any working: what it says and why it holds, in a sentence, with the conditions it needs; step-by-step working only when there is a problem to work. Exact results come from the engine when it gives them.',
   learning: 'Work like a good tutor: the central idea first, in their terms, one idea at a time; check understanding only when it helps.',
 };
-const domainLine = (st: TurnState): string => ((st.work === 'explanation' || st.work === 'information') && IDEA_LINE[st.domain]) || DOMAIN_LINE[st.domain];
+/** Code is for work that makes or fixes something: "what is a closure?" is an idea, not a code review. */
+const CODE_WORK = new Set<TurnState['work']>(['execution', 'diagnosis', 'creation']);
+/** With the shape of the reply set this turn, the idea line keeps only what the shape does not say. */
+const IDEA_SHAPED: Partial<Record<TurnState['domain'], string>> = {
+  math: 'Exact results come from the engine when it gives them.',
+  learning: 'Work like a good tutor: in their terms, one idea at a time; check understanding only when it helps.',
+};
+const domainLine = (st: TurnState, view: AssistView = {}): string => {
+  const idea = st.work === 'explanation' || st.work === 'information';
+  if (idea && view.shape === 'understand' && IDEA_SHAPED[st.domain]) return IDEA_SHAPED[st.domain]!;
+  if (idea && IDEA_LINE[st.domain]) return IDEA_LINE[st.domain]!;
+  if (st.domain === 'engineering' && CODE_WORK.has(st.work)) return `${DOMAIN_LINE.engineering} Runnable code in fenced blocks; the edge cases that bite.`;
+  return DOMAIN_LINE[st.domain];
+};
+
+/**
+ * A QUESTION, ASKED IN CONVERSATION — and not read as anything in particular.
+ * With no line at all, it got the core's defaults and the model's habit: every
+ * consideration there is. One line asks for the answer, and only what would
+ * change it for them.
+ */
+const QUESTION_LINE = 'A question: your answer or your read first, in a sentence; then only what would change it for them — the few that matter most, not everything that could.';
 
 /**
  * What an exchange that is not a task asks for, in a line. Each names the kind
@@ -353,13 +400,15 @@ function mannerLine(x: Exchange): string {
  * of their writing — is said whenever the split reserves it, whatever the
  * exchange, because Human-First does not lapse in a friendly register.
  */
-export function renderAllocation(a: RuntimeAllocation, st: TurnState): string {
+export function renderAllocation(a: RuntimeAllocation, st: TurnState, view: AssistView = {}): string {
   const x = st.exchange;
   const lines: string[] = [];
-  const core = renderCore(a, st);
+  const core = renderCore(a, st, view);
   if (x.kind === 'task') {
-    lines.push(domainLine(st), `You do: ${a.does.join('; ')}.`);
-    if (a.supports.length) lines.push(`You support: ${a.supports.join('; ')}.`);
+    lines.push(domainLine(st, view), `You do: ${a.does.join('; ')}.`);
+    // "their reasoning: the next step… the full solution only if they ask" is about a problem they are
+    // working; a decision and a question of evidence are not one, and it read as a reason to hold back
+    if (a.supports.length && st.work !== 'judgment' && st.work !== 'research') lines.push(`You support: ${a.supports.join('; ')}.`);
     if (a.theirs.length) lines.push(`Theirs: ${a.theirs.join('; ')}.`);
     // "They asked for the answer" beside a withhold is one instruction arguing with another.
     if (st.preferences.answerFirst && !a.core?.withhold) lines.push('They asked for the answer: give it first.');
@@ -376,8 +425,9 @@ export function renderAllocation(a: RuntimeAllocation, st: TurnState): string {
     if (a.core?.withhold || a.core?.reasonCode === 'reflect.heard') lines.push(...core);
     const manner = mannerLine(x);
     if (manner) lines.push(manner);
+    if (x.kind === 'conversation' && x.manner.words >= 4 && view.question) lines.push(QUESTION_LINE);
   }
-  const move = renderAssist(a.assist).replace(/^\s+/, '');
+  const move = renderAssist(a.assist, view).replace(/^\s+/, '');
   if (!lines.length && !move) return '';
   return `\n\n=== This turn ===\n${lines.join('\n')}\n${move}`;
 }

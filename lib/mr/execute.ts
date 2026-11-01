@@ -170,7 +170,9 @@ export function renderControls(c: TypedControls, ctx: { withheld: boolean; hardN
   const lines: string[] = [];
   switch (c.strategy) {
     case 'direct':
-      lines.push('THEY ASKED FOR IT DIRECTLY. Give it now and first — the answer, or the steps numbered in order — with no diagnostic question before it.');
+      // "the steps in order", not "numbered": with a sequence offered this turn the steps are the block's
+      // (lib/runtime/presentation.ts), and a numbered list beside it said them twice
+      lines.push('THEY ASKED FOR IT DIRECTLY. Give it now and first — the answer, or the steps in order — with no diagnostic question before it.');
       break;
     case 'execute':
       lines.push('A ROUTINE TASK. Do it, plainly and correctly. Do not turn it into an exercise or ask them to work it out.');

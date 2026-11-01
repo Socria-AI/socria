@@ -24,6 +24,7 @@ export * from './behavior';
 export * from './epistemic';
 export * from './representation';
 export * from './presentation';
+export * from './asks';
 
 const off = (v: string | undefined): boolean => /^(off|0|false|no)$/i.test((v ?? '').trim());
 

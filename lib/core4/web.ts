@@ -145,6 +145,24 @@ const CURRENT = /\b(?:latest|current(?:ly)?|right now|today|this (?:week|month|y
 export const LIVE_SUBJECT =
   /\b(?:weather|forecast|temperature (?:in|at|today|tomorrow|tonight|outside|right now)|(?:is it|will it) (?:rain|snow)|(?:live |final )?scores?|who (?:won|is winning|leads|is leading)|standings|stock(?:s| price| prices| market)?|share price|exchange rate|interest rates?|mortgage rates?|inflation rate|bitcoin|ethereum|crypto(?:currency)? prices?|gas prices?|traffic|headlines|breaking news|latest news|news today|today'?s news|election results?|box office|open now|opening hours)\b/i;
 
+/**
+ * A CONCEPT, NAMING SOMETHING LIVE IN PASSING (November 2026). "What is the
+ * difference between weather and climate?", "index funds vs individual
+ * stocks", "how do interest rates affect inflation?" — the live word is inside
+ * a comparison, a definition or a how-or-why, and the question is about the
+ * idea. Each was sent to search; with no page back, the reply was handed a
+ * page of where to look in place of the comparison asked for. Pinned to now or
+ * to a place ("how is the weather in Paris?", "are stocks up today?"), the
+ * same words are a lookup again.
+ */
+const CONCEPTUAL =
+  /\b(?:differences?\s+between|different\s+(?:from|than)|differ\s+from|compared?\s+(?:to|with)|vs\.?|versus|how\s+(?:do|does|did|would|can)\b|why\s+(?:do|does|did|is|are|would)\b|what\s+(?:is|are)\s+(?:a|an|the)?\s*(?:difference|point|idea|purpose|role)\b|explain|meaning|definition|pros\s+and\s+cons|better\s+(?:for|than)|in\s+general)\b/i;
+const LIVE_FRAME = /\b(?:today|tonight|tomorrow|now|right\s+now|currently|current|latest|this\s+(?:week|weekend|morning|afternoon|evening|month)|at\s+the\s+moment|forecast)\b/i;
+const LIVE_PLACE = /\b(?:in|at|for|near)\s+[A-Z][\w.'’-]+/;
+export function liveInPassing(t: string): boolean {
+  return CONCEPTUAL.test(t) && !LIVE_FRAME.test(t) && !LIVE_PLACE.test(t);
+}
+
 /** A few words, as typed into a search box: "weather in dallas", "bitcoin price", "lakers score". */
 const SEARCH_BOX = (t: string): boolean => {
   const words = t.replace(/[^\p{L}\p{N}'\s]/gu, ' ').split(/\s+/).filter(Boolean);
@@ -295,7 +313,7 @@ export function webIntent(
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
   }
   // …and live data by its subject: asked in any of those shapes, or in as few words as a search box takes
-  if (LIVE_SUBJECT.test(t) && !INWARD.test(t) && (asks || SEARCH_BOX(t))) {
+  if (LIVE_SUBJECT.test(t) && !INWARD.test(t) && !liveInPassing(t) && (asks || SEARCH_BOX(t))) {
     return { want: true, kind: 'search', why: 'the answer is one that moves' };
   }
   // A FACT ABOUT A NAMED THING: "Who founded Socria?", "What does Anthropic's

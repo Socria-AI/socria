@@ -105,7 +105,7 @@ console.log('\n=== what the turn is told: the move and the subject ===');
   ok('the maths block: the idea first, then the picture to change; proofs when asked', /EXPLORATION \(a concept, a theorem, a relationship\): the idea first, in one sentence/.test(I.LOGOS5_MATH) && /never dropped for brevity/.test(I.LOGOS5_MATH));
   // the cached core stays inside its budget: the rule rides on the turns that need it (the shape, the move, the maths block)
   ok('the core leads with the insight, and leaves the rest to the turns that need it', /Lead with what matters: the answer, the insight, the finding/.test(I.LOGOS5_CORE) && !/THE SHAPE OF THIS REPLY/.test(I.LOGOS5_CORE));
-  ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v5');
+  ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v6');
 }
 
 console.log('\n=== the shape, and what may be drawn ===');
@@ -138,7 +138,9 @@ console.log('\n=== the shape, and what may be drawn ===');
   ok('…told a sentence or two is the whole reply', /If a sentence or two carries it, that is the whole reply/.test(I.renderPresentation(onion)) && /one concrete example or image, if the sentence needs one/.test(I.renderPresentation(onion)));
   for (const t of ["What's the capital of Peru?", 'How long should I boil an egg for a runny yolk?', 'hi! how are you?', 'thanks, that helps'])
     ok(`a simple question gets no shape and nothing drawn: "${t}"`, !plan(t).shape && !plan(t).forms.length, J(plan(t)));
-  ok('going deeper still takes the deeper shape', plan('Go deeper: Where c comes from').shape === 'deeper');
+  // a way deeper, opened, goes one layer down and offers the next (VX, November 2026); depth asked for in words is the whole thread
+  ok('a way deeper opened goes one layer down, with the next ways deeper', plan('Go deeper: Where c comes from').shape === 'layer' && plan('Go deeper: Where c comes from').forms.includes('paths'));
+  ok('…and depth asked for in so many words takes the deeper shape', plan('walk me through it in detail').shape === 'deeper');
   ok('a list asked for is still a list, never an overview', !plan('list the steps of mitosis').forms.includes('concepts'));
 }
 
@@ -302,10 +304,11 @@ console.log('\n=== through the real route: what the reply model is sent ===');
   };
   const mvt = await turn('I need to understand the Mean Value Theorem');
   ok('the Mean Value Theorem: answered (200), the maths block in the stable prompt', mvt.status === 200 && /EXPLORATION \(a concept, a theorem, a relationship\)/.test(mvt.stable), mvt.status);
-  ok('…the turn: EXPLAIN, the idea first; the understanding shape; the chord graph; the ways deeper', /The move this turn — EXPLAIN\. The central idea first/.test(mvt.turn) && /THE SHAPE OF THIS REPLY — they want to understand an idea/.test(mvt.turn) && /"chord":\["a","b"\]/.test(mvt.turn) && /"type":"paths"/.test(mvt.turn), mvt.turn);
+  // the move names itself and leaves the how to the shape: the central idea is asked for once, not twice (VX, November 2026)
+  ok('…the turn: EXPLAIN, the idea first; the understanding shape; the chord graph; the ways deeper', /The move this turn — EXPLAIN — the shape of this reply, below, says how/.test(mvt.turn) && /THE SHAPE OF THIS REPLY — they want to understand an idea/.test(mvt.turn) && (mvt.turn.match(/central insight in one plain sentence|central idea first/g) ?? []).length === 1 && /"chord":\["a","b"\]/.test(mvt.turn) && /"type":"paths"/.test(mvt.turn), mvt.turn);
   ok('…and never "show the reasoning step by step" or "work the problem through"', !/Show the reasoning step by step/.test(mvt.turn) && !/work the problem through/.test(mvt.turn));
   const der = await turn('What does a derivative actually mean?');
-  ok('a derivative: the idea first, and the tangent at a point to drag', /The idea before any working/.test(der.turn) && /"tangent":"p"/.test(der.turn), der.turn);
+  ok('a derivative: the idea first, and the tangent at a point to drag', /THE SHAPE OF THIS REPLY — they want to understand an idea/.test(der.turn) && !/Show the reasoning step by step/.test(der.turn) && /"tangent":"p"/.test(der.turn), der.turn);
   const tax = await turn('Why does a tax on sellers raise the price buyers pay by less than the tax?');
   ok('economics: supply and demand meeting, the tax to drag', /"curves":\[\{"expr":"2\+x\+t","label":"supply"\}\]/.test(tax.turn) && /THE SHAPE OF THIS REPLY — they want to understand an idea/.test(tax.turn), tax.turn);
   const biz = await turn('Should we hire a second engineer or our first marketer? We have 8 months of runway.');

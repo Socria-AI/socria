@@ -69,12 +69,13 @@ for (const t of ['hi', 'hey, how is it going?', 'lol that is brilliant', 'thanks
 console.log('\n=== 3. a list asked for is a list ===');
 for (const t of ['List the main concepts of microeconomics', 'give me a bulleted list of the key ideas in psychology', 'what are the steps to apply for a passport? just list them', 'enumerate the branches of philosophy'])
   ok(`nothing offered in place of the list: "${t}"`, !forms(t).some((k) => k === 'concepts' || k === 'sequence'), J(plan(t)));
-ok('the core says a list is for what is one, or when they ask for one', /A list only when the content is one \(steps in order, things to gather\) or they ask for one/.test(I.LOGOS5_CORE));
+// logos5-v6: a list holds the few that matter most, a line each — "tips for sleeping better" came back as twelve
+ok('the core says a list is for what is one, or when they ask for one — and then the few that matter most', /A list only when the content is one or they ask, and then the few that matter most, a line each/.test(I.LOGOS5_CORE));
 ok('…prose is the default, and an explanation is never a list of bolded terms and definitions', /Prose by default/.test(I.LOGOS5_CORE) && /never bolded terms with definitions/.test(I.LOGOS5_CORE) && /A reply takes the shape of the thought/.test(I.LOGOS5_CORE));
 ok('…no headings, no "Key points" or "In summary"', /Never # headings/.test(I.LOGOS5_CORE) && /No "Key points" or "In summary"/.test(I.LOGOS5_CORE));
 ok('…and a short answer stays short', /a short answer stays short/.test(I.LOGOS5_CORE));
 ok('…and the offer marker is never in the cached core (it travels only on a turn that is offered something)', !I.LOGOS5_CORE.includes('INLINE, IF IT HELPS'));
-ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v5');
+ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v6');
 
 console.log('\n=== 4. several related concepts: an overview to explore ===');
 for (const t of ['Explain the key concepts in statistics', 'teach me the basics of organic chemistry', 'What does macroeconomics cover?', 'give me an introduction to machine learning'])
@@ -84,7 +85,8 @@ ok('its grammar: 3–7 parts, links to the others, the prose a short introductio
 ok(`…short: ${said.length} characters`, said.length < 700, said.length);
 ok('room for an overview in the reply ceiling, so it is never cut off and dropped: 700; steps 450', I.presentationRoom({ forms: ['concepts'] }) === 700 && I.presentationRoom({ forms: ['sequence'] }) === 450 && I.presentationRoom({ forms: ['chart'] }) === 350);
 const both = I.renderPresentation({ forms: ['concepts', 'sequence'], reasons: [] });
-ok(`…with a sequence beside it: ${both.length} characters`, both.length < 1000, both.length);
+// each grammar now ends on what the prose around it is for, and the header carries the no-restate rule (VX, November 2026)
+ok(`…with a sequence beside it: ${both.length} characters`, both.length < 1200, both.length);
 
 console.log('\n=== 5. a comparison: the comparison ===');
 ok('"compare Python and JavaScript for a beginner": a comparison, not an overview', forms('compare Python and JavaScript for a beginner').includes('compare') && !forms('compare Python and JavaScript for a beginner').includes('concepts'));
@@ -104,12 +106,17 @@ const routed = I.routeTurn({ text: mapAsk });
 ok('"See how they connect" asks for the Logic Map in words: rule D, the map beside the conversation', routed.intent === 'structure' && routed.reveal?.view === 'logic_map', J(routed));
 for (const t of ['What happened during the French Revolution?', 'what were the key events of the Cold War?', 'how did the internet evolve over time?'])
   ok(`events whose order is the point, in the conversation: a timeline may help: "${t}"`, plan(t).reasons.includes('sequence:timeline'), J(plan(t)));
-ok('"give me a timeline of the French Revolution" is something to make: Artifacts answers it, nothing inline', I.routeTurn({ text: 'give me a timeline of the French Revolution' }).intent === 'visual' && forms('give me a timeline of the French Revolution').length === 0);
+// A timeline of a history, asked for in passing, is drawn in the reply and kept with Keep (lib/runtime/orchestrate.ts
+// inlineInstead, November 2026); one MADE, or of their own plans, is still made in Artifacts.
+ok('"give me a timeline of the French Revolution": in the conversation, the timeline as the form that fits', I.routeTurn({ text: 'give me a timeline of the French Revolution' }).intent === 'conversation' && forms('give me a timeline of the French Revolution').includes('sequence') && plan('give me a timeline of the French Revolution').strong?.includes('sequence'), J(plan('give me a timeline of the French Revolution')));
+ok('  "make me a timeline of the French Revolution" and "a timeline for our product launch" are still made in Artifacts', I.routeTurn({ text: 'make me a timeline of the French Revolution' }).intent === 'visual' && I.routeTurn({ text: 'give me a timeline for our product launch' }).intent === 'visual');
 ok('how a process runs, step by step: steps', forms('how does a bill become law?').includes('sequence') && plan('how does a bill become law?').reasons.includes('sequence:steps'));
 
 console.log('\n=== 8. where UI would be unnecessary ===');
-for (const t of ["what's the capital of France?", 'how many ounces are in a pound?', 'tell me about the history of jazz in New Orleans', 'is it worth reading Dune?'])
+for (const t of ["what's the capital of France?", 'how many ounces are in a pound?', 'is it worth reading Dune?'])
   ok(`"${t}": nothing`, forms(t).length === 0, J(plan(t)));
+// a history may be told as a story: its events are OFFERED in order, never required (VX, November 2026)
+ok('"tell me about the history of jazz in New Orleans": a timeline offered, optional', forms('tell me about the history of jazz in New Orleans').includes('sequence') && !plan('tell me about the history of jazz in New Orleans').strong?.includes('sequence'), J(plan('tell me about the history of jazz in New Orleans')));
 ok('writing they are making ("write an overview of microeconomics for my essay"): no overview element', !forms('write an overview of microeconomics for my essay intro').includes('concepts'), J(plan('write an overview of microeconomics for my essay intro')));
 ok('a brainstorm: nothing to explore, ideas in prose', !forms('brainstorm some ideas for a microeconomics project').includes('concepts'));
 ok('under the Answer Guard: no overview to read instead of working, no steps, no timeline (the gate drops all three)', forms('Give me an overview of microeconomics', { guard: true }).length === 0 && !forms('how does a bill become law?', { guard: true }).includes('sequence') && !forms('What happened during the French Revolution?', { guard: true }).includes('sequence'));

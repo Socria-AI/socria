@@ -19,7 +19,9 @@ import type { MapDigest } from '../cognition/digest';
 import { asksForDecision, isFactQuestion, offersWork, wantsExplanation } from '../cognition/assist';
 import { claimCheck } from '../cognition/claims';
 import { quickPlot } from './plot-ask';
-import { onlyAboutSocria, readExchange, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
+import { LIST_LEAD, PERSONAL_HOW, adviceAsk, comparisonAsk, topicAsk } from './asks';
+import { looksMath } from '../tex-split';
+import { onlyAboutSocria, readExchange, saysFeeling, smallTalk, withoutGreeting, type Exchange } from '../cognition/register';
 import type { Intent } from './orchestrate';
 
 export const DOMAINS = ['business', 'research', 'engineering', 'writing', 'learning', 'creative', 'math', 'everyday'] as const;
@@ -28,7 +30,7 @@ export type Domain = (typeof DOMAINS)[number];
 /** Words that place a conversation, weighed together — one word decides nothing. */
 const DOMAIN_WORDS: Record<Exclude<Domain, 'everyday'>, RegExp> = {
   business:
-    /\b(?:revenue|customers?|clients?|pricing|market(?:ing)?|sales|startup|investors?|funding|roi|kpis?|margins?|profit|competitors?|stakeholders?|budget|hiring|okrs?|b2b|saas|churn|go[- ]to[- ]market|business|company|quarter(?:ly)?|forecast)\b/gi,
+    /\b(?:revenue|customers?|clients?|pricing|market(?:ing)?|marketers?|sales|startup|investors?|funding|roi|kpis?|margins?|profit|competitors?|stakeholders?|budget|hiring|hire|runway|headcount|payroll|co-?founders?|valuation|okrs?|b2b|saas|churn|go[- ]to[- ]market|business|company|quarter(?:ly)?|forecast)\b/gi,
   research:
     /\b(?:research|stud(?:y|ies) (?:found|shows?|suggests?)|papers?|literature|journal|hypothes[ie]s|evidence|sources?|citations?|methodology|dataset|data set|survey|experiment|findings|peer[- ]review(?:ed)?|meta-analysis|sample size|confound\w*)\b/gi,
   engineering:
@@ -39,8 +41,10 @@ const DOMAIN_WORDS: Record<Exclude<Domain, 'everyday'>, RegExp> = {
     /\b(?:exam|quiz|homework|assignment|class|course|lecture|syllabus|studying|study for|learn\w*|understand\w*|revision|tutor|professor|teacher|semester|midterm|finals?|economics|microeconomics|macroeconomics|elasticity|equilibrium|supply and demand|marginal (?:cost|revenue|utility|product)|opportunity cost|tax incidence|deadweight loss|inflation)\b/gi,
   creative:
     /\b(?:story|stories|novel|poem|poetry|characters?|screenplay|song|lyrics|worldbuilding|brainstorm\w*|creative|game idea|name ideas|plot twist|fiction)\b/gi,
+  // "Solve 2x^2 - 8x + 6 = 0": the exponent follows a coefficient, so a word boundary before the x never
+  // matched it, and the problem was read as nothing in particular (November 2026)
   math:
-    /\b(?:derivative|integral|equation|solve for|matri(?:x|ces)|eigen\w*|probabilit\w*|theorem|proof|limit|calculus|algebra|geometry|statistics|regression|variance|polynomial|logarithm)\b|[∫∑√]|\b[a-z]\s*\^\s*\d/gi,
+    /\b(?:derivative|integral|equation|solve for|solve|prove|matri(?:x|ces)|eigen\w*|probabilit\w*|theorem|proof|limit|calculus|algebra|geometry|statistics|regression|variance|polynomial|quadratic|parabola|logarithm|irrational|square roots?|induction|p-?values?|chain rule)\b|[∫∑√]|(?<![a-z])[a-z]\s*\^\s*\d/gi,
 };
 
 /** The map's own reading of the thinking, where it has one. */
@@ -89,7 +93,10 @@ export function readDomain(userTexts: readonly string[], mapContext?: string | n
  */
 export function looksMathematical(texts: readonly string[]): boolean {
   const re = new RegExp(DOMAIN_WORDS.math.source, 'i');
-  return texts.some((t) => re.test(t) || /\$[^$\n]{1,80}\$|\\(?:frac|int|sum|sqrt)\b/.test(t));
+  // a $…$ span counts only when what is inside it is mathematics: "from $29 to $49" is two prices
+  // (lib/tex-split.ts looksMath, the judgement the renderer makes of the same span)
+  const tex = (t: string) => [...t.matchAll(/\$([^$\n]{1,80})\$/g)].some((m) => looksMath(m[1]));
+  return texts.some((t) => re.test(t) || tex(t) || /\\(?:frac|int|sum|sqrt)\b/.test(t));
 }
 
 // "find the derivative of x³ sin x" is a problem to work, said the way a problem set says it — it was read as
@@ -129,10 +136,30 @@ export function readWork(text: string, signals: ExplicitSignals, intent: Intent,
   if (RESEARCH.test(t)) return 'research';
   if (wantsExplanation(t, signals)) return 'explanation';
   if (isFactQuestion(t) || /^(?:what|which|who|whom|whose|when|where)\b[^?]{0,160}\?\s*$/i.test(t)) return 'information';
+  // ASKED, THOUGH NOT IN THE WORDS OF A QUESTION (November 2026, lib/runtime/asks.ts). "TCP vs UDP" was
+  // too short to be anything but talk; "Postgres or MongoDB for a chat app?", "causes of inflation",
+  // "list the main causes of the First World War", "how do I hire my first engineer?" and "tips for
+  // sleeping better" were read as idle reflection — so nothing was shaped, and the reply wrote its habit.
+  // Each asks for something with an answer: a comparison, a topic, a list, practical advice. Before
+  // writing and doing: "how do I write a cover letter?" asks how, not for the letter.
+  if (comparisonAsk(t) || topicAsk(t) || LIST_LEAD.test(t) || adviceAsk(t)) return 'information';
   if (CREATION.test(t)) return 'creation';
   if (EXECUTION.test(t)) return 'execution';
+  // A QUESTION THAT IS NOTHING ELSE IS STILL A QUESTION: "is nuclear power good or bad?", "does sugar
+  // make kids hyperactive?". Not one put to Socria ("do you like jazz?"), not a feeling, not a request
+  // for help ("can you help me with…"), and not their own decision ("should I…" is judged above).
+  if (plainQuestion(t)) return 'information';
   if (t.length < 25 && !t.includes('?')) return 'conversation';
   return 'reflection';
+}
+
+const ASKS = /^(?:how|why|is|are|was|were|does|do|did|can|could|would|will|has|have|isn'?t|aren'?t|doesn'?t|don'?t)\b/i;
+const TO_SOCRIA = /^(?:(?:do|did|are|were|can|could|would|will|have|has|is)\s+(?:you|u)\b|how\s+(?:are|do|did|have|would|can|could|will)\s+(?:you|u)\b|(?:can|could|would|will)\s+you\s+help\b)/i;
+function plainQuestion(t: string): boolean {
+  if (!/\?\s*$/.test(t) || t.split(/\s+/).length < 4 || t.length > 300) return false;
+  if (!ASKS.test(t) || TO_SOCRIA.test(t) || saysFeeling(t) || PERSONAL_HOW.test(t)) return false;
+  // a decision of theirs that the reader above did not take ("should I be worried?") stays where it was
+  return !/\bshould\s+(?:i|we)\b/i.test(t);
 }
 
 export interface StateInput {
@@ -203,7 +230,17 @@ export function readTurnState(i: StateInput): TurnState {
     intent: i.intent,
     domain: readDomain(userTexts, i.map?.context ?? null),
     work,
-    exchange: readExchange({ text: i.text, history: i.history, task, work, signals: s, mapContext: i.map?.context ?? null, claim: work === 'information' && claimCheck(i.text) }),
+    exchange: readExchange({
+      text: i.text,
+      history: i.history,
+      task,
+      work,
+      signals: s,
+      mapContext: i.map?.context ?? null,
+      claim: work === 'information' && claimCheck(i.text),
+      // two named options, compared: a question with an answer, not an opinion asked for (lib/runtime/asks.ts)
+      compare: (work === 'information' || work === 'explanation') && comparisonAsk(i.text),
+    }),
     workspace: {
       docs: i.workspace?.docs ?? 0,
       artifacts: i.workspace?.artifacts ?? 0,

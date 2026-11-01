@@ -177,7 +177,8 @@ console.log('\n=== the planner offers them only where they help ===');
   ok('a relationship to discover: a graph', plan('I don’t get why the vertex of a parabola is at x = −b/2a').forms.includes('graph'), J(plan('I don’t get why the vertex of a parabola is at x = −b/2a')));
   ok('…under the guard too (nothing that would be the answer is marked on it)', plan('why does the slope change the graph like that?', { guard: true }).forms.includes('graph'));
   ok('motion, asked why: one small simulation', plan('Why does throwing at 45 degrees go the farthest?').forms.includes('sim'));
-  ok('…but a fall in history is history', !plan('Why did the Roman Republic fall?').forms.length);
+  // a fall in history is history: never a simulation — its causes, converging, are a diagram (VX, November 2026)
+  ok('…but a fall in history is history', !plan('Why did the Roman Republic fall?').forms.includes('sim') && plan('Why did the Roman Republic fall?').diagram === 'causes');
   ok('the working, asked for: steps — never under the guard', plan('how do I solve x^2 + 4x - 1 = 0 by completing the square?').forms.includes('steps') && !plan('how do I solve x^2 + 4x - 1 = 0 by completing the square?', { guard: true }).forms.includes('steps'));
   ok('practising, in the conversation: a question to work out', plan('ok, let me try one').forms.includes('check'));
   ok('…not where no question may go', !plan('ok, let me try one', { questions: 0 }).forms.includes('check'));

@@ -33,7 +33,7 @@
 //
 // Pure. No model, no network, no clock.
 
-import { LIVE_SUBJECT, webIntent } from '../core4/web';
+import { LIVE_SUBJECT, liveInPassing, webIntent } from '../core4/web';
 import type { ExplicitSignals } from '../core4/types';
 import { smallTalk } from '../cognition/register';
 
@@ -47,6 +47,18 @@ const CURRENT =
 
 const FACT =
   /^(?:what(?:'s|\s+is|\s+are|\s+was|\s+were)|who(?:'s|\s+is|\s+was|\s+were)|when(?:'s|\s+is|\s+was|\s+did)|where(?:'s|\s+is|\s+are)|which|how\s+(?:many|much|long|far|old|big|tall|fast))\b/i;
+
+/**
+ * A time word on their own plans is about their evening, not the world: "what
+ * should I cook tonight with chicken and rice?" was told nothing current had
+ * been checked (November 2026). Only when the time word is all that made it
+ * current, and the question is theirs.
+ */
+const BARE_TIME = /\b(?:today|tonight|this\s+(?:week|month|year|season|quarter)|recent(?:ly)?)\b/gi;
+function ownPlansOnly(t: string): boolean {
+  const rest = t.replace(BARE_TIME, ' ');
+  return !CURRENT.test(rest) && !LIVE_SUBJECT.test(t) && /\b(?:i|we|my|our|me|us)\b/i.test(t);
+}
 
 export interface NeedInput {
   text: string;
@@ -73,7 +85,9 @@ export function assessNeed(i: NeedInput): Need {
   // "How are you doing today?" asks after Socria, not after the world: it is
   // not a claim about anything current, and "what's up?" is not a fact.
   const chat = smallTalk(t);
-  if (!chat && (CURRENT.test(t) || LIVE_SUBJECT.test(t)) && (t.includes('?') || FACT.test(t) || /\b(?:look up|check|find out|search)\b/i.test(t))) kinds.push('current');
+  const asked = t.includes('?') || FACT.test(t) || /\b(?:look up|check|find out|search)\b/i.test(t);
+  // a live word inside a comparison or a definition, or a time word on their own plans, is not a question of what is current
+  if (!chat && (CURRENT.test(t) || LIVE_SUBJECT.test(t)) && asked && !liveInPassing(t) && !ownPlansOnly(t)) kinds.push('current');
   else if (!chat && FACT.test(t)) kinds.push('fact');
   const w = webIntent(t, i.signals, i.policy);
   return { kinds, web: w.want ? { want: true, why: w.why, kind: w.kind, ...(w.url ? { url: w.url } : {}) } : { want: false, why: w.why } };

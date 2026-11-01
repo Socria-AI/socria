@@ -73,6 +73,11 @@ export interface ExchangeInput {
   mapContext?: string | null;
   /** the caller read a claim put up to be checked (lib/cognition/claims.ts): a verdict to give, not two sides to weigh */
   claim?: boolean;
+  /**
+   * two named options set against each other, as the caller read it (lib/runtime/asks.ts comparisonAsk):
+   * "which is better for a small startup, React or Vue?" asks for the comparison, not for an opinion
+   */
+  compare?: boolean;
 }
 
 /** Their words without code, quotations or attachment blocks: what they said to Socria. */
@@ -299,6 +304,11 @@ export function mannerOf(text: string): Exchange['manner'] {
 }
 
 /** Where each feeling was said, the later one counting: "ugh, long week. finally friday" ends glad. */
+/** A feeling said in so many words — for a caller deciding whether a question is only a question. */
+export function saysFeeling(text: string): boolean {
+  return feelingOf(spoken(text ?? '')) !== null;
+}
+
 function feelingOf(t: string): 'up' | 'down' | null {
   const last = (re: RegExp) => {
     let at = -1;
@@ -344,6 +354,7 @@ export function readExchange(i: ExchangeInput): Exchange {
   if (i.task) {
     if (i.work === 'judgment' || i.work === 'verification') return done('task', 'work');
     if (i.claim) return done('task', 'claim');
+    if (i.compare) return done('task', 'compare');
     if (BRAINSTORM.test(t) && !s.recommendationRequested) return done('brainstorm', 'ideas');
     if (asksView || (OPINION.test(t) && !THEIR_PLAN.test(t))) return done('discussion', 'opinion');
     return done('task', 'work');

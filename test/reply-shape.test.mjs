@@ -113,7 +113,7 @@ const kinds = (pieces) => pieces.map((p) => (p.kind === 'block' ? (p.lead ? 'lea
 console.log('\n=== the ask: what comes first, and what a reply is not ===');
 {
   const core = I.LOGOS5_CORE;
-  ok('the persona says it changed: logos5-v5', I.PERSONA_VERSION === 'logos5-v5');
+  ok('the persona says it changed: logos5-v6', I.PERSONA_VERSION === 'logos5-v6');
   // The core says the rule in a line each; the detail of an open request and
   // of going deeper travels in that turn's own shape note (presentation.ts
   // SHAPES, pinned below), so the cached core stays inside its budget.
@@ -148,9 +148,18 @@ const plan = (text, o = {}) => {
   for (const t of ['We want to launch a podcast next spring', 'help me plan the team offsite', 'how should I approach the database migration?'])
     ok(`  "${t}": the same shape`, plan(t).shape === 'open' && plan(t).forms.includes('paths'), J(plan(t)));
 
+  // PROGRESSIVE DISCLOSURE (VX, November 2026): a way deeper, opened, goes ONE LAYER down — the mechanism
+  // under it in a few sentences — and offers the next layers as ways onward; the whole thread in parts is for
+  // depth asked for in so many words, or a Detailed length.
   for (const t of [I.pathAsk({ label: 'Sketch the first five minutes' }), 'Take me further into Supply and demand.', 'say more about the second one', 'ok, expand on that'])
-    ok(`going deeper: "${t}" — that thread, in parts`, plan(t).shape === 'deeper' && !plan(t).forms.includes('paths'), J(plan(t)));
-  const deep = plan(I.pathAsk({ label: 'Sketch the first five minutes' }));
+    ok(`going deeper: "${t}" — one layer down, the next layers offered`, plan(t).shape === 'layer' && plan(t).forms.includes('paths'), J(plan(t)));
+  const layer = plan(I.pathAsk({ label: 'Sketch the first five minutes' }));
+  const layerSaid = I.renderPresentation(layer);
+  ok('  told: one layer down, built on the conversation, the next ways deeper as paths — no headings', /one way deeper/.test(layerSaid) && /one layer down/.test(layerSaid) && /next ways deeper as a paths block/.test(layerSaid) && /No headings, no summary/.test(layerSaid) && !/### A few words/.test(layerSaid), layerSaid);
+  ok('  and a little room for the ways onward', I.presentationRoom(layer) === 200 + 350);
+  for (const t of ['walk me through it in detail', 'explain that in more detail', 'go deeper on that, step by step'])
+    ok(`depth asked for in words: "${t}" — that thread, in parts`, plan(t).shape === 'deeper' && !plan(t).forms.includes('paths'), J(plan(t)));
+  const deep = plan('walk me through it in detail');
   const deepSaid = I.renderPresentation(deep);
   ok('  told to go deep on that thread only, as long as it needs, in parts that can be read one at a time', /go deeper on one thread/.test(deepSaid) && /as long as it needs/.test(deepSaid) && /### A few words/.test(deepSaid) && /no summary/.test(deepSaid), deepSaid);
   ok('  and given the room for it: a cut-off part is worse than a long one', I.presentationRoom(deep) === 600 && I.presentationRoom({ forms: ['chart'], shape: 'deeper' }) === 950);

@@ -29,6 +29,7 @@
 // Pure. No model, no network, no clock (time arrives in the input).
 
 import { quickPlot } from './plot-ask';
+import { OWN_TIMELINE } from './asks';
 import { constructAsk } from '../cognition/assist';
 import { readViewRequest } from '../view-request';
 import { wantedSimulation } from '../model/wants';
@@ -177,6 +178,27 @@ export function tableInReply(text: string): boolean {
   return readViewRequest(t)?.lens === 'matrix' && !/\b(?:matrix|map|logic|options?|criteria)\b/i.test(t);
 }
 
+/**
+ * ONE SUBJECT'S TWO SIDES, OR A HISTORY'S EVENTS, ASKED FOR IN PASSING
+ * (November 2026). "Pros and cons of remote work" and "give me a timeline of
+ * the French Revolution" named a display, so both opened Artifacts and the
+ * conversation got a sentence about it. Each is drawn in the reply instead —
+ * the two sides weighed, the events in order (lib/runtime/presentation.ts) —
+ * and Keep files it in Artifacts if they want to come back to it. Made in so
+ * many words ("make me a pros and cons table", "build a timeline"), drawn from
+ * the map, or a timeline of their own plans ("a timeline for our launch"), it
+ * is still made in Artifacts.
+ */
+const INLINE_DISPLAY = new Set(['pros and cons', 'pros and cons list', 'pro and con list', 'pros cons list', 'pros/cons', 'timeline', 'time line', 'chronology']);
+const MADE = /\b(?:make|create|build|draw|generate|draft|design|prepare|set\s+up|put\s+together|lay\s+out|map\s+out|plan\s+out|table|matrix|chart|board|grid|spreadsheet|document|artifact|template|gantt)\b/i;
+function inlineInstead(text: string, display: { noun: string; fromMap: boolean } | null): 'balance' | 'timeline' | null {
+  if (!display || !INLINE_DISPLAY.has(display.noun) || display.fromMap || MADE.test(text)) return null;
+  const timeline = /time\s*line|chronology/.test(display.noun);
+  // a timeline of their own plans is a plan, made in Artifacts (lib/runtime/asks.ts)
+  if (timeline && OWN_TIMELINE.test(text)) return null;
+  return timeline ? 'timeline' : 'balance';
+}
+
 /** Alex's rules A–D, read from the turn. */
 export function routeTurn(t: TurnInput): TurnRoute {
   const text = clean(t.text ?? '');
@@ -200,7 +222,10 @@ export function routeTurn(t: TurnInput): TurnRoute {
   }
 
   const sim = wantedSimulation(text);
-  const display = readDisplayRequest(text);
+  const named = readDisplayRequest(text);
+  // two sides or a history's events, asked for in passing: drawn in the reply, not made
+  const inline = inlineInstead(text, named);
+  const display = inline ? null : named;
   const construct = constructAsk(text);
   const visual =
     (sim && `visual:simulation`) ||
@@ -237,6 +262,7 @@ export function routeTurn(t: TurnInput): TurnRoute {
     return { intent: 'ingest', reasons, reveal: null };
   }
 
+  if (inline) reasons.push(`inline:${inline}`);
   reasons.push('conversation');
   return { intent: 'conversation', reasons, reveal: null };
 }

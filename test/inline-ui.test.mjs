@@ -190,11 +190,14 @@ const plan = (text, o = {}) => {
     ok(`another view answers it: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
   // a quick plot of one function is drawn in the reply, as a graph to change (lib/runtime/plot-ask.ts)
   ok('a quick plot: "plot y = x^2 from -3 to 3" is drawn inline', plan('plot y = x^2 from -3 to 3').forms.includes('graph') && plan('plot y = x^2 from -3 to 3').graph === 'plot', J(plan('plot y = x^2 from -3 to 3')));
-  for (const t of ['Why did the Roman Republic fall?', 'tell me about the history of jazz in New Orleans'])
-    ok(`an explanation is prose: "${t}"`, plan(t).forms.length === 0, J(plan(t)));
+  for (const t of ['Why do onions make you cry?', 'what is inflation'])
+    ok(`an explanation is prose: "${t}"`, !plan(t).forms.some((k) => k !== 'paths'), J(plan(t)));
+  // …unless the answer is a set of parts: causes converging, a history's events (VX, November 2026)
+  ok('the fall of the Roman Republic: its causes as a diagram', plan('Why did the Roman Republic fall?').forms.includes('diagram') && plan('Why did the Roman Republic fall?').diagram === 'causes', J(plan('Why did the Roman Republic fall?')));
   // …unless the idea is a relationship that can be seen: who bears a tax is where two curves meet as one shifts
   // (minimum explanation, maximum understanding — November 2026); the graph stays optional
-  ok('tax incidence: a graph of the market, offered, never required', plan('what is tax incidence').forms.includes('graph') && plan('what is tax incidence').graph === 'market' && /optional; plain prose is often better/.test(I.renderPresentation(plan('what is tax incidence'))), J(plan('what is tax incidence')));
+  // the graph is the form that fits an idea to understand — still never required: "unless one sentence fully answers them"
+  ok('tax incidence: a graph of the market, the form that fits, never required', plan('what is tax incidence').forms.includes('graph') && plan('what is tax incidence').graph === 'market' && /THE FORM THAT FITS/.test(I.renderPresentation(plan('what is tax incidence'))) && /unless one sentence fully answers them/.test(I.renderPresentation(plan('what is tax incidence'))), J(plan('what is tax incidence')));
   const costs = plan('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?');
   ok('their own named amounts: a chart is offered', costs.forms.includes('chart'), J(costs));
   ok('  "$90 on gas, $50 on food, $30 on parking" reads as a list too', plan('I spent $90 on gas, $50 on food and $30 on parking this week').forms.includes('chart'));
@@ -221,11 +224,14 @@ const plan = (text, o = {}) => {
   ok('  as the model read the history back, too', !plan('and the month after: rent 1300, food 390, transport 150, phone 60', { history: read }).forms.includes('chart'));
   const p = plan('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?');
   const said = I.renderPresentation(p);
-  ok('the offer carries only the grammar offered, and says it is optional', said.includes('INLINE, IF IT HELPS — optional') && said.includes('"type":"chart"') && !said.includes('"type":"draft"'), said);
+  // their own numbers are the chart's structure: the form that fits (VX, November 2026)
+  ok('the offer carries only the grammar offered, as the form that fits', said.includes('THE FORM THAT FITS') && said.includes('"type":"chart"') && !said.includes('"type":"draft"'), said);
+  ok('  a speculative offer still says it is optional', I.renderPresentation({ forms: ['options'], reasons: ['options:open-request'] }).includes('INLINE, IF IT HELPS — optional'));
   ok('  nothing offered is nothing said', I.renderPresentation({ forms: [], reasons: [] }) === '');
   ok(`  an offer is short: ${said.length} characters for one element`, said.length < 700, said.length);
   const two = I.renderPresentation({ forms: ['compare', 'slider'], reasons: [] });
-  ok(`  two elements: ${two.length} characters`, two.length < 1000, two.length);
+  // each grammar ends on what the prose around it is for, and the header says once that words never repeat a block
+  ok(`  two elements: ${two.length} characters`, two.length < 1300, two.length);
   ok('room for an element in the reply ceiling: none, a block, a draft', I.presentationRoom({ forms: [] }) === 0 && I.presentationRoom({ forms: ['chart'] }) === 350 && I.presentationRoom({ forms: ['draft'] }) === 700);
 }
 

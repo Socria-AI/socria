@@ -124,6 +124,7 @@ import { carriedInOf, modelDeliberationsIn, persistAllowed, resetTurnOf, revocat
 import { loadForTurn, readIncognito, readSettings, writeRows, writeSettings } from '@/lib/mr/store';
 import type { LedgerRow, MRSettings } from '@/lib/mr/types';
 import { NO_LOOKUP_FACT, renderNoResearch, renderResearch, type Research } from '@/lib/core4/web';
+import { LIST_ASK } from '@/lib/runtime/asks';
 import { SPOKEN_TURN } from '@/lib/voice/speech';
 
 export const runtime = 'nodejs';
@@ -935,6 +936,8 @@ export async function POST(req: NextRequest) {
             ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
             guard: assistInput.guard,
             history: assistInput.history,
+            // a Detailed length asks for depth on every thread: a way deeper opened is gone into in full
+            length: body?.length === 'concise' || body?.length === 'standard' || body?.length === 'detailed' ? body.length : null,
           })
         : { forms: [], reasons: [] };
     // A write-up filed in Content is a document (lib/entitlements.ts): claimed
@@ -948,6 +951,8 @@ export async function POST(req: NextRequest) {
     }
     const placed = writeUpRefused ? { ...planned, place: undefined, reasons: [...planned.reasons, 'documents-spent'] } : planned;
     const presentation = inlineOn ? placed : { ...placed, forms: [] };
+    const lastText = String(last.content ?? '');
+    const turnView = { shape: presentation.shape, forms: presentation.forms, question: /\?\s*$/.test(lastText.trim()) || LIST_ASK.test(lastText) };
 
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the
@@ -983,10 +988,15 @@ export async function POST(req: NextRequest) {
       : (research
           ? renderResearch(research)
           : need.web.want
-            ? // a settled fact about a named thing is answered from memory, not with a page of where to look
+            ? // WHY IT WAS WANTED DECIDES WHAT IS SAID WHEN IT DID NOT RUN (November 2026). Where to look —
+              // the databases, the query to paste — is the answer when they asked for something to be looked
+              // up. A settled fact about a named thing is answered from memory; an answer that moves is
+              // answered from memory with a clause that it may have changed. Neither is a page of where to look.
               (need.web as { why?: string }).why === 'a fact about a named thing'
               ? NO_LOOKUP_FACT
-              : renderNoResearch(true, '')
+              : (need.web as { why?: string }).why === 'the answer is one that moves'
+                ? UNCHECKED_CURRENT
+                : renderNoResearch(true, '')
             : need.kinds.includes('current')
               ? UNCHECKED_CURRENT
               : '') + renderConflicts(conflicts(evidence.sources));
@@ -1104,11 +1114,13 @@ export async function POST(req: NextRequest) {
       // model reads: what was computed.
       // How to help on this turn: under the runtime, who does what and the
       // move (allocation.ts); under the classic persona, the move alone.
-      (allocationShown ? renderAllocation(allocationShown, turnState) : renderAssist(assist)) +
+      // The move and the allocation are told the turn's shape (lib/runtime/presentation.ts): what the shape
+      // says — the central idea first, a decision laid out to weigh — is said once, by the shape.
+      (allocationShown ? renderAllocation(allocationShown, turnState, turnView) : renderAssist(assist, turnView)) +
       // …adjusted, when MR is regulating this turn (lib/mr/execute.ts): only the lines its prompt-level controls need
       (mrRun?.block ?? '') +
       // …and what shape it may take: the inline elements on offer, if any
-      renderPresentation(presentation) +
+      renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block) }) +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
       evidenceBlock +
       accuracy.block;

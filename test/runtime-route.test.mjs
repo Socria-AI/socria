@@ -108,7 +108,7 @@ console.log('\n=== the persona, and taking it back ===');
 {
   const v5 = await turn({ messages: [U('We should launch in March.')] });
   ok('Logos 5 speaks by default', v5.status === 200 && /^You are Socria\. People come to you to think out loud/.test(v5.first) && /READ THE ROOM/.test(v5.first) && !/You are the mirror/.test(v5.first), v5.first.slice(0, 120));
-  ok('  and says so in the trace, with the exchange it read', /^logos5-v5;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
+  ok('  and says so in the trace, with the exchange it read', /^logos5-v6;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
   const classic = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'classic' } });
   ok('LOGOS_PERSONA=classic: the Logos 3.5 prompt, the rest of the runtime kept', /You are the mirror/.test(classic.first) && /^classic;/.test(classic.headers.get('x-socria-runtime') ?? ''), classic.headers.get('x-socria-runtime'));
   const off = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_RUNTIME: 'off' } });
@@ -118,7 +118,7 @@ console.log('\n=== the persona, and taking it back ===');
   const l4costs = await turn({ surface: undefined, length: 'concise', messages: [U('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?')] });
   ok('  with none of the new Socria in it: no inline elements offered, no length line', !/INLINE, IF IT HELPS/.test(l4costs.system) && !/=== LENGTH/.test(l4costs.first) && /;inline=none(;|$)/.test(l4costs.headers.get('x-socria-runtime') ?? ''), l4costs.headers.get('x-socria-runtime'));
   const every = await turn({ surface: undefined, messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'v5' } });
-  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v5;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
+  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v6;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
 }
 
 console.log('\n=== who does what, this turn ===');
@@ -315,11 +315,15 @@ console.log('\n=== adaptive response rendering: inline only when it helps ===');
 {
   const fence = (o) => '```ui\n' + JSON.stringify(o) + '\n```';
   const rt = (r) => r.headers.get('x-socria-runtime') ?? '';
-  const OFFER = /INLINE, IF IT HELPS/;
+  // an offer is optional (INLINE, IF IT HELPS) or the form that fits the turn's structure (VX, November 2026)
+  const OFFER = /INLINE, IF IT HELPS|THE FORM THAT FITS/;
   const hi = await turn({ messages: [U('hi there!')] }, { reply: 'Hi. What are you working on?' });
   ok('a hello is offered nothing: no grammar in the prompt, inline=none in the trace', !OFFER.test(hi.system) && /;inline=none;/.test(rt(hi)), rt(hi));
   const plain = await turn({ messages: [U('Why did the Roman Republic fall?')] });
-  ok('  nor is a question with nothing to draw', !OFFER.test(plain.system) || /inline=reasoning/.test(rt(plain)), rt(plain));
+  // a question with nothing to draw is offered nothing; the fall of the Republic now has its causes to show
+  const onion = await turn({ messages: [U('Why do onions make you cry?')] });
+  ok('  nor is a question with nothing to draw', !OFFER.test(onion.system) && /;inline=none;/.test(rt(onion)), rt(onion));
+  ok('  a question whose answer is causes is offered them as a diagram', /inline=[a-z,]*diagram/.test(rt(plain)), rt(plain));
   const costs = 'My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?';
   const c = await turn({ messages: [U(costs)] }, {
     reply: `Mostly rent: it is over two thirds of the total.\n\n${fence({ type: 'chart', kind: 'bar', title: 'Monthly costs', x: ['Rent', 'Food', 'Transport', 'Phone'], series: [{ values: [1200, 400, 150, 60] }], unit: '$', basis: 'given' })}\n\nFood is the one to look at next.`,

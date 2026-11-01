@@ -49,7 +49,7 @@ import { conceptTerms } from '@/lib/core4/considered';
 import type { ExplicitSignals } from '@/lib/core4/types';
 import type { MapDigest } from './digest';
 import { TALK, withoutGreeting, type ExchangeKind } from './register';
-import { claimCheck, PRACTICAL_SHOULD } from './claims';
+import { claimCheck, practicalShould } from './claims';
 
 export { sanitizeDigest, digestOf, type MapDigest } from './digest';
 
@@ -125,8 +125,9 @@ const ABOUT_THEM = /\b(?:should\s+i|do\s+i|am\s+i|can\s+i|would\s+i|will\s+i|wha
 export function isFactQuestion(text: string): boolean {
   const t = clean(text).toLowerCase();
   if (!t || t.length > 260) return false;
-  // "how long should I boil an egg?" has an answer; "should I" there asks for it (lib/cognition/claims.ts)
-  if (PRACTICAL_SHOULD.test(t) && !/\bor\b/.test(t)) return true;
+  // "how long should I boil an egg?" has an answer; "should I" there asks for it — and a pick asked for
+  // ("recommend me a sci-fi book") is a pick (lib/cognition/claims.ts; the text as written: a place is a capital)
+  if (practicalShould(clean(text))) return true;
   if (ABOUT_THEM.test(t)) return false;
   if (/^(?:what(?:'s|\s+is|\s+are|\s+was|\s+were|\s+does|\s+do|\s+(?:year|day|date|time|century|decade|month|country|city|language|currency|percentage|percent))|who(?:'s|\s+is|\s+was|\s+were)?|when(?:'s|\s+is|\s+was|\s+did)|where(?:'s|\s+is|\s+are)|which\s+(?:year|country|city|element|planet|is\s+the)|how\s+(?:many|much|long|far|old|big|tall|heavy))\b/.test(t)) {
     // "what is the meaning of my life" is not a fact; "what does X mean" is
@@ -175,12 +176,14 @@ export function wantsExplanation(text: string, s: ExplicitSignals): boolean {
  * order was the only thing that kept it from being read as one.
  */
 export function asksForDecision(text: string, s: ExplicitSignals): boolean {
-  if (s.recommendationRequested) return true;
   const t = clean(text);
-  // "how long should I boil an egg?" is a question with an answer, not a decision (lib/cognition/claims.ts)
-  if (PRACTICAL_SHOULD.test(t) && !/\bor\b/i.test(t)) return false;
+  // "how long should I boil an egg?" is a question with an answer, not a decision — and "recommend me a
+  // sci-fi book" asks for a pick, not for what the choice rests on (lib/cognition/claims.ts)
+  if (practicalShould(t)) return false;
+  if (s.recommendationRequested) return true;
   // a team's choice is a decision too: "should we hire an engineer or a marketer?"
-  return /\b(?:should\s+i\b|should\s+we\b[^.?!]{1,90}\bor\b|which\s+(?:one\s+)?should\s+(?:i|we)|what\s+would\s+you\s+(?:do|pick|choose)|help\s+(?:me|us)\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+(?:i|we)\s+should|(?:i|we)\s+should\s+[^.?!]{1,80}\bor\b)/i.test(t);
+  // …and a team's change, weighed against how things are: "should we raise prices?"
+  return /\b(?:should\s+i\b|should\s+we\b[^.?!]{1,90}\bor\b|should\s+we\s+(?:raise|cut|lower|increase|reduce|switch|keep|change|drop|stop|start|move|expand|delay)\b|which\s+(?:one\s+)?should\s+(?:i|we)|what\s+would\s+you\s+(?:do|pick|choose)|help\s+(?:me|us)\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+(?:i|we)\s+should|(?:i|we)\s+should\s+[^.?!]{1,80}\bor\b)/i.test(t);
 }
 
 /**
@@ -445,10 +448,38 @@ const SCAFFOLD_LINE: Record<Scaffold, string> = {
 
 const UNDERSTAND_STEPS = 'SUPPORT: plain words and one idea at a time — the central one now, the next only when that one has landed or they ask.';
 
+/**
+ * WHAT THE TURN'S SHAPE ALREADY SAYS, the move does not say again (November
+ * 2026). "The central idea first, in one plain sentence…" rode on the turn
+ * twice — once as the move, once as the shape of the reply — and INFORM's "in
+ * a sentence or two" argued with a practical question's shape and a decision
+ * laid out to weigh. Where the reply is shaped this turn (lib/runtime/
+ * presentation.ts), the move names itself and leaves the how to the shape.
+ */
+export interface AssistView {
+  /** how the reply itself is shaped this turn */
+  shape?: string;
+  /** the inline elements offered this turn */
+  forms?: readonly string[];
+  /** their message asks a question, or for a list (lib/runtime/allocation.ts QUESTION_LINE) */
+  question?: boolean;
+}
+const MODE_SHAPED: Partial<Record<AssistMode, string>> = {
+  explain: 'EXPLAIN — the shape of this reply, below, says how. Understanding is not authorship: explaining a concept takes nothing from them.',
+  inform: 'INFORM. The answer plainly, first; the shape of this reply, below, says what follows it. Do not turn it into a question, and do not make them work for something they could look up.',
+  perspective: 'PERSPECTIVE. They asked you to decide: the decide block below lays out what the choice rests on, and the call is theirs.',
+};
+function modeLine(mode: AssistMode, v: AssistView): string {
+  if (mode === 'explain' && v.shape === 'understand') return MODE_SHAPED.explain!;
+  if (mode === 'inform' && (v.shape === 'practical' || v.shape === 'understand')) return MODE_SHAPED.inform!;
+  if (mode === 'perspective' && v.forms?.includes('decide')) return MODE_SHAPED.perspective!;
+  return MODE_LINE[mode];
+}
+
 /** The block appended to the system prompt. '' when nothing is imposed and the budget is open. */
-export function renderAssist(d: AssistDecision): string {
+export function renderAssist(d: AssistDecision, view: AssistView = {}): string {
   const lines: string[] = [];
-  if (d.mode !== 'open') lines.push(`${d.forced ? 'The move this turn' : 'The move this turn, unless you see a clearly stronger one'} — ${MODE_LINE[d.mode]}`);
+  if (d.mode !== 'open') lines.push(`${d.forced ? 'The move this turn' : 'The move this turn, unless you see a clearly stronger one'} — ${modeLine(d.mode, view)}`);
   if (d.target) lines.push(`ABOUT: "${d.target.slice(0, 160)}"${d.reasons.some((r) => r.startsWith('focus:')) ? ' — what they selected in the workspace; answer about it, never ask which one they mean.' : ''}`);
   // wanting to understand an idea is not a problem to break into steps: one idea at a time, the central one first
   const sl = d.mode === 'explain' && d.scaffold === 'steps' && d.reasons.includes('explain') ? UNDERSTAND_STEPS : SCAFFOLD_LINE[d.scaffold];
