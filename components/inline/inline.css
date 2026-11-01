@@ -136,8 +136,11 @@ html[data-theme="night"] .logos-root .ln-options {
   gap: 6px;
 }
 
-/* the table a chart is, for a screen reader: present, never seen */
+/* the table a chart is, for a screen reader: present, never seen. A block one
+   pixel square that clips what is in it — a table inside it keeps its width
+   to itself, so however wide its numbers it never widens the page */
 .logos-root .ln .ln-sr {
+  display: block;
   position: absolute;
   width: 1px;
   height: 1px;
@@ -147,6 +150,23 @@ html[data-theme="night"] .logos-root .ln-options {
   clip: rect(0 0 0 0);
   white-space: nowrap;
   border: 0;
+}
+
+/* PHONE OVERFLOW (November 2026). The element's words keep their ordinary
+   breaking (.ln is overflow-wrap: normal, so a number in a table is never
+   split), but the words that are labels — a choice, a step, a way onward, a
+   title, a part's name, a claim's part — break anywhere when one word is
+   longer than its line: a URL or a long compound in a 360px column otherwise
+   pushed the whole page sideways. */
+.logos-root .ln :is(.ln-chip, .ln-seq-label, .ln-seq-when, .ln-seq-detail, .ln-path-l, .ln-path-g, .ln-title, .ln-card-n, .ln-card-g, .ln-concept-h, .ln-concept-d, .ln-link, .ln-claim-text, .ln-part-text, .ln-part-basis, .ln-decide-l, .ln-dg-label, .ln-dg-panel-h, .ln-dg-panel-d, .ln-dg-to, .ln-bal-text, .ln-bal-detail, .ln-bal-turns-t, .ln-eqn-term dd, .ln-fallback) {
+  overflow-wrap: anywhere;
+  min-width: 0;
+}
+
+/* an element that could not be drawn, said in its own words where it stood */
+.logos-root .ln-fallback {
+  margin: 0.2em 0 1em;
+  white-space: pre-line;
 }
 
 /* ── chart ────────────────────────────────────────────────────────── */
@@ -1772,3 +1792,381 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 .logos-root .ln-keepable > .ln-keep.is-kept { color: var(--lg-primary, #354620); border-color: currentColor; }
 .logos-root .ln-keepable > .ln-keep:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: 2px; }
 @media (forced-colors: active) { .logos-root .ln-keepable > .ln-keep { border-color: ButtonText; } }
+
+/* ── how the parts connect (diagram) ──────────────────────────────────
+   The picture where there is room; the same parts as a list with
+   connectors on a phone (640px and under) or wherever the picture would
+   squeeze its words (.is-listed, decided at the width it has). Both are in
+   the markup, one is seen, and a screen reader meets one set of parts. */
+
+.logos-root .ln-diagram .ln-dg-fig {
+  position: relative;
+  width: 100%;
+  margin: 2px 0 4px;
+}
+.logos-root .ln-diagram .ln-dg-fig > svg {
+  position: absolute;
+  inset: 0;
+  overflow: visible;
+}
+.logos-root .ln-diagram .ln-dg-link {
+  fill: none;
+  stroke: rgba(var(--ln-tint), 0.42);
+  stroke-width: 1.4;
+}
+.logos-root .ln-diagram .ln-dg-link.is-on {
+  stroke: var(--ln-primary);
+  stroke-width: 2;
+}
+.logos-root .ln-diagram .ln-dg-link.is-amplifier {
+  stroke-dasharray: 5 4;
+}
+.logos-root .ln-diagram marker path {
+  fill: rgba(var(--ln-tint), 0.6);
+}
+.logos-root .ln-diagram .ln-dg-at {
+  position: absolute;
+  display: flex;
+}
+.logos-root .ln .ln-dg-node {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 1px;
+  width: 100%;
+  min-width: 0;
+  padding: 4px 8px;
+  border: 1px solid rgba(var(--ln-tint), 0.3);
+  border-radius: 10px;
+  background: var(--ln-ground);
+  color: var(--ln-ink);
+  font: inherit;
+  font-size: 12.5px;
+  line-height: 1.25;
+  text-align: center;
+  cursor: pointer;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.logos-root .ln .ln-dg-node:hover {
+  border-color: rgba(var(--ln-tint), 0.55);
+}
+.logos-root .ln .ln-dg-node.is-on {
+  border-color: var(--ln-primary);
+  box-shadow: inset 0 0 0 1px var(--ln-primary);
+}
+.logos-root .ln .ln-dg-node:focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+}
+.logos-root .ln .ln-dg-fig .ln-dg-label {
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  overflow: hidden;
+}
+.logos-root .ln .ln-dg-role {
+  font-size: 9.5px;
+  font-weight: 600;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ln-ink-70);
+}
+/* the part each plays, by weight and line as well as its word — never colour alone */
+.logos-root .ln .ln-dg-node.is-underlying {
+  border-width: 2.5px;
+  border-color: rgba(var(--ln-tint), 0.62);
+}
+.logos-root .ln .ln-dg-node.is-trigger {
+  border-left-width: 5px;
+  border-left-color: var(--ln-ink);
+}
+.logos-root .ln .ln-dg-node.is-amplifier {
+  border-style: dashed;
+  border-color: rgba(var(--ln-tint), 0.62);
+}
+.logos-root .ln .ln-dg-node.is-effect {
+  background: rgba(var(--ln-tint), 0.1);
+  border-color: var(--ln-ink-60);
+  font-weight: 600;
+}
+.logos-root .ln .ln-dg-panel {
+  margin-top: 10px;
+  padding: 10px 2px 0;
+  border-top: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-dg-panel.is-inline {
+  display: none;
+}
+.logos-root .ln .ln-dg-panel-h {
+  margin: 0 0 3px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.logos-root .ln .ln-dg-panel-d {
+  margin: 0;
+  font-size: 14px;
+  line-height: 1.55;
+}
+.logos-root .ln .ln-dg-panel-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin: 8px 0 0;
+}
+/* the list: unseen where the picture is drawn */
+.logos-root .ln .ln-dg-list {
+  display: none;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .ln .ln-dg-item {
+  position: relative;
+  margin: 0;
+  padding: 0 0 18px;
+}
+.logos-root .ln .ln-dg-list .ln-dg-node {
+  align-items: flex-start;
+  min-height: 40px;
+  padding: 7px 12px;
+  font-size: 14px;
+  text-align: left;
+}
+/* a connector to the next part: a short line and its arrowhead, under the item */
+.logos-root .ln .ln-dg-item.is-next::after {
+  content: '';
+  position: absolute;
+  left: 22px;
+  bottom: 3px;
+  width: 0;
+  height: 12px;
+  border-left: 1.5px solid rgba(var(--ln-tint), 0.45);
+}
+.logos-root .ln .ln-dg-item.is-next::before {
+  content: '';
+  position: absolute;
+  left: 18.5px;
+  bottom: 0;
+  border: 4px solid transparent;
+  border-top: 5px solid rgba(var(--ln-tint), 0.6);
+  border-bottom: 0;
+}
+.logos-root .ln .ln-dg-list:not(.is-tree) .ln-dg-item:not(.is-next) {
+  padding-bottom: 8px;
+}
+.logos-root .ln .ln-dg-to {
+  display: block;
+  margin: 4px 0 0 12px;
+  font-size: 12.5px;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-dg-back {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin: 0;
+  padding: 0 12px;
+  font-size: 13px;
+  color: var(--ln-ink-70);
+}
+/* a tree is an outline: each part indented under its parent, a guide line down its left */
+.logos-root .ln .ln-dg-list.is-tree .ln-dg-item {
+  padding: 0 0 6px calc(var(--d, 0) * 18px);
+}
+.logos-root .ln .ln-dg-list.is-tree .ln-dg-item:not(.is-d0)::before {
+  content: '';
+  position: absolute;
+  left: calc(var(--d, 0) * 18px - 10px);
+  top: 0;
+  bottom: 6px;
+  border-left: 1.5px solid rgba(var(--ln-tint), 0.3);
+}
+.logos-root .ln-diagram.is-listed .ln-dg-list {
+  display: block;
+}
+.logos-root .ln-diagram.is-listed .ln-dg-panel.is-inline {
+  display: block;
+  margin: 6px 0 0;
+  padding: 6px 4px 0 12px;
+  border-top: 0;
+}
+.logos-root .ln-diagram.is-listed .ln-dg-panel.is-panel {
+  display: none;
+}
+
+/* ── for and against (balance) ────────────────────────────────────── */
+
+.logos-root .ln .ln-bal-cols {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+.logos-root .ln .ln-bal-side {
+  min-width: 0;
+  padding: 0 14px 0 0;
+}
+.logos-root .ln .ln-bal-side.is-against {
+  padding: 0 0 0 14px;
+  border-left: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-bal-list {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .ln .ln-bal-item {
+  margin: 0;
+  border-top: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-bal-item:first-child {
+  border-top: 0;
+}
+.logos-root .ln .ln-bal-row {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  width: 100%;
+  min-height: 36px;
+  padding: 7px 0;
+  border: 0;
+  background: none;
+  color: var(--ln-ink);
+  font: inherit;
+  font-size: 14px;
+  line-height: 1.45;
+  text-align: left;
+}
+.logos-root .ln button.ln-bal-row {
+  cursor: pointer;
+}
+.logos-root .ln button.ln-bal-row:focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+  border-radius: 4px;
+}
+.logos-root .ln .ln-bal-mark {
+  flex: none;
+  width: 14px;
+  font-weight: 700;
+  color: var(--ln-ink-60);
+  text-align: center;
+}
+.logos-root .ln .ln-bal-text {
+  flex: 1;
+}
+.logos-root .ln .ln-bal-more {
+  flex: none;
+  width: 16px;
+  color: var(--ln-ink-60);
+  font-weight: 600;
+  text-align: center;
+}
+.logos-root .ln .ln-bal-detail {
+  margin: -2px 0 8px 22px;
+  font-size: 13.5px;
+  line-height: 1.5;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-bal-turns {
+  margin: 10px 0 0;
+  padding: 9px 0 0;
+  border-top: 1px solid var(--ln-hair);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.logos-root .ln .ln-bal-turns .ln-k {
+  margin-bottom: 2px;
+}
+
+/* ── a definition, as one equation ────────────────────────────────── */
+
+.logos-root .ln .ln-eqn-tex {
+  text-align: center;
+}
+.logos-root .ln .ln-eqn-tex .katex-display {
+  margin: 0.3em 0 0.5em;
+}
+.logos-root .ln .ln-eqn-terms {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 4px 14px;
+  margin: 4px 0 0;
+  padding: 8px 0 0;
+  border-top: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-eqn-term {
+  display: contents;
+}
+.logos-root .ln .ln-eqn-term dt {
+  font-weight: 600;
+  max-width: 16em;
+  overflow-wrap: anywhere;
+}
+.logos-root .ln .ln-eqn-term dd {
+  margin: 0;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-eqn-ex {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 10px;
+  margin: 10px 0 0;
+  font-size: 13.5px;
+  color: var(--ln-ink-60);
+}
+.logos-root .ln .ln-eqn-ex .ln-k {
+  display: inline;
+  margin: 0;
+}
+.logos-root .ln .ln-eqn-ex-t {
+  max-width: 100%;
+  overflow-x: auto;
+}
+
+/* ── the three, on a phone ────────────────────────────────────────── */
+
+@media (max-width: 640px) {
+  .logos-root .ln-diagram .ln-dg-fig {
+    display: none;
+  }
+  .logos-root .ln-diagram .ln-dg-list {
+    display: block;
+  }
+  .logos-root .ln-diagram .ln-dg-panel.is-inline {
+    display: block;
+    margin: 6px 0 0;
+    padding: 6px 4px 0 12px;
+    border-top: 0;
+  }
+  .logos-root .ln-diagram .ln-dg-panel.is-panel {
+    display: none;
+  }
+  .logos-root .ln .ln-bal-cols {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .logos-root .ln .ln-bal-side,
+  .logos-root .ln .ln-bal-side.is-against {
+    padding: 0;
+    border-left: 0;
+  }
+  .logos-root .ln .ln-bal-side.is-against {
+    margin-top: 10px;
+    padding-top: 8px;
+    border-top: 1px solid var(--ln-hair);
+  }
+  .logos-root .ln .ln-eqn-terms {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 0;
+  }
+  .logos-root .ln .ln-eqn-term dd {
+    margin: 0 0 6px;
+  }
+}
+
+@media (forced-colors: active) {
+  .logos-root .ln .ln-dg-node { border-color: ButtonText; }
+  .logos-root .ln-diagram .ln-dg-link { stroke: CanvasText; }
+  .logos-root .ln-diagram marker path { fill: CanvasText; }
+}

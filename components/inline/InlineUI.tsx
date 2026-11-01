@@ -1,12 +1,14 @@
 'use client';
 // components/inline/InlineUI.tsx — THE INLINE ELEMENTS, DRAWN IN THE CONVERSATION.
 //
-// Fourteen small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
+// Eighteen small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
 // comparison, reasoning folded under its conclusion, choices to tap, a draft to
 // edit, the parts of a subject to explore, steps or events in order, the ways
-// an open piece of work could go next, a decision they weigh themselves — and
-// things to reason with: a graph whose numbers they drag, a small simulation,
-// the working with their numbers, a question they work out and check.
+// an open piece of work could go next, a decision they weigh themselves, a
+// picture of how parts connect, the case for and against one thing, a
+// definition as one equation — and things to reason with: a graph whose
+// numbers they drag, a small simulation, the working with their numbers, a
+// question they work out and check.
 // Each is drawn from a validated description, in the reading column,
 // quietly — a thin rule, the conversation's own type, nothing that looks like
 // a dashboard. What the person does with one (a slider moved, a choice tapped,
@@ -16,12 +18,19 @@
 // Nothing here computes a claim: a chart draws the numbers it was given and
 // says where they came from; a slider evaluates the formula it shows with the
 // math engine's parser; a comparison marks the figures nothing checked.
+//
+// AN ELEMENT THAT BREAKS NEVER TAKES THE REPLY WITH IT. Each is drawn inside
+// a boundary (InlineSafe): if drawing one throws — a shape nobody foresaw, a
+// number past what the arithmetic holds — the element becomes its own words
+// (inlinePlainText), in a paragraph where it stood, and the prose around it
+// that refers to it still has something to refer to.
 
-import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
+import { Component, useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import { CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
+import { CLAIM_SAID, decideLeaning, decideTally, graphReadings, HOLDS_SAID, inlinePlainText, meanSaid, pathAsk, SCORE_SAID, WEIGHT_SAID, type BalanceItem, type BalanceSpec, type DiagramSpec, type EquationSpec, type ChartSpec, type CheckPart, type ClaimSpec, type CompareSpec, type GraphFeature, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
 import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWindowAll, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
+import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows } from '@/lib/inline-diagram';
 import { TeX } from '@/components/TeX';
 import { copyText } from '@/lib/copy-text';
 import './inline.css';
@@ -47,7 +56,7 @@ export interface InlineHost {
 
 type RenderInline = (text: string, key: string) => ReactNode;
 
-/** One element: drawn, waiting to be (the reply is still writing it), or nothing (it was not one of the eight). */
+/** One element: drawn, waiting to be (the reply is still writing it), or nothing (it was not one of the kinds). */
 export function InlineBlock({ spec, open, n, host, renderInline }: { spec: InlineSpec | null; open: boolean; n: number; host?: InlineHost; renderInline: RenderInline }) {
   if (open) {
     return (
@@ -61,7 +70,7 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
   if (!spec) return null;
   const state = host?.state?.[String(n)];
   const setState = (s: InlineState) => host?.onState?.(n, s);
-  const el = drawn(spec, n, host, state, setState, renderInline);
+  const el = <InlineSafe spec={spec}>{drawn(spec, n, host, state, setState, renderInline)}</InlineSafe>;
   // KEEP (lib/objects/display-kept.ts): anything worth coming back to goes into Artifacts as it was left,
   // with the reply it came from. A chart, a comparison and a decision carry their own larger form's button.
   if (!host?.onOpen || !KEEPABLE.has(spec.type)) return el;
@@ -85,7 +94,36 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
 }
 
 /** Kept with a press of Keep: everything but the ways onward (they are only ever a next message), and the three with larger forms of their own. */
-const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft']);
+const KEEPABLE = new Set<InlineSpec['type']>(['graph', 'sim', 'claim', 'check', 'steps', 'slider', 'reasoning', 'concepts', 'sequence', 'draft', 'diagram', 'balance', 'equation']);
+
+/** An element that could not be drawn, said instead: its words where it stood (nothing, if even they cannot be said). */
+export function InlineFallback({ spec }: { spec: InlineSpec }) {
+  let text = '';
+  try {
+    text = inlinePlainText(spec);
+  } catch {
+    text = '';
+  }
+  return text ? <p className="ln-fallback">{text}</p> : null;
+}
+
+/**
+ * The boundary each element is drawn in: what throws while drawing it is
+ * caught here, and the element is said in words instead (InlineFallback) — the
+ * reply, the conversation and the page go on. A new spec is tried afresh.
+ */
+export class InlineSafe extends Component<{ spec: InlineSpec; children: ReactNode }, { failed: boolean }> {
+  state = { failed: false };
+  static getDerivedStateFromError() {
+    return { failed: true };
+  }
+  componentDidUpdate(prev: { spec: InlineSpec }) {
+    if (prev.spec !== this.props.spec && this.state.failed) this.setState({ failed: false });
+  }
+  render() {
+    return this.state.failed ? <InlineFallback spec={this.props.spec} /> : this.props.children;
+  }
+}
 
 function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state: InlineState | undefined, setState: (s: InlineState) => void, renderInline: RenderInline) {
   switch (spec.type) {
@@ -123,6 +161,12 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
       return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} />;
     case 'claim':
       return <InlineClaim spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
+    case 'diagram':
+      return <InlineDiagram spec={spec} state={state} onState={setState} renderInline={renderInline} />;
+    case 'balance':
+      return <InlineBalance spec={spec} renderInline={renderInline} />;
+    case 'equation':
+      return <InlineEquation spec={spec} renderInline={renderInline} />;
   }
 }
 
@@ -199,7 +243,9 @@ function InlineChart({ spec, onOpen }: { spec: ChartSpec; onOpen?: () => void })
           ))}
         </ul>
       )}
-      <table className="ln-sr">
+      {/* a block that is one pixel and clips what is in it: a table, however wide its numbers, never widens the page */}
+      <div className="ln-sr">
+      <table>
         <caption>{spec.title || 'Chart'}</caption>
         <thead>
           <tr>
@@ -220,6 +266,7 @@ function InlineChart({ spec, onOpen }: { spec: ChartSpec; onOpen?: () => void })
           ))}
         </tbody>
       </table>
+      </div>
       <div className="ln-foot">
         <span className={`ln-basis${spec.basis === 'illustrative' ? ' is-example' : ''}`}>{BASIS_SAID[spec.basis]}</span>
         <OpenButton onOpen={onOpen} what="chart" />
@@ -849,7 +896,7 @@ function InlineOptions({ spec, state, live, onPick }: { spec: OptionsSpec; state
 
 // ── draft ────────────────────────────────────────────────────────────
 
-const DRAFT_SAID: Record<NonNullable<DraftSpec['kind']>, string> = { email: 'Email', message: 'Message', note: 'Note', paragraph: 'Paragraph', post: 'Post' };
+const DRAFT_SAID: Record<NonNullable<DraftSpec['kind']>, string> = { email: 'Email', message: 'Message', note: 'Note', paragraph: 'Paragraph', post: 'Post', letter: 'Letter', invite: 'Invitation', bio: 'Bio', agenda: 'Agenda' };
 
 function InlineDraft({ spec, state, onState }: { spec: DraftSpec; state?: InlineState; onState: (s: InlineState) => void }) {
   const [text, setText] = useState(state?.text ?? spec.text);
@@ -1338,7 +1385,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
       <div className="ln-graph-head">
         <div className="ln-eqs">
           <p className="ln-eq">
-            {spec.label && others.length > 0 && <span className="ln-eq-name">{spec.label}</span>}
+            {spec.label && <span className="ln-eq-name">{spec.label}</span>}
             <i className="ln-eq-v">y</i>
             <span className="ln-eq-op">=</span>
             {segs ? <Expr segs={segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{spec.expr}</code>}
@@ -1418,7 +1465,7 @@ function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: Gra
             const s = sampleCurve(o.c, values, x0, x1);
             return s ? <path key={`c${i}`} className={`ln-curve ${CURVE_TONE[i + 1]}`} d={pathOf(s.pts, X, Y, y0, y1)} /> : null;
           })}
-          {c && spec.label && others.length > 0 && endLabel(c, spec.label, 'n0', '')}
+          {c && spec.label && endLabel(c, spec.label, 'n0', '')}
           {others.map((o, i) => (o.label ? endLabel(o.c, o.label, `n${i + 1}`, CURVE_TONE[i + 1]) : null))}
           {readings.chord && (
             <g className="ln-chord">
@@ -1811,6 +1858,244 @@ function InlineSteps({ spec, state, onState, renderInline }: { spec: StepsSpec; 
         })}
       </ol>
       {spec.check && <CheckBox part={spec.check} state={state} onState={(s) => onState({ ...latest.current, ...s, whys })} renderInline={renderInline} />}
+    </div>
+  );
+}
+
+// ── how the parts connect ────────────────────────────────────────────
+
+/**
+ * A cycle, a hierarchy, a flow or the causes of something, drawn as the
+ * connections they are (lib/inline-diagram.ts places them). Each part is a
+ * button: opened, its line shows in a panel under the figure with what leads
+ * to it and what it leads to, a press away. On a phone — or wherever the
+ * picture would squeeze its words past reading — the same parts are a list
+ * with connectors instead: a cycle ends on the way back to its start, a tree
+ * is an indented outline, a flow and the causes run top to bottom into what
+ * they lead to. Both forms are in the markup and the width picks one (CSS),
+ * so nothing has to be measured before it is drawn, and nothing scrolls
+ * sideways. A screen reader is given the whole diagram in words as well
+ * (inlinePlainText): every part and every connection.
+ *
+ * In causes, the part each plays is said in words on the part and shown by
+ * its weight and line — heavy for an underlying cause, a bar for the trigger,
+ * dashed for an amplifier, filled for the effect — never by colour alone.
+ */
+function InlineDiagram({ spec, state, onState, renderInline }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline }) {
+  const id = useId();
+  const marker = `lnarrow${id.replace(/[^A-Za-z0-9_-]/g, '')}`;
+  const [ref, width] = useWidth<HTMLDivElement>(600);
+  const fig = useMemo(() => diagramFigure(spec, Math.max(240, width)), [spec, width]);
+  const byId = useMemo(() => new Map(spec.nodes.map((nd) => [nd.id, nd])), [spec]);
+  const open = state?.node && byId.has(state.node) ? state.node : null;
+  const pick = (nid: string | null) => onState({ ...state, node: nid ?? undefined });
+  const toggle = (nid: string) => pick(open === nid ? null : nid);
+  const cur = open ? byId.get(open)! : null;
+  const links = open ? linksOf(spec, open) : null;
+  const name = spec.title || (spec.view === 'cycle' ? 'A cycle' : spec.view === 'tree' ? 'How it is organised' : spec.view === 'causes' ? 'What led to it' : 'How it flows');
+  // the part an opened part says: in a panel under the figure, or under the list item pressed (one of the two is seen at each width)
+  const detail = (where: 'panel' | 'inline') =>
+    cur && (
+      <div className={`ln-dg-panel is-${where}`} {...(where === 'panel' ? { id: `${id}-d`, 'aria-live': 'polite' as const } : {})}>
+        {cur.role && <p className="ln-k">{DIAGRAM_ROLE_SAID[cur.role]}</p>}
+        <p className="ln-dg-panel-h">{cur.label}</p>
+        {cur.detail && <p className="ln-dg-panel-d">{renderInline(cur.detail, `d-${where}`)}</p>}
+        {links && (links.from.length > 0 || links.to.length > 0) && (
+          <p className="ln-dg-panel-links">
+            {links.from.length > 0 && <span className="ln-basis">{spec.view === 'tree' ? 'Under' : 'Comes from'}</span>}
+            {links.from.map((nd) => (
+              <button key={`f${nd.id}`} type="button" className="ln-link" onClick={() => pick(nd.id)}>
+                {nd.label}
+              </button>
+            ))}
+            {links.to.length > 0 && <span className="ln-basis">{spec.view === 'tree' ? 'Over' : 'Leads to'}</span>}
+            {links.to.map((nd) => (
+              <button key={`t${nd.id}`} type="button" className="ln-link" onClick={() => pick(nd.id)}>
+                {nd.label}
+              </button>
+            ))}
+          </p>
+        )}
+      </div>
+    );
+  const node = (nid: string, where: 'fig' | 'list') => {
+    const nd = byId.get(nid)!;
+    return (
+      <button
+        type="button"
+        className={`ln-dg-node${nd.role ? ` is-${nd.role}` : ''}${open === nid ? ' is-on' : ''}${nd.detail ? ' has-detail' : ''}`}
+        aria-expanded={open === nid}
+        aria-controls={`${id}-d`}
+        onClick={() => toggle(nid)}
+        data-where={where}
+      >
+        {nd.role && <span className="ln-dg-role">{DIAGRAM_ROLE_SAID[nd.role]}</span>}
+        <span className="ln-dg-label">{nd.label}</span>
+      </button>
+    );
+  };
+  // the list: a cycle in its order and back; a tree as an outline; a flow or causes in column order
+  const order = spec.view === 'tree' ? treeRows(spec) : (spec.view === 'cycle' ? spec.nodes.map((nd) => nd.id) : diagramColumns(spec).flat()).map((nid) => ({ id: nid, depth: 0 }));
+  // an outline's indent says what is under what; arrows between its lines would say something else
+  const leadsToNext = (i: number) => spec.view !== 'tree' && (spec.view === 'cycle' || (i + 1 < order.length && spec.edges.some(([a, b]) => a === order[i].id && b === order[i + 1].id)));
+  const List = spec.view === 'tree' ? 'ul' : 'ol';
+  return (
+    <div ref={ref} className={`ln ln-diagram is-${spec.view}${fig ? '' : ' is-listed'}`} role="group" aria-label={name} aria-describedby={`${id}-alt`}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      {fig && (
+        <div className="ln-dg-fig" style={{ height: fig.H }}>
+          <svg viewBox={`0 0 ${fig.W} ${fig.H}`} width={fig.W} height={fig.H} aria-hidden="true" focusable="false">
+            <defs>
+              <marker id={marker} viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
+                <path d="M0,1 L9,5 L0,9 z" />
+              </marker>
+            </defs>
+            {fig.links.map((l) => (
+              <path
+                key={`${l.from}-${l.to}`}
+                d={l.d}
+                className={`ln-dg-link${open && (l.from === open || l.to === open) ? ' is-on' : ''}${byId.get(l.from)?.role === 'amplifier' ? ' is-amplifier' : ''}`}
+                markerEnd={spec.view === 'tree' ? undefined : `url(#${marker})`}
+              />
+            ))}
+          </svg>
+          {fig.boxes.map((b) => (
+            <span key={b.id} className="ln-dg-at" style={{ left: b.cx - b.w / 2, top: b.cy - b.h / 2, width: b.w, height: b.h }}>
+              {node(b.id, 'fig')}
+            </span>
+          ))}
+        </div>
+      )}
+      <List className={`ln-dg-list is-${spec.view}`}>
+        {order.map((r, i) => {
+          const to = spec.view === 'tree' ? [] : linksOf(spec, r.id).to;
+          // a connection that is not simply on to the next item is said under it
+          const elsewhere = spec.view === 'cycle' ? [] : to.filter((nd) => !(leadsToNext(i) && nd.id === order[i + 1]?.id));
+          return (
+            <li key={r.id} className={`ln-dg-item${leadsToNext(i) ? ' is-next' : ''}${spec.view === 'tree' ? ` is-d${r.depth}` : ''}`} style={spec.view === 'tree' ? ({ '--d': r.depth } as React.CSSProperties) : undefined}>
+              {node(r.id, 'list')}
+              {elsewhere.length > 0 && <span className="ln-dg-to">→ {elsewhere.map((nd) => nd.label).join(', ')}</span>}
+              {open === r.id && detail('inline')}
+            </li>
+          );
+        })}
+        {spec.view === 'cycle' && (
+          <li className="ln-dg-back">
+            <span aria-hidden="true">↺ </span>Back to the start: {spec.nodes[0].label}
+          </li>
+        )}
+      </List>
+      {detail('panel')}
+      <p id={`${id}-alt`} className="ln-sr">
+        {inlinePlainText(spec)}
+      </p>
+      <div className="ln-foot">
+        <span className="ln-basis">{cur ? '' : spec.nodes.some((nd) => nd.detail) ? 'Open a part to read more' : 'Open a part to see what it connects to'}</span>
+      </div>
+    </div>
+  );
+}
+
+// ── for and against ──────────────────────────────────────────────────
+
+/**
+ * The case either way, side by side: what is for it and what is against it,
+ * a few words each, more on one when it is opened, and under both the one
+ * thing it turns on for most people. It leans neither way. Two columns with a
+ * hairline between them where there is room; on a phone, For then Against,
+ * the footer last.
+ */
+function InlineBalance({ spec, renderInline }: { spec: BalanceSpec; renderInline: RenderInline }) {
+  const [open, setOpen] = useState<string | null>(null);
+  const side = (key: 'for' | 'against', items: readonly BalanceItem[]) => (
+    <div className={`ln-bal-side is-${key}`}>
+      <p className="ln-k" aria-hidden="true">
+        {key === 'for' ? 'For' : 'Against'}
+      </p>
+      <ul className="ln-bal-list" aria-label={key === 'for' ? 'For' : 'Against'}>
+        {items.map((x, i) => {
+          const k = `${key}${i}`;
+          const mark = (
+            <span className="ln-bal-mark" aria-hidden="true">
+              {key === 'for' ? '+' : '−'}
+            </span>
+          );
+          return (
+            <li key={k} className={`ln-bal-item${open === k ? ' is-open' : ''}`}>
+              {x.detail ? (
+                <button type="button" className="ln-bal-row" aria-expanded={open === k} onClick={() => setOpen(open === k ? null : k)}>
+                  {mark}
+                  <span className="ln-bal-text">{renderInline(x.text, `t${k}`)}</span>
+                  <span className="ln-bal-more" aria-hidden="true">
+                    {open === k ? '−' : '+'}
+                  </span>
+                </button>
+              ) : (
+                <span className="ln-bal-row is-still">
+                  {mark}
+                  <span className="ln-bal-text">{renderInline(x.text, `t${k}`)}</span>
+                </span>
+              )}
+              {open === k && x.detail && <p className="ln-bal-detail">{renderInline(x.detail, `d${k}`)}</p>}
+            </li>
+          );
+        })}
+      </ul>
+    </div>
+  );
+  return (
+    <div className="ln ln-balance" role="group" aria-label={`For and against: ${spec.subject}`}>
+      <p className="ln-title">{spec.subject}</p>
+      <div className="ln-bal-cols">
+        {side('for', spec.for)}
+        {side('against', spec.against)}
+      </div>
+      {spec.turns_on && (
+        <p className="ln-bal-turns">
+          <span className="ln-k">Turns on</span>
+          <span className="ln-bal-turns-t">{renderInline(spec.turns_on, 'turns')}</span>
+        </p>
+      )}
+    </div>
+  );
+}
+
+// ── a definition, as one equation ────────────────────────────────────
+
+/** A term's symbol as maths when it is maths ("r", "P_0", "\pi"), as words when it is words ("new customers"). */
+const isTexSym = (sym: string) => /[\\^_{}]/.test(sym) || /^[A-Za-z](?:_?\d)?$/.test(sym);
+
+/**
+ * The equation, displayed (KaTeX, as the working is), what each term means
+ * as a two-column list under it, and one worked example on a quiet line.
+ * A wide equation scrolls inside its own box, never the page; on a phone the
+ * terms stack, the symbol over its meaning.
+ */
+function InlineEquation({ spec, renderInline }: { spec: EquationSpec; renderInline: RenderInline }) {
+  return (
+    <div className="ln ln-equation" role="group" aria-label={spec.title || 'The equation'}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <div className="ln-scroll ln-eqn-tex">
+        <TeX tex={spec.tex} display />
+      </div>
+      {!!spec.terms?.length && (
+        <dl className="ln-eqn-terms">
+          {spec.terms.map((t, i) => (
+            <div key={i} className="ln-eqn-term">
+              <dt>{isTexSym(t.sym) ? <TeX tex={t.sym} /> : t.sym}</dt>
+              <dd>{renderInline(t.means, `m${i}`)}</dd>
+            </div>
+          ))}
+        </dl>
+      )}
+      {spec.example && (
+        <p className="ln-eqn-ex">
+          <span className="ln-k">For example</span>
+          <span className="ln-eqn-ex-t">
+            <TeX tex={spec.example.tex} />
+          </span>
+        </p>
+      )}
     </div>
   );
 }

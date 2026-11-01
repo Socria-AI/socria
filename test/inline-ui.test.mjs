@@ -286,5 +286,85 @@ console.log('\n=== drawn in the conversation ===');
   ok('  and never on a calculation, which has nowhere larger to go', !calc.includes('Open in Artifacts') && calc.includes('ln-slider'));
 }
 
+console.log('\n=== lenient where it costs nothing: what a model writes instead is read as what it means ===');
+{
+  const CL = { type: 'claim', claim: 'We only use 10% of our brains', verdict: 'fails', parts: [{ text: 'Imaging shows activity everywhere', holds: 'yes' }, { text: 'The figure comes from research', holds: 'no' }] };
+  const v = (verdict) => I.parseInlineSpec(J({ ...CL, verdict }))?.verdict;
+  ok('a verdict in capitals, with a full stop, or as a word for the same thing', v('Fails') === 'fails' && v(' HOLDS. ') === 'holds' && v('false') === 'fails' && v('Myth') === 'fails' && v('incorrect') === 'fails' && v('true') === 'holds' && v('Correct') === 'holds');
+  ok('…mixed, partial and misleading are "partly"; unclear and disputed are "unsettled"', v('mixed') === 'partly' && v('Partially true') === 'partly' && v('misleading') === 'partly' && v('unclear') === 'unsettled' && v('Disputed') === 'unsettled');
+  ok('…a verdict as true or false', v(true) === 'holds' && v(false) === 'fails');
+  ok('…and a verdict that says none of them is still nothing', I.parseInlineSpec(J({ ...CL, verdict: 'banana' })) === null && I.parseInlineSpec(J({ ...CL, verdict: 3 })) === null);
+  const hp = (a, b) => I.parseInlineSpec(J({ ...CL, parts: [{ text: 'One', holds: a }, { text: 'Two', holds: b }] }))?.parts.map((p) => p.holds);
+  ok('a part that holds as true or false, "Yes", "partially", "unknown"', J(hp(true, false)) === J(['yes', 'no']) && J(hp('Yes', 'Partially')) === J(['yes', 'partly']) && J(hp('unknown', 'False')) === J(['unclear', 'no']));
+  ok('…a part whose standing says nothing is left off (and with one left, no claim)', I.parseInlineSpec(J({ ...CL, parts: [{ text: 'One', holds: 'maybe so' }, { text: 'Two', holds: 'yes' }] })) === null);
+
+  const DEC = (scores) => ({ type: 'decide', options: ['Rent', 'Buy'], rows: [{ label: 'Cost', scores: scores[0] }, { label: 'Freedom', scores: scores[1] }] });
+  const ds = (scores) => J(I.parseInlineSpec(J(DEC(scores)))?.rows.map((r) => r.scores));
+  ok('readings out of five are read onto 0–3 (1 poor … 5 strong)', ds([[1, 5], [3, 4]]) === J([[0, 3], [2, 2]]), ds([[1, 5], [3, 4]]));
+  ok('…but one stray 5 among readings of 0–3 is that row’s mistake: it is left off, the others read as written', J(I.parseInlineSpec(J({ type: 'decide', options: ['Rent', 'Buy'], rows: [{ label: 'Cost', scores: [3, 2] }, { label: 'Freedom', scores: [1, 3] }, { label: 'Space', scores: [3, 1] }, { label: 'Stray', scores: [5, 1] }] }))?.rows.map((r) => r.scores)) === J([[3, 2], [1, 3], [3, 1]]));
+  ok('…readings within 0–3 are read as written', ds([[1, 3], [2, 0]]) === J([[1, 3], [2, 0]]));
+  ok('…a reading written as a numeral is a number', ds([['2', '3'], ['1', '0']]) === J([[2, 3], [1, 0]]));
+  ok('…readings out of ten are not guessed at: those rows are left off, and the decision with them', I.parseInlineSpec(J(DEC([[7, 9], [2, 10]]))) === null);
+
+  ok('an overview’s part with a "description" for its gist, a "title" for its name', I.parseInlineSpec(J({ type: 'concepts', items: [{ title: 'Supply', description: 'what sellers offer' }, { name: 'Demand', summary: 'what buyers want' }, { label: 'Price', gist: 'where they meet' }] }))?.items.map((x) => `${x.name}:${x.gist}`).join('|') === 'Supply:what sellers offer|Demand:what buyers want|Price:where they meet');
+  ok('steps whose label is a "title" or "text"', I.parseInlineSpec(J({ type: 'sequence', kind: 'steps', items: [{ title: 'One' }, { text: 'Two' }, { label: 'Three' }] }))?.items.length === 3);
+  ok('…a timeline written as "Timeline", its dates as "date"', I.parseInlineSpec(J({ type: 'sequence', kind: 'Timeline', items: [{ label: 'A', date: '1789' }, { label: 'B', date: '1793' }, { label: 'C', date: '1799' }] }))?.kind === 'timeline');
+  const paths = I.parseInlineSpec(J({ type: 'paths', options: [{ title: 'The formal statement', description: 'what it says exactly' }, { text: 'Why continuity matters' }] }));
+  ok('the ways onward as "options", each with a "title" and a "description"', paths?.items.length === 2 && paths.items[0].label === 'The formal statement' && paths.items[0].gist === 'what it says exactly', J(paths));
+  ok('the working’s lines as "math"', I.parseInlineSpec(J({ type: 'steps', lines: [{ math: 'x = 1' }, { math: 'x + 1 = 2' }] }))?.lines[1].tex === 'x + 1 = 2');
+  ok('a draft’s text as its "body"', I.parseInlineSpec(J({ type: 'draft', kind: 'email', body: 'Hi Sam,\n\nThanks.' }))?.text === 'Hi Sam,\n\nThanks.');
+  ok('a choice as "text"', I.parseInlineSpec(J({ type: 'options', options: [{ text: 'A' }, { text: 'B' }] }))?.options[1].label === 'B');
+  ok('a type in capitals is its type', I.parseInlineSpec(J({ ...CHART, type: 'Chart' }))?.type === 'chart');
+
+  ok('one repair: a trailing comma', I.parseInlineSpec('{"type":"options","options":["A","B",],}')?.options.length === 2);
+  ok('…a // comment, or a /* comment */', I.parseInlineSpec('{"type":"options", // the two ways\n"options":["A", /* first */ "B"]}')?.options.length === 2);
+  ok('…curly quotes, when every quote is curled', I.parseInlineSpec('{“type”:“options”,“options”:[“A”,“B”]}')?.options[1].label === 'B');
+  ok('…but a comment mark or a comma inside a string is the string’s', I.parseInlineSpec('{"type":"options","options":["see http://x.org/a, b","B",]}')?.options[0].label === 'see http://x.org/a, b');
+  ok('…curly quotes inside straight ones are quotation marks, kept', I.parseInlineSpec('{"type":"options","options":["The “best” one","B"]}')?.options[0].label === 'The “best” one');
+  ok('…and garbage is still nothing', I.parseInlineSpec('{not json') === null && I.parseInlineSpec('{"type":"options","options":["A" "B"]}') === null && I.repairJson('{"a":1}') === null);
+
+  const c = () => ctx({ theirs: 'rent 1200, food 400, transport 150' });
+  const canon = `${I.fenceOf(I.parseInlineSpec(J(CHART)))}\n\n`;
+  ok('an element in a ```json fence is the element', I.gateInlineBlock('```json\n' + J(CHART) + '\n```', c()) === canon);
+  ok('…in a bare ``` fence too', I.gateInlineBlock('```\n' + J(CHART) + '\n```', c()) === canon);
+  ok('…and it is checked like one: a chart of numbers from nowhere is its notice', I.gateInlineBlock('```json\n' + J(CHART) + '\n```', ctx()) === `${I.UNSUPPORTED_CHART}\n\n`);
+  const sample = '```json\n{"type":"chart","title":"My config"}\n```';
+  ok('a JSON sample whose "type" happens to be a kind, without what that kind is made of, stays code', I.gateInlineBlock(sample, c()) === sample);
+  const conf = '```json\n{"name":"socria","version":2}\n```';
+  ok('…any other JSON stays code', I.gateInlineBlock(conf, c()) === conf && I.gateInlineBlock('```json\n[1,2,3]\n```', c()) === '```json\n[1,2,3]\n```');
+  const near = '```json\n{"type":"chart","x":["a"],"series":[{"values":[1]}]}\n```';
+  ok('…a near miss (a kind’s fields, but not drawable) stays the code it was written as', I.gateInlineBlock(near, c()) === near);
+  const asked = '```json\n' + J(CHART) + '\n```';
+  ok('…and when the turn asked for code, a json block is theirs to read, never an element', I.gateInlineBlock(asked, { ...c(), code: true }) === asked);
+  ok('…nor while the stream is still inside it', I.gateInlineBlock('```json\n{"type":"chart"', c(), true) === '```json\n{"type":"chart"');
+  ok('…and any other language is untouched', I.gateInlineBlock('```python\n' + J(CHART) + '\n```', c()) === '```python\n' + J(CHART) + '\n```');
+  const out = [];
+  const g = new I.SentenceGate((x) => out.push(x), { block: (chunk, open) => I.gateInlineBlock(chunk, c(), open) });
+  // the block arrives in one piece here: a block split across pieces is the stream gate's to reassemble (lib/core4/stream-gate.ts)
+  for (const piece of ['Here it is.\n\n', '```json\n' + J(CHART) + '\n```', '\n\nRent is most of it.']) g.push(piece);
+  g.finish();
+  ok('…streamed, it comes out as the element', out.join('').includes(I.fenceOf(I.parseInlineSpec(J(CHART)))) && !out.join('').includes('```json'), out.join(''));
+}
+
+console.log('\n=== what the graph grammar and the draft offer is what is drawn ===');
+{
+  const G = { type: 'graph', expr: 'x^2 - 4', x: [-3, 3], params: [] };
+  const f = (features) => I.parseInlineSpec(J({ ...G, features }))?.features;
+  ok('a vertex is a turning point; zeros and x-intercepts are roots; the y-intercept is the intercept', J(f(['vertex', 'zeros', 'y-intercept'])) === J(['turning', 'roots', 'intercept']) && J(f(['X-Intercepts', 'Turning points'])) === J(['turning', 'roots']));
+  ok('…a feature it does not know is left off, the rest kept', J(f(['asymptotes', 'roots'])) === J(['roots']));
+  ok('unasked, a plain graph marks its shape', J(f(undefined)) === J(['turning', 'roots', 'intercept']));
+  const T = { type: 'graph', expr: 'x^2', x: [-3, 3], params: [{ name: 'p', label: 'point', value: 1, min: -2.5, max: 2.5, step: 0.1 }], tangent: 'p' };
+  ok('…a graph built around a tangent, a chord or a point marks only that, unasked', J(I.parseInlineSpec(J(T))?.features) === J([]) && J(I.parseInlineSpec(J({ ...T, tangent: undefined, at: ['p'] }))?.features) === J([]));
+  ok('…and marks what was asked for when it was asked', J(I.parseInlineSpec(J({ ...T, features: ['vertex'] }))?.features) === J(['turning']));
+  const PT = { type: 'graph', title: 'Elasticity along a demand curve', expr: '10-x', label: 'demand', x: [0, 10], params: [{ name: 'q', label: 'quantity', value: 3, min: 0.5, max: 9.5, step: 0.5 }], at: ['q'] };
+  const pt = I.parseInlineSpec(J(PT));
+  ok('a single curve keeps its name ("demand", a point dragged along it)', pt?.label === 'demand', J(pt));
+  const drawn = html(h(I.RichText, { rich: true, text: fence(PT) }));
+  ok('…and is drawn with it, by the equation and at the curve’s end', /<span class="ln-eq-name">demand<\/span>/.test(drawn) && /class="ln-curve-name "[^>]*>demand<\/text>/.test(drawn), drawn.slice(0, 400));
+  const dk = (kind) => I.parseInlineSpec(J({ type: 'draft', kind, text: 'Dear Sam,' }))?.kind;
+  ok('a letter, an invitation, a bio and an agenda are drafts of their kind', dk('letter') === 'letter' && dk('invite') === 'invite' && dk('Invitation') === 'invite' && dk('bio') === 'bio' && dk('biography') === 'bio' && dk('agenda') === 'agenda');
+  ok('…and say so on the draft', html(h(I.RichText, { rich: true, text: fence({ type: 'draft', kind: 'invite', text: 'Come on Friday.' }) })).includes('Invitation'));
+}
+
 console.log(`\ninline ui: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

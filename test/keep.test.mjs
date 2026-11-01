@@ -78,5 +78,21 @@ console.log('\n=== the Keep button ===');
   ok('drawn in Artifacts by the same component, live, with where it came from', /registerFigure\('kept', KeptFigure\)/.test(read('components/display/register.tsx')) && /<InlineBlock spec=\{s\.spec\}/.test(read('components/display/KeptFigure.tsx')) && /Kept from the conversation/.test(read('components/display/KeptFigure.tsx')) && /d\.act\('state', \{ state: JSON\.stringify\(st\) \}\)/.test(read('components/display/KeptFigure.tsx')));
 }
 
+console.log('\n=== the three new shapes are kept too ===');
+{
+  const DIAGRAM = { type: 'diagram', view: 'cycle', title: 'The water cycle', nodes: [{ id: 'a', label: 'Evaporation', detail: 'sun heats surface water into vapour' }, { id: 'b', label: 'Condensation' }, { id: 'c', label: 'Precipitation' }], edges: [['a', 'b'], ['b', 'c'], ['c', 'a']] };
+  const BALANCE = { type: 'balance', subject: 'Index funds', for: ['Low fees', 'Instant diversification'], against: ['No downside protection', 'You own the bad companies too'] };
+  const EQUATION = { type: 'equation', tex: 'm = \\frac{p - c}{p}', terms: [{ sym: 'p', means: 'the price' }, { sym: 'c', means: 'the cost' }] };
+  const d = I.keptFrom(I.parseInlineSpec(J(DIAGRAM)), { node: 'a' }, { message: 'm_1' });
+  ok('a diagram is kept as it was left, the part they had open with it', d?.spec.type === 'diagram' && d.ui?.node === 'a' && d.title === 'The water cycle', J(d));
+  ok('…its words are what the reply model reads, and opening a part adds nothing to them (it was reading)', I.keptText(d) === I.inlinePlainText(d.spec) && /back to Evaporation/.test(I.keptText(d)));
+  const kind = I.kindOf('kept');
+  ok('…what is opened in Artifacts is kept with it', kind.ops.state.apply(d, { state: J({ node: 'b' }) }).ui.node === 'b');
+  ok('the pros and cons and an equation are kept, named for what they are when untitled', I.keptFrom(I.parseInlineSpec(J(BALANCE)), undefined, {})?.title === 'Pros and cons: Index funds' && I.keptFrom(I.parseInlineSpec(J(EQUATION)), undefined, {})?.title === 'Equation');
+  const R = (spec) => renderToStaticMarkup(h(I.RichText, { rich: true, text: fence(spec), inline: { live: true, onState: () => {}, onOpen: () => {} } }));
+  ok('each has Keep under it in the conversation', [DIAGRAM, BALANCE, EQUATION].every((x) => /class="ln-keep"/.test(R(x))));
+  ok('…none has a larger form of its own to open instead', [DIAGRAM, BALANCE, EQUATION].every((x) => I.artifactFromSpec(I.parseInlineSpec(J(x))) === null));
+}
+
 console.log(`\nkeep: ${pass} passed, ${fail} failed`);
 if (fail) process.exit(1);

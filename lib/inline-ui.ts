@@ -8,19 +8,31 @@
 // the ways an open piece of work could go next, a decision they weigh
 // themselves — and, to reason WITH rather than read: a graph whose numbers
 // they drag, a small simulation, the working laid out with their numbers, a
-// question whose answer they work out and check. Those are drawn INSIDE the
-// conversation, from a structured description the reply writes in a fenced
-// block:
+// question whose answer they work out and check — and, for the ideas that
+// have no single central sentence, a picture of how the parts connect (a
+// cycle, a hierarchy, a flow, the causes of something), the case for and
+// against one thing, and a definition as one equation with its terms. Those
+// are drawn INSIDE the conversation, from a structured description the reply
+// writes in a fenced block:
 //
 //   ```ui
 //   {"type":"compare","options":["Rent","Buy"],"rows":[{"label":"Monthly","values":["$1,900","$2,350"]}]}
 //   ```
 //
-// A DESCRIPTION, NEVER CODE. Fourteen kinds, each with a fixed shape and limits;
+// A DESCRIPTION, NEVER CODE. Eighteen kinds, each with a fixed shape and limits;
 // anything else is not drawn. Every string is cleaned and capped, every number
 // is finite, a formula is compiled by the same safe parser the math engine
 // uses (lib/logos-math.ts compileExpr — no eval), and nothing in a spec can run.
-// The renderer (components/inline/InlineUI.tsx) knows these fourteen and no others.
+// The renderer (components/inline/InlineUI.tsx) knows these eighteen and no others.
+//
+// LENIENT WHERE IT COSTS NOTHING (November 2026). A model writes "Fails" for
+// "fails", true for "yes", scores out of five, "description" for "gist", a
+// trailing comma, curly quotes, or puts the block in a ```json fence. None of
+// that changes what the element says, and each of them used to delete it —
+// leaving prose that points at something that is not there. So the cleaning
+// reads those as what they plainly mean (verdictOf, holdsOf, the 1–5 rescale,
+// the aliases, one repair of the JSON, a json fence whose body is a spec) and
+// still drops anything it cannot draw honestly: garbage is still nothing.
 //
 // WHAT THEY DO REACHES SOCRIA. What the person does with an element — a number
 // dragged, a prediction made, an answer checked — is kept with the message
@@ -60,9 +72,10 @@
 // share it.
 
 import { compileExpr, freeNames } from './logos-math';
+import { diagramText } from './inline-diagram';
 import { answerOf, checkTyped, compileOver, compileOverT, crossingsOf, curveFeatures, exprWithValues, fmtPoint, fmtVal, meanValue, sampleCurve, slopeAt, timeAt, type Feature } from './inline-math';
 
-export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps', 'claim'] as const;
+export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps', 'claim', 'diagram', 'balance', 'equation'] as const;
 export type InlineKind = (typeof INLINE_KINDS)[number];
 
 export type ChartBasis = 'given' | 'source' | 'illustrative';
@@ -116,7 +129,7 @@ export interface OptionsSpec {
 export interface DraftSpec {
   type: 'draft';
   title?: string;
-  kind?: 'email' | 'message' | 'note' | 'paragraph' | 'post';
+  kind?: 'email' | 'message' | 'note' | 'paragraph' | 'post' | 'letter' | 'invite' | 'bio' | 'agenda';
   text: string;
 }
 /**
@@ -300,7 +313,80 @@ export type ClaimHolds = 'yes' | 'no' | 'partly' | 'unclear';
 export const CLAIM_VERDICTS: readonly ClaimVerdict[] = ['holds', 'fails', 'partly', 'unsettled'];
 export const CLAIM_HOLDS: readonly ClaimHolds[] = ['yes', 'no', 'partly', 'unclear'];
 
-export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec | ClaimSpec;
+/**
+ * HOW THE PARTS CONNECT. Cycles, hierarchies, flows and causal chains have no
+ * single central sentence: written out they become paragraphs chained with
+ * "which then", and a list loses the very thing that matters — what leads to
+ * what. So the parts are drawn as a picture of their connections, each a few
+ * words, with more on one when it is opened:
+ *   • cycle — the parts in order round a loop, the last leading back to the
+ *     first (the water cycle, a feedback loop);
+ *   • tree — one root, each part under exactly one parent, at most three
+ *     levels below the root (how something is organised);
+ *   • flow — a chain left to right, which may branch and join, never loop
+ *     (a process, a mechanism);
+ *   • causes — what led to something, pointing at the effect; a part may be
+ *     marked as an underlying cause, the trigger, an amplifier or the effect.
+ * The edges are pairs of node ids, [from, to]. Anything the renderer could
+ * not draw as the view says — an edge to a node that is not there, a tree
+ * with two roots or a loop in it, a flow that comes back on itself — is
+ * repaired where the repair is plain (a cycle's loop closed in the order the
+ * nodes were given) and otherwise not drawn at all.
+ */
+export type DiagramView = 'cycle' | 'tree' | 'flow' | 'causes';
+export type DiagramRole = 'underlying' | 'trigger' | 'amplifier' | 'effect';
+export interface DiagramNode {
+  id: string;
+  label: string;
+  detail?: string;
+  /** causes only: what part this plays in bringing the effect about */
+  role?: DiagramRole;
+}
+export interface DiagramSpec {
+  type: 'diagram';
+  view: DiagramView;
+  title?: string;
+  nodes: DiagramNode[];
+  edges: [string, string][];
+}
+export const DIAGRAM_VIEWS: readonly DiagramView[] = ['cycle', 'tree', 'flow', 'causes'];
+export const DIAGRAM_ROLES: readonly DiagramRole[] = ['underlying', 'trigger', 'amplifier', 'effect'];
+/**
+ * FOR AND AGAINST ONE THING. Pros and cons of a single subject have no second
+ * option to compare against, so a comparison table fills with "Pros" and
+ * "Cons" as if they were choices. Here the two sides sit next to each other,
+ * a few words each, with more on one when it is opened, and under them the one
+ * thing that decides which side wins for most people (`turns_on`). It leans
+ * neither way: which side wins is theirs.
+ */
+export interface BalanceItem {
+  text: string;
+  detail?: string;
+}
+export interface BalanceSpec {
+  type: 'balance';
+  subject: string;
+  for: BalanceItem[];
+  against: BalanceItem[];
+  turns_on?: string;
+}
+/**
+ * A DEFINITION, AS ONE EQUATION. A ratio or a formula that is defined rather
+ * than explored (CAC, EBITDA, a margin) reads best as the equation itself, what
+ * each term means, and one worked example — three blocks of prose otherwise.
+ * Nothing varies, so it is not a slider; nothing is worked through, so it is
+ * not steps. Under the Answer Guard the example is left off: it would be the
+ * worked answer to a question of the same kind.
+ */
+export interface EquationSpec {
+  type: 'equation';
+  title?: string;
+  tex: string;
+  terms?: { sym: string; means: string }[];
+  example?: { tex: string };
+}
+
+export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec | ClaimSpec | DiagramSpec | BalanceSpec | EquationSpec;
 
 /** The kinds a person works with — one to a reply: more than one is a dashboard. */
 export const LIVE_KINDS: readonly InlineKind[] = ['graph', 'sim', 'slider', 'decide', 'steps', 'claim'];
@@ -362,6 +448,26 @@ export const INLINE_LIMITS = {
   lines: 8,
   tex: 240,
   why: 400,
+  /** how the parts connect: fewer than three is a sentence, more than nine is not a glance */
+  diagramNodes: 9,
+  diagramMin: 3,
+  diagramEdges: 16,
+  nodeLabel: 40,
+  nodeDetail: 200,
+  /** a tree's levels below its root */
+  treeDepth: 3,
+  /** for and against: one a side is a sentence, more than four a list */
+  balanceSide: 4,
+  balanceMin: 2,
+  balanceText: 80,
+  balanceDetail: 240,
+  turnsOn: 160,
+  /** an equation's terms, and a term's symbol and meaning */
+  terms: 6,
+  sym: 60,
+  means: 160,
+  /** a chart's value past this is not a quantity anyone reads off a bar: not drawn */
+  chartValue: 1e15,
 } as const;
 const L = INLINE_LIMITS;
 
@@ -383,6 +489,50 @@ function prose(v: unknown, max: number): string {
 const fin = (v: unknown): v is number => typeof v === 'number' && Number.isFinite(v);
 const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
 const NAME = /^[A-Za-z][A-Za-z0-9_]{0,15}$/;
+const asObj = (v: unknown): Record<string, unknown> | null => (v && typeof v === 'object' && !Array.isArray(v) ? (v as Record<string, unknown>) : null);
+
+/**
+ * The first of these fields that holds something: the name a reply was asked
+ * to use, then the names a model reaches for instead ("description" for
+ * "gist", "title" for "label", "body" for "text"). What they hold is the same
+ * thing under another name, so it is read, not dropped.
+ */
+function field(o: Record<string, unknown> | null | undefined, ...keys: string[]): unknown {
+  if (!o) return undefined;
+  for (const k of keys) {
+    const v = o[k];
+    if ((typeof v === 'string' && v.trim()) || typeof v === 'number') return v;
+  }
+  return undefined;
+}
+
+/** A word as the lenient readers compare it: lower case, trimmed, one space for any run of spaces, hyphens or underscores, no closing full stop, straight apostrophes. */
+const wordOf = (v: string) => v.trim().toLowerCase().replace(/[’‘]/g, "'").replace(/[\s_-]+/g, ' ').replace(/[.!]+$/, '');
+
+/** A claim's verdict, however it was written: "Fails", "false", "myth", "mixed", true — or nothing, when it says none of them. */
+const VERDICT_WORDS: Record<string, ClaimVerdict> = {
+  holds: 'holds', hold: 'holds', true: 'holds', correct: 'holds', accurate: 'holds', right: 'holds', valid: 'holds', supported: 'holds', yes: 'holds', confirmed: 'holds',
+  fails: 'fails', fail: 'fails', false: 'fails', incorrect: 'fails', wrong: 'fails', myth: 'fails', untrue: 'fails', debunked: 'fails', no: 'fails', 'does not hold': 'fails', "doesn't hold": 'fails', 'not true': 'fails',
+  partly: 'partly', partial: 'partly', partially: 'partly', mixed: 'partly', misleading: 'partly', 'half true': 'partly', 'partly true': 'partly', 'partially true': 'partly', 'partly holds': 'partly', somewhat: 'partly', 'mostly true': 'partly', 'mostly false': 'partly',
+  unsettled: 'unsettled', unclear: 'unsettled', unknown: 'unsettled', uncertain: 'unsettled', disputed: 'unsettled', contested: 'unsettled', debated: 'unsettled', unproven: 'unsettled', open: 'unsettled', 'not settled': 'unsettled',
+};
+/** A part's standing, however it was written: "Yes", true, "false", "partially", "unknown" — or nothing. */
+const HOLDS_WORDS: Record<string, ClaimHolds> = {
+  yes: 'yes', true: 'yes', holds: 'yes', hold: 'yes', correct: 'yes', supported: 'yes', accurate: 'yes', valid: 'yes',
+  no: 'no', false: 'no', fails: 'no', fail: 'no', incorrect: 'no', wrong: 'no', unsupported: 'no', 'does not hold': 'no', "doesn't hold": 'no',
+  partly: 'partly', partial: 'partly', partially: 'partly', mixed: 'partly', misleading: 'partly', somewhat: 'partly',
+  unclear: 'unclear', unknown: 'unclear', uncertain: 'unclear', unsettled: 'unclear', disputed: 'unclear', contested: 'unclear', unproven: 'unclear',
+};
+export function verdictOf(v: unknown): ClaimVerdict | undefined {
+  if (v === true) return 'holds';
+  if (v === false) return 'fails';
+  return typeof v === 'string' ? VERDICT_WORDS[wordOf(v)] : undefined;
+}
+export function holdsOf(v: unknown): ClaimHolds | undefined {
+  if (v === true) return 'yes';
+  if (v === false) return 'no';
+  return typeof v === 'string' ? HOLDS_WORDS[wordOf(v)] : undefined;
+}
 
 function sanitizeChart(r: Record<string, unknown>): ChartSpec | null {
   const kind = r.kind === 'line' || r.kind === 'pie' ? r.kind : 'bar';
@@ -393,6 +543,9 @@ function sanitizeChart(r: Record<string, unknown>): ChartSpec | null {
     const o = s && typeof s === 'object' ? (s as Record<string, unknown>) : null;
     const values = Array.isArray(o?.values) ? (o!.values as unknown[]).slice(0, x.length) : [];
     if (values.length !== x.length || !values.every(fin)) return null;
+    // a value past a thousand million million is not something read off a bar (and the scale's arithmetic
+    // loses its digits there): a chart that would draw one dishonestly is not drawn
+    if ((values as number[]).some((v) => Math.abs(v) > L.chartValue)) return null;
     const name = line(o?.name, L.label);
     series.push({ ...(name ? { name } : {}), values: (values as number[]).map(r6) });
   }
@@ -464,7 +617,7 @@ function sanitizeOptions(r: Record<string, unknown>): OptionsSpec | null {
   const options: OptionsSpec['options'] = [];
   for (const o of (Array.isArray(r.options) ? r.options : []).slice(0, L.choices)) {
     const x = typeof o === 'string' ? { label: o } : o && typeof o === 'object' ? (o as Record<string, unknown>) : null;
-    const label = line(x?.label, L.choice);
+    const label = line(field(x, 'label', 'text', 'title'), L.choice);
     if (!label || options.some((y) => y.label === label)) continue;
     const reply = line(x?.reply, L.reply);
     options.push({ label, ...(reply && reply !== label ? { reply } : {}) });
@@ -474,11 +627,14 @@ function sanitizeOptions(r: Record<string, unknown>): OptionsSpec | null {
   return { type: 'options', ...(prompt ? { prompt } : {}), options };
 }
 
-const DRAFT_KINDS = ['email', 'message', 'note', 'paragraph', 'post'] as const;
+// a letter, an invitation, a bio and an agenda are what the planner offers a draft for (PRACTICAL_TEXT): each is named as what it is
+const DRAFT_KINDS = ['email', 'message', 'note', 'paragraph', 'post', 'letter', 'invite', 'bio', 'agenda'] as const;
+const DRAFT_ALIASES: Record<string, NonNullable<DraftSpec['kind']>> = { 'e mail': 'email', invitation: 'invite', biography: 'bio', text: 'message', 'text message': 'message' };
 function sanitizeDraft(r: Record<string, unknown>): DraftSpec | null {
-  const text = prose(r.text, L.draft);
+  const text = prose(typeof r.text === 'string' && r.text.trim() ? r.text : r.body, L.draft);
   if (text.length < 2) return null;
-  const kind = DRAFT_KINDS.includes(r.kind as DraftSpec['kind'] & string) ? (r.kind as DraftSpec['kind']) : undefined;
+  const k = typeof r.kind === 'string' ? wordOf(r.kind) : '';
+  const kind = DRAFT_KINDS.includes(k as NonNullable<DraftSpec['kind']>) ? (k as DraftSpec['kind']) : DRAFT_ALIASES[k];
   const title = line(r.title, L.title);
   return { type: 'draft', ...(title ? { title } : {}), ...(kind ? { kind } : {}), text };
 }
@@ -487,8 +643,8 @@ function sanitizeConcepts(r: Record<string, unknown>): ConceptsSpec | null {
   const items: ConceptsSpec['items'] = [];
   for (const it of (Array.isArray(r.items) ? r.items : []).slice(0, L.concepts)) {
     const o = it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
-    const name = line(o?.name, L.conceptName);
-    const gist = line(o?.gist, L.gist);
+    const name = line(field(o, 'name', 'label', 'title'), L.conceptName);
+    const gist = line(field(o, 'gist', 'description', 'summary'), L.gist);
     if (!name || !gist || items.some((x) => x.name.toLowerCase() === name.toLowerCase())) continue;
     const detail = line(o?.detail, L.detail);
     items.push({ name, gist, ...(detail && detail !== gist ? { detail } : {}), ...(Array.isArray(o?.links) ? { links: (o!.links as unknown[]).map((v) => line(v, L.conceptName)) } : {}) });
@@ -510,13 +666,13 @@ function sanitizeSequence(r: Record<string, unknown>): SequenceSpec | null {
   const raw: { label: string; when: string; detail: string }[] = [];
   for (const it of (Array.isArray(r.items) ? r.items : []).slice(0, L.sequence)) {
     const o = typeof it === 'string' ? { label: it } : it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
-    const label = line(o?.label, L.step);
+    const label = line(field(o, 'label', 'title', 'text'), L.step);
     if (!label) continue;
-    raw.push({ label, when: line(o?.when, L.when), detail: line(o?.detail, L.detail) });
+    raw.push({ label, when: line(field(o, 'when', 'date'), L.when), detail: line(field(o, 'detail', 'description'), L.detail) });
   }
   if (raw.length < 3) return null;
   // a timeline dates every event; one that does not is steps, in the order given
-  const kind: SequenceSpec['kind'] = r.kind === 'timeline' && raw.every((x) => x.when) ? 'timeline' : 'steps';
+  const kind: SequenceSpec['kind'] = typeof r.kind === 'string' && wordOf(r.kind) === 'timeline' && raw.every((x) => x.when) ? 'timeline' : 'steps';
   const items = raw.map((x) => ({ label: x.label, ...(kind === 'timeline' ? { when: x.when } : {}), ...(x.detail && x.detail !== x.label ? { detail: x.detail } : {}) }));
   const title = line(r.title, L.title);
   return { type: 'sequence', kind, ...(title ? { title } : {}), items };
@@ -524,11 +680,13 @@ function sanitizeSequence(r: Record<string, unknown>): SequenceSpec | null {
 
 function sanitizePaths(r: Record<string, unknown>): PathsSpec | null {
   const items: PathsSpec['items'] = [];
-  for (const it of (Array.isArray(r.items) ? r.items : []).slice(0, L.paths + 2)) {
+  // the ways onward, called "options" as often as "items"
+  const list = Array.isArray(r.items) ? r.items : Array.isArray(r.options) ? r.options : [];
+  for (const it of list.slice(0, L.paths + 2)) {
     const o = typeof it === 'string' ? { label: it } : it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
-    const label = line(o?.label, L.pathLabel).replace(/[.:;,]+$/, '');
+    const label = line(field(o, 'label', 'title', 'text'), L.pathLabel).replace(/[.:;,]+$/, '');
     if (!label || items.some((x) => x.label.toLowerCase() === label.toLowerCase())) continue;
-    const gist = line(o?.gist, L.pathGist);
+    const gist = line(field(o, 'gist', 'description', 'summary'), L.pathGist);
     items.push({ label, ...(gist && gist.toLowerCase() !== label.toLowerCase() ? { gist } : {}) });
     if (items.length === L.paths) break;
   }
@@ -543,14 +701,40 @@ function score(v: unknown): number | null {
   return Math.round(v);
 }
 
+/** A number written as a number or as a numeral ("2"); anything else is not one. */
+const numeric = (v: unknown): unknown => (typeof v === 'string' && /^\s*-?\d+(?:\.\d+)?\s*$/.test(v) ? Number(v) : v);
+
+/**
+ * READINGS OUT OF FIVE. Asked for 0–3, a model often scores out of five
+ * instead; read as 0–3 every 4 and 5 is out of range and the whole decision
+ * disappeared. When the readings are plainly a five-point scale — every one a
+ * whole number from 1 to 5, and at least a quarter of them above 3 — they are
+ * mapped onto 0–3 (1 poor, 3 middling, 5 strong). Anything less plain is read
+ * as written, and a row with a reading out of range is left off as before: one
+ * stray 5 among readings of 0–3 is a mistake in that row, not a reason to
+ * rescale every other row, and readings that all sit within 1–3 cannot be told
+ * apart from the scale they were asked for.
+ */
+function scoreScale(rows: unknown[]): (v: unknown) => unknown {
+  const all = rows.flatMap((row) => (Array.isArray(asObj(row)?.scores) ? (asObj(row)!.scores as unknown[]).map(numeric) : [])).filter(fin);
+  const five = all.length > 0 && all.every((v) => Number.isInteger(v) && v >= 1 && v <= 5) && all.filter((v) => v > L.maxScore).length * 4 >= all.length;
+  if (!five) return numeric;
+  return (v) => {
+    const n = numeric(v);
+    return fin(n) ? ((n - 1) * L.maxScore) / 4 : n;
+  };
+}
+
 function sanitizeDecide(r: Record<string, unknown>): DecideSpec | null {
   const options = (Array.isArray(r.options) ? r.options : []).slice(0, L.decideOptions).map((v) => line(v, L.label));
   if (options.length < 2 || options.some((v) => !v) || new Set(options.map((v) => v.toLowerCase())).size !== options.length) return null;
   const rows: DecideSpec['rows'] = [];
-  for (const row of (Array.isArray(r.rows) ? r.rows : []).slice(0, L.decideRows)) {
+  const rawRows = (Array.isArray(r.rows) ? r.rows : []).slice(0, L.decideRows);
+  const scaled = scoreScale(rawRows);
+  for (const row of rawRows) {
     const o = row && typeof row === 'object' ? (row as Record<string, unknown>) : null;
-    const label = line(o?.label, L.label);
-    const scores = Array.isArray(o?.scores) ? (o!.scores as unknown[]).slice(0, options.length).map(score) : [];
+    const label = line(field(o, 'label', 'title', 'text'), L.label);
+    const scores = Array.isArray(o?.scores) ? (o!.scores as unknown[]).slice(0, options.length).map((v) => score(scaled(v))) : [];
     if (!label || scores.length !== options.length || scores.some((v) => v === null) || rows.some((x) => x.label.toLowerCase() === label.toLowerCase())) continue;
     const note = line(o!.note, L.note);
     rows.push({ label, scores: scores as number[], ...(note ? { note } : {}) });
@@ -598,6 +782,20 @@ function sanitizePredict(raw: unknown): PredictSpec | undefined {
 }
 const valuesOf = (params: readonly ParamSpec[]): Record<string, number> => Object.fromEntries(params.map((p) => [p.name, p.value]));
 const FEATURES: readonly GraphFeature[] = ['turning', 'roots', 'intercept', 'crossings', 'mean-value'];
+/**
+ * What a feature is called besides its own name: a vertex is a turning point,
+ * the zeros and x-intercepts are its roots, the y-intercept is the intercept.
+ * Each was silently emptied before, leaving a graph with nothing marked that
+ * the prose said was marked.
+ */
+const FEATURE_WORDS: Record<string, GraphFeature> = {
+  turning: 'turning', 'turning point': 'turning', 'turning points': 'turning', vertex: 'turning', vertices: 'turning', extremum: 'turning', extrema: 'turning', maximum: 'turning', minimum: 'turning', maxima: 'turning', minima: 'turning', 'stationary point': 'turning', 'stationary points': 'turning',
+  roots: 'roots', root: 'roots', zeros: 'roots', zeroes: 'roots', zero: 'roots', 'x intercept': 'roots', 'x intercepts': 'roots',
+  intercept: 'intercept', intercepts: 'intercept', 'y intercept': 'intercept', 'y intercepts': 'intercept',
+  crossings: 'crossings', crossing: 'crossings', intersection: 'crossings', intersections: 'crossings',
+  'mean value': 'mean-value', 'mean value point': 'mean-value', mvt: 'mean-value',
+};
+const featureOf = (v: unknown): GraphFeature | undefined => (typeof v === 'string' ? FEATURE_WORDS[wordOf(v)] : undefined);
 /** What a graph marks when the reply named nothing: its shape, and where its curves meet. Never the mean value point unasked. */
 const DEFAULT_FEATURES: readonly GraphFeature[] = ['turning', 'roots', 'intercept', 'crossings'];
 
@@ -647,13 +845,18 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
   const tangent = isParam(r.tangent) ? r.tangent.toLowerCase() : null;
   const at = [...new Set([...(Array.isArray(r.at) ? (r.at as unknown[]).filter(isParam).map((v) => (v as string).toLowerCase()) : []), ...(chord ?? []), ...(tangent ? [tangent] : [])])].slice(0, L.params);
   const y = r.y === undefined ? null : range(r.y);
-  const asked = Array.isArray(r.features) ? FEATURES.filter((f) => (r.features as unknown[]).includes(f)) : [...DEFAULT_FEATURES];
+  // a graph built around a point, a chord or a tangent is about that construction: unasked, nothing else is
+  // marked on it (its roots and intercept would crowd the one thing it is there to show)
+  const marks = r.features === undefined && (chord || tangent || at.length) ? [] : DEFAULT_FEATURES;
+  const named = Array.isArray(r.features) ? new Set((r.features as unknown[]).map(featureOf)) : null;
+  const asked = named ? FEATURES.filter((f) => named.has(f)) : [...marks];
   // crossings need a second curve; the mean value point needs a chord
   const features = asked.filter((f) => (f !== 'crossings' || curves.length > 0) && (f !== 'mean-value' || !!chord));
   const readouts = sanitizeReadouts(r.readouts, names, vals);
   const predict = sanitizePredict(r.predict);
   const title = line(r.title, L.title);
-  const label = curves.length ? line(r.label, L.label) : '';
+  // the first curve's name stays even when it is the only curve ("demand", with a point dragged along it)
+  const label = line(r.label, L.label);
   return {
     type: 'graph',
     ...(title ? { title } : {}),
@@ -676,13 +879,13 @@ function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
 /** A claim inspected: the claim, a verdict, and two to five parts it rests on — no links (a source comes from a search, cited). */
 function sanitizeClaim(r: Record<string, unknown>): ClaimSpec | null {
   const claim = line(r.claim, L.claim);
-  const verdict = CLAIM_VERDICTS.find((v) => v === r.verdict);
+  const verdict = verdictOf(r.verdict);
   if (!claim || !verdict) return null;
   const parts: ClaimSpec['parts'] = [];
   for (const v of (Array.isArray(r.parts) ? r.parts : []).slice(0, L.claimParts)) {
     const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
-    const text = line(o?.text, L.claimPart);
-    const holds = CLAIM_HOLDS.find((h) => h === o?.holds);
+    const text = line(field(o, 'text', 'label'), L.claimPart);
+    const holds = holdsOf(o?.holds);
     if (!text || !holds) continue;
     const basis = line(String(o!.basis ?? '').replace(/\bhttps?:\/\/\S+/gi, '').replace(/\bwww\.\S+/gi, ''), L.basis);
     parts.push({ text, holds, ...(basis ? { basis } : {}) });
@@ -737,7 +940,7 @@ function sanitizeSteps(r: Record<string, unknown>): StepsSpec | null {
   const lines: StepsSpec['lines'] = [];
   for (const it of (Array.isArray(r.lines) ? r.lines : []).slice(0, L.lines)) {
     const o = typeof it === 'string' ? { tex: it } : it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
-    const tex = line(o?.tex, L.tex);
+    const tex = line(field(o, 'tex', 'math'), L.tex);
     if (!tex || TEX_UNSAFE.test(tex)) continue;
     const why = line(o?.why, L.why);
     lines.push({ tex, ...(why ? { why } : {}) });
@@ -748,11 +951,207 @@ function sanitizeSteps(r: Record<string, unknown>): StepsSpec | null {
   return { type: 'steps', ...(title ? { title } : {}), lines, ...(check ? { check } : {}) };
 }
 
-/** Anything at all in, one of the fourteen canonical shapes out — or null, and nothing is drawn. */
+// ── how the parts connect ────────────────────────────────────────────
+
+const NODE_ID = /^[A-Za-z0-9_.:-]{1,24}$/;
+const VIEW_WORDS: Record<string, DiagramView> = {
+  cycle: 'cycle', loop: 'cycle', 'feedback loop': 'cycle', circle: 'cycle', ring: 'cycle', 'life cycle': 'cycle', lifecycle: 'cycle',
+  tree: 'tree', hierarchy: 'tree', 'org chart': 'tree', outline: 'tree', structure: 'tree',
+  flow: 'flow', chain: 'flow', process: 'flow', pipeline: 'flow', flowchart: 'flow',
+  causes: 'causes', cause: 'causes', causal: 'causes', 'cause and effect': 'causes', 'causes and effects': 'causes', 'causal chain': 'causes',
+};
+const ROLE_WORDS: Record<string, DiagramRole> = {
+  underlying: 'underlying', 'underlying cause': 'underlying', root: 'underlying', 'root cause': 'underlying', structural: 'underlying', background: 'underlying', 'long term': 'underlying', 'long term cause': 'underlying',
+  trigger: 'trigger', spark: 'trigger', immediate: 'trigger', 'immediate cause': 'trigger', proximate: 'trigger', 'proximate cause': 'trigger', catalyst: 'trigger',
+  amplifier: 'amplifier', amplifying: 'amplifier', accelerant: 'amplifier', accelerator: 'amplifier', aggravating: 'amplifier', 'feedback': 'amplifier',
+  effect: 'effect', outcome: 'effect', result: 'effect', consequence: 'effect',
+};
+
+/** The nodes' ids as one walk round the loop, or null when the edges say something a ring cannot draw. */
+function cycleOrder(ids: readonly string[], edges: readonly [string, string][]): string[] | null {
+  const n = ids.length;
+  // no edges: the order the parts were given is the order round the loop
+  if (!edges.length) return [...ids];
+  const succ = new Map<string, string>();
+  const preds = new Map<string, number>();
+  for (const [a, b] of edges) {
+    // a part that leads to two others, or is led to by two, is a branch: no ring draws it
+    if (succ.has(a)) return null;
+    succ.set(a, b);
+    preds.set(b, (preds.get(b) ?? 0) + 1);
+    if (preds.get(b)! > 1) return null;
+  }
+  // one walk through every part — a closed loop, or a chain whose last step back to the start was left out
+  const start = ids.find((id) => !preds.has(id)) ?? ids[0];
+  const walk = [start];
+  for (let cur = succ.get(start); cur !== undefined && cur !== start && walk.length <= n; cur = succ.get(cur)) walk.push(cur);
+  if (walk.length === n && new Set(walk).size === n) {
+    // a closed loop starts where the reply started it; a chain starts at its first step
+    if (succ.get(walk[n - 1]) === start && preds.has(start)) {
+      const at = walk.indexOf(ids[0]);
+      return [...walk.slice(at), ...walk.slice(0, at)];
+    }
+    return walk;
+  }
+  // some steps missing, but every one given goes on to the next part in the order given: that order, closed
+  const at = new Map(ids.map((id, i) => [id, i]));
+  return edges.every(([a, b]) => at.get(b) === ((at.get(a) ?? -2) + 1) % n) ? [...ids] : null;
+}
+
+/** Is every part reachable from every other, ignoring which way the arrows point? */
+function connected(ids: readonly string[], edges: readonly [string, string][]): boolean {
+  const near = new Map(ids.map((id) => [id, [] as string[]]));
+  for (const [a, b] of edges) {
+    near.get(a)!.push(b);
+    near.get(b)!.push(a);
+  }
+  const seen = new Set([ids[0]]);
+  const todo = [ids[0]];
+  while (todo.length) for (const m of near.get(todo.pop()!)!) if (!seen.has(m)) seen.add(m), todo.push(m);
+  return seen.size === ids.length;
+}
+
+/** Does following the arrows ever come back to where it started? */
+function looped(ids: readonly string[], edges: readonly [string, string][]): boolean {
+  const indeg = new Map(ids.map((id) => [id, 0]));
+  for (const [, b] of edges) indeg.set(b, indeg.get(b)! + 1);
+  const todo = ids.filter((id) => indeg.get(id) === 0);
+  let done = 0;
+  while (todo.length) {
+    const a = todo.pop()!;
+    done++;
+    for (const [x, b] of edges) if (x === a && indeg.set(b, indeg.get(b)! - 1).get(b) === 0) todo.push(b);
+  }
+  return done !== ids.length;
+}
+
+function sanitizeDiagram(r: Record<string, unknown>): DiagramSpec | null {
+  const view = typeof r.view === 'string' ? VIEW_WORDS[wordOf(r.view)] : undefined;
+  if (!view) return null;
+  const rawNodes = Array.isArray(r.nodes) ? r.nodes : [];
+  // more parts than a glance takes is not cut down to fit: which ones to leave out is not the renderer's to choose
+  if (rawNodes.length > L.diagramNodes) return null;
+  const nodes: DiagramNode[] = [];
+  const byKey = new Map<string, string>();
+  rawNodes.forEach((v, i) => {
+    const o = typeof v === 'string' ? { label: v } : asObj(v);
+    const label = line(field(o, 'label', 'text', 'name', 'title'), L.nodeLabel);
+    const rid = field(o, 'id');
+    const id = rid !== undefined && NODE_ID.test(String(rid).trim()) ? String(rid).trim() : `n${i + 1}`;
+    if (!label || nodes.some((x) => x.id === id || x.label.toLowerCase() === label.toLowerCase())) return;
+    const detail = line(field(o, 'detail', 'description', 'gist'), L.nodeDetail);
+    const role = view === 'causes' && typeof o?.role === 'string' ? ROLE_WORDS[wordOf(o.role)] : undefined;
+    nodes.push({ id, label, ...(detail && detail.toLowerCase() !== label.toLowerCase() ? { detail } : {}), ...(role ? { role } : {}) });
+    // an edge may name a part by its id, or by its label
+    byKey.set(id, id);
+    byKey.set(label.toLowerCase(), id);
+  });
+  if (nodes.length < L.diagramMin) return null;
+  const ids = nodes.map((x) => x.id);
+  const key = (v: unknown) => (typeof v === 'string' || typeof v === 'number' ? byKey.get(String(v).trim()) ?? byKey.get(String(v).trim().toLowerCase()) : undefined);
+  let edges: [string, string][] = [];
+  for (const e of (Array.isArray(r.edges) ? r.edges : []).slice(0, L.diagramEdges * 2)) {
+    const o = asObj(e);
+    const a = key(Array.isArray(e) ? e[0] : o?.from ?? o?.source);
+    const b = key(Array.isArray(e) ? e[1] : o?.to ?? o?.target);
+    // an edge to a part that is not there, or from a part to itself, draws nothing
+    if (!a || !b || a === b || edges.some(([x, y]) => x === a && y === b)) continue;
+    edges.push([a, b]);
+  }
+  if (edges.length > L.diagramEdges) return null;
+  let ordered = nodes;
+  if (view === 'cycle') {
+    const order = cycleOrder(ids, edges);
+    if (!order) return null;
+    ordered = order.map((id) => nodes.find((x) => x.id === id)!);
+    edges = order.map((id, i) => [id, order[(i + 1) % order.length]] as [string, string]);
+  } else if (view === 'tree') {
+    // one root; every other part under exactly one parent; every part reached from the root; three levels at most
+    const parent = new Map<string, string>();
+    for (const [p, c] of edges) {
+      if (parent.has(c)) return null;
+      parent.set(c, p);
+    }
+    const roots = ids.filter((id) => !parent.has(id));
+    if (roots.length !== 1) return null;
+    const depth = new Map([[roots[0], 0]]);
+    const todo = [roots[0]];
+    while (todo.length) {
+      const p = todo.shift()!;
+      for (const [x, c] of edges) if (x === p && !depth.has(c)) depth.set(c, depth.get(p)! + 1), todo.push(c);
+    }
+    if (depth.size !== ids.length || Math.max(...depth.values()) > L.treeDepth) return null;
+  } else {
+    // a flow, or causes: no edges is the chain in the order given (causes: everything leading to the one effect)
+    if (!edges.length) {
+      const effects = nodes.filter((x) => x.role === 'effect');
+      if (view === 'flow') edges = ids.slice(1).map((id, i) => [ids[i], id] as [string, string]);
+      else if (effects.length === 1) edges = ids.filter((id) => id !== effects[0].id).map((id) => [id, effects[0].id] as [string, string]);
+      else return null;
+    }
+    // a flow that comes back on itself is a cycle, and parts joined to nothing are not a flow
+    if (looped(ids, edges) || !connected(ids, edges)) return null;
+    if (view === 'causes' && !nodes.some((x) => x.role === 'effect')) {
+      // where the arrows end is what was caused
+      const sinks = new Set(ids.filter((id) => !edges.some(([a]) => a === id)));
+      ordered = nodes.map((x) => (sinks.has(x.id) ? { ...x, role: 'effect' as const } : x));
+    }
+  }
+  const title = line(r.title, L.title);
+  return { type: 'diagram', view, ...(title ? { title } : {}), nodes: ordered, edges };
+}
+
+// ── for and against ──────────────────────────────────────────────────
+
+function balanceSide(v: unknown): BalanceItem[] {
+  const out: BalanceItem[] = [];
+  for (const it of (Array.isArray(v) ? v : []).slice(0, L.balanceSide + 2)) {
+    const o = typeof it === 'string' ? { text: it } : asObj(it);
+    const text = line(field(o, 'text', 'label', 'title', 'point'), L.balanceText);
+    if (!text || out.some((x) => x.text.toLowerCase() === text.toLowerCase())) continue;
+    const detail = line(field(o, 'detail', 'description', 'why'), L.balanceDetail);
+    out.push({ text, ...(detail && detail.toLowerCase() !== text.toLowerCase() ? { detail } : {}) });
+    if (out.length === L.balanceSide) break;
+  }
+  return out;
+}
+
+function sanitizeBalance(r: Record<string, unknown>): BalanceSpec | null {
+  const subject = line(field(r, 'subject', 'title', 'topic'), L.title);
+  const pro = balanceSide(r.for ?? r.pros);
+  const con = balanceSide(r.against ?? r.cons);
+  // one point a side is a sentence, not a balance
+  if (!subject || pro.length < L.balanceMin || con.length < L.balanceMin) return null;
+  const turns = line(field(r, 'turns_on', 'turnsOn', 'depends_on', 'hinges_on'), L.turnsOn);
+  return { type: 'balance', subject, for: pro, against: con, ...(turns ? { turns_on: turns } : {}) };
+}
+
+// ── a definition, as one equation ────────────────────────────────────
+
+function sanitizeEquation(r: Record<string, unknown>): EquationSpec | null {
+  const tex = line(field(r, 'tex', 'math', 'latex'), L.tex);
+  if (!tex || TEX_UNSAFE.test(tex)) return null;
+  const terms: NonNullable<EquationSpec['terms']> = [];
+  for (const t of (Array.isArray(r.terms) ? r.terms : []).slice(0, L.terms)) {
+    const o = asObj(t);
+    const sym = line(field(o, 'sym', 'symbol', 'term', 'name'), L.sym);
+    const means = line(field(o, 'means', 'meaning', 'description', 'is'), L.means);
+    if (!sym || !means || TEX_UNSAFE.test(sym) || terms.some((x) => x.sym === sym)) continue;
+    terms.push({ sym, means });
+  }
+  const ex = typeof r.example === 'string' ? { tex: r.example } : asObj(r.example);
+  const exTex = line(field(ex, 'tex', 'math', 'latex'), L.tex);
+  const example = exTex && !TEX_UNSAFE.test(exTex) ? { tex: exTex } : null;
+  const title = line(r.title, L.title);
+  return { type: 'equation', ...(title ? { title } : {}), tex, ...(terms.length ? { terms } : {}), ...(example ? { example } : {}) };
+}
+
+/** Anything at all in, one of the eighteen canonical shapes out — or null, and nothing is drawn. */
 export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
-  switch (r.type) {
+  // "Chart" and " chart" are a chart
+  switch (typeof r.type === 'string' ? r.type.trim().toLowerCase() : r.type) {
     case 'chart':
       return sanitizeChart(r);
     case 'slider':
@@ -785,19 +1184,133 @@ export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
       return sanitizeSteps(r);
     case 'claim':
       return sanitizeClaim(r);
+    case 'diagram':
+      return sanitizeDiagram(r);
+    case 'balance':
+      return sanitizeBalance(r);
+    case 'equation':
+      return sanitizeEquation(r);
     default:
       return null;
+  }
+}
+
+/**
+ * ONE REPAIR, THEN NOTHING. JSON a model writes is now and then JSON with the
+ * habits of code: a // comment, a trailing comma before ] or }, or every
+ * quote curled by something that "typeset" it. Each is fixed, outside the
+ * strings only (a comma or a // inside a label is the label's), and the body
+ * is parsed once more; anything else wrong with it is wrong, and it is not
+ * drawn. Curly quotes are straightened only when the body has no straight
+ * double quote at all — mixed, they are quotation marks inside the text.
+ * Null when there was nothing to repair.
+ */
+export function repairJson(body: string): string | null {
+  let s = body;
+  if (!s.includes('"') && /[“”]/.test(s)) s = s.replace(/[“”]/g, '"');
+  // strings are copied as they are; outside them, comments go
+  const pass = (src: string, outside: (src: string, i: number, out: string[]) => number): string => {
+    const out: string[] = [];
+    let inStr = false;
+    for (let i = 0; i < src.length; i++) {
+      const ch = src[i];
+      if (inStr) {
+        out.push(ch);
+        if (ch === '\\') out.push(src[++i] ?? '');
+        else if (ch === '"') inStr = false;
+        continue;
+      }
+      if (ch === '"') {
+        inStr = true;
+        out.push(ch);
+        continue;
+      }
+      i = outside(src, i, out);
+    }
+    return out.join('');
+  };
+  s = pass(s, (src, i, out) => {
+    if (src[i] === '/' && src[i + 1] === '/') {
+      const nl = src.indexOf('\n', i);
+      return nl < 0 ? src.length : nl - 1;
+    }
+    if (src[i] === '/' && src[i + 1] === '*') {
+      const end = src.indexOf('*/', i + 2);
+      return end < 0 ? src.length : end + 1;
+    }
+    out.push(src[i]);
+    return i;
+  });
+  // then a comma with nothing after it but a closing bracket
+  s = pass(s, (src, i, out) => {
+    if (src[i] === ',' && /^\s*[\]}]/.test(src.slice(i + 1, i + 64))) return i;
+    out.push(src[i]);
+    return i;
+  });
+  return s !== body ? s : null;
+}
+
+/** A body read as JSON, with one repair if it needs one; undefined when it is not JSON either way. */
+function readJson(body: string): unknown {
+  try {
+    return JSON.parse(body);
+  } catch {
+    const fixed = repairJson(body);
+    if (fixed === null) return undefined;
+    try {
+      return JSON.parse(fixed);
+    } catch {
+      return undefined;
+    }
   }
 }
 
 /** The body of a ```ui block, parsed and sanitised; null for anything that is not a valid spec. */
 export function parseInlineSpec(body: string): InlineSpec | null {
   if (typeof body !== 'string' || body.length > 12_000) return null;
-  try {
-    return sanitizeInlineSpec(JSON.parse(body));
-  } catch {
-    return null;
-  }
+  const raw = readJson(body);
+  return raw === undefined ? null : sanitizeInlineSpec(raw);
+}
+
+/**
+ * What a kind cannot be without (any one of each group of names), for reading
+ * a ```json or bare ``` block as an element: a JSON object with "type":"chart"
+ * and nothing a chart is made of is somebody's JSON, not a chart.
+ */
+const REQUIRED: Record<InlineKind, readonly (readonly string[])[]> = {
+  chart: [['x'], ['series']],
+  slider: [['formula'], ['vars']],
+  compare: [['options'], ['rows']],
+  reasoning: [['summary'], ['steps']],
+  options: [['options']],
+  draft: [['text', 'body']],
+  concepts: [['items']],
+  sequence: [['items']],
+  paths: [['items', 'options']],
+  decide: [['options'], ['rows']],
+  graph: [['expr'], ['x']],
+  sim: [['x'], ['y'], ['t'], ['view'], ['params']],
+  check: [['prompt'], ['answer']],
+  steps: [['lines']],
+  claim: [['claim'], ['verdict'], ['parts']],
+  diagram: [['view'], ['nodes']],
+  balance: [['subject', 'title', 'topic'], ['for', 'pros'], ['against', 'cons']],
+  equation: [['tex', 'math', 'latex']],
+};
+
+/**
+ * A ```json (or unlabelled) block that is an element in the wrong fence: a
+ * JSON object whose type is one of the kinds, with every field that kind is
+ * made of, that sanitises to a spec. Anything less — a JSON sample, a config,
+ * a near miss — is null, and stays the code block it was written as.
+ */
+export function specInJsonFence(body: string): InlineSpec | null {
+  if (typeof body !== 'string' || body.length > 12_000 || !/^\s*\{/.test(body)) return null;
+  const raw = asObj(readJson(body));
+  const type = typeof raw?.type === 'string' ? raw.type.trim().toLowerCase() : '';
+  if (!raw || !(INLINE_KINDS as readonly string[]).includes(type)) return null;
+  if (!REQUIRED[type as InlineKind].every((names) => names.some((k) => raw[k] !== undefined && raw[k] !== null))) return null;
+  return sanitizeInlineSpec(raw);
 }
 
 /** A spec as the fenced block it travels in. */
@@ -854,6 +1367,12 @@ export interface InlineContext {
   ownReasoning?: boolean;
   /** blocks already shown in this reply, and how many of them are things to work with (mutated as the reply streams) */
   shown: { n: number; live?: number };
+  /**
+   * the turn asked for code, JSON or a config: a ```json block in the reply is
+   * then theirs to read and copy, never an element (gateInlineBlock). Unset is
+   * read as not asked — a json block is an element only when it is wholly one.
+   */
+  code?: boolean;
 }
 
 export type InlineVerdict = { ok: true; spec: InlineSpec } | { ok: false; why: string; notice?: string };
@@ -893,8 +1412,9 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
     if (spec.type === 'reasoning' && ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'draft') {
     if (ctx.ownWriting) return { ok: false, why: 'their-writing' };
-  } else if (spec.type === 'concepts' || spec.type === 'sequence') {
-    // under the guard nothing is laid out to read instead of working it; steps that are theirs to find stay theirs
+  } else if (spec.type === 'concepts' || spec.type === 'sequence' || spec.type === 'diagram' || spec.type === 'balance') {
+    // under the guard nothing is laid out to read instead of working it — an overview, a picture of how the
+    // parts connect, the case either way; steps that are theirs to find stay theirs
     if (ctx.guard) return { ok: false, why: 'guarded' };
     if (spec.type === 'sequence' && spec.kind === 'steps' && ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'steps') {
@@ -921,6 +1441,12 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
       const { explain: _e, ...rest } = spec;
       out = rest;
     }
+  } else if (spec.type === 'equation') {
+    // what the formula is stays; the worked example would be the worked answer to a guarded question of its kind
+    if (ctx.guard && spec.example) {
+      const { example: _x, ...rest } = spec;
+      out = rest;
+    }
   }
   ctx.shown.n++;
   if (LIVE_KINDS.includes(spec.type)) ctx.shown.live = (ctx.shown.live ?? 0) + 1;
@@ -929,15 +1455,29 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
 
 /**
  * The stream gate's hook: a finished fenced block in, what the person sees out.
- * Anything that is not ```ui passes untouched; a ui block that is not a valid
- * spec, or is cut off, is dropped; one that fails its check becomes its notice
- * (or nothing); one that passes goes out in its canonical form.
+ * Anything that is not ```ui passes untouched — except a ```json or bare
+ * block that is wholly an element (specInJsonFence), which is read as the ui
+ * block it was meant to be; a ui block that is not a valid spec, or is cut
+ * off, is dropped; one that fails its check becomes its notice (or nothing);
+ * one that passes goes out in its canonical form.
  */
 export function gateInlineBlock(chunk: string, ctx: InlineContext, open = false): string {
   const m = /^```[ \t]*([\w-]*)[ \t]*\n?([\s\S]*?)(?:```\s*)?$/.exec(chunk.trim());
-  if (!m || m[1].toLowerCase() !== 'ui') return chunk;
-  if (open) return '';
-  const spec = parseInlineSpec(m[2]);
+  if (!m) return chunk;
+  const lang = m[1].toLowerCase();
+  let spec: InlineSpec | null;
+  if (lang === 'ui') {
+    if (open) return '';
+    spec = parseInlineSpec(m[2]);
+  } else {
+    // AN ELEMENT IN THE WRONG FENCE. A spec written in a ```json (or unlabelled) block is still the element
+    // the reply meant — shown as raw JSON, it is a wall of braces the person was never meant to read. It is
+    // read as one only when it wholly is one (a known kind, every field that kind is made of, valid), never
+    // when the turn asked for code, and never while it is cut off: anything less is the code block it was.
+    if ((lang !== 'json' && lang !== '') || open || ctx.code) return chunk;
+    spec = specInJsonFence(m[2]);
+    if (!spec) return chunk;
+  }
   if (!spec) return '';
   const v = checkInlineSpec(spec, ctx);
   if (!v.ok) return v.notice ? `${v.notice}\n\n` : '';
@@ -1000,6 +1540,14 @@ export function inlinePlainText(spec: InlineSpec): string {
       return [`The claim: “${spec.claim}” — ${CLAIM_SAID[spec.verdict]}`, ...spec.parts.map((x) => `- ${HOLDS_SAID[x.holds]}: ${x.text}${x.basis ? ` (${x.basis})` : ''}`)].join('\n');
     case 'steps':
       return [spec.title ?? '', ...spec.lines.map((l, i) => `${i + 1}. ${l.tex}${l.why ? ` — ${l.why}` : ''}`), spec.check ? `Your turn: ${spec.check.prompt}` : ''].filter(Boolean).join('\n');
+    case 'diagram':
+      return diagramText(spec);
+    case 'balance': {
+      const side = (xs: readonly BalanceItem[]) => xs.map((x) => `${x.text}${x.detail ? ` (${x.detail})` : ''}`).join('; ');
+      return [`${spec.subject}, for and against`, `For: ${side(spec.for)}`, `Against: ${side(spec.against)}`, spec.turns_on ? `It turns on: ${spec.turns_on}` : ''].filter(Boolean).join('\n');
+    }
+    case 'equation':
+      return [spec.title ?? '', spec.tex, ...(spec.terms ?? []).map((t) => `${t.sym}: ${t.means}`), spec.example ? `For example: ${spec.example.tex}` : ''].filter(Boolean).join('\n');
   }
 }
 
@@ -1094,6 +1642,12 @@ export interface InlineState {
   whys?: number[];
   /** the parts of a claim they said they doubt */
   doubted?: number[];
+  /**
+   * the part of a diagram they opened, by its id. Kept so the diagram opens
+   * where they left it (and is kept so in Artifacts); never said to Socria —
+   * opening a part to read its line is reading, not something they did.
+   */
+  node?: string;
 }
 
 /** One block's state, cleaned; null when nothing usable is left. */
@@ -1150,6 +1704,7 @@ export function sanitizeInlineStateOne(raw: unknown): InlineState | null {
     const doubted = [...new Set(r.doubted.filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < L.claimParts))].sort((a, b) => a - b);
     if (doubted.length) out.doubted = doubted;
   }
+  if (typeof r.node === 'string' && NODE_ID.test(r.node)) out.node = r.node;
   return Object.keys(out).length ? out : null;
 }
 
@@ -1282,6 +1837,12 @@ export function inlineFrom(spec: InlineSpec): string {
       return 'the overview';
     case 'claim':
       return 'the claim';
+    case 'diagram':
+      return 'the diagram';
+    case 'balance':
+      return 'the pros and cons';
+    case 'equation':
+      return 'the equation';
     default:
       return 'the element';
   }

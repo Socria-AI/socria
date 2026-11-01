@@ -36,3 +36,7 @@ export { displayMeta, offeredKinds } from '@/lib/objects/display-base';
 // a reply still being written, and how the parser reads a list line (vx-render: disclosure, density, streaming)
 export { L5Pending } from '@/components/logos5/L5Message';
 export { listLine, isTableRule, bulletBlock } from '@/lib/rich-text';
+// how a diagram's parts are placed and said (lib/inline-diagram.ts); an element that throws, said in words instead
+export * from '@/lib/inline-diagram';
+export { InlineSafe, InlineFallback } from '@/components/inline/InlineUI';
+export { fmtNum } from '@/lib/objects/display-data';
