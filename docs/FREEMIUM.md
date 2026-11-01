@@ -58,13 +58,24 @@ retried turn, a redrawn map or an artifact saved again costs nothing.
 | Counter | One unit is | Charged at | Marker |
 |---|---|---|---|
 | `chats` | a conversation, when it is started | `app/api/logos/chat` (and the archived `app/api/chat`), after the pre-check, at the charge point | `chatmark:<session>` |
-| `maps` | a conversation's Logic Map, the first time one is drawn | `app/api/logos/map` | `mapmark:<session>` |
+| `maps` | a conversation's Logic Map, the first time it gains a node — by a map pass or by hand | `app/api/logos/map`; `app/api/logos/allowance` (`newMap`) for a map begun by hand | `mapmark:<session>` |
 | `nodes` | a node a map gains | `app/api/logos/map` (`consume`, `upTo`: a pass keeps the nodes there is room for); `app/api/logos/allowance` for nodes added by hand | — |
 | `artifacts` | a workspace object, a built model, or a conversation's first picture | `app/api/logos/map`, and `app/api/conversations` PUT for artifacts made in the browser | `artmark:<session>:obj:<id>` etc. |
 | `documents` | a document whose reading first reaches a conversation, or a write-up filed in Content | `app/api/logos/chat`, `app/api/files/read` | `docmark:<id>` |
 
+Whether a conversation already has its map is the server's to say — its
+`mapmark:` row, or a saved map with nodes (`savedMapHasNodes` in `lib/quota.ts`)
+— never what the browser sends. A free map pass that names no conversation
+has none to already have a map, so each one that leaves a map is counted as a
+new map; and a map the browser owes from an earlier turn is redrawn only for
+Socria One.
+
 At a limit the route answers `402` with `{ error, upgrade: <counter>, used, limit }`,
-before any model call where it can be known in advance. Two exceptions keep the
+before any model call where it can be known in advance. If the free plan cannot
+be counted at all (the `logos_usage` table is missing), its monthly allowances
+answer `503 { error, unavailable: true }` instead of running uncounted — "starting
+new conversations, maps, artifacts and documents is paused", everything already
+made stays open — and Socria One is never paused. Two exceptions keep the
 words coming: a write-up refused for documents is answered in the conversation
 instead (`X-Socria-Limit: documents`), and a map pass that would exceed nodes
 keeps what fits and returns `limit`. Nothing already made is ever removed —
@@ -86,6 +97,15 @@ door a free owner opened before the change stays open.
   `lib/one-prompt.ts`): one trigger per counter (`chats-spent`, `maps-spent`,
   `nodes-spent`, `artifacts-spent`, `documents-spent`) and per feature
   (`voice-locked`, `share-locked`), with a usage meter.
+- Both sheets are drawn in Logos 5's own paper (`components/one/one-sheet.css`):
+  the surface, serif and hairlines of every other sheet, a bottom sheet on a
+  phone, with Socria One's blue kept for the monogram, the One column and the
+  button that buys it. Their buttons are the product's button language
+  (`components/logos5/buttons.css`).
+- **The Logic Map, once the month's maps are used**: a conversation with no map
+  shows what happened and that it carries on ("You’ve used this month’s free
+  Logic Maps."), the date they start again, and "See Socria One" — not a "Map
+  this conversation" button the server would refuse.
 - **The usage panel** in Logos 5 shows each monthly allowance, and a quiet
   near-limit note on the last two of ten or the last one of a small allowance
   (`nearLimit`). Never a countdown.
@@ -98,19 +118,26 @@ door a free owner opened before the change stays open.
 ## Production: the one manual step
 
 Run `supabase/freemium.sql` in the Supabase SQL Editor. It is safe to run more
-than once and changes no row: it adds a non-negative check (`NOT VALID`, so old
-rows are not scanned) and four functions — `consume_logos_usage`,
-`refund_logos_usage`, `claim_logos_unit`, `release_logos_unit`.
+than once and changes no existing row: it creates the `logos_usage` table and
+its index if they are missing (row-level security on, as the service role is
+the only reader), adds a non-negative check (`NOT VALID`, so old rows are not
+scanned), and the counting functions — `bump_logos_usage`,
+`consume_logos_usage`, `refund_logos_usage`, `claim_logos_unit`,
+`release_logos_unit`.
 
 - **Without the functions**, the code still counts through the older
   read-then-bump path and logs a warning once per instance. That is correct
   except when two requests race for the last unit of an allowance.
-- **Without the `logos_usage` table** (`supabase/schema.sql`), no free limit is
-  enforced at all — the long-standing fail-open rule of `lib/usage.ts`, so an
-  outage never blocks a paying user — and that is logged as an error.
+- **Without the `logos_usage` table**, the free plan's monthly allowances pause
+  (`503 unavailable`) rather than run uncounted, and that is logged as an error.
+  This is what let free accounts past their maps and conversations before: the
+  table was missing, and the old rule failed open. Socria One is never paused,
+  and a transient database error still fails open.
 
-Check after deploying: a free test account's eleventh conversation in a month
-should answer 402, and the server log should show no `[quota]` warning.
+Check after deploying: `GET /api/health/upstream` reports
+`usage: { table: true, functions: true }`; a free test account's third Logic Map
+in a month answers 402, as does its eleventh conversation; the server log shows
+no `[quota]` warning.
 
 ## Stripe
 
@@ -132,7 +159,9 @@ should answer 402, and the server log should show no `[quota]` warning.
   request, with everything they made intact. An account that should keep it
   without paying goes in `SOCRIA_ONE_USER_IDS`.
 - **Nodes added by hand** are counted through `POST /api/logos/allowance`
-  before the browser applies them. A conversation saved through
+  before the browser applies them; the first node of a conversation's map claims
+  that conversation's map there too, so a map begun by hand counts like one
+  drawn by Socria. A conversation saved through
   `PUT /api/conversations` re-checks new artifacts on the server, but not new
   nodes: a client that skipped the allowance call could save hand-made nodes
   uncounted. Map passes — where nodes are actually made — are fully held on the

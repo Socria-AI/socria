@@ -2,32 +2,34 @@
 
 // components/OnePrompt.tsx
 //
-// The Socria One invitation plate, at the scale of an interruption.
+// The Socria One prompt: the sheet that opens at one boundary — a spent
+// allowance, Voice, sharing — and answers the only question someone has at
+// that moment: why did that stop, and how do I keep going.
 //
-// It is the /one cover, not a lookalike: the same Prussian-blue plate and
-// inner rule, the same tracked eyebrow, the same italic monogram in its ring,
-// the same serif name with One set italic, the same price with its tracked
-// period, the same standfirst voice, and the same cream pill. Someone who
-// walks into a boundary here and later opens the Socria One page should
-// recognise the second from the first.
+// It is drawn in Logos 5's own paper (components/one/one-sheet.css), the same
+// surface as the plan sheet (SocriaOneModal), with Socria One's blue kept for
+// the monogram, the name and the one button that buys it. It used to be the
+// /one cover's dark Prussian-blue plate at the scale of an interruption, which
+// read as a page dropped over the conversation from somewhere else.
 //
-// What it drops is the ledger of six capabilities. SocriaOneModal keeps that,
-// and it is the right thing when someone has chosen to go and look at One.
-// It is the wrong thing in front of someone who just pressed Explore and
-// found it had stopped: at that moment they have one question — why did that
-// stop, and how do I keep going — and a feature list is not an answer to it.
-// So this says the answer, in the product's best voice, and the foot links to
-// the page that does carry the ledger.
+// What it drops is the comparison table: SocriaOneModal keeps that, for
+// someone who has chosen to go and look at One. In front of someone who just
+// pressed Explore and found it had stopped, a feature list is not an answer.
+// So this says the answer, shows the month's count when it is a count, and the
+// foot links to the page that carries everything.
 //
 // What is deliberately absent: any countdown, any "limited time", any
 // animation beyond the one that gets it on screen without a jump. The price
 // is on the face of it, because hiding it until checkout is its own kind of
-// dark pattern. The dismissal is a real phrase, not a grey ✕ in a corner.
+// dark pattern. The dismissal is a real phrase, not only a grey ✕.
 
-import { useEffect, useRef } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { COUNTER_NOUN, COUNTERS, resetsAt, type Counter } from '@/lib/entitlements';
+import { OneClose } from './SocriaOneModal';
 import type { OnePromptView } from './useOnePrompt';
+import './one/one-sheet.css';
+import './logos5/buttons.css';
 
 /**
  * The allowance a limit prompt is about, as a count — "10 of 10 conversations
@@ -66,6 +68,7 @@ export function OnePrompt({
   /** the month's counts (/api/logos/usage), for a limit prompt's meter */
   usage?: Partial<Record<string, { used: number; limit: number | null }>>;
 }) {
+  const id = useId();
   const goRef = useRef<HTMLButtonElement>(null);
   const open = !!view?.open;
 
@@ -83,87 +86,71 @@ export function OnePrompt({
   }, [open, onDismiss]);
 
   if (!view || !open) return null;
+  const meter = promptMeter(view, usage);
 
   return (
-    <div
-      className="lg-op-scrim"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="lg-op-title"
-      aria-describedby="lg-op-body"
-    >
-      <div className="lg-op-back" onClick={onDismiss} aria-hidden="true" />
-      <div className={`lg-op-sheet is-${view.category}`}>
-        <p className="lg-op-eyebrow">The complete reasoning environment</p>
+    <div className="os-scrim" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-s`}>
+      <div className="os-back" onClick={onDismiss} aria-hidden="true" />
+      <div className={`os-sheet is-${view.category}`}>
+        <span className="os-grab" aria-hidden="true" />
+        <button type="button" className="os-x l5-icon-btn" onClick={onDismiss} aria-label="Close">
+          <OneClose />
+        </button>
 
-        <span className="lg-op-mono" aria-hidden="true">
-          <span>I</span>
-        </span>
-
-        <h2 id="lg-op-title" className="lg-op-title">
-          {view.title}
-        </h2>
-
-        {/* The price sits on the face, where the cover puts it. */}
-        <p className="lg-op-price">
-          <span className="lg-op-amt">
-            {SOCRIA_ONE.currency}
-            {SOCRIA_ONE.price}
+        {/* The price sits on the face, beside the name. */}
+        <p className="os-brand">
+          <span className="os-mono" aria-hidden="true">
+            <span>I</span>
           </span>
-          <span className="lg-op-per">/ {SOCRIA_ONE.period}</span>
+          Socria One
+          <span className="os-price">
+            {SOCRIA_ONE.currency}
+            {SOCRIA_ONE.price} a {SOCRIA_ONE.period}
+          </span>
         </p>
 
-        <p id="lg-op-body" className="lg-op-body">
+        <h2 id={`${id}-t`} className="os-title">
+          {view.title}
+        </h2>
+        <p id={`${id}-s`} className="os-sub">
           {view.body}
         </p>
 
-        {(() => {
-          const m = promptMeter(view, usage);
-          if (!m) return null;
-          return (
-            <div className="lg-op-meter">
-              <span className="lg-op-meter-bar" role="img" aria-label={`${m.used} of ${m.limit} used`}>
-                <i style={{ width: `${Math.round((m.used / m.limit) * 100)}%` }} />
-              </span>
-              <span className="lg-op-meter-l">{m.line}</span>
-            </div>
-          );
-        })()}
+        {meter && (
+          <div className="os-meter">
+            <span className="os-meter-bar" role="img" aria-label={`${meter.used} of ${meter.limit} used`}>
+              <i style={{ width: `${Math.round((meter.used / meter.limit) * 100)}%` }} />
+            </span>
+            <span className="os-meter-l">{meter.line}</span>
+          </div>
+        )}
 
         {error && (
-          <p className="lg-op-err" role="alert">
+          <p className="os-err" role="alert">
             {error}
           </p>
         )}
 
-        <div className="lg-op-actions">
-          <button
-            ref={goRef}
-            type="button"
-            className="lg-op-go"
-            onClick={onAccept}
-            disabled={busy}
-          >
-            {busy ? 'Opening checkout…' : view.primary}
-            {!busy && (
-              <span className="ar" aria-hidden="true">
-                →
-              </span>
+        <div className="os-actions">
+          <button ref={goRef} type="button" className="l5-btn is-primary is-one is-wide" onClick={onAccept} disabled={busy}>
+            {busy ? (
+              'Opening checkout…'
+            ) : (
+              <>
+                {view.primary}
+                <span className="l5-ar" aria-hidden="true">
+                  →
+                </span>
+              </>
             )}
           </button>
-          <button type="button" className="lg-op-not" onClick={onDismiss}>
+          <button type="button" className="l5-btn is-quiet" onClick={onDismiss}>
             {view.secondary}
           </button>
         </div>
 
-        <p className="lg-op-foot">
-          <span>Cancel anytime. Your maps stay yours.</span>
-          <span className="lg-op-dot" aria-hidden="true">
-            ·
-          </span>
-          <a className="lg-op-more" href="/one">
-            everything One opens
-          </a>
+        <p className="os-foot">
+          Cancel anytime. Your maps stay yours. <a href="/one">See everything One opens</a>
         </p>
       </div>
     </div>

@@ -13,14 +13,14 @@
 //               rather than refusing outright — a map pass that would add
 //               five nodes with three left keeps three.
 //
-// THE FALLBACK. The two functions are in supabase/schema.sql and are applied
-// by hand (docs/FREEMIUM.md). Until they are, a deployment still counts —
-// through the older read-then-bump path, which is right except under a race
-// for the last unit — and says so in the log. Only when the usage table
-// itself is missing does a limit go unenforced (as lib/usage.ts has always
-// done: a person who cannot be checked is let through, never blocked by an
-// outage), and that is logged as an error, not a warning, because it means
-// the free plan is not being held.
+// THE FALLBACK. The functions are in supabase/freemium.sql (and schema.sql),
+// applied by hand (docs/FREEMIUM.md). Until they are, a deployment still
+// counts — through the older read-then-bump path, which is right except under
+// a race for the last unit — and says so in the log. When the usage TABLE is
+// missing there is nothing to count against: the free plan's allowances are
+// then paused (QUOTA_UNAVAILABLE, a 503 rather than a paywall), because
+// letting them through is how free accounts drew map after map without being
+// counted. Socria One is never paused by it.
 //
 // WHO IS COUNTED. Free accounts, against PLANS.free. Socria One is counted
 // only where it has a fair-use ceiling (conversations); everything it holds
@@ -28,13 +28,30 @@
 // guests have their own, smaller pass (lib/guest-pass.ts).
 
 import { supabaseAdmin } from './supabase';
-import { limitOf, type Counter, type UnitCounter } from './entitlements';
+import { boundaryNote, limitOf, type Counter, type UnitCounter } from './entitlements';
 import { chatMarkerScope } from './usage-scope';
-import { monthKey, readUsage, bumpUsage } from './usage';
+import { monthKey, pausedForMissingStore, readUsage, bumpUsage } from './usage';
 import type { Plan } from './socria-one';
 
-export type Claim = { ok: true; used: number; limit: number | null; already: boolean } | { ok: false; used: number; limit: number };
-export type Taken = { ok: boolean; granted: number; used: number; limit: number | null };
+export type Claim =
+  | { ok: true; used: number; limit: number | null; already: boolean }
+  | { ok: false; used: number; limit: number; unavailable?: boolean };
+export type Taken = { ok: boolean; granted: number; used: number; limit: number | null; unavailable?: boolean };
+
+/** What the free plan says while its usage table is missing — paused, not spent, and nothing lost. */
+export const QUOTA_UNAVAILABLE =
+  'Your free plan can’t be checked right now, so starting new conversations, maps, artifacts and documents is paused. Everything you already have stays open.';
+
+/**
+ * The answer to a refused allowance: a 402 with the boundary's own words and
+ * the counter the page offers Socria One for — or, when the refusal is the
+ * missing table rather than a spent allowance, a 503 that says so and offers
+ * nothing (nobody should be sold past a fault).
+ */
+export function refusal(counter: Counter, r: { used: number; limit: number | null; unavailable?: boolean }): { status: number; body: Record<string, unknown> } {
+  if (r.unavailable) return { status: 503, body: { error: QUOTA_UNAVAILABLE, unavailable: true } };
+  return { status: 402, body: { error: boundaryNote(counter), upgrade: counter, used: r.used, limit: r.limit } };
+}
 
 /**
  * The marker for one thing. A conversation keeps the marker it has always had
@@ -82,6 +99,7 @@ function counted(plan: Plan, counter: Counter): number | null | undefined {
 export async function claimUnit(userId: string | null, plan: Plan, counter: UnitCounter, key: string, at = Date.now()): Promise<Claim> {
   const limit = counted(plan, counter);
   if (!userId || limit === undefined || !key) return { ok: true, used: 0, limit: limit ?? null, already: false };
+  if (await pausedForMissingStore(plan, counter)) return { ok: false, used: 0, limit: limit as number, unavailable: true };
   const scope = monthKey(at);
   const mark = unitMark(counter, key);
   try {
@@ -93,8 +111,8 @@ export async function claimUnit(userId: string | null, plan: Plan, counter: Unit
     }
     if (!missingFunction(error)) {
       if (missingTable(error)) {
-        warnOnce('table', '[quota] logos_usage is missing — free-plan limits are NOT being enforced (docs/FREEMIUM.md)', true);
-        return { ok: true, used: 0, limit, already: false };
+        warnOnce('table', '[quota] logos_usage is missing — the free plan is paused until supabase/freemium.sql is run (docs/FREEMIUM.md)', true);
+        return plan === 'free' ? { ok: false, used: 0, limit: limit as number, unavailable: true } : { ok: true, used: 0, limit, already: false };
       }
       console.error('[quota] claim:', error.message);
       return { ok: true, used: 0, limit, already: false };
@@ -104,16 +122,16 @@ export async function claimUnit(userId: string | null, plan: Plan, counter: Unit
     console.error('[quota] claim failed:', e instanceof Error ? e.message : 'error');
     return { ok: true, used: 0, limit, already: false };
   }
-  return fallbackClaim(userId, counter, mark, limit as number, at);
+  return fallbackClaim(userId, plan, counter, mark, limit as number, at);
 }
 
 /** The pre-migration path: read the marker, read the count, bump both. Right except under a race for the last unit. */
-async function fallbackClaim(userId: string, counter: UnitCounter, mark: string, limit: number, at: number): Promise<Claim> {
+async function fallbackClaim(userId: string, plan: Plan, counter: UnitCounter, mark: string, limit: number, at: number): Promise<Claim> {
   try {
     const { data, error } = await supabaseAdmin().from('logos_usage').select('n').eq('user_id', userId).eq('scope', mark).eq('counter', counter).maybeSingle();
     if (error && missingTable(error)) {
-      warnOnce('table', '[quota] logos_usage is missing — free-plan limits are NOT being enforced (docs/FREEMIUM.md)', true);
-      return { ok: true, used: 0, limit, already: false };
+      warnOnce('table', '[quota] logos_usage is missing — the free plan is paused until supabase/freemium.sql is run (docs/FREEMIUM.md)', true);
+      return plan === 'free' ? { ok: false, used: 0, limit, unavailable: true } : { ok: true, used: 0, limit, already: false };
     }
     const used = await readUsage(userId, counter);
     if (typeof data?.n === 'number' && data.n > 0) return { ok: true, used, limit, already: true };
@@ -146,6 +164,7 @@ export async function consume(userId: string | null, plan: Plan, counter: Counte
   const limit = counted(plan, counter);
   if (want <= 0) return { ok: true, granted: 0, used: 0, limit: limit ?? null };
   if (!userId || limit === undefined) return { ok: true, granted: want, used: 0, limit: limit ?? null };
+  if (await pausedForMissingStore(plan, counter)) return { ok: false, granted: 0, used: 0, limit, unavailable: true };
   const scope = monthKey(at);
   for (let attempt = 0; attempt < 2; attempt++) {
     const used = await readUsage(userId, counter);
@@ -165,8 +184,8 @@ export async function consume(userId: string | null, plan: Plan, counter: Counte
         return { ok: take === want, granted: take, used: next ?? used + take, limit };
       }
       if (missingTable(error)) {
-        warnOnce('table', '[quota] logos_usage is missing — free-plan limits are NOT being enforced (docs/FREEMIUM.md)', true);
-        return { ok: true, granted: want, used: 0, limit };
+        warnOnce('table', '[quota] logos_usage is missing — the free plan is paused until supabase/freemium.sql is run (docs/FREEMIUM.md)', true);
+        return plan === 'free' ? { ok: false, granted: 0, used: 0, limit, unavailable: true } : { ok: true, granted: want, used: 0, limit };
       }
       console.error('[quota] consume:', error.message);
       return { ok: true, granted: want, used, limit };
@@ -179,9 +198,10 @@ export async function consume(userId: string | null, plan: Plan, counter: Counte
 }
 
 /** What is left of a monthly count right now — for a pass that must stop short BEFORE it runs. */
-export async function left(userId: string | null, plan: Plan, counter: Counter): Promise<{ left: number | null; used: number; limit: number | null }> {
+export async function left(userId: string | null, plan: Plan, counter: Counter): Promise<{ left: number | null; used: number; limit: number | null; unavailable?: boolean }> {
   const limit = counted(plan, counter);
   if (!userId || limit === undefined) return { left: null, used: 0, limit: limit ?? null };
+  if (await pausedForMissingStore(plan, counter)) return { left: 0, used: 0, limit, unavailable: true };
   const used = await readUsage(userId, counter);
   return { left: Math.max(0, (limit as number) - used), used, limit };
 }
@@ -195,5 +215,47 @@ export async function unitClaimed(userId: string | null, counter: UnitCounter, k
     return typeof data?.n === 'number' && data.n > 0;
   } catch {
     return false;
+  }
+}
+
+/**
+ * Whether this conversation was saved with a Logic Map — one drawn before
+ * these limits, or on another device. With unitClaimed, this is how the map
+ * route knows a conversation already HAS its map: from the server's own
+ * record, never from the map a browser says it is holding (a stale map from
+ * the previous conversation, sent in the moment after switching, used to let a
+ * new conversation's map through without counting it).
+ */
+export async function savedMapHasNodes(userId: string | null, sessionId: string): Promise<boolean> {
+  if (!userId || !sessionId) return false;
+  try {
+    const { data, error } = await supabaseAdmin().from('conversations').select('map').eq('id', sessionId).eq('user_id', userId).maybeSingle();
+    if (error || !data) return false;
+    const nodes = (data as { map?: { nodes?: unknown[] } | null }).map?.nodes;
+    return Array.isArray(nodes) && nodes.length > 0;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Whether this deployment can count the free plan at all — for
+ * /api/health/upstream, so "are the limits on here?" has an answer you can
+ * open in a browser. `table`: logos_usage answers. `functions`: the atomic
+ * functions from supabase/freemium.sql are installed (asked with calls that
+ * change nothing: taking zero units, and releasing a claim nobody made).
+ */
+export async function usageStoreHealth(): Promise<{ table: boolean; functions: boolean; detail?: string }> {
+  try {
+    const db = supabaseAdmin();
+    const t = await db.from('logos_usage').select('n').limit(1);
+    if (t.error) return { table: false, functions: false, detail: String(t.error.message ?? '').slice(0, 160) };
+    const at = Date.now();
+    const c = await db.rpc('consume_logos_usage', { p_user: '__health__', p_scope: '__health__', p_counter: 'chats', p_by: 0, p_limit: 0, p_at: at });
+    const r = await db.rpc('release_logos_unit', { p_user: '__health__', p_mark: '__health__', p_scope: '__health__', p_counter: 'chats', p_at: at });
+    const functions = !c.error && !r.error;
+    return { table: true, functions, ...(functions ? {} : { detail: String((c.error ?? r.error)?.message ?? '').slice(0, 160) }) };
+  } catch (e) {
+    return { table: false, functions: false, detail: e instanceof Error ? e.message.slice(0, 160) : 'error' };
   }
 }

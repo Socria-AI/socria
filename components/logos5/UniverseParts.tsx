@@ -16,6 +16,8 @@ import { COLOR_BY, LABELS, SIZE_BY, type Arrangement, type ColorBy, type Display
 import { useVoiceInput } from '@/components/useVoiceInput';
 import { HoldMic, type Hold } from '@/components/LogosComposer';
 import { clock, insertSpoken } from '@/lib/logos4/voice';
+import { MathText } from '@/components/TeX';
+import './buttons.css';
 
 /** A colour key as the theme draws it. */
 export const colorVar = (key: string | null | undefined) => (key ? `var(--sc-${key})` : 'var(--sc-none)');
@@ -65,6 +67,29 @@ export function StarMark({ on = true }: { on?: boolean }) {
   return (
     <svg className="l5h-star" viewBox="0 0 24 24" width="13" height="13" fill={on ? 'currentColor' : 'none'} stroke="currentColor" strokeWidth="1.6" strokeLinejoin="round" aria-hidden="true">
       <path d={STAR} />
+    </svg>
+  );
+}
+
+// ── the card's action glyphs: one stroke weight, 24-unit grid ─────────
+const ACT_ICON = {
+  move: 'M3.5 7.5a2 2 0 012-2h4l2 2h7a2 2 0 012 2v7.5a2 2 0 01-2 2h-13a2 2 0 01-2-2zM12 11v5M9.5 13.5h5',
+  more: 'M5.5 12h.01M12 12h.01M18.5 12h.01',
+  link: 'M10 14a4 4 0 005.66 0l3-3a4 4 0 00-5.66-5.66l-1 1M14 10a4 4 0 00-5.66 0l-3 3a4 4 0 005.66 5.66l1-1',
+  week: 'M4.5 6.5h15v13h-15zM4.5 10.5h15M8.5 4v4M15.5 4v4',
+  time: 'M12 7v5l3 2M20 12a8 8 0 11-16 0 8 8 0 0116 0z',
+  back: 'M9 7L4.5 11.5 9 16M5 11.5h9.5a5 5 0 010 10H12',
+  subject: 'M4 12.5l7.5-7.5h7v7L11 19.5zM15 8.5h.01',
+  rename: 'M5 19l4-1L19 8l-3-3L6 15zM14 7l3 3',
+  hide: 'M3.5 12s3-6 8.5-6 8.5 6 8.5 6-3 6-8.5 6-8.5-6-8.5-6zM12 14.5a2.5 2.5 0 100-5 2.5 2.5 0 000 5zM4.5 4.5l15 15',
+  delete: 'M5 7h14M10 7V5h4v2M7 7l1 12h8l1-12M10.5 10.5v6M13.5 10.5v6',
+  close: 'M6.5 6.5l11 11M17.5 6.5l-11 11',
+} as const;
+
+export function ActIcon({ name }: { name: keyof typeof ACT_ICON }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={name === 'more' ? 3 : 1.7} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d={ACT_ICON[name]} />
     </svg>
   );
 }
@@ -140,6 +165,12 @@ export function PreviewCard({
   const [naming, setNaming] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [deleting, setDeleting] = useState(false);
+  const [more, setMore] = useState(false);
+  const moreRef = useRef<HTMLDivElement>(null);
+  // the card can sit low on the map: what More opened is brought into view, not left under the fold
+  useEffect(() => {
+    if (more) moreRef.current?.scrollIntoView?.({ block: 'nearest', behavior: 'smooth' });
+  }, [more]);
   const chat = tile.kind === 'core';
   return (
     <aside className={`l5h-pv${sheet ? ' is-sheet' : ''}`} style={style} role="dialog" aria-label={tile.title} onPointerDown={(e) => e.stopPropagation()}>
@@ -149,12 +180,17 @@ export function PreviewCard({
           <span>{kindLine(tile)}</span>
           {home && <span className="l5h-pv-g">· {home.name}</span>}
         </span>
-        <button type="button" className="l5h-x" aria-label="Close" onClick={acts.onClose}>
-          ×
+        <button type="button" className="l5-icon-btn is-sm l5h-pv-x" aria-label="Close" onClick={acts.onClose}>
+          <ActIcon name="close" />
         </button>
       </div>
       <h3 className="l5h-pv-t">{tile.title}</h3>
-      {tile.stands && <p className="l5h-pv-s">{tile.stands}</p>}
+      {/* where it stands is a line a reply said, so its mathematics is drawn, not shown as \( … \) */}
+      {tile.stands && (
+        <p className="l5h-pv-s">
+          <MathText>{tile.stands}</MathText>
+        </p>
+      )}
       {tile.made > 0 && (
         <p className="l5h-pv-made">
           <MadeMark n={tile.made} /> {tile.made === 1 ? 'Something was made in it — a chart, a plan or practice.' : `${tile.made} things were made in it — charts, plans or practice.`}
@@ -167,7 +203,7 @@ export function PreviewCard({
       )}
       {suggested && acts.onFileHere && (
         <p className="l5h-pv-sugg">
-          It is about {suggested}, but not filed in it.{' '}
+          It is about <b className="l5h-pv-name">{suggested}</b>, but not filed there.{' '}
           <button type="button" className="l5h-link" onClick={acts.onFileHere}>
             File it there
           </button>
@@ -198,55 +234,82 @@ export function PreviewCard({
           ))}
         </p>
       )}
+      {/* The one way on, the two things done most, and the rest under More —
+          ten pills in a wrapping row read as a toolbar nobody could scan. */}
       <div className="l5h-pv-acts">
-        <button type="button" className="l5h-go" onClick={acts.onOpen}>
-          {chat ? 'Open' : tile.open ? 'Answer it' : 'Continue'} <span aria-hidden="true">→</span>
+        <button type="button" className="l5-btn is-primary" onClick={acts.onOpen}>
+          {chat ? 'Open' : tile.open ? 'Answer it' : 'Continue'} <span className="l5-ar" aria-hidden="true">→</span>
         </button>
-        <button type="button" className={`l5h-btn${starred ? ' is-on' : ''}`} aria-pressed={starred} onClick={acts.onStar}>
+        <button type="button" className={`l5-btn${starred ? ' is-on' : ''}`} aria-pressed={starred} onClick={acts.onStar}>
           <StarMark on={starred} /> {starred ? 'Starred' : 'Star'}
         </button>
         {acts.onMove && (
-          <button type="button" className={`l5h-btn${moving ? ' is-on' : ''}`} aria-expanded={moving} onClick={() => setMoving((v) => !v)}>
-            Move to…
+          <button type="button" className={`l5-btn${moving ? ' is-on' : ''}`} aria-expanded={moving} onClick={() => (setMoving((v) => !v), setMore(false))}>
+            <ActIcon name="move" /> Move to…
           </button>
         )}
+        <button
+          type="button"
+          className={`l5-icon-btn is-framed l5h-pv-more${more ? ' is-on' : ''}`}
+          aria-label="More"
+          title="More"
+          aria-haspopup="menu"
+          aria-expanded={more}
+          onClick={() => (setMore((v) => !v), setMoving(false))}
+        >
+          <ActIcon name="more" />
+        </button>
+      </div>
+      {/* in the markup always, shown when More is pressed: what it holds can be found by a search of the page */}
+      <div ref={moreRef} className="l5-menu l5h-pv-menu" role="menu" aria-label={`More for ${tile.title}`} hidden={!more} onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setMore(false))}>
         {acts.onLink && (
-          <button type="button" className="l5h-btn" onClick={acts.onLink}>
+          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onLink!())}>
+            <ActIcon name="link" />
             Link to…
           </button>
         )}
         {acts.onWeek && (
-          <button type="button" className="l5h-btn" onClick={acts.onWeek}>
+          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onWeek!())}>
+            <ActIcon name="week" />
             See that week as a map
           </button>
         )}
         {acts.onTime && (
-          <button type="button" className="l5h-btn" onClick={acts.onTime} title="All time, at the day it began">
+          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onTime!())} title="All time, at the day it began">
+            <ActIcon name="time" />
             Find it in time
           </button>
         )}
         {pinned && acts.onUnpin && (
-          <button type="button" className="l5h-btn" onClick={acts.onUnpin}>
+          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onUnpin!())}>
+            <ActIcon name="back" />
             Back in order
           </button>
         )}
         {acts.onUnsubject && (
-          <button type="button" className="l5h-btn" onClick={acts.onUnsubject} title="You put it in this subject; this puts it back where it was read as belonging">
+          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onUnsubject!())} title="You put it in this subject; this puts it back where it was read as belonging">
+            <ActIcon name="subject" />
             Its own subject
           </button>
         )}
         {acts.onRename && (
-          <button type="button" className={`l5h-btn${renaming !== null ? ' is-on' : ''}`} aria-expanded={renaming !== null} onClick={() => (setRenaming((v) => (v === null ? tile.title : null)), setDeleting(false))}>
+          <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), setRenaming(tile.title), setDeleting(false))}>
+            <ActIcon name="rename" />
             Rename
           </button>
         )}
-        <button type="button" className="l5h-btn is-quiet" onClick={acts.onHide}>
+        <button type="button" role="menuitem" className="l5-mi" onClick={() => (setMore(false), acts.onHide())}>
+          <ActIcon name="hide" />
           Hide
         </button>
         {acts.onDelete && (
-          <button type="button" className={`l5h-btn is-quiet${deleting ? ' is-on' : ''}`} aria-expanded={deleting} onClick={() => (setDeleting((v) => !v), setRenaming(null))}>
-            Delete
-          </button>
+          <>
+            <span className="l5-menu-sep" role="separator" />
+            <button type="button" role="menuitem" className="l5-mi is-danger" onClick={() => (setMore(false), setDeleting(true), setRenaming(null))}>
+              <ActIcon name="delete" />
+              Delete
+            </button>
+          </>
         )}
       </div>
       {renaming !== null && acts.onRename && (
@@ -267,7 +330,7 @@ export function PreviewCard({
             onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setRenaming(null))}
             style={{ fontSize: 16 }}
           />
-          <button type="submit" className="l5h-btn" disabled={!renaming.trim()}>
+          <button type="submit" className="l5-btn is-sm" disabled={!renaming.trim()}>
             Save
           </button>
         </form>
@@ -276,10 +339,10 @@ export function PreviewCard({
         <div className="l5h-pv-confirm" role="group" aria-label={`Delete ${tile.title}`}>
           <p>Delete it? Its messages, its map and anything written or made in it go with it, and it cannot be brought back.</p>
           <div className="l5h-pv-acts">
-            <button type="button" className="l5h-btn is-danger" onClick={acts.onDelete}>
-              Delete it
+            <button type="button" className="l5-btn is-sm is-danger is-solid" onClick={acts.onDelete}>
+              <ActIcon name="delete" /> Delete it
             </button>
-            <button type="button" className="l5h-btn" autoFocus onClick={() => setDeleting(false)}>
+            <button type="button" className="l5-btn is-sm" autoFocus onClick={() => setDeleting(false)}>
               Keep it
             </button>
           </div>
@@ -313,7 +376,7 @@ export function PreviewCard({
                 }}
               >
                 <input autoFocus value={naming} maxLength={80} placeholder="Name the Project" aria-label="Name the new Project" onChange={(e) => setNaming(e.target.value)} style={{ fontSize: 16 }} />
-                <button type="submit" className="l5h-btn" disabled={!naming.trim()}>
+                <button type="submit" className="l5-btn is-sm" disabled={!naming.trim()}>
                   Make it
                 </button>
               </form>

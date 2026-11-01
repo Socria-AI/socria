@@ -14,6 +14,7 @@
 // builds or is refused with what is missing named in the person's terms.
 
 import { NextRequest, NextResponse } from 'next/server';
+import { randomUUID } from 'node:crypto';
 import { contentAsText } from '@/lib/inline-ui';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
@@ -53,7 +54,7 @@ import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
-import { claimUnit, consume, left, unitClaimed } from '@/lib/quota';
+import { claimUnit, consume, left, QUOTA_UNAVAILABLE, refusal, savedMapHasNodes, unitClaimed } from '@/lib/quota';
 import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -169,14 +170,29 @@ export async function POST(req: NextRequest) {
   // month's nodes are spent. Signed out is a guest's one map, not counted here.
   const sessionKey = typeof body?.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim().slice(0, 80) : '';
   const metered = !!userId && plan === 'free';
-  const hadMap = current.nodes.length > 0;
+  // WHETHER THIS CONVERSATION ALREADY HAS ITS MAP is the server's to say, never
+  // the browser's: the map it sends can be the previous conversation's (sent in
+  // the moment after switching) or anything else, and trusting it let a new
+  // conversation's map through without being counted. A conversation has its
+  // map when its map was claimed (this month or before) or when it was saved
+  // with one — drawn before these limits, or on another device.
+  //
+  // A pass that names no conversation has no conversation to have a map
+  // already: each one that leaves a map is a new map, under a mark of its own,
+  // so leaving the id out can never ride on a map that was counted elsewhere
+  // (the page always sends it; this is for anything else that calls).
+  let hadMap = current.nodes.length > 0;
+  const mapMark = sessionKey || `pass:${randomUUID()}`;
+  if (metered) hadMap = sessionKey ? (await unitClaimed(userId, 'maps', sessionKey)) || (await savedMapHasNodes(userId, sessionKey)) : false;
   if (metered && !hadMap) {
-    const claimed = await unitClaimed(userId, 'maps', sessionKey);
-    const maps = claimed ? null : await left(userId, plan, 'maps');
-    const nodes = await left(userId, plan, 'nodes');
-    const refused: { counter: Counter; used: number; limit: number | null } | null =
-      maps && maps.left === 0 ? { counter: 'maps', used: maps.used, limit: maps.limit } : nodes.left === 0 ? { counter: 'nodes', used: nodes.used, limit: nodes.limit } : null;
-    if (refused) return NextResponse.json({ map: current, error: boundaryNote(refused.counter), upgrade: refused.counter, used: refused.used, limit: refused.limit }, { status: 402 });
+    const maps = await left(userId, plan, 'maps');
+    const nodes = maps.left === 0 ? null : await left(userId, plan, 'nodes');
+    const refused: { counter: Counter; used: number; limit: number | null; unavailable?: boolean } | null =
+      maps.left === 0 ? { counter: 'maps', ...maps } : nodes && nodes.left === 0 ? { counter: 'nodes', ...nodes } : null;
+    if (refused) {
+      const r = refusal(refused.counter, refused);
+      return NextResponse.json({ map: current, ...r.body }, { status: r.status });
+    }
   }
 
   /**
@@ -195,12 +211,22 @@ export async function POST(req: NextRequest) {
     let map = out;
     let reached: { counter: Counter; used: number; limit: number | null } | null = null;
     const added = addedNodes(current, map);
-    if (added.length) {
-      if (!hadMap) {
-        const claim = await claimUnit(userId, plan, 'maps', sessionKey || `map:${added[0]}`);
-        if (!claim.ok) return NextResponse.json({ map: current, error: boundaryNote('maps'), upgrade: 'maps', used: claim.used, limit: claim.limit }, { status: 402 });
+    // A first map is claimed whenever the pass leaves this conversation with a
+    // map at all — not only when it added nodes, so a browser that sent a map
+    // of its own cannot carry one in uncounted.
+    if (!hadMap && map.nodes.length > 0) {
+      const claim = await claimUnit(userId, plan, 'maps', mapMark);
+      if (!claim.ok) {
+        const r = refusal('maps', claim);
+        return NextResponse.json({ map: current, ...r.body }, { status: r.status });
       }
+    }
+    if (added.length) {
       const took = await consume(userId, plan, 'nodes', added.length, { upTo: true });
+      if (took.unavailable) {
+        const r = refusal('nodes', took);
+        return NextResponse.json({ map: current, ...r.body }, { status: r.status });
+      }
       if (took.granted < added.length) {
         map = keepAddedNodes(map, current, took.granted).map;
         reached = { counter: 'nodes', used: took.used, limit: took.limit };
@@ -209,10 +235,14 @@ export async function POST(req: NextRequest) {
     const made = madeArtifacts(current, map);
     if (madeAny(made)) {
       const refused: Made = { objects: [], models: [], picture: false };
-      const key = (what: string) => `${sessionKey || 'map'}:${what}`;
+      const key = (what: string) => `${mapMark}:${what}`;
+      let paused = false;
       const take = async (what: string) => {
         const c = await claimUnit(userId, plan, 'artifacts', key(what));
-        if (!c.ok) reached = { counter: 'artifacts', used: c.used, limit: c.limit };
+        if (!c.ok) {
+          if (c.unavailable) paused = true;
+          else reached = { counter: 'artifacts', used: c.used, limit: c.limit };
+        }
         return c.ok;
       };
       for (const id of made.objects) if (!(await take(`obj:${id}`))) refused.objects.push(id);
@@ -220,7 +250,7 @@ export async function POST(req: NextRequest) {
       if (made.picture && !(await take('picture'))) refused.picture = true;
       if (madeAny(refused)) {
         map = withoutArtifacts(map, current, refused);
-        const said = { ok: false, failure: 'limit', says: boundaryNote('artifacts') };
+        const said = { ok: false, failure: 'limit', says: paused ? QUOTA_UNAVAILABLE : boundaryNote('artifacts') };
         const display = extras.display as { id?: string } | null | undefined;
         if (display && (!display.id || refused.objects.includes(display.id))) extras = { ...extras, display: said };
         if (extras.build && refused.models.length) extras = { ...extras, build: said };

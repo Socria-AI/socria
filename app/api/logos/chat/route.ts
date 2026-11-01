@@ -35,7 +35,7 @@ import { reportUpstream } from '@/lib/upstream-error';
 import { sanitizeViz, sceneBlock } from '@/lib/logos-viz';
 import { sanitizeModelState, vizModelBlock } from '@/lib/viz-model';
 import { bumpUsage, chatAlreadyCounted, checkAllowance } from '@/lib/usage';
-import { claimUnit } from '@/lib/quota';
+import { claimUnit, refusal } from '@/lib/quota';
 import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { planTurn, checkDraft, correctionFor, repairDraft } from '@/lib/accuracy/accuracy';
@@ -404,7 +404,8 @@ export async function POST(req: NextRequest) {
       for (const id of docsSent.keys()) {
         const claim = await claimUnit(userId, plan, 'documents', id);
         if (!claim.ok) {
-          return NextResponse.json({ error: boundaryNote('documents'), upgrade: 'documents', used: claim.used, limit: claim.limit }, { status: 402 });
+          const r = refusal('documents', claim);
+          return NextResponse.json(r.body, { status: r.status });
         }
       }
     }
@@ -480,15 +481,8 @@ export async function POST(req: NextRequest) {
             'unavailable' as const
           );
         }
-        return NextResponse.json(
-          {
-            error: boundaryNote('chats'),
-            upgrade: 'chats',
-            used: allowance.used,
-            limit: allowance.limit,
-          },
-          { status: 402 }
-        );
+        const r = refusal('chats', allowance);
+        return NextResponse.json(r.body, { status: r.status });
       }
     }
 
@@ -941,10 +935,10 @@ export async function POST(req: NextRequest) {
     // for this turn before it is written. With the month's documents spent it
     // is answered in the conversation instead, and the page is told why
     // (X-Socria-Limit) — the words still come; the document does not.
-    let writeUpRefused: { used: number; limit: number } | null = null;
+    let writeUpRefused: { used: number; limit: number; unavailable?: boolean } | null = null;
     if (planned.place === 'content' && userId && !sharedCtx.guest) {
       const claim = await claimUnit(userId, plan, 'documents', `${sessionId ?? 'chat'}:writeup:${userTurns}`);
-      if (!claim.ok) writeUpRefused = { used: claim.used, limit: claim.limit };
+      if (!claim.ok) writeUpRefused = { used: claim.used, limit: claim.limit, ...(claim.unavailable ? { unavailable: true } : {}) };
     }
     const placed = writeUpRefused ? { ...planned, place: undefined, reasons: [...planned.reasons, 'documents-spent'] } : planned;
     const presentation = inlineOn ? placed : { ...placed, forms: [] };
@@ -1506,7 +1500,7 @@ export async function POST(req: NextRequest) {
         // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
         'X-Socria-Assist': assistTrace(assist),
         // a write-up they asked for, answered here because the month's documents are spent (above)
-        ...(writeUpRefused ? { 'X-Socria-Limit': 'documents', 'X-Socria-Limit-Used': String(writeUpRefused.used), 'X-Socria-Limit-Of': String(writeUpRefused.limit) } : {}),
+        ...(writeUpRefused && !writeUpRefused.unavailable ? { 'X-Socria-Limit': 'documents', 'X-Socria-Limit-Used': String(writeUpRefused.used), 'X-Socria-Limit-Of': String(writeUpRefused.limit) } : {}),
         // Metacognitive Regulation's decision this turn: content-free codes (lib/mr/index.ts traceOf)
         ...(mrRun ? { 'X-Socria-MR': mrRun.trace } : {}),
         // the runtime's reading of the turn: content-free, for the client and the evals

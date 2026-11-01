@@ -8,15 +8,20 @@
 // account to count against (a guest's one map is local), so it is refused like
 // every account route.
 //
-//   { counter: 'nodes', n?: number }  →  200 { ok: true, used, limit }
-//                                      →  402 { error, upgrade: 'nodes', used, limit }
+// A map BEGUN by hand — the first cards of a conversation with no map yet —
+// is one of the month's Logic Maps as well, claimed for that conversation
+// before its nodes are taken (the server decides whether the conversation
+// already has a map, exactly as the map route does).
+//
+//   { counter: 'nodes', n?, sessionId?, newMap? }  →  200 { ok: true, used, limit }
+//                                                  →  402 { error, upgrade: 'maps' | 'nodes', used, limit }
+//                                                  →  503 { error, unavailable: true } (usage table missing)
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { boundaryNote } from '@/lib/entitlements';
-import { consume } from '@/lib/quota';
+import { claimUnit, consume, refusal, savedMapHasNodes, unitClaimed } from '@/lib/quota';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -30,7 +35,21 @@ export async function POST(req: NextRequest) {
   if (body?.counter !== 'nodes') return NextResponse.json({ error: 'Nothing to count.' }, { status: 400 });
   const n = Number.isInteger(body?.n) && body.n > 0 && body.n <= 20 ? (body.n as number) : 1;
   const plan = await resolvePlanForRequest(req, userId);
+  const sessionId = typeof body?.sessionId === 'string' && body.sessionId.trim() ? body.sessionId.trim().slice(0, 80) : '';
+  if (plan === 'free' && body?.newMap === true && sessionId) {
+    const hadMap = (await unitClaimed(userId, 'maps', sessionId)) || (await savedMapHasNodes(userId, sessionId));
+    if (!hadMap) {
+      const claim = await claimUnit(userId, plan, 'maps', sessionId);
+      if (!claim.ok) {
+        const r = refusal('maps', claim);
+        return NextResponse.json(r.body, { status: r.status });
+      }
+    }
+  }
   const took = await consume(userId, plan, 'nodes', n);
-  if (!took.ok) return NextResponse.json({ error: boundaryNote('nodes'), upgrade: 'nodes', used: took.used, limit: took.limit }, { status: 402 });
+  if (!took.ok) {
+    const r = refusal('nodes', took);
+    return NextResponse.json(r.body, { status: r.status });
+  }
   return NextResponse.json({ ok: true, used: took.used, limit: took.limit });
 }

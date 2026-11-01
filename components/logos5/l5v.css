@@ -45,26 +45,59 @@
   justify-content: center;
   min-width: 0;
 }
+/* The way back and Split View are the bar's keys (buttons.css, the small
+   secondary): card stock, a hairline edge and a one-pixel ledge; pointed at,
+   the edge darkens and the face takes a breath of the primary; pressed, down a
+   pixel with the ledge gone. */
 .l5v-home {
   display: inline-flex;
   align-items: center;
   gap: 4px;
   height: 32px;
-  padding: 0 10px 0 6px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 9px;
-  background: var(--l5-surface);
-  color: var(--lg-ink);
+  padding: 0 11px 0 7px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-weight: 500;
-  font-size: 13.5px;
+  font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.l5v-home svg,
+.l5v-btn svg {
+  flex: none;
+  color: var(--l5b-ink-2);
+  transition: color 0.15s;
 }
 .l5v-home:hover,
-.l5v-btn:hover,
+.l5v-btn:hover:not(:disabled) {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.l5v-home:hover svg,
+.l5v-btn:hover:not(:disabled) svg {
+  color: var(--l5b-ink);
+}
+.l5v-home:active,
+.l5v-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
 .l5v-icon:hover {
-  background: rgba(var(--l5-tint-rgb), 0.07);
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+.l5v-icon:active {
+  transform: translateY(1px);
+}
+:is(.l5v-home, .l5v-btn, .l5v-icon):focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .l5v-title {
   margin: 0 0 0 6px;
@@ -75,6 +108,7 @@
   overflow: hidden;
   text-overflow: ellipsis;
 }
+/* a glyph beside the title (a new line of thinking, closing what is beside): buttons.css's small icon square */
 .l5v-icon {
   display: inline-grid;
   place-items: center;
@@ -84,8 +118,10 @@
   border: 0;
   border-radius: 8px;
   background: transparent;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--l5b-ink-2);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, transform 0.12s;
 }
 .l5v-search {
   display: flex;
@@ -125,22 +161,32 @@
 .l5v-btn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
   height: 32px;
-  padding: 0 10px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 9px;
-  background: var(--l5-surface);
-  color: var(--lg-ink);
+  padding: 0 11px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-weight: 500;
-  font-size: 13.5px;
+  font-size: 13px;
   white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
 }
-.l5v-btn.is-on {
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
+/* something open beside, or its menu open: pressed in, in the primary */
+.l5v-btn:is(.is-on, [aria-expanded='true']) {
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
+}
+.l5v-btn:is(.is-on, [aria-expanded='true']) svg {
+  color: var(--l5b-fill);
 }
 .l5v-link {
   border: 0;
@@ -916,18 +962,40 @@
   min-height: 0;
 }
 
+/* the one way on (buttons.css .is-primary): filled in the primary ink, lit from above, a darker lip */
 .l5v-btn.is-primary {
-  border-color: var(--lg-primary);
-  background: var(--lg-primary);
-  color: #fff;
+  border-color: color-mix(in srgb, var(--l5b-fill) 78%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
+    0 8px 18px -12px rgba(var(--l5b-fill-rgb), 0.9);
+  color: var(--l5b-on-fill);
+  font-weight: 600;
 }
-.l5v-btn.is-primary:hover {
-  background: var(--lg-primary);
-  filter: brightness(1.06);
+.l5v-btn.is-primary svg {
+  color: currentColor;
+}
+.l5v-btn.is-primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
+  transform: translateY(-1px);
+}
+.l5v-btn.is-primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
 }
 .l5v-btn:disabled {
-  opacity: 0.55;
+  opacity: 0.45;
   cursor: default;
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.l5v-home, .l5v-btn, .l5v-icon) {
+    transition: none;
+  }
+  :is(.l5v-home, .l5v-btn, .l5v-icon):is(:hover, :active) {
+    transform: none !important;
+  }
 }
 .l5v-link.is-quiet {
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
@@ -1052,24 +1120,44 @@
   flex: 1 1 auto;
   min-width: 0;
 }
-.l5-clip {
+/* a glyph in the words' own line (buttons.css .l5-icon-btn): a square that
+   takes a wash when pointed at — scoped as the shared .lg-attach is, so it is
+   this rule, and not that round one, that draws it */
+.logos-root .l5-clip {
   flex: 0 0 auto;
-  width: 34px;
-  height: 34px;
+  width: 32px;
+  height: 32px;
   margin: 0 0 2px 2px;
   border: 0;
-  border-radius: 50%;
+  border-radius: var(--l5b-r-sm);
   background: none;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--l5b-ink-2);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, transform 0.12s;
 }
 .l5-clip svg {
   width: 18px;
   height: 18px;
 }
-.l5-clip:hover:not(:disabled) {
-  background: rgba(var(--l5-tint-rgb), 0.08);
-  color: var(--lg-ink);
+.logos-root .l5-clip:hover:not(:disabled) {
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+.logos-root .l5-clip:active:not(:disabled) {
+  transform: translateY(1px);
+}
+.logos-root .l5-clip:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5-clip {
+    transition: none;
+  }
+  .logos-root .l5-clip:active:not(:disabled) {
+    transform: none;
+  }
 }
 .lg-send.is-waiting {
   display: inline-grid;
@@ -1410,7 +1498,13 @@
     height: 44px;
     padding: 0;
     justify-content: center;
-    border-radius: 12px;
+    border-radius: var(--l5b-r);
+  }
+  /* More, beside it on the other side: the same key */
+  .logos-root .l5v-top-r > .l5-menuhost > .l5-iconbtn {
+    width: 44px;
+    height: 44px;
+    border-radius: var(--l5b-r);
   }
   .l5v-title {
     font-size: 15px;

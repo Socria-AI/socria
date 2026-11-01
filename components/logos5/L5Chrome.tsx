@@ -57,8 +57,10 @@ export function L5Menu({
       window.removeEventListener('keydown', key);
     };
   }, [open]);
+  // l5-menuhost, not l5-menu: that is the panel a More opens (buttons.css), and
+  // on this wrapper it drew the button inside a 220px card
   return (
-    <div ref={root} className={`l5-menu ${className}`}>
+    <div ref={root} className={`l5-menuhost ${className}`}>
       <button type="button" className="l5-iconbtn" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((v) => !v)}>
         {button}
       </button>

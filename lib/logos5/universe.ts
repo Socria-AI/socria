@@ -179,10 +179,38 @@ function sentencesOf(text: string): string[] {
   return (plain(text).match(/[^.!?…]+(?:[.!?…]+|$)/g) ?? []).map((x) => x.trim()).filter(Boolean);
 }
 
-/** The first thing a text says that is not a question, in a line. */
+/** A span of mathematics as a reply writes it: \( … \), \[ … \], $$ … $$ or $ … $. */
+const MATH_SPAN = /\\\([\s\S]*?\\\)|\\\[[\s\S]*?\\\]|\$\$[\s\S]*?\$\$|\$[^$\n]+\$/g;
+const HELD = /\u0001(\d+)\u0002/g;
+
+/**
+ * The first thing a text says that is not a question, in a line.
+ *
+ * Its mathematics is held aside while the sentence is found and clipped: a
+ * period inside \( 1.5 \) is not the end of a sentence, plain() would take
+ * the _ out of x_1, and a clip through the middle of an expression left the
+ * card showing "\( f(x) = x^3" with no end — so the card that draws it
+ * (MathText) had nothing it could draw.
+ */
 export function firstSaid(text: string, max = 120): string {
-  const s = sentencesOf(text).find((x) => !x.endsWith('?') && x.length > 3);
-  return s ? clip(s, max) : '';
+  const held: string[] = [];
+  const masked = text.replace(MATH_SPAN, (m) => `\u0001${held.push(m) - 1}\u0002`);
+  const s = sentencesOf(masked).find((x) => !x.endsWith('?') && x.length > 3);
+  if (!s) return '';
+  const whole = s.replace(HELD, (_, i) => held[Number(i)] ?? '');
+  if (whole.length <= max) return whole;
+  // clip by what is read, never inside an expression
+  let out = '';
+  let last = 0;
+  for (const m of s.matchAll(HELD)) {
+    const before = s.slice(last, m.index);
+    const expr = held[Number(m[1])] ?? '';
+    if (out.length + before.length > max - 1) return clip(out + before, max);
+    if (out.length + before.length + expr.length > max - 1) return (out + before).trimEnd() + '…';
+    out += before + expr;
+    last = (m.index ?? 0) + m[0].length;
+  }
+  return clip(out + s.slice(last), max);
 }
 
 /** The question a text ends on, if it ends on one. */

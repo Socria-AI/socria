@@ -25,7 +25,7 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { extractFile, type ExtractResult } from '@/lib/file-extract';
 import { DIRECT_UPLOAD_BYTES, boundaryNote, limitsFor, megabytes } from '@/lib/entitlements';
-import { left } from '@/lib/quota';
+import { left, refusal } from '@/lib/quota';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { ownsUploadPath } from '@/lib/upload-paths';
 import { readUpload, removeUpload } from '@/lib/upload-store';
@@ -77,7 +77,10 @@ export async function POST(req: NextRequest) {
   // of reading it, once the month's is spent.
   if (userId) {
     const docs = await left(userId, await resolvePlanForRequest(req, userId), 'documents');
-    if (docs.left === 0) return NextResponse.json({ error: boundaryNote('documents'), upgrade: 'documents', used: docs.used, limit: docs.limit }, { status: 402 });
+    if (docs.left === 0) {
+      const r = refusal('documents', docs);
+      return NextResponse.json(r.body, { status: r.status });
+    }
   }
 
   // A LARGE FILE, ALREADY IN STORAGE: read it from there, and delete it whatever happens.

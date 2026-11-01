@@ -1,10 +1,11 @@
 'use client';
 
-// The Socria One screen, styled after the design project's invitation spread:
-// a Prussian-blue plate with an inner rule, the italic "I" monogram in its
-// ring, serif headline, six capabilities with hand-drawn glyphs, and a cream
-// call-to-action. Logos keeps its greens; this is the one place it reaches
-// for blue.
+// The Socria One plan sheet: what each plan holds, side by side, and one way
+// to upgrade. It is drawn in Logos 5's own paper (components/one/one-sheet.css)
+// — the surface, ink, serif and hairlines of every other sheet in here — with
+// Socria One's blue kept for what it means: the monogram, the name, the One
+// column and the button that buys it. It used to be the /one cover's dark plate
+// set over the conversation, which read as a page from somewhere else.
 //
 // What someone decides here is whether Socria is worth $15 a month to them, so
 // the sheet says plainly what each plan holds — the free plan's allowances
@@ -13,9 +14,28 @@
 // on free. (The access-code field that lived at the bottom is gone with the
 // codes: Socria One is paid for or it is not held, October 31, 2026.)
 
-import { useEffect } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { comparisonRows, LIMIT_HEADLINE } from '@/lib/entitlements';
+import './one/one-sheet.css';
+import './logos5/buttons.css';
+
+/** The ✓ in the One column: drawn, so it is the same weight in every font. */
+export function OneCheck() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M3.2 8.4l3 3 6.6-6.8" />
+    </svg>
+  );
+}
+
+export function OneClose() {
+  return (
+    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+      <path d="M4 4l8 8M12 4l-8 8" />
+    </svg>
+  );
+}
 
 export function SocriaOneModal({
   open,
@@ -39,10 +59,15 @@ export function SocriaOneModal({
   /** checkout could not be reached */
   error?: string | null;
 }) {
+  const id = useId();
+  const goRef = useRef<HTMLButtonElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
     window.addEventListener('keydown', onKey);
+    // the way on has the focus, so a keyboard user is not left behind the page
+    goRef.current?.focus();
     return () => window.removeEventListener('keydown', onKey);
   }, [open, onClose]);
 
@@ -51,66 +76,95 @@ export function SocriaOneModal({
   const price = `${SOCRIA_ONE.currency}${SOCRIA_ONE.price}`;
 
   return (
-    <div className="lg-one-scrim" role="dialog" aria-modal="true" aria-labelledby="lg-one-title">
-      <div className="lg-one-back" onClick={onClose} aria-hidden="true" />
-      <div className="lg-one-sheet">
-        <button type="button" className="lg-one-x" onClick={onClose} aria-label="Close">
-          ×
+    <div className="os-scrim" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-s`}>
+      <div className="os-back" onClick={onClose} aria-hidden="true" />
+      <div className="os-sheet is-wide">
+        <span className="os-grab" aria-hidden="true" />
+        <button type="button" className="os-x l5-icon-btn" onClick={onClose} aria-label="Close">
+          <OneClose />
         </button>
 
-        <header className="lg-one-head">
-          <span className="lg-one-mono" aria-hidden="true">
+        <p className="os-brand">
+          <span className="os-mono" aria-hidden="true">
             <span>I</span>
           </span>
-          {limited && <p className="lg-one-limit">{LIMIT_HEADLINE}</p>}
-          <h2 className="lg-one-title" id="lg-one-title">
-            Socria <span className="lg-one-title-one">One</span>
-          </h2>
-          <p className="lg-one-price">
-            <span className="lg-one-amount">{price}</span>
-            <span className="lg-one-per">/ {SOCRIA_ONE.period}</span>
-          </p>
-          <p className="lg-one-lede">{reason ?? 'Unlimited Socria — every conversation, map, artifact and document you need, with Socria Voice and sharing.'}</p>
-        </header>
+          Socria One
+          <span className="os-price">
+            {price} a {SOCRIA_ONE.period}
+          </span>
+        </p>
+
+        <h2 className="os-title" id={`${id}-t`}>
+          {limited ? LIMIT_HEADLINE : 'Unlimited Socria'}
+        </h2>
+        <p className="os-sub" id={`${id}-s`}>
+          {reason ?? 'Conversations, Logic Maps, artifacts and documents without a monthly count — with Socria Voice and sharing, which only Socria One includes.'}
+        </p>
 
         {/* what each plan holds, from the one table (lib/entitlements.ts) — never a number written here */}
-        <table className="lg-one-cmp">
-          <caption className="lg-one-sr">Free compared with Socria One</caption>
-          <thead>
-            <tr>
-              <td />
-              <th scope="col">Free</th>
-              <th scope="col" className="is-one">
-                Socria One
-              </th>
-            </tr>
-          </thead>
-          <tbody>
-            {rows.map((r) => (
-              <tr key={r.id}>
-                <th scope="row">{r.label}</th>
-                <td className={r.free === 'Not included' ? 'is-no' : undefined}>{r.free === 'Not included' ? <span aria-label="Not included">—</span> : r.free}</td>
-                <td className="is-one">{r.one}</td>
+        <div className="os-cmp-wrap">
+          <table className="os-cmp">
+            <caption className="os-sr">Free compared with Socria One</caption>
+            <thead>
+              <tr>
+                <td />
+                <th scope="col">Free</th>
+                <th scope="col" className="is-one">
+                  Socria One
+                </th>
               </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {error && <p className="lg-one-err">{error}</p>}
-
-        <div className="lg-one-actions">
-          <button type="button" className="lg-one-go" onClick={() => void onUnlock('')} disabled={busy}>
-            {busy ? 'Opening checkout…' : `Upgrade to Socria One — ${price}/${SOCRIA_ONE.period}`} <span aria-hidden="true">→</span>
-          </button>
-          <button type="button" className="lg-one-not" onClick={onClose}>
-            Not now — keep the free plan
-          </button>
-          <a className="lg-one-more" href="/one">
-            Compare the plans →
-          </a>
+            </thead>
+            <tbody>
+              {rows.map((r) => (
+                <tr key={r.id}>
+                  <th scope="row">{r.label}</th>
+                  {r.free === 'Not included' ? (
+                    <td className="is-no">
+                      <span aria-hidden="true">—</span>
+                      <span className="os-sr">Not included</span>
+                    </td>
+                  ) : (
+                    <td>{r.free}</td>
+                  )}
+                  <td className="is-one">
+                    <span className="os-check">
+                      <OneCheck />
+                      {r.one}
+                    </span>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
 
-        <p className="lg-one-keep">Cancel anytime. Everything you have made stays open and editable, on either plan.</p>
+        {error && (
+          <p className="os-err" role="alert">
+            {error}
+          </p>
+        )}
+
+        <div className="os-actions">
+          <button ref={goRef} type="button" className="l5-btn is-primary is-one is-wide" onClick={() => void onUnlock('')} disabled={busy}>
+            {busy ? (
+              'Opening checkout…'
+            ) : (
+              <>
+                {`Upgrade to Socria One — ${price}/${SOCRIA_ONE.period}`}
+                <span className="l5-ar" aria-hidden="true">
+                  →
+                </span>
+              </>
+            )}
+          </button>
+          <button type="button" className="l5-btn is-quiet" onClick={onClose}>
+            Not now — keep the free plan
+          </button>
+        </div>
+
+        <p className="os-foot">
+          Cancel anytime. Everything you’ve made stays yours. <a href="/one">Compare the plans</a>
+        </p>
       </div>
     </div>
   );

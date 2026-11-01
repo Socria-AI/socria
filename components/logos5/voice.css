@@ -2,31 +2,60 @@
    Theme tokens only (app/themes.css): Paper, White, Dark, One and Celestial alike. */
 
 /* ── the button beside the box ───────────────────────────────────── */
+/* a key, as Make and the length dial beside it are (buttons.css, the small
+   secondary): card stock, a hairline edge, a ledge; on, pressed in, in the primary */
 .logos-root .sv-btn {
   position: relative;
   display: inline-flex;
   align-items: center;
   gap: 6px;
   height: 32px;
-  padding: 0 8px 0 9px;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lg-ink-60);
+  padding: 0 10px 0 9px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
 }
-.logos-root .sv-btn:hover,
+.logos-root .sv-btn > svg {
+  flex: none;
+  color: var(--l5b-ink-2);
+}
+.logos-root .sv-btn:hover {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .sv-btn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
 .logos-root .sv-btn:focus-visible {
-  color: var(--lg-primary);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .sv-btn.is-on {
-  color: var(--lg-primary);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.28);
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
+}
+.logos-root .sv-btn.is-on > svg {
+  color: var(--l5b-fill);
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .sv-btn {
+    transition: none;
+  }
+  .logos-root .sv-btn:active {
+    transform: none;
+  }
 }
 .logos-root .sv-btn.is-hearing svg {
   color: #c0412f;
@@ -503,6 +532,7 @@ html[data-theme='night'] .logos-root .sv-problem {
     height: 44px;
     padding: 0 10px;
     gap: 4px;
+    border-radius: var(--l5b-r);
   }
   /* the badge on the button's shoulder, so the row keeps its room */
   .logos-root .sv-btn .sv-exp {
@@ -512,6 +542,9 @@ html[data-theme='night'] .logos-root .sv-problem {
     height: 13px;
     padding: 0 4px;
     font-size: 8px;
+  }
+  /* on the key's shoulder it needs a ground of its own — Socria One's tag keeps its blue (above), or its cream words vanish */
+  .logos-root .sv-btn .sv-exp:not(.is-one) {
     background: var(--l5-raise, #fff);
   }
   .logos-root .sv-exp-long {

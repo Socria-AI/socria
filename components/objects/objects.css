@@ -93,13 +93,20 @@
 .logos-root .obj-step-note { flex-basis: 100%; color: var(--lg-accent); font-family: var(--serif); font-size: 15px; line-height: 1.35; }
 .logos-root .obj-step.is-off .obj-step-note { color: var(--lg-tension); }
 
-.logos-root .obj-ops { display: flex; gap: 6px; align-items: center; margin-top: 10px; }
-.logos-root .obj-ops-tpl { display: inline-flex; gap: 2px; }
+/* "In the chat:" — things to do to it, each a small key in the product's button
+   language (components/logos5/buttons.css): it puts the words in the chat box */
+.logos-root .obj-ops { display: flex; gap: 6px 8px; align-items: center; margin-top: 12px; }
+.logos-root .obj-ops-tpl { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .logos-root .obj-ops-tpl button {
-  background: none; border: 1px solid var(--lg-line); border-radius: 999px; padding: 2px 8px; cursor: pointer;
-  font-family: var(--font-stix, serif); font-size: 12px; color: var(--lg-ink-60);
+  display: inline-flex; align-items: center; min-height: 30px; padding: 0 10px; cursor: pointer;
+  border: 1px solid var(--l5b-edge, rgba(35, 36, 31, 0.15)); border-radius: 8px;
+  background: var(--l5b-face, #fffdf8); box-shadow: var(--l5b-ledge, 0 1px 0 rgba(35, 36, 31, 0.07));
+  font-family: var(--font-stix, serif); font-size: 13.5px; color: var(--lg-ink);
+  transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
 }
-.logos-root .obj-ops-tpl button:hover { color: var(--lg-primary); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4); }
+.logos-root .obj-ops-tpl button:hover { border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05); }
+.logos-root .obj-ops-tpl button:active { transform: translateY(1px); box-shadow: none; }
+.logos-root .obj-ops-tpl button:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
 .logos-root .obj-ops input {
   flex: 1; min-width: 0; border: 0; border-bottom: 1px solid var(--lg-ink-24); background: transparent; padding: 5px 2px;
   font-family: var(--font-stix, serif); font-size: 15px; color: var(--lg-ink); outline: none;
@@ -116,9 +123,22 @@
 .logos-root .obj-suggest > span { display: flex; gap: 8px; align-items: baseline; font-family: var(--font-stix, serif); }
 .logos-root .obj-suggest-k { font-family: var(--lg-sans); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-accent); }
 .logos-root .obj-suggest button { background: none; border: 0; padding: 0; cursor: pointer; color: var(--lg-accent); font: inherit; font-family: var(--lg-sans); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
-.logos-root .obj-hist { display: flex; align-items: center; justify-content: center; gap: 10px; margin-top: 8px; font-size: 11px; color: var(--lg-ink-40); }
-.logos-root .obj-hist button { background: none; border: 0; cursor: pointer; font-size: 16px; color: var(--lg-ink-60); padding: 0 6px; }
-.logos-root .obj-hist button:disabled { opacity: 0.25; cursor: default; }
+/* the steps it has been through: back and forward keys either side of where it is */
+.logos-root .obj-hist {
+  display: flex; align-items: center; justify-content: space-between; gap: 10px;
+  margin-top: 12px; padding: 3px; border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.08); border-radius: 10px;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.04); font-size: 12px; color: var(--lg-ink-60);
+}
+.logos-root .obj-hist button {
+  display: inline-grid; place-items: center; width: 30px; height: 28px; padding: 0; cursor: pointer;
+  border: 1px solid var(--l5b-edge, rgba(35, 36, 31, 0.15)); border-radius: 7px;
+  background: var(--l5b-face, #fffdf8); box-shadow: var(--l5b-ledge, 0 1px 0 rgba(35, 36, 31, 0.07));
+  font-size: 16px; line-height: 1; color: var(--lg-ink);
+}
+.logos-root .obj-hist button:hover:not(:disabled) { border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); }
+.logos-root .obj-hist button:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
+.logos-root .obj-hist button:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+.logos-root .obj-hist button:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
 
 /* the function: a figure, an expression, its parameters */
 .logos-root .obj-fn-eq { background: none; border: 0; padding: 2px 4px; cursor: pointer; font-size: 17px; border-radius: 3px; }

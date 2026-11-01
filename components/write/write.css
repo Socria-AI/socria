@@ -671,21 +671,46 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) ::highlig
 /* beside the map, before Logos 5: the column it fills */
 .logos-root .lg-draft-col > .w-space { flex: 1 1 auto; height: auto; min-height: 0; }
 
-/* starting the writing, offered in Artifacts — never opened for them */
+/* starting the writing, offered in Artifacts — never opened for them: a key
+   (components/logos5/buttons.css, the secondary) whose arrow steps on when
+   pointed at; the send button is the surface's one filled key */
 .logos-root .l5 .l5s-write-start {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
   margin-top: 14px;
-  padding: 8px 16px;
-  min-height: 36px;
-  border-radius: 999px;
-  border: 1px solid var(--lg-line);
-  background: transparent;
-  color: var(--lg-ink);
+  min-height: 40px;
+  padding: 0 16px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.12s;
 }
-.logos-root .l5 .l5s-write-start:hover { border-color: var(--lg-primary); color: var(--lg-primary); }
-.logos-root .l5 .l5s-art-pill.is-add { border-style: dashed; color: var(--lg-ink-60); }
+.logos-root .l5 .l5s-write-start > span[aria-hidden] { display: inline-block; color: var(--l5b-ink-2); transition: transform 0.18s, color 0.15s; }
+.logos-root .l5 .l5s-write-start:hover {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .l5 .l5s-write-start:hover > span[aria-hidden] { transform: translateX(2px); color: var(--l5b-ink); }
+.logos-root .l5 .l5s-write-start:active { transform: translateY(1px); box-shadow: none; }
+.logos-root .l5 .l5s-write-start:focus-visible { outline: 2px solid var(--l5b-focus); outline-offset: 2px; }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 .l5s-write-start,
+  .logos-root .l5 .l5s-write-start > span[aria-hidden] { transition: none; }
+  .logos-root .l5 .l5s-write-start:active,
+  .logos-root .l5 .l5s-write-start:hover > span[aria-hidden] { transform: none; }
+}
+/* + Write and + Make beside what was made: keys as the others are (redesign.css), the quieter ink — no dashed outline */
+.logos-root .l5 .l5s-art-pill.is-add:not([aria-expanded='true']) { color: var(--l5b-ink-2); }
+.logos-root .l5 .l5s-art-pill.is-add:not([aria-expanded='true']):hover { color: var(--l5b-ink); }
 
 
 /* ── the word processor: blocks the browser cannot type into ──────── */

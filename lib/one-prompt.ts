@@ -443,8 +443,9 @@ export function copyFor(reason: TriggerReason, shown = 0): PromptCopy {
     // "Continue with Socria One", which read as a step in what they were doing
     // rather than a purchase, and an upgrade should never be mistaken for one).
     primary: spec.category === 'entitlement' ? 'Upgrade to Socria One' : 'Become a member',
-    // The way out says what actually happens next: the free plan, kept.
-    secondary: spec.category === 'entitlement' ? 'keep the free plan' : 'maybe later',
+    // The way out says what actually happens next: the free plan, kept — in the
+    // same words as the plan sheet's, and as a sentence now that it is a button.
+    secondary: spec.category === 'entitlement' ? 'Not now — keep the free plan' : 'Maybe later',
   };
 }
 

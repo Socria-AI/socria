@@ -8,8 +8,9 @@
  * (--ink-*, --app-paper), so paper, white, dark and the Socria One blue all
  * follow; the gold is the reward's colour on every ground.
  *
- * THE POPUPS are a plate in the family of the Socria One invitation
- * (globals.css, .lg-op-*): the same inner rule, grain, tracked eyebrow and
+ * THE POPUPS are a plate in the family of the old Socria One invitation
+ * (the /one cover's plate; the in-app Socria One sheets are now paper,
+ * components/one/one-sheet.css): an inner rule, grain, tracked eyebrow and
  * serif title, on a deep moss ground with gold instead of Prussian blue with
  * cream — a reward, not a sale. The plate carries its own colours, so it is
  * the same plate whichever theme it opens over.

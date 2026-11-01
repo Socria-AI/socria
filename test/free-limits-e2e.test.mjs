@@ -27,6 +27,10 @@
 //   dora   free — documents
 //   vic    free — Voice and sharing
 //   carl   free, with a complimentary grant and a comp row from before
+//   nina   free — a new conversation's map is the server's to count, whatever the page sends
+//   otto   free — a map saved before these limits keeps growing; a new one is refused
+//   hana   free — a map begun by hand is one of the month's maps
+//   pete   free — with the usage table missing, the free plan is paused, never lifted
 //   olga   Socria One (the operator's allowlist)
 //   paula  Socria One (a paid Stripe subscription)
 
@@ -100,6 +104,8 @@ process.env.OPENAI_API_KEY = 'test';
 process.env.RATE_LIMIT_DISABLED = '1';
 process.env.SHARE_SECRET = 'test-share-secret';
 process.env.SOCRIA_ONE_USER_IDS = 'olga';
+// ask whether the usage table exists on every request: the suite takes it away and puts it back
+process.env.USAGE_STORE_MEMO_MS = '0';
 
 const load = (n) => import(pathToFileURL(join(OUT, `${n}.mjs`)).href);
 const R = Object.fromEntries(await Promise.all(Object.keys(ROUTES).map(async (k) => [k, await load(k)])));
@@ -146,7 +152,7 @@ const settle = async () => {
 const passes = () => (globalThis.__logosCalls ?? []).filter((p) => !p.stream).length;
 
 globalThis.__users = Object.fromEntries(
-  ['liam', 'fiona', 'mira', 'ada', 'dora', 'vic', 'olga', 'paula'].map((u) => [u, { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] }])
+  ['liam', 'fiona', 'mira', 'ada', 'dora', 'vic', 'nina', 'otto', 'hana', 'pete', 'olga', 'paula'].map((u) => [u, { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] }])
 );
 // carl: a complimentary grant on the account, and a comp row, from before
 globalThis.__users.carl = { firstName: 'Carl', emails: ['carl@example.com'], privateMetadata: { socriaOne: 'comp' } };
@@ -228,6 +234,73 @@ ok('a node added by hand is refused too, once the month’s nodes are spent', ha
 as('olga');
 const oneMap = await map('o1', EMPTY, extraction(Array.from({ length: 14 }, (_, k) => `n${k}`)));
 ok('Socria One: a map of fourteen nodes, kept whole, nothing counted', oneMap.status === 200 && oneMap.json?.map?.nodes?.length === 14 && count('olga', 'nodes') === 0 && count('olga', 'maps') === 0);
+
+console.log('\n=== a new conversation\'s map is the server\'s to count, whatever the page sends ===');
+// The bug as reported: on the free plan, a third and fourth map were drawn after
+// two. The page can send a map with a new conversation's id — the previous
+// conversation's, in the moment after switching — and the route used to take
+// "it already has nodes" as "this conversation already has its map".
+as('nina');
+const n1 = await map('n1', EMPTY, extraction(['a', 'b']));
+const n2 = await map('n2', EMPTY, extraction(['c']));
+ok('two maps drawn and counted', n1.status === 200 && n2.status === 200 && count('nina', 'maps') === 2, `${n1.status} ${n2.status} ${count('nina', 'maps')}`);
+before = passes();
+const stale = await map('n3', n2.json.map, extraction(['c', 'd']));
+ok('a third conversation sent with the previous conversation\'s map is still refused — before any model is asked', stale.status === 402 && stale.json?.upgrade === 'maps' && passes() === before, stale.text.slice(0, 300));
+ok('  and nothing more is counted', count('nina', 'maps') === 2 && count('nina', 'nodes') === 3);
+const anon = await call(R.map.POST, 'POST', '/api/logos/map', { messages: [{ role: 'user', content: 'A thought.' }], map: EMPTY });
+ok('a free map pass that names no conversation is refused like any other once the maps are used', anon.status === 402 && anon.json?.upgrade === 'maps', anon.text.slice(0, 200));
+// A pass that names no conversation has no conversation to "already have" a map: each one that
+// leaves a map is a new one, so leaving the id out never rides on a map counted elsewhere.
+as('pia');
+const p1 = await map(undefined, EMPTY, extraction(['a']));
+const p2 = await map(undefined, p1.json?.map ?? EMPTY, extraction(['a', 'b']));
+ok('  without a conversation, every pass that leaves a map is counted as a new map', p1.status === 200 && p2.status === 200 && count('pia', 'maps') === 2, `${p1.status} ${p2.status} ${count('pia', 'maps')}`);
+before = passes();
+const p3 = await map(undefined, p2.json?.map ?? EMPTY, extraction(['a', 'b', 'c']));
+ok('  and the third is refused before any model is asked', p3.status === 402 && p3.json?.upgrade === 'maps' && passes() === before, p3.text.slice(0, 200));
+as('olga');
+const oneStale = await map('o9', n2.json.map, extraction(['c', 'd']));
+ok('Socria One is not counted, whatever it sends', oneStale.status === 200 && count('olga', 'maps') === 0);
+
+console.log('\n=== a map saved before the limits keeps growing; a new one is refused ===');
+as('otto');
+db.rows('conversations').push({ id: 'old-1', user_id: 'otto', title: 'Before the limits', messages: [], map: { nodes: N(['p', 'q']), edges: [] }, updated_at: Date.now() });
+db.rows('logos_usage').push({ user_id: 'otto', scope: month, counter: 'maps', n: 2, updated_at: Date.now() });
+const grows = await map('old-1', { nodes: N(['p', 'q']), edges: [] }, extraction(['p', 'q', 'r']));
+ok('a conversation saved with a map is known to have one: it grows, and no map is charged', grows.status === 200 && (grows.json?.map?.nodes ?? []).length === 3 && count('otto', 'maps') === 2 && count('otto', 'nodes') === 1, grows.text.slice(0, 300));
+before = passes();
+const fresh = await map('new-1', EMPTY, extraction(['x']));
+ok('a new conversation, with the month\'s maps spent, is refused before any model is asked', fresh.status === 402 && fresh.json?.upgrade === 'maps' && passes() === before, fresh.text.slice(0, 200));
+
+console.log('\n=== a map begun by hand is one of the month\'s maps ===');
+as('hana');
+const byHand = (sessionId, newMap = true) => call(R.allowance.POST, 'POST', '/api/logos/allowance', { counter: 'nodes', n: 1, sessionId, newMap });
+const h1 = await byHand('h1');
+ok('the first card of a conversation, added by hand, claims a map and a node', h1.status === 200 && count('hana', 'maps') === 1 && count('hana', 'nodes') === 1, h1.text);
+const h1b = await byHand('h1');
+ok('  another card in the same conversation claims only a node', h1b.status === 200 && count('hana', 'maps') === 1 && count('hana', 'nodes') === 2, h1b.text);
+await byHand('h2');
+const h3 = await byHand('h3');
+ok('a third conversation begun by hand is refused at the month\'s two maps', h3.status === 402 && h3.json?.upgrade === 'maps' && count('hana', 'maps') === 2 && count('hana', 'nodes') === 3, h3.text);
+
+console.log('\n=== with the usage table missing, the free plan is paused — never lifted ===');
+db.absent.add('logos_usage');
+as('pete');
+before = streams();
+const paused = await logos('p1');
+ok('a free conversation is paused, not let through uncounted: 503, said plainly', paused.status === 503 && paused.json?.unavailable === true && /can’t be checked right now/.test(paused.json?.error ?? ''), paused.text.slice(0, 300));
+ok('  offering nothing — it is a fault, not a limit — and before the model is asked', !paused.json?.upgrade && streams() === before);
+before = passes();
+const pausedMap = await map('p1', EMPTY, extraction(['a']));
+ok('a free map is paused the same way, before any model is asked', pausedMap.status === 503 && pausedMap.json?.unavailable === true && passes() === before, pausedMap.text.slice(0, 200));
+const pausedHand = await call(R.allowance.POST, 'POST', '/api/logos/allowance', { counter: 'nodes', n: 1, sessionId: 'p2', newMap: true });
+ok('  and a card added by hand', pausedHand.status === 503 && pausedHand.json?.unavailable === true, pausedHand.text);
+as('olga');
+const onePaused = await logos('o-missing');
+ok('Socria One is never paused by it', onePaused.status === 200, onePaused.text.slice(0, 200));
+db.absent.delete('logos_usage');
+await settle();
 
 console.log('\n=== artifacts: two a month, held at the save ===');
 as('ada');

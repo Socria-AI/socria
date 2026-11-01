@@ -35,9 +35,8 @@ import type { MindNode } from '@/lib/mind/types';
 import { prepareTurn, guardReply, fallbackReply, finishTurn, SentenceGate, type PreparedTurn } from '@/lib/core4/turn';
 import { checkDraft, correctionFor } from '@/lib/accuracy/accuracy';
 import { fabricatedToolClaim } from '@/lib/core4/guard2';
-import { boundaryNote } from '@/lib/entitlements';
 import { chatAlreadyCounted, checkAllowance } from '@/lib/usage';
-import { claimUnit } from '@/lib/quota';
+import { claimUnit, refusal } from '@/lib/quota';
 import { encodeActivity, type Activity } from '@/lib/core4/activity';
 import { renderDisclosure } from '@/lib/core4/web';
 import { modelClient, collect, type ChatTurn } from '@/lib/core4/model';
@@ -378,11 +377,10 @@ export async function POST(req: NextRequest) {
     if (beginsChat) {
       const room = await checkAllowance(userId, plan, 'chats');
       if (!room.ok) {
-        return NextResponse.json(
-          // the counter's own name, so the client raises the Socria One prompt it has for exactly this boundary
-          { error: boundaryNote('chats'), upgrade: 'chats', used: room.used, limit: room.limit },
-          { status: 402 }
-        );
+        // the counter's own name, so the client raises the Socria One prompt it has for exactly
+        // this boundary — or, with the usage table missing, a pause that offers nothing (lib/quota.ts)
+        const r = refusal('chats', room);
+        return NextResponse.json(r.body, { status: r.status });
       }
     }
     const leftHeader: Record<string, string> = {};

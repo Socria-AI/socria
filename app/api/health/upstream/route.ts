@@ -15,6 +15,7 @@ import { deployedCommit, probeModels, probeSearch, probeStore, summarise } from 
 import { runSearch, searchConfigured } from '@/lib/logos-explore';
 import { storeHealth } from '@/lib/core4/store';
 import { mrStoreHealth } from '@/lib/mr/store';
+import { usageStoreHealth } from '@/lib/quota';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -35,7 +36,7 @@ export async function GET(req: NextRequest) {
   // Whether Core 4 can look things up, asked of this runtime rather than of the
   // dashboard. `images: false` because nothing here displays one, and it is one
   // fewer billed request per check.
-  const [search, store, mrStore] = await Promise.all([
+  const [search, store, mrStore, usage] = await Promise.all([
     probeSearch({ configured: searchConfigured, run: (q) => runSearch(q, { images: false }) }),
     // Whether Core 4 can read its own tables. Ahead of the models in the
     // verdict's order, because an unreadable state row takes its memory, its
@@ -46,6 +47,10 @@ export async function GET(req: NextRequest) {
     // and with its table missing every turn simply writes nothing — which is
     // exactly the silence this field exists to make visible.
     mrStoreHealth().catch(() => ({ ok: false, detail: 'threw' })),
+    // Whether the free plan can be counted here: the usage table, and the
+    // atomic functions from supabase/freemium.sql. Without the table the free
+    // plan is paused (lib/quota.ts) — this is where that is made visible.
+    usageStoreHealth(),
   ]);
 
   if (!apiKey) {
@@ -55,6 +60,7 @@ export async function GET(req: NextRequest) {
       search,
       store,
       mrStore,
+      usage,
       verdict: summarise({ ...base, probes: [], search, store }),
     });
   }
@@ -64,5 +70,5 @@ export async function GET(req: NextRequest) {
   // three at once is what makes that readable.
   const models = [...new Set([CORE_4_MODEL, CORE_3_MODEL, CORE_3_FALLBACK_MODEL])];
   const probes = await probeModels(new OpenAI({ apiKey, maxRetries: 0 }), models);
-  return NextResponse.json({ ...base, probes, search, store, mrStore, verdict: summarise({ ...base, probes, search, store }) });
+  return NextResponse.json({ ...base, probes, search, store, mrStore, usage, verdict: summarise({ ...base, probes, search, store }) });
 }

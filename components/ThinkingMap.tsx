@@ -224,8 +224,11 @@ export function ThinkingMap({
   shapes,
   fitMax = FIT_MAX,
   fitMinK,
+  emptyNote,
 }: {
   map: TMap;
+  /** what an empty map says instead of "The map builds as you talk" — the month's maps used, say */
+  emptyNote?: React.ReactNode;
   /** how large a few cards are fitted, at most — big-screen mode draws them larger (lib/logos5/cabin.ts) */
   fitMax?: number;
   /** the smallest a big map is fitted — big-screen mode keeps cards pressable from arm's length */
@@ -1142,6 +1145,8 @@ export function ThinkingMap({
   }, [active, map.edges]);
 
   // ── static lenses ────────────────────────────────────────────────
+  /** each object figure's height as drawn (the Work lens), by placed id — the layout leaves it that much room */
+  const [objH, setObjH] = useState<Record<string, number>>({});
   const staticLayout = useMemo(() => {
     if (lens === 'graph' || !drawsCards(lens) || (workspace && lens === 'structure')) return null;
     const { w, h } = size;
@@ -1150,9 +1155,37 @@ export function ThinkingMap({
     if (lens === 'solve') return layoutSolve(map, w, h);
     if (lens === 'flow') return layoutFlow(map, w, h);
     if (lens === 'timeline') return layoutTimeline(map, w, h);
-    if (lens === 'work') return layoutWork(map, w, h);
+    if (lens === 'work') return layoutWork(map, w, h, objH);
     return layoutEvidence(map, w, h);
-  }, [lens, map, size, workspace]);
+  }, [lens, map, size, workspace, objH]);
+
+  // A live figure is as tall as what it holds — its step, its parameters, the
+  // chips and the step navigator — which no declared size can know. Measure
+  // each one as drawn (offsetHeight is in the world's units, untouched by the
+  // camera's scale) and lay the lens out again when one is taller or shorter
+  // than it was; heights do not depend on positions, so this settles at once.
+  useLayoutEffect(() => {
+    if (lens !== 'work') return;
+    const figures = () => Array.from(nodeElRef.current.entries()).filter(([id]) => id.startsWith('obj:'));
+    const els = figures();
+    if (!els.length) return;
+    const read = () => {
+      const next: Record<string, number> = {};
+      for (const [id, el] of figures()) {
+        const h = Math.ceil(((el.firstElementChild as HTMLElement | null) ?? el).offsetHeight);
+        if (h) next[id] = h;
+      }
+      setObjH((prev) => {
+        for (const k of new Set([...Object.keys(prev), ...Object.keys(next)])) if (Math.abs((prev[k] ?? 0) - (next[k] ?? 0)) > 3) return next;
+        return prev;
+      });
+    };
+    read();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(read);
+    for (const [, el] of els) ro.observe((el.firstElementChild as HTMLElement | null) ?? el);
+    return () => ro.disconnect();
+  }, [lens, staticLayout]);
 
   // ── graph lens: seed positions ───────────────────────────────────
   // Deterministic, so the same map opens the same way on every load; and
@@ -1710,12 +1743,16 @@ export function ThinkingMap({
       >
         {/* not behind a model the plot lens is drawing: it would show through */}
         {map.nodes.length === 0 && !(lens === 'plot' && (map.viz || doc)) && (
-          <div className="lg-map-empty">
-            <span className="lg-map-empty-mark" aria-hidden="true">
-              <LogosMark size={46} />
-            </span>
-            <p>The map builds as you talk.</p>
-          </div>
+          emptyNote ? (
+            <div className="lg-map-empty is-note">{emptyNote}</div>
+          ) : (
+            <div className="lg-map-empty">
+              <span className="lg-map-empty-mark" aria-hidden="true">
+                <LogosMark size={46} />
+              </span>
+              <p>The map builds as you talk.</p>
+            </div>
+          )
         )}
 
         {map.nodes.length > 0 && staticLayout?.empty && !(lens === 'plot' && (map.viz || doc)) && (

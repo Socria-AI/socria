@@ -21,7 +21,7 @@
 //   • an idea that keeps coming back runs across subjects.
 
 import { build } from 'esbuild';
-import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 
@@ -157,6 +157,20 @@ console.log('\n=== Today’s learning ===');
 console.log('\n=== what they share ===');
 {
   ok('a theme runs across subjects: monthly runway, from a Project to Money', ideas.some((i) => i.theme && i.members.includes('offers') && i.members.includes('rent')));
+}
+
+// WHERE IT STANDS, WITH ITS MATHEMATICS WHOLE: the card draws \( … \) with KaTeX, so the line it is
+// given must keep each expression intact — a period inside 1.5 is not a sentence's end, and a clip
+// through an expression left the card showing "\( f(x) = x^3" with nothing it could draw.
+{
+  const said = 'At \\( x = 1 \\), the function \\( f(x) = x^3 - 3x \\) evaluates to \\(-2\\). Then more.';
+  ok('the first sentence keeps every expression', S.firstSaid(said) === 'At \\( x = 1 \\), the function \\( f(x) = x^3 - 3x \\) evaluates to \\(-2\\).', S.firstSaid(said));
+  const dot = S.firstSaid('The slope at \\( x = 1.5 \\) is \\( 3.75 \\), and x_1 stays x_1 here.');
+  ok('  a decimal point inside an expression is not the end of the sentence', dot.startsWith('The slope at \\( x = 1.5 \\) is \\( 3.75 \\)'), dot);
+  const clipped = S.firstSaid('Here \\( a^2 + b^2 = c^2 + d^2 + e^2 + f^2 + g^2 \\) holds for every case we tried today.', 30);
+  const opens = (clipped.match(/\\\(/g) ?? []).length, closes = (clipped.match(/\\\)/g) ?? []).length;
+  ok('  a clip never cuts through an expression', opens === closes && clipped.endsWith('…'), clipped);
+  ok('  and the card draws it rather than printing it', /<MathText>\{tile\.stands\}<\/MathText>/.test(readFileSync(join(root, 'components/logos5/UniverseParts.tsx'), 'utf8')));
 }
 
 console.log(`\nlogos5-spatial: ${pass} passed, ${fail} failed`);

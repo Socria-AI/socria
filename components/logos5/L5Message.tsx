@@ -193,10 +193,10 @@ function EditBox({ initial, after, onSave, onCancel }: { initial: string; after:
         </p>
       )}
       <div className="l5-edit-acts">
-        <button type="button" className="l5-btn" onClick={onCancel}>
+        <button type="button" className="l5-btn is-sm" onClick={onCancel}>
           Cancel
         </button>
-        <button type="button" className="l5-btn is-primary" disabled={!changed} onClick={() => changed && onSave(text.trim())}>
+        <button type="button" className="l5-btn is-sm is-primary" disabled={!changed} onClick={() => changed && onSave(text.trim())}>
           Send
         </button>
       </div>

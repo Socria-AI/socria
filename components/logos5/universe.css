@@ -129,6 +129,7 @@
   flex: none;
   display: inline-flex;
 }
+/* add files: a glyph (buttons.css .l5-icon-btn) — a square that takes a wash when pointed at */
 .logos-root .l5 .l5h-find-att {
   flex: none;
   display: inline-grid;
@@ -137,18 +138,26 @@
   height: 36px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 10px;
   background: transparent;
-  color: var(--lg-ink-60);
+  color: var(--l5b-ink-2);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, transform 0.12s;
 }
 .logos-root .l5 .l5h-find-att:hover {
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
-  color: var(--lg-ink);
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5h-find-att:active {
+  transform: translateY(1px);
+}
+.logos-root .l5 .l5h-find-att:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-find-go:disabled {
-  opacity: 0.5;
+  opacity: 0.45;
   cursor: default;
 }
 /* files put in it, read before anything is sent */
@@ -345,29 +354,41 @@
 
 /* ── the bar over the map ─────────────────────────────────────────── */
 
+/* a choice of one (buttons.css .l5-seg): a tray, the chosen one raised in it, as the lenses are */
 .logos-root .l5 .l5h-seg {
   display: inline-flex;
   flex: none;
+  gap: 2px;
   padding: 3px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.09);
+  border-radius: var(--l5b-r);
+  background: var(--l5h-lens-tray);
 }
 .logos-root .l5 .l5h-seg button {
-  min-height: 32px;
-  padding: 0 13px;
-  border: 0;
-  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--l5b-r-sm);
   background: transparent;
-  color: var(--lg-ink-60);
+  color: var(--l5b-ink-2);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+.logos-root .l5 .l5h-seg button:hover {
+  color: var(--l5b-ink);
 }
 .logos-root .l5 .l5h-seg button.is-on {
-  background: var(--lg-primary);
-  color: var(--l5-on-primary, #f5f3eb);
+  border-color: var(--l5b-edge);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5h-seg button:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-strip {
   flex: 1 1 auto;
@@ -380,6 +401,9 @@
 .logos-root .l5 .l5h-strip::-webkit-scrollbar {
   display: none;
 }
+/* where to pick up, and what is starred: keys (buttons.css, the small
+   secondary) — the conversation's name in the serif, the glyph and the arrow
+   in the primary, the arrow stepping on when pointed at */
 .logos-root .l5 .l5h-pick,
 .logos-root .l5 .l5h-starchip {
   flex: none;
@@ -387,24 +411,48 @@
   align-items: center;
   gap: 8px;
   max-width: 420px;
-  min-height: 38px;
-  padding: 0 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
-  color: var(--lg-ink);
+  min-height: 34px;
+  padding: 0 12px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5h-pick:hover,
+.logos-root .l5 .l5h-starchip:hover {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .l5 .l5h-pick:active,
+.logos-root .l5 .l5h-starchip:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.logos-root .l5 .l5h-pick:focus-visible,
+.logos-root .l5 .l5h-starchip:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-pick {
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.24);
-  color: var(--lg-primary);
+  color: var(--l5b-fill);
+}
+.logos-root .l5 .l5h-pick > span[aria-hidden] {
+  display: inline-block;
+  transition: transform 0.18s;
+}
+.logos-root .l5 .l5h-pick:hover > span[aria-hidden] {
+  transform: translateX(2px);
 }
 .logos-root .l5 .l5h-pick-k {
-  color: var(--lg-ink-60);
+  color: var(--l5b-ink-2);
 }
 .logos-root .l5 .l5h-pick-t,
 .logos-root .l5 .l5h-starchip span {
@@ -413,37 +461,74 @@
   text-overflow: ellipsis;
   font-family: var(--l5-serif);
   font-size: 16px;
+  font-weight: 400;
   color: var(--lg-ink);
 }
 .logos-root .l5 .l5h-starchip {
   max-width: 240px;
 }
 
+/* the map's tools — Select, undo, redo, the subjects, View — are keys
+   (buttons.css, the small secondary): card stock, a hairline edge, a ledge */
 .logos-root .l5 .l5h-tool {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  min-width: 38px;
-  height: 38px;
+  min-width: 32px;
+  height: 32px;
   padding: 0 11px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
-  color: var(--lg-ink);
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5h-tool svg {
+  flex: none;
+  color: var(--l5b-ink-2);
+  transition: color 0.15s;
+}
+/* undo and redo are their glyph alone: square keys */
+.logos-root .l5 .l5h-tool:not(:has(.l5h-tool-l)) {
+  width: 32px;
+  padding: 0;
+}
+.logos-root .l5 .l5h-tool:hover:not(:disabled) {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .l5 .l5h-tool:hover:not(:disabled) svg {
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5h-tool:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.logos-root .l5 .l5h-tool:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-tool:disabled {
-  opacity: 0.38;
+  opacity: 0.4;
   cursor: default;
 }
+/* choosing several, or the View open: pressed in, in the primary — not filled */
 .logos-root .l5 .l5h-tool.is-on {
-  border-color: var(--lg-primary);
-  background: var(--lg-primary);
-  color: var(--l5-on-primary, #f5f3eb);
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
+}
+.logos-root .l5 .l5h-tool.is-on svg {
+  color: var(--l5b-fill);
 }
 
 /* a lens's name, long on a wide screen and short on a phone */
@@ -585,29 +670,51 @@
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06);
   pointer-events: none;
 }
+/* the camera's controls: one framed tray, as the canvas's (globals.css .lg-zoom)
+   — card stock with a ledge, 32px keys that take a wash when pointed at */
 .logos-root .l5 .l5h-zoom {
   position: absolute;
   right: 16px;
   bottom: 16px;
   z-index: 12;
   display: flex;
-  gap: 6px;
+  gap: 2px;
+  padding: 2px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
 }
 .logos-root .l5 .l5h-zoom button {
-  min-width: 38px;
-  height: 38px;
-  padding: 0 10px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
-  color: var(--lg-ink);
+  position: relative;
+  min-width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: var(--l5b-r-sm);
+  background: transparent;
+  color: var(--l5b-ink-2);
   font: inherit;
   font-size: 16px;
+  line-height: 1;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5h-zoom button:hover {
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5h-zoom button:active {
+  transform: translateY(1px);
+}
+.logos-root .l5 .l5h-zoom button:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 1px;
 }
 .logos-root .l5 .l5h-zoom button.is-fit {
-  font-size: 13px;
+  font-size: 12px;
+  font-weight: 500;
 }
 
 /* said once, and said now */
@@ -706,20 +813,41 @@
   }
 }
 
-/* ── buttons ──────────────────────────────────────────────────────── */
+/* ── buttons ──────────────────────────────────────────────────────────
+   The map's own, in the product's one language (components/logos5/buttons.css):
+   .l5h-go the one way on (filled, lit from above, a darker lip), .l5h-btn a
+   key of card stock (a hairline edge, a one-pixel ledge), .l5h-x a glyph. */
 .logos-root .l5 .l5h-go {
   display: inline-flex;
   align-items: center;
-  gap: 6px;
-  min-height: 36px;
-  padding: 0 16px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--lg-primary);
-  color: var(--l5-on-primary, #f5f3eb);
+  justify-content: center;
+  gap: 7px;
+  min-height: 40px;
+  padding: 0 18px;
+  border: 1px solid color-mix(in srgb, var(--l5b-fill) 78%, #000);
+  border-radius: var(--l5b-r);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
+    0 8px 18px -12px rgba(var(--l5b-fill-rgb), 0.9);
+  color: var(--l5b-on-fill);
   font: inherit;
   font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5h-go:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
+  transform: translateY(-1px);
+}
+.logos-root .l5 .l5h-go:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
 }
 .logos-root .l5 .l5h-go:disabled {
   opacity: 0.45;
@@ -728,31 +856,59 @@
 .logos-root .l5 .l5h-btn {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  color: var(--lg-ink);
+  justify-content: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5h-btn:hover:not(:disabled) {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .l5 .l5h-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-btn:disabled {
   opacity: 0.45;
   cursor: default;
 }
 .logos-root .l5 .l5h-btn.is-on {
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.32);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
 }
 .logos-root .l5 .l5h-btn.is-quiet {
-  color: var(--lg-ink-60);
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--l5b-ink-2);
+}
+.logos-root .l5 .l5h-btn.is-quiet:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
 }
 .logos-root .l5 .l5h-btn.is-danger {
-  border-color: color-mix(in srgb, var(--l5h-danger) 35%, transparent);
+  border-color: color-mix(in srgb, var(--l5h-danger) 40%, transparent);
   color: var(--l5h-danger);
+}
+.logos-root .l5 .l5h-btn.is-danger:hover:not(:disabled) {
+  border-color: var(--l5h-danger);
+  background: color-mix(in srgb, var(--l5h-danger) 8%, var(--l5b-face));
 }
 .logos-root .l5 .l5h-x {
   flex: none;
@@ -762,16 +918,41 @@
   height: 30px;
   padding: 0;
   border: 0;
-  border-radius: 50%;
+  border-radius: 8px;
   background: transparent;
-  color: var(--lg-ink-40);
+  color: var(--l5b-ink-2);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, transform 0.12s;
 }
 .logos-root .l5 .l5h-x:hover {
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
-  color: var(--lg-ink);
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5h-x:active {
+  transform: translateY(1px);
+}
+.logos-root .l5 :is(.l5h-go, .l5h-btn, .l5h-x):focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
+}
+/* in the bar over several chosen, the way on is the small size, beside the small keys */
+.logos-root .l5 .l5h-bar-sel .l5h-go {
+  min-height: 32px;
+  padding: 0 13px;
+  border-radius: var(--l5b-r-sm);
+  font-size: 13px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 :is(.l5h-go, .l5h-btn, .l5h-x, .l5h-tool, .l5h-pick, .l5h-starchip, .l5h-wt-step, .l5h-find-go, .l5h-find-att, .l5h-zoom button, .l5h-pick > span[aria-hidden]) {
+    transition: none;
+  }
+  .logos-root .l5 :is(.l5h-go, .l5h-btn, .l5h-x, .l5h-tool, .l5h-pick, .l5h-starchip, .l5h-wt-step, .l5h-find-go, .l5h-find-att, .l5h-zoom button):is(:hover, :active),
+  .logos-root .l5 .l5h-pick:hover > span[aria-hidden] {
+    transform: none !important;
+  }
 }
 .logos-root .l5 .l5h-link {
   padding: 0;
@@ -893,12 +1074,47 @@
   font-size: 13px;
   color: var(--lg-ink-60);
 }
+/* the one way on, the two things done most, then More (components/logos5/buttons.css) */
 .logos-root .l5 .l5h-pv-acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
-  padding-top: 12px;
+  align-items: center;
+  gap: 8px;
+  padding-top: 14px;
   border-top: 1px solid var(--l5-hair);
+}
+.logos-root .l5 .l5h-pv-acts .l5h-pv-more {
+  margin-left: auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+}
+.logos-root .l5 .l5h-pv-more.is-on {
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.38);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.09);
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5h-pv-menu {
+  margin-top: -2px;
+  box-shadow: 0 10px 28px -18px rgba(var(--shadow-rgb, 35, 36, 31), 0.45);
+}
+.logos-root .l5 .l5h-pv-menu[hidden] {
+  display: none;
+}
+.logos-root .l5 .l5h-pv-confirm .l5h-pv-acts {
+  padding-top: 0;
+  border-top: 0;
+}
+.logos-root .l5 .l5h-pv-x {
+  margin: -6px -8px 0 0;
+}
+.logos-root .l5 .l5h-pv-name {
+  font-weight: 600;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5h-pv-s .katex {
+  font-size: 1.02em;
+  color: var(--lg-ink);
 }
 .logos-root .l5 .l5h-pv-move {
   display: flex;
@@ -984,9 +1200,6 @@
   letter-spacing: 0;
   text-transform: none;
 }
-.logos-root .l5 .l5h-vm .l5h-seg {
-  box-shadow: none;
-}
 .logos-root .l5 .l5h-vm .l5h-seg button {
   min-height: 28px;
   padding: 0 10px;
@@ -994,7 +1207,6 @@
 }
 .logos-root .l5 .l5h-seg.is-wrap {
   flex-wrap: wrap;
-  border-radius: 14px;
 }
 .logos-root .l5 .l5h-vm-row {
   display: flex;
@@ -1084,9 +1296,10 @@
   align-items: center;
   gap: 8px;
   max-width: calc(100% - 24px);
-  padding: 7px 7px 7px 16px;
+  padding: 6px 6px 6px 16px;
   border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.18);
-  border-radius: 999px;
+  /* a softened rectangle round its keys, as the menus are — not a pill */
+  border-radius: 14px;
   background: var(--l5-surface);
   box-shadow: 0 22px 54px -24px rgba(var(--shadow-rgb, 35, 36, 31), 0.55);
   white-space: nowrap;
@@ -1236,6 +1449,10 @@
   }
   .logos-root .l5 .l5h-tool-l {
     display: none;
+  }
+  /* the tools are their glyphs here: square keys */
+  .logos-root .l5 .l5h-tool {
+    padding: 0 7px;
   }
   .logos-root .l5 .l5h-vm,
   .logos-root .l5 .l5h-tray {
@@ -1866,21 +2083,40 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 }
 /* the week, as a map: its name over it, and a way back to other weeks */
 
+/* the week before, the week after: small framed keys for one glyph (buttons.css .l5-icon-btn.is-framed) */
 .logos-root .l5 .l5h-wt-step {
   width: 30px;
   height: 30px;
   display: inline-grid;
   place-items: center;
-  border: 1px solid var(--l5-hair);
-  border-radius: 50%;
-  background: var(--l5-surface);
+  padding: 0;
+  border: 1px solid var(--l5b-edge);
+  border-radius: 8px;
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
   font: inherit;
   font-size: 15px;
-  color: var(--lg-ink);
+  line-height: 1;
+  color: var(--l5b-ink-2);
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5h-wt-step:hover:not(:disabled) {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5h-wt-step:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.logos-root .l5 .l5h-wt-step:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-wt-step:disabled {
-  opacity: 0.35;
+  opacity: 0.4;
   cursor: default;
 }
 
@@ -1989,11 +2225,9 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   flex: 1 1 auto;
 }
 .logos-root .l5 .l5h-sub :is(.l5h-pick, .l5h-starchip) {
-  min-height: 30px;
-  padding: 0 12px;
-  box-shadow: none;
-  background: color-mix(in srgb, var(--l5-surface) 80%, transparent);
-  font-size: 12.5px;
+  min-height: 32px;
+  padding: 0 11px;
+  font-size: 13px;
 }
 .logos-root .l5 .l5h-sub :is(.l5h-pick-t, .l5h-starchip span) {
   font-size: 15px;
@@ -2005,9 +2239,9 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   gap: 8px;
 }
 .logos-root .l5 .l5h-sub .l5h-wt-step {
-  width: 26px;
-  height: 26px;
-  font-size: 14px;
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
 }
 .logos-root .l5 .l5h-right {
   flex: none;
@@ -2018,77 +2252,68 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   padding-top: 26px;
 }
 
-/* the lenses: the serif, the one chosen on a dark pill that slides to it */
+/* the lenses: a choice of one (buttons.css .l5-seg) — a tray set into the
+   page, the chosen lens a key of card stock raised in it, which slides to the
+   one pressed. Not a dark pill: a filled pill is a toggle's, and the tray says
+   these four are one choice. */
 .logos-root .l5 .l5h-lens {
   position: relative;
   display: inline-flex;
-  padding: 4px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.04), 0 10px 30px -18px rgba(var(--shadow-rgb, 35, 36, 31), 0.22);
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.09);
+  border-radius: var(--l5b-r);
+  background: var(--l5h-lens-tray);
+  box-shadow: inset 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.06);
 }
 .logos-root .l5 .l5h-lens-pill {
   position: absolute;
   left: 0;
-  top: 4px;
-  bottom: 4px;
-  border-radius: 999px;
-  background: var(--l5h-lens-on, #2f3820);
-  box-shadow: 0 6px 16px -8px rgba(var(--shadow-rgb, 35, 36, 31), 0.55);
-  transition: transform 0.5s cubic-bezier(0.32, 1.32, 0.48, 1), width 0.5s cubic-bezier(0.32, 1.32, 0.48, 1);
+  top: 3px;
+  bottom: 3px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  transition: transform 0.26s cubic-bezier(0.2, 0.8, 0.2, 1), width 0.26s cubic-bezier(0.2, 0.8, 0.2, 1);
 }
 .logos-root .l5 .l5h-lens button {
   position: relative;
   z-index: 1;
-  min-height: 36px;
-  padding: 0 19px;
-  border: 0;
-  border-radius: 999px;
+  min-height: 30px;
+  padding: 0 13px;
+  border: 1px solid transparent;
+  border-radius: var(--l5b-r-sm);
   background: transparent;
-  font-family: var(--l5-serif);
-  font-size: 18.5px;
+  font-family: var(--lg-sans);
+  font-size: 13px;
+  font-weight: 500;
   line-height: 1;
-  letter-spacing: 0.005em;
-  color: var(--lg-ink-60);
+  letter-spacing: 0;
+  color: var(--l5b-ink-2);
+  white-space: nowrap;
   cursor: pointer;
-  transition: color 0.3s ease;
+  -webkit-tap-highlight-color: transparent;
+  transition: color 0.15s;
 }
-.logos-root .l5 .l5h-lens button:hover {
-  color: var(--lg-ink);
-}
+.logos-root .l5 .l5h-lens button:hover,
 .logos-root .l5 .l5h-lens button.is-on {
-  color: var(--l5h-lens-ink, #f7f5ee);
+  color: var(--l5b-ink);
 }
-/* until the pill has found its place (and on the server), the chosen one is filled itself */
+/* until the key has found its place (and on the server), the chosen one is raised itself */
 .logos-root .l5 .l5h-lens:not(.is-measured) button.is-on {
-  background: var(--l5h-lens-on, #2f3820);
+  border-color: var(--l5b-edge);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
 }
 .logos-root .l5 .l5h-lens button:focus-visible {
-  outline: 2px solid rgba(var(--l5h-gold-rgb), 0.7);
+  outline: 2px solid var(--l5b-focus);
   outline-offset: 2px;
 }
-/* the map's tools, quiet, under the lenses */
+/* the map's tools, under the lenses: the keys above (.l5h-tool), in a row */
 .logos-root .l5 .l5h-tools {
   display: flex;
   gap: 6px;
-}
-.logos-root .l5 .l5h-tools .l5h-tool {
-  height: 34px;
-  min-width: 34px;
-  padding: 0 10px;
-  box-shadow: none;
-  background: color-mix(in srgb, var(--l5-surface) 82%, transparent);
-  color: var(--lg-ink-60);
-  font-size: 12.5px;
-}
-.logos-root .l5 .l5h-tools .l5h-tool:hover:not(:disabled) {
-  color: var(--lg-ink);
-  background: var(--l5-surface);
-}
-.logos-root .l5 .l5h-tools .l5h-tool.is-on {
-  color: var(--l5-on-primary, #f5f3eb);
-  background: var(--lg-primary);
 }
 .logos-root .l5 .l5h-vm,
 .logos-root .l5 .l5h-tray {
@@ -2157,6 +2382,8 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   min-width: 0;
   margin-left: auto;
 }
+/* the way on from the box: one glyph, so a circle — but the primary key's
+   own make (buttons.css .is-primary): lit from above, a darker lip under it */
 .logos-root .l5 .l5h-find-go {
   flex: none;
   display: inline-grid;
@@ -2164,18 +2391,30 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   width: 38px;
   height: 38px;
   padding: 0;
-  border: 0;
+  border: 1px solid color-mix(in srgb, var(--l5b-fill) 78%, #000);
   border-radius: 50%;
-  background: var(--l5h-lens-on, #2f3820);
-  color: var(--l5h-lens-ink, #f7f5ee);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
+    0 6px 14px -9px rgba(var(--l5b-fill-rgb), 0.9);
+  color: var(--l5b-on-fill);
   cursor: pointer;
-  transition: transform 0.2s ease, background 0.2s ease;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
 }
-.logos-root .l5 .l5h-find-go:hover {
+.logos-root .l5 .l5h-find-go:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
   transform: translateY(-1px);
 }
-.logos-root .l5 .l5h-find-go:active {
-  transform: scale(0.94);
+.logos-root .l5 .l5h-find-go:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+.logos-root .l5 .l5h-find-go:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 /* said once, and said now: over the foot, not on it */
 .logos-root .l5 .l5h-hint {
@@ -2201,33 +2440,24 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 .logos-root .l5 .l5h-empty {
   padding-top: 150px;
 }
-/* the zoom, a small column at the right, over the box */
+/* the zoom, a small column at the right, over the box: the tray above, stood on end */
 .logos-root .l5 .l5b ~ * .l5h-zoom,
 .logos-root .l5 .l5b .l5h-zoom {
   right: 32px;
   flex-direction: column;
-  gap: 4px;
-  padding: 4px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--l5-surface) 88%, transparent);
-  box-shadow: var(--l5-shadow);
 }
-.logos-root .l5 .l5b .l5h-zoom button {
-  min-width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 0;
-  box-shadow: none;
-  background: transparent;
-  color: var(--lg-ink-60);
-}
-.logos-root .l5 .l5b .l5h-zoom button:hover {
-  color: var(--lg-ink);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
-}
+/* a hairline between zooming and fitting, as the canvas's tray draws one */
 .logos-root .l5 .l5b .l5h-zoom button.is-fit {
-  font-size: 11px;
+  margin-top: 3px;
+}
+.logos-root .l5 .l5b .l5h-zoom button.is-fit::before {
+  content: '';
+  position: absolute;
+  top: -4px;
+  left: 7px;
+  right: 7px;
+  height: 1px;
+  background: var(--l5b-edge);
 }
 
 /* ── the map as subjects (UniverseBubbles.tsx, lib/logos5/bubbles.ts) ── */
@@ -2237,8 +2467,8 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   --l5b-line: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.26);
   --l5b-ring: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.24);
   --l5b-name: #8b887d;
-  --l5h-lens-on: #2f3820;
-  --l5h-lens-ink: #f7f5ee;
+  /* the tray a choice of one is set into (the lenses, the View's choices): the paper, a shade down */
+  --l5h-lens-tray: color-mix(in srgb, var(--lg-paper) 93%, rgb(var(--lg-ink-rgb, 35, 36, 31)));
 }
 .logos-root .l5 .l5b-lines {
   position: absolute;
@@ -3078,8 +3308,8 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   --l5b-line: rgba(var(--lg-ink-rgb), 0.3);
   --l5b-ring: rgba(var(--lg-ink-rgb), 0.26);
   --l5b-name: rgba(var(--lg-ink-rgb), 0.55);
-  --l5h-lens-on: #e9e6dc;
-  --l5h-lens-ink: #141b2b;
+  /* on a dark ground the tray is a recess darker than it, so the chosen key's face reads raised */
+  --l5h-lens-tray: color-mix(in srgb, var(--lg-paper) 70%, #000);
 }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5b-hub {
   --l5b-disc: var(--c);
@@ -3223,9 +3453,11 @@ html[data-theme="night"] .logos-root .l5 .l5h-find:focus-within {
   border-color: rgba(240, 216, 158, 0.42);
   box-shadow: 0 0 0 4px rgba(240, 216, 158, 0.08), 0 0 40px -6px rgba(140, 170, 255, 0.25);
 }
+/* the chosen lens: a key raised in the glass, its edge caught in the gold of what is lit */
 html[data-theme="night"] .logos-root .l5 .l5h-lens-pill {
-  background: linear-gradient(180deg, #f6e4b4, #e2c483);
-  box-shadow: 0 0 18px rgba(240, 216, 158, 0.45), 0 6px 16px -8px rgba(0, 0, 0, 0.6);
+  border-color: rgba(var(--lg-primary-rgb), 0.42);
+  background: var(--l5-raise);
+  box-shadow: 0 0 16px rgba(var(--lg-primary-rgb), 0.16), var(--l5b-ledge);
 }
 html[data-theme="night"] .logos-root .l5 .l5b-card-t {
   color: #f3f0fa;
@@ -3361,6 +3593,10 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
 .logos-root .l5 .l5h.is-narrow .l5h-sub-k {
   display: none;
 }
+.logos-root .l5 .l5h.is-narrow .l5h-sub .l5h-wt-step {
+  width: 32px;
+  height: 32px;
+}
 .logos-root .l5 .l5h.is-narrow .l5h-weektitle .l5h-sub-k {
   display: inline;
   font-size: 9.5px;
@@ -3377,11 +3613,12 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
 .logos-root .l5 .l5h.is-narrow .l5h-lens {
   width: 100%;
 }
+/* a phone: the tray the row's width, its keys 32px — with the tray's edge, as tall as the tools beside it */
 .logos-root .l5 .l5h.is-narrow .l5h-lens button {
   flex: 1 1 0;
-  min-height: 34px;
+  min-height: 32px;
   padding: 0 6px;
-  font-size: 17px;
+  font-size: 13.5px;
 }
 /* One row, as the 640px rules intend: the lenses, then undo and View beside
    them. The tools used to be pinned to the top corner, which put them on top
@@ -3404,6 +3641,7 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   height: 40px;
   min-width: 40px;
   padding: 0 8px;
+  border-radius: var(--l5b-r);
 }
 .logos-root .l5 .l5h.is-narrow .l5h-foot {
   padding: 0 12px calc(12px + env(safe-area-inset-bottom, 0px));

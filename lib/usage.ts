@@ -15,16 +15,22 @@
 // bought unlimited Research. Everything metered now comes from here, so the
 // client's opinion of its own usage is only ever used to draw the UI.
 //
-// FAILS OPEN, on purpose. If the table is missing — a deployment that has not
-// run the migration — the boundary lifts rather than closing. A free user
-// getting more than they should is a pricing question; a paying user locked
-// out by an unrun migration is a broken product, and the second is worse.
+// WHEN THE STORE CANNOT BE READ. A momentary read error lets the action through
+// — an outage never blocks anyone mid-thought. A MISSING TABLE is different: it
+// is a deployment that has not run supabase/freemium.sql, and it used to lift
+// every free limit silently, for good (that is how free accounts drew a third
+// and fourth map, November 2026). Now the free plan's monthly allowances —
+// conversations, Logic Maps, nodes, artifacts, documents — are paused while the
+// table is missing, with a sentence that says so (lib/quota.ts
+// QUOTA_UNAVAILABLE), and the log says why. Socria One is never paused by it,
+// and the fair-use ceilings both plans share still lift, as before.
 
 import { supabaseAdmin } from './supabase';
 import {
   COUNTER_SCOPE,
   isSpent,
   limitOf,
+  TIERED_COUNTERS,
   type Counter,
 } from './entitlements';
 import { chatMarkerScope, chatScopeFor, dayKey, foldUsageRows, type UsageRow } from './usage-scope';
@@ -61,6 +67,50 @@ function unavailable(error: { message?: string; code?: string } | null): boolean
     m.includes('42p01') || // undefined_table
     m.includes('42883') // undefined_function
   );
+}
+
+/**
+ * Whether the usage table itself is missing — a deployment that has not run
+ * supabase/freemium.sql. Asked once a minute per instance, not per request.
+ * A table that answers with any other error is not "missing": that is a
+ * momentary fault, and the caller lets the action through.
+ */
+// once a minute by default; USAGE_STORE_MEMO_MS=0 asks every time (the suite changes the store under it)
+const storeMemoMs = () => {
+  const v = Number(process.env.USAGE_STORE_MEMO_MS);
+  return Number.isFinite(v) && v >= 0 ? v : 60_000;
+};
+let storeMemo: { missing: boolean; at: number } | null = null;
+let saidMissing = false;
+export async function usageStoreMissing(now = Date.now()): Promise<boolean> {
+  if (storeMemo && now - storeMemo.at < storeMemoMs()) return storeMemo.missing;
+  let missing = false;
+  try {
+    const { error } = await supabaseAdmin().from('logos_usage').select('n').limit(1);
+    if (error) {
+      const m = `${error.code ?? ''} ${error.message ?? ''}`.toLowerCase();
+      missing = m.includes('42p01') || m.includes('pgrst205') || ((m.includes('relation') || m.includes('table')) && (m.includes('does not exist') || m.includes('could not find')));
+    }
+  } catch {
+    missing = false;
+  }
+  storeMemo = { missing, at: now };
+  if (missing && !saidMissing) {
+    saidMissing = true;
+    console.error('[usage] logos_usage is missing — the free plan is paused until supabase/freemium.sql is run (docs/FREEMIUM.md)');
+  }
+  return missing;
+}
+
+/** For the suite: forget the memo, so a test can change the store under it. */
+export function forgetUsageStore(): void {
+  storeMemo = null;
+}
+
+/** Whether a free-plan allowance is held closed because its store is missing. */
+export async function pausedForMissingStore(plan: Plan, counter: Counter): Promise<boolean> {
+  if (plan !== 'free' || !TIERED_COUNTERS.includes(counter)) return false;
+  return usageStoreMissing();
 }
 
 /** How many times a counter has been spent in its scope. */
@@ -219,6 +269,8 @@ export interface Allowance {
   ok: boolean;
   used: number;
   limit: number | null;
+  /** refused because the usage table is missing, not because the allowance is spent */
+  unavailable?: boolean;
 }
 
 /**
@@ -236,6 +288,7 @@ export async function checkAllowance(
 ): Promise<Allowance> {
   const limit = limitOf(plan, counter);
   if (limit === null || !userId) return { ok: true, used: 0, limit };
+  if (await pausedForMissingStore(plan, counter)) return { ok: false, used: 0, limit, unavailable: true };
   const used = await readUsage(userId, counter, chatId);
   return { ok: !isSpent(plan, counter, used), used, limit };
 }

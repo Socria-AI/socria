@@ -127,7 +127,7 @@ import { addCard as addDraftCard, emptyDoc, isEmptyDoc, type CardKind, type Writ
 import { normalizeDraft, storedFrom } from '@/lib/write/parse';
 import { describeWriting, type WriteSel } from '@/lib/write/focus';
 import type { AssistInput, AssistResult } from '@/lib/write/assist';
-import { boundaryNote, COUNTER_NOUN, COUNTERS, DIRECT_UPLOAD_BYTES, FEATURE_NOTE, limitsFor, nearLimit, type Counter } from '@/lib/entitlements';
+import { boundaryNote, COUNTER_NOUN, COUNTERS, DIRECT_UPLOAD_BYTES, FEATURE_NOTE, limitsFor, nearLimit, resetsAt, type Counter } from '@/lib/entitlements';
 import { failureText, sendFailure } from '@/lib/upstream-error';
 import { isModelOp, parseVizOps, stripVizOps, type VizModelState, type VizOp } from '@/lib/viz-model';
 import {
@@ -192,6 +192,8 @@ import type { UniverseIn } from '@/lib/logos5/universe';
 import { checkPractice, clozeFrom, intentOf, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
 import { restudy, studyIn, type StudyState } from '@/lib/objects/display-study';
 import './logos5/l5.css';
+import './logos5/buttons.css';
+import './one/one-sheet.css';
 import './logos5/redesign.css';
 import './logos5/l5v.css';
 import { CaptureInbox } from './CaptureInbox';
@@ -541,6 +543,9 @@ export function LogosApp({
   // Just came back from a completed checkout.
   const [oneWelcome, setOneWelcome] = useState(false);
   const one = plan === 'one';
+  // what the plan is now, for work that runs after the render that started it (drawOwed)
+  const oneRef = useRef(one);
+  oneRef.current = one;
   useThemeGuard(one, planKnown);
   // THE ACCOUNT, FROM HERE TOO.
   //
@@ -2360,6 +2365,11 @@ export function LogosApp({
     setActiveId(id);
     activeIdRef.current = id;
     chronRef.current = [...(sessionsRef.current.find((s) => s.id === id)?.messages ?? [])];
+    // The map follows at once, not on the next render: a map pass sent in the
+    // moment after switching carried the PREVIOUS conversation's map with the
+    // new conversation's id — its cards into the new map, and (before the map
+    // route stopped trusting what it is sent) a new map that was never counted.
+    mapRef.current = sessionsRef.current.find((s) => s.id === id)?.map ?? EMPTY_MAP;
     // Everything below is about one session's nodes — none of it carries over.
     exploreCache.current.clear();
     setExploredIds(new Set());
@@ -2661,6 +2671,12 @@ export function LogosApp({
           void refreshUsage(forSession);
           const c = body?.upgrade === 'nodes' ? 'nodes' : 'maps';
           if (forSession === activeIdRef.current && !ask(reasonForCounter(c))) setBuildNote(body?.error || boundaryNote(c));
+          return;
+        }
+        // the free plan is paused (its usage table is missing): said, never silent
+        if (res.status === 503) {
+          const body = await res.json().catch(() => ({}));
+          if (body?.unavailable && forSession === activeIdRef.current && typeof body.error === 'string') setBuildNote(body.error);
           return;
         }
         if (res.ok) {
@@ -3421,8 +3437,15 @@ export function LogosApp({
     // THE FREE PLAN'S NODES (lib/entitlements.ts): ten a month across every map, the ones added by hand
     // included. Past them, an addition is refused here, with the paywall; the rest of an edit is not.
     const counting = !one && !!isSignedIn;
-    if (counting && edits.some((e) => e.op === 'add') && spentOf('nodes')) {
+    const adding = edits.some((e) => e.op === 'add');
+    if (counting && adding && spentOf('nodes')) {
       if (!ask('nodes-spent')) setError(boundaryNote('nodes'));
+      return null;
+    }
+    // a map begun by hand is one of the month's maps too
+    const firstOfMap = !(current.map?.nodes ?? []).length;
+    if (counting && adding && firstOfMap && spentOf('maps')) {
+      if (!ask('maps-spent')) setError(boundaryNote('maps'));
       return null;
     }
     const out = applyMapEdits(current.map, edits);
@@ -3444,9 +3467,26 @@ export function LogosApp({
     const fresh = out.map.nodes.filter((n) => !before.has(n.id)).map((n) => n.id);
     // …and what was added is taken from the month's allowance on the server (app/api/logos/allowance)
     if (counting && fresh.length) {
-      void fetch('/api/logos/allowance', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ counter: 'nodes', n: fresh.length }) })
-        .then((r) => {
-          if (r.status === 402) ask('nodes-spent');
+      void fetch('/api/logos/allowance', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ counter: 'nodes', n: fresh.length, sessionId: current.id, newMap: firstOfMap }),
+      })
+        .then(async (r) => {
+          if (r.status === 402 || r.status === 503) {
+            // the server said no: the cards just added come back off the map, with
+            // every connection to them — the allowance is the server's, not this page's
+            const body = await r.json().catch(() => ({}));
+            const gone = new Set(fresh);
+            const without = (m: TMap): TMap => ({ ...m, nodes: m.nodes.filter((n) => !gone.has(n.id)), edges: m.edges.filter((e) => !gone.has(e.from) && !gone.has(e.to)) });
+            patchSession(current.id, (x) => (x.map ? { ...x, map: without(x.map) } : x));
+            if (current.id === activeIdRef.current) mapRef.current = without(mapRef.current);
+            if (r.status === 503) setError(typeof body?.error === 'string' ? body.error : 'Your free plan can’t be checked right now.');
+            else {
+              const c: Counter = body?.upgrade === 'maps' ? 'maps' : 'nodes';
+              if (!ask(reasonForCounter(c))) setError(typeof body?.error === 'string' ? body.error : boundaryNote(c));
+            }
+          }
           void refreshUsage(current.id);
         })
         .catch(() => {});
@@ -5976,9 +6016,15 @@ export function LogosApp({
     return history ? { ...kept, history } : kept;
   }
 
-  /** Draw the maps still owed, one at a time, until none are left or the pass says to stop. */
+  /**
+   * Draw the maps still owed, one at a time, until none are left or the pass says to stop.
+   * Socria One only: on the free plan every map is one of the month's two, and
+   * drawing old conversations' maps in the background would spend them without
+   * anyone asking — each is drawn instead when its conversation is opened, and
+   * counted then. The list waits, so a member's maps are still drawn later.
+   */
   async function drawOwed() {
-    if (drawingRef.current) return;
+    if (drawingRef.current || !oneRef.current) return;
     drawingRef.current = true;
     const store = browserStorage();
     let done = 0;
@@ -6000,6 +6046,7 @@ export function LogosApp({
             method: 'POST',
             headers: { 'Content-Type': 'application/json', ...keyHeaders() },
             body: JSON.stringify({
+              sessionId: id,
               messages: s.messages,
               map: s.map ?? { ...EMPTY_MAP },
               contexts: s.contexts ?? {},
@@ -6109,7 +6156,7 @@ export function LogosApp({
       }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [l5, cloud, hydrating, firstRun.ready]);
+  }, [l5, cloud, hydrating, firstRun.ready, one]);
   useEffect(() => {
     setStudyTopic(null);
     setStudyNote(null);
@@ -7186,19 +7233,24 @@ export function LogosApp({
                 sell; the title goes into the file and nowhere else. */}
             <button
               type="button"
-              className="lg-panel-save"
+              className="l5-btn is-sm lg-panel-save"
               hidden={firstMapNote}
               disabled={!map.nodes.length || mapping}
               onClick={() => void exportMapPng(map, active?.title && active.title !== UNTITLED ? active.title : 'A line of thinking')}
+              title="Save this as a picture"
+              aria-label="Save image"
             >
-              Save as image
+              <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M8 2.5v7.5M4.8 7l3.2 3.2L11.2 7M3 12.5h10" />
+              </svg>
+              <span className="lg-panel-save-l">Save image</span>
             </button>
             {/* Logos 3 remembers through the Mind graph; this is where you see
                 how this line of thinking connects to everything else. */}
             {primary && workspaceOn && cloud && (
               <button
                 type="button"
-                className={`lg-panel-mind${mindOpen ? ' is-on' : ''}`}
+                className={`l5-btn is-sm lg-panel-mind${mindOpen ? ' is-on' : ''}`}
                 aria-pressed={mindOpen}
                 onClick={() => setMindOpen((v) => !v)}
               >
@@ -7286,6 +7338,7 @@ export function LogosApp({
           ) : (
           <ThinkingMap
             key={`tm-${lens ?? ''}`}
+            emptyNote={mapsLockedNote}
             // where the person put this line of thinking's cards, kept for it
             layoutKey={activeId}
             // on a big screen the cards are drawn larger, and a big map is never fitted below pressable
@@ -7633,6 +7686,31 @@ export function LogosApp({
     );
   };
   const userTurns = messages.filter((m) => m.role === 'user').length;
+  // The month's maps are used and this conversation has none: say so where the map would be — on a
+  // phone's Logic Map view and in the desktop canvas alike — instead of offering a button the server
+  // would only refuse. The conversation itself carries on.
+  const mapsLocked = !one && spentOf('maps') && userTurns > 0 && !togetherReadOnly && map.nodes.length === 0;
+  const mapsLockedNote = mapsLocked ? (
+      <div className="os-locked" role="note">
+        <p className="os-brand">
+          <span className="os-mono" aria-hidden="true">
+            <span>I</span>
+          </span>
+          Socria One
+        </p>
+        <h2>You’ve used this month’s free Logic Maps.</h2>
+        <p>{boundaryNote('maps')}</p>
+        <button type="button" className="l5-btn is-primary is-one is-wide" onClick={() => askOne(boundaryNote('maps'), true)}>
+          See Socria One <span className="l5-ar" aria-hidden="true">→</span>
+        </button>
+        {(() => {
+          const when = resetsAt('maps');
+          return when ? (
+            <p className="os-when">Your free maps start again on {new Date(when).toLocaleDateString('en-GB', { day: 'numeric', month: 'long', timeZone: 'UTC' })}.</p>
+          ) : null;
+        })()}
+      </div>
+  ) : null;
   // A guest using Socria a lot: the sign-up card. With the conversation on
   // screen it sits in the dock above the box, in the flow, so it covers neither
   // the box nor the end of the conversation; anywhere else it floats, lifted
@@ -8154,15 +8232,19 @@ export function LogosApp({
   const logicView = wsLayout ? (
     <div className="l5v-logic">
       {map.nodes.length === 0 && !mapping ? (
-        <div className="l5v-empty">
-          <h2>Nothing mapped yet.</h2>
-          <p>{userTurns ? 'The Logic Map draws your ideas — how they connect, what rests on what, where they pull against each other — in whatever shape your thinking takes.' : 'Say what you are working through, and your ideas can be drawn here.'}</p>
-          {userTurns > 0 && !togetherReadOnly && (
-            <button type="button" className="l5v-btn is-primary" onClick={() => refreshMap()} disabled={busy}>
-              Map this conversation
-            </button>
-          )}
-        </div>
+        mapsLocked ? (
+          mapsLockedNote
+        ) : (
+          <div className="l5v-empty">
+            <h2>Nothing mapped yet.</h2>
+            <p>{userTurns ? 'The Logic Map draws your ideas — how they connect, what rests on what, where they pull against each other — in whatever shape your thinking takes.' : 'Say what you are working through, and your ideas can be drawn here.'}</p>
+            {userTurns > 0 && !togetherReadOnly && (
+              <button type="button" className="l5-btn is-primary" onClick={() => refreshMap()} disabled={busy}>
+                Map this conversation
+              </button>
+            )}
+          </div>
+        )
       ) : (
         <Workspace
           layout={wsLayout}

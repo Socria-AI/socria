@@ -196,8 +196,12 @@
   height: 56px;
   min-width: 56px;
   padding: 0 18px;
-  border-radius: 28px;
+  /* the keys' softened corner at a finger's size (components/logos5/buttons.css), not a pill */
+  border-radius: 14px;
   font-size: 17px;
+}
+.logos-root.is-cabin :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-iconbtn {
+  border-radius: 14px;
 }
 .logos-root.is-cabin .l5v-search {
   width: min(520px, 34vw);
@@ -243,7 +247,12 @@
 .logos-root.is-cabin .sv-btn {
   height: 56px;
   padding: 0 14px;
+  border-radius: 14px;
   font-size: 18px;
+}
+/* the composer's glyph keys at this size take the same corner; the send stays a circle */
+.logos-root.is-cabin .l5-ctools :is(.lg-plus .l5-iconbtn, .lg-mic, .lg-mathbtn) {
+  border-radius: 14px;
 }
 .logos-root.is-cabin .l5-ctools .mp-btn .nm {
   font-size: 19px;

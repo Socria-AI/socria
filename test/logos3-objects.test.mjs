@@ -312,6 +312,16 @@ console.log('\n=== the Work lens: the object, its trail, and what is said about 
   const sp2 = O.seek(sp, 'A', 1);
   const L2 = layoutWork({ ...map, objects: sp2 }, 1000, 600);
   ok('a state stepped back from is shown as undone, not erased', L2.placed.find((p) => p.id === 'obj:A@2')?.objRef.undone === true);
+  // A live figure is as tall as what it holds (its step, chips, step navigator): the canvas measures
+  // it and the layout leaves that much room, so the trail is laid out under it, never over it.
+  const tall = layoutWork(map, 1000, 600, { 'obj:A': 720, 'obj:A@1': 150 });
+  const live = tall.placed.find((p) => p.id === 'obj:A');
+  const trail = tall.placed.filter((p) => p.id.startsWith('obj:A@'));
+  ok('a measured figure is laid out at its measured height', live?.h === 720 && trail.some((t) => t.h === 150), JSON.stringify({ live: live?.h, trail: trail.map((t) => t.h) }));
+  ok('  and its trail starts below it, not across it', trail.every((t) => t.y - t.h / 2 >= live.y + live.h / 2), JSON.stringify({ liveBottom: live.y + live.h / 2, trailTops: trail.map((t) => t.y - t.h / 2) }));
+  const shorter = layoutWork(map, 1000, 600, { 'obj:A': 10 });
+  ok('  a measurement never shrinks a figure below its declared size', shorter.placed.find((p) => p.id === 'obj:A').h === L.placed.find((p) => p.id === 'obj:A').h);
+  ok('  the canvas measures live figures and lays the lens out again', /layoutWork\(map, w, h, objH\)/.test(read('components/ThinkingMap.tsx')) && /new ResizeObserver\(read\)/.test(read('components/ThinkingMap.tsx')));
 }
 
 console.log('\n=== REPRESENTATION BENCHMARK: does the view chosen expose the object of thought? ===');

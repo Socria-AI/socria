@@ -21,7 +21,7 @@ import { adoptConversation, releaseConversation } from '@/lib/mind/projects';
 import { mergeStaleMap } from '@/lib/map-edit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote } from '@/lib/entitlements';
-import { claimUnit } from '@/lib/quota';
+import { claimUnit, QUOTA_UNAVAILABLE } from '@/lib/quota';
 import { madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { sanitizeStoredDraft, type StoredDraft } from '@/lib/write/doc';
 
@@ -581,17 +581,22 @@ async function moveToProject(userId: string, id: string, raw: unknown) {
  * One is not counted.
  */
 async function holdArtifacts(userId: string, plan: 'free' | 'one', id: string, before: unknown, after: ReturnType<typeof sanitizeMap>) {
-  if (plan === 'one') return { map: after, refused: null as Made | null };
+  if (plan === 'one') return { map: after, refused: null as Made | null, paused: false };
   const was = before && typeof before === 'object' ? sanitizeMap(before, { trust: 'stored' }) : EMPTY_MAP;
   const made = madeArtifacts(was, after);
-  if (!madeAny(made)) return { map: after, refused: null as Made | null };
+  if (!madeAny(made)) return { map: after, refused: null as Made | null, paused: false };
   const refused: Made = { objects: [], models: [], picture: false };
-  const take = async (what: string) => (await claimUnit(userId, plan, 'artifacts', `${id}:${what}`)).ok;
+  let paused = false;
+  const take = async (what: string) => {
+    const c = await claimUnit(userId, plan, 'artifacts', `${id}:${what}`);
+    if (!c.ok && c.unavailable) paused = true;
+    return c.ok;
+  };
   for (const o of made.objects) if (!(await take(`obj:${o}`))) refused.objects.push(o);
   for (const m of made.models) if (!(await take(`model:${m}`))) refused.models.push(m);
   if (made.picture && !(await take('picture'))) refused.picture = true;
-  if (!madeAny(refused)) return { map: after, refused: null as Made | null };
-  return { map: withoutArtifacts(after, was, refused) as ReturnType<typeof sanitizeMap>, refused };
+  if (!madeAny(refused)) return { map: after, refused: null as Made | null, paused: false };
+  return { map: withoutArtifacts(after, was, refused) as ReturnType<typeof sanitizeMap>, refused, paused };
 }
 
 export async function PUT(req: NextRequest) {
@@ -708,6 +713,7 @@ export async function PUT(req: NextRequest) {
     // the plan, once: a free account's new artifacts are claimed before the write (holdArtifacts)
     const plan = (await resolvePlanForRequest(req, userId)) === 'one' ? 'one' : 'free';
     let refusedArtifacts: Made | null = null;
+    let refusedPaused = false;
     // what the stored row held, for a save that does not read it below (an older client's)
     let storedMap: unknown = null;
     if (plan === 'free' && !versioned) {
@@ -749,6 +755,7 @@ export async function PUT(req: NextRequest) {
         const held = await holdArtifacts(userId, plan, c.id, storedMap, extras.map);
         extras.map = held.map;
         refusedArtifacts = held.refused;
+        refusedPaused = held.paused;
       }
 
       // Where the project id goes when its column is missing along with the
@@ -839,7 +846,9 @@ export async function PUT(req: NextRequest) {
         updatedAt: base.updated_at,
         ...(merged ? { merged: true } : {}),
         // artifacts the month had no room for, not kept — for the page to take back and say why
-        ...(refusedArtifacts ? { refused: { artifacts: refusedArtifacts, note: boundaryNote('artifacts'), upgrade: 'artifacts' } } : {}),
+        ...(refusedArtifacts
+          ? { refused: { artifacts: refusedArtifacts, note: refusedPaused ? QUOTA_UNAVAILABLE : boundaryNote('artifacts'), ...(refusedPaused ? { unavailable: true } : { upgrade: 'artifacts' }) } }
+          : {}),
       });
     }
     return NextResponse.json({ error: 'This conversation is being saved from somewhere else at the same moment — it will be saved with the next change.' }, { status: 409 });

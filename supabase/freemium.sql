@@ -1,15 +1,64 @@
 -- supabase/freemium.sql — the free plan's allowances, spent atomically.
 --
 -- The freemium change of October 31, 2026 (docs/FREEMIUM.md). Paste into the
--- Supabase SQL Editor once, before or after the code ships — it is safe to run
--- again, and it changes no row: it adds a check (NOT VALID, so old rows are not
--- scanned) and four functions beside bump_logos_usage. The same statements are
+-- Supabase SQL Editor once and run it — it is safe to run again, and it
+-- changes no existing row. It creates EVERYTHING the free plan's limits need:
+-- the usage table (if this database never had it), the counting function, a
+-- non-negative check (NOT VALID, so old rows are not scanned) and the four
+-- functions that refuse and count in one statement. The same statements are
 -- in supabase/schema.sql, which stays the whole schema in one file.
 --
--- Until it is applied the code still counts, through the older read-then-bump
--- path (lib/quota.ts says so in the log) — right except when two requests race
--- for the last unit of an allowance. Without the logos_usage table itself
--- (supabase/schema.sql), no free limit is enforced at all.
+-- WITHOUT THE TABLE the free plan cannot be counted at all, and the server
+-- pauses it: new conversations, Logic Maps, artifacts and documents answer
+-- "Your free plan can't be checked right now" (lib/quota.ts
+-- QUOTA_UNAVAILABLE) until this has been run. Without only the functions, the
+-- code still counts, through the older read-then-bump path — right except
+-- when two requests race for the last unit of an allowance.
+--
+-- Check it worked: signed in, open /api/health/upstream — `usage` should read
+-- { table: true, functions: true }.
+
+-- ── The usage table and its counter (lib/usage.ts) ───────────────────
+--
+-- One row per (person, scope, counter). `scope` is what the counter resets
+-- with: a calendar month for the monthly ones ('2026-11'), or a marker for a
+-- thing charged once ('mapmark:<conversation>'). Deliberately not in
+-- `conversations`: a count must survive the conversation being deleted, or
+-- deleting a chat would refund what it spent.
+create table if not exists logos_usage (
+  user_id text not null,
+  scope text not null,
+  counter text not null,
+  n integer not null default 0,
+  updated_at bigint not null,
+  primary key (user_id, scope, counter)
+);
+
+create index if not exists logos_usage_user_scope_idx
+  on logos_usage (user_id, scope);
+
+-- Only the server (service role) reads and writes it; nobody signed in reads
+-- another person's counts through the public API.
+alter table logos_usage enable row level security;
+
+-- Atomic increment: read-then-write from the application would race two tabs
+-- against each other and lose counts; this cannot.
+create or replace function bump_logos_usage(
+  p_user text, p_scope text, p_counter text, p_by integer, p_at bigint
+) returns integer
+language plpgsql
+as $$
+declare
+  out_n integer;
+begin
+  insert into logos_usage (user_id, scope, counter, n, updated_at)
+  values (p_user, p_scope, p_counter, p_by, p_at)
+  on conflict (user_id, scope, counter)
+  do update set n = logos_usage.n + p_by, updated_at = p_at
+  returning n into out_n;
+  return out_n;
+end;
+$$;
 
 -- ── Free-tier allowances, spent atomically (lib/quota.ts) ─────────────
 --

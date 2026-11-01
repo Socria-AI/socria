@@ -1,0 +1,349 @@
+/* components/logos5/buttons.css — HOW A BUTTON IN LOGOS 5 LOOKS AND BEHAVES.
+ *
+ * One language for every action, so a button reads as a button wherever it
+ * is, and the most important one on a surface is plain at a glance:
+ *
+ *   .l5-btn               secondary — card stock on the paper: a hairline edge
+ *                          and a one-pixel ledge under it, so it sits up off
+ *                          the page the way a key does
+ *   .l5-btn.is-primary    the one way on — filled in the primary ink, lit from
+ *                          above, with a darker lip; at most one per surface
+ *   .l5-btn.is-one        the primary in Socria One's blue (only for buying it)
+ *   .l5-btn.is-quiet      no frame; for the way to stay, or a lesser action
+ *   .l5-btn.is-danger     what cannot be undone
+ *   .l5-btn.is-on         a toggle that is on (aria-pressed), or an open menu
+ *   .l5-btn.is-sm         32px — inside dense panels
+ *   .l5-icon-btn          a square for one glyph (always with aria-label)
+ *   .l5-seg / .l5-seg-b   a choice of one: a tray with the chosen one raised
+ *   .l5-menu / .l5-mi     what a "More" button opens
+ *
+ * Not pills: a full round end is the generic web control. A softened
+ * rectangle with a real edge and a ledge is the product's paper, ink and
+ * letterpress. Press feedback is physical — down a pixel, the ledge gone —
+ * and reduced motion keeps the colour change without the travel. Every colour
+ * is a theme token, so Paper, White, Dark, One and Night draw it in their own
+ * light. Targets are 40px (32px small) with the hit area never under 32px.
+ */
+
+/* declared again on .l5, where --l5-surface is defined: a custom property
+   resolves where it is declared, so on .logos-root alone the face would never
+   see Logos 5's surface */
+:is(.logos-root, .lg-tokens),
+.logos-root .l5 {
+  --l5b-r: 12px;
+  --l5b-r-sm: 9px;
+  --l5b-face: var(--l5-surface, var(--lg-panel, #faf8f2));
+  --l5b-edge: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.15);
+  --l5b-edge-hi: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.28);
+  --l5b-ledge: 0 1px 0 rgba(var(--lg-ink-rgb, 35, 36, 31), 0.07), 0 1px 3px -1px rgba(var(--shadow-rgb, 35, 36, 31), 0.12);
+  --l5b-ink: var(--lg-ink, #23241f);
+  --l5b-ink-2: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.66);
+  --l5b-wash: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.055);
+  --l5b-fill: var(--lg-primary, #354620);
+  --l5b-fill-rgb: var(--lg-primary-rgb, 53, 70, 32);
+  --l5b-on-fill: var(--l5-on-primary, #f5f3eb);
+  --l5b-danger: var(--lg-tension, #9c5b3c);
+  --l5b-focus: var(--lg-primary, #354620);
+}
+
+/* ── secondary: the default ─────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-btn {
+  --l5b-h: 40px;
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: var(--l5b-h);
+  padding: 0 15px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
+  font: inherit;
+  font-family: var(--lg-sans, inherit);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1.2;
+  letter-spacing: 0;
+  text-transform: none;
+  text-decoration: none;
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+:is(.logos-root, .lg-tokens) .l5-btn svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--l5b-ink-2);
+  transition: transform 0.18s, color 0.15s;
+}
+:is(.logos-root, .lg-tokens) .l5-btn:hover:not(:disabled) {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+:is(.logos-root, .lg-tokens) .l5-btn:hover:not(:disabled) svg {
+  color: var(--l5b-ink);
+}
+:is(.logos-root, .lg-tokens) .l5-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+:is(.logos-root, .lg-tokens) .l5-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+:is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon-btn, .l5-seg-b, .l5-mi):focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
+}
+
+/* the small size, for dense panels and toolbars */
+:is(.logos-root, .lg-tokens) .l5-btn.is-sm {
+  --l5b-h: 32px;
+  gap: 6px;
+  padding: 0 11px;
+  border-radius: var(--l5b-r-sm);
+  font-size: 13px;
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-sm svg {
+  width: 14px;
+  height: 14px;
+}
+
+/* ── primary: the one way on ────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary {
+  padding: 0 18px;
+  border: 1px solid color-mix(in srgb, var(--l5b-fill) 78%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
+    0 8px 18px -12px rgba(var(--l5b-fill-rgb), 0.9);
+  color: var(--l5b-on-fill);
+  font-size: 14px;
+  font-weight: 600;
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary svg {
+  color: currentColor;
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
+  transform: translateY(-1px);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:hover:not(:disabled) .l5-ar {
+  transform: translateX(2px);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+:is(.logos-root, .lg-tokens) .l5-btn .l5-ar {
+  display: inline-block;
+  transition: transform 0.18s;
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-wide {
+  width: 100%;
+  min-height: 46px;
+  font-size: 15px;
+}
+
+/* Socria One's blue, for the button that buys it and nothing else */
+:is(.logos-root, .lg-tokens) .l5-btn.is-one {
+  --l5b-fill: var(--lg-one, #26485a);
+  --l5b-fill-rgb: 38, 72, 90;
+  --l5b-on-fill: #fff;
+  --l5b-focus: var(--lg-one, #26485a);
+}
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) :is(.logos-root, .lg-tokens) .l5-btn.is-one {
+  --l5b-on-fill: var(--lg-paper);
+  --l5b-fill-rgb: 150, 190, 210;
+}
+
+/* ── quiet, on, danger ──────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-btn.is-quiet {
+  border-color: transparent;
+  background: transparent;
+  box-shadow: none;
+  color: var(--l5b-ink-2);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-quiet:hover:not(:disabled) {
+  border-color: transparent;
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-on {
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-on svg {
+  color: var(--l5b-fill);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger {
+  border-color: color-mix(in srgb, var(--l5b-danger) 40%, transparent);
+  color: var(--l5b-danger);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger svg {
+  color: currentColor;
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger:hover:not(:disabled) {
+  border-color: var(--l5b-danger);
+  background: color-mix(in srgb, var(--l5b-danger) 8%, var(--l5b-face));
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger.is-solid {
+  border-color: color-mix(in srgb, var(--l5b-danger) 80%, #000);
+  background: var(--l5b-danger);
+  color: #fff;
+}
+
+/* ── a square for one glyph ─────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-icon-btn {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 36px;
+  height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--l5b-ink-2);
+  font: inherit;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, transform 0.12s;
+}
+:is(.logos-root, .lg-tokens) .l5-icon-btn svg {
+  width: 17px;
+  height: 17px;
+}
+:is(.logos-root, .lg-tokens) .l5-icon-btn:hover:not(:disabled) {
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
+}
+:is(.logos-root, .lg-tokens) .l5-icon-btn:active:not(:disabled) {
+  transform: translateY(1px);
+}
+:is(.logos-root, .lg-tokens) .l5-icon-btn:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+:is(.logos-root, .lg-tokens) .l5-icon-btn.is-framed {
+  border-color: var(--l5b-edge);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+}
+:is(.logos-root, .lg-tokens) .l5-icon-btn.is-sm {
+  width: 30px;
+  height: 30px;
+  border-radius: 8px;
+}
+
+/* ── a choice of one ────────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-seg {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  padding: 3px;
+  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.08);
+  border-radius: var(--l5b-r);
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.05);
+}
+:is(.logos-root, .lg-tokens) .l5-seg-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 30px;
+  padding: 0 12px;
+  border: 1px solid transparent;
+  border-radius: var(--l5b-r-sm);
+  background: transparent;
+  color: var(--l5b-ink-2);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
+}
+:is(.logos-root, .lg-tokens) .l5-seg-b:hover:not([aria-pressed='true']):not([aria-selected='true']) {
+  color: var(--l5b-ink);
+}
+:is(.logos-root, .lg-tokens) .l5-seg-b:is([aria-pressed='true'], [aria-selected='true'], .is-on) {
+  border-color: var(--l5b-edge);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
+}
+
+/* ── what a "More" button opens ─────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-menu {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: 14px;
+  background: var(--l5b-face);
+  box-shadow:
+    0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.06),
+    0 18px 40px -18px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
+}
+:is(.logos-root, .lg-tokens) .l5-mi {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 9px;
+  background: transparent;
+  color: var(--l5b-ink);
+  font: inherit;
+  font-size: 13.5px;
+  text-align: left;
+  cursor: pointer;
+}
+:is(.logos-root, .lg-tokens) .l5-mi svg {
+  width: 16px;
+  height: 16px;
+  flex: none;
+  color: var(--l5b-ink-2);
+}
+:is(.logos-root, .lg-tokens) .l5-mi:hover,
+:is(.logos-root, .lg-tokens) .l5-mi:focus-visible {
+  background: var(--l5b-wash);
+}
+:is(.logos-root, .lg-tokens) .l5-mi.is-on {
+  color: var(--l5b-fill);
+}
+:is(.logos-root, .lg-tokens) .l5-mi.is-danger,
+:is(.logos-root, .lg-tokens) .l5-mi.is-danger svg {
+  color: var(--l5b-danger);
+}
+:is(.logos-root, .lg-tokens) .l5-menu-sep {
+  height: 1px;
+  margin: 4px 6px;
+  background: var(--l5b-edge);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon-btn, .l5-btn svg, .l5-btn .l5-ar) {
+    transition: none;
+  }
+  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon-btn):is(:hover, :active) {
+    transform: none !important;
+  }
+}
+@media (forced-colors: active) {
+  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon-btn.is-framed, .l5-seg-b[aria-pressed='true']) {
+    border: 1px solid ButtonText;
+  }
+}

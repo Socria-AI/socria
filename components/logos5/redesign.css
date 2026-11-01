@@ -89,17 +89,23 @@
   justify-self: end;
   gap: 10px;
 }
+/* the bar's keys (study.css .l5-unibtn), at the bar's 32px; a key that is on
+   is pressed in — the primary's wash and edge — not a filled pill */
 .logos-root .l5 .l5-unibtn {
-  height: 36px;
-  min-height: 36px;
-  background: var(--l5-paper-hi);
-  color: var(--lg-ink-60);
+  height: 32px;
+  min-height: 32px;
+  background: var(--l5b-face);
+  color: var(--l5b-ink);
 }
 .logos-root .l5 .l5-unibtn.is-on,
 .logos-root .l5 .l5-unibtn.is-list.is-on {
-  background: var(--lg-primary);
-  border-color: var(--lg-primary);
-  color: var(--l5-on-primary);
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
+}
+.logos-root .l5 .l5-unibtn.is-on svg {
+  color: var(--l5b-fill);
 }
 .logos-root .l5 .l5-unibtn .l5-count {
   display: inline-grid;
@@ -114,8 +120,8 @@
   font-weight: 600;
 }
 .logos-root .l5 .l5-unibtn.is-on .l5-count {
-  background: rgba(var(--l5-on-primary-rgb), 0.22);
-  color: var(--l5-on-primary);
+  background: rgba(var(--l5b-fill-rgb), 0.14);
+  color: var(--l5b-fill);
 }
 .logos-root .l5 .l5-mindbtn {
   width: 38px;
@@ -919,24 +925,54 @@
   gap: 8px;
   max-width: 960px;
 }
+/* each thing made, and + Write / + Make: keys (buttons.css, the small
+   secondary) — card stock with a hairline edge and a ledge, not outline pills;
+   the one open is pressed in, in the primary, as an open menu's key is */
 .logos-root .l5 .l5s-art-pill {
   display: inline-flex;
-  align-items: baseline;
+  align-items: center;
   gap: 8px;
   max-width: 320px;
-  min-height: 34px;
-  padding: 6px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-paper-hi);
-  color: var(--lg-ink);
+  min-height: 32px;
+  padding: 0 12px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
 }
-.logos-root .l5 .l5s-art-pill.is-on {
-  border-color: var(--lg-primary);
-  box-shadow: 0 0 0 1px var(--lg-primary);
+.logos-root .l5 .l5s-art-pill:hover {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .l5 .l5s-art-pill:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.logos-root .l5 .l5s-art-pill:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
+}
+.logos-root .l5 .l5s-art-pill:is(.is-on, [aria-expanded='true']) {
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 .l5s-art-pill {
+    transition: none;
+  }
+  .logos-root .l5 .l5s-art-pill:active {
+    transform: none;
+  }
 }
 /* choose what to make (lib/logos5/make.ts): in the empty Artifacts, and under "+ Make" */
 .logos-root .l5 .l5s-make-h {
@@ -953,11 +989,20 @@
 .logos-root .l5 .l5s-cempty .l5s-make {
   text-align: left;
 }
+/* what kind it is, before its name: in sentence case, quieter, a hairline between them */
 .logos-root .l5 .l5s-art-k {
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lg-ink-40);
+  flex: none;
+  padding-right: 8px;
+  border-right: 1px solid var(--l5b-edge);
+  font-size: 12px;
+  font-weight: 500;
+  letter-spacing: 0;
+  text-transform: none;
+  color: var(--l5b-ink-2);
+}
+.logos-root .l5 .l5s-art-pill.is-on .l5s-art-k {
+  border-right-color: rgba(var(--l5b-fill-rgb), 0.3);
+  color: inherit;
 }
 .logos-root .l5 .l5s-art-t {
   overflow: hidden;
@@ -1334,6 +1379,13 @@
   .logos-root .l5 .l5-head-rule,
   .logos-root .l5 .l5-eyebrow {
     display: none;
+  }
+  /* the bar's keys are their glyphs on a phone (study.css): a thumb wide, at the larger key's radius */
+  .logos-root .l5 .l5-unibtn {
+    min-width: 44px;
+    height: 44px;
+    padding: 0;
+    border-radius: var(--l5b-r);
   }
   .logos-root .l5 .l5-where .l5-title {
     font-size: 17px;

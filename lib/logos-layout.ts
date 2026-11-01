@@ -1297,7 +1297,16 @@ import { routeBetween } from './canvas';
 const TRAIL_GAP = 92;
 const TRAIL_MAX = 6;
 
-export function layoutWork(map: ThinkingMap, w: number, _h: number): Layout {
+/**
+ * `measured`: each figure's height as drawn, by placed id, when the canvas has
+ * measured it. A kind declares its size up front (lib/objects/), but a live
+ * figure grows with what it holds — the step it is on, its parameters, the
+ * chips that start something in the chat, the step navigator — and a function
+ * declared at 372px drew at nearly twice that, so the trail beneath was laid
+ * out over it. The declared size seats the first frame; the measured one wins
+ * from the next.
+ */
+export function layoutWork(map: ThinkingMap, w: number, _h: number, measured?: Readonly<Record<string, number>>): Layout {
   const objs = map.objects?.objs ?? [];
   if (!objs.length) return emptyLayout('work', 'Nothing to work on yet — write a matrix or a function and it appears here as itself.');
   const placed: Placed[] = [];
@@ -1312,7 +1321,8 @@ export function layoutWork(map: ThinkingMap, w: number, _h: number): Layout {
   for (const o of objs) {
     const k = kindOf(o.kind);
     if (!k) continue;
-    const live = k.size(currentOf(o), 'live');
+    const declared = k.size(currentOf(o), 'live');
+    const live = { w: declared.w, h: Math.max(declared.h, measured?.[`obj:${o.id}`] ?? 0) };
     const liveP: Placed = {
       id: `obj:${o.id}`,
       node: { id: `obj:${o.id}`, type: 'given', label: o.name },
@@ -1346,7 +1356,10 @@ export function layoutWork(map: ThinkingMap, w: number, _h: number): Layout {
     if (o.states.length > 1 && !isDisplayKind(o.kind)) {
       const last = o.states.length - 1;
       const first = Math.max(0, last - TRAIL_MAX + 1);
-      const sizes = o.states.slice(first).map((st) => k.size(st, 'trail'));
+      const sizes = o.states.slice(first).map((st, idx) => {
+        const sz = k.size(st, 'trail');
+        return { w: sz.w, h: Math.max(sz.h, measured?.[`obj:${o.id}@${first + idx}`] ?? 0) };
+      });
       const total = sizes.reduce((a, sz) => a + sz.w, 0) + TRAIL_GAP * (sizes.length - 1);
       const tall = Math.max(...sizes.map((sz) => sz.h));
       let x = w / 2 - total / 2;

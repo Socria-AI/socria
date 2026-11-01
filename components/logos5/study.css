@@ -45,28 +45,42 @@
 .logos-root .l5 .l5s-chip.is-src span[aria-hidden] {
   color: var(--lg-primary);
 }
+/* the study's buttons, in the product's one language (components/logos5/buttons.css):
+   .l5s-x a glyph, .l5s-btn a key of card stock, .l5s-go the one way on */
 .logos-root .l5 .l5s-x {
   width: 32px;
   height: 32px;
   border: 0;
-  border-radius: 999px;
+  border-radius: var(--l5b-r-sm);
   background: transparent;
-  color: var(--lg-ink-60);
+  color: var(--l5b-ink-2);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+.logos-root .l5 .l5s-x:hover {
+  background: var(--l5b-wash);
+  color: var(--l5b-ink);
 }
 
 .logos-root .l5 .l5s-btn {
   min-height: 40px;
   padding: 0 16px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  color: var(--lg-ink);
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
   font-size: 14px;
+  font-weight: 500;
   cursor: pointer;
+  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5s-btn:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: none;
 }
 .logos-root .l5 .l5s-btn:disabled,
 .logos-root .l5 .l5s-go:disabled,
@@ -80,14 +94,32 @@
   gap: 8px;
   min-height: 44px;
   padding: 0 20px;
-  border: 0;
-  border-radius: 999px;
-  background: var(--lg-primary);
-  color: var(--l5-on-primary);
+  border: 1px solid color-mix(in srgb, var(--l5b-fill) 78%, #000);
+  border-radius: var(--l5b-r);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
+    0 8px 18px -12px rgba(var(--l5b-fill-rgb), 0.9);
+  color: var(--l5b-on-fill);
   font: inherit;
   font-size: 15px;
-  font-weight: 500;
+  font-weight: 600;
   cursor: pointer;
+  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5s-go:hover:not(:disabled) {
+  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
+  transform: translateY(-1px);
+}
+.logos-root .l5 .l5s-go:active:not(:disabled) {
+  transform: translateY(1px);
+  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
+}
+.logos-root .l5 :is(.l5s-x, .l5s-btn, .l5s-go):focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5s-link {
   border: 0;
@@ -188,35 +220,67 @@
   justify-content: center;
   min-width: 0;
 }
+/* the bar's keys (Search, List, the way back): buttons.css's small secondary —
+   card stock with a hairline edge and a ledge, not a thin-outline pill */
 .logos-root .l5 .l5-unibtn {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 6px;
-  min-height: 34px;
-  padding: 0 12px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lg-ink);
+  min-height: 32px;
+  padding: 0 11px;
+  border: 1px solid var(--l5b-edge);
+  border-radius: var(--l5b-r-sm);
+  background: var(--l5b-face);
+  box-shadow: var(--l5b-ledge);
+  color: var(--l5b-ink);
   font: inherit;
-  font-size: 13.5px;
+  font-size: 13px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+}
+.logos-root .l5 .l5-unibtn svg {
+  flex: none;
+  color: var(--l5b-ink-2);
+  transition: color 0.15s;
+}
+.logos-root .l5 .l5-unibtn:hover {
+  border-color: var(--l5b-edge-hi);
+  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+}
+.logos-root .l5 .l5-unibtn:hover svg {
+  color: var(--l5b-ink);
+}
+.logos-root .l5 .l5-unibtn:active {
+  transform: translateY(1px);
+  box-shadow: none;
+}
+.logos-root .l5 .l5-unibtn:focus-visible {
+  outline: 2px solid var(--l5b-focus);
+  outline-offset: 2px;
 }
 
 .logos-root .l5 .l5-unibtn.is-new {
-  background: var(--lg-primary);
-  border-color: var(--lg-primary);
-  color: var(--l5-on-primary);
-  font-weight: 500;
+  border-color: color-mix(in srgb, var(--l5b-fill) 78%, #000);
+  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.16),
+    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000);
+  color: var(--l5b-on-fill);
+  font-weight: 600;
 }
 .logos-root .l5 .l5-unibtn.is-new span[aria-hidden] {
   font-size: 17px;
   line-height: 1;
 }
 .logos-root .l5 .l5-unibtn.is-list.is-on {
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.3);
+  border-color: rgba(var(--l5b-fill-rgb), 0.38);
+  background: rgba(var(--l5b-fill-rgb), 0.09);
+  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  color: var(--l5b-fill);
 }
 
 /* ── the study's own screen ───────────────────────────────────────── */
@@ -1140,9 +1204,12 @@
     opacity: 0.7;
   }
   .logos-root .l5 .l5s-opt:hover,
-  .logos-root .l5 .l5s-act:not(.is-primary):hover,
-  .logos-root .l5 .l5s-btn:hover {
+  .logos-root .l5 .l5s-act:not(.is-primary):hover {
     border-color: rgba(var(--l5-tint-rgb), 0.35);
+  }
+  .logos-root .l5 .l5s-btn:hover:not(:disabled) {
+    border-color: var(--l5b-edge-hi);
+    background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1150,5 +1217,11 @@
   .logos-root .l5 .l5s-spin {
     transition: none;
     animation: none;
+  }
+  .logos-root .l5 :is(.l5s-btn, .l5s-go, .l5-unibtn) {
+    transition: none;
+  }
+  .logos-root .l5 :is(.l5s-btn, .l5s-go, .l5-unibtn):is(:hover, :active) {
+    transform: none !important;
   }
 }
