@@ -264,14 +264,55 @@ export function diagramFigure(spec: DiagramSpec, W: number): DiagramFigure | nul
   if (w < min) return null;
   const rows = Math.max(...cols.map((c) => c.length));
   const gap = 16;
-  const H = rows * h + (rows - 1) * gap + 4;
-  const boxes: DiagramBox[] = cols.flatMap((col, ci) => col.map((id, i) => ({ id, cx: r1((ci + 0.5) * colW), cy: r1(H / 2 + (i - (col.length - 1) / 2) * (h + gap)), w, h })));
+  const body = rows * h + (rows - 1) * gap + 4;
+  const colOf = new Map(cols.flatMap((col, ci) => col.map((id) => [id, ci] as const)));
+  const place = (top: number): DiagramBox[] => cols.flatMap((col, ci) => col.map((id, i) => ({ id, cx: r1((ci + 0.5) * colW), cy: r1(top + body / 2 + (i - (col.length - 1) / 2) * (h + gap)), w, h })));
+  const curve = (p: DiagramBox, c: DiagramBox) => {
+    const x1 = r1(p.cx + w / 2), x2 = r1(c.cx - w / 2 - 3);
+    const dx = r1((x2 - x1) / 2);
+    return { x1, x2, dx, d: `M${x1},${p.cy} C${r1(x1 + dx)},${p.cy} ${r1(x2 - dx)},${c.cy} ${x2},${c.cy}` };
+  };
+  // A CONNECTION THAT SKIPS A COLUMN (an underlying cause straight into the effect, past the trigger) drawn
+  // as the same curve would run under the parts in between — the boxes are drawn over the lines — and read
+  // as passing through them: "alliances → assassination → war" where the reply said "alliances → war". So
+  // a curve that would cross a part it does not join goes round instead, in a lane above or below every
+  // part, leaving and entering in the gaps between columns.
+  const first = place(0);
+  const firstBox = new Map(first.map((b) => [b.id, b]));
+  const crosses = (a: string, b: string) => {
+    const p = firstBox.get(a)!, c = firstBox.get(b)!;
+    const { x1, x2, dx } = curve(p, c);
+    const others = first.filter((o) => o.id !== a && o.id !== b);
+    for (let k = 1; k < 40; k++) {
+      const t = k / 40, u = 1 - t;
+      const x = u * u * u * x1 + 3 * u * u * t * (x1 + dx) + 3 * u * t * t * (x2 - dx) + t * t * t * x2;
+      const y = u * u * u * p.cy + 3 * u * u * t * p.cy + 3 * u * t * t * c.cy + t * t * t * c.cy;
+      if (others.some((o) => inside(o, x, y, 3))) return true;
+    }
+    return false;
+  };
+  const LANE = 12;
+  const lanes = new Map<string, { side: 'above' | 'below'; k: number }>();
+  let above = 0, below = 0;
+  for (const [a, b] of spec.edges) {
+    if (colOf.get(b)! - colOf.get(a)! < 2 || !crosses(a, b)) continue;
+    const side = (firstBox.get(a)!.cy + firstBox.get(b)!.cy) / 2 <= body / 2 ? 'above' : 'below';
+    lanes.set(`${a}\u0000${b}`, { side, k: side === 'above' ? above++ : below++ });
+  }
+  const top = above * LANE;
+  const H = body + (above + below) * LANE;
+  const boxes = place(top);
   const box = new Map(boxes.map((b) => [b.id, b]));
   const links = spec.edges.map(([a, b]) => {
     const p = box.get(a)!, c = box.get(b)!;
+    const lane = lanes.get(`${a}\u0000${b}`);
+    if (!lane) return { from: a, to: b, d: curve(p, c).d };
     const x1 = r1(p.cx + w / 2), x2 = r1(c.cx - w / 2 - 3);
-    const dx = r1((x2 - x1) / 2);
-    return { from: a, to: b, d: `M${x1},${p.cy} C${r1(x1 + dx)},${p.cy} ${r1(x2 - dx)},${c.cy} ${x2},${c.cy}` };
+    // out into the gap after its own column, along the lane, and down into the gap before the effect's
+    const gx1 = r1((colOf.get(a)! + 1) * colW), gx2 = r1(colOf.get(b)! * colW);
+    const y = r1(lane.side === 'above' ? top - 4 - lane.k * LANE : top + body + 4 + lane.k * LANE);
+    const s1 = r1((gx1 - x1) / 2), s2 = r1((x2 - gx2) / 2);
+    return { from: a, to: b, d: `M${x1},${p.cy} C${r1(x1 + s1)},${p.cy} ${gx1},${r1((p.cy + y) / 2)} ${gx1},${y} H${gx2} C${gx2},${r1((c.cy + y) / 2)} ${r1(x2 - s2)},${c.cy} ${x2},${c.cy}` };
   });
   return { W, H, boxes, links };
 }

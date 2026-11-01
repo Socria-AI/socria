@@ -57,6 +57,11 @@ console.log('\n=== a diagram: what it draws, and what it will not ===');
   ok('…some steps missing but every one in order: closed in that order', J(P({ ...WATER, edges: [['a', 'b'], ['c', 'd']] })?.edges) === J(WATER.edges));
   ok('a "cycle" that branches is not drawn as a ring', P({ ...WATER, edges: [['a', 'b'], ['a', 'c'], ['c', 'd'], ['d', 'a']] }) === null && P({ ...WATER, edges: [['a', 'b'], ['c', 'b'], ['b', 'd']] }) === null);
   ok('…nor one whose steps say a different order and do not close', P({ ...WATER, edges: [['a', 'c'], ['b', 'd']] }) === null);
+  {
+    // a part whose id is unusable is given one that no other part already has: never dropped as a duplicate of a part it is not
+    const d = P({ type: 'diagram', view: 'flow', nodes: [{ id: 'bad id!', label: 'Mix' }, { id: 'n1', label: 'Knead' }, { label: 'Prove' }, { label: 'Bake' }], edges: [['Mix', 'Knead'], ['n1', 'Prove'], ['Prove', 'Bake']] });
+    ok('a part with an unusable id never collides with a part named by its id', d?.nodes.length === 4 && new Set(d.nodes.map((n) => n.id)).size === 4 && d.edges.length === 3, J(d));
+  }
   ok('an edge to a part that is not there draws nothing (the rest is still read)', J(P({ ...WATER, edges: [...WATER.edges, ['a', 'zz'], ['b', 'b']] })?.edges) === J(WATER.edges));
   ok('an edge may name a part by its label', J(P({ ...WATER, edges: [['Evaporation', 'Condensation'], ['condensation', 'c'], ['c', 'd'], ['d', 'a']] })?.edges) === J(WATER.edges));
   ok('parts without ids are numbered', J(P({ type: 'diagram', view: 'flow', nodes: ['Mix', 'Knead', 'Prove', 'Bake'] })?.edges) === J([['n1', 'n2'], ['n2', 'n3'], ['n3', 'n4']]));
@@ -107,6 +112,44 @@ console.log('\n=== where a diagram’s parts go ===');
   ok('…no two parts of a cycle overlap', (() => { const f = I.diagramFigure(P({ type: 'diagram', view: 'cycle', nodes: Array.from({ length: 9 }, (_, i) => `Stage ${i + 1}`) }), 700); return !f || f.boxes.every((a, i) => f.boxes.every((b, j) => j <= i || Math.abs(a.cx - b.cx) >= (a.w + b.w) / 2 || Math.abs(a.cy - b.cy) >= (a.h + b.h) / 2)); })());
   ok('a picture that would squeeze its words is not drawn: the list is', I.diagramFigure(P({ type: 'diagram', view: 'flow', nodes: Array.from({ length: 9 }, (_, i) => `Step ${i + 1}`) }), 600) === null && I.diagramFigure(P(BREAD), 300) === null && !!I.diagramFigure(P(BREAD), 640));
   ok('a tree is joined by elbows, without arrowheads; a flow by curves', /^M[\d.]+,[\d.]+ V[\d.]+ H[\d.]+ V[\d.]+$/.test(I.diagramFigure(P(GOV), 700).links[0].d) && /^M[\d.]+,[\d.]+ C/.test(I.diagramFigure(P(BREAD), 700).links[0].d));
+}
+
+{
+  // A connection that skips a column must not be drawn under the parts in between (boxes sit over the lines): the
+  // causes' canonical shape — underlying causes straight into the effect, past the trigger — read as "alliances →
+  // assassination → war".
+  const points = (d) => {
+    const out = [];
+    const tok = d.match(/[MCHLV]|-?[\d.]+/g);
+    let x = 0, y = 0, i = 0, cmd = '';
+    const n = () => Number(tok[i++]);
+    while (i < tok.length) {
+      if (/[MCHLV]/.test(tok[i])) cmd = tok[i++];
+      if (cmd === 'M' || cmd === 'L') { const nx = n(), ny = n(); if (cmd === 'L') for (let k = 1; k <= 20; k++) out.push([x + (nx - x) * k / 20, y + (ny - y) * k / 20]); x = nx; y = ny; }
+      else if (cmd === 'H') { const nx = n(); for (let k = 1; k <= 20; k++) out.push([x + (nx - x) * k / 20, y]); x = nx; }
+      else if (cmd === 'V') { const ny = n(); for (let k = 1; k <= 20; k++) out.push([x, y + (ny - y) * k / 20]); y = ny; }
+      else if (cmd === 'C') {
+        const a = [n(), n()], b = [n(), n()], e = [n(), n()];
+        for (let k = 1; k <= 40; k++) { const t = k / 40, u = 1 - t; out.push([u * u * u * x + 3 * u * u * t * a[0] + 3 * u * t * t * b[0] + t * t * t * e[0], u * u * u * y + 3 * u * u * t * a[1] + 3 * u * t * t * b[1] + t * t * t * e[1]]); }
+        x = e[0]; y = e[1];
+      } else i++;
+    }
+    return out;
+  };
+  const through = (f) => f.links.filter((l) => points(l.d).some(([x, y]) => f.boxes.some((b) => b.id !== l.from && b.id !== l.to && Math.abs(x - b.cx) < b.w / 2 && Math.abs(y - b.cy) < b.h / 2))).map((l) => `${l.from}→${l.to}`);
+  const SKIP = { type: 'diagram', view: 'causes', nodes: [{ id: 'a', label: 'Drought', role: 'underlying' }, { id: 'b', label: 'Crop failure', role: 'trigger' }, { id: 'c', label: 'Prices rise' }, { id: 'd', label: 'Famine', role: 'effect' }], edges: [['a', 'b'], ['b', 'c'], ['c', 'd'], ['a', 'd']] };
+  let crossed = [];
+  for (const spec of [WWI, SKIP, { ...SKIP, view: 'flow', nodes: SKIP.nodes.map(({ role: _r, ...n }) => n) }].map(P)) {
+    for (const W of [640, 720, 900]) {
+      const f = I.diagramFigure(spec, W);
+      if (!f) continue;
+      crossed = crossed.concat(through(f).map((x) => `${spec.view}@${W}: ${x}`));
+      for (const b of f.boxes) if (b.cy - b.h / 2 < -0.5 || b.cy + b.h / 2 > f.H + 0.5) crossed.push(`${spec.view}@${W}: box ${b.id} outside`);
+      for (const l of f.links) for (const [, y] of points(l.d)) if (y < -0.5 || y > f.H + 0.5) { crossed.push(`${spec.view}@${W}: ${l.from}→${l.to} outside`); break; }
+    }
+  }
+  ok('a connection that skips a column goes round the parts in between, never under them (and stays inside the figure)', crossed.length === 0, crossed.join('; '));
+  ok('…a connection between neighbouring columns is still one curve', /^M[\d.]+,[\d.]+ C[^HC]*$/.test(I.diagramFigure(P(WWI), 720).links.find((l) => l.from === 'f').d));
 }
 
 console.log('\n=== a diagram drawn ===');
