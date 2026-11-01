@@ -70,6 +70,10 @@ console.log('\n=== what a turn did in the workspace ===');
   ok('a turn that did nothing says nothing', !none.includes('l5-fx'));
   const userFx = html(h(U.L5Message, { ...base, side: 'mine', who: 'You', m: msg({ role: 'user', content: 'x' }), effect: { map: { said: '+1 on the map', nodes: ['a'] } } }));
   ok('effects are said on the reply, never on the person’s own turn', !userFx.includes('+1 on the map'));
+  const soloSocria = html(h(U.L5Message, { ...base, side: 'socria', who: 'Socria', m: msg() }));
+  const soloYou = html(h(U.L5Message, { ...base, side: 'mine', who: 'You', m: msg({ role: 'user', content: 'what is it?' }) }));
+  ok('alone with Socria, each turn says who spoke: Socria by its mark, you as You', soloSocria.includes('class="l5-who"') && soloSocria.includes('socria-mark') && />Socria</.test(soloSocria) && soloYou.includes('class="l5-who"') && />You</.test(soloYou) && !soloYou.includes('l5-av'));
+  ok('  …and a turn that continues the one before is not named again', !html(h(U.L5Message, { ...base, side: 'socria', who: 'Socria', m: msg(), cont: true })).includes('class="l5-who"'));
   const linked = html(h(U.L5Message, { ...base, m: msg(), linked: true }));
   ok('a turn the selected card came from is marked', linked.includes('is-linked'));
 }

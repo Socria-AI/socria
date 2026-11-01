@@ -8568,6 +8568,7 @@ export function LogosApp({
             composer={l5Dock}
             narrow={narrow}
             onBack={() => setZoomed(false)}
+            {...(chromeHidden ? { onHome: goHome } : {})}
             onJump={(t: CanvasTurn) => {
               setZoomed(false);
               const id = t.askedId ?? t.replyId;

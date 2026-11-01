@@ -63,6 +63,7 @@ export function L5Canvas({
   narrow,
   onBack,
   onJump,
+  onHome,
 }: {
   turns: CanvasTurn[];
   cards: CanvasCard[];
@@ -72,6 +73,8 @@ export function L5Canvas({
   onBack: () => void;
   /** back into the conversation, at this turn */
   onJump: (turn: CanvasTurn) => void;
+  /** to the Universal Map — given when the header (which carries ‹ Universal Map) is hidden */
+  onHome?: () => void;
 }) {
   const [filter, setFilter] = useState<CanvasFilter>('all');
   const [zoom, setZoom] = useState<number>(ZOOM.start);
@@ -220,6 +223,11 @@ export function L5Canvas({
   return (
     <div className={`lcv${narrow ? ' is-narrow' : ''}${focused ? ' is-focusing' : ''}`}>
       <div className="lcv-bar" role="toolbar" aria-label="The whole line of thinking">
+        {onHome && (
+          <button type="button" className="lcv-home" onClick={onHome} aria-label="Universal Map">
+            <span aria-hidden="true">‹</span> {narrow ? 'Map' : 'Universal Map'}
+          </button>
+        )}
         <div className="lcv-seg" role="group" aria-label="Show">
           {FILTERS.map((f) => (
             <button key={f.id} type="button" className={filter === f.id ? 'is-on' : ''} aria-pressed={filter === f.id} onClick={() => setFilter(f.id)}>
@@ -279,13 +287,30 @@ export function L5Canvas({
                   onClick={() => onJump(row.turn!)}
                   aria-label={`Turn ${row.turn.index + 1}${row.turn.asked ? `: ${row.turn.asked}` : ''}. Back to the conversation here`}
                 >
-                  {row.turn.asked && <span className="lcv-ask">{row.turn.asked}</span>}
-                  {row.turn.synthesis ? (
-                    <span className="lcv-said is-synth">{row.turn.said}</span>
-                  ) : row.turn.pending ? (
-                    <span className="lcv-said is-wait">Socria is replying…</span>
-                  ) : (
-                    row.turn.said && <span className="lcv-said">{row.turn.said}</span>
+                  {/* who said what: you, in your bubble on the right; Socria, by its mark, beneath */}
+                  {row.turn.asked && (
+                    <span className="lcv-you">
+                      <span className="lcv-who is-you">You</span>
+                      <span className="lcv-ask">{row.turn.asked}</span>
+                    </span>
+                  )}
+                  {(row.turn.said || row.turn.pending || row.turn.synthesis) && (
+                    <span className="lcv-soc">
+                      <span className="lcv-who is-socria">
+                        <span className="lcv-av" aria-hidden="true">
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src="/socria-mark.png" alt="" width={12} height={12} />
+                        </span>
+                        Socria
+                      </span>
+                      {row.turn.synthesis ? (
+                        <span className="lcv-said is-synth">{row.turn.said}</span>
+                      ) : row.turn.pending ? (
+                        <span className="lcv-said is-wait">Replying…</span>
+                      ) : (
+                        <span className="lcv-said">{row.turn.said}</span>
+                      )}
+                    </span>
                   )}
                 </button>
               ) : (

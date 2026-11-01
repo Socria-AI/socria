@@ -246,9 +246,10 @@ export function L5Message(p: L5MessageProps) {
       style={style}
       aria-label={m.role === 'assistant' ? 'Socria' : p.who === 'You' ? 'You' : p.who}
     >
-      {group && side !== 'mine' && !p.cont && (
+      {/* who is speaking — in a group, everyone but you; alone, you and Socria too, so the two are never confused */}
+      {!p.cont && !(group && side === 'mine') && (
         <div className="l5-who">
-          {side === 'socria' ? (
+          {side === 'mine' ? null : side === 'socria' ? (
             <span className="l5-av is-socria" aria-hidden="true">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src="/socria-mark.png" alt="" width={14} height={14} />

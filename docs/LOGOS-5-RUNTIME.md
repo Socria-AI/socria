@@ -2929,3 +2929,33 @@ and Dark, on desktop and phone:
 
 The Universal Map, the chat and the canvas were checked in Dark with no green
 cast.
+
+### 33.1 Who said what, cleaner colour, the way back, and the owner's permanent grant
+
+- **Who said what.** Each turn on the canvas now names its speakers: **You**
+  over your question, which sits in a filled bubble on the right in the chat's
+  own shape, and **Socria**, by its mark, over the gist of the reply, below a
+  hairline. The chat does the same when it is only you and Socria: every turn
+  that starts a run is named (in a group, everyone but you is named, as
+  before).
+- **Colour.** Canvas cards sit on the theme's raised surface (`--l5-raise`):
+  white on Paper and a step up from the ground on Dark, never the beige of a
+  chat card. The question bubble is a neutral wash of the ink, and the shadows
+  are softer.
+- **The way back to the Universal Map.** The canvas filled the nearest
+  positioned ancestor and covered the header, and with it **‹ Universal Map**.
+  The canvas now fills only the body (`.l5-body.is-zoomed`), so the header
+  stays visible. With the bars hidden, the canvas's own bar carries a
+  Universal Map button.
+- **The owner's permanent Socria One** (`lib/socria-one-grant.ts`,
+  `OPERATOR_GRANTS`). The owner can give an account Socria One for good, by
+  name. This is not an offer and not a code.
+  - Each entry is the SHA-256 of a **verified** address, lowercased and
+    trimmed, so no address is written in the code.
+  - An account holds the grant while that address is on it and verified, and
+    loses it when the address goes.
+  - A deployment can add hashes in `SOCRIA_ONE_GRANT_HASHES` without a commit.
+  - Read beside the paid-subscription mirror in the same account read.
+  - `free-limits-e2e` covers it: a listed, verified address (in any case) is
+    Socria One; the same address unverified is not; and the list holds only
+    hashes.

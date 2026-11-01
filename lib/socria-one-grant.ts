@@ -12,6 +12,7 @@
 // written only by the server. It never reaches the browser except as the
 // resolved plan.
 
+import { createHash } from 'node:crypto';
 import { clerkClient } from '@clerk/nextjs/server';
 import { entitledBy } from './entitlement-rule';
 import { readStudentMonth, studentStanding, type EmailLike, type StudentMonth } from './socria-edu';
@@ -78,6 +79,52 @@ export function readMirror(meta: Record<string, unknown> | null | undefined): St
 // and a grant already written to an account's metadata is no longer read as
 // one. Nothing is deleted: the metadata stays where it is.)
 
+/**
+ * THE OPERATOR'S PERMANENT GRANTS — accounts the owner has given Socria One for
+ * good, by name. Not an offer and not a code: nobody can take one, and adding
+ * one is a commit. Each is the SHA-256 of a VERIFIED email address, lowercased
+ * and trimmed, so no address is ever written into the code; an account holds
+ * the grant while that address is on it and verified (Clerk sends the code to
+ * prove it), and loses it the moment the address goes.
+ *
+ * The complimentary list this replaces held addresses in the clear and was read
+ * for anyone; this one is the owner's own short list, beside the environment's
+ * user-id allowlist (SOCRIA_ONE_USER_IDS) for deployments that set one.
+ */
+export const OPERATOR_GRANTS: ReadonlySet<string> = new Set([
+  // the owner's account (November 1, 2026)
+  '195ff47bcd4609bfe6074d140da8d96943ee9ceba5b45adea341722a0784132c',
+]);
+
+/** The hash an address is listed under: SHA-256 of the address, lowercased and trimmed. */
+export function grantHash(email: string): string {
+  return createHash('sha256').update(email.trim().toLowerCase()).digest('hex');
+}
+
+interface EmailLikeAddress {
+  emailAddress?: string | null;
+  verification?: { status?: string | null } | null;
+}
+
+/**
+ * The grants in force: the list above, and any further hashes the deployment
+ * sets in SOCRIA_ONE_GRANT_HASHES (comma-separated SHA-256 hex, the same
+ * recipe) — so the owner can add someone without a commit, and still without
+ * an address written anywhere.
+ */
+export function operatorGrants(env: string | undefined = process.env.SOCRIA_ONE_GRANT_HASHES): ReadonlySet<string> {
+  const extra = (env ?? '')
+    .split(',')
+    .map((h) => h.trim().toLowerCase())
+    .filter((h) => /^[0-9a-f]{64}$/.test(h));
+  return extra.length ? new Set([...OPERATOR_GRANTS, ...extra]) : OPERATOR_GRANTS;
+}
+
+/** Whether any VERIFIED address on an account is one of the operator's permanent grants. */
+export function operatorGranted(addresses: readonly EmailLikeAddress[] | null | undefined, grants: ReadonlySet<string> = operatorGrants()): boolean {
+  return (addresses ?? []).some((e) => e?.verification?.status === 'verified' && typeof e.emailAddress === 'string' && grants.has(grantHash(e.emailAddress)));
+}
+
 // resolvePlanForRequest runs on every gated request, and asking Clerk's API
 // each time would put a network round-trip in front of every map extraction.
 // A short in-memory cache per server instance keeps that honest: a fresh
@@ -102,11 +149,12 @@ async function readGrant(userId: string): Promise<{ v: boolean; ok: boolean }> {
     const meta = user?.privateMetadata as Record<string, unknown> | null;
     // A paid subscription, as the webhook last saw it — checked here so that
     // somebody who has actually paid is entitled even when the subscriptions
-    // table cannot be read. It is the ONLY account-level grant: complimentary
-    // grants (GRANT_KEY), comped addresses and student months no longer
-    // entitle anyone (October 31, 2026).
+    // table cannot be read. Beside it, only the operator's permanent grants
+    // (OPERATOR_GRANTS): complimentary grants (GRANT_KEY), the old comped
+    // addresses and student months no longer entitle anyone (October 31, 2026).
     const paid = mirrorEntitles(readMirror(meta));
-    const v = paid;
+    // …or the owner gave this account Socria One for good, by a verified address (OPERATOR_GRANTS)
+    const v = paid || operatorGranted(user?.emailAddresses as EmailLikeAddress[] | undefined);
     cache.set(userId, { v, at: Date.now() });
     return { v, ok: true };
   } catch {

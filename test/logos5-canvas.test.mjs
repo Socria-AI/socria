@@ -96,7 +96,8 @@ console.log('\n=== the canvas ===');
   const html = renderToStaticMarkup(h(C.L5Canvas, { turns, cards, composer: h('div', { id: 'the-dock' }, 'composer'), narrow: false, onBack() {}, onJump() {} }));
   ok('the turns are a spine of buttons back into the conversation', (html.match(/class="lcv-turn/g) || []).length === 4 && html.includes('data-turn="0"') && html.includes('Back to the conversation here'), html.slice(0, 300));
   ok('…what was asked in its own bubble, the reply as its gist', html.includes('class="lcv-ask">Help me understand the mean value theorem') && html.includes('class="lcv-said">Picture the chord'));
-  ok('…the turn being answered says so', html.includes('Socria is replying…'));
+  ok('…the turn being answered says so', html.includes('class="lcv-said is-wait">Replying…'));
+  ok('who said what: “You” over your bubble, Socria by its mark over the reply', (html.match(/class="lcv-who is-you">You</g) || []).length === 3 && (html.match(/class="lcv-who is-socria">/g) || []).length === 4 && html.includes('src="/socria-mark.png"'));
   ok('what a turn made is beside it, wired to it', (html.match(/data-card-turn="0"/g) || []).length === 2);
   ok('…the map on the left, the graph on the right', /data-side="l"[^>]*data-card-turn="0"[\s\S]*?Logic Map/.test(html) && /data-side="r"[^>]*data-card-turn="0"[\s\S]*?Live graph/.test(html));
   ok('…what belongs to no turn is gathered at the end', html.includes('Also in this line of thinking') && html.includes('Three questions'));
@@ -131,7 +132,9 @@ console.log('\n=== the wiring ===');
   ok('elements are drawn by the conversation’s own component, live in focus, as they were left', /<InlineBlock[\s\S]{0,400}live,/.test(app) && /sanitizeInlineState\(msg\.ui\)/.test(app));
   ok('Ask about this aims the chatbox at it', /setFocus\(\{ kind: 'element', label, of, lines/.test(app) && /focusComposer\(\)/.test(app));
   ok('while zoomed, the conversation underneath is neither seen nor reachable', /\.l5-body\.is-zoomed > :not\(\.lcv\)\s*\{[^}]*visibility: hidden[^}]*pointer-events: none/.test(css));
-  ok('the user’s question is the chat’s own bubble colour', /\.lcv-ask \{[^}]*background: var\(--l5-bubble/.test(css));
+  ok('cards on the theme’s raised surface (white on Paper), not the chat card’s beige', /--lcv-card: var\(--l5-raise/.test(css) && !/--lcv-card: var\(--l5-card/.test(css));
+  ok('  your question in a filled neutral bubble (the chat’s shape), not a tan one', /\.lcv-ask \{[^}]*background: rgba\(var\(--lcv-ink-rgb\), 0\.075\)/.test(css));
+  ok('the canvas sits under the header, so ‹ Universal Map stays on screen while zoomed', /\.l5-body\.is-zoomed \{\s*position: relative;/.test(css) && /\{!chromeHidden && !mindShown && !homeShown && l5Head\}/.test(app));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

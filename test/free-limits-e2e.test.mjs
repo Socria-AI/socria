@@ -33,6 +33,8 @@
 //   pete   free — with the usage table missing, the free plan is paused, never lifted
 //   olga   Socria One (the operator's allowlist)
 //   paula  Socria One (a paid Stripe subscription)
+//   owen   Socria One (the operator's permanent grant, by a verified address)
+//   uma    free — the same address, never verified
 
 import { build } from 'esbuild';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -104,6 +106,9 @@ process.env.OPENAI_API_KEY = 'test';
 process.env.RATE_LIMIT_DISABLED = '1';
 process.env.SHARE_SECRET = 'test-share-secret';
 process.env.SOCRIA_ONE_USER_IDS = 'olga';
+// owen and uma: the operator's permanent grant is the SHA-256 of a verified address (lib/socria-one-grant.ts);
+// a deployment may add hashes in SOCRIA_ONE_GRANT_HASHES, which is how a test lists one without a real address
+process.env.SOCRIA_ONE_GRANT_HASHES = (await import('node:crypto')).createHash('sha256').update('owen@example.com').digest('hex');
 // ask whether the usage table exists on every request: the suite takes it away and puts it back
 process.env.USAGE_STORE_MEMO_MS = '0';
 
@@ -157,6 +162,9 @@ globalThis.__users = Object.fromEntries(
 // carl: a complimentary grant on the account, and a comp row, from before
 globalThis.__users.carl = { firstName: 'Carl', emails: ['carl@example.com'], privateMetadata: { socriaOne: 'comp' } };
 db.rows('socria_subscriptions').push({ user_id: 'carl', customer_id: 'comp_carl', subscription_id: 'comp_carl', status: 'comp', current_period_end: null, price_id: null, cancel_at_period_end: false, updated_at: Date.now() });
+// owen: the operator's permanent grant, by his verified address; uma: the same address, never verified
+globalThis.__users.owen = { firstName: 'Owen', emails: ['Owen@Example.com '] };
+globalThis.__users.uma = { firstName: 'Uma', emails: ['owen@example.com'], unverified: ['owen@example.com'] };
 // paula: a paid Stripe subscription
 db.rows('socria_subscriptions').push({ user_id: 'paula', customer_id: 'cus_paula', subscription_id: 'sub_paula', status: 'active', current_period_end: Math.floor(Date.now() / 1000) + 20 * 86400, price_id: 'price_one', cancel_at_period_end: false, updated_at: Date.now() });
 
@@ -385,6 +393,15 @@ ok('redeeming a code: retired, said plainly', redeem.status === 410 && /no longe
 ok('  and nothing is written to the account', !db.rows('socria_subscriptions').some((r) => r.user_id === 'carl' && r.status !== 'comp'));
 as('paula');
 ok('a paid subscription is Socria One', (await call(R.plan.GET, 'GET', '/api/logos/plan')).json?.plan === 'one');
+as('owen');
+ok('the operator’s permanent grant is Socria One — by a verified address, whatever its case', (await call(R.plan.GET, 'GET', '/api/logos/plan')).json?.plan === 'one');
+as('uma');
+ok('  the same address unverified opens nothing', (await call(R.plan.GET, 'GET', '/api/logos/plan')).json?.plan === 'free');
+{
+  const src = (await import('node:fs')).readFileSync(join(root, 'lib/socria-one-grant.ts'), 'utf8');
+  const list = src.slice(src.indexOf('export const OPERATOR_GRANTS'), src.indexOf(']);', src.indexOf('export const OPERATOR_GRANTS')));
+  ok('  and the permanent list holds hashes, never an address', /'[0-9a-f]{64}'/.test(list) && !/@/.test(list));
+}
 as(null);
 ok('signed out, Logos is a guest’s pass — the typed access key no longer stands in for an account', (await logos('anon-1')).status === 401);
 
