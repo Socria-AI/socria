@@ -183,8 +183,21 @@ export function asksForDecision(text: string, s: ExplicitSignals): boolean {
   if (s.recommendationRequested) return true;
   // a team's choice is a decision too: "should we hire an engineer or a marketer?"
   // …and a team's change, weighed against how things are: "should we raise prices?"
-  return /\b(?:should\s+i\b|should\s+we\b[^.?!]{1,90}\bor\b|should\s+we\s+(?:raise|cut|lower|increase|reduce|switch|keep|change|drop|stop|start|move|expand|delay)\b|which\s+(?:one\s+)?should\s+(?:i|we)|what\s+would\s+you\s+(?:do|pick|choose)|help\s+(?:me|us)\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+(?:i|we)\s+should|(?:i|we)\s+should\s+[^.?!]{1,80}\bor\b)/i.test(t);
+  return /\b(?:should\s+i\b|should\s+we\b[^.?!]{1,90}\bor\b|should\s+we\s+(?:raise|cut|lower|increase|reduce|switch|keep|change|drop|stop|start|move|expand|delay)\b|which\s+(?:one\s+)?should\s+(?:i|we)|what\s+would\s+you\s+(?:do|pick|choose)|help\s+(?:me|us)\s+decide|is\s+it\s+worth\s+it|what\s+do\s+you\s+recommend|(?:do\s+you\s+think|would\s+you\s+say|you\s+think)\s+(?:i|we)\s+should|(?:i|we)\s+should\s+[^.?!]{1,80}\bor\b)/i.test(t) || FIRST_PERSON_CHOICE.test(t);
 }
+
+/**
+ * Their own choice between two courses, said in the first person (adversarial
+ * review, November 2026): "do I take the job in Denver or stay in Austin?",
+ * "do I text him first or wait?", "do I break up with him?", "would it be
+ * better for us to split up or try counseling?", "is it better for my kids if
+ * we divorce or stay together?". Read as a fact or a comparison, each was told
+ * to answer it, or given a table with a pick. "Is it better to rent or buy a
+ * house?" asks about everyone, and stays a comparison; "do I need a visa or a
+ * passport?" has an answer.
+ */
+const FIRST_PERSON_CHOICE =
+  /\bdo\s+(?:i|we)\s+(?!need\b|have\s+to\b|get\s+(?:a|an|the)\b|know\b)[^?.!]{1,80}\bor\b(?!\s+(?:not|no|what|something|so)\b)|^(?:so,?\s+|ok(?:ay)?,?\s+|honestly,?\s+)?do\s+i\s+(?:break\s+up|quit|leave|stay|move|tell|text|call|forgive|accept|take|go\s+back|keep|sell|marry|propose|confront|report|resign|switch|wait|say\s+yes|say\s+no)\b|\b(?:is|would)\s+it\s+(?:be\s+)?(?:better|smarter|wiser|best)\b[^?]{0,100}?\b(?:for\s+(?:me|us|my|our)|in\s+my\s+(?:situation|case|position)|if\s+(?:i|we))\b/i;
 
 /**
  * They put their own work down to be checked.
@@ -463,16 +476,25 @@ export interface AssistView {
   forms?: readonly string[];
   /** their message asks a question, or for a list (lib/runtime/allocation.ts QUESTION_LINE) */
   question?: boolean;
+  /** the forms offered as the form that fits: the block below carries the answer */
+  strong?: readonly string[];
+  /** they asked for Socria's own read on a choice that is theirs */
+  lean?: boolean;
 }
 const MODE_SHAPED: Partial<Record<AssistMode, string>> = {
   explain: 'EXPLAIN — the shape of this reply, below, says how. Understanding is not authorship: explaining a concept takes nothing from them.',
   inform: 'INFORM. The answer plainly, first; the shape of this reply, below, says what follows it. Do not turn it into a question, and do not make them work for something they could look up.',
   perspective: 'PERSPECTIVE. They asked you to decide: the decide block below lays out what the choice rests on, and the call is theirs.',
 };
+/** …and where a block that fits carries the answer, with no shape: the answer first, the block the rest of it. */
+const INFORM_BLOCK = 'INFORM. The answer plainly, first; the block below carries the rest of it. Do not turn it into a question, and do not make them work for something they could look up.';
+const PERSPECTIVE_LEAN = 'PERSPECTIVE. They asked for your read: the decide block below lays out what the choice rests on; give your lean once, marked as yours — the call stays theirs.';
 function modeLine(mode: AssistMode, v: AssistView): string {
-  if (mode === 'explain' && v.shape === 'understand') return MODE_SHAPED.explain!;
+  // one layer down, or a thread in full, is a shape too: the move names itself and leaves the how to it
+  if (mode === 'explain' && v.shape) return MODE_SHAPED.explain!;
   if (mode === 'inform' && (v.shape === 'practical' || v.shape === 'understand')) return MODE_SHAPED.inform!;
-  if (mode === 'perspective' && v.forms?.includes('decide')) return MODE_SHAPED.perspective!;
+  if (mode === 'inform' && v.strong?.length) return INFORM_BLOCK;
+  if (mode === 'perspective' && v.forms?.includes('decide')) return v.lean ? PERSPECTIVE_LEAN : MODE_SHAPED.perspective!;
   return MODE_LINE[mode];
 }
 

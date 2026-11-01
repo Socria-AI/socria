@@ -197,7 +197,7 @@ const plan = (text, o = {}) => {
   // …unless the idea is a relationship that can be seen: who bears a tax is where two curves meet as one shifts
   // (minimum explanation, maximum understanding — November 2026); the graph stays optional
   // the graph is the form that fits an idea to understand — still never required: "unless one sentence fully answers them"
-  ok('tax incidence: a graph of the market, the form that fits, never required', plan('what is tax incidence').forms.includes('graph') && plan('what is tax incidence').graph === 'market' && /THE FORM THAT FITS/.test(I.renderPresentation(plan('what is tax incidence'))) && /unless one sentence fully answers them/.test(I.renderPresentation(plan('what is tax incidence'))), J(plan('what is tax incidence')));
+  ok('tax incidence: a graph of the market, the form that fits, never required', plan('what is tax incidence').forms.includes('graph') && plan('what is tax incidence').graph === 'market' && /THE FORM THAT FITS/.test(I.renderPresentation(plan('what is tax incidence'))) && /unless one sentence fully answers them|If a sentence or two carries it/.test(I.renderPresentation(plan('what is tax incidence'))), J(plan('what is tax incidence')));
   const costs = plan('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?');
   ok('their own named amounts: a chart is offered', costs.forms.includes('chart'), J(costs));
   ok('  "$90 on gas, $50 on food, $30 on parking" reads as a list too', plan('I spent $90 on gas, $50 on food and $30 on parking this week').forms.includes('chart'));

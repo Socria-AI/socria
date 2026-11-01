@@ -52,7 +52,7 @@ function jsonsIn(s) {
 }
 
 /** The reply's own words hold every figure its examples use, so a chart "given" passes; nothing else is relaxed. */
-const theirs = '1200 400 150 300000 6 12000 80 150';
+const theirs = '1200 400 150 300000 6 12000 80 150 4 3';
 const ctx = (extra = {}) => ({ theirs, sources: '', questions: 1, shown: { n: 0 }, ...extra });
 const host = { live: true, state: {}, onState() {}, onChoose() {}, onOpen() {}, onExplore() {} };
 const draw = (spec) => {

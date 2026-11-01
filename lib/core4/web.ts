@@ -155,10 +155,17 @@ export const LIVE_SUBJECT =
  * to a place ("how is the weather in Paris?", "are stocks up today?"), the
  * same words are a lookup again.
  */
+//
+// …and a how or a why is a concept only about a mechanism: "how do interest rates AFFECT inflation?" is the
+// idea; "why is bitcoin crashing?", "how did the stock market do?", "how do the standings look?" ask what is
+// happening, and lost their search and the 'current' caveat when any how or why counted (adversarial review,
+// November 2026). A place counts in lower case too ("weather in dallas"), but not "in general" or "for beginners".
 const CONCEPTUAL =
-  /\b(?:differences?\s+between|different\s+(?:from|than)|differ\s+from|compared?\s+(?:to|with)|vs\.?|versus|how\s+(?:do|does|did|would|can)\b|why\s+(?:do|does|did|is|are|would)\b|what\s+(?:is|are)\s+(?:a|an|the)?\s*(?:difference|point|idea|purpose|role)\b|explain|meaning|definition|pros\s+and\s+cons|better\s+(?:for|than)|in\s+general)\b/i;
-const LIVE_FRAME = /\b(?:today|tonight|tomorrow|now|right\s+now|currently|current|latest|this\s+(?:week|weekend|morning|afternoon|evening|month)|at\s+the\s+moment|forecast)\b/i;
-const LIVE_PLACE = /\b(?:in|at|for|near)\s+[A-Z][\w.'’-]+/;
+  /\b(?:differences?\s+between|different\s+(?:from|than)|differ\s+from|compared?\s+(?:to|with)|vs\.?|versus|how\s+(?:do|does|would|can)\s+[^?]{1,40}?\s+(?:work|affect|influence|impact|determine|relate|differ|interact)\b|why\s+(?:do|does|would)\s+[^?]{1,40}?\s+(?:matter|affect|exist|work)\b|what\s+(?:is|are)\s+(?:a|an|the)?\s*(?:difference|point|idea|purpose|role)\b|explain|meaning|definition|pros\s+and\s+cons|better\s+(?:for|than)|in\s+general)\b/i;
+const LIVE_FRAME =
+  /\b(?:today|tonight|tomorrow|now|right\s+now|currently|current|latest|lately|recently|yesterday|last\s+night|so\s+far|this\s+(?:week|weekend|morning|afternoon|evening|month|year|season)|the\s+weekend|weekend|at\s+the\s+moment|forecast|what'?s\s+happening|what\s+is\s+happening|going\s+on\s+(?:with|in)|the\s+news)\b/i;
+const LIVE_PLACE =
+  /\b(?:in|at|for|near)\s+(?!(?:the|a|an|my|your|our|their|his|her|its|this|that|these|those|general|terms|practice|theory|principle|short|simple|plain|detail|english|words|other|some|any|each|every|order|fact|particular|real|life|time|use|example|investing|finance|economics|business|beginners?|kids|children|people|me|us|you|them|him|it|retirement|school|class|college|long|summary|brief|most|many|all|both|savings|stocks|bonds|crypto|inflation|interest|weather|climate|science|math|maths|physics|chemistry|biology|history)\b)[a-z][\w.'’-]{2,}/i;
 export function liveInPassing(t: string): boolean {
   return CONCEPTUAL.test(t) && !LIVE_FRAME.test(t) && !LIVE_PLACE.test(t);
 }

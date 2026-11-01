@@ -317,6 +317,11 @@ const CODE_WORK = new Set<TurnState['work']>(['execution', 'diagnosis', 'creatio
 const IDEA_SHAPED: Partial<Record<TurnState['domain'], string>> = {
   math: 'Exact results come from the engine when it gives them.',
   learning: 'Work like a good tutor: in their terms, one idea at a time; check understanding only when it helps.',
+  // an idea in a business, research or engineering conversation is still an idea: the shape says stop, and "the
+  // next concrete step" argued with it (adversarial review, November 2026)
+  business: 'Work like a sharp operator: plain terms, and the number that matters where there is one.',
+  research: 'Work like a careful researcher: how strong the evidence is, in a word, where it matters.',
+  engineering: 'Work like a senior engineer: concrete and correct.',
 };
 const domainLine = (st: TurnState, view: AssistView = {}): string => {
   const idea = st.work === 'explanation' || st.work === 'information';

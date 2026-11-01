@@ -284,6 +284,22 @@ const PUSHBACK_ANYWHERE = /\b(?:i (?:disagree|don'?t agree|do not agree)|i (?:do
 const BRAINSTORM = /\b(?:brainstorm\w*|spitball\w*|riff(?:ing)? on|bounce (?:some )?ideas|throw (?:out )?(?:some )?ideas|(?:give me|need|want|got|any|some|more|other|fresh|wild|crazy|fun) (?:\w+ )?(?:ideas|suggestions|names|angles|ways to|twists|options for)\b|ideas? (?:for|about|on) |names? for\b|come up with (?:some |a few |more |\w+ )?(?:ideas|names|ways|options|titles|slogans|taglines)|let'?s (?:think of|come up with|brainstorm|generate|dream up)|what if (?:we|i|you|it|they)\b|how might we\b)/i;
 const OPINION = /\b(?:what do you (?:think|make) (?:about|of)|what(?:'s| is) your (?:take|view|opinion|stance|read)\b|do you (?:think|believe|reckon|agree)\b|would you (?:say|agree)\b|(?:any |your )thoughts on\b|hot take|unpopular opinion|controversial opinion|is it (?:true|possible|ethical|wrong|right|fair|moral|immoral|better|worse) (?:that|to)\b|(?:is|are) (?:\w+ ){1,4}(?:overrated|underrated|real|a myth|worth (?:it|the hype)|the future|dead|inevitable)\b|which is (?:better|worse)\b|why do (?:people|we|humans)\b)/i;
 const BIG_IDEAS = /\b(?:free will|determinism|consciousness|the meaning of life|meaning of (?:it all|life)|morality|moral|ethic(?:s|al)|justice|philosoph\w*|existential|god|religion|truth|beauty|human nature|society|democracy|capitalism|socialism|the future of|purpose|identity|the mind|reality|the universe|art)\b/i;
+/**
+ * "Why do we have seasons?", "why do we yawn?", "why do people get colds more
+ * in winter?" ask for an explanation of how the world works, not for a view —
+ * read as an opinion to debate, each was given two sides (adversarial review,
+ * November 2026). "Why do people believe in conspiracy theories?" or a big
+ * idea ("why do we need morality?") still is one.
+ */
+const WHY_PEOPLE = /\bwhy do (?:people|we|humans)\b/i;
+const VIEW_VERB = /\bwhy do (?:people|we|humans)\s+(?:still\s+)?(?:believe|think|like|love|hate|vote|prefer|trust|distrust|care|bother|fall\s+for|support|follow|worship)\b/i;
+function opinionAsked(t: string, work: string | undefined): boolean {
+  if (!OPINION.test(t)) return false;
+  // the only opinion cue is "why do people/we/humans": an explanation, unless a view or a big idea is in it
+  const without = t.replace(WHY_PEOPLE, ' ');
+  if (WHY_PEOPLE.test(t) && !OPINION.test(without) && work === 'explanation') return VIEW_VERB.test(t) || BIG_IDEAS.test(t);
+  return true;
+}
 /** A view of their own, offered: "I think…", "hot take:". Not a plan of their own ("I think I should…"). */
 const OFFERS_VIEW = /^(?:honestly,? |personally,? |tbh,? )?(?:i (?:think|believe|reckon|suspect|feel like)|hot take|unpopular opinion|controversial opinion)\b/i;
 const THEIR_PLAN = /\b(?:i|we) (?:should|might|could|will|'ll|need to|have to|want to)\b|\bmy (?:plan|essay|draft|thesis|code|project|idea|business|job|team)\b/i;
@@ -354,9 +370,11 @@ export function readExchange(i: ExchangeInput): Exchange {
   if (i.task) {
     if (i.work === 'judgment' || i.work === 'verification') return done('task', 'work');
     if (i.claim) return done('task', 'claim');
-    if (i.compare) return done('task', 'compare');
+    // two named options compared: a question with an answer — unless the options are big ideas ("free will
+    // vs determinism?"), which are thought about together
+    if (i.compare && !BIG_IDEAS.test(t)) return done('task', 'compare');
     if (BRAINSTORM.test(t) && !s.recommendationRequested) return done('brainstorm', 'ideas');
-    if (asksView || (OPINION.test(t) && !THEIR_PLAN.test(t))) return done('discussion', 'opinion');
+    if (asksView || (opinionAsked(t, i.work) && !THEIR_PLAN.test(t))) return done('discussion', 'opinion');
     return done('task', 'work');
   }
 
@@ -370,7 +388,7 @@ export function readExchange(i: ExchangeInput): Exchange {
   if (joking) return done('playful', 'joking');
   if (aboutSocria) return done(NATURE.test(t) ? 'discussion' : 'social', 'about-socria');
   if (BRAINSTORM.test(t) || ((i.mapContext === 'brainstorming' || i.mapContext === 'creating') && /^(?:and|also|plus|another|oh,?\s+and|maybe|or)\b/i.test(t))) return done('brainstorm', 'ideas');
-  if (asksView || (OPINION.test(t) && !THEIR_PLAN.test(t))) return done('discussion', 'opinion');
+  if (asksView || (opinionAsked(t, i.work) && !THEIR_PLAN.test(t))) return done('discussion', 'opinion');
   if (BIG_IDEAS.test(t) && /\?/.test(t) && !THEIR_PLAN.test(t)) return done('discussion', 'big-question');
   if (OFFERS_VIEW.test(t) && !THEIR_PLAN.test(t)) return done('discussion', 'a-view');
   return done('conversation', 'talk');

@@ -955,7 +955,13 @@ export async function POST(req: NextRequest) {
     const placed = writeUpRefused ? { ...planned, place: undefined, reasons: [...planned.reasons, 'documents-spent'] } : planned;
     const presentation = inlineOn ? placed : { ...placed, forms: [] };
     const lastText = String(last.content ?? '');
-    const turnView = { shape: presentation.shape, forms: presentation.forms, question: /\?\s*$/.test(lastText.trim()) || LIST_ASK.test(lastText) };
+    const turnView = {
+      shape: presentation.shape,
+      forms: presentation.forms,
+      strong: presentation.strong,
+      lean: !!presentation.lean,
+      question: /\?\s*$/.test(lastText.trim()) || LIST_ASK.test(lastText),
+    };
 
     // EPISTEMIC CONTROL (lib/runtime/epistemic.ts). What the turn asks for,
     // and the evidence there is for it: their documents' passages, the
