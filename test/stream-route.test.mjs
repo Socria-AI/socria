@@ -102,6 +102,8 @@ const CASES = [
   ['an unquoted email body after "Subject:"', EMAIL, 'Subject: Heater in unit 4\n\nHi Sam,\n\nThe heater in unit 4 stopped working on Monday. Could someone come this week? Let me know if you have any questions.'],
   ['an unquoted email body after "Here\'s a draft:"', EMAIL, "Here's a draft:\n\nHi Sam, the heater in unit 4 stopped working on Monday. Could someone come this week? Let me know if you have any questions."],
   ['three polite ways to end a work email, the third a closer', 'Give me three polite ways to end a work email.', '- Thanks in advance.\n- Best regards.\n- Let me know if you have any questions.'],
+  // review: the closer as an item's SECOND sentence, on a turn requestsPhrasing does not read
+  ['a third sign-off whose second sentence is a closer', 'How should I end an email to my professor?', '1. Thanks in advance.\n2. Best regards.\n3. Thank you for your time. Let me know if you have any questions.'],
 ];
 
 console.log('\n=== what they asked for arrives verbatim, MR on and off, at every delta size ===');

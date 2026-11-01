@@ -67,7 +67,7 @@ import {
   englishDominant,
   elementImperative,
 } from './questions';
-import { classify } from './considered';
+import { classify, conceptTerms, REDUNDANT_AT } from './considered';
 
 /**
  * How much of the filler trimming is applied (env LOGOS_TRIM). See the head
@@ -488,7 +488,11 @@ export class SentenceGate {
       const st = draftStep(state, line);
       const item = LIST_ITEM.test(line);
       const exempt = quotedOrTableLine(line) || st === 'body' || st === 'signoff' || (!!this.opts.phrasing && item);
-      const sibling = item && lastItem && !head.trim();
+      // the whole of an item that follows another, not only a sentence that
+      // starts its line: "3. Thank you for your time. Let me know if you have
+      // any questions." is one requested sign-off, and its second sentence
+      // was being dropped as a closing offer
+      const sibling = item && lastItem;
       // a continuation of a line keeps its head for reading ("…? Let me know" on a ">" line)
       visible.push(exempt ? ' ' : seg);
       offers.push(exempt || sibling ? ' ' : seg);
@@ -652,7 +656,21 @@ export class SentenceGate {
     if (!rest || !this.out.trim() || !englishDominant(this.out)) return false;
     const said = sentencesOf(this.out.replace(/```[\s\S]*?```/g, ' ')).map((x) => x.trim()).filter(Boolean);
     if (said.length + 1 < 3) return false;
-    return classify(rest.trim(), [...said, said.join(' ')]).verdict === 'REDUNDANT';
+    // nothing new: every figure in it was already given, and its own terms are
+    // covered. similarity() (inside classify) divides by the SHORTER text's
+    // terms, so a long recap that adds a caveat ("…but only if you never need
+    // weekend support, which costs $15 extra") scored as covered by a short
+    // reply; the coverage is read from the recap's side here as well.
+    const whole = said.join(' ');
+    const figures = (t: string) => t.match(/\d+(?:[.,]\d+)*/g) ?? [];
+    const given = new Set(figures(whole));
+    if (figures(rest).some((n) => !given.has(n))) return false;
+    const terms = conceptTerms(rest);
+    const known = conceptTerms(whole);
+    let covered = 0;
+    for (const t of terms) if (known.has(t)) covered++;
+    if (terms.size && covered / terms.size < REDUNDANT_AT) return false;
+    return classify(rest.trim(), [...said, whole]).verdict === 'REDUNDANT';
   }
 
   /** A held sentence: is it what more exposition was waiting for? */
