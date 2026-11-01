@@ -2241,3 +2241,116 @@ a guest to look in an account they do not have.
 card and wall; in the browser (`.journeys/uxfix`), each fix before and after —
 including a control run with the view guard switched off, in which choosing the
 Logic Map still ended on Artifacts.
+
+## 29. The conversation as something to reason with
+
+"I want the conversation itself to become a dynamic, interactive reasoning
+interface rather than primarily generating static text … these interactions
+should affect conversational context, allowing Socria to understand what users
+manipulate and respond accordingly." No new tab, mode or workspace: everything
+here is inside a reply, in the Chat view as it was.
+
+**What was there (the audit).** Ten inline element kinds (§12), checked before
+they are shown — but what a person did with one never reached the model: the
+route kept a message's role and words and dropped its `ui` state, and the
+history read every element back at the values it started with
+(`contentForHistory`). A slider moved, a draft edited, a decision weighed: the
+next reply saw none of it. The slider computed one number with its formula in
+code type; there was no graph, no working, no question to check; sliders and
+reasoning were refused outright under the Answer Guard, which is exactly when a
+student is working a problem; and the Logic Map showed in the conversation only
+as "+3 on the map".
+
+**What they do reaches Socria** (`lib/inline-ui.ts`):
+
+- `describeInline(spec, state)` says what was done with an element in a line,
+  from where it started to how it stands: "predicted “Left”; changed b 2 → 4;
+  the curve is now y = x² + 4x − 1; its turning point moved from (−1, −2) to
+  (−2, −5)", "tried angle 30° (range 8.8 m); angle 60° (range 8.8 m)",
+  "answered 2 for x — right", "set Price from 10 to 20; Cost is now $40".
+- Each change is kept as one pending line per element (the latest wins) and
+  shown on the box — **Goes with your next message** — each chip a press from
+  being left out (`LogosComposer` `context`). The next message carries them
+  (`LogosMsg.did`), shown over the person's words ("From the graph …"), saved
+  with the conversation (`/api/conversations` cleans them), given back with the
+  words if the message fails, and never carried into another line of thinking.
+  An element in an older reply is named as such ("the graph in an earlier
+  reply").
+- The route reads `did` into the model's copy only, as one bracketed line before
+  the person's words (`didLine`) — so it is read as what happened, never as
+  what they said — and reads every earlier element back **as it stands now**
+  (`contentForHistory(content, ui)` → "[shown inline — graph: … — now: …]").
+
+**Four new kinds** — descriptions, never code; computed, never asserted
+(`lib/inline-math.ts`, by the math engine's own parser):
+
+- `graph` — y over x and up to three parameters. The parameters are the numbers
+  in the typeset equation, dragged sideways or moved with the arrow keys (role
+  `slider`), with sliders under the picture too. Turning points, roots and the
+  y-intercept are found on the curve as it is now; the curve it started as
+  stays faintly once it has changed, and the turning point's move is said.
+  Tapping or pointing at the curve reads a point. An optional `predict` asks
+  before anything moves — the numbers wait for an answer, or Skip.
+- `sim` — a path over time (x(t), y(t)) with up to three parameters; when it
+  ends and what it reads ("range") are formulas. Each setting the person stops
+  on is kept and drawn faintly, named by what was changed, so 30° and 60° can
+  be seen landing in the same place.
+- `check` — a question they work out and type an answer to. The answer is a
+  formula the engine evaluates and compares (half a percent, or the question's
+  own tolerance); how it comes out is shown once they have it or after two
+  tries, and when there is nothing to show, an invitation to say what they
+  tried. The answer is never in what is copied or shown.
+- `steps` — the working as typeset lines (each a Point & Ask target), a why
+  folded under any line, and their turn at the end (a `check`).
+
+**Restraint.** One thing to work with in a reply (graph, simulation, slider,
+decision or working) — a second is not drawn; a question may sit beside it.
+None of these is folded away under a long reply's headings (`reply-layout`
+`NEVER_FOLDED`). The planner offers a graph for a relationship asked about
+(vertex, slope, a function and "why/how/what happens"), a simulation for motion
+asked why (a projectile, a pendulum — or a throw or a fall *with* an angle, a
+speed, a height; "why did the Roman Republic fall?" stays prose), steps when
+the working is asked for, a question when they practise in the conversation —
+and a graph instead of a slider, never both. A practice set asked for is still
+made in Artifacts, and a plot asked for still opens there.
+
+**The Answer Guard** now allows the person's own work: a question (its
+explanation held back), a graph with nothing marked that would be the answer, a
+simulation without its readings. The working and folded reasoning stay out,
+as before.
+
+**The Logic Map in the conversation.** Under a reply whose turn added ideas to
+the map, those cards are drawn there — at most four, in the map's shapes (what
+they want tinted, what pulls against something rust, what is assumed dashed,
+an open question round), named in the person's terms ("You said", "Assumed",
+"· kept from Socria") — each a press from itself on the map, all of them a press
+from the Logic Map (`lib/logos5/mapSlice.ts`). One card is still a line.
+
+**The slider's formula** is typeset like the rest (its exact text on hover).
+
+**Cost.** No model call while anything is dragged; the context is a line per
+element (tens of tokens) on the turn it is sent. The grammar for the new kinds
+is only in the per-turn block when the planner offers them.
+
+**Guests and the access key.** Since October 31 the chat and map routes count
+everyone signed out as a guest, the typed access key included, and ask for the
+guest pass; the claim route and the app still treated a key holder as needing
+none, so none was ever set and every turn they sent was refused. The claim
+route now gives a key holder the pass like any guest, and the app counts them
+as one (`test/guest.test.mjs`).
+
+**Tested.** `test/interactive-chat.test.mjs` (the arithmetic, the specs, the
+gate and the guard, what is said and read back, the planner, the drawn
+elements, never folded, the app and the route); `test/inline-ui.test.mjs`
+unchanged in what it holds. In the browser, against the stand-in model
+(`scripts/dev/fake-openai.mjs`, which now answers with these elements and,
+with `FAKE_OPENAI_TRACE`, records what the server sent it): on a desktop, the
+graph's sliders are held until a prediction is made; b moved 2 → 4 by keyboard
+leaves the first curve dashed beside the new one and says "The turning point
+moved left and down, from (−1, −2) to (−2, −5)."; a right answer to the
+question shows its explanation; both go as chips on the box, and on sending
+the strip sits over the message, the model receives the line before their
+words and reads the graph back as it was left ("— now: … its turning point
+moved from (−1, −2) to (−2, −5)"), and it answered by what they did; all of it
+is there after a reload. On a phone, three angles tried on the throw stay as
+tagged traces and go as one chip; no sideways scroll, no page errors.

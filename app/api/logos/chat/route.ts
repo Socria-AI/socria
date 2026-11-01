@@ -109,7 +109,7 @@ import {
   UNCHECKED_CURRENT,
 } from '@/lib/runtime';
 import { runResearch } from '@/lib/core4/web-server';
-import { contentAsText, contentForCheck, contentForHistory, gateInlineBlock, type InlineContext } from '@/lib/inline-ui';
+import { contentAsText, contentForCheck, contentForHistory, didLine, gateInlineBlock, sanitizeDid, sanitizeInlineState, type InlineContext } from '@/lib/inline-ui';
 import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
 import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
 // METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
@@ -313,12 +313,18 @@ export async function POST(req: NextRequest) {
     const clean = kept
       .map((m: any, i: number) => {
         // An inline block Socria showed earlier is read back as a line saying
-        // what it was, not as its JSON (lib/inline-ui.ts contentForHistory).
-        const rendered = renderMessageForModel(
-          { role: m.role, content: m.role === 'assistant' ? contentForHistory(m.content) : m.content, attachments: sanitizeAttachments(m.attachments) },
+        // what it was, not as its JSON — and as it stands now, where the person
+        // did something with it (lib/inline-ui.ts contentForHistory).
+        const rendered0 = renderMessageForModel(
+          { role: m.role, content: m.role === 'assistant' ? contentForHistory(m.content, sanitizeInlineState(m.ui)) : m.content, attachments: sanitizeAttachments(m.attachments) },
           i === kept.length - 1,
           sentLetters
         );
+        // What they did with the elements before writing this — a number dragged, a prediction, an
+        // answer checked — in the model's copy only: one bracketed line before their words, so it is
+        // read as what happened, never as what they said (lib/inline-ui.ts didLine).
+        const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
+        const rendered = did && rendered0 ? `${didLine(did)}\n${rendered0}` : rendered0;
         const name = twoPeople && m.role === 'user' ? cleanPerson(m.by?.name) : '';
         // A turn that replies to a particular message says which, in the
         // model's copy only: one fixed-format line, quoted and clipped

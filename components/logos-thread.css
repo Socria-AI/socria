@@ -198,3 +198,71 @@
   .logos-root .lg-synth-wrap.is-flash { animation: none; outline: 2px solid var(--lg-primary); outline-offset: 2px; }
   .logos-root .lg-msg-acts { transition: none; }
 }
+
+/* WHAT GOES WITH THE NEXT MESSAGE (lib/inline-ui.ts describeInline): what they did with the
+   replies' elements, on the box before it goes — each chip a line, one press to leave it out */
+.logos-root .lg-did-row {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  margin: 0 0 6px;
+}
+.logos-root .lg-did-k {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--lg-ink) 70%, transparent);
+}
+.logos-root .lg-did-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  min-height: 28px;
+  padding: 2px 4px 2px 10px;
+  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.25);
+  border-radius: 999px;
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06);
+  font-size: 12.5px;
+  color: var(--lg-ink);
+}
+.logos-root .lg-did-from {
+  flex: none;
+  font-weight: 600;
+  color: var(--lg-primary);
+  text-transform: capitalize;
+}
+.logos-root .lg-did-said {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  max-width: 46ch;
+}
+.logos-root .lg-did-x {
+  flex: none;
+  width: 22px;
+  height: 22px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: color-mix(in srgb, var(--lg-ink) 60%, transparent);
+  font-size: 15px;
+  line-height: 1;
+  cursor: pointer;
+}
+.logos-root .lg-did-x:hover {
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+  color: var(--lg-ink);
+}
+@media (max-width: 560px) {
+  .logos-root .lg-did-said {
+    max-width: 26ch;
+  }
+  .logos-root .lg-did-x {
+    width: 32px;
+    height: 32px;
+  }
+}

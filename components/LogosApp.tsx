@@ -114,7 +114,7 @@ import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
 import { cleanTitle } from '@/lib/session-rail';
-import { artifactFromSpec, sanitizeInlineStateOne, type InlineSpec, type InlineState } from '@/lib/inline-ui';
+import { artifactFromSpec, describeInline, inlineFrom, sanitizeInlineStateOne, specsIn, type DidItem, type InlineSpec, type InlineState } from '@/lib/inline-ui';
 import { buildStarters, PENDING_TYPES } from '@/lib/starters';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { ContextPanel } from '@/components/ContextPanel';
@@ -571,6 +571,16 @@ export function LogosApp({
   inputRef.current = input;
   /** the message the next one answers — set by Reply, shown above the composer */
   const [replyTo, setReplyTo] = useState<ReplyRef | null>(null);
+  /**
+   * WHAT THEY DID with the elements of Socria's replies since they last wrote —
+   * a number dragged, a prediction made, an answer checked (lib/inline-ui.ts
+   * describeInline), one line per element, the latest kept. Shown on the box
+   * before it goes, any of it theirs to take off, and sent with their next
+   * message so Socria answers what they did, not only what they typed.
+   */
+  const [didPending, setDidPending] = useState<Record<string, DidItem & { at: number }>>({});
+  const didRef = useRef(didPending);
+  didRef.current = didPending;
   const replyToRef = useRef(replyTo);
   replyToRef.current = replyTo;
 
@@ -676,6 +686,8 @@ export function LogosApp({
   }, []);
 
   const bottomRef = useRef<HTMLDivElement>(null);
+  // what was done in one line of thinking is never said in another
+  useEffect(() => setDidPending({}), [activeId]);
   // The part of an object of thought the person has selected — a row, an
   // entry, a parameter. Per person and ephemeral, like the workspace focus.
   const [objSel, setObjSel] = useState<{ obj: string; part: string } | null>(null);
@@ -1514,7 +1526,9 @@ export function LogosApp({
   // key, or a GUEST — signed out, with one line of thinking and its map
   // (lib/guest-pass.ts; a second asks them to sign up, GuestWall).
   const hasAccess = unlocked || !!isSignedIn || authSettled;
-  const guest = authSettled && !isSignedIn && !unlocked;
+  // the typed access key opens Logos 5 but is no account: signed out with it is a guest,
+  // as the chat and map routes have it, so the pass is claimed (app/api/logos/guest)
+  const guest = authSettled && !isSignedIn;
   const guestRef = useRef(guest);
   guestRef.current = guest;
   /** the guest's one line of thinking, claimed on this server (POST /api/logos/guest) */
@@ -4352,6 +4366,10 @@ export function LogosApp({
       : workspaceOn
         ? describeFocus(focusRef.current, mapRef.current, docsRef.current)
         : null;
+    const didNow: DidItem[] = Object.values(didRef.current)
+      .sort((a, b) => a.at - b.at)
+      .slice(-4)
+      .map(({ from, said }) => ({ from, said }));
     const turn: Msg = {
       id: newMsgId(),
       at: Date.now(),
@@ -4364,7 +4382,11 @@ export function LogosApp({
       ...(make ? { make } : {}),
       // said, not typed (Socria Voice): marked, and told to Socria with the turn
       ...(via ? { via } : {}),
+      // what they did with the replies' elements since they last wrote, as the box showed it
+      ...(didNow.length ? { did: didNow } : {}),
     };
+    // said once: the box is clear of it for what comes next (a turn that fails gives it back)
+    if (didNow.length) setDidPending({});
     // In a shared room — and in the room's own session — the turn is stamped
     // with who wrote it and broadcast to the other person before anything
     // else happens. In a group it is posted to everyone at once, so the
@@ -4735,6 +4757,8 @@ export function LogosApp({
         if (giveBack(sid, content, replying, atts)) {
           setError(sendFailure(e, { online }));
           setRetryable(true);
+          // what they did goes back on the box with their words, to be sent again with them
+          if (turn.did?.length) setDidPending((p) => ({ ...Object.fromEntries(turn.did!.map((d, i) => [`back:${i}`, { ...d, at: i }])), ...p }));
         }
       }
     } finally {
@@ -5890,6 +5914,21 @@ export function LogosApp({
     // the record the map reads holds the same turn: it follows, so nothing is said twice
     const { from, to } = swap;
     if (from && to) chronRef.current = chronRef.current.map((c) => (c === from ? to : c));
+    // WHAT THEY DID, said with their next message: from where the element started to how it stands
+    // now, one line per element (lib/inline-ui.ts describeInline) — and which reply it was in, when it
+    // was not the latest
+    const spec = specsIn(msg.content)[n];
+    if (!spec || !to) return;
+    const said = describeInline(spec, to.ui?.[key]);
+    const replies = (sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? []).filter((x) => x.role === 'assistant' && !x.synthesis);
+    const earlier = replies.length > 0 && replies[replies.length - 1].id !== msg.id;
+    const id = `${msg.id}:${key}`;
+    setDidPending((p) => {
+      const next = { ...p };
+      if (said) next[id] = { from: `${inlineFrom(spec)}${earlier ? ' in an earlier reply' : ''}`, said, at: Date.now() };
+      else delete next[id];
+      return next;
+    });
   }
 
   /** A choice tapped in the latest reply: sent as their next message, and whatever they had started typing stays. */
@@ -6429,6 +6468,7 @@ export function LogosApp({
     const out = new Map<string, L5Effect>();
     if (!l5) return out;
     const live = new Set(map.nodes.map((n) => n.id));
+    const nodeById = new Map(map.nodes.map((n) => [n.id, n]));
     const named = new Map((wsFacts.displays ?? []).map((d) => [d.id, d]));
     let lastUser: string | null = null;
     for (const m of messages) {
@@ -6446,7 +6486,14 @@ export function LogosApp({
             .filter((d): d is NonNullable<typeof d> => !!d)
             .map((d) => ({ id: d.id, label: d.title || d.name, kind: d.noun }))
         : [];
-      if (said || objects.length) out.set(m.id, { map: said ? { said, nodes: [...fx.added, ...fx.renamed] } : null, objects });
+      // the ideas themselves, for the cards drawn under the reply (lib/logos5/mapSlice.ts)
+      const cards = said
+        ? [...fx.added, ...fx.renamed]
+            .map((id) => nodeById.get(id))
+            .filter((n): n is NonNullable<typeof n> => !!n)
+            .map((n) => ({ id: n.id, label: n.label, type: n.type, ...(n.origin ? { origin: n.origin } : {}) }))
+        : [];
+      if (said || objects.length) out.set(m.id, { map: said ? { said, nodes: [...fx.added, ...fx.renamed], cards } : null, objects });
     }
     return out;
   }, [l5, messages, map.nodes, map.history, wsFacts.displays, objMsg]);
@@ -7748,6 +7795,16 @@ export function LogosApp({
         group={groupLive}
         about={focusBrief ? { kind: focusBrief.kind, label: focusBrief.label, of: focusBrief.of } : null}
         onClearAbout={clearAbout}
+        context={Object.entries(didPending)
+          .sort((a, b) => a[1].at - b[1].at)
+          .map(([key, d]) => ({ key, from: d.from, said: d.said }))}
+        onDropContext={(key) =>
+          setDidPending((p) => {
+            const next = { ...p };
+            delete next[key];
+            return next;
+          })
+        }
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly && one}
         voiceButton={voiceButton}
         voiceLive={voiceOn}

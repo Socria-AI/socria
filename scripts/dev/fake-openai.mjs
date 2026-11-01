@@ -13,6 +13,10 @@
 // FAKE_STREAM_MS=400 slows the stream (default 12ms a word), so a reply can be
 // watched arriving — and stopped — in a browser.
 //
+// FAKE_OPENAI_TRACE=/path/trace.jsonl appends the last few messages of every
+// reply request, one JSON line each, so a journey can read what the server
+// actually sent the model (the history, the line saying what they did).
+//
 // What it answers:
 //   POST /v1/chat/completions      streamed text, or JSON when json_object is asked
 //                                  (a map, a study's topics, journal-entry practice,
@@ -24,6 +28,7 @@
 //   GET  /v1/models                a short list
 
 import http from 'node:http';
+import { appendFileSync } from 'node:fs';
 
 const PORT = Number(process.argv[2] || process.env.FAKE_OPENAI_PORT || 3999);
 
@@ -52,6 +57,22 @@ function chatReply(messages) {
 }
 
 /**
+ * What they did with an element in an earlier reply (lib/inline-ui.ts didLine,
+ * put before their words by app/api/logos/chat), answered the way the model is
+ * asked to: by what they actually did, not by the reply as it was first shown.
+ */
+function didReply(messages) {
+  const said = /\[What they did with the elements in your replies before writing this — (.+?)\. Take it into account\.\]/.exec(lastUser(messages))?.[1];
+  if (!said) return null;
+  const guess = /predicted “([^”]+)”/.exec(said)?.[1];
+  const moved = /turning point moved from (\([^)]*\)) to (\([^)]*\))/.exec(said);
+  if (moved) return `${guess ? `You said ${guess.toLowerCase()}` : 'You moved it'}, and the turning point went from ${moved[1]} to ${moved[2]}: x = −b/2a, so doubling b doubles how far left it sits. Why did it drop as well?`;
+  const tried = /tried (.+?)(?:;|$)/.exec(said)?.[1];
+  if (tried) return `You tried ${tried}. The two that land together add up to 90°. What does that say about sin 2a?`;
+  return `I can see what you did: ${said}. What did you expect before you tried it?`;
+}
+
+/**
  * A turn offered an inline element (app/api/logos/chat, lib/runtime/presentation.ts
  * renderPresentation) is answered with one, so the browser can be driven through
  * a chart, a slider, a comparison, choices, a draft and folded reasoning. The
@@ -72,6 +93,19 @@ function inlineReply(messages) {
   }
   if (!sys.includes('INLINE, IF IT HELPS')) return null;
   const t = lastUser(messages);
+  // the conversation as something to reason with (GRAMMAR graph / sim / check / steps)
+  if (sys.includes('"type":"graph"') && /vertex|parabola|b\/2a/i.test(t)) {
+    return `No — c only lifts the whole curve; where it turns depends on a and b. Guess first, then try it.\n\n${ui({ type: 'graph', title: 'Where the vertex sits', expr: 'a*x^2 + b*x + c', x: [-6, 4], params: [{ name: 'a', value: 1, min: -3, max: 3, step: 0.5 }, { name: 'b', value: 2, min: -6, max: 6, step: 1 }, { name: 'c', value: -1, min: -5, max: 5, step: 1 }], features: ['turning', 'roots', 'intercept'], predict: { prompt: 'If b doubles, which way does the vertex move?', options: ['Left', 'Right', 'It stays put'] } })}`;
+  }
+  if (sys.includes('"type":"sim"') && /throw|angle|projectile|45/i.test(t)) {
+    return `Because 45° splits the throw evenly between going up and going forward. Move the angle and watch where it lands.\n\n${ui({ type: 'sim', title: 'Throw at 10 m/s', x: 'v*cos(a*pi/180)*t', y: 'v*sin(a*pi/180)*t - 4.9*t^2', t: [0, '2*v*sin(a*pi/180)/9.8'], view: { x: [0, 12], y: [0, 5] }, params: [{ name: 'a', label: 'angle', value: 45, min: 5, max: 85, step: 1, unit: '°' }, { name: 'v', label: 'speed', value: 10, min: 2, max: 20, step: 1, unit: 'm/s' }], readouts: [{ label: 'range', expr: 'v^2*sin(2*a*pi/180)/9.8', unit: 'm', digits: 1 }], predict: { prompt: 'Which angle lands as far as 30°?', options: ['60°', '15°', 'None'] } })}`;
+  }
+  if (sys.includes('"type":"steps"')) {
+    return `Complete the square: half of b, squared, makes the perfect square.\n\n${ui({ type: 'steps', title: 'Completing the square', lines: [{ tex: 'y = x^2 + 4x - 1' }, { tex: '= (x^2 + 4x + 4) - 4 - 1', why: 'half of 4, squared, is 4' }, { tex: '= (x+2)^2 - 5' }], check: { prompt: 'Now you: where is the vertex of y = x² − 6x + 2?', label: 'x', answer: '6/2' } })}`;
+  }
+  if (sys.includes('"type":"check"')) {
+    return `One like it.\n\n${ui({ type: 'check', prompt: 'Where is the vertex of y = 2x² − 8x + 3?', label: 'x', answer: '-(-8)/(2*2)', explain: 'x = −b/2a = 8/4 = 2' })}`;
+  }
   // an open piece of work (SHAPES.open): the problem that matters, one starting point, the ways onward
   if (sys.includes('"type":"paths"')) {
     return `The hard part isn't the screens — it's that Logos 5 asks people to think *with* it, and nobody arrives knowing how.\n\nSo I'd build onboarding around one first success instead of a tour: in the first few minutes someone brings a real question of their own, talks it through, and watches their reasoning come back as a Logic Map they didn't have to draw. Views, Artifacts and Memory can wait until they reach for them.\n\nA relaunch adds one wrinkle: people who learned the old Logos will look for what moved, so they need a different first minute from someone arriving cold.\n\n${ui({ type: 'paths', title: 'Where to take it', items: [
@@ -474,7 +508,12 @@ const server = http.createServer((req, res) => {
         const content = JSON.stringify(isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
-      const text = inlineReply(messages) ?? chatReply(messages.slice(1));
+      if (process.env.FAKE_OPENAI_TRACE) {
+        try {
+          appendFileSync(process.env.FAKE_OPENAI_TRACE, JSON.stringify({ at: Date.now(), messages: messages.slice(-4).map((m) => ({ role: m.role, content: String(m.content ?? '').slice(0, 4000) })) }) + '\n');
+        } catch {}
+      }
+      const text = didReply(messages) ?? inlineReply(messages) ?? chatReply(messages.slice(1));
       if (body.stream) return streamText(res, text, model);
       return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
     }

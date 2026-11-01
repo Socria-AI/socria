@@ -18,3 +18,6 @@ export { makeDisplay, EMPTY_SPACE } from '@/lib/objects';
 export { LOGOS5_CORE, PERSONA_VERSION } from '@/lib/runtime/behavior';
 // how a Logos 5 reply is laid out to be read (lib/reply-layout.ts, logos5-v4)
 export * from '@/lib/reply-layout';
+// the arithmetic of the live elements (lib/inline-math.ts) and the Logic Map under a reply (lib/logos5/mapSlice.ts)
+export * from '@/lib/inline-math';
+export * from '@/lib/logos5/mapSlice';

@@ -1,10 +1,12 @@
 'use client';
 // components/inline/InlineUI.tsx — THE INLINE ELEMENTS, DRAWN IN THE CONVERSATION.
 //
-// Ten small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
+// Fourteen small things a reply can hold (lib/inline-ui.ts): a chart, a slider, a
 // comparison, reasoning folded under its conclusion, choices to tap, a draft to
 // edit, the parts of a subject to explore, steps or events in order, the ways
-// an open piece of work could go next, and a decision they weigh themselves.
+// an open piece of work could go next, a decision they weigh themselves — and
+// things to reason with: a graph whose numbers they drag, a small simulation,
+// the working with their numbers, a question they work out and check.
 // Each is drawn from a validated description, in the reading column,
 // quietly — a thin rule, the conversation's own type, nothing that looks like
 // a dashboard. What the person does with one (a slider moved, a choice tapped,
@@ -18,7 +20,9 @@
 import { useEffect, useId, useMemo, useRef, useState, type ReactNode, type RefObject } from 'react';
 import { compileExpr } from '@/lib/logos-math';
 import { linearScale, scaleAt, fmtNum } from '@/lib/objects/display-data';
-import { decideLeaning, decideTally, pathAsk, SCORE_SAID, WEIGHT_SAID, type ChartSpec, type CompareSpec, type ConceptsSpec, type DecideSpec, type DraftSpec, type InlineSpec, type InlineState, type OptionsSpec, type PathsSpec, type ReasoningSpec, type SequenceSpec, type SliderSpec } from '@/lib/inline-ui';
+import { decideLeaning, decideTally, pathAsk, SCORE_SAID, WEIGHT_SAID, type ChartSpec, type CheckPart, type CompareSpec, type ConceptsSpec, type DecideSpec, type DraftSpec, type GraphSpec, type InlineSpec, type InlineState, type OptionsSpec, type ParamSpec, type PathsSpec, type PredictSpec, type ReasoningSpec, type SequenceSpec, type SimSpec, type SliderSpec, type StepsSpec } from '@/lib/inline-ui';
+import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fmtPoint, fmtVal, prettyExpr, sampleCurve, samplePath, timeAt, type Feature, type Pt, type Seg } from '@/lib/inline-math';
+import { TeX } from '@/components/TeX';
 import { copyText } from '@/lib/copy-text';
 import './inline.css';
 
@@ -78,6 +82,18 @@ export function InlineBlock({ spec, open, n, host, renderInline }: { spec: Inlin
       return <InlinePaths spec={spec} state={state} onState={setState} onExplore={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} renderInline={renderInline} />;
     case 'decide':
       return <InlineDecide spec={spec} state={state} onState={host?.onState ? setState : undefined} onAsk={host?.onExplore ?? (host?.live ? host?.onChoose : undefined)} onOpen={host?.onOpen ? (s) => host.onOpen!(n, s) : undefined} />;
+    case 'graph':
+      return <InlineGraph spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
+    case 'sim':
+      return <InlineSim spec={spec} state={state} onState={setState} shared={!!host?.onState} />;
+    case 'check':
+      return (
+        <div className="ln ln-check">
+          <CheckBox part={spec} state={state} onState={setState} renderInline={renderInline} />
+        </div>
+      );
+    case 'steps':
+      return <InlineSteps spec={spec} state={state} onState={setState} renderInline={renderInline} />;
   }
 }
 
@@ -391,8 +407,8 @@ function InlineSlider({ spec, state, onState }: { spec: SliderSpec; state?: Inli
         </label>
       ))}
       <div className="ln-foot">
-        <span className="ln-formula" title="What the result is computed from">
-          {spec.result.label} = <code>{spec.formula}</code>
+        <span className="ln-formula" title={`What the result is computed from: ${spec.formula}`}>
+          {spec.result.label} = <FormulaText formula={spec.formula} names={spec.vars.map((v) => v.name)} labels={Object.fromEntries(spec.vars.map((v) => [v.name, v.name]))} />
         </span>
       </div>
     </div>
@@ -854,6 +870,642 @@ function InlineDraft({ spec, state, onState }: { spec: DraftSpec; state?: Inline
           </button>
         </span>
       </div>
+    </div>
+  );
+}
+
+
+// ── a formula, read as maths; its numbers to drag ────────────────────
+
+const r6 = (v: number) => Math.round(v * 1e6) / 1e6;
+/** A value moved onto a parameter's own steps, within its range. */
+function onSteps(v: number, p: ParamSpec): number {
+  const n = Math.round((v - p.min) / p.step);
+  return r6(Math.min(p.max, Math.max(p.min, p.min + n * p.step)));
+}
+
+/**
+ * A NUMBER TO DRAG, inside the equation: a slider in all but looks — dragged
+ * sideways, or focused and moved with the arrow keys (Shift for ten steps,
+ * Home and End for the ends). Locked while a prediction is still to be made.
+ */
+function Scrub({ p, value, shown, hot, locked, onChange, onHot }: { p: ParamSpec; value: number; shown: string; hot: boolean; locked: boolean; onChange: (v: number) => void; onHot: (on: boolean) => void }) {
+  const drag = useRef<{ id: number; x: number; v: number } | null>(null);
+  const set = (v: number) => onChange(onSteps(v, p));
+  return (
+    <span
+      role="slider"
+      tabIndex={locked ? -1 : 0}
+      aria-label={p.label}
+      aria-valuemin={p.min}
+      aria-valuemax={p.max}
+      aria-valuenow={value}
+      aria-valuetext={`${p.label} ${fmtVal(value)}${p.unit ? ` ${p.unit}` : ''}`}
+      aria-disabled={locked || undefined}
+      className={`ln-scrub${hot ? ' is-hot' : ''}${locked ? ' is-locked' : ''}`}
+      title={locked ? 'Answer the question first' : `Drag sideways, or use the arrow keys, to change ${p.label}`}
+      onFocus={() => onHot(true)}
+      onBlur={() => onHot(false)}
+      onKeyDown={(e) => {
+        if (locked) return;
+        if (e.key === 'Home' || e.key === 'End') {
+          e.preventDefault();
+          set(e.key === 'Home' ? p.min : p.max);
+          return;
+        }
+        const d = e.key === 'ArrowRight' || e.key === 'ArrowUp' ? 1 : e.key === 'ArrowLeft' || e.key === 'ArrowDown' ? -1 : 0;
+        if (!d) return;
+        e.preventDefault();
+        set(value + d * p.step * (e.shiftKey ? 10 : 1));
+      }}
+      onPointerDown={(e) => {
+        if (locked || e.button !== 0) return;
+        drag.current = { id: e.pointerId, x: e.clientX, v: value };
+        (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
+        onHot(true);
+      }}
+      onPointerMove={(e) => {
+        const d = drag.current;
+        if (!d || d.id !== e.pointerId) return;
+        set(d.v + Math.round((e.clientX - d.x) / 8) * p.step);
+      }}
+      onPointerUp={() => {
+        drag.current = null;
+        onHot(false);
+      }}
+      onPointerCancel={() => {
+        drag.current = null;
+        onHot(false);
+      }}
+    >
+      {shown}
+    </span>
+  );
+}
+
+/**
+ * An expression laid out as maths (lib/inline-math.ts prettyExpr). With
+ * `values`, each parameter is drawn as its number — the number to drag when
+ * `onScrub` is given — and a sign meeting a negative number reads as one
+ * ("+ −2x" is "− 2x"). Without, parameters are their names.
+ */
+function Expr({ segs, params, values, hot, locked, onScrub, onHot }: { segs: Seg[]; params: readonly ParamSpec[]; values?: Record<string, number>; hot?: string | null; locked?: boolean; onScrub?: (name: string, v: number) => void; onHot?: (name: string | null) => void }) {
+  const byName = new Map(params.map((p) => [p.name, p]));
+  const draw = (list: Seg[], key: string): ReactNode[] => {
+    // how each sign before a negative number is read
+    const signAt = new Map<number, string | null>();
+    const absAt = new Set<number>();
+    if (values) {
+      list.forEach((g, i) => {
+        if (g.k !== 'param' || !(values[g.v] < 0)) return;
+        const prev = list[i - 1];
+        if (!prev || prev.k !== 'op' || (prev.v !== '+' && prev.v !== '−')) return;
+        signAt.set(i - 1, prev.unary ? (prev.v === '−' ? null : '−') : prev.v === '+' ? '−' : '+');
+        absAt.add(i);
+      });
+    }
+    return list.map((g, i) => {
+      const k = `${key}-${i}`;
+      switch (g.k) {
+        case 'num':
+          return <span key={k}>{g.v}</span>;
+        case 'var':
+          return (
+            <i key={k} className="ln-eq-v">
+              {g.v}
+            </i>
+          );
+        case 'fn':
+          return (
+            <span key={k} className="ln-eq-f">
+              {g.v}
+            </span>
+          );
+        case 'sup':
+          return <sup key={k}>{draw(g.s, k)}</sup>;
+        case 'op': {
+          const v = signAt.has(i) ? signAt.get(i) : g.v;
+          if (v === null || v === undefined) return null;
+          const binary = !g.unary && (v === '+' || v === '−');
+          return (
+            <span key={k} className={binary ? 'ln-eq-op' : undefined}>
+              {v}
+            </span>
+          );
+        }
+        case 'param': {
+          const p = byName.get(g.v);
+          if (!values || !p) {
+            return (
+              <i key={k} className="ln-eq-v">
+                {g.v}
+              </i>
+            );
+          }
+          const v = values[g.v] ?? p.value;
+          const shown = fmtVal(absAt.has(i) ? Math.abs(v) : v);
+          if (!onScrub) {
+            return (
+              <span key={k} className="ln-eq-p">
+                {shown}
+              </span>
+            );
+          }
+          return <Scrub key={k} p={p} value={v} shown={shown} hot={hot === g.v} locked={!!locked} onChange={(nv) => onScrub(g.v, nv)} onHot={(on) => onHot?.(on ? g.v : null)} />;
+        }
+      }
+    });
+  };
+  return <>{draw(segs, 'e')}</>;
+}
+
+/** A formula as maths, its names in italic — or, where it cannot be read, as written. */
+function FormulaText({ formula, names }: { formula: string; names: string[]; labels?: Record<string, string> }) {
+  const segs = useMemo(() => prettyExpr(formula, names), [formula, names]);
+  if (!segs) return <code>{formula}</code>;
+  return (
+    <span className="ln-eq is-small">
+      <Expr segs={segs} params={[]} />
+    </span>
+  );
+}
+
+// ── shared: a prediction first, and the note that what is done is shared ──
+
+function Predict({ predict, picked, onPick, onSkip }: { predict: PredictSpec; picked?: number; onPick?: (i: number) => void; onSkip?: () => void }) {
+  if (picked !== undefined) {
+    return (
+      <p className="ln-predicted">
+        <span className="ln-k">You predicted</span> {predict.options[picked]}
+      </p>
+    );
+  }
+  return (
+    <div className="ln-predict" role="group" aria-label={predict.prompt}>
+      <p className="ln-k">Before you change anything</p>
+      <p className="ln-q">{predict.prompt}</p>
+      <div className="ln-chips">
+        {predict.options.map((o, i) => (
+          <button key={i} type="button" className="ln-chip" disabled={!onPick} onClick={() => onPick?.(i)}>
+            {o}
+          </button>
+        ))}
+        {onSkip && (
+          <button type="button" className="ln-skip" onClick={onSkip}>
+            Skip
+          </button>
+        )}
+      </div>
+    </div>
+  );
+}
+
+function SharedNote({ what }: { what: string }) {
+  return (
+    <p className="ln-shared">
+      <svg viewBox="0 0 24 24" width="13" height="13" aria-hidden="true">
+        <path d="M2 12s3.6-6 10-6 10 6 10 6-3.6 6-10 6S2 12 2 12Z" fill="none" stroke="currentColor" strokeWidth="1.7" />
+        <circle cx="12" cy="12" r="2.6" fill="currentColor" />
+      </svg>
+      What you {what} here goes to Socria with your next message.
+    </p>
+  );
+}
+
+/** A polyline through points, the pen lifted where a point is undefined; a value far off the window is held at its edge, not drawn to infinity. */
+function pathOf(pts: readonly Pt[], X: (x: number) => number, Y: (y: number) => number, y0: number, y1: number): string {
+  const lo = y0 - 3 * (y1 - y0), hi = y1 + 3 * (y1 - y0);
+  let d = '';
+  let pen = false;
+  for (const p of pts) {
+    if (!Number.isFinite(p.x) || !Number.isFinite(p.y)) {
+      pen = false;
+      continue;
+    }
+    d += `${pen ? 'L' : 'M'}${X(p.x).toFixed(1)},${Y(Math.max(lo, Math.min(hi, p.y))).toFixed(1)}`;
+    pen = true;
+  }
+  return d;
+}
+
+/** The grid and axes of a window, its zero lines drawn where they fall inside it. */
+function Grid({ x0, x1, y0, y1, X, Y, W, H }: { x0: number; x1: number; y0: number; y1: number; X: (x: number) => number; Y: (y: number) => number; W: number; H: number }) {
+  const xs = linearScale([x0, x1], { want: Math.max(3, Math.round(W / 90)) }).ticks.filter((t) => t > x0 && t < x1);
+  const ys = linearScale([y0, y1], { want: Math.max(3, Math.round(H / 60)) }).ticks.filter((t) => t > y0 && t < y1);
+  const ax = y0 <= 0 && 0 <= y1 ? Y(0) : null;
+  const ay = x0 <= 0 && 0 <= x1 ? X(0) : null;
+  return (
+    <g className="ln-axes" aria-hidden="true">
+      {xs.map((t) => (
+        <line key={`x${t}`} x1={X(t)} x2={X(t)} y1={0} y2={H} />
+      ))}
+      {ys.map((t) => (
+        <line key={`y${t}`} x1={0} x2={W} y1={Y(t)} y2={Y(t)} />
+      ))}
+      {ax !== null && <line className="is-axis" x1={0} x2={W} y1={ax} y2={ax} />}
+      {ay !== null && <line className="is-axis" x1={ay} x2={ay} y1={0} y2={H} />}
+      {xs.filter((t) => t !== 0).map((t) => (
+        <text key={`tx${t}`} x={X(t)} y={Math.min(H - 4, (ax ?? H - 16) + 14)} textAnchor="middle">
+          {fmtVal(t)}
+        </text>
+      ))}
+      {ys.filter((t) => t !== 0).map((t) => (
+        <text key={`ty${t}`} x={Math.min(W - 4, (ay ?? 0) + 6)} y={Y(t) + 4}>
+          {fmtVal(t)}
+        </text>
+      ))}
+    </g>
+  );
+}
+
+// ── a graph to change ────────────────────────────────────────────────
+
+const FEATURE_KINDS: Record<GraphSpec['features'][number], Feature['kind']> = { turning: 'turning', roots: 'root', intercept: 'intercept' };
+
+function InlineGraph({ spec, state, onState, shared, renderInline }: { spec: GraphSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean; renderInline: RenderInline }) {
+  const names = useMemo(() => spec.params.map((p) => p.name), [spec]);
+  const c = useMemo(() => compileOver(spec.expr, names), [spec, names]);
+  const segs = useMemo(() => prettyExpr(spec.expr, names), [spec, names]);
+  const start = useMemo(() => Object.fromEntries(spec.params.map((p) => [p.name, p.value])), [spec]);
+  const [values, setValues] = useState<Record<string, number>>(() => ({ ...start, ...(state?.values ?? {}) }));
+  const [hot, setHot] = useState<string | null>(null);
+  const [probe, setProbe] = useState<{ x: number; y: number } | null>(null);
+  const [picked, setPicked] = useState<number | undefined>(state?.predicted);
+  const [skipped, setSkipped] = useState(!!state?.skipped);
+  const saveTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(state);
+  latest.current = state;
+  useEffect(() => () => {
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+  }, []);
+  const [ref, width] = useWidth<HTMLDivElement>(560);
+  const W = Math.max(240, width);
+  const H = W < 420 ? 200 : 250;
+  const [x0, x1] = spec.x;
+  const fit = useMemo(() => (c ? sampleCurve(c, start, x0, x1, 200) : null), [c, start, x0, x1]);
+  // the window: as the reply gave it, or around what matters on the curve as it started — widened, never
+  // narrowed, when what they change takes it further
+  const auto = useMemo(() => (c ? fitWindow(c, [start], x0, x1) : ([-10, 10] as [number, number])), [c, start, x0, x1]);
+  const reach = useMemo(() => (c ? fitWindow(c, [values], x0, x1) : auto), [c, values, x0, x1, auto]);
+  const [y0, y1] = spec.y ?? [Math.min(auto[0], reach[0]), Math.max(auto[1], reach[1])];
+  const X = (x: number) => ((x - x0) / (x1 - x0)) * W;
+  const Y = (y: number) => ((y1 - y) / (y1 - y0)) * H;
+  const cur = useMemo(() => (c ? sampleCurve(c, values, x0, x1) : null), [c, values, x0, x1]);
+  const changed = names.some((n) => values[n] !== start[n]);
+  const kinds = spec.features.map((f) => FEATURE_KINDS[f]);
+  const feats = useMemo(() => (c && kinds.length ? curveFeatures(c, values, x0, x1, kinds) : []), [c, values, x0, x1, kinds.join()]);
+  const startTurn = useMemo(() => (c && kinds.includes('turning') ? curveFeatures(c, start, x0, x1, ['turning'])[0] ?? null : null), [c, start, x0, x1, kinds.join()]);
+  const nowTurn = feats.find((f) => f.kind === 'turning') ?? null;
+  const ordered = [...feats.filter((f) => f.kind === 'turning').slice(0, 2), ...feats.filter((f) => f.kind === 'intercept'), ...feats.filter((f) => f.kind === 'root').slice(0, 2)].filter((f) => f.y >= y0 && f.y <= y1);
+  // every point is drawn; a label that would sit on another's is left off (its point says enough)
+  const labelled: Feature[] = [];
+  for (const f of ordered) {
+    if (labelled.length >= 4) break;
+    const crowd = labelled.some((g) => Math.abs(X(g.x) - X(f.x)) < 64 && Math.abs(Y(g.y) - Y(f.y)) < 30);
+    if (!crowd) labelled.push(f);
+  }
+  const shown = ordered;
+  const locked = !!spec.predict && picked === undefined && !skipped;
+  const save = (next: InlineState) => onState({ ...latest.current, ...next });
+  const set = (name: string, v: number) => {
+    const next = { ...values, [name]: v };
+    setValues(next);
+    // kept with the message once the hand stops, not on every pixel
+    if (saveTimer.current) clearTimeout(saveTimer.current);
+    saveTimer.current = setTimeout(() => save({ values: next }), 400);
+  };
+  const observe = (() => {
+    if (!changed || !startTurn || !nowTurn || (startTurn.x === nowTurn.x && startTurn.y === nowTurn.y)) return null;
+    const dx = nowTurn.x - startTurn.x, dy = nowTurn.y - startTurn.y;
+    const way = [dx < 0 ? 'left' : dx > 0 ? 'right' : '', dy < 0 ? 'down' : dy > 0 ? 'up' : ''].filter(Boolean).join(' and ');
+    return `The turning point moved ${way}, from ${fmtPoint(startTurn)} to ${fmtPoint(nowTurn)}.`;
+  })();
+  const at = (e: React.PointerEvent<SVGSVGElement>) => {
+    if (!c) return;
+    const r = e.currentTarget.getBoundingClientRect();
+    const x = x0 + ((e.clientX - r.left) / r.width) * (x1 - x0);
+    const y = c.eval({ ...values, x });
+    setProbe(Number.isFinite(y) ? { x, y } : null);
+  };
+  const label = (f: Feature) => {
+    const px = X(f.x), py = Y(f.y);
+    const right = px > W - 90;
+    return { px, py, tx: right ? px - 9 : px + 9, ty: f.kind === 'turning' && !f.max ? py + 18 : py - 9, anchor: right ? ('end' as const) : ('start' as const) };
+  };
+  return (
+    <div className="ln ln-graph" role="group" aria-label={spec.title || 'A graph you can change'}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <div className="ln-graph-head">
+        <p className="ln-eq">
+          <i className="ln-eq-v">y</i>
+          <span className="ln-eq-op">=</span>
+          {segs ? <Expr segs={segs} params={spec.params} values={values} hot={hot} locked={locked} onScrub={set} onHot={setHot} /> : <code>{spec.expr}</code>}
+        </p>
+        {spec.params.length > 0 && !locked && <span className="ln-hint">Drag a number</span>}
+      </div>
+      {spec.predict && picked === undefined && !skipped && (
+        <Predict
+          predict={spec.predict}
+          onPick={(i) => {
+            setPicked(i);
+            save({ predicted: i });
+          }}
+          onSkip={() => {
+            setSkipped(true);
+            save({ skipped: true });
+          }}
+        />
+      )}
+      <div ref={ref} className="ln-plot">
+        <svg
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          height={H}
+          role="img"
+          aria-label={`Graph of y = ${spec.expr}${nowTurn ? `, turning point ${fmtPoint(nowTurn)}` : ''}`}
+          onPointerMove={at}
+          onPointerDown={at}
+          onPointerLeave={() => setProbe(null)}
+        >
+          <Grid x0={x0} x1={x1} y0={y0} y1={y1} X={X} Y={Y} W={W} H={H} />
+          {changed && fit && <path className="ln-curve is-ghost" d={pathOf(fit.pts, X, Y, y0, y1)} />}
+          {cur && <path className="ln-curve" d={pathOf(cur.pts, X, Y, y0, y1)} />}
+          {changed && startTurn && nowTurn && (startTurn.x !== nowTurn.x || startTurn.y !== nowTurn.y) && <circle className="ln-pt is-ghost" cx={X(startTurn.x)} cy={Y(startTurn.y)} r={4} />}
+          {shown.map((f, i) => {
+            const l = label(f);
+            return (
+              <g key={i} className={`ln-feat is-${f.kind}`}>
+                <circle className="ln-pt" cx={l.px} cy={l.py} r={f.kind === 'turning' ? 5 : 3.5} />
+                {labelled.includes(f) && (
+                  <text x={l.tx} y={l.ty} textAnchor={l.anchor}>
+                    {fmtPoint(f)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          {probe && probe.y >= y0 && probe.y <= y1 && (
+            <g className="ln-probe" aria-hidden="true">
+              <circle cx={X(probe.x)} cy={Y(probe.y)} r={3.5} />
+              <text x={Math.min(W - 6, X(probe.x) + 8)} y={Math.max(14, Y(probe.y) - 8)} textAnchor={X(probe.x) > W - 90 ? 'end' : 'start'}>
+                {fmtPoint(probe)}
+              </text>
+            </g>
+          )}
+        </svg>
+      </div>
+      {changed && (
+        <p className="ln-was" aria-hidden="true">
+          <span className="is-now">now</span>
+          <span className="is-ghost">as it started</span>
+        </p>
+      )}
+      {spec.params.length > 0 && (
+        <div className="ln-graph-vars">
+          {spec.params.map((p) => (
+            <label key={p.name} className={`ln-var${hot === p.name ? ' is-hot' : ''}`}>
+              <span className="ln-var-top">
+                <span className="ln-var-k">{p.label}</span>
+                <span className="ln-var-v">{fmtWith(values[p.name] ?? p.value, p.unit)}</span>
+              </span>
+              <input
+                type="range"
+                min={p.min}
+                max={p.max}
+                step={p.step}
+                value={values[p.name] ?? p.value}
+                disabled={locked}
+                aria-valuetext={fmtWith(values[p.name] ?? p.value, p.unit)}
+                onChange={(e) => set(p.name, Number(e.target.value))}
+                onFocus={() => setHot(p.name)}
+                onBlur={() => setHot(null)}
+              />
+            </label>
+          ))}
+        </div>
+      )}
+      {(picked !== undefined || observe) && (
+        <div className="ln-after" aria-live="polite">
+          {spec.predict && picked !== undefined && <Predict predict={spec.predict} picked={picked} />}
+          {observe && <p className="ln-observe">{renderInline(observe, 'obs')}</p>}
+        </div>
+      )}
+      {shared && spec.params.length > 0 && <SharedNote what="change" />}
+    </div>
+  );
+}
+
+// ── a simulation, small ──────────────────────────────────────────────
+
+function InlineSim({ spec, state, onState, shared }: { spec: SimSpec; state?: InlineState; onState: (s: InlineState) => void; shared: boolean }) {
+  const names = useMemo(() => spec.params.map((p) => p.name), [spec]);
+  const cx = useMemo(() => compileOverT(spec.x, names), [spec, names]);
+  const cy = useMemo(() => compileOverT(spec.y, names), [spec, names]);
+  const start = useMemo(() => Object.fromEntries(spec.params.map((p) => [p.name, p.value])), [spec]);
+  const [values, setValues] = useState<Record<string, number>>(() => ({ ...start, ...(state?.values ?? {}) }));
+  const [tries, setTries] = useState<Record<string, number>[]>(state?.tries ?? []);
+  const [picked, setPicked] = useState<number | undefined>(state?.predicted);
+  const [skipped, setSkipped] = useState(!!state?.skipped);
+  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latest = useRef(state);
+  latest.current = state;
+  useEffect(() => () => {
+    if (timer.current) clearTimeout(timer.current);
+  }, []);
+  const [ref, width] = useWidth<HTMLDivElement>(560);
+  const W = Math.max(240, width);
+  const H = W < 420 ? 170 : 210;
+  const [x0, x1] = spec.view.x;
+  const [y0, y1] = spec.view.y;
+  const X = (x: number) => ((x - x0) / (x1 - x0)) * W;
+  const Y = (y: number) => ((y1 - y) / (y1 - y0)) * H;
+  const pathAt = (vals: Record<string, number>): Pt[] => (cx && cy ? samplePath(cx, cy, vals, timeAt(spec.t[0], names, vals), timeAt(spec.t[1], names, vals)) : []);
+  const same = (a: Record<string, number>, b: Record<string, number>) => names.every((n) => a[n] === b[n]);
+  const locked = !!spec.predict && picked === undefined && !skipped;
+  const save = (next: InlineState) => onState({ ...latest.current, ...next });
+  const set = (name: string, v: number) => {
+    const next = { ...values, [name]: v };
+    setValues(next);
+    // a setting they stopped on is a try: kept, and drawn faintly from then on
+    if (timer.current) clearTimeout(timer.current);
+    timer.current = setTimeout(() => {
+      setTries((prev) => {
+        const t = [...prev.filter((x) => !same(x, next)), next].slice(-4);
+        save({ values: next, tries: t });
+        return t;
+      });
+    }, 600);
+  };
+  const reading = (vals: Record<string, number>) =>
+    (spec.readouts ?? []).map((ro) => {
+      const c = compileOver(ro.expr, names);
+      const v = c ? c.eval({ ...vals, x: 0 }) : NaN;
+      return { label: ro.label, shown: Number.isFinite(v) ? fmtWith(Number(v.toFixed(ro.digits ?? 2)), ro.unit) : '—' };
+    });
+  const tag = (t: Record<string, number>) => spec.params.filter((p) => t[p.name] !== start[p.name] || spec.params.length === 1).slice(0, 1).map((p) => fmtWith(t[p.name], p.unit)).join(' ') || fmtWith(t[names[0]], spec.params[0].unit);
+  const ghosts = tries.filter((t) => !same(t, values));
+  const nowPath = pathAt(values);
+  const endOf = (pts: Pt[]) => [...pts].reverse().find((p) => Number.isFinite(p.x) && Number.isFinite(p.y)) ?? null;
+  const nowEnd = endOf(nowPath);
+  return (
+    <div className="ln ln-sim" role="group" aria-label={spec.title || 'A simulation you can change'}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      {spec.predict && picked === undefined && !skipped && (
+        <Predict
+          predict={spec.predict}
+          onPick={(i) => {
+            setPicked(i);
+            save({ predicted: i });
+          }}
+          onSkip={() => {
+            setSkipped(true);
+            save({ skipped: true });
+          }}
+        />
+      )}
+      <div ref={ref} className="ln-plot">
+        <svg viewBox={`0 0 ${W} ${H}`} width="100%" height={H} role="img" aria-label={`${spec.title || 'A simulation'}: ${spec.params.map((p) => `${p.label} ${fmtWith(values[p.name], p.unit)}`).join(', ')}${reading(values).map((r) => `, ${r.label} ${r.shown}`).join('')}`}>
+          {y0 <= 0 && 0 <= y1 && <line className="ln-ground" x1={0} x2={W} y1={Y(0)} y2={Y(0)} />}
+          {ghosts.map((t, i) => {
+            const pts = pathAt(t);
+            const end = endOf(pts);
+            return (
+              <g key={i} className="ln-try">
+                <path className="ln-curve is-ghost" d={pathOf(pts, X, Y, y0, y1)} />
+                {end && (
+                  <text x={Math.min(W - 4, X(end.x))} y={Math.max(12, Y(end.y) - 6)} textAnchor="end">
+                    {tag(t)}
+                  </text>
+                )}
+              </g>
+            );
+          })}
+          <path className="ln-curve" d={pathOf(nowPath, X, Y, y0, y1)} />
+          {nowEnd && <circle className="ln-pt" cx={X(nowEnd.x)} cy={Y(nowEnd.y)} r={4.5} />}
+        </svg>
+      </div>
+      <div className="ln-graph-vars">
+        {spec.params.map((p) => (
+          <label key={p.name} className="ln-var">
+            <span className="ln-var-top">
+              <span className="ln-var-k">{p.label}</span>
+              <span className="ln-var-v">{fmtWith(values[p.name], p.unit)}</span>
+            </span>
+            <input type="range" min={p.min} max={p.max} step={p.step} value={values[p.name]} disabled={locked} aria-valuetext={fmtWith(values[p.name], p.unit)} onChange={(e) => set(p.name, Number(e.target.value))} />
+          </label>
+        ))}
+      </div>
+      {!!spec.readouts?.length && (
+        <p className="ln-read" aria-live="polite">
+          {reading(values).map((r) => (
+            <span key={r.label}>
+              {r.label} <b>{r.shown}</b>
+            </span>
+          ))}
+        </p>
+      )}
+      {spec.predict && picked !== undefined && (
+        <div className="ln-after">
+          <Predict predict={spec.predict} picked={picked} />
+        </div>
+      )}
+      {shared && <SharedNote what="try" />}
+    </div>
+  );
+}
+
+// ── a question they work out and check ───────────────────────────────
+
+/**
+ * Their turn: a question, a box, Check. The answer is worked out from the
+ * question's own formula and compared with what they typed (lib/inline-math.ts
+ * checkTyped); how it comes out is shown once they have it, or after two tries
+ * — and when there is nothing to show, an invitation to say what they tried.
+ */
+function CheckBox({ part, state, onState, renderInline, kicker = 'Your turn' }: { part: CheckPart; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; kicker?: string }) {
+  const [typed, setTyped] = useState(state?.answer ?? '');
+  const [mine, setMine] = useState<InlineState>(state ?? {});
+  const [note, setNote] = useState<string | null>(null);
+  const id = useId();
+  const attempts = mine.attempts ?? 0;
+  const right = mine.right === true;
+  const tried = attempts > 0;
+  const check = () => {
+    const r = checkTyped(part.answer, typed, part.tolerance);
+    if (r.got === null) {
+      setNote('Type a number — 2, −1/2 or 0.75 all work.');
+      return;
+    }
+    setNote(null);
+    const next: InlineState = { ...mine, answer: typed.trim(), right: r.right, attempts: attempts + 1 };
+    setMine(next);
+    onState(next);
+  };
+  const reveal = right || attempts >= 2;
+  return (
+    <div className="ln-checkbox">
+      <p className="ln-k">{kicker}</p>
+      <p className="ln-q" id={`${id}-q`}>
+        {renderInline(part.prompt, 'q')}
+      </p>
+      <form
+        className="ln-answer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          if (typed.trim() && !right) check();
+        }}
+      >
+        <label>
+          {part.label && <span className="ln-answer-k">{part.label} =</span>}
+          <input value={typed} inputMode="decimal" autoComplete="off" spellCheck={false} aria-describedby={`${id}-q`} aria-label={part.label ? `Your answer for ${part.label}` : 'Your answer'} disabled={right} onChange={(e) => setTyped(e.target.value)} />
+          {part.unit && <span className="ln-answer-u">{part.unit}</span>}
+        </label>
+        <button type="submit" className="l5-btn is-sm" disabled={!typed.trim() || right}>
+          Check
+        </button>
+        <span className="ln-verdict" aria-live="polite">
+          {note ? <span className="is-note">{note}</span> : right ? <span className="is-right">✓ Right{attempts > 1 ? ` — on try ${attempts}` : ''}</span> : tried ? <span className="is-wrong">Not quite{attempts < 2 ? ' — try again' : ''}</span> : null}
+        </span>
+      </form>
+      {reveal && part.explain && <p className="ln-explain">{renderInline(part.explain, 'x')}</p>}
+      {!right && attempts >= 2 && !part.explain && <p className="ln-explain is-ask">Say what you tried in the box — Socria will work through it with you.</p>}
+    </div>
+  );
+}
+
+// ── the working, with their numbers ──────────────────────────────────
+
+function InlineSteps({ spec, state, onState, renderInline }: { spec: StepsSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline }) {
+  const [whys, setWhys] = useState<number[]>(state?.whys ?? []);
+  const latest = useRef(state);
+  latest.current = state;
+  const toggle = (i: number) => {
+    const next = whys.includes(i) ? whys.filter((x) => x !== i) : [...whys, i].sort((a, b) => a - b);
+    setWhys(next);
+    onState({ ...latest.current, whys: next });
+  };
+  return (
+    <div className="ln ln-steps" role="group" aria-label={spec.title || 'The working'}>
+      {spec.title && <p className="ln-title">{spec.title}</p>}
+      <ol className="ln-lines">
+        {spec.lines.map((l, i) => {
+          const open = whys.includes(i);
+          return (
+            <li key={i} className={open ? 'is-open' : undefined}>
+              <span className="ln-step">
+                <TeX tex={l.tex} />
+              </span>
+              {l.why && (
+                <button type="button" className="ln-whybtn" aria-expanded={open} onClick={() => toggle(i)}>
+                  {open ? 'Why ▴' : 'Why? ▾'}
+                </button>
+              )}
+              {open && l.why && <p className="ln-why-said">{renderInline(l.why, `w${i}`)}</p>}
+            </li>
+          );
+        })}
+      </ol>
+      {spec.check && <CheckBox part={spec.check} state={state} onState={(s) => onState({ ...latest.current, ...s, whys })} renderInline={renderInline} />}
     </div>
   );
 }

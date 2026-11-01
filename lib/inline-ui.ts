@@ -6,18 +6,28 @@
 // under its conclusion, a few choices to tap, a draft they can edit in place,
 // the parts of a subject to explore one at a time, steps or events in order,
 // the ways an open piece of work could go next, a decision they weigh
-// themselves. Those are drawn INSIDE the conversation, from a structured
-// description the reply writes in a fenced block:
+// themselves — and, to reason WITH rather than read: a graph whose numbers
+// they drag, a small simulation, the working laid out with their numbers, a
+// question whose answer they work out and check. Those are drawn INSIDE the
+// conversation, from a structured description the reply writes in a fenced
+// block:
 //
 //   ```ui
 //   {"type":"compare","options":["Rent","Buy"],"rows":[{"label":"Monthly","values":["$1,900","$2,350"]}]}
 //   ```
 //
-// A DESCRIPTION, NEVER CODE. Ten kinds, each with a fixed shape and limits;
+// A DESCRIPTION, NEVER CODE. Fourteen kinds, each with a fixed shape and limits;
 // anything else is not drawn. Every string is cleaned and capped, every number
 // is finite, a formula is compiled by the same safe parser the math engine
 // uses (lib/logos-math.ts compileExpr — no eval), and nothing in a spec can run.
-// The renderer (components/inline/InlineUI.tsx) knows these ten and no others.
+// The renderer (components/inline/InlineUI.tsx) knows these fourteen and no others.
+//
+// WHAT THEY DO REACHES SOCRIA. What the person does with an element — a number
+// dragged, a prediction made, an answer checked — is kept with the message
+// (`ui`), read back in the history as the element now stands
+// (contentForHistory), and said once with their next message as what they did
+// (`did`, describeInline): shown to them first, on the box, and theirs to take
+// off before it goes.
 //
 // CHECKED BEFORE IT IS SHOWN (Epistemic Control). The route runs every block
 // through `checkInlineSpec` as it streams (lib/core4/stream-gate.ts `block`):
@@ -36,14 +46,23 @@
 //     out is theirs;
 //   • a decision drawn to be weighed carries no weights from the reply: how
 //     much each thing matters is theirs to say, so the leaning it shows is
-//     arithmetic on THEIR weights, never a verdict handed to them.
+//     arithmetic on THEIR weights, never a verdict handed to them;
+//   • a graph, a simulation and a question compute what they show — a turning
+//     point found on the curve, a range evaluated, an answer worked out from
+//     its formula (lib/inline-math.ts) — never a number the reply asserts;
+//   • one thing to work with in a reply: a second graph, simulation, slider,
+//     decision or working is not drawn;
+//   • under the Answer Guard, the person's own work is what is drawn: a
+//     question to answer (its explanation held back), a graph with nothing
+//     marked on it, a simulation without its readings — never the working.
 //
 // PURE: the route, the parser (lib/rich-text.ts), the renderer and the tests
 // share it.
 
 import { compileExpr, freeNames } from './logos-math';
+import { answerOf, checkTyped, compileOver, compileOverT, curveFeatures, exprWithValues, fmtPoint, fmtVal, sampleCurve, timeAt, type Feature } from './inline-math';
 
-export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide'] as const;
+export const INLINE_KINDS = ['chart', 'slider', 'compare', 'reasoning', 'options', 'draft', 'concepts', 'sequence', 'paths', 'decide', 'graph', 'sim', 'check', 'steps'] as const;
 export type InlineKind = (typeof INLINE_KINDS)[number];
 
 export type ChartBasis = 'given' | 'source' | 'illustrative';
@@ -150,7 +169,90 @@ export interface DecideSpec {
   /** the person's own weights (0–3, one per row) — set only when it is opened in Artifacts */
   weights?: number[];
 }
-export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec;
+/** A number the person can change: a parameter of a graph or a simulation. */
+export interface ParamSpec {
+  name: string;
+  label: string;
+  min: number;
+  max: number;
+  step: number;
+  value: number;
+  unit?: string;
+}
+/** A question asked before anything is moved: committed to first, compared with what happens after. */
+export interface PredictSpec {
+  prompt: string;
+  options: string[];
+}
+/**
+ * A GRAPH TO CHANGE. y as an expression of x and up to three parameters
+ * ("a*x^2 + b*x + c"), drawn across a window. The parameters are the numbers
+ * in the equation the person drags (and sliders under it); what is marked on
+ * the curve — its turning points, where it crosses zero, where it meets the
+ * y-axis — is found on the curve as it is now, never written by the reply.
+ * The curve it started as stays, faintly, once it has been changed.
+ */
+export interface GraphSpec {
+  type: 'graph';
+  title?: string;
+  expr: string;
+  /** the window: x from–to; y from–to, or fitted to the curve as it starts */
+  x: [number, number];
+  y?: [number, number];
+  params: ParamSpec[];
+  features: ('turning' | 'roots' | 'intercept')[];
+  predict?: PredictSpec;
+}
+/**
+ * A SIMULATION, SMALL. A path traced over time — x(t) and y(t) over up to
+ * three parameters (a throw: the angle, the speed) — from t0 to t1, either an
+ * end a formula gives ("when it lands"). Its readings are computed from
+ * formulas too. Each setting the person tries stays on the picture, faintly,
+ * so what they tried can be compared.
+ */
+export interface SimSpec {
+  type: 'sim';
+  title?: string;
+  x: string;
+  y: string;
+  t: [number | string, number | string];
+  view: { x: [number, number]; y: [number, number] };
+  params: ParamSpec[];
+  readouts?: { label: string; expr: string; unit?: string; digits?: number }[];
+  predict?: PredictSpec;
+}
+/** A question with an answer they work out: the answer is a formula the engine evaluates, never a number asserted. */
+export interface CheckPart {
+  prompt: string;
+  /** "-(-8)/(2*2)": worked out, then compared with what they type */
+  answer: string;
+  /** what the answer is called: "x", "the area" */
+  label?: string;
+  unit?: string;
+  /** how far off still counts as right, in the answer's own units */
+  tolerance?: number;
+  /** how it comes out, said after they try (may hold $…$) */
+  explain?: string;
+}
+export interface CheckSpec extends CheckPart {
+  type: 'check';
+}
+/**
+ * THE WORKING, WITH THEIR NUMBERS. Lines of maths (TeX), each with why it
+ * follows folded under it, and their turn at the end — a question of the same
+ * kind to work out and check. Never under the Answer Guard, and never the
+ * working that is theirs to do.
+ */
+export interface StepsSpec {
+  type: 'steps';
+  title?: string;
+  lines: { tex: string; why?: string }[];
+  check?: CheckPart;
+}
+export type InlineSpec = ChartSpec | SliderSpec | CompareSpec | ReasoningSpec | OptionsSpec | DraftSpec | ConceptsSpec | SequenceSpec | PathsSpec | DecideSpec | GraphSpec | SimSpec | CheckSpec | StepsSpec;
+
+/** The kinds a person works with — one to a reply: more than one is a dashboard. */
+export const LIVE_KINDS: readonly InlineKind[] = ['graph', 'sim', 'slider', 'decide', 'steps'];
 
 export const INLINE_LIMITS = {
   points: 24,
@@ -191,6 +293,17 @@ export const INLINE_LIMITS = {
   note: 120,
   /** inline blocks in one reply: more than two is a dashboard */
   perReply: 2,
+  /** a graph's or a simulation's numbers to change */
+  params: 3,
+  readouts: 3,
+  /** what may be answered before anything is moved */
+  predictOptions: 4,
+  prompt: 200,
+  explain: 500,
+  /** the working: lines of maths */
+  lines: 8,
+  tex: 240,
+  why: 400,
 } as const;
 const L = INLINE_LIMITS;
 
@@ -391,7 +504,130 @@ function sanitizeDecide(r: Record<string, unknown>): DecideSpec | null {
   return { type: 'decide', ...(title ? { title } : {}), options, rows };
 }
 
-/** Anything at all in, one of the ten canonical shapes out — or null, and nothing is drawn. */
+/** A pair of finite numbers, low then high, within a sensible span — a window's side. */
+function range(v: unknown, span = 1e6): [number, number] | null {
+  if (!Array.isArray(v) || v.length !== 2 || !fin(v[0]) || !fin(v[1]) || !(v[0] < v[1]) || v[1] - v[0] > span) return null;
+  return [r6(v[0]), r6(v[1])];
+}
+
+/** A number to change: named as a single word that is no function or constant, and none of `reserved` (the graph's x, the simulation's t). */
+function sanitizeParam(v: unknown, reserved: readonly string[]): ParamSpec | null {
+  const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+  const name = typeof o?.name === 'string' && NAME.test(o.name) ? o.name.toLowerCase() : null;
+  if (!name || reserved.includes(name) || freeNames(name).length !== 1) return null;
+  const min = o!.min, max = o!.max;
+  if (!fin(min) || !fin(max) || !(min < max) || max - min > 1e9) return null;
+  const step = fin(o!.step) && o!.step > 0 ? o!.step : (max - min) / 100;
+  if ((max - min) / step > 2000) return null;
+  const value = fin(o!.value) ? Math.min(max, Math.max(min, o!.value)) : min;
+  const unit = line(o!.unit, L.unit);
+  return { name, label: line(o!.label, L.label) || name, min: r6(min), max: r6(max), step: r6(step), value: r6(value), ...(unit ? { unit } : {}) };
+}
+function sanitizeParams(raw: unknown, reserved: readonly string[], least: number): ParamSpec[] | null {
+  const out: ParamSpec[] = [];
+  for (const v of (Array.isArray(raw) ? raw : []).slice(0, L.params)) {
+    const p = sanitizeParam(v, reserved);
+    if (!p || out.some((x) => x.name === p.name)) return null;
+    out.push(p);
+  }
+  return out.length >= least ? out : null;
+}
+function sanitizePredict(raw: unknown): PredictSpec | undefined {
+  const o = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  const prompt = line(o?.prompt, L.prompt);
+  const options = [...new Set((Array.isArray(o?.options) ? (o!.options as unknown[]) : []).slice(0, L.predictOptions).map((v) => line(v, L.choice)).filter(Boolean))];
+  return prompt && options.length >= 2 ? { prompt, options } : undefined;
+}
+const valuesOf = (params: readonly ParamSpec[]): Record<string, number> => Object.fromEntries(params.map((p) => [p.name, p.value]));
+const FEATURES = ['turning', 'roots', 'intercept'] as const;
+
+function sanitizeGraph(r: Record<string, unknown>): GraphSpec | null {
+  const expr = typeof r.expr === 'string' ? r.expr.trim() : '';
+  if (!expr || expr.length > L.formula) return null;
+  const x = range(r.x);
+  if (!x) return null;
+  const params = sanitizeParams(r.params, ['x'], 0);
+  if (!params) return null;
+  // compiled by the math engine's parser over x and exactly these names, and drawable as it starts — or not drawn
+  const c = compileOver(expr, params.map((p) => p.name));
+  if (!c || !c.vars.includes('x')) return null;
+  if (!sampleCurve(c, valuesOf(params), x[0], x[1], 120)) return null;
+  const y = r.y === undefined ? null : range(r.y);
+  const features = Array.isArray(r.features) ? FEATURES.filter((f) => (r.features as unknown[]).includes(f)) : [...FEATURES];
+  const predict = sanitizePredict(r.predict);
+  const title = line(r.title, L.title);
+  return { type: 'graph', ...(title ? { title } : {}), expr, x, ...(y ? { y } : {}), params, features, ...(predict ? { predict } : {}) };
+}
+
+function sanitizeSim(r: Record<string, unknown>): SimSpec | null {
+  const xe = typeof r.x === 'string' ? r.x.trim() : '';
+  const ye = typeof r.y === 'string' ? r.y.trim() : '';
+  if (!xe || !ye || xe.length > L.formula || ye.length > L.formula) return null;
+  const params = sanitizeParams(r.params, ['t', 'x', 'y'], 1);
+  if (!params) return null;
+  const names = params.map((p) => p.name);
+  const cx = compileOverT(xe, names);
+  const cy = compileOverT(ye, names);
+  if (!cx || !cy || (!cx.vars.includes('t') && !cy.vars.includes('t'))) return null;
+  // the time it runs for: numbers, or formulas over the parameters ("when it lands")
+  const tr = Array.isArray(r.t) && r.t.length === 2 ? (r.t as unknown[]) : null;
+  if (!tr) return null;
+  const end = (v: unknown): number | string | null => (fin(v) ? r6(v) : typeof v === 'string' && v.trim() && v.length <= L.formula && compileExpr(v, names) ? v.trim() : null);
+  const t0 = end(tr[0]), t1 = end(tr[1]);
+  if (t0 === null || t1 === null) return null;
+  const vals = valuesOf(params);
+  const a = timeAt(t0, names, vals), b = timeAt(t1, names, vals);
+  if (!Number.isFinite(a) || !Number.isFinite(b) || !(b > a) || b - a > 1e6) return null;
+  const vo = r.view && typeof r.view === 'object' ? (r.view as Record<string, unknown>) : null;
+  const vx = range(vo?.x), vy = range(vo?.y);
+  if (!vx || !vy) return null;
+  const readouts: NonNullable<SimSpec['readouts']> = [];
+  for (const ro of (Array.isArray(r.readouts) ? r.readouts : []).slice(0, L.readouts)) {
+    const o = ro && typeof ro === 'object' ? (ro as Record<string, unknown>) : null;
+    const label = line(o?.label, L.label);
+    const expr = typeof o?.expr === 'string' ? o.expr.trim() : '';
+    const c = expr && expr.length <= L.formula ? compileExpr(expr, names) : null;
+    if (!label || !c || !Number.isFinite(c.eval(vals))) continue;
+    const unit = line(o!.unit, L.unit);
+    const digits = fin(o!.digits) && o!.digits >= 0 && o!.digits <= 6 ? Math.round(o!.digits) : undefined;
+    readouts.push({ label, expr, ...(unit ? { unit } : {}), ...(digits !== undefined ? { digits } : {}) });
+  }
+  const predict = sanitizePredict(r.predict);
+  const title = line(r.title, L.title);
+  return { type: 'sim', ...(title ? { title } : {}), x: xe, y: ye, t: [t0, t1], view: { x: vx, y: vy }, params, ...(readouts.length ? { readouts } : {}), ...(predict ? { predict } : {}) };
+}
+
+function sanitizeCheckPart(raw: unknown): CheckPart | null {
+  const r = raw && typeof raw === 'object' ? (raw as Record<string, unknown>) : null;
+  if (!r) return null;
+  const prompt = line(r.prompt, L.prompt);
+  const answer = fin(r.answer) ? String(r6(r.answer)) : typeof r.answer === 'string' ? r.answer.trim() : '';
+  // the answer is worked out by the engine, from a formula with no unknowns in it — or there is no question
+  if (!prompt || !answer || answer.length > L.formula || answerOf(answer) === null) return null;
+  const label = line(r.label, L.label);
+  const unit = line(r.unit, L.unit);
+  const tolerance = fin(r.tolerance) && r.tolerance >= 0 ? r6(r.tolerance) : undefined;
+  const explain = line(r.explain, L.explain);
+  return { prompt, answer, ...(label ? { label } : {}), ...(unit ? { unit } : {}), ...(tolerance !== undefined ? { tolerance } : {}), ...(explain ? { explain } : {}) };
+}
+
+const TEX_UNSAFE = /\\(?:href|url|includegraphics|html\w*|class|id|data|style)\b/;
+function sanitizeSteps(r: Record<string, unknown>): StepsSpec | null {
+  const lines: StepsSpec['lines'] = [];
+  for (const it of (Array.isArray(r.lines) ? r.lines : []).slice(0, L.lines)) {
+    const o = typeof it === 'string' ? { tex: it } : it && typeof it === 'object' ? (it as Record<string, unknown>) : null;
+    const tex = line(o?.tex, L.tex);
+    if (!tex || TEX_UNSAFE.test(tex)) continue;
+    const why = line(o?.why, L.why);
+    lines.push({ tex, ...(why ? { why } : {}) });
+  }
+  if (lines.length < 2) return null;
+  const check = r.check === undefined ? null : sanitizeCheckPart(r.check);
+  const title = line(r.title, L.title);
+  return { type: 'steps', ...(title ? { title } : {}), lines, ...(check ? { check } : {}) };
+}
+
+/** Anything at all in, one of the fourteen canonical shapes out — or null, and nothing is drawn. */
 export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const r = raw as Record<string, unknown>;
@@ -416,6 +652,16 @@ export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
       return sanitizePaths(r);
     case 'decide':
       return sanitizeDecide(r);
+    case 'graph':
+      return sanitizeGraph(r);
+    case 'sim':
+      return sanitizeSim(r);
+    case 'check': {
+      const part = sanitizeCheckPart(r);
+      return part ? { type: 'check', ...part } : null;
+    }
+    case 'steps':
+      return sanitizeSteps(r);
     default:
       return null;
   }
@@ -483,8 +729,8 @@ export interface InlineContext {
   ownJudgment?: boolean;
   /** working it out is theirs (Core 4's split): no reasoning laid out for them */
   ownReasoning?: boolean;
-  /** blocks already shown in this reply (mutated as the reply streams) */
-  shown: { n: number };
+  /** blocks already shown in this reply, and how many of them are things to work with (mutated as the reply streams) */
+  shown: { n: number; live?: number };
 }
 
 export type InlineVerdict = { ok: true; spec: InlineSpec } | { ok: false; why: string; notice?: string };
@@ -495,6 +741,8 @@ export const UNSUPPORTED_CHART =
 
 export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVerdict {
   if (ctx.shown.n >= L.perReply) return { ok: false, why: 'too-many' };
+  // one thing to work with in a reply: a second graph, simulation, slider, decision or working is a dashboard
+  if (LIVE_KINDS.includes(spec.type) && (ctx.shown.live ?? 0) >= 1) return { ok: false, why: 'one-at-a-time' };
   const theirs = numbersIn(ctx.theirs);
   const sources = numbersIn(ctx.sources);
   let out: InlineSpec = spec;
@@ -526,8 +774,29 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
     // under the guard nothing is laid out to read instead of working it; steps that are theirs to find stay theirs
     if (ctx.guard) return { ok: false, why: 'guarded' };
     if (spec.type === 'sequence' && spec.kind === 'steps' && ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
+  } else if (spec.type === 'steps') {
+    // the working is the thing a guarded problem asks them to do
+    if (ctx.guard) return { ok: false, why: 'guarded' };
+    if (ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
+  } else if (spec.type === 'graph') {
+    // a graph is theirs to explore; under the guard nothing is marked on it that would be the answer
+    if (ctx.guard) out = { ...spec, features: [] };
+  } else if (spec.type === 'sim') {
+    // the same: the picture to try things in, without the readings that would answer it
+    if (ctx.guard) {
+      const { readouts: _r, ...rest } = spec;
+      out = rest;
+    }
+  } else if (spec.type === 'check') {
+    // a question to answer is a question: only where one may go. Their own work, so the guard allows it — with how it comes out held back
+    if (ctx.questions <= 0) return { ok: false, why: 'no-questions' };
+    if (ctx.guard && spec.explain) {
+      const { explain: _e, ...rest } = spec;
+      out = rest;
+    }
   }
   ctx.shown.n++;
+  if (LIVE_KINDS.includes(spec.type)) ctx.shown.live = (ctx.shown.live ?? 0) + 1;
   return { ok: true, spec: out };
 }
 
@@ -585,10 +854,25 @@ export function inlinePlainText(spec: InlineSpec): string {
         spec.title ?? `Deciding: ${spec.options.join(' or ')}`,
         ...spec.rows.map((r, ri) => `${r.label}${spec.weights ? ` (matters ${spec.weights[ri] ?? 2}/3)` : ''}: ${r.scores.map((v, i) => `${spec.options[i]} ${v}/3`).join(', ')}${r.note ? ` — ${r.note}` : ''}`),
       ].join('\n');
+    case 'graph':
+      return `${spec.title ? `${spec.title}: ` : ''}y = ${exprWithValues(spec.expr, valuesOf(spec.params))}${spec.params.length ? ` (${spec.params.map((p) => `${p.label} = ${num(p.value)}`).join(', ')})` : ''}, x from ${num(spec.x[0])} to ${num(spec.x[1])}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
+    case 'sim':
+      return `${spec.title ? `${spec.title}: ` : 'A simulation: '}x(t) = ${spec.x}, y(t) = ${spec.y}; ${spec.params.map((p) => `${p.label} ${num(p.value)}${p.unit ?? ''}`).join(', ')}${spec.predict ? `\n${spec.predict.prompt} ${spec.predict.options.join(' / ')}` : ''}`;
+    case 'check':
+      // the question, never its answer: this is what is copied, and what a reader would see
+      return spec.prompt;
+    case 'steps':
+      return [spec.title ?? '', ...spec.lines.map((l, i) => `${i + 1}. ${l.tex}${l.why ? ` — ${l.why}` : ''}`), spec.check ? `Your turn: ${spec.check.prompt}` : ''].filter(Boolean).join('\n');
   }
 }
 
 const UI_FENCE = /```[ \t]*ui[ \t]*\n([\s\S]*?)```/gi;
+
+/** A reply's inline blocks in order, numbered as the renderer numbers them (every ```ui block counts, drawn or not). */
+export function specsIn(content: string): (InlineSpec | null)[] {
+  if (!content.includes('```')) return [];
+  return [...content.matchAll(UI_FENCE)].map((m) => parseInlineSpec(m[1]));
+}
 
 /** A reply with each inline block written out in words — for copying, and for anything that reads text. */
 export function contentAsText(content: string): string {
@@ -608,21 +892,35 @@ export function contentForCheck(content: string): string {
   if (!content.includes('```')) return content;
   return content.replace(UI_FENCE, (_m, body: string) => {
     const spec = parseInlineSpec(body);
-    return spec && spec.type !== 'slider' ? `\n${inlinePlainText(spec)}\n` : '';
+    return spec && !['slider', 'graph', 'sim', 'check'].includes(spec.type) ? `\n${inlinePlainText(spec)}\n` : '';
   });
 }
 
 /**
  * A reply as the model reads it back on a later turn: each block a short line
- * saying what was shown. Cheaper than the JSON, and it keeps the model from
- * re-emitting a stale chart because it saw one in the transcript.
+ * saying what was shown — and, when the person did something with it, how it
+ * stands now (inlineNow): a slider where they left it, a graph as they changed
+ * it, an answer they checked. Cheaper than the JSON, and it keeps the model
+ * from re-emitting a stale chart because it saw one in the transcript.
  */
-export function contentForHistory(content: string): string {
+export function contentForHistory(content: string, ui?: Record<string, InlineState>): string {
   if (!content.includes('```')) return content;
+  let n = 0;
   return content.replace(UI_FENCE, (_m, body: string) => {
     const spec = parseInlineSpec(body);
-    return spec ? `[shown inline — ${spec.type}: ${inlinePlainText(spec).replace(/\s+/g, ' ').slice(0, 240)}]` : '';
+    const at = n++;
+    if (!spec) return '';
+    const was = `[shown inline — ${spec.type}: ${historyText(spec).replace(/\s+/g, ' ').slice(0, 240)}`;
+    const now = ui?.[String(at)] ? inlineNow(spec, ui[String(at)]) : null;
+    return now ? `${was} — now: ${now.slice(0, 280)}]` : `${was}]`;
   });
+}
+
+/** What the model reads of a block: its plain words, with a question's answer (the person's copy never shows it). */
+function historyText(spec: InlineSpec): string {
+  if (spec.type === 'check') return `${spec.prompt} (answer: ${spec.answer} = ${fmtVal(answerOf(spec.answer) ?? NaN, 4)})`;
+  if (spec.type === 'steps' && spec.check) return `${inlinePlainText(spec)} (answer: ${spec.check.answer} = ${fmtVal(answerOf(spec.check.answer) ?? NaN, 4)})`;
+  return inlinePlainText(spec);
 }
 
 // ── what the person did with it, kept with the message ───────────────
@@ -646,6 +944,17 @@ export interface InlineState {
   weights?: number[];
   /** a decision's readings as they changed them: [row][option], 0–3 */
   scores?: number[][];
+  /** what they predicted before moving anything (a graph's or a simulation's question), or that they skipped it */
+  predicted?: number;
+  skipped?: boolean;
+  /** the settings of a simulation they tried, oldest first (the last few) */
+  tries?: Record<string, number>[];
+  /** a question's answer as they typed it, whether it was right, and how many times they checked */
+  answer?: string;
+  right?: boolean;
+  attempts?: number;
+  /** the lines of the working whose why they opened */
+  whys?: number[];
 }
 
 /** One block's state, cleaned; null when nothing usable is left. */
@@ -678,6 +987,25 @@ export function sanitizeInlineStateOne(raw: unknown): InlineState | null {
   if (Array.isArray(r.scores)) {
     const rows = r.scores.slice(0, L.decideRows).map((row) => (Array.isArray(row) ? row.slice(0, L.decideOptions).map(score) : []));
     if (rows.length && rows.every((row) => row.length >= 2 && row.every((v) => v !== null))) out.scores = rows as number[][];
+  }
+  if (Number.isInteger(r.predicted) && (r.predicted as number) >= 0 && (r.predicted as number) < L.predictOptions) out.predicted = r.predicted as number;
+  if (r.skipped === true) out.skipped = true;
+  if (Array.isArray(r.tries)) {
+    const tries = r.tries
+      .slice(-4)
+      .map((t) => (t && typeof t === 'object' ? Object.fromEntries(Object.entries(t as Record<string, unknown>).slice(0, L.params).filter(([k, v]) => NAME.test(k) && fin(v)).map(([k, v]) => [k.toLowerCase(), r6(v as number)])) : {}))
+      .filter((t) => Object.keys(t).length);
+    if (tries.length) out.tries = tries;
+  }
+  if (typeof r.answer === 'string') {
+    const a = line(r.answer, 60);
+    if (a) out.answer = a;
+  }
+  if (typeof r.right === 'boolean') out.right = r.right;
+  if (Number.isInteger(r.attempts) && (r.attempts as number) > 0) out.attempts = Math.min(99, r.attempts as number);
+  if (Array.isArray(r.whys)) {
+    const whys = [...new Set(r.whys.filter((i): i is number => Number.isInteger(i) && (i as number) >= 0 && (i as number) < L.lines))].sort((a, b) => a - b);
+    if (whys.length) out.whys = whys;
   }
   return Object.keys(out).length ? out : null;
 }
@@ -783,4 +1111,185 @@ export function artifactFromSpec(spec: InlineSpec): InlineArtifact | null {
     return { kind: 'compare', state: { title: spec.title ?? 'Decision', options, criteria, scores, view: 'ranking' } };
   }
   return null;
+}
+
+
+// ── what they did with it, said to Socria ────────────────────────────
+
+/** What an element is called when what was done with it is said: "the graph", "the question". */
+export function inlineFrom(spec: InlineSpec): string {
+  switch (spec.type) {
+    case 'graph':
+      return 'the graph';
+    case 'sim':
+      return 'the simulation';
+    case 'slider':
+      return spec.title ? `“${spec.title}”` : 'the slider';
+    case 'check':
+      return 'the question';
+    case 'steps':
+      return 'the working';
+    case 'decide':
+      return 'the decision';
+    case 'draft':
+      return 'the draft';
+    case 'sequence':
+      return spec.kind === 'timeline' ? 'the timeline' : 'the steps';
+    case 'concepts':
+      return 'the overview';
+    default:
+      return 'the element';
+  }
+}
+
+const unitAfter = (v: number, unit?: string) => (unit ? (/^(?:%|°|‰)$/.test(unit) ? `${fmtVal(v)}${unit}` : /^[$£€¥₹]$/.test(unit) ? `${unit}${fmtVal(v)}` : `${fmtVal(v)} ${unit}`) : fmtVal(v));
+/** The parameters they moved, from where they started: "b 2 → 4". */
+function moved(params: readonly ParamSpec[], values?: Record<string, number>): string[] {
+  if (!values) return [];
+  return params.filter((p) => values[p.name] !== undefined && values[p.name] !== p.value).map((p) => `${p.label} ${unitAfter(p.value, p.unit)} → ${unitAfter(values[p.name], p.unit)}`);
+}
+function turningOf(spec: GraphSpec, values: Record<string, number>): Feature | null {
+  const c = compileOver(spec.expr, spec.params.map((p) => p.name));
+  return c ? curveFeatures(c, values, spec.x[0], spec.x[1], ['turning'])[0] ?? null : null;
+}
+/** A simulation's readings at a setting: "range 8.8 m". */
+function readingsAt(spec: SimSpec, values: Record<string, number>): string {
+  const names = spec.params.map((p) => p.name);
+  return (spec.readouts ?? [])
+    .slice(0, 2)
+    .map((ro) => {
+      const c = compileExpr(ro.expr, names);
+      const v = c ? c.eval(values) : NaN;
+      return Number.isFinite(v) ? `${ro.label} ${unitAfter(Number(v.toFixed(ro.digits ?? 2)), ro.unit)}` : '';
+    })
+    .filter(Boolean)
+    .join(', ');
+}
+/** A setting as it is said: the numbers that were changed ("angle 30°"), not the ones left as they were. */
+const settingOf = (spec: SimSpec, t: Record<string, number>, only?: readonly ParamSpec[]) =>
+  (only?.length ? only : spec.params).filter((p) => t[p.name] !== undefined).map((p) => `${p.label} ${unitAfter(t[p.name], p.unit)}`).join(', ');
+/** The parameters someone actually moved across their tries; the first when none were. */
+const varied = (spec: SimSpec, tries: readonly Record<string, number>[]) => {
+  const v = spec.params.filter((p) => tries.some((t) => t[p.name] !== undefined && t[p.name] !== p.value));
+  return v.length ? v : spec.params.slice(0, 1);
+};
+
+/**
+ * WHAT THEY DID with an element, in a line, from where it started to how it
+ * stands — what goes to Socria with their next message, and what the box shows
+ * them first. Null when there is nothing worth saying (nothing moved, a fold
+ * opened, a choice that is already their message).
+ */
+export function describeInline(spec: InlineSpec, state?: InlineState): string | null {
+  if (!state) return null;
+  const parts: string[] = [];
+  const predicted = (p?: PredictSpec) => (p && state.predicted !== undefined && p.options[state.predicted] ? `predicted “${p.options[state.predicted]}” (asked: ${p.prompt})` : null);
+  switch (spec.type) {
+    case 'slider': {
+      const changed = spec.vars.filter((v) => state.values?.[v.name] !== undefined && state.values[v.name] !== v.value);
+      if (!changed.length) return null;
+      const c = compileExpr(spec.formula, spec.vars.map((v) => v.name));
+      const at = Object.fromEntries(spec.vars.map((v) => [v.name, state.values?.[v.name] ?? v.value]));
+      const res = c ? c.eval(at) : NaN;
+      parts.push(changed.map((v) => `set ${v.label} from ${unitAfter(v.value, v.unit)} to ${unitAfter(state.values![v.name], v.unit)}`).join(', '));
+      if (Number.isFinite(res)) parts.push(`${spec.result.label} is now ${unitAfter(Number(res.toFixed(spec.result.digits ?? 2)), spec.result.unit)}`);
+      break;
+    }
+    case 'graph': {
+      const p = predicted(spec.predict);
+      if (p) parts.push(p);
+      const m = moved(spec.params, state.values);
+      if (m.length) {
+        parts.push(`changed ${m.join(', ')}`);
+        const now = { ...valuesOf(spec.params), ...state.values };
+        const before = turningOf(spec, valuesOf(spec.params));
+        const after = turningOf(spec, now);
+        parts.push(`the curve is now y = ${exprWithValues(spec.expr, now)}`);
+        if (before && after && (before.x !== after.x || before.y !== after.y)) parts.push(`its turning point moved from ${fmtPoint(before)} to ${fmtPoint(after)}`);
+        else if (after) parts.push(`turning point ${fmtPoint(after)}`);
+      }
+      break;
+    }
+    case 'sim': {
+      const p = predicted(spec.predict);
+      if (p) parts.push(p);
+      // every setting they left long enough to look at — the starting one included, when they came back to it
+      const tries = (state.tries ?? []).filter((t) => Object.keys(t).length > 0);
+      const moving = varied(spec, tries);
+      if (tries.length) parts.push(`tried ${tries.map((t) => { const r = readingsAt(spec, { ...valuesOf(spec.params), ...t }); return `${settingOf(spec, t, moving)}${r ? ` (${r})` : ''}`; }).join('; ')}`);
+      const m = moved(spec.params, state.values);
+      if (m.length && !tries.length) parts.push(`changed ${m.join(', ')}`);
+      break;
+    }
+    case 'check':
+    case 'steps': {
+      const q = spec.type === 'check' ? spec : spec.check;
+      if (!q || !state.answer) return null;
+      parts.push(`answered ${state.answer}${q.label ? ` for ${q.label}` : ''} to “${q.prompt}” — ${state.right ? 'right' : 'not right'}${state.attempts && state.attempts > 1 ? ` (after ${state.attempts} tries)` : ''}`);
+      break;
+    }
+    case 'decide': {
+      const t = decideTally(spec, state);
+      if (state.weights) parts.push(`weighed it: ${spec.rows.map((r, i) => `${r.label} ${WEIGHT_SAID[t.weights[i]]}`).join('; ')}`);
+      const changes = state.scores ? spec.rows.flatMap((r, ri) => r.scores.map((v, oi) => (state.scores![ri]?.[oi] !== undefined && state.scores![ri][oi] !== v ? `${spec.options[oi]} on ${r.label} to ${SCORE_SAID[state.scores![ri][oi]]}` : null)).filter(Boolean)) : [];
+      if (changes.length) parts.push(`changed ${changes.slice(0, 3).join(', ')}`);
+      if (parts.length) parts.push(decideLeaning(spec, t));
+      break;
+    }
+    case 'draft':
+      if (state.text && state.text !== spec.text) parts.push(`edited the draft to: “${state.text.replace(/\s+/g, ' ').slice(0, 200)}${state.text.length > 200 ? '…' : ''}”`);
+      break;
+    case 'sequence':
+      if (state.done?.length && spec.kind === 'steps') parts.push(`ticked off ${state.done.length} of ${spec.items.length} steps`);
+      break;
+    case 'concepts':
+      if (state.picked !== undefined && spec.items[state.picked]) parts.push(`opened “${spec.items[state.picked].name}”`);
+      break;
+    default:
+      return null;
+  }
+  return parts.length ? parts.join('; ') : null;
+}
+
+/**
+ * How an element stands now, for the history Socria reads back: what the
+ * person left it at — not where it started. Null when nothing was done with it.
+ */
+export function inlineNow(spec: InlineSpec, state: InlineState): string | null {
+  if (spec.type === 'sim' && state.values) {
+    const now = { ...valuesOf(spec.params), ...state.values };
+    const d = describeInline(spec, state);
+    const r = readingsAt(spec, now);
+    return `${d ? `${d}; ` : ''}set to ${settingOf(spec, now)}${r ? ` (${r})` : ''}`;
+  }
+  return describeInline(spec, state);
+}
+
+/** One thing they did, as it travels with their message: which element, and what. */
+export interface DidItem {
+  from: string;
+  said: string;
+}
+
+/** What they did, as it came from a browser: shaped, clipped, four at most — display and context, trusted for nothing else. */
+export function sanitizeDid(raw: unknown): DidItem[] | undefined {
+  if (!Array.isArray(raw)) return undefined;
+  const out: DidItem[] = [];
+  for (const v of raw.slice(0, 12)) {
+    const o = v && typeof v === 'object' ? (v as Record<string, unknown>) : null;
+    const from = line(o?.from, 48);
+    const said = line(o?.said, 400);
+    if (from && said) out.push({ from, said });
+    if (out.length === 4) break;
+  }
+  return out.length ? out : undefined;
+}
+
+/**
+ * What they did, as the model reads it with their message: one bracketed line,
+ * so it can never read as their words — said after they did it, before what
+ * they wrote, and what the reply should take into account.
+ */
+export function didLine(did: readonly DidItem[]): string {
+  return `[What they did with the elements in your replies before writing this — ${did.map((d) => `${d.from}: ${d.said}`).join(' · ')}. Take it into account.]`;
 }

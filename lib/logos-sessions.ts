@@ -56,6 +56,12 @@ export interface LogosMsg {
   via?: 'voice';
   /** the web pages this reply was given to read (lib/chat-thread.ts cleanWebSources) — listed under it, never their text */
   sources?: { query: string; list: WebSourceRef[] };
+  /**
+   * What they had done with the elements of Socria's replies when they wrote
+   * this (lib/inline-ui.ts describeInline): a number dragged, a prediction, an
+   * answer checked. Shown over their words, and told to Socria with them.
+   */
+  did?: { from: string; said: string }[];
 }
 
 /**

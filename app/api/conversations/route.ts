@@ -5,7 +5,7 @@
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
-import { sanitizeInlineState } from '@/lib/inline-ui';
+import { sanitizeDid, sanitizeInlineState } from '@/lib/inline-ui';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -74,6 +74,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       const about = m.role === 'user' ? cleanAboutRef(m.about) : undefined;
       // said rather than typed (Socria Voice): the conversation marks it with a microphone
       const via = m.role === 'user' && m.via === 'voice' ? 'voice' : undefined;
+      // what they had done with a reply's elements when they wrote it (lib/inline-ui.ts) — shown over their words
+      const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
       // the web pages a reply read, listed under it — addresses and titles, never their text
       const sources = m.role === 'assistant' ? cleanWebSources(m.sources) : undefined;
       return {
@@ -84,6 +86,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(replyTo ? { replyTo } : {}),
         ...(about ? { about } : {}),
         ...(via ? { via } : {}),
+        ...(did ? { did } : {}),
         ...(sources ? { sources } : {}),
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),

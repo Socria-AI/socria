@@ -1139,6 +1139,370 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   }
 }
 
+/* ── things to reason with: a graph, a simulation, a question, the working ── */
+
+/* an expression as maths: the reply's serif for the letters, the numbers to drag marked */
+.logos-root .ln .ln-eq {
+  margin: 0;
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 22px;
+  line-height: 1.5;
+  color: var(--ln-ink);
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .ln .ln-eq.is-small,
+.logos-root .ln .ln-formula .ln-eq {
+  font-size: 14px;
+}
+.logos-root .ln .ln-eq sup {
+  font-size: 0.62em;
+  line-height: 0;
+}
+.logos-root .ln .ln-eq-v {
+  font-style: italic;
+  padding: 0 0.04em;
+}
+.logos-root .ln .ln-eq-f {
+  padding-right: 0.08em;
+}
+.logos-root .ln .ln-eq-op {
+  padding: 0 0.28em;
+}
+.logos-root .ln .ln-scrub {
+  display: inline-block;
+  min-width: 1.1em;
+  margin: 0 0.06em;
+  padding: 0 0.22em;
+  border-bottom: 1.5px dotted rgba(var(--ln-tint), 0.55);
+  border-radius: 5px 5px 2px 2px;
+  text-align: center;
+  cursor: ew-resize;
+  touch-action: none;
+  user-select: none;
+  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+}
+.logos-root .ln .ln-scrub:hover,
+.logos-root .ln .ln-scrub.is-hot {
+  background: rgba(var(--ln-tint), 0.1);
+  border-bottom: 1.5px solid var(--ln-primary);
+  color: var(--ln-primary);
+}
+.logos-root .ln .ln-scrub:focus-visible {
+  outline: 2px solid var(--ln-primary);
+  outline-offset: 2px;
+}
+.logos-root .ln .ln-scrub.is-locked {
+  cursor: default;
+  border-bottom-color: transparent;
+  opacity: 0.6;
+}
+.logos-root .ln .ln-graph-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+}
+.logos-root .ln .ln-hint {
+  font-size: 12px;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln-graph .ln-plot,
+.logos-root .ln-sim .ln-plot {
+  margin: 8px 0 2px;
+  touch-action: pan-y;
+}
+.logos-root .ln-graph svg,
+.logos-root .ln-sim svg {
+  display: block;
+  overflow: visible;
+}
+.logos-root .ln .ln-axes line {
+  stroke: var(--ln-hair);
+  stroke-width: 1;
+}
+.logos-root .ln .ln-axes line.is-axis {
+  stroke: var(--ln-ink-40);
+}
+.logos-root .ln .ln-axes text,
+.logos-root .ln-try text {
+  font-size: 10.5px;
+  fill: var(--ln-ink-60);
+}
+.logos-root .ln .ln-curve {
+  fill: none;
+  stroke: var(--ln-primary);
+  stroke-width: 2.25;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+.logos-root .ln .ln-curve.is-ghost {
+  stroke: rgba(var(--ln-tint), 0.38);
+  stroke-width: 1.5;
+  stroke-dasharray: 4 4;
+}
+.logos-root .ln .ln-pt {
+  fill: var(--ln-primary);
+  stroke: var(--l5-surface, #fff);
+  stroke-width: 2;
+}
+.logos-root .ln .ln-pt.is-ghost {
+  fill: var(--ln-ground);
+  stroke: rgba(var(--ln-tint), 0.5);
+  stroke-width: 1.5;
+}
+.logos-root .ln .ln-feat text,
+.logos-root .ln .ln-probe text {
+  font-size: 11.5px;
+  font-weight: 600;
+  fill: var(--ln-ink);
+  paint-order: stroke;
+  stroke: var(--ln-ground);
+  stroke-width: 3px;
+  stroke-linejoin: round;
+}
+.logos-root .ln .ln-feat.is-root text,
+.logos-root .ln .ln-feat.is-intercept text {
+  font-weight: 500;
+  fill: var(--ln-ink-70);
+}
+.logos-root .ln .ln-probe circle {
+  fill: var(--ln-ground);
+  stroke: var(--ln-primary);
+  stroke-width: 1.5;
+}
+.logos-root .ln .ln-ground {
+  stroke: var(--ln-ink-40);
+  stroke-width: 1;
+}
+.logos-root .ln .ln-was {
+  display: flex;
+  justify-content: flex-end;
+  gap: 14px;
+  margin: 2px 0 0;
+  font-size: 11.5px;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-was span::before {
+  content: '';
+  display: inline-block;
+  width: 16px;
+  margin-right: 5px;
+  vertical-align: middle;
+  border-top: 2px solid var(--ln-primary);
+}
+.logos-root .ln .ln-was .is-ghost::before {
+  border-top: 1.5px dashed rgba(var(--ln-tint), 0.45);
+}
+.logos-root .ln .ln-graph-vars {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
+  gap: 0 18px;
+}
+.logos-root .ln .ln-var.is-hot .ln-var-k {
+  color: var(--ln-primary);
+  font-weight: 600;
+}
+.logos-root .ln .ln-k {
+  display: block;
+  margin: 0 0 3px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-q {
+  margin: 0 0 9px;
+  font-size: 15px;
+  line-height: 1.45;
+  color: var(--ln-ink);
+}
+.logos-root .ln .ln-predict {
+  margin: 10px 0 4px;
+  padding: 10px 12px 12px;
+  border-radius: 10px;
+  background: rgba(var(--ln-tint), 0.05);
+}
+.logos-root .ln .ln-skip {
+  min-height: 36px;
+  padding: 0 6px;
+  border: 0;
+  background: none;
+  color: var(--ln-ink-60);
+  font: inherit;
+  font-size: 13px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+  cursor: pointer;
+}
+.logos-root .ln .ln-after {
+  margin-top: 8px;
+  padding-top: 8px;
+  border-top: 1px solid var(--ln-hair);
+}
+.logos-root .ln .ln-predicted {
+  margin: 0;
+  font-size: 14px;
+  color: var(--ln-ink);
+}
+.logos-root .ln .ln-predicted .ln-k {
+  display: inline;
+  margin-right: 6px;
+}
+.logos-root .ln .ln-observe {
+  margin: 4px 0 0;
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--ln-primary);
+}
+.logos-root .ln .ln-shared {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-read {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 2px 16px;
+  margin: 8px 0 0;
+  font-size: 13.5px;
+  color: var(--ln-ink-70);
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .ln .ln-read b {
+  font-weight: 600;
+  color: var(--ln-ink);
+}
+/* a question to work out */
+.logos-root .ln .ln-answer {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+}
+.logos-root .ln .ln-answer label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.logos-root .ln .ln-answer-k,
+.logos-root .ln .ln-answer-u {
+  font-family: var(--l5-serif, Georgia, serif);
+  font-size: 18px;
+  font-style: italic;
+}
+.logos-root .ln .ln-answer input {
+  width: 92px;
+  height: 38px;
+  padding: 0 10px;
+  border: 1px solid rgba(var(--ln-tint), 0.3);
+  border-radius: 10px;
+  background: var(--l5-raise, #fff);
+  color: var(--ln-ink);
+  font: inherit;
+  font-size: 16px;
+  font-variant-numeric: tabular-nums;
+}
+.logos-root .ln .ln-answer input:focus {
+  outline: none;
+  border-color: var(--ln-primary);
+  box-shadow: 0 0 0 3px rgba(var(--ln-tint), 0.1);
+}
+.logos-root .ln .ln-verdict {
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.logos-root .ln .ln-verdict .is-right {
+  color: var(--ln-primary);
+}
+.logos-root .ln .ln-verdict .is-wrong {
+  color: var(--l5-no-ink, #7d3f27);
+}
+.logos-root .ln .ln-verdict .is-note {
+  font-weight: 400;
+  color: var(--ln-ink-70);
+}
+.logos-root .ln .ln-explain {
+  margin: 10px 0 0;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--ln-primary);
+  font-size: 14px;
+  line-height: 1.5;
+}
+.logos-root .ln .ln-explain.is-ask {
+  border-left-color: var(--ln-hair);
+  color: var(--ln-ink-70);
+}
+/* the working */
+.logos-root .ln .ln-lines {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .ln .ln-lines > li {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: baseline;
+  gap: 2px 12px;
+  margin: 0;
+  padding: 7px 0;
+  border-bottom: 1px dashed var(--ln-hair);
+}
+.logos-root .ln .ln-lines > li:last-child {
+  border-bottom: 0;
+}
+.logos-root .ln .ln-step {
+  min-width: 0;
+  overflow-x: auto;
+  font-size: 17px;
+}
+.logos-root .ln .ln-whybtn {
+  min-height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: none;
+  color: var(--ln-ink-60);
+  font: inherit;
+  font-size: 12.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.logos-root .ln li.is-open .ln-whybtn {
+  color: var(--ln-primary);
+}
+.logos-root .ln .ln-why-said {
+  grid-column: 1 / -1;
+  margin: 4px 0 2px;
+  padding: 2px 0 2px 12px;
+  border-left: 2px solid var(--ln-primary);
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--ln-ink);
+}
+.logos-root .ln-steps .ln-checkbox,
+.logos-root .ln-check .ln-checkbox {
+  margin-top: 6px;
+}
+.logos-root .ln-steps .ln-checkbox {
+  padding-top: 12px;
+  border-top: 1px solid var(--ln-hair);
+}
+@media (max-width: 560px) {
+  .logos-root .ln .ln-eq {
+    font-size: 19px;
+  }
+  .logos-root .ln .ln-graph-vars {
+    grid-template-columns: 1fr;
+  }
+  .logos-root .ln .ln-scrub {
+    padding: 0.08em 0.3em;
+  }
+}
+
 @media (prefers-reduced-motion: reduce) {
   .logos-root .ln *,
   .logos-root .ln-pending span {
@@ -1148,6 +1512,12 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 }
 
 @media (forced-colors: active) {
+  .logos-root .ln :is(.ln-curve, .ln-axes line.is-axis) {
+    stroke: CanvasText;
+  }
+  .logos-root .ln .ln-pt {
+    fill: CanvasText;
+  }
   .logos-root .ln :is(.ln-bar, .ln-dot, .ln-slice) {
     fill: CanvasText;
     stroke: Canvas;

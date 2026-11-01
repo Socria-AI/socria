@@ -4,13 +4,14 @@
 // line of thinking (lib/guest-pass.ts), when it is the guest's first or the one
 // they already have; { ok: false, guestLimit: true } with a 403 when they
 // already have another; { ok: false } with a 503 when this deployment cannot
-// sign a pass. Somebody signed in, or holding the access key, needs no pass:
-// { ok: true, guest: false }.
+// sign a pass. Somebody signed in needs no pass: { ok: true, guest: false }.
+// The typed access key is no account: whoever holds it signed out is a guest
+// here as in the chat and map routes, which ask for this pass (October 31,
+// 2026), so they claim it like any other guest.
 
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { mayUse } from '@/lib/route-guard';
 import { GUEST_COOKIE, GUEST_COOKIE_PATH, GUEST_LIMIT, GUEST_TTL_MS, claimGuest } from '@/lib/guest-pass';
 
 export const runtime = 'nodejs';
@@ -25,7 +26,7 @@ export async function POST(req: NextRequest) {
   }
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
-  if (userId || mayUse(req, userId)) return NextResponse.json({ ok: true, guest: false });
+  if (userId) return NextResponse.json({ ok: true, guest: false });
 
   const body = await req.json().catch(() => null);
   const claim = claimGuest(req.cookies.get(GUEST_COOKIE)?.value, body?.sessionId, Date.now());

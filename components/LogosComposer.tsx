@@ -399,6 +399,8 @@ export function LogosComposer({
   group,
   about,
   onClearAbout,
+  context,
+  onDropContext,
   voice,
   layout = 'inline',
   onStop,
@@ -440,6 +442,13 @@ export function LogosComposer({
    */
   about?: { kind: string; label: string; of?: string } | null;
   onClearAbout?: () => void;
+  /**
+   * What they did with the elements of Socria's replies since they last wrote
+   * (lib/inline-ui.ts describeInline): shown on the box so what goes with the
+   * message is never a surprise, each a press away from being left out.
+   */
+  context?: { key: string; from: string; said: string }[];
+  onDropContext?: (key: string) => void;
   /**
    * Logos 4, Voice to Text: offer the mic. It is still drawn only where the
    * browser can record and the server can transcribe (useVoiceInput).
@@ -769,6 +778,23 @@ export function LogosComposer({
                 ×
               </button>
             )}
+          </div>
+        )}
+
+        {!!context?.length && (
+          <div className="lg-did-row" role="group" aria-label="Goes with your next message">
+            <span className="lg-did-k">Goes with your next message</span>
+            {context.map((c) => (
+              <span key={c.key} className="lg-did-chip" title={`${c.from}: ${c.said}`}>
+                <span className="lg-did-from">{c.from.replace(/^the /, '')}</span>
+                <span className="lg-did-said">{c.said}</span>
+                {onDropContext && (
+                  <button type="button" className="lg-did-x" aria-label={`Leave out what you did with ${c.from}`} title="Leave this out" onClick={() => onDropContext(c.key)}>
+                    ×
+                  </button>
+                )}
+              </span>
+            ))}
           </div>
         )}
 

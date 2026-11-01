@@ -38,8 +38,12 @@
 // form the last two replies both used is not offered a third time running.
 //
 // THE VIEW DECIDES THE SHAPE. Chat converses: prose, and a small element only
-// where it carries the idea better than a sentence — never an application, a
-// simulator or a dashboard in the conversation. Content is read: a write-up
+// where it carries the idea better than a sentence — never an application or a
+// dashboard in the conversation. A relationship the person can discover by
+// changing something may be drawn to change: a graph whose numbers they drag,
+// one small simulation, a question they work out and check — one thing to
+// work with in a reply, and what they do with it reaches Socria
+// (lib/inline-ui.ts describeInline). Content is read: a write-up
 // they asked to keep is written as a document, with headings where they help
 // someone find their way, and filed there (place: 'content'). What is made
 // belongs to Artifacts, and only when asked for.
@@ -158,6 +162,23 @@ const DECIDE_ASK =
  */
 const DEEPER =
   /^(?:(?:ok(?:ay)?|great|yes|yeah|sure|right|nice|good|perfect|cool),?\s+)?(?:let'?s\s+)?(?:go deeper|dig (?:deeper|into)|say more about|tell me more(?: about)?|expand on|elaborate on|unpack|more on|take me further into|go further (?:on|into)|explain (?:that|this|it) (?:in more detail|further|more)|walk me through (?:that|this|it)(?: in detail)?|go into (?:more )?detail)\b/i;
+/** A relationship in maths or science, asked about: something they could see by changing a number. */
+const MATH_REL = /\b(?:parabolas?|quadratics?|vertex|vertices|slope|gradient|intercepts?|linear functions?|exponential|logarithm(?:s|ic)?|sine|cosine|sin\s*\(|cos\s*\(|amplitude|period|asymptotes?|derivatives?|tangent line|functions?|graphs?|curves?|y\s*=|f\s*\(\s*x\s*\))/i;
+const WHY_HOW = /\b(?:why|how|what happens|what does|explain|understand|get it|don'?t get|mean|means|change|changes|affect|affects|shift|shifts|move|moves|depend|depends|look like)\b/i;
+/**
+ * Motion, asked about: a small simulation to try. Physics by its own words
+ * (a projectile, a pendulum, an orbit), or a throw, a jump or a fall WITH the
+ * words that make it physics (an angle, a speed, a height, a ball) — "why did
+ * the Roman Republic fall?" is history.
+ */
+const SIM_CORE = /\b(?:projectiles?|trajector(?:y|ies)|pendulums?|orbit(?:s|al|ing)?|oscillat\w*|simple harmonic)\b/i;
+const SIM_MOVE = /\b(?:throw(?:n|ing|s)?|launch(?:ed|es|ing)?|kick(?:ed|ing|s)?|toss(?:ed|ing)?|shoot(?:ing|s)?|jump(?:s|ed|ing)?|bounc\w*|swing(?:s|ing)?|springs?|falls?|falling|dropp?(?:ed|ing|s)?)\b/i;
+const SIM_PHYS = /\b(?:angles?|degrees?|°|speed|velocity|gravity|heights?|metres?|meters?|m\/s|ball|arrow|cannon|rocket|mass|air resistance|farthest|furthest|highest|range|seconds?|feather|stone)/i;
+const simAsk = (t: string) => SIM_CORE.test(t) || (SIM_MOVE.test(t) && SIM_PHYS.test(t));
+/** The working, asked for. */
+const WORKING_ASK = /\b(?:how do (?:i|you|we) (?:solve|find|work out|calculate|complete|factor|simplify|integrate|differentiate)|show (?:me )?(?:the )?(?:working|steps|how)|work (?:it |this |that )?(?:out|through)|walk me through (?:solving|the (?:maths|math|algebra|derivation|working))|derive|derivation|complete the square|solve (?:for|this|it|the)|step[- ]by[- ]step)\b/i;
+/** Practising: a question of their own to work out. */
+const PRACTICE_ASK = /\b(?:quiz me|test me|check (?:my|if i) understand\w*|practice (?:question|problem)s?|give me (?:a|one|another|some) (?:problem|question|example)s?(?: to try)?|let me try|can i try|another one)\b/i;
 /** Work that is not reading an explanation: making something, doing it themselves, checking or fixing. */
 const NOT_READING = new Set(['creation', 'practice', 'verification', 'diagnosis', 'execution']);
 
@@ -209,8 +230,18 @@ export function planPresentation(i: PresentationInput): Presentation {
   if (deciding) offer('decide', 'decide:their-choice');
   // options set against each other — the facts side by side, when the choice is not theirs to weigh here
   else if (COMPARE_ASK.test(t) && (VERSUS.test(t) || /\band\b/i.test(t)) && work !== 'creation') offer('compare', 'compare:options');
-  // a quantity that moves with something they can vary
-  if (!i.guard && ((WHAT_IF.test(t) && nums.length >= 1) || (FORMULA.test(t) && /\b(?:change|vary|depends?|how does|what happens)\b/i.test(t)))) offer('slider', 'slider:what-if');
+  // a relationship they could discover by changing a number: a graph to change (under the guard too —
+  // nothing that would be the answer is marked on it)
+  if (work !== 'creation' && x.kind !== 'brainstorm' && MATH_REL.test(t) && (WHY_HOW.test(t) || FORMULA.test(t))) offer('graph', 'graph:relationship');
+  // motion, or something that unfolds in time, asked why or how: one small simulation to try
+  if (work !== 'creation' && simAsk(t) && WHY_HOW.test(t)) offer('sim', 'sim:try-it');
+  // the working, asked for — never the working that is theirs, never under the guard
+  if (!i.guard && !i.ownReasoning && WORKING_ASK.test(t)) offer('steps', 'steps:working');
+  // practising, asked for in so many words ("let me try one"): a question they work out and check, their
+  // own work — a question, so only where one may go. A problem handed over ("solve 2x + 3 = 7") is not this.
+  if (i.questions > 0 && PRACTICE_ASK.test(t)) offer('check', 'check:practice');
+  // a quantity that moves with something they can vary — unless a graph or a simulation already shows it
+  if (!i.guard && !offered.includes('graph') && !offered.includes('sim') && ((WHAT_IF.test(t) && nums.length >= 1) || (FORMULA.test(t) && /\b(?:change|vary|depends?|how does|what happens)\b/i.test(t)))) offer('slider', 'slider:what-if');
   // practical writing they handed over: editable in place
   if (work === 'creation' && PRACTICAL_TEXT.test(t) && !i.ownWriting) offer('draft', 'draft:practical-writing');
   // an open piece of work: the ways it could go next, to open one at a time — after the useful part, never instead of it
@@ -265,6 +296,14 @@ const GRAMMAR: Record<InlineKind, string> = {
     '{"type":"paths","items":[{"label":"Sketch the first five minutes","gist":"what opening it would give them, in a line"}]} — 2–4 ways the work could go next, each a few words; opening one sends it as their next message. Ways to explore, not questions; the useful part stays in your prose above it.',
   decide:
     '{"type":"decide","title":"…","options":["…","…"],"rows":[{"label":"Cost over five years","scores":[2,1],"note":"why, in a few words"}]} — a choice that is theirs: 2–4 options, 2–5 things it rests on (from what they said matters), and your honest first reading of each option on each (0 poor – 3 strong, in option order). They set how much each matters and can change any reading; the leaning is computed from their weights, so name no winner in your prose.',
+  graph:
+    '{"type":"graph","title":"…","expr":"a*x^2+b*x+c","x":[-6,4],"params":[{"name":"a","value":1,"min":-3,"max":3,"step":0.5},{"name":"b","value":2,"min":-6,"max":6,"step":1},{"name":"c","value":-1,"min":-5,"max":5,"step":1}],"features":["turning","roots","intercept"],"predict":{"prompt":"If b doubles, which way does the vertex move?","options":["Left","Right","It stays put"]}} — y over x and 0–3 single-letter parameters they drag; turning points, roots and the y-intercept are found on the curve live, so state none you have not computed. "predict" (optional) has them commit before they move anything: use it when the point is a relationship they can discover. One or two lines of prose around it.',
+  sim:
+    '{"type":"sim","title":"Throw at 10 m/s","x":"v*cos(a*pi/180)*t","y":"v*sin(a*pi/180)*t-4.9*t^2","t":[0,"2*v*sin(a*pi/180)/9.8"],"view":{"x":[0,12],"y":[0,5]},"params":[{"name":"a","label":"angle","value":45,"min":5,"max":85,"step":1,"unit":"°"},{"name":"v","label":"speed","value":10,"min":2,"max":20,"step":1,"unit":"m/s"}],"readouts":[{"label":"range","expr":"v^2*sin(2*a*pi/180)/9.8","unit":"m","digits":1}],"predict":{"prompt":"Which angle lands as far as 30°?","options":["60°","15°","None"]}} — a path over time t with 1–3 parameters; when it ends and its readings are formulas, computed live, and each setting they try stays on the picture. Only for one relationship worth trying, never a dashboard.',
+  check:
+    '{"type":"check","prompt":"Where is the vertex of y = 2x² − 8x + 3?","label":"x","answer":"-(-8)/(2*2)","explain":"x = −b/2a = 8/4 = 2"} — a question they work out and check themselves: "answer" is plain arithmetic the engine evaluates (not just your number), and "explain" is shown only after they try. To let them try, never instead of explaining.',
+  steps:
+    '{"type":"steps","title":"…","lines":[{"tex":"y = x^2 + 4x - 1"},{"tex":"= (x^2 + 4x + 4) - 4 - 1","why":"half of 4, squared, makes a perfect square"},{"tex":"= (x+2)^2 - 5"}],"check":{"prompt":"Now you: where is the vertex of y = x² − 6x + 2?","label":"x","answer":"6/2"}} — the working as lines of maths (TeX), with their own numbers when they have them; "why" folds under a line; "check" (optional) gives them one like it to do. Never the working that is theirs to do.',
 };
 
 /**
@@ -307,5 +346,7 @@ export function presentationRoom(p: Presentation): number {
   const deeper = p.shape === 'deeper' ? 600 : 0;
   if (!p.forms.length) return deeper;
   if (p.forms.includes('draft') || p.forms.includes('concepts')) return 700 + deeper;
+  // a graph, a simulation or the working is one longer line of JSON: a cut-off one is not drawn at all
+  if (p.forms.includes('graph') || p.forms.includes('sim') || p.forms.includes('steps')) return 550 + deeper;
   return (p.forms.includes('sequence') || p.forms.includes('decide') ? 450 : 350) + deeper;
 }

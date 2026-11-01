@@ -40,7 +40,7 @@ const swap = {
   },
 };
 await Promise.all(
-  Object.entries({ pass: 'lib/guest-pass.ts', claim: 'app/api/logos/guest/route.ts', chat: 'app/api/logos/chat/route.ts', map: 'app/api/logos/map/route.ts' }).map(([name, file]) =>
+  Object.entries({ pass: 'lib/guest-pass.ts', access: 'lib/access-codes-server.ts', claim: 'app/api/logos/guest/route.ts', chat: 'app/api/logos/chat/route.ts', map: 'app/api/logos/map/route.ts' }).map(([name, file]) =>
     build({
       entryPoints: [join(root, file)],
       bundle: true,
@@ -68,6 +68,7 @@ process.env.RATE_LIMIT_DISABLED = '1';
 delete process.env.CLERK_SECRET_KEY;
 const P = await import(pathToFileURL(join(OUT, 'pass.mjs')).href);
 const claim = await import(pathToFileURL(join(OUT, 'claim.mjs')).href);
+const access = await import(pathToFileURL(join(OUT, 'access.mjs')).href);
 const chat = await import(pathToFileURL(join(OUT, 'chat.mjs')).href);
 const mapRoute = await import(pathToFileURL(join(OUT, 'map.mjs')).href);
 const { NextRequest } = await import('next/server.js');
@@ -117,6 +118,15 @@ process.env.CLERK_SECRET_KEY = 'sk_test_guest';
 globalThis.__uid = 'user_guest_test';
 r = await claim.POST(req('/api/logos/guest', { sessionId: 'lg_guest2' }));
 ok('somebody signed in needs no pass', r.status === 200 && (await r.json()).guest === false && !cookieOf(r)?.value);
+// the typed access key is no account: signed out with it, a guest claims the pass
+// the chat and map routes ask for — before, the claim waved them through with
+// no pass and every turn they sent was refused
+globalThis.__uid = null;
+process.env.SOCRIA_ACCESS_CODE = 'guest-test-code-1234';
+const keyCookie = `${access.ACCESS_COOKIE}=${access.issueGrant('core', NOW)}`;
+r = await claim.POST(req('/api/logos/guest', { sessionId: 'lg_key1' }, keyCookie));
+const keyPass = cookieOf(r)?.value;
+ok('holding the access key, signed out: a guest, and a pass is set', r.status === 200 && (await r.json()).guest === true && !!keyPass);
 
 console.log('\n=== the turns ===');
 const U = (content) => ({ role: 'user', content });
@@ -136,6 +146,11 @@ let t = await turn({ sessionId: 'lg_guest1', messages: [U('What is opportunity c
 ok('a guest turn with no pass: refused before any model is asked', t.status === 401 && /guestLimit/.test(t.text) && t.calls.length === 0, t.text.slice(0, 200));
 t = await turn({ sessionId: 'lg_guest1', messages: [U('What is opportunity cost?')] }, passCookie);
 ok('in the line of thinking their pass names: answered, as Logos 5', t.status === 200 && /^You are Socria\. People come to you to think out loud/.test(t.first), `${t.status} ${t.text.slice(0, 120)}`);
+t = await turn({ sessionId: 'lg_key1', messages: [U('What is opportunity cost?')] }, keyCookie);
+ok('the access key alone, with no pass: refused like any guest', t.status === 401 && /guestLimit/.test(t.text) && t.calls.length === 0, t.text.slice(0, 200));
+t = await turn({ sessionId: 'lg_key1', messages: [U('What is opportunity cost?')] }, `${keyCookie}; ${P.GUEST_COOKIE}=${keyPass}`);
+ok('the access key and the pass it claimed: answered', t.status === 200 && /^You are Socria\./.test(t.first), `${t.status} ${t.text.slice(0, 120)}`);
+delete process.env.SOCRIA_ACCESS_CODE;
 t = await turn({ sessionId: 'lg_guest2', messages: [U('A second thing')] }, passCookie);
 ok('in another one: refused before any model is asked, with a way to sign up', t.status === 401 && /Sign up free/.test(t.text) && t.calls.length === 0, t.text.slice(0, 200));
 globalThis.__uid = 'user_guest_test';
@@ -151,7 +166,7 @@ ok('the map of their one line of thinking: drawn (not refused)', (await mapReq('
 console.log('\n=== the screen ===');
 const app = readFileSync(join(root, 'components', 'LogosApp.tsx'), 'utf8');
 ok('no cover for a guest: everyone has Logos 5 once the account has answered', /const hasAccess = unlocked \|\| !!isSignedIn \|\| authSettled;/.test(app) && !/<LogosCover/.test(app));
-ok('a guest is signed out with no access key', /const guest = authSettled && !isSignedIn && !unlocked;/.test(app));
+ok('a guest is anyone signed out — the access key opens Logos 5 but is no account', /const guest = authSettled && !isSignedIn;/.test(app) && !/const guest = [^\n]*unlocked/.test(app));
 ok('a second line of thinking opens the sign-up note, from newSession and from send', /if \(guestRef\.current && sessionsRef\.current\.some\(\(x\) => x\.messages\.length > 0\)\) \{\s*setGuestWall\(true\);/.test(app) && /guestHasAnother\(activeIdRef\.current\) \|\| !\(await claimGuestPass\(activeIdRef\.current\)\)/.test(app));
 // the words go back to the line that sent them (giveBack), which is the one on screen unless the person moved on
 ok('the server refusing a guest turn puts the words back and opens the note', /if \(body\?\.guestLimit\) \{[\s\S]{0,400}giveBack\(sid, content, replying\);[\s\S]{0,200}setGuestWall\(true\);/.test(app) && /function giveBack\([\s\S]{0,1200}setInput\(content\);/.test(app));

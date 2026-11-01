@@ -28,6 +28,9 @@
 //
 // Pure: no React, no DOM. components/RichText.tsx draws what this returns.
 
+
+/** Elements that stay in view whatever heading they fall under: where the reply could go next, and anything the person works with. */
+const NEVER_FOLDED = new Set<string>(['paths', 'graph', 'sim', 'slider', 'decide', 'steps', 'check']);
 import { stripMarks, type Block } from './rich-text';
 
 /** A lead is a sentence or two: longer than this and it is a paragraph. */
@@ -251,8 +254,9 @@ export function layoutReply(blocks: Block[], o: LayoutOptions = {}): Piece[] {
         fold = null;
         pieces.push({ kind: 'block', i });
       }
-    } else if (b?.kind === 'ui' && b.spec?.type === 'paths') {
-      // where the reply could go next belongs to all of it
+    } else if (b?.kind === 'ui' && b.spec && NEVER_FOLDED.has(b.spec.type)) {
+      // where the reply could go next belongs to all of it; and a thing to work with — a graph, a
+      // simulation, a question, the working — is never put behind a press
       fold = null;
       pieces.push({ kind: 'block', i });
     } else if (fold) {

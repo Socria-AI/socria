@@ -25,6 +25,7 @@ import { TeX, TexPick } from '@/components/TeX';
 import { RichText, StreamingRichText } from '@/components/RichText';
 import type { DocRef } from '@/lib/docs/render';
 import { writeUpParts } from '@/lib/logos5/content';
+import { sliceOf, type SliceCard } from '@/lib/logos5/mapSlice';
 
 const I = {
   copy: <path d="M9 9h11v11H9zM5 15V6a2 2 0 0 1 2-2h9" />,
@@ -68,8 +69,8 @@ function Icon({ d }: { d: ReactNode }) {
 }
 
 export interface L5Effect {
-  /** "+3 on the map" — what the turn did to the map, when it did anything */
-  map?: { said: string; nodes: string[] } | null;
+  /** "+3 on the map" — what the turn did to the map, when it did anything; `cards`, the ideas it added, drawn under the reply */
+  map?: { said: string; nodes: string[]; cards?: SliceCard[] } | null;
   /** displays, documents and models this turn opened */
   objects?: { id: string; label: string; kind: string }[];
 }
@@ -286,6 +287,17 @@ export function L5Message(p: L5MessageProps) {
         </span>
       )}
 
+      {m.role === 'user' && !!m.did?.length && (
+        <div className="l5-did" aria-label="What was done with the replies, sent with this message">
+          {m.did.map((d, i) => (
+            <p key={i} className="l5-did-row">
+              <span className="l5-did-k">From {d.from}</span>
+              <span className="l5-did-t">{d.said}</span>
+            </p>
+          ))}
+        </div>
+      )}
+
       {!!m.attachments?.length && (
         <div className="l5-atts">
           <AttachmentList items={m.attachments} onOpenDoc={p.onOpenDoc} />
@@ -357,9 +369,18 @@ export function L5Message(p: L5MessageProps) {
         </div>
       )}
 
-      {(mapFx || objFx.length > 0) && (
+      {mapFx && (mapFx.cards?.length ?? 0) >= 2 && (
+        <MapSlice
+          cards={mapFx.cards!}
+          onOpen={() => p.onShowNodes?.(mapFx.nodes)}
+          onOne={(id) => p.onShowNodes?.([id])}
+          onHover={(ids) => p.onHoverNodes?.(ids)}
+        />
+      )}
+
+      {((mapFx && (mapFx.cards?.length ?? 0) < 2) || objFx.length > 0) && (
         <div className="l5-fx" aria-label="What this turn did in the workspace">
-          {mapFx && (
+          {mapFx && (mapFx.cards?.length ?? 0) < 2 && (
             <button
               type="button"
               className="l5-fx-chip"
@@ -407,6 +428,36 @@ export function L5Message(p: L5MessageProps) {
         </div>
       )}
     </article>
+  );
+}
+
+/**
+ * THE LOGIC MAP, IN THE CONVERSATION: the ideas this turn added to the
+ * person's map (lib/logos5/mapSlice.ts), at most four, in the map's shapes —
+ * each a press from itself on the map, all of them a press from the map.
+ */
+function MapSlice({ cards, onOpen, onOne, onHover }: { cards: SliceCard[]; onOpen: () => void; onOne: (id: string) => void; onHover: (ids: string[] | null) => void }) {
+  const { shown, more } = sliceOf(cards);
+  return (
+    <div className="l5-slice" role="group" aria-label="What this turn added to your Logic Map">
+      <div className="l5-slice-head">
+        <span className="l5-slice-k">On your Logic Map</span>
+        <button type="button" className="l5-slice-open" onClick={onOpen}>
+          Open in Logic Map <span aria-hidden="true">→</span>
+        </button>
+      </div>
+      <ol className="l5-slice-cards">
+        {shown.map((c) => (
+          <li key={c.id}>
+            <button type="button" className={`l5-slice-card is-${c.shape}`} onClick={() => onOne(c.id)} onMouseEnter={() => onHover([c.id])} onMouseLeave={() => onHover(null)} onFocus={() => onHover([c.id])} onBlur={() => onHover(null)} title="Show it on the Logic Map">
+              <span className="l5-slice-ck">{c.said}</span>
+              <span className="l5-slice-ct">{c.label}</span>
+            </button>
+          </li>
+        ))}
+      </ol>
+      {more > 0 && <span className="l5-slice-more">and {more} more on the map</span>}
+    </div>
   );
 }
 

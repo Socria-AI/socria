@@ -2017,3 +2017,148 @@
     animation: none;
   }
 }
+
+/* ── what they did, over their words (lib/inline-ui.ts describeInline) ── */
+.logos-root .l5-did {
+  max-width: min(86%, 560px);
+  margin: 0 0 6px;
+  padding: 7px 12px 8px;
+  border: 1px solid rgba(var(--l5-tint-rgb), 0.18);
+  border-radius: 14px 14px 5px 14px;
+  background: rgba(var(--l5-tint-rgb), 0.035);
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--lg-ink);
+  text-align: right;
+}
+.logos-root .l5-u.is-other .l5-did {
+  border-radius: 14px 14px 14px 5px;
+  text-align: left;
+}
+.logos-root .l5-did-row {
+  margin: 0;
+}
+.logos-root .l5-did-row + .l5-did-row {
+  margin-top: 4px;
+}
+.logos-root .l5-did-k {
+  display: block;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lg-primary);
+}
+.logos-root .l5-did-t {
+  overflow-wrap: anywhere;
+}
+
+/* ── the Logic Map, a few cards at a time, under the reply (lib/logos5/mapSlice.ts) ── */
+.logos-root .l5-slice {
+  margin: 14px 0 4px;
+  padding: 12px 14px 12px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 12px;
+  background: rgba(var(--l5-tint-rgb), 0.018);
+}
+.logos-root .l5-slice-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.logos-root .l5-slice-k {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--lg-ink) 70%, transparent);
+}
+.logos-root .l5-slice-open {
+  min-height: 32px;
+  padding: 0 2px;
+  border: 0;
+  background: none;
+  color: var(--lg-primary);
+  font: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.logos-root .l5-slice-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.logos-root .l5-slice-card {
+  width: 100%;
+  height: 100%;
+  display: grid;
+  align-content: start;
+  gap: 4px;
+  padding: 9px 11px 10px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 10px;
+  background: var(--l5-raise, #fff);
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  line-height: 1.38;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+.logos-root .l5-slice-card:hover,
+.logos-root .l5-slice-card:focus-visible {
+  border-color: var(--lg-primary);
+}
+.logos-root .l5-slice-ck {
+  font-size: 10px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
+}
+.logos-root .l5-slice-ct {
+  overflow-wrap: anywhere;
+}
+.logos-root .l5-slice-card.is-want {
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.3);
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
+}
+.logos-root .l5-slice-card.is-want .l5-slice-ck {
+  color: var(--lg-primary);
+}
+.logos-root .l5-slice-card.is-pull {
+  border-color: var(--lg-tension, #9c5b3c);
+  border-radius: 4px;
+}
+.logos-root .l5-slice-card.is-pull .l5-slice-ck {
+  color: var(--lg-tension, #9c5b3c);
+}
+.logos-root .l5-slice-card.is-taken {
+  border-style: dashed;
+  border-color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.28);
+  background: transparent;
+}
+.logos-root .l5-slice-card.is-open {
+  border-color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.28);
+  border-radius: 16px;
+  background: transparent;
+}
+.logos-root .l5-slice-card.is-open .l5-slice-ct {
+  font-family: var(--l5-serif);
+  font-size: 16px;
+  font-style: italic;
+  line-height: 1.25;
+}
+.logos-root .l5-slice-more {
+  display: block;
+  margin-top: 8px;
+  font-size: 12.5px;
+  color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
+}
