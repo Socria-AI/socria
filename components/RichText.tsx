@@ -287,7 +287,8 @@ function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block;
       return (
         <div key={k} className={`socria-groups${block.side ? ' is-side' : ''}`}>
           {block.groups.map((g, gi) => {
-            const more = gi === lastG && tailLi !== null ? tailLi : null;
+            // the line still being written: the group's next point, whether written as an item or under one
+            const more = gi === lastG ? tailLi ?? tailSub ?? null : null;
             return (
               <div key={gi} className="socria-group">
                 {g.header && (

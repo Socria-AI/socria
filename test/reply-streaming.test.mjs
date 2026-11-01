@@ -91,6 +91,8 @@ console.log('\n=== a list, cut every ten characters ===');
   ok('the first item of a list not yet begun: already a list', first.includes('<ul><li class="is-tail"><span>Alf</span></li></ul>'), first);
   const nested = stream('- Hire an engineer\n  - faster product\n  - burns run');
   ok('a point nested under an item, being written: under that item', /<li><span>Hire an engineer<\/span><span class="socria-sub">.*faster product.*<span class="is-tail"><span>burns run<\/span><\/span><\/span><\/li>/.test(nested), nested);
+  const grouped = stream('- **Pros:**\n  - cheap\n  - fa');
+  ok('a point being written under a group label: in that group', /<div class="socria-group-head">Pros<\/div><ul><li><span>cheap<\/span><\/li><li class="is-tail"><span>fa<\/span><\/li><\/ul>/.test(grouped), grouped);
   const loose = stream('1. Define the audience\n\n2. Pick one channel\n\n3. Ship a sm');
   ok('a loose numbered list: the item being written joins the list it belongs to (one list, its numbers right)', (loose.match(/<ol/g) ?? []).length === 1 && loose.includes('<li class="is-tail"><span>Ship a sm</span></li>'), loose);
 }
