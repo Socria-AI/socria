@@ -198,6 +198,7 @@ import './logos5/buttons.css';
 import './one/one-sheet.css';
 import './logos5/redesign.css';
 import './logos5/l5v.css';
+import './logos5/buttons-soft.css';
 import { CaptureInbox } from './CaptureInbox';
 import { EasyCapture } from './logos5/EasyCapture';
 import { CabinDock } from './logos5/CabinDock';
