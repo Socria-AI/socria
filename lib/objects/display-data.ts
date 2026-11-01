@@ -184,13 +184,26 @@ export function readNumber(v: unknown): number | null {
   return keep(n);
 }
 
-/** A number as a person reads it — no float noise, thousands grouped — the same on every machine. */
+const SUPERSCRIPT = '⁰¹²³⁴⁵⁶⁷⁸⁹';
+
+/**
+ * A number as a person reads it — no float noise, thousands grouped — the same on every machine.
+ *
+ * Past a thousand million million (1e15) the digits are not read, they are
+ * counted, and toFixed stops writing digits at all: from 1e21 it writes
+ * "1e+21", which split on its decimal point and was grouped into nonsense, and
+ * that threw inside a chart. So from 1e15 a number is said as a power of ten,
+ * to three figures: 1.23×10²¹.
+ */
 export function fmtNum(n: number): string {
   if (!Number.isFinite(n)) return '—';
   const a = Math.abs(n);
   if (a < 1e-9) return '0';
   let body: string;
-  if (a >= 1) {
+  if (a >= 1e15) {
+    const [m, e] = a.toExponential(2).split('e');
+    body = `${m.replace(/\.?0+$/, '')}×10${String(Number(e)).split('').map((d) => (d === '-' ? '⁻' : SUPERSCRIPT[Number(d)])).join('')}`;
+  } else if (a >= 1) {
     const [int, frac] = a.toFixed(2).split('.');
     const f = frac.replace(/0+$/, '');
     body = int.replace(/\B(?=(\d{3})+(?!\d))/g, ',') + (f ? `.${f}` : '');

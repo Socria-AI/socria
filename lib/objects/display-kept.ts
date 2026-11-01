@@ -65,6 +65,8 @@ export function sanitizeKept(raw: unknown): KeptState | null {
 /** What a kept element is called when the reply gave it no title: "Graph", "Claim". */
 export function keptName(spec: InlineSpec): string {
   if (spec.type === 'claim') return cleanText(`Claim: ${spec.claim}`, 80);
+  // the case for and against one thing is known by that thing, as a claim is by what it claims
+  if (spec.type === 'balance') return cleanText(`Pros and cons: ${spec.subject}`, 80);
   const w = inlineFrom(spec).replace(/^the\s+/, '').replace(/[“”]/g, '');
   return w.charAt(0).toUpperCase() + w.slice(1);
 }
@@ -135,7 +137,7 @@ export const KEPT_META: DisplayMeta = {
   kind: 'kept',
   noun: 'kept element',
   handle: 'K',
-  about: 'Something from the conversation — a graph, a simulation, a claim, a question, the working — kept as the person left it, with the reply it came from. Made by pressing Keep on it.',
+  about: 'Something from the conversation — a graph, a simulation, a claim, a question, the working, a diagram, the pros and cons, an equation — kept as the person left it, with the reply it came from. Made by pressing Keep on it.',
   internal: true,
   madeFrom: 'kept from the conversation',
   tell: (guarded) =>

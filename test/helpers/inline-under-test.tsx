@@ -33,3 +33,7 @@ export { quickPlot } from '@/lib/runtime/plot-ask';
 export { sanitizeKept, keptFrom, keptText, keptName } from '@/lib/objects/display-kept';
 export { kindOf } from '@/lib/objects/core';
 export { displayMeta, offeredKinds } from '@/lib/objects/display-base';
+// how a diagram's parts are placed and said (lib/inline-diagram.ts); an element that throws, said in words instead
+export * from '@/lib/inline-diagram';
+export { InlineSafe, InlineFallback } from '@/components/inline/InlineUI';
+export { fmtNum } from '@/lib/objects/display-data';

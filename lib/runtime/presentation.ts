@@ -364,6 +364,15 @@ const GRAMMAR: Record<InlineKind, string> = {
     '{"type":"check","prompt":"Where is the vertex of y = 2x² − 8x + 3?","label":"x","answer":"-(-8)/(2*2)","explain":"x = −b/2a = 8/4 = 2"} — a question they work out and check themselves: "answer" is plain arithmetic the engine evaluates (not just your number), and "explain" is shown only after they try. To let them try, never instead of explaining.',
   steps:
     '{"type":"steps","title":"…","lines":[{"tex":"y = x^2 + 4x - 1"},{"tex":"= (x^2 + 4x + 4) - 4 - 1","why":"half of 4, squared, makes a perfect square"},{"tex":"= (x+2)^2 - 5"}],"check":{"prompt":"Now you: where is the vertex of y = x² − 6x + 2?","label":"x","answer":"6/2"}} — the working as lines of maths (TeX), with their own numbers when they have them; "why" folds under a line; "check" (optional) gives them one like it to do. Never the working that is theirs to do.',
+  // PLACEHOLDERS for the three kinds added in November 2026 (lib/inline-ui.ts): the shapes the sanitizer
+  // accepts, so the record is complete. Nothing offers these kinds yet; the planner's triggers and the final
+  // wording of each grammar line come with that change.
+  diagram:
+    '{"type":"diagram","view":"cycle","title":"The water cycle","nodes":[{"id":"a","label":"Evaporation","detail":"sun heats surface water into vapour"},{"id":"b","label":"Condensation"},{"id":"c","label":"Precipitation"},{"id":"d","label":"Collection"}],"edges":[["a","b"],["b","c"],["c","d"],["d","a"]]} — view cycle (edges close the loop), tree (parent→child, one root, depth ≤3), flow, or causes (nodes add "role":"underlying"|"trigger"|"amplifier"|"effect"); 3–9 nodes, labels a few words, detail read when opened. Your prose: what drives it, in a sentence; the nodes carry the parts — do not also list them.',
+  balance:
+    '{"type":"balance","subject":"Index funds","for":[{"text":"Low fees","detail":"often under 0.1% a year"},{"text":"Instant diversification"}],"against":[{"text":"No downside protection"},{"text":"You own the bad companies too"}],"turns_on":"how long you can leave the money alone"} — 2–4 each side, a few words each, detail read when opened; turns_on is the one thing that decides which side wins for most people. Your prose: that one thing, in a sentence; do not also list the sides.',
+  equation:
+    '{"type":"equation","tex":"\\\\text{CAC} = \\\\frac{\\\\text{sales + marketing spend}}{\\\\text{new customers}}","terms":[{"sym":"sales + marketing spend","means":"all of it, in the same period"}],"example":{"tex":"\\\\frac{\\\\$12{,}000}{80} = \\\\$150"}} — the definition as one equation, each term a line, one worked example (plain arithmetic). Your prose: what it tells you, in a sentence.',
 };
 
 /**
