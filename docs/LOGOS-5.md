@@ -372,9 +372,9 @@ it to be made the person's own. Empty, it offers where to pick up.
   asking) and files it in a Project.
 - The Socria mark always comes back here.
 
-**Celestial.** On the Celestial theme (Settings → Theme; everyone's, like
-Dark — it was called Night, and keeps that key, so a choice made under the old
-name holds) the whole app is read under a sky (`components/CelestialSky.tsx`,
+**Celestial.** On the Celestial theme (Settings → Theme; part of Socria One,
+like White and the One blue — it was called Night, and keeps that key, so a
+choice made under the old name comes back with One) the whole app is read under a sky (`components/CelestialSky.tsx`,
 `lib/celestial.ts`, `app/celestial.css`): a deep field generated the same
 every time — thousands of faint stars, the Milky Way as a band of grain and
 light with dust lanes through it, violet and teal nebulae — wheeling once an

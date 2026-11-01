@@ -2852,7 +2852,7 @@ overflow or page error. Pinned suites updated where the change is the
 point, each with its reason: presentation, minimum-explanation,
 interactive-chat, inline-ui, reply-shape, runtime-route, runtime-register.
 
-## 33. The line of thinking, zoomed out — and Dark made dark
+## 33. The line of thinking, zoomed out — and Dark made dark, Celestial for One
 
 The four-tab row over a conversation (Chat · Content · Artifacts · Logic Map)
 is gone. The conversation and what it made are one thing at two distances:
@@ -2898,6 +2898,10 @@ where each one came from.
   cleaner green). The same goes for the component sheets that named the olive
   directly (Quick capture, the guide, What's new), and the build badge is now
   readable on a dark ground.
+- **Celestial is part of Socria One** (`lib/theme.ts`, `one: true`), like White
+  and the One blue. The picker shows it with the One mark and the way to One.
+  Anyone without One who chose it before sees Paper (`effectiveTheme`), and
+  gets it back if they join; nothing stored is changed.
 
 **Tested.** `test/logos5-canvas.test.mjs` (55 checks) covers:
 - TeX read as type, and money not mistaken for maths;
@@ -2913,7 +2917,7 @@ where each one came from.
 - the wiring: no tab row, Back to chat on a full view, Zoom out with its dot,
   Esc and pinch guards, the chatbox never shown twice, the bubble colour.
 
-`logos5-shell` and `ux-polish` were updated for the removed tab row. In the
+`logos5-shell`, `ux-polish`, `logos3-chat-notes` and `logos3-workspace` were updated for the removed tab row and the canvas wiring; `themes` for Celestial with One. In the
 browser, a guest line of thinking was run through the stand-in model in Paper
 and Dark, on desktop and phone:
 - two turns with a live graph and a claim beside them;

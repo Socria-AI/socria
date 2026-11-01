@@ -1,9 +1,9 @@
 // Themes — Paper, White, Dark, Celestial and the Socria One blue (lib/theme.ts, app/themes.css).
 //
-// Paper is the default and the absence of a theme; Dark and Celestial are
-// everyone's — Celestial (stored as 'night', its first name) is deep space,
-// the whole app under a sky and the Universal Map a star chart;
-// White and the One blue come with Socria One and are refused, not just
+// Paper is the default and the absence of a theme; Dark is everyone's.
+// Celestial (stored as 'night', its first name) is deep space, the whole app
+// under a sky and the Universal Map a star chart;
+// White, Celestial and the One blue come with Socria One and are refused, not just
 // hidden, for anyone else. A theme is variables only, on the app's own routes.
 // Logos 5 reads them too: its surfaces' own tokens are given for every dark
 // ground, and the map becomes a star chart on Celestial (test/celestial.test.mjs).
@@ -19,12 +19,13 @@ let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 
 ok('five themes: paper, white, dark, night, one', THEME_IDS.join(',') === 'paper,white,dark,night,one');
-ok('paper, dark and night are everyone’s; white and the One blue are One’s', !THEMES.paper.one && !THEMES.dark.one && !THEMES.night.one && THEMES.white.one && THEMES.one.one);
+ok('paper and dark are everyone’s; white, Celestial (night) and the One blue are One’s', !THEMES.paper.one && !THEMES.dark.one && THEMES.night.one && THEMES.white.one && THEMES.one.one);
+ok('Celestial chosen without One shows Paper, and comes back with One', effectiveTheme('night', false) === 'paper' && effectiveTheme('night', true) === 'night');
 ok('night is Celestial now — the key kept, so a choice made under the old name holds — a dark ground with a sky of a swatch', THEMES.night.id === 'night' && THEMES.night.scheme === 'dark' && THEMES.night.label === 'Celestial' && THEMES.night.swatch[0] === '#060A1A');
 ok('the default is paper', effectiveTheme(undefined, false) === 'paper' && effectiveTheme('nonsense', true) === 'paper');
 ok('a member gets what they chose', effectiveTheme('one', true) === 'one' && effectiveTheme('white', true) === 'white');
 ok('a free account choosing a One theme is shown paper', effectiveTheme('one', false) === 'paper' && effectiveTheme('white', false) === 'paper');
-ok('dark needs no membership, and nor does night', effectiveTheme('dark', false) === 'dark' && effectiveTheme('night', false) === 'night');
+ok('dark needs no membership; Celestial (night) does', effectiveTheme('dark', false) === 'dark' && effectiveTheme('night', false) === 'paper');
 ok('a broken store reads as paper', readTheme({ getItem: () => { throw new Error('denied'); } }) === 'paper' && readTheme(null) === 'paper');
 ok('the app’s routes are themed', ['/chat', '/chat/abc', '/account', '/memory', '/projects/x'].every(themeAppliesTo));
 ok('the journal, docs and pages about Socria keep their paper', ['/', '/docs', '/docs/logos-2', '/journal', '/logos', '/one', '/chatter'].every((p) => !themeAppliesTo(p)));

@@ -1,7 +1,7 @@
 'use client';
 // components/account/ThemePicker.tsx
 //
-// Five grounds to read Socria on. Paper, Dark and Celestial are everyone's; White
+// Five grounds to read Socria on. Paper and Dark are everyone's; White, Celestial
 // and the Socria One blue are part of One, shown to everyone so the choice is
 // visible, and offered as the way in for someone who is not a member yet.
 
@@ -55,7 +55,7 @@ export function ThemePicker({ isOne, onUpgrade }: { isOne: boolean; onUpgrade?: 
       })}
       {!isOne && (
         <p className="theme-note">
-          White and the One blue come with Socria One.{' '}
+          White, Celestial and the One blue come with Socria One.{' '}
           <Link className="link-act" href="/one" onClick={onUpgrade}>
             See One →
           </Link>

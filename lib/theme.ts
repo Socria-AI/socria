@@ -2,12 +2,12 @@
 //
 // THE THEMES A PERSON CAN READ SOCRIA IN.
 //
-// Paper is the product's own ground and stays the default. Dark and Celestial
-// are for everyone — Celestial is deep space: the whole app is read under a
+// Paper is the product's own ground and stays the default. Dark — a true,
+// tintless dark — is for everyone. White, the Socria One blue and Celestial are
+// part of One — choosing them is one of the things membership opens, the same
+// way every depth is. Celestial is deep space: the whole app is read under a
 // sky (components/CelestialSky.tsx), and the Universal Map is drawn as a star
-// chart, its conversations as stars. White and the Socria One blue are part of One —
-// choosing them is one of the things membership opens, the same way every
-// depth is.
+// chart, its conversations as stars.
 //
 // A theme is a set of colour variables (app/themes.css re-declares the ones
 // the app surfaces already read) and nothing else: no surface knows which
@@ -44,8 +44,9 @@ export const THEMES: Record<ThemeId, Theme> = {
   white: { id: 'white', label: 'White', says: 'Clean and bright', one: true, swatch: ['#FFFFFF', '#1A1A1A', '#4f6a2a'], scheme: 'light' },
   dark: { id: 'dark', label: 'Dark', says: 'True dark, no tint', one: false, swatch: ['#121212', '#E8E8E8', '#8A8A8A'], scheme: 'dark' },
   // CELESTIAL. Its key is still 'night' — the name it was first chosen under —
-  // so everyone who chose it keeps it (lib/celestial.ts, app/celestial.css).
-  night: { id: 'night', label: 'Celestial', says: 'Deep space, and your map as a star chart', one: false, swatch: ['#060A1A', '#E9E6F2', '#F0D79B'], scheme: 'dark' },
+  // (lib/celestial.ts, app/celestial.css). Part of Socria One: someone without
+  // One who chose it before sees Paper (effectiveTheme), and has it back with One.
+  night: { id: 'night', label: 'Celestial', says: 'Deep space, and your map as a star chart', one: true, swatch: ['#060A1A', '#E9E6F2', '#F0D79B'], scheme: 'dark' },
   one: { id: 'one', label: 'Socria One', says: 'The One blue', one: true, swatch: ['#13293A', '#F0EAD8', '#B8CDD9'], scheme: 'dark' },
 };
 
