@@ -40,7 +40,7 @@ import { renderContextsForNode, sanitizeNodeContextList } from '@/lib/logos-sour
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
 import { planTurn, checkDraft, correctionFor, repairDraft } from '@/lib/accuracy/accuracy';
 import { fabricatedToolClaim } from '@/lib/core4/guard2';
-import { SentenceGate } from '@/lib/core4/stream-gate';
+import { SentenceGate, gateTrace } from '@/lib/core4/stream-gate';
 import { sentencesOf, deleteSentences } from '@/lib/core4/questions';
 import { readSignals } from '@/lib/core4/signals';
 import { chooseAssist, renderAssist, assistTrace, sanitizeDigest, constructAsk } from '@/lib/cognition/assist';
@@ -1380,6 +1380,13 @@ export async function POST(req: NextRequest) {
               // a question MR kept under their "stop asking" (somebody else's words) goes out in order, not to the tail cap
               ...(mrGate ? { keep: mrGate.exempt, see: mrGate.see } : {}),
               neverEmpty: true,
+              // what the filler rules need to know and never guess (lib/core4/stream-gate.ts): their words (a
+              // yes/no question keeps its "Absolutely."), the exchange (a pleasantry is natural on talk), the
+              // shape (the textbook opener goes only on an idea to understand), and wordings asked for
+              asked: lastText,
+              exchange: turnState.exchange.kind,
+              ...(presentation.shape ? { shape: presentation.shape } : {}),
+              phrasing: !!signals.requestsPhrasing,
               // the fences MR's filters do not see (lib/mr/index.ts sawBlock)
               block: mrGate
                 ? (chunk: string, open: boolean) => {
@@ -1395,6 +1402,12 @@ export async function POST(req: NextRequest) {
               if (delta) gate.push(delta);
             }
             gate.finish(assist.questions);
+            // What the gate took out, by class — and what the filler classes held back in this mode
+            // (LOGOS_TRIM, shadow-first) would have — counts only, never the words (lib/core4/stream-gate.ts)
+            {
+              const g = gate.stats();
+              if (Object.values(g.removed).some(Boolean) || Object.values(g.would).some(Boolean) || Object.keys(g.blocks).length) console.info(`[logos] gate ${gateTrace(g)}`);
+            }
             // a number with no item after it ("42.") goes out last
             const rest = mrGate?.settle() ?? '';
             if (rest) {
