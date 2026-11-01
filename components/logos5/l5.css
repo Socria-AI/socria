@@ -757,8 +757,12 @@
 .logos-root .l5-prose tr:last-child td {
   border-bottom: 0;
 }
-.logos-root .l5-prose .is-tail {
+/* the paragraph still being written runs on to the caret — its line breaks kept, so a line that
+   has not yet settled into a list or a table never reads as one run-on line (a list item or a
+   table row still being written is drawn inside its list or table: reply.css) */
+.logos-root .l5-prose p.is-tail {
   display: inline;
+  white-space: pre-line;
 }
 .logos-root .l5-caret {
   display: inline-block;

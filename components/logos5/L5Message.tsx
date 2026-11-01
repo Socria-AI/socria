@@ -126,6 +126,13 @@ export interface L5MessageProps {
    * and "Not now", which is not asked again.
    */
   offer?: { said: string; take: string; onTake: () => void; onDecline: () => void } | null;
+  /**
+   * Whether the reply's longer stretches may be folded (lib/reply-layout.ts).
+   * False when the message it answers asked for depth — "in detail", "step by
+   * step", going deeper — or the length setting is Detailed (depthAsked): what
+   * someone asked to read in full is shown in full. Folding by default.
+   */
+  disclose?: boolean;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -324,7 +331,7 @@ export function L5Message(p: L5MessageProps) {
           <div className={m.role === 'assistant' ? 'l5-prose is-reply' : 'l5-said'}>
             {m.role === 'assistant' ? (
               <TexPick.Provider value={p.onPickTex ?? null}>
-                <RichText text={m.content} math rich cite={cite} askLast inline={inline} editorial />
+                <RichText text={m.content} math rich cite={cite} askLast inline={inline} editorial disclose={p.disclose !== false} />
               </TexPick.Provider>
             ) : (
               <SaidText text={m.content} />
@@ -478,7 +485,7 @@ function WriteUpCard({ w, onOpen }: { w: { id: string; title: string; opening: s
 }
 
 /** Socria, still writing — formatted as it arrives (finished paragraphs as blocks), or thinking. A write-up is written in Content, and said so here. */
-export function L5Pending({ text, group, to, mapping, onStop, place }: { text: string; group: boolean; to?: string | null; mapping?: boolean; onStop?: () => void; place?: 'chat' | 'content' }) {
+export function L5Pending({ text, group, to, mapping, onStop, place, disclose }: { text: string; group: boolean; to?: string | null; mapping?: boolean; onStop?: () => void; place?: 'chat' | 'content'; disclose?: boolean }) {
   return (
     <article className={`l5-msg l5-a is-socria is-pending${group ? ' is-group' : ''}`} aria-live="polite" aria-busy="true">
       {group && (
@@ -503,7 +510,8 @@ export function L5Pending({ text, group, to, mapping, onStop, place }: { text: s
         </div>
       ) : text ? (
         <div className="l5-prose is-reply is-streaming">
-          <StreamingRichText text={text} math rich editorial />
+          {/* folded as it will be once it lands — and, when they asked for depth, folded not at all */}
+          <StreamingRichText text={text} math rich editorial disclose={disclose !== false} />
           <span className="l5-caret" aria-hidden="true" />
         </div>
       ) : (

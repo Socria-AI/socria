@@ -29,11 +29,19 @@ export interface TableBlock {
   kind: 'table';
   header: string[];
   rows: string[][];
+  /**
+   * Logos 5's editorial reading (lib/reply-layout.ts): the table sets things
+   * against each other on the same points — its first column names the
+   * points — so it is drawn as a comparison, with row headers.
+   */
+  compare?: boolean;
 }
 
 export interface GroupsBlock {
   kind: 'groups';
   groups: { header: string | null; items: string[] }[];
+  /** Logos 5's editorial reading: two to four short groups (Pros, Cons…) set side by side */
+  side?: boolean;
 }
 
 /**
@@ -53,10 +61,31 @@ export interface SourcesBlock {
   items: { n: number; title: string; url: string }[];
 }
 
+/**
+ * A list's items, and — rich reading only — what is nested under each.
+ *
+ * NESTING. A model that writes "- Hire an engineer" with "  - faster product"
+ * and "  - burns runway" under it is saying the second two belong to the
+ * first. Read flat, that hierarchy was lost and two options with their
+ * consequences became six undifferentiated bullets, longer and harder to read
+ * than what was written. `subs[i]` holds the lines under item i (empty when
+ * there are none); it is present only when some item has any, so a plain list
+ * is exactly what it always was. Only one level is kept: anything deeper is
+ * read as part of the level above, because the page draws one muted run under
+ * an item, not a tree.
+ *
+ * START. A numbered list remembers the number it began at, so a list that
+ * picks up again after a paragraph ("3. …") is drawn as 3, not as 1 again.
+ * Absent when it begins at 1.
+ *
+ * COMPACT (Logos 5's editorial reading only, lib/reply-layout.ts): a list of
+ * many short items laid out in columns instead of a tall line each.
+ */
 export type Block =
-  | { kind: 'p'; text: string }
-  | { kind: 'ul'; items: string[] }
-  | { kind: 'ol'; items: string[] }
+  /** `split`: the rest of an opening paragraph whose first sentence was set apart as the lead (Logos 5's editorial reading only) */
+  | { kind: 'p'; text: string; split?: boolean }
+  | { kind: 'ul'; items: string[]; subs?: string[][]; compact?: boolean }
+  | { kind: 'ol'; items: string[]; subs?: string[][]; start?: number }
   | GroupsBlock
   | TableBlock
   | SourcesBlock
@@ -70,13 +99,17 @@ export type Block =
    * `n`, its position among the reply's inline blocks, which keys its state.
    * `open` while the reply is still writing it.
    */
-  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number }
+  | { kind: 'ui'; spec: InlineSpec | null; open: boolean; n: number; pending?: string }
   /**
-   * A list whose every item is a bold label and its text — never produced by
-   * parseBlocks itself, only by Logos 5's editorial reading of a reply
-   * (lib/reply-layout.ts editorialBlocks), which lays it out as terms.
+   * A list read as labels and their text — never produced by parseBlocks
+   * itself, only by Logos 5's editorial reading of a reply
+   * (lib/reply-layout.ts editorialBlocks), which lays it out as terms. An item
+   * with an empty label is one that came after the list had already been read
+   * as terms and is not written that way: it is drawn as a plain row rather
+   * than turning the whole list back into bullets (a list settles line by line
+   * while it streams, so the decision is made once, from its first items).
    */
-  | { kind: 'terms'; ordered: boolean; items: { label: string; body: string }[] };
+  | { kind: 'terms'; ordered: boolean; items: { label: string; body: string; sub?: string[] }[]; start?: number };
 
 /**
  * RICH READING — Logos 5's thread, and nowhere else unless asked.
@@ -93,6 +126,27 @@ export interface ReadOptions {
   rich?: boolean;
 }
 const FENCE_RE = /^\s*```\s*([\w+#.-]{0,20})\s*$/;
+/**
+ * The ways a model actually writes an inline block that the strict shape
+ * above does not read, each seen in a streamed reply:
+ *
+ *   ```ui {"type":"chart",…}```     the whole block on one line
+ *   ```ui {"type":"chart",…         the JSON starting on the opening line
+ *   …}```                           the closing fence at the end of a line
+ *   ```Drag the slider…             a closing fence with the next sentence
+ *                                   run straight onto it
+ *
+ * The server's stream gate is the first line of defence and normalises a
+ * block before it is sent; this is the second, so a block that reaches the
+ * page in one of these shapes is still drawn as the element it is — and the
+ * words after it are still words — instead of the JSON appearing as prose.
+ */
+const UI_ONE_LINE_RE = /^\s*```[ \t]*ui[ \t]*(\{.*\})[ \t]*```[ \t]*(.*)$/i;
+const UI_OPEN_INLINE_RE = /^\s*```[ \t]*ui[ \t]+(\{.*)$/i;
+const CLOSE_RE = /^\s*```(?!`)[ \t]*(.*)$/;
+const UI_CLOSE_INSIDE_RE = /^(.*\})[ \t]*```[ \t]*(.*)$/;
+/** a bare language word after a closing fence is what it always was — the fence closing — not a sentence */
+const LANG_WORD_RE = /^[\w+#-]{1,20}$/;
 const HEADING_RE = /^(#{1,3})\s+(\S.*)$/;
 const QUOTE_RE = /^\s*>\s?(.*)$/;
 
@@ -204,6 +258,8 @@ export function stripMarks(s: string): string {
 const BULLET_RE = /^\s*([-•]|\*)\s+(.*)$/;
 const ORDERED_RE = /^\s*\d+[.)]\s+(.*)$/;
 const TABLE_SEP_RE = /^\s*\|?[\s:|-]*-{2,}[\s:|-]*\|?\s*$/;
+/** How far a line is indented, a tab counted as two spaces. */
+const indentOf = (l: string): number => (l.match(/^[ \t]*/)?.[0] ?? '').replace(/\t/g, '  ').length;
 
 /** A heading row followed by a `|---|` rule is a table and nothing else is. */
 function startsTable(lines: string[], i: number): boolean {
@@ -215,7 +271,22 @@ function startsTable(lines: string[], i: number): boolean {
   );
 }
 
-function splitTableRow(line: string): string[] {
+/**
+ * One line read as a list item — its mark, its words, how far in it sits —
+ * or null when it is not one. For a reply still streaming
+ * (lib/reply-layout.ts), which draws the line being written inside the list
+ * it belongs to instead of as a run-on line of raw marks.
+ */
+export function listLine(line: string): { ordered: boolean; text: string; indent: number; n: number } | null {
+  if (BULLET_RE.test(line)) return { ordered: false, text: line.replace(BULLET_RE, '$2'), indent: indentOf(line), n: 0 };
+  if (ORDERED_RE.test(line)) return { ordered: true, text: line.replace(ORDERED_RE, '$1'), indent: indentOf(line), n: Number(line.match(/^\s*(\d+)/)?.[1] ?? 1) };
+  return null;
+}
+
+/** A table's `|---|---|` rule. */
+export const isTableRule = (line: string): boolean => TABLE_SEP_RE.test(line) && line.includes('-');
+
+export function splitTableRow(line: string): string[] {
   return line
     .trim()
     .replace(/^\|/, '')
@@ -235,11 +306,25 @@ export function isGroupHeader(item: string): boolean {
   return /:$/.test(s) && s.length <= 42;
 }
 
-/** Bullets that carry labels become titled groups; otherwise a plain list. */
-function bulletBlock(items: string[]): Block {
+/**
+ * Bullets that carry labels become titled groups; otherwise a plain list.
+ * Exported for Logos 5's editorial reading, which joins a loose list — items
+ * with blank lines between them, parsed as one list each — back into the one
+ * list it is and reads it again.
+ *
+ * With nesting (`subs`): a list whose every item is a label with points under
+ * it ("- **Pros:**" over "  - fast") is that set of groups, exactly as the flat
+ * spelling of it always was. A list that mixes labels and points at the top
+ * keeps the old reading, its nested points following their item, because
+ * which group a nested point belongs to is then a guess.
+ */
+export function bulletBlock(items: string[], subs?: string[][]): Block {
+  const nested = !!subs && subs.some((x) => x.length > 0);
+  if (nested && items.every(isGroupHeader)) return { kind: 'groups', groups: items.map((h, k) => ({ header: h, items: subs![k] ?? [] })) };
+  if (nested && items.some(isGroupHeader)) return bulletBlock(items.flatMap((it, k) => [it, ...(subs![k] ?? [])]));
   const labelled = items.some(isGroupHeader);
   const plain = items.some((it) => !isGroupHeader(it));
-  if (!labelled || !plain) return { kind: 'ul', items };
+  if (!labelled || !plain) return nested ? { kind: 'ul', items, subs } : { kind: 'ul', items };
 
   const groups: GroupsBlock['groups'] = [];
   let cur: GroupsBlock['groups'][number] = { header: null, items: [] };
@@ -271,6 +356,46 @@ function bulletBlock(items: string[]): Block {
  * printed. That is how `**a label that wraps` arrived on screen with its
  * asterisks showing.
  */
+/**
+ * A list, read richly (Logos 5): its items, what is nested under each, and
+ * the number it starts at. The rules are the flat reading's — an indented line
+ * continues the item above, an unindented line that is not an item ends the
+ * list — plus one: an item indented two or more spaces further than the
+ * list's own items is nested under the item above it, whichever mark it uses
+ * ("1. Plan it" over "   - book the room" is common). A mark of the other
+ * kind at the list's own depth still ends it, as it always did.
+ */
+function richListAt(lines: string[], from: number): { block: Block; next: number } {
+  const ordered = !BULLET_RE.test(lines[from]);
+  const own = ordered ? ORDERED_RE : BULLET_RE;
+  const base = indentOf(lines[from]);
+  const items: string[] = [];
+  const subs: string[][] = [];
+  const startN = ordered ? Number(lines[from].match(/^\s*(\d+)/)?.[1] ?? 1) : 1;
+  let i = from;
+  let inSub = false;
+  while (i < lines.length && lines[i].trim() !== '') {
+    const l = lines[i];
+    const marked = BULLET_RE.test(l) || ORDERED_RE.test(l);
+    const depth = indentOf(l);
+    if (marked && depth >= base + 2 && items.length) {
+      subs[items.length - 1].push(l.replace(BULLET_RE.test(l) ? BULLET_RE : ORDERED_RE, BULLET_RE.test(l) ? '$2' : '$1'));
+      inSub = true;
+    } else if (marked && own.test(l) && depth < base + 2) {
+      items.push(l.replace(own, ordered ? '$1' : '$2'));
+      subs.push([]);
+      inSub = false;
+    } else if (!marked && /^\s{2,}\S/.test(l) && items.length) {
+      const into = inSub ? subs[items.length - 1] : items;
+      into[into.length - 1] += ' ' + l.trim();
+    } else break;
+    i++;
+  }
+  const nested = subs.some((x) => x.length > 0);
+  if (!ordered) return { block: bulletBlock(items, nested ? subs : undefined), next: i };
+  return { block: { kind: 'ol', items, ...(nested ? { subs } : {}), ...(startN !== 1 && Number.isFinite(startN) ? { start: startN } : {}) }, next: i };
+}
+
 function absorbContinuation(lines: string[], from: number, items: string[]): number {
   let i = from;
   while (
@@ -337,7 +462,7 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
   /** inline blocks met so far — the next one's position */
   let uiSeen = 0;
   /** a line that starts a rich block — a paragraph stops before it */
-  const richStart = (l: string) => rich && (FENCE_RE.test(l) || HEADING_RE.test(l) || QUOTE_RE.test(l));
+  const richStart = (l: string) => rich && (FENCE_RE.test(l) || UI_ONE_LINE_RE.test(l) || UI_OPEN_INLINE_RE.test(l) || HEADING_RE.test(l) || QUOTE_RE.test(l));
   let i = 0;
 
   while (i < lines.length) {
@@ -347,18 +472,53 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
     }
 
     if (rich) {
-      const fence = lines[i].match(FENCE_RE);
-      if (fence) {
-        const body: string[] = [];
+      const one = lines[i].match(UI_ONE_LINE_RE);
+      if (one) {
+        blocks.push({ kind: 'ui', spec: parseInlineSpec(one[1]), open: false, n: uiSeen++ });
+        // what was run on after the closing fence is read as the line it would have been
+        if (one[2].trim()) lines[i] = one[2];
+        else i++;
+        continue;
+      }
+      const inlineOpen = lines[i].match(UI_OPEN_INLINE_RE);
+      const fence = inlineOpen ? null : lines[i].match(FENCE_RE);
+      if (fence || inlineOpen) {
+        const lang = inlineOpen ? 'ui' : (fence![1] || '').toLowerCase();
+        const isUi = lang === 'ui';
+        const body: string[] = inlineOpen ? [inlineOpen[1]] : [];
         i++;
-        while (i < lines.length && !FENCE_RE.test(lines[i])) body.push(lines[i++]);
-        const open = i >= lines.length;
-        if (!open) i++;
-        if ((fence[1] || '').toLowerCase() === 'ui') {
-          blocks.push({ kind: 'ui', spec: open ? null : parseInlineSpec(body.join('\n')), open, n: uiSeen++ });
+        let open = true;
+        while (i < lines.length) {
+          // a code block closes only on a fence line of its own, as it always has; a line in it that
+          // merely starts with backticks is code. An inline block is JSON, so it can be read more freely.
+          const close = isUi ? lines[i].match(CLOSE_RE) : FENCE_RE.test(lines[i]) ? ['', ''] : null;
+          if (close) {
+            const rest = close[1].trim();
+            open = false;
+            if (!rest || LANG_WORD_RE.test(rest)) i++;
+            else lines[i] = rest;
+            break;
+          }
+          const inside = isUi ? lines[i].match(UI_CLOSE_INSIDE_RE) : null;
+          if (inside) {
+            body.push(inside[1]);
+            open = false;
+            if (inside[2].trim()) lines[i] = inside[2];
+            else i++;
+            break;
+          }
+          body.push(lines[i++]);
+        }
+        // the very first characters of an inline block — "```", "```u" — while the reply is still
+        // writing it: a placeholder, never a code block that flashes and then turns into the element
+        const said = body.join('\n').trim();
+        const uiArriving = open && 'ui'.startsWith(lang) && (!said || said.startsWith('{'));
+        if (isUi || uiArriving) {
+          const kind = open ? said.match(/"type"\s*:\s*"([a-z]+)"/)?.[1] : undefined;
+          blocks.push({ kind: 'ui', spec: open ? null : parseInlineSpec(body.join('\n')), open, n: uiSeen++, ...(kind ? { pending: kind } : {}) });
           continue;
         }
-        blocks.push({ kind: 'code', lang: fence[1] || null, text: body.join('\n'), open });
+        blocks.push({ kind: 'code', lang: fence?.[1] || null, text: body.join('\n'), open });
         continue;
       }
       const h = lines[i].match(HEADING_RE);
@@ -396,6 +556,13 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
       continue;
     }
 
+    if (rich && (BULLET_RE.test(lines[i]) || ORDERED_RE.test(lines[i]))) {
+      const list = richListAt(lines, i);
+      blocks.push(list.block);
+      i = list.next;
+      continue;
+    }
+
     if (BULLET_RE.test(lines[i])) {
       const items: string[] = [];
       while (i < lines.length && BULLET_RE.test(lines[i])) {
@@ -409,12 +576,13 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
 
     if (ORDERED_RE.test(lines[i])) {
       const items: string[] = [];
+      const startN = Number(lines[i].match(/^\s*(\d+)/)?.[1] ?? 1);
       while (i < lines.length && ORDERED_RE.test(lines[i])) {
         items.push(lines[i].replace(ORDERED_RE, '$1'));
         i++;
         i = absorbContinuation(lines, i, items);
       }
-      blocks.push({ kind: 'ol', items });
+      blocks.push(startN !== 1 && Number.isFinite(startN) ? { kind: 'ol', items, start: startN } : { kind: 'ol', items });
       continue;
     }
 

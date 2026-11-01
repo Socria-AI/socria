@@ -223,6 +223,29 @@ console.log('\n=== the page: folds, by a rule that only looks back ===');
     }
   }
   ok(`folded mid-stream exactly as when landed, at ${cuts.length} places the stream could stop`, agree, why);
+  // The same guarantee for a reply with no headings at all (lib/reply-layout.ts PARAGRAPH DISCLOSURE):
+  // DEEPER's paragraphs alone, its ### lines taken out (and AFTER's middle paragraph added, so there is
+  // enough of it to fold), fold after their first 140-odd words — and a paragraph is folded mid-stream
+  // exactly when it is folded once landed (test/reply-disclosure.test.mjs holds the rest of it).
+  const deepParas = DEEPER.replace(/^### .*\n\n/gm, '').split('\n\n');
+  const plainDeep = [...deepParas.slice(0, 2), AFTER.split('\n\n')[1], ...deepParas.slice(2)].join('\n\n');
+  const plainFinal = layout(plainDeep);
+  const inFold = (ps) => new Set(ps.flatMap((p) => (p.kind === 'fold' ? p.body : [])));
+  const plainFolded = inFold(plainFinal);
+  ok('a reply with no headings folds too, once it has said enough', plainFinal.some((p) => p.kind === 'fold' && p.head === -1) && !plainFolded.has(0) && !plainFolded.has(1), kinds(plainFinal));
+  let same = true,
+    whyNot = '';
+  for (let c = 20; c < plainDeep.length; c += 29) {
+    const { settled, tail } = I.streamingSplit(plainDeep.slice(0, c), true);
+    const mid = I.layoutReply(I.editorialBlocks(I.parseBlocks(settled, { rich: true }), { more: true }), { streaming: true, tail });
+    const midFolded = inFold(mid);
+    const settledCount = I.parseBlocks(settled, { rich: true }).length;
+    for (let i = 0; i < settledCount; i++) if (plainFolded.has(i) !== midFolded.has(i)) {
+      const lastLanded = I.parseBlocks(plainDeep, { rich: true }).length - 1;
+      if (!(i === lastLanded && midFolded.has(i))) (same = false), (whyNot = `cut ${c}: paragraph ${i} ${midFolded.has(i) ? 'folded' : 'open'} mid-stream, ${plainFolded.has(i) ? 'folded' : 'open'} landed`);
+    }
+  }
+  ok('  and folds the same paragraphs mid-stream as when landed (its closing line comes out at the end)', same, whyNot);
   const at = BEFORE.indexOf('**4. Test and iterate**') + '**4. Test and iterate**\n- Run usab'.length;
   const s = I.streamingSplit(BEFORE.slice(0, at), true);
   const writing = I.layoutReply(I.editorialBlocks(I.parseBlocks(s.settled, { rich: true }), { more: true }), { streaming: true, tail: s.tail });
