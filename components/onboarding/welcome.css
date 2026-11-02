@@ -14,9 +14,6 @@
 
 .ob-first.obw {
   --obw-green: #3b6a28;
-  --obw-swash: rgba(128, 184, 86, 0.3);
-  --obw-glow-a: rgba(128, 184, 86, 0.15);
-  --obw-glow-b: rgba(214, 170, 74, 0.1);
   --obw-map: #354620;
   --obw-card: rgba(255, 255, 255, 0.84);
   --obw-card-hi: rgba(255, 255, 255, 0.97);
@@ -26,9 +23,6 @@
 }
 html[data-theme='dark'] .ob-first.obw {
   --obw-green: #a6d28a;
-  --obw-swash: rgba(140, 200, 100, 0.2);
-  --obw-glow-a: rgba(140, 200, 100, 0.07);
-  --obw-glow-b: rgba(232, 232, 232, 0.035);
   --obw-map: #e8e8e8;
   --obw-card: rgba(255, 255, 255, 0.035);
   --obw-card-hi: rgba(255, 255, 255, 0.075);
@@ -36,9 +30,6 @@ html[data-theme='dark'] .ob-first.obw {
 }
 html[data-theme='one'] .ob-first.obw {
   --obw-green: #b2dc96;
-  --obw-swash: rgba(150, 210, 110, 0.2);
-  --obw-glow-a: rgba(143, 179, 196, 0.12);
-  --obw-glow-b: rgba(150, 210, 110, 0.06);
   --obw-map: #b8cdd9;
   --obw-card: rgba(255, 255, 255, 0.04);
   --obw-card-hi: rgba(255, 255, 255, 0.085);
@@ -46,39 +37,13 @@ html[data-theme='one'] .ob-first.obw {
 }
 html[data-theme='night'] .ob-first.obw {
   --obw-green: #b8e3a0;
-  --obw-swash: rgba(150, 214, 112, 0.19);
-  --obw-glow-a: rgba(157, 180, 227, 0.1);
-  --obw-glow-b: rgba(231, 207, 146, 0.07);
   --obw-map: #e7cf92;
   --obw-card: rgba(255, 255, 255, 0.04);
   --obw-card-hi: rgba(255, 255, 255, 0.08);
   --obw-tint: rgba(150, 214, 112, 0.1);
 }
 
-/* ── the ground: a soft light at two corners, and the map ─────────── */
-.obw-glow {
-  position: fixed;
-  inset: 0;
-  z-index: 0;
-  pointer-events: none;
-  background:
-    radial-gradient(52% 46% at 88% 8%, var(--obw-glow-a), transparent 72%),
-    radial-gradient(46% 42% at 4% 96%, var(--obw-glow-b), transparent 72%);
-}
-@media (prefers-reduced-motion: no-preference) {
-  .obw-glow {
-    animation: obw-drift 22s ease-in-out infinite alternate;
-  }
-}
-@keyframes obw-drift {
-  from {
-    transform: translate3d(0, 0, 0) scale(1);
-  }
-  to {
-    transform: translate3d(-2%, 1.5%, 0) scale(1.04);
-  }
-}
-
+/* ── the ground: the map ── */
 .obw-map {
   position: fixed;
   z-index: 0;
@@ -156,9 +121,6 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .ob-first
   width: min(820px, 100%);
 }
 .obw-eyebrow {
-  display: inline-flex;
-  align-items: center;
-  gap: 10px;
   margin: 0 0 clamp(16px, 3vh, 26px);
   font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
   font-size: 11px;
@@ -166,13 +128,6 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .ob-first
   letter-spacing: 0.22em;
   text-transform: uppercase;
   color: var(--ink-45);
-}
-.obw-eyebrow i {
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: var(--obw-green);
-  box-shadow: 0 0 0 4px var(--obw-tint);
 }
 .obw-say {
   margin: 0;
@@ -195,34 +150,60 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .ob-first
   color: var(--ink-70);
   text-wrap: pretty;
 }
-/* what matters, in green — the swash sweeps in under the words once they are up */
-mark.obw-hl {
+/* what matters, in green — the words themselves, nothing behind them */
+.obw-hl {
   color: var(--obw-green);
-  background-color: transparent;
-  background-image: linear-gradient(var(--obw-swash), var(--obw-swash));
-  background-repeat: no-repeat;
-  background-position: 0 92%;
-  background-size: 100% 0.34em;
-  -webkit-box-decoration-break: clone;
-  box-decoration-break: clone;
-  padding: 0 0.04em;
-  border-radius: 2px;
 }
-.obw-say2 mark.obw-hl {
-  font-style: italic;
+/* the words still to be typed, holding their place */
+.obw-ghost {
+  visibility: hidden;
 }
-@media (prefers-reduced-motion: no-preference) {
-  mark.obw-hl {
-    animation: obw-swash 1.1s var(--obw-ease) both;
-    animation-delay: calc(var(--hl, 0) * 38ms + 0.45s);
+/* the caret, while it types */
+.obw-caret {
+  display: inline-block;
+  width: 2px;
+  height: 0.9em;
+  margin-left: 2px;
+  vertical-align: -0.08em;
+  background: var(--ink);
+  animation: obw-blink 1s steps(1) infinite;
+}
+@keyframes obw-blink {
+  50% {
+    opacity: 0;
   }
 }
-@keyframes obw-swash {
-  from {
-    background-size: 0% 0.34em;
+/* the full text, for a screen reader, while the typed copy is drawn */
+.obw-sr {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+.obw-say,
+.obw-say2 {
+  cursor: default;
+}
+/* Begin waits for the last word */
+.obw-after {
+  opacity: 0;
+  transform: translateY(8px);
+  transition: opacity 0.6s var(--obw-ease), transform 0.6s var(--obw-ease);
+  pointer-events: none;
+}
+.obw-after.is-in {
+  opacity: 1;
+  transform: none;
+  pointer-events: auto;
+}
+@media (prefers-reduced-motion: reduce) {
+  .obw-caret {
+    display: none;
   }
-  to {
-    background-size: 100% 0.34em;
+  .obw-after {
+    transition: none;
   }
 }
 .obw-begin {

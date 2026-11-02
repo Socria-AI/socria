@@ -6,8 +6,8 @@
 // Four short beats on paper, each one answered or skipped, nothing performing
 // itself:
 //
-//   premise   what Socria is, in its own words — the parts that matter set in
-//             green — and what it is not: "We're not building humanity's
+//   premise   what Socria is, in its own words, typed out — the parts that
+//             matter in green — and what it is not: "We're not building humanity's
 //             replacement."
 //   name      what they want to be called (lib/onboarding-name.ts)
 //   who       what brings them to Socria — studying, trying to understand
@@ -72,33 +72,37 @@ function Rise({ text, from = 0 }: { text: string; from?: number }) {
   );
 }
 
-/** Words that rise, with the green parts swept in once their words are up. */
-function Said({ parts, from = 0 }: { parts: readonly { t: string; hl?: boolean }[]; from?: number }) {
-  let i = from;
+/** Characters in a premise paragraph. */
+const lengthOf = (parts: readonly { t: string }[]) => parts.reduce((n, p) => n + p.t.length, 0);
+/** How fast it types, per character. */
+const TYPE_MS = 24;
+
+/**
+ * The premise, typed out a character at a time — its green words green as they arrive. The whole text is
+ * there for a screen reader from the start; with reduced motion it is simply there. A press skips to the end.
+ */
+function Typed({ parts, shown, caret }: { parts: readonly { t: string; hl?: boolean }[]; shown: number; caret: boolean }) {
+  let left = shown;
   return (
     <>
-      {parts.map((p, k) => {
-        const words = p.t.split(/(\s+)/).map((w, j) =>
-          /^\s+$/.test(w) || !w ? (
-            w
-          ) : (
-            <span className="ob-w" key={j}>
-              <i style={{ '--i': i++ } as React.CSSProperties}>{w}</i>
+      <span className="obw-sr">{parts.map((p) => p.t).join('')}</span>
+      <span aria-hidden="true">
+        {parts.map((p, k) => {
+          const take = Math.max(0, Math.min(p.t.length, left));
+          left -= take;
+          return (
+            <span key={k} className={p.hl ? 'obw-hl' : undefined}>
+              {p.t.slice(0, take)}
+              {caret && take > 0 && take < p.t.length && <i className="obw-caret" />}
+              {/* what is still to come holds its place, so the lines never move as they are typed */}
+              {take < p.t.length && <span className="obw-ghost">{p.t.slice(take)}</span>}
             </span>
-          )
-        );
-        return p.hl ? (
-          <mark key={k} className="obw-hl" style={{ '--hl': i } as React.CSSProperties}>
-            {words}
-          </mark>
-        ) : (
-          <span key={k}>{words}</span>
-        );
-      })}
+          );
+        })}
+      </span>
     </>
   );
 }
-const wordsIn = (parts: readonly { t: string }[]) => parts.map((p) => p.t).join('').split(/\s+/).filter(Boolean).length;
 
 /**
  * The Logic Map behind the beats: seven ideas and the lines between them,
@@ -173,6 +177,22 @@ export function FirstRunIntro({
   const [use, setUse] = useState<UseCase | null>(null);
   const [text, setText] = useState('');
   const [leaving, setLeaving] = useState(false);
+  // the premise, typed: how many characters are on screen
+  const total0 = lengthOf(PREMISE[0]);
+  const total = total0 + lengthOf(PREMISE[1]);
+  const [typed, setTyped] = useState(0);
+  useEffect(() => {
+    if (beat !== 'premise') return;
+    if (typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches) {
+      setTyped(total);
+      return;
+    }
+    if (typed >= total) return;
+    // a breath between the two sentences of the claim
+    const t = window.setTimeout(() => setTyped((n) => n + 1), typed === total0 ? 520 : TYPE_MS);
+    return () => window.clearTimeout(t);
+  }, [beat, typed, total, total0]);
+  const typedAll = typed >= total;
   const area = useRef<HTMLTextAreaElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
   const known = useRef<{ name: string | null; role: string | null }>({ name: null, role: null });
@@ -257,12 +277,10 @@ export function FirstRunIntro({
   const first = sanitizeName(name)?.split(' ')[0] ?? null;
   const steps: Beat[] = ['name', 'who', 'thought'];
   const stepAt = steps.indexOf(beat);
-  const lead = wordsIn(PREMISE[0]);
 
   return (
     <div className={`ob ob-first obw is-${beat}${leaving ? ' is-leaving' : ''}`} role="dialog" aria-label="Welcome to Socria">
       <span className="ob-grain" aria-hidden="true" />
-      <span className="obw-glow" aria-hidden="true" />
       <ObMap lit={LIT[beat]} />
 
       <div className="ob-top">
@@ -289,16 +307,14 @@ export function FirstRunIntro({
       <div className="ob-stage">
         {beat === 'premise' && (
           <div className="ob-wrap obw-premise" key="premise">
-            <p className="obw-eyebrow ob-fade" style={{ '--d': '.05s' } as React.CSSProperties}>
-              <i aria-hidden="true" /> Welcome to Socria
-            </p>
-            <h1 className="obw-say">
-              <Said parts={PREMISE[0]} />
+            <p className="obw-eyebrow">Welcome to Socria</p>
+            <h1 className="obw-say" onClick={() => setTyped(total)}>
+              <Typed parts={PREMISE[0]} shown={typed} caret={typed < total0} />
             </h1>
-            <p className="obw-say2">
-              <Said parts={PREMISE[1]} from={lead + 4} />
+            <p className="obw-say2" onClick={() => setTyped(total)}>
+              <Typed parts={PREMISE[1]} shown={typed - total0} caret={typed >= total0 && !typedAll} />
             </p>
-            <div className="ob-row ob-fade" style={{ '--d': '2.6s' } as React.CSSProperties}>
+            <div className={`ob-row obw-after${typedAll ? ' is-in' : ''}`}>
               <button
                 type="button"
                 className="ob-primary obw-begin"

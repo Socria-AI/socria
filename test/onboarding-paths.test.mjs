@@ -55,7 +55,7 @@ ok(
 );
 const greens = [...prem.matchAll(/t: '([^']*)', hl: true/g)].map((m) => m[1]);
 ok('the parts that matter are set in green', greens.join('|') === 'Human-First AI|expand what people can see, understand, and do|think for themselves|makes humanity more capable', greens.join('|'));
-ok('  green in every theme, swept in under the words once they are up', /mark\.obw-hl \{[^}]*color: var\(--obw-green\)/.test(css) && /html\[data-theme='dark'\] \.ob-first\.obw \{[^}]*--obw-green:/.test(css) && /html\[data-theme='night'\] \.ob-first\.obw \{[^}]*--obw-green:/.test(css) && /@keyframes obw-swash/.test(css));
+ok('  green in every theme — the words, nothing behind them — typed out a character at a time', /\.obw-hl \{\s*color: var\(--obw-green\);\s*\}/.test(css) && /html\[data-theme='dark'\] \.ob-first\.obw \{[^}]*--obw-green:/.test(css) && /html\[data-theme='night'\] \.ob-first\.obw \{[^}]*--obw-green:/.test(css) && !/obw-swash|obw-glow/.test(css) && /function Typed\(/.test(intro) && /prefers-reduced-motion: reduce\)'\)\.matches\) \{\s*setTyped\(total\);/.test(intro));
 ok('then the name, what brings them, and where to start', /const order: Beat\[\] = \['premise', 'name', 'who', 'thought'\]/.test(intro) && /What brings you to Socria\?/.test(intro) && /Where shall we start/.test(intro));
 ok('a way to start fills the field, to change or send — it never sends by itself', /setText\(u\.text\)/.test(intro) && !/onStart\(u\.text/.test(intro));
 ok('or their own words', /placeholder="Or in your own words…"/.test(intro));
