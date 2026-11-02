@@ -94,7 +94,7 @@ like paranoia below is aimed at these.
 
 | Trigger | Intent | Category |
 |---|---|---|
-| `chats-spent` (the month's 10 conversations) · `maps-spent` (2 Logic Maps) · `nodes-spent` (10 Logic Map nodes) · `artifacts-spent` (2 artifacts) · `documents-spent` (1 document) — the numbers are read from `PLANS.free` | urgent | entitlement |
+| `chats-spent` (the month's 3 conversations) · `maps-spent` (2 Logic Maps) · `nodes-spent` (10 Logic Map nodes) · `artifacts-spent` (2 artifacts) · `documents-spent` (1 document) — the numbers are read from `PLANS.free` | urgent | entitlement |
 | `voice-locked` (pressed Socria Voice) · `share-locked` (pressed Share on their own conversation) | urgent | entitlement |
 | `explore-spent` `research-spent` `challenge-spent` `context-spent` `images-spent` `files-spent` (fair-use ceilings both plans share) | urgent | entitlement |
 | `messages-spent` `core-chats-spent` `core-messages-spent` — retired with the daily message count and the archived Core chat (October 2026); kept so stored dismissals and checkout attribution still read, never fired | — | — |

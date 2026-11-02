@@ -32,7 +32,7 @@ import './one/one-sheet.css';
 import './logos5/buttons.css';
 
 /**
- * The allowance a limit prompt is about, as a count — "10 of 10 conversations
+ * The allowance a limit prompt is about, as a count — "3 of 3 conversations
  * used this month · starts again on 1 November" — from the same numbers the
  * server refused at (/api/logos/usage). Null for anything but a spent monthly
  * allowance.

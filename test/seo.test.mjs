@@ -158,7 +158,7 @@ console.log('\n=== llms.txt ===');
   ok('every docs page, the overview at /docs', DOC_PAGES.every((d) => t.includes(`(${SEO.absoluteUrl(SEO.docPath(d.slug))})`)));
   ok('the price, from the one place it lives', t.includes('$15/month'));
   // removed: "says what needs an account" (Logos needed one, Core worked without) — Core was archived, Logos 5 is the one surface
-  ok('says what a guest gets, and what an account adds', /Without an account you get one line of thinking and its map; a free account has 10 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month/.test(t));
+  ok('says what a guest gets, and what an account adds', /Without an account you get one line of thinking and its map; a free account has 3 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month/.test(t));
   ok('…and what Socria One is, from the plan table', t.includes('Socria One ($15/month) is unlimited conversations, Logic Maps, artifacts and documents, with Socria Voice and chat sharing.'));
   // the summary and the public pages are this file's words; the docs list is the docs registry's
   const own = t.slice(0, t.indexOf('## Docs')) + t.slice(t.indexOf('## More'));
@@ -346,7 +346,7 @@ console.log('\n=== Socria One ===');
   ok('exactly one h1', h1Count(html) === 1 && /Socria One/.test(h1Of(html)), h1Of(html));
   ok('the price and its period, from lib/socria-one', html.includes('<span class="s-one-amt">$15</span>') && html.includes('<span class="s-one-per">a month</span>') && html.includes('$15 a month.'));
   ok('the memory line is the plan table’s, not the design’s', html.includes('Free remembers twelve things about you') && html.includes('One remembers 160') && !html.includes('Free remembers the conversation'));
-  ok('the free allowances, from the plan table', html.includes('Free starts ten conversations a month') && html.includes('Free draws two maps and ten nodes a month') && html.includes('Free makes two artifacts and reads one document a month'));
+  ok('the free allowances, from the plan table', html.includes('Free starts three conversations a month') && html.includes('Free draws two maps and ten nodes a month') && html.includes('Free makes two artifacts and reads one document a month'));
   ok('Voice and sharing are One’s alone', html.includes('Socria Voice') && html.includes('Free does not include it') && html.includes('Free joins what others share'));
   ok('six chapters', (html.match(/class="s-chapter"/g) ?? []).length === 6);
   ok('no retired promise on the page', !/without the ceiling|No daily count|free month|access code/i.test(html));
@@ -371,7 +371,7 @@ console.log('\n=== the student page ===');
   const ended = renderToStaticMarkup(h(UI.StudentsBody, {}));
   ok('it says the month has ended', ended.includes('has <span class="em">ended.</span>'));
   ok('…and promises no month', !ended.includes('@mavs.uta.edu') && !/Create my free account|first month of Socria One/.test(ended));
-  ok('…and says what Socria is now, from the plan table', ended.includes('10 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month') && ended.includes('$15/month'));
+  ok('…and says what Socria is now, from the plan table', ended.includes('3 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month') && ended.includes('$15/month'));
   ok('…with a way in and the plan page', ended.includes('href="/chat"') && ended.includes('href="/one"'));
   ok('one h1', (ended.match(/<h1[\s>]/g) ?? []).length === 1);
 }

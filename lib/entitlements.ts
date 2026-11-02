@@ -13,7 +13,7 @@
 // Logos 5 is the one product, and Socria One is the one subscription:
 //
 //                         Free          Socria One ($15 a month)
-//   Conversations         10 a month    unlimited (fair use)
+//   Conversations         3 a month     unlimited (fair use)
 //   Logic Maps            2 a month     unlimited
 //   Logic Map nodes       10 a month    unlimited
 //   Artifacts             2 a month     unlimited
@@ -175,7 +175,7 @@ export const megabytes = (bytes: number) => `${Math.round(bytes / (1024 * 1024))
 export const PLANS: Record<Plan, Limits> = {
   free: {
     counters: {
-      chats: 10,
+      chats: 3,
       messages: null,
       maps: 2,
       nodes: 10,
@@ -314,7 +314,7 @@ export const COUNTER_NOUN: Partial<Record<Counter, { one: string; many: string }
   documents: { one: 'document', many: 'documents' },
 };
 
-/** "10 conversations a month", "2 Logic Maps a month" — a free allowance, as it is said. */
+/** "3 conversations a month", "2 Logic Maps a month" — a free allowance, as it is said. */
 export function allowanceLabel(counter: Counter, plan: Plan = 'free'): string {
   const noun = COUNTER_NOUN[counter];
   const n = PLANS[plan].counters[counter];

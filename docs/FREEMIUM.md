@@ -12,7 +12,7 @@ number of its own — so a limit changes in one place.
 
 | | Free | Socria One — $15/month |
 |---|---|---|
-| Conversations | 10 a month | Unlimited (fair use: 400) |
+| Conversations | 3 a month | Unlimited (fair use: 400) |
 | Logic Maps | 2 a month | Unlimited |
 | Logic Map nodes | 10 a month | Unlimited |
 | Artifacts | 2 a month | Unlimited |

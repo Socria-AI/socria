@@ -1,7 +1,7 @@
 // The free plan, end to end, through the real routes (October 31, 2026).
 //
 //                         Free          Socria One
-//   Conversations         10 a month    unlimited (fair use)
+//   Conversations         3 a month     unlimited (fair use)
 //   Logic Maps            2 a month     unlimited
 //   Logic Map nodes       10 a month    unlimited
 //   Artifacts             2 a month     unlimited
@@ -177,38 +177,38 @@ const turns = (n) => {
 const logos = (sessionId, userTurns = 1, extra = {}) => call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId, messages: turns(userTurns), ...extra });
 const core = (conversationId, userTurns = 1) => call(R.chat.POST, 'POST', '/api/chat', { model: 'core-4', conversationId, messages: turns(userTurns) });
 
-console.log('\n=== conversations: ten a month ===');
+console.log('\n=== conversations: three a month ===');
 as('liam');
 globalThis.__logosReply = 'Noted.';
-for (let k = 1; k <= 10; k++) {
+for (let k = 1; k <= 3; k++) {
   const r = await logos(`s${k}`);
-  if (r.status !== 200) ok(`conversation ${k} of 10 is answered`, false, r.text);
+  if (r.status !== 200) ok(`conversation ${k} of 3 is answered`, false, r.text);
 }
-ok('ten conversations begun, ten counted', count('liam', 'chats') === 10, String(count('liam', 'chats')));
+ok('three conversations begun, three counted', count('liam', 'chats') === 3, String(count('liam', 'chats')));
 let before = streams();
-const eleventh = await logos('s11');
-ok('the eleventh is refused, with the word the page raises Socria One for', eleventh.status === 402 && eleventh.json?.upgrade === 'chats', eleventh.text);
-ok('  and the boundary’s own sentence: ten this month, every one still open, Socria One', /10 free conversations this month/.test(eleventh.json?.error ?? '') && /stays open/.test(eleventh.json?.error ?? '') && /Unlock unlimited access with Socria One/.test(eleventh.json?.error ?? ''), eleventh.json?.error);
-ok('  at the count it was refused at, and before the model is asked', eleventh.json?.used === 10 && eleventh.json?.limit === 10 && streams() === before);
+const eleventh = await logos('s4');
+ok('the fourth is refused, with the word the page raises Socria One for', eleventh.status === 402 && eleventh.json?.upgrade === 'chats', eleventh.text);
+ok('  and the boundary’s own sentence: three this month, every one still open, Socria One', /3 free conversations this month/.test(eleventh.json?.error ?? '') && /stays open/.test(eleventh.json?.error ?? '') && /Unlock unlimited access with Socria One/.test(eleventh.json?.error ?? ''), eleventh.json?.error);
+ok('  at the count it was refused at, and before the model is asked', eleventh.json?.used === 3 && eleventh.json?.limit === 3 && streams() === before);
 const back = await logos('s3', 4);
-ok('going back to a conversation already begun costs nothing', back.status === 200 && count('liam', 'chats') === 10, back.text);
+ok('going back to a conversation already begun costs nothing', back.status === 200 && count('liam', 'chats') === 3, back.text);
 let long = true;
 for (let k = 2; k <= 16; k++) long = long && (await logos('s1', k)).status === 200;
 ok('no daily count of messages: fifteen more turns in one conversation, all answered', long);
-ok('  and none of them is counted as a message the plan limits', count('liam', 'chats') === 10);
-ok('a first turn sent again is not a second conversation', (await logos('s2', 1)).status === 200 && count('liam', 'chats') === 10);
+ok('  and none of them is counted as a message the plan limits', count('liam', 'chats') === 3);
+ok('a first turn sent again is not a second conversation', (await logos('s2', 1)).status === 200 && count('liam', 'chats') === 3);
 const gift = await logos('s12', 1, { firstThought: true });
-ok('onboarding’s "first thought" is no longer a gift: past the ten, it is refused like any other', gift.status === 402 && gift.json?.upgrade === 'chats' && !gift.headers.get('X-Socria-First-Thought'), gift.text);
+ok('onboarding’s "first thought" is no longer a gift: past the three, it is refused like any other', gift.status === 402 && gift.json?.upgrade === 'chats' && !gift.headers.get('X-Socria-First-Thought'), gift.text);
 
 console.log('\n=== Core and Logos share the month ===');
 as('fiona');
-for (let k = 1; k <= 9; k++) await logos(`f${k}`);
+for (let k = 1; k <= 2; k++) await logos(`f${k}`);
 const c1 = await core('core-1');
-ok('a Core conversation is answered — and is one of the month’s ten', c1.status === 200 && count('fiona', 'chats') === 10, `${c1.status} ${count('fiona', 'chats')}`);
+ok('a Core conversation is answered — and is one of the month’s three', c1.status === 200 && count('fiona', 'chats') === 3, `${c1.status} ${count('fiona', 'chats')}`);
 const c2 = await core('core-2');
 ok('the next, in Core, is refused at the same boundary', c2.status === 402 && c2.json?.upgrade === 'chats', c2.text);
 ok('  no Core counters are written any more', !db.rows('logos_usage').some((x) => x.user_id === 'fiona' && /^core-/.test(x.counter)));
-ok('a Core conversation going on costs nothing', (await core('core-1', 3)).status === 200 && count('fiona', 'chats') === 10);
+ok('a Core conversation going on costs nothing', (await core('core-1', 3)).status === 200 && count('fiona', 'chats') === 3);
 
 console.log('\n=== Logic Maps: two a month, ten nodes a month ===');
 await settle();

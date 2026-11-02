@@ -77,6 +77,7 @@ ok('a comparison with no title is its options', C.elementTitle({ type: 'compare'
 
 console.log('\n=== filters, places, sides ===');
 ok('Everything shows every lane; a filter shows its own', C.inFilter('ideas', 'all') && C.inFilter('made', 'made') && !C.inFilter('practice', 'ideas'));
+ok('Chats is the conversation alone — no cards beside it; practice counts as made', ['ideas', 'made', 'practice'].every((l) => !C.inFilter(l, 'chats')) && C.inFilter('practice', 'made'));
 ok('a note made from a reply sits beside that turn', C.turnOfEntry('note:a2:summary', turns) === 1 && C.turnOfEntry('upload:x', turns) === null);
 {
   const s = C.sidesFor([{ key: 'm', lane: 'ideas', tone: 'map' }, { key: 'g', lane: 'made', tone: 'artifact' }]);
@@ -103,7 +104,7 @@ console.log('\n=== the canvas ===');
   ok('…what belongs to no turn is gathered at the end', html.includes('Also in this line of thinking') && html.includes('Three questions'));
   ok('a preview is to look at, not to use', html.includes('class="lcv-inert" aria-hidden="true"'));
   ok('every card opens with a key as well as a click', (html.match(/class="lcv-card[^"]*"[^>]*role="button" tabindex="0"/g) || []).length === 3, html.match(/<div class="lcv-card[^>]*>/g)?.join('\n'));
-  ok('the bar: Everything / Ideas / Made / Practice, the zoom, the way back', ['Everything', 'Ideas', 'Made', 'Practice'].every((l) => html.includes(`>${l}</button>`)) && html.includes('aria-label="Zoom in"') && html.includes('80%') && html.includes('Back to chat'));
+  ok('the bar: Everything / Ideas / Made / Chats, the zoom, the way back', ['Everything', 'Ideas', 'Made', 'Chats'].every((l) => html.includes(`>${l}</button>`)) && html.includes('aria-label="Zoom in"') && html.includes('80%') && html.includes('Back to chat'));
   ok('the chatbox stays docked', html.includes('class="lcv-dock"><div id="the-dock">composer</div>'));
   ok('the map card: the question on top, what hangs from it beneath', html.includes('lcv-node is-question') && html.indexOf('Why does the chord matter?') < html.indexOf('A tangent matches it'));
   const phone = renderToStaticMarkup(h(C.L5Canvas, { turns, cards, composer: null, narrow: true, onBack() {}, onJump() {} }));

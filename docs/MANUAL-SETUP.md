@@ -27,7 +27,7 @@ question, but a paying user locked out by an unrun migration is a broken
 product. So the failure is silent and generous.
 
 The consequence: **free-tier limits are not being enforced.** Free accounts
-get unlimited use: none of the free plan's monthly counts — 10 conversations,
+get unlimited use: none of the free plan's monthly counts — 3 conversations,
 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document (lib/entitlements.ts)
 — is held, and neither are the fair-use ceilings both plans share (Research,
 images, files). With the table but without the freemium functions

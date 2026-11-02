@@ -2876,7 +2876,7 @@ where each one came from.
   belongs to no particular turn (a model, the writing) is gathered at the end.
   The ways onward and choices to tap are never shown: they belong to the
   moment.
-- **Doing things there.** Filters (Everything · Ideas · Made · Practice) and
+- **Doing things there.** Filters (Everything · Ideas · Made · Chats (the conversation alone)) and
   zoom from 50% to 100%; on a phone it is one column, with a pinch left to the
   page. Clicking a card brings it into focus, large and live. **Ask about
   this** aims the docked chatbox at it, and Socria is told what it is and which

@@ -38,7 +38,7 @@ const FILTERS: { id: CanvasFilter; label: string }[] = [
   { id: 'all', label: 'Everything' },
   { id: 'ideas', label: 'Ideas' },
   { id: 'made', label: 'Made' },
-  { id: 'practice', label: 'Practice' },
+  { id: 'chats', label: 'Chats' },
 ];
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));

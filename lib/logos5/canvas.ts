@@ -34,8 +34,8 @@ export interface CanvasTurn {
   synthesis?: boolean;
 }
 
-/** What the canvas can be narrowed to. */
-export type CanvasFilter = 'all' | 'ideas' | 'made' | 'practice';
+/** What the canvas can be narrowed to: everything, the ideas, what was made (practice with it), or just the chat. */
+export type CanvasFilter = 'all' | 'ideas' | 'made' | 'chats';
 export type CanvasLane = 'ideas' | 'made' | 'practice';
 
 /** An element a reply drew, placed beside the turn that drew it. */
@@ -215,9 +215,15 @@ export function canvasElements(messages: readonly CanvasMsg[], turns: readonly C
   return out;
 }
 
-/** Whether something in a lane shows under a filter. The turns always show: they are the spine. */
+/**
+ * Whether something in a lane shows under a filter. The turns always show: they are the spine.
+ * Chats is the spine alone — what was said, nothing beside it; practice is something made.
+ */
 export function inFilter(lane: CanvasLane, filter: CanvasFilter): boolean {
-  return filter === 'all' || filter === lane;
+  if (filter === 'all') return true;
+  if (filter === 'chats') return false;
+  if (filter === 'made') return lane === 'made' || lane === 'practice';
+  return filter === lane;
 }
 
 /** Which turn a content entry came from: the turn whose question or reply its id names, else none. */
