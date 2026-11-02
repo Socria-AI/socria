@@ -3,7 +3,7 @@
    tokens, so they are paper on Paper, dark on Dark, the sky's on Celestial. */
 
 .logos-root .l5tip {
-  --tip-green: #3b6a28;
+  --tip-green: #5e7633; /* moss */
   position: fixed;
   left: 0;
   top: 0;
@@ -20,14 +20,14 @@
 }
 html[data-theme='dark'] .logos-root .l5tip,
 html[data-theme='one'] .logos-root .l5tip {
-  --tip-green: #a6d28a;
+  --tip-green: #9cb874; /* sage */
   background: #1c1c1c;
 }
 html[data-theme='one'] .logos-root .l5tip {
   background: #17304a;
 }
 html[data-theme='night'] .logos-root .l5tip {
-  --tip-green: #b8e3a0;
+  --tip-green: #9cb874;
   background: #121c31;
 }
 .logos-root .l5tip.is-placed {

@@ -13,34 +13,35 @@
  */
 
 .ob-first.obw {
-  --obw-green: #228b22; /* forest green */
-  --obw-map: #354620;
-  --obw-card: rgba(255, 255, 255, 0.84);
-  --obw-card-hi: rgba(255, 255, 255, 0.97);
-  --obw-tint: rgba(94, 118, 51, 0.1);
+  /* the brand book's palette (docs: Brand Book, 08 Colour): moss is the one green; paper, never pure white */
+  --obw-green: #5e7633; /* moss */
+  --obw-map: #5e7633;
+  --obw-card: #f4f1e8; /* paper */
+  --obw-card-hi: #e9e5d9; /* paper 2 */
+  --obw-tint: #e4eada; /* moss 100 */
   --obw-ease: cubic-bezier(0.16, 1, 0.3, 1);
   overflow-x: hidden;
 }
 html[data-theme='dark'] .ob-first.obw {
-  --obw-green: #5cbf5c;
+  --obw-green: #9cb874; /* sage — on dark only */
   --obw-map: #e8e8e8;
   --obw-card: rgba(255, 255, 255, 0.035);
   --obw-card-hi: rgba(255, 255, 255, 0.075);
-  --obw-tint: rgba(140, 200, 100, 0.1);
+  --obw-tint: rgba(156, 184, 116, 0.12);
 }
 html[data-theme='one'] .ob-first.obw {
-  --obw-green: #66c766;
+  --obw-green: #9cb874; /* sage — on dark only */
   --obw-map: #b8cdd9;
   --obw-card: rgba(255, 255, 255, 0.04);
   --obw-card-hi: rgba(255, 255, 255, 0.085);
-  --obw-tint: rgba(150, 210, 110, 0.1);
+  --obw-tint: rgba(156, 184, 116, 0.12);
 }
 html[data-theme='night'] .ob-first.obw {
-  --obw-green: #6fcf6f;
+  --obw-green: #9cb874; /* sage — on dark only */
   --obw-map: #e7cf92;
   --obw-card: rgba(255, 255, 255, 0.04);
   --obw-card-hi: rgba(255, 255, 255, 0.08);
-  --obw-tint: rgba(150, 214, 112, 0.1);
+  --obw-tint: rgba(156, 184, 116, 0.12);
 }
 
 /* ── the ground: the map ── */
@@ -390,4 +391,10 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .ob-first
     display: block;
     width: 100%;
   }
+}
+
+/* paper cards on paper: a hairline draws them (the brand book's border), never a shadow or white */
+html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) .obw .ob-card,
+html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) .obw .ob-way {
+  border-color: #ded8c6;
 }
