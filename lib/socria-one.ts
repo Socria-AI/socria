@@ -47,6 +47,11 @@ export function priceWithPeriod(): string {
   return `${priceLabel()}/${SOCRIA_ONE.period}`;
 }
 
+/** What the /one page says, word for word: its headline (the price follows it) and
+ *  the line beside it. The share card says the same, so the two cannot drift. */
+export const ONE_HEADLINE = 'More of Socria.';
+export const ONE_STANDFIRST = 'The free tier, without the counts. Same models, same map.';
+
 // Imported for the map cap's default; entitlements imports only the TYPE
 // above, so this edge is one-directional at runtime.
 import { PLANS } from './entitlements';

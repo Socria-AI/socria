@@ -7,7 +7,7 @@ the Socria design system, `SocriaDesignSystem_060a22`):
 | Route | Page | What it is |
 |---|---|---|
 | `/` | `components/site/Landing.tsx` | "Come out sharper." Logos 5 framed on the cover, one sample conversation with the cards it drew in the margin, three demos that play once seen, the plans, the close. |
-| `/one` | `components/site/One.tsx` | Socria One: the deep-blue cover, the position, the five things One holds, the join band. |
+| `/one` | `components/site/One.tsx` | Socria One (the 2026 page): paper, the price in the headline, two cards — unlimited conversations and sharing a map — and a foot that says how it renews. |
 | `/charter` | `components/site/Charter.tsx` | The founding text, one column; the same document as a PDF at `/socria-charter.pdf`. |
 
 `/logos` is where every "Start a conversation" points. It opens Logos
@@ -39,12 +39,18 @@ change when what that button opens does.
 ## Where the design was departed from, and why
 
 - **The One button checks out.** The design links "Become a member" back to
-  the page; here the cover's and the join band's go through
-  `/api/stripe/checkout` (surface `one-page`): signed out, to sign-in and
-  back; already a member, into Logos. A member is shown "Open Logos", not
-  sold One again. Socria One from a reward alone still sells, and says the
-  reward's remaining days are saved. The masthead's button goes down to the
-  join band, where the price sits beside the button.
+  the page; here both buttons — the masthead's and the one beside the
+  headline — go through `/api/stripe/checkout` (surface `one-page`): signed
+  out, to sign-in and back; already a member, into Logos. A member is shown
+  "Open Logos", not sold One again. A checkout that fails says why under the
+  button (in the masthead, in a small note beneath it).
+- **The pictures are pictures.** The conversation list and the shared map are
+  inert and hidden from screen readers; each card's heading and line say
+  what it shows. The map's line between its two ideas is drawn from where
+  the cards actually are (`MapEdges.tsx`), as on the landing.
+- **The headline and its line are the share card's too.** `ONE_HEADLINE` and
+  `ONE_STANDFIRST` live in `lib/socria-one`, beside the price, so the page
+  and the `/one` share card say the same thing.
 - **The numbers are read, not written.** The price comes from
   `lib/socria-one`, the counts from `lib/entitlements` and
   `lib/share/roles`. The design's memory line said free "remembers the

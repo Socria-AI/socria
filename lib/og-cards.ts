@@ -17,7 +17,7 @@
 // the referral settings.
 
 import { TAGLINE } from './seo';
-import { priceWithPeriod } from './socria-one';
+import { ONE_HEADLINE, ONE_STANDFIRST, priceWithPeriod } from './socria-one';
 
 export interface OgCard {
   /** the small line above the title */
@@ -63,8 +63,8 @@ const FIXED: Record<string, OgCard> = {
   },
   one: {
     kicker: 'Socria One',
-    title: 'Unlimited Socria, with Voice and sharing.',
-    line: `Conversations, Logic Maps, artifacts and documents, none of them counted — ${priceWithPeriod()}.`,
+    title: ONE_HEADLINE,
+    line: `${ONE_STANDFIRST.replace(/\.$/, '')} — ${priceWithPeriod()}.`,
   },
   charter: {
     kicker: 'Socria',

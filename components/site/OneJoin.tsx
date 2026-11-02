@@ -8,6 +8,9 @@
 // The masthead's takes you down to the join band, where the price is said
 // beside the button.
 //
+// (The 2026 page has no join band: the price is in the headline, so the
+// masthead's button goes through the checkout too.)
+//
 // THE BUTTON TELLS THE TRUTH ABOUT WHAT YOU HOLD. A member is shown the way
 // in, not sold what they already have. (Socria One from a reward, a code or
 // a student month is no longer given, so there is no third case to explain.)
@@ -18,7 +21,7 @@ import { usePlan } from '@/components/usePlan';
 import { billingError, billingLine } from '@/lib/billing-message';
 import { START } from './chrome';
 
-export function OneJoin({ place }: { place: 'mast' | 'cover' | 'join' }) {
+export function OneJoin({ place }: { place: 'mast' | 'cover' }) {
   const plan = usePlan();
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -59,7 +62,7 @@ export function OneJoin({ place }: { place: 'mast' | 'cover' | 'join' }) {
     setBusy(false);
   }, [busy]);
 
-  const size = place === 'join' ? 's-pill is-cream is-md' : 's-pill is-cream';
+  const size = place === 'mast' ? 's-pill is-deep' : 's-pill is-blue';
 
   if (isOne) {
     if (place === 'mast') {
@@ -81,18 +84,15 @@ export function OneJoin({ place }: { place: 'mast' | 'cover' | 'join' }) {
     );
   }
 
-  if (place === 'mast') {
-    return (
-      <a className="s-pill is-deep" href="#join">
-        Become a member
-      </a>
-    );
-  }
-
   return (
-    <div>
+    <div className="s-join-btn">
       <button type="button" className={size} onClick={subscribe} disabled={busy}>
-        {busy ? 'Opening checkout…' : 'Become a member'} <span className="s-ar" aria-hidden="true">→</span>
+        {busy ? 'Opening checkout…' : 'Become a member'}
+        {place !== 'mast' && (
+          <span className="s-ar" aria-hidden="true">
+            →
+          </span>
+        )}
       </button>
       {err && (
         <p className="s-pill-err" role="alert">

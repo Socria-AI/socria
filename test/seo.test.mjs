@@ -191,7 +191,7 @@ console.log('\n=== preview cards ===');
   ok('the invitation, in words — and no days of Socria One', inv.kicker === 'A friend invited you' && !/Socria One/.test(`${inv.title} ${inv.line}`), JSON.stringify(inv));
   ok('…not while referrals are off', ogCardFor(['invited'], ctx({ referral: { enabled: false, signupDays: 7 } })).kicker === 'Socria');
   const oneCard = ogCardFor(['one'], ctx());
-  ok('the One card keeps to the /one page’s own claim', oneCard.title === 'Unlimited Socria, with Voice and sharing.' && /Unlimited Socria, with Voice and sharing/.test(readFileSync(join(root, 'components/site/One.tsx'), 'utf8')), JSON.stringify(oneCard));
+  ok('the One card says what the /one page says', oneCard.title === 'More of Socria.' && oneCard.line === 'The free tier, without the counts. Same models, same map — $15/month.' && /ONE_HEADLINE/.test(readFileSync(join(root, 'components/site/One.tsx'), 'utf8')), JSON.stringify(oneCard));
   ok('…and never the retired daily count', !/daily count/i.test(`${oneCard.title} ${oneCard.line}`) && !/daily count|without the ceiling/i.test(readFileSync(join(root, 'app/one/page.tsx'), 'utf8')));
   ok('fit keeps short text', fit('Short title', 20) === 'Short title');
   const f = fit('A rather long title that will not fit on the card at all', 30);
@@ -343,17 +343,22 @@ console.log('\n=== the homepage ===');
 console.log('\n=== Socria One ===');
 {
   const html = renderToStaticMarkup(h(UI.One, {}));
-  ok('exactly one h1', h1Count(html) === 1 && /Socria One/.test(h1Of(html)), h1Of(html));
-  ok('the price and its period, from lib/socria-one', html.includes('<span class="s-one-amt">$15</span>') && html.includes('<span class="s-one-per">a month</span>') && html.includes('$15 a month.'));
-  ok('the memory line is the plan table’s, not the design’s', html.includes('Free remembers twelve things about you') && html.includes('One remembers 160') && !html.includes('Free remembers the conversation'));
-  ok('the free allowances, from the plan table', html.includes('Free starts three conversations a month') && html.includes('Free draws two maps and ten nodes a month') && html.includes('Free makes two artifacts and reads one document a month'));
-  ok('Voice and sharing are One’s alone', html.includes('Socria Voice') && html.includes('Free does not include it') && html.includes('Free joins what others share'));
-  ok('six chapters', (html.match(/class="s-chapter"/g) ?? []).length === 6);
-  ok('no retired promise on the page', !/without the ceiling|No daily count|free month|access code/i.test(html));
-  ok('the cover and the join band can subscribe', (html.match(/<button type="button" class="s-pill is-cream[^"]*"/g) ?? []).length === 2);
-  ok('the masthead goes to the join band', /<a class="s-pill is-deep" href="#join">Become a member<\/a>/.test(html) && html.includes('id="join"'));
-  ok('the free tier opens Logos', /<a class="s-free" href="\/logos">continue with the free tier<\/a>/.test(html));
-  ok('it says how it renews', html.includes('Renews monthly until you cancel.'));
+  ok('exactly one h1', h1Count(html) === 1, String(h1Count(html)));
+  ok('the headline carries the price, from lib/socria-one', h1Of(html) === 'More of Socria. $15 a month.', h1Of(html));
+  ok('the line beside it', html.includes('The free tier, without the counts. Same models, same map.'));
+  ok('two cards, each named by its heading', (html.match(/<section class="s-o-card" aria-labelledby="s-o-c[12]">/g) ?? []).length === 2 && html.includes('Unlimited conversations') && html.includes('Share every map'));
+  ok('the pictures are pictures: hidden and inert, no controls inside', (html.match(/<div class="s-o-pic" aria-hidden="true" inert="">/g) ?? []).length === 2);
+  const pics = html.split('class="s-o-pic"').slice(1).map((x) => x.split('class="s-o-cap"')[0]);
+  // the map's cards are the design system's LogosNode, a button by nature: inert is what takes them out of the tab order
+  ok('…no link in either, and the only buttons are the two map cards, inside the inert picture', pics.every((x) => !/<a /.test(x)) && pics.map((x) => (x.match(/<button/g) ?? []).length).join() === '0,2');
+  ok('the map draws its two ideas and the line between them', html.includes('data-pn="c"') && html.includes('data-pn="c2"') && /<svg class="s-edges" aria-hidden="true"><path class="is-on"/.test(html));
+  ok('the masthead and the headline can subscribe', (html.match(/<button type="button" class="s-pill is-(deep|blue)"/g) ?? []).length === 2);
+  ok('no dead anchor to a join band that is gone', !html.includes('href="#join"'));
+  ok('the free tier opens Logos', /<a class="s-o-free" href="\/logos">Socria is free to start<\/a>/.test(html));
+  ok('it says how it renews', html.includes('Renews monthly · Cancel any time'));
+  ok('the masthead reaches Socria, the Charter and the docs', ['/', '/charter', '/docs'].every((x) => hrefs(html).includes(x)));
+  ok('the foot carries Terms and Privacy', hrefs(html).includes('/terms') && hrefs(html).includes('/privacy'));
+  ok('no retired promise on the page', !/without the ceiling|free month|access code/i.test(html));
 }
 
 console.log('\n=== the Charter ===');
