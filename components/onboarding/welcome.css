@@ -13,7 +13,7 @@
  */
 
 .ob-first.obw {
-  --obw-green: #3b6a28;
+  --obw-green: #228b22; /* forest green */
   --obw-map: #354620;
   --obw-card: rgba(255, 255, 255, 0.84);
   --obw-card-hi: rgba(255, 255, 255, 0.97);
@@ -22,21 +22,21 @@
   overflow-x: hidden;
 }
 html[data-theme='dark'] .ob-first.obw {
-  --obw-green: #a6d28a;
+  --obw-green: #5cbf5c;
   --obw-map: #e8e8e8;
   --obw-card: rgba(255, 255, 255, 0.035);
   --obw-card-hi: rgba(255, 255, 255, 0.075);
   --obw-tint: rgba(140, 200, 100, 0.1);
 }
 html[data-theme='one'] .ob-first.obw {
-  --obw-green: #b2dc96;
+  --obw-green: #66c766;
   --obw-map: #b8cdd9;
   --obw-card: rgba(255, 255, 255, 0.04);
   --obw-card-hi: rgba(255, 255, 255, 0.085);
   --obw-tint: rgba(150, 210, 110, 0.1);
 }
 html[data-theme='night'] .ob-first.obw {
-  --obw-green: #b8e3a0;
+  --obw-green: #6fcf6f;
   --obw-map: #e7cf92;
   --obw-card: rgba(255, 255, 255, 0.04);
   --obw-card-hi: rgba(255, 255, 255, 0.08);
