@@ -63,6 +63,19 @@ type Join = { state: 'idle' | 'sending' | 'joined' | 'already' | 'error'; msg?: 
 /** The most cards AR Mode draws: a Logic Map is rarely near this; past it the stage is a crowd, not a map. */
 const CARD_CAP = 160;
 const WAIT_KEY = 'socria.ar.waitlist.v1';
+/** whether the small camera view is shown — the person's choice, kept in this browser */
+const CAM_VIEW_KEY = 'socria.ar.camview.v1';
+/** a pose, as the camera view and the status say it */
+const POSE_WORD: Record<string, string> = {
+  none: 'tracking',
+  open: 'open hand',
+  point: 'pointing',
+  pinch: 'pinch',
+  two: 'two fingers',
+  three: 'three fingers',
+  fist: 'closed hand',
+  thumb: 'thumbs up',
+};
 const ACTION_WORD: Record<Action, string> = { grab: 'Move', research: 'Research', challenge: 'Challenge', delete: 'Take off the map' };
 
 /** Can this browser run hand tracking at all? Asked before the camera is. */
@@ -285,6 +298,8 @@ export function ARMode({
 
   // ── the camera and the hands (testers only, and only when asked) ────
   const videoRef = useRef<HTMLVideoElement>(null);
+  /** the small camera view: the same stream, with the hands drawn over it */
+  const pipRef = useRef<HTMLVideoElement>(null);
   const handCanvasRef = useRef<HTMLCanvasElement>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const markerRef = useRef<Landmarker | null>(null);
@@ -299,6 +314,21 @@ export function ARMode({
   const [camera, setCamera] = useState<Camera>('off');
   const [camMsg, setCamMsg] = useState('');
   const [showVideo, setShowVideo] = useState(true);
+  // THE CAMERA, SMALL, IN A CORNER — what it sees and how it reads your hands, so a person can see their own
+  // movements being followed. Shown by default once the camera is on; Hide folds it to a chip, and the
+  // choice is kept in this browser.
+  const [camView, setCamViewState] = useState(true);
+  useEffect(() => {
+    try {
+      if (localStorage.getItem(CAM_VIEW_KEY) === '0') setCamViewState(false);
+    } catch {}
+  }, []);
+  const setCamView = (on: boolean) => {
+    setCamViewState(on);
+    try {
+      localStorage.setItem(CAM_VIEW_KEY, on ? '1' : '0');
+    } catch {}
+  };
   const [track, setTrack] = useState<{ hands: number; pose: string; held: { action: Action; at: number } | null; both: boolean }>({ hands: 0, pose: 'none', held: null, both: false });
   const trackSig = useRef('');
   const [cursors, setCursors] = useState<{ x: number; y: number; pinch: boolean }[]>([]);
@@ -325,6 +355,7 @@ export function ARMode({
     streamRef.current?.getTracks().forEach((t) => t.stop());
     streamRef.current = null;
     if (videoRef.current) videoRef.current.srcObject = null;
+    if (pipRef.current) pipRef.current.srcObject = null;
     markerRef.current?.close();
     markerRef.current = null;
     trackerRef.current.reset();
@@ -336,6 +367,14 @@ export function ARMode({
     setCamera((c) => (c === 'error' || c === 'unsupported' ? c : 'off'));
   }, []);
   useEffect(() => stopHands, [stopHands]);
+
+  useEffect(() => {
+    const v = pipRef.current;
+    const stream = streamRef.current;
+    if (!v || !stream || v.srcObject === stream) return;
+    v.srcObject = stream;
+    void v.play().catch(() => {});
+  }, [camera, camView]);
 
   const loop = useCallback(() => {
     rafRef.current = requestAnimationFrame(() => loopRef.current());
@@ -839,7 +878,7 @@ export function ARMode({
               ? 'Show a hand to the camera'
               : track.both
                 ? 'Both hands: zoom and turn'
-                : `${track.hands === 1 ? 'One hand' : 'Two hands'} · ${track.pose === 'none' ? 'tracking' : track.pose}`
+                : `${track.hands === 1 ? 'One hand' : 'Two hands'} · ${POSE_WORD[track.pose] ?? track.pose}`
             : 'Mouse and touch';
   const lost = camera === 'on' && track.hands === 0 && noHandsSince.current > 0 && performance.now() - noHandsSince.current > 4000;
 
@@ -941,8 +980,8 @@ export function ARMode({
               </button>
             ))}
           {tester && camera === 'on' && (
-            <button type="button" className="arm-btn" aria-pressed={showVideo} onClick={() => setShowVideo((s) => !s)}>
-              {showVideo ? 'Hide video' : 'Show video'}
+            <button type="button" className="arm-btn" aria-pressed={showVideo} onClick={() => setShowVideo((s) => !s)} title="The camera's picture, full size, behind the map">
+              {showVideo ? 'Hide room' : 'Show room'}
             </button>
           )}
           {!preview && (
@@ -960,11 +999,32 @@ export function ARMode({
         </div>
       </header>
 
-      {tester && camera === 'on' && (
-        <div className="arm-cam" aria-hidden="true">
-          <canvas ref={handCanvasRef} />
-        </div>
-      )}
+      {tester &&
+        (camera === 'on' || camera === 'loading') &&
+        (camView ? (
+          <figure className="arm-cam" aria-label="Your camera, and the hands it is following">
+            <video ref={pipRef} className="arm-cam-v" playsInline muted autoPlay aria-hidden="true" />
+            <canvas ref={handCanvasRef} className="arm-cam-c" aria-hidden="true" />
+            <figcaption className="arm-cam-k">
+              <i className={`arm-cam-dot${camera === 'on' && track.hands > 0 ? ' is-live' : ''}`} aria-hidden="true" />
+              {camera === 'loading'
+                ? 'Loading hand tracking…'
+                : track.hands === 0
+                  ? 'No hand in view'
+                  : track.both
+                    ? 'Both hands · zoom and turn'
+                    : `${track.hands === 1 ? 'One hand' : 'Two hands'} · ${POSE_WORD[track.pose] ?? track.pose}`}
+            </figcaption>
+            <button type="button" className="arm-cam-x" onClick={() => setCamView(false)} aria-label="Hide the camera view">
+              Hide
+            </button>
+          </figure>
+        ) : (
+          <button type="button" className="arm-cam-show" onClick={() => setCamView(true)}>
+            <i className={`arm-cam-dot${camera === 'on' && track.hands > 0 ? ' is-live' : ''}`} aria-hidden="true" />
+            Show camera
+          </button>
+        ))}
       {(camMsg || lost || note) && !preview && (
         <p className={`arm-note${camera === 'error' || camera === 'unsupported' ? ' is-warn' : ''}`} role="status">
           {camMsg || (lost ? 'No hand in view. Hold one up, palm towards the screen, about an arm’s length away — good light helps.' : note)}

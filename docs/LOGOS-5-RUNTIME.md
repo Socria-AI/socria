@@ -3041,11 +3041,18 @@ editable.
 presses Start hand tracking, and only after checking for a secure page, a
 camera API and WebAssembly; each missing piece is said plainly, and the mouse
 keeps working. Each start is a session: Stop, Done, or a permission answered
-after the person already left releases the stream and closes the model. The
-video is mirrored, dimmed behind the cards and can be hidden; a small skeleton
-shows what the model sees; "No hand in view" appears after four seconds
-without one. Frames are read in the browser and dropped: nothing is recorded
-or uploaded.
+after the person already left releases the stream and closes the model.
+
+Once the camera is on, a **small camera view** sits in a corner (top-right,
+under the bar, on a phone). It shows the camera's own picture, mirrored, with
+the hands it is following drawn over it, and says what it reads ("One hand ·
+pinch", "Both hands · zoom and turn", "No hand in view"), so a person can see
+their own movements being followed. **Hide** folds it to a *Show camera*
+chip, and the choice is kept in this browser (`socria.ar.camview.v1`).
+Separately, the same picture can fill the stage behind the cards, mirrored
+and dimmed, toggled from the bar (*Hide room* / *Show room*). "No hand in
+view" also appears as a note after four seconds without one. Frames are read
+in the browser and dropped: nothing is recorded or uploaded.
 
 **Who may use it** (`lib/ar-access.ts`, decided on the server, default deny):
 - an account id (`user_…`) or a **verified** address in `SOCRIA_AR_TESTERS`;
@@ -3070,7 +3077,7 @@ export it from `/api/waitlist/export?list=ar` (`ar-waitlist.txt`); the
 relaunch's list is unchanged at `/api/waitlist/export`.
 
 **Tested.**
-- `test/ar-mode.test.mjs` (121 checks):
+- `test/ar-mode.test.mjs` (127 checks):
   - the geometry: view inverses, zoom and turn fixed points, the two-hand
     transform, the fit, including around a bar and a bottom panel;
   - seeding in the Logic Map's own order, and spreading only unplaced cards;

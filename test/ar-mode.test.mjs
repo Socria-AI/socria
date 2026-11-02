@@ -272,6 +272,27 @@ console.log('\n=== the camera: only when a tester asks, released when they stop 
   ok('  even when the camera or the model arrives after the person already said stop', /sessionRef\.current \+= 1/.test(start + src) && /if \(stale\(\)\) \{\s*stream\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*return;/.test(start) && /if \(stale\(\)\) \{\s*marker\.close\(\);\s*return;/.test(start));
   ok('the hand loop always runs its newest self, so a gesture acts on the map as it is now', /requestAnimationFrame\(\(\) => loopRef\.current\(\)\)/.test(src) && /loopRef\.current = loop;/.test(src));
   ok('frames are read and dropped in the browser: nothing records, nothing uploads', !/MediaRecorder|toDataURL|toBlob|fetch\([^)]*(frame|video)/i.test(src));
+  // the camera, small, in a corner, so a person sees their own movements being followed — and can hide it
+  ok(
+    'once the camera is on, a small view of it shows the hands being followed, drawn over the picture',
+    /\(camera === 'on' \|\| camera === 'loading'\) &&\s*\(camView \? \(\s*<figure className="arm-cam"/.test(src) &&
+      /<video ref=\{pipRef\} className="arm-cam-v" playsInline muted autoPlay/.test(src) &&
+      /<canvas ref=\{handCanvasRef\} className="arm-cam-c"/.test(src) &&
+      /drawHands\(ctx, hc\.width, hc\.height, res\.landmarks/.test(src),
+  );
+  ok('  saying what it reads, in words', /POSE_WORD\[track\.pose\]/.test(src) && /pinch: 'pinch'/.test(src) && /thumb: 'thumbs up'/.test(src) && /'No hand in view'/.test(src));
+  ok(
+    '  Hide folds it to a Show camera chip, and the choice is kept in this browser',
+    /aria-label="Hide the camera view"/.test(src) && /onClick=\{\(\) => setCamView\(false\)\}/.test(src) && /className="arm-cam-show" onClick=\{\(\) => setCamView\(true\)\}/.test(src) &&
+      /CAM_VIEW_KEY = 'socria\.ar\.camview\.v1'/.test(src) && /localStorage\.setItem\(CAM_VIEW_KEY, on \? '1' : '0'\)/.test(src),
+  );
+  ok('  it is the same stream, released with the rest when the camera stops', /if \(pipRef\.current\) pipRef\.current\.srcObject = null;/.test(src) && /v\.srcObject = stream;\s*void v\.play\(\)/.test(src));
+  const camCss = read('components/logos5/ar-mode.css');
+  ok(
+    '  the picture and the drawing share one crop and are both a mirror, so the drawn hand sits on the hand',
+    /\.logos-root \.arm-cam-v,\s*\.logos-root \.arm-cam-c \{[^}]*object-fit: cover;[^}]*transform: scaleX\(-1\);/.test(camCss),
+  );
+  ok('  the full-size picture behind the map is its own toggle, called the room', /\{showVideo \? 'Hide room' : 'Show room'\}/.test(src));
   const ht = read('lib/hand-tracking.ts');
   ok('the hand model is the benches’ — MediaPipe from a CDN at runtime, nothing added to the bundle', /cdn\.jsdelivr\.net\/npm\/@mediapipe\/tasks-vision@/.test(ht) && /webpackIgnore: true/.test(ht) && !/"@mediapipe\//.test(read('package.json')));
 }
