@@ -127,6 +127,18 @@
   z-index: 70;
   margin: 0;
 }
+/* over AR Mode (its overlay is z 80): the panel above it, at the top, clear of AR Mode's own bottom edge */
+.logos-root .l5-voice-ar .sv-panel.is-floating {
+  z-index: 86;
+  top: calc(64px + env(safe-area-inset-top, 0px));
+  bottom: auto;
+}
+@media (max-width: 640px) {
+  .logos-root .l5-voice-ar .sv-panel.is-floating {
+    top: auto;
+    bottom: calc(8px + env(safe-area-inset-bottom, 0px));
+  }
+}
 .logos-root .sv-panel.is-error {
   border-color: rgba(163, 58, 44, 0.35);
 }

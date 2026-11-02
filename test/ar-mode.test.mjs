@@ -262,35 +262,37 @@ console.log('\n=== the overlay, rendered ===');
 
 console.log('\n=== the camera: only when a tester asks, released when they stop ===');
 {
+  // ONE camera and ONE model for all of Logos 5 (lib/hand-session.ts): AR Mode and the hand pointer read the same hands
   const src = read('components/logos5/ARMode.tsx');
-  const start = src.slice(src.indexOf('const startHands = useCallback'), src.indexOf('// ── pointer, touch and wheel'));
-  ok('the camera is opened in one place — Start hand tracking', (src.match(/openCamera\(/g) ?? []).length === 1 && start.includes('openCamera()'));
-  ok('  which is a tester’s only', /const startHands = useCallback\(async \(\) => \{\s*if \(!tester\) return;/.test(src) && /\{tester &&[\s\S]{0,200}Start hand tracking/.test(src));
+  const hs = read('lib/hand-session.ts');
+  const startFn = hs.slice(hs.indexOf('async start(): Promise<void>'), hs.indexOf('  /** Stop: the camera released'));
+  ok('the camera is opened in one place in the whole app — the shared session’s start', (hs.match(/openCamera\(/g) ?? []).length === 1 && startFn.includes('openCamera()') && !/openCamera\(/.test(src) && !/openCamera\(/.test(read('components/logos5/HandControl.tsx')));
+  ok('  AR Mode starts it for a tester only', /const startHands = useCallback\(\(\) => \{\s*if \(!tester\) return;\s*handSession\.clear\(\);\s*void handSession\.start\(\);/.test(src) && /\{tester &&[\s\S]{0,200}Start hand tracking/.test(src));
   ok('  pressed by them, never on open', /onClick=\{\(\) => void startHands\(\)\}/.test(src) && (src.match(/startHands\(\)/g) ?? []).length === 1);
-  ok('  checked first: a page without https, a browser without a camera or WebAssembly is told so, and keeps the mouse', /isSecureContext/.test(src) && /WebAssembly/.test(src) && /You can still move the map with a mouse/.test(src));
-  ok('stopping, or leaving AR Mode, releases the camera and the model', /const stopHands = useCallback\(\(\) => \{[\s\S]{0,400}getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\)[\s\S]{0,200}markerRef\.current\?\.close\(\)/.test(src) && /useEffect\(\(\) => stopHands, \[stopHands\]\)/.test(src));
-  ok('  even when the camera or the model arrives after the person already said stop', /sessionRef\.current \+= 1/.test(start + src) && /if \(stale\(\)\) \{\s*stream\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*return;/.test(start) && /if \(stale\(\)\) \{\s*marker\.close\(\);\s*return;/.test(start));
-  ok('the hand loop always runs its newest self, so a gesture acts on the map as it is now', /requestAnimationFrame\(\(\) => loopRef\.current\(\)\)/.test(src) && /loopRef\.current = loop;/.test(src));
-  ok('frames are read and dropped in the browser: nothing records, nothing uploads', !/MediaRecorder|toDataURL|toBlob|fetch\([^)]*(frame|video)/i.test(src));
+  ok('  checked first: a page without https, a browser without a camera or WebAssembly is told so, and keeps the mouse', /isSecureContext/.test(hs) && /WebAssembly/.test(hs) && /You can still use the mouse, a trackpad or touch/.test(hs));
+  ok('Stop releases the camera and closes the model, and anything following the hands hears there are none', /stop\(\) \{\s*this\.session \+= 1;\s*this\.release\(\);/.test(hs) && /this\.snap\.stream\?\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\)/.test(hs) && /this\.marker\?\.close\(\)/.test(hs) && /l\(\{ reads: \[\], landmarks: \[\]/.test(hs));
+  ok('  even when the camera or the model arrives after the person already said stop', /if \(stale\(\)\) \{\s*stream\.getTracks\(\)\.forEach\(\(t\) => t\.stop\(\)\);\s*return;/.test(startFn) && /if \(stale\(\)\) \{\s*marker\.close\(\);\s*return;/.test(startFn));
+  ok('leaving AR Mode leaves the hands on the rest of Logos 5 (shown, with Stop) — it does not quietly keep or drop the camera', !/useEffect\(\(\) => stopHands/.test(src) && /onHands\?\.\(\)/.test(src));
+  ok('the frame handler is always the newest, so a gesture acts on the map as it is now', /frameRef\.current = onFrame;/.test(src) && /handSession\.onFrame\(\(f\) => frameRef\.current\(f\)\)/.test(src));
+  ok('frames are read and dropped in the browser: nothing records, nothing uploads', [src, hs, read('components/logos5/HandCam.tsx'), read('components/logos5/HandControl.tsx'), read('lib/hand-dom.ts')].every((t) => !/MediaRecorder|toDataURL|toBlob|fetch\([^)]*(frame|video)/i.test(t)));
   // the camera, small, in a corner, so a person sees their own movements being followed — and can hide it
+  const cam = read('components/logos5/HandCam.tsx');
   ok(
     'once the camera is on, a small view of it shows the hands being followed, drawn over the picture',
-    /\(camera === 'on' \|\| camera === 'loading'\) &&\s*\(camView \? \(\s*<figure className="arm-cam"/.test(src) &&
-      /<video ref=\{pipRef\} className="arm-cam-v" playsInline muted autoPlay/.test(src) &&
-      /<canvas ref=\{handCanvasRef\} className="arm-cam-c"/.test(src) &&
-      /drawHands\(ctx, hc\.width, hc\.height, res\.landmarks/.test(src),
+    /<HandCam\s+placement="ar"/.test(src) && /<video ref=\{videoRef\} className="hand-cam-v" playsInline muted autoPlay/.test(cam) && /<canvas ref=\{canvasRef\} className="hand-cam-c"/.test(cam) &&
+      /handSession\.onFrame\(\(f\) => \{[\s\S]{0,300}drawHands\(ctx, c\.width, c\.height, f\.landmarks\)/.test(cam),
   );
-  ok('  saying what it reads, in words', /POSE_WORD\[track\.pose\]/.test(src) && /pinch: 'pinch'/.test(src) && /thumb: 'thumbs up'/.test(src) && /'No hand in view'/.test(src));
+  ok('  saying what it reads, in words', /POSE_WORD\[track\.pose\]/.test(src) && /pinch: 'pinch'/.test(cam) && /thumb: 'thumbs up'/.test(cam) && /'No hand in view'/.test(cam));
   ok(
     '  Hide folds it to a Show camera chip, and the choice is kept in this browser',
-    /aria-label="Hide the camera view"/.test(src) && /onClick=\{\(\) => setCamView\(false\)\}/.test(src) && /className="arm-cam-show" onClick=\{\(\) => setCamView\(true\)\}/.test(src) &&
-      /CAM_VIEW_KEY = 'socria\.ar\.camview\.v1'/.test(src) && /localStorage\.setItem\(CAM_VIEW_KEY, on \? '1' : '0'\)/.test(src),
+    /aria-label="Hide the camera view"/.test(cam) && /onClick=\{\(\) => setShown\(false\)\}/.test(cam) && /className="hand-cam-show" onClick=\{\(\) => setShown\(true\)\}/.test(cam) &&
+      /CAM_VIEW_KEY = 'socria\.ar\.camview\.v1'/.test(cam) && /localStorage\.setItem\(CAM_VIEW_KEY, on \? '1' : '0'\)/.test(cam),
   );
-  ok('  it is the same stream, released with the rest when the camera stops', /if \(pipRef\.current\) pipRef\.current\.srcObject = null;/.test(src) && /v\.srcObject = stream;\s*void v\.play\(\)/.test(src));
-  const camCss = read('components/logos5/ar-mode.css');
+  ok('  it is the session’s own stream — one camera, never opened twice', /if \(snap\.stream && v\.srcObject !== snap\.stream\)/.test(cam) && /if \(!snap\.stream\) v\.srcObject = null;/.test(cam));
+  const camCss = read('components/logos5/hands.css');
   ok(
     '  the picture and the drawing share one crop and are both a mirror, so the drawn hand sits on the hand',
-    /\.logos-root \.arm-cam-v,\s*\.logos-root \.arm-cam-c \{[^}]*object-fit: cover;[^}]*transform: scaleX\(-1\);/.test(camCss),
+    /\.hand-cam-v,\s*\.hand-cam-c \{[^}]*object-fit: cover;[^}]*transform: scaleX\(-1\);/.test(camCss),
   );
   ok('  the full-size picture behind the map is its own toggle, called the room', /\{showVideo \? 'Hide room' : 'Show room'\}/.test(src));
   const ht = read('lib/hand-tracking.ts');
@@ -319,7 +321,7 @@ console.log('\n=== one arrangement, two views ===');
 {
   const src = read('components/logos5/ARMode.tsx');
   ok('a card put down is a pin in the Logic Map’s graph lens, and the map is told', /saveCanvas\(layoutKey, pin\(loadCanvas\(layoutKey\), 'graph', id, p\.x, p\.y\)\)/.test(src) && /announceCanvas\(layoutKey\)/.test(src));
-  ok('  but only a card that moved — a pinch that put it back where it was is a select', /Math\.hypot\(now\.x - from\.at\.x, now\.y - from\.at\.y\) > 3\) keepPlace/.test(src) && /if \(d\.moved < 5\) setSelected/.test(src));
+  ok('  but only a card that moved — a pinch that put it back where it was is a select', /Math\.hypot\(at\.x - from\.at\.x, at\.y - from\.at\.y\) > 3\) keepPlace/.test(src) && /if \(d\.moved < 5\) setSelected/.test(src));
   ok('  never for the sample or the preview', /const keeps = tester && !sample && !!layoutKey;/.test(src) && /if \(!keeps\) return;/.test(src));
   ok('the arrangement is READ for everybody (the preview shows a person their own map as they left it), written only by a tester', /const doc = !sample && layoutKey \? loadCanvas\(layoutKey\) : null;/.test(src));
   ok('  and only cards with no place yet are spread', /posRef\.current = separate\(next, fresh\);/.test(src) && /if \(!had && !remembered\.has\(n\.id\)\) fresh\.add\(n\.id\);/.test(src));
@@ -344,7 +346,7 @@ console.log('\n=== the way in ===');
   const app = read('components/LogosApp.tsx');
   ok('the Logic Map’s view bar has AR Mode, marked early', /\{studyTab === 'logic_map' && \([\s\S]{0,300}className="l5v-btn l5v-ar" onClick=\{openAr\}[\s\S]{0,200}AR Mode <span className="l5v-ar-k">Early<\/span>/.test(app));
   ok('  and the ⋯ menu, on any line of thinking', /\.\.\.\(activeId \? \[\{ label: 'AR Mode', hint: [^}]*onSelect: openAr \}\] : \[\]\)/.test(app));
-  ok('who may use it is asked when it is opened — never on load', (app.match(/fetch\('\/api\/ar\/access'/g) ?? []).length === 1 && /function openAr\(\) \{\s*setArOpen\(true\);[\s\S]{0,300}fetch\('\/api\/ar\/access'/.test(app));
+  ok('who may use it is asked when it is opened — never on load', (app.match(/fetch\('\/api\/ar\/access'/g) ?? []).length === 1 && /function askArAccess\(\)/.test(app) && /function openAr\(\) \{\s*setArOpen\(true\);\s*if \(arKnownRef\.current\) return;\s*void askArAccess\(\);/.test(app));
   ok('  a failed ask is not kept, and signing in or out asks again', /arKnownRef\.current = known;/.test(app) && /arKnownRef\.current = false;\s*setArAccess\(null\);\s*\}, \[isSignedIn\]\)/.test(app));
   ok('it is the map of the line of thinking that is open, and leaves when another opens', /<ARMode\s+map=\{map\}\s+layoutKey=\{activeId\}/.test(app) && /useEffect\(\(\) => setArOpen\(false\), \[activeId\]\)/.test(app));
   ok('its edits go through the map’s own edit, its actions through the map’s own, shown in the Logic Map', /onEdit=\{\(edit\) => editMap\(\[edit\]\)\}/.test(app) && /openFull\('logic_map'\);\s*signalFirstMap\('action-taken'\);\s*void runAction\(mode, node\);/.test(app));
@@ -365,6 +367,47 @@ console.log('\n=== the way in ===');
     /\.logos-root \.arm-card\.lg-node \{[^}]*animation: armCardIn [^;]*;/.test(css) && /@keyframes armCardIn \{\s*from \{\s*opacity: 0;\s*\}\s*to \{\s*opacity: 1;\s*\}\s*\}/.test(css),
   );
   ok('  touch never scrolls the page from under a pinch; a phone gets its own layout; reduced motion is honoured', /touch-action: none/.test(css) && /@media \(max-width: \d+px\)/.test(css) && /prefers-reduced-motion/.test(read('components/logos5/ARMode.tsx') + css));
+}
+
+console.log('\n=== hands on all of Logos 5, with Voice alongside ===');
+{
+  const app = read('components/LogosApp.tsx');
+  const hc = read('components/logos5/HandControl.tsx');
+  const dom = read('lib/hand-dom.ts');
+  const ar = read('components/logos5/ARMode.tsx');
+  ok('the hand pointer is fetched only once somebody uses their hands', /const HandControl = dynamic\(\(\) => import\('@\/components\/logos5\/HandControl'\)\.then\(\(m\) => m\.HandControl\), \{ ssr: false \}\)/.test(app) && /\{handsWanted && \(\s*<HandControl/.test(app));
+  ok('  "Use your hands" in the menu — a tester’s camera, by their own press; anybody else is shown AR Mode’s preview and waitlist', /label: 'Use your hands'/.test(app) && /function startYourHands\(\) \{\s*void askArAccess\(\)\.then\(\(a\) => \{\s*if \(a\.tester\) setHandsWanted\('start'\);\s*else openAr\(\);/.test(app));
+  ok('  and "Stop using your hands" while they are on', /label: 'Stop using your hands'/.test(app) && /function stopYourHands\(\) \{\s*stopHands\(\);\s*setHandsWanted\(false\);/.test(app));
+  // found in the browser: Stop fetched hand tracking's code before stopping, and with the server gone the camera stayed on
+  ok(
+    'Stop never waits on a download: the session registers its stop as it loads, and the app reaches it directly',
+    /registerHandStop\(\(\) => handSession\.stop\(\)\)/.test(read('lib/hand-session.ts')) && /import \{ handPointer, stopHands \} from '@\/lib\/hand-bus';/.test(app) && !/import\('@\/lib\/hand-(session|dom)'\)/.test(app),
+  );
+  ok('  the bus itself is tiny and touches no camera', !/getUserMedia|openCamera|import /.test(read('lib/hand-bus.ts').replace(/^\/\/.*$/gm, '')));
+  ok('  a start made in AR Mode carries on over the app once AR Mode closes', /onHands=\{\(\) => setHandsWanted\(\(w\) => w \|\| 'on'\)\}/.test(app) && /active=\{!arOpen\}/.test(app));
+  ok('the pointer follows the hands only while AR Mode is closed and the camera is on, and lets go of everything when it stops', /if \(!active \|\| snap\.state !== 'on'\) return;/.test(hc) && /driver\.dispose\(\)/.test(hc) && /pointer\.reset\(\)/.test(hc));
+  ok('  the camera’s frame spread over the whole screen', /frameToScreen\(r\.aim, W, H\)/.test(hc));
+  ok('  Stop anywhere ends it everywhere', /else if \(snap\.state === 'off' && wasOn\.current\) onEnd\(\)/.test(hc));
+  ok('a drag goes to what takes drags (touch-action: none), else the page scrolls, as a finger would', /ta === 'none' \|\| ta === 'pinch-zoom'/.test(dom) && /this\.scroller\.scrollBy\(\{ left: -dx, top: -dy/.test(dom));
+  ok('  a press that does not travel is a click, and focuses what a mouse would', /if \(click && el && el\.isConnected\) fireMouse\('click'/.test(dom) && /focusableOf\(el\)\?\.focus\(\{ preventScroll: true \}\)/.test(dom));
+  ok('  a slider is set where the hand is, telling React as a person would', /function setRange\(input: HTMLInputElement, x: number\)/.test(dom) && /input\.dispatchEvent\(new Event\('input', \{ bubbles: true \}\)\)/.test(dom));
+  ok('  both hands are a trackpad pinch: a ctrl-wheel at the point between them', /new WheelEvent\('wheel', \{[^}]*ctrlKey: true/.test(dom));
+  // found in the browser: "zoom in" said "Zoomed in." with the hand over Voice's panel, where nothing zoomed
+  ok(
+    '  "zoom in", said, reports a zoom only when what is under the hand took it',
+    /return ev\.defaultPrevented;/.test(dom) && /return took \|\| !!this\.at\(x, y\)\?\.closest\(ZOOMS_PASSIVELY\);/.test(dom) && /'Nothing under your hand zooms — point at the map or the canvas\.'/.test(app),
+  );
+  ok('  pointer capture works for the hand’s own pointer id, and real capture is restored when hands stop', /if \(id === HAND_POINTER_ID\) \{\s*captured = this;/.test(dom) && /P\.setPointerCapture = original\.set;/.test(dom));
+  ok('Socria Voice is usable inside AR Mode: its button in the bar, its panel above the overlay', /voice=\{voiceButton\}/.test(app) && /\{tester && voice \? <span className="arm-voice">\{voice\}<\/span> : null\}/.test(ar) && /\{arOpen && <div className="l5-voice-ar">\{voicePanel\(true\)\}<\/div>\}/.test(app) && /\.l5-voice-ar \.sv-panel\.is-floating \{\s*z-index: 86;/.test(read('components/logos5/voice.css')));
+  ok('  what is said to the hands or AR Mode is read before anything else of the workspace’s', /const hc = readHandCommand\(text, \{ ar: arOpen, hands: !!handsWanted \}\);\s*if \(hc\) return doHandCommand\(hc, said\);\s*\/\/ over the Universal Map or Memory/.test(app));
+  // found in the browser: "yes" was read as a yes only when Voice itself had asked, so AR Mode's armed card went to Socria as a question
+  ok('  while AR Mode waits on something armed, "yes" and "no" are read as an answer, not sent to Socria', /readControl\(text, \{ confirming: !!voiceConfirmRef\.current \|\| \(arOpen && !!arArmedRef\.current\), dictating: dictatingRef\.current \}\)/.test(app));
+  ok('  a spoken "yes" confirms what AR Mode armed; "no" calls it off', /else if \(arOpen && arArmedRef\.current\) \{[\s\S]{0,200}sayToAr\(\{ act: 'confirm' \}\)/.test(app) && /if \(arOpen && arArmedRef\.current\) sayToAr\(\{ act: 'cancel' \}\)/.test(app) && /onArmed=\{\(label\) => \(arArmedRef\.current = label\)\}/.test(app));
+  ok('  AR Mode arms research, challenge and taking a card off the map when told — it never does them unconfirmed', /case 'remove':\s*if \(target\) arm\('delete', target\);/.test(ar) && /case 'research':\s*case 'challenge':\s*if \(target\) arm\(c\.act, target\);/.test(ar));
+  ok('pointing is focusing: the card a hand rests on becomes "this" for a command and for a question', /onPoint=\{pointAtNode\}/.test(app) && /onPoint=\{pointAtElement\}/.test(app) && /setFocus\(\{ kind: 'node', id \}\);\s*touchedRef\.current = \{ id, label: n\.label \};\s*\}, 300\)/.test(app));
+  ok('a question asked from AR Mode is answered in AR Mode (Socria’s answer, streaming in)', /reply=\{arReply\}/.test(app) && /if \(busy && busyFor === activeId\) return \{ id: 'pending', text: streaming, pending: true \}/.test(app) && /className="arm-reply"/.test(ar));
+  ok('a dialog over AR Mode (Voice’s sheet) keeps its own keys', /const other = t\?\.closest\?\.\('\[role="dialog"\], \[aria-modal="true"\]'\);\s*if \(other && root && other !== root && !root\.contains\(other\)\) return;/.test(ar));
+  ok('nothing is ever said aloud (Socria Voice answers in text)', ![app, ar, hc].some((t) => /speechSynthesis|SpeechSynthesisUtterance|\.speak\(/.test(t)));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

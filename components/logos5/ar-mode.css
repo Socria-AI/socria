@@ -333,100 +333,6 @@
   background: rgba(236, 237, 235, 0.08);
 }
 
-/* ── the camera, small, in a corner: what it sees, with the hands it is following drawn over it ── */
-.logos-root .arm-cam {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 6;
-  width: 232px;
-  aspect-ratio: 4 / 3;
-  margin: 0;
-  border: 1px solid var(--arm-hair);
-  border-radius: 14px;
-  background: #0b0c0d;
-  overflow: hidden;
-  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
-}
-/* the picture and the drawing over it share one size and one crop, and both are a mirror — as a person expects to see themselves */
-.logos-root .arm-cam-v,
-.logos-root .arm-cam-c {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  transform: scaleX(-1);
-}
-.logos-root .arm-cam-c {
-  pointer-events: none;
-}
-.logos-root .arm-cam-k {
-  position: absolute;
-  left: 8px;
-  bottom: 8px;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  max-width: calc(100% - 16px);
-  padding: 3px 9px;
-  border-radius: 999px;
-  background: rgba(10, 12, 14, 0.62);
-  backdrop-filter: blur(6px);
-  font-size: 11px;
-  color: var(--arm-ink);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.logos-root .arm-cam-dot {
-  flex: none;
-  width: 7px;
-  height: 7px;
-  border-radius: 50%;
-  background: rgba(236, 237, 235, 0.4);
-}
-.logos-root .arm-cam-dot.is-live {
-  background: var(--arm-accent);
-  box-shadow: 0 0 0 3px rgba(156, 195, 240, 0.25);
-}
-.logos-root .arm-cam-x {
-  position: absolute;
-  top: 6px;
-  right: 6px;
-  padding: 3px 10px;
-  border: 1px solid rgba(236, 237, 235, 0.25);
-  border-radius: 999px;
-  background: rgba(10, 12, 14, 0.6);
-  color: var(--arm-ink);
-  font: inherit;
-  font-size: 11px;
-  cursor: pointer;
-}
-.logos-root .arm-cam-x:hover,
-.logos-root .arm-cam-show:hover {
-  background: rgba(10, 12, 14, 0.85);
-}
-.logos-root .arm-cam-show {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  z-index: 6;
-  display: inline-flex;
-  align-items: center;
-  gap: 7px;
-  height: 34px;
-  padding: 0 13px;
-  border: 1px solid var(--arm-hair);
-  border-radius: 999px;
-  background: var(--arm-glass);
-  backdrop-filter: blur(10px);
-  color: var(--arm-ink);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-
 .logos-root .arm-note,
 .logos-root .arm-sample {
   position: absolute;
@@ -753,6 +659,96 @@
 }
 
 /* ── a phone: everything stacks, the inspector and the waitlist are sheets ── */
+/* ── Socria's answer, here: a question asked in AR Mode is answered in AR Mode ── */
+.logos-root .arm-reply {
+  position: absolute;
+  left: 16px;
+  bottom: 16px;
+  z-index: 7;
+  width: min(420px, calc(100% - 32px));
+  max-height: 42%;
+  display: flex;
+  flex-direction: column;
+  padding: 12px 14px 12px;
+  border: 1px solid var(--arm-hair);
+  border-radius: 16px;
+  background: rgba(22, 24, 25, 0.92);
+  backdrop-filter: blur(14px);
+  box-shadow: 0 24px 60px -24px rgba(0, 0, 0, 0.8);
+}
+.logos-root .arm-reply-h {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 6px;
+  font-size: 12px;
+  color: var(--arm-ink-2);
+}
+.logos-root .arm-reply-h b {
+  color: var(--arm-ink);
+  font-weight: 600;
+}
+.logos-root .arm-reply-s {
+  color: var(--arm-accent);
+}
+.logos-root .arm-reply-h .arm-x {
+  position: static;
+  margin-left: auto;
+}
+.logos-root .arm-reply-t {
+  margin: 0;
+  overflow: auto;
+  font-size: 13.5px;
+  line-height: 1.55;
+  color: var(--arm-ink);
+  white-space: pre-wrap;
+}
+/* an answer on screen: the intro steps aside for it */
+.logos-root .arm.has-reply .arm-intro {
+  display: none;
+}
+/* Voice's button in the bar — in the bar's own dark glass: the composer's paper colours vanish on the room */
+.logos-root .arm-voice {
+  display: inline-flex;
+  align-items: center;
+}
+.logos-root .arm-voice .sv-btn {
+  height: auto;
+  padding: 7px 13px 7px 11px;
+  border: 1px solid var(--arm-hair);
+  border-radius: 999px;
+  background: var(--arm-glass);
+  backdrop-filter: blur(10px);
+  box-shadow: none;
+  color: var(--arm-ink);
+}
+.logos-root .arm-voice .sv-btn > svg {
+  color: var(--arm-ink-2);
+}
+.logos-root .arm-voice .sv-btn:hover {
+  border-color: rgba(236, 237, 235, 0.32);
+  background: var(--arm-glass);
+}
+.logos-root .arm-voice .sv-btn.is-on {
+  border-color: rgba(156, 195, 240, 0.6);
+  background: rgba(156, 195, 240, 0.16);
+  color: var(--arm-ink);
+}
+.logos-root .arm-voice .sv-btn.is-on > svg {
+  color: var(--arm-accent);
+}
+.logos-root .arm-voice .sv-exp:not(.is-one) {
+  color: var(--arm-ink-2);
+}
+/* the build's corner badge (development and preview builds only) steps aside: AR Mode has the whole screen */
+body:has(.logos-root .arm) .env-badge {
+  display: none;
+}
+/* with Voice listening, its panel sits at the top of AR Mode: notes go below it */
+.logos-root .arm.has-voice .arm-note {
+  top: 150px;
+}
+
 @media (max-width: 640px) {
   .logos-root .arm-bar {
     top: 8px;
@@ -836,36 +832,42 @@
     font-size: 13px;
     line-height: 1.5;
   }
-  /* on a phone the bottom is the open card's and the confirm's: the camera sits top-right, under the bar,
-     and a note beside it on the left */
-  .logos-root .arm-cam {
-    top: 104px;
-    bottom: auto;
+  .logos-root .arm-reply {
+    left: 8px;
     right: 8px;
-    width: 132px;
-    border-radius: 12px;
+    bottom: 8px;
+    width: auto;
+    max-height: 34%;
   }
-  .logos-root .arm-cam-k {
-    left: 5px;
-    bottom: 5px;
-    max-width: calc(100% - 10px);
-    padding: 2px 7px;
-    font-size: 10px;
+  .logos-root .arm.has-sel .arm-reply {
+    display: none;
   }
-  .logos-root .arm-cam-x {
-    top: 4px;
-    right: 4px;
-    padding: 2px 8px;
-    font-size: 10px;
+  .logos-root .arm.has-voice .arm-confirm {
+    bottom: 104px;
   }
-  .logos-root .arm-cam-show {
-    top: 104px;
-    bottom: auto;
-    right: 8px;
-    height: 30px;
-    padding: 0 11px;
-    font-size: 12px;
+  /* while Voice listens its panel keeps the very bottom, so AR Mode's own sheets — a card, Socria's answer,
+     the waitlist — sit above it, every button in reach (found on a phone: the card's actions were under it) */
+  .logos-root .arm.has-voice:not(.is-preview) .arm-inspect,
+  .logos-root .arm.has-voice .arm-reply,
+  .logos-root .arm.has-voice .arm-wait {
+    bottom: calc(96px + env(safe-area-inset-bottom, 0px));
   }
+  .logos-root .arm.has-voice:not(.is-preview) .arm-inspect,
+  .logos-root .arm.has-voice .arm-wait {
+    max-height: 52%;
+  }
+  .logos-root .arm.has-voice .arm-reply {
+    max-height: 26%;
+  }
+  /* Voice in the bar, at the size of the bar's buttons; "Experimental" is said in its panel */
+  .logos-root .arm-voice .sv-btn {
+    padding: 6px 11px 6px 9px;
+    font-size: 12.5px;
+  }
+  .logos-root .arm-voice .sv-btn .sv-exp {
+    display: none;
+  }
+  /* on a phone a note sits on the left, beside the camera view (components/logos5/hands.css) */
   .logos-root .arm-note {
     top: 104px;
     left: 8px;

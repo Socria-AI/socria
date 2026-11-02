@@ -1,0 +1,250 @@
+/* components/logos5/hands.css — hands in Logos 5: the camera view (HandCam.tsx) and the hand pointer
+   (HandControl.tsx). Loaded with them, only once someone uses their hands. Dark glass on purpose: it
+   sits on AR Mode's dark ground and on the app's Paper and Dark themes alike. */
+
+/* ── the camera, small, in a corner: what it sees, with the hands it is following drawn over it ── */
+.hand-cam {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 6;
+  width: 232px;
+  aspect-ratio: 4 / 3;
+  margin: 0;
+  border: 1px solid rgba(236, 237, 235, 0.18);
+  border-radius: 14px;
+  background: #0b0c0d;
+  overflow: hidden;
+  box-shadow: 0 18px 40px -18px rgba(0, 0, 0, 0.8);
+  color: #ecedeb;
+  font-size: 12px;
+}
+/* over the rest of the app: fixed, above the page, clear of the Logic Map's zoom controls */
+.hand-cam.is-app,
+.hand-cam-chip.is-app {
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  z-index: 75;
+}
+/* the picture and the drawing over it share one size and one crop, and both are a mirror — as a person expects to see themselves */
+.hand-cam-v,
+.hand-cam-c {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  transform: scaleX(-1);
+}
+.hand-cam-c {
+  pointer-events: none;
+}
+.hand-cam-k {
+  position: absolute;
+  left: 8px;
+  bottom: 8px;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: calc(100% - 16px);
+  padding: 3px 9px;
+  border-radius: 999px;
+  background: rgba(10, 12, 14, 0.62);
+  backdrop-filter: blur(6px);
+  font-size: 11px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.hand-cam-dot {
+  flex: none;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: rgba(236, 237, 235, 0.4);
+}
+.hand-cam-dot.is-live {
+  background: #9cc3f0;
+  box-shadow: 0 0 0 3px rgba(156, 195, 240, 0.25);
+}
+.hand-cam-b {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  display: inline-flex;
+  gap: 4px;
+}
+.hand-cam-x,
+.hand-cam-show {
+  padding: 3px 10px;
+  border: 1px solid rgba(236, 237, 235, 0.25);
+  border-radius: 999px;
+  background: rgba(10, 12, 14, 0.6);
+  color: #ecedeb;
+  font: inherit;
+  font-size: 11px;
+  cursor: pointer;
+}
+.hand-cam-x:hover,
+.hand-cam-show:hover {
+  background: rgba(10, 12, 14, 0.85);
+}
+.hand-cam-chip {
+  position: absolute;
+  right: 16px;
+  bottom: 16px;
+  z-index: 6;
+  display: inline-flex;
+  gap: 6px;
+}
+.hand-cam-show {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  height: 34px;
+  padding: 0 13px;
+  border-color: rgba(236, 237, 235, 0.16);
+  background: rgba(22, 24, 25, 0.82);
+  backdrop-filter: blur(10px);
+  font-size: 12.5px;
+}
+
+/* ── the hand pointer over the app: a ring where the hand aims, filled while it presses ── */
+.hand-layer {
+  position: fixed;
+  inset: 0;
+  z-index: 2147483000;
+  pointer-events: none;
+}
+.hand-cursor {
+  position: absolute;
+  top: -15px;
+  left: -15px;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  border: 2px solid #fff;
+  box-shadow: 0 0 0 1.5px rgba(0, 0, 0, 0.55), 0 4px 14px rgba(0, 0, 0, 0.35);
+  background: rgba(80, 140, 240, 0.12);
+  transition: background-color 0.12s, transform 0.04s linear;
+  will-change: transform;
+}
+.hand-cursor::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 4px;
+  height: 4px;
+  margin: -2px 0 0 -2px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.5);
+}
+.hand-cursor.is-pressed {
+  background: rgba(80, 140, 240, 0.55);
+}
+.hand-cursor.is-both {
+  width: 44px;
+  height: 44px;
+  top: -22px;
+  left: -22px;
+  border-style: dashed;
+}
+.hand-cursor[hidden] {
+  display: none;
+}
+/* what a pinch would press: the button, card or field under the hand */
+.hand-hot {
+  outline: 2px solid rgba(80, 140, 240, 0.95) !important;
+  outline-offset: 2px !important;
+}
+
+@media (max-width: 640px) {
+  .hand-cam {
+    width: 132px;
+    border-radius: 12px;
+  }
+  .hand-cam.is-ar,
+  .hand-cam-chip.is-ar {
+    top: 104px;
+    bottom: auto;
+    right: 8px;
+  }
+  .hand-cam.is-app,
+  .hand-cam-chip.is-app {
+    top: 64px;
+    bottom: auto;
+    right: 8px;
+    width: auto;
+  }
+  .hand-cam.is-app {
+    width: 120px;
+  }
+  .hand-cam-k {
+    left: 5px;
+    bottom: 5px;
+    max-width: calc(100% - 10px);
+    padding: 2px 7px;
+    font-size: 10px;
+  }
+  .hand-cam-b {
+    top: 4px;
+    right: 4px;
+  }
+  .hand-cam-x {
+    padding: 2px 8px;
+    font-size: 10px;
+  }
+  .hand-cam-show {
+    height: 30px;
+    padding: 0 11px;
+    font-size: 12px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .hand-cursor {
+    transition: none;
+  }
+}
+
+/* a note while the camera is asked for, or why it could not start */
+.hand-note {
+  position: fixed;
+  right: 16px;
+  bottom: 84px;
+  z-index: 75;
+  max-width: min(420px, calc(100% - 32px));
+  margin: 0;
+  padding: 9px 14px;
+  border: 1px solid rgba(236, 237, 235, 0.18);
+  border-radius: 12px;
+  background: rgba(22, 24, 25, 0.92);
+  color: #ecedeb;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.hand-note.is-warn {
+  border-color: rgba(229, 154, 122, 0.5);
+}
+.hand-note button {
+  margin-left: 6px;
+  padding: 2px 10px;
+  border: 1px solid rgba(236, 237, 235, 0.3);
+  border-radius: 999px;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+@media (max-width: 640px) {
+  .hand-note {
+    top: 64px;
+    bottom: auto;
+    right: 8px;
+    left: 8px;
+    max-width: none;
+  }
+}

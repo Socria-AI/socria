@@ -177,6 +177,8 @@ import { L5Layout, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5
 import { L5Canvas, MapPreview, type CanvasCard } from '@/components/logos5/L5Canvas';
 import dynamic from 'next/dynamic';
 import type { ArAccess } from '@/lib/ar-access';
+import { HANDCAM_EVENT, readHandCommand, type ArCommand, type HandCommand } from '@/lib/logos5/hand-commands';
+import { handPointer, stopHands } from '@/lib/hand-bus';
 import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
 import { Inline as RichInline } from '@/components/RichText';
@@ -237,6 +239,9 @@ const ARMode = dynamic(() => import('@/components/logos5/ARMode').then((m) => m.
     </div>
   ),
 });
+
+// YOUR HANDS ON ALL OF LOGOS 5 (components/logos5/HandControl.tsx): fetched only once somebody uses their hands.
+const HandControl = dynamic(() => import('@/components/logos5/HandControl').then((m) => m.HandControl), { ssr: false });
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
 const WS_KEY = 'socria.logos3.workspace.v2';
@@ -5420,12 +5425,18 @@ export function LogosApp({
         setVoiceConfirm(null);
         voiceConfirmRef.current = null;
         if (k) k.run();
-        else said('There was nothing waiting for a yes.');
+        else if (arOpen && arArmedRef.current) {
+          // AR Mode armed something (a gesture, a button, or "research this") and waits for its yes
+          const label = arArmedRef.current;
+          sayToAr({ act: 'confirm' });
+          said(`Done — “${label}”.`);
+        } else said('There was nothing waiting for a yes.');
         return;
       }
       case 'no':
         setVoiceConfirm(null);
         voiceConfirmRef.current = null;
+        if (arOpen && arArmedRef.current) sayToAr({ act: 'cancel' });
         said('Not done.');
         return;
       case 'stop':
@@ -5619,12 +5630,99 @@ export function LogosApp({
     if (!busy && !voiceConfirm) pumpRef.current();
   }, [busy, voiceConfirm]);
 
+  /** A spoken command for AR Mode: numbered, so saying the same thing twice does it twice. */
+  function sayToAr(cmd: ArCommand) {
+    setArCommand((c) => ({ n: (c?.n ?? 0) + 1, cmd }));
+  }
+  /** What was said to the hands or to AR Mode, done — and what was done, in words for the Voice panel. */
+  function doHandCommand(hc: HandCommand, said: (did: string) => void) {
+    switch (hc.kind) {
+      case 'ar': {
+        const c = hc.cmd;
+        sayToAr(c);
+        const words: Record<ArCommand['act'], string> = {
+          zoom: 'Zoomed.',
+          turn: 'Turned.',
+          fit: 'The whole map.',
+          select: 'Selecting it.',
+          deselect: 'Nothing selected.',
+          research: 'Research — say “yes”, give a thumbs up, or press Confirm.',
+          challenge: 'Challenge — say “yes”, give a thumbs up, or press Confirm.',
+          explore: 'Exploring it in the Logic Map.',
+          remove: 'Take it off the map? Say “yes”, give a thumbs up, or press Confirm.',
+          confirm: 'Done.',
+          cancel: 'Called off.',
+          leave: 'Left AR Mode.',
+          room: 'Done.',
+        };
+        said(c.act === 'zoom' ? (c.dir > 0 ? 'Zoomed in.' : 'Zoomed out.') : c.act === 'select' ? `Selecting “${c.label}”.` : words[c.act]);
+        return;
+      }
+      case 'hands':
+        if (hc.on) {
+          startYourHands();
+          said('Your hands — the camera asks first.');
+        } else {
+          stopYourHands();
+          said('Hands off. The camera is off.');
+        }
+        return;
+      case 'camera':
+        window.dispatchEvent(new CustomEvent(HANDCAM_EVENT, { detail: { shown: hc.shown } }));
+        said(hc.shown ? 'Camera view shown.' : 'Camera view hidden — your hands still work.');
+        return;
+      case 'open-ar':
+        openAr();
+        said('AR Mode.');
+        return;
+      case 'pointer': {
+        // where the hand is, through lib/hand-bus.ts: the pointer is already following the hands, nothing is fetched
+        const hp = handPointer();
+        if (!hp) {
+          said('Your hands are not pointing yet — wait for the camera to start.');
+          return;
+        }
+        if (hc.act === 'click') {
+          const what = hp.click();
+          said(what ? `Clicked “${what}”.` : 'There is nothing under your hand to click.');
+        } else if (hc.act === 'scroll') said(hp.scroll(hc.dir === -1 ? -1 : 1) ? (hc.dir === -1 ? 'Scrolled up.' : 'Scrolled down.') : 'Nothing here scrolls.');
+        else {
+          const zin = (hc.dir ?? 1) > 0;
+          said(hp.zoom(zin ? 1.25 : 0.8) ? (zin ? 'Zoomed in.' : 'Zoomed out.') : 'Nothing under your hand zooms — point at the map or the canvas.');
+        }
+        return;
+      }
+    }
+  }
+  /**
+   * POINTING IS FOCUSING. The Logic Map card a hand rests on — in AR Mode, or over the map — becomes "this":
+   * for a spoken command ("remove this", "research this") and for a question ("what supports this?"), as
+   * "select" and Point & Ask make it. A moment's rest first, so a hand passing over cards does not flicker it.
+   */
+  const pointTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  function pointAtNode(id: string | null) {
+    if (pointTimer.current) clearTimeout(pointTimer.current);
+    if (!id) return;
+    pointTimer.current = setTimeout(() => {
+      const n = mapRef.current.nodes.find((x) => x.id === id);
+      if (!n) return;
+      const f = focusRef.current;
+      if (f && f.kind === 'node' && f.id === id) return;
+      setFocus({ kind: 'node', id });
+      touchedRef.current = { id, label: n.label };
+    }, 300);
+  }
+  function pointAtElement(el: Element | null) {
+    pointAtNode(el?.closest<HTMLElement>('.lg-node-pos[data-id]')?.dataset.id ?? null);
+  }
+
   /** EVERY SPOKEN TURN ARRIVES HERE (components/logos5/useSocriaVoice.ts). */
   function onVoiceTurn(raw: string) {
     const text = cleanUtterance(raw);
     if (!text) return;
     const said = (did: string) => setVoiceOutcome({ heard: text, did, at: Date.now() });
-    const c = readControl(text, { confirming: !!voiceConfirmRef.current, dictating: dictatingRef.current });
+    // a "yes" is waited for when Voice asked one, or when AR Mode armed something (a gesture, a button, "take this off")
+    const c = readControl(text, { confirming: !!voiceConfirmRef.current || (arOpen && !!arArmedRef.current), dictating: dictatingRef.current });
     if (c) return voiceControl(c.control, c.rest, said);
     // a "yes" was waited for and something else was said: what waited is not done, and this goes on
     if (voiceConfirmRef.current) {
@@ -5637,6 +5735,9 @@ export function LogosApp({
       said('In the box — say “send”, or press Send.');
       return;
     }
+    // HANDS AND AR MODE (lib/logos5/hand-commands.ts): what to do where the hand is, or to AR Mode itself
+    const hc = readHandCommand(text, { ar: arOpen, hands: !!handsWanted });
+    if (hc) return doHandCommand(hc, said);
     // over the Universal Map or Memory, the workspace's own commands (back, open, new, search…) first
     const over = overNow();
     if (over) {
@@ -5836,6 +5937,12 @@ export function LogosApp({
   const [arAccess, setArAccess] = useState<ArAccess | null>(null);
   /** the answer came from the server (a failed ask is not kept: the next open asks again) */
   const arKnownRef = useRef(false);
+  /** HANDS ON ALL OF LOGOS 5: wanted ('start' asks for the camera as it mounts; 'on' follows a start made in AR Mode) */
+  const [handsWanted, setHandsWanted] = useState<false | 'start' | 'on'>(false);
+  /** a spoken command for AR Mode (lib/logos5/hand-commands.ts), numbered so the same words twice run twice */
+  const [arCommand, setArCommand] = useState<{ n: number; cmd: ArCommand } | null>(null);
+  /** what AR Mode has armed and is waiting to have confirmed — so a spoken "yes" does it */
+  const arArmedRef = useRef<string | null>(null);
   /** whether the conversation is the screen now, so Escape or a pinch can zoom out (kept fresh each render) */
   const zoomOkRef = useRef(false);
   const pinchRef = useRef(0);
@@ -5869,6 +5976,16 @@ export function LogosApp({
   useEffect(() => setZoomed(true), [activeId]);
   // and AR Mode is a way of looking at one line of thinking: another one opens without it
   useEffect(() => setArOpen(false), [activeId]);
+  /** Socria's answer, for AR Mode: streaming in while it is answering this line of thinking, else the last one */
+  const arReply = useMemo(() => {
+    if (!arOpen) return null;
+    if (busy && busyFor === activeId) return { id: 'pending', text: streaming, pending: true };
+    for (let i = messages.length - 1; i >= 0; i--) {
+      const m = messages[i];
+      if (m.role === 'assistant' && typeof m.content === 'string' && m.content.trim()) return { id: m.id ?? `at-${i}`, text: m.content, pending: false };
+    }
+    return null;
+  }, [arOpen, busy, busyFor, activeId, streaming, messages]);
   // signing in or out changes who is asking: the next open asks again
   useEffect(() => {
     arKnownRef.current = false;
@@ -7663,6 +7780,9 @@ export function LogosApp({
       ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
       : []),
     ...(activeId ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
+    ...(!handsWanted
+      ? [{ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands }]
+      : [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }]),
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'Unlimited, with Voice and sharing', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
@@ -8472,18 +8592,43 @@ export function LogosApp({
    * AR MODE, opened. Who may use it is asked now (GET /api/ar/access) — never on load — and kept for the visit:
    * a tester gets the map moved by hand (the camera only when they start it); anybody else, a preview and the waitlist.
    */
-  function openAr() {
-    setArOpen(true);
-    if (arKnownRef.current) return;
+  function askArAccess(): Promise<ArAccess> {
     const fallback: ArAccess = { tester: false, signedIn: !!isSignedIn, email: null, waitlisted: false };
-    fetch('/api/ar/access', { cache: 'no-store' })
+    if (arKnownRef.current && arAccess) return Promise.resolve(arAccess);
+    return fetch('/api/ar/access', { cache: 'no-store' })
       .then((r) => (r.ok ? r.json() : null))
       .then((j: ArAccess | null) => {
         const known = !!j && typeof j.tester === 'boolean';
         arKnownRef.current = known;
-        setArAccess(known ? j : fallback);
+        const a = known ? (j as ArAccess) : fallback;
+        setArAccess(a);
+        return a;
       })
-      .catch(() => setArAccess(fallback));
+      .catch(() => {
+        setArAccess(fallback);
+        return fallback;
+      });
+  }
+  function openAr() {
+    setArOpen(true);
+    if (arKnownRef.current) return;
+    void askArAccess();
+  }
+  /**
+   * YOUR HANDS, ON ALL OF LOGOS 5 — a tester's camera on, by their own press, until Stop. Anybody who is not a
+   * tester is shown AR Mode instead: its preview, and the waitlist.
+   */
+  /** Stop: the camera off everywhere. The session's module is already loaded whenever hands are on. */
+  /** The camera off at once — through lib/hand-bus.ts, so no download stands between Stop and the camera going off. */
+  function stopYourHands() {
+    stopHands();
+    setHandsWanted(false);
+  }
+  function startYourHands() {
+    void askArAccess().then((a) => {
+      if (a.tester) setHandsWanted('start');
+      else openAr();
+    });
   }
   /** a full view — the Logic Map, Content, Artifacts — from the canvas, with the way back to the chat above it */
   const openFull = (v: Viewport) => {
@@ -9340,6 +9485,23 @@ export function LogosApp({
                 void runAction(mode, node);
               }}
               onEdit={(edit) => editMap([edit])}
+              onHands={() => setHandsWanted((w) => w || 'on')}
+              command={arCommand}
+              onPoint={pointAtNode}
+              onArmed={(label) => (arArmedRef.current = label)}
+              voice={voiceButton}
+              voiceOn={voiceOn}
+              reply={arReply}
+            />
+          )}
+          {/* Socria Voice over AR Mode: its panel above the overlay, so what it heard and did is seen there */}
+          {arOpen && <div className="l5-voice-ar">{voicePanel(true)}</div>}
+          {handsWanted && (
+            <HandControl
+              active={!arOpen}
+              start={handsWanted === 'start'}
+              onEnd={() => setHandsWanted(false)}
+              onPoint={pointAtElement}
             />
           )}
           <GuestWall open={guestWall && guest} spent={guest && guestUsed >= GUEST_TURNS} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />

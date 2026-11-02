@@ -3040,8 +3040,11 @@ editable.
 **The camera.** It is never on by itself. It is asked for only when a tester
 presses Start hand tracking, and only after checking for a secure page, a
 camera API and WebAssembly; each missing piece is said plainly, and the mouse
-keeps working. Each start is a session: Stop, Done, or a permission answered
-after the person already left releases the stream and closes the model.
+keeps working. Each start is a session: Stop, or a permission answered after
+the person already stopped, releases the stream and closes the model. The
+camera and the model are the one hand session that all of Logos 5 shares
+(§35): leaving AR Mode leaves the hands on as a pointer over the app, shown
+and with Stop, rather than quietly keeping or dropping the camera.
 
 Once the camera is on, a **small camera view** sits in a corner (top-right,
 under the bar, on a phone). It shows the camera's own picture, mirrored, with
@@ -3077,7 +3080,7 @@ export it from `/api/waitlist/export?list=ar` (`ar-waitlist.txt`); the
 relaunch's list is unchanged at `/api/waitlist/export`.
 
 **Tested.**
-- `test/ar-mode.test.mjs` (127 checks):
+- `test/ar-mode.test.mjs` (152 checks, with §35's):
   - the geometry: view inverses, zoom and turn fixed points, the two-hand
     transform, the fit, including around a bar and a bottom panel;
   - seeding in the Logic Map's own order, and spreading only unplaced cards;
@@ -3141,3 +3144,144 @@ relaunch's list is unchanged at `/api/waitlist/export`.
 - Supabase Storage for the waitlist.
 - `SOCRIA_AR_TESTERS` set in each Vercel environment.
 - A device with a camera, on https or localhost.
+
+## 35. Hands on all of Logos 5, with Voice alongside
+
+AR Mode was the one place hands worked. Now hands are a way of using all of
+Logos 5. AR Mode still moves the Logic Map in space; everywhere else the hand
+is a pointer, and every view does with it what it already does with a mouse.
+Socria Voice works alongside both: point at a card, say what to do.
+
+**One camera, one model** (`lib/hand-session.ts`). AR Mode and the pointer
+read the same session, so going in and out of AR Mode neither asks for the
+camera again nor reloads the model, and there is one thing to stop. It
+starts only from a person's own press (*Use your hands* in the ⋯ menu, or
+*Start hand tracking* in AR Mode) or their saying so. A camera or model that
+arrives after Stop is released on arrival. Frames are read in the browser and
+dropped.
+
+**The hand as a pointer** (`lib/hand-pointer.ts`, pure; `lib/hand-dom.ts`;
+`components/logos5/HandControl.tsx`).
+- *Aim.* The middle of the camera's picture (`CONTROL_BOX`) is spread over
+  the whole screen, so no corner needs a hand at the picture's edge. A ring
+  shows where the hand aims, filled while it presses, and whatever a pinch
+  would press is outlined.
+- *Press.* A quick pinch is a click (it travels less than 10 px). A pinch
+  that moves drags whatever takes drags (`touch-action: none`: a Logic Map
+  card, the map itself); anything else scrolls, as a finger would. A slider
+  is set where the hand is. Both hands pinching are a trackpad pinch: a
+  ctrl-wheel at the point between them, so the Logic Map, the canvas and the
+  Universal Map zoom.
+- *What it sends.* Pointer, mouse and wheel events, so no view needs teaching.
+  The hand has its own pointer id (47), with pointer capture shimmed for it
+  and restored when the hands stop.
+- *Safety.* A press always ends: when the hand is let go, when the hand is
+  lost, or when a second hand comes in.
+- *AR Mode.* While AR Mode is open it reads the hands itself, and its own bar
+  can be pressed by hand.
+- *The camera view* (`HandCam`) is the same one AR Mode shows, with Hide and
+  Stop. On a phone it sits at the top.
+
+**Pointing is focusing.** The Logic Map card a hand rests on for 300 ms
+becomes "this", in AR Mode and over the Logic Map alike. It is the same focus
+that selecting a card or Point & Ask gives, so a spoken command ("remove
+this") and a question ("what supports this?") are both about it.
+
+**Voice alongside** (`lib/logos5/hand-commands.ts`, pure). Whole, plain
+commands only; anything else is a question for Socria, as before.
+
+| Where | Said | Done |
+| --- | --- | --- |
+| anywhere | "use my hands" / "stop using my hands" | the camera on (a tester's) / off |
+| hands on | "hide the camera" / "show the camera" | the camera view folds to a chip / comes back |
+| a line of thinking | "open AR mode" | AR Mode |
+| hands over the app | "click", "open this", "scroll down", "zoom in" | where the hand is; a zoom over something that does not zoom says so |
+| AR Mode | "zoom in", "turn left", "fit the map", "select the rent card", "deselect" | the view, the card |
+| AR Mode | "research this", "challenge this", "take this off the map" | armed, as a gesture arms them |
+| AR Mode | "yes" / "no" | confirms / calls off what is armed |
+| AR Mode | "explore this", "show the room", "leave" | as the buttons do |
+
+Nothing destructive happens on words alone. Outside AR Mode, "remove this"
+waits for Voice's own yes; inside it, taking a card off is armed and a thumbs
+up, Confirm or "yes" does it. A question asked in AR Mode is answered there,
+in a strip that streams Socria's answer. Voice's button sits in AR Mode's bar
+and its panel above the overlay. On a phone the panel keeps the very bottom,
+and AR Mode's own sheets (the card, the answer, the waitlist) sit above it.
+Voice answers in text only.
+
+**Reaching the hands without loading them** (`lib/hand-bus.ts`). Stop, and
+the pointer's spoken commands, go through a tiny module that the session and
+the pointer register with as they load. Stop never waits on a download.
+Found in the browser: Stop used to fetch hand tracking's code first, and with
+the server gone the camera stayed on.
+
+**Who may use it.** The camera, as AR Mode's testers (§34). Anybody else who
+chooses *Use your hands* is shown AR Mode's preview and waitlist. Voice is
+Socria One's.
+
+**Tested.**
+- `test/hand-pointer.test.mjs` (33 checks): the screen mapping; a press only
+  once meant; drag and release; a lost hand and a second hand cancelling;
+  the two-hand zoom; and the bus, including that a Stop with nothing on is
+  harmless.
+- `test/hand-commands.test.mjs` (48 checks): every command; questions not
+  taken for commands; a card found by its words.
+- `test/ar-mode.test.mjs`: the shared session, hands everywhere, and Voice
+  alongside, plus three fixes found in the browser: Stop through the bus,
+  "yes" answering AR Mode, and an honest zoom.
+- In the browser, with the real camera and model on Chromium's fake camera.
+  Hands were fed at exact points through the session's `inject()`, which only
+  a development build exposes (`window.__socriaHands`). A scripted recogniser
+  stood in for the browser's speech recognition.
+  - *Hands everywhere*:
+    - a canvas card lit and opened;
+    - the Logic Map opened;
+    - a node dragged exactly 160 × 60 and pinned;
+    - both hands zoomed 100% → 300%;
+    - a resting hand made a card "this";
+    - the menu opened by hand and AR Mode chosen;
+    - a card carried in AR Mode and Done pressed by hand;
+    - the chat scrolled by dragging and the composer focused by a pinch;
+    - the Universal Map opened, then Stop.
+  - *Voice and hands*, desktop (37 checks):
+    - "use my hands" and "open the logic map";
+    - a hand resting on a card, then "remove this": it asked, and "yes"
+      removed that card;
+    - "zoom in" over the map (100% → 190%), and over Voice's panel, which said
+      nothing there zooms;
+    - "click" opened the menu;
+    - "open AR mode", with Voice's panel above it;
+    - "zoom in", "turn left", "select the sister card", "deselect";
+    - "take this off the map", then "yes": the card left AR Mode and the
+      Logic Map;
+    - "what supports this" was sent about the card under the hand and
+      answered in AR Mode;
+    - "hide the camera" and "show the camera", "leave", "stop using my hands"
+      and "stop listening";
+    - nothing was spoken aloud, and there were no page errors.
+  - *Phone*, 390 × 844 (18 checks): the bar fits with Voice in it and is
+    legible; no button sits under the camera view; the card's sheet and the
+    answer sit above Voice's panel.
+- Found in the browser and fixed:
+  - "yes" in AR Mode went to Socria as a question;
+  - "zoom in" said it zoomed over a panel;
+  - Stop depended on a download;
+  - Voice's button was unreadable on AR Mode's bar;
+  - on a phone, AR Mode's sheets were under Voice's panel;
+  - the build badge (development and preview builds only) sat over AR Mode's
+    answer.
+
+**Experimental, or not yet done.**
+- Not tried on real hands: the model has read MediaPipe's sample photos, and
+  the rest was fed frames. How a pinch holds up, long sessions and tiredness
+  are unmeasured. The fist still reads as a pinch (§34).
+- Typing by hand: a pinch focuses a field, but the words need a keyboard or
+  Voice's dictation.
+- Hover styles that only CSS `:hover` draws do not light up for a hand (a
+  pointer made of events cannot set `:hover`); the outline stands in for
+  pressable things.
+- The canvas zooms through React's wheel handler, which cannot say it took
+  the wheel; a spoken zoom there is taken as done because it is the canvas.
+- The model runs on the page's main thread. With it running, the browser's
+  timers can run late: in the test browser a spoken turn ended about 0.6 s
+  after its pause.

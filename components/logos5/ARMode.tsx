@@ -31,8 +31,11 @@ import type { LogosEdge, LogosNode, ThinkingMap } from '@/lib/logos';
 import type { MapEdit } from '@/lib/map-edit';
 import type { NodeMode } from '@/lib/logos-explore';
 import type { ArAccess } from '@/lib/ar-access';
-import { drawHands, loadHandLandmarker, openCamera, type Landmarker } from '@/lib/hand-tracking';
-import { CONFIRM_WINDOW, GestureTracker, PinchTap, TwoHandTracker, readHand, type Action, type HandRead } from '@/lib/hand-gestures';
+import { CONFIRM_WINDOW, GestureTracker, PinchTap, TwoHandTracker, type Action, type HandRead } from '@/lib/hand-gestures';
+import { handSession, useHandSession, type HandFrame, type HandState } from '@/lib/hand-session';
+import { HandCam, POSE_WORD, handCaption } from './HandCam';
+import { findCard, type ArCommand } from '@/lib/logos5/hand-commands';
+import { plainText } from '@/lib/logos5/canvas';
 import {
   AR_HELP,
   AR_SAMPLE,
@@ -56,36 +59,14 @@ import { announceCanvas, isPinned, loadCanvas, pin, saveCanvas, unpin } from '@/
 import './ar-mode.css';
 
 type MapNodeRef = { id: string; label: string; type: LogosNode['type'] };
-type Camera = 'off' | 'asking' | 'loading' | 'on' | 'error' | 'unsupported';
+type Camera = HandState;
 type Armed = { action: Action; id: string; label: string };
 type Join = { state: 'idle' | 'sending' | 'joined' | 'already' | 'error'; msg?: string };
 
 /** The most cards AR Mode draws: a Logic Map is rarely near this; past it the stage is a crowd, not a map. */
 const CARD_CAP = 160;
 const WAIT_KEY = 'socria.ar.waitlist.v1';
-/** whether the small camera view is shown — the person's choice, kept in this browser */
-const CAM_VIEW_KEY = 'socria.ar.camview.v1';
-/** a pose, as the camera view and the status say it */
-const POSE_WORD: Record<string, string> = {
-  none: 'tracking',
-  open: 'open hand',
-  point: 'pointing',
-  pinch: 'pinch',
-  two: 'two fingers',
-  three: 'three fingers',
-  fist: 'closed hand',
-  thumb: 'thumbs up',
-};
 const ACTION_WORD: Record<Action, string> = { grab: 'Move', research: 'Research', challenge: 'Challenge', delete: 'Take off the map' };
-
-/** Can this browser run hand tracking at all? Asked before the camera is. */
-function handsSupported(): string | null {
-  if (typeof window === 'undefined') return 'Hand tracking runs in a browser.';
-  if (!window.isSecureContext) return 'Hand tracking needs a secure page (https).';
-  if (!navigator.mediaDevices?.getUserMedia) return 'This browser does not let pages use a camera.';
-  if (typeof WebAssembly === 'undefined') return 'This browser cannot run the hand-tracking model (it needs WebAssembly).';
-  return null;
-}
 
 export function ARMode({
   map,
@@ -95,6 +76,13 @@ export function ARMode({
   onClose,
   onAction,
   onEdit,
+  onHands,
+  command,
+  onPoint,
+  onArmed,
+  voice,
+  voiceOn = false,
+  reply,
 }: {
   map: ThinkingMap;
   /** the line of thinking whose card positions these are (lib/canvas-store.ts) */
@@ -106,6 +94,20 @@ export function ARMode({
   onClose: () => void;
   onAction?: (mode: NodeMode, node: MapNodeRef) => void;
   onEdit?: (edit: MapEdit) => void;
+  /** hands were started here: the app keeps them working on the rest of Logos 5 after AR Mode closes */
+  onHands?: () => void;
+  /** a spoken command (lib/logos5/hand-commands.ts), numbered so the same words said twice run twice */
+  command?: { n: number; cmd: ArCommand } | null;
+  /** the card the hand is on — else the one selected — so "this", in a question or a command, means it */
+  onPoint?: (id: string | null) => void;
+  /** an action waiting for a confirm, by its card's words — so a spoken "yes" can do it — or null */
+  onArmed?: (label: string | null) => void;
+  /** Socria Voice's button, so it can be started from here */
+  voice?: React.ReactNode;
+  /** Voice is listening: the confirm says "say yes" too */
+  voiceOn?: boolean;
+  /** Socria's latest answer, so a question asked from here is answered here */
+  reply?: { id: string; text: string; pending: boolean } | null;
 }) {
   const tester = !!access?.tester;
   const preview = !!access && !access.tester;
@@ -241,6 +243,19 @@ export function ARMode({
   const [selected, setSelected] = useState<string | null>(null);
   const [hover, setHover] = useState<string | null>(null);
   const [armed, setArmed] = useState<Armed | null>(null);
+  const hoverRef = useRef(hover);
+  hoverRef.current = hover;
+  const selectedRef = useRef(selected);
+  selectedRef.current = selected;
+  // the card the hand is on — else the one selected — is "this" for Voice and for a question (Point & Ask)
+  useEffect(() => {
+    onPoint?.(hover ?? selected ?? null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [hover, selected]);
+  useEffect(() => {
+    onArmed?.(armed ? armed.label : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [armed]);
   const armedRef = useRef<Armed | null>(null);
   armedRef.current = armed;
   const [note, setNote] = useState('');
@@ -297,38 +312,23 @@ export function ARMode({
   };
 
   // ── the camera and the hands (testers only, and only when asked) ────
+  //
+  // The camera and the model are the shared hand session (lib/hand-session.ts): AR Mode reads the same hands
+  // the rest of Logos 5 does (components/logos5/HandControl.tsx), so going in and out of AR Mode neither asks
+  // for the camera again nor reloads the model — and leaving AR Mode leaves the hands working on the rest of
+  // the app, until Stop.
+  const hands = useHandSession();
+  const camera: Camera = hands.state;
+  const camMsg = hands.message;
+  /** the room behind the map: the session's own picture, full size */
   const videoRef = useRef<HTMLVideoElement>(null);
-  /** the small camera view: the same stream, with the hands drawn over it */
-  const pipRef = useRef<HTMLVideoElement>(null);
-  const handCanvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const markerRef = useRef<Landmarker | null>(null);
-  const rafRef = useRef(0);
   const trackerRef = useRef(new GestureTracker());
   const twoRef = useRef(new TwoHandTracker());
   const tapRef = useRef(new PinchTap(18, 450));
   const holdRef = useRef<ArHold>(null);
   /** where a card was when a hand picked it up — a pinch that put it back where it was is a select, not a move */
   const holdFrom = useRef<{ id: string; at: Pt } | null>(null);
-  const lastVideoT = useRef(-1);
-  const [camera, setCamera] = useState<Camera>('off');
-  const [camMsg, setCamMsg] = useState('');
   const [showVideo, setShowVideo] = useState(true);
-  // THE CAMERA, SMALL, IN A CORNER — what it sees and how it reads your hands, so a person can see their own
-  // movements being followed. Shown by default once the camera is on; Hide folds it to a chip, and the
-  // choice is kept in this browser.
-  const [camView, setCamViewState] = useState(true);
-  useEffect(() => {
-    try {
-      if (localStorage.getItem(CAM_VIEW_KEY) === '0') setCamViewState(false);
-    } catch {}
-  }, []);
-  const setCamView = (on: boolean) => {
-    setCamViewState(on);
-    try {
-      localStorage.setItem(CAM_VIEW_KEY, on ? '1' : '0');
-    } catch {}
-  };
   const [track, setTrack] = useState<{ hands: number; pose: string; held: { action: Action; at: number } | null; both: boolean }>({ hands: 0, pose: 'none', held: null, both: false });
   const trackSig = useRef('');
   const [cursors, setCursors] = useState<{ x: number; y: number; pinch: boolean }[]>([]);
@@ -341,191 +341,151 @@ export function ARMode({
     return () => clearTimeout(t);
   }, [camera, track.hands]);
 
-  // Each start is a session. Stopping — or leaving AR Mode — ends it, so a camera or a model that arrives
-  // after the person has already said stop (the permission prompt answered late, a slow model download)
-  // is released the moment it arrives instead of quietly turning the camera on behind them.
-  const sessionRef = useRef(0);
-  // The frame loop always runs the newest version of itself, so what a gesture does (research, challenge,
-  // take off the map) goes to the map as it is now, never to a copy from when the camera started.
-  const loopRef = useRef<() => void>(() => {});
-
-  const stopHands = useCallback(() => {
-    sessionRef.current += 1;
-    cancelAnimationFrame(rafRef.current);
-    streamRef.current?.getTracks().forEach((t) => t.stop());
-    streamRef.current = null;
-    if (videoRef.current) videoRef.current.srcObject = null;
-    if (pipRef.current) pipRef.current.srcObject = null;
-    markerRef.current?.close();
-    markerRef.current = null;
-    trackerRef.current.reset();
-    twoRef.current.reset();
-    tapRef.current.reset();
-    holdRef.current = null;
-    setCursors([]);
-    setTrack({ hands: 0, pose: 'none', held: null, both: false });
-    setCamera((c) => (c === 'error' || c === 'unsupported' ? c : 'off'));
-  }, []);
-  useEffect(() => stopHands, [stopHands]);
-
   useEffect(() => {
-    const v = pipRef.current;
-    const stream = streamRef.current;
-    if (!v || !stream || v.srcObject === stream) return;
-    v.srcObject = stream;
-    void v.play().catch(() => {});
-  }, [camera, camView]);
-
-  const loop = useCallback(() => {
-    rafRef.current = requestAnimationFrame(() => loopRef.current());
     const v = videoRef.current;
-    const mk = markerRef.current;
-    const stage = stageRef.current;
-    if (!v || !mk || !stage || v.readyState < 2 || v.currentTime === lastVideoT.current) return;
-    lastVideoT.current = v.currentTime;
-    const { w, h } = sizeRef.current;
-    let res;
-    try {
-      res = mk.detectForVideo(v, performance.now());
-    } catch {
-      return; // a dropped frame is fine
+    if (!v) return;
+    if (hands.stream && v.srcObject !== hands.stream) {
+      v.srcObject = hands.stream;
+      void v.play().catch(() => {});
     }
-    const now = performance.now();
-    const hc = handCanvasRef.current;
-    if (hc) {
-      hc.width = v.videoWidth || 640;
-      hc.height = v.videoHeight || 480;
-      const ctx = hc.getContext('2d');
-      if (ctx) drawHands(ctx, hc.width, hc.height, res.landmarks ?? []);
-    }
-    // MIRRORED, because the picture is: the landmarks are flipped here, so everything downstream is in screen terms.
-    const vid = { w: v.videoWidth || 640, h: v.videoHeight || 480 };
-    const toStage = (p: Pt) => videoToStage(p, vid, { w, h }, false);
-    const reads: HandRead[] = (res.landmarks ?? [])
-      .slice(0, 2)
-      .map((pts, i) => readHand(pts.map((p) => ({ ...p, x: 1 - p.x })), (res.handedness?.[i]?.[0]?.categoryName?.toLowerCase() as 'left' | 'right') ?? 'unknown'))
-      .filter((r): r is HandRead => !!r);
-    // the hands in stage pixels, so a two-handed turn is measured on the screen's own proportions
-    const inStage = reads.map((r) => ({ ...r, aim: toStage(r.aim), palm: toStage(r.palm) }));
+    if (!hands.stream) v.srcObject = null;
+  }, [hands.stream]);
 
-    const out = trackerRef.current.read(reads[0] ?? null, now);
-    const bothPinch = inStage.length === 2 && inStage.every((r) => r.pose === 'pinch' || r.pinch > 0.8);
-    const both = bothPinch ? twoRef.current.read(inStage[0], inStage[1]) : (twoRef.current.reset(), null);
-    const aim = toStage(out.aim);
-    const tap = !bothPinch && reads[0] ? tapRef.current.read(out.grabbing, aim, now) : (tapRef.current.reset(), null);
+  // Each frame the session reads, decided here — always by the newest version of this handler, so what a
+  // gesture does (research, challenge, take off the map) goes to the map as it is now, never to a copy
+  // from when the camera started.
+  const onFrame = useCallback(
+    (f: HandFrame) => {
+      if (!stageRef.current) return;
+      const { w, h } = sizeRef.current;
+      const now = f.t;
+      // the frame is MIRRORED already (lib/hand-session.ts), so everything here is in screen terms
+      const toStage = (p: Pt) => videoToStage(p, f.video, { w, h }, false);
+      const reads: HandRead[] = f.reads;
+      // the hands in stage pixels, so a two-handed turn is measured on the screen's own proportions
+      const inStage = reads.map((r) => ({ ...r, aim: toStage(r.aim), palm: toStage(r.palm) }));
 
-    const view = viewRef.current;
-    const cards = nodesRef.current.map((n) => {
-      const world = posRef.current[n.id];
-      const s = world ? toScreen(world, view, w, h) : { x: -9999, y: -9999 };
-      return { id: n.id, x: s.x, y: s.y, world: world ?? { x: 0, y: 0 } };
-    });
-    // how near a hand must be to a card's middle to take it: most of a card, at the size cards are drawn
-    const reach = Math.max(64, 104 * Math.max(0.6, Math.min(1.35, view.k)));
-    const step = arStep(view, holdRef.current, { one: reads[0] ? { aim, grabbing: out.grabbing } : null, both, tap }, cards, w, h, reach);
-    if (holdRef.current?.kind !== 'node' && step.hold?.kind === 'node') {
-      const at = posRef.current[step.hold.id];
-      holdFrom.current = at ? { id: step.hold.id, at } : null;
-    }
-    if (step.view !== view) viewTouched.current = true;
-    viewRef.current = step.view;
-    holdRef.current = step.hold;
-    if (step.moved) posRef.current = { ...posRef.current, [step.moved.id]: step.moved.at };
-    if (step.dropped) {
-      const from = holdFrom.current;
-      const now = posRef.current[step.dropped];
-      if (from && from.id === step.dropped && now && Math.hypot(now.x - from.at.x, now.y - from.at.y) > 3) keepPlace(step.dropped);
+      const out = trackerRef.current.read(reads[0] ?? null, now);
+      const bothPinch = inStage.length === 2 && inStage.every((r) => r.pose === 'pinch' || r.pinch > 0.8);
+      const both = bothPinch ? twoRef.current.read(inStage[0], inStage[1]) : (twoRef.current.reset(), null);
+      const aim = toStage(out.aim);
+      const tap = !bothPinch && reads[0] ? tapRef.current.read(out.grabbing, aim, now) : (tapRef.current.reset(), null);
+
+      // AR Mode's own controls — Done, Fit, Stop camera, Confirm, the inspector's Research and Challenge — are
+      // pressed by hand as well: over one, it is outlined, and a quick pinch clicks it instead of moving the map
+      const stageBox = stageRef.current.getBoundingClientRect();
+      const under = reads[0] && !bothPinch && !holdRef.current ? document.elementFromPoint(stageBox.left + aim.x, stageBox.top + aim.y) : null;
+      const control = (under?.closest('button, a[href], input, select, textarea, [role="button"]') as HTMLElement | null) ?? null;
+      const onControl = !!control && !control.closest('.arm-stage');
+      if (hotRef.current !== (onControl ? control : null)) {
+        hotRef.current?.classList.remove('hand-hot');
+        hotRef.current = onControl ? control : null;
+        hotRef.current?.classList.add('hand-hot');
+      }
+      if (onControl && tap && control) {
+        if (/^(INPUT|TEXTAREA|SELECT)$/.test(control.tagName)) control.focus();
+        else control.click();
+      }
+
+      const view = viewRef.current;
+      const cards = nodesRef.current.map((n) => {
+        const world = posRef.current[n.id];
+        const s = world ? toScreen(world, view, w, h) : { x: -9999, y: -9999 };
+        return { id: n.id, x: s.x, y: s.y, world: world ?? { x: 0, y: 0 } };
+      });
+      // how near a hand must be to a card's middle to take it: most of a card, at the size cards are drawn
+      const reach = Math.max(64, 104 * Math.max(0.6, Math.min(1.35, view.k)));
+      const step = arStep(
+        view,
+        holdRef.current,
+        { one: reads[0] && !onControl ? { aim, grabbing: out.grabbing } : null, both, tap: onControl ? null : tap },
+        cards,
+        w,
+        h,
+        reach
+      );
+      if (holdRef.current?.kind !== 'node' && step.hold?.kind === 'node') {
+        const at = posRef.current[step.hold.id];
+        holdFrom.current = at ? { id: step.hold.id, at } : null;
+      }
+      if (step.view !== view) viewTouched.current = true;
+      viewRef.current = step.view;
+      holdRef.current = step.hold;
+      if (step.moved) posRef.current = { ...posRef.current, [step.moved.id]: step.moved.at };
+      if (step.dropped) {
+        const from = holdFrom.current;
+        const at = posRef.current[step.dropped];
+        if (from && from.id === step.dropped && at && Math.hypot(at.x - from.at.x, at.y - from.at.y) > 3) keepPlace(step.dropped);
+        holdFrom.current = null;
+      }
+      if (step.select) setSelected(step.select.id);
+
+      // what the hand is over, for the highlight — and what an armed action, or a spoken "this", is aimed at
+      const overCard = !bothPinch && reads[0]
+        ? cards.reduce<{ id: string; d: number } | null>((best, c) => {
+            const d = Math.hypot(c.x - aim.x, c.y - aim.y);
+            return d < reach && (!best || d < best.d) ? { id: c.id, d } : best;
+          }, null)
+        : null;
+      setHover((cur) => (cur === (overCard?.id ?? null) ? cur : overCard?.id ?? null));
+
+      if (out.justArmed) {
+        if (overCard) arm(out.justArmed, overCard.id);
+        else trackerRef.current.disarm();
+      }
+      if (out.fired) confirm();
+      if (out.cancelled) cancel(out.cancelled.why === 'timeout' ? 'It gave up waiting for a thumbs up.' : 'Called off.');
+
+      setCursors(inStage.map((r) => ({ x: r.aim.x, y: r.aim.y, pinch: r.pose === 'pinch' })));
+      const sig = `${reads.length}|${out.pose}|${out.holding?.action ?? ''}${out.holding ? Math.round(out.holding.at * 20) : ''}|${bothPinch}`;
+      if (sig !== trackSig.current) {
+        trackSig.current = sig;
+        setTrack({ hands: reads.length, pose: out.pose, held: out.holding, both: bothPinch });
+      }
+      if (reads.length === 0) {
+        if (!noHandsSince.current) noHandsSince.current = now;
+      } else noHandsSince.current = 0;
+      if (step.moved || step.view !== view) paint();
+    },
+    [arm, cancel, confirm, keepPlace, paint]
+  );
+  const frameRef = useRef(onFrame);
+  frameRef.current = onFrame;
+  /** the control the hand is over (outlined), if any */
+  const hotRef = useRef<HTMLElement | null>(null);
+  useEffect(
+    () => () => {
+      hotRef.current?.classList.remove('hand-hot');
+      hotRef.current = null;
+    },
+    []
+  );
+  useEffect(() => {
+    if (!tester || camera !== 'on') return;
+    noHandsSince.current = performance.now();
+    const off = handSession.onFrame((f) => frameRef.current(f));
+    return () => {
+      off();
+      trackerRef.current.reset();
+      twoRef.current.reset();
+      tapRef.current.reset();
+      holdRef.current = null;
       holdFrom.current = null;
-    }
-    if (step.select) setSelected(step.select.id);
+      setCursors([]);
+      setHover(null);
+      setTrack({ hands: 0, pose: 'none', held: null, both: false });
+    };
+  }, [tester, camera]);
 
-    // what the hand is over, for the highlight — and what an armed action will be aimed at
-    const overCard = !bothPinch && reads[0] ? cards.reduce<{ id: string; d: number } | null>((best, c) => {
-      const d = Math.hypot(c.x - aim.x, c.y - aim.y);
-      return d < reach && (!best || d < best.d) ? { id: c.id, d } : best;
-    }, null) : null;
-    setHover((cur) => (cur === (overCard?.id ?? null) ? cur : overCard?.id ?? null));
-
-    if (out.justArmed) {
-      if (overCard) arm(out.justArmed, overCard.id);
-      else trackerRef.current.disarm();
-    }
-    if (out.fired) confirm();
-    if (out.cancelled) cancel(out.cancelled.why === 'timeout' ? 'It gave up waiting for a thumbs up.' : 'Called off.');
-
-    setCursors(inStage.map((r) => ({ x: r.aim.x, y: r.aim.y, pinch: r.pose === 'pinch' })));
-    const sig = `${reads.length}|${out.pose}|${out.holding?.action ?? ''}${out.holding ? Math.round(out.holding.at * 20) : ''}|${bothPinch}`;
-    if (sig !== trackSig.current) {
-      trackSig.current = sig;
-      setTrack({ hands: reads.length, pose: out.pose, held: out.holding, both: bothPinch });
-    }
-    if (reads.length === 0) {
-      if (!noHandsSince.current) noHandsSince.current = now;
-    } else noHandsSince.current = 0;
-    if (step.moved || step.view !== view) paint();
-  }, [arm, cancel, confirm, keepPlace, paint]);
-  loopRef.current = loop;
-
-  const startHands = useCallback(async () => {
+  /** Start: the shared session asks for the camera — only here, only for a tester, only on their press. */
+  const startHands = useCallback(() => {
     if (!tester) return;
-    const why = handsSupported();
-    if (why) {
-      setCamera('unsupported');
-      setCamMsg(`${why} You can still move the map with a mouse, a trackpad or touch.`);
-      return;
-    }
-    const my = ++sessionRef.current;
-    const stale = () => sessionRef.current !== my;
-    setCamera('asking');
-    setCamMsg('');
-    let stream: MediaStream | null = null;
-    try {
-      // the camera first — the permission prompt is the person's to answer — then the model, which can take a moment
-      stream = await openCamera();
-      if (stale()) {
-        stream.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      streamRef.current = stream;
-      const v = videoRef.current;
-      if (v) {
-        v.srcObject = stream;
-        await v.play().catch(() => {});
-      }
-      if (stale()) return; // stopHands has already released this stream
-      setCamera('loading');
-      let marker: Landmarker;
-      try {
-        marker = await loadHandLandmarker(2);
-      } catch {
-        if (stale()) return;
-        stream.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-        if (videoRef.current) videoRef.current.srcObject = null;
-        setCamera('error');
-        setCamMsg('Hand tracking could not load — it downloads a small model the first time. Check the connection and try again; the mouse and touch still work.');
-        return;
-      }
-      if (stale()) {
-        marker.close();
-        return;
-      }
-      markerRef.current = marker;
-      setCamera('on');
-      noHandsSince.current = performance.now();
-      lastVideoT.current = -1;
-      rafRef.current = requestAnimationFrame(() => loopRef.current());
-    } catch (e) {
-      if (stale()) {
-        stream?.getTracks().forEach((t) => t.stop());
-        return;
-      }
-      streamRef.current?.getTracks().forEach((t) => t.stop());
-      streamRef.current = null;
-      setCamera('error');
-      setCamMsg(`${e instanceof Error ? e.message : 'The camera could not start.'} The mouse and touch still work.`);
-    }
-  }, [tester]);
+    handSession.clear();
+    void handSession.start();
+    onHands?.();
+  }, [tester, onHands]);
+  /** Stop: the camera released and the model closed — for AR Mode and the rest of Logos 5 alike. */
+  const stopHands = useCallback(() => handSession.stop(), []);
 
   // ── pointer, touch and wheel: the same map, without a camera ─────────
   const pointers = useRef(new Map<number, { x: number; y: number }>());
@@ -643,6 +603,83 @@ export function ARMode({
     paint();
   };
 
+  /** Bring a card to the middle of the stage, as following one of its connections does. */
+  const centreOn = (id: string) => {
+    const p = posRef.current[id];
+    if (!p || preview) return;
+    const { w: W, h: H } = sizeRef.current;
+    const sc = toScreen(p, viewRef.current, W, H);
+    viewRef.current = panBy(viewRef.current, W / 2 - sc.x, H / 2 - sc.y);
+    paint();
+  };
+
+  // ── what is said (Socria Voice, lib/logos5/hand-commands.ts) ─────────
+  // "This" is the card the hand is on, else the one selected. Research, challenge and taking a card off the
+  // map are ARMED, as a gesture arms them — a thumbs up, Confirm or a spoken "yes" does them.
+  const lastCommand = useRef(0);
+  useEffect(() => {
+    if (!command || command.n === lastCommand.current) return;
+    lastCommand.current = command.n;
+    const c = command.cmd;
+    const target = hoverRef.current ?? selectedRef.current;
+    const needCard = () => setNote('Point at a card, or say “select” and its name, first.');
+    switch (c.act) {
+      case 'zoom':
+        zoomBy(c.dir > 0 ? 1.25 : 1 / 1.25);
+        return;
+      case 'turn':
+        turnBy((c.dir * Math.PI) / 12);
+        return;
+      case 'fit':
+        fit();
+        return;
+      case 'deselect':
+        setSelected(null);
+        return;
+      case 'select': {
+        const n = findCard(nodesRef.current, c.label);
+        if (!n) {
+          setNote(`No card called “${c.label}” on this map.`);
+          return;
+        }
+        setSelected(n.id);
+        centreOn(n.id);
+        return;
+      }
+      case 'research':
+      case 'challenge':
+        if (target) arm(c.act, target);
+        else needCard();
+        return;
+      case 'remove':
+        if (target) arm('delete', target);
+        else needCard();
+        return;
+      case 'explore':
+        if (target) explore(target, 'explore');
+        else needCard();
+        return;
+      case 'confirm':
+        if (armedRef.current) confirm();
+        return;
+      case 'cancel':
+        cancel();
+        return;
+      case 'leave':
+        onClose();
+        return;
+      case 'room':
+        setShowVideo(c.shown);
+        return;
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [command]);
+
+  // ── Socria's answer, here: a question asked from AR Mode is answered in AR Mode ───
+  const replyAtOpen = useRef(reply?.id ?? null);
+  const [replyShut, setReplyShut] = useState<string | null>(null);
+  const showReply = !!reply && !preview && (reply.pending || reply.id !== replyAtOpen.current) && replyShut !== reply.id && !!(reply.text.trim() || reply.pending);
+
   // ── keyboard: every move has a key, and Esc steps back ───────────────
   //
   // Listened for on the WINDOW, first (capture), for as long as AR Mode is open. It is a dialog over the
@@ -657,6 +694,9 @@ export function ARMode({
     const root = rootRef.current;
     const t = e.target as HTMLElement | null;
     const inside = !!root && !!t && root.contains(t);
+    // a dialog shown over AR Mode (Socria Voice's sheet) keeps its own keys: Esc, Tab, arrows
+    const other = t?.closest?.('[role="dialog"], [aria-modal="true"]');
+    if (other && root && other !== root && !root.contains(other)) return;
     const own = () => {
       e.preventDefault();
       e.stopPropagation();
@@ -885,7 +925,7 @@ export function ARMode({
   return (
     <div
       ref={rootRef}
-      className={`arm${camera === 'on' && showVideo ? ' has-video' : ''}${preview ? ' is-preview' : ''}${sel ? ' has-sel' : ''}`}
+      className={`arm${camera === 'on' && showVideo ? ' has-video' : ''}${preview ? ' is-preview' : ''}${sel ? ' has-sel' : ''}${voiceOn ? ' has-voice' : ''}${showReply ? ' has-reply' : ''}`}
       role="dialog"
       aria-modal="true"
       aria-label={preview ? 'AR Mode preview' : 'AR Mode'}
@@ -993,38 +1033,20 @@ export function ARMode({
               <button type="button" onClick={fit} aria-label="Fit the map">Fit</button>
             </span>
           )}
+          {tester && voice ? <span className="arm-voice">{voice}</span> : null}
           <button type="button" className="arm-btn" onClick={onClose} aria-label="Leave AR Mode">
             Done
           </button>
         </div>
       </header>
 
-      {tester &&
-        (camera === 'on' || camera === 'loading') &&
-        (camView ? (
-          <figure className="arm-cam" aria-label="Your camera, and the hands it is following">
-            <video ref={pipRef} className="arm-cam-v" playsInline muted autoPlay aria-hidden="true" />
-            <canvas ref={handCanvasRef} className="arm-cam-c" aria-hidden="true" />
-            <figcaption className="arm-cam-k">
-              <i className={`arm-cam-dot${camera === 'on' && track.hands > 0 ? ' is-live' : ''}`} aria-hidden="true" />
-              {camera === 'loading'
-                ? 'Loading hand tracking…'
-                : track.hands === 0
-                  ? 'No hand in view'
-                  : track.both
-                    ? 'Both hands · zoom and turn'
-                    : `${track.hands === 1 ? 'One hand' : 'Two hands'} · ${POSE_WORD[track.pose] ?? track.pose}`}
-            </figcaption>
-            <button type="button" className="arm-cam-x" onClick={() => setCamView(false)} aria-label="Hide the camera view">
-              Hide
-            </button>
-          </figure>
-        ) : (
-          <button type="button" className="arm-cam-show" onClick={() => setCamView(true)}>
-            <i className={`arm-cam-dot${camera === 'on' && track.hands > 0 ? ' is-live' : ''}`} aria-hidden="true" />
-            Show camera
-          </button>
-        ))}
+      {tester && (
+        <HandCam
+          placement="ar"
+          caption={track.both ? 'Both hands · zoom and turn' : handCaption(track.hands, track.pose, false)}
+          live={track.hands > 0}
+        />
+      )}
       {(camMsg || lost || note) && !preview && (
         <p className={`arm-note${camera === 'error' || camera === 'unsupported' ? ' is-warn' : ''}`} role="status">
           {camMsg || (lost ? 'No hand in view. Hold one up, palm towards the screen, about an arm’s length away — good light helps.' : note)}
@@ -1048,6 +1070,21 @@ export function ARMode({
       )}
 
       {sample && !preview && <p className="arm-sample">A sample map — nothing on this line of thinking’s Logic Map yet.</p>}
+
+      {showReply && reply && (
+        <aside className="arm-reply" aria-label="Socria’s answer">
+          <header className="arm-reply-h">
+            <b>Socria</b>
+            {reply.pending ? <span className="arm-reply-s">answering…</span> : null}
+            <button type="button" className="arm-x" onClick={() => setReplyShut(reply.id)} aria-label="Hide the answer">
+              ×
+            </button>
+          </header>
+          <p className="arm-reply-t" aria-live="polite">
+            {plainText(reply.text).slice(0, 1200) || '…'}
+          </p>
+        </aside>
+      )}
 
       {sel && (
         <aside className="arm-inspect" aria-label={`About ${sel.label}`}>
@@ -1125,6 +1162,7 @@ export function ARMode({
           </span>
           <span className="arm-confirm-h">
             {camera === 'on' ? 'Thumbs up to confirm · open hand to cancel' : 'Nothing has happened yet'}
+            {voiceOn ? ' · or say “yes”' : ''}
             {armed.action !== 'delete' ? ' · opens in the Logic Map' : ''}
           </span>
           <span className="arm-confirm-b">
