@@ -14,6 +14,7 @@
 
 import { ROLES } from './onboarding-roles';
 import { INTENTS, START_MODELS } from './onboarding-intents';
+import { PATH_IDS } from './onboarding-paths';
 import { LANDING_KINDS, REFERRER_KINDS } from './first-touch';
 import { isCounted } from './product-events';
 
@@ -22,6 +23,8 @@ export const ONBOARDING_STEPS = ['premise', 'name', 'who', 'how', 'thought', 'ex
 export type OnboardingStep = (typeof ONBOARDING_STEPS)[number];
 
 const ROLE_IDS = new Set<string>(ROLES.map((r) => r.id));
+/** what brings them (lib/onboarding-paths.ts) — the onboarding's third beat since November 2026; roles before it */
+const PATHS_ = new Set<string>(PATH_IDS);
 const INTENT_IDS = new Set<string>(INTENTS.map((i) => i.id));
 const MODELS = new Set<string>(START_MODELS);
 const SURFACES = new Set(['core', 'logos']);
@@ -39,7 +42,7 @@ export function answerAllowed(step: string, kind: string): boolean {
       // never the name itself: whether one was given
       return kind === 'given' || kind === 'skipped' || kind === 'skip_all';
     case 'who':
-      return ROLE_IDS.has(kind) || kind === 'skipped' || kind === 'skip_all';
+      return PATHS_.has(kind) || ROLE_IDS.has(kind) || kind === 'skipped' || kind === 'skip_all';
     case 'how':
       return MODELS.has(kind) || kind === 'skipped' || kind === 'skip_all';
     case 'thought':

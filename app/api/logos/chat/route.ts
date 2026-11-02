@@ -470,7 +470,7 @@ export async function POST(req: NextRequest) {
     // Whether THIS request is the one that will pay for the conversation.
     // Checked here, charged further down — see the note at the charge itself.
     // (The first conversation is no longer a gift: every one counts against
-    // the month's ten, October 31, 2026.)
+    // the month's allowance, October 31, 2026 — onboarding's included.)
     const willCharge = isNewChat && !alreadyCounted && !sharedCtx.guest;
 
     if (willCharge) {

@@ -1,0 +1,412 @@
+/* components/onboarding/welcome.css — the onboarding, as a welcome (FirstRunIntro.tsx).
+ *
+ * Built on app/onboarding/onboarding.css (the paper, the grain, the word rise,
+ * the question sizes) and drawn in the page's own tokens — --paper, --ink,
+ * --moss — so it is Paper on Paper, dark on Dark, the sky on Celestial. What
+ * it adds:
+ *   - green for the parts of what Socria says that matter, swept in under
+ *     their words once the words are up;
+ *   - a Logic Map behind the beats, drawing itself a node per answer;
+ *   - cards that arrive one after another, and a page that lifts away when
+ *     the first conversation starts.
+ * Motion is decoration only: with reduced motion everything is simply there.
+ */
+
+.ob-first.obw {
+  --obw-green: #3b6a28;
+  --obw-swash: rgba(128, 184, 86, 0.3);
+  --obw-glow-a: rgba(128, 184, 86, 0.15);
+  --obw-glow-b: rgba(214, 170, 74, 0.1);
+  --obw-map: #354620;
+  --obw-card: rgba(255, 255, 255, 0.84);
+  --obw-card-hi: rgba(255, 255, 255, 0.97);
+  --obw-tint: rgba(94, 118, 51, 0.1);
+  --obw-ease: cubic-bezier(0.16, 1, 0.3, 1);
+  overflow-x: hidden;
+}
+html[data-theme='dark'] .ob-first.obw {
+  --obw-green: #a6d28a;
+  --obw-swash: rgba(140, 200, 100, 0.2);
+  --obw-glow-a: rgba(140, 200, 100, 0.07);
+  --obw-glow-b: rgba(232, 232, 232, 0.035);
+  --obw-map: #e8e8e8;
+  --obw-card: rgba(255, 255, 255, 0.035);
+  --obw-card-hi: rgba(255, 255, 255, 0.075);
+  --obw-tint: rgba(140, 200, 100, 0.1);
+}
+html[data-theme='one'] .ob-first.obw {
+  --obw-green: #b2dc96;
+  --obw-swash: rgba(150, 210, 110, 0.2);
+  --obw-glow-a: rgba(143, 179, 196, 0.12);
+  --obw-glow-b: rgba(150, 210, 110, 0.06);
+  --obw-map: #b8cdd9;
+  --obw-card: rgba(255, 255, 255, 0.04);
+  --obw-card-hi: rgba(255, 255, 255, 0.085);
+  --obw-tint: rgba(150, 210, 110, 0.1);
+}
+html[data-theme='night'] .ob-first.obw {
+  --obw-green: #b8e3a0;
+  --obw-swash: rgba(150, 214, 112, 0.19);
+  --obw-glow-a: rgba(157, 180, 227, 0.1);
+  --obw-glow-b: rgba(231, 207, 146, 0.07);
+  --obw-map: #e7cf92;
+  --obw-card: rgba(255, 255, 255, 0.04);
+  --obw-card-hi: rgba(255, 255, 255, 0.08);
+  --obw-tint: rgba(150, 214, 112, 0.1);
+}
+
+/* ── the ground: a soft light at two corners, and the map ─────────── */
+.obw-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(52% 46% at 88% 8%, var(--obw-glow-a), transparent 72%),
+    radial-gradient(46% 42% at 4% 96%, var(--obw-glow-b), transparent 72%);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .obw-glow {
+    animation: obw-drift 22s ease-in-out infinite alternate;
+  }
+}
+@keyframes obw-drift {
+  from {
+    transform: translate3d(0, 0, 0) scale(1);
+  }
+  to {
+    transform: translate3d(-2%, 1.5%, 0) scale(1.04);
+  }
+}
+
+.obw-map {
+  position: fixed;
+  z-index: 0;
+  right: -3vw;
+  top: 50%;
+  width: min(58vw, 860px);
+  height: auto;
+  transform: translateY(-46%);
+  pointer-events: none;
+  overflow: visible;
+}
+.obw-edge {
+  stroke: var(--obw-map);
+  stroke-width: 1.2;
+  stroke-opacity: 0.16;
+  stroke-dasharray: 1;
+  stroke-dashoffset: 1;
+  transition: stroke-dashoffset 1.4s var(--obw-ease);
+}
+.obw-edge.is-on {
+  stroke-dashoffset: 0;
+}
+.obw-dot {
+  fill: var(--obw-map);
+  opacity: 0.1;
+  transition: opacity 0.9s var(--obw-ease);
+}
+.obw-node.is-on .obw-dot {
+  opacity: 0.42;
+}
+.obw-halo {
+  fill: var(--obw-green);
+  opacity: 0;
+  transform-box: fill-box;
+  transform-origin: center;
+}
+@media (prefers-reduced-motion: no-preference) {
+  .obw-node.is-new .obw-halo {
+    animation: obw-pulse 1.8s var(--obw-ease) 0.3s both;
+  }
+}
+@keyframes obw-pulse {
+  from {
+    opacity: 0.32;
+    transform: scale(0.4);
+  }
+  to {
+    opacity: 0;
+    transform: scale(1.25);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .obw-edge,
+  .obw-dot {
+    transition: none;
+  }
+}
+
+/* once there are cards to read, the map steps back behind them — it is a backdrop, never in the way */
+.obw-map {
+  transition: opacity 0.8s var(--obw-ease);
+}
+.ob-first.obw.is-who .obw-map,
+.ob-first.obw.is-thought .obw-map {
+  opacity: 0.4;
+}
+/* the mark is ink on paper: on a dark ground it is drawn light, as themes.css draws it in the app
+   (important, because the Logo sets its filter inline) */
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .ob-first.obw .ob-top img {
+  filter: invert(1) brightness(0.92) !important;
+}
+
+/* ── the premise: what Socria is ─────────────────────────────────── */
+.obw-premise {
+  width: min(820px, 100%);
+}
+.obw-eyebrow {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 clamp(16px, 3vh, 26px);
+  font-family: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.22em;
+  text-transform: uppercase;
+  color: var(--ink-45);
+}
+.obw-eyebrow i {
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  background: var(--obw-green);
+  box-shadow: 0 0 0 4px var(--obw-tint);
+}
+.obw-say {
+  margin: 0;
+  max-width: 23ch;
+  font-family: var(--serif);
+  font-weight: 400;
+  font-size: clamp(2rem, 4.3vw, 3.5rem);
+  line-height: 1.1;
+  letter-spacing: -0.025em;
+  color: var(--ink);
+  text-wrap: pretty;
+}
+.obw-say2 {
+  margin: clamp(18px, 3vh, 28px) 0 0;
+  max-width: 38ch;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: clamp(1.15rem, 1.9vw, 1.55rem);
+  line-height: 1.38;
+  color: var(--ink-70);
+  text-wrap: pretty;
+}
+/* what matters, in green — the swash sweeps in under the words once they are up */
+mark.obw-hl {
+  color: var(--obw-green);
+  background-color: transparent;
+  background-image: linear-gradient(var(--obw-swash), var(--obw-swash));
+  background-repeat: no-repeat;
+  background-position: 0 92%;
+  background-size: 100% 0.34em;
+  -webkit-box-decoration-break: clone;
+  box-decoration-break: clone;
+  padding: 0 0.04em;
+  border-radius: 2px;
+}
+.obw-say2 mark.obw-hl {
+  font-style: italic;
+}
+@media (prefers-reduced-motion: no-preference) {
+  mark.obw-hl {
+    animation: obw-swash 1.1s var(--obw-ease) both;
+    animation-delay: calc(var(--hl, 0) * 38ms + 0.45s);
+  }
+}
+@keyframes obw-swash {
+  from {
+    background-size: 0% 0.34em;
+  }
+  to {
+    background-size: 100% 0.34em;
+  }
+}
+.obw-begin {
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  padding: 14px 26px;
+  font-size: 0.98rem;
+}
+.obw-begin svg {
+  transition: transform 0.25s var(--obw-ease);
+}
+.obw-begin:hover svg {
+  transform: translateX(3px);
+}
+.obw-aside {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1rem;
+  color: var(--ink-45);
+}
+
+/* ── what brings them ─────────────────────────────────────────────── */
+.obw-q2 {
+  margin: 10px 0 0;
+  font-family: var(--serif);
+  font-size: clamp(1.45rem, 2.7vw, 2.1rem);
+  line-height: 1.15;
+  color: var(--ink-70);
+}
+.obw-paths {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+}
+.obw .ob-card {
+  background: var(--obw-card);
+  border-radius: 16px;
+  padding: 18px 18px 17px;
+  border-color: var(--ink-12);
+}
+.obw .ob-card:hover,
+.obw .ob-card:focus-visible {
+  background: var(--obw-card-hi);
+  border-color: var(--obw-green);
+}
+.obw .ob-card.is-on {
+  border-color: var(--obw-green);
+  background: var(--obw-tint);
+}
+.obw .ob-card-ic,
+.obw .ob-way-ic {
+  background: var(--obw-tint);
+  color: var(--obw-green);
+}
+.obw .ob-way.is-on .ob-way-ic {
+  background: var(--obw-green);
+  color: var(--paper);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .obw .obw-paths .ob-card,
+  .obw .obw-uses .ob-way {
+    animation: ob-in 0.8s var(--obw-ease) both;
+    animation-delay: calc(0.45s + var(--k, 0) * 70ms);
+  }
+}
+
+/* ── where to start ───────────────────────────────────────────────── */
+.obw-uses {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+.obw-uses.n-4 {
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+}
+.obw .ob-way {
+  background: var(--obw-card);
+  border-radius: 16px;
+  padding: 17px 17px 16px;
+  gap: 6px;
+}
+.obw .ob-way:hover,
+.obw .ob-way:focus-visible {
+  background: var(--obw-card-hi);
+  border-color: var(--obw-green);
+}
+.obw .ob-way.is-on {
+  border-color: var(--obw-green);
+  background: var(--obw-tint);
+  box-shadow: 0 0 0 1px var(--obw-green) inset;
+}
+.obw .ob-way-t {
+  font-size: 1.22rem;
+}
+.obw .ob-way-d {
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 0.98rem;
+  line-height: 1.38;
+  color: var(--ink-70);
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.obw .ob-field.is-taken {
+  border-color: var(--obw-green);
+}
+.obw .ob-go {
+  background: var(--obw-green);
+}
+.obw-note {
+  display: block;
+  margin-top: 6px;
+  font-style: italic;
+  color: var(--ink-45);
+}
+
+/* ── leaving: the page lifts away, the conversation is underneath ── */
+@media (prefers-reduced-motion: no-preference) {
+  .ob-first.obw.is-leaving {
+    animation: obw-leave 0.48s var(--obw-ease) forwards;
+  }
+}
+@keyframes obw-leave {
+  to {
+    opacity: 0;
+    transform: translateY(-10px) scale(1.01);
+  }
+}
+.ob-first.obw.is-leaving {
+  pointer-events: none;
+}
+
+/* ── narrower screens ─────────────────────────────────────────────── */
+@media (max-width: 900px) {
+  .obw-paths {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .obw-uses,
+  .obw-uses.n-4 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .obw-map {
+    width: 92vw;
+    right: -30vw;
+    opacity: 0.7;
+  }
+}
+@media (max-width: 560px) {
+  .obw-say {
+    max-width: none;
+    font-size: clamp(1.75rem, 7.6vw, 2.3rem);
+  }
+  .obw-say2 {
+    font-size: 1.12rem;
+  }
+  .obw-map {
+    top: auto;
+    bottom: -60px;
+    right: -38vw;
+    width: 128vw;
+    transform: none;
+    opacity: 0.55;
+  }
+  .obw-uses,
+  .obw-uses.n-4 {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+  .obw .ob-way {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    column-gap: 12px;
+    row-gap: 2px;
+    align-items: center;
+  }
+  .obw .ob-way-ic {
+    grid-row: 1 / 3;
+    margin-bottom: 0;
+  }
+  .obw .ob-way-d {
+    -webkit-line-clamp: 2;
+  }
+  .obw-aside {
+    display: block;
+    width: 100%;
+  }
+}

@@ -28,6 +28,7 @@
 
 import { entitledBy } from '@/lib/entitlement-rule';
 import { ROLES } from '@/lib/onboarding-roles';
+import { PATHS } from '@/lib/onboarding-paths';
 import { INTENTS, START_MODEL_LABELS, type StartModel } from '@/lib/onboarding-intents';
 import { STYLE_META, CONVERSATION_STYLES, type ConversationStyle } from '@/lib/conversation-style';
 import { dayOf } from '@/lib/product-event-kinds';
@@ -286,9 +287,14 @@ export function aggregate(c: Collected, range: Range): DashboardModel {
     const answer = (step: string, kind: string) => count('onboarding_answered', `${step}:${kind}`);
     const step = (id: StepAnswers['step'], title: string, question: string, bars: Bar[]): StepAnswers => ({ step: id, title, question, bars, total: bars.reduce((s, b) => s + b.n, 0) });
     const steps: StepAnswers[] = [
-      step('who', 'What they think about', 'What do you mostly think about?', [
-        ...ROLES.map((role) => ({ id: role.id, label: role.title, n: answer('who', role.id) })),
-        { id: 'skipped', label: 'Rather not say', n: answer('who', 'skipped'), muted: true },
+      // What brings them (lib/onboarding-paths.ts); before November 2026 the beat asked what they mostly
+      // think about, and a role answered it — those are shown when the range holds any
+      step('who', 'What brings them', 'What brings you to Socria?', [
+        ...PATHS.map((p) => ({ id: p.id, label: p.title, n: answer('who', p.id) })),
+        ...ROLES.filter((role) => !PATHS.some((p) => p.id === role.id))
+          .map((role) => ({ id: role.id, label: `${role.title} (earlier question)`, n: answer('who', role.id) }))
+          .filter((b) => b.n > 0),
+        { id: 'skipped', label: 'Something else', n: answer('who', 'skipped'), muted: true },
       ]),
       step('how', 'How they like to think', 'How do you like to think something through?', [
         // Logos 2 is no longer offered on this screen: shown only if somebody chose it within the range
@@ -307,7 +313,7 @@ export function aggregate(c: Collected, range: Range): DashboardModel {
     ];
     const skipAt: Bar[] = (['premise', 'name', 'who', 'how', 'thought'] as const).map((s) => ({
       id: s,
-      label: { premise: 'On the first screen', name: 'At the name', who: 'At "what do you think about"', how: 'At "how do you like to think"', thought: 'At the first thought' }[s],
+      label: { premise: 'On the first screen', name: 'At the name', who: 'At "what brings you"', how: 'At "how do you like to think"', thought: 'At the first thought' }[s],
       n: answer(s, 'skip_all'),
     }));
     onboarding = { since, opened: count('socria_intro_started'), steps, skipAt };

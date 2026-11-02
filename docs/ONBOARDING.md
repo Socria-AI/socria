@@ -6,17 +6,27 @@ rather than three.
 ## The shape
 
 ```
-ONE ONBOARDING, FOR ALL OF SOCRIA (components/onboarding/FirstRunIntro.tsx)
+ONE ONBOARDING, FOR ALL OF SOCRIA (components/onboarding/FirstRunIntro.tsx) — the welcome
 
-  premise   "Most AI gives you an answer. Socria helps you build the thinking behind one."
+  premise   "Socria is Human-First AI built to expand what people can see,
+            understand, and do, without surrendering the ability to think for
+            themselves. We're not building humanity's replacement. We're
+            building technology that makes humanity more capable."
+            — four phrases set in green, swept in under their words
   name      "First — what should we call you?"            lib/onboarding-name.ts
-  who       "What do you mostly think about?"             lib/onboarding-roles.ts
-            Studying · Building · Researching · Making · Leading · Helping people · Life, mostly
-  how       "How do you like to think something through?"
-            Talk it through → Core 4  ·  See it laid out → Logos 3 where it is
-            offered, Logos 2 where it is not
-  thought   "What are you trying to figure out, <name>?"  five starting points as cards,
-            ordered and worded for what they think about
+  who       "Good to meet you, <name>. What brings you to Socria?"
+            Studying · Understanding something · Making a decision ·
+            Building something · Writing · Researching   lib/onboarding-paths.ts
+            (or "Something else")
+  thought   "Where shall we start, <name>?" — three ways to start down that
+            path, each a whole first message that fills the field to change or
+            send; or their own words. Starting opens a line of thinking of its
+            own and sends it: their first conversation, counted like any other.
+
+  Behind the beats a Logic Map draws itself, a node per answer.
+
+TIPS, ONCE, IN THE FIRST FORTNIGHT; A FEATURE NOW AND THEN; SOCRIA ONE ON RETURN
+(lib/logos5/tips.ts, components/logos5/L5Tips.tsx, components/logos5/OneHeader.tsx)
 
 CORE        one line, once, after the first real reply
 
@@ -33,45 +43,34 @@ WHAT CHANGED, ONCE, FOR WHOEVER USED SOCRIA BEFORE THE MAP
 ```
 
 Every step is skippable, and anything already answered on this browser is not
-asked again. The model question is asked only where no surface has been chosen
-yet (/onboarding, for anyone who can open both); over the chat or over Logos the
-surface is the answer. There is no Logos-only sequence any more: the three-beat
-coach marks over a first map (lib/onboarding.ts, components/FirstMap.tsx) were
-removed. The first map still rises card by card once, with nothing to press.
+asked again. There is no model question any more (it went with the Core chat on
+24 October 2026), and no Logos-only sequence: the first map still rises card by
+card once, with nothing to press.
 
-## Logos 3, where it is offered
+## Tips, features, and Socria One on return
 
-Logos 3 is offered on every deployment, production included
-(`isOffered('logos-3')` in `lib/socria-model-store.ts`, the one rule every menu
-uses). Until 9 October 2026 production listed it only once its access code had
-been entered; opening it to everyone changed all of this at once, with no copy
-to edit. Where Logos 3 is not offered, onboarding falls back to Logos 2.
-
-- **The model question.** "See it laid out" names *Socria Logos 3*: "Your
-  reasoning drawn as a live map, and what you describe built beside it: models
-  you can move, alone or with someone." Its picture adds a model and a second
-  person to the map. The choice is carried through the handover
-  (`Carried.model` in `lib/onboarding-script.ts`), so the chat opens the Logos
-  that was chosen rather than its default — and Logos 2 if Logos 3 is no longer
-  offered by the time they land.
-- **The first screen.** "Think out loud" adds what Logos 3 builds: a model you
-  can move, a matrix you can work, a shape in Live 3D. Its first opening is a
-  system to build — *A spring that won't settle* — in the place of the
-  derivative (`LOGOS3_OPENINGS`); its assumption ("more damping always settles
-  it faster") is one the model itself shows to be wrong past critical damping.
-- **The tour** (`LOGOS3_TOUR`): the map; the one box ("Ask, or say what to
-  build"); "+ View" (`data-tour="views"`, where a model, its parameters or
-  Live 3D open beside the map); switching to Core 4.
-- **The "?" guide** (`LogosGuide edition={3}`): the map and its cards, then
-  what Logos 3 adds, each shown in miniature — a model built from a sentence
-  (computed by the engine, not the AI); the chat working everything (a row
-  operation computed in place); the views beside the map; and thinking it
-  through with someone, Socria between you. Shared steps are the same objects
-  as Logos 2's, so the two walks cannot drift apart.
-
-The name and the answer to "what do you think about" live in this browser, are
-changeable under Manage Account, and reach Socria as one sanitised line each —
-the name to be used rarely, the role only to pick examples that land.
+- **Tips** (`lib/logos5/tips.ts`, kind `tip`) are for somebody's first fortnight
+  (from the welcome, else the account, else a guest's first visit): the Logic
+  Map their words are making, Make, the Universal Map, search. One at a time, 25
+  seconds apart, each once, in order, beside what it is about (`L5Tip`) and
+  never over the box someone types in. The first-reply tour, where it ran, has
+  already pointed at Make, so that tip is skipped.
+- **Features** (kind `feature`) are now and then, for anyone: List, Split View,
+  the tutorials, Quick capture, Voice — each with a "Show me" that does it. At
+  most one a visit, two days apart, never in a visit's first 20 seconds and never
+  on a visit that has had tips.
+- Neither shows over the welcome, "We killed the chatbot.", a sheet, the tour,
+  AR Mode, search, Voice's sheets or big-screen mode, and neither starts while an
+  answer is arriving. A card counts as seen once it has been on screen four
+  seconds, or pressed. Seen is kept with the hints (`socria.hints.seen.v1`), so
+  Manage Account's "Show hints again" brings them back; when the browser keeps
+  nothing, no cards are shown at all.
+- **Socria One** — a free account has a Socria One button beside the account
+  chip (the ⋯ menu was the only way before). When somebody comes back, a small
+  note under it: "Welcome back, <name>." and one short line of the four the
+  welcome-back prompt rotates. When is the prompt's own rule (`lib/one-prompt.ts`):
+  never to a member, never on a first visit, never in a reflective
+  conversation, once a tab, six hours apart. It is never drawn as a sheet.
 
 ## The record — `lib/first-run.ts`
 
@@ -157,21 +156,22 @@ Told once, to the people it changed for, and to nobody else.
 
 ## Routing, and who sees what
 
-- **New account** → `/sign-up` → `/onboarding` (the premise, then the thought)
-  → `/chat` with the sentence carried in session storage (`lib/onboarding-script.ts`).
-  `/onboarding?to=logos` carries it into Logos instead (the Logos page's door).
-- **Signed-out visitor** on `/chat` with nothing → the same premise, over the
-  chat, then the thought goes into the composer. Core 3.1 is open signed out;
-  one free conversation, then sign-in.
-- **Anyone** opening Logos with nothing and no record of the premise → the same
-  premise, over Logos, then the thought goes into Logos's composer.
-- A person with work on screen is never shown the premise, whatever the record
-  says. A Core veteran opening Logos gets the Logos beats and nothing else. A
-  Logos-first person is not re-introduced to Socria by the chat.
-- Nobody is asked "Core or Logos?". The surface you are on is the surface you
-  start in.
+- **New account** → the welcome, once per account, over Logos 5 — however they
+  arrived (lib/first-run.ts `wantsWelcome`): an account made in the last week
+  whose record, merged from the account first, has no `socria.intro`. That
+  includes a guest who signs up and brings their line of thinking along, who
+  used to miss it. `/sign-up` without a redirect still goes to `/onboarding`,
+  the same welcome on its own page, which carries the sentence to `/chat`.
+- **Signed-out visitor** with nothing here → the same welcome, over Logos 5.
+- Whatever starts it, the first message opens a **line of thinking of its own**
+  (`startFromHome`) — never appended to one Instant Resume opened — and it is
+  one of the month's conversations like any other. A free account is told so
+  under the field: "It counts as one of your 3 free conversations this month —
+  3 left."
+- A person whose account is older than a week has met Socria, whatever the
+  record says, and is not welcomed.
 - **Somebody who used Socria before the map** → "We killed the chatbot.",
-  once, over the map (or over Core's chat, leading to it) — see above.
+  once, over the map — see above.
 
 ## Core
 

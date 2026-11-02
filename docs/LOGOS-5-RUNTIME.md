@@ -3285,3 +3285,88 @@ Socria One's.
 - The model runs on the page's main thread. With it running, the browser's
   timers can run late: in the test browser a spoken turn ended about 0.6 s
   after its pause.
+
+## 36. The welcome, tips, features now and then, and Socria One on return
+
+**The welcome** (`components/onboarding/FirstRunIntro.tsx`, `welcome.css`,
+`lib/onboarding-paths.ts`). Four beats on paper, Dark and Celestial alike:
+
+- *Premise*: what Socria is, in its own words, with four phrases in green swept
+  in under their words: "Human-First AI", "expand what people can see,
+  understand, and do", "think for themselves" and "makes humanity more capable".
+- *Name*.
+- *What brings you to Socria?* Six paths in a person's own words: Studying,
+  Understanding something, Making a decision, Building something, Writing,
+  Researching.
+- *Where shall we start?* Three ways to start down the chosen path, each a whole
+  first message that fills the field to change or send — or their own words.
+
+A path says what they mostly think about only when it is one (studying,
+building, writing, researching): that is the one quiet line Socria is told
+(`roleBlock`). A Logic Map draws itself behind the beats, a node per answer, and
+steps back behind the cards. Starting lifts the page away onto their first
+conversation.
+
+**Who sees it** (`lib/first-run.ts` `wantsWelcome`): a guest with nothing here,
+as before. A signed-in account sees it once, made within the last week, whose
+record — merged from the account first, so a second device never shows it again
+— has not reached `socria.intro`. A guest who signs up and brings their line of
+thinking along sees it now; they used to miss it.
+
+**What it starts counts.** The first message opens a line of thinking of its own
+(`startFromHome`) and is charged like any other new conversation. That is so
+whether it comes from the welcome over Logos 5 or is carried from `/onboarding`;
+before, it could be appended to whichever line Instant Resume had opened, and
+then went uncounted. A free account is told under the field how many of the
+month's conversations are left.
+
+**Tips and features** (`lib/logos5/tips.ts`, pure; `L5Tips`, `L5Tip`):
+
+- *Tips* are for the first fortnight, one at a time, 25 seconds apart, each once:
+  the Logic Map, Make, the Universal Map, search.
+- *Features* are for anyone, now and then: List, Split View, the tutorials, Quick
+  capture and Voice, each with a "Show me". At most one a visit, two days apart,
+  never in a visit's first 20 seconds, never on a tips visit.
+- Each card sits beside what it is about and follows it. It is never over the
+  box someone types in, and never over anything else on screen.
+- Seen is kept with the hints, so "Show hints again" brings them back.
+
+**Socria One on return** (`components/logos5/OneHeader.tsx`). A free account has
+a Socria One button beside the account chip. When somebody comes back, a small
+note sits under it: "Welcome back, <name>.", one short true line, "See Socria
+One" (the plan sheet) and "Not now" (a dismissal, for the cooldown). When is the
+welcome-back prompt's own rule: never to a member, never on a first visit, never
+in a reflective conversation, once a tab, six hours apart. It is never a sheet
+over the work.
+
+**Analytics.** The counted answers stay kinds, never words: "who" now counts the
+path id, alongside the earlier role ids still counted. The dashboard shows
+"What brings them", with earlier roles shown only when the range holds any.
+
+**Tested.**
+- `test/onboarding-paths.test.mjs` (45 checks): the paths, their ways to start,
+  the roles they say, the counted kinds, and the screen's wiring, including that
+  a way to start never sends by itself and that what starts counts.
+- `test/onboarding-tips.test.mjs` (34 checks): tips and features, each rule
+  above; every anchor exists; the card; the One button and note; and that the
+  welcome-back is never a sheet.
+- `test/first-run.test.mjs`: the new-account rules.
+- `onboarding`, `onboarding-roles`, `dashboard` and `dashboard-e2e`, updated.
+- In the browser (`.journeys/ob/welcome.mjs`, `features.mjs`; Chromium, desktop
+  and phone, Paper and Dark):
+  - the welcome end to end, with the words and the green checked;
+  - a way to start filling the field without sending, and starting opening a
+    line of its own with their words first and the answer on screen;
+  - the Make tip clear of the box, "Got it" for good, and the counted answers
+    kinds only;
+  - a phone's "Something else" with its own words;
+  - a returning visitor's List feature after the settle, "Show me" opening List,
+    and nothing more on the next visit;
+  - the One note's placement.
+
+**Not yet done.**
+- A signed-in account cannot be made in this sandbox. The new-account rule and
+  the One note's rules are unit-tested, and the note was checked in the browser
+  only as drawn.
+- Name and role still live in the browser, not the account, so a second device
+  asks again if the welcome is replayed. The welcome itself is never shown twice.

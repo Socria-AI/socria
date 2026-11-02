@@ -299,6 +299,32 @@ export function wantsIntro(s: FirstRun, ctx: { work: number; carried: boolean; h
   return ctx.work === 0;
 }
 
+/** How new an account is still new: onboarding is for an account made within this long. */
+export const NEW_ACCOUNT_MS = 7 * 24 * 60 * 60 * 1000;
+
+/**
+ * Show the onboarding (components/onboarding/FirstRunIntro.tsx)?
+ *
+ * To a GUEST, as the premise always was: only with nothing here yet
+ * (wantsIntro). To somebody SIGNED IN, once per account: when the account is
+ * new — made within NEW_ACCOUNT_MS — and the account's own record, merged in
+ * first (`synced`, so a second device does not show it again), says they
+ * have not been through it. Work does not stop it for them: a guest who
+ * signs up brings their one line of thinking along and is new all the same,
+ * and that is exactly who used to miss it. An older account has met Socria,
+ * whatever its record says.
+ */
+export function wantsWelcome(
+  s: FirstRun,
+  ctx: { work: number; carried: boolean; hydrated: boolean; signedIn: boolean; synced: boolean; accountAgeMs: number | null }
+): boolean {
+  if (!ctx.signedIn) return wantsIntro(s, ctx);
+  if (!ctx.hydrated || !ctx.synced) return false;
+  if (has(s, 'socria.intro')) return false;
+  if (ctx.carried) return false;
+  return ctx.accountAgeMs !== null && Number.isFinite(ctx.accountAgeMs) && ctx.accountAgeMs >= 0 && ctx.accountAgeMs < NEW_ACCOUNT_MS;
+}
+
 /**
  * Show Core's one line?
  *

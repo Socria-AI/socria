@@ -20,6 +20,7 @@ import { dirname, join, resolve as res } from 'node:path';
 import { fileURLToPath, pathToFileURL } from 'node:url';
 import { renderToStaticMarkup } from 'react-dom/server';
 import { ROLES } from './.tmp/onboarding-roles.mjs';
+import { PATHS } from './.tmp/onboarding-paths.mjs';
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');
@@ -95,7 +96,8 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
 const DAY = 86_400_000;
 const HOUR = 3_600_000;
 const NOW = Date.now();
-const title = (id) => ROLES.find((r) => r.id === id).title;
+// what brings them (lib/onboarding-paths.ts) is the question now; an id it does not have is an earlier role
+const title = (id) => (PATHS.find((p) => p.id === id) ?? ROLES.find((r) => r.id === id)).title;
 
 // bump_product_event as supabase/schema.sql defines it: one row per
 // (env, day, event, kind), added to. Every call is kept, to be read back.

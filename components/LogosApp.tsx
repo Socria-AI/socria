@@ -77,7 +77,7 @@ import { callsSocria, cleanWebSources, landReply, mentionsSocria, newMsgId, repl
 import { SocriaOneModal } from '@/components/SocriaOneModal';
 import { OnePrompt } from '@/components/OnePrompt';
 import { useOnePrompt } from '@/components/useOnePrompt';
-import { reasonForCounter } from '@/lib/one-prompt';
+import { reasonForCounter, welcomeNudge } from '@/lib/one-prompt';
 import { track } from '@/lib/analytics';
 import { authUrl } from '@/lib/auth-links';
 import { isSource } from '@/lib/checkout-attribution';
@@ -179,6 +179,9 @@ import dynamic from 'next/dynamic';
 import type { ArAccess } from '@/lib/ar-access';
 import { HANDCAM_EVENT, readHandCommand, type ArCommand, type HandCommand } from '@/lib/logos5/hand-commands';
 import { handPointer, stopHands } from '@/lib/hand-bus';
+import { L5Tips } from '@/components/logos5/L5Tips';
+import { OneButton, WelcomeBack } from '@/components/logos5/OneHeader';
+import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
 import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
 import { Inline as RichInline } from '@/components/RichText';
@@ -278,7 +281,7 @@ import { WhatsNew } from '@/components/onboarding/WhatsNew';
 import { GUEST_NUDGE_AT, GUEST_TURNS, guestTurnsUsed } from '@/lib/guest-limits';
 import { GuestNudge, GuestWall } from '@/components/logos5/GuestWall';
 import { useFirstRun } from '@/components/useFirstRun';
-import { wantsIntro, wantsWhatsNew } from '@/lib/first-run';
+import { wantsWelcome, wantsWhatsNew } from '@/lib/first-run';
 import { computationFacts, whatChanged } from '@/lib/model/inspect';
 import { viewsFor } from '@/lib/model/views';
 import { affectedBy } from '@/lib/model/deps';
@@ -437,7 +440,7 @@ export function LogosApp({
   tourAfter = false,
 }: {
   initialInput?: string;
-  /** send initialInput on landing — onboarding's first thought, free once per account */
+  /** send initialInput on landing — onboarding's first thought, in a line of thinking of its own; it counts like any other */
   autoSend?: boolean;
   /** run the tour once Socria's first reply is on screen — onboarding starts it */
   tourAfter?: boolean;
@@ -1242,7 +1245,8 @@ export function LogosApp({
     if (!autoSend || autoSentRef.current || !initialInput || hydrating || busy || !activeId) return;
     autoSentRef.current = true;
     seeded.current = true;
-    void send(initialInput);
+    // in a line of thinking of its own — never appended to whichever one Instant Resume opened
+    startFromHome(initialInput);
     // send reads the state it needs when it runs
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [autoSend, initialInput, hydrating, busy, activeId]);
@@ -4333,7 +4337,6 @@ export function LogosApp({
     // a press that does nothing — that was the whole reason entitlement
     // prompts were never rationed, and the once-per-tab rule only holds
     // because this line keeps the promise the sheet used to.
-    // Onboarding's sentence is exempt — the server decides whether it still is.
     // (The month's conversations are the only count a turn can meet now: there
     // is no day's count of messages, and onboarding's first thought is one of
     // the month's conversations like any other — October 31, 2026.)
@@ -6856,16 +6859,28 @@ export function LogosApp({
   // gets Logos 5 — a guest with one line of thinking and its map.
   if (!hasAccess) return <div className="logos-root" />;
 
-  // THE PREMISE, for a person with nothing here yet and nothing carried in.
-  // The record is shared with the chat, so a Core veteran opening Logos is
-  // not shown it, and a Logos-first person is not shown it again by the chat.
+  // THE WELCOME (components/onboarding/FirstRunIntro.tsx): to a guest with nothing here yet and nothing
+  // carried in, and to a new account once — even one that brought a guest's line of thinking along, who
+  // used to miss it (lib/first-run.ts wantsWelcome). The record is the account's, so it is never shown twice.
   const introWanted =
     firstRun.ready &&
-    wantsIntro(firstRun.state, {
+    wantsWelcome(firstRun.state, {
       work: sessions.filter((x) => x.messages.length > 0 || !!x.map?.nodes?.length).length,
       carried: !!initialInput || !!pendingStart,
       hydrated: !hydrating,
+      signedIn: !!isSignedIn,
+      synced: firstRun.synced,
+      accountAgeMs: user?.createdAt ? Date.now() - new Date(user.createdAt).getTime() : null,
     });
+  /** under the welcome's field, on a free plan: what starting costs — it is one of the month's conversations */
+  const welcomeNote = (() => {
+    if (!isSignedIn || one || !planKnown) return null;
+    const u = usage.chats;
+    const limit = u?.limit ?? null;
+    if (limit === null || limit <= 0) return null;
+    const left = Math.max(0, limit - (u?.used ?? 0));
+    return left > 0 ? `It counts as one of your ${limit} free conversations this month — ${left} left.` : null;
+  })();
 
   // ── ONE WRITE PATH FOR EVERY SURFACE ─────────────────────────────
   // A slider, a cursor, a selection or an open view goes into the document
@@ -8816,14 +8831,36 @@ export function LogosApp({
       </a>
     </div>
   ) : isSignedIn ? (
-    <AccountControl
-      onOpen={() => setAcctOpen(true)}
-      isOne={one}
-      items={[
-        { label: 'Account settings', hint: 'Profile, plan, devices, export', onSelect: () => setAcctOpen(true) },
-        ...(cloud ? [{ label: 'Memory', hint: 'What Socria remembers about you', onSelect: () => setL5Mind(true) }] : []),
-      ]}
-    />
+    // a free account: Socria One a press away, beside the account — and, on a return, a word under it
+    <span className="l5-acct">
+      {planKnown && !one && (
+        <OneButton
+          onOpen={() => askOne()}
+          note={
+            onePrompt?.open && onePrompt.reason === 'welcome-back'
+              ? {
+                  first: (readName() ?? user?.firstName ?? '').trim().split(/\s+/)[0] || null,
+                  title: onePrompt.title,
+                  line: welcomeNudge(onePrompt.title),
+                  onSee: () => {
+                    acceptPrompt();
+                    askOne();
+                  },
+                  onLater: dismissPrompt,
+                }
+              : null
+          }
+        />
+      )}
+      <AccountControl
+        onOpen={() => setAcctOpen(true)}
+        isOne={one}
+        items={[
+          { label: 'Account settings', hint: 'Profile, plan, devices, export', onSelect: () => setAcctOpen(true) },
+          ...(cloud ? [{ label: 'Memory', hint: 'What Socria remembers about you', onSelect: () => setL5Mind(true) }] : []),
+        ]}
+      />
+    </span>
   ) : null;
   const moreEl = (
     <L5Menu
@@ -8902,6 +8939,22 @@ export function LogosApp({
     });
   /** Memory is its own place: over home and over a line of thinking alike */
   const mindShown = l5 && l5Mind && !hydrating && !room.active;
+  /** new to Socria — their first fortnight, from the welcome (or the account, or a guest's first visit) — for the tips */
+  const tipsNew = (() => {
+    const at = firstRun.state.at['socria.intro'];
+    if (typeof at === 'number') return Date.now() - at < NEW_FOR_MS;
+    if (isSignedIn) return !!user?.createdAt && Date.now() - new Date(user.createdAt).getTime() < NEW_FOR_MS;
+    return true;
+  })();
+  /** a feature's "Show me" (lib/logos5/tips.ts): the press it stands for */
+  function doTipAction(a: TipAction) {
+    if (a === 'list') setL5List(true);
+    else if (a === 'guide') setGuideOpen(true);
+    else if (a === 'capture') setCaptureOpen(true);
+    else if (a === 'search') setSearchOpen(Date.now());
+    else if (a === 'voice') pressVoice();
+    else if (a === 'split') document.querySelector<HTMLButtonElement>('.l5v-split button')?.click();
+  }
   zoomOkRef.current = !!l5 && !!activeId && !homeShown && !mindShown && studyTab === 'chat' && !zoomed && messages.length > 0;
   function goHome() {
     setL5Home(true);
@@ -9238,14 +9291,37 @@ export function LogosApp({
       {introWanted && (
         <LogosIntroOnce
           signedIn={!!isSignedIn}
+          defaultName={user?.firstName ?? null}
+          startNote={welcomeNote}
           onStart={(text) => {
             firstRun.reach('socria.intro');
-            // straight through: the answer to their own question is the welcome
-            void send(text);
+            // straight through, in a line of thinking of its own: the answer to their own question is the
+            // welcome, and it is one of the month's conversations like any other
+            startFromHome(text);
           }}
           onSkip={() => firstRun.reach('socria.intro', { skipped: true })}
         />
       )}
+      {l5 && hasAccess && (
+        <L5Tips
+          ctx={{
+            where: homeShown ? 'home' : mindShown ? 'other' : activeId ? 'line' : 'other',
+            replies: messages.filter((m) => m.role === 'assistant').length,
+            lines: withWork.length,
+            newUser: tipsNew,
+            can: { split: !narrow, capture: !!LOGOS4.capture, voice: voiceOffered },
+          }}
+          quiet={busy || !!streaming || hydrating || organizing || sortPending}
+          hidden={
+            introWanted || whatsNewShown || guideOpen || oneOpen || !!onePrompt?.open || acctOpen || captureOpen || tourOpen || arOpen || !!searchOpen || !!voiceSheet || togetherReadOnly || cabin
+          }
+          onAction={doTipAction}
+        />
+      )}
+      <WelcomeBack
+        ready={!!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun.synced && !introWanted && !whatsNewShown && !busy && !oneOpen && !acctOpen && !guideOpen}
+        ask={ask}
+      />
       {whatsNewShown && (
         <WhatsNew
           surface="logos"
@@ -9425,7 +9501,8 @@ export function LogosApp({
           past — it is one screen instead of two. */}
 
       <OnePrompt
-        view={onePrompt}
+        // the welcome-back is said small, under the Socria One button (OneButton), never as a sheet over the work
+        view={onePrompt?.reason === 'welcome-back' ? null : onePrompt}
         onDismiss={dismissPrompt}
         onAccept={() => {
           acceptPrompt();
@@ -9565,11 +9642,23 @@ function docAttachment(doc: SourceDoc): Attachment {
  * The first-run screen over Logos — and its own "started" event, fired once
  * per showing rather than per render.
  */
-function LogosIntroOnce({ onStart, onSkip, signedIn }: { onStart: (text: string) => void; onSkip: () => void; signedIn: boolean }) {
+function LogosIntroOnce({
+  onStart,
+  onSkip,
+  signedIn,
+  defaultName,
+  startNote,
+}: {
+  onStart: (text: string) => void;
+  onSkip: () => void;
+  signedIn: boolean;
+  defaultName?: string | null;
+  startNote?: string | null;
+}) {
   useEffect(() => {
     track('socria_intro_started', { surface: 'logos' });
   }, []);
-  return <FirstRunIntro surface="logos" onStart={onStart} onSkip={onSkip} signedIn={signedIn} />;
+  return <FirstRunIntro surface="logos" onStart={onStart} onSkip={onSkip} signedIn={signedIn} defaultName={defaultName} startNote={startNote} />;
 }
 
 /** The time zone this browser is in, as it names it (America/Chicago), or nothing. */

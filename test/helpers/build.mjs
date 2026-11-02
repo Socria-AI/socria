@@ -46,6 +46,7 @@ const MODULES = [
   'lib/objects/matrix.ts',
   'lib/objects/matrix-analysis.ts',
   'lib/onboarding-roles.ts',
+  'lib/onboarding-paths.ts',
   'lib/onboarding-name.ts',
   'lib/theme.ts',
   'lib/new-socria.ts',
@@ -353,6 +354,8 @@ const MODULES = [
   'test/helpers/canvas-under-test.tsx',
   // AR Mode: the Logic Map moved with your hands — its geometry, who may use it, the overlay, the store
   'test/helpers/ar-under-test.tsx',
+  // the welcome's tips and features, and Socria One's button and its note on return
+  'test/helpers/tips-under-test.tsx',
 ];
 
 export async function buildAll() {

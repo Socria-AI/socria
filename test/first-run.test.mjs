@@ -5,7 +5,7 @@
 import {
   MILESTONES, EMPTY_FIRST_RUN, FIRST_RUN_KEY, ANALYTICS_FOR,
   parseFirstRun, has, reach, mergeFirstRun, aheadOf,
-  legacyMilestones, readFirstRun, writeFirstRun, wantsIntro, wantsCoreLine,
+  legacyMilestones, readFirstRun, writeFirstRun, wantsIntro, wantsCoreLine, wantsWelcome, NEW_ACCOUNT_MS,
 } from './.tmp/first-run.mjs';
 import { EVENTS } from './.tmp/analytics.mjs';
 
@@ -99,6 +99,23 @@ console.log('=== who sees the premise ===');
   // Socria, whatever the chat's own flags say.
   const logosVeteran = reach(reach(fresh, 'logos.aha').state, 'socria.intro').state;
   ok('a Logos veteran is not new to Socria', !wantsIntro(logosVeteran, { work: 0, carried: false, hydrated: true }));
+}
+
+console.log('=== who sees the welcome (the onboarding) ===');
+{
+  const fresh = EMPTY_FIRST_RUN;
+  const day = 86_400_000;
+  const me = (o = {}) => ({ work: 0, carried: false, hydrated: true, signedIn: true, synced: true, accountAgeMs: day, ...o });
+  ok('a new account, once', wantsWelcome(fresh, me()));
+  // the guest who signs up brings their one line of thinking along — and used to miss the welcome for it
+  ok('a new account with a line of thinking brought from being a guest', wantsWelcome(fresh, me({ work: 1 })));
+  ok('not an account older than a week — it has met Socria', !wantsWelcome(fresh, me({ accountAgeMs: NEW_ACCOUNT_MS + 1 })) && NEW_ACCOUNT_MS === 7 * day);
+  ok('not without knowing how old the account is', !wantsWelcome(fresh, me({ accountAgeMs: null })) && !wantsWelcome(fresh, me({ accountAgeMs: NaN })) && !wantsWelcome(fresh, me({ accountAgeMs: -5 })));
+  ok('not before the account’s own record has been merged in — a second device never shows it again', !wantsWelcome(fresh, me({ synced: false })));
+  ok('not before the list has loaded', !wantsWelcome(fresh, me({ hydrated: false })));
+  ok('never twice, on any device', !wantsWelcome(reach(fresh, 'socria.intro').state, me()) && !wantsWelcome(reach(fresh, 'socria.intro', 1, { skipped: true }).state, me()));
+  ok('not when a sentence was carried in from /onboarding', !wantsWelcome(fresh, me({ carried: true })));
+  ok('a guest, as the premise always was: only with nothing here yet', wantsWelcome(fresh, me({ signedIn: false, synced: false, accountAgeMs: null })) && !wantsWelcome(fresh, me({ signedIn: false, work: 2 })));
 }
 
 console.log('=== who sees Core\'s one line ===');

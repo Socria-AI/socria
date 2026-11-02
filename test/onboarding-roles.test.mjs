@@ -46,7 +46,10 @@ ok('roleOf only knows the seven', roleOf('lead')?.title === 'Leading' && roleOf(
 console.log('\n=== the wiring ===');
 const intro = read('components/onboarding/FirstRunIntro.tsx');
 ok('onboarding asks it after the name, skippably', /beat === 'who'/.test(intro) && /Rather not say/.test(intro) && /'premise', 'name', 'who'/.test(intro));
-ok('the starting points follow the role’s order and wording', /role \? role\.order/.test(intro) && /role\?\.ways\[id\]/.test(intro));
+// Since November 2026 the third beat asks what brings them (lib/onboarding-paths.ts): a path, which says
+// a role only when it is one (studying, building, writing, researching) — and the ways to start follow it.
+ok('a path says the role when it is one, and only then', /const r = roleOf\(p\?\.role\);\s*writeRole\(r\?\.id \?\? null\);/.test(intro));
+ok('the ways to start follow the path chosen — or the role an earlier onboarding was told', /const uses = usesFor\(path\);/.test(intro) && /setPath\(pathForRole\(r\?\.id\)\)/.test(intro));
 ok('the starting points are visible cards with icons, not a line of italics', /className=\{`ob-way/.test(intro) && /<ObIcon/.test(intro) && !/ob-intents/.test(intro));
 ok('both chat routes give Socria the line', /roleBlock\(body\?\.role\)/.test(read('app/api/chat/route.ts')) && /roleBlock\(body\?\.role\)/.test(read('app/api/logos/chat/route.ts')));
 // The Core chat sent it with its own requests too; that went with the Core chat, and Logos 5 is the one surface.

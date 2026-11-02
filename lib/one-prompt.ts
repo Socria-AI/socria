@@ -148,9 +148,10 @@ export interface TriggerSpec {
  * something, not measured. If a line here ever reads as pressure, it is the
  * wrong line.
  */
-export const WELCOME_BACK: readonly { title: string; body: string }[] = [
+export const WELCOME_BACK: readonly { title: string; body: string; nudge: string }[] = [
   {
     title: 'Pick it back up',
+    nudge: 'Socria One holds as many conversations as you have, and carries what it learns into the next.',
     body:
       `The free plan holds ${allowanceLabel('chats')} and ${allowanceLabel('maps')}. ` +
       'Socria One holds as many as you have, and carries what it learns ' +
@@ -158,6 +159,7 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
   },
   {
     title: 'What stays between conversations',
+    nudge: 'Room and continuity: as much as you need, with what you have settled carried forward.',
     body:
       `The free plan gives you ${freePlanSentence()}. What Socria One adds is ` +
       'room and continuity: as much as you need, with your positions, what you ' +
@@ -165,6 +167,7 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Where this goes next',
+    nudge: 'Long work is where Socria earns its place. Socria One is the version without a count on it.',
     body:
       'Long work is where this product earns its place — a decision that runs ' +
       'for weeks, a question you keep returning to. Socria One is the version ' +
@@ -172,12 +175,18 @@ export const WELCOME_BACK: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Everything you have made stays yours',
+    nudge: 'Nothing here expires on the free plan. Socria One adds unlimited conversations, Voice and sharing.',
     body:
       'Nothing here expires and nothing is taken back: every conversation and ' +
       'every map you have made stays open on the free plan. Socria One is ' +
       'unlimited, with Socria Voice and sharing.',
   },
 ];
+
+/** The welcome-back's one short line, for the small note on the Socria One button (LogosApp's OneNudge). */
+export function welcomeNudge(title: string): string {
+  return WELCOME_BACK.find((v) => v.title === title)?.nudge ?? WELCOME_BACK[0].nudge;
+}
 
 /** Which one this time. Cycles, so nobody is shown the same line twice running. */
 export function welcomeVariant(shown: number): { title: string; body: string } {

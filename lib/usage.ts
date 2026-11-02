@@ -2,10 +2,9 @@
 //
 // The counters behind the product's boundaries, read and written server-side.
 //
-// Two different things live here now. The plan boundaries — two lines of
-// thinking a month and ten messages a day in Logos, four new chats and twenty
-// messages a day in Core, on the free tier; effectively uncounted on Socria
-// One. Everything else is a fair-use ceiling identical on both plans, set
+// Two different things live here now. The plan boundaries — the free tier's
+// conversations a month (lib/entitlements.ts says how many), effectively
+// uncounted on Socria One. Everything else is a fair-use ceiling identical on both plans, set
 // where serious work does not reach it, and lib/entitlements.ts says which is
 // which (TIERED_COUNTERS). Nothing in this file needs to know the difference;
 // the copy and the prompts do.

@@ -6,29 +6,52 @@
 // Four short beats on paper, each one answered or skipped, nothing performing
 // itself:
 //
-//   premise   "Most AI gives you an answer. Socria helps you build the thinking
-//              behind one."
+//   premise   what Socria is, in its own words — the parts that matter set in
+//             green — and what it is not: "We're not building humanity's
+//             replacement."
 //   name      what they want to be called (lib/onboarding-name.ts)
-//   who       what they mostly think about (lib/onboarding-roles.ts)
-//   thought   the question, a field, and five starting points worded for them
+//   who       what brings them to Socria — studying, trying to understand
+//             something, a decision… (lib/onboarding-paths.ts)
+//   thought   three ways to start down that path, each a whole first message
+//             they can take and change, or their own words
 //
-// Whatever they write goes, verbatim, into Logos 5's composer. It is the SAME
-// component on /onboarding and over Logos, so it is read once rather than
-// twice (lib/first-run.ts).
+// Whatever they start with becomes their first conversation, and it counts
+// like any other (the caller says so under the field, for a free plan). It
+// is the SAME component on /onboarding and over Logos 5, so it is read once
+// rather than twice (lib/first-run.ts).
 //
-// There was a fifth beat, "how do you like to think something through?",
-// which was the choice of model: talking it through (Core 4) or seeing it laid
-// out (Logos). It went with the Core chat on 24 October 2026 (docs/ARCHIVE.md):
-// there is one surface, so there is nothing to choose.
+// Behind the beats, a Logic Map draws itself a node at a time: each answer
+// adds one, so by the time they start, the shape they are about to make is
+// already on the page.
 
 import { useEffect, useRef, useState } from 'react';
 import { Logo } from '@/components/ds';
 import { ObIcon } from './ObIcon';
-import { ROLES, readRole, roleOf, writeRole, type IntentId, type Role } from '@/lib/onboarding-roles';
+import { readRole, roleOf, writeRole } from '@/lib/onboarding-roles';
 import { readName, sanitizeName, writeName } from '@/lib/onboarding-name';
+import { INTENTS } from '@/lib/onboarding-intents';
+import { PATHS, pathForRole, usesFor, type Path, type UseCase } from '@/lib/onboarding-paths';
 import { track } from '@/lib/analytics';
-import { INTENTS, type Intent } from '@/lib/onboarding-intents';
 import '@/app/onboarding/onboarding.css';
+import './welcome.css';
+
+/** What Socria is, as it says it. `hl` is set in green: the parts that matter. */
+export const PREMISE: readonly (readonly { t: string; hl?: boolean }[])[] = [
+  [
+    { t: 'Socria is ' },
+    { t: 'Human-First AI', hl: true },
+    { t: ' built to ' },
+    { t: 'expand what people can see, understand, and do', hl: true },
+    { t: ', without surrendering the ability to ' },
+    { t: 'think for themselves', hl: true },
+    { t: '.' },
+  ],
+  [
+    { t: 'We’re not building humanity’s replacement. We’re building technology that ' },
+    { t: 'makes humanity more capable', hl: true },
+    { t: '.' },
+  ],
+];
 
 /* ── words, rising on mount. Nothing here depends on scroll. ── */
 function Rise({ text, from = 0 }: { text: string; from?: number }) {
@@ -37,7 +60,7 @@ function Rise({ text, from = 0 }: { text: string; from?: number }) {
   return (
     <span>
       {parts.map((p, k) =>
-        /^\s+$/.test(p) ? (
+        /^\s+$/.test(p) || !p ? (
           p
         ) : (
           <span className="ob-w" key={k}>
@@ -49,8 +72,80 @@ function Rise({ text, from = 0 }: { text: string; from?: number }) {
   );
 }
 
+/** Words that rise, with the green parts swept in once their words are up. */
+function Said({ parts, from = 0 }: { parts: readonly { t: string; hl?: boolean }[]; from?: number }) {
+  let i = from;
+  return (
+    <>
+      {parts.map((p, k) => {
+        const words = p.t.split(/(\s+)/).map((w, j) =>
+          /^\s+$/.test(w) || !w ? (
+            w
+          ) : (
+            <span className="ob-w" key={j}>
+              <i style={{ '--i': i++ } as React.CSSProperties}>{w}</i>
+            </span>
+          )
+        );
+        return p.hl ? (
+          <mark key={k} className="obw-hl" style={{ '--hl': i } as React.CSSProperties}>
+            {words}
+          </mark>
+        ) : (
+          <span key={k}>{words}</span>
+        );
+      })}
+    </>
+  );
+}
+const wordsIn = (parts: readonly { t: string }[]) => parts.map((p) => p.t).join('').split(/\s+/).filter(Boolean).length;
+
+/**
+ * The Logic Map behind the beats: seven ideas and the lines between them,
+ * drawn faintly. `lit` of them are on — one more with every answer.
+ */
+const MAP_NODES = [
+  { x: 470, y: 250, r: 9 },
+  { x: 330, y: 150, r: 6 },
+  { x: 610, y: 135, r: 6 },
+  { x: 650, y: 330, r: 7 },
+  { x: 345, y: 360, r: 6 },
+  { x: 520, y: 455, r: 5 },
+  { x: 200, y: 255, r: 5 },
+];
+const MAP_EDGES: [number, number][] = [
+  [0, 1],
+  [0, 2],
+  [0, 3],
+  [0, 4],
+  [3, 5],
+  [4, 5],
+  [1, 6],
+  [4, 6],
+];
+function ObMap({ lit }: { lit: number }) {
+  return (
+    <svg className="obw-map" viewBox="0 0 800 560" aria-hidden="true" focusable="false">
+      {MAP_EDGES.map(([a, b], k) => {
+        const on = Math.max(a, b) < lit;
+        const A = MAP_NODES[a];
+        const B = MAP_NODES[b];
+        return <line key={k} className={`obw-edge${on ? ' is-on' : ''}`} x1={A.x} y1={A.y} x2={B.x} y2={B.y} pathLength={1} />;
+      })}
+      {MAP_NODES.map((n, k) => (
+        <g key={k} className={`obw-node${k < lit ? ' is-on' : ''}${k === lit - 1 ? ' is-new' : ''}`}>
+          <circle className="obw-halo" cx={n.x} cy={n.y} r={n.r * 3.2} />
+          <circle className="obw-dot" cx={n.x} cy={n.y} r={n.r} />
+        </g>
+      ))}
+    </svg>
+  );
+}
+
 const MAX = 2000;
 type Beat = 'premise' | 'name' | 'who' | 'thought';
+/** how many ideas the map behind has lit, by beat */
+const LIT: Record<Beat, number> = { premise: 1, name: 3, who: 5, thought: 7 };
 
 export function FirstRunIntro({
   surface: _surface,
@@ -58,36 +153,41 @@ export function FirstRunIntro({
   onSkip,
   defaultName,
   signedIn = false,
+  startNote = null,
 }: {
   /** which surface mounted it — kept for callers; the questions are the same everywhere */
   surface: 'core' | 'logos';
   /** an account to change the answers in later; a guest has none, and is not told to look for one */
   signedIn?: boolean;
-  /** the thought, verbatim, and the starting point they picked */
+  /** the first message, verbatim, and the kind of thinking it starts (an intent id), if they took a way in */
   onStart: (text: string, intent: string | null) => void;
   onSkip: () => void;
   /** a name the account already knows, to start the field with */
   defaultName?: string | null;
+  /** said under the field — that starting is one of the month's conversations, on a free plan */
+  startNote?: string | null;
 }) {
   const [beat, setBeat] = useState<Beat>('premise');
   const [name, setName] = useState('');
-  const [role, setRole] = useState<Role | null>(null);
-  const [intent, setIntent] = useState<Intent | null>(null);
+  const [path, setPath] = useState<Path | null>(null);
+  const [use, setUse] = useState<UseCase | null>(null);
   const [text, setText] = useState('');
+  const [leaving, setLeaving] = useState(false);
   const area = useRef<HTMLTextAreaElement>(null);
   const nameRef = useRef<HTMLInputElement>(null);
-  const known = useRef<{ name: string | null; role: Role | null }>({ name: null, role: null });
+  const known = useRef<{ name: string | null; role: string | null }>({ name: null, role: null });
   useEffect(() => {
     const n = readName();
     const r = roleOf(readRole());
-    known.current = { name: n, role: r };
+    known.current = { name: n, role: r?.id ?? null };
     setName(n ?? sanitizeName(defaultName) ?? '');
-    setRole(r);
+    // a role told to an earlier onboarding on this browser is a path already taken
+    setPath(pathForRole(r?.id));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   useEffect(() => {
-    if (beat === 'thought') area.current?.focus();
-    if (beat === 'name') nameRef.current?.focus();
+    if (beat === 'thought') area.current?.focus({ preventScroll: true });
+    if (beat === 'name') nameRef.current?.focus({ preventScroll: true });
   }, [beat]);
 
   // The beats this person still needs, in order — anything already answered
@@ -103,7 +203,7 @@ export function FirstRunIntro({
     return 'thought';
   };
 
-  // Every answer on this screen, as a step and a kind — a role id, a starting
+  // Every answer on this screen, as a step and a kind — a path id, a starting
   // point, or 'skipped' — counted anonymously (lib/product-events.ts) so the
   // developer dashboard can say what people choose. Never their words, never
   // their name: for the name, only whether they gave one.
@@ -118,34 +218,52 @@ export function FirstRunIntro({
     setName(clean ?? '');
     setBeat(next('name'));
   };
-  const pickRole = (r: Role | null) => {
-    answer('who', r?.id ?? 'skipped');
+  const pickPath = (p: Path | null) => {
+    answer('who', p?.id ?? 'skipped');
+    // what they mostly think about, when the path says — and only then (lib/onboarding-paths.ts)
+    const r = roleOf(p?.role);
     writeRole(r?.id ?? null);
-    setRole(r);
     if (r) track('onboarding_role_chosen', { kind: r.id });
-    setIntent(null);
+    setPath(p);
+    setUse(null);
+    setText('');
     setBeat(next('who'));
   };
+  const pickUse = (u: UseCase) => {
+    if (use?.id === u.id) {
+      setUse(null);
+      setText('');
+      area.current?.focus({ preventScroll: true });
+      return;
+    }
+    answer('example', u.intent);
+    setUse(u);
+    setText(u.text);
+    area.current?.focus({ preventScroll: true });
+  };
+  // the kind of thinking their way in starts — the intent of the way they took, if they took one
+  const intent = use ? INTENTS.find((i) => i.id === use.intent) ?? null : null;
   const begin = (v: string) => {
     const s = (v || '').replace(/\s+$/, '').slice(0, MAX);
-    if (!s.trim()) return;
+    if (!s.trim() || leaving) return;
     answer('thought', intent?.id ?? 'none');
-    onStart(s, intent?.id ?? null);
+    setLeaving(true);
+    // the page lifts away, and their conversation is underneath it
+    const still = typeof window !== 'undefined' && window.matchMedia?.('(prefers-reduced-motion: reduce)').matches;
+    window.setTimeout(() => onStart(s, intent?.id ?? null), still ? 0 : 480);
   };
 
-  // the starting points, in the order that fits them, worded for their life
-  const ways: Intent[] = (role ? role.order : INTENTS.map((i) => i.id)).map((id) => {
-    const base = INTENTS.find((i) => i.id === id)!;
-    const w = role?.ways[id];
-    return w ? { ...base, placeholder: w.placeholder, eg: w.eg } : base;
-  });
+  const uses = usesFor(path);
   const first = sanitizeName(name)?.split(' ')[0] ?? null;
   const steps: Beat[] = ['name', 'who', 'thought'];
   const stepAt = steps.indexOf(beat);
+  const lead = wordsIn(PREMISE[0]);
 
   return (
-    <div className="ob ob-first" role="dialog" aria-label="Beginning">
+    <div className={`ob ob-first obw is-${beat}${leaving ? ' is-leaving' : ''}`} role="dialog" aria-label="Welcome to Socria">
       <span className="ob-grain" aria-hidden="true" />
+      <span className="obw-glow" aria-hidden="true" />
+      <ObMap lit={LIT[beat]} />
 
       <div className="ob-top">
         <Logo size="sm" markSrc="/socria-mark.png" />
@@ -170,26 +288,31 @@ export function FirstRunIntro({
 
       <div className="ob-stage">
         {beat === 'premise' && (
-          <div className="ob-wrap" key="premise">
-            <h1 className="ob-q ob-premise">
-              <span className="ob-line">
-                <Rise text="Most AI gives you an answer." />
-              </span>
-              <span className="ob-line ob-line-2">
-                <Rise text="Socria helps you build the thinking behind one." from={6} />
-              </span>
+          <div className="ob-wrap obw-premise" key="premise">
+            <p className="obw-eyebrow ob-fade" style={{ '--d': '.05s' } as React.CSSProperties}>
+              <i aria-hidden="true" /> Welcome to Socria
+            </p>
+            <h1 className="obw-say">
+              <Said parts={PREMISE[0]} />
             </h1>
-            <div className="ob-row ob-fade" style={{ '--d': '1.35s' } as React.CSSProperties}>
+            <p className="obw-say2">
+              <Said parts={PREMISE[1]} from={lead + 4} />
+            </p>
+            <div className="ob-row ob-fade" style={{ '--d': '2.6s' } as React.CSSProperties}>
               <button
                 type="button"
-                className="ob-primary"
+                className="ob-primary obw-begin"
                 onClick={() => {
                   answer('premise', 'continued');
                   setBeat(next('premise'));
                 }}
               >
-                Start thinking
+                Begin
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                  <path d="M5 12h14M13 6l6 6-6 6" />
+                </svg>
               </button>
+              <span className="obw-aside">Three quick questions, then your first conversation.</span>
             </div>
           </div>
         )}
@@ -232,23 +355,35 @@ export function FirstRunIntro({
         {beat === 'who' && (
           <div className="ob-wrap ob-wrap-wide" key="who">
             <h1 className="ob-q ob-q-sm">
-              <Rise text={first ? `Good to meet you, ${first}. What do you mostly think about?` : 'What do you mostly think about?'} />
+              <Rise text={first ? `Good to meet you, ${first}.` : 'Good to meet you.'} />
             </h1>
-            <p className="ob-sub ob-fade" style={{ '--d': '.35s' } as React.CSSProperties}>
+            <p className="obw-q2 ob-fade" style={{ '--d': '.3s' } as React.CSSProperties}>
+              What brings you to Socria?
+            </p>
+            <p className="ob-sub ob-fade" style={{ '--d': '.4s' } as React.CSSProperties}>
               So the examples fit.{signedIn ? ' Change it any time in Manage Account.' : ''}
             </p>
-            <div className="ob-roles ob-fade" style={{ '--d': '.5s' } as React.CSSProperties} role="list">
-              {ROLES.map((r) => (
-                <button key={r.id} type="button" role="listitem" className={`ob-card${role?.id === r.id ? ' is-on' : ''}`} onClick={() => pickRole(r)}>
-                  <span className="ob-card-ic"><ObIcon name={r.id} /></span>
-                  <span className="ob-card-t">{r.title}</span>
-                  <span className="ob-card-d">{r.line}</span>
+            <div className="ob-roles obw-paths ob-fade" style={{ '--d': '.5s' } as React.CSSProperties} role="list">
+              {PATHS.map((p, k) => (
+                <button
+                  key={p.id}
+                  type="button"
+                  role="listitem"
+                  className={`ob-card${path?.id === p.id ? ' is-on' : ''}`}
+                  style={{ '--k': k } as React.CSSProperties}
+                  onClick={() => pickPath(p)}
+                >
+                  <span className="ob-card-ic">
+                    <ObIcon name={p.icon} />
+                  </span>
+                  <span className="ob-card-t">{p.title}</span>
+                  <span className="ob-card-d">{p.line}</span>
                 </button>
               ))}
             </div>
-            <p className="ob-fade" style={{ '--d': '.7s' } as React.CSSProperties}>
-              <button type="button" className="ob-later" onClick={() => pickRole(null)}>
-                Rather not say
+            <p className="ob-fade" style={{ '--d': '.75s' } as React.CSSProperties}>
+              <button type="button" className="ob-later" onClick={() => pickPath(null)}>
+                Something else
               </button>
             </p>
           </div>
@@ -257,67 +392,61 @@ export function FirstRunIntro({
         {beat === 'thought' && (
           <div className="ob-wrap ob-wrap-wide" key="thought">
             <h1 className="ob-q ob-q-sm">
-              <Rise text={first ? `What are you trying to figure out, ${first}?` : 'What are you trying to figure out?'} />
+              <Rise text={first ? `Where shall we start, ${first}?` : 'Where shall we start?'} />
             </h1>
             <p className="ob-kick ob-fade" style={{ '--d': '.3s' } as React.CSSProperties}>
-              Pick a way in, or just start writing.
+              {path ? `${path.title} — take one of these, or say it in your own words.` : 'Take one of these, or say it in your own words.'}
             </p>
-            {/* Five starting points, as cards — in the order that fits what
-                they mostly think about. Pressing one changes the placeholder
-                and the example beneath; it never fills the field. */}
-            <div className="ob-ways ob-fade" style={{ '--d': '.4s' } as React.CSSProperties} role="group" aria-label="Starting points">
-              {ways.map((o) => (
+            {/* Ways to start, as cards: each a whole first message. Pressing
+                one puts it in the field, to change or send as it is; it never
+                sends by itself. */}
+            <div className={`ob-ways obw-uses n-${uses.length} ob-fade`} style={{ '--d': '.4s' } as React.CSSProperties} role="group" aria-label="Ways to start">
+              {uses.map((u, k) => (
                 <button
-                  key={o.id}
+                  key={u.id}
                   type="button"
-                  className={`ob-way${intent?.id === o.id ? ' is-on' : ''}`}
-                  aria-pressed={intent?.id === o.id}
-                  onClick={() => {
-                    setIntent((cur) => (cur?.id === o.id ? null : o));
-                    area.current?.focus();
-                  }}
+                  className={`ob-way${use?.id === u.id ? ' is-on' : ''}`}
+                  style={{ '--k': k } as React.CSSProperties}
+                  aria-pressed={use?.id === u.id}
+                  onClick={() => pickUse(u)}
                 >
-                  <span className="ob-way-ic"><ObIcon name={o.id === 'research' ? 'research-intent' : o.id} size={24} /></span>
-                  <span className="ob-way-t">{o.title}</span>
-                  <span className="ob-way-d">{o.when}</span>
+                  <span className="ob-way-ic">
+                    <ObIcon name={u.intent === 'research' ? 'research-intent' : u.intent} size={22} />
+                  </span>
+                  <span className="ob-way-t">{u.title}</span>
+                  <span className="ob-way-d">“{u.text}”</span>
                 </button>
               ))}
             </div>
-            <div className="ob-field ob-fade" style={{ '--d': '.55s' } as React.CSSProperties}>
+            <div className={`ob-field ob-fade${use ? ' is-taken' : ''}`} style={{ '--d': '.55s' } as React.CSSProperties}>
               <textarea
                 ref={area}
                 rows={2}
                 value={text}
                 maxLength={MAX}
-                placeholder={intent?.placeholder ?? 'In your own words…'}
-                onChange={(e) => setText(e.target.value)}
+                placeholder="Or in your own words…"
+                onChange={(e) => {
+                  setText(e.target.value);
+                  if (!e.target.value.trim()) setUse(null);
+                }}
                 onKeyDown={(e) => {
                   if (e.key === 'Enter' && !e.shiftKey) {
                     e.preventDefault();
                     begin(text);
                   }
                 }}
-                aria-label="What are you trying to figure out?"
+                aria-label="Your first question"
               />
-              <button type="button" className="ob-go" onClick={() => begin(text)} disabled={!text.trim()} aria-label="Start">
+              <button type="button" className="ob-go" onClick={() => begin(text)} disabled={!text.trim() || leaving} aria-label="Start">
                 <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                   <path d="M5 12h14M13 6l6 6-6 6" />
                 </svg>
               </button>
             </div>
-            {intent && !text.trim() ? (
-              <p className="ob-eg-card ob-fade" style={{ '--d': '.05s' } as React.CSSProperties}>
-                <span className="ob-eg-k">For instance</span>
-                <button type="button" onClick={() => { answer('example', intent.id); setText(intent.eg); area.current?.focus(); }}>
-                  “{intent.eg}”
-                </button>
-                <span className="ob-eg-use">Press to use it</span>
-              </p>
-            ) : (
-              <p className="ob-hint ob-fade" style={{ '--d': '.7s' } as React.CSSProperties}>
-                Something real. Enter to begin.
-              </p>
-            )}
+            <p className="ob-hint ob-fade" style={{ '--d': '.7s' } as React.CSSProperties}>
+              {text.trim() ? 'Enter to begin — it becomes your first conversation.' : 'Something real. It becomes your first conversation.'}
+              {startNote ? <span className="obw-note"> {startNote}</span> : null}
+            </p>
           </div>
         )}
       </div>
