@@ -175,6 +175,8 @@ import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5Views';
 import { L5Canvas, MapPreview, type CanvasCard } from '@/components/logos5/L5Canvas';
+import dynamic from 'next/dynamic';
+import type { ArAccess } from '@/lib/ar-access';
 import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
 import { Inline as RichInline } from '@/components/RichText';
@@ -224,6 +226,17 @@ import {
 import { LogosSynthesis, SynthesisPending } from '@/components/LogosSynthesis';
 import { useThemeGuard } from '@/components/account/ThemePicker';
 import { LENSES, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
+
+// AR MODE (components/logos5/ARMode.tsx) is fetched when it is opened, never with the page: most people
+// never open it, and nobody should pay for the camera code and the hand geometry in every load of /chat.
+const ARMode = dynamic(() => import('@/components/logos5/ARMode').then((m) => m.ARMode), {
+  ssr: false,
+  loading: () => (
+    <div className="l5-arwait" role="status">
+      Opening AR Mode…
+    </div>
+  ),
+});
 
 /** Where a person's own Logos 3 arrangement is kept: this browser, never the session. */
 const WS_KEY = 'socria.logos3.workspace.v2';
@@ -5818,6 +5831,11 @@ export function LogosApp({
   /** THE CANVAS (components/logos5/L5Canvas.tsx): the line of thinking zoomed out — the turns and what they made, laid out.
    *  It is the default: a line of thinking opens zoomed out; Back to chat (or a turn) brings the conversation close. */
   const [zoomed, setZoomed] = useState(true);
+  /** AR MODE (components/logos5/ARMode.tsx): the Logic Map moved by hand — open, and who may use it (asked when opened, never on load) */
+  const [arOpen, setArOpen] = useState(false);
+  const [arAccess, setArAccess] = useState<ArAccess | null>(null);
+  /** the answer came from the server (a failed ask is not kept: the next open asks again) */
+  const arKnownRef = useRef(false);
   /** whether the conversation is the screen now, so Escape or a pinch can zoom out (kept fresh each render) */
   const zoomOkRef = useRef(false);
   const pinchRef = useRef(0);
@@ -5849,6 +5867,13 @@ export function LogosApp({
   }, []);
   // every line of thinking opens zoomed out — the canvas is the default view
   useEffect(() => setZoomed(true), [activeId]);
+  // and AR Mode is a way of looking at one line of thinking: another one opens without it
+  useEffect(() => setArOpen(false), [activeId]);
+  // signing in or out changes who is asking: the next open asks again
+  useEffect(() => {
+    arKnownRef.current = false;
+    setArAccess(null);
+  }, [isSignedIn]);
   // …but a full view opened by anything else — a reply that reveals the Logic Map, Make, a voice command — is shown, not hidden under it
   const prevTabRef = useRef(studyTab);
   useEffect(() => {
@@ -7637,6 +7662,7 @@ export function LogosApp({
     ...(!phone || cabin
       ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
       : []),
+    ...(activeId ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'Unlimited, with Voice and sharing', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
     { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
@@ -8442,6 +8468,23 @@ export function LogosApp({
     setArtFresh(false);
     setStageFresh(false);
   };
+  /**
+   * AR MODE, opened. Who may use it is asked now (GET /api/ar/access) — never on load — and kept for the visit:
+   * a tester gets the map moved by hand (the camera only when they start it); anybody else, a preview and the waitlist.
+   */
+  function openAr() {
+    setArOpen(true);
+    if (arKnownRef.current) return;
+    const fallback: ArAccess = { tester: false, signedIn: !!isSignedIn, email: null, waitlisted: false };
+    fetch('/api/ar/access', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: ArAccess | null) => {
+        const known = !!j && typeof j.tester === 'boolean';
+        arKnownRef.current = known;
+        setArAccess(known ? j : fallback);
+      })
+      .catch(() => setArAccess(fallback));
+  }
   /** a full view — the Logic Map, Content, Artifacts — from the canvas, with the way back to the chat above it */
   const openFull = (v: Viewport) => {
     handChoseRef.current = Date.now();
@@ -8596,6 +8639,12 @@ export function LogosApp({
         <span className="l5v-viewbar-t">{VIEW_LABELS[studyTab]}</span>
         <div className="l5v-viewbar-a">
           {synthAction}
+          {studyTab === 'logic_map' && (
+            // AR MODE: the Logic Map, moved with your hands — early access; everybody else sees a preview and the waitlist
+            <button type="button" className="l5v-btn l5v-ar" onClick={openAr} title="Move your Logic Map with your hands (early access)">
+              AR Mode <span className="l5v-ar-k">Early</span>
+            </button>
+          )}
           <button type="button" className="l5v-btn" onClick={zoomOut}>
             Zoom out
           </button>
@@ -9277,6 +9326,22 @@ export function LogosApp({
           </div>
           {draftEl}
           {chromeEls}
+          {arOpen && (
+            <ARMode
+              map={map}
+              layoutKey={activeId}
+              access={arAccess}
+              readOnly={togetherReadOnly}
+              onClose={() => setArOpen(false)}
+              // research, challenge and explore are the map's own: their findings open in the Logic Map's panel
+              onAction={(mode, node) => {
+                openFull('logic_map');
+                signalFirstMap('action-taken');
+                void runAction(mode, node);
+              }}
+              onEdit={(edit) => editMap([edit])}
+            />
+          )}
           <GuestWall open={guestWall && guest} spent={guest && guestUsed >= GUEST_TURNS} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />
           {/* floating only where the conversation's dock is not on screen to hold it */}
           <GuestNudge open={nudgeOpen && !(convoOpen && !homeShown && !mindShown)} spent={guestSpent} signUpHref={signUpHref} onClose={shutNudge} />

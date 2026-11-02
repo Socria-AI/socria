@@ -184,6 +184,8 @@ const PUBLIC = {
   'GET transcribe': 'whether voice-to-text is available on this deployment',
   'POST rewards/invite': 'remembers, in a cookie, who invited a visitor before they sign up',
   'POST waitlist': 'joining the waitlist needs no account',
+  'GET ar/access': 'whether AR Mode is open to the caller: a visitor is told no, and sees its preview (nothing stored is read)',
+  'POST ar/waitlist': 'joining AR Mode’s early-access waitlist needs no account, like the relaunch’s',
   'GET logos/connect/[provider]': 'a stranger is sent back to /logos to sign in, never to a consent screen',
   'GET logos/connect/[provider]/callback': 'a stranger is sent back to /logos to sign in; nothing is stored',
 };

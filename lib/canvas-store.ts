@@ -175,3 +175,20 @@ export function forgetCanvas(key: string | null | undefined): void {
     localStorage.removeItem(CANVAS_PREFIX + key);
   } catch {}
 }
+
+/**
+ * ANOTHER VIEW MOVED THE CARDS. AR Mode (components/logos5/ARMode.tsx) puts
+ * cards down in this same store; the Logic Map, open underneath, would keep
+ * drawing the arrangement it read when it opened. So a writer that is not the
+ * map announces the line of thinking it wrote for, and the map reads it again
+ * (components/ThinkingMap.tsx). One store, read by both, written by either:
+ * a card put down in either view is in the same place in the other.
+ */
+export const CANVAS_CHANGED = 'socria:canvas';
+
+export function announceCanvas(key: string | null | undefined): void {
+  if (!key || typeof window === 'undefined') return;
+  try {
+    window.dispatchEvent(new CustomEvent(CANVAS_CHANGED, { detail: { key } }));
+  } catch {}
+}

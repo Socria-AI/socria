@@ -1,17 +1,25 @@
-// lib/waitlist.ts — the relaunch's waitlist: an email, kept, and handed back as one text file.
+// lib/waitlist.ts — Socria's waitlists: an email, kept, and handed back as one text file.
 //
 // No table and no migration: one private Supabase Storage bucket, made on
-// first use, with one empty object per address, named by the address itself
-// (base64url), so listing the bucket is reading the list — and the same
-// address twice is the same object, kept once. The team reads it as
-// waitlist.txt from app/api/waitlist/export, behind the developer
-// dashboard's own gate.
+// first use, with one small object per address, named by the address itself
+// (base64url), so listing a folder is reading the list — and the same
+// address twice is the same object, kept once. The team reads a list as a
+// text file from app/api/waitlist/export, behind the developer dashboard's
+// own gate.
+//
+// TWO LISTS, ONE WAY OF KEEPING THEM. The relaunch's waitlist (its folder is
+// still `entries`, so nothing already kept moves) and AR Mode's early access
+// (`ar` — components/logos5/ARMode.tsx). A list holds addresses and when they
+// joined, and nothing that names an account.
 
 import 'server-only';
 import { supabaseAdmin } from '@/lib/supabase';
 
 export const WAITLIST_BUCKET = 'socria-waitlist';
-const DIR = 'entries';
+/** Each list's folder in the bucket. The relaunch's keeps the folder it always had. */
+export const WAITLISTS = { relaunch: 'entries', ar: 'ar' } as const;
+export type WaitlistName = keyof typeof WAITLISTS;
+export const isWaitlistName = (v: unknown): v is WaitlistName => typeof v === 'string' && Object.prototype.hasOwnProperty.call(WAITLISTS, v);
 
 /** An address as kept: trimmed, lower case, and plausibly an address; else null. */
 export function cleanEmail(raw: unknown): string | null {
@@ -47,26 +55,42 @@ function ensureBucket(): Promise<void> {
   return ready;
 }
 
-/** Put an address on the list. Already there is not an error. */
-export async function joinWaitlist(email: string): Promise<'added' | 'already'> {
+/**
+ * Put an address on a list. Already there is not an error: the object is
+ * named by the address and written without overwriting, so the storage itself
+ * refuses the second copy — a duplicate cannot be kept even by two requests
+ * racing each other.
+ */
+export async function joinWaitlist(email: string, list: WaitlistName = 'relaunch'): Promise<'added' | 'already'> {
   await ensureBucket();
   const body = new TextEncoder().encode(`${email}\t${new Date().toISOString()}\n`);
   const { error } = await supabaseAdmin()
     .storage.from(WAITLIST_BUCKET)
-    .upload(`${DIR}/${nameFor(email)}`, body, { contentType: 'text/plain', upsert: false });
+    .upload(`${WAITLISTS[list]}/${nameFor(email)}`, body, { contentType: 'text/plain', upsert: false });
   if (!error) return 'added';
   if (/already exists|duplicate/i.test(error.message)) return 'already';
   throw error;
 }
 
+/** Is this address on the list already? */
+export async function onWaitlist(email: string, list: WaitlistName = 'relaunch'): Promise<boolean> {
+  await ensureBucket();
+  const name = nameFor(email);
+  const { data, error } = await supabaseAdmin()
+    .storage.from(WAITLIST_BUCKET)
+    .list(WAITLISTS[list], { limit: 10, search: name });
+  if (error) throw error;
+  return (data ?? []).some((f) => f.name === name);
+}
+
 /** The whole list, oldest first: "email<TAB>joined at" per line. */
-export async function waitlistText(): Promise<{ text: string; count: number }> {
+export async function waitlistText(list: WaitlistName = 'relaunch'): Promise<{ text: string; count: number }> {
   await ensureBucket();
   const rows: { email: string; at: string }[] = [];
   for (let offset = 0; offset < 200_000; offset += 1000) {
     const { data, error } = await supabaseAdmin()
       .storage.from(WAITLIST_BUCKET)
-      .list(DIR, { limit: 1000, offset, sortBy: { column: 'created_at', order: 'asc' } });
+      .list(WAITLISTS[list], { limit: 1000, offset, sortBy: { column: 'created_at', order: 'asc' } });
     if (error) throw error;
     for (const f of data ?? []) {
       const email = emailFrom(f.name);

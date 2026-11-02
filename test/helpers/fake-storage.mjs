@@ -33,13 +33,18 @@ function bucketApi(name) {
       if (!f) return { data: null, error: { message: 'Object not found', statusCode: '404' } };
       return { data: new Blob([f.bytes], { type: f.type }), error: null };
     },
+    // `search` narrows to names that begin with it (Supabase matches it as a prefix, ignoring case), and
+    // `sortBy: { column: 'created_at' }` lists oldest first — what a waitlist asks (lib/waitlist.ts).
     async list(prefix = '', opts = {}) {
       s.calls.push(['list', name, prefix]);
+      const search = typeof opts.search === 'string' ? opts.search.toLowerCase() : '';
+      const byTime = opts.sortBy?.column === 'created_at';
       const all = [...(files() ?? new Map()).entries()]
         .filter(([p]) => p.startsWith(prefix ? `${prefix}/` : ''))
         .map(([p, f]) => ({ name: p.slice(prefix ? prefix.length + 1 : 0), id: p, created_at: f.at, metadata: { size: f.bytes.length, mimetype: f.type } }))
         .filter((f) => !f.name.includes('/'))
-        .sort((a, b) => a.name.localeCompare(b.name));
+        .filter((f) => !search || f.name.toLowerCase().startsWith(search))
+        .sort((a, b) => (byTime ? (a.created_at < b.created_at ? -1 : a.created_at > b.created_at ? 1 : 0) * (opts.sortBy.order === 'desc' ? -1 : 1) : a.name.localeCompare(b.name)));
       const offset = opts.offset ?? 0;
       return { data: all.slice(offset, offset + (opts.limit ?? 100)), error: null };
     },

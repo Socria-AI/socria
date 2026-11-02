@@ -351,6 +351,8 @@ const MODULES = [
   'test/helpers/cabin-under-test.tsx',
   // the line of thinking zoomed out: the turns as a spine, what each made beside it, the chatbox docked
   'test/helpers/canvas-under-test.tsx',
+  // AR Mode: the Logic Map moved with your hands — its geometry, who may use it, the overlay, the store
+  'test/helpers/ar-under-test.tsx',
 ];
 
 export async function buildAll() {

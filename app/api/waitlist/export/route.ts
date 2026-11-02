@@ -1,6 +1,7 @@
 // app/api/waitlist/export/route.ts
 // GET → waitlist.txt: every address on the relaunch's waitlist, one per line,
-// with when it joined. Behind the developer dashboard's gate — a named admin
+// with when it joined; ?list=ar → ar-waitlist.txt, AR Mode's early-access
+// list. Behind the developer dashboard's gate — a named admin
 // (SOCRIA_DASHBOARD_ADMINS), or this browser holding the dashboard's pass —
 // and a 404 to everybody else, as if there were nothing here.
 
@@ -9,7 +10,7 @@ import { NextResponse } from 'next/server';
 import { currentUser } from '@clerk/nextjs/server';
 import { mayViewDashboard, type Viewer } from '@/lib/dashboard/gate';
 import { PASS_COOKIE, holds } from '@/lib/dashboard/codes';
-import { waitlistText } from '@/lib/waitlist';
+import { isWaitlistName, waitlistText } from '@/lib/waitlist';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -24,13 +25,16 @@ async function viewer(): Promise<Viewer | null> {
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   const allowed = mayViewDashboard(await viewer()) || holds('pass', cookies().get(PASS_COOKIE)?.value, Date.now());
   if (!allowed) return new NextResponse('Not found', { status: 404 });
   try {
-    const { text } = await waitlistText();
+    const asked = new URL(req.url).searchParams.get('list');
+    const list = isWaitlistName(asked) ? asked : 'relaunch';
+    const { text } = await waitlistText(list);
+    const file = list === 'relaunch' ? 'waitlist.txt' : `${list}-waitlist.txt`;
     return new NextResponse(text, {
-      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': 'attachment; filename="waitlist.txt"', 'Cache-Control': 'no-store' },
+      headers: { 'Content-Type': 'text/plain; charset=utf-8', 'Content-Disposition': `attachment; filename="${file}"`, 'Cache-Control': 'no-store' },
     });
   } catch (e) {
     return new NextResponse(`Could not read the waitlist: ${e instanceof Error ? e.message : 'unknown'}\n`, { status: 503 });

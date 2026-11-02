@@ -14,7 +14,7 @@
 // one assertion on this page that really matters.
 
 import {
-  readHand, GestureTracker, TwoHandTracker, aimedAt, GESTURE, ACTIONS, POSES,
+  readHand, GestureTracker, TwoHandTracker, PinchTap, aimedAt, GESTURE, ACTIONS, POSES,
   CONFIRM_POSE, CONFIRM_WINDOW,
 } from './.tmp/hand-gestures.mjs';
 
@@ -275,6 +275,45 @@ console.log('\n=== two hands ===');
   t.read(null, null);
   const first = t.read(L(0.1), L(0.9));
   ok('the first frame after a gap moves nothing', first && first.scale === 1);
+  ok('  no turn and no travel either', first && first.roll === 0 && first.move.x === 0 && first.move.y === 0);
+  // Where the hands are centred, and how far that centre went — so Logos 5's AR Mode zooms and turns
+  // ABOUT the hands, and carrying both hands across carries the map (lib/logos5/ar.ts twoHandView).
+  ok('  and says where the hands are centred', first && Math.abs(first.mid.x - 0.5) < 1e-9 && Math.abs(first.mid.y - 0.5) < 0.05);
+  const across = t.read(L(0.2), L(1.0));
+  ok('carrying both hands across reports the travel, not a zoom', across && Math.abs(across.move.x - 0.1) < 1e-9 && Math.abs(across.scale - 1) < 1e-9 && Math.abs(across.roll) < 1e-9, JSON.stringify(across));
+  const R = (x, y) => readHand(hand({ at: [x, y] }));
+  t.reset();
+  t.read(R(0.3, 0.5), R(0.7, 0.5));
+  const tilted = t.read(R(0.3, 0.45), R(0.7, 0.55));
+  ok('tilting the pair turns it, the way the hands turned', tilted && tilted.roll > 0.2 && tilted.roll < 0.3, JSON.stringify(tilted));
+  t.reset();
+  const fresh = t.read(L(0.3), L(0.6));
+  ok('reset forgets the last reading', fresh && fresh.scale === 1 && fresh.move.x === 0);
+}
+
+console.log('\n=== a pinch that is a tap ===');
+{
+  // On a touch screen a finger that lifts without travelling is a tap; in the air a pinch is the same:
+  // closed and opened quickly, without moving, SELECTS. A pinch that travelled or lingered was a carry.
+  const at = (x, y = 0.5) => ({ x, y });
+  const tap = new PinchTap(0.025, 450);
+  tap.read(true, at(0.5), 0);
+  tap.read(true, at(0.505), 100);
+  const hit = tap.read(false, at(0.505), 220);
+  ok('a quick pinch that stays put is a tap, where it closed', hit && Math.abs(hit.x - 0.5) < 1e-9, JSON.stringify(hit));
+  ok('  opening an already-open hand is nothing', tap.read(false, at(0.5), 300) === null);
+  tap.read(true, at(0.5), 1000);
+  ok('a pinch held too long is not a tap', tap.read(false, at(0.5), 1600) === null);
+  tap.read(true, at(0.5), 2000);
+  tap.read(true, at(0.56), 2100);
+  ok('a pinch that travelled is a carry, not a tap', tap.read(false, at(0.56), 2200) === null);
+  tap.read(true, at(0.5), 3000);
+  tap.reset();
+  ok('reset drops a pinch half made', tap.read(false, at(0.5), 3100) === null);
+  const px = new PinchTap(18, 450);
+  px.read(true, { x: 400, y: 300 }, 0);
+  px.read(true, { x: 410, y: 305 }, 80);
+  ok('it works in pixels too: the caller chooses the units', px.read(false, { x: 410, y: 305 }, 160)?.x === 400);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

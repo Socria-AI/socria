@@ -443,6 +443,23 @@ What each number means, and what is and is not read: `docs/DASHBOARD.md`.
 4. Sign in as an admin, open `/events/admin/in-public-002`, set the start and
    end time, tick "confirmed" when they are, and save.
 
+## 9. AR Mode testers (optional)
+
+AR Mode (Logos 5: the Logic Map moved with your hands, `docs/LOGOS-5-RUNTIME.md`
+section 34) opens only for testers; everybody else sees a preview and a
+waitlist.
+
+1. **Vercel**: on each environment, set `SOCRIA_AR_TESTERS` to the testers'
+   verified email addresses and/or Clerk user ids, comma-separated, then
+   redeploy. The dashboard's admins (section 7) are testers already. `*` opens
+   it to everyone on a preview or locally, and is ignored on production.
+2. **The waitlist** needs nothing new: it is kept in the same private Storage
+   bucket as the relaunch's (`socria-waitlist`, folder `ar`). An admin
+   downloads it from `/api/waitlist/export?list=ar`.
+3. **Hand tracking** loads MediaPipe from `cdn.jsdelivr.net` and its model
+   from `storage.googleapis.com` in the tester's browser. If a
+   Content-Security-Policy is ever added, it must allow both.
+
 ## Afterwards
 
 Once §1 and §2 are done, this is the state you should be able to confirm:

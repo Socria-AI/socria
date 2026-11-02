@@ -2972,3 +2972,165 @@ on desktop and phone: a new conversation opens on the canvas's empty state;
 two questions asked from the canvas land as two turns with their graph and
 claim beside them; Back to chat shows the four messages; reopening the
 conversation opens zoomed out again.
+
+## 34. AR Mode: the Logic Map, moved with your hands (early access)
+
+The Logos 2 benches (the hand-tracking and Mind AR test pages, never linked)
+proved the parts on a toy map. AR Mode is those parts on the person's own
+Logic Map, inside Logos 5 — not a new product, and not a new tab.
+
+**What was reused, and what was added.**
+
+| Part | Where | Reused or new |
+| --- | --- | --- |
+| Camera and MediaPipe Hand Landmarker 1.0.1, loaded at runtime from jsDelivr (model from Google storage) | `lib/hand-tracking.ts` | reused as is |
+| A hand read as a pose; poses as intentions with hysteresis; arm-then-thumbs-up for anything that changes the map | `lib/hand-gestures.ts` | reused; `TwoHandTracker` now also reports where the hands are centred and how far that centre moved, and `PinchTap` tells a quick pinch (select) from a carry |
+| The view (pan, zoom, turn), where cards start, one frame of hands decided, relationships said from either end, cards spread apart | `lib/logos5/ar.ts` | new, pure, tested |
+| Who may use it | `lib/ar-access.ts`, `GET /api/ar/access` | new; same name format as the developer dashboard |
+| The waitlist | `lib/waitlist.ts` (`ar` list), `POST /api/ar/waitlist` | reused store, a second list beside the relaunch's |
+| The overlay | `components/logos5/ARMode.tsx`, `ar-mode.css` | new; the cards are the Logic Map's own (`lg-node lg-node-<type>`) |
+
+**The way in.** On the Logic Map's view bar, **AR Mode** with an *Early* tag,
+and in the ⋯ menu on any line of thinking. It opens over the page as a dialog
+(Done or Esc leaves) and closes when another line of thinking is opened. Its
+code is fetched when it is first opened (`next/dynamic`), so the page nobody
+opens it on carries none of it: it was 14 kB on every load of `/chat`.
+
+**One arrangement, two views.** AR Mode opens on the arrangement the Logic Map
+already has: its graph lens's pins first, then where its graph settled
+(`lib/canvas-store.ts`). Cards with no place there yet are put where the Logic
+Map would put them, and then only those are spread apart (`separate`), so none
+sits on another. A card a tester puts down is a pin in the same store, and the
+Logic Map is told (`announceCanvas` → `CANVAS_CHANGED`), so it shows the card
+where it was put even if it was open underneath. A pinch that puts a card back
+where it was selects it rather than pinning it. *Return to its place* unpins.
+Taking a card off the map is the map's own edit (`editMap`, op `remove`);
+Explore, Research and Challenge are the map's own actions, and their findings
+open in the Logic Map.
+
+**What a tester can do.**
+- *Mouse and touch*, at once, with no camera:
+  - drag a card (it is kept);
+  - drag empty space to pan;
+  - two fingers to zoom, turn and pan;
+  - the wheel zooms about the pointer (with Shift it turns);
+  - zoom, turn and Fit buttons.
+- *Keyboard*: + and −, 0 to fit, [ and ] to turn, arrows to move the selected
+  card (or the map), Enter to select, Esc to step back (an armed action, then
+  the selection, then AR Mode). Keys are read on the window while AR Mode is
+  open, so Esc works wherever the focus is, and no key it uses reaches the
+  page underneath.
+- *Hands*, after **Start hand tracking**:
+  - pinch a card to carry it, and open the fingers to put it down;
+  - pinch empty space to pan;
+  - pinch with both hands to zoom and turn about the hands;
+  - a quick pinch selects a card;
+  - two fingers at a card arm Research, three arm Challenge;
+  - a thumbs up confirms, an open hand calls it off, and it gives up after 8
+    seconds.
+- *The inspector*: kind, status, whether it was Socria's suggestion, the
+  note, and every connection said from this card ("conflicts with",
+  "is supported by"). What pulls against it is listed first, and a
+  connection takes you to that card.
+
+Nothing that changes the map happens without a confirm — a thumbs up or the
+Confirm button. A sample, the preview and a read-only room are never
+editable.
+
+**The camera.** It is never on by itself. It is asked for only when a tester
+presses Start hand tracking, and only after checking for a secure page, a
+camera API and WebAssembly; each missing piece is said plainly, and the mouse
+keeps working. Each start is a session: Stop, Done, or a permission answered
+after the person already left releases the stream and closes the model. The
+video is mirrored, dimmed behind the cards and can be hidden; a small skeleton
+shows what the model sees; "No hand in view" appears after four seconds
+without one. Frames are read in the browser and dropped: nothing is recorded
+or uploaded.
+
+**Who may use it** (`lib/ar-access.ts`, decided on the server, default deny):
+- an account id (`user_…`) or a **verified** address in `SOCRIA_AR_TESTERS`;
+- whoever may see the developer dashboard (`SOCRIA_DASHBOARD_ADMINS`);
+- the owner's permanent grant (`OPERATOR_GRANTS` / `SOCRIA_ONE_GRANT_HASHES`);
+- `*` in `SOCRIA_AR_TESTERS` opens it to everyone — honoured only off
+  production, ignored on production.
+
+Joining the waitlist never makes anybody a tester. Access is asked when AR
+Mode is first opened, never on load; a failed ask is not kept, and signing in
+or out asks again.
+
+**Everybody else** sees a preview — their own map (or a sample, labelled),
+moved by a demo hand through a carry, a two-hand zoom and turn and a quick
+pinch, with captions; a still frame with reduced motion — and the waitlist.
+The waitlist takes an address (prefilled with the person's own verified one),
+keeps it once in a private bucket (`socria-waitlist`, folder `ar`, one object
+per address written without overwriting, so even two requests at once keep it
+once), says when the list cannot be reached rather than claiming success, and
+remembers in the browser that the person joined. The dashboard's admins
+export it from `/api/waitlist/export?list=ar` (`ar-waitlist.txt`); the
+relaunch's list is unchanged at `/api/waitlist/export`.
+
+**Tested.**
+- `test/ar-mode.test.mjs` (121 checks):
+  - the geometry: view inverses, zoom and turn fixed points, the two-hand
+    transform, the fit, including around a bar and a bottom panel;
+  - seeding in the Logic Map's own order, and spreading only unplaced cards;
+  - one frame of hands: carry with its offset, pan, both hands, tap, release;
+  - relationships said from either end, and the access rules;
+  - the overlay rendered for a tester, a visitor and while asking — with no
+    camera asked for during render;
+  - the camera's single entry point and its release;
+  - confirm before anything changes, keys on the window, one arrangement in
+    both views;
+  - the way in;
+  - two bugs found in the browser and fixed: the cards' entrance animation
+    pinned them to the corner, and Esc was lost after Confirm.
+- `test/ar-waitlist-e2e.test.mjs` (38 checks, the routes against fake Clerk
+  and fake storage):
+  - who is a tester, including unverified addresses, admins, the grant, and
+    `*` on and off production;
+  - joining: once only, in any case, two at once, refusals, an outage, and
+    being on the list;
+  - the export.
+- `hand-gestures` covers the two-hand centre and travel and the quick pinch.
+- `route-boundary` lists the two new public routes.
+- In the browser (Chromium, desktop and phone):
+  - a visitor: preview, waitlist (bad address, unreachable, joined, already),
+    camera asked 0 times;
+  - a tester: drag, inspector, a connection followed, Challenge armed and
+    cancelled, wheel zoom, turning, keyboard moves, a card taken off. The
+    Logic Map then showed the moved card at exactly the pinned place and the
+    removed card gone.
+  - the camera: a browser without one, no device, and a fake camera; Stop
+    and leaving released it.
+- **Hand tracking end to end.** Chromium's fake camera played MediaPipe's own
+  hand photos, and the real model (served locally, since this sandbox cannot
+  reach jsDelivr) read them inside AR Mode. Detection, the pose in the status,
+  the aim lighting the card under it, and the aim landing on the fingertip in
+  the mirrored video were all confirmed.
+
+**Experimental, or not yet done.**
+- *The fist.* On MediaPipe's sample photos the shared Logos 2 classifier
+  reads point, thumbs up, two fingers and an open hand correctly, but reads a
+  closed fist as a pinch: the thumb rests on the curled index finger. So a
+  closed hand over a card picks it up instead of arming "take off the map".
+  That is the safe direction, since a carry is undone by opening the hand. The
+  inspector's button arms the same confirm. Telling the two apart needs real
+  pinch data; the index fingertip's reach is 0.84 of its knuckle's in the fist
+  photo, and a pinch is estimated near 1.05 — too close to change the
+  classifier blind.
+- Not yet tried on real hands: a pinch, three fingers, two-hand pinch, and
+  lighting, distance and skin-tone variation. Mobile camera performance is
+  unmeasured.
+- Turning is the view only; nothing about direction is kept.
+- Testers are named in an environment variable per deployment (Production and
+  Preview are different Clerk instances); there is no admin screen.
+- The waitlist is not linked to accounts, and nobody is emailed
+  automatically.
+
+**What it needs to run.**
+- Network access, and a Content-Security-Policy that allows
+  `cdn.jsdelivr.net` (script and WebAssembly) and `storage.googleapis.com`
+  (the model) — there is no CSP today.
+- Supabase Storage for the waitlist.
+- `SOCRIA_AR_TESTERS` set in each Vercel environment.
+- A device with a camera, on https or localhost.

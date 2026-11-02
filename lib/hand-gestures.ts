@@ -365,24 +365,89 @@ export function aimedAt<T extends { id: string; x: number; y: number }>(
  * the air. Returns the CHANGE since the previous reading, so a caller can add
  * it to whatever it already had, and null whenever there are not two hands to
  * read.
+ *
+ * `mid` is where the hands are centred now and `move` how far that centre
+ * travelled since the last reading — so a zoom or a turn can happen ABOUT the
+ * hands rather than about the middle of the screen, and carrying both hands
+ * across carries the thing with them (Logos 5's AR Mode, lib/logos5/ar.ts).
+ * A first reading has no change: scale 1, roll 0, move 0.
  */
 export class TwoHandTracker {
-  private last: { gap: number; angle: number } | null = null;
+  private last: { gap: number; angle: number; mid: { x: number; y: number } } | null = null;
 
-  read(a: HandRead | null, b: HandRead | null): { scale: number; roll: number } | null {
+  reset() {
+    this.last = null;
+  }
+
+  read(
+    a: HandRead | null,
+    b: HandRead | null
+  ): { scale: number; roll: number; mid: { x: number; y: number }; move: { x: number; y: number } } | null {
     if (!a || !b) {
       this.last = null;
       return null;
     }
     const gap = Math.hypot(a.palm.x - b.palm.x, a.palm.y - b.palm.y);
     const angle = Math.atan2(b.palm.y - a.palm.y, b.palm.x - a.palm.x);
+    const mid = { x: (a.palm.x + b.palm.x) / 2, y: (a.palm.y + b.palm.y) / 2 };
     const prev = this.last;
-    this.last = { gap, angle };
-    if (!prev || prev.gap < 1e-4) return { scale: 1, roll: 0 };
+    this.last = { gap, angle, mid };
+    if (!prev || prev.gap < 1e-4) return { scale: 1, roll: 0, mid, move: { x: 0, y: 0 } };
     let roll = angle - prev.angle;
     // Across the ±π seam the shortest way round is the one that was meant.
     if (roll > Math.PI) roll -= 2 * Math.PI;
     if (roll < -Math.PI) roll += 2 * Math.PI;
-    return { scale: gap / prev.gap, roll };
+    return { scale: gap / prev.gap, roll, mid, move: { x: mid.x - prev.mid.x, y: mid.y - prev.mid.y } };
+  }
+}
+
+/**
+ * A pinch that is a TAP, told apart from a pinch that is a DRAG.
+ *
+ * On a touch screen a finger that comes down and lifts without travelling is a
+ * tap, and one that travels is a drag; the air has the same distinction and
+ * nothing to tell it by except the same two measures — how far the pinch
+ * moved while it was closed, and how long it stayed closed. So a pinch that
+ * opens again within `maxMs` having moved less than `slop` (in the units the
+ * caller feeds, a fraction of the frame) is a tap: SELECT what it was over.
+ * Anything longer or further was a carry, and selects nothing.
+ *
+ * Pure: the caller passes whether the pinch is closed, where, and when.
+ */
+export class PinchTap {
+  private downAt: { x: number; y: number; t: number } | null = null;
+  private travelled = 0;
+  private last: { x: number; y: number } | null = null;
+
+  constructor(
+    private slop = 0.025,
+    private maxMs = 450
+  ) {}
+
+  reset() {
+    this.downAt = null;
+    this.travelled = 0;
+    this.last = null;
+  }
+
+  /** Feed one reading; returns the point of a tap on the reading that completes one, else null. */
+  read(closed: boolean, at: { x: number; y: number }, now: number): { x: number; y: number } | null {
+    if (closed) {
+      if (!this.downAt) {
+        this.downAt = { x: at.x, y: at.y, t: now };
+        this.travelled = 0;
+      } else if (this.last) {
+        this.travelled += Math.hypot(at.x - this.last.x, at.y - this.last.y);
+      }
+      this.last = { x: at.x, y: at.y };
+      return null;
+    }
+    const d = this.downAt;
+    this.downAt = null;
+    this.last = null;
+    if (!d) return null;
+    const tap = this.travelled < this.slop && now - d.t <= this.maxMs;
+    this.travelled = 0;
+    return tap ? { x: d.x, y: d.y } : null;
   }
 }

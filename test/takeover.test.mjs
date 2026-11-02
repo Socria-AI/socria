@@ -402,7 +402,7 @@ ok('the waitlist route is open, and its export never asks for the code (it has i
 const ex = read('app/api/waitlist/export/route.ts');
 ok(
   'the export is the dashboard’s to open: a named admin or its pass, else a 404',
-  /mayViewDashboard\(await viewer\(\)\) \|\| holds\('pass'/.test(ex) && /status: 404/.test(ex) && /filename="waitlist.txt"/.test(ex)
+  /mayViewDashboard\(await viewer\(\)\) \|\| holds\('pass'/.test(ex) && /status: 404/.test(ex) && /list === 'relaunch' \? 'waitlist\.txt'/.test(ex) && /filename="\$\{file\}"/.test(ex)
 );
 ok('the list is kept in a private bucket', /createBucket\(WAITLIST_BUCKET, \{ public: false \}\)/.test(read('lib/waitlist.ts')));
 

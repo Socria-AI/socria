@@ -111,6 +111,7 @@ import {
   type Rect,
 } from '@/lib/canvas';
 import {
+  CANVAS_CHANGED,
   emptyCanvas,
   isPinned,
   lensOf,
@@ -424,6 +425,18 @@ export function ThinkingMap({
     saveCanvas(keyRef.current, next);
     if (rerender) setPinsVer((v) => v + 1);
   };
+  // AR MODE PUT CARDS DOWN (lib/canvas-store.ts announceCanvas): the same store, written from another view —
+  // read it again, so a card placed by hand in the air is where it was placed when the map is looked at.
+  useEffect(() => {
+    const on = (e: Event) => {
+      const key = (e as CustomEvent<{ key?: string }>).detail?.key;
+      if (!key || key !== keyRef.current) return;
+      canvasRef.current = loadCanvas(key);
+      setPinsVer((v) => v + 1);
+    };
+    window.addEventListener(CANVAS_CHANGED, on);
+    return () => window.removeEventListener(CANVAS_CHANGED, on);
+  }, []);
 
   // WHERE THE LENS TABS SIT — any edge of the map, the person's choice, kept per browser.
   const outerRef = useRef<HTMLDivElement>(null);
