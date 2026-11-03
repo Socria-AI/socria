@@ -133,7 +133,7 @@ console.log('\n=== on the server, everywhere a model is called ===');
 {
   const chat = read('app/api/logos/chat/route.ts');
   ok('the reply: the tier from the session and the server’s plan', /chooseModel\(\s*tierOf\(userId, plan\)/.test(chat) && /const plan = await resolvePlanForRequest\(req, userId\)/.test(chat));
-  ok('  the level from what the engine read, not from the request', /levelOf\(\{[\s\S]{0,600}mathCheck: accuracy\.check/.test(chat) && !/body\??\.model\b/.test(chat));
+  ok('  the level from what the engine read, not from the request', /levelOf\(\{[\s\S]{0,600}mathCheck: accuracy\.theirs\.length > 0/.test(chat) && !/body\??\.model\b/.test(chat));
   ok('  refused ids step down the tier’s ladder', /firstAccepted\(route\.ladder, make/.test(chat));
   ok('  the model that answered is said in a header', /'X-Socria-Model': `\$\{route\.tier\}\/\$\{route\.level\}\/\$\{served\}`/.test(chat));
   ok('  older replies read back clipped', /compressHistory\(kept/.test(chat));
