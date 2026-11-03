@@ -185,3 +185,86 @@ html[data-theme='night'] .sl-bar {
   margin-right: 8px;
   color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
 }
+
+/* the ring beside the box's tools: an outline that fills as the day is spent, solid when resting */
+.sl-ringwrap {
+  position: relative;
+  display: inline-flex;
+}
+.sl-ring {
+  display: inline-grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--lg-primary, #354620);
+  cursor: pointer;
+}
+.sl-ring:hover {
+  background: rgba(var(--l5-tint-rgb, 53, 70, 32), 0.08);
+}
+.sl-ring:focus-visible {
+  outline: 2px solid var(--lg-accent, #264653);
+  outline-offset: 1px;
+}
+.sl-ring-track {
+  fill: none;
+  stroke: currentColor;
+  stroke-opacity: 0.28;
+  stroke-width: 1.6;
+}
+.sl-ring-used {
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 1.6;
+  stroke-linecap: round;
+  transition: stroke-dasharray 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+}
+.sl-ring-full {
+  fill: currentColor;
+  stroke: currentColor;
+  stroke-width: 1.6;
+}
+@media (prefers-reduced-motion: reduce) {
+  .sl-ring-used {
+    transition: none;
+  }
+}
+.sl-ringtip {
+  position: absolute;
+  right: 0;
+  bottom: calc(100% + 8px);
+  z-index: 30;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: max-content;
+  max-width: 240px;
+  padding: 8px 11px;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  border-radius: 10px;
+  background: var(--l5-surface, #f5f3eb);
+  box-shadow: 0 12px 28px -18px rgba(var(--shadow-rgb, 32, 32, 27), 0.5);
+  font-family: var(--lg-sans, Inter, system-ui, sans-serif);
+  text-align: left;
+}
+html[data-theme='dark'] .sl-ringtip {
+  background: #1c1c1c;
+}
+html[data-theme='night'] .sl-ringtip {
+  background: #121c31;
+}
+.sl-ringtip-t {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}
+.sl-ringtip-b {
+  font-size: 0.85rem;
+  color: var(--lg-ink, #20201b);
+}

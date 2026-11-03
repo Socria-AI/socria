@@ -170,3 +170,58 @@ export function SleepBar({ sleep, onOpen, onWake }: { sleep: SleepState | null; 
     </button>
   );
 }
+
+/**
+ * THE DAY'S THINKING TIME, AS A RING beside the box's tools — free accounts only. It fills clockwise
+ * as the day's tokens are spent; filled solid, Socria is resting. Hover or press it for the numbers
+ * and the reset; pressed while resting, it opens the Sleep screen.
+ */
+export function SleepRing({ sleep, onOpen, onWake }: { sleep: SleepState | null; onOpen: () => void; onWake: () => void }) {
+  const { left, clock } = useWake(sleep, onWake);
+  const [shown, setShown] = useState(false);
+  const ref = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!shown) return;
+    const away = (e: PointerEvent) => !ref.current?.contains(e.target as Node) && setShown(false);
+    document.addEventListener('pointerdown', away);
+    return () => document.removeEventListener('pointerdown', away);
+  }, [shown]);
+  if (!sleep) return null;
+  const share = sleep.asleep ? 1 : Math.max(0, Math.min(1, sleep.used / Math.max(1, sleep.limit)));
+  const pct = Math.round(share * 100);
+  const R = 6.5;
+  const C = 2 * Math.PI * R;
+  const said = sleep.asleep
+    ? `Socria is resting. Wakes in ${wakesIn(left)}${clock ? `, at ${clock}` : ''}.`
+    : `${pct}% of today’s thinking time used. Resets in ${wakesIn(left)}${clock ? `, at ${clock}` : ''}.`;
+  return (
+    <span className="sl-ringwrap" ref={ref}>
+      <button
+        type="button"
+        className={`sl-ring${sleep.asleep ? ' is-asleep' : ''}${share >= 0.8 && !sleep.asleep ? ' is-low' : ''}`}
+        aria-label={said}
+        aria-expanded={shown}
+        title={said}
+        onClick={() => (sleep.asleep ? onOpen() : setShown((v) => !v))}
+      >
+        <svg viewBox="0 0 16 16" width="16" height="16" aria-hidden="true">
+          <circle cx="8" cy="8" r={R} className="sl-ring-track" />
+          {sleep.asleep ? (
+            <circle cx="8" cy="8" r={R} className="sl-ring-full" />
+          ) : (
+            share > 0 && <circle cx="8" cy="8" r={R} className="sl-ring-used" strokeDasharray={`${share * C} ${C}`} transform="rotate(-90 8 8)" />
+          )}
+        </svg>
+      </button>
+      {shown && !sleep.asleep && (
+        <span className="sl-ringtip" role="status">
+          <span className="sl-ringtip-t">Today’s thinking time</span>
+          <span className="sl-ringtip-b">
+            {pct}% used · resets in {wakesIn(left)}
+            {clock ? ` (${clock})` : ''}
+          </span>
+        </span>
+      )}
+    </span>
+  );
+}

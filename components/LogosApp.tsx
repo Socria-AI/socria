@@ -181,7 +181,7 @@ import { HANDCAM_EVENT, readHandCommand, type ArCommand, type HandCommand } from
 import { handPointer, stopHands } from '@/lib/hand-bus';
 import { L5Tips } from '@/components/logos5/L5Tips';
 import { OneButton, WelcomeBack } from '@/components/logos5/OneHeader';
-import { SleepBar, SleepScreen, useSleepWatch } from '@/components/logos5/SleepMode';
+import { SleepBar, SleepRing, SleepScreen, useSleepWatch } from '@/components/logos5/SleepMode';
 import type { SleepState } from '@/lib/sleep';
 import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
 import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
@@ -8081,6 +8081,17 @@ export function LogosApp({
         }
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly && one}
         voiceButton={voiceButton}
+        // the day's thinking time, a small ring beside the tools (free accounts; filled = resting)
+        meter={
+          <SleepRing
+            sleep={sleep}
+            onOpen={() => setSleepOpen(true)}
+            onWake={() => {
+              setSleep(null);
+              void refreshUsage(activeIdRef.current);
+            }}
+          />
+        }
         voiceLive={voiceOn}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
         idlePlaceholder={

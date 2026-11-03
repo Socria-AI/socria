@@ -410,6 +410,7 @@ export function LogosComposer({
   onCapture,
   idlePlaceholder,
   voiceButton,
+  meter,
   voiceLive,
 }: {
   /**
@@ -479,6 +480,8 @@ export function LogosComposer({
   idlePlaceholder?: string;
   /** Socria Voice's button (components/logos5/SocriaVoice.tsx), beside the box's other tools */
   voiceButton?: ReactNode;
+  /** the day's thinking time, as a small ring (components/logos5/SleepMode.tsx SleepRing) — free accounts only */
+  meter?: ReactNode;
   /** Socria Voice is listening: the hold-to-talk mic steps aside, so one microphone is in use at a time */
   voiceLive?: boolean;
   /**
@@ -970,6 +973,7 @@ export function LogosComposer({
             />
               {footer && <span className="l5-ctools-mid">{footer}</span>}
               <span className="l5-ctools-end">
+              {meter}
               {voiceButton}
               {micOn && <HoldMic mic={mic} onHold={setHold} />}
               {/* Appears only when mathematics is in play, and stays put once it

@@ -217,6 +217,21 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
   ok('the bar over the box: resting until a time, in how long', /class="sl-bar"/.test(bar) && /Resting until/.test(bar) && /aria-label="Socria is resting\. Wakes in/.test(bar));
 }
 
+console.log('\n=== the ring beside the box: the day at a glance ===');
+{
+  const awake = S.sleepState(14_000, 35_000, Date.now());
+  const ring = renderToStaticMarkup(h(UI.SleepRing, { sleep: awake, onOpen() {}, onWake() {} }));
+  ok('awake: an outline, filled as far as the day is spent (40%)', /class="sl-ring"/.test(ring) && /class="sl-ring-used"/.test(ring) && !/sl-ring-full/.test(ring) && /stroke-dasharray="16\.33\d* 40\.84\d*"/.test(ring), ring);
+  ok('  and says it: how much, and when it resets', /aria-label="40% of today’s thinking time used\. Resets in \d/.test(ring));
+  const low = renderToStaticMarkup(h(UI.SleepRing, { sleep: S.sleepState(30_000, 35_000, Date.now()), onOpen() {}, onWake() {} }));
+  ok('nearly spent: marked as such', /sl-ring is-low/.test(low));
+  const asleep = renderToStaticMarkup(h(UI.SleepRing, { sleep: S.sleepState(36_000, 35_000, Date.now()), onOpen() {}, onWake() {} }));
+  ok('resting: the circle filled solid', /sl-ring is-asleep/.test(asleep) && /class="sl-ring-full"/.test(asleep) && /aria-label="Socria is resting\. Wakes in/.test(asleep));
+  ok('nothing for Socria One or a guest (no state)', renderToStaticMarkup(h(UI.SleepRing, { sleep: null, onOpen() {}, onWake() {} })) === '');
+  const app = readFileSync(join(root, 'components', 'LogosApp.tsx'), 'utf8');
+  ok('in the box’s tools, beside Voice', /meter=\{\s*<SleepRing/.test(app) && /\{meter\}\s*\{voiceButton\}/.test(readFileSync(join(root, 'components', 'LogosComposer.tsx'), 'utf8')));
+}
+
 console.log('\n=== wired everywhere a model is called ===');
 {
   const walk = (d) => readdirSync(d).flatMap((f) => (statSync(join(d, f)).isDirectory() ? walk(join(d, f)) : f === 'route.ts' ? [join(d, f)] : []));
