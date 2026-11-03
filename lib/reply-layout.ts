@@ -365,6 +365,35 @@ export function editorialBlocks(input: Block[], opts: { more?: boolean } = {}): 
   });
 }
 
+// ── emphasis, kept to what matters ───────────────────────────────────
+
+/** Key concepts a reply may set in bold: the few a reader should leave with. */
+export const KEY_CONCEPTS = 3;
+/** A bold run longer than this is a sentence shouted, not a concept named. */
+const CONCEPT_WORDS = 8;
+
+/**
+ * BOLD MEANS "A KEY CONCEPT", SO THERE ARE FEW. In the reply's prose (its
+ * paragraphs and its one insight line) the first KEY_CONCEPTS bold terms are
+ * kept; a bold run of a whole sentence, a term bolded again, and any beyond the
+ * first few are set in plain type. List labels and table cells keep theirs —
+ * there, bold labels. Left to right and deterministic, so a reply still
+ * arriving never un-bolds a word it has already shown.
+ */
+export function capEmphasis(blocks: Block[], max = KEY_CONCEPTS): Block[] {
+  let kept = 0;
+  const seen = new Set<string>();
+  const tame = (text: string) =>
+    text.replace(/\*\*([^*\n]+?)\*\*/g, (whole, inner: string) => {
+      const term = inner.trim().toLowerCase();
+      if (!term || term.split(/\s+/).length > CONCEPT_WORDS || seen.has(term) || kept >= max) return inner;
+      seen.add(term);
+      kept++;
+      return whole;
+    });
+  return blocks.map((b) => (b.kind === 'p' || b.kind === 'quote' ? { ...b, text: tame(b.text) } : b));
+}
+
 // ── how much a block says ────────────────────────────────────────────
 
 export function blockWords(b: Block): number {

@@ -113,7 +113,7 @@ const kinds = (pieces) => pieces.map((p) => (p.kind === 'block' ? (p.lead ? 'lea
 console.log('\n=== the ask: what comes first, and what a reply is not ===');
 {
   const core = I.LOGOS5_CORE;
-  ok('the persona says it changed: logos5-v6', I.PERSONA_VERSION === 'logos5-v6');
+  ok('the persona says it changed: logos5-v7', I.PERSONA_VERSION === 'logos5-v7');
   // The core says the rule in a line each; the detail of an open request and
   // of going deeper travels in that turn's own shape note (presentation.ts
   // SHAPES, pinned below), so the cached core stays inside its budget.
@@ -125,7 +125,7 @@ console.log('\n=== the ask: what comes first, and what a reply is not ===');
   ok('  and the line that produced the five sections is gone', !/name the two or three directions it could go/.test(core));
   ok('at most one question, and only one whose answer changes what comes next', /At most one, and only when its answer would change what you say next/.test(core) && /Never a list of questions/.test(core));
   ok('  never "would you like me to go deeper…?"', /would you like me to go deeper…\?/.test(core));
-  ok('bold is only a list item’s label — never a heading of its own', /\*\*bold\*\* only as a list item's label/.test(core) && !/\*\*bold\*\* as a list label;/.test(core) && /Never # headings unless this turn's note asks/.test(core));
+  ok('bold marks the few key concepts, never a whole sentence — and is never a heading of its own', /\*\*Bold\*\* one to three key concepts/.test(core) && /never a whole sentence/.test(core) && /Never # headings unless this turn's note asks/.test(core));
   ok('the cached core stays inside its budget (runtime.test.mjs holds it to 55% of Logos 3.5)', core.length < 14000, String(core.length));
   ok('Human-First stays: their decisions and their writing are theirs', /Theirs: consequential decisions/.test(core) && /do not produce the finished piece from nothing/.test(core));
 }

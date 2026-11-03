@@ -29,7 +29,7 @@
 import { Fragment, useEffect, useRef, useState, type ReactNode } from 'react';
 import { copyText } from '@/lib/copy-text';
 import { isTableRule, listLine, parseBlocks, splitInline, splitTableRow, stripMarks, type Block } from '@/lib/rich-text';
-import { editorialBlocks, layoutReply, plainTermOf, streamingSplit, tableShape, tailShape, termOf, type TailShape } from '@/lib/reply-layout';
+import { capEmphasis, editorialBlocks, layoutReply, plainTermOf, streamingSplit, tableShape, tailShape, termOf, type TailShape } from '@/lib/reply-layout';
 import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
 import { InlineBlock, type InlineHost } from '@/components/inline/InlineUI';
@@ -473,7 +473,8 @@ export function RichText({ text, math, cite, rich, askLast, inline, editorial, d
  * then jumping in.
  */
 function EditorialText({ text, tail, joins, math, cite, askLast, inline, streaming, disclose }: { text: string; tail?: string; joins?: boolean; math?: boolean; cite?: CiteRender; askLast?: boolean; inline?: InlineHost; streaming?: boolean; disclose?: boolean }) {
-  const blocks = editorialBlocks(parseBlocks(text, { rich: true }), { more: !!streaming });
+  // bold kept to the few key concepts (lib/reply-layout.ts capEmphasis), whatever the model wrote
+  const blocks = capEmphasis(editorialBlocks(parseBlocks(text, { rich: true }), { more: !!streaming }));
   // what the text still being written is: the next item of the list above it, a row of the table, a paragraph…
   const shape = tail ? tailShape(blocks, tail, !!joins) : null;
   const tailIn = shape === 'li' || shape === 'sub' || shape === 'row';

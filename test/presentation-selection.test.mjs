@@ -259,7 +259,7 @@ console.log('\n=== 13. the core: a list is the few that matter ===');
 {
   const core = R.logos5System({ math: false, picture: false, build: false, guard: false });
   ok('a list only when the content is one, and then the few that matter most, a line each', /A list only when the content is one or they ask, and then the few that matter most, a line each/.test(core));
-  ok('the persona says it changed', R.PERSONA_VERSION === 'logos5-v6');
+  ok('the persona says it changed', R.PERSONA_VERSION === 'logos5-v7');
 }
 
 

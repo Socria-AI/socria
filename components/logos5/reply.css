@@ -436,3 +436,55 @@
     color: CanvasText;
   }
 }
+
+/* ── hierarchy: key concepts, distinct ideas, the one insight ───────
+ * Bold in a reply's prose is a key concept (lib/reply-layout.ts capEmphasis
+ * keeps three at most): set off by a faint highlighter stroke under the words,
+ * in the conversation's own tint — no colour of its own, nothing that looks
+ * pressable. Each idea its own short paragraph, with air between them. A line
+ * that opens "> " is the insight the reply turns on: the serif, a rule in the
+ * primary colour, the ink at full strength — never a grey italic quotation. */
+.logos-root .l5-prose.is-reply :is(p:not(.socria-lead), blockquote, .socria-fold-body > p) > .socria-strong {
+  font-weight: 600;
+  color: var(--lg-ink);
+  background: linear-gradient(transparent 58%, rgba(var(--l5-tint-rgb), 0.16) 58%, rgba(var(--l5-tint-rgb), 0.16) 92%, transparent 92%);
+  padding: 0 0.08em;
+  box-decoration-break: clone;
+  -webkit-box-decoration-break: clone;
+}
+.logos-root .l5-prose.is-reply > p:not(.socria-lead),
+.logos-root .l5-prose.is-reply .socria-fold-body > p {
+  margin-bottom: 1em;
+  line-height: 1.62;
+}
+.logos-root .l5-prose.is-reply > p:last-child,
+.logos-root .l5-prose.is-reply .socria-fold-body > p:last-child {
+  margin-bottom: 0;
+}
+.logos-root .l5-prose.is-reply .socria-quote {
+  margin: 1.05em 0;
+  padding: 0.1em 0 0.1em 0.95em;
+  border-left: 2px solid var(--lg-primary);
+  font-family: var(--l5-serif);
+  font-style: normal;
+  font-size: 1.14em;
+  line-height: 1.4;
+  color: var(--lg-ink);
+  text-wrap: pretty;
+}
+.logos-root .l5-prose.is-reply .socria-quote:last-child {
+  margin-bottom: 0;
+}
+/* the serif has one weight: a key concept inside the insight is the primary colour */
+.logos-root .l5-prose.is-reply .socria-quote > .socria-strong {
+  font-weight: 400;
+  color: var(--lg-primary);
+  background: none;
+  padding: 0;
+}
+@media (forced-colors: active) {
+  .logos-root .l5-prose.is-reply .socria-strong {
+    background: none;
+    text-decoration: underline;
+  }
+}
