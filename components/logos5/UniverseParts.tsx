@@ -7,6 +7,7 @@
 // is UniverseBubbles.tsx, the line through time UniverseTime.tsx, and the
 // whole is Universe.tsx.
 
+import { isEditable, pasteIsFiles, pastedFiles } from '@/lib/paste';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { relTime } from '@/lib/logos-sessions';
 import type { Attachment } from '@/lib/logos-attachments';
@@ -517,6 +518,24 @@ export function FindOrStart({
     }
   }
   if (takeRef) takeRef.current = canFiles ? (list) => void take(list) : null;
+  // pasted with nothing focused (the map itself): the box takes it, when it is on screen
+  const takeNow = useRef(take);
+  takeNow.current = take;
+  useEffect(() => {
+    if (!canFiles) return;
+    const onDocPaste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || isEditable(document.activeElement)) return;
+      const box = inputRef.current;
+      if (!box || box.offsetParent === null) return;
+      const pasted = pastedFiles(e.clipboardData);
+      if (!pasteIsFiles(e.clipboardData?.getData('text/plain'), pasted)) return;
+      e.preventDefault();
+      void takeNow.current(pasted);
+      box.focus();
+    };
+    document.addEventListener('paste', onDocPaste);
+    return () => document.removeEventListener('paste', onDocPaste);
+  }, [canFiles]);
 
   /** begin: with the files, if there are any; else with the words; with neither, the box asks for them */
   const begin = () => {
@@ -624,6 +643,14 @@ export function FindOrStart({
           aria-controls="l5h-find-list"
           aria-activedescendant={open && options.length ? `l5h-o-${at}` : undefined}
           onFocus={() => setOpen(true)}
+          onPaste={(e) => {
+            // a screenshot or a copied file is added, as if dropped (lib/paste.ts); a copied paragraph stays text
+            if (!canFiles) return;
+            const pasted = pastedFiles(e.clipboardData);
+            if (!pasteIsFiles(e.clipboardData?.getData('text/plain'), pasted)) return;
+            e.preventDefault();
+            void take(pasted);
+          }}
           onChange={(e) => {
             onQuery(e.target.value);
             setOpen(true);

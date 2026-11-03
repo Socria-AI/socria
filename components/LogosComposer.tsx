@@ -30,6 +30,7 @@ import { DOCUMENT_EXTENSIONS, IMAGE_EXTENSIONS, TEXT_EXTENSIONS, kindOfFile, ref
 const DOC_ACCEPT = [IMAGE_ACCEPT, ...[...IMAGE_EXTENSIONS, ...DOCUMENT_EXTENSIONS.filter((e) => e !== 'zip'), ...TEXT_EXTENSIONS].map((e) => `.${e}`)].join(',');
 const PLAIN_ACCEPT = `${IMAGE_ACCEPT},text/plain,text/markdown,.txt,.md,.csv,.log,.json`;
 import { mentionAt, type ReplyRef } from '@/lib/chat-thread';
+import { isEditable, pasteIsFiles, pastedFiles } from '@/lib/paste';
 import { TeX } from './TeX';
 import { useVoiceInput } from './useVoiceInput';
 import { MAX_RECORD_SECONDS, SLIDE_CANCEL_PX, clock, insertSpoken } from '@/lib/logos4/voice';
@@ -699,15 +700,12 @@ export function LogosComposer({
   }
 
   function onPaste(e: React.ClipboardEvent) {
-    const items = Array.from(e.clipboardData?.items ?? []);
-    const imgs = items
-      .filter((i) => i.kind === 'file' && i.type.startsWith('image/'))
-      .map((i) => i.getAsFile())
-      .filter(Boolean) as File[];
-
-    if (imgs.length) {
+    // a screenshot, a copied picture or a file copied in Finder/Explorer is attached, as if dropped
+    // (lib/paste.ts finds it wherever the browser put it, and leaves a copied paragraph as text)
+    const files = pastedFiles(e.clipboardData);
+    if (pasteIsFiles(e.clipboardData?.getData('text/plain'), files)) {
       e.preventDefault();
-      void takeFiles(imgs);
+      void takeFiles(files);
       return;
     }
 
@@ -721,8 +719,28 @@ export function LogosComposer({
     }
   }
 
+  // A screenshot pasted while nothing is focused (the conversation, the map) comes here, as if it
+  // had been pasted into the box — as long as the box is on screen and nothing else took the paste.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const takeRef = useRef(takeFiles);
+  takeRef.current = takeFiles;
+  useEffect(() => {
+    const onDocPaste = (e: ClipboardEvent) => {
+      if (e.defaultPrevented || isEditable(document.activeElement)) return;
+      const box = rootRef.current;
+      if (!box || box.offsetParent === null) return;
+      const files = pastedFiles(e.clipboardData);
+      if (!pasteIsFiles(e.clipboardData?.getData('text/plain'), files)) return;
+      e.preventDefault();
+      void takeRef.current(files);
+      taRef.current?.focus();
+    };
+    document.addEventListener('paste', onDocPaste);
+    return () => document.removeEventListener('paste', onDocPaste);
+  }, []);
+
   return (
-    <div className="lg-composer" data-tour="composer">
+    <div className="lg-composer" data-tour="composer" ref={rootRef}>
       <div
         className={`lg-composer-box${dragging ? ' is-dropping' : ''}`}
         onDragEnter={(e) => {
