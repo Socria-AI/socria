@@ -25,9 +25,7 @@ import {
   mapAsItStands,
   buildProposePrompt,
   sanitizeMap,
-  LOGOS_MODEL,
   LOGOS_MAP_MODEL,
-  LOGOS_FALLBACK_MODEL,
   EMPTY_MAP,
   type ThinkingMap,
 } from '@/lib/logos';
@@ -57,6 +55,7 @@ import { boundaryNote, type Counter } from '@/lib/entitlements';
 import { claimUnit, consume, left, QUOTA_UNAVAILABLE, refusal, savedMapHasNodes, unitClaimed } from '@/lib/quota';
 import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { cacheKey, chooseAuxModel, tierOf } from '@/lib/model-router';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
@@ -324,9 +323,13 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'logos/map');
-    // GPT 5.6 Terra (lib/logos.ts LOGOS_MAP_MODEL), whatever the reply runs on:
-    // only the map's own override moves it, not OPENAI_MODEL_LOGOS.
-    const configured = process.env.OPENAI_MODEL_LOGOS_MAP || LOGOS_MAP_MODEL;
+    // By tier (lib/model-router.ts): Socria One's map on GPT-6.1 Terra, the free
+    // plan's on GPT-6 Luna, a guest's on GPT-4o mini — each stepping down its own
+    // ladder if refused. LOGOS_ROUTER=off: GPT 5.6 Terra for everyone, as before
+    // (OPENAI_MODEL_LOGOS_MAP still moves it then).
+    const route = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS_MAP || LOGOS_MAP_MODEL);
+    const configured = route.model;
+    const mapCacheKey = cacheKey('map', typeof body?.sessionId === 'string' ? body.sessionId : null);
 
     // The ceiling has to fit the JSON the prompt asks for, which is now a map
     // AND, when the conversation wants one, a picture the model authors part
@@ -342,6 +345,7 @@ export async function POST(req: NextRequest) {
         temperature: 0,
         max_tokens: cap,
         response_format: { type: 'json_object' },
+        ...(mapCacheKey ? { prompt_cache_key: mapCacheKey } : {}),
         messages: [
           // THE INSTRUCTIONS ARE A MESSAGE OF THEIR OWN. They are the same on
           // every call — with the depth and the guard, which hold for the
@@ -369,10 +373,10 @@ export async function POST(req: NextRequest) {
       return status === 404 || /model/i.test(e?.code || '') || /model|not found|does not exist|unknown/i.test(e?.message || '');
     };
 
-    // A REFUSED ID STEPS DOWN, NEVER OUT: Terra, then Sol, then the old
-    // fallback — said in the log, so a map quietly answered by another model
-    // is seen. Every pass after this one asks the model that answered.
-    const ladder = [...new Set([configured, LOGOS_MODEL, LOGOS_FALLBACK_MODEL])];
+    // A REFUSED ID STEPS DOWN, NEVER OUT: down the tier's ladder — said in the
+    // log, so a map quietly answered by another model is seen. Every pass after
+    // this one asks the model that answered.
+    const ladder = route.ladder;
     let served = configured;
     let completion;
     for (let i = 0; ; i++) {

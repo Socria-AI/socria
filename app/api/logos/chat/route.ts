@@ -19,7 +19,6 @@ import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import {
   LOGOS_CHAT_PROMPT,
-  LOGOS_FALLBACK_MODEL,
   NODE_TYPES,
   buildFocusPrompt,
 } from '@/lib/logos';
@@ -29,6 +28,7 @@ import { DOC_RULES, renderDocs, type DocRef } from '@/lib/docs/render';
 import { BLOCK_ID, sanitizeSourceDoc } from '@/lib/docs/sanitize';
 import type { SourceDoc } from '@/lib/docs/types';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { cacheKey, chooseModel, compressHistory, firstAccepted, levelOf, tierOf } from '@/lib/model-router';
 import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
@@ -315,7 +315,9 @@ export async function POST(req: NextRequest) {
 
     // Attachments are flattened into the text the model reads. Only the turn
     // being answered carries a long note in full.
-    const clean = kept
+    // Socria's older replies are read back clipped (lib/model-router.ts compressHistory): the
+    // person's words, and the reply they are answering, in full.
+    const clean = compressHistory(kept
       .map((m: any, i: number) => {
         // An inline block Socria showed earlier is read back as a line saying
         // what it was, not as its JSON — and as it stands now, where the person
@@ -346,7 +348,7 @@ export async function POST(req: NextRequest) {
           content: name && said ? `${name}: ${said}` : said,
         };
       })
-      .filter((m) => m.content.trim());
+      .filter((m) => m.content.trim()));
 
     if (!clean.length) {
       return NextResponse.json({ error: 'Nothing to respond to.' }, { status: 400 });
@@ -1167,7 +1169,32 @@ export async function POST(req: NextRequest) {
     };
 
     const openai = tracked(new OpenAI({ apiKey }), 'logos/chat');
-    const configured = modelFor('reply');
+    // ── WHICH MODEL ANSWERS (lib/model-router.ts) ─────────────────────
+    //
+    // By who is asking — a guest, the free plan, Socria One, all read on the
+    // server above — and by how much this turn needs, read from what the
+    // engine already knows about it (no model call). A refused id steps down
+    // its ladder, never above the tier.
+    const route = chooseModel(
+      tierOf(userId, plan),
+      levelOf({
+        text: String(last.content ?? ''),
+        exchange: runtime ? turnState.exchange.kind : null,
+        move: assist?.mode ?? null,
+        // a claim of theirs to check, or something to compute — maths merely mentioned is ordinary work
+        mathCheck: accuracy.theirs.length > 0 || accuracy.computed.some((c) => !!c.result),
+        pushback: !!accuracy.pushback,
+        docs: docRefs.length,
+        construct: assistInput.construct ?? (asked ? 'simulation' : constructAsk(String(last.content ?? ''))),
+        length: typeof body?.length === 'string' ? body.length : null,
+        turns: clean.length,
+        lastReplyAsked: /\?\s*$/.test(String(priorReply ?? '').trim()),
+      }),
+      process.env
+    );
+    const configured = route.model;
+    // one conversation's requests kept on one cache (the id hashed; nothing identifying leaves)
+    const promptCacheKey = cacheKey('chat', sessionId);
     // The ceiling follows their length setting (Logos 5), and rises for an
     // answer about a document, which quotes, cites and calculates.
     // MR's "shorter" is a hard ceiling, never above the route's own (lib/mr/execute.ts)
@@ -1188,30 +1215,14 @@ export async function POST(req: NextRequest) {
         // An answer about a document quotes, cites and calculates: it gets more room.
         max_tokens: maxReply,
         stream: true,
-      });
+        ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
+      } as Parameters<typeof openai.chat.completions.create>[0]) as Promise<AsyncIterable<{ choices?: { delta?: { content?: string | null } }[] }>>;
 
-    let completion;
-    let served = configured;
-    try {
-      completion = await make(configured);
-    } catch (e: any) {
-      const status = e?.status ?? e?.response?.status;
-      const isModelError =
-        status === 404 ||
-        /model/i.test(e?.code || '') ||
-        /model|not found|does not exist|unknown/i.test(e?.message || '');
-      if (isModelError && configured !== LOGOS_FALLBACK_MODEL) {
-        if (process.env.NODE_ENV !== 'production') {
-          console.warn(
-            `[logos] model "${configured}" rejected; falling back to ${LOGOS_FALLBACK_MODEL}`
-          );
-        }
-        completion = await make(LOGOS_FALLBACK_MODEL);
-        served = LOGOS_FALLBACK_MODEL;
-      } else {
-        throw e;
-      }
-    }
+    const answered = await firstAccepted(route.ladder, make, (from, to, why) =>
+      console.warn('[logos] model %s refused (%s); asking %s', from, why, to)
+    );
+    const completion = answered.result;
+    const served = answered.model;
 
     // ── charged here, and not one line earlier ────────────────────
     //
@@ -1554,6 +1565,8 @@ export async function POST(req: NextRequest) {
         'X-Content-Type-Options': 'nosniff',
         // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
         'X-Socria-Assist': assistTrace(assist),
+        // which model answered, and why it was chosen: tier/level/model (lib/model-router.ts)
+        'X-Socria-Model': `${route.tier}/${route.level}/${served}`,
         // a write-up they asked for, answered here because the month's documents are spent (above)
         ...(writeUpRefused && !writeUpRefused.unavailable ? { 'X-Socria-Limit': 'documents', 'X-Socria-Limit-Used': String(writeUpRefused.used), 'X-Socria-Limit-Of': String(writeUpRefused.limit) } : {}),
         // Metacognitive Regulation's decision this turn: content-free codes (lib/mr/index.ts traceOf)

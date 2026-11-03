@@ -231,6 +231,8 @@ const MODULES = [
   'lib/image-kind.ts',
   // what a paste carries, as files (lib/paste.ts)
   'lib/paste.ts',
+  // which model answers, by tier and by turn (lib/model-router.ts)
+  'lib/model-router.ts',
   'lib/upload-paths.ts',
   'lib/chat-attachments.ts',
   'lib/file-extract.ts',

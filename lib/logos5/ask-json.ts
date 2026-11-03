@@ -5,12 +5,14 @@
 
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
-import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL } from '@/lib/logos';
+import { LOGOS_MODEL } from '@/lib/logos';
+import { chooseAuxModel, firstAccepted, type Tier } from '@/lib/model-router';
 import type { Asked } from './study-ask';
 
-export async function askJson(asked: Asked, opts: { model?: string; maxTokens: number }): Promise<unknown | null> {
+export async function askJson(asked: Asked, opts: { model?: string; maxTokens: number; tier: Tier }): Promise<unknown | null> {
   const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), 'logos/study');
-  const configured = opts.model || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+  // by tier (lib/model-router.ts); LOGOS_ROUTER=off: the configured model, as before
+  const routed = chooseAuxModel(opts.tier, 'standard', process.env, opts.model || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
   const call = (model: string) =>
     openai.chat.completions.create({
       model,
@@ -22,14 +24,7 @@ export async function askJson(asked: Asked, opts: { model?: string; maxTokens: n
         { role: 'user', content: asked.user },
       ],
     });
-  let completion;
-  try {
-    completion = await call(configured);
-  } catch (e: any) {
-    const status = e?.status ?? e?.response?.status;
-    if ((status === 404 || /model/i.test(e?.message || '')) && configured !== LOGOS_FALLBACK_MODEL) completion = await call(LOGOS_FALLBACK_MODEL);
-    else throw e;
-  }
+  const { result: completion } = await firstAccepted(routed.ladder, call);
   const text = completion.choices?.[0]?.message?.content;
   try {
     return text ? JSON.parse(text) : null;

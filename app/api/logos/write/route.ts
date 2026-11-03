@@ -14,8 +14,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
+import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
-import { LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
+import { LOGOS_MODEL } from '@/lib/logos';
 import { buildWritePrompt, sanitizeAssist, sanitizeAssistInput } from '@/lib/write/assist';
 import { styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
@@ -49,7 +51,11 @@ export async function POST(req: NextRequest) {
   }
 
   const openai = tracked(new OpenAI({ apiKey }), 'logos/write');
-  const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+  // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
+  // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
+  const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
+  const configured = routed.model;
+  const stepDown = routed.ladder[1];
   // How Socria talks to them shapes the wording of its notes — never their writing, never the edits.
   const voice =
     conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true }) +
@@ -78,8 +84,8 @@ export async function POST(req: NextRequest) {
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
       const isModelError = status === 404 || /model|not found|does not exist|unknown/i.test(e?.message || '');
-      if (!isModelError || configured === LOGOS_FALLBACK_MODEL) throw e;
-      res = await make(LOGOS_FALLBACK_MODEL);
+      if (!isModelError || !stepDown) throw e;
+      res = await make(stepDown!);
     }
     let parsed: unknown = null;
     try {

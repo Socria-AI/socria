@@ -70,8 +70,21 @@ export function tracked<T extends Creatable>(client: T, route: string): T {
     try {
       res = await create(asked, ...rest);
     } catch (e) {
-      if (asked === params || !refusesParam(e, 'stream_options')) throw e;
-      res = await create(params, ...rest);
+      // a parameter this provider or model does not know is dropped and the call asked again —
+      // the usage report (stream_options) and the cache hint (prompt_cache_key) are extras, never the call
+      if (refusesParam(e, 'prompt_cache_key') && 'prompt_cache_key' in asked) {
+        const { prompt_cache_key: _k, ...without } = asked;
+        void _k;
+        res = await create(without, ...rest).catch((e2: unknown) => {
+          if (!refusesParam(e2, 'stream_options') || !('stream_options' in without) || params.stream_options) throw e2;
+          const { stream_options: _s, ...bare } = without;
+          void _s;
+          return create(bare, ...rest);
+        });
+      } else {
+        if (asked === params || !refusesParam(e, 'stream_options')) throw e;
+        res = await create(params, ...rest);
+      }
     }
     if (!streamed) {
       logUsage(route, res?.model ?? params?.model, res?.usage);

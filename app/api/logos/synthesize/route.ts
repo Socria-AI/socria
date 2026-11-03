@@ -10,8 +10,10 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
+import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
-import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL, sanitizeMap } from '@/lib/logos';
+import { LOGOS_MODEL, sanitizeMap } from '@/lib/logos';
 import { enforce, digest, fromStructure, isSynthesisText, sanitizeSynthesis, snapshotOf, synthesisPrompt } from '@/lib/logos-synthesis';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
@@ -59,7 +61,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'logos/synthesize');
-    const configured = process.env.OPENAI_MODEL_LOGOS_SYNTHESIS || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+    // by tier (lib/model-router.ts): Socria One on GPT-6.1 Sol, the free plan on GPT-6 Luna, a guest on
+    // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
+    const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'deep', process.env, process.env.OPENAI_MODEL_LOGOS_SYNTHESIS || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
+    const configured = routed.model;
+    const stepDown = routed.ladder[1];
     const ask = (model: string) =>
       openai.chat.completions.create({
         model,
@@ -76,7 +82,7 @@ export async function POST(req: NextRequest) {
       completion = await ask(configured);
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
-      if ((status === 404 || /model/i.test(e?.message || '')) && configured !== LOGOS_FALLBACK_MODEL) completion = await ask(LOGOS_FALLBACK_MODEL);
+      if ((status === 404 || /model/i.test(e?.message || '')) && !!stepDown) completion = await ask(stepDown!);
       else throw e;
     }
     const text = completion.choices?.[0]?.message?.content;

@@ -14,6 +14,8 @@
 // Who may ask: a signed-in account, or the typed access key, like every Logos
 // route. It counts against the rate limit.
 
+import { tierOf } from '@/lib/model-router';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { sanitizeSourceDoc } from '@/lib/docs/sanitize';
@@ -55,7 +57,7 @@ export async function POST(req: NextRequest) {
   };
   if (!process.env.OPENAI_API_KEY) return plain();
   try {
-    const raw = await askJson(sortAsk(docs, said, goal), { model: process.env.OPENAI_MODEL_LOGOS_STUDY, maxTokens: 3200 });
+    const raw = await askJson(sortAsk(docs, said, goal), { model: process.env.OPENAI_MODEL_LOGOS_STUDY, tier: tierOf(userId, await resolvePlanForRequest(req, userId)), maxTokens: 3200 });
     const sorted = sanitizeSorted(raw, docs);
     if (!sorted) return plain();
     return NextResponse.json({ sorted });

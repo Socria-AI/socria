@@ -26,6 +26,7 @@ import 'server-only';
 // nothing about what is stored or how it is retrieved.
 
 import { modelClient } from '../core4/model';
+import { firstAccepted, ladderFor } from '../model-router';
 import { SAVED_VOICE_RULE } from '../memory-voice';
 import { KNOWN_NODE_TYPES, KNOWN_RELATIONSHIPS, PROVENANCE_KINDS, clip } from './types';
 import type { EdgeCandidate, NodeCandidate } from './apply';
@@ -33,6 +34,17 @@ import type { ActivatedSubgraph } from './activate';
 
 /** A cheap model, regardless of what the conversation is running on. */
 export const EXTRACTOR_MODEL = process.env.OPENAI_MODEL_MIND || 'gpt-4o-mini';
+
+/**
+ * What the extractor asks, in order: GPT-6 Luna — cheaper per token than GPT-4o mini
+ * and stronger at structured reading (lib/model-router.ts PRICES) — stepping down to
+ * GPT-4o mini if it is refused. OPENAI_MODEL_MIND, or LOGOS_ROUTER=off, keeps one model.
+ */
+export function extractorLadder(env: Record<string, string | undefined> = process.env): string[] {
+  if (env.OPENAI_MODEL_MIND) return [env.OPENAI_MODEL_MIND];
+  if (['off', '0', 'false', 'no'].includes((env.LOGOS_ROUTER ?? '').trim().toLowerCase())) return [EXTRACTOR_MODEL];
+  return ladderFor('gpt-6-luna', 'free');
+}
 
 const SYSTEM = `You build a semantic memory graph from a conversation.
 
@@ -229,9 +241,10 @@ export async function extract(
   existing: ActivatedSubgraph | null
 ): Promise<ExtractResult> {
   try {
-    const res = await modelClient(apiKey).complete({
+    const client = modelClient(apiKey);
+    const { result: res } = await firstAccepted(extractorLadder(), (model) => client.complete({
       role: 'extract',
-      model: EXTRACTOR_MODEL,
+      model,
       temperature: 0,
       json: true,
       system: SYSTEM,
@@ -247,7 +260,7 @@ export async function extract(
         },
       ],
       maxTokens: 2000,
-    });
+    }));
     const body = res.text || '{}';
     return sanitizeExtraction(JSON.parse(body));
   } catch {

@@ -13,7 +13,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import { tracked } from '@/lib/openai-usage';
-import { LOGOS_MODEL, LOGOS_FALLBACK_MODEL } from '@/lib/logos';
+import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { LOGOS_MODEL } from '@/lib/logos';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote } from '@/lib/entitlements';
@@ -50,7 +51,11 @@ export async function POST(req: NextRequest) {
   }
 
   const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), 'logos/easy');
-  const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+  // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
+  // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
+  const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
+  const configured = routed.model;
+  const stepDown = routed.ladder[1];
   const call = (model: string) =>
     openai.chat.completions.create({
       model,
@@ -77,7 +82,7 @@ export async function POST(req: NextRequest) {
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
       const isModelError = status === 404 || /model|not found|does not exist|unknown|vision|image/i.test(e?.message || '');
-      if (configured !== LOGOS_FALLBACK_MODEL && isModelError) completion = await call(LOGOS_FALLBACK_MODEL);
+      if (!!stepDown && isModelError) completion = await call(stepDown!);
       else throw e;
     }
     let raw: unknown = null;

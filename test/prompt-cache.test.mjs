@@ -11,8 +11,9 @@
 //                                   message — the documents stay in it;
 //   the map (app/api/logos/map)     the extractor's instructions as a message
 //                                   of their own, then the map as it stands
-//                                   and the conversation — asked of GPT 5.6
-//                                   Terra, stepping down to Sol if refused.
+//                                   and the conversation — asked of the
+//                                   tier's model (lib/model-router.ts),
+//                                   stepping down its ladder if refused.
 //
 // Through the real routes, with only the database, Clerk and the model
 // replaced (test/helpers/fake-openai-logos.mjs).
@@ -197,27 +198,103 @@ async function mapTurn(map, said, { script = [{ nodes: [], edges: [] }], env = {
   ok('  the pure prompt is the same instructions and the same map, joined', buildMapPrompt(BUSY) === `${mapInstructions()}\n\n${mapAsItStands(BUSY)}`);
 }
 
-console.log('\n=== the map, through the route: GPT 5.6 Terra reads it ===');
+console.log('\n=== the map, through the route: the model by tier (lib/model-router.ts) ===');
 {
+  // the test's user is signed in on the free plan: GPT-6 Luna, stepping down to GPT-5.6 Luna, then GPT-4o mini
   const t = await mapTurn(BUSY, 'The pricing is not settled, though.');
-  ok('the map pass asks Terra', t.models.length === 1 && t.models[0] === 'gpt-5.6-terra', JSON.stringify(t.models));
-  const pinned = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: { OPENAI_MODEL_LOGOS: 'gpt-5.6-sol' } });
-  ok('  whatever the reply is pinned to — OPENAI_MODEL_LOGOS does not move it', pinned.models[0] === 'gpt-5.6-terra', JSON.stringify(pinned.models));
-  const own = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: { OPENAI_MODEL_LOGOS_MAP: 'gpt-5.6-sol' } });
-  ok('  its own override does, with no redeploy', own.models[0] === 'gpt-5.6-sol', JSON.stringify(own.models));
-  const reply = await reply_({ messages: [U('Should we launch in March?')] });
-  ok('the reply stays on Sol', reply === 'gpt-5.6-sol', reply);
+  ok('the free plan’s map pass asks GPT-6 Luna', t.models.length === 1 && t.models[0] === 'gpt-6-luna', JSON.stringify(t.models));
+  const pinned = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: { OPENAI_MODEL_LOGOS: 'gpt-5.6-sol', OPENAI_MODEL_LOGOS_MAP: 'gpt-5.6-sol' } });
+  ok('  the old single-model overrides do not move a routed map', pinned.models[0] === 'gpt-6-luna', JSON.stringify(pinned.models));
+  const own = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: { OPENAI_MODEL_FREE_STANDARD: 'gpt-5.6-luna' } });
+  ok('  the tier’s own override does, with no redeploy', own.models[0] === 'gpt-5.6-luna', JSON.stringify(own.models));
+  const reply = await reply_({ messages: [U('Should we launch in March? Walk me through the trade-offs.')] });
+  ok('the free plan’s reply is on GPT-6 Luna too', reply === 'gpt-6-luna', reply);
 
   const refused = (id) => Object.assign(new Error(`The model \`${id}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
   const MAPPED = { nodes: [{ id: 'n1', label: 'Launch in March', type: 'idea' }, { id: 'n2', label: 'Pricing is not settled', type: 'assumption' }], edges: [{ from: 'n2', to: 'n1', relation: 'conflicts' }], context: 'deciding' };
-  const down = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [refused('gpt-5.6-terra'), MAPPED] });
-  ok('a refused Terra steps down to Sol, and the map is drawn', JSON.stringify(down.models) === JSON.stringify(['gpt-5.6-terra', 'gpt-5.6-sol']) && down.json?.map?.nodes?.length === 2, JSON.stringify({ models: down.models, nodes: down.json?.map?.nodes?.length }));
-  const twice = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [refused('gpt-5.6-terra'), refused('gpt-5.6-sol'), MAPPED] });
-  ok('  and a refused Sol to the old fallback', JSON.stringify(twice.models) === JSON.stringify(['gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-4o']) && twice.json?.map?.nodes?.length === 2, JSON.stringify(twice.models));
+  const down = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [refused('gpt-6-luna'), MAPPED] });
+  ok('a refused GPT-6 Luna steps down to GPT-5.6 Luna, and the map is drawn', JSON.stringify(down.models) === JSON.stringify(['gpt-6-luna', 'gpt-5.6-luna']) && down.json?.map?.nodes?.length === 2, JSON.stringify({ models: down.models, nodes: down.json?.map?.nodes?.length }));
+  const twice = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [refused('gpt-6-luna'), refused('gpt-5.6-luna'), MAPPED] });
+  ok('  and then to GPT-4o mini — never up to a member’s model', JSON.stringify(twice.models) === JSON.stringify(['gpt-6-luna', 'gpt-5.6-luna', 'gpt-4o-mini']) && twice.json?.map?.nodes?.length === 2, JSON.stringify(twice.models));
   const broke = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [Object.assign(new Error('upstream exploded'), { status: 500 })] });
   ok('an error that is not a refused id is not retried down the ladder', broke.models.length === 1 && broke.status === 200 && broke.json?.map?.nodes?.[0]?.label === 'Launch in March', JSON.stringify(broke.models));
-  const second = await mapTurn(EMPTY, 'build a model of how a pulsar beam sweeps', { script: [refused('gpt-5.6-terra'), { nodes: [{ id: 'n1', label: 'Pulsar beam', type: 'concept' }], edges: [], context: 'math', ask: { action: 'construct', artifact: 'model', topic: 'pulsar beam' } }] });
-  ok('a pass after the first asks the model that answered it', second.models.length === 3 && second.models[1] === 'gpt-5.6-sol' && second.models[2] === 'gpt-5.6-sol' && /returned no proposal/.test(String(second.calls[2]?.messages?.[0]?.content)), JSON.stringify(second.models));
+  const second = await mapTurn(EMPTY, 'build a model of how a pulsar beam sweeps', { script: [refused('gpt-6-luna'), { nodes: [{ id: 'n1', label: 'Pulsar beam', type: 'concept' }], edges: [], context: 'math', ask: { action: 'construct', artifact: 'model', topic: 'pulsar beam' } }] });
+  ok('a pass after the first asks the model that answered it', second.models.length === 3 && second.models[1] === 'gpt-5.6-luna' && second.models[2] === 'gpt-5.6-luna' && /returned no proposal/.test(String(second.calls[2]?.messages?.[0]?.content)), JSON.stringify(second.models));
+  const cached = await mapTurn(BUSY, 'The pricing is not settled, though.');
+  ok('the map pass names no cache key without a line of thinking', !('prompt_cache_key' in (cached.calls[0] ?? {})));
+}
+
+console.log('\n=== LOGOS_ROUTER=off: GPT 5.6 Terra reads the map, as before ===');
+{
+  const OFF = { LOGOS_ROUTER: 'off' };
+  const t = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: OFF });
+  ok('the map pass asks Terra', t.models.length === 1 && t.models[0] === 'gpt-5.6-terra', JSON.stringify(t.models));
+  const own = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: { ...OFF, OPENAI_MODEL_LOGOS_MAP: 'gpt-5.6-sol' } });
+  ok('  its own override moves it, with no redeploy', own.models[0] === 'gpt-5.6-sol', JSON.stringify(own.models));
+  const refused = (id) => Object.assign(new Error(`The model \`${id}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
+  const MAPPED = { nodes: [{ id: 'n1', label: 'Launch in March', type: 'idea' }], edges: [], context: 'deciding' };
+  const twice = await mapTurn(BUSY, 'The pricing is not settled, though.', { env: OFF, script: [refused('gpt-5.6-terra'), refused('gpt-5.6-sol'), MAPPED] });
+  ok('  a refused Terra steps down to Sol, then to the old fallback', JSON.stringify(twice.models) === JSON.stringify(['gpt-5.6-terra', 'gpt-5.6-sol', 'gpt-4o']), JSON.stringify(twice.models));
+  const saved = process.env.LOGOS_ROUTER;
+  process.env.LOGOS_ROUTER = 'off';
+  try {
+    const reply = await reply_({ messages: [U('Should we launch in March?')] });
+    ok('the reply is on Sol', reply === 'gpt-5.6-sol', reply);
+  } finally {
+    saved === undefined ? delete process.env.LOGOS_ROUTER : (process.env.LOGOS_ROUTER = saved);
+  }
+}
+
+console.log('\n=== the reply, routed by tier and by the turn (lib/model-router.ts) ===');
+{
+  // Through the real route: the plan is the server's (a member here by the operator's list,
+  // SOCRIA_ONE_USER_IDS), the level is read from the turn, and no request can name a model.
+  const asked = async (said, { env = {}, extra = {}, script = [], refuse = [] } = {}) => {
+    const saved = Object.fromEntries(Object.keys(env).map((k) => [k, process.env[k]]));
+    for (const [k, v] of Object.entries(env)) process.env[k] = v;
+    try {
+      globalThis.__logosCalls = []; globalThis.__logosPrompts = []; globalThis.__logosReply = 'Noted.'; globalThis.__logosScript = [...script]; globalThis.__logosRefuse = refuse;
+      const r = await chat.POST(new NextRequest('http://localhost/api/logos/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ messages: [U(said)], ...extra }) }));
+      await r.text().catch(() => '');
+      const streamed = globalThis.__logosCalls.filter((c) => c.stream);
+      return { status: r.status, header: r.headers.get('x-socria-model') ?? '', models: streamed.map((c) => c.model), call: streamed[streamed.length - 1] ?? {} };
+    } finally {
+      for (const [k, v] of Object.entries(saved)) v === undefined ? delete process.env[k] : (process.env[k] = v);
+      globalThis.__logosRefuse = [];
+    }
+  };
+  const ONE = { SOCRIA_ONE_USER_IDS: 'user_prompt_cache' };
+
+  const freeHi = await asked('thanks!');
+  ok('free plan, a thanks: GPT-6 Luna, and the header says so', freeHi.models[0] === 'gpt-6-luna' && freeHi.header === 'free/light/gpt-6-luna', freeHi.header);
+  const freeProof = await asked('Prove that the square root of 2 is irrational, step by step.');
+  ok('free plan, a proof: still GPT-6 Luna — the free plan never reaches a member’s model', freeProof.models[0] === 'gpt-6-luna' && freeProof.header === 'free/deep/gpt-6-luna', freeProof.header);
+  const pinned = await asked('Prove that the square root of 2 is irrational.', { extra: { model: 'gpt-6.1-sol' } });
+  ok('a request that names a model is not heard', pinned.models[0] === 'gpt-6-luna', JSON.stringify(pinned.models));
+
+  const oneHi = await asked('thanks!', { env: ONE });
+  ok('Socria One, a thanks: GPT-6 Luna — Terra buys nothing there', oneHi.models[0] === 'gpt-6-luna' && oneHi.header === 'one/light/gpt-6-luna', oneHi.header);
+  const oneWork = await asked('What should I look for when choosing a used bike?', { env: ONE });
+  ok('Socria One, ordinary work: GPT-6.1 Terra', oneWork.models[0] === 'gpt-6.1-terra' && oneWork.header === 'one/standard/gpt-6.1-terra', oneWork.header);
+  const oneProof = await asked('Prove that the square root of 2 is irrational, step by step.', { env: ONE });
+  ok('Socria One, a proof: GPT-6.1 Sol', oneProof.models[0] === 'gpt-6.1-sol' && oneProof.header === 'one/deep/gpt-6.1-sol', oneProof.header);
+  const oneMaths = await asked('Is the derivative of x^3 equal to 3x^2?', { env: ONE });
+  ok('Socria One, maths to check: GPT-6.1 Sol', oneMaths.models[0] === 'gpt-6.1-sol', oneMaths.header);
+
+  const refused = (id) => Object.assign(new Error(`The model \`${id}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
+  const down = await asked('Prove that the square root of 2 is irrational, step by step.', { env: ONE, refuse: ['gpt-6.1-sol'] });
+  ok('a refused GPT-6.1 Sol steps down to GPT-5.6 Sol, and the turn is answered', JSON.stringify(down.models) === JSON.stringify(['gpt-6.1-sol', 'gpt-5.6-sol']) && down.status === 200 && down.header === 'one/deep/gpt-5.6-sol', JSON.stringify({ m: down.models, h: down.header }));
+  const freeDown = await asked('What should I look for in a used bike?', { refuse: ['gpt-6-luna', 'gpt-5.6-luna'] });
+  ok('a refused free model steps down to GPT-4o mini, never up', JSON.stringify(freeDown.models) === JSON.stringify(['gpt-6-luna', 'gpt-5.6-luna', 'gpt-4o-mini']), JSON.stringify(freeDown.models));
+
+  const keyed = await asked('What should I look for in a used bike?', { extra: { sessionId: 'line-1' } });
+  const keyedAgain = await asked('And the brakes?', { extra: { sessionId: 'line-1' } });
+  const other = await asked('What should I look for in a used bike?', { extra: { sessionId: 'line-2' } });
+  ok('one line of thinking asks with one cache key, hashed', typeof keyed.call.prompt_cache_key === 'string' && keyed.call.prompt_cache_key === keyedAgain.call.prompt_cache_key && !keyed.call.prompt_cache_key.includes('line-1'), String(keyed.call.prompt_cache_key));
+  ok('  another line of thinking, another key', other.call.prompt_cache_key && other.call.prompt_cache_key !== keyed.call.prompt_cache_key);
+
+  const off = await asked('thanks!', { env: { ...ONE, LOGOS_ROUTER: 'off' } });
+  ok('LOGOS_ROUTER=off: every reply on Sol, as before', off.models[0] === 'gpt-5.6-sol' && off.header.endsWith('/gpt-5.6-sol'), off.header);
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

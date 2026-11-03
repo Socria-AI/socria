@@ -13,9 +13,11 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
+import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { LOGOS_FALLBACK_MODEL, LOGOS_MODEL } from '@/lib/logos';
+import { LOGOS_MODEL } from '@/lib/logos';
 import { listProjectChats, listSources, loadGraph } from '@/lib/mind/store';
 import { atlasMapOf } from '@/lib/mind/atlas';
 import { sanitizeSynthesis, synthesisDigest, synthesizeFromStructure, type HomeChat, type HomeGoal } from '@/lib/project-home';
@@ -78,7 +80,11 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     files.map((f) => ({ id: f.id, name: f.name, bytes: f.bytes, createdAt: f.createdAt }))
   );
   const openai = tracked(new OpenAI({ apiKey }), 'projects/synthesize');
-  const configured = process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL;
+  // by tier (lib/model-router.ts): Socria One on GPT-6.1 Sol, the free plan on GPT-6 Luna, a guest on
+  // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
+  const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'deep', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
+  const configured = routed.model;
+  const stepDown = routed.ladder[1];
   const ask = (model: string) =>
     openai.chat.completions.create({
       model,
@@ -93,7 +99,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
       completion = await ask(configured);
     } catch (e: any) {
       const status = e?.status ?? e?.response?.status;
-      if ((status === 404 || /model/i.test(e?.message || '')) && configured !== LOGOS_FALLBACK_MODEL) completion = await ask(LOGOS_FALLBACK_MODEL);
+      if ((status === 404 || /model/i.test(e?.message || '')) && !!stepDown) completion = await ask(stepDown!);
       else throw e;
     }
     const raw = JSON.parse(completion.choices?.[0]?.message?.content || '{}');

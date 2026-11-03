@@ -7,7 +7,9 @@
 // reply) records its system prompt in globalThis.__logosPrompts and streams
 // globalThis.__logosReply — in one delta, or, when globalThis.__logosChunk is
 // a positive number, in deltas of that many characters (as a real stream
-// arrives: a fence, a quotation or a table row split across deltas).
+// arrives: a fence, a quotation or a table row split across deltas). A streamed
+// call to a model listed in globalThis.__logosRefuse is refused as an unknown id
+// (a 404, as the provider refuses a model not enabled on the account).
 //
 // "Its system prompt" is every system message, in order: the reply sends the
 // part that holds for the whole line of thinking first and this turn's
@@ -23,6 +25,8 @@ export default class OpenAI {
           const g = globalThis;
           (g.__logosCalls ??= []).push(p);
           if (p.stream) {
+            if ((g.__logosRefuse ?? []).includes(p.model))
+              throw Object.assign(new Error(`The model \`${p.model}\` does not exist or you do not have access to it.`), { status: 404, code: 'model_not_found' });
             (g.__logosPrompts ??= []).push(systemOf(p));
             const text = g.__logosReply ?? 'Here it is.';
             const step = Number(g.__logosChunk) > 0 ? Number(g.__logosChunk) : text.length || 1;

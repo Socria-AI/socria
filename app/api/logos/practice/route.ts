@@ -12,6 +12,8 @@
 // Who may ask: a signed-in account, or the typed access key. It counts
 // against the rate limit.
 
+import { tierOf } from '@/lib/model-router';
+import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { sanitizeSourceDoc } from '@/lib/docs/sanitize';
@@ -53,7 +55,7 @@ export async function POST(req: NextRequest) {
 
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: 'Socria cannot make these just now.' }, { status: 503 });
   try {
-    const raw = await askJson(entriesAsk(topic, docs, review, avoid), { model: process.env.OPENAI_MODEL_LOGOS_STUDY, maxTokens: 1800 });
+    const raw = await askJson(entriesAsk(topic, docs, review, avoid), { model: process.env.OPENAI_MODEL_LOGOS_STUDY, tier: tierOf(userId, await resolvePlanForRequest(req, userId)), maxTokens: 1800 });
     const made = sanitizeJournal(raw, docs);
     if (!made.events.length) return NextResponse.json({ error: 'Nothing came back that these pages bear out.', dropped: made.dropped }, { status: 422 });
     return NextResponse.json(made);
