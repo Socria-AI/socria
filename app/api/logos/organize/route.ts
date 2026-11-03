@@ -15,6 +15,7 @@
 // route. It counts against the rate limit.
 
 import { tierOf } from '@/lib/model-router';
+import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -57,6 +58,11 @@ export async function POST(req: NextRequest) {
   };
   if (!process.env.OPENAI_API_KEY) return plain();
   try {
+    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
+    // one that is awake is metered from here, so every call this request makes is counted.
+    const sleep = await sleepGate(req, userId);
+    if (sleep.refuse) return sleep.refuse;
+    if (sleep.meter) meterFor(sleep.meter);
     const raw = await askJson(sortAsk(docs, said, goal), { model: process.env.OPENAI_MODEL_LOGOS_STUDY, tier: tierOf(userId, await resolvePlanForRequest(req, userId)), maxTokens: 3200 });
     const sorted = sanitizeSorted(raw, docs);
     if (!sorted) return plain();

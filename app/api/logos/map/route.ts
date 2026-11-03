@@ -54,6 +54,7 @@ import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
 import { claimUnit, consume, left, QUOTA_UNAVAILABLE, refusal, savedMapHasNodes, unitClaimed } from '@/lib/quota';
 import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
+import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { cacheKey, chooseAuxModel, tierOf } from '@/lib/model-router';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -156,6 +157,11 @@ export async function POST(req: NextRequest) {
   // Depth is one of the things One opens, so a free request is answered at
   // Balanced whatever it asked for — clamped here rather than trusted.
   const plan = await resolvePlanForRequest(req, userId);
+  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
+  // one that is awake is metered from here, so every call this request makes is counted.
+  const sleep = await sleepGate(req, userId, plan);
+  if (sleep.refuse) return sleep.refuse;
+  if (sleep.meter) meterFor(sleep.meter);
   const depth = depthForPlan(resolveDepth(body?.depth), plan);
   const guidance = guidanceBlock(depth, resolveGuard(body?.guard), 'surface');
 

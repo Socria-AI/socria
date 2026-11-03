@@ -1,0 +1,187 @@
+/* components/logos5/sleep.css — Sleep Mode (SleepMode.tsx), in Logos 5's own tokens:
+   paper on Paper, dark on Dark, the night sky on Celestial. Quiet: a moon, a few
+   lines, a countdown in the serif. No glow, no gradient, nothing that pulses. */
+
+.sl-scrim {
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+}
+.sl-back {
+  position: absolute;
+  inset: 0;
+  background: rgba(var(--shadow-rgb, 32, 32, 27), 0.32);
+}
+@media (prefers-reduced-motion: no-preference) {
+  .sl-back {
+    animation: sl-fade 0.3s ease both;
+  }
+  .sl-card {
+    animation: sl-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+  }
+}
+@keyframes sl-fade {
+  from {
+    opacity: 0;
+  }
+}
+@keyframes sl-rise {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+.sl-card {
+  position: relative;
+  width: min(420px, 100%);
+  padding: 30px 28px 24px;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  border-radius: 20px;
+  background: var(--l5-surface, #f5f3eb);
+  color: var(--lg-ink, #20201b);
+  box-shadow: 0 30px 70px -40px rgba(var(--shadow-rgb, 32, 32, 27), 0.55);
+  font-family: var(--lg-sans, Inter, system-ui, sans-serif);
+  text-align: center;
+}
+html[data-theme='dark'] .sl-card {
+  background: #1c1c1c;
+}
+html[data-theme='one'] .sl-card {
+  background: #17304a;
+}
+html[data-theme='night'] .sl-card {
+  background: #121c31;
+}
+.sl-moon {
+  display: inline-grid;
+  place-items: center;
+  width: 56px;
+  height: 56px;
+  margin-bottom: 14px;
+  border-radius: 50%;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  color: var(--lg-primary, #354620);
+}
+.sl-t {
+  margin: 0;
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  font-weight: 400;
+  font-size: 1.75rem;
+  line-height: 1.1;
+  letter-spacing: -0.01em;
+}
+.sl-b {
+  margin: 10px auto 0;
+  max-width: 32ch;
+  font-size: 0.95rem;
+  line-height: 1.55;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+.sl-when {
+  display: flex;
+  justify-content: center;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 8px;
+  margin: 18px 0 0;
+}
+.sl-when-k {
+  font-size: 0.72rem;
+  font-weight: 600;
+  letter-spacing: 0.16em;
+  text-transform: uppercase;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}
+.sl-when-v {
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  font-size: 1.45rem;
+  color: var(--lg-ink, #20201b);
+}
+.sl-when-at {
+  font-size: 0.85rem;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+.sl-acts {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px;
+  margin-top: 22px;
+}
+.sl-btn {
+  height: 40px;
+  padding: 0 18px;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  border-radius: 999px;
+  background: transparent;
+  color: var(--lg-ink, #20201b);
+  font: inherit;
+  font-size: 0.9rem;
+  font-weight: 500;
+  cursor: pointer;
+}
+.sl-btn:hover {
+  border-color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}
+.sl-btn.is-one {
+  border-color: var(--lg-one, #26485a);
+  background: var(--lg-one, #26485a);
+  color: #f0ead8;
+}
+.sl-btn.is-one:hover {
+  filter: brightness(1.08);
+}
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .sl-btn.is-one {
+  color: #0d1a24;
+}
+.sl-btn:focus-visible,
+.sl-bar:focus-visible {
+  outline: 2px solid var(--lg-accent, #264653);
+  outline-offset: 2px;
+}
+.sl-one {
+  margin: 12px 0 0;
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  font-style: italic;
+  font-size: 0.95rem;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+
+/* the bar, while it lasts: one line over the conversation box */
+.sl-bar {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  align-self: center;
+  max-width: 100%;
+  margin: 0 auto 8px;
+  padding: 6px 12px;
+  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
+  border-radius: 999px;
+  background: var(--l5-surface, #f5f3eb);
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+}
+html[data-theme='dark'] .sl-bar {
+  background: #1c1c1c;
+}
+html[data-theme='night'] .sl-bar {
+  background: #121c31;
+}
+.sl-bar svg {
+  color: var(--lg-primary, #354620);
+  flex: 0 0 auto;
+}
+.sl-bar-t {
+  color: var(--lg-ink, #20201b);
+}
+.sl-bar-n::before {
+  content: '·';
+  margin-right: 8px;
+  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+}

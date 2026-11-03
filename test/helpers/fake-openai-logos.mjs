@@ -9,7 +9,10 @@
 // a positive number, in deltas of that many characters (as a real stream
 // arrives: a fence, a quotation or a table row split across deltas). A streamed
 // call to a model listed in globalThis.__logosRefuse is refused as an unknown id
-// (a 404, as the provider refuses a model not enabled on the account).
+// (a 404, as the provider refuses a model not enabled on the account). With
+// globalThis.__logosUsage set, every call reports that usage as the provider
+// does — a final chunk with no choices on a stream, `usage` on a buffered call —
+// so what a request spends can be counted (lib/sleep-server.ts).
 //
 // "Its system prompt" is every system message, in order: the reply sends the
 // part that holds for the whole line of thinking first and this turn's
@@ -32,15 +35,18 @@ export default class OpenAI {
             const step = Number(g.__logosChunk) > 0 ? Number(g.__logosChunk) : text.length || 1;
             return (async function* () {
               for (let i = 0; i < Math.max(1, text.length); i += step) yield { choices: [{ delta: { content: text.slice(i, i + step) } }] };
+              if (g.__logosUsage && p.stream_options?.include_usage) yield { choices: [], usage: g.__logosUsage };
             })();
           }
           const next = (g.__logosScript ??= []).shift();
           if (next instanceof Error) throw next;
-          if (next === undefined) return { choices: [{ message: { content: '' }, finish_reason: 'stop' }] };
+          const usage = g.__logosUsage ? { usage: g.__logosUsage } : {};
+          if (next === undefined) return { choices: [{ message: { content: '' }, finish_reason: 'stop' }], ...usage };
           return {
             choices: [
               { message: { content: typeof next === 'string' ? next : JSON.stringify(next) }, finish_reason: 'stop' },
             ],
+            ...usage,
           };
         },
       },

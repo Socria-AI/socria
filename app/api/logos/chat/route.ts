@@ -27,6 +27,7 @@ import { docLetters } from '@/lib/docs/conversation';
 import { DOC_RULES, renderDocs, type DocRef } from '@/lib/docs/render';
 import { BLOCK_ID, sanitizeSourceDoc } from '@/lib/docs/sanitize';
 import type { SourceDoc } from '@/lib/docs/types';
+import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { cacheKey, chooseModel, compressHistory, firstAccepted, levelOf, tierOf } from '@/lib/model-router';
 import { depthForPlan } from '@/lib/socria-one';
@@ -385,6 +386,11 @@ export async function POST(req: NextRequest) {
     const trim = (v: any, n: number) =>
       typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
     const plan = await resolvePlanForRequest(req, userId);
+    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
+    // one that is awake is metered from here, so every call this request makes is counted.
+    const sleep = await sleepGate(req, userId, plan);
+    if (sleep.refuse) return sleep.refuse;
+    if (sleep.meter) meterFor(sleep.meter);
 
     // ── the metered boundaries ────────────────────────────────────
     //

@@ -181,6 +181,8 @@ import { HANDCAM_EVENT, readHandCommand, type ArCommand, type HandCommand } from
 import { handPointer, stopHands } from '@/lib/hand-bus';
 import { L5Tips } from '@/components/logos5/L5Tips';
 import { OneButton, WelcomeBack } from '@/components/logos5/OneHeader';
+import { SleepBar, SleepScreen, useSleepWatch } from '@/components/logos5/SleepMode';
+import type { SleepState } from '@/lib/sleep';
 import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
 import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
@@ -529,6 +531,18 @@ export function LogosApp({
   // to keep this itself and post it with each request, which meant the
   // browser was the authority on its own limits; now it only draws them.
   const [usage, setUsage] = useState<Record<string, { used: number; limit: number | null }>>({});
+  // SLEEP MODE (lib/sleep.ts): a free account's day of thinking time, as the server counts it — and
+  // whether its screen is up. Anything that would ask Socria waits for the reset; nothing else does.
+  const [sleep, setSleep] = useState<SleepState | null>(null);
+  const [sleepOpen, setSleepOpen] = useState(false);
+  const sleepRef = useRef<SleepState | null>(null);
+  sleepRef.current = sleep;
+  // any route that answers "resting" — the reply, the map, a reading — puts the whole app to sleep at once
+  useSleepWatch((st) => {
+    setSleep(st);
+    setSleepOpen(true);
+  });
+  const asleepNow = () => !!sleepRef.current?.asleep && Date.now() < sleepRef.current.resetAt;
   // Checkout is a redirect, so the button needs to show it's gone somewhere.
   const [oneBusy, setOneBusy] = useState(false);
   const [oneError, setOneError] = useState<string | null>(null);
@@ -1657,6 +1671,8 @@ export function LogosApp({
         if (!res.ok) return;
         const json = await res.json();
         if (json?.counters) setUsage(json.counters);
+        // the day's thinking time, the same on every device (null: Socria One, or not counted)
+        if (json && 'sleep' in json) setSleep(json.sleep && typeof json.sleep.resetAt === 'number' ? json.sleep : null);
       } catch {
         /* the panel simply does not update; nothing depends on it */
       }
@@ -2716,6 +2732,8 @@ export function LogosApp({
           if (forSession === activeIdRef.current && !ask(reasonForCounter(c))) setBuildNote(body?.error || boundaryNote(c));
           return;
         }
+        // resting (lib/sleep.ts): the map they have stays as it is; the screen has already said why
+        if (res.status === 429) return;
         // the free plan is paused (its usage table is missing): said, never silent
         if (res.status === 503) {
           const body = await res.json().catch(() => ({}));
@@ -3237,6 +3255,10 @@ export function LogosApp({
     const content = text.trim();
     const node = explore.node;
     if (!content || focusBusy || !node) return;
+    if (asleepNow()) {
+      setSleepOpen(true);
+      return;
+    }
     const key = `${node.id}::${node.label}`;
 
     setFocusError(null);
@@ -3308,6 +3330,8 @@ export function LogosApp({
           setFocusStream(visibleStream(acc));
         }
       }
+      // what this turn spent is counted when its stream ends: read the day again, so the next send knows
+      if (!one && isSignedIn) window.setTimeout(() => void refreshUsage(activeIdRef.current), 1500);
       acc = absorbRemember(acc);
       applyVizOps(parseVizOps(acc, sentViz), sid);
       acc = stripVizOps(acc);
@@ -4119,6 +4143,11 @@ export function LogosApp({
     };
     const said0 = text.trim();
     if ((!said0 && !atts.length) || !activeIdRef.current) return;
+    // resting: nothing is sent, the words stay in the box, and the screen says when Socria wakes
+    if (asleepNow()) {
+      setSleepOpen(true);
+      return;
+    }
     // THE WORDS A COMMAND WAS MISSING ("add a branch" … "cost"), typed or said
     // next: the turn is read as the command they complete, and kept as said
     const slot = slotRef.current;
@@ -4575,6 +4604,21 @@ export function LogosApp({
           ...(addressed && people.length >= 2 ? { addressed } : {}),
         }),
       });
+      if (res.status === 429) {
+        const body = await res.json().catch(() => ({}));
+        if (body?.sleep) {
+          // Resting (lib/sleep.ts): the turn is put back in the box, nothing they wrote is lost, and the
+          // screen (raised by useSleepWatch) says when Socria wakes.
+          if (!group) {
+            patchSession(sid, (sn) => ({ ...sn, messages: withoutTurn(sn.messages, sent) }), false);
+            if (sid === activeIdRef.current) chronRef.current = withoutTurn(chronRef.current, sent);
+            giveBack(sid, content, replying);
+          }
+          setBusy(false);
+          return;
+        }
+        throw new Error(failureText(body));
+      }
       if (res.status === 402) {
         // A boundary rather than a failure. Alone, the turn is put back in the
         // composer so nothing they wrote is lost to a limit. In a group it was
@@ -4657,6 +4701,8 @@ export function LogosApp({
         if (!group) takeBack();
         return;
       }
+      // what this turn spent is counted when its stream ends: read the day again, so the next send knows
+      if (!one && isSignedIn) window.setTimeout(() => void refreshUsage(activeIdRef.current), 1500);
       acc = absorbRemember(acc);
       // Changes to the picture, checked against the very state that was sent:
       // unknown ids dropped, numbers clamped to the ranges the physics owns.
@@ -7990,6 +8036,15 @@ export function LogosApp({
       {nudgeOpen && <GuestNudge inline open spent={guestSpent} signUpHref={signUpHref} onClose={shutNudge} />}
       {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}
       {voicePanel(false)}
+      {/* resting: one line over the box — they can still draft; sending waits for the reset */}
+      <SleepBar
+        sleep={sleep}
+        onOpen={() => setSleepOpen(true)}
+        onWake={() => {
+          setSleep(null);
+          void refreshUsage(activeIdRef.current);
+        }}
+      />
       {voiceOffered && !voiceOn && <VoiceOffNote ear={ear} onOn={pressVoice} />}
       <LogosComposer
         layout="stacked"
@@ -9482,6 +9537,19 @@ export function LogosApp({
         onClose={() => setAcctOpen(false)}
         isOne={one}
         onRetakeTour={() => setTourOpen(true)}
+      />
+
+      {/* Sleep Mode (lib/sleep.ts): the day's free thinking time is spent — said once, with when Socria wakes */}
+      <SleepScreen
+        sleep={sleep}
+        open={sleepOpen && !oneOpen}
+        onClose={() => setSleepOpen(false)}
+        onUpgrade={plan === 'one' ? undefined : () => askOne('sleep')}
+        onWake={() => {
+          setSleep(null);
+          setSleepOpen(false);
+          void refreshUsage(activeIdRef.current);
+        }}
       />
 
       <SocriaOneModal

@@ -21,6 +21,15 @@
 //
 // SERVER ONLY.
 
+/**
+ * Whoever counts what a call spent — Sleep Mode (lib/sleep-server.ts) registers itself here when a
+ * route loads it, so this file imports nothing and stays usable anywhere a model is called.
+ */
+let usageSink: ((route: string, usage: Usage) => void) | null = null;
+export function onUsage(sink: (route: string, usage: Usage) => void): void {
+  usageSink = sink;
+}
+
 export interface Usage {
   prompt_tokens?: number;
   completion_tokens?: number;
@@ -31,6 +40,9 @@ export interface Usage {
 
 /** One call's cost, as a log line — or nothing, when there is no usage to say or it is switched off. */
 export function logUsage(route: string, model: string | undefined, usage: Usage | null | undefined): void {
+  // a free account's day of tokens (lib/sleep-server.ts registers it): every call, input and output —
+  // counted whether or not the log line is written
+  if (usage && usageSink) usageSink(route, usage);
   if (!usage || process.env.SOCRIA_TOKEN_LOG === 'off') return;
   const line: Record<string, string | number> = {
     route,

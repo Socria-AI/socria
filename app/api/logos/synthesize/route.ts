@@ -11,6 +11,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL, sanitizeMap } from '@/lib/logos';
@@ -61,6 +62,11 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'logos/synthesize');
+    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
+    // one that is awake is metered from here, so every call this request makes is counted.
+    const sleep = await sleepGate(req, userId);
+    if (sleep.refuse) return sleep.refuse;
+    if (sleep.meter) meterFor(sleep.meter);
     // by tier (lib/model-router.ts): Socria One on GPT-6.1 Sol, the free plan on GPT-6 Luna, a guest on
     // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
     const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'deep', process.env, process.env.OPENAI_MODEL_LOGOS_SYNTHESIS || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);

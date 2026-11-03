@@ -22,6 +22,7 @@ import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance'
 import { styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
 import { depthForPlan } from '@/lib/socria-one';
+import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
 import { spend } from '@/lib/usage';
@@ -136,6 +137,11 @@ export async function POST(req: NextRequest) {
   const grounded = nodeContexts.length ? renderContextsForNode(nodeContexts) : '';
 
   const openai = tracked(new OpenAI({ apiKey }), 'logos/explore');
+  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
+  // one that is awake is metered from here, so every call this request makes is counted.
+  const sleep = await sleepGate(req, userId, plan);
+  if (sleep.refuse) return sleep.refuse;
+  if (sleep.meter) meterFor(sleep.meter);
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);

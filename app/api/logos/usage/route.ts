@@ -13,6 +13,7 @@ import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { COUNTERS, limitsFor, type Counter } from '@/lib/entitlements';
 import { readAllUsage } from '@/lib/usage';
+import { sleepFor } from '@/lib/sleep-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -33,5 +34,9 @@ export async function GET(req: NextRequest) {
     counters[c] = { used: used[c] ?? 0, limit: limits.counters[c] };
   }
 
-  return NextResponse.json({ plan, counters, limits });
+  // the day's thinking time (lib/sleep.ts): a free account's tokens today, and when Socria wakes —
+  // null for Socria One and for a guest, who are not counted here
+  const sleep = await sleepFor(userId ?? null, plan);
+
+  return NextResponse.json({ plan, counters, limits, sleep });
 }
