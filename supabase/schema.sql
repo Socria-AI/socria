@@ -1055,7 +1055,7 @@ values (
   'Socria: In Public 002',
   'An interactive event about building Socria in public — entrepreneurship, business, AI, product development and community.',
   'Socria is a Human-First AI company being built in the open at UT Arlington. In Public is where we show the work as it is: what we are building, what is working, what is not, and the decisions behind it.' || chr(10) || chr(10) || 'Come with questions. This is a conversation, not a lecture — about starting something, building a product people use, working with AI without handing it your thinking, and finding the people to do it with.',
-  'Maverick Hall, Room 1309, University of Texas at Arlington',
+  'CETD (Center for Entrepreneurship and Technology Development)',
   'America/Chicago',
   false,
   'Target: Wednesday, November 4, 2026 (tentative). Start time not set.',

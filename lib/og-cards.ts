@@ -112,7 +112,7 @@ const EVENT_CARDS: Record<string, OgCard> = {
   'in-public-002': {
     kicker: 'Socria · Event · Free',
     title: 'Socria: In Public 002.',
-    line: 'Building Socria in public — entrepreneurship, AI and product. Maverick Hall 1309, UT Arlington.',
+    line: 'Building Socria in public — entrepreneurship, AI and product. At CETD.',
   },
 };
 

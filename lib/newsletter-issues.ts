@@ -46,7 +46,7 @@ export const NEWSLETTER_ISSUES: readonly NewsletterIssue[] = [
     preheader: 'An open conversation about building Socria in public. Free to attend.',
     paragraphs: [
       'We are holding the second In Public: an open conversation about how Socria is being built, what is working, what is not and the decisions behind it, and about starting something, building a product people use, and working with AI without handing it your thinking.',
-      'It is in Maverick Hall, Room 1309, at the University of Texas at Arlington, and admission is free. The date and time will be on the event page as soon as they are set.',
+      'It is at CETD, the Center for Entrepreneurship and Technology Development, and admission is free. The date and time will be on the event page as soon as they are set.',
       'If you are nearby, RSVP so we know you are coming.',
     ],
     link: { label: 'See the event and RSVP', path: '/events/in-public-002' },

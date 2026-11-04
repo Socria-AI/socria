@@ -159,7 +159,7 @@ const settle = async () => {
 
 const EVENT = {
   id: 'in-public-002', title: 'Socria: In Public 002', summary: 'An interactive event about building Socria in public.', description: 'About.',
-  location: 'Maverick Hall, Room 1309, University of Texas at Arlington', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false,
+  location: 'CETD (Center for Entrepreneurship and Technology Development)', starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false,
   tentative_note: 'Target: Wednesday, November 4, 2026 (tentative).', status: 'open', capacity: null, expectations: ['A candid look'], self_checkin: false, created_at: 1, updated_at: 1,
 };
 const rsvp = (o = {}) => ({ eventId: 'in-public-002', fullName: 'Maya Patel', email: 'Maya@Gmail.com', interest: 'ai', source: 'instagram', marketingConsent: false, utm: { source: 'instagram', campaign: 'in-public-002' }, website: '', elapsedMs: 9000, ...o });
@@ -259,7 +259,7 @@ console.log('\n=== admins: edit, export, delete ===');
   ok('with a start, the date can be confirmed', good.status === 200 && good.j.event.date_confirmed === true);
   const ics = await R.ics.GET(req('/api/events/in-public-002/ics', 'GET'), { params: { id: 'in-public-002' } });
   const icsText = await ics.text();
-  ok('then the calendar file exists, with public facts only', ics.status === 200 && icsText.includes('DTSTART:20261105T000000Z') && icsText.includes('Maverick Hall') && !icsText.includes('Maya'));
+  ok('then the calendar file exists, with public facts only', ics.status === 200 && icsText.includes('DTSTART:20261105T000000Z') && icsText.includes('CETD') && !icsText.includes('Maya'));
   const csv = await R.exportCsv.GET(req('/api/events/admin/in-public-002/export', 'GET'), { params: { id: 'in-public-002' } });
   const csvText = await csv.text();
   ok('admins export CSV with the sheet’s columns, uncached', csv.status === 200 && csvText.startsWith('Registration ID,Event,Full Name,Email') && csvText.includes('Maya Patel') && csv.headers.get('cache-control') === 'no-store');

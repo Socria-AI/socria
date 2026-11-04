@@ -49,7 +49,7 @@ const row = (o = {}) => ({
   marketing_consent: false, consent_at: null, token_hash: 'h', code: 'K7P4QX', ...o,
 });
 const event = (o = {}) => ({
-  id: 'in-public-002', title: 'Socria: In Public 002', summary: 's', description: 'd', location: 'Maverick Hall, Room 1309, University of Texas at Arlington',
+  id: 'in-public-002', title: 'Socria: In Public 002', summary: 's', description: 'd', location: 'CETD (Center for Entrepreneurship and Technology Development)',
   starts_at: null, ends_at: null, timezone: 'America/Chicago', date_confirmed: false, tentative_note: 'Target: Nov 4 (tentative)', status: 'open', capacity: null,
   expectations: ['A candid look'], created_at: 1, updated_at: 1, ...o,
 });
@@ -132,7 +132,7 @@ console.log('\n=== retention, and the email ===');
   ok('the confirmation link carries its secret in the #fragment, which no server or analytics tool sees', link === `https://socria.app/events/in-public-002/ticket#t=${'T'.repeat(43)}`);
   const m = E.confirmationEmail({ event: event(), firstName: 'Maya', code: 'K7P4QX', link });
   ok('an unconfirmed date is not in the email', /to be announced/i.test(m.text) && !/Nov|November/.test(m.text));
-  ok('it carries the place, how to check in, the link and how to cancel', m.text.includes('Maverick Hall, Room 1309') && /scan the QR code at the door and enter your name or this email/.test(m.text) && m.text.includes(link) && /cancel/i.test(m.text));
+  ok('it carries the place, how to check in, the link and how to cancel', m.text.includes('CETD (Center for Entrepreneurship and Technology Development)') && /scan the QR code at the door and enter your name or this email/.test(m.text) && m.text.includes(link) && /cancel/i.test(m.text));
   ok('nothing about food or prizes', !/food|pizza|prize|giveaway|swag/i.test(m.text + m.html));
   const xss = E.confirmationEmail({ event: event({ title: '<img src=x onerror=alert(1)>' }), firstName: '<b>', code: 'K7P4QX', link });
   ok('the HTML is escaped', !xss.html.includes('<img src=x') && !xss.html.includes('<b>,'));
