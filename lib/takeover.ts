@@ -68,19 +68,17 @@ export function takeoverEnv(): Env {
 }
 
 /**
- * Whether the campaign runs. SOCRIA_TAKEOVER decides when it is set (on/off,
- * 1/0, true/false, yes/no). Unset, the campaign runs on the PRODUCTION
- * deployment only (VERCEL_ENV=production): the public site there is the one
- * page, while every preview — the dev branch's included — and a machine
- * running the site locally show the whole site, the landing page and every
- * other page, as they were. (October 31, 2026: "on the dev branch, add back
- * the landing page and all the other pages", without touching production.)
+ * Whether the campaign runs. Off everywhere — production included — unless
+ * SOCRIA_TAKEOVER is switched on (on, 1, true, yes). Off, the whole site is
+ * public: the landing page, Socria One, the Charter, the docs, and Logos 5
+ * open to everyone, no code and no waitlist.
  */
 export function takeoverOn(env: Env = takeoverEnv()): boolean {
   const v = (env.SOCRIA_TAKEOVER ?? '').trim().toLowerCase();
   if (['off', '0', 'false', 'no'].includes(v)) return false;
-  if (['on', '1', 'true', 'yes'].includes(v)) return true;
-  return (env.VERCEL_ENV ?? '').trim().toLowerCase() === 'production';
+  // November 4, 2026: "push Logos 5 to main … open production to all" — the
+  // campaign is over. It runs again only when SOCRIA_TAKEOVER is switched on.
+  return ['on', '1', 'true', 'yes'].includes(v);
 }
 
 // ── where a request goes ─────────────────────────────────────────────

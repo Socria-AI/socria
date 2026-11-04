@@ -148,3 +148,14 @@ the one page.
 `SOCRIA_TAKEOVER` set still decides everywhere: `on` (or 1/true/yes) runs the
 campaign on a preview too; `off` (or 0/false/no) ends it on production. Ending
 the campaign is still one variable and a redeploy.
+
+## Ended (November 4, 2026)
+
+The campaign is over: "push Logos 5 to main … open production to all". Unset,
+`SOCRIA_TAKEOVER` now means **off everywhere, production included**. The whole
+site is public — the landing page at `/`, `/one`, `/charter`, `/docs` and every
+other page — and Logos 5 is open to everyone with no code and no waitlist.
+`/api/access/enter` answers 404. Sign-ups already on the waitlist stay stored
+and can still be downloaded from `/api/waitlist/export`.
+
+To run the campaign again, set `SOCRIA_TAKEOVER=on` on Vercel and redeploy.
