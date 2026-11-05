@@ -233,6 +233,8 @@ const MODULES = [
   'lib/paste.ts',
   // which model answers, by tier and by turn (lib/model-router.ts)
   'lib/model-router.ts',
+  // every request shaped for the model it goes to (lib/model-params.ts)
+  'lib/model-params.ts',
   'lib/upload-paths.ts',
   'lib/chat-attachments.ts',
   'lib/file-extract.ts',

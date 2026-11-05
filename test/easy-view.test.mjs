@@ -481,7 +481,7 @@ console.log('\n=== the photo: Make, the sheet, the route ===');
     '  read once, carefully: no randomness, one JSON object, the full picture',
     /temperature: 0/.test(route) && /response_format: \{ type: 'json_object' \}/.test(route) && /detail: 'high'/.test(route) && /role: 'system', content: EASY_PROMPT/.test(route)
   );
-  ok('  held to the kind before anything is returned — nothing to read is said plainly', /const easy = sanitizeEasy\(raw\)/.test(route) && /error: EASY_UNREAD \}, \{ status: 422 \}/.test(route));
+  ok('  held to the kind before anything is returned — read once more when it does not hold, then said plainly', /let easy = sanitizeEasy\(parseDraft\(text\)\)/.test(route) && /if \(!easy\) \{/.test(route) && /error: EASY_UNREAD \}, \{ status: 422 \}/.test(route));
   ok('  logged as its own call', /tracked\(new OpenAI\([^)]*\), 'logos\/easy'\)/.test(route));
   const takeover = read('lib/takeover.ts');
   ok('behind the takeover gate, with the other routes that think', /'\/api\/logos\/read',\s*'\/api\/logos\/easy'/.test(takeover), takeover.match(/THINKING_API[\s\S]{0,400}/)?.[0]);

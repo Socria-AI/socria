@@ -36,6 +36,7 @@ import {
   localDay,
   mergeSpaces,
   objOf,
+  readDisplayRequest,
   readOperation,
   sanitizeEasy,
   seek as seekObject,
@@ -315,6 +316,8 @@ import {
 
 // Shared with Core 3.1 — unlocking once covers both.
 const KEY_STORAGE = 'socria.core3AccessKey.v1';
+/** Said beside the map when a turn asked for something to be made and the pass that makes it failed outright. */
+const MAKE_FAILED = 'That could not be made just now — ask again in a moment.';
 // Depth is shared with the Core chat, so switching there carries over.
 const DEPTH_KEY = 'socria.depth.v1';
 // Same store the Core chat reads, so picking a model here lands there.
@@ -2704,6 +2707,9 @@ export function LogosApp({
     // card, mark one resolved, add one, move a slider — and the extractor saw
     // none of it, so the answer is built from this, never from what is live.
     const sentMap = mapRef.current;
+    // whether this turn asked for something to be made (lib/objects/display-request.ts) — so a pass that fails says so
+    const lastAsk = [...chronRef.current].reverse().find((m) => m.role === 'user');
+    const askedToMake = !!(lastAsk && typeof lastAsk.content === 'string' && readDisplayRequest(lastAsk.content));
     setMapping(true);
     void (async () => {
       try {
@@ -2734,6 +2740,12 @@ export function LogosApp({
         }
         // resting (lib/sleep.ts): the map they have stays as it is; the screen has already said why
         if (res.status === 429) return;
+        // THE PASS FAILED OUTRIGHT (a 5xx, the platform's time limit): the map they have stays, and a turn that
+        // asked for something to be made says it was not — silence here looked like Logos had stopped making things
+        if (!res.ok && res.status !== 402 && res.status !== 503) {
+          if (askedToMake && forSession === activeIdRef.current) setBuildNote(MAKE_FAILED);
+          return;
+        }
         // the free plan is paused (its usage table is missing): said, never silent
         if (res.status === 503) {
           const body = await res.json().catch(() => ({}));
@@ -2911,7 +2923,9 @@ export function LogosApp({
           }
         }
       } catch {
-        // The map is allowed to lag or skip a turn — never break the chat.
+        // The map is allowed to lag or skip a turn — never break the chat. What they asked to be made is said not
+        // to have been, never left to look like nothing happened.
+        if (askedToMake && forSession === activeIdRef.current) setBuildNote(MAKE_FAILED);
       } finally {
         setMapping(false);
       }

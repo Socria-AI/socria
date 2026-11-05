@@ -8,7 +8,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
-import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { auth } from '@clerk/nextjs/server';
 import {
   LOGOS_MODEL,
@@ -145,8 +145,6 @@ export async function POST(req: NextRequest) {
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
-  const configured = routed.model;
-  const stepDown = routed.ladder[1];
 
   const complete = async (system: string, user: string, maxTokens: number) => {
     const make = (model: string) =>
@@ -160,15 +158,8 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: user },
         ],
       });
-    try {
-      return await make(configured);
-    } catch (e: any) {
-      const status = e?.status ?? e?.response?.status;
-      const isModelError =
-        status === 404 || /model|not found|does not exist|unknown/i.test(e?.message || '');
-      if (isModelError && !!stepDown) return make(stepDown!);
-      throw e;
-    }
+    // a refused or failing model steps down the tier's whole ladder (lib/model-router.ts firstAccepted)
+    return (await firstAccepted(routed.ladder, make, (from, to, why) => console.warn('logos explore: %s refused (%s); asking %s', from, why, to))).result;
   };
 
   try {

@@ -31,6 +31,8 @@
 //
 // PURE: no network, no clock.
 
+import { failureOf } from './model-params';
+
 export type Tier = 'guest' | 'free' | 'one';
 export type Level = 'light' | 'standard' | 'deep';
 export type Env = Record<string, string | undefined>;
@@ -208,23 +210,38 @@ export function chooseAuxModel(tier: Tier, kind: 'standard' | 'deep', env: Env =
   return chooseModel(tier, { level: kind, reasons: [kind === 'deep' ? 'deep work' : 'standard work'] }, env);
 }
 
-/** The provider refusing the model itself, rather than the request. */
+/**
+ * Whether a failure is one a step down the ladder can answer: the model itself
+ * refused (an id not enabled on the account, a model withdrawn), or a passing
+ * fault the provider's own retries did not clear (a rate limit, its 5xx, a
+ * dropped connection) — another model may still answer. NOT a parameter the
+ * model does not take: lib/openai-usage.ts asks the same model again without
+ * it, and a refusal that names "this model" ("max_tokens is not supported with
+ * this model") is the request, never the model. Nor a prompt too long, a
+ * policy refusal or the account's spent credit, which every model would refuse
+ * the same way.
+ */
 export function refusedModel(e: unknown): boolean {
-  const x = e as { status?: number; response?: { status?: number }; code?: string; message?: string } | null;
-  const status = x?.status ?? x?.response?.status;
-  return status === 404 || /model/i.test(x?.code || '') || /model|not found|does not exist|unknown/i.test(x?.message || '');
+  const f = failureOf(e);
+  return f === 'model' || f === 'transient';
 }
 
 /**
- * Ask the first model on the ladder that accepts: a refused id steps down, any
- * other failure is thrown as it was. Returns what answered.
+ * Ask the first model on the ladder that answers: a model refused or failing
+ * steps down, anything else is thrown as it was. Returns what answered.
  */
-export async function firstAccepted<T>(ladder: readonly string[], make: (model: string) => Promise<T>, warn: (from: string, to: string, why: string) => void = () => {}): Promise<{ result: T; model: string }> {
+export async function firstAccepted<T>(
+  ladder: readonly string[],
+  make: (model: string) => Promise<T>,
+  warn: (from: string, to: string, why: string) => void = () => {},
+  /** another failure a lower rung may answer — a model that cannot read images, for a route that sends one */
+  also?: (e: unknown) => boolean
+): Promise<{ result: T; model: string }> {
   for (let i = 0; ; i++) {
     try {
       return { result: await make(ladder[i]), model: ladder[i] };
     } catch (e) {
-      if (!refusedModel(e) || i >= ladder.length - 1) throw e;
+      if (!(refusedModel(e) || !!also?.(e)) || i >= ladder.length - 1) throw e;
       warn(ladder[i], ladder[i + 1], String((e as { message?: string })?.message ?? e).slice(0, 160));
     }
   }

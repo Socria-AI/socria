@@ -1158,9 +1158,99 @@ function sanitizeEquation(r: Record<string, unknown>): EquationSpec | null {
 }
 
 /** Anything at all in, one of the eighteen canonical shapes out — or null, and nothing is drawn. */
+// ── near misses, read as what they meant ─────────────────────────────
+
+/** A number as a model writes one in a chart: 1200, "1200", "1,200", "$1,200", "12%" — anything else is not a number. */
+function numberish(v: unknown): unknown {
+  if (typeof v !== 'string') return v;
+  const t = v.trim().replace(/[\s,$€£¥]/g, '').replace(/%$/, '');
+  return /^[-+−]?(?:\d+\.?\d*|\.\d+)(?:e[-+]?\d+)?$/i.test(t) ? Number(t.replace('−', '-')) : v;
+}
+const nameOf = (o: Record<string, unknown> | null) => field(o, 'name', 'label', 'option', 'title');
+
+/**
+ * A NEAR MISS, READ AS WHAT IT MEANT. An element a model wrote in a shape
+ * close to the grammar — the chart type as the element's type ("type":
+ * "bar"), its labels as "labels", its numbers as "data" or as strings
+ * ("1,200"), a comparison's options as "columns" or its rows as arrays, the
+ * options as objects with a field per criterion — used to be dropped whole,
+ * and the reply went out with nothing where the element was. Each is
+ * rewritten here into the grammar's own shape and then held to exactly the
+ * same sanitizer and the same checks as anything else (the numbers must
+ * still be theirs, or a source's). Nothing is invented: a field is only ever
+ * moved or read, never filled in.
+ */
+export function normalizeInline(r: Record<string, unknown>): Record<string, unknown> {
+  const type = typeof r.type === 'string' ? wordOf(r.type) : '';
+  // the chart's kind written as the element's type
+  if (type === 'bar' || type === 'line' || type === 'pie' || type === 'bar chart' || type === 'line chart' || type === 'pie chart' || type === 'graph chart') {
+    return normalizeInline({ ...r, type: 'chart', kind: type.replace(/ chart$/, '') });
+  }
+  if (type === 'comparison' || type === 'comparison table' || type === 'compare table' || type === 'versus' || (type === 'table' && Array.isArray(r.options))) {
+    return normalizeInline({ ...r, type: 'compare' });
+  }
+  if (type === 'flowchart' || type === 'flow chart' || type === 'process') return { ...r, type: 'diagram', view: r.view ?? 'flow' };
+  if (type === 'timeline') return { ...r, type: 'sequence', kind: 'timeline' };
+  if (type === 'chart') {
+    const out: Record<string, unknown> = { ...r };
+    if (out.kind === undefined && typeof (r.chartType ?? r.chart) === 'string') out.kind = wordOf(String(r.chartType ?? r.chart)).replace(/ chart$/, '');
+    // [{label, value}, …]: the labels and one series of their values
+    const points = Array.isArray(r.data) && r.data.every((d) => asObj(d)) ? (r.data as Record<string, unknown>[]) : null;
+    if (!Array.isArray(out.x) && points) {
+      out.x = points.map((d) => field(d, 'label', 'name', 'x', 'category'));
+      if (!Array.isArray(out.series)) out.series = [{ values: points.map((d) => d.value ?? d.y ?? d.amount ?? d.count) }];
+    }
+    if (!Array.isArray(out.x)) out.x = [r.labels, r.categories, r.xAxis].find(Array.isArray) ?? out.x;
+    if (!Array.isArray(out.series)) {
+      const sets = [r.datasets].find(Array.isArray) as unknown[] | undefined;
+      if (sets) out.series = sets;
+      else if (Array.isArray(r.values) || (Array.isArray(r.data) && !points)) out.series = [{ name: r.seriesName ?? r.name, values: r.values ?? r.data }];
+    }
+    if (Array.isArray(out.series)) {
+      out.series = (out.series as unknown[]).map((x) => {
+        const o = asObj(x);
+        if (Array.isArray(x)) return { values: x.map(numberish) };
+        if (!o) return x;
+        const values = Array.isArray(o.values) ? o.values : Array.isArray(o.data) ? o.data : o.values;
+        return { ...o, ...(o.name === undefined && o.label !== undefined ? { name: o.label } : {}), values: Array.isArray(values) ? values.map(numberish) : values };
+      });
+    }
+    return out;
+  }
+  if (type === 'compare') {
+    const out: Record<string, unknown> = { ...r };
+    const opts = (Array.isArray(r.options) ? r.options : Array.isArray(r.columns) ? r.columns : Array.isArray(r.items) ? r.items : Array.isArray(r.choices) ? r.choices : null) as unknown[] | null;
+    // the options as objects, a field per point: {"name": "iPhone", "price": "$799", …} — pivoted into rows
+    if (opts && opts.length && opts.every((o) => asObj(o) && nameOf(asObj(o)) !== undefined) && !Array.isArray(r.rows)) {
+      const objs = opts.map((o) => asObj(o)!);
+      const skip = new Set(['name', 'label', 'option', 'title']);
+      const keys = [...new Set(objs.flatMap((o) => Object.keys(o).filter((k) => !skip.has(k) && (typeof o[k] === 'string' || typeof o[k] === 'number'))))];
+      out.options = objs.map((o) => nameOf(o));
+      out.rows = keys.map((k) => ({ label: k.replace(/[_-]+/g, ' ').replace(/^./, (c) => c.toUpperCase()), values: objs.map((o) => (o[k] === undefined ? '' : String(o[k]))) }));
+      return out;
+    }
+    if (opts) out.options = opts.map((o) => (asObj(o) ? nameOf(asObj(o)) : o));
+    const rows = (Array.isArray(r.rows) ? r.rows : Array.isArray(r.criteria) ? r.criteria : null) as unknown[] | null;
+    if (rows) {
+      let options = out.options as unknown[] | undefined;
+      // a header row's first cell names the criteria ("Feature", "", "Criteria"): one more column than there are rows' values
+      const width = rows.map((x) => (Array.isArray(x) ? x.length - 1 : Array.isArray(asObj(x)?.values) ? (asObj(x)!.values as unknown[]).length : Array.isArray(asObj(x)?.cells) ? (asObj(x)!.cells as unknown[]).length : 0)).find((n) => n > 0);
+      if (Array.isArray(options) && width && options.length === width + 1) options = out.options = options.slice(1);
+      out.rows = rows.map((x) => {
+        if (Array.isArray(x)) return { label: x[0], values: x.slice(1) };
+        const o = asObj(x);
+        if (!o) return x;
+        return { ...o, label: field(o, 'label', 'criterion', 'feature', 'name', 'aspect', 'point') ?? o.label, values: Array.isArray(o.values) ? o.values : Array.isArray(o.cells) ? o.cells : o.values };
+      });
+    }
+    return out;
+  }
+  return r;
+}
+
 export function sanitizeInlineSpec(raw: unknown): InlineSpec | null {
   if (!raw || typeof raw !== 'object' || Array.isArray(raw)) return null;
-  const r = raw as Record<string, unknown>;
+  const r = normalizeInline(raw as Record<string, unknown>);
   // "Chart" and " chart" are a chart
   switch (typeof r.type === 'string' ? r.type.trim().toLowerCase() : r.type) {
     case 'chart':
@@ -1317,7 +1407,10 @@ const REQUIRED: Record<InlineKind, readonly (readonly string[])[]> = {
  */
 export function specInJsonFence(body: string): InlineSpec | null {
   if (typeof body !== 'string' || body.length > 12_000 || !/^\s*\{/.test(body)) return null;
-  const raw = asObj(readJson(body));
+  const read = asObj(readJson(body));
+  // a near miss in the wrong fence ("type": "bar", "labels" for "x") is read as what it meant, and only then
+  // held to what the kind is made of
+  const raw = read ? normalizeInline(read) : null;
   const type = typeof raw?.type === 'string' ? raw.type.trim().toLowerCase() : '';
   if (!raw || !(INLINE_KINDS as readonly string[]).includes(type)) return null;
   if (!REQUIRED[type as InlineKind].every((names) => names.some((k) => raw[k] !== undefined && raw[k] !== null))) return null;
@@ -1475,7 +1568,7 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
 export function gateInlineBlock(chunk: string, ctx: InlineContext, open = false): string {
   const m = /^```[ \t]*([\w-]*)[ \t]*\n?([\s\S]*?)(?:```\s*)?$/.exec(chunk.trim());
   if (!m) return chunk;
-  const lang = m[1].toLowerCase();
+  const lang = UI_LANGS.has(m[1].toLowerCase()) ? 'ui' : m[1].toLowerCase();
   let spec: InlineSpec | null;
   if (lang === 'ui') {
     if (open) return '';
@@ -1500,6 +1593,8 @@ export function gateInlineBlock(chunk: string, ctx: InlineContext, open = false)
   return `${fenceOf(v.spec)}\n\n`;
 }
 const JSON_FENCE_ROOM = new Set(['too-many', 'one-at-a-time', 'no-questions']);
+/** The names a model gives the ui fence when it strays from it — the element it meant, not code to show. */
+const UI_LANGS = new Set(['ui', 'socria-ui', 'socria', 'ui-json', 'inline-ui', 'element']);
 
 // ── as words, where a picture cannot go ──────────────────────────────
 

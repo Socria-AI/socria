@@ -118,15 +118,33 @@ console.log('\n=== refusal, and stepping down ===');
     return 'answer';
   });
   ok('a refused model steps to the next', r.model === 'c' && r.result === 'answer' && tried.join() === 'a,b,c');
-  let threw = null;
-  try {
-    await R.firstAccepted(['a', 'b'], async () => {
-      throw Object.assign(new Error('rate limited'), { status: 429 });
-    });
-  } catch (e) {
-    threw = e;
+  // A PASSING FAULT STEPS DOWN TOO (November 5, 2026): a rate limit or the provider's 5xx that its own retries did
+  // not clear is answered by the next rung, never above the tier — the artifact still gets made
+  const busy = [];
+  const r2 = await R.firstAccepted(['a', 'b'], async (m) => {
+    busy.push(m);
+    if (m === 'a') throw Object.assign(new Error('rate limited'), { status: 429, code: 'rate_limit_exceeded' });
+    return 'answer';
+  });
+  ok('a rate-limited or failing model steps to the next', r2.model === 'b' && busy.join() === 'a,b');
+  // …but a failure every model would give the same way is thrown as it was
+  for (const [what, err] of [
+    ['a parameter it does not take (answered by lib/openai-usage.ts, on the same model)', Object.assign(new Error("400 Unsupported parameter: 'max_tokens' is not supported with this model. Use 'max_completion_tokens' instead."), { status: 400, code: 'unsupported_parameter', param: 'max_tokens' })],
+    ['a prompt too long', Object.assign(new Error("400 This model's maximum context length is 128000 tokens."), { status: 400, code: 'context_length_exceeded' })],
+    ['the account’s credit spent', Object.assign(new Error('429 You exceeded your current quota'), { status: 429, code: 'insufficient_quota' })],
+  ]) {
+    let threw = null;
+    const asked = [];
+    try {
+      await R.firstAccepted(['a', 'b'], async (m) => {
+        asked.push(m);
+        throw err;
+      });
+    } catch (e) {
+      threw = e;
+    }
+    ok(`not retried down the ladder: ${what}`, threw === err && asked.join() === 'a');
   }
-  ok('any other failure is not retried down the ladder', threw?.status === 429);
 }
 
 console.log('\n=== on the server, everywhere a model is called ===');
@@ -139,7 +157,7 @@ console.log('\n=== on the server, everywhere a model is called ===');
   ok('  older replies read back clipped', /compressHistory\(kept/.test(chat));
   ok('  one cache key per line of thinking', /prompt_cache_key: promptCacheKey/.test(chat));
   const map = read('app/api/logos/map/route.ts');
-  ok('the map: by tier', /chooseAuxModel\(tierOf\(userId, plan\), 'standard'/.test(map) && /const ladder = route\.ladder/.test(map));
+  ok('the map: by tier', /chooseAuxModel\(tierOf\(userId, plan\), 'standard'/.test(map) && /firstAccepted\(route\.ladder/.test(map));
   for (const f of ['app/api/logos/explore/route.ts', 'app/api/logos/read/route.ts', 'app/api/logos/write/route.ts', 'app/api/logos/easy/route.ts', 'app/api/logos/synthesize/route.ts', 'app/api/logos/experience/route.ts', 'app/api/docs/page/route.ts', 'app/api/projects/[id]/synthesize/route.ts']) {
     const s = read(f);
     ok(`${f.replace('app/api/', '')}: by tier, stepping down within it`, /chooseAuxModel\(tierOf\(userId, /.test(s) && !/LOGOS_FALLBACK_MODEL/.test(s));
@@ -147,7 +165,7 @@ console.log('\n=== on the server, everywhere a model is called ===');
   ok('both syntheses are deep work', /'deep'/.test(read('app/api/logos/synthesize/route.ts')) && /'deep'/.test(read('app/api/projects/[id]/synthesize/route.ts')));
   ok('the study routes pass the tier', ['app/api/logos/organize/route.ts', 'app/api/logos/practice/route.ts'].every((f) => /tier: tierOf\(userId, await resolvePlanForRequest\(req, userId\)\)/.test(read(f))) && /firstAccepted\(routed\.ladder, call\)/.test(read('lib/logos5/ask-json.ts')));
   ok('the memory extractor asks GPT-6 Luna, stepping down to GPT-4o mini', /firstAccepted\(extractorLadder\(\)/.test(read('lib/mind/extract.ts')));
-  ok('a refused cache key is dropped and the call asked again', /refusesParam\(e, 'prompt_cache_key'\)/.test(read('lib/openai-usage.ts')));
+  ok('a refused cache key (any refused parameter) is dropped and the call asked again', /adaptRefused\(asked, e\)/.test(read('lib/openai-usage.ts')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

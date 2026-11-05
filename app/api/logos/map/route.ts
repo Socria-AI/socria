@@ -45,8 +45,11 @@ import {
   todayDay,
   sanitizeCustom,
   templateShape,
+  parseDraft,
+  repairFor,
   type MapMaterial,
 } from '@/lib/objects';
+import type { DisplayRequest } from '@/lib/objects/display-request';
 import { renderMessageForModel, sanitizeAttachments } from '@/lib/logos-attachments';
 import { renderContextsForMap, sanitizeContexts } from '@/lib/logos-sources';
 import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance';
@@ -56,7 +59,7 @@ import { claimUnit, consume, left, QUOTA_UNAVAILABLE, refusal, savedMapHasNodes,
 import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { cacheKey, chooseAuxModel, tierOf } from '@/lib/model-router';
+import { cacheKey, chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
 import { EMPTY_WORKSPACE, modelFor, openFromProposal } from '@/lib/model/docs';
@@ -327,15 +330,180 @@ export async function POST(req: NextRequest) {
     return withSimulation(map, wanted);
   };
 
+  const openai = tracked(new OpenAI({ apiKey }), 'logos/map');
+  // By tier (lib/model-router.ts): Socria One's map on GPT-6.1 Terra, the free
+  // plan's on GPT-6 Luna, a guest's on GPT-4o mini — each stepping down its own
+  // ladder if refused. LOGOS_ROUTER=off: GPT 5.6 Terra for everyone, as before
+  // (OPENAI_MODEL_LOGOS_MAP still moves it then). Every call is shaped for the
+  // model it goes to (lib/model-params.ts, through lib/openai-usage.ts).
+  const route = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS_MAP || LOGOS_MAP_MODEL);
+  const mapCacheKey = cacheKey('map', typeof body?.sessionId === 'string' ? body.sessionId : null);
+  /** Down the tier's ladder from the model that answered: a rung already refused is not asked again. */
+  const ladderFrom = (model: string) => route.ladder.slice(Math.max(0, route.ladder.indexOf(model)));
+  const stepped = (what: string) => (from: string, to: string, why: string) => console.warn('logos map: %s — %s was refused (%s); asking %s', what, from, why, to);
+
+  // ── AN EVERYDAY DISPLAY ───────────────────────────────────────
+  //
+  // "Make me a study plan for finals", "turn this map into a checklist":
+  // an artifact to look at and work in, not a model of anything. Asked for
+  // in their words (lib/objects/display-request.ts) or read so by the
+  // extractor (ask: construct → display), it is made in this route, beside
+  // the model on-ramp and under the same rule: a language model may propose
+  // a display's state, and only the kind's own sanitizer decides what of it
+  // the workspace holds (lib/objects/display-propose.ts). A display made
+  // from the map is computed from the map, not drafted. Either way the turn
+  // says what came of it — and the model second pass, which would read the
+  // same construction as a model nobody proposed, stands aside.
+  //
+  // ASKED FOR IN WORDS, IT IS DRAFTED BESIDE THE MAP, NOT AFTER IT. A simple
+  // "make me a checklist" used to wait for the whole map extraction — the
+  // largest prompt Socria sends — and was never attempted at all when that
+  // extraction came back empty, cut off or unreadable: the route returned the
+  // old map, the page said nothing, and the checklist simply did not appear.
+  // A display the words name (and that is not made from the map) is now
+  // drafted alongside the extraction, from the conversation alone, and is
+  // made whatever becomes of the map.
+  //
+  // CHECKED, AND REPAIRED ONCE. A draft the kind cannot hold — not JSON, the
+  // wrong kind, a state that does not follow the kind's rules, cut off — is
+  // sent back once with what was wrong (display-propose.ts repairFor); what
+  // comes back is checked the same way. Nothing is ever substituted for it:
+  // when it still does not hold, the turn says so in a sentence.
+  const displayWords = readDisplayRequest(said, { stated });
+  // THEIR TEMPLATE: a custom artifact asked for from one of their own templates carries it on the
+  // message (lib/logos5/templates.ts) — read through the kind's own sanitizer, never taken as written
+  const theirTemplate = (() => {
+    const raw = (lastSaid as { make?: { template?: { name?: unknown; blocks?: unknown } } } | undefined)?.make?.template;
+    if (displayWords?.kind !== 'custom' || !raw || typeof raw !== 'object') return null;
+    const kept = sanitizeCustom({ title: raw.name, blocks: raw.blocks });
+    return kept ? { name: kept.title, blocks: templateShape(kept.blocks) } : null;
+  })();
+  // what the PERSON said, with what they attached — the only numbers a table may call theirs
+  const personSaid = kept
+    .filter((m: any) => m.role === 'user')
+    .map((m: any) => renderMessageForModel({ role: 'user', content: m.content, attachments: sanitizeAttachments(m.attachments) }, true))
+    .join('\n');
+  const userTurns: string[] = kept.filter((m: any) => m.role === 'user').map((m: any) => String(m.content ?? ''));
+  const today = isoDay(body?.today) ?? todayDay();
+  const DISPLAY_CAP = 2400;
+
+  type Sealed = { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person'; says?: string; from?: 'map' | 'words' | 'template' };
+  type DisplayNote = { ok: boolean; says: string; id?: string; kind?: string; failure?: string };
+  type Settled = { sealed: Sealed } | { note: DisplayNote };
+  const mapMaterial = (m: ThinkingMap): MapMaterial => ({
+    nodes: m.nodes.map((n) => ({ id: n.id, label: n.label, type: n.type, role: n.role, origin: n.origin, status: n.status })),
+    edges: m.edges.map((e) => ({ from: e.from, to: e.to, relation: e.relation })),
+  });
+
+  /** MADE, NOT DRAFTED: what a request made in code becomes — sealed, opened, or why not. */
+  const fromMade = (madeHere: ReturnType<typeof makeFromRequest>, space: typeof EMPTY_SPACE): Settled | null => {
+    if (!madeHere) return null;
+    if ('why' in madeHere) return { note: { ok: false, failure: 'empty', says: madeHere.why } };
+    // the experience this is about is already here: opened, not made twice
+    if ('open' in madeHere) return { note: { ok: true, id: madeHere.open, kind: space.objs.find((o) => o.id === madeHere.open)?.kind, says: madeHere.says } };
+    const state = kindOf(madeHere.kind)?.sanitize(madeHere.state) ?? null;
+    if (!state) return { note: { ok: false, failure: 'malformed', says: 'That could not be made from what is here.' } };
+    return { sealed: { kind: madeHere.kind, state, gaps: [], origin: madeHere.origin, says: madeHere.says, from: madeHere.from } };
+  };
+
+  /** One display drafted by the model, read by its kind — and, when it does not hold, sent back once with why. */
+  const draftDisplay = async (request: DisplayRequest | null, mapIdeas: MapMaterial | null, ladder: readonly string[]): Promise<Settled> => {
+    const system = buildDisplayPrompt({ request, today, guarded: resolveGuard(body?.guard) === 'guard', map: request?.fromMap ? mapIdeas : null, template: theirTemplate });
+    const ask =
+      (extra: { role: 'assistant' | 'user'; content: string }[], cap: number) =>
+      (model: string) =>
+        openai.chat.completions.create({
+          model,
+          temperature: 0,
+          max_tokens: cap,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'system', content: system }, { role: 'user', content: transcript }, ...extra],
+        });
+    const read = (c: { choices?: { message?: { content?: string | null }; finish_reason?: string | null }[] }) => {
+      const text = c.choices?.[0]?.message?.content ?? '';
+      const parsed = parseDraft(text);
+      return { text, parsed, cut: c.choices?.[0]?.finish_reason === 'length', proposal: readDisplayProposal(parsed, { request, said: personSaid }) };
+    };
+    const first = await firstAccepted(ladder, ask([], DISPLAY_CAP), stepped('display'));
+    let got = read(first.result);
+    const fix = got.proposal.ok ? null : repairFor(got.parsed, { request, cut: got.cut });
+    if (fix) {
+      console.info('logos map: the display draft did not hold (%s) — sent back once', got.cut ? 'cut off' : got.proposal.ok ? 'ok' : got.proposal.failure);
+      const again = await firstAccepted(
+        ladder.slice(Math.max(0, ladder.indexOf(first.model))),
+        ask([{ role: 'assistant', content: got.text.slice(0, 8000) || '{}' }, { role: 'user', content: fix }], got.cut ? DISPLAY_CAP * 2 : DISPLAY_CAP),
+        stepped('display repair')
+      ).catch(() => null);
+      // the repair stands when it holds, or when it declines honestly; otherwise the first draft's fault is
+      // the one said — it is what the pass actually tried to make
+      const second = again ? read(again.result) : null;
+      if (second && (second.proposal.ok || second.proposal.failure === 'declined')) got = second;
+      console.info('logos map: the repaired draft %s', second?.proposal.ok ? 'holds' : 'still does not hold');
+    }
+    const p = got.proposal;
+    if (!p.ok) return { note: { ok: false, failure: p.failure, says: p.says } };
+    // made from their template: it says so, and is theirs to save again
+    const state = theirTemplate && p.kind === 'custom' ? (sanitizeCustom({ ...(p.state as object), from: theirTemplate.name }) ?? p.state) : p.state;
+    return { sealed: { kind: p.kind, state, gaps: p.gaps, origin: 'socria' } };
+  };
+
+  // Drafted beside the map: asked for in words, not a simulation they named, not made from the map or
+  // from what is already here (those need the map this pass is drawing)
+  const EMPTY_FAIL: Settled = { note: { ok: false, failure: 'failed', says: 'The display could not be drafted just now — ask again in a moment.' } };
+  const drawnBeside = !!displayWords && !wanted && !displayWords.fromMap && displayWords.kind !== 'exercise';
+  let early: Promise<Settled> | null = null;
+  /** Started the moment the extraction has been asked (so the two run together), or on first need. */
+  const startEarly = (): Promise<Settled> | null => {
+    if (!drawnBeside || !displayWords) return null;
+    return (early ??= (async () => {
+      const space = current.objects ?? EMPTY_SPACE;
+      const made = fromMade(makeFromRequest(displayWords, { said: personSaid, map: null, space, latest: said, turns: userTurns, today }), space);
+      return made ?? (await draftDisplay(displayWords, null, route.ladder));
+    })().catch((e) => {
+      console.warn('logos map: display pass failed', e instanceof Error ? e.message : e);
+      return EMPTY_FAIL;
+    }));
+  };
+
+  /** The display this turn makes, into `base`'s workspace: the one drafted beside the map, or made now. */
+  const settleDisplay = async (base: ThinkingMap, opts: { mapIdeas: MapMaterial; topic?: string; ladder: readonly string[]; request: DisplayRequest | null }): Promise<{ map: ThinkingMap; display: DisplayNote; made: boolean }> => {
+    const space = base.objects ?? EMPTY_SPACE;
+    let settled: Settled;
+    try {
+      const beside = early ?? startEarly();
+      settled =
+        (beside ? await beside : null) ??
+        (opts.request ? fromMade(makeFromRequest(opts.request, { said: personSaid, map: opts.mapIdeas, space, topic: opts.topic, latest: said, turns: userTurns, today }), space) : null) ??
+        (await draftDisplay(opts.request, opts.mapIdeas, opts.ladder));
+    } catch (e) {
+      console.warn('logos map: display pass failed', e instanceof Error ? e.message : e);
+      settled = EMPTY_FAIL;
+    }
+    if ('note' in settled) return { map: base, display: settled.note, made: false };
+    const s = settled.sealed;
+    const made = makeDisplay(space, s.kind, s.state, s.origin);
+    if (!made.ok) return { map: base, display: { ok: false, failure: made.failure, says: made.says }, made: false };
+    return {
+      map: { ...base, objects: made.space },
+      display: { ok: true, id: made.obj.id, kind: made.obj.kind, says: [madeSays(made.obj, s.gaps, s.from), s.says].filter(Boolean).join(' ').slice(0, 300) },
+      made: true,
+    };
+  };
+
+  /**
+   * THE MAP COULD NOT BE DRAWN THIS TURN — THE DISPLAY THEY ASKED FOR STILL
+   * IS. An extraction that came back empty, cut off, unreadable, or not at all
+   * used to end the turn here with the map as it was and no word of what had
+   * been asked: from the outside, Logos had stopped making things.
+   */
+  const withoutMap = async (map: ThinkingMap): Promise<NextResponse> => {
+    if (!displayWords || wanted) return meter(map);
+    const s = await settleDisplay(map, { mapIdeas: mapMaterial(current), ladder: route.ladder, request: displayWords });
+    console.info('logos map: the map was not redrawn; display %s — %s', s.display.ok ? 'made' : 'not made', s.display.says.slice(0, 160));
+    return meter(s.map, { display: s.display });
+  };
+
   try {
-    const openai = tracked(new OpenAI({ apiKey }), 'logos/map');
-    // By tier (lib/model-router.ts): Socria One's map on GPT-6.1 Terra, the free
-    // plan's on GPT-6 Luna, a guest's on GPT-4o mini — each stepping down its own
-    // ladder if refused. LOGOS_ROUTER=off: GPT 5.6 Terra for everyone, as before
-    // (OPENAI_MODEL_LOGOS_MAP still moves it then).
-    const route = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS_MAP || LOGOS_MAP_MODEL);
-    const configured = route.model;
-    const mapCacheKey = cacheKey('map', typeof body?.sessionId === 'string' ? body.sessionId : null);
 
     // The ceiling has to fit the JSON the prompt asks for, which is now a map
     // AND, when the conversation wants one, a picture the model authors part
@@ -373,28 +541,18 @@ export async function POST(req: NextRequest) {
         ],
       });
 
-    /** The provider refusing the model id itself, rather than the request. */
-    const refusedModel = (e: any) => {
-      const status = e?.status ?? e?.response?.status;
-      return status === 404 || /model/i.test(e?.code || '') || /model|not found|does not exist|unknown/i.test(e?.message || '');
-    };
-
-    // A REFUSED ID STEPS DOWN, NEVER OUT: down the tier's ladder — said in the
-    // log, so a map quietly answered by another model is seen. Every pass after
-    // this one asks the model that answered.
-    const ladder = route.ladder;
-    let served = configured;
-    let completion;
-    for (let i = 0; ; i++) {
-      try {
-        completion = await make(ladder[i]);
-        served = ladder[i];
-        break;
-      } catch (e: any) {
-        if (!refusedModel(e) || i === ladder.length - 1) throw e;
-        console.warn('logos map: %s was refused (%s) — asking %s', ladder[i], String(e?.message ?? e).slice(0, 160), ladder[i + 1]);
-      }
-    }
+    // A REFUSED OR FAILING MODEL STEPS DOWN, NEVER OUT: down the tier's ladder
+    // (lib/model-router.ts firstAccepted) — said in the log, so a map quietly
+    // answered by another model is seen. A parameter the model does not take
+    // is not a refusal of the model: lib/openai-usage.ts asks it again without
+    // it. Every pass after this one asks the model that answered.
+    const extraction = firstAccepted(route.ladder, (m: string) => make(m), stepped('map'));
+    // the display their words asked for is drafted now, beside the extraction — asked after it, so the two
+    // calls go out in the same order every time
+    startEarly();
+    const first = await extraction;
+    let completion = first.result;
+    const served = first.model;
 
     // Ran out of room even at the ceiling. The map is the product and the
     // picture is the extra, so drop the picture and ask again rather than
@@ -411,14 +569,14 @@ export async function POST(req: NextRequest) {
 
     const raw = completion.choices?.[0]?.message?.content;
     if (!raw) {
-      console.warn('logos map: empty completion');
-      return meter(salvage(asked));
+      console.warn('logos map: empty completion', completion.choices?.[0]?.finish_reason);
+      return withoutMap(salvage(asked));
     }
 
-    let parsed: any;
-    try {
-      parsed = JSON.parse(raw);
-    } catch {
+    // read as a model writes it when it strays (a fence, a sentence around it, a trailing comma) — the same
+    // lenient reading a display draft gets
+    const parsed: any = parseDraft(raw);
+    if (!parsed) {
       // Said out loud, because the silent version of this looks exactly like
       // a map that has decided to stop building.
       console.error(
@@ -426,7 +584,7 @@ export async function POST(req: NextRequest) {
         completion.choices?.[0]?.finish_reason,
         raw.slice(0, 200)
       );
-      return meter(salvage(asked));
+      return withoutMap(salvage(asked));
     }
 
     // The extractor's output is a PROPOSAL: sanitizeMap's default trust mode
@@ -537,9 +695,10 @@ export async function POST(req: NextRequest) {
     // nothing below should report the turn as having failed.
     const answeredByScene = () => bySimulation || isThatSimulation(next.viz, wanted);
 
-    // Never let a malformed extraction blank a map the user has built up.
+    // Never let a malformed extraction blank a map the user has built up — and never let it take the display
+    // they asked for with it.
     if (next.nodes.length === 0 && current.nodes.length > 0) {
-      return meter(salvage(asked));
+      return withoutMap(salvage(asked));
     }
     // What the person took off the map stays off, whatever the extractor made
     // of the transcript that still mentions it. The client does this too; the
@@ -560,114 +719,36 @@ export async function POST(req: NextRequest) {
       for (const t of theirs) objects = discover(objects, t, 'person').space;
       next = bindNodes({ ...rest, ...(objects.objs.length ? { objects } : {}) } as typeof next, theirs.join('\n')) as typeof next;
     }
-    // ── AN EVERYDAY DISPLAY ───────────────────────────────────────
+    // ── AN EVERYDAY DISPLAY (above: settleDisplay) ────────────────
     //
-    // "Make me a study plan for finals", "turn this map into a checklist":
-    // an artifact to look at and work in, not a model of anything. Asked for
-    // in their words (lib/objects/display-request.ts) or read so by the
-    // extractor (ask: construct → display), it is made HERE, beside the
-    // model on-ramp and under the same rule: a language model may propose a
-    // display's state, and only the kind's own sanitizer decides what of it
-    // the workspace holds (lib/objects/display-propose.ts). A display made
-    // from the map is computed from the map, not drafted. Either way the turn
-    // says what came of it — and the model second pass, which would read the
-    // same construction as a model nobody proposed, stands aside.
-    const displayWords = readDisplayRequest(said, { stated });
-    // THEIR TEMPLATE: a custom artifact asked for from one of their own templates carries it on the
-    // message (lib/logos5/templates.ts) — read through the kind's own sanitizer, never taken as written
-    const theirTemplate = (() => {
-      const raw = (lastSaid as { make?: { template?: { name?: unknown; blocks?: unknown } } } | undefined)?.make?.template;
-      if (displayWords?.kind !== 'custom' || !raw || typeof raw !== 'object') return null;
-      const kept = sanitizeCustom({ title: raw.name, blocks: raw.blocks });
-      return kept ? { name: kept.title, blocks: templateShape(kept.blocks) } : null;
-    })();
+    // Asked for in their words, it has been drafting beside this extraction
+    // (`startEarly`); read so by the extractor alone, or made from the map, it
+    // is made now, from what the extraction found.
     const displayAsked =
       !answeredByScene() &&
       (!!displayWords ||
         (next.ask?.action === 'construct' && (next.ask.artifact === 'display' || (next.ask.artifact === 'comparison' && !next.viz))));
-    let display: { ok: boolean; says: string; id?: string; kind?: string; failure?: string } | null = null;
+    let display: DisplayNote | null = null;
     if (displayAsked) {
-      const space = next.objects ?? EMPTY_SPACE;
-      const onMap = current.nodes.length ? current : next;
-      const mapIdeas: MapMaterial = {
-        nodes: onMap.nodes.map((n) => ({ id: n.id, label: n.label, type: n.type, role: n.role, origin: n.origin, status: n.status })),
-        edges: onMap.edges.map((e) => ({ from: e.from, to: e.to, relation: e.relation })),
-      };
-      // what the PERSON said, with what they attached — the only numbers a table may call theirs
-      const personSaid = kept
-        .filter((m: any) => m.role === 'user')
-        .map((m: any) => renderMessageForModel({ role: 'user', content: m.content, attachments: sanitizeAttachments(m.attachments) }, true))
-        .join('\n');
-      try {
-        let sealed: { kind: string; state: unknown; gaps: string[]; origin: 'socria' | 'person'; says?: string; from?: 'map' | 'words' | 'template' } | null = null;
-        // MADE, NOT DRAFTED: a plan from the map, a labeling exercise over what is here, a worksheet from a template
-        const turns = kept.filter((m: any) => m.role === 'user').map((m: any) => String(m.content ?? ''));
-        const madeHere = displayWords ? makeFromRequest(displayWords, { said: personSaid, map: mapIdeas, space, topic: next.ask?.topic, latest: said, turns, today: isoDay(body?.today) ?? todayDay() }) : null;
-        if (madeHere && 'why' in madeHere) {
-          display = { ok: false, failure: 'empty', says: madeHere.why };
-        } else if (madeHere && 'open' in madeHere) {
-          // the experience this is about is already here: opened, not made twice
-          const there = space.objs.find((o) => o.id === madeHere.open);
-          display = { ok: true, id: madeHere.open, kind: there?.kind, says: madeHere.says };
-        } else if (madeHere) {
-          const state = kindOf(madeHere.kind)?.sanitize(madeHere.state) ?? null;
-          if (state) sealed = { kind: madeHere.kind, state, gaps: [], origin: madeHere.origin, says: madeHere.says, from: madeHere.from };
-          else display = { ok: false, failure: 'malformed', says: 'That could not be made from what is here.' };
-        } else {
-          const drafted = await openai.chat.completions.create({
-            model: served,
-            temperature: 0,
-            max_tokens: 2400,
-            response_format: { type: 'json_object' },
-            messages: [
-              {
-                role: 'system',
-                content: buildDisplayPrompt({
-                  request: displayWords,
-                  today: isoDay(body?.today) ?? todayDay(),
-                  guarded: resolveGuard(body?.guard) === 'guard',
-                  map: displayWords?.fromMap ? mapIdeas : null,
-                  template: theirTemplate,
-                }),
-              },
-              { role: 'user', content: transcript },
-            ],
-          });
-          const text = drafted.choices?.[0]?.message?.content;
-          let parsed: unknown = null;
-          try {
-            parsed = text ? JSON.parse(text) : null;
-          } catch {
-            parsed = null;
-          }
-          const read = readDisplayProposal(parsed, { request: displayWords, said: personSaid });
-          // made from their template: it says so, and is theirs to save again
-          const state = read.ok && theirTemplate && read.kind === 'custom' ? (sanitizeCustom({ ...(read.state as object), from: theirTemplate.name }) ?? read.state) : read.ok ? read.state : null;
-          if (read.ok) sealed = { kind: read.kind, state, gaps: read.gaps, origin: 'socria' };
-          else display = { ok: false, failure: read.failure, says: read.says };
-        }
-        if (sealed) {
-          const made = makeDisplay(space, sealed.kind, sealed.state, sealed.origin);
-          if (made.ok) {
-            next = { ...next, objects: made.space };
-            display = { ok: true, id: made.obj.id, kind: made.obj.kind, says: [madeSays(made.obj, sealed.gaps, sealed.from), sealed.says].filter(Boolean).join(' ').slice(0, 300) };
-            // ONE ANSWER TO ONE ASK. Told to draw whenever someone says "chart", "plot" or
-            // "diagram", the extractor also drew this turn's request as a picture of its own — a
-            // second, cruder copy made by hand from the same words: a chart's numbers as bars, a
-            // Venn diagram as overlapping triangles on axes. The display is the answer, whatever
-            // its kind; a picture this turn invented beside it is dropped, and one already on
-            // screen stays.
-            if (next.viz && JSON.stringify(next.viz) !== JSON.stringify(current.viz ?? null)) {
-              const { viz: _drawn, ...rest } = next;
-              next = (current.viz ? { ...rest, viz: current.viz } : rest) as typeof next;
-            }
-          } else display = { ok: false, failure: made.failure, says: made.says };
-        }
-        console.info('logos map: display %s — %s', display?.ok ? 'made' : 'not made', display?.says?.slice(0, 160));
-      } catch (e) {
-        console.warn('logos map: display pass failed', e);
-        display = { ok: false, failure: 'failed', says: 'The display could not be drafted just now — ask again in a moment.' };
+      const settled = await settleDisplay(next, {
+        mapIdeas: mapMaterial(current.nodes.length ? current : next),
+        topic: next.ask?.topic,
+        ladder: ladderFrom(served),
+        request: displayWords,
+      });
+      next = settled.map;
+      display = settled.display;
+      // ONE ANSWER TO ONE ASK. Told to draw whenever someone says "chart", "plot" or
+      // "diagram", the extractor also drew this turn's request as a picture of its own — a
+      // second, cruder copy made by hand from the same words: a chart's numbers as bars, a
+      // Venn diagram as overlapping triangles on axes. The display is the answer, whatever
+      // its kind; a picture this turn invented beside it is dropped, and one already on
+      // screen stays.
+      if (settled.made && next.viz && JSON.stringify(next.viz) !== JSON.stringify(current.viz ?? null)) {
+        const { viz: _drawn, ...rest } = next;
+        next = (current.viz ? { ...rest, viz: current.viz } : rest) as typeof next;
       }
+      console.info('logos map: display %s — %s', display.ok ? 'made' : 'not made', display.says.slice(0, 160));
     }
     // ── A FUNCTION THEY ASKED TO SEE ──────────────────────────────
     //
@@ -926,6 +1007,8 @@ export async function POST(req: NextRequest) {
     return meter(withModels, { ...modelsChanged, ...(build ? { build } : {}), ...(display ? { display } : {}) });
   } catch (e) {
     console.error('logos map error:', e);
-    return meter(salvage(current ?? EMPTY_MAP)).catch(() => NextResponse.json({ map: current ?? EMPTY_MAP }));
+    // the map could not be drawn at all (every model on the ladder failed, or this route did): the display
+    // they asked for is still made if it can be, and said if it cannot — never silence
+    return withoutMap(salvage(current ?? EMPTY_MAP)).catch(() => meter(salvage(current ?? EMPTY_MAP)).catch(() => NextResponse.json({ map: current ?? EMPTY_MAP })));
   }
 }

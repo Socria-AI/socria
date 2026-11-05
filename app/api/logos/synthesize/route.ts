@@ -10,7 +10,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
-import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
@@ -70,8 +70,6 @@ export async function POST(req: NextRequest) {
     // by tier (lib/model-router.ts): Socria One on GPT-6.1 Sol, the free plan on GPT-6 Luna, a guest on
     // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
     const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'deep', process.env, process.env.OPENAI_MODEL_LOGOS_SYNTHESIS || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
-    const configured = routed.model;
-    const stepDown = routed.ladder[1];
     const ask = (model: string) =>
       openai.chat.completions.create({
         model,
@@ -83,14 +81,8 @@ export async function POST(req: NextRequest) {
           { role: 'user', content: scope === 'selection' ? 'Synthesise the selected objects.' : 'Synthesise where my thinking stands.' },
         ],
       });
-    let completion;
-    try {
-      completion = await ask(configured);
-    } catch (e: any) {
-      const status = e?.status ?? e?.response?.status;
-      if ((status === 404 || /model/i.test(e?.message || '')) && !!stepDown) completion = await ask(stepDown!);
-      else throw e;
-    }
+    // a refused or failing model steps down the tier's whole ladder (lib/model-router.ts firstAccepted)
+    const { result: completion } = await firstAccepted(routed.ladder, ask, (from, to, why) => console.warn('logos synthesize: %s refused (%s); asking %s', from, why, to));
     const text = completion.choices?.[0]?.message?.content;
     const parsed = text ? JSON.parse(text) : null;
     return NextResponse.json({ synthesis: enforce(parsed, d, base) });

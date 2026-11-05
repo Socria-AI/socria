@@ -15,7 +15,8 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
-import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
+import { cannotSee } from '@/lib/model-params';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL } from '@/lib/logos';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -60,8 +61,6 @@ export async function POST(req: NextRequest) {
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
-  const configured = routed.model;
-  const stepDown = routed.ladder[1];
   const make = (model: string) =>
     openai.chat.completions.create({
       model,
@@ -81,15 +80,8 @@ export async function POST(req: NextRequest) {
     });
 
   try {
-    let completion;
-    try {
-      completion = await make(configured);
-    } catch (e: unknown) {
-      const err = e as { status?: number; message?: string };
-      const modelProblem = err?.status === 404 || err?.status === 400 || /model|not found|does not exist|unknown|vision|image|response_format/i.test(err?.message || '');
-      if (!!stepDown && modelProblem) completion = await make(stepDown!);
-      else throw e;
-    }
+    // a refused or failing model steps down the tier's whole ladder (lib/model-router.ts firstAccepted) — and one that cannot read an image steps down too
+    const { result: completion } = await firstAccepted(routed.ladder, make, (from, to, why) => console.warn('docs page: %s refused (%s); asking %s', from, why, to), cannotSee);
     const raw = completion.choices?.[0]?.message?.content || '';
     const truncated = completion.choices?.[0]?.finish_reason === 'length';
     if (kind === 'figure') {

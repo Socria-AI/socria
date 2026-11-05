@@ -14,7 +14,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
-import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
@@ -60,8 +60,6 @@ export async function POST(req: NextRequest) {
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
-  const configured = routed.model;
-  const stepDown = routed.ladder[1];
   // How Socria talks to them shapes the wording of its notes — never their writing, never the edits.
   const voice =
     conversationStyleBlock(body?.conversationStyle, 'logos', { structured: true }) +
@@ -84,15 +82,8 @@ export async function POST(req: NextRequest) {
     });
 
   try {
-    let res;
-    try {
-      res = await make(configured);
-    } catch (e: any) {
-      const status = e?.status ?? e?.response?.status;
-      const isModelError = status === 404 || /model|not found|does not exist|unknown/i.test(e?.message || '');
-      if (!isModelError || !stepDown) throw e;
-      res = await make(stepDown!);
-    }
+    // a refused or failing model steps down the tier's whole ladder (lib/model-router.ts firstAccepted)
+    const { result: res } = await firstAccepted(routed.ladder, make, (from, to, why) => console.warn('logos write: %s refused (%s); asking %s', from, why, to));
     let parsed: unknown = null;
     try {
       parsed = JSON.parse(res.choices?.[0]?.message?.content || '{}');

@@ -25,8 +25,8 @@ if (!process.env.OPENAI_API_KEY) {
   process.exit(1);
 }
 const args = Object.fromEntries(process.argv.slice(2).join(' ').split('--').filter(Boolean).map((a) => a.trim().split(/\s+/)));
-const TIERS = (args.tiers?.[0] ?? 'free,one').split(',');
-const LIMIT = Number(args.limit?.[0] ?? 1e9);
+const TIERS = String(args.tiers ?? 'free,one').split(',');
+const LIMIT = Number(args.limit ?? 1e9);
 
 const here = dirname(fileURLToPath(import.meta.url));
 const root = join(here, '..');

@@ -13,7 +13,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { auth } from '@clerk/nextjs/server';
 import { tracked } from '@/lib/openai-usage';
-import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
+import { cannotSee } from '@/lib/model-params';
 import { LOGOS_MODEL } from '@/lib/logos';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { meterFor, sleepGate } from '@/lib/sleep-server';
@@ -23,6 +24,7 @@ import { spend } from '@/lib/usage';
 import { mayUse } from '@/lib/route-guard';
 import { EASY_PROMPT, EASY_UNREAD, easyAsk } from '@/lib/easy-view';
 import { sanitizeEasy } from '@/lib/objects/display-easy';
+import { parseDraft } from '@/lib/objects/display-propose';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -60,44 +62,52 @@ export async function POST(req: NextRequest) {
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
-  const configured = routed.model;
-  const stepDown = routed.ladder[1];
-  const call = (model: string) =>
-    openai.chat.completions.create({
-      model,
-      temperature: 0,
-      max_tokens: 2600,
-      response_format: { type: 'json_object' },
-      messages: [
-        { role: 'system', content: EASY_PROMPT },
-        {
-          role: 'user',
-          content: [
-            { type: 'text', text: easyAsk(body?.said) },
-            // small print needs the full picture
-            { type: 'image_url', image_url: { url: image, detail: 'high' } },
-          ],
-        },
-      ],
-    });
+  const call =
+    (extra: { role: 'assistant' | 'user'; content: string }[] = [], cap = 2600) =>
+    (model: string) =>
+      openai.chat.completions.create({
+        model,
+        temperature: 0,
+        max_tokens: cap,
+        response_format: { type: 'json_object' },
+        messages: [
+          { role: 'system', content: EASY_PROMPT },
+          {
+            role: 'user',
+            content: [
+              { type: 'text', text: easyAsk(body?.said) },
+              // small print needs the full picture
+              { type: 'image_url', image_url: { url: image, detail: 'high' } },
+            ],
+          },
+          ...extra,
+        ],
+      });
+  const step = (from: string, to: string, why: string) => console.warn('logos easy: %s refused (%s); asking %s', from, why, to);
 
   try {
-    let completion;
-    try {
-      completion = await call(configured);
-    } catch (e: any) {
-      const status = e?.status ?? e?.response?.status;
-      const isModelError = status === 404 || /model|not found|does not exist|unknown|vision|image/i.test(e?.message || '');
-      if (!!stepDown && isModelError) completion = await call(stepDown!);
-      else throw e;
+    // a refused or failing model steps down the tier's whole ladder (lib/model-router.ts firstAccepted) — and one that cannot read an image steps down too
+    const first = await firstAccepted(routed.ladder, call(), step, cannotSee);
+    const text = first.result.choices?.[0]?.message?.content ?? '';
+    let easy = sanitizeEasy(parseDraft(text));
+    // A READING THE KIND CANNOT HOLD (not JSON, cut off, the wrong shape): read once more, told why — the
+    // photo is not sent to a model a third time
+    if (!easy) {
+      const cut = first.result.choices?.[0]?.finish_reason === 'length';
+      const again = await firstAccepted(
+        routed.ladder.slice(Math.max(0, routed.ladder.indexOf(first.model))),
+        call(
+          [
+            { role: 'assistant', content: text.slice(0, 6000) || '{}' },
+            { role: 'user', content: cut ? 'That was cut off before it finished. Read it again, complete and shorter: ONLY JSON in the shape given.' : 'That could not be read as the shape asked for. Read the photo again: ONLY JSON, exactly the shape given.' },
+          ],
+          cut ? 4000 : 2600
+        ),
+        step,
+        cannotSee
+      ).catch(() => null);
+      if (again) easy = sanitizeEasy(parseDraft(again.result.choices?.[0]?.message?.content ?? ''));
     }
-    let raw: unknown = null;
-    try {
-      raw = JSON.parse(completion.choices?.[0]?.message?.content || 'null');
-    } catch {
-      raw = null;
-    }
-    const easy = sanitizeEasy(raw);
     if (!easy) return NextResponse.json({ error: EASY_UNREAD }, { status: 422 });
     return NextResponse.json({ easy });
   } catch (e) {

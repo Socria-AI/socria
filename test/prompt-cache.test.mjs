@@ -216,8 +216,11 @@ console.log('\n=== the map, through the route: the model by tier (lib/model-rout
   ok('a refused GPT-6 Luna steps down to GPT-5.6 Luna, and the map is drawn', JSON.stringify(down.models) === JSON.stringify(['gpt-6-luna', 'gpt-5.6-luna']) && down.json?.map?.nodes?.length === 2, JSON.stringify({ models: down.models, nodes: down.json?.map?.nodes?.length }));
   const twice = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [refused('gpt-6-luna'), refused('gpt-5.6-luna'), MAPPED] });
   ok('  and then to GPT-4o mini — never up to a member’s model', JSON.stringify(twice.models) === JSON.stringify(['gpt-6-luna', 'gpt-5.6-luna', 'gpt-4o-mini']) && twice.json?.map?.nodes?.length === 2, JSON.stringify(twice.models));
-  const broke = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [Object.assign(new Error('upstream exploded'), { status: 500 })] });
-  ok('an error that is not a refused id is not retried down the ladder', broke.models.length === 1 && broke.status === 200 && broke.json?.map?.nodes?.[0]?.label === 'Launch in March', JSON.stringify(broke.models));
+  // the provider failing (a 5xx its own retries did not clear) steps down too — the map is still drawn
+  const broke = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [Object.assign(new Error('upstream exploded'), { status: 500 }), MAPPED] });
+  ok('the provider failing steps down the ladder too, and the map is drawn', JSON.stringify(broke.models) === JSON.stringify(['gpt-6-luna', 'gpt-5.6-luna']) && broke.status === 200 && broke.json?.map?.nodes?.length === 2, JSON.stringify(broke.models));
+  const wrong = await mapTurn(BUSY, 'The pricing is not settled, though.', { script: [Object.assign(new Error("400 This model's maximum context length is 128000 tokens."), { status: 400, code: 'context_length_exceeded' })] });
+  ok('an error every model would give is not retried down the ladder; the map stays as it was', wrong.models.length === 1 && wrong.status === 200 && wrong.json?.map?.nodes?.[0]?.label === 'Launch in March', JSON.stringify(wrong.models));
   const second = await mapTurn(EMPTY, 'build a model of how a pulsar beam sweeps', { script: [refused('gpt-6-luna'), { nodes: [{ id: 'n1', label: 'Pulsar beam', type: 'concept' }], edges: [], context: 'math', ask: { action: 'construct', artifact: 'model', topic: 'pulsar beam' } }] });
   ok('a pass after the first asks the model that answered it', second.models.length === 3 && second.models[1] === 'gpt-5.6-luna' && second.models[2] === 'gpt-5.6-luna' && /returned no proposal/.test(String(second.calls[2]?.messages?.[0]?.content)), JSON.stringify(second.models));
   const cached = await mapTurn(BUSY, 'The pricing is not settled, though.');

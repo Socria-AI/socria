@@ -228,8 +228,10 @@ console.log('\n=== THE FAILURE: "Chart my monthly spending…" ===');
   for (let i = 0; i < 10; i++) runs.push(await mapTurn(said, [SKETCHED]));
   const states = runs.map((r) => JSON.stringify((r.json.map?.objects?.objs ?? []).find((o) => o.kind === 'data')?.states[0]));
   ok('consistent: ten turns, ten identical charts', states.every((x) => x && x === states[0]));
+  // the chart is read from their own words, so the extractor failing outright does not take it away
+  // (docs/ARTIFACT-RELIABILITY.md): the map they had stays, and the chart is still made and said
   const threw = await mapTurn(said, [new Error('upstream down')]);
-  ok('when the extractor itself fails, the map is salvaged and nothing is claimed', threw.status === 200 && !threw.json.display?.ok);
+  ok('when the extractor itself fails, the map is salvaged and the chart from their words is still made', threw.status === 200 && threw.json.display?.ok === true && (threw.json.map?.objects?.objs ?? []).some((o) => o.kind === 'data'), JSON.stringify(threw.json.display));
 }
 
 console.log('\n=== ONE ANSWER TO ONE ASK, whatever the kind: "Venn diagram of mitosis and meiosis" ===');

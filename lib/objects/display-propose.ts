@@ -29,6 +29,7 @@ import { create, kindOf, MAX_OBJECTS, type ObjectSpace, type ThoughtObject } fro
 import { cleanText, displayMeta, freshHandle, isDisplayKind, offeredKinds } from './display-base';
 import type { DisplayRequest } from './display-request';
 import { sealDraft, type MapMaterial } from './display-make';
+import { repairJson } from '../inline-ui';
 
 // a plan made from the map, and the map's ideas themselves, live with the other displays that are made, not drafted
 export { planFromMap, type MapMaterial } from './display-make';
@@ -156,6 +157,70 @@ export function readDisplayProposal(raw: unknown, ctx: { request: DisplayRequest
   // what the draft must pass beyond the kind's own rules: numbers called theirs are theirs, examples are named
   const sealed = sealDraft(kind, state, ctx.said ?? '');
   return { ok: true, kind, state: sealed.state, gaps: [...sealed.gaps, ...said].slice(0, 5) };
+}
+
+// ── when a draft does not hold: read leniently, repaired once ─────────
+
+/**
+ * A draft's JSON, read the way a model writes it when it strays: as asked, or
+ * inside a ```json fence, or with a sentence before or after it, or with the
+ * habits of code (a trailing comma, a comment) — each fixed outside the
+ * strings only. Null when there is no JSON object in it at all.
+ */
+export function parseDraft(text: unknown): unknown {
+  if (typeof text !== 'string' || !text.trim()) return null;
+  const tries: string[] = [text.trim()];
+  const fenced = /```(?:json)?[ \t]*\n?([\s\S]*?)```/i.exec(text);
+  if (fenced) tries.push(fenced[1].trim());
+  const a = text.indexOf('{');
+  const b = text.lastIndexOf('}');
+  if (a >= 0 && b > a) tries.push(text.slice(a, b + 1));
+  for (const t of tries) {
+    try {
+      const v = JSON.parse(t);
+      if (v && typeof v === 'object') return v;
+    } catch {
+      const fixed = repairJson(t);
+      if (fixed === null) continue;
+      try {
+        const v = JSON.parse(fixed);
+        if (v && typeof v === 'object') return v;
+      } catch {
+        /* the next reading */
+      }
+    }
+  }
+  return null;
+}
+
+/**
+ * What to tell the drafting pass when what it wrote cannot be made into the
+ * display asked for — one instruction, aimed at the fault, for ONE repair.
+ * Null when there is nothing to repair: an honest decline ("there is not
+ * enough here") stands, and a draft that holds is kept.
+ */
+export function repairFor(raw: unknown, ctx: { request: DisplayRequest | null; cut?: boolean }): string | null {
+  const wanted = ctx.request?.kind ?? null;
+  const shape = 'Return ONLY one JSON object: {"display": {"kind": "<one of the kinds listed>", "state": { …that kind\'s state… }}, "gaps": []} — or {"none": "why"} if it cannot be made honestly.';
+  if (ctx.cut) return `What you wrote was cut off before it finished. Write the same display again, complete — shorter where you can (fewer, shorter items). ${shape}`;
+  if (!raw || typeof raw !== 'object') return `That was not JSON. ${shape}`;
+  const r = raw as Record<string, unknown>;
+  if (typeof r.none === 'string' || (r.display === undefined && typeof r.because === 'string')) return null;
+  const d = r.display as Record<string, unknown> | undefined;
+  const kind = typeof d?.kind === 'string' ? d.kind.trim().toLowerCase() : '';
+  if (!d || typeof d !== 'object' || !kind) return `There was no "display" with a "kind" in it. ${shape}`;
+  if (!isDisplayKind(kind) || !kindOf(kind) || displayMeta(kind)?.internal || !displayMeta(kind)?.spec) {
+    return `"${cleanText(kind, 40)}" is not one of the kinds listed. Write the display as one of them${wanted ? ` — "${wanted}", the one they asked for` : ''}, with its own field names. ${shape}`;
+  }
+  const req = ctx.request;
+  if (req && (req.kind ? req.kind !== kind : req.kinds.length && !req.kinds.includes(kind))) {
+    return `They asked for ${aOrAn(nounOf(req.kind ?? req.kinds[0]))} ("${req.kind ?? req.kinds.join('" or "')}"), and that was ${aOrAn(nounOf(kind))}. Write ${req.kind ? `a "${req.kind}"` : 'one of those'} display instead, with that kind's own field names. ${shape}`;
+  }
+  const k = kindOf(kind)!;
+  if (k.sanitize(unclaimed(d.state ?? d)) === null) {
+    return `The workspace could not hold that ${nounOf(kind)}: its "state" does not follow the "${kind}" State described above. Write it again with exactly those field names and value types, shaped the way that kind's Example is. ${shape}`;
+  }
+  return null;
 }
 
 // ── into the workspace ───────────────────────────────────────────────

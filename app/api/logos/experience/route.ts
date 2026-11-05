@@ -16,12 +16,12 @@
 import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
-import { chooseAuxModel, tierOf } from '@/lib/model-router';
+import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { meterFor, sleepGate } from '@/lib/sleep-server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL } from '@/lib/logos';
-import '@/lib/objects';
+import { parseDraft } from '@/lib/objects';
 import { buildPrompt, precheck, readAnswer, readAsk, readState, vetOps } from '@/lib/objects/experience-asks';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
@@ -57,32 +57,39 @@ export async function POST(req: NextRequest) {
     // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
     // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
     const routed = chooseAuxModel(tierOf(userId, await resolvePlanForRequest(req, userId)), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS_EXPERIENCE || process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
-    const configured = routed.model;
-    const stepDown = routed.ladder[1];
-    const call = (model: string) =>
-      openai.chat.completions.create({
-        model,
-        temperature: prompted.temperature,
-        max_tokens: 900,
-        response_format: { type: 'json_object' },
-        messages: [{ role: 'system', content: prompted.system }, ...prompted.messages],
-      });
-    let completion;
-    try {
-      completion = await call(configured);
-    } catch (e: any) {
-      const status = e?.status ?? e?.response?.status;
-      if ((status === 404 || /model/i.test(e?.message || '')) && !!stepDown) completion = await call(stepDown!);
-      else throw e;
+    const call =
+      (extra: { role: 'assistant' | 'user'; content: string }[] = []) =>
+      (model: string) =>
+        openai.chat.completions.create({
+          model,
+          temperature: prompted.temperature,
+          max_tokens: 900,
+          response_format: { type: 'json_object' },
+          messages: [{ role: 'system', content: prompted.system }, ...prompted.messages, ...extra],
+        });
+    const step = (from: string, to: string, why: string) => console.warn('logos experience: %s refused (%s); asking %s', from, why, to);
+    const answer = (c: { choices?: { message?: { content?: string | null } }[] }) => {
+      const text = c.choices?.[0]?.message?.content ?? '';
+      return { text, vetted: vetOps(ask.kind, state, readAnswer(ask, state, parseDraft(text))) };
+    };
+    // a refused or failing model steps down the tier's whole ladder (lib/model-router.ts firstAccepted)
+    const first = await firstAccepted(routed.ladder, call(), step);
+    let got = answer(first.result);
+    // NOTHING USABLE CAME BACK: asked once more, told so — what comes back is vetted the same way, and nothing
+    // is ever made up in its place
+    if (!got.vetted.ops.length) {
+      const why = got.vetted.refused.length ? ` What was refused: ${got.vetted.refused.slice(0, 3).join('; ')}.` : '';
+      const again = await firstAccepted(
+        routed.ladder.slice(Math.max(0, routed.ladder.indexOf(first.model))),
+        call([
+          { role: 'assistant', content: got.text.slice(0, 6000) || '{}' },
+          { role: 'user', content: `Nothing in that could be used.${why} Answer again: ONLY JSON, exactly the shape given, following every rule.` },
+        ]),
+        step
+      ).catch(() => null);
+      if (again) got = answer(again.result);
     }
-    const text = completion.choices?.[0]?.message?.content;
-    let parsed: unknown = null;
-    try {
-      parsed = text ? JSON.parse(text) : null;
-    } catch {
-      parsed = null;
-    }
-    const vetted = vetOps(ask.kind, state, readAnswer(ask, state, parsed));
+    const vetted = got.vetted;
     if (!vetted.ops.length) return NextResponse.json({ error: 'Nothing came back that could be used — try again.', refused: vetted.refused.slice(0, 3) }, { status: 422 });
     return NextResponse.json({ ops: vetted.ops, ...(vetted.refused.length ? { refused: vetted.refused.slice(0, 3) } : {}) });
   } catch (e) {
