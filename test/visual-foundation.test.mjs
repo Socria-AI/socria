@@ -229,6 +229,13 @@ const chart = (said, o = {}) => dataFromWords(said, o)?.state ?? null;
   ({ r } = made('Compare iPhone and Pixel on price, camera and battery'));
   ok('compare: the options and criteria named, every weight even, no score given', eq(r?.state.options.map((o) => o.name.toLowerCase()), ['iphone', 'pixel']) && eq(r.state.criteria.map((c) => [c.name, c.weight]), [['Price', 5], ['Camera', 5], ['Battery', 5]]) && r.state.scores.length === 0 && keeps(r), JSON.stringify(r?.state));
   ok('compare: without criteria, it is drafted (and sealed)', made('Compare iPhone and Pixel in a table').r === null);
+  // "side by side" is how it should look, never a criterion: its "by" read as the start of the criteria made a
+  // comparison of "TCP" and "UDP side" on the criterion "Side" (found in the browser, November 5, 2026)
+  ok('compare: "side by side" is not a criterion — with none named, it is drafted', made('Compare TCP and UDP side by side').r === null && made('Compare TCP and UDP side-by-side').r === null, JSON.stringify(made('Compare TCP and UDP side by side').r?.state));
+  ({ r } = made('Compare TCP and UDP side by side on speed, reliability and ordering'));
+  ok('  and with criteria named after it, the options are the two protocols and the criteria are theirs', eq(r?.state.options.map((o) => o.name), ['TCP', 'UDP']) && eq(r.state.criteria.map((c) => c.name), ['Speed', 'Reliability', 'Ordering']), JSON.stringify(r?.state));
+  ({ r } = made('Compare iPhone and Pixel by price and camera, in a table'));
+  ok('  "in a table" after the criteria is not a criterion either', eq(r?.state.options.map((o) => o.name.toLowerCase()), ['iphone', 'pixel']) && eq(r.state.criteria.map((c) => c.name), ['Price', 'Camera']), JSON.stringify(r?.state));
   ({ r } = made('Pros and cons of moving to Denver. Pros: cheaper rent, mountains; cons: far from family, cold winters'));
   const notes = r?.state.notes ?? [];
   ok('pros and cons: the option and not doing it, their pros and cons filed under it', r?.kind === 'crossroads' && r.state.alternatives.length === 2 && eq(notes.filter((n) => n.kind === 'pro').map((n) => n.text), ['Cheaper rent', 'Mountains']) && eq(notes.filter((n) => n.kind === 'con').map((n) => n.text), ['Far from family', 'Cold winters']));

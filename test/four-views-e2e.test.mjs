@@ -90,7 +90,7 @@ async function chatTurn(messages, { env = {}, reply = 'Noted.', length } = {}) {
     const received = await r.text().catch(() => '');
     await new Promise((ok) => setTimeout(ok, 30));
     const streamed = globalThis.__logosCalls.find((c) => c.stream);
-    return { status: r.status, received, system: systemOf(streamed), first: String(streamed?.messages?.[0]?.content ?? ''), max: streamed?.max_tokens };
+    return { status: r.status, received, system: systemOf(streamed), first: String(streamed?.messages?.[0]?.content ?? ''), max: streamed?.max_tokens ?? streamed?.max_completion_tokens };
   } finally {
     for (const [k, v] of Object.entries(saved)) v === undefined ? delete process.env[k] : (process.env[k] = v);
   }

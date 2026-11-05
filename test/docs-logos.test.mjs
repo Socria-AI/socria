@@ -262,7 +262,7 @@ console.log('\n=== the real chat route, with a document ===');
     const r = await chat.POST(new NextRequest('http://localhost/api/logos/chat', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
     try { await r.text(); } catch {}
     const call = globalThis.__logosCalls.find((c) => c.stream);
-    return { status: r.status, assist: r.headers.get('x-socria-assist') ?? '', system: systemOf(call), msgs: turnsOf(call), max: call?.max_tokens };
+    return { status: r.status, assist: r.headers.get('x-socria-assist') ?? '', system: systemOf(call), msgs: turnsOf(call), max: call?.max_tokens ?? call?.max_completion_tokens };
   };
   const messages = [{ role: 'user', content: 'What happened to revenue?', attachments: [attach(doc)] }];
   const t = await turn({ messages, docs: [doc] });

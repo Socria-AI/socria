@@ -98,7 +98,7 @@ ok('  else the picture, else the functions on their own', M.plotArtifact([], nul
 const app = read('components/LogosApp.tsx');
 ok('Logos 5 lists what the map draws by these rules, not its own copy of them', /mapArtifacts\(\{/.test(app) && /pictureRepeatsDisplay\(/.test(app) && /plotArtifact\(/.test(app) && !/vizRepeatsDisplay/.test(app) && /\.\.\.\(drawn\.viz \?/.test(app) && /\.\.\.\(drawn\.plot \?/.test(app));
 const route = read('app/api/logos/map/route.ts');
-ok('the map route keeps no picture of its own beside a display it made, whatever the kind', /ONE ANSWER TO ONE ASK/.test(route) && /if \(next\.viz && JSON\.stringify\(next\.viz\) !== JSON\.stringify\(current\.viz \?\? null\)\)/.test(route));
+ok('the map route keeps no picture of its own beside a display it made, whatever the kind', /ONE ANSWER TO ONE ASK/.test(route) && /if \(settled\.made && next\.viz && JSON\.stringify\(next\.viz\) !== JSON\.stringify\(current\.viz \?\? null\)\)/.test(route));
 
 console.log('\n=== containment: a picture is drawn inside its card ===');
 const css = read('components/logos5/redesign.css');

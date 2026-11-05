@@ -115,6 +115,9 @@ async function turn(body, { reply = 'Here it is.', script = [], env = {}, uid } 
 
 const STEPS = [U('How do I solve 2x + 3 = 11?'), A(ASKING), U('just show me the steps')];
 
+/** The reply's ceiling as it reaches the provider: max_tokens on a classic model, max_completion_tokens on a reasoning one (lib/model-params.ts). */
+const capOf = (call) => call?.max_tokens ?? call?.max_completion_tokens;
+
 console.log('\n=== MR off is the route as it was ===');
 {
   // MR is on by default: "off" (or 0/false/no) is the route as it was
@@ -122,11 +125,11 @@ console.log('\n=== MR off is the route as it was ===');
   const off = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'off' } });
   ok('"false" and "off" send byte-identical prompts', unset.status === 200 && JSON.stringify(unset.streamed.messages) === JSON.stringify(off.streamed.messages));
   ok('  no MR header, no [mr] line, no ledger rows', unset.mr === null && off.mr === null && unset.log.length === 0 && off.log.length === 0 && ledger().length === 0, `${unset.mr} ${unset.log.length} ${ledger().length}`);
-  ok('  the same max_tokens', unset.streamed.max_tokens === off.streamed.max_tokens);
+  ok('  the same max_tokens', capOf(unset.streamed) === capOf(off.streamed));
   const byDefault = await turn({ messages: STEPS }, { env: { LOGOS_MR: undefined } });
   ok('MR runs by default (LOGOS_MR unset): traced and enforced', /^mr1;arm=full;/.test(byDefault.mr ?? '') && /;enf=1;/.test(byDefault.mr ?? ''), byDefault.mr);
   const sh = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'shadow' } });
-  ok('shadow: the identical prompt and ceiling…', JSON.stringify(sh.streamed.messages) === JSON.stringify(off.streamed.messages) && sh.streamed.max_tokens === off.streamed.max_tokens);
+  ok('shadow: the identical prompt and ceiling…', JSON.stringify(sh.streamed.messages) === JSON.stringify(off.streamed.messages) && capOf(sh.streamed) === capOf(off.streamed));
   ok('  …and the decision it WOULD have enforced, traced', /;enf=0;/.test(sh.mr ?? '') && /;a=direct;/.test(sh.mr ?? ''), sh.mr);
 }
 
@@ -160,7 +163,7 @@ console.log('\n=== "shorter" is a ceiling the model cannot pass ===');
 {
   const base = await turn({ messages: [U('Explain inflation.'), A('Inflation is a general rise in prices. '.repeat(20)), U('too long, keep it short')] }, { env: { LOGOS_MR: 'off' } });
   const r = await turn({ messages: [U('Explain inflation.'), A('Inflation is a general rise in prices. '.repeat(20)), U('too long, keep it short')] }, { env: { LOGOS_MR: 'on' } });
-  ok('max_tokens is lowered for the reply call', r.streamed.max_tokens < base.streamed.max_tokens && /;a=shorter;/.test(r.mr ?? ''), `${base.streamed.max_tokens} → ${r.streamed.max_tokens} ${r.mr}`);
+  ok('max_tokens is lowered for the reply call', capOf(r.streamed) < capOf(base.streamed) && /;a=shorter;/.test(r.mr ?? ''), `${capOf(base.streamed)} → ${capOf(r.streamed)} ${r.mr}`);
 }
 
 console.log('\n=== an unsupported "you\'ve improved" is taken out ===');

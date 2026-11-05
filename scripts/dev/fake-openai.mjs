@@ -26,9 +26,16 @@
 //                                  citing two fixed example pages (url_citation),
 //                                  the shape OpenAI's web search returns
 //   GET  /v1/models                a short list
+//
+// FAKE_OPENAI_CONTRACT=1 holds every call to its model's real parameter contract (see the import below).
 
 import http from 'node:http';
 import { appendFileSync } from 'node:fs';
+// FAKE_OPENAI_CONTRACT=1: every call is held to the contract its model has on the real API — the GPT-5.6 and
+// GPT-6 reasoning models refuse max_tokens and a fixed temperature, an effort a model has not got, and so on
+// (test/helpers/fake-openai-contract.mjs, docs/ARTIFACT-RELIABILITY.md) — so the app can be driven in a browser
+// as a tier routed to those models (OPENAI_MODEL_GUEST_STANDARD=gpt-6-luna …) and be refused as it would be
+import { judge } from '../../test/helpers/fake-openai-contract.mjs';
 
 const PORT = Number(process.argv[2] || process.env.FAKE_OPENAI_PORT || 3999);
 
@@ -547,6 +554,13 @@ const server = http.createServer((req, res) => {
         return send(res, 400, { error: { message: 'bad json' } });
       }
       const model = body.model || 'gpt-local';
+      if (process.env.FAKE_OPENAI_CONTRACT) {
+        const j = judge(body);
+        if (j.error) {
+          console.log(`refused ${model}: ${j.error.error.message}`);
+          return send(res, j.error.status, { error: j.error.error });
+        }
+      }
       const messages = Array.isArray(body.messages) ? body.messages : [];
       const system = String(messages[0]?.role === 'system' ? messages[0].content : '');
       if (body.response_format?.type === 'json_object') {
@@ -555,9 +569,13 @@ const server = http.createServer((req, res) => {
         const isEntries = /journal-entry practice/.test(system);
         const isWrite = system.startsWith('You help someone with their own writing.');
         const isCustom = system.startsWith('You draft EVERYDAY DISPLAYS') && /- "custom" —/.test(system);
+        // any other display drafted (lib/objects/display-propose.ts): the first kind it is offered, drawn as that
+        // kind's own example — a state its sanitizer keeps
+        const offered = system.startsWith('You draft EVERYDAY DISPLAYS') && !isCustom ? /- "([a-z]+)" — [\s\S]*?\n  Example: (\{.*\})\n/.exec(system) : null;
         // an easy view of a photo (app/api/logos/easy): the stand-in reads every photo as the same café menu
         const isEasy = system.startsWith('You make an EASY VIEW of a photo');
-        const content = JSON.stringify(isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : {});
+        const drafted = offered ? (() => { try { return { display: { kind: offered[1], state: JSON.parse(offered[2]) }, gaps: [] }; } catch { return {}; } })() : null;
+        const content = JSON.stringify(isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : drafted ?? {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
       }
       if (process.env.FAKE_OPENAI_TRACE) {

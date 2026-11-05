@@ -367,7 +367,8 @@ console.log('\n=== adaptive response rendering: inline only when it helps ===');
   const back = after.turns.find((m) => m.role === 'assistant')?.content ?? '';
   ok('a chart already shown is read back as a line saying so, not as its JSON', back.startsWith('Mostly rent.') && /\[shown inline — chart: Rent 1,200; Food 400; Transport 150 \(\$\)\]/.test(back) && !back.includes('```'), back);
 
-  const len = (r) => r.calls.find((x) => x.stream)?.max_tokens;
+  // the reply's ceiling as it reaches the provider: max_tokens on a classic model, max_completion_tokens on a reasoning one (lib/model-params.ts)
+  const len = (r) => { const c = r.calls.find((x) => x.stream); return c?.max_tokens ?? c?.max_completion_tokens; };
   const conc = await turn({ length: 'concise', messages: [U('We should launch in March.')] });
   const bal = await turn({ messages: [U('We should launch in March.')] });
   const det = await turn({ length: 'detailed', messages: [U('We should launch in March.')] });
@@ -387,7 +388,7 @@ console.log('\n=== adaptive response rendering: inline only when it helps ===');
   const gov = await turn({ guard: 'guard', messages: [U('Give me an overview of microeconomics')] }, { reply: `Start with what you know.\n\n${fence(concepts)}` });
   ok('under the Answer Guard: no overview offered, and one written anyway is dropped', !/"type":"concepts"/.test(gov.system) && !/```ui/.test(gov.received), JSON.stringify(gov.received));
   ok('the core prompt carries the shape rule in its cached part', /A reply takes the shape of the thought/.test(ov.first));
-  ok('  an overview offered makes room for itself: the ceiling grows by 700', ov.calls.find((x) => x.stream)?.max_tokens === 700 + 700, String(ov.calls.find((x) => x.stream)?.max_tokens));
+  ok('  an overview offered makes room for itself: the ceiling grows by 700', len(ov) === 700 + 700, String(len(ov)));
   const c2 = await turn({ messages: [U(costs), A('Mostly rent.'), U('and how about my savings goal?')] });
   ok('the stable prompt does not change with what a turn is offered', c.first === c2.first || c.first === hi.first, 'system message differs');
 }

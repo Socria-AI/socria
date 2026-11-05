@@ -717,8 +717,16 @@ const tidyOption = (x: string) =>
  * criteria they named, every weight even (5) and every score empty: how much
  * each matters and how each option does are the person's to say.
  */
+/**
+ * How the comparison should look, said inside the request ("side by side", "in a table", "as a matrix"):
+ * taken out before the request is read, so its words are never read as options or criteria. "Compare TCP
+ * and UDP side by side" read the "by" of "side by side" as the start of the criteria, and made a comparison
+ * of "TCP" and "UDP side" on the criterion "Side" (November 5, 2026).
+ */
+const PRESENTATION = /\s*,?\s*\b(?:side[\s-]+by[\s-]+side|(?:in|as|into|using)\s+(?:a\s+|an\s+)?(?:(?:comparison|scoring|decision|weighted)\s+)?(?:table|chart|grid|matrix|scorecard|spreadsheet))\b/gi;
+
 export function compareFromWords(said: string, opts: { view?: string } = {}): FromWords<unknown> | null {
-  const line = said.replace(/\n/g, ' ');
+  const line = said.replace(/\n/g, ' ').replace(PRESENTATION, ' ').replace(/\s{2,}/g, ' ');
   const m =
     /\bcompar(?:e|ing)\s+(.+?)(?:\s+(?:on|by|for|across|in terms of|using|against the criteria(?: of)?)\s+(.+?))?(?:[.?!]|$)/i.exec(line) ??
     /^(?:[^:]*\b(?:table|chart|matrix|grid|comparison|scoring)\b[^:]*:\s*)?(.+?)\s+(?:vs\.?|versus)\s+(.+?)(?:[.?!]|$)/i.exec(line);

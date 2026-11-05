@@ -242,9 +242,16 @@ console.log('\n=== the model failing ===');
   const fell = await ask({ op: 'explain', selection: PASSAGE }, { body: 'Fine.' });
   const models = fell.calls.map((c) => c.model);
   ok('a model that is not there: the fallback answers', fell.status === 200 && models.length === 2 && models[0] !== models[1], J(models) + ' ' + fell.status);
+  // the provider failing (a 5xx its own retries did not clear) is answered by the next model on the ladder
+  // (lib/model-router.ts firstAccepted, docs/ARTIFACT-RELIABILITY.md) — never above the tier
   globalThis.__writeThrow = { status: 500, message: 'upstream down', once: true };
   const down = await ask({ op: 'explain', selection: PASSAGE }, { body: 'Fine.' });
-  ok('an upstream failure that is not about the model is not retried on another', down.status === 500 && down.calls.length === 1);
+  const downModels = down.calls.map((c) => c.model);
+  ok('the provider failing: the next model on the ladder answers', down.status === 200 && downModels.length === 2 && downModels[0] !== downModels[1], J(downModels) + ' ' + down.status);
+  // …but a failure every model would give the same way is not retried on another
+  globalThis.__writeThrow = { status: 400, code: 'context_length_exceeded', message: "This model's maximum context length is 128000 tokens.", once: true };
+  const long = await ask({ op: 'explain', selection: PASSAGE }, { body: 'Fine.' });
+  ok('a failure that is not about the model (a prompt too long) is not retried on another', long.status === 500 && long.calls.length === 1, J(long.calls.map((c) => c.model)) + ' ' + long.status);
   const junk = await ask({ op: 'explain', selection: PASSAGE }, 'this is not json');
   ok('an answer that is not JSON is said to be unusable, not passed on', junk.status === 502 && /Nothing useful/.test(junk.json.error));
   const empty = await ask({ op: 'improve', selection: PASSAGE }, { edits: [{ from: 'not there', to: 'x' }] });
