@@ -1,23 +1,28 @@
 'use client';
 // components/logos5/SleepMode.tsx — SOCRIA, RESTING (lib/sleep.ts).
 //
-// When a free account's day of thinking time is spent, Socria sleeps until the
-// next reset. Two pieces, both calm:
+// A free account has a week of tokens, and when they are spent Socria sleeps
+// until the reset — Monday 00:00 UTC. Three pieces, all calm:
 //
 //   SleepScreen  said once, when it happens (and again only if they try to send):
-//                a moon, "Socria is resting", what still works, when it wakes,
-//                and — offered, never pressed — Socria One, which has no daily
-//                limit. "Keep exploring" closes it.
+//                a moon, "Socria is resting", what still works, when it wakes —
+//                in UTC and in their own time — and, offered, never pressed,
+//                Socria One, which has no weekly limit. "Keep exploring"
+//                closes it.
 //   SleepBar     while it lasts, one line over the conversation box: resting
-//                until a time, in how long. The box still takes their words —
-//                they can draft — and everything else in Logos 5 works as before:
-//                conversations, Logic Maps, artifacts, writing, by hand.
+//                until Monday 00:00 UTC, in how long. The box still takes their
+//                words — they can draft, and sending waits — and everything
+//                else in Logos 5 works as before: conversations, Logic Maps,
+//                artifacts, writing, Files, by hand.
+//   SleepRing    the week at a glance beside the box's tools: a circle that fills
+//                as the week's tokens are spent; hover or press it for what is
+//                left and when it resets.
 //
 // useSleepWatch hears a 429 Sleep reply from ANY route (the map, a reading, the
 // study tools), so every surface agrees without each one being taught.
 
 import { useEffect, useRef, useState } from 'react';
-import { wakeClock, wakesIn, type SleepState } from '@/lib/sleep';
+import { RESET_WORDS, WEEK_MS, allowanceLine, formatTokens, leftLine, localReset, wakesIn, type SleepState } from '@/lib/sleep';
 import './sleep.css';
 
 /** Something the server said is resting, with its state. */
@@ -44,7 +49,14 @@ export function useSleepWatch(onSleep: (s: SleepState) => void) {
             .json()
             .then((b) => {
               if (b?.sleep && typeof b.resetAt === 'number') {
-                const s: SleepState = { asleep: true, used: Number(b.used) || 0, limit: Number(b.limit) || 0, left: 0, resetAt: b.resetAt };
+                const s: SleepState = {
+                  asleep: true,
+                  used: Number(b.used) || 0,
+                  limit: Number(b.limit) || 0,
+                  left: 0,
+                  weekStart: typeof b.weekStart === 'number' ? b.weekStart : b.resetAt - WEEK_MS,
+                  resetAt: b.resetAt,
+                };
                 cb.current(s);
                 window.dispatchEvent(new CustomEvent(SLEEP_EVENT, { detail: s }));
               }
@@ -82,23 +94,36 @@ function Moon({ size = 28 }: { size?: number }) {
   );
 }
 
-/** When Socria wakes, in words and as a clock time; and a call when that moment comes. */
-function useWake(sleep: SleepState | null, onWake: () => void) {
-  const asleep = !!sleep?.asleep;
-  const now = useNow(asleep);
+/** When Socria wakes — how long, and the moment in their own time — and a call when the reset comes. */
+function useWake(sleep: SleepState | null, onWake: () => void, timeZone?: string) {
+  const now = useNow(!!sleep);
   const left = sleep ? sleep.resetAt - now : 0;
-  const woke = useRef(false);
+  // the reset already answered, so each week's is answered once
+  const woke = useRef<number | null>(null);
   useEffect(() => {
-    if (!asleep) {
-      woke.current = false;
-      return;
-    }
-    if (left <= 0 && !woke.current) {
-      woke.current = true;
+    if (!sleep) return;
+    // the week is over: asleep, Socria wakes; awake, the count starts again — either way, read it afresh
+    if (left <= 0 && woke.current !== sleep.resetAt) {
+      woke.current = sleep.resetAt;
       onWake();
     }
-  }, [asleep, left, onWake]);
-  return { left, clock: sleep ? wakeClock(sleep.resetAt) : '' };
+  }, [sleep, left, onWake]);
+  return { now, left, local: sleep ? localReset(sleep.resetAt, { timeZone }) : '' };
+}
+
+/** "Monday 00:00 UTC", with their own time beside it where they have one — each kept whole on a narrow screen. */
+function ResetWithLocal({ local }: { local: string }) {
+  return (
+    <>
+      <span className="sl-keep">{RESET_WORDS}</span>
+      {local && (
+        <>
+          {' · '}
+          <span className="sl-keep">{local} your time</span>
+        </>
+      )}
+    </>
+  );
 }
 
 export function SleepScreen({
@@ -107,6 +132,7 @@ export function SleepScreen({
   onClose,
   onUpgrade,
   onWake,
+  timeZone,
 }: {
   sleep: SleepState | null;
   open: boolean;
@@ -114,8 +140,10 @@ export function SleepScreen({
   /** offers Socria One; absent, it is not offered */
   onUpgrade?: () => void;
   onWake: () => void;
+  /** the zone their own time is said in; the browser's when absent */
+  timeZone?: string;
 }) {
-  const { left, clock } = useWake(sleep, onWake);
+  const { left, local } = useWake(sleep, onWake, timeZone);
   const closeRef = useRef<HTMLButtonElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -136,12 +164,14 @@ export function SleepScreen({
           Socria is resting
         </h2>
         <p id="sl-b" className="sl-b">
-          You’ve used today’s free thinking time. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing.
+          You’ve used this week’s {formatTokens(sleep.limit)} free tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.
         </p>
         <p className="sl-when" aria-live="polite">
           <span className="sl-when-k">Wakes in</span>
           <span className="sl-when-v">{wakesIn(left)}</span>
-          {clock && <span className="sl-when-at">at {clock}</span>}
+          <span className="sl-when-at">
+            <ResetWithLocal local={local} />
+          </span>
         </p>
         <div className="sl-acts">
           <button ref={closeRef} type="button" className="sl-btn" onClick={onClose}>
@@ -153,31 +183,36 @@ export function SleepScreen({
             </button>
           )}
         </div>
-        {onUpgrade && <p className="sl-one">Socria One has no daily limit.</p>}
+        {onUpgrade && <p className="sl-one">Socria One has no weekly limit.</p>}
       </div>
     </div>
   );
 }
 
-export function SleepBar({ sleep, onOpen, onWake }: { sleep: SleepState | null; onOpen: () => void; onWake: () => void }) {
-  const { left, clock } = useWake(sleep, onWake);
+export function SleepBar({ sleep, onOpen, onWake, timeZone }: { sleep: SleepState | null; onOpen: () => void; onWake: () => void; timeZone?: string }) {
+  const { left, local } = useWake(sleep, onWake, timeZone);
   if (!sleep?.asleep) return null;
   return (
-    <button type="button" className="sl-bar" onClick={onOpen} aria-label={`Socria is resting. Wakes in ${wakesIn(left)}${clock ? `, at ${clock}` : ''}.`}>
+    <button
+      type="button"
+      className="sl-bar"
+      onClick={onOpen}
+      aria-label={`Socria is resting until ${RESET_WORDS}${local ? ` (${local} your time)` : ''}, in ${wakesIn(left)}. You can keep drafting; sending waits.`}
+    >
       <Moon size={15} />
-      <span className="sl-bar-t">Resting{clock ? ` until ${clock}` : ''}</span>
+      <span className="sl-bar-t">Resting until {RESET_WORDS}</span>
       <span className="sl-bar-n">{wakesIn(left)}</span>
     </button>
   );
 }
 
 /**
- * THE DAY'S THINKING TIME, AS A RING beside the box's tools — free accounts only. It fills clockwise
- * as the day's tokens are spent; filled solid, Socria is resting. Hover or press it for the numbers
- * and the reset; pressed while resting, it opens the Sleep screen.
+ * THE WEEK'S TOKENS, AS A RING beside the box's tools — free accounts only. It fills clockwise as the
+ * week's tokens are spent; filled solid, Socria is resting. Hover or press it for what is left and when
+ * it resets; pressed while resting, it opens the Sleep screen.
  */
-export function SleepRing({ sleep, onOpen, onWake }: { sleep: SleepState | null; onOpen: () => void; onWake: () => void }) {
-  const { left, clock } = useWake(sleep, onWake);
+export function SleepRing({ sleep, onOpen, onWake, timeZone }: { sleep: SleepState | null; onOpen: () => void; onWake: () => void; timeZone?: string }) {
+  const { now, left, local } = useWake(sleep, onWake, timeZone);
   const [shown, setShown] = useState(false);
   const ref = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -188,12 +223,11 @@ export function SleepRing({ sleep, onOpen, onWake }: { sleep: SleepState | null;
   }, [shown]);
   if (!sleep) return null;
   const share = sleep.asleep ? 1 : Math.max(0, Math.min(1, sleep.used / Math.max(1, sleep.limit)));
-  const pct = Math.round(share * 100);
   const R = 6.5;
   const C = 2 * Math.PI * R;
   const said = sleep.asleep
-    ? `Socria is resting. Wakes in ${wakesIn(left)}${clock ? `, at ${clock}` : ''}.`
-    : `${pct}% of today’s thinking time used. Resets in ${wakesIn(left)}${clock ? `, at ${clock}` : ''}.`;
+    ? `Socria is resting. ${leftLine(sleep)}; wakes ${RESET_WORDS}, in ${wakesIn(left)}${local ? ` (${local} your time)` : ''}.`
+    : `${allowanceLine(sleep, now)}${local ? ` — ${local} your time` : ''}.`;
   return (
     <span className="sl-ringwrap" ref={ref}>
       <button
@@ -215,11 +249,12 @@ export function SleepRing({ sleep, onOpen, onWake }: { sleep: SleepState | null;
       </button>
       {shown && !sleep.asleep && (
         <span className="sl-ringtip" role="status">
-          <span className="sl-ringtip-t">Today’s thinking time</span>
-          <span className="sl-ringtip-b">
-            {pct}% used · resets in {wakesIn(left)}
-            {clock ? ` (${clock})` : ''}
+          <span className="sl-ringtip-t">This week’s tokens</span>
+          <span className="sl-ringtip-b">{leftLine(sleep)}</span>
+          <span className="sl-ringtip-r">
+            Resets {RESET_WORDS} <span className="sl-keep">(in {wakesIn(left)})</span>
           </span>
+          {local && <span className="sl-ringtip-l">{local} your time</span>}
         </span>
       )}
     </span>

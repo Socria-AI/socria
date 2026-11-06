@@ -227,9 +227,23 @@ class Query {
   }
 }
 
+/**
+ * The week of tokens' two functions, for a suite that supplies none: a hold is
+ * always granted in full and a settle answers nothing — an allowance nobody
+ * meets, so a suite that is not about Sleep Mode never meets it. (The app
+ * itself refuses an answer that is not the function's: an rpc that answered
+ * nothing here would pause every free request.) test/sleep.test.mjs supplies
+ * the real ones, from scripts/dev/usage-functions.mjs.
+ */
+const UNMETERED = {
+  reserve_logos_tokens: (a) => ({ data: { granted: Math.max(1, a?.p_want ?? 1), used: 0, held: Math.max(1, a?.p_want ?? 1) }, error: null }),
+  settle_logos_tokens: () => ({ data: 0, error: null }),
+};
+
 const client = {
   from: (t) => new Query(t),
-  rpc: async (name, args) => (typeof db.rpcs?.[name] === 'function' ? db.rpcs[name](args ?? {}) : { data: null, error: null }),
+  rpc: async (name, args) =>
+    typeof db.rpcs?.[name] === 'function' ? db.rpcs[name](args ?? {}) : UNMETERED[name] ? UNMETERED[name](args ?? {}) : { data: null, error: null },
 };
 
 export function supabaseAdmin() {

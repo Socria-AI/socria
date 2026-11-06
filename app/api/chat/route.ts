@@ -51,6 +51,8 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { eggFor } from '@/lib/easter-eggs';
 import { isModelRejection, reportUpstream, streamFailureNotice } from '@/lib/upstream-error';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { uncounted, withMeter } from '@/lib/token-meter';
 import { memoryCaps, selectRelevant, visibleEntries } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
 import {
@@ -93,8 +95,10 @@ async function computeConversationState(
     process.env.OPENAI_STATE_MODEL ||
     process.env.OPENAI_MEMORY_MODEL ||
     'gpt-4o-mini';
-  const run = openai.chat.completions
-    .create({
+  // reading the conversation's state steers our reply — ours, never counted against a free account's
+  // week of tokens (lib/token-meter.ts uncounted)
+  const run = uncounted(() =>
+    openai.chat.completions.create({
       model,
       temperature: 0,
       max_tokens: 220,
@@ -107,6 +111,7 @@ async function computeConversationState(
         { role: 'user', content: renderTranscriptForState(messages) },
       ],
     })
+  )
     .then((c) => {
       const raw = c.choices?.[0]?.message?.content;
       if (!raw) return null;
@@ -123,7 +128,7 @@ async function computeConversationState(
   return Promise.race([run, timeout]);
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -232,6 +237,13 @@ export async function POST(req: NextRequest) {
         { status: sharedCtx.refuse.status }
       );
     }
+    // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+    // 00:00 UTC here as on Logos 5 — no model is asked; one that is awake is metered from here, so the
+    // reply this request makes is held against its week and settled at what it cost (reading the
+    // conversation's state, the guard and the checker, a retry and the memory kept are ours, not counted).
+    const sleep = await sleepGate(req, userId ?? null, plan);
+    if (sleep.refuse) return sleep.refuse;
+    if (sleep.meter) meterFor(sleep.meter);
     const caps = memoryCaps(plan);
     const now = Date.now();
     const contextText = Array.isArray(messages)
@@ -736,6 +748,9 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: any) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     // It used to forward `e?.message` straight to the browser. More useful
     // than Logos's opaque string, but an upstream error object carries things
     // a browser should never see, and "Internal error" when the message was
@@ -747,7 +762,7 @@ export async function POST(req: NextRequest) {
       { status: f.status }
     );
   }
-}
+});
 
 // ── the Core 4 reply ────────────────────────────────────────────────────
 

@@ -111,6 +111,10 @@ process.env.SOCRIA_ONE_USER_IDS = 'olga';
 process.env.SOCRIA_ONE_GRANT_HASHES = (await import('node:crypto')).createHash('sha256').update('owen@example.com').digest('hex');
 // ask whether the usage table exists on every request: the suite takes it away and puts it back
 process.env.USAGE_STORE_MEMO_MS = '0';
+// The usage functions supplied below include the week of tokens' (Sleep Mode, test/sleep.test.mjs holds
+// it): this suite is about the monthly allowances, and its scripted model reports no usage, so every
+// call is counted at an estimate — a week no person here should reach while the months are proved.
+process.env.SOCRIA_FREE_WEEKLY_TOKENS = '2000000000';
 
 const load = (n) => import(pathToFileURL(join(OUT, `${n}.mjs`)).href);
 const R = Object.fromEntries(await Promise.all(Object.keys(ROUTES).map(async (k) => [k, await load(k)])));

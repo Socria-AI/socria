@@ -22,7 +22,8 @@ import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance'
 import { styleBlock } from '@/lib/logos-style';
 import { conversationStyleBlock } from '@/lib/conversation-style';
 import { depthForPlan } from '@/lib/socria-one';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
 import { spend } from '@/lib/usage';
@@ -52,7 +53,7 @@ const MAX_TRACE_HISTORY = 30;
 
 type Turn = { role: 'user' | 'assistant'; content: string };
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   const keyUnlocked = mayUse(req, userId);
   if (!userId && !keyUnlocked) {
@@ -76,6 +77,14 @@ export async function POST(req: NextRequest) {
   }
 
   const plan = await resolvePlanForRequest(req, userId);
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+  // 00:00 UTC, before anything is spent and before any model is asked — Trace too, which no monthly
+  // count ever limits but which is an AI request like the rest; one that is awake is metered from
+  // here, so every call this request makes (the query, a web search, the panel) is held against its
+  // week and settled at what it cost.
+  const sleep = await sleepGate(req, userId, plan);
+  if (sleep.refuse) return sleep.refuse;
+  if (sleep.meter) meterFor(sleep.meter);
 
   // Explore and Challenge are uncapped on both plans; Research carries a
   // fair-use ceiling, also on both, set where serious work does not reach it.
@@ -137,11 +146,6 @@ export async function POST(req: NextRequest) {
   const grounded = nodeContexts.length ? renderContextsForNode(nodeContexts) : '';
 
   const openai = tracked(new OpenAI({ apiKey }), 'logos/explore');
-  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-  // one that is awake is metered from here, so every call this request makes is counted.
-  const sleep = await sleepGate(req, userId, plan);
-  if (sleep.refuse) return sleep.refuse;
-  if (sleep.meter) meterFor(sleep.meter);
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
@@ -224,7 +228,10 @@ export async function POST(req: NextRequest) {
       searchAvailable: MODE_META[mode].searches ? searchConfigured() : true,
     });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('logos explore error:', e);
     return NextResponse.json({ error: 'Internal error' }, { status: 500 });
   }
-}
+});

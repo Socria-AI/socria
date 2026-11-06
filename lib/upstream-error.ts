@@ -23,6 +23,8 @@
 // The person gets a sentence they can act on plus six characters to quote; the
 // log keeps everything else.
 
+import { SLEEP_NOTE, TOKENS_BUSY, TOKENS_UNAVAILABLE } from './sleep';
+
 export type UpstreamCode =
   | 'upstream_auth'
   | 'upstream_quota'
@@ -248,6 +250,10 @@ export function failureText(body: unknown, fallback = 'Something went wrong.'): 
  * forwarded, only a fixed sentence and a reference that is also in the log.
  */
 export function streamFailureNotice(where: string, err: unknown, sentSomething: boolean): string {
+  // A call the week's tokens refused (lib/token-allowance.ts TokenRefusal) is Sleep Mode, not a fault:
+  // said as Sleep Mode says it, with no reference to look up
+  const resting = refusalNotice(err);
+  if (resting) return sentSomething ? `\n\n[The reply stopped here. ${resting}]` : `\n\n[${resting}]`;
   const f = reportUpstream(where, err);
   const reason = f.detail ? `${f.reason} (${f.detail})` : f.reason;
   // Mid-reply, the sentence has to say the reply stopped — the person can see
@@ -255,6 +261,14 @@ export function streamFailureNotice(where: string, err: unknown, sentSomething: 
   return sentSomething
     ? `\n\n[The reply stopped here. ${reason} (ref ${f.ref})]`
     : `\n\n[${reason} (ref ${f.ref})]`;
+}
+
+/** The sentence for a call the week's tokens refused — read from the error's shape, so nothing here reaches the database. */
+function refusalNotice(err: unknown): string | null {
+  const r = err as { tokenRefusal?: unknown; refusal?: { kind?: unknown } } | null;
+  if (!r || typeof r !== 'object' || r.tokenRefusal !== true) return null;
+  const kind = r.refusal?.kind;
+  return kind === 'sleep' ? SLEEP_NOTE : kind === 'busy' ? TOKENS_BUSY : TOKENS_UNAVAILABLE;
 }
 
 /**

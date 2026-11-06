@@ -19,6 +19,7 @@ import { affectedBy, changesBlock, changesOf, detectContradictions, impactView, 
 import { recordChangeImpact } from './waiting';
 import { applyCandidates, type ApplyReport, type EdgeCandidate, type NodeCandidate } from './apply';
 import { extract } from './extract';
+import { uncounted } from '../token-meter';
 import { FILE_BUDGET, TURN_BUDGET, type Budget } from './gate';
 import { fromFile, groundCandidates } from './ground';
 import { renderMindGraph } from './serialize';
@@ -284,8 +285,11 @@ export async function remember(
       return { report: null, persisted: false };
     }
 
+    // The memory kept from a turn is ours, not something they asked for: never counted against a free
+    // account's week of tokens (lib/sleep.ts, lib/token-meter.ts). A file they read into Memory is — that
+    // path extracts in lib/mind/ingest-text.ts and hands its candidates in.
     const extracted =
-      opts.candidates ?? (await extract(opts.apiKey, text, opts.existing ?? null));
+      opts.candidates ?? (await uncounted(() => extract(opts.apiKey, text, opts.existing ?? null)));
     // A FILE IS NOT THE PERSON SPEAKING, and a model's "stated" is not a record
     // of what they said: a claim is held to their own words in this turn, or
     // to the file it came from, before any register decides it (lib/mind/ground.ts).

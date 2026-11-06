@@ -34,6 +34,7 @@ import {
 } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
 import { logosPersistPolicy } from '@/lib/mind/logos-turn';
+import { restingNow } from '@/lib/sleep-server';
 
 /**
  * How many known entries the extractor is shown.
@@ -181,6 +182,14 @@ export async function POST(req: NextRequest) {
   // entries was only half the boundary. The whole pass stands down.
   if (privateSource) {
     return NextResponse.json({ understanding: current, skipped: 'private' });
+  }
+
+  // THE WEEK'S TOKENS (lib/sleep-server.ts). What Socria understands about the person across
+  // conversations is our upkeep, never something they asked for, so it is never counted against a free
+  // account's week — and while the account is resting (or its week cannot be checked) no model is asked
+  // for it at all: the understanding stays as it was, and catches up on a later pass.
+  if (await restingNow(req, userId)) {
+    return NextResponse.json({ understanding: current, resting: true });
   }
 
   try {

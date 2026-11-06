@@ -14,7 +14,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -44,7 +45,7 @@ Rules:
 - summary: two or three sentences, plain, in the second person.
 - At most 6 items per list. Short items.`;
 
-export async function POST(req: NextRequest, { params }: Ctx) {
+export const POST = withMeter(async function POST(req: NextRequest, { params }: Ctx) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const limited = await enforceRateLimit(req, userId, 'chat');
@@ -81,8 +82,9 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     files.map((f) => ({ id: f.id, name: f.name, bytes: f.bytes, createdAt: f.createdAt }))
   );
   const openai = tracked(new OpenAI({ apiKey }), 'projects/synthesize');
-  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-  // one that is awake is metered from here, so every call this request makes is counted.
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+  // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+  // makes is held against its week and settled at what it cost.
   const sleep = await sleepGate(req, userId);
   if (sleep.refuse) return sleep.refuse;
   if (sleep.meter) meterFor(sleep.meter);
@@ -104,7 +106,10 @@ export async function POST(req: NextRequest, { params }: Ctx) {
     const read = sanitizeSynthesis(raw, new Set(chats.map((c) => c.id)));
     return NextResponse.json({ synthesis: read ?? floor, at: now });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('[projects/synthesize] model reading failed; giving the structural one', e);
     return NextResponse.json({ synthesis: floor, at: now });
   }
-}
+});

@@ -24,6 +24,7 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { memoryCaps, memoryFrozen } from '@/lib/person-memory';
 import { mayUse } from '@/lib/route-guard';
+import { restingNow } from '@/lib/sleep-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -79,6 +80,14 @@ export async function POST(req: NextRequest) {
       frozen: true,
       limit: caps.threadTurns,
     });
+  }
+
+  // THE WEEK'S TOKENS (lib/sleep-server.ts). A conversation's title and its thread memory are our upkeep,
+  // never something the person asked for, so they are never counted against a free account's week — and
+  // while the account is resting (or its week cannot be checked) no model is asked for them at all: the
+  // title the page already gave stands, and the memory stays as it was.
+  if (await restingNow(req, userId)) {
+    return NextResponse.json({ memory: currentMemory, suggestedTitle: null, resting: true });
   }
 
   // Core 4 asks for a TITLE only. Its continuity is the Cognitive State and

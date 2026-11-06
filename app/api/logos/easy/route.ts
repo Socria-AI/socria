@@ -17,7 +17,8 @@ import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { cannotSee } from '@/lib/model-params';
 import { LOGOS_MODEL } from '@/lib/logos';
 import { enforceRateLimit } from '@/lib/rate-limit';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { uncounted, withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { boundaryNote } from '@/lib/entitlements';
 import { spend } from '@/lib/usage';
@@ -33,7 +34,7 @@ export const dynamic = 'force-dynamic';
 const MAX_DATA_URL = 9_000_000;
 const DATA_URL = /^data:image\/(png|jpeg|webp|gif);base64,[A-Za-z0-9+/=\s]+$/;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   if (!userId && !mayUse(req, userId)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const limited = await enforceRateLimit(req, userId, 'aux');
@@ -48,17 +49,18 @@ export async function POST(req: NextRequest) {
 
   // a photo read is a photo counted, from the same allowance as any other
   const plan = await resolvePlanForRequest(req, userId);
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+  // 00:00 UTC, before anything is spent and before any model is asked; one that is awake is metered
+  // from here, so every call this request makes is held against its week and settled at what it cost.
+  const sleep = await sleepGate(req, userId, plan);
+  if (sleep.refuse) return sleep.refuse;
+  if (sleep.meter) meterFor(sleep.meter);
   const allowance = await spend(userId, plan, 'images', typeof body?.sessionId === 'string' ? body.sessionId : null);
   if (!allowance.ok) {
     return NextResponse.json({ error: boundaryNote('images'), upgrade: 'images', used: allowance.used, limit: allowance.limit }, { status: 402 });
   }
 
   const openai = tracked(new OpenAI({ apiKey: process.env.OPENAI_API_KEY }), 'logos/easy');
-  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-  // one that is awake is metered from here, so every call this request makes is counted.
-  const sleep = await sleepGate(req, userId, plan);
-  if (sleep.refuse) return sleep.refuse;
-  if (sleep.meter) meterFor(sleep.meter);
   // by tier (lib/model-router.ts): Socria One on GPT-6.1 Terra, the free plan on GPT-6 Luna, a guest on
   // GPT-4o mini; a refused model steps down within the tier. LOGOS_ROUTER=off: as before.
   const routed = chooseAuxModel(tierOf(userId, plan), 'standard', process.env, process.env.OPENAI_MODEL_LOGOS || LOGOS_MODEL);
@@ -91,10 +93,11 @@ export async function POST(req: NextRequest) {
     const text = first.result.choices?.[0]?.message?.content ?? '';
     let easy = sanitizeEasy(parseDraft(text));
     // A READING THE KIND CANNOT HOLD (not JSON, cut off, the wrong shape): read once more, told why — the
-    // photo is not sent to a model a third time
+    // photo is not sent to a model a third time. That second reading is ours (our check refused the first),
+    // so it is never counted against the week (lib/token-meter.ts uncounted): the photo costs one reading.
     if (!easy) {
       const cut = first.result.choices?.[0]?.finish_reason === 'length';
-      const again = await firstAccepted(
+      const again = await uncounted(() => firstAccepted(
         routed.ladder.slice(Math.max(0, routed.ladder.indexOf(first.model))),
         call(
           [
@@ -105,13 +108,16 @@ export async function POST(req: NextRequest) {
         ),
         step,
         cannotSee
-      ).catch(() => null);
+      )).catch(() => null);
       if (again) easy = sanitizeEasy(parseDraft(again.result.choices?.[0]?.message?.content ?? ''));
     }
     if (!easy) return NextResponse.json({ error: EASY_UNREAD }, { status: 422 });
     return NextResponse.json({ easy });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('logos easy error:', e);
     return NextResponse.json({ error: 'That photo could not be read just now — try again in a moment.' }, { status: 500 });
   }
-}
+});

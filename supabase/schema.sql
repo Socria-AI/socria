@@ -295,6 +295,86 @@ begin
 end;
 $$;
 
+-- ── A free account's week of tokens (lib/sleep-server.ts, Sleep Mode) ─
+--
+-- supabase/weekly-tokens.sql, kept here too. One row per person per week
+-- ('week:<Monday>', counter 'tokens') holds the tokens settled; each AI call
+-- still running holds its share in a row of its own ('tokhold:<week>:<id>'),
+-- which stops counting after p_ttl ms if its call never returns. Both
+-- functions take the week's row lock first, so concurrent requests for one
+-- person are held one at a time and never past the limit (docs/SLEEP-MODE.md).
+
+create or replace function reserve_logos_tokens(
+  p_user text, p_week text, p_hold text, p_want integer, p_min integer, p_limit integer, p_ttl bigint, p_at bigint
+) returns jsonb
+language plpgsql
+as $$
+declare
+  cur integer;
+  held integer;
+  free integer;
+  take integer;
+  want integer := greatest(coalesce(p_want, 1), 1);
+  least_free integer := greatest(coalesce(p_min, 1), 1);
+begin
+  insert into logos_usage (user_id, scope, counter, n, updated_at)
+  values (p_user, p_week, 'tokens', 0, p_at)
+  on conflict (user_id, scope, counter) do nothing;
+  -- the lock every hold and settle for this person's week takes first
+  select n into cur from logos_usage
+   where user_id = p_user and scope = p_week and counter = 'tokens'
+   for update;
+  -- holds whose call never came back stop counting
+  delete from logos_usage
+   where user_id = p_user and counter = 'tokens' and scope like 'tokhold:%'
+     and updated_at < p_at - coalesce(p_ttl, 600000);
+  select coalesce(sum(n), 0)::integer into held from logos_usage
+   where user_id = p_user and counter = 'tokens' and scope like 'tokhold:' || p_week || ':%';
+  if p_limit is null then
+    take := want;
+  else
+    free := p_limit - cur - held;
+    if free < least_free then
+      return jsonb_build_object('granted', 0, 'used', cur, 'held', held);
+    end if;
+    take := least(want, free);
+  end if;
+  insert into logos_usage (user_id, scope, counter, n, updated_at)
+  values (p_user, 'tokhold:' || p_week || ':' || p_hold, 'tokens', take, p_at)
+  on conflict (user_id, scope, counter) do update set n = excluded.n, updated_at = excluded.updated_at;
+  return jsonb_build_object('granted', take, 'used', cur, 'held', held + take);
+end;
+$$;
+
+create or replace function settle_logos_tokens(
+  p_user text, p_week text, p_hold text, p_tokens integer, p_at bigint
+) returns integer
+language plpgsql
+as $$
+declare
+  out_n integer;
+begin
+  insert into logos_usage (user_id, scope, counter, n, updated_at)
+  values (p_user, p_week, 'tokens', 0, p_at)
+  on conflict (user_id, scope, counter) do nothing;
+  -- the same lock, in the same order, as a hold
+  select n into out_n from logos_usage
+   where user_id = p_user and scope = p_week and counter = 'tokens'
+   for update;
+  delete from logos_usage
+   where user_id = p_user and scope = 'tokhold:' || p_week || ':' || p_hold and counter = 'tokens';
+  if not found then
+    -- settled already (a retry), or expired: nothing is added twice
+    return out_n;
+  end if;
+  update logos_usage
+     set n = n + greatest(coalesce(p_tokens, 0), 0), updated_at = p_at
+   where user_id = p_user and scope = p_week and counter = 'tokens'
+  returning n into out_n;
+  return out_n;
+end;
+$$;
+
 -- Lifecycle email: the ledger of who has had which note, and who has said
 -- stop.
 --

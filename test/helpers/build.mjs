@@ -327,6 +327,12 @@ const MODULES = [
   'test/helpers/write-under-test.ts',
   // what each model call cost: the usage log and the client wrapper (lib/openai-usage.ts)
   'lib/openai-usage.ts',
+  // Sleep Mode: a free account's week of tokens — the week, the words, the counting rule (lib/sleep.ts),
+  // holding and settling one call against a store (lib/token-allowance.ts), whose request a call is
+  // (lib/token-meter.ts)
+  'lib/sleep.ts',
+  'lib/token-allowance.ts',
+  'lib/token-meter.ts',
   // the turns the map is not redrawn for (lib/map-skip.ts)
   'lib/map-skip.ts',
   // the Logos Runtime (lib/runtime): six subsystems in one bundle

@@ -57,7 +57,8 @@ import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
 import { claimUnit, consume, left, QUOTA_UNAVAILABLE, refusal, savedMapHasNodes, unitClaimed } from '@/lib/quota';
 import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { uncounted, withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { cacheKey, chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -141,7 +142,7 @@ const NO_PICTURE = `
 
 THIS TURN ONLY: omit "viz" entirely. The previous attempt ran out of room. Return the nodes and edges and nothing else — the picture already on screen stays as it is.`;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   // a guest draws the map of their one line of thinking (lib/guest-pass.ts), and no
   // other — every signed-out caller, the typed access key included (October 31, 2026)
@@ -176,8 +177,9 @@ export async function POST(req: NextRequest) {
   // Depth is one of the things One opens, so a free request is answered at
   // Balanced whatever it asked for — clamped here rather than trusted.
   const plan = await resolvePlanForRequest(req, userId);
-  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-  // one that is awake is metered from here, so every call this request makes is counted.
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+  // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+  // makes is held against its week and settled at what it cost.
   const sleep = await sleepGate(req, userId, plan);
   if (sleep.refuse) return sleep.refuse;
   if (sleep.meter) meterFor(sleep.meter);
@@ -470,11 +472,12 @@ export async function POST(req: NextRequest) {
     const fix = got.proposal.ok ? null : repairFor(got.parsed, { request, cut: got.cut });
     if (fix) {
       console.info('logos map: the display draft did not hold (%s) — sent back once', got.cut ? 'cut off' : got.proposal.ok ? 'ok' : got.proposal.failure);
-      const again = await firstAccepted(
+      // the repair is ours (our check refused the draft): never counted against the week (lib/token-meter.ts)
+      const again = await uncounted(() => firstAccepted(
         ladder.slice(Math.max(0, ladder.indexOf(first.model))),
         ask([{ role: 'assistant', content: got.text.slice(0, 8000) || '{}' }, { role: 'user', content: fix }], got.cut ? DISPLAY_CAP * 2 : DISPLAY_CAP),
         stepped('display repair')
-      ).catch(() => null);
+      )).catch(() => null);
       // the repair stands when it holds, or when it declines honestly; otherwise the first draft's fault is
       // the one said — it is what the pass actually tried to make
       const second = again ? read(again.result) : null;
@@ -1054,9 +1057,12 @@ export async function POST(req: NextRequest) {
     // the map is ever taken off it.
     return meter(withModels, { ...modelsChanged, ...(build ? { build } : {}), ...(display ? { display } : {}) });
   } catch (e) {
+    // the week's last tokens taken by another request first: the map stays as it is, and Sleep Mode says why
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('logos map error:', e);
     // the map could not be drawn at all (every model on the ladder failed, or this route did): the display
     // they asked for is still made if it can be, and said if it cannot — never silence
     return withoutMap(salvage(current ?? EMPTY_MAP)).catch(() => meter(salvage(current ?? EMPTY_MAP)).catch(() => NextResponse.json({ map: current ?? EMPTY_MAP })));
   }
-}
+});

@@ -2,7 +2,7 @@
 //
 // What this person has spent, so the UI can say what is left before they run
 // into it. Read-only and cheap — one query for the month, the day and the
-// conversation together.
+// conversation together, and one for the week's tokens.
 //
 // The numbers are the server's, which is the point: the client draws the
 // panel from the same counts the routes enforce against, so what it shows and
@@ -34,9 +34,11 @@ export async function GET(req: NextRequest) {
     counters[c] = { used: used[c] ?? 0, limit: limits.counters[c] };
   }
 
-  // the day's thinking time (lib/sleep.ts): a free account's tokens today, and when Socria wakes —
-  // null for Socria One and for a guest, who are not counted here
+  // the week's tokens (lib/sleep.ts): a free account's tokens this week, the limit, and when Socria wakes
+  // (Monday 00:00 UTC) — the same on every device, since it is the account's, not the browser's. Null for
+  // Socria One and for a guest, who are not counted here; left out when the store cannot be read, so the
+  // app keeps what it last knew rather than showing a number nobody counted.
   const sleep = await sleepFor(userId ?? null, plan);
 
-  return NextResponse.json({ plan, counters, limits, sleep });
+  return NextResponse.json({ plan, counters, limits, ...(sleep === undefined ? {} : { sleep }) });
 }

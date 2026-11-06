@@ -23,7 +23,7 @@ import 'server-only';
 import { extract } from './extract';
 import { FILE_BUDGET } from './gate';
 import { applyCandidates, type EdgeCandidate, type NodeCandidate } from './apply';
-import { loadGraph, persistGraph, saveSource } from './store';
+import { deleteSource, loadGraph, persistGraph, saveSource } from './store';
 import { associate, type ProjectContainer } from './projects';
 import { clip, normalize, type MindGraph, type MindNode } from './types';
 import { fromFile } from './ground';
@@ -69,6 +69,12 @@ export function chunkText(text: string, size = CHUNK_CHARS): Chunk[] {
 export interface IngestResult {
   sourceId: string;
   chunks: number;
+  /**
+   * parts of the file not read because a free account's week of tokens ran
+   * out partway (lib/sleep.ts) — read by uploading the file again after the
+   * reset; 0 when it was read to the end
+   */
+  unread: number;
   created: number;
   reinforced: number;
   conflicts: number;
@@ -186,8 +192,24 @@ export async function ingestTextFile(
   const edges: EdgeCandidate[] = [];
   const chunks = chunkText(text);
 
-  for (const chunk of chunks) {
-    const found = await extract(opts.apiKey, chunk.text, null);
+  // A FILE READ INTO MEMORY IS THEIR REQUEST: each part is held against a free account's week of tokens
+  // (the route meters it, lib/sleep-server.ts). The first part the week cannot pay for ends the reading —
+  // what was read is kept, and the rest is said as unread rather than asked for, part by part, in vain.
+  let unread = 0;
+  for (const [k, chunk] of chunks.entries()) {
+    let found: Awaited<ReturnType<typeof extract>>;
+    try {
+      found = await extract(opts.apiKey, chunk.text, null, { refusals: true });
+    } catch (e) {
+      // nothing read at all: the file is not kept as read, and the refusal is the answer (the route says it
+      // as Sleep Mode)
+      if (k === 0) {
+        await deleteSource(userId, sourceId).catch(() => false);
+        throw e;
+      }
+      unread = chunks.length - k;
+      break;
+    }
     for (const n of found.nodes) {
       nodes.push(n);
       // Every claim points back at the file it came from.
@@ -239,6 +261,7 @@ export async function ingestTextFile(
   return {
     sourceId,
     chunks: chunks.length,
+    unread,
     created: report.nodes.filter((n) => n.action === 'created').length,
     reinforced: report.nodes.filter((n) => n.action === 'reinforced' || n.action === 'revised').length,
     conflicts: report.nodes.filter((n) => n.action === 'conflicted' || n.action === 'superseded').length,

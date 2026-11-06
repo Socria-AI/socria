@@ -185,6 +185,9 @@ import { L5Tips } from '@/components/logos5/L5Tips';
 import { OneButton, WelcomeBack } from '@/components/logos5/OneHeader';
 import { SleepBar, SleepRing, SleepScreen, useSleepWatch } from '@/components/logos5/SleepMode';
 import type { SleepState } from '@/lib/sleep';
+
+/** What the Socria One sheet says when it is opened from Sleep Mode. */
+const SLEEP_ONE = 'Socria One has no weekly token allowance, so Socria stays awake — its own fair-use limits are the only ones.';
 import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
 import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
@@ -538,16 +541,20 @@ export function LogosApp({
   // to keep this itself and post it with each request, which meant the
   // browser was the authority on its own limits; now it only draws them.
   const [usage, setUsage] = useState<Record<string, { used: number; limit: number | null }>>({});
-  // SLEEP MODE (lib/sleep.ts): a free account's day of thinking time, as the server counts it — and
-  // whether its screen is up. Anything that would ask Socria waits for the reset; nothing else does.
+  // SLEEP MODE (lib/sleep.ts): a free account's week of tokens, as the server counts it — and whether
+  // its screen is up. Anything that would ask Socria waits for the reset (Monday 00:00 UTC); nothing else
+  // does: conversations, Logic Maps, artifacts, writing, Files and the box itself all work by hand.
   const [sleep, setSleep] = useState<SleepState | null>(null);
   const [sleepOpen, setSleepOpen] = useState(false);
   const sleepRef = useRef<SleepState | null>(null);
   sleepRef.current = sleep;
-  // any route that answers "resting" — the reply, the map, a reading — puts the whole app to sleep at once
+  // any route that answers "resting" — the reply, the map, a reading — puts the whole app to sleep at once;
+  // the screen is said when Socria falls asleep, not again for every request refused while it rests (a map
+  // pass when a conversation opens) — a send while resting opens it again, from send() itself
   useSleepWatch((st) => {
+    const already = !!sleepRef.current?.asleep && Date.now() < sleepRef.current.resetAt;
     setSleep(st);
-    setSleepOpen(true);
+    if (!already) setSleepOpen(true);
   });
   const asleepNow = () => !!sleepRef.current?.asleep && Date.now() < sleepRef.current.resetAt;
   // Checkout is a redirect, so the button needs to show it's gone somewhere.
@@ -1680,7 +1687,7 @@ export function LogosApp({
         if (!res.ok) return;
         const json = await res.json();
         if (json?.counters) setUsage(json.counters);
-        // the day's thinking time, the same on every device (null: Socria One, or not counted)
+        // the week's tokens, the same on every device (null: Socria One, or not counted; absent: unreadable)
         if (json && 'sleep' in json) setSleep(json.sleep && typeof json.sleep.resetAt === 'number' ? json.sleep : null);
       } catch {
         /* the panel simply does not update; nothing depends on it */
@@ -3163,7 +3170,8 @@ export function LogosApp({
     return !!u && u.limit !== null && u.used >= u.limit;
   };
   const chatsSpent = spentOf('chats');
-  // the free day's ten Logos messages (lib/entitlements.ts `messages`)
+  // messages are not limited on either plan (lib/entitlements.ts `messages` is null), so this stays false;
+  // a free account's AI requests are held to its week of tokens instead (Sleep Mode, lib/sleep.ts)
   const messagesSpent = spentOf('messages');
   const researchLocked = spentOf('research');
 
@@ -3350,7 +3358,7 @@ export function LogosApp({
           setFocusStream(visibleStream(acc));
         }
       }
-      // what this turn spent is counted when its stream ends: read the day again, so the next send knows
+      // what this turn spent is settled when its stream ends: read the week again, so the next send knows
       if (!one && isSignedIn) window.setTimeout(() => void refreshUsage(activeIdRef.current), 1500);
       acc = absorbRemember(acc);
       applyVizOps(parseVizOps(acc, sentViz), sid);
@@ -4691,8 +4699,8 @@ export function LogosApp({
       // that says something sends the whole conversation (lib/map-skip.ts).
       // Logos 5 draws it only when it is worth its cost (mapWanted).
       if (mapWanted(route, skipsMap({ text: content, attachments: atts.length, replying: !!replying, lastReply: lastReplyIn(before), mapNodes: mapRef.current.nodes.length }))) refreshMap();
-      // ...and it was one of the day's messages: the count is re-read, so the
-      // next send knows where the free day stands before it goes.
+      // ...and the counts are re-read, so the next send knows where the free
+      // month and the week's tokens stand before it goes.
       if (!one) void refreshUsage(activeIdRef.current);
       // A write-up they asked to keep, answered in the conversation because the
       // month's document is spent: the words come, and the boundary is said.
@@ -4721,7 +4729,7 @@ export function LogosApp({
         if (!group) takeBack();
         return;
       }
-      // what this turn spent is counted when its stream ends: read the day again, so the next send knows
+      // what this turn spent is settled when its stream ends: read the week again, so the next send knows
       if (!one && isSignedIn) window.setTimeout(() => void refreshUsage(activeIdRef.current), 1500);
       acc = absorbRemember(acc);
       // Changes to the picture, checked against the very state that was sent:
@@ -8201,7 +8209,7 @@ export function LogosApp({
         }
         voice={LOGOS4.voice && hasAccess && !togetherReadOnly && one}
         voiceButton={voiceButton}
-        // the day's thinking time, a small ring beside the tools (free accounts; filled = resting)
+        // the week's tokens, a small ring beside the tools: what is left and when it resets (free accounts; filled = resting)
         meter={
           <SleepRing
             sleep={sleep}
@@ -9955,12 +9963,12 @@ export function LogosApp({
         onRetakeTour={() => setTourOpen(true)}
       />
 
-      {/* Sleep Mode (lib/sleep.ts): the day's free thinking time is spent — said once, with when Socria wakes */}
+      {/* Sleep Mode (lib/sleep.ts): the week's free tokens are spent — said once, with when Socria wakes */}
       <SleepScreen
         sleep={sleep}
         open={sleepOpen && !oneOpen}
         onClose={() => setSleepOpen(false)}
-        onUpgrade={plan === 'one' ? undefined : () => askOne('sleep')}
+        onUpgrade={plan === 'one' ? undefined : () => askOne(SLEEP_ONE)}
         onWake={() => {
           setSleep(null);
           setSleepOpen(false);

@@ -234,11 +234,18 @@ function num(v: unknown): number | undefined {
   return typeof v === 'number' && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : undefined;
 }
 
-/** Run the extractor over some text. Never throws: a failed read is no read. */
+/**
+ * Run the extractor over some text. Never throws: a failed read is no read —
+ * except, when `opts.refusals` asks for it, a read the week's tokens refused
+ * (lib/token-allowance.ts TokenRefusal), so a file being read into Memory
+ * stops at the first part the week cannot pay for instead of asking for every
+ * part after it.
+ */
 export async function extract(
   apiKey: string,
   text: string,
-  existing: ActivatedSubgraph | null
+  existing: ActivatedSubgraph | null,
+  opts: { refusals?: boolean } = {}
 ): Promise<ExtractResult> {
   try {
     const client = modelClient(apiKey);
@@ -263,7 +270,8 @@ export async function extract(
     }));
     const body = res.text || '{}';
     return sanitizeExtraction(JSON.parse(body));
-  } catch {
+  } catch (e) {
+    if (opts.refusals && (e as { tokenRefusal?: unknown } | null)?.tokenRefusal === true) throw e;
     // A turn the graph did not learn from is recoverable. A turn that broke
     // because of the graph is not.
     return { nodes: [], edges: [] };

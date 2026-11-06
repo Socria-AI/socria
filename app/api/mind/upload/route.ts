@@ -9,6 +9,8 @@ import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { ingestTextFile, MAX_FILE_BYTES } from '@/lib/mind/ingest-text';
 import { deleteSource, getProject, listSources } from '@/lib/mind/store';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -16,7 +18,7 @@ export const dynamic = 'force-dynamic';
 /** Enough to be useful, few enough that the graph stays somebody's own. */
 const MAX_FILES = 20;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   if (!userId) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   // Ingestion is many model calls, so it draws on the expensive budget rather
@@ -60,12 +62,26 @@ export async function POST(req: NextRequest) {
     if (!project) return NextResponse.json({ error: 'That Project could not be found.' }, { status: 404 });
   }
 
-  const result = await ingestTextFile(userId, { name, text }, { now: Date.now(), apiKey, project });
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): reading a file into Memory is a request they made, so a free
+  // account whose week is spent rests until Monday 00:00 UTC and no model is asked; one that is awake is
+  // metered from here, so each part of the file read is held against its week and settled at what it cost.
+  const sleep = await sleepGate(req, userId);
+  if (sleep.refuse) return sleep.refuse;
+  if (sleep.meter) meterFor(sleep.meter);
+  let result: Awaited<ReturnType<typeof ingestTextFile>>;
+  try {
+    result = await ingestTextFile(userId, { name, text }, { now: Date.now(), apiKey, project });
+  } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
+    throw e;
+  }
   if (!result) {
     return NextResponse.json({ error: 'That file could not be read.' }, { status: 500 });
   }
   return NextResponse.json({ ok: true, ...result });
-}
+});
 
 /**
  * Remove an uploaded file.

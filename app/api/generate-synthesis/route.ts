@@ -20,13 +20,15 @@ import {
 } from '@/lib/socria-prompt';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { mayUse } from '@/lib/route-guard';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_MESSAGES = 40;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   const keyUnlocked = mayUse(req, userId);
   if (!userId && !keyUnlocked) {
@@ -71,6 +73,12 @@ export async function POST(req: NextRequest) {
     .map((m: any) => `${m.role === 'user' ? 'User' : 'Socria'}: ${m.content}`)
     .join('\n\n');
 
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+  // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+  // makes is held against its week and settled at what it cost.
+  const sleep = await sleepGate(req, userId);
+  if (sleep.refuse) return sleep.refuse;
+  if (sleep.meter) meterFor(sleep.meter);
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'core/synthesis');
     const prompt = buildSynthesisPrompt(memory, exchange, depthLabel);
@@ -95,7 +103,10 @@ export async function POST(req: NextRequest) {
     const synthesis = sanitizeSynthesisData(parsed);
     return NextResponse.json({ synthesis });
   } catch (e: any) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('generate-synthesis error:', e);
     return NextResponse.json({ synthesis: null });
   }
-}
+});

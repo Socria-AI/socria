@@ -19,6 +19,7 @@
 
 import OpenAI from 'openai';
 import { tracked } from '../openai-usage';
+import { uncounted } from '../token-meter';
 
 /** Which step of the turn a call belongs to — for logging, caching and evals. */
 export type ModelRole = 'state' | 'reply' | 'retry' | 'guard' | 'verify' | 'extract' | 'baseline';
@@ -54,6 +55,18 @@ export interface ModelClient {
 
 // ── OpenAI (production) ─────────────────────────────────────────────
 
+/**
+ * The steps that are ours, never the person's: reading the conversation's
+ * state, the guard and the checker on a draft, a reply written again because
+ * the guard refused the first, an evaluation's baseline. None of them is
+ * counted against a free account's week of tokens (lib/sleep.ts) — the reply
+ * is, and an extraction is counted or not by who asked for it (a file read
+ * into Memory is theirs; the memory kept after a turn, lib/mind/pipeline.ts,
+ * is ours).
+ */
+const OURS: ReadonlySet<ModelRole> = new Set<ModelRole>(['state', 'guard', 'verify', 'retry', 'baseline']);
+const asStep = <T,>(role: ModelRole, call: () => T): T => (OURS.has(role) ? uncounted(call) : call());
+
 export function openAIClient(apiKey: string): ModelClient {
   // one client a step, so each call's cost is logged as the step it was (lib/openai-usage.ts)
   const clients = new Map<ModelRole, OpenAI>();
@@ -68,13 +81,15 @@ export function openAIClient(apiKey: string): ModelClient {
   ];
   return {
     async complete(req) {
-      const res = await clientFor(req.role).chat.completions.create({
-        model: req.model,
-        temperature: req.temperature,
-        max_tokens: req.maxTokens,
-        ...(req.json ? { response_format: { type: 'json_object' as const } } : {}),
-        messages: toMessages(req),
-      });
+      const res = await asStep(req.role, () =>
+        clientFor(req.role).chat.completions.create({
+          model: req.model,
+          temperature: req.temperature,
+          max_tokens: req.maxTokens,
+          ...(req.json ? { response_format: { type: 'json_object' as const } } : {}),
+          messages: toMessages(req),
+        })
+      );
       return {
         text: res.choices?.[0]?.message?.content ?? '',
         served: (res as { model?: string }).model,
@@ -95,13 +110,15 @@ export function openAIClient(apiKey: string): ModelClient {
         let served: string | undefined;
         let finishReason: string | undefined;
         try {
-          const s = await clientFor(req.role).chat.completions.create({
-            model: req.model,
-            temperature: req.temperature,
-            max_tokens: req.maxTokens,
-            stream: true,
-            messages: toMessages(req),
-          });
+          const s = await asStep(req.role, () =>
+            clientFor(req.role).chat.completions.create({
+              model: req.model,
+              temperature: req.temperature,
+              max_tokens: req.maxTokens,
+              stream: true,
+              messages: toMessages(req),
+            })
+          );
           for await (const chunk of s as AsyncIterable<any>) {
             served ||= chunk?.model;
             finishReason = chunk?.choices?.[0]?.finish_reason ?? finishReason;

@@ -13,7 +13,8 @@
 // against the rate limit.
 
 import { tierOf } from '@/lib/model-router';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -36,7 +37,7 @@ function topicsOf(raw: unknown): StudyTopic[] {
   return s?.topics ?? [];
 }
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   if (!userId && !mayUse(req, userId)) return NextResponse.json({ error: 'Logos requires an access key.', requiresKey: true }, { status: 401 });
   const limited = await enforceRateLimit(req, userId, 'aux');
@@ -56,8 +57,9 @@ export async function POST(req: NextRequest) {
 
   if (!process.env.OPENAI_API_KEY) return NextResponse.json({ error: 'Socria cannot make these just now.' }, { status: 503 });
   try {
-    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-    // one that is awake is metered from here, so every call this request makes is counted.
+    // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+    // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+    // makes is held against its week and settled at what it cost.
     const sleep = await sleepGate(req, userId);
     if (sleep.refuse) return sleep.refuse;
     if (sleep.meter) meterFor(sleep.meter);
@@ -66,7 +68,10 @@ export async function POST(req: NextRequest) {
     if (!made.events.length) return NextResponse.json({ error: 'Nothing came back that these pages bear out.', dropped: made.dropped }, { status: 422 });
     return NextResponse.json(made);
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.warn('logos practice: the model did not answer', e instanceof Error ? e.message : e);
     return NextResponse.json({ error: 'Socria could not make these just now — try again in a moment.' }, { status: 502 });
   }
-}
+});

@@ -15,7 +15,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL } from '@/lib/logos';
@@ -31,7 +32,7 @@ export const dynamic = 'force-dynamic';
 // what each kind of request may run to: a reading is short; a proofread of a section is longer
 const TOKENS = { explain: 600, critique: 700, shorten: 1200, improve: 1400, develop: 700, phrase: 1200, proofread: 1800, board: 1000, structure: 1600 } as const;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   const keyUnlocked = mayUse(req, userId);
   if (!userId && !keyUnlocked) {
@@ -52,8 +53,9 @@ export async function POST(req: NextRequest) {
   }
 
   const openai = tracked(new OpenAI({ apiKey }), 'logos/write');
-  // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-  // one that is awake is metered from here, so every call this request makes is counted.
+  // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+  // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+  // makes is held against its week and settled at what it cost.
   const sleep = await sleepGate(req, userId);
   if (sleep.refuse) return sleep.refuse;
   if (sleep.meter) meterFor(sleep.meter);
@@ -96,7 +98,10 @@ export async function POST(req: NextRequest) {
     }
     return NextResponse.json({ result });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('logos write error:', e);
     return NextResponse.json({ error: 'That could not be done just now.' }, { status: 500 });
   }
-}
+});

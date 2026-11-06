@@ -49,6 +49,10 @@ await build({
 console.error = () => {};
 process.env.OPENAI_API_KEY = 'test';
 process.env.RATE_LIMIT_DISABLED = '1';
+// No database here, so a free account's week of tokens cannot be read — and a free request whose week
+// cannot be read is paused (fail closed, test/sleep.test.mjs). This suite is about what the writing
+// route asks and keeps, so Sleep Mode is off for it.
+process.env.SOCRIA_SLEEP = 'off';
 const route = await import(pathToFileURL(join(OUT, 'write.mjs')).href);
 const { NextRequest } = await import('next/server.js');
 

@@ -27,7 +27,8 @@ import { docLetters } from '@/lib/docs/conversation';
 import { DOC_RULES, renderDocs, type DocRef } from '@/lib/docs/render';
 import { BLOCK_ID, sanitizeSourceDoc } from '@/lib/docs/sanitize';
 import type { SourceDoc } from '@/lib/docs/types';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { uncounted, withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { cacheKey, chooseModel, compressHistory, firstAccepted, levelOf, tierOf } from '@/lib/model-router';
 import { depthForPlan } from '@/lib/socria-one';
@@ -154,7 +155,7 @@ const MAX_MESSAGES_ACCEPTED = 400;
 /** Characters of documents shown to the model on one turn — the most relevant passages of a long one. */
 const DOC_BUDGET = 36_000;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   try {
     const apiKey = process.env.OPENAI_API_KEY;
     if (!apiKey) {
@@ -386,8 +387,9 @@ export async function POST(req: NextRequest) {
     const trim = (v: any, n: number) =>
       typeof v === 'string' ? v.replace(/\s+/g, ' ').trim().slice(0, n) : '';
     const plan = await resolvePlanForRequest(req, userId);
-    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-    // one that is awake is metered from here, so every call this request makes is counted.
+    // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+    // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+    // makes is held against its week and settled at what it cost.
     const sleep = await sleepGate(req, userId, plan);
     if (sleep.refuse) return sleep.refuse;
     if (sleep.meter) meterFor(sleep.meter);
@@ -909,8 +911,10 @@ export async function POST(req: NextRequest) {
             modelAllowed,
             ...(mrOpenai
               ? {
+                  // MR's deliberation regulates our own reply — never something they asked for, so never
+                  // counted against the week (lib/token-meter.ts uncounted)
                   create: (params: Record<string, unknown>) =>
-                    mrOpenai.chat.completions.create(params as unknown as Parameters<typeof mrOpenai.chat.completions.create>[0]) as unknown as Promise<{ choices?: { message?: { content?: string | null } }[] }>,
+                    uncounted(() => mrOpenai.chat.completions.create(params as unknown as Parameters<typeof mrOpenai.chat.completions.create>[0])) as unknown as Promise<{ choices?: { message?: { content?: string | null } }[] }>,
                   model: process.env.OPENAI_MODEL_MR || modelFor('memory'),
                   timeoutMs: 1500,
                 }
@@ -1328,12 +1332,16 @@ export async function POST(req: NextRequest) {
               let again = '';
               try {
                 const note = `\n\n=== Your previous draft was rejected ===\nWHY: ${first.retryNote}\nWrite the reply again. Do not apologise, do not mention this instruction, and do not reference a previous attempt — the person has not seen one.\n`;
-                const r = await openai.chat.completions.create({
-                  model: served,
-                  messages: turnMessages(note),
-                  temperature: 0.7,
-                  max_tokens: maxReply,
-                });
+                // the second draft is ours (our check refused the first): the reply is counted once, never
+                // twice (lib/token-meter.ts uncounted)
+                const r = await uncounted(() =>
+                  openai.chat.completions.create({
+                    model: served,
+                    messages: turnMessages(note),
+                    temperature: 0.7,
+                    max_tokens: maxReply,
+                  })
+                );
                 again = r.choices?.[0]?.message?.content?.trim() ?? '';
               } catch (e) {
                 console.error('[logos/chat] accuracy retry failed', e);
@@ -1613,6 +1621,10 @@ export async function POST(req: NextRequest) {
       },
     });
   } catch (e: any) {
+    // the week's last tokens taken by another request first (a second tab, the map pass): Sleep Mode —
+    // the turn goes back in the box, as it does when the gate above refuses it
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     // This used to answer every failure with { error: 'Internal error' }, and
     // that single string is why a person who reported the fault, offered to
     // help, and pasted four network responses still could not say what had
@@ -1620,4 +1632,4 @@ export async function POST(req: NextRequest) {
     const f = reportUpstream('logos chat', e);
     return NextResponse.json({ error: f.reason, code: f.code, ref: f.ref }, { status: f.status });
   }
-}
+});

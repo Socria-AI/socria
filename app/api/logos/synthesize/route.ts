@@ -11,7 +11,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL, sanitizeMap } from '@/lib/logos';
@@ -26,7 +27,7 @@ export const dynamic = 'force-dynamic';
 const CONTEXT_TURNS = 6;
 const CONTEXT_CHARS = 360;
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   if (!userId && !mayUse(req, userId)) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   const limited = await enforceRateLimit(req, userId, 'aux');
@@ -62,8 +63,9 @@ export async function POST(req: NextRequest) {
 
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'logos/synthesize');
-    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-    // one that is awake is metered from here, so every call this request makes is counted.
+    // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+    // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+    // makes is held against its week and settled at what it cost.
     const sleep = await sleepGate(req, userId);
     if (sleep.refuse) return sleep.refuse;
     if (sleep.meter) meterFor(sleep.meter);
@@ -87,7 +89,10 @@ export async function POST(req: NextRequest) {
     const parsed = text ? JSON.parse(text) : null;
     return NextResponse.json({ synthesis: enforce(parsed, d, base) });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.warn('logos synthesize: the model did not answer; synthesising from structure', e instanceof Error ? e.message : e);
     return NextResponse.json({ synthesis: fromStructure(d, base) });
   }
-}
+});

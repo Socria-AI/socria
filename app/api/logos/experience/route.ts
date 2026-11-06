@@ -17,7 +17,8 @@ import { NextRequest, NextResponse } from 'next/server';
 import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
+import { uncounted, withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { auth } from '@clerk/nextjs/server';
 import { LOGOS_MODEL } from '@/lib/logos';
@@ -29,7 +30,7 @@ import { mayUse } from '@/lib/route-guard';
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-export async function POST(req: NextRequest) {
+export const POST = withMeter(async function POST(req: NextRequest) {
   const { userId } = auth();
   if (!userId && !mayUse(req, userId)) return NextResponse.json({ error: 'Logos requires an access key.', requiresKey: true }, { status: 401 });
   const limited = await enforceRateLimit(req, userId, 'aux');
@@ -49,8 +50,9 @@ export async function POST(req: NextRequest) {
   const prompted = buildPrompt(ask, state);
   try {
     const openai = tracked(new OpenAI({ apiKey }), 'logos/experience');
-    // Sleep Mode (lib/sleep-server.ts): a free account whose day of tokens is spent rests until tomorrow;
-    // one that is awake is metered from here, so every call this request makes is counted.
+    // THE WEEK'S TOKENS (lib/sleep-server.ts): a free account whose week is spent rests until Monday
+    // 00:00 UTC — no model is asked; one that is awake is metered from here, so every call this request
+    // makes is held against its week and settled at what it cost.
     const sleep = await sleepGate(req, userId);
     if (sleep.refuse) return sleep.refuse;
     if (sleep.meter) meterFor(sleep.meter);
@@ -76,16 +78,19 @@ export async function POST(req: NextRequest) {
     const first = await firstAccepted(routed.ladder, call(), step);
     let got = answer(first.result);
     // NOTHING USABLE CAME BACK: asked once more, told so — what comes back is vetted the same way, and nothing
-    // is ever made up in its place
+    // is ever made up in its place. The second asking is ours (our vetting refused the first), so it is never
+    // counted against the week (lib/token-meter.ts uncounted): the experience costs one answer.
     if (!got.vetted.ops.length) {
       const why = got.vetted.refused.length ? ` What was refused: ${got.vetted.refused.slice(0, 3).join('; ')}.` : '';
-      const again = await firstAccepted(
-        routed.ladder.slice(Math.max(0, routed.ladder.indexOf(first.model))),
-        call([
-          { role: 'assistant', content: got.text.slice(0, 6000) || '{}' },
-          { role: 'user', content: `Nothing in that could be used.${why} Answer again: ONLY JSON, exactly the shape given, following every rule.` },
-        ]),
-        step
+      const again = await uncounted(() =>
+        firstAccepted(
+          routed.ladder.slice(Math.max(0, routed.ladder.indexOf(first.model))),
+          call([
+            { role: 'assistant', content: got.text.slice(0, 6000) || '{}' },
+            { role: 'user', content: `Nothing in that could be used.${why} Answer again: ONLY JSON, exactly the shape given, following every rule.` },
+          ]),
+          step
+        )
       ).catch(() => null);
       if (again) got = answer(again.result);
     }
@@ -93,7 +98,10 @@ export async function POST(req: NextRequest) {
     if (!vetted.ops.length) return NextResponse.json({ error: 'Nothing came back that could be used — try again.', refused: vetted.refused.slice(0, 3) }, { status: 422 });
     return NextResponse.json({ ops: vetted.ops, ...(vetted.refused.length ? { refused: vetted.refused.slice(0, 3) } : {}) });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.warn('logos experience: the model did not answer', e instanceof Error ? e.message : e);
     return NextResponse.json({ error: 'Socria could not answer just now — try again in a moment.' }, { status: 502 });
   }
-}
+});

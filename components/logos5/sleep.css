@@ -1,6 +1,8 @@
 /* components/logos5/sleep.css — Sleep Mode (SleepMode.tsx), in Logos 5's own tokens:
    paper on Paper, dark on Dark, the night sky on Celestial. Quiet: a moon, a few
-   lines, a countdown in the serif. No glow, no gradient, nothing that pulses. */
+   lines, a countdown in the serif. No glow, no gradient, nothing that pulses.
+   Logos 5.5's steps (components/logos5/l5-controls.css): type 32 / 18 / 15.5 /
+   13.5 / 12.5 / 10.5, radii 999 / 16 / 10 / 6, controls 40 tall. */
 
 .sl-scrim {
   position: fixed;
@@ -39,7 +41,7 @@
   width: min(420px, 100%);
   padding: 30px 28px 24px;
   border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
-  border-radius: 20px;
+  border-radius: 16px;
   background: var(--l5-surface, #f5f3eb);
   color: var(--lg-ink, #20201b);
   box-shadow: 0 30px 70px -40px rgba(var(--shadow-rgb, 32, 32, 27), 0.55);
@@ -69,14 +71,14 @@ html[data-theme='night'] .sl-card {
   margin: 0;
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
   font-weight: 400;
-  font-size: 1.75rem;
+  font-size: 32px;
   line-height: 1.1;
   letter-spacing: -0.01em;
 }
 .sl-b {
   margin: 10px auto 0;
-  max-width: 32ch;
-  font-size: 0.95rem;
+  max-width: 34ch;
+  font-size: 15.5px;
   line-height: 1.55;
   color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
 }
@@ -89,7 +91,7 @@ html[data-theme='night'] .sl-card {
   margin: 18px 0 0;
 }
 .sl-when-k {
-  font-size: 0.72rem;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -97,11 +99,12 @@ html[data-theme='night'] .sl-card {
 }
 .sl-when-v {
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
-  font-size: 1.45rem;
+  font-size: 18px;
   color: var(--lg-ink, #20201b);
 }
 .sl-when-at {
-  font-size: 0.85rem;
+  flex-basis: 100%;
+  font-size: 13.5px;
   color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
 }
 .sl-acts {
@@ -119,7 +122,7 @@ html[data-theme='night'] .sl-card {
   background: transparent;
   color: var(--lg-ink, #20201b);
   font: inherit;
-  font-size: 0.9rem;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -146,7 +149,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .sl-btn.i
   margin: 12px 0 0;
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
   font-style: italic;
-  font-size: 0.95rem;
+  font-size: 15.5px;
   color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
 }
 
@@ -164,7 +167,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .sl-btn.i
   background: var(--l5-surface, #f5f3eb);
   color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
   font: inherit;
-  font-size: 0.82rem;
+  font-size: 12.5px;
   cursor: pointer;
 }
 html[data-theme='dark'] .sl-bar {
@@ -186,7 +189,7 @@ html[data-theme='night'] .sl-bar {
   color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
 }
 
-/* the ring beside the box's tools: an outline that fills as the day is spent, solid when resting */
+/* the ring beside the box's tools: an outline that fills as the week is spent, solid when resting */
 .sl-ringwrap {
   position: relative;
   display: inline-flex;
@@ -242,7 +245,7 @@ html[data-theme='night'] .sl-bar {
   flex-direction: column;
   gap: 2px;
   width: max-content;
-  max-width: 240px;
+  max-width: min(280px, calc(100vw - 32px));
   padding: 8px 11px;
   border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
   border-radius: 10px;
@@ -258,13 +261,22 @@ html[data-theme='night'] .sl-ringtip {
   background: #121c31;
 }
 .sl-ringtip-t {
-  font-size: 0.72rem;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
   color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
 }
 .sl-ringtip-b {
-  font-size: 0.85rem;
+  font-size: 13.5px;
   color: var(--lg-ink, #20201b);
+}
+.sl-ringtip-r,
+.sl-ringtip-l {
+  font-size: 12.5px;
+  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+}
+/* "(in 2 days 4 h)" breaks before itself, never inside */
+.sl-keep {
+  white-space: nowrap;
 }
