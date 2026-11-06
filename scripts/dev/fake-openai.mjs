@@ -28,6 +28,14 @@
 //   GET  /v1/models                a short list
 //
 // FAKE_OPENAI_CONTRACT=1 holds every call to its model's real parameter contract (see the import below).
+//
+// USAGE, AS THE PROVIDER REPORTS IT, so a local run counts a free account's week
+// of tokens (Sleep Mode, lib/sleep.ts) the way production does: every answer
+// carries `usage` — what it read and wrote, at about four bytes a token — and a
+// stream that asks for it (`stream_options.include_usage`) ends with a usage
+// chunk. A first message of 1,024 tokens or more seen before is reported as
+// served from the prompt cache (`cached_tokens`), as the provider caches a
+// prefix it has recently seen.
 
 import http from 'node:http';
 import { appendFileSync } from 'node:fs';
@@ -523,12 +531,31 @@ function writeReply(system) {
   return {};
 }
 
+const tokensIn = (text) => Math.ceil(Buffer.byteLength(String(text ?? ''), 'utf8') / 4);
+const textOf = (m) => (typeof m?.content === 'string' ? m.content : Array.isArray(m?.content) ? m.content.map((p) => (typeof p?.text === 'string' ? p.text : p?.type === 'image_url' ? ' '.repeat(3000) : '')).join('') : '');
+/** First messages long enough to cache, seen recently — the provider's prompt cache, roughly. */
+const cachedPrefixes = new Set();
+/** What a call read and wrote, as the provider reports it. */
+function usageFor(body, answer) {
+  const messages = Array.isArray(body?.messages) ? body.messages : [];
+  const prompt = messages.reduce((n, m) => n + 4 + tokensIn(textOf(m)), 3);
+  const first = textOf(messages[0]);
+  const cacheable = tokensIn(first) >= 1024;
+  const cached = cacheable && cachedPrefixes.has(first) ? Math.min(prompt, tokensIn(first)) : 0;
+  if (cacheable) {
+    cachedPrefixes.add(first);
+    if (cachedPrefixes.size > 200) cachedPrefixes.delete(cachedPrefixes.values().next().value);
+  }
+  const completion = tokensIn(answer);
+  return { prompt_tokens: prompt, completion_tokens: completion, total_tokens: prompt + completion, prompt_tokens_details: { cached_tokens: cached } };
+}
+
 function send(res, status, body, headers = {}) {
   res.writeHead(status, { 'content-type': 'application/json', ...headers });
   res.end(typeof body === 'string' ? body : JSON.stringify(body));
 }
 
-function streamText(res, text, model) {
+function streamText(res, text, model, usage = null) {
   res.writeHead(200, { 'content-type': 'text/event-stream', 'cache-control': 'no-cache', connection: 'keep-alive' });
   const id = `chatcmpl-local-${Date.now()}`;
   const words = text.match(/\S+\s*/g) ?? [text];
@@ -541,6 +568,8 @@ function streamText(res, text, model) {
       return;
     }
     res.write(`data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model, choices: [{ index: 0, delta: {}, finish_reason: 'stop' }] })}\n\n`);
+    // the usage chunk, when the call asked for it: no choices, as the provider sends it
+    if (usage) res.write(`data: ${JSON.stringify({ id, object: 'chat.completion.chunk', created: Math.floor(Date.now() / 1000), model, choices: [], usage })}\n\n`);
     res.write('data: [DONE]\n\n');
     res.end();
   };
@@ -625,7 +654,7 @@ const server = http.createServer((req, res) => {
         const isEasy = system.startsWith('You make an EASY VIEW of a photo');
         const drafted = offered ? (() => { try { return { display: { kind: offered[1], state: JSON.parse(offered[2]) }, gaps: [] }; } catch { return {}; } })() : null;
         const content = JSON.stringify(isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : drafted ?? {});
-        return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
+        return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: usageFor(body, content) });
       }
       if (process.env.FAKE_OPENAI_TRACE) {
         try {
@@ -633,8 +662,8 @@ const server = http.createServer((req, res) => {
         } catch {}
       }
       const text = didReply(messages) ?? inlineReply(messages) ?? chatReply(messages.slice(1));
-      if (body.stream) return streamText(res, text, model);
-      return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: { prompt_tokens: 1, completion_tokens: 1, total_tokens: 2 } });
+      if (body.stream) return streamText(res, text, model, body.stream_options?.include_usage ? usageFor(body, text) : null);
+      return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content: text }, finish_reason: 'stop' }], usage: usageFor(body, text) });
     }
     send(res, 404, { error: { message: `not scripted: ${req.method} ${url.pathname}` } });
   });
