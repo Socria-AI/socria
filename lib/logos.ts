@@ -563,10 +563,11 @@ const NODE_TYPE_ALIASES: Record<string, LogosNodeType> = {
 const MATH_READS: Readonly<Record<string, LogosNodeType>> = { process: 'concept', mechanism: 'concept', quantity: 'given' };
 
 /** The node type to draw this as. Never null — see the note at the call site. */
-function resolveNodeType(raw: unknown, context?: ThinkingContext): LogosNodeType {
+function resolveNodeType(raw: unknown, context?: ThinkingContext, origin?: unknown): LogosNodeType {
   if (typeof raw !== 'string') return 'idea';
   const t = raw.trim().toLowerCase().replace(/\s+/g, '_');
-  if (context === 'math' && MATH_READS[t]) return MATH_READS[t];
+  // a drawing's parts are what they say they are, in a mathematical map too
+  if (context === 'math' && origin !== 'drawn' && MATH_READS[t]) return MATH_READS[t];
   if (NODE_TYPES.includes(t as LogosNodeType)) return t as LogosNodeType;
   const alias = NODE_TYPE_ALIASES[t];
   if (alias && NODE_TYPES.includes(alias)) return alias;
@@ -647,7 +648,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       // stopped working. Near misses are mapped to their nearest kin and
       // anything else becomes an idea, which draws correctly and says the
       // true thing: we know what they thought, not what to call it.
-      const type = resolveNodeType(n?.type, context);
+      const type = resolveNodeType(n?.type, context, n?.origin);
       if (!id || !label) return null;
       const status: LogosNodeStatus = NODE_STATUSES.includes(n?.status)
         ? (n.status as LogosNodeStatus)

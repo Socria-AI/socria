@@ -56,7 +56,7 @@ import { guidanceBlock, resolveDepth, resolveGuard } from '@/lib/logos-guidance'
 import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, type Counter } from '@/lib/entitlements';
 import { claimUnit, consume, left, QUOTA_UNAVAILABLE, refusal, savedMapHasNodes, unitClaimed } from '@/lib/quota';
-import { addedNodes, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
+import { addedNodes, drawingNote, keepAddedNodes, madeAny, madeArtifacts, withoutArtifacts, type Made } from '@/lib/quota-map';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { uncounted, withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
@@ -236,11 +236,38 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     if (!metered || !userId) return NextResponse.json({ map: out, ...extras });
     let map = out;
     let reached: { counter: Counter; used: number; limit: number | null } | null = null;
+    /** a drawing left off because the month's nodes could not hold all of it — said in its own words */
+    let drawingLeft: { needed: number; left: number; own: number } | null = null;
     const added = addedNodes(current, map);
+    // A DRAWING IS KEPT WHOLE OR NOT AT ALL (lib/quota-map.ts): when this pass adds one and the month's nodes
+    // cannot hold everything it added, the room is read first and only what will be kept is planned — the
+    // person's own new ideas first, the drawing only if all of it fits. Never charged for a node not kept,
+    // and planned BEFORE a first map is claimed, so a map that would be left empty is never charged.
+    const drawnNew = new Set(map.nodes.filter((n) => n.origin === 'drawn').map((n) => n.id));
+    const whole = drawnNew.size ? (id: string) => drawnNew.has(id) : undefined;
+    let want = added.length;
+    let room: Awaited<ReturnType<typeof left>> | null = null;
+    if (added.length && whole && added.some(whole)) {
+      room = await left(userId, plan, 'nodes');
+      if (room.unavailable) {
+        const r = refusal('nodes', room);
+        return NextResponse.json({ map: current, ...r.body }, { status: r.status });
+      }
+      if (room.left !== null && room.left < added.length) {
+        want = keepAddedNodes(map, current, room.left, whole).kept;
+        // what the month had left for the drawing once their own new ideas were kept
+        const drawn = added.filter(whole).length;
+        const own = Math.min(room.left, added.length - drawn);
+        const forDrawing = room.left - own;
+        if (drawn > forDrawing) drawingLeft = { needed: drawn, left: forDrawing, own };
+      }
+    }
     // A first map is claimed whenever the pass leaves this conversation with a
     // map at all — not only when it added nodes, so a browser that sent a map
-    // of its own cannot carry one in uncounted.
-    if (!hadMap && map.nodes.length > 0) {
+    // of its own cannot carry one in uncounted. A pass whose every new node
+    // must be left off leaves no map, and claims none.
+    const keeps = map.nodes.length - added.length + want;
+    if (!hadMap && map.nodes.length > 0 && keeps > 0) {
       const claim = await claimUnit(userId, plan, 'maps', mapMark);
       if (!claim.ok) {
         const r = refusal('maps', claim);
@@ -248,29 +275,21 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       }
     }
     if (added.length) {
-      // A DRAWING IS KEPT WHOLE OR NOT AT ALL (lib/quota-map.ts): when this pass adds one and the month's
-      // nodes cannot hold everything it added, the room is read first and only what will be kept is taken —
-      // the person's own new ideas first, the drawing only if all of it fits. Never charged for a node not kept.
-      const drawnNew = new Set(map.nodes.filter((n) => n.origin === 'drawn').map((n) => n.id));
-      const whole = drawnNew.size ? (id: string) => drawnNew.has(id) : undefined;
-      let want = added.length;
-      let room: Awaited<ReturnType<typeof left>> | null = null;
-      if (whole && added.some(whole)) {
-        room = await left(userId, plan, 'nodes');
-        if (room.unavailable) {
-          const r = refusal('nodes', room);
-          return NextResponse.json({ map: current, ...r.body }, { status: r.status });
-        }
-        if (room.left !== null && room.left < added.length) want = keepAddedNodes(map, current, room.left, whole).kept;
-      }
       const took = want > 0 ? await consume(userId, plan, 'nodes', want, { upTo: true }) : { ok: false, granted: 0, used: room?.used ?? 0, limit: room?.limit ?? null, unavailable: false };
       if (took.unavailable) {
         const r = refusal('nodes', took);
         return NextResponse.json({ map: current, ...r.body }, { status: r.status });
       }
       if (took.granted < added.length) {
+        // what was planned is kept whole; in the rare race where another pass took nodes between the read and
+        // the take, exactly what was granted is kept — a node taken cannot be given back
         map = keepAddedNodes(map, current, took.granted, took.granted === want ? whole : undefined).map;
         reached = { counter: 'nodes', used: took.used, limit: took.limit };
+        // a drawing left off takes its title with it
+        if (drawingLeft && !map.nodes.some((n) => n.origin === 'drawn')) {
+          const { title: _left, ...rest } = map;
+          map = current.title ? { ...rest, title: current.title } : rest;
+        }
       }
     }
     const made = madeArtifacts(current, map);
@@ -298,7 +317,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       }
     }
     const stop = reached as { counter: Counter; used: number; limit: number | null } | null;
-    return NextResponse.json({ map, ...extras, ...(stop ? { limit: { ...stop, note: boundaryNote(stop.counter) } } : {}) });
+    // a drawing left off says so plainly: how many parts it needed and how many of the month's nodes are left
+    const dl = drawingLeft as { needed: number; left: number; own: number } | null;
+    const note = stop && dl && stop.counter === 'nodes' ? drawingNote(dl.needed, dl.left, dl.own) : stop ? boundaryNote(stop.counter) : null;
+    return NextResponse.json({ map, ...extras, ...(stop ? { limit: { ...stop, note } } : {}) });
   };
 
   const kept = messages
@@ -363,7 +385,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   // told it may draw it. Their own thinking is never restructured for either —
   // a drawing is its own layer on the map (lib/logos.ts, THE SUBJECT, DRAWN).
   const drawing: DiagramShape | null = typeof said === 'string' ? diagramAsked(said) : null;
-  const shaped: DiagramShape | null = !drawing && typeof said === 'string' ? drawable(said) : null;
+  // unasked, a subject is drawn for Socria One and a guest; a free account's week is not spent on it (needsMap drawUnasked)
+  const shaped: DiagramShape | null = !drawing && !metered && typeof said === 'string' ? drawable(said) : null;
   const asked: ThinkingMap = stated
     ? { ...current, building: readBuilding({ map: current, stated, prev: current.building }) ?? undefined }
     : current;

@@ -70,6 +70,17 @@ export function keepAddedNodes<T extends MapLike>(
   };
 }
 
+/**
+ * Why a drawing is not on the map (the free plan's nodes, app/api/logos/map):
+ * it needed more of the month's Logic Map nodes than were left once the
+ * person's own new ideas were kept. Never half of it.
+ */
+export function drawingNote(needed: number, left: number, ownKept: number): string {
+  const n = (k: number) => `${k} Logic Map ${k === 1 ? 'node' : 'nodes'}`;
+  const room = left > 0 ? `only ${n(left)} ${left === 1 ? 'is' : 'are'} left` : 'none are left';
+  return `This drawing needs ${n(needed)} and ${room} this month, so it was not drawn — never half of it.${ownKept > 0 ? ' Your own new ideas were kept.' : ''}`;
+}
+
 /** What a pass made that counts as an artifact: workspace objects, built models, and the conversation's first picture. */
 export interface Made {
   objects: string[];

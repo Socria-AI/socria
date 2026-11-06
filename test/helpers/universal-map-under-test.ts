@@ -6,8 +6,9 @@ export { sanitizeMap, mapCaps, mapInstructions, NODE_TYPES, RELATIONS, NODE_ORIG
 export { GRAMMARS, GRAMMAR_IDS, ROLES, statedBuilding, satisfies, structuralScores, hasLoop, readBuilding, lensFor } from '@/lib/representation';
 export { routeTurn, needsMap, diagramAsked, drawable, askedToSee } from '@/lib/runtime/orchestrate';
 export { applyMapEdits, dropRemoved, keyOf } from '@/lib/map-edit';
-export { keepAddedNodes, addedNodes } from '@/lib/quota-map';
+export { keepAddedNodes, addedNodes, drawingNote } from '@/lib/quota-map';
 export { RELATION_WORDS } from '@/lib/logos5/ar';
 export { RELATION_LABEL, LENSES, availableLenses, ideaLenses } from '@/lib/logos-layout';
 export { drawingOf, drawingFromInline, withDrawing, diagramFromDrawing, isDrawn } from '@/lib/logos5/drawing';
 export { sanitizeDiagram } from '@/lib/objects/display-diagram';
+export { inspectorEdits, inspectorKinds, aboutLine, kindWord } from '@/components/logos5/MapInspector';

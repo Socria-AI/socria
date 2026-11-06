@@ -247,6 +247,44 @@ as('olga');
 const oneMap = await map('o1', EMPTY, extraction(Array.from({ length: 14 }, (_, k) => `n${k}`)));
 ok('Socria One: a map of fourteen nodes, kept whole, nothing counted', oneMap.status === 200 && oneMap.json?.map?.nodes?.length === 14 && count('olga', 'nodes') === 0 && count('olga', 'maps') === 0);
 
+console.log('\n=== a drawing on the free plan: kept whole or not at all, never an empty map charged ===');
+// THE LOGIC MAP DRAWS (Logos 5.5, lib/quota-map.ts keepAddedNodes): a drawing the month's nodes cannot hold is
+// left off whole, the person's own new ideas kept first — and the meter plans that BEFORE a first map is
+// claimed, so a pass that would leave a conversation's map empty takes none of the month's maps.
+for (const u of ['dina', 'eve']) globalThis.__users[u] = { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] };
+as('dina');
+db.rows('logos_usage').push({ id: `dina|${month}|nodes`, user_id: 'dina', scope: month, counter: 'nodes', n: 9, updated_at: Date.now() });
+const stageOf = (id, label) => ({ id, type: 'process', label, status: 'open', origin: 'drawn', role: 'stage' });
+const WATERMAP = {
+  context: 'learning',
+  title: 'The water cycle',
+  nodes: [stageOf('ev', 'Evaporation'), stageOf('co', 'Condensation'), stageOf('pr', 'Precipitation'), stageOf('cl', 'Collection')],
+  edges: [{ from: 'ev', to: 'co', relation: 'leads_to' }, { from: 'co', to: 'pr', relation: 'leads_to' }, { from: 'pr', to: 'cl', relation: 'leads_to' }, { from: 'cl', to: 'ev', relation: 'leads_to' }],
+};
+const drawItAsk = [{ role: 'user', content: 'Draw the water cycle.' }];
+const dLeft = await map('dLeft', EMPTY, WATERMAP, drawItAsk);
+ok('one node left and a drawing of four: none of it is drawn — never half', dLeft.status === 200 && (dLeft.json?.map?.nodes ?? []).length === 0, dLeft.text.slice(0, 300));
+ok('  no map is claimed for a map left empty, and no node is taken', count('dina', 'maps') === 0 && count('dina', 'nodes') === 9, `${count('dina', 'maps')} ${count('dina', 'nodes')}`);
+ok('  the page is told why, in the drawing\'s own words', dLeft.json?.limit?.counter === 'nodes' && dLeft.json.limit.note === 'This drawing needs 4 Logic Map nodes and only 1 Logic Map node is left this month, so it was not drawn — never half of it.', JSON.stringify(dLeft.json?.limit));
+ok('  and the drawing\'s title goes with it', !('title' in (dLeft.json?.map ?? {})), JSON.stringify(dLeft.json?.map));
+const theirsDrawn = { ...WATERMAP, nodes: [{ id: 'q', type: 'question', label: 'Why does it rain so much here?', status: 'open' }, ...WATERMAP.nodes] };
+const dMine = await map('dMine', EMPTY, theirsDrawn, [{ role: 'user', content: 'Why does it rain so much here? Draw the water cycle.' }]);
+ok('their own question and a drawing, one node left: their question is kept, the drawing left off whole', dMine.status === 200 && JSON.stringify((dMine.json?.map?.nodes ?? []).map((x) => x.id)) === '["q"]', dMine.text.slice(0, 300));
+ok('  this map holds their idea, so it is one of the month\'s maps; one node taken', count('dina', 'maps') === 1 && count('dina', 'nodes') === 10, `${count('dina', 'maps')} ${count('dina', 'nodes')}`);
+ok('  said plainly: none left for the drawing, their idea kept', dMine.json?.limit?.note === 'This drawing needs 4 Logic Map nodes and none are left this month, so it was not drawn — never half of it. Your own new ideas were kept.', JSON.stringify(dMine.json?.limit));
+as('eve');
+const eFits = await map('eFits', EMPTY, WATERMAP, drawItAsk);
+ok('with room, the whole drawing is drawn and counted: one map, four nodes', eFits.status === 200 && (eFits.json?.map?.nodes ?? []).length === 4 && eFits.json.map.title === 'The water cycle' && !eFits.json.limit && count('eve', 'maps') === 1 && count('eve', 'nodes') === 4, eFits.text.slice(0, 300));
+// UNASKED, A SUBJECT IS DRAWN FOR SOCRIA ONE AND A GUEST — a free account's week is not spent on it
+const mapToldOf = () => JSON.stringify((globalThis.__logosCalls ?? []).filter((p) => !p.stream).at(-1)?.messages ?? []);
+let passesBefore = passes();
+await map('e2', eFits.json.map, { ...WATERMAP }, [{ role: 'user', content: 'explain the water cycle' }]);
+ok('a free account asking about a subject with a shape: the map pass runs, and is not told to draw it', passes() === passesBefore + 1 && !mapToldOf().includes("THIS TURN'S SUBJECT"), `${passes() - passesBefore} ${mapToldOf().slice(-300)}`);
+as('olga');
+passesBefore = passes();
+await map('o2', EMPTY, { ...WATERMAP }, [{ role: 'user', content: 'explain the water cycle' }]);
+ok('Socria One asking the same: the map pass is told the subject has a shape to draw', passes() === passesBefore + 1 && mapToldOf().includes("THIS TURN'S SUBJECT"), `${passes() - passesBefore} ${mapToldOf().slice(-300)}`);
+
 console.log('\n=== a new conversation\'s map is the server\'s to count, whatever the page sends ===');
 // The bug as reported: on the free plan, a third and fourth map were drawn after
 // two. The page can send a map with a new conversation's id — the previous

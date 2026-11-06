@@ -32,6 +32,17 @@ export function aboutLine(node: Pick<LogosNode, 'origin' | 'type' | 'at' | 'grou
 }
 
 /**
+ * The kinds a card may be changed to. A drawn part is offered a drawing's kinds
+ * first. A mathematical map reads "process" as a concept and "quantity" as a
+ * given on the person's own cards (lib/logos.ts MATH_READS), so those two are
+ * not offered there: a kind that would not survive a save is not a choice.
+ */
+export function inspectorKinds(drawn: boolean, context?: string): readonly LogosNodeType[] {
+  if (drawn) return [...DRAWING_KINDS, ...NODE_TYPES.filter((k) => !DRAWING_KINDS.includes(k))];
+  return context === 'math' ? NODE_TYPES.filter((k) => k !== 'process' && k !== 'quantity') : NODE_TYPES;
+}
+
+/**
  * The edits that turn `node` (and its lines) into what the form holds — only
  * what changed, in the order a reader would say them. Pure, for the suite.
  */
@@ -47,18 +58,19 @@ export function inspectorEdits(
   if (t(form.detail) !== (node.detail ?? '')) out.push({ op: 'detail', id: node.id, detail: t(form.detail) });
   if (t(form.at) !== (node.at ?? '')) out.push({ op: 'at', id: node.id, at: t(form.at) });
   if (t(form.group) !== (node.group ?? '')) out.push({ op: 'group', id: node.id, group: t(form.group) });
-  for (const f of form.lines) {
-    const was = lines.find((l) => l.from === f.from && l.to === f.to);
-    if (!was) continue;
+  // each line of the form is the line at the same place in `lines` — two lines between the same cards are two rows
+  form.lines.forEach((f, i) => {
+    const was = lines[i];
+    if (!was || was.from !== f.from || was.to !== f.to) return;
     const label = t(f.label);
     const labelChanged = label !== (was.label ?? '');
     const relationChanged = f.relation !== was.relation;
-    if (labelChanged || relationChanged) out.push({ op: 'edge', from: f.from, to: f.to, ...(labelChanged ? { label } : {}), ...(relationChanged ? { relation: f.relation } : {}) });
-  }
+    if (labelChanged || relationChanged) out.push({ op: 'edge', from: f.from, to: f.to, was: was.relation, ...(labelChanged ? { label } : {}), ...(relationChanged ? { relation: f.relation } : {}) });
+  });
   return out;
 }
 
-export function MapInspector({ node, map, onEdits }: { node: LogosNode; map: Pick<ThinkingMap, 'nodes' | 'edges'>; onEdits?: (edits: MapEdit[]) => void }) {
+export function MapInspector({ node, map, onEdits }: { node: LogosNode; map: Pick<ThinkingMap, 'nodes' | 'edges' | 'context'>; onEdits?: (edits: MapEdit[]) => void }) {
   const [editing, setEditing] = useState(false);
   const lines = useMemo(() => map.edges.filter((e) => e.from === node.id || e.to === node.id).slice(0, 8), [map.edges, node.id]);
   const name = (id: string) => map.nodes.find((n) => n.id === id)?.label ?? id;
@@ -71,7 +83,7 @@ export function MapInspector({ node, map, onEdits }: { node: LogosNode; map: Pic
     group: node.group ?? '',
     lines: lines.map((l) => ({ from: l.from, to: l.to, label: l.label ?? '', relation: l.relation })),
   }));
-  const kinds = drawn ? [...DRAWING_KINDS, ...NODE_TYPES.filter((k) => !DRAWING_KINDS.includes(k))] : NODE_TYPES;
+  const kinds = inspectorKinds(drawn, map.context);
 
   if (!editing) {
     return (
@@ -83,7 +95,7 @@ export function MapInspector({ node, map, onEdits }: { node: LogosNode; map: Pic
             {lines.map((l) => {
               const out = l.from === node.id;
               return (
-                <li key={`${l.from}>${l.to}`}>
+                <li key={`${l.from}>${l.to}>${l.relation}`}>
                   <span className="lg-insp-arrow" aria-hidden="true">{out ? '→' : '←'}</span>
                   <span className="lg-insp-other">{name(out ? l.to : l.from)}</span>
                   {(l.label || l.when) && <span className="lg-insp-says">{l.label ?? l.when}</span>}
@@ -152,7 +164,7 @@ export function MapInspector({ node, map, onEdits }: { node: LogosNode; map: Pic
           {form.lines.map((l, i) => {
             const out = l.from === node.id;
             return (
-              <div key={`${l.from}>${l.to}`} className="lg-insp-line">
+              <div key={`${l.from}>${l.to}>${i}`} className="lg-insp-line">
                 <span className="lg-insp-other">
                   {out ? '→' : '←'} {name(out ? l.to : l.from)}
                 </span>

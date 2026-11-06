@@ -3526,13 +3526,15 @@ export function LogosApp({
    * no model is consulted about whether to do what they asked. A removal is
    * remembered on the map (`removed`) so the next extraction cannot undo it.
    */
-  function editMap(edits: MapEdit[]): string | null {
+  /** `prepaid`: the nodes it adds were taken from the month's allowance before it was applied (mapInline) */
+  function editMap(edits: MapEdit[], opts: { prepaid?: boolean } = {}): string | null {
     const current = sessionsRef.current.find((x) => x.id === activeIdRef.current);
     if (!current) return null;
     // THE FREE PLAN'S NODES (lib/entitlements.ts): ten a month across every map, the ones added by hand
     // included. Past them, an addition is refused here, with the paywall; the rest of an edit is not.
     const counting = !one && !!isSignedIn;
-    const adding = edits.some((e) => e.op === 'add' || e.op === 'drawing');
+    // what was granted before it was asked for here is not refused here (the server said yes; this page's count may lag)
+    const adding = !opts.prepaid && edits.some((e) => e.op === 'add' || e.op === 'drawing');
     if (counting && adding && spentOf('nodes')) {
       if (!ask('nodes-spent')) setError(boundaryNote('nodes'));
       return null;
@@ -3561,7 +3563,7 @@ export function LogosApp({
     const before = new Set(current.map.nodes.map((n) => n.id));
     const fresh = out.map.nodes.filter((n) => !before.has(n.id)).map((n) => n.id);
     // …and what was added is taken from the month's allowance on the server (app/api/logos/allowance)
-    if (counting && fresh.length) {
+    if (counting && fresh.length && !opts.prepaid) {
       void fetch('/api/logos/allowance', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -6224,7 +6226,7 @@ export function LogosApp({
    * "drawn", to open, edit, inspect and keep (lib/logos5/drawing.ts). An edit like any other: Undo takes
    * it back, the free plan counts its parts, and the drawing before it gives way. The map is shown.
    */
-  function mapInline(msg: Msg, n: number, spec: InlineSpec) {
+  async function mapInline(msg: Msg, n: number, spec: InlineSpec) {
     if (spec.type !== 'diagram') return;
     if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
       setError('You can look at this line of thinking, but not change it.');
@@ -6234,7 +6236,54 @@ export function LogosApp({
     // already there (opened before, from this reply or one like it): shown, not drawn again
     const there = drawingOf(mapRef.current);
     const same = !!there && there.title === drawing.title && there.nodes.length === drawing.nodes.length && drawing.nodes.every((d) => there.nodes.some((x) => x.label === d.label));
-    if (!same && !editMap([{ op: 'drawing', drawing }])) return;
+    if (!same) {
+      const current = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+      if (!current) return;
+      const counting = !one && !!isSignedIn;
+      if (!counting) {
+        if (!editMap([{ op: 'drawing', drawing }])) return;
+      } else {
+        // THE FREE PLAN'S NODES, TAKEN FIRST: what the drawing would add is asked for before anything changes,
+        // so a drawing the month cannot hold leaves the map — and the drawing already on it — exactly as they were
+        const dry = applyMapEdits(current.map, [{ op: 'drawing', drawing }]);
+        if (!dry.applied.length) {
+          if (dry.refused.length) setError(dry.refused[0]);
+          return;
+        }
+        const had = new Set(current.map.nodes.map((x) => x.id));
+        const fresh = dry.map.nodes.filter((x) => !had.has(x.id)).length;
+        const firstOfMap = !(current.map?.nodes ?? []).length;
+        if (fresh > 0) {
+          if (spentOf('nodes')) {
+            if (!ask('nodes-spent')) setError(boundaryNote('nodes'));
+            return;
+          }
+          if (firstOfMap && spentOf('maps')) {
+            if (!ask('maps-spent')) setError(boundaryNote('maps'));
+            return;
+          }
+          const r = await fetch('/api/logos/allowance', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ counter: 'nodes', n: fresh, sessionId: current.id, newMap: firstOfMap }),
+          }).catch(() => null);
+          if (!r || !r.ok) {
+            const body = r ? await r.json().catch(() => ({})) : {};
+            if (!r || r.status === 503) setError(typeof body?.error === 'string' ? body.error : 'Your free plan can’t be checked right now.');
+            else {
+              const c: Counter = body?.upgrade === 'maps' ? 'maps' : 'nodes';
+              if (!ask(reasonForCounter(c))) setError(typeof body?.error === 'string' ? body.error : boundaryNote(c));
+            }
+            void refreshUsage(current.id);
+            return;
+          }
+        }
+        // the line of thinking may have changed while the allowance was asked
+        if (activeIdRef.current !== current.id) return;
+        if (!editMap([{ op: 'drawing', drawing }], { prepaid: true })) return;
+        void refreshUsage(current.id);
+      }
+    }
     void msg;
     void n;
     // shown where it can be opened and edited: beside the board on a wide screen (One view), else the Logic Map view

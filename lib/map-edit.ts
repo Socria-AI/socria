@@ -45,8 +45,12 @@ export type MapEdit =
   | { op: 'at'; id: string; at: string }
   /** the region it sits inside — "Nucleus", "Cytoplasm" (empty takes it out) */
   | { op: 'group'; id: string; group: string }
-  /** what a connection says, and what kind it is: "evaporates", "is eaten by" (an empty label clears it) */
-  | { op: 'edge'; from: string; to: string; label?: string; relation?: LogosRelation }
+  /**
+   * what a connection says, and what kind it is: "evaporates", "is eaten by" (an empty label clears it). The
+   * line from `from` to `to` — of kind `was`, when two lines join the same cards — and only failing that the
+   * line the other way, for a command that named its ends loosely.
+   */
+  | { op: 'edge'; from: string; to: string; label?: string; relation?: LogosRelation; was?: LogosRelation }
   /** what the drawing is of — "The water cycle" (empty clears it) */
   | { op: 'title'; title: string }
   /** a drawing put on the map — a reply's diagram opened there (lib/logos5/drawing.ts); the drawing before gives way */
@@ -208,7 +212,9 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
     } else if (edit.op === 'edge') {
       const a = byId(edit.from), b = byId(edit.to);
       if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }
-      const at = edges.findIndex((e) => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id));
+      const kindOk = (e: (typeof edges)[number]) => !edit.was || e.relation === edit.was;
+      let at = edges.findIndex((e) => e.from === a.id && e.to === b.id && kindOk(e));
+      if (at < 0) at = edges.findIndex((e) => e.from === b.id && e.to === a.id && kindOk(e));
       if (at < 0) { refused.push(`${quote(a.label)} and ${quote(b.label)} are not connected.`); continue; }
       const relation = edit.relation === undefined ? undefined : (RELATIONS as readonly string[]).includes(edit.relation) ? edit.relation : null;
       if (edit.relation !== undefined && !relation) { refused.push(`A connection cannot be a ${String(edit.relation)}.`); continue; }

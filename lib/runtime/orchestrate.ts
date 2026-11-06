@@ -124,23 +124,40 @@ const DIAGRAM_NAMED: readonly (readonly [DiagramShape, RegExp])[] = [
  * The thing drawn is named, and it has parts in an order, a loop or a tree —
  * "draw the field" names none of these, and is a picture.
  */
+// HOW A REQUEST TO DRAW BEGINS: the opening ASKS reads below ("can you…", "please…", "I'd like you to…"), written
+// out here because the readers that use it are built as the module loads — at the start of the message or of a
+// sentence in it ("I have a test tomorrow. Draw the water cycle."). "What lessons can I draw from the hiring
+// process?" does not begin with a request to draw, and is a question.
+const DRAW_ASK = String.raw`(?:^|[.!?]\s+)(?:(?:hey|hi|ok(?:ay)?|so|and|also|now|great|thanks)[,!.]?\s+)?(?:(?:can|could|would|will)\s+you\s+(?:please\s+)?|please\s+|now\s+|let'?s\s+|i'?d\s+like\s+you\s+to\s+|i\s+want\s+you\s+to\s+|i\s+need\s+you\s+to\s+)?`;
+const DRAW_VERB = String.raw`${DRAW_ASK}(?:draw|diagram|sketch|map\s+out)\s+(?:me\s+|us\s+)?`;
 const DRAW_THE = String.raw`(?:out\s+)?(?:for\s+(?:me|us)\s+)?(?:the\s+|a\s+|an\s+|my\s+|our\s+)?`;
 const DRAWN_AS: readonly (readonly [DiagramShape, RegExp])[] = [
-  ['cycle', new RegExp(String.raw`\b(?:draw|diagram|sketch|show\s+(?:me|us))\s+${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:life\s*-?\s*cycle|cycle|feedback\s+loop)s?\b`, 'i')],
-  ['hierarchy', new RegExp(String.raw`\b(?:draw|diagram|sketch|show\s+(?:me|us))\s+${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:hierarchy|chain\s+of\s+command|family\s+tree|taxonomy|classification)\b`, 'i')],
-  ['process', new RegExp(String.raw`\b(?:draw|diagram|sketch)\s+${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:process|workflow|pipeline|stages|steps|phases|supply\s+chain|food\s+(?:chain|web))\b|\b(?:draw|diagram)\s+(?:out\s+)?(?:for\s+(?:me|us)\s+)?how\s+(?:[\w'-]+\s+){1,6}?(?:works?|happens?|becomes?|forms?|is\s+(?:made|produced|formed|passed)|are\s+(?:made|produced|formed)|develops?|spreads?|flows?)\b`, 'i')],
-  ['causal', new RegExp(String.raw`\b(?:draw|diagram|sketch|show\s+(?:me|us))\s+${DRAW_THE}(?:(?:main|root|key|underlying|likely)\s+)?(?:causes|effects|consequences)\s+(?:of|and)\b`, 'i')],
-  ['parts', new RegExp(String.raw`\b(?:draw|diagram|sketch)\s+${DRAW_THE}(?:main\s+)?(?:parts|anatomy|components|layers|organelles)\s+(?:of|in)\b`, 'i')],
+  ['cycle', new RegExp(String.raw`${DRAW_VERB}${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:life\s*-?\s*cycle|cycle|feedback\s+loop)s?\b`, 'i')],
+  ['hierarchy', new RegExp(String.raw`${DRAW_VERB}${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:hierarchy|chain\s+of\s+command|family\s+tree|taxonomy|classification)\b`, 'i')],
+  ['process', new RegExp(String.raw`${DRAW_VERB}${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:process|workflow|pipeline|stages|steps|phases|supply\s+chain|food\s+(?:chain|web))\b|${DRAW_ASK}(?:draw|diagram|map\s+out)\s+(?:me\s+|us\s+)?(?:for\s+(?:me|us)\s+)?how\s+(?:[\w'-]+\s+){1,6}?(?:works?|happens?|becomes?|forms?|is\s+(?:made|produced|formed|passed)|are\s+(?:made|produced|formed)|develops?|spreads?|flows?)\b`, 'i')],
+  ['causal', new RegExp(String.raw`${DRAW_VERB}${DRAW_THE}(?:(?:main|root|key|underlying|likely)\s+)?(?:causes|effects|consequences)\s+(?:of|and)\b`, 'i')],
+  ['parts', new RegExp(String.raw`${DRAW_VERB}${DRAW_THE}(?:main\s+)?(?:parts|anatomy|components|layers|organelles)\s+(?:of|in)\b`, 'i')],
 ];
 
-/** A diagram of something with that shape, named: "a diagram of the water cycle", "a chart of the stages of grief". */
+/** A diagram of something with that shape, named: "a diagram of the water cycle", "a map of the causes of the war". */
 const DIAGRAM_OF = new RegExp(
-  String.raw`\b(?:diagram|chart|map|illustration|picture)\s+(?:of|showing|for|explaining|that\s+shows|to\s+show)\s+(?:me\s+)?(?:the\s+|a\s+|an\s+)?(?:[\w'-]+\s+){0,4}?(?:(life\s*-?\s*cycle|cycle|feedback\s+loop)|(process|workflow|pipeline|stages|steps|phases|supply\s+chain|food\s+(?:chain|web))|(hierarchy|chain\s+of\s+command|family\s+tree|taxonomy|classification|organi[sz]ation(?:al)?\s+structure)|(causes|effects|consequences)|(parts|anatomy|components|layers|organelles))\b`,
+  String.raw`\b(?:diagram|map|illustration|picture)\s+(?:of|showing|for|explaining|that\s+shows|to\s+show)\s+(?:me\s+)?(?:the\s+|a\s+|an\s+)?(?:[\w'-]+\s+){0,4}?(?:(life\s*-?\s*cycle|cycle|feedback\s+loop)|(process|workflow|pipeline|stages|steps|phases|supply\s+chain|food\s+(?:chain|web))|(hierarchy|chain\s+of\s+command|family\s+tree|taxonomy|classification|organi[sz]ation(?:al)?\s+structure)|(causes|effects|consequences)|(parts|anatomy|components|layers|organelles))\b`,
   'i'
 );
 const OF_SHAPES: readonly DiagramShape[] = ['cycle', 'process', 'hierarchy', 'causal', 'parts'];
 /** …or a diagram of how something works: "a diagram of how a bill becomes law". */
 const DIAGRAM_OF_HOW = /\b(?:diagram|map)\s+(?:of|showing|explaining|that\s+shows|to\s+show)\s+(?:me\s+)?how\s+(?:[\w'-]+\s+){1,6}?(?:works?|happens?|becomes?|forms?|is\s+(?:made|produced|formed|passed)|are\s+(?:made|produced|formed)|develops?|spreads?|flows?)\b/i;
+
+/**
+ * NOT A DIAGRAM OF A STRUCTURE, whatever else it says. A chart, a graph or a
+ * plot is data to see ("a bar chart of the causes of death", "a gantt chart
+ * of the phases of our launch", "a graph of the cycle of sin x"); forces, a
+ * field, a circuit or a curve are a picture ("a labelled diagram of the
+ * forces on a block"). Both are made in Artifacts, as before — unless a
+ * structural diagram is named outright (a flowchart, an org chart).
+ */
+const DATA_VISUAL = /\b(?:chart|graph|plot|histogram|scatter|spreadsheet|gantt)s?\b/i;
+const PICTURE_SUBJECT = /\b(?:forces?|free[- ]body|vectors?|(?:electric|magnetic|gravitational|vector)\s+fields?|field\s+lines|circuits?|ray\s+diagrams?|waves?|projectiles?|inclined?\s+planes?|pendulums?|orbits?|functions?|curves?|equations?)\b/i;
 
 /**
  * Made in Artifacts all the same: Artifacts named ("a flowchart in
@@ -154,7 +171,10 @@ const MADE_FROM_LIST = /^make\s+an?\s+[\w\s/-]{2,40}?(?::|\s+from\s+this\s+conve
 export function diagramAsked(text: string): DiagramShape | null {
   const t = clean(normalizeTyping(text ?? ''));
   if (!t || INTO_ARTIFACTS.test(t) || MADE_FROM_LIST.test(t) || /\bvenn\b/i.test(t)) return null;
-  for (const [shape, re] of DIAGRAM_NAMED) if (re.test(t)) return shape;
+  const picture = PICTURE_SUBJECT.test(t);
+  // a structural diagram named outright wins — but a labelled or block diagram of forces or a circuit is a picture
+  for (const [shape, re] of DIAGRAM_NAMED) if (re.test(t) && !(picture && (shape === 'parts' || shape === 'system'))) return shape;
+  if (picture || DATA_VISUAL.test(t)) return null;
   for (const [shape, re] of DRAWN_AS) if (re.test(t)) return shape;
   const of = DIAGRAM_OF.exec(t);
   if (of) for (let g = 1; g <= OF_SHAPES.length; g++) if (of[g]) return OF_SHAPES[g - 1];
@@ -178,6 +198,9 @@ const STAGES_OF = /\b(?:the\s+)?(?:stages|phases|steps)\s+(?:of|in)\s+(?!(?:my|o
 export function drawable(text: string): DiagramShape | null {
   const t = clean(normalizeTyping(text ?? ''));
   if (!t || t.length > 400) return null;
+  // a chart, a graph or a plot asked for is data to see, made in Artifacts: "a bar chart of the causes of death"
+  // is not a cause-and-effect drawing; nor is anything made in Artifacts or from the Make list
+  if (DATA_VISUAL.test(t) || INTO_ARTIFACTS.test(t) || MADE_FROM_LIST.test(t)) return null;
   const parts = partsShape(t);
   if (parts === 'cycle') return 'cycle';
   if (parts === 'tree' || parts === 'types') return 'hierarchy';

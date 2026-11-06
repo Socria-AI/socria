@@ -291,7 +291,7 @@ export const GRAMMARS: Record<GrammarId, Grammar> = {
       state: 'a form or condition the thing is in between stages',
       event: 'a moment that recurs each time round',
     },
-    called: ['cycle', 'life cycle', 'lifecycle', 'loop', 'feedback loop', 'circular diagram', 'cycle diagram', 'round'],
+    called: ['cycle', 'life cycle', 'lifecycle', 'feedback loop', 'circular diagram', 'cycle diagram'],
     draws: ['cycle', 'flow'],
     ordered: true,
   },
@@ -306,7 +306,7 @@ export const GRAMMARS: Record<GrammarId, Grammar> = {
       whole: 'the top of a breakdown',
       part: 'something it breaks down into',
     },
-    called: ['hierarchy', 'tree', 'tree diagram', 'taxonomy', 'classification', 'org chart', 'organisation chart', 'organization chart', 'family tree', 'breakdown', 'outline'],
+    called: ['hierarchy', 'tree', 'tree diagram', 'taxonomy', 'classification', 'org chart', 'organisation chart', 'organization chart', 'family tree'],
     draws: ['tree', 'structure'],
     ordered: false,
   },
@@ -744,17 +744,23 @@ const VERB = /\b(show|draw|see|view|display|lay|map|make|turn|treat|structure|or
  * says outright that the thing IS one ("this is really a timeline"). A
  * subject that merely mentions a process is not a correction.
  */
+/** The shapes only a drawing takes (Logos 5.5): named only by asking for them. */
+const DRAWN_SHAPES: ReadonlySet<GrammarId> = new Set<GrammarId>(['cycle', 'hierarchy', 'concept', 'causal', 'parts']);
+
 export function statedBuilding(text: unknown): GrammarId | null {
   if (typeof text !== 'string') return null;
   const t = text.toLowerCase().replace(/\s+/g, ' ').slice(0, 400);
   for (const g of GRAMMAR_IDS) {
+    // a drawing's shapes are named only as a request ("show this as a cycle", "turn it into a family tree"):
+    // "it's round", "this is a tree" or "the parts are cheap" say nothing about the map
+    const asked = DRAWN_SHAPES.has(g);
     for (const name of GRAMMARS[g].called) {
       const n = name.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
       const asA = new RegExp(`\\bas (?:a |an |the )?${n}\\b`);
       const isA = new RegExp(`\\b(?:this|it|that)(?: is|'s| should be| would be)(?: really| more| more like| actually| basically)? (?:a |an )?${n}\\b`);
       const into = new RegExp(`\\b(?:into|in) (?:a |an )?${n}(?: view| form| shape)?\\b`);
       if (asA.test(t) && VERB.test(t)) return g;
-      if (isA.test(t) && !/\?\s*$/.test(t)) return g;
+      if (!asked && isA.test(t) && !/\?\s*$/.test(t)) return g;
       if (into.test(t) && /\b(turn|make|put|lay|organi[sz]e|restructure|reshape|convert)\b/.test(t)) return g;
     }
   }

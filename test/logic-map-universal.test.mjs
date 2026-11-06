@@ -17,6 +17,8 @@
 //   7. editing       a drawing edited by hand, deterministically
 //   8. the free plan a drawing kept whole or not at all, never over-charged
 //   9. AR and lenses every new connection has words, every lens a caption
+//  10. integration   a reply's diagram, the Logic Map and Artifacts
+//  11. review        what an independent review found, each held here
 
 import { readFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
@@ -88,6 +90,9 @@ console.log('\n=== 1. the model: anything at all, drawn ===');
   const mt = Object.fromEntries(math.nodes.map((x) => [x.id, x.type]));
   ok('a mathematical map reads "quantity" as a given, as it always did (the working lens solves from it)', mt.a === 'given', J(mt));
   ok('…and "process" and "mechanism" as concepts, as before', mt.b === 'concept' && mt.c === 'concept', J(mt));
+  const mathDrawn = U.sanitizeMap({ context: 'math', nodes: [drawn('m', 'quantity', 'Mass'), drawn('d', 'process', 'Diffusion'), n('g', 'quantity', 'a = 3')], edges: [] });
+  const md = Object.fromEntries(mathDrawn.nodes.map((x) => [x.id, x.type]));
+  ok('…but a drawing\'s parts are what they say they are, in a mathematical map too (review)', md.m === 'quantity' && md.d === 'process' && md.g === 'given', J(md));
 
   const bad = U.sanitizeMap({ nodes: [n('a', 'claim', 'X', { origin: 'painted' })], edges: [e('a', 'a', 'teleports')] });
   ok('an origin that is not one is dropped', !bad.nodes[0].origin);
@@ -132,6 +137,11 @@ console.log('\n=== 4. the shapes: cycle, hierarchy, concept map, cause and effec
   for (const r of ['stage', 'category', 'member', 'concept', 'cause', 'effect', 'whole', 'part', 'input', 'output']) ok(`a role: ${r}`, U.ROLES.includes(r));
   for (const [said, want] of [['show this as a cycle', 'cycle'], ['turn it into a family tree', 'hierarchy'], ['lay this out as a concept map', 'concept'], ['show it as a fishbone', 'causal'], ['make this into a labelled diagram', 'parts']])
     ok(`said: "${said}" → ${want}`, U.statedBuilding(said) === want, U.statedBuilding(said));
+  // a drawing's shapes are named only by asking for one: what a thing IS in passing is not a request (review)
+  for (const said of ["No, the earth isn't flat, it's round.", 'This is an outline for my essay', 'This is a breakdown of my costs', "it's a tree", 'it loops back round', 'this is really a cycle'])
+    ok(`said in passing: "${said}" — no shape`, U.statedBuilding(said) === null, U.statedBuilding(said));
+  for (const [said, want] of [['this is really a timeline', 'timeline'], ["it's really a process", 'process']])
+    ok(`…while a thinking shape said outright still is one: "${said}" → ${want}`, U.statedBuilding(said) === want, U.statedBuilding(said));
   const water = U.sanitizeMap(WATER);
   ok('the water cycle has a loop', U.hasLoop(water));
   ok('…and satisfies the cycle', U.satisfies(water, 'cycle'));
@@ -151,13 +161,16 @@ console.log('\n=== 5. routing: a diagram asked for opens the Logic Map ===');
 {
   const asked = [
     ['draw a flowchart of how a bill becomes law', 'process'], ['make a flowchart of the scientific method', 'process'], ['Flowchart for troubleshooting a printer', 'process'],
-    ['draw the water cycle', 'cycle'], ['diagram the krebs cycle', 'cycle'], ['show me the carbon cycle', 'cycle'], ['draw the life cycle of a frog', 'cycle'],
-    ['draw an org chart for a small startup', 'hierarchy'], ['family tree of the Tudors', 'hierarchy'], ['show me the hierarchy of the Catholic Church', 'hierarchy'], ['tree diagram for flipping two coins', 'hierarchy'],
+    ['draw the water cycle', 'cycle'], ['diagram the krebs cycle', 'cycle'], ['can you draw the water cycle?', 'cycle'], ['draw the life cycle of a frog', 'cycle'],
+    ['draw an org chart for a small startup', 'hierarchy'], ['family tree of the Tudors', 'hierarchy'], ['please draw the hierarchy of the Catholic Church', 'hierarchy'], ['tree diagram for flipping two coins', 'hierarchy'],
     ['make a cause and effect diagram of the Great Depression', 'causal'], ['fishbone diagram for late deliveries', 'causal'], ['sketch the causes of World War 1', 'causal'],
     ['labelled diagram of a plant cell', 'parts'], ['draw the parts of a flower', 'parts'], ['draw the layers of the earth', 'parts'],
     ['block diagram of a computer', 'system'], ['draw how vaccines work', 'process'], ['diagram of how a bill becomes law', 'process'],
     ['show me a diagram of the water cycle', 'cycle'], ['make a diagram of the stages of mitosis', 'process'], ['timeline diagram of the space race', 'timeline'],
     ['can you draw a concept diagram of photosynthesis?', 'concept'],
+    ['Could you please diagram the krebs cycle', 'cycle'], ['ok, now draw the causes of World War 1', 'causal'], ["I'd like you to draw the layers of the earth", 'parts'],
+    ['draw a flowchart of how a circuit breaker trips', 'process'], ['a map of the causes of the war', 'causal'],
+    ['I have a test tomorrow. Draw the water cycle.', 'cycle'], ['Thanks! Now can you draw the life cycle of a frog?', 'cycle'],
   ];
   for (const [t, shape] of asked) {
     const r = U.routeTurn({ text: t });
@@ -171,9 +184,21 @@ console.log('\n=== 5. routing: a diagram asked for opens the Logic Map ===');
     ['plot y = x^2 and y = 2x + 1', 'visual'], ['visualize the data', 'visual'],
     ['show me the steps to solve 2x+3=7', 'conversation'], ['Can you show me how to factor this?', 'conversation'], ['how does a pendulum work?', 'conversation'],
     ['Illustrate the nitrogen cycle', 'conversation'], ['break down the water cycle for me', 'conversation'],
+    // what the review found opening the Logic Map that should not: a chart is data to see, forces and
+    // circuits are a picture, "draw" in a question is not a request to draw, and "show me" is not "draw"
+    ['make a gantt chart of the phases of our launch', 'visual'], ['make a bar chart of the causes of death in the UK', 'visual'], ['Make a bar chart showing my steps per day', 'visual'],
+    ['draw a graph of the cycle of sin x', 'visual'], ['draw a labelled diagram of the forces on a block on an inclined plane', 'visual'], ['pie chart of the parts of my budget', 'visual'],
+    ['chart of the stages of grief', 'visual'], ['labelled diagram of an electric circuit', 'conversation'],
+    ['What lessons can I draw from the hiring process?', 'conversation'], ['I want to draw a line under this project', 'conversation'], ['he drew the hierarchy out on a napkin', 'conversation'],
+    ['show me the class hierarchy in this code', 'conversation'], ['show me the React component lifecycle methods', 'conversation'],
+    ['What lessons can I draw from the hiring process? I think it went badly.', 'conversation'], ['I drew the water cycle in class.', 'conversation'],
   ];
   for (const [t, intent] of stays) ok(`"${t}" — not moved (${intent})`, U.routeTurn({ text: t }).intent === intent && !U.diagramAsked(t), J(U.routeTurn({ text: t })));
   ok('a picture asked for is still something to see in Artifacts', U.askedToSee('Draw the field') && !U.askedToSee('draw the water cycle'));
+  for (const t of ['make a bar chart of the causes of death in the UK', 'chart of the stages of grief', 'make a gantt chart of the phases of our launch', 'Make a flowchart: how a bill becomes law'])
+    ok(`"${t}" — a chart or the Make list is never drawn on the map in the background either`, !U.drawable(t) && !U.routeTurn({ text: t }).draw, J(U.routeTurn({ text: t })));
+  for (const t of ['show me the class hierarchy in this code', 'show me the React component lifecycle methods'])
+    ok(`"${t}" — nothing drawn: neither a cycle nor an institution's hierarchy`, !U.drawable(t), U.drawable(t));
 }
 
 console.log('\n=== 6. the map pass: drawn beside a question whose subject has a shape ===');
@@ -182,6 +207,8 @@ console.log('\n=== 6. the map pass: drawn beside a question whose subject has a 
     ['explain the water cycle', 'cycle'], ['what caused World War I?', 'causal'], ['how is the UK parliament structured?', 'hierarchy'], ['what are the stages of mitosis?', 'process'],
     ['what are the types of rock?', 'hierarchy'], ['give me a timeline of the French Revolution', 'timeline'], ['how does a bill become law?', 'process'], ['effects of social media on teenagers', 'causal'],
     ['Illustrate the nitrogen cycle', 'cycle'],
+    // "show me" asks to see the subject, not to open the map: answered in the conversation, drawn beside it
+    ['show me the carbon cycle', 'cycle'], ['show me the hierarchy of the Catholic Church', 'hierarchy'], ['tell me about the carbon cycle', 'cycle'], ['show me the causes of the Great Depression', 'causal'],
   ];
   for (const [t, shape] of shaped) {
     const r = U.routeTurn({ text: t });
@@ -338,6 +365,52 @@ console.log('\n=== 10. a drawing between a reply, the Logic Map and Artifacts ==
   const flow = U.sanitizeMap({ title: 'How a bill becomes law', building: { kind: 'process' }, nodes: [drawn('a', 'event', 'Introduced', { role: 'start' }), drawn('b', 'step', 'Floor vote', { role: 'branch' }), drawn('c', 'event', 'Becomes law', { role: 'end' })], edges: [e('a', 'b', 'precedes'), e('b', 'c', 'leads_to', { when: 'passes' })] });
   const fs = U.sanitizeDiagram(U.diagramFromDrawing(flow));
   ok('…a process is kept as a flow, its conditions on its lines', fs.view === 'flow' && fs.edges.find((x) => x.from === 'b').label === 'passes', J(fs));
+}
+
+console.log('\n=== 11. what an independent review found, each held here ===');
+{
+  // AN EDIT REACHES THE LINE IT MEANS: two lines between the same two cards, or one each way
+  const both = U.sanitizeMap({ context: 'learning', nodes: [n('a', 'claim', 'Rent is too high'), n('b', 'claim', 'Moving would help')], edges: [e('a', 'b', 'supports'), e('a', 'b', 'conflicts')] });
+  ok('two lines between the same two cards are both kept by a save', both.edges.length === 2, J(both.edges));
+  const r1 = U.applyMapEdits(both, [{ op: 'edge', from: 'a', to: 'b', was: 'conflicts', label: 'but not for long' }]);
+  ok('an edit names its line by kind: the second line changes, the first does not', r1.map.edges.find((x) => x.relation === 'conflicts').label === 'but not for long' && !r1.map.edges.find((x) => x.relation === 'supports').label, J(r1.map.edges));
+  ok('…a kind no line between them has is refused, and said', U.applyMapEdits(both, [{ op: 'edge', from: 'a', to: 'b', was: 'depends', label: 'x' }]).refused.length === 1);
+  const loop = U.sanitizeMap({ nodes: [drawn('x', 'state', 'Ice'), drawn('y', 'state', 'Water')], edges: [e('y', 'x', 'becomes', { label: 'freezes' }), e('x', 'y', 'becomes', { label: 'melts' })] });
+  const r2 = U.applyMapEdits(loop, [{ op: 'edge', from: 'x', to: 'y', label: 'thaws' }]);
+  ok('a line each way: the edit reaches the line in the direction named, not the first one found', r2.map.edges.find((x) => x.from === 'x').label === 'thaws' && r2.map.edges.find((x) => x.from === 'y').label === 'freezes', J(r2.map.edges));
+
+  // THE INSPECTOR'S FORM: each row is the line at its place
+  const node = both.nodes.find((x) => x.id === 'a');
+  const lines = both.edges.filter((x) => x.from === 'a' || x.to === 'a');
+  const form = { label: node.label, type: node.type, detail: '', at: '', group: '', lines: lines.map((l) => ({ from: l.from, to: l.to, label: l.label ?? '', relation: l.relation })) };
+  ok('the inspector: a form left as it was makes no edit', U.inspectorEdits(node, lines, form).length === 0);
+  const words = U.inspectorEdits(node, lines, { ...form, lines: form.lines.map((l, i) => (i === 1 ? { ...l, label: 'but not for long' } : l)) });
+  ok('…the second row edited names the second line by its kind', words.length === 1 && words[0].op === 'edge' && words[0].was === 'conflicts' && words[0].label === 'but not for long', J(words));
+  const said = U.applyMapEdits(both, words).map.edges;
+  ok('…and applied, it changes that line alone', said.find((x) => x.relation === 'conflicts').label === 'but not for long' && !said.find((x) => x.relation === 'supports').label, J(said));
+  const kind = U.applyMapEdits(both, U.inspectorEdits(node, lines, { ...form, lines: form.lines.map((l, i) => (i === 0 ? { ...l, relation: 'depends' } : l)) })).map.edges;
+  ok('…a row\'s kind changed changes that line\'s kind, the other line kept', kind.some((x) => x.relation === 'depends') && kind.some((x) => x.relation === 'conflicts') && !kind.some((x) => x.relation === 'supports'), J(kind));
+
+  // THE KINDS IT OFFERS: none that a save would turn into another
+  const keeps = (context, origin) => U.inspectorKinds(origin === 'drawn', context).filter((k) => U.sanitizeMap({ context, nodes: [n('a', k, 'X', origin ? { origin } : {})], edges: [] }).nodes[0]?.type !== k);
+  ok('the inspector offers a mathematical map\'s own cards no kind a save would change ("process", "quantity")', !U.inspectorKinds(false, 'math').includes('process') && !U.inspectorKinds(false, 'math').includes('quantity') && keeps('math').length === 0, J(keeps('math')));
+  ok('…a drawn part there, every kind, a drawing\'s first — each saved as itself', U.inspectorKinds(true, 'math')[0] === 'entity' && U.inspectorKinds(true, 'math').includes('quantity') && keeps('math', 'drawn').length === 0, J(keeps('math', 'drawn')));
+  ok('…any other map, every kind', U.inspectorKinds(false, 'learning').length === U.NODE_TYPES.length && keeps('learning').length === 0, J(keeps('learning')));
+
+  // THE FREE PLAN: never an empty map charged, a drawing left off said plainly
+  ok('a drawing left off says what it needed and what was left', U.drawingNote(5, 1, 0) === 'This drawing needs 5 Logic Map nodes and only 1 Logic Map node is left this month, so it was not drawn — never half of it.', U.drawingNote(5, 1, 0));
+  ok('…and that their own new ideas were kept, when there were some', U.drawingNote(4, 0, 2) === 'This drawing needs 4 Logic Map nodes and none are left this month, so it was not drawn — never half of it. Your own new ideas were kept.', U.drawingNote(4, 0, 2));
+  const route = readFileSync(join(here, '..', 'app', 'api', 'logos', 'map', 'route.ts'), 'utf8');
+  const read = route.indexOf("room = await left(userId, plan, 'nodes')"), claim = route.indexOf("claimUnit(userId, plan, 'maps', mapMark)");
+  ok('the meter plans what it keeps before a first map is claimed, and claims none for a map left empty', read > 0 && claim > read && /const keeps = map\.nodes\.length - added\.length \+ want;/.test(route) && /if \(!hadMap && map\.nodes\.length > 0 && keeps > 0\)/.test(route));
+  ok('…a drawing left off is said in its own words, and takes its title with it', /drawingNote\(dl\.needed, dl\.left, dl\.own\)/.test(route) && /a drawing left off takes its title with it/.test(route));
+  ok('unasked, the map pass is never told to draw for a free account — the server agrees with the page', /const shaped: DiagramShape \| null = !drawing && !metered && typeof said === 'string' \? drawable\(said\) : null;/.test(route));
+  const app = readFileSync(join(here, '..', 'components', 'LogosApp.tsx'), 'utf8');
+  const at = app.indexOf('async function mapInline(');
+  const inline = app.slice(at, at + 5000);
+  const dry = inline.indexOf("applyMapEdits(current.map, [{ op: 'drawing', drawing }])"), ask = inline.indexOf("fetch('/api/logos/allowance'"), put = inline.indexOf("editMap([{ op: 'drawing', drawing }], { prepaid: true })");
+  ok('a reply\'s diagram opened on the map, on the free plan: the allowance is asked first, the map changed only after', at > 0 && dry > 0 && ask > dry && put > ask, J({ at, dry, ask, put }));
+  ok('…and the map is not charged for it a second time, nor refused by the page\'s own count, which may lag what the server granted', /if \(counting && fresh\.length && !opts\.prepaid\)/.test(app) && /const adding = !opts\.prepaid && edits\.some/.test(app));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);
