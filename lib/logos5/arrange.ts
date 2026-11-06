@@ -47,6 +47,12 @@ export interface Display {
   labels: LabelLevel;
   color: ColorBy;
   size: SizeBy;
+  /**
+   * What Socria remembers, hung beside the conversations it came from — only
+   * ever drawn for a person signed in, who has a memory; on until they turn it
+   * off. How the map is shown, so Undo does not take it back.
+   */
+  memory: boolean;
 }
 
 /** A conversation put somewhere by hand: relative to its cluster's origin, and only while it is in that cluster. */
@@ -130,7 +136,7 @@ export const SIZE_BY: readonly SizeBy[] = ['ideas', 'recency', 'same'];
 export const SORTS: readonly SortBy[] = ['manual', 'recent', 'started', 'name', 'size'];
 
 /** Put down by hand, a conversation lands on the grid unless the person turns that off: the map stays tidy. */
-export const DEFAULT_DISPLAY: Display = { chats: true, ideas: true, snap: true, labels: 'ideas', color: 'project', size: 'ideas' };
+export const DEFAULT_DISPLAY: Display = { chats: true, ideas: true, snap: true, labels: 'ideas', color: 'project', size: 'ideas', memory: true };
 
 export function emptyArrangement(): Arrangement {
   return {
@@ -202,6 +208,7 @@ function displayOf(v: unknown): Display {
     labels: oneOf(d.labels, LABELS, DEFAULT_DISPLAY.labels),
     color: oneOf(d.color, COLOR_BY, DEFAULT_DISPLAY.color),
     size: oneOf(d.size, SIZE_BY, DEFAULT_DISPLAY.size),
+    memory: typeof d.memory === 'boolean' ? d.memory : DEFAULT_DISPLAY.memory,
   };
 }
 
@@ -438,7 +445,8 @@ export function saveView(a: Arrangement, id: string, name: string, query: string
 export function applyView(a: Arrangement, id: string): Arrangement {
   const v = a.views.find((x) => x.id === id);
   if (!v) return a;
-  return { ...a, mode: v.mode, sort: v.sort, display: { ...v.display }, projects: v.projects ? [...v.projects] : null };
+  // what Socria remembers has its own key on the map, and a view saved before it existed would turn it back on: it stays as it is
+  return { ...a, mode: v.mode, sort: v.sort, display: { ...v.display, memory: a.display.memory }, projects: v.projects ? [...v.projects] : null };
 }
 
 export function removeView(a: Arrangement, id: string): Arrangement {

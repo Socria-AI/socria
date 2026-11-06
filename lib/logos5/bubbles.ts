@@ -21,6 +21,11 @@
 // holds, pressed to open; an empty one waits to be dragged into. Room is kept
 // at the end for a new one.
 //
+// With Memory on, what Socria remembers hangs beside the conversation it came
+// from on a dotted tether — placed last, round what is already drawn, so
+// nothing else moves; one from two subjects the map already joins is said on
+// that link's card instead (memoryAtlas.ts says what each memory is).
+//
 // Every position is computed here, deterministically — no randomness, no
 // clock (the time is passed in) — so the same conversations draw the same
 // map on every screen.
@@ -77,6 +82,35 @@ export interface BubbleIn {
    * what it builds on, as it did.
    */
   strictToday?: boolean;
+  /**
+   * What Socria remembers, to hang beside the conversations it came from
+   * (Memory on), the most important first. Absent or empty, nothing about the
+   * map changes.
+   */
+  memories?: readonly BubbleMemoryIn[];
+}
+
+/** A memory as the map places it: its words, and the conversations it came from, in order. */
+export interface BubbleMemoryIn {
+  id: string;
+  text: string;
+  from: readonly string[];
+}
+
+/** A memory placed: its mark, the chip of its words, and the conversations it hangs from. */
+export interface BubbleMemory {
+  id: string;
+  /** the conversations drawn here that it hangs from — a tether from each one's edge to the mark */
+  from: string[];
+  /** the mark's centre */
+  x: number;
+  y: number;
+  /** the paper chip: the mark and its words */
+  box: Box;
+  /** which end of the chip the mark is at: the end nearest what it hangs from */
+  end: 'start' | 'end';
+  /** its words as the map says them (cut when long; the whole of them is its title) */
+  words: string;
 }
 
 export interface BubbleHub {
@@ -160,6 +194,10 @@ export interface BubbleCard extends Box {
   says: { text: string; em?: boolean }[];
   /** when they were opened */
   note: string;
+  /** what Socria remembers from both, said on the card instead of the computed "why" (Memory on) */
+  memory?: string;
+  /** with a memory, where its curve rises to: where it rose to the card the computed "why" would have */
+  rise?: Pt;
 }
 
 export interface BubbleLink {
@@ -196,6 +234,8 @@ export interface BubbleLayout {
   card: BubbleCard | null;
   /** where a new Project is made, at the end of the folded row; null when there is no room asked for */
   make: Box | null;
+  /** what Socria remembers, each beside what it came from (empty with Memory off) */
+  memories: BubbleMemory[];
   /** every conversation drawn: where, how big, which subject */
   byId: Map<string, { x: number; y: number; r: number; g: string; hub: boolean }>;
   bounds: Box;
@@ -256,6 +296,20 @@ const OPENED_MAX = 8;
 const QUICK_MAX = 3;
 /** links drawn across, at most */
 const LINKS_MAX = 6;
+/**
+ * What Socria remembers: a mark (an 11px ring or square) and its words in the
+ * serif italic at 15px, on a paper chip 20px tall — and how far from what it
+ * hangs from its mark may be, nearest first.
+ */
+const MEM_MARK = 11;
+const MEM_GAP = 8;
+const MEM_PAD = 5;
+const MEM_H = 20;
+const MEM_WORDS = 34;
+const MEM_RINGS = [26, 42, 60, 82, 108, 138, 172];
+const MEM_RINGS_NARROW = [22, 36, 52, 72, 96, 124];
+/** the ways a memory can hang from what it came from, round the clock */
+const MEM_ANGLES = Array.from({ length: 24 }, (_, i) => -165 + i * 15);
 
 const DAY = 86_400_000;
 const DAYS = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
@@ -316,6 +370,16 @@ export function subjectWords(h: Pick<Home, 'kind' | 'name' | 'subject'>): { fiel
 const capsW = (s: string) => Math.round(s.length * 8.7 + 10);
 /** A quick question's words at 13px, as wide as they are drawn — about, and a little over rather than under. */
 const wordsW = (s: string) => s.length * 7.1;
+/** A memory's words in the serif italic at 15px: about, and a little over rather than under. */
+const memWordsW = (s: string) => Math.round(s.length * 5.9 + 6);
+/** A memory's words as the map says them: one line, cut at a word when long. */
+export function memoryWords(text: string): string {
+  const t = text.replace(/\s+/g, ' ').trim();
+  if (t.length <= MEM_WORDS) return t;
+  const cut = t.slice(0, MEM_WORDS - 1);
+  const at = cut.lastIndexOf(' ');
+  return `${(at > MEM_WORDS / 2 ? cut.slice(0, at) : cut).replace(/[\s,;:.–—-]+$/, '')}…`;
+}
 
 // ── geometry ─────────────────────────────────────────────────────────
 
@@ -866,23 +930,30 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   }
   const links = [...own, ...ideaLinks.slice(0, Math.max(0, LINKS_MAX - own.length))];
 
+  // ── what Socria remembers: which link's card says it, and what each of the rest hangs from ──
+  const remembered = input.memories?.length ? planMemories(input.memories, placed, links, tileOf) : null;
+
   // ── the card over the one that matters most, its curve rising to meet it ──
-  const card = cardOver(links, { hubs, dots, clusters, placed, tileOf, homes: input.homes, now: input.now, narrow, haloId: hubs.find((h) => h.halo)?.id ?? null, chosen: input.cardFor ?? null });
+  const card = cardOver(links, { hubs, dots, clusters, placed, tileOf, homes: input.homes, now: input.now, narrow, haloId: hubs.find((h) => h.halo)?.id ?? null, chosen: input.cardFor ?? null, onLink: remembered?.onLink });
   if (card) {
     const l = links.find((x) => x.key === card.link)!;
     const p = placed.get(l.a)!;
     const q = placed.get(l.b)!;
     const stacked = Math.abs(q.x - p.x) < Math.abs(q.y - p.y) * 0.6;
     // over the arc: its top tucked just under the card's foot; one over the other: through the card
-    Object.assign(l, curveThrough(p, q, stacked ? { x: card.x + card.w / 2, y: card.y + card.h / 2 } : { x: card.x + card.w / 2, y: card.y + card.h - 6 }));
+    Object.assign(l, curveThrough(p, q, card.rise ?? (stacked ? { x: card.x + card.w / 2, y: card.y + card.h / 2 } : { x: card.x + card.w / 2, y: card.y + card.h - 6 })));
   }
 
-  const bounds = boxAround([
+  let bounds = boxAround([
     ...clusters.map((c) => (c.folded ? foldedBox(c) : { x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r })),
     ...(card ? [card] : []),
     ...(make ? [make] : []),
   ]);
-  return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, make, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
+  // placed last, round everything already drawn — inside the room the map already takes where they fit, so it is fitted to the screen as it was
+  const memories = remembered ? placeMemories(remembered.hang, { hubs, dots, clusters, placed, links, spokes, joins, card, make, area: bounds, narrow }) : [];
+  const inside = (b: Box) => b.x >= bounds.x && b.y >= bounds.y && b.x + b.w <= bounds.x + bounds.w && b.y + b.h <= bounds.y + bounds.h;
+  if (memories.some((m) => !inside(m.box))) bounds = boxAround([bounds, ...memories.map((m) => m.box)]);
+  return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, make, memories, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
 }
 
 /** A folded one's room: its name and the dots under it — or, empty, the words that say so. */
@@ -932,10 +1003,12 @@ function cardOver(
     narrow: boolean;
     haloId: string | null;
     chosen: string | null;
+    /** what Socria remembers from both ends of a link (Memory on), by the link's key: said on its card */
+    onLink?: ReadonlyMap<string, BubbleMemoryIn>;
   }
 ): BubbleCard | null {
-  // the person's own across two subjects, then an idea across two, then the person's own within one; the one by the halo, then the newest
-  const rank = (l: BubbleLink) => (l.kind === 'own' ? (l.across ? 4 : 2) : 3) + (o.haloId && (l.a === o.haloId || l.b === o.haloId) ? 0.5 : 0);
+  // the person's own across two subjects, then an idea across two, then the person's own within one; the one by the halo, then one with a memory to say, then the newest
+  const rank = (l: BubbleLink) => (l.kind === 'own' ? (l.across ? 4 : 2) : 3) + (o.haloId && (l.a === o.haloId || l.b === o.haloId) ? 0.5 : 0) + (o.onLink?.has(l.key) ? 0.25 : 0);
   const newest = (l: BubbleLink) => Math.max(o.tileOf.get(l.a)?.at ?? 0, o.tileOf.get(l.b)?.at ?? 0);
   const pick = links.find((l) => l.key === o.chosen) ?? [...links].filter((l) => l.across || l.kind === 'own').sort((a, b) => rank(b) - rank(a) || newest(b) - newest(a) || (a.key < b.key ? -1 : 1))[0];
   const A = pick && o.tileOf.get(pick.a);
@@ -966,6 +1039,9 @@ function cardOver(
   const perLine = Math.floor((w - 36) / 6.6);
   const lines = (s: string) => Math.max(1, Math.ceil(s.length / perLine));
   const h = Math.round(16 + 26 + 4 + lines(`${says.map((x) => x.text).join('')} ${note}`) * 21 + 16);
+  // a memory instead of the "why": its kind in capitals on two lines, its words in the serif at 23px, where it was said, and Edit · Forget
+  const memory = o.onLink?.get(pick.key) ?? null;
+  const memH = memory ? Math.round(14 + 33 + 6 + Math.max(1, Math.ceil((memory.text.length + 1) / Math.floor((w - 60) / 8.6))) * 25.5 + 6 + Math.max(1, Math.ceil(`You said it in “${A.title}” and again in “${B.title}”. The map joins them by ${pick.idea ?? ''}.`.length / Math.floor((w - 38) / 6.3))) * 21 + 6 + 19 + 16) : h;
   // its arc's top, raised until the card sits clear of everything drawn
   const p = o.placed.get(pick.a)!;
   const q = o.placed.get(pick.b)!;
@@ -993,5 +1069,189 @@ function cardOver(
         }
       }
   box ??= { x: Math.round(mid.x - w / 2), y: Math.round(Math.min(p.y - p.r, q.y - q.r) - h - 40), w, h };
-  return { ...box, link: pick.key, title, says, note };
+  if (!memory) return { ...box, link: pick.key, title, says, note };
+  // The memory's card is where the computed one would be, grown downward over its curve — so with Memory on nothing else
+  // moves, and the curve still rises to where it did. Where what it grew onto is in the way, it slides along its curve
+  // (never so far that the curve misses it), and only then is raised.
+  const rise = stacked ? { x: box.x + box.w / 2, y: box.y + box.h / 2 } : { x: box.x + box.w / 2, y: box.y + box.h - 6 };
+  const grown = { ...box, h: Math.max(box.h, memH) };
+  const slid = [1, -1, 2, -2, 3, -3, 4, -4, 5, -5, 6, -6].map((k) => ({ ...grown, x: grown.x + k * 18 })).filter((b) => Math.abs(b.x + b.w / 2 - rise.x) <= b.w / 2 - 30);
+  const raised = { ...grown, y: box.y - (grown.h - box.h) };
+  const at = [grown, ...slid, raised].find((b) => !solid(b)) ?? grown;
+  return { ...at, link: pick.key, title, says, note, memory: memory.id, rise };
+}
+
+// ── what Socria remembers, hung beside what it came from ─────────────
+
+type Placed = Map<string, { x: number; y: number; r: number; g: string; hub: boolean }>;
+
+interface MemoryPlan {
+  m: BubbleMemoryIn;
+  /** what it hangs from: one conversation, or the sessions of one subject it sits between */
+  at: string[];
+  how: 'beside' | 'between';
+}
+
+/**
+ * Where each memory goes, from the conversations drawn here that it came
+ * from: from two subjects the map already joins by a shared idea, onto that
+ * link's card (no mark); from two or more sessions of one subject, between
+ * them; otherwise beside the newest session it came from — or, from quick
+ * questions only, the newest of those. One whose conversations are none of
+ * them drawn here is not on this map.
+ */
+function planMemories(list: readonly BubbleMemoryIn[], placed: Placed, links: readonly BubbleLink[], tileOf: Map<string, Tile>): { onLink: Map<string, BubbleMemoryIn>; hang: MemoryPlan[] } {
+  const onLink = new Map<string, BubbleMemoryIn>();
+  const hang: MemoryPlan[] = [];
+  const newest = (a: string, b: string) => (tileOf.get(b)?.at ?? 0) - (tileOf.get(a)?.at ?? 0) || (a < b ? -1 : a > b ? 1 : 0);
+  for (const m of list) {
+    const here = [...new Set(m.from)].filter((id) => placed.has(id));
+    if (!here.length) continue;
+    const subjects = new Set(here.map((id) => placed.get(id)!.g));
+    if (subjects.size >= 2) {
+      const l = links.find((x) => x.kind === 'idea' && x.across && !onLink.has(x.key) && subjects.has(placed.get(x.a)!.g) && subjects.has(placed.get(x.b)!.g));
+      if (l) {
+        onLink.set(l.key, m);
+        continue;
+      }
+    }
+    const hubs = here.filter((id) => placed.get(id)!.hub).sort(newest);
+    if (subjects.size === 1 && hubs.length >= 2) hang.push({ m, at: hubs.slice(0, 3), how: 'between' });
+    else hang.push({ m, at: [(hubs.length ? hubs : [...here].sort(newest))[0]], how: 'beside' });
+  }
+  return { onLink, hang };
+}
+
+/** A point inside a box, or within `air` of it. */
+const inBox = (p: Pt, b: Box, air = 0) => p.x > b.x - air && p.x < b.x + b.w + air && p.y > b.y - air && p.y < b.y + b.h + air;
+/** Points along a straight line, every few pixels. */
+function along(a: Pt, b: Pt, step = 5): Pt[] {
+  const n = Math.max(1, Math.ceil(dist(a, b) / step));
+  return Array.from({ length: n + 1 }, (_, i) => ({ x: a.x + ((b.x - a.x) * i) / n, y: a.y + ((b.y - a.y) * i) / n }));
+}
+
+/**
+ * Each memory's mark and chip, placed round what is already drawn — the same
+ * kind of pass that finds room for a quick question's words: on the side of
+ * what it hangs from away from its spokes and joins, as near as there is room,
+ * clear of every disc, dot, word, name and card, and of every chip before it;
+ * its tether crossing no other disc. Inside the room the map already takes
+ * where it fits (so the map is fitted as before), never on a line where there
+ * is a place off one. One with nowhere to go is left off the map: it is on its
+ * conversation's card all the same.
+ */
+function placeMemories(
+  plans: readonly MemoryPlan[],
+  o: {
+    hubs: readonly BubbleHub[];
+    dots: readonly BubbleDot[];
+    clusters: readonly BubbleCluster[];
+    placed: Placed;
+    links: readonly BubbleLink[];
+    spokes: readonly [string, string][];
+    joins: readonly [string, string][];
+    card: Box | null;
+    make: Box | null;
+    area: Box;
+    narrow: boolean;
+  }
+): BubbleMemory[] {
+  const out: BubbleMemory[] = [];
+  const room = (h: BubbleHub) => h.r + (h.halo ? HALO : 0);
+  // words and names: a Project's name has its tag after it, a little more than the letters
+  const solids: Box[] = [
+    ...o.dots.filter((d) => d.named).map((d) => d.label),
+    ...o.clusters.map((c) => (c.folded ? foldedBox(c) : c.kind === 'project' ? { ...c.label, w: c.label.w + 74 } : c.label)),
+    ...(o.make ? [o.make] : []),
+    ...(o.card ? [{ x: o.card.x - 4, y: o.card.y - 4, w: o.card.w + 8, h: o.card.h + 8 }] : []),
+  ];
+  // the lines already drawn: a chip sits off them where it can
+  const lineDots: Pt[] = [];
+  for (const l of o.links) {
+    for (let t = 0; t <= 1.0001; t += 0.02) {
+      const u = 1 - t;
+      lineDots.push({ x: u * u * l.p0.x + 2 * u * t * l.c.x + t * t * l.p1.x, y: u * u * l.p0.y + 2 * u * t * l.c.y + t * t * l.p1.y });
+    }
+  }
+  for (const [a, b] of [...o.spokes, ...o.joins]) {
+    const p = o.placed.get(a);
+    const q = o.placed.get(b);
+    if (p && q) lineDots.push(...along(p, q, 6));
+  }
+  const rings = o.narrow ? MEM_RINGS_NARROW : MEM_RINGS;
+  const deg = (from: Pt, to: Pt) => (Math.atan2(to.y - from.y, to.x - from.x) * 180) / Math.PI;
+
+  for (const plan of plans) {
+    const words = memoryWords(plan.m.text);
+    const w = MEM_PAD * 2 + MEM_MARK + MEM_GAP + memWordsW(words);
+    const anchors = plan.at.map((id) => ({ id, ...o.placed.get(id)! }));
+    const chipAt = (m: Pt, end: BubbleMemory['end']): Box =>
+      end === 'start' ? { x: round(m.x - MEM_PAD - MEM_MARK / 2), y: round(m.y - MEM_H / 2), w, h: MEM_H } : { x: round(m.x + MEM_PAD + MEM_MARK / 2 - w), y: round(m.y - MEM_H / 2), w, h: MEM_H };
+    // the places to try, the best first
+    const cands: { m: Pt; end: BubbleMemory['end']; cost: number }[] = [];
+    if (plan.how === 'beside') {
+      const A = anchors[0];
+      // not towards its spokes, the sessions it is joined to, or the curves that leave it
+      const blocked: number[] = [];
+      for (const [d, h] of o.spokes) {
+        if (h === A.id && o.placed.has(d)) blocked.push(deg(A, o.placed.get(d)!));
+        if (d === A.id && o.placed.has(h)) blocked.push(deg(A, o.placed.get(h)!));
+      }
+      for (const [a, b] of o.joins) if (a === A.id || b === A.id) blocked.push(deg(A, o.placed.get(a === A.id ? b : a)!));
+      for (const l of o.links) if (l.a === A.id || l.b === A.id) blocked.push(deg(A, l.c));
+      const pref = (a: number) => Math.min(70, blocked.length ? Math.min(...blocked.map((b) => apart(a, b))) : 70);
+      for (const d of rings)
+        for (const a of MEM_ANGLES) {
+          const m = { x: round(A.x + Math.cos(rad(a)) * (A.r + d)), y: round(A.y + Math.sin(rad(a)) * (A.r + d)) };
+          // on a phone the map is one subject under another: over or under, to keep it narrow, as the quick questions do
+          cands.push({ m, end: Math.cos(rad(a)) < -0.34 ? 'end' : 'start', cost: d + (70 - pref(a)) * 1.4 + (o.narrow ? 30 * Math.abs(Math.cos(rad(a))) : 0) });
+        }
+    } else {
+      // between them: as near their middle as there is room
+      const T = { x: anchors.reduce((s, a) => s + a.x, 0) / anchors.length, y: anchors.reduce((s, a) => s + a.y, 0) / anchors.length };
+      cands.push({ m: { x: round(T.x), y: round(T.y) }, end: 'start', cost: 0 });
+      for (let ring = 1; ring <= 16; ring++)
+        for (let k = 0; k < 16; k++) {
+          const a = k * 22.5 + (ring % 2 ? 11.25 : 0);
+          const m = { x: round(T.x + Math.cos(rad(a)) * ring * 18), y: round(T.y + Math.sin(rad(a)) * ring * 18) };
+          cands.push({ m, end: Math.cos(rad(a)) < -0.34 ? 'end' : 'start', cost: ring * 18 });
+        }
+    }
+    cands.sort((x, y) => x.cost - y.cost);
+
+    const fits = (m: Pt, box: Box, strict: boolean, within: boolean): boolean => {
+      if (within && (box.x < o.area.x + 4 || box.y < o.area.y + 4 || box.x + box.w > o.area.x + o.area.w - 4 || box.y + box.h > o.area.y + o.area.h - 4)) return false;
+      if (o.hubs.some((h) => circleHitsBox(h, room(h), box, 8))) return false;
+      if (o.dots.some((d) => circleHitsBox(d, d.r, box, 6))) return false;
+      if (solids.some((s) => overlaps(s, box, 6))) return false;
+      if (out.some((c) => overlaps(c.box, box, 6))) return false;
+      if (strict && lineDots.some((p) => inBox(p, box, 3))) return false;
+      // each tether, from the edge of what it hangs from to the mark: across no other disc, dot, word or chip
+      for (const A of anchors) {
+        const d = Math.max(1, dist(A, m));
+        if (d < A.r + MEM_MARK) return false;
+        const e = { x: A.x + ((m.x - A.x) / d) * A.r, y: A.y + ((m.y - A.y) / d) * A.r };
+        if (o.hubs.some((h) => h.id !== A.id && toSegment(h, e, m) < room(h) + 2)) return false;
+        if (o.dots.some((x) => x.id !== A.id && toSegment(x, e, m) < x.r + 3)) return false;
+        const path = along(e, m, 4).slice(1, -1);
+        if (path.some((p) => solids.some((s) => inBox(p, s, 1)) || out.some((c) => inBox(p, c.box, 1)))) return false;
+      }
+      return true;
+    };
+    let chosen: { m: Pt; end: BubbleMemory['end']; box: Box } | null = null;
+    // in the room the map takes, off the lines; then on one; then beyond that room
+    for (const [strict, within] of [[true, true], [false, true], [true, false], [false, false]] as const) {
+      for (const c of cands) {
+        const box = chipAt(c.m, c.end);
+        if (fits(c.m, box, strict, within)) {
+          chosen = { m: c.m, end: c.end, box };
+          break;
+        }
+      }
+      if (chosen) break;
+    }
+    if (!chosen) continue;
+    out.push({ id: plan.m.id, from: plan.at, x: chosen.m.x, y: chosen.m.y, box: chosen.box, end: chosen.end, words });
+  }
+  return out;
 }

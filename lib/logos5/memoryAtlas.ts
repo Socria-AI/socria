@@ -25,7 +25,7 @@
 // PURE: no React, no DOM, no clock — the caller passes `now`, and the width of
 // words is estimated here unless the caller can measure them.
 
-import { whereFrom, type WhereFrom } from '../mind/types';
+import { isGeneralising, whereFrom, type WhereFrom } from '../mind/types';
 
 // ── the eight regions ────────────────────────────────────────────────
 
@@ -1095,4 +1095,120 @@ export function changeCounts(changes: readonly ChangeIn[], memories: ReadonlyMap
     for (const r of rs) out[r] += 1;
   }
   return out;
+}
+
+// ── on the Universal Map: each memory beside the conversations it came from ──
+//
+// The map (lib/logos5/bubbles.ts, components/logos5/UniverseBubbles.tsx) hangs
+// what Socria remembers off the conversation it was learned in. Everything here
+// is read from the record's own grounds, as the Memory view reads it, and the
+// rules of memory carry over unchanged:
+//   • something is yours only if you said it — a ground stated in your own
+//     words in a conversation (lib/mind/ground.ts held it to them), or words
+//     you wrote or rewrote yourself on the Memory page;
+//   • a file is never a statement about you: a memory read from one is "from
+//     your file", whatever else it says;
+//   • a reading of Socria's waits for a second conversation: it waits while
+//     its record names one conversation and nothing says a second one saw it
+//     — the gate (lib/mind/gate.ts) only lets an inferred claim about the
+//     person become a memory once a second conversation proposed it, so one
+//     like that has been seen twice even where the record kept only the
+//     second conversation's name (the first is the pending ledger's, and
+//     goes when it lands);
+//   • off the record and sensitive conversations contribute nothing: their
+//     memories are private and never reach this feed (/api/mind?scope=logos),
+//     and the map also leaves out any conversation the caller names as quiet.
+// What it came from is the conversations its grounds name, in order — never a
+// guess. One that names none (added by hand, a file read on the Memory page)
+// is not on the map, which has nowhere true to hang it.
+
+export type MapSource = 'words' | 'file' | 'reading';
+
+export interface MapMemory {
+  id: string;
+  /** its name, as the store holds it */
+  text: string;
+  source: MapSource;
+  /** a reading of Socria's not yet seen in a second conversation */
+  waiting: boolean;
+  /** "That's right" pressed */
+  confirmed: boolean;
+  /** the conversations its grounds name, in the order they first did */
+  from: string[];
+  /** of those, the ones in which it was said in the person's own words */
+  saidIn: string[];
+  /** the file it was read from, when it was (the Source node's name) */
+  fileName?: string;
+  /** how much it should be seen first (the Memory view's measure) */
+  prio: number;
+}
+
+const SPOKEN = new Set(['core', 'logos']);
+const ASSERTED = new Set(['stated', 'established']);
+/** the person's own hand on the Memory page: added, or rewritten — not a confirmation (a dispute leaves it contradicted, and off the map) */
+const ownHand = (p: ProvIn) => p.surface === 'user' && p.review !== 'confirmed';
+const confirmedByThem = (p: ProvIn) => p.surface === 'user' && p.review === 'confirmed';
+
+/**
+ * The memories the map can draw, each with where it came from, what kind of
+ * mark it is, and whether it waits for the person — from the private-filtered
+ * feed (/api/mind?scope=logos), and nothing else. `quiet` names conversations
+ * that contribute nothing (off the record, or read as sensitive).
+ */
+export function mapMemoriesOf(nodes: readonly MemoryIn[], now: number, o: { quiet?: ReadonlySet<string> } = {}): MapMemory[] {
+  const names = new Map(nodes.map((n) => [n.id, (n.label ?? '').trim()]));
+  const out: MapMemory[] = [];
+  for (const m of memoriesOf(nodes, [], [], now)) {
+    // an earlier position, something in dispute, or the store's own record of a file: kept in Memory, not hung on the map
+    if (m.state.faded || m.status === 'contradicted' || m.type.toLowerCase() === 'source') continue;
+    const where = whereFrom(m);
+    // found in a source or worked out: not something the person taught
+    if (where === 'source') continue;
+    const p = m.provenance;
+    const from: string[] = [];
+    const saidIn: string[] = [];
+    for (const g of p) {
+      const id = g.conversationId;
+      if (!id || g.surface === 'user' || o.quiet?.has(id)) continue;
+      if (!from.includes(id)) from.push(id);
+      if (ASSERTED.has(g.kind ?? '') && SPOKEN.has(g.surface ?? '') && !saidIn.includes(id)) saidIn.push(id);
+    }
+    if (!from.length) continue;
+    const spoken = p.some((g) => ASSERTED.has(g.kind ?? '') && SPOKEN.has(g.surface ?? '') && !!g.conversationId && !o.quiet?.has(g.conversationId));
+    const file = p.find((g) => g.surface === 'file' || g.surface === 'import');
+    const source: MapSource = spoken || p.some(ownHand) ? 'words' : file ? 'file' : 'reading';
+    const confirmed = p.some(confirmedByThem);
+    // seen twice: two conversations named, or an inference about the person the gate let in only on a second sighting
+    const first = p[0];
+    const corroborated = from.length >= 2 || (isGeneralising(m.type) && (first?.kind === 'inferred' || first?.kind === 'hypothesis'));
+    const fileName = source === 'file' && file?.sourceNodeId ? names.get(file.sourceNodeId) || undefined : undefined;
+    out.push({
+      id: m.id,
+      text: m.label,
+      source,
+      waiting: source === 'reading' && !confirmed && !corroborated,
+      confirmed,
+      from,
+      saidIn,
+      ...(fileName ? { fileName } : {}),
+      prio: m.prio,
+    });
+  }
+  return out;
+}
+
+/** How a memory came to be known, said under it on a conversation's card — "in your words · also in …". */
+export function mapProvenance(m: MapMemory, here: string, titleOf: (id: string) => string | null): string {
+  const other = m.from.find((id) => id !== here);
+  const otherTitle = other ? titleOf(other) : null;
+  const also = other ? ` · also in ${otherTitle ?? 'another chat'}` : '';
+  if (m.source === 'words') {
+    if (m.saidIn.includes(here) || !m.saidIn.length) return `in your words${also}`;
+    // said elsewhere, and come up here
+    return `in your words, in ${titleOf(m.saidIn[0]) ?? 'another chat'}`;
+  }
+  if (m.source === 'file') return m.fileName ? `from your file · ${m.fileName}` : 'from your file';
+  if (m.waiting) return 'Socria’s reading · waiting for a second chat';
+  if (m.confirmed) return 'Socria’s reading · you said it’s right';
+  return other ? `Socria’s reading${also}` : 'Socria’s reading · seen in a second chat';
 }
