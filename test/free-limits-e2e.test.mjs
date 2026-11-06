@@ -248,7 +248,7 @@ const oneMap = await map('o1', EMPTY, extraction(Array.from({ length: 14 }, (_, 
 ok('Socria One: a map of fourteen nodes, kept whole, nothing counted', oneMap.status === 200 && oneMap.json?.map?.nodes?.length === 14 && count('olga', 'nodes') === 0 && count('olga', 'maps') === 0);
 
 console.log('\n=== a drawing on the free plan: kept whole or not at all, never an empty map charged ===');
-// THE LOGIC MAP DRAWS (Logos 5.5, lib/quota-map.ts keepAddedNodes): a drawing the month's nodes cannot hold is
+// THE LOGIC MAP DRAWS (Logos 5, lib/quota-map.ts keepAddedNodes): a drawing the month's nodes cannot hold is
 // left off whole, the person's own new ideas kept first — and the meter plans that BEFORE a first map is
 // claimed, so a pass that would leave a conversation's map empty takes none of the month's maps.
 for (const u of ['dina', 'eve']) globalThis.__users[u] = { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] };

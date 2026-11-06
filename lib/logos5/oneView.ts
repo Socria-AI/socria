@@ -1,4 +1,4 @@
-// lib/logos5/oneView.ts — ONE BOARD. THE CHATBOX IS THE CHAT. (Logos 5.5, VIII · One view.)
+// lib/logos5/oneView.ts — ONE BOARD. THE CHATBOX IS THE CHAT. (Logos 5, VIII · One view.)
 //
 // On a wide screen a line of thinking is one board, built on the canvas
 // (lib/logos5/canvas.ts, components/logos5/L5Board.tsx): the conversation runs

@@ -43,7 +43,7 @@ export interface InlineHost {
   onChoose?: (text: string) => void;
   /** a chart or a comparison opened as a full artifact in the Artifacts view (once; after that, what it made opens) */
   onOpen?: (n: number, spec: InlineSpec) => void;
-  /** a diagram opened on the Logic Map, as a drawing to open, edit, inspect and keep (Logos 5.5, lib/logos5/drawing.ts) */
+  /** a diagram opened on the Logic Map, as a drawing to open, edit, inspect and keep (Logos 5, lib/logos5/drawing.ts) */
   onMap?: (n: number, spec: InlineSpec) => void;
   /** choices can still be tapped — nothing has been said since this reply */
   live?: boolean;

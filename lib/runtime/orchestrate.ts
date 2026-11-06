@@ -91,7 +91,7 @@ const STRUCTURE = new RegExp(
 );
 
 /**
- * THE SHAPES A DIAGRAM CAN TAKE ON THE LOGIC MAP (Logos 5.5): each is one of
+ * THE SHAPES A DIAGRAM CAN TAKE ON THE LOGIC MAP (Logos 5): each is one of
  * its grammars (lib/representation.ts GRAMMAR_IDS), so the shape asked for is
  * the shape the map is read as and the lens it opens on.
  */
@@ -183,7 +183,7 @@ export function diagramAsked(text: string): DiagramShape | null {
 }
 
 /**
- * THE SUBJECT HAS A SHAPE WORTH SEEING (Logos 5.5): a question whose answer
+ * THE SUBJECT HAS A SHAPE WORTH SEEING (Logos 5): a question whose answer
  * is a cycle, a hierarchy, a chain of causes, the stages of a process or the
  * kinds of a thing — "explain the water cycle", "how is the UK parliament
  * structured?", "what caused World War I?", "what are the stages of mitosis?".
@@ -340,7 +340,7 @@ export function routeTurn(t: TurnInput): TurnRoute {
     return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' }, ...(asked ? { diagram: asked } : {}) };
   }
 
-  // A DIAGRAM, asked for by what it is or by drawing something that has its shape (Logos 5.5): the Logic
+  // A DIAGRAM, asked for by what it is or by drawing something that has its shape (Logos 5): the Logic
   // Map draws it — a flowchart, a cycle, a hierarchy, the parts of something — and Keep files it in
   // Artifacts. A picture of a field or a function is still made there (below).
   const diagram = diagramAsked(text);
@@ -415,7 +415,7 @@ export function routeTurn(t: TurnInput): TurnRoute {
  * to be built or a structure to be drawn; while the Logic Map is the view they
  * are looking at (it is live while it is looked at); when the question's
  * subject has a shape worth seeing — a cycle, a hierarchy, causes, stages —
- * which the map draws beside the answer without opening (Logos 5.5, `draw`);
+ * which the map draws beside the answer without opening (Logos 5, `draw`);
  * and in the background on a light cadence — once a line of thinking has a
  * few substantive turns, then every few more — so the Universal Map, search
  * and anything that reads the stored map (the 5-node rewards challenge among

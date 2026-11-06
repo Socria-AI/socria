@@ -262,7 +262,7 @@ export function ThinkingMap({
   onEdit?: (edit: MapEdit) => void;
   /** several edits made at once, as one change — a card edited in its inspector (components/logos5/MapInspector.tsx) */
   onEdits?: (edits: MapEdit[]) => void;
-  /** the map's drawing filed in Artifacts as a Diagram display (Logos 5.5, lib/logos5/drawing.ts) */
+  /** the map's drawing filed in Artifacts as a Diagram display (Logos 5, lib/logos5/drawing.ts) */
   onKeepDrawing?: () => void;
   /**
    * The first map, arriving: cards rise one after another and the lines
@@ -544,7 +544,7 @@ export function ThinkingMap({
       }
       return boundsOf(rects);
     }
-    // the regions a drawing's parts sit in are part of the picture too (Logos 5.5): fitted with the cards
+    // the regions a drawing's parts sit in are part of the picture too (Logos 5): fitted with the cards
     return boundsOf([
       ...placedNowRef.current.map((p) => ({ x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h })),
       ...groupsNowRef.current.map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h })),
@@ -1182,9 +1182,9 @@ export function ThinkingMap({
     if (lens === 'tensions') return layoutTensions(map, w, h);
     if (lens === 'solve') return layoutSolve(map, w, h);
     if (lens === 'flow') return layoutFlow(map, w, h);
-    // a drawing's dates set it on its axis, spaced by when they fell (Logos 5.5); a timeline without them as before
+    // a drawing's dates set it on its axis, spaced by when they fell (Logos 5); a timeline without them as before
     if (lens === 'timeline') return layoutDatedTimeline(map, w, h) ?? layoutTimeline(map, w, h);
-    // THE SUBJECT, DRAWN (Logos 5.5, lib/logos5/diagramLayout.ts)
+    // THE SUBJECT, DRAWN (Logos 5, lib/logos5/diagramLayout.ts)
     if (lens === 'cycle') return layoutCycle(map, w, h);
     if (lens === 'tree') return layoutTree(map, w, h);
     if (lens === 'parts') return layoutParts(map, w, h);
@@ -1352,7 +1352,7 @@ export function ThinkingMap({
       const cx = (ax + bx) / 2 - (dy / len) * off;
       const cy = (ay + by) / 2 + (dx / len) * off;
       el.setAttribute('d', `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`);
-      // what the line says sits at the curve's middle (Logos 5.5)
+      // what the line says sits at the curve's middle (Logos 5)
       const t = labelElRef.current.get(key);
       if (t) {
         t.setAttribute('x', String(Math.round(((ax + 2 * cx + bx) / 4) * 10) / 10));
@@ -1549,7 +1549,7 @@ export function ThinkingMap({
   }, [map.nodes]);
   const caption =
     staticLayout?.caption ?? LENSES.find((l) => l.id === lens)!.caption;
-  /** What the map's drawing is of, when it holds one (Logos 5.5): it names the plate, and it can be kept. */
+  /** What the map's drawing is of, when it holds one (Logos 5): it names the plate, and it can be kept. */
   const drawnTitle = useMemo(() => {
     const d = drawingOf(map);
     return d ? d.title || 'A drawing' : null;
@@ -1606,12 +1606,12 @@ export function ThinkingMap({
           path: '',
           relation: e.relation as LogosRelation,
           strength: e.strength,
-          // what the line says (Logos 5.5): placed at its middle by the graph's own loop (paint)
+          // what the line says (Logos 5): placed at its middle by the graph's own loop (paint)
           ...(e.label ? { label: e.label, lx: 0, ly: 0 } : {}),
         }))
       : rerouted(staticLayout?.connectors ?? [], placedWithPins, lensPins);
   placedNowRef.current = lens === 'graph' ? [] : cards;
-  // the regions behind a parts diagram's cards (Logos 5.5) — not moved with a pinned card, so they hold only while none is
+  // the regions behind a parts diagram's cards (Logos 5) — not moved with a pinned card, so they hold only while none is
   const groups: GroupBox[] = lens === 'graph' || Object.keys(lensPins).length ? [] : (staticLayout?.groups ?? []);
   groupsNowRef.current = groups;
   connNowRef.current = lens === 'graph' ? [] : connectors;
@@ -1669,7 +1669,7 @@ export function ThinkingMap({
             </>
           ) : (
             <>
-              {/* A DRAWING IS NAMED BY WHAT IT IS OF (Logos 5.5): "The water cycle", its lens and question beside it */}
+              {/* A DRAWING IS NAMED BY WHAT IT IS OF (Logos 5): "The water cycle", its lens and question beside it */}
               <span className={`l${drawnTitle ? ' is-title' : ''}`}>{drawnTitle ?? LENSES.find((l) => l.id === lens)?.label ?? 'Map'}</span>
               <span className="st">{drawnTitle ? `${LENSES.find((l) => l.id === lens)?.label ?? 'Map'} · ${caption}` : caption}</span>
               {drawnTitle && onKeepDrawing && (
@@ -1930,7 +1930,7 @@ export function ThinkingMap({
             it would lie over the plot and the Board like a sheet of glass. */}
         {isCanvas && (
           <div className="lg-map-world" ref={worldRef}>
-        {/* WHAT SITS INSIDE WHAT (Logos 5.5): a parts diagram's regions, behind its cards, deepest last */}
+        {/* WHAT SITS INSIDE WHAT (Logos 5): a parts diagram's regions, behind its cards, deepest last */}
         {groups.map((g) => (
           <div
             key={g.key}
@@ -1955,7 +1955,7 @@ export function ThinkingMap({
             >
               <path d="M0,1 L7,4 L0,7" fill="none" stroke="currentColor" strokeWidth="1.2" />
             </marker>
-            {/* where a dated event sits on its axis (Logos 5.5): the dot at the foot of its tick */}
+            {/* where a dated event sits on its axis (Logos 5): the dot at the foot of its tick */}
             <marker id="lg-dot" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7">
               <circle cx="4" cy="4" r="3" fill="currentColor" />
             </marker>
@@ -2280,7 +2280,7 @@ export function ThinkingMap({
                 style={{ left: menu.x, top: menu.y, maxHeight: menu.maxH, overflowY: 'auto' }}
                 onClick={(ev) => ev.stopPropagation()}
               >
-                {/* WHAT THIS CARD IS (Logos 5.5): whose, what kind, what it says opened — and Edit */}
+                {/* WHAT THIS CARD IS (Logos 5): whose, what kind, what it says opened — and Edit */}
                 <MapInspector key={node.id} node={node} map={map} onEdits={onEdits ?? (onEdit ? (es) => es.forEach((x) => onEdit(x)) : undefined)} />
                 {askCard?.({ id: node.id, label: node.label, type: node.type }, () => setMenu(null))}
                 {/* with the ask first, the card's other actions are a press away beneath it */}

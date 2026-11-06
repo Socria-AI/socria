@@ -21,7 +21,7 @@ const css = read('components/logos5/l5v.css');
 const composer = read('components/LogosComposer.tsx');
 
 console.log('\n=== the screen is the four views ===');
-ok('a line of thinking is L5Layout over the view that is open (on a wide screen, the board — Logos 5.5 One view)', /<L5Layout\s+view=\{oneView \? 'chat' : studyTab\}/.test(app) && /primary=\{primaryEl\}/.test(app));
+ok('a line of thinking is L5Layout over the view that is open (on a wide screen, the board — Logos 5 One view)', /<L5Layout\s+view=\{oneView \? 'chat' : studyTab\}/.test(app) && /primary=\{primaryEl\}/.test(app));
 ok('  each view has its own body: Chat the thread, Content, Artifacts, the Logic Map', /const viewEl = \(v: Viewport\) => \(v === 'chat' \? l5Thread : v === 'content' \? contentView : v === 'artifacts' \? artifactsView : logicView\)/.test(app) && /const primaryEl = oneView \? boardEl : viewEl\(studyTab\)/.test(app));
 ok('  …and the view beside is drawn by the same body its tab draws', /const besideEl = oneView \? \(boardBeside \? viewEl\(boardBeside\) : null\) : screen\.beside && screen\.beside !== studyTab \? viewEl\(screen\.beside\) : null/.test(app) && !/besidePanelOf/.test(app));
 ok('  5.5: the four views are a switch in the header, not a tab row; the canvas (Zoom out) still holds what each view holds', !/<L5Tabs\b/.test(app) && /<L5Switch\s+label="Views"/.test(app) && /switcher=\{switchEl\}/.test(app) && /<L5Canvas\b/.test(app) && /map\.nodes\.length/.test(app) && /for \(const c of contentItems\)/.test(app));

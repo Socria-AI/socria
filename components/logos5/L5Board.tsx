@@ -1,5 +1,5 @@
 'use client';
-// components/logos5/L5Board.tsx — ONE BOARD. THE CHATBOX IS THE CHAT. (Logos 5.5, VIII · One view.)
+// components/logos5/L5Board.tsx — ONE BOARD. THE CHATBOX IS THE CHAT. (Logos 5, VIII · One view.)
 //
 // Built on the canvas (L5Canvas.tsx, lib/logos5/canvas.ts), on a wide screen
 // the line of thinking's only view. The conversation runs down the middle;
@@ -54,7 +54,7 @@ export interface BoardMap {
   onIdea: (id: string) => void;
   /** the Logic Map, large beside the board, to edit */
   onOpen: () => void;
-  /** what the map's drawing is of, when it holds one — "The water cycle" (Logos 5.5) */
+  /** what the map's drawing is of, when it holds one — "The water cycle" (Logos 5) */
   title?: string | null;
 }
 

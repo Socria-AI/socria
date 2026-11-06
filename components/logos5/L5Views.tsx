@@ -18,7 +18,7 @@ import { SIDES, VIEW_LABELS, VIEW_ORDER, clampShare, nearestSide, shareAt, type 
 
 const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '');
 
-// ── the header (Logos 5.5) ───────────────────────────────────────────
+// ── the header (Logos 5) ───────────────────────────────────────────
 //
 // One bar, 56px: where you are on the left (the rail, the mark that goes home,
 // a label and the line's name in italic), the switch between the four views in
@@ -183,7 +183,7 @@ export function SplitView({
   /** where the conversation sits when it shares the screen, and the way to put it elsewhere */
   chatSide?: Side;
   onChatSide?: (side: Side) => void;
-  /** One view (Logos 5.5): "Split View" in the header, opening one thing large beside the board */
+  /** One view (Logos 5): "Split View" in the header, opening one thing large beside the board */
   board?: boolean;
 }) {
   const [open, setOpen] = useState(false);
@@ -317,7 +317,7 @@ export function L5Layout({
   narrow,
 }: {
   view: Viewport;
-  /** One view (Logos 5.5): the board is the view — it scrolls and zooms itself, and holds the chatbox */
+  /** One view (Logos 5): the board is the view — it scrolls and zooms itself, and holds the chatbox */
   board?: boolean;
   primary: ReactNode;
   /** the view open beside it, drawn as its own tab draws it */

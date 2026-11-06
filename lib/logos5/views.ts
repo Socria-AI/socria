@@ -31,7 +31,7 @@ export const VIEW_ORDER: readonly Viewport[] = ['chat', 'content', 'artifacts', 
 
 export const VIEW_LABELS: Record<Viewport, string> = {
   chat: 'Chat',
-  // Logos 5.5: the view is called Files — what you brought; its id stays 'content'
+  // Logos 5: the view is called Files — what you brought; its id stays 'content'
   content: 'Files',
   artifacts: 'Artifacts',
   logic_map: 'Logic Map',
@@ -304,7 +304,7 @@ export const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top:
 
 /**
  * Where the panel beside the view docks, for where the conversation was put (null: never chosen).
- * Never chosen, the conversation docks on `fresh`: the left beside the Logic Map (Logos 5.5,
+ * Never chosen, the conversation docks on `fresh`: the left beside the Logic Map (Logos 5,
  * Screen 1), the right beside a study's desk, read left to right (Screen 4).
  */
 export function besideSide(s: Screen, chat: Side | null, fresh: Side = 'left'): Side {

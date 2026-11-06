@@ -124,7 +124,7 @@
   color: var(--lg-ink-60);
 }
 
-/* ── the switch (Logos 5.5) ─────────────────────────────────────────
+/* ── the switch (Logos 5) ─────────────────────────────────────────
    A hairline tray, 36 tall; items 28 tall at UI 13.5 in ink 70; the one chosen
    is the wash with primary text (l5-controls.css). Counts are plain tabular
    type, never badges; something new in a view you are not on is a 6px primary
@@ -666,7 +666,7 @@
 
 /* ── "Asking about": a card, asked about on the map ───────────────── */
 .logos-root .l5 .lg-acts.is-ask {
-  /* Logos 5.5: the ask card is a holder like any other — 310 wide, panel
+  /* Logos 5: the ask card is a holder like any other — 310 wide, panel
      paper, a rule, radius 16, elevation 2, no blur (l5v.css draws inside it) */
   width: 310px;
   padding: 16px 16px 12px;

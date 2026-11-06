@@ -60,7 +60,7 @@ export const GRAMMAR_IDS = [
   'research',
   'model',
   'brainstorm',
-  // ANYTHING AT ALL, DRAWN (Logos 5.5, the universal Logic Map): the shapes a
+  // ANYTHING AT ALL, DRAWN (Logos 5, the universal Logic Map): the shapes a
   // subject takes when the map draws the subject itself — the stages of a
   // cycle, a classification, how the ideas of a field relate, what causes
   // what, what something is made of.
@@ -112,7 +112,7 @@ export const ROLES = [
   // possibilities
   'idea',
   'cluster',
-  // ANYTHING AT ALL, DRAWN (Logos 5.5)
+  // ANYTHING AT ALL, DRAWN (Logos 5)
   'stage', // a stage of a cycle
   'category', // a class with things under it
   'member', // something that belongs to a class
@@ -377,7 +377,7 @@ const ROLE_ALIASES: Record<string, Role> = {
   objective: 'goal',
   deliverable: 'milestone',
   module: 'component',
-  // the universal map's roles (Logos 5.5)
+  // the universal map's roles (Logos 5)
   parent: 'category',
   class: 'category',
   subcategory: 'category',
@@ -744,7 +744,7 @@ const VERB = /\b(show|draw|see|view|display|lay|map|make|turn|treat|structure|or
  * says outright that the thing IS one ("this is really a timeline"). A
  * subject that merely mentions a process is not a correction.
  */
-/** The shapes only a drawing takes (Logos 5.5): named only by asking for them. */
+/** The shapes only a drawing takes (Logos 5): named only by asking for them. */
 const DRAWN_SHAPES: ReadonlySet<GrammarId> = new Set<GrammarId>(['cycle', 'hierarchy', 'concept', 'causal', 'parts']);
 
 export function statedBuilding(text: unknown): GrammarId | null {

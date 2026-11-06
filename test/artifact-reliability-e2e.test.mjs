@@ -182,7 +182,7 @@ for (const tier of Object.keys(TIERS)) {
   }
 }
 
-console.log('\n=== a diagram the Logic Map draws is not also made in Artifacts (Logos 5.5) ===');
+console.log('\n=== a diagram the Logic Map draws is not also made in Artifacts (Logos 5) ===');
 for (const tier of Object.keys(TIERS)) {
   const r = await mapTurn('Make a flowchart of how to make a cup of tea', tier);
   const userOf = (p) => (p?.messages ?? []).filter((m) => m.role === 'user').map((m) => String(m.content ?? '')).join('\n');

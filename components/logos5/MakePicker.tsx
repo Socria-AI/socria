@@ -22,7 +22,7 @@ export function MakePicker({
 }: {
   value: string | null;
   onChange: (next: string | null) => void;
-  /** opened from elsewhere — Logos 5.5 keeps Make under the composer's "+" */
+  /** opened from elsewhere — Logos 5 keeps Make under the composer's "+" */
   open?: boolean;
   onOpenChange?: (open: boolean) => void;
   /** no button of its own until something is chosen: then the choice shows, with its × */

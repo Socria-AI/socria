@@ -1,4 +1,4 @@
-// lib/logos5/drawing.ts — A DRAWING, BETWEEN THE LOGIC MAP, THE CONVERSATION AND ARTIFACTS (Logos 5.5).
+// lib/logos5/drawing.ts — A DRAWING, BETWEEN THE LOGIC MAP, THE CONVERSATION AND ARTIFACTS (Logos 5).
 //
 // The Logic Map draws almost anything now: beside the person's thinking it can
 // hold a drawing of the subject — every part of it "origin": "drawn" (lib/logos.ts,

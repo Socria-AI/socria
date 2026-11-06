@@ -1,4 +1,4 @@
-// test/logic-map-universal.test.mjs — THE LOGIC MAP DRAWS ALMOST ANYTHING (Logos 5.5).
+// test/logic-map-universal.test.mjs — THE LOGIC MAP DRAWS ALMOST ANYTHING (Logos 5).
 //
 // The map was a picture of the person's reasoning and nothing else: "the map
 // tracks this conversation, not the subject". It now holds two kinds of thing

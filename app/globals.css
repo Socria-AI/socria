@@ -4693,7 +4693,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   font-size: 9px; font-weight: 600; letter-spacing: 0.14em;
   text-transform: uppercase; color: var(--lg-ink-40);
 }
-/* THE SUBJECT, DRAWN (Logos 5.5, lib/logos5/diagramLayout.ts): a drawing's cards are words only — the shape says
+/* THE SUBJECT, DRAWN (Logos 5, lib/logos5/diagramLayout.ts): a drawing's cards are words only — the shape says
    what each box is — in a calm card, with the shape of the part they play: a round stage on a cycle, a pill where a
    flow starts or ends, a marked corner where it divides, a dot where an event sits on its axis */
 .logos-root .lg-node.is-bare { padding: 8px 12px; display: flex; align-items: center; justify-content: center; text-align: center; }
@@ -4723,7 +4723,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-map-wrap:is([data-lens="cycle"], [data-lens="concept"], [data-lens="tree"], [data-lens="parts"], [data-lens="timeline"], [data-lens="graph"]) .lg-conn-label {
   font-size: 11px; font-style: italic; fill: var(--lg-ink-60); paint-order: stroke; stroke: var(--lg-paper, #f6f3ec); stroke-width: 4px;
 }
-/* WHAT A CARD IS, AND CHANGING IT (Logos 5.5, components/logos5/MapInspector.tsx): whose it is, what kind,
+/* WHAT A CARD IS, AND CHANGING IT (Logos 5, components/logos5/MapInspector.tsx): whose it is, what kind,
    what it says opened, its lines — at the top of a pressed card's menu, and Edit beneath */
 .logos-root .lg-insp { display: flex; flex-direction: column; gap: 5px; padding: 8px 9px 7px; border-bottom: 1px solid var(--lg-line); }
 .logos-root .lg-insp-k { margin: 0; font-size: 9.5px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--lg-ink-40); }
@@ -4752,7 +4752,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .logos-root .lg-insp-line > .lg-insp-other { grid-column: 1 / -1; }
 .logos-root .lg-insp-acts { display: flex; gap: 6px; }
 .logos-root .lg-acts:has(.lg-insp.is-editing) { width: 288px; }
-/* a drawing names the plate (Logos 5.5): "The water cycle", and Keep files it in Artifacts */
+/* a drawing names the plate (Logos 5): "The water cycle", and Keep files it in Artifacts */
 .logos-root .mp-top .l.is-title { text-transform: none; letter-spacing: 0; font-size: 13px; font-weight: 600; color: var(--lg-ink); }
 .logos-root .mp-keep {
   font: inherit; font-size: 11px; color: var(--lg-ink); border: 1px solid var(--lg-line);

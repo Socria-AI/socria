@@ -1,6 +1,6 @@
 // lib/logos5/diagramLayout.ts — ANYTHING AT ALL, DRAWN: the shapes a subject takes.
 //
-// The universal Logic Map (Logos 5.5) draws a subject as well as an argument:
+// The universal Logic Map (Logos 5) draws a subject as well as an argument:
 // the stages of the water cycle, a classification, the parts of a cell, how the
 // ideas of a field connect, what happened when. Each lens here takes the same
 // map and returns the same Layout every other lens does (lib/logos-layout.ts),

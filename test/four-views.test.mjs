@@ -154,7 +154,7 @@ console.log('\n=== The Logic Map tracks the conversation (and draws the subject 
   for (const t of [FOOTBALL, 'How does scoring work?', 'Compare renting and buying a flat', 'Can you put that in a table?']) ok(`"${t}" — never opens the Logic Map`, screen(t).view === 'chat', J(screen(t)));
   ok('it is live while it is looked at, and drawn on a light cadence otherwise — not on every turn', V.needsMap({ route: route('why?'), view: 'logic_map', filler: false, turnsSinceMap: 0, neverDrawn: false }).map && !V.needsMap({ route: route('why?'), view: 'chat', filler: false, turnsSinceMap: 1, neverDrawn: false }).map);
   const I = V.mapInstructions();
-  // Logos 5.5: the map holds the person's thinking AND, as a layer of its own, a drawing of the subject
+  // Logos 5: the map holds the person's thinking AND, as a layer of its own, a drawing of the subject
   // (test/logic-map-universal.test.mjs) — their thinking is still tracked exactly as before
   ok('the map pass is told the map holds their thinking, and a drawing of the subject apart from it', /ONE MAP, TWO KINDS OF THING ON IT/.test(I) && /they must never be confused/.test(I) && /"origin": "drawn"/.test(I));
   ok('  a learning conversation is mapped as questions, the gist of each answer, and what came next', /learning\s+their questions, what answered each \(the gist, one idea per answer\)/.test(I));

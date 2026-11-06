@@ -10,7 +10,7 @@ import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react
 
 // ── the one close: × top right of whatever it closes (l5-controls.css .l5-close) ──
 
-/** The close glyph, 24 grid, stroke 1.7 (Logos 5.5's glyph table). */
+/** The close glyph, 24 grid, stroke 1.7 (Logos 5's glyph table). */
 export function CloseGlyph() {
   return (
     <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">

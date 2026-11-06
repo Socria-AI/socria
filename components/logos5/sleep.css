@@ -1,7 +1,7 @@
 /* components/logos5/sleep.css — Sleep Mode (SleepMode.tsx), in Logos 5's own tokens:
    paper on Paper, dark on Dark, the night sky on Celestial. Quiet: a moon, a few
    lines, a countdown in the serif. No glow, no gradient, nothing that pulses.
-   Logos 5.5's steps (components/logos5/l5-controls.css): type 32 / 18 / 15.5 /
+   Logos 5's steps (components/logos5/l5-controls.css): type 32 / 18 / 15.5 /
    13.5 / 12.5 / 10.5, radii 999 / 16 / 10 / 6, controls 40 tall. */
 
 .sl-scrim {

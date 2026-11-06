@@ -753,7 +753,7 @@ export function LogosApp({
   const sceneLastRef = useRef<string | null>(null);
   // asks the composer to take focus, with the caret where a filled-in form wants it
   const [composerFocus, setComposerFocus] = useState<{ n: number; caret?: number } | null>(null);
-  /** the Make sheet, opened from the composer's "+" (Logos 5.5) */
+  /** the Make sheet, opened from the composer's "+" (Logos 5) */
   const [makeOpen, setMakeOpen] = useState(false);
   // Logos 5: what to make, chosen before asking (components/logos5/MakePicker.tsx) — spent by the message that asks for it
   const [makeId, setMakeId] = useState<string | null>(null);
@@ -6222,7 +6222,7 @@ export function LogosApp({
   }
 
   /**
-   * OPEN ON THE LOGIC MAP (Logos 5.5): a reply's diagram put on the map as a drawing — every part
+   * OPEN ON THE LOGIC MAP (Logos 5): a reply's diagram put on the map as a drawing — every part
    * "drawn", to open, edit, inspect and keep (lib/logos5/drawing.ts). An edit like any other: Undo takes
    * it back, the free plan counts its parts, and the drawing before it gives way. The map is shown.
    */
@@ -6294,7 +6294,7 @@ export function LogosApp({
   }
 
   /**
-   * KEEP IN ARTIFACTS (Logos 5.5): the Logic Map's drawing filed as a Diagram display, to keep and work
+   * KEEP IN ARTIFACTS (Logos 5): the Logic Map's drawing filed as a Diagram display, to keep and work
    * with as an artifact (lib/logos5/drawing.ts diagramFromDrawing). The person's own thinking stays on the
    * map. Kept once: pressed again, the diagram it made opens. The free plan's artifacts count it
    * (commitObjects), as they count anything made.
@@ -6357,7 +6357,7 @@ export function LogosApp({
   const [studyNote, setStudyNote] = useState<string | null>(null);
   /** the topic opened by "Recommend for me", whose reason is shown with it */
   const [studyWhy, setStudyWhy] = useState<string | null>(null);
-  // STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4): the artifact opened at full size from the desk, per line of
+  // STUDY, READ LEFT TO RIGHT (Logos 5, Screen 4): the artifact opened at full size from the desk, per line of
   // thinking. What is heavy to draw (your writing, a model, a 3D scene) opens at full size when it is chosen —
   // by you, or by the conversation pointing at it — and "All artifacts" brings the desk back.
   const [deskFull, setDeskFull] = useState<Record<string, string | null>>({});
@@ -6368,7 +6368,7 @@ export function LogosApp({
     const it = artifactListRef.current.find((a) => a.key === deskPick);
     if (it && !drawsInCard(it.kind)) setDeskFull((m) => (m[sid] === deskPick ? m : { ...m, [sid]: deskPick }));
   }, [deskPick]);
-  // ONE BOARD (Logos 5.5, VIII · One view; lib/logos5/oneView.ts, components/logos5/L5Board.tsx). On a wide screen the
+  // ONE BOARD (Logos 5, VIII · One view; lib/logos5/oneView.ts, components/logos5/L5Board.tsx). On a wide screen the
   // line of thinking is one board: the tabs move its camera (the view the screen's rules choose is where it looks), and
   // what is opened large beside it is its own — put there by Split View or by opening something, never the conversation,
   // which is the chatbox. The turn being read is open in full above the chatbox: the newest, unless another was pressed;
@@ -7998,7 +7998,7 @@ export function LogosApp({
   // Universal Map (components/logos5/UniverseParts.tsx PreviewCard), where it
   // lives, rather than in a list brought back from here.
   const l5Menu: L5MenuItem[] = [
-    // Logos 5.5: the header has no "+", so a new line of thinking is the first thing here, at any size; on a
+    // Logos 5: the header has no "+", so a new line of thinking is the first thing here, at any size; on a
     // phone, search is here too, so the title is not "Sh…".
     ...(activeId && !l5Home ? [{ label: 'New line of thinking', onSelect: () => void newFromHome() }] : []),
     ...(phone && activeId && !l5Home ? [{ label: 'Search everything', hint: 'Conversations, files and artifacts', onSelect: () => setSearchOpen(Date.now()) }] : []),
@@ -8010,7 +8010,7 @@ export function LogosApp({
     ...(!phone || cabin
       ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
       : []),
-    // on a wide screen the line of thinking is one board with nothing floating over it (Logos 5.5 One view): Synthesize is here
+    // on a wide screen the line of thinking is one board with nothing floating over it (Logos 5 One view): Synthesize is here
     ...(activeId && !narrow && !l5Home && canSynthesize(map) ? [{ label: 'Synthesize', hint: 'See where your thinking stands', onSelect: () => void synthesize('workspace') }] : []),
     ...(activeId ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
     ...(!handsWanted
@@ -8282,10 +8282,10 @@ export function LogosApp({
             <ConcisePicker value={replyLength} onChange={pickLength} />
           </>
         }
-        // Logos 5.5: Make lives under "+", beside Attach, Search my files and ∑
+        // Logos 5: Make lives under "+", beside Attach, Search my files and ∑
         plusItems={[{ label: 'Make', hint: 'A chart, a table, a timeline — drawn in Artifacts', onSelect: () => setMakeOpen(true) }]}
         onSearchFiles={() => setSearchOpen(Date.now())}
-        // the Answer Guard, on the chatbox's first line beside "Asking about" (Logos 5.5, One view)
+        // the Answer Guard, on the chatbox's first line beside "Asking about" (Logos 5, One view)
         guide={guarded && l5 ? { onHint: () => void send('Can I have another hint?'), onReveal: reveal, busy } : null}
         // folded over a view (the conversation not on screen): its first tool unfolds the conversation beside the view
         lead={
@@ -8530,7 +8530,7 @@ export function LogosApp({
   artShownRef.current = (artifactItems.find((i) => i.key === artKey) ?? artifactItems[artifactItems.length - 1])?.key ?? null;
   // what Artifacts holds, by name — for "open the habit tracker", said or typed (lib/logos5/commands.ts)
   artifactListRef.current = artifactItems.map((a) => ({ key: a.key, kind: a.kind, title: a.title }));
-  // STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4; components/logos5/StudyDesk.tsx): a study with files, on a
+  // STUDY, READ LEFT TO RIGHT (Logos 5, Screen 4; components/logos5/StudyDesk.tsx): a study with files, on a
   // wide screen, shows its files and their topics on the left and what was made from them in the middle as cards,
   // for the topic chosen or for all of them. The card the conversation last pointed at is lit. One opened at full
   // size is the one-at-a-time view below, with the way back to the desk.
@@ -8852,7 +8852,7 @@ export function LogosApp({
           overlay={wsCard}
         />
       )}
-      {/* Logos 5.5: what the lines mean, and how many ideas there are — type at the foot, not a key with swatches.
+      {/* Logos 5: what the lines mean, and how many ideas there are — type at the foot, not a key with swatches.
           A drawing's lines say what they mean on themselves, so its key is only the count */}
       {map.nodes.length > 0 && (
         <ul className="l5v-legend" aria-label="What the lines mean">
@@ -8878,7 +8878,7 @@ export function LogosApp({
   // SPLIT VIEW (lib/logos5/views.ts): two of the views side by side — the one open, and beside it the
   // conversation, Content, the Logic Map, or Artifacts on the artifact chosen — each drawn as its own
   // tab draws it. Only what this line of thinking has is offered.
-  // ONE BOARD. THE CHATBOX IS THE CHAT. (Logos 5.5, VIII · One view; components/logos5/L5Board.tsx, lib/logos5/oneView.ts.)
+  // ONE BOARD. THE CHATBOX IS THE CHAT. (Logos 5, VIII · One view; components/logos5/L5Board.tsx, lib/logos5/oneView.ts.)
   // On a wide screen the line of thinking's only view: the turns down the middle, what each brought or made on the
   // right wired to it, the Logic Map pinned on the left lighting the turn being read, and that turn open in full above
   // the chatbox. A card pressed opens large beside the board (Split View); the tabs move the camera.
@@ -9006,7 +9006,7 @@ export function LogosApp({
               ideas.length
                 ? {
                     ideas,
-                    // a drawing names the card by what it is of (Logos 5.5, lib/logos5/drawing.ts)
+                    // a drawing names the card by what it is of (Logos 5, lib/logos5/drawing.ts)
                     title: drawingOf(map)?.title ?? null,
                     lit,
                     at: litAt,
@@ -9090,7 +9090,7 @@ export function LogosApp({
     setArtFresh(false);
     setStageFresh(false);
   };
-  // A VIEW'S OWN ACTIONS (Logos 5.5): top right on the view, as hairline keys — Split View ("+ View"), Synthesize,
+  // A VIEW'S OWN ACTIONS (Logos 5): top right on the view, as hairline keys — Split View ("+ View"), Synthesize,
   // AR Mode on the map, and the way to the line of thinking zoomed out. The switch in the header is the way
   // between views, so there is no "Back to chat" bar any more.
   const viewActsEl =
@@ -9403,7 +9403,7 @@ export function LogosApp({
       }
     />
   );
-  // THE SWITCH (Logos 5.5): the four views in the header's middle — Chat · Files n · Artifacts n · Logic Map. Zoomed out
+  // THE SWITCH (Logos 5): the four views in the header's middle — Chat · Files n · Artifacts n · Logic Map. Zoomed out
   // (the canvas), none is chosen; pressing one brings it close.
   const switchEl = activeId ? (
     <L5Switch

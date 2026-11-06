@@ -436,7 +436,7 @@ Core 4 included (`lib/logos5/merge.ts`):
   the conversation in Logos (`lib/rewards/challenge-rule.ts`) — which is when
   a Core chat's map used to be drawn at all — so who qualifies is as before.
 
-### What Socria remembers, on the map (Logos 5.5)
+### What Socria remembers, on the map (Logos 5)
 
 Signed in, Today and This week also show what Socria remembers, each memory
 beside the conversation it came from (`lib/logos5/memoryAtlas.ts`

@@ -1,4 +1,4 @@
-// lib/logos5/studyDesk.ts — STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4).
+// lib/logos5/studyDesk.ts — STUDY, READ LEFT TO RIGHT (Logos 5, Screen 4).
 //
 // Your files, what was made from them, and what was said, in that order. The
 // files say which topics each holds and whether each is on your map yet;

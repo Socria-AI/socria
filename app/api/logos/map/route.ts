@@ -97,7 +97,7 @@ export const dynamic = 'force-dynamic';
 const MAX_HISTORY = 16;
 
 /**
- * THE DRAWING THIS TURN ASKS FOR, IN A LINE (Logos 5.5) — after the map as it
+ * THE DRAWING THIS TURN ASKS FOR, IN A LINE (Logos 5) — after the map as it
  * stands, so the instructions above stay the same on every call (and in the
  * provider's cache). Asked for, it is drawn; a subject with a shape is drawn
  * if it would teach.
@@ -376,7 +376,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   // pass restructures what is there rather than starting over, and it wins
   // over whatever the extractor or the structure would have read.
   const stated: GrammarId | null = statedBuilding(said);
-  // ── A DIAGRAM ASKED FOR, OR A SUBJECT WITH A SHAPE (Logos 5.5) ──────
+  // ── A DIAGRAM ASKED FOR, OR A SUBJECT WITH A SHAPE (Logos 5) ──────
   //
   // "Draw a flowchart of how a bill becomes law" is the Logic Map's to draw
   // (lib/runtime/orchestrate.ts diagramAsked): no display is drafted in
@@ -683,7 +683,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     if (shape) next.building = shape;
     else delete next.building;
     const claimed = shape && (shape.by === 'person' || proposedShape?.kind === shape.kind) ? shape.kind : null;
-    // A DRAWING IS NEVER RESHAPED THIS WAY (Logos 5.5): the restructure rewires every edge on the map,
+    // A DRAWING IS NEVER RESHAPED THIS WAY (Logos 5): the restructure rewires every edge on the map,
     // and a map holding a drawing holds the person's thinking beside it, which no drawing's shape may
     // rewire. A drawing that is not its shape is shown in a lens that fits what it is (lib/logos-layout.ts).
     const holdsDrawing = next.nodes.some((n) => n.origin === 'drawn');

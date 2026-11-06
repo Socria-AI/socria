@@ -1,8 +1,8 @@
-# Logos 5.5 — the interface system
+# Logos 5 — the interface system
 
-Logos 5.5 keeps every behaviour of Logos 5 (the four views, Split View, the
+This keeps every behaviour of Logos 5 (the four views, Split View, the
 canvas zoomed out, the Universal Map, Memory, Study) and replaces the chrome
-around it with one consistent system. The design handoff is "Logos 5.5 System"
+around it with one consistent system. The design handoff is "Logos 5 System"
 (November 2026): six type steps, four radii, four elevations and three control
 states, applied to the Logic Map docked, the Logic Map folded with a card being
 asked about, Study, Home with Memory on the Universal Map, and (VIII) one
@@ -360,7 +360,7 @@ its own glyph beside it.
 
 ## 11. How it is held
 
-- `test/logos5-system-5-5.test.mjs` reads the sources: the old sheets gone and
+- `test/logos5-system.test.mjs` reads the sources: the old sheets gone and
   never imported; the three states; the one icon, menu, close and label; every
   reading size one of the six steps and every corner one of the four radii in
   the workspace's sheets; no blur, no press travel, no lit primary; the colour

@@ -1,5 +1,5 @@
 "use client";
-// components/logos5/StudyDesk.tsx — STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4).
+// components/logos5/StudyDesk.tsx — STUDY, READ LEFT TO RIGHT (Logos 5, Screen 4).
 //
 // The Artifacts view of a study: your files on the left, each holding its
 // topics (on your map, or not yet; where to start; what is new); what was made

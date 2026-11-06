@@ -18,7 +18,7 @@
   --l5-ui: var(--lg-sans);
 }
 
-/* ── the header (Logos 5.5) ──────────────────────────────────────────
+/* ── the header (Logos 5) ──────────────────────────────────────────
    56px, a rule below, the paper. Start: the rail, the mark, a rule, a label and
    the line's name in italic serif. Middle: the switch. End: Search ⌘K, Memory,
    More, the account — quiet glyphs, nothing filled. */
@@ -1574,7 +1574,7 @@
   }
 }
 
-/* ── the composer (Logos 5.5) ─────────────────────────────────────────
+/* ── the composer (Logos 5) ─────────────────────────────────────────
    The only white in the app: a rule border, radius 16, elevation 1 docked and
    2 folded. Four controls under the words — "+" (Attach, Make, Search my
    files, ∑), the length, Voice, Send — all quiet glyphs and words but Send,
@@ -1755,7 +1755,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   font-size: 13.5px;
 }
 
-/* ── the conversation (Logos 5.5) ─────────────────────────────────────
+/* ── the conversation (Logos 5) ─────────────────────────────────────
    Your words sit in the wash, radius 16/16/6/16. Socria's reply is unboxed
    prose with no name over it — the shape already says who spoke — and its
    question is serif italic in ink. Under the latest reply: Copy · Retry ·
@@ -1853,7 +1853,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   box-shadow: none;
 }
 
-/* ── the Logic Map's chrome (Logos 5.5) ──────────────────────────────
+/* ── the Logic Map's chrome (Logos 5) ──────────────────────────────
    The nodes are the map's own (LogosNode, unchanged). Around them: edges
    1.5px at .75 in four colours that each mean one thing — supports in the
    primary (yours), depends on in the accent, conflicts in tension and
@@ -1930,7 +1930,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   }
 }
 
-/* ── asking about one card (Logos 5.5) ───────────────────────────────
+/* ── asking about one card (Logos 5) ───────────────────────────────
    A holder like any other: 310 wide, panel paper, a rule, radius 16,
    elevation 2, no blur. Its head is a label and the card's name in serif;
    your question is a small bubble in the wash; the answer is prose; the

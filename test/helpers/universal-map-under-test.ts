@@ -1,4 +1,4 @@
-// The universal Logic Map (Logos 5.5): the model that holds a drawing beside
+// The universal Logic Map (Logos 5): the model that holds a drawing beside
 // the person's thinking, what a diagram request routes to, the map pass's
 // instructions, edits by hand and the free plan's whole-or-nothing rule for a
 // drawing — one bundle, for test/logic-map-universal.test.mjs.

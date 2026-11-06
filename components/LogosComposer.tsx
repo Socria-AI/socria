@@ -488,14 +488,14 @@ export function LogosComposer({
   meter?: ReactNode;
   /** Socria Voice is listening: the hold-to-talk mic steps aside, so one microphone is in use at a time */
   voiceLive?: boolean;
-  /** the host's own entries under "+" (Logos 5.5: Make lives there) */
+  /** the host's own entries under "+" (Logos 5: Make lives there) */
   plusItems?: L5MenuItem[];
   /** "Search my files", under "+" */
   onSearchFiles?: () => void;
   /** first in the tool row, before "+": folded, the way back to the conversation ("Conversation n") */
   lead?: ReactNode;
   /**
-   * THE ANSWER GUARD, as the chatbox's first line (Logos 5.5, One view): "Guiding, not solving" at its
+   * THE ANSWER GUARD, as the chatbox's first line (Logos 5, One view): "Guiding, not solving" at its
    * start, Another hint and Show solution at its end — the same line as "Asking about", never a bar of its own.
    */
   guide?: { onHint: () => void; onReveal: () => void; busy?: boolean } | null;
@@ -797,7 +797,7 @@ export function LogosComposer({
         )}
 
         {(about || guide) && (
-          // Logos 5.5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear;
+          // Logos 5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear;
           // and, while Socria is guiding rather than solving, that said at its start and the two ways out at its end
           <div className={`lg-about-chip l5-asking${guide ? ' has-guide' : ''}`} role="status" aria-live="polite">
             {guide && (
@@ -966,7 +966,7 @@ export function LogosComposer({
             </div>
             <div className="l5-ctools">
             {lead && <span className="l5-ctools-lead">{lead}</span>}
-            {/* Logos 5.5: four controls — "+" holds Attach, Make, Search my files and ∑; then the length, Voice and Send */}
+            {/* Logos 5: four controls — "+" holds Attach, Make, Search my files and ∑; then the length, Voice and Send */}
             <L5Menu
               label="Add"
               className="lg-plus"

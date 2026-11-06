@@ -36,7 +36,7 @@ export function addedNodes(before: MapLike | null | undefined, after: MapLike): 
  * back out, with every connection that touched them. What `before` had stays,
  * whatever this pass did to it.
  *
- * A DRAWING IS KEPT WHOLE OR NOT AT ALL (Logos 5.5). Half a water cycle is a
+ * A DRAWING IS KEPT WHOLE OR NOT AT ALL (Logos 5). Half a water cycle is a
  * wrong water cycle, so when `whole` marks the nodes of a drawing (origin
  * "drawn"), the person's own new ideas are kept first, and the drawing's new
  * nodes only if every one of them fits in what is left. `kept` is how many new

@@ -412,7 +412,7 @@ export const RELATION_WORDS: Record<LogosRelation, [string, string]> = {
   justifies: ['justifies', 'is justified by'],
   equivalent_to: ['is equivalent to', 'is equivalent to'],
   applies_to: ['applies to', 'is shaped by'],
-  // the universal Logic Map's connections (Logos 5.5): read in AR Mode the same way
+  // the universal Logic Map's connections (Logos 5): read in AR Mode the same way
   causes: ['causes', 'is caused by'],
   inhibits: ['holds back', 'is held back by'],
   is_a: ['is a kind of', 'includes'],

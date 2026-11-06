@@ -1,6 +1,6 @@
 'use client';
 
-// components/logos5/MapInspector.tsx — WHAT A CARD IS, AND CHANGING IT (Logos 5.5).
+// components/logos5/MapInspector.tsx — WHAT A CARD IS, AND CHANGING IT (Logos 5).
 //
 // The Logic Map draws almost anything now, and a drawing carries more than a
 // label: what a part says when it is opened, when it comes, the region it

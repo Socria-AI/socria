@@ -1,7 +1,7 @@
 /* components/logos5/memory.css — Memory, in Logos 5 (MemoryView, MemoryNetwork, MemoryParts).
  *
  * Drawn in the Logos 5 tokens (l5.css) and Logos's own (--lg-*), so a dark
- * ground recolours it with everything else. Logos 5.5: the eight regions are
+ * ground recolours it with everything else. Logos 5: the eight regions are
  * told apart by where they are and their labels, not by a hue each — on a
  * Thinking Map every colour already means one thing. They all draw in one
  * ink (--l5mm-region); a memory's status (confirmed, proposed, changed,

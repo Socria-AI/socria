@@ -36,7 +36,7 @@ export type MapEdit =
   | { op: 'unlink'; from: string; to: string }
   /** a node the person chose to take — a Socria suggestion keeps origin 'socria'; a part added to a drawing, 'drawn' */
   | { op: 'add'; node: { label: string; type: LogosNode['type']; role?: LogosNode['role']; origin?: LogosNode['origin']; detail?: string; at?: string; group?: string }; near?: string }
-  // ── A DRAWING, EDITED (Logos 5.5): what a part is, what it says when opened, where it sits, what a line says ──
+  // ── A DRAWING, EDITED (Logos 5): what a part is, what it says when opened, where it sits, what a line says ──
   /** what kind of thing a card is — a step that is really an event, a concept that is a component */
   | { op: 'retype'; id: string; type: LogosNode['type'] }
   /** what a card says when it is opened (empty clears it) */

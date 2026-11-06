@@ -268,7 +268,7 @@ function conversationOf(messages) {
 }
 
 /**
- * THE SUBJECT, DRAWN (Logos 5.5): what a well-behaved map pass returns when
+ * THE SUBJECT, DRAWN (Logos 5): what a well-behaved map pass returns when
  * the person's latest words name something with a shape — a cycle, a process,
  * a classification, a concept map, the parts of a cell, a chronology, causes.
  * Every part of a drawing is "origin": "drawn"; their own question stays

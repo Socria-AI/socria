@@ -81,7 +81,7 @@ export const NODE_TYPES = [
   'lemma', // a proven stepping-stone another statement leans on
   'conjecture', // believed but not yet established
   'counterexample', // a case that defeats a claim or conjecture
-  // ANYTHING AT ALL, DRAWN (Logos 5.5, the universal Logic Map). What a thing
+  // ANYTHING AT ALL, DRAWN (Logos 5, the universal Logic Map). What a thing
   // IS when the map shows a subject rather than an argument: the parts of a
   // cell, the stages of the water cycle, the people in a story, the branches of
   // government. Kept deliberately few — a diagram needs to know what kind of
@@ -122,7 +122,7 @@ export const RELATIONS = [
    * shape hierarchical instead of one flat canvas (lib/representation.ts).
    */
   'applies_to',
-  // ANYTHING AT ALL, DRAWN (Logos 5.5): how the parts of a subject connect.
+  // ANYTHING AT ALL, DRAWN (Logos 5): how the parts of a subject connect.
   /** A brings B about — a cause and its effect, a stimulus and its response */
   'causes',
   /** A holds B back or reduces it — a negative influence, an inhibitor */
@@ -287,7 +287,7 @@ export interface LogosNode {
 }
 
 /**
- * Where a node came from. 'drawn' is the universal Logic Map's (Logos 5.5):
+ * Where a node came from. 'drawn' is the universal Logic Map's (Logos 5):
  * SOCRIA DREW IT to show the subject — a stage of a cycle, a part of a cell,
  * an event in a history — so what the map explains is never mistaken for
  * what the person believes. The claim, evidence and assumption analysis reads
@@ -319,7 +319,7 @@ export interface ThinkingMap {
   edges: LogosEdge[];
   /**
    * WHAT THE DIAGRAM IS OF, in a few words — "The water cycle", "How a bill
-   * becomes law" — when the map draws a subject (Logos 5.5). The person's own
+   * becomes law" — when the map draws a subject (Logos 5). The person's own
    * thinking needs no title; a drawing of something does.
    */
   title?: string;
@@ -494,7 +494,7 @@ const NODE_TYPE_ALIASES: Record<string, LogosNodeType> = {
   cause: 'concept',
   mechanism: 'process',
   principle: 'concept',
-  // the universal map's kinds of thing (Logos 5.5): near misses for each
+  // the universal map's kinds of thing (Logos 5): near misses for each
   thing: 'entity',
   object: 'entity',
   organism: 'entity',
@@ -555,7 +555,7 @@ const NODE_TYPE_ALIASES: Record<string, LogosNodeType> = {
 
 /**
  * A MATHEMATICAL MAP READS THREE WORDS AS IT ALWAYS DID. Before the universal
- * map (Logos 5.5) "process" and "mechanism" were drawn as concepts and
+ * map (Logos 5) "process" and "mechanism" were drawn as concepts and
  * "quantity" as a given — the value a problem hands you, which the working
  * lens solves from. They are kinds of thing in a drawing now; in a
  * mathematical map they still mean what they meant.
@@ -576,7 +576,7 @@ function resolveNodeType(raw: unknown, context?: ThinkingContext, origin?: unkno
 
 /**
  * TWO ROLES MEAN WHAT THEY ALWAYS MEANT OUTSIDE THE SHAPES THAT OWN THEM.
- * Before the universal map (Logos 5.5) a "stage" was a step and a "part" a
+ * Before the universal map (Logos 5) a "stage" was a step and a "part" a
  * component, in every map. They are roles of their own now — the stage of a
  * cycle, the part of a breakdown — and only there: a flowchart's "stage" is
  * still one of its steps, so its order is still read.

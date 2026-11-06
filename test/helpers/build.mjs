@@ -340,11 +340,11 @@ const MODULES = [
   'test/helpers/mr-under-test.ts',
   // Logos 5's four views, titles, Content (lib/logos5/views.ts, title.ts, content.ts, contentBoard.ts)
   'test/helpers/l5views-under-test.ts',
-  // Study, read left to right (Logos 5.5, Screen 4): the desk, its facts, where the conversation docks
+  // Study, read left to right (Logos 5, Screen 4): the desk, its facts, where the conversation docks
   'test/helpers/study-desk-under-test.tsx',
-  // One board, the chatbox is the chat (Logos 5.5, VIII · One view)
+  // One board, the chatbox is the chat (Logos 5, VIII · One view)
   'test/helpers/one-view-under-test.tsx',
-  // The universal Logic Map's diagram lenses: cycle, tree, parts, concept map, a dated timeline (Logos 5.5)
+  // The universal Logic Map's diagram lenses: cycle, tree, parts, concept map, a dated timeline (Logos 5)
   'test/helpers/diagram-layout-under-test.ts',
   // The universal Logic Map: the model, diagram routing, the map pass's instructions, edits, the free plan's rule
   'test/helpers/universal-map-under-test.ts',

@@ -229,7 +229,7 @@ const PATHS: Record<LogosNodeType, JSX.Element> = {
       <path d="M4.4 11.6 11.6 4.4" />
     </>
   ),
-  // THE UNIVERSAL MAP'S KINDS OF THING (Logos 5.5)
+  // THE UNIVERSAL MAP'S KINDS OF THING (Logos 5)
   // a solid thing: a box with a face
   entity: (
     <>

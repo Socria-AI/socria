@@ -113,7 +113,7 @@ export interface L5MessageProps {
   onExplore?: (text: string) => void;
   /** an inline element opened in Artifacts as a full artifact */
   onOpenInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
-  /** a reply's diagram, opened on the Logic Map as a drawing (Logos 5.5) */
+  /** a reply's diagram, opened on the Logic Map as a drawing (Logos 5) */
   onMapInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
   /**
    * A write-up they asked to read and keep (lib/logos5/content.ts): filed in

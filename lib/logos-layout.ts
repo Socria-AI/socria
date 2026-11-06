@@ -56,7 +56,7 @@ export interface Placed {
    */
   objRef?: { id: string; at: number; live: boolean; undone?: boolean };
   /**
-   * HOW THE CARD IS DRAWN in a diagram (Logos 5.5): a pill where a flow starts
+   * HOW THE CARD IS DRAWN in a diagram (Logos 5): a pill where a flow starts
    * or ends, a diamond where it divides, a round stage on a cycle, a dot on a
    * timeline's axis. Absent: the ordinary card.
    */
@@ -112,7 +112,7 @@ export interface Connector {
 export interface Layout {
   placed: Placed[];
   connectors: Connector[];
-  /** the regions drawn behind the cards — a whole and its parts, a lane, a group (Logos 5.5) */
+  /** the regions drawn behind the cards — a whole and its parts, a lane, a group (Logos 5) */
   groups?: GroupBox[];
   /** the italic line under the map, naming the question this lens answers */
   caption: string;
@@ -122,7 +122,7 @@ export interface Layout {
 
 export const LENSES: { id: LensId; label: string; caption: string }[] = [
   { id: 'work', label: 'Work', caption: 'The thing itself, and what each step did to it.' },
-  // ANYTHING AT ALL, DRAWN (Logos 5.5): the shapes a subject takes — first among the tabs, because they are offered
+  // ANYTHING AT ALL, DRAWN (Logos 5): the shapes a subject takes — first among the tabs, because they are offered
   // only when the map holds that shape, and then it is the thing being looked at
   { id: 'cycle', label: 'Cycle', caption: 'Each stage leads to the next, and round again.' },
   { id: 'tree', label: 'Tree', caption: 'What sits under what.' },
@@ -348,13 +348,13 @@ export function availableLenses(map: ThinkingMap, opts: { workspace?: boolean } 
     const ordered = spine.size >= 2 && transitionsOf(map, spine).length >= 1;
     const events = map.nodes.some((n) => n.role === 'event' || n.role === 'period');
     if (ordered && kind !== 'timeline') shapes.push('flow');
-    // a drawing's dated events are a timeline whether or not a spine was read in them (Logos 5.5): at least two
+    // a drawing's dated events are a timeline whether or not a spine was read in them (Logos 5): at least two
     // with a time, and the drawing is a chronology or holds events
     const dated = map.nodes.filter((n) => typeof n.at === 'string' && n.at.trim()).length >= 2 && (kind === 'timeline' || map.nodes.some((n) => n.type === 'event'));
     if ((ordered && (kind === 'timeline' || events)) || dated) shapes.push('timeline');
   }
 
-  // THE SUBJECT, DRAWN (Logos 5.5, lib/logos5/diagramLayout.ts). A drawing earns the lens that draws its shape,
+  // THE SUBJECT, DRAWN (Logos 5, lib/logos5/diagramLayout.ts). A drawing earns the lens that draws its shape,
   // and only when the map holds that shape — the structure is the evidence, as it is for the shapes above: a cycle
   // when a loop runs through it, a tree when it has a hierarchy, the parts when something is taken apart or its
   // parts sit in regions, a concept map when its lines say what joins them.
@@ -1279,11 +1279,11 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
       relation: e.relation,
       strength: e.strength,
       arrow: true,
-      // what the line says: its condition, else its own words (a drawing's, Logos 5.5)
+      // what the line says: its condition, else its own words (a drawing's, Logos 5)
       ...((e.when ?? e.label) ? { label: (() => { const t = (e.when ?? e.label)!; return t.length > 26 ? t.slice(0, 25) + '…' : t; })(), lx, ly } : {}),
     };
   });
-  // A FLOWCHART'S SHAPES (Logos 5.5): a drawn flow starts and ends in a pill and divides at a diamond
+  // A FLOWCHART'S SHAPES (Logos 5): a drawn flow starts and ends in a pill and divides at a diamond
   for (const p of placed) {
     if (p.node.origin !== 'drawn' || p.loose) continue;
     const shape = p.node.role === 'start' || p.node.role === 'end' ? 'pill' : p.node.role === 'branch' ? 'diamond' : undefined;

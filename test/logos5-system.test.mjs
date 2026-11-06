@@ -1,4 +1,4 @@
-// test/logos5-system-5-5.test.mjs — LOGOS 5.5, THE INTERFACE SYSTEM.
+// test/logos5-system.test.mjs — LOGOS 5.5, THE INTERFACE SYSTEM.
 //
 // Fill means do, wash means here, a hairline means you can. One controls sheet
 // (l5-controls.css) replaces buttons.css, buttons-soft.css and the artifact

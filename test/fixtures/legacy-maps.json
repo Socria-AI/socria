@@ -1,5 +1,5 @@
 {
- "note": "Logic Maps as the sanitizer before Logos 5.5 saved them (lib/logos.ts at a404afa). The universal map must read every one back exactly as it was: test/logic-map-universal.test.mjs.",
+ "note": "Logic Maps as the sanitizer saved them before the universal Logic Map (lib/logos.ts at a404afa). The universal map must read every one back exactly as it was: test/logic-map-universal.test.mjs.",
  "maps": [
   {
    "name": "shapes:ONBOARDING_CLOUD",

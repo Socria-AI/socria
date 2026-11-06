@@ -130,7 +130,7 @@ console.log('=== asking for a view by name ===');
   ];
   for (const s of no) ok(`not a view: "${s}"`, readViewRequest(s) === null, JSON.stringify(readViewRequest(s)));
   ok('each view has its own line', viewSaid('structure') !== viewSaid('graph') && /structure/.test(viewSaid('structure')));
-  // a concept map is a shape of its own now — ideas joined by labelled links (Logos 5.5) — and a mind map is still a brainstorm
+  // a concept map is a shape of its own now — ideas joined by labelled links (Logos 5) — and a mind map is still a brainstorm
   ok('the map pass reads the same words as a shape to build', statedBuilding('show this as a chart') === 'model' && statedBuilding('organize this as a concept map') === 'concept' && statedBuilding('organize this as a mind map') === 'brainstorm');
 }
 
