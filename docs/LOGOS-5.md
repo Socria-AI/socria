@@ -436,6 +436,77 @@ Core 4 included (`lib/logos5/merge.ts`):
   the conversation in Logos (`lib/rewards/challenge-rule.ts`) — which is when
   a Core chat's map used to be drawn at all — so who qualifies is as before.
 
+### What Socria remembers, on the map (Logos 5.5)
+
+Signed in, Today and This week also show what Socria remembers, each memory
+beside the conversation it came from (`lib/logos5/memoryAtlas.ts`
+`mapMemoriesOf`, placed by `lib/logos5/bubbles.ts`, drawn by
+`UniverseBubbles.tsx`). Nothing else on the map moves for it.
+
+- **The key.** *Memory*, among the map's tools between *All subjects* and
+  *View* (its glyph alone on a phone), with a gold count of the readings on
+  this map still waiting for the person. It is a display preference kept with
+  the arrangement (`display.memory`, on by default), so Undo does not take it
+  back and a saved view put back leaves it as it is. Signed out, or when the
+  memory cannot be read, there is no key and nothing changes. With it off the
+  map is drawn exactly as before.
+- **What is read.** The same private-filtered feed the Memory view reads
+  (`/api/mind?scope=logos`), and nothing else. A memory is *in your words* only
+  when a ground says they said it in a conversation (held to their words by
+  `lib/mind/ground.ts`) or they wrote it on the Memory page; *from your file*
+  when it was read from one, and then never "your words"; otherwise *Socria's
+  reading*. A reading **waits for a second conversation** while its record
+  names one conversation and nothing says a second saw it. An inferred claim
+  about the person is only ever a memory once a second conversation proposed it
+  (`lib/mind/gate.ts`), so one like that counts as seen twice even where its
+  record kept only the second conversation's id. What it **came from** is the
+  conversations its grounds name, in order. A conversation off the record or
+  read as sensitive contributes nothing: its memories are private and never
+  reach the feed, and the map also drops any conversation whose own words
+  fold to anything but `full` (`lib/mind/logos-turn.ts`). Found in a source, an
+  earlier position, one in dispute, and anything naming no conversation (added
+  by hand, a file read on the Memory page) stay in Memory, not on the map.
+- **Where it hangs.** From one conversation: beside its disc, on the side away
+  from its spokes, joins and curves, with the same kind of pass that finds room
+  for a quick question's words. From two or more sessions of one subject:
+  between them, tethered to each. From quick questions only: off the newest.
+  From two subjects the map already joins by a shared idea: no mark; that
+  curve's card says it instead (*Socria remembers · in your words*, the words,
+  where it was said, and **Edit** · **Forget**), where the computed card would
+  be and as wide, grown down over its curve, slid along it, or raised only when
+  something is in the way. Placed last, round everything already drawn, inside
+  the room the map is fitted to, so it is never under the page's words at the
+  top or the box at the foot; one with nowhere to go is left off the map and is
+  still on its conversation's card. On a phone a memory may stand out a little
+  to the side of the subjects.
+- **Drawn.** A dotted tether from the disc's edge (gold for one waiting) to a
+  mark and its words in the serif italic on a paper chip: a ring in your words,
+  a square from your file, a grey ring Socria's reading seen twice, a dashed
+  gold ring a reading waiting. It dims with the rest when a search leaves its
+  conversations out or another conversation is pointed at. It comes in after
+  the quick questions and before the card (a 0.3s fade, its tether drawn out);
+  under reduced motion it is simply there. On Celestial the chip is on glass.
+  Pressed, it opens the card of the conversation it came from.
+- **The conversation's card** gains *What it taught Socria · n* under what
+  Socria asked: each memory with its mark, its words and how it is known ("in
+  your words · also in …", "from your file · …", "Socria's reading · waiting for
+  a second chat"), five at most and the rest in Memory. A reading still waiting
+  has **That's right** (the Memory view's confirm, `PATCH /api/mind/node`) and
+  **Not quite**, which opens its words to be put right and keeps them as theirs
+  from then on (the same `PATCH` as Edit). Either shows at once, the ring solid
+  and the count lower, and the map reads memory again.
+- **The legend.** The map has had none since Logos 5 Comments v2; while Memory
+  is on, one line beside the box says what the ring means (not on a phone, or
+  with the List open).
+- **Not done, and why.** A reading noticed in one conversation and not yet
+  believed lives in the pending ledger, which `/api/mind?scope=logos` does not
+  send (it carries no privacy mark, as §7 says), so the waiting readings shown
+  are memories held lightly (`tentative`) from one conversation, not those
+  sightings. This month and All time do not draw memory yet.
+
+Held down by `test/logos5-map-memory.test.mjs`; seen in a browser harness (the
+real component on the real page's styles, stand-in memory served to it).
+
 ## 6. The map is the screen
 
 A line of thinking is three views of the same material, switched in the
