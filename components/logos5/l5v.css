@@ -1717,6 +1717,43 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   width: 14px;
   height: 14px;
 }
+/* the Answer Guard on the same line: "Guiding, not solving" at its start, Another hint · Show solution at its end */
+.logos-root .l5 .l5-guide {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  font-size: 12.5px;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
+}
+.logos-root .l5 .l5-guide-dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: var(--lg-primary);
+}
+.logos-root .l5 .l5-guide-sep {
+  flex: none;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.3);
+}
+.logos-root .l5 .l5-asking.has-guide:not(:has(.l5-asking-t)) .l5-guide {
+  flex: 1 1 auto;
+}
+.logos-root .l5 .l5-guide-acts {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  flex: none;
+  margin-left: auto;
+}
+.logos-root .l5 .l5-guide-acts .l5-chip {
+  height: 30px;
+  padding: 0 12px;
+  font-size: 13.5px;
+}
+.logos-root .l5 .l5-guide-acts .l5-btn {
+  font-size: 13.5px;
+}
 
 /* ── the conversation (Logos 5.5) ─────────────────────────────────────
    Your words sit in the wash, radius 16/16/6/16. Socria's reply is unboxed
@@ -1875,6 +1912,13 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   padding-left: 16px;
   border-left: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
   font-variant-numeric: tabular-nums;
+}
+/* beside another view (the board's Split View), the map is narrower: the count gives way to the map's own zoom tray */
+.logos-root .l5 .l5v-beside .l5v-legend .is-count {
+  display: none;
+}
+.logos-root .l5 .l5v-beside .l5v-legend {
+  gap: 12px;
 }
 /* the legend steps aside while a card is being asked about */
 .logos-root .l5 .l5v-logic:has(.l5-ask) .l5v-legend {

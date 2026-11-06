@@ -336,6 +336,8 @@ const MODULES = [
   'test/helpers/l5views-under-test.ts',
   // Study, read left to right (Logos 5.5, Screen 4): the desk, its facts, where the conversation docks
   'test/helpers/study-desk-under-test.tsx',
+  // One board, the chatbox is the chat (Logos 5.5, VIII · One view)
+  'test/helpers/one-view-under-test.tsx',
   // adaptive response rendering: the inline vocabulary, its planner, its gate and its components
   'test/helpers/inline-under-test.tsx',
   // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws

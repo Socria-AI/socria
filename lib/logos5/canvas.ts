@@ -26,6 +26,9 @@ export interface CanvasTurn {
   index: number;
   askedId?: string;
   replyId?: string;
+  /** where its question and its reply are in the conversation (a message not yet saved has no id) */
+  askedAt?: number;
+  replyAt?: number;
   asked: string;
   said: string;
   /** Socria is still writing this turn's reply */
@@ -133,27 +136,28 @@ export function canvasTurns(messages: readonly CanvasMsg[], opts: { pending?: bo
     turns.push(turn);
     return turn;
   };
-  for (const m of messages) {
+  messages.forEach((m, at) => {
     if (m.synthesis) {
-      start({ asked: '', said: 'Where your thinking stands', replyId: m.id, synthesis: true });
+      start({ asked: '', said: 'Where your thinking stands', replyId: m.id, replyAt: at, synthesis: true });
       open = null;
-      continue;
+      return;
     }
     if (m.role === 'user') {
-      open = start({ asked: excerpt(m.content, 140), said: '', askedId: m.id });
-      continue;
+      open = start({ asked: excerpt(m.content, 140), said: '', askedId: m.id, askedAt: at });
+      return;
     }
-    if (m.role !== 'assistant') continue;
+    if (m.role !== 'assistant') return;
     const said = excerpt(m.content, 200);
-    if (open && !open.replyId) {
+    if (open && open.replyAt === undefined) {
       open.replyId = m.id;
+      open.replyAt = at;
       open.said = said;
-    } else start({ asked: '', said, replyId: m.id });
+    } else start({ asked: '', said, replyId: m.id, replyAt: at });
     open = null;
-  }
+  });
   // the turn still being answered
   const last = turns[turns.length - 1];
-  if (opts.pending && last && !last.replyId && !last.synthesis) last.pending = true;
+  if (opts.pending && last && last.replyAt === undefined && !last.synthesis) last.pending = true;
   return turns;
 }
 

@@ -61,7 +61,8 @@ export const TIPS: readonly Tip[] = [
     kind: 'tip',
     title: 'Your thinking, drawn',
     body: 'As you talk, Socria draws your ideas as a Logic Map. Open it to move them, question them and see what connects.',
-    anchor: '.lcv-card.is-map',
+    // the canvas's map card, or the board's, pinned (Logos 5.5 One view)
+    anchor: '.lcv-card.is-map, .lob-map',
     when: (c) => c.where === 'line' && c.replies >= 1 && c.mapCard,
   },
   {
@@ -102,8 +103,8 @@ export const TIPS: readonly Tip[] = [
   {
     id: 'f.split',
     kind: 'feature',
-    title: 'Two views side by side',
-    body: 'Split View puts the conversation beside the Logic Map or an artifact, so you can talk and look at once.',
+    title: 'Two things side by side',
+    body: 'Split View opens one thing large beside what you are on — an artifact to use, the Logic Map to edit, a file to read.',
     anchor: '.l5v-split',
     action: 'split',
     when: (c) => c.where === 'line' && c.can.split && c.replies >= 2,

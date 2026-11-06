@@ -415,6 +415,7 @@ export function LogosComposer({
   plusItems,
   onSearchFiles,
   lead,
+  guide,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -493,6 +494,11 @@ export function LogosComposer({
   onSearchFiles?: () => void;
   /** first in the tool row, before "+": folded, the way back to the conversation ("Conversation n") */
   lead?: ReactNode;
+  /**
+   * THE ANSWER GUARD, as the chatbox's first line (Logos 5.5, One view): "Guiding, not solving" at its
+   * start, Another hint and Show solution at its end — the same line as "Asking about", never a bar of its own.
+   */
+  guide?: { onHint: () => void; onReveal: () => void; busy?: boolean } | null;
   /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
@@ -790,15 +796,41 @@ export function LogosComposer({
           </div>
         )}
 
-        {about && (
-          // Logos 5.5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear
-          <div className="lg-about-chip l5-asking" role="status" aria-live="polite">
-            <span className="l5-label">Asking about</span>
-            <span className="l5-asking-t">
-              {about.kind === 'expression' ? <TeX tex={about.label} /> : about.label}
-              {about.of ? <span className="lg-about-of"> · {about.of}</span> : null}
-            </span>
-            {onClearAbout && <L5Close className="l5-asking-x" label={`Stop asking about ${about.label}`} title="Clear what this is about" onClose={onClearAbout} />}
+        {(about || guide) && (
+          // Logos 5.5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear;
+          // and, while Socria is guiding rather than solving, that said at its start and the two ways out at its end
+          <div className={`lg-about-chip l5-asking${guide ? ' has-guide' : ''}`} role="status" aria-live="polite">
+            {guide && (
+              <span className="l5-guide">
+                <span className="l5-guide-dot" aria-hidden="true" />
+                Guiding, not solving
+              </span>
+            )}
+            {guide && about && (
+              <span className="l5-guide-sep" aria-hidden="true">
+                ·
+              </span>
+            )}
+            {about && (
+              <>
+                <span className="l5-label">Asking about</span>
+                <span className="l5-asking-t">
+                  {about.kind === 'expression' ? <TeX tex={about.label} /> : about.label}
+                  {about.of ? <span className="lg-about-of"> · {about.of}</span> : null}
+                </span>
+                {onClearAbout && <L5Close className="l5-asking-x" label={`Stop asking about ${about.label}`} title="Clear what this is about" onClose={onClearAbout} />}
+              </>
+            )}
+            {guide && (
+              <span className="l5-guide-acts">
+                <button type="button" className="l5-chip l5-guide-hint" disabled={guide.busy} onClick={guide.onHint}>
+                  Another hint
+                </button>
+                <button type="button" className="l5-btn is-sm is-quiet l5-guide-reveal" onClick={guide.onReveal}>
+                  Show solution
+                </button>
+              </span>
+            )}
           </div>
         )}
 

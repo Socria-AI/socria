@@ -173,6 +173,7 @@ export function SplitView({
   onPick,
   chatSide,
   onChatSide,
+  board = false,
 }: {
   menu: { views: SplitChoice[]; artifacts: SplitChoice[] };
   /** something is open beside the view */
@@ -182,6 +183,8 @@ export function SplitView({
   /** where the conversation sits when it shares the screen, and the way to put it elsewhere */
   chatSide?: Side;
   onChatSide?: (side: Side) => void;
+  /** One view (Logos 5.5): "Split View" in the header, opening one thing large beside the board */
+  board?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const wrap = useRef<HTMLSpanElement>(null);
@@ -216,18 +219,25 @@ export function SplitView({
     <span className="l5v-split" ref={wrap}>
       <button
         type="button"
-        className={`l5-btn is-sm${besideOn ? ' is-on' : ''}`}
+        className={`l5-btn is-sm${besideOn ? ' is-on' : ''}${board ? ' l5v-splitb' : ''}`}
         aria-haspopup="menu"
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
-        aria-label="Split View: open a view beside this one"
-        title="Open a view beside this one"
+        aria-label={board ? 'Split View: open one thing large beside the board' : 'Split View: open a view beside this one'}
+        title={board ? 'Open an artifact, the Logic Map or a file large beside the board' : 'Open a view beside this one'}
         onClick={() => setOpen((v) => !v)}
       >
-        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-          <path d="M12 5v14M5 12h14" />
-        </svg>
-        <span>View</span>
+        {board ? (
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+            <path d="M12 4.5v15" />
+          </svg>
+        ) : (
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+            <path d="M12 5v14M5 12h14" />
+          </svg>
+        )}
+        <span>{board ? 'Split View' : 'View'}</span>
       </button>
       {open && (
         <div className="l5v-menu l5-menu" role="menu" id={menuId} aria-label="Open beside">
@@ -291,6 +301,7 @@ const SIDE_LABEL: Record<Side, string> = { left: 'Left', right: 'Right', top: 'T
 
 export function L5Layout({
   view,
+  board = false,
   primary,
   beside,
   besideView = null,
@@ -306,6 +317,8 @@ export function L5Layout({
   narrow,
 }: {
   view: Viewport;
+  /** One view (Logos 5.5): the board is the view — it scrolls and zooms itself, and holds the chatbox */
+  board?: boolean;
   primary: ReactNode;
   /** the view open beside it, drawn as its own tab draws it */
   beside: ReactNode | null;
@@ -364,7 +377,7 @@ export function L5Layout({
   return (
     <div
       ref={body}
-      className={`l5v-body is-${view}${besideOn ? ` has-beside side-${side}` : ''}${narrow ? ' is-narrow' : ''}${omniTop && omni && !narrow ? ' omni-top' : ''}${aim ? ' is-docking' : ''}`}
+      className={`l5v-body is-${view}${board ? ' is-board' : ''}${besideOn ? ` has-beside side-${side}` : ''}${narrow ? ' is-narrow' : ''}${omniTop && omni && !narrow ? ' omni-top' : ''}${aim ? ' is-docking' : ''}`}
       style={besideOn ? ({ ['--beside' as string]: `${Math.round(share * 1000) / 10}%` }) : undefined}
     >
       <main id="l5v-primary" className="l5v-primary" role="tabpanel" aria-labelledby={`l5v-tab-${view}`}>

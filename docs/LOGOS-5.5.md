@@ -5,7 +5,8 @@ canvas zoomed out, the Universal Map, Memory, Study) and replaces the chrome
 around it with one consistent system. The design handoff is "Logos 5.5 System"
 (November 2026): six type steps, four radii, four elevations and three control
 states, applied to the Logic Map docked, the Logic Map folded with a card being
-asked about, Study, and Home with Memory on the Universal Map.
+asked about, Study, Home with Memory on the Universal Map, and (VIII) one
+board for a line of thinking, where the chatbox is the chat.
 
 **Fill means do. Wash means here. A hairline means you can.**
 
@@ -181,7 +182,48 @@ layer on it, shown by default when signed in and absent signed out.
 - The detail, and what the data cannot yet say, is in `docs/LOGOS-5.md` §5
   (Memory on the map).
 
-## 8. Not finished
+## 8. VIII · One view — one board, the chatbox is the chat
+
+The newest part of the handoff. On a wide screen (1024 and over) a line of
+thinking with something in it is one board, built on the canvas
+(`components/logos5/L5Board.tsx`, its rules in `lib/logos5/oneView.ts`,
+`board.css`). It is the line of thinking's only view there; the phone keeps
+the four views and the zoomed-out canvas as they were.
+
+- **The board.** The conversation runs down the middle as turn cards (your
+  words in the wash, then Socria, "Turn n", the gist) on a spine; what each
+  turn brought or made sits on the right, wired to its turn ("File ·
+  Brought", "Artifact · Live graph"). The Logic Map is **one pinned card** on
+  the left: the question first, then the ideas the turn being read put on the
+  map (lit), then the rest — five, "+ n more ideas"; pressing an idea asks
+  about it; pressing the card's name opens the map beside, to edit.
+- **The chatbox is the chat.** The turn being read — the newest unless
+  another was pressed — opens in full above the chatbox, drawn exactly as the
+  conversation draws it (one renderer, `msgEl`, for both): "Socria · Turn 3
+  of 3", ↑ ↓ through the turns, Fold. Folded, every turn is on the board and
+  the chatbox's first tool is "Turn n ⌃". Sending opens the new turn above
+  the chatbox. Under the reply, "{kind}, beside this turn →" opens what it
+  made.
+- **One line for the guide.** "Guiding, not solving" and "Asking about" are
+  the chatbox's first line, with Another hint and Show solution at its end
+  (`LogosComposer` `guide`); the bar that floated over the conversation is
+  gone in Logos 5.
+- **The tabs move the board.** Each brings its part forward and the rest
+  steps back (the card stays opaque; what is in it fades); Logic Map opens
+  all the ideas on the pinned card. The screen's own rules
+  (`lib/logos5/views.ts`: what a sent turn does, rule C) are kept and read
+  as the camera. The filters, the zoom group and Back to chat are gone; zoom
+  is a tray in the corner (− % + fit).
+- **Split View stays.** In the header ("Split View"), it opens one thing
+  large beside the board — an artifact to use, the Logic Map to edit, a file
+  to read — never the conversation, which is the chatbox. A card pressed on
+  the board opens there too. The board fits itself to the room left; the
+  reply and the chatbox stay full size. A study's Artifacts, beside the
+  board, is the desk of §6.
+- **Nothing floats over the board.** The view's own actions are gone from
+  it: Synthesize and AR Mode are in More.
+
+## 9. Not finished
 
 - **Readings seen once** are not on the map: they live in the pending ledger,
   which the Logos memory feed deliberately does not send. "Waiting" on the map
@@ -191,11 +233,17 @@ layer on it, shown by default when signed in and absent signed out.
   conversation, so their memories appear once they come up in one.
 - This month and All time draw no memory, as the handoff says for this pass.
 - On a phone the desk is not drawn: Artifacts stays one at a time.
+- **One view on a phone** was not drawn in the handoff: a phone keeps the
+  four views and the zoomed-out canvas. A shared room (others thinking
+  together) keeps the conversation as it was.
+- On the board, what was made outside any turn (a model, the writing, a
+  kept artifact) sits at the foot beside the sheet, wired to no turn; a
+  display has no record of the turn that asked for it.
 - The phone sheet, and the White, Dark and Celestial themes, use the same
   tokens and were not drawn separately in the handoff; they were checked only
   where the browser runs below went.
 
-## 9. How it is held
+## 10. How it is held
 
 - `test/logos5-system-5-5.test.mjs` reads the sources: the old sheets gone and
   never imported; the three states; the one icon, menu, close and label; every
@@ -209,6 +257,11 @@ layer on it, shown by default when signed in and absent signed out.
   which artifact belongs to which topic, what the middle shows, the desk drawn
   (files, topics, dots, cards, the lit card, heavy things not drawn, Show
   all), the conversation docked right, and the wiring in `LogosApp.tsx`.
+- `test/logos5-one-view.test.mjs`: when the board is the view, what each
+  tab brings forward, what may open beside (never the conversation), the
+  turn the sheet reads and ↑ ↓, the ideas a turn lit, the pinned card's
+  ideas, zoom; the board drawn (no bar, one pinned card, the turn being read
+  off the board, wires, the tray) and the sheet; the wiring in LogosApp.
 - `test/logos5-map-memory.test.mjs`: memory's kinds from provenance, where
   each hangs, what is left off, the key, the card, That's right / Not quite.
 - The suites that asserted the old chrome (`logos5-shell`, `logos5-canvas`,
@@ -220,4 +273,7 @@ layer on it, shown by default when signed in and absent signed out.
   map folded, a card asked about, Files and Artifacts
   (`.journeys/l55-shots.mjs`); a study — two files sorted into topics,
   practice made, the desk, a topic chosen, the conversation beside on the
-  right, the files folded (`.journeys/l55-study.mjs`).
+  right, the files folded (`.journeys/l55-study.mjs`); the board — three
+  turns, a file, a drawing; a turn read; Fold; each tab; Split View with the
+  Logic Map and with an artifact; at 1440, 1100 and a phone
+  (`.journeys/l55-board.mjs`).

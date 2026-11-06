@@ -107,7 +107,7 @@ ok('  something else beside, on the right as before', D.besideSide(S('artifacts'
 
 console.log('\n=== wired: the Artifacts view of a study with files, on a wide screen ===');
 const app = read('components/LogosApp.tsx');
-ok('the desk draws the Artifacts view for a study with files, wide, as the view', /const deskOn = !!study && study\.state\.files\.length > 0 && !narrow && studyTab === 'artifacts';/.test(app) && /<StudyDesk/.test(app));
+ok('the desk draws the Artifacts view for a study with files, wide, as the view', /const deskOn = !!study && study\.state\.files\.length > 0 && !narrow && \(oneView \? boardBeside === 'artifacts' : studyTab === 'artifacts'\);/.test(app) && /<StudyDesk/.test(app));
 ok('  the lit card is the one the conversation last pointed at', /lit=\{artKey\}/.test(app));
 ok('  on your map is read from the Logic Map\'s own ideas', /mapped=\{onMap\(deskTopics, map\.nodes\.map\(\(n\) => n\.label\)\)\}/.test(app));
 ok('  a topic chosen is the same choice as in Files', /onTopic=\{pickTopic\}/.test(app) && /topic=\{studyTopic\}/.test(app));

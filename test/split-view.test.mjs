@@ -104,7 +104,7 @@ console.log('\n=== nothing of the old drawer is left ===');
   const views = read('lib/logos5/views.ts');
   ok('no workspace panel is docked beside a view', !/besidePanelOf|l5b-/.test(app));
   ok('no drawer sections, no panel names', !/SPLIT_SECTIONS|Math Plotting|Interactive Modeling|Studio \(CAD\)|Displays \(Tables|Mind \(Memory History\)|Thinking Map Structure/.test(views + read('components/logos5/L5Views.tsx')));
-  ok('the beside pane is the view itself, chosen in Split View', /const besideEl = screen\.beside && screen\.beside !== studyTab \? viewEl\(screen\.beside\) : null/.test(app));
+  ok('the beside pane is the view itself, chosen in Split View', /const besideEl = oneView \? \(boardBeside \? viewEl\(boardBeside\) : null\) : screen\.beside && screen\.beside !== studyTab \? viewEl\(screen\.beside\) : null/.test(app));
 }
 
 console.log(`\nsplit-view: ${pass} passed, ${fail} failed`);
