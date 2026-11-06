@@ -41,7 +41,8 @@ ok('  the drawer is a menu that closes on Escape: the views, then the artifacts 
 ok('  …offering only what this line of thinking has (splitMenu)', /const splitChoices = splitMenu\(\{/.test(app) && /<SplitView menu=\{splitChoices\}/.test(app));
 ok('  the panel beside is resized by a separator that takes the arrow keys', /role="separator"/.test(shell) && /aria-valuenow/.test(shell) && /ArrowLeft/.test(shell));
 ok('Synthesize is the Content and Logic Map views’ own action, not the bar’s', /\(studyTab === 'content' \|\| studyTab === 'logic_map'\) && canSynthesize\(map\)/.test(app) && !/label: synthBusy === 'workspace' \? 'Reading your map…' : 'Synthesize'/.test(app));
-ok('Memory: in the profile\'s own menu, and (5.5) its glyph in the header for a signed-in account', /label: 'Memory', hint: 'What Socria remembers about you'/.test(app) && /items\?\.length/.test(read('components/account/AccountControl.tsx')) && /memory=\{cloud \? <MindButton onOpen=\{\(\) => setL5Mind\(true\)\} \/> : null\}/.test(app));
+// the name chip opens account settings directly (November 2026) — no menu in between; Memory keeps its own glyph
+ok('the name chip opens account settings directly; Memory has its glyph in the header for a signed-in account', /<AccountControl onOpen=\{\(\) => setAcctOpen\(true\)\} isOne=\{one\} \/>/.test(app) && !/label: 'Account settings', hint: 'Profile, plan, devices, export'/.test(app) && /memory=\{cloud \? <MindButton onOpen=\{\(\) => setL5Mind\(true\)\} \/> : null\}/.test(app));
 
 console.log('\n=== the omnibox ===');
 ok('Enter sends; Shift+Enter is a new line; a word being composed is not sent', /e\.key === 'Enter' && !e\.shiftKey && !\(e\.nativeEvent as KeyboardEvent\)\.isComposing/.test(composer));

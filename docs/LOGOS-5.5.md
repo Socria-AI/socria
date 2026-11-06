@@ -302,6 +302,9 @@ analysis, and now draws the subject too.
   drawing is kept whole or not at all — never half a drawing, never charged
   for a part not kept (`lib/quota-map.ts` `keepAddedNodes`).
 
+The name chip in the header now opens account settings directly; Memory has
+its own glyph beside it.
+
 ## 10. Not finished
 
 - **Readings seen once** are not on the map: they live in the pending ledger,

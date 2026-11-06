@@ -9328,14 +9328,9 @@ export function LogosApp({
           }
         />
       )}
-      <AccountControl
-        onOpen={() => setAcctOpen(true)}
-        isOne={one}
-        items={[
-          { label: 'Account settings', hint: 'Profile, plan, devices, export', onSelect: () => setAcctOpen(true) },
-          ...(cloud ? [{ label: 'Memory', hint: 'What Socria remembers about you', onSelect: () => setL5Mind(true) }] : []),
-        ]}
-      />
+      {/* The name chip opens account settings directly (November 2026): no menu in between. Memory has its own
+          glyph in the header (MindButton), so nothing is reached only through here. */}
+      <AccountControl onOpen={() => setAcctOpen(true)} isOne={one} />
     </span>
   ) : null;
   const moreEl = (
