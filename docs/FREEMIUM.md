@@ -24,6 +24,11 @@ Months are calendar months, UTC. Messages are not counted on either plan. The
 fair-use ceilings both plans share (Research runs, images and files read per
 conversation) are unchanged and are never sold past.
 
+Beside the table, a free account's AI requests are held to **30,000 tokens a
+week**, reset every Monday at 00:00 UTC (Sleep Mode, `docs/SLEEP-MODE.md`, which
+has the rule for what counts). Socria One is not counted; it keeps the limits
+above.
+
 A signed-out guest has their own smaller pass (`lib/guest-limits.ts`: five
 messages and one map in one conversation, kept in the browser). Signing up
 brings that conversation along.
@@ -138,6 +143,12 @@ Check after deploying: `GET /api/health/upstream` reports
 `usage: { table: true, functions: true }`; a free test account's third Logic Map
 in a month answers 402, as does its eleventh conversation; the server log shows
 no `[quota]` warning.
+
+**And the week of tokens:** run `supabase/weekly-tokens.sql` as well (add-only:
+two functions, `reserve_logos_tokens` and `settle_logos_tokens`, over the same
+table). Until it is run the weekly allowance holds through
+`consume_logos_usage` and says so once in the log (`[sleep] reserve_logos_tokens
+is not installed`); `docs/SLEEP-MODE.md` has what that changes.
 
 ## Stripe
 

@@ -413,6 +413,11 @@ conversation as before.
 `SOCRIA_TOKEN_LOG=off` silences the lines. Transcription is billed by the
 minute and is not in them; neither is the upstream health check.
 
+A signed-in free account's week of tokens (Sleep Mode, `docs/SLEEP-MODE.md`) is
+counted from the same usage: `in − cached + out` for each call made for the
+person, held before the call and settled after it. Turning the lines off does
+not turn the counting off. Production needs `supabase/weekly-tokens.sql`.
+
 ---
 
 ## What CI does not do, and why
