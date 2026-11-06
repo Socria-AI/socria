@@ -6,7 +6,26 @@
 // everything else. Nothing in it is decoration; anything used rarely is in
 // the menu, not on the bar.
 
-import { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+import React, { useEffect, useId, useRef, useState, type ReactNode } from 'react';
+
+// ── the one close: × top right of whatever it closes (l5-controls.css .l5-close) ──
+
+/** The close glyph, 24 grid, stroke 1.7 (Logos 5.5's glyph table). */
+export function CloseGlyph() {
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M6.5 6.5l11 11M17.5 6.5l-11 11" />
+    </svg>
+  );
+}
+
+export function L5Close({ label, onClose, className = '', title }: { label: string; onClose: () => void; className?: string; title?: string }) {
+  return (
+    <button type="button" className={`l5-icon l5-close${className ? ` ${className}` : ''}`} aria-label={label} title={title ?? label} onClick={onClose}>
+      <CloseGlyph />
+    </button>
+  );
+}
 
 // ── a small menu: a button and a list, Escape and outside-press close it ──
 
@@ -57,18 +76,18 @@ export function L5Menu({
       window.removeEventListener('keydown', key);
     };
   }, [open]);
-  // l5-menuhost, not l5-menu: that is the panel a More opens (buttons.css), and
-  // on this wrapper it drew the button inside a 220px card
+  // l5-menuhost holds the button and places the panel; the panel itself is the
+  // one menu, .l5-menu (l5-controls.css), and each item the one .l5-mi
   return (
     <div ref={root} className={`l5-menuhost ${className}`}>
-      <button type="button" className="l5-iconbtn" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className="l5-icon" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((v) => !v)}>
         {button}
       </button>
       {open && (
         <div
           id={id}
           role="menu"
-          className={`l5-menu-list is-${align}${up ? ' is-up' : ''}`}
+          className={`l5-menu is-${align}${up ? ' is-up' : ''}`}
           onKeyDown={(e) => {
             if (e.key !== 'ArrowDown' && e.key !== 'ArrowUp') return;
             e.preventDefault();
@@ -83,6 +102,7 @@ export function L5Menu({
               <button
                 type="button"
                 role="menuitem"
+                className={`l5-mi${it.hint ? ' has-hint' : ''}`}
                 disabled={it.disabled}
                 onClick={() => {
                   setOpen(false);
@@ -139,7 +159,7 @@ export function L5Header({
       {onToggleRail && (
         <button
           type="button"
-          className="l5-iconbtn l5-railbtn"
+          className="l5-icon l5-railbtn"
           onClick={onToggleRail}
           aria-expanded={railOpen}
           aria-label={railOpen ? 'Hide your lines of thinking' : 'Your lines of thinking'}
@@ -160,7 +180,7 @@ export function L5Header({
         )}
         {onHome && (eyebrow || title) && <span className="l5-head-rule" aria-hidden="true" />}
         <h1 className="l5-where" title={[eyebrow, title].filter(Boolean).join(' · ')}>
-          {eyebrow && <span className="l5-eyebrow">{eyebrow}</span>}
+          {eyebrow && <span className="l5-label l5-eyebrow">{eyebrow}</span>}
           {title && <span className="l5-title">{title}</span>}
         </h1>
       </div>
@@ -206,7 +226,7 @@ export function L5Header({
 /** A neuron: what Socria remembers, as its own place. */
 export function MindButton({ onOpen }: { onOpen: () => void }) {
   return (
-    <button type="button" className="l5-iconbtn l5-mindbtn" onClick={onOpen} aria-label="Memory — what Socria remembers" title="Memory — what Socria remembers">
+    <button type="button" className="l5-icon l5-mindbtn" onClick={onOpen} aria-label="Memory — what Socria remembers" title="Memory — what Socria remembers">
       <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
         <circle cx="12" cy="12.5" r="3.2" />
         <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8M12 4.5l-2.2-1.6M12 4.5l2.2-1.6M5.1 17l-1.9.2M18.9 17l1.9.2" />
@@ -227,13 +247,35 @@ export interface L5SwitchItem {
 }
 
 export function L5Switch({ items, value, onChange, label, wide = false }: { items: L5SwitchItem[]; value: string; onChange: (id: string) => void; label: string; wide?: boolean }) {
+  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
+  // the tab that takes the focus: the one chosen, or the first when none is (the canvas, zoomed out)
+  const focusId = items.some((it) => it.id === value) ? value : items[0]?.id;
+  const onKey = (e: React.KeyboardEvent<HTMLDivElement>) => {
+    const i = Math.max(0, items.findIndex((it) => it.id === (document.activeElement as HTMLElement | null)?.dataset?.tab));
+    const n = items.length;
+    const to = e.key === 'ArrowRight' ? (i + 1) % n : e.key === 'ArrowLeft' ? (i + n - 1) % n : e.key === 'Home' ? 0 : e.key === 'End' ? n - 1 : -1;
+    if (to < 0) return;
+    e.preventDefault();
+    refs.current[items[to].id]?.focus();
+  };
   return (
-    <div className={`l5-switch${wide ? ' is-wide' : ''}`} role="tablist" aria-label={label}>
+    <div className={`l5-switch${wide ? ' is-wide' : ''}`} role="tablist" aria-label={label} onKeyDown={onKey}>
       {items.map((it) => (
-        <button key={it.id} type="button" role="tab" aria-selected={value === it.id} className={`l5-switch-i${value === it.id ? ' is-on' : ''}`} onClick={() => onChange(it.id)}>
+        <button
+          key={it.id}
+          ref={(el) => void (refs.current[it.id] = el)}
+          type="button"
+          role="tab"
+          data-tab={it.id}
+          id={`l5-switch-${it.id}`}
+          aria-selected={value === it.id}
+          tabIndex={it.id === focusId ? 0 : -1}
+          className="l5-switch-i"
+          onClick={() => onChange(it.id)}
+        >
           {it.label}
-          {!!it.count && <span className="l5-switch-n">{it.count}</span>}
-          {it.fresh && value !== it.id && <span className="l5-switch-dot" aria-label="something new" />}
+          {!!it.count && <span className="l5-count">{it.count}</span>}
+          {it.fresh && value !== it.id && <span className="l5-new" aria-label="something new" />}
         </button>
       ))}
     </div>
@@ -259,20 +301,18 @@ export function L5LinkBar({ label, count, at, onStep, onClear }: { label: string
       </span>
       {count > 1 && (
         <span className="l5-linkbar-step">
-          <button type="button" className="l5-iconbtn is-sm" aria-label="Previous" onClick={() => onStep(-1)}>
+          <button type="button" className="l5-icon is-sm" aria-label="Previous" onClick={() => onStep(-1)}>
             ‹
           </button>
           <span aria-label={`${at + 1} of ${count}`}>
             {at + 1}/{count}
           </span>
-          <button type="button" className="l5-iconbtn is-sm" aria-label="Next" onClick={() => onStep(1)}>
+          <button type="button" className="l5-icon is-sm" aria-label="Next" onClick={() => onStep(1)}>
             ›
           </button>
         </span>
       )}
-      <button type="button" className="l5-iconbtn is-sm" aria-label="Clear" onClick={onClear}>
-        ×
-      </button>
+      <L5Close label="Clear" onClose={onClear} />
     </div>
   );
 }
@@ -293,9 +333,7 @@ export function L5StageHead({ title, sub, onClose, actions }: { title: string; s
         {sub && <small>{sub}</small>}
       </span>
       <span className="l5-stagehead-acts">{actions}</span>
-      <button type="button" className="l5-iconbtn is-sm l5-stage-x" onClick={onClose} aria-label="Put the workspace away" title="Put the workspace away">
-        ×
-      </button>
+      <L5Close className="l5-stage-x" label="Put the workspace away" onClose={onClose} />
     </div>
   );
 }

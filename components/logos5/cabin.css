@@ -174,14 +174,14 @@
 .logos-root.is-cabin .l5-title {
   font-size: 26px;
 }
-.logos-root.is-cabin .l5-iconbtn,
+.logos-root.is-cabin .l5-icon,
 .logos-root.is-cabin .l5-unibtn,
 .logos-root.is-cabin .l5-stagebtn {
   min-width: 56px;
   min-height: 56px;
   font-size: 17px;
 }
-.logos-root.is-cabin .l5-menu-list button {
+.logos-root.is-cabin .l5-menu button {
   min-height: 58px;
   font-size: 17px;
 }
@@ -200,7 +200,7 @@
   border-radius: 14px;
   font-size: 17px;
 }
-.logos-root.is-cabin :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-iconbtn {
+.logos-root.is-cabin :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-icon {
   border-radius: 14px;
 }
 .logos-root.is-cabin .l5v-search {
@@ -235,11 +235,11 @@
   font-size: 20px;
   line-height: 1.4;
 }
-.logos-root.is-cabin .l5-ctools .l5-iconbtn,
+.logos-root.is-cabin .l5-ctools .l5-icon,
 .logos-root.is-cabin .l5-ctools .lg-attach,
 .logos-root.is-cabin .l5-ctools .lg-send,
 .logos-root.is-cabin .l5-ctools .lg-mic,
-.logos-root.is-cabin .l5-ctools .lg-plus .l5-iconbtn {
+.logos-root.is-cabin .l5-ctools .lg-plus .l5-icon {
   width: 56px;
   height: 56px;
 }
@@ -251,7 +251,7 @@
   font-size: 18px;
 }
 /* the composer's glyph keys at this size take the same corner; the send stays a circle */
-.logos-root.is-cabin .l5-ctools :is(.lg-plus .l5-iconbtn, .lg-mic, .lg-mathbtn) {
+.logos-root.is-cabin .l5-ctools :is(.lg-plus .l5-icon, .lg-mic, .lg-mathbtn) {
   border-radius: 14px;
 }
 .logos-root.is-cabin .l5-ctools .mp-btn .nm {

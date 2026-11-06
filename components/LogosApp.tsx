@@ -199,7 +199,7 @@ import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { depthAsked } from '@/lib/reply-layout';
 import { ModelArtifact } from './logos5/ModelTools';
-import { L5Header, L5LinkBar, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
+import { L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView, type SharedIn } from './logos5/Universe';
@@ -208,11 +208,10 @@ import type { UniverseIn } from '@/lib/logos5/universe';
 import { checkPractice, clozeFrom, intentOf, looksLikeEntries, plainSort, sortedSaid, type Gap, type Intent, type Practice, type Sorted, type StudyQuote, type StudyState as StudyCore } from '@/lib/logos5/study';
 import { restudy, studyIn, type StudyState } from '@/lib/objects/display-study';
 import './logos5/l5.css';
-import './logos5/buttons.css';
+import './logos5/l5-controls.css';
 import './one/one-sheet.css';
 import './logos5/redesign.css';
 import './logos5/l5v.css';
-import './logos5/buttons-soft.css';
 import { CaptureInbox } from './CaptureInbox';
 import { EasyCapture } from './logos5/EasyCapture';
 import { CabinDock } from './logos5/CabinDock';
@@ -742,6 +741,8 @@ export function LogosApp({
   const sceneLastRef = useRef<string | null>(null);
   // asks the composer to take focus, with the caret where a filled-in form wants it
   const [composerFocus, setComposerFocus] = useState<{ n: number; caret?: number } | null>(null);
+  /** the Make sheet, opened from the composer's "+" (Logos 5.5) */
+  const [makeOpen, setMakeOpen] = useState(false);
   // Logos 5: what to make, chosen before asking (components/logos5/MakePicker.tsx) — spent by the message that asks for it
   const [makeId, setMakeId] = useState<string | null>(null);
   // the person's own templates (lib/logos5/templates.ts): choices in Make beside the list
@@ -7838,14 +7839,10 @@ export function LogosApp({
   // Universal Map (components/logos5/UniverseParts.tsx PreviewCard), where it
   // lives, rather than in a list brought back from here.
   const l5Menu: L5MenuItem[] = [
-    // On a phone the line's header holds the way back, the title and ⋯: a new
-    // line of thinking and search are here, so the title is not "Sh…".
-    ...(phone && activeId && !l5Home
-      ? [
-          { label: 'New line of thinking', onSelect: () => void newFromHome() },
-          { label: 'Search everything', hint: 'Conversations, content and artifacts', onSelect: () => setSearchOpen(Date.now()) },
-        ]
-      : []),
+    // Logos 5.5: the header has no "+", so a new line of thinking is the first thing here, at any size; on a
+    // phone, search is here too, so the title is not "Sh…".
+    ...(activeId && !l5Home ? [{ label: 'New line of thinking', onSelect: () => void newFromHome() }] : []),
+    ...(phone && activeId && !l5Home ? [{ label: 'Search everything', hint: 'Conversations, files and artifacts', onSelect: () => setSearchOpen(Date.now()) }] : []),
     { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
@@ -8004,9 +8001,9 @@ export function LogosApp({
         onClose={close}
         onAsk={(text) => askCardQuestion(node, text)}
         quick={[
-          { label: 'Why does this one matter?', text: 'Why does this one matter?' },
           { label: 'Challenge it', text: `Challenge this — is “${node.label}” really so?` },
-          { label: 'What rests on this?', text: `What rests on “${node.label}”?` },
+          { label: 'Trace it back', text: `Trace “${node.label}” back — where did it come from, and what does it rest on?` },
+          { label: 'Take it to research', text: `Take “${node.label}” to research — what does the evidence say?` },
         ]}
       />
     );
@@ -8109,15 +8106,30 @@ export function LogosApp({
         voiceLive={voiceOn}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
         idlePlaceholder={
-          makeChoice(makeId, ownChoices)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Reply to Socria…' : 'What are you working through?'))
+          makeChoice(makeId, ownChoices)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Say what you actually think.' : 'What are you actually trying to work out?'))
         }
         // a chosen artifact can be made from the conversation so far, with nothing typed
         sendable={!!makeChoice(makeId, ownChoices) && messages.length > 0}
         footer={
           <>
-            <MakePicker value={makeId} onChange={pickMake} />
+            <MakePicker value={makeId} onChange={pickMake} open={makeOpen} onOpenChange={setMakeOpen} bare />
             <ConcisePicker value={replyLength} onChange={pickLength} />
           </>
+        }
+        // Logos 5.5: Make lives under "+", beside Attach, Search my files and ∑
+        plusItems={[{ label: 'Make', hint: 'A chart, a table, a timeline — drawn in Artifacts', onSelect: () => setMakeOpen(true) }]}
+        onSearchFiles={() => setSearchOpen(Date.now())}
+        // folded over a view (the conversation not on screen): its first tool unfolds the conversation beside the view
+        lead={
+          !convoOpen && !narrow && activeId && messages.length > 0 ? (
+            <button type="button" className="l5-btn is-sm is-quiet l5-unfold" onClick={() => setScreen((sc) => dock('chat', sc))} title="Unfold the conversation beside this view">
+              <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
+                <path d="M9.5 4.5v15M13.5 9.5l2.5 2.5-2.5 2.5" />
+              </svg>
+              Conversation <span className="l5-count">{userTurns}</span>
+            </button>
+          ) : null
         }
       />
       {l5Meter}
@@ -8410,7 +8422,7 @@ export function LogosApp({
           {messages.length === 0 && !streaming && !busy && !organizing && !sortPending && (
             <div className="l5-hello">
               <h2>What are you working through?</h2>
-              <p>Think out loud — Socria asks back. Files you add are kept in Content; anything made for you is in Artifacts.</p>
+              <p>Think out loud — Socria asks back. What you bring is kept in Files; anything made for you is in Artifacts.</p>
               {pickUpOffer && (
                 <button type="button" className="l5-pickup" onClick={() => switchSession(pickUpOffer.id)}>
                   <span className="l5-pickup-k">Pick up where you left off · {relTime(pickUpOffer.at)}</span>
@@ -8502,7 +8514,7 @@ export function LogosApp({
               {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
               {brought.length > 0 && (
                 <p className="l5v-ingest" role="note">
-                  <span className="l5v-ingest-k">Added to Content</span>
+                  <span className="l5v-ingest-k">Added to Files</span>
                   {brought.map((c) => (
                     <button key={c.id} type="button" className="l5v-link" onClick={() => openContent(c.id)}>
                       {c.title}
@@ -8606,6 +8618,18 @@ export function LogosApp({
           overlay={wsCard}
         />
       )}
+      {/* Logos 5.5: what the lines mean, and how many ideas there are — type at the foot, not a key with swatches */}
+      {map.nodes.length > 0 && (
+        <ul className="l5v-legend" aria-label="What the lines mean">
+          <li className="is-supports"><i aria-hidden="true" />supports</li>
+          <li className="is-depends"><i aria-hidden="true" />depends on</li>
+          <li className="is-conflicts"><i aria-hidden="true" />conflicts</li>
+          <li className="is-relates"><i aria-hidden="true" />relates</li>
+          <li className="is-count">
+            {map.nodes.length} {map.nodes.length === 1 ? 'idea' : 'ideas'} · {mapping ? 'drawing…' : 'up to date'}
+          </li>
+        </ul>
+      )}
     </div>
   ) : null;
 
@@ -8635,7 +8659,7 @@ export function LogosApp({
     setScreen((s) => dock(c.beside, s));
   }
   /** Where the conversation is now: as it was put, or — never put — where the panel beside leaves it. */
-  const chatSideNow: ChatSide = chatSide ?? (screen.view === 'chat' && screen.beside ? 'left' : 'right');
+  const chatSideNow: ChatSide = chatSide ?? 'left';
   /**
    * The conversation put on a side from Split View or in words: kept, and — when it is not on screen
    * beside the view — brought beside it, so the choice is seen. On the conversation's own view, with
@@ -8649,6 +8673,35 @@ export function LogosApp({
     else if (now.view === 'chat' && !now.beside) return `The conversation will sit on the ${side} when it shares the screen.`;
     return `The conversation is on the ${side} now.`;
   }
+  const zoomOut = () => {
+    setZoomed(true);
+    setArtFresh(false);
+    setStageFresh(false);
+  };
+  // A VIEW'S OWN ACTIONS (Logos 5.5): top right on the view, as hairline keys — Split View ("+ View"), Synthesize,
+  // AR Mode on the map, and the way to the line of thinking zoomed out. The switch in the header is the way
+  // between views, so there is no "Back to chat" bar any more.
+  const viewActsEl =
+    !narrow && activeId && !zoomed ? (
+      <>
+        <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} chatSide={chatSideNow} onChatSide={chatSideChosen} />
+        {synthAction}
+        {studyTab === 'logic_map' && (
+          // AR MODE: the Logic Map, moved with your hands — early access; everybody else sees a preview and the waitlist
+          <button type="button" className="l5-btn is-sm l5v-ar" onClick={openAr} title="Move your Logic Map with your hands (early access)">
+            AR Mode <span className="l5v-ar-k">Early</span>
+          </button>
+        )}
+        {messages.length > 0 && (
+          <button type="button" className="l5-btn is-sm is-quiet l5v-zoomout" onClick={zoomOut} aria-label="Zoom out: the whole line of thinking, and what it made" title="Zoom out (Esc)">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5" />
+            </svg>
+            Zoom out
+          </button>
+        )}
+      </>
+    ) : null;
   const l5Line = (
     <L5Layout
       view={studyTab}
@@ -8657,6 +8710,7 @@ export function LogosApp({
       besideView={besideEl ? screen.beside : null}
       besideTitle={screen.beside ? SPLIT_NAMES[screen.beside] : ''}
       onCloseBeside={() => setScreen((s) => ({ ...s, beside: null }))}
+      actions={viewActsEl}
       // the composer, wherever the conversation is not on screen: what is said here is still said to Socria
       omni={convoOpen || zoomed ? null : l5Dock}
       omniTop={chatSide === 'top'}
@@ -8678,11 +8732,6 @@ export function LogosApp({
   // down the middle; beside each, what it made — the elements its reply drew (live, the same component as the
   // conversation), the notes and files it brought, the practice it set — and the Logic Map beside the turns that
   // drew it. The chatbox stays docked: what is said here is said to Socria, and the reply arrives on the spine.
-  const zoomOut = () => {
-    setZoomed(true);
-    setArtFresh(false);
-    setStageFresh(false);
-  };
   /**
    * AR MODE, opened. Who may use it is asked now (GET /api/ar/access) — never on load — and kept for the visit:
    * a tester gets the map moved by hand (the camera only when they start it); anybody else, a preview and the waitlist.
@@ -8870,27 +8919,6 @@ export function LogosApp({
       })()
     : null;
   /** where the tab row was: on a full view, the way back to the chat and that view's own actions; on the chat, nothing */
-  const viewBarEl =
-    studyTab !== 'chat' ? (
-      <div className="l5v-viewbar">
-        <button type="button" className="l5v-btn" onClick={() => openFull('chat')}>
-          <span aria-hidden="true">‹</span> Back to chat
-        </button>
-        <span className="l5v-viewbar-t">{VIEW_LABELS[studyTab]}</span>
-        <div className="l5v-viewbar-a">
-          {synthAction}
-          {studyTab === 'logic_map' && (
-            // AR MODE: the Logic Map, moved with your hands — early access; everybody else sees a preview and the waitlist
-            <button type="button" className="l5v-btn l5v-ar" onClick={openAr} title="Move your Logic Map with your hands (early access)">
-              AR Mode <span className="l5v-ar-k">Early</span>
-            </button>
-          )}
-          <button type="button" className="l5v-btn" onClick={zoomOut}>
-            Zoom out
-          </button>
-        </div>
-      </div>
-    ) : null;
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   /** the account chip opens the profile's own menu: the account, and Memory (Alex Tran: the mind graph lives in the profile) */
   const accountEl = guest ? (
@@ -8955,31 +8983,29 @@ export function LogosApp({
       }
     />
   );
+  // THE SWITCH (Logos 5.5): the four views in the header's middle — Chat · Files n · Artifacts n · Logic Map. Zoomed out
+  // (the canvas), none is chosen; pressing one brings it close.
+  const switchEl = activeId ? (
+    <L5Switch
+      label="Views"
+      value={zoomed ? '' : studyTab}
+      onChange={(v) => openFull(v as Viewport)}
+      items={[
+        { id: 'chat', label: VIEW_LABELS.chat, fresh: chatFresh },
+        { id: 'content', label: VIEW_LABELS.content, count: contentItems.length },
+        { id: 'artifacts', label: VIEW_LABELS.artifacts, count: artifactItems.length, fresh: artFresh },
+        { id: 'logic_map', label: VIEW_LABELS.logic_map, fresh: stageFresh },
+      ]}
+    />
+  ) : null;
   const l5Head = (
     <L5TopBar
-      title={[study?.state.course || projectName, active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : ''].filter(Boolean).join(' · ')}
+      kind={projectName ? 'Project' : study ? 'Study' : messages.length ? 'Line of thinking' : ''}
+      title={projectName || (active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : '')}
       onHome={goHome}
+      switcher={switchEl}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
-      onNew={phone ? undefined : () => void newFromHome()}
-      zoom={
-        activeId && !zoomed && studyTab === 'chat' && messages.length > 0 ? (
-          <button type="button" className="l5v-btn l5v-zoomout" onClick={zoomOut} aria-label="Zoom out: the whole line of thinking, and what it made" title="Zoom out (Esc)">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <rect x="3.5" y="3.5" width="7" height="7" rx="1.5" />
-              <rect x="13.5" y="3.5" width="7" height="7" rx="1.5" />
-              <rect x="3.5" y="13.5" width="7" height="7" rx="1.5" />
-              <rect x="13.5" y="13.5" width="7" height="7" rx="1.5" />
-            </svg>
-            {!narrow && <span>Zoom out</span>}
-            {(artFresh || stageFresh) && <span className="l5v-dot" aria-label="new" />}
-          </button>
-        ) : null
-      }
-      split={
-        !narrow && activeId ? (
-          <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} chatSide={chatSideNow} onChatSide={chatSideChosen} />
-        ) : null
-      }
+      memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} /> : null}
       presence={
         <>
           <ChallengeChip enabled={cloud} progress={!(railOpen && !chromeHidden)} onOpenAccount={() => setAcctOpen(true)} />
@@ -9623,7 +9649,6 @@ export function LogosApp({
           {railEl}
           <div className="l5-main">
             {!chromeHidden && !mindShown && !homeShown && l5Head}
-            {!mindShown && !homeShown && !zoomed && viewBarEl && <div className={`l5v-tabhost${chromeHidden ? ' is-bare' : ''}`}>{viewBarEl}</div>}
             <div className={`l5-body${zoomed && !mindShown && !homeShown ? ' is-zoomed' : ''}`}>
               {mindShown ? (
                 l5MindView

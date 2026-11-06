@@ -280,7 +280,7 @@ export function L5Message(p: L5MessageProps) {
 
       {m.role === 'user' && m.about && (
         <span className="l5-about">
-          <span className="l5-about-k">About</span> {m.about.kind === 'expression' ? <TeX tex={m.about.label} /> : <b>{m.about.label}</b>}
+          <span className="l5-label l5-about-k">Asked about</span> {m.about.kind === 'expression' ? <TeX tex={m.about.label} /> : <b>{m.about.label}</b>}
           {m.about.of ? <span className="l5-about-of"> · {m.about.of}</span> : null}
         </span>
       )}
@@ -472,13 +472,13 @@ function MapSlice({ cards, onOpen, onOne, onHover }: { cards: SliceCard[]; onOpe
 /** A write-up, in the conversation: what it is, how it opens, and the way to it in Content. */
 function WriteUpCard({ w, onOpen }: { w: { id: string; title: string; opening: string; words: number }; onOpen?: (id: string) => void }) {
   return (
-    <div className="l5-writeup" role="group" aria-label={`Written in Content: ${w.title}`}>
-      <span className="l5-writeup-k">Written in Content</span>
+    <div className="l5-writeup" role="group" aria-label={`Written in Files: ${w.title}`}>
+      <span className="l5-writeup-k">Written in Files</span>
       <b className="l5-writeup-t">{w.title}</b>
       {w.opening && <p className="l5-writeup-o">{w.opening}</p>}
       {onOpen && (
         <button type="button" className="l5-writeup-open" onClick={() => onOpen(w.id)}>
-          Read it in Content · {w.words} {w.words === 1 ? 'word' : 'words'} <span aria-hidden="true">→</span>
+          Read it in Files · {w.words} {w.words === 1 ? 'word' : 'words'} <span aria-hidden="true">→</span>
         </button>
       )}
     </div>
@@ -502,7 +502,7 @@ export function L5Pending({ text, group, to, mapping, onStop, place, disclose }:
       )}
       {text && place === 'content' ? (
         <div className="l5-writeup is-writing" role="status">
-          <span className="l5-writeup-k">Writing in Content</span>
+          <span className="l5-writeup-k">Writing in Files</span>
           <b className="l5-writeup-t">{writeUpParts(text).title}</b>
           <span className="l5-writeup-n">
             {writeUpParts(text).words} words so far

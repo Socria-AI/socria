@@ -13,17 +13,27 @@
 // lib/logos5/views.ts; this file only draws it.
 
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { L5Close } from './L5Chrome';
 import { SIDES, VIEW_LABELS, VIEW_ORDER, clampShare, nearestSide, shareAt, type Side, type SplitChoice, type Viewport } from '@/lib/logos5/views';
 
 const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '');
 
-// ── the header ───────────────────────────────────────────────────────
+// ── the header (Logos 5.5) ───────────────────────────────────────────
+//
+// One bar, 56px: where you are on the left (the rail, the mark that goes home,
+// a label and the line's name in italic), the switch between the four views in
+// the middle, and what is global on the right — search, Memory, More, the
+// account. Selected is the wash; nothing in it is filled.
 
 export function L5TopBar({
+  kind,
   title,
   onHome,
+  onRail,
+  railOpen,
+  switcher,
   onSearch,
-  onNew,
+  memory,
   zoom,
   split,
   presence,
@@ -31,11 +41,19 @@ export function L5TopBar({
   account,
   narrow,
 }: {
+  /** the label above the name: Project, Study, Line of thinking */
+  kind?: string;
   title: string;
   onHome: () => void;
+  /** your lines of thinking, as a list */
+  onRail?: () => void;
+  railOpen?: boolean;
+  /** Chat · Files · Artifacts · Logic Map (L5Switch) */
+  switcher?: ReactNode;
   /** search, here — absent on a phone, where it is in the ⋯ menu so the title has room */
   onSearch?: () => void;
-  onNew?: () => void;
+  /** Memory's door (MindButton) */
+  memory?: ReactNode;
   /** the way to the line of thinking zoomed out (components/logos5/L5Canvas.tsx) */
   zoom?: ReactNode;
   /** Split View — desktop only */
@@ -46,42 +64,41 @@ export function L5TopBar({
   narrow: boolean;
 }) {
   return (
-    <header className="l5v-top">
+    <header className={`l5v-top${narrow ? ' is-narrow' : ''}`}>
       <div className="l5v-top-l">
-        <button type="button" className="l5v-home" onClick={onHome} aria-label="Back to the Universal Map">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M15 18l-6-6 6-6" />
-          </svg>
-          {!narrow && <span>Universal Map</span>}
+        {onRail && (
+          <button type="button" className="l5-icon l5v-rail" onClick={onRail} aria-expanded={!!railOpen} aria-label="Your lines of thinking" title="Your lines of thinking">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M4 7h16M4 12h16M4 17h10" />
+            </svg>
+          </button>
+        )}
+        <button type="button" className="l5v-home" onClick={onHome} aria-label="Back to the Universal Map" title="Your Universal Map">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/socria-mark.png" alt="" width={22} height={22} />
+          {!narrow && <span className="l5v-home-w">Socria</span>}
         </button>
-        {title && (
-          <h1 className="l5v-title" title={title}>
-            {title}
-          </h1>
-        )}
-        {onNew && (
-          <button type="button" className="l5v-icon" onClick={onNew} aria-label="Start a new line of thinking" title="New line of thinking">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-        )}
+        {(kind || title) && <span className="l5v-rule" aria-hidden="true" />}
+        <h1 className="l5v-where" title={[kind, title].filter(Boolean).join(' · ')}>
+          {kind && !narrow && <span className="l5-label">{kind}</span>}
+          {title && <span className="l5v-title">{title}</span>}
+        </h1>
       </div>
-      <div className="l5v-top-c">
-        {onSearch && (
-          <button type="button" className="l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K">
-            <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="6.5" />
-              <path d="M20 20l-4.2-4.2" />
-            </svg>
-            {!narrow && <span className="l5v-search-l">Search conversations, content, artifacts…</span>}
-            {!narrow && <kbd className="l5v-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
-          </button>
-        )}
-      </div>
+      <div className="l5v-top-c">{switcher}</div>
       <div className="l5v-top-r">
         {zoom}
         {split}
+        {onSearch && (
+          <button type="button" className="l5-btn is-sm is-quiet l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K" title="Search everything">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="11" cy="11" r="6.5" />
+              <path d="M20 20l-4.2-4.2" />
+            </svg>
+            {!narrow && <span>Search</span>}
+            {!narrow && <kbd className="l5v-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
+          </button>
+        )}
+        {memory}
         {presence}
         {menu}
         {account}
@@ -197,15 +214,23 @@ export function SplitView({
   const nothing = !menu.views.length && !menu.artifacts.length;
   return (
     <span className="l5v-split" ref={wrap}>
-      <button type="button" className={`l5v-btn${besideOn ? ' is-on' : ''}`} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? menuId : undefined} onClick={() => setOpen((v) => !v)}>
-        <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" aria-hidden="true">
-          <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-          <path d="M13 4.5v15" />
+      <button
+        type="button"
+        className={`l5-btn is-sm${besideOn ? ' is-on' : ''}`}
+        aria-haspopup="menu"
+        aria-expanded={open}
+        aria-controls={open ? menuId : undefined}
+        aria-label="Split View: open a view beside this one"
+        title="Open a view beside this one"
+        onClick={() => setOpen((v) => !v)}
+      >
+        <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+          <path d="M12 5v14M5 12h14" />
         </svg>
-        <span>Split View</span>
+        <span>View</span>
       </button>
       {open && (
-        <div className="l5v-menu" role="menu" id={menuId} aria-label="Open beside">
+        <div className="l5v-menu l5-menu" role="menu" id={menuId} aria-label="Open beside">
           <p className="l5v-menu-h">Open beside the view</p>
           {menu.views.map(item)}
           {menu.artifacts.length > 0 && (
@@ -271,6 +296,7 @@ export function L5Layout({
   besideView = null,
   besideTitle,
   onCloseBeside,
+  actions,
   omni,
   omniTop = false,
   share,
@@ -286,6 +312,8 @@ export function L5Layout({
   besideView?: Viewport | null;
   besideTitle: string;
   onCloseBeside: () => void;
+  /** the open view's own actions — + View, Synthesize, AR Mode, Zoom out — top right on it */
+  actions?: ReactNode;
   /** the composer, when the conversation is not on screen */
   omni: ReactNode | null;
   /** the composer floats at the top of the view, not its foot — the conversation was put at the top */
@@ -341,6 +369,7 @@ export function L5Layout({
     >
       <main id="l5v-primary" className="l5v-primary" role="tabpanel" aria-labelledby={`l5v-tab-${view}`}>
         <div className="l5v-primary-in">{primary}</div>
+        {actions && <div className="l5v-acts">{actions}</div>}
         {omni && <div className="l5v-omni">{omni}</div>}
       </main>
       {besideOn && (
@@ -421,11 +450,7 @@ export function L5Layout({
                     ))}
                   </span>
                 )}
-                <button type="button" className="l5v-icon" aria-label={`Close ${besideTitle}`} onClick={onCloseBeside}>
-                  <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                    <path d="M6 6l12 12M18 6L6 18" />
-                  </svg>
-                </button>
+                <L5Close label={`Close ${besideTitle}`} onClose={onCloseBeside} />
               </span>
             </div>
             <div className="l5v-beside-body">{beside}</div>

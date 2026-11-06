@@ -34,7 +34,7 @@
   flex-direction: column;
   min-width: 0;
   border: 1px solid var(--mkg-hair);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--mkg-card);
   overflow: hidden;
   transition: border-color 0.15s, box-shadow 0.15s, transform 0.15s;
@@ -105,7 +105,7 @@
 }
 .mkg-text {
   font-family: var(--lg-sans, system-ui, sans-serif);
-  font-size: 11px;
+  font-size: 10.5px;
   fill: var(--mkg-60);
 }
 .mkg-face-top {
@@ -146,7 +146,7 @@
   outline: none;
 }
 .mkg-name {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1.3;
 }
@@ -159,10 +159,10 @@
   padding: 7px 9px 9px;
 }
 .mkg.is-compact .mkg-name {
-  font-size: 13px;
+  font-size: 13.5px;
 }
 .mkg.is-compact .mkg-about {
-  font-size: 11.5px;
+  font-size: 12.5px;
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -190,7 +190,7 @@
 .mkg-sec {
   grid-column: 1 / -1;
   margin: 6px 2px -2px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
@@ -213,7 +213,7 @@
   border-radius: 999px;
   background: var(--mkg-card);
   color: var(--mkg-60);
-  font-size: 16px;
+  font-size: 15.5px;
   line-height: 1;
   cursor: pointer;
 }

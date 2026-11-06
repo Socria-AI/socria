@@ -8,6 +8,7 @@
 // views themselves (lib/logos5/views.ts splitMenu).
 
 import type { ReactNode } from 'react';
+import { L5Close } from './L5Chrome';
 import type { ModelTool } from '@/lib/logos5/views';
 
 export const MODEL_TOOLS: readonly { id: ModelTool; label: string; says: string }[] = [
@@ -34,9 +35,7 @@ export function ModelArtifact({ model, tool, onTool, renderTool }: { model: Reac
           <aside className="l5m-side" aria-label={open.label}>
             <div className="l5m-side-head">
               <span>{open.label}</span>
-              <button type="button" className="l5m-x" aria-label={`Close ${open.label}`} onClick={() => onTool(null)}>
-                ×
-              </button>
+              <L5Close className="l5m-x" label={`Close ${open.label}`} onClose={() => onTool(null)} />
             </div>
             <div className="l5m-side-body">{renderTool(open.id)}</div>
           </aside>

@@ -60,8 +60,8 @@ export function ConcisePicker({ value, onChange }: { value: ReplyLength; onChang
             <path d="M3 4.5h10M3 8h7M3 11.5h4" />
           </svg>
           <span className="nm">{now.label}</span>
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <path d="M6 15l6-6 6 6" />
+          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+            <path d="M7 10l5 5 5-5" />
           </svg>
         </button>
         {open && (

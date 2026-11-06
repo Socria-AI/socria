@@ -8,7 +8,7 @@
 // work from the same material.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { L5Menu } from './logos5/L5Chrome';
+import { L5Close, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
 import { MathKeypad } from './MathKeypad';
 import { DocPreview } from './DocPreview';
 import type { MathTopic } from '@/lib/math-context';
@@ -412,6 +412,9 @@ export function LogosComposer({
   voiceButton,
   meter,
   voiceLive,
+  plusItems,
+  onSearchFiles,
+  lead,
 }: {
   /**
    * Reads a file — a PDF, Word, a spreadsheet, slides, Markdown, CSV… — into
@@ -484,6 +487,12 @@ export function LogosComposer({
   meter?: ReactNode;
   /** Socria Voice is listening: the hold-to-talk mic steps aside, so one microphone is in use at a time */
   voiceLive?: boolean;
+  /** the host's own entries under "+" (Logos 5.5: Make lives there) */
+  plusItems?: L5MenuItem[];
+  /** "Search my files", under "+" */
+  onSearchFiles?: () => void;
+  /** first in the tool row, before "+": folded, the way back to the conversation ("Conversation n") */
+  lead?: ReactNode;
   /**
    * Others are here: a message goes to everyone, and Socria answers when it
    * is mentioned (@socria) or replied to. Talking to the others never waits
@@ -782,23 +791,14 @@ export function LogosComposer({
         )}
 
         {about && (
-          <div className="lg-reply-chip lg-about-chip" role="status" aria-live="polite">
-            <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="12" cy="12" r="3" />
-              <path d="M12 3v3M12 18v3M3 12h3M18 12h3" />
-            </svg>
-            <span className="lg-reply-text">
-              <span className="lg-reply-k">Asking about</span>
-              <span className="lg-reply-x">
-                {about.kind === 'expression' ? <TeX tex={about.label} /> : about.label}
-                {about.of ? <span className="lg-about-of"> · {about.of}</span> : null}
-              </span>
+          // Logos 5.5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear
+          <div className="lg-about-chip l5-asking" role="status" aria-live="polite">
+            <span className="l5-label">Asking about</span>
+            <span className="l5-asking-t">
+              {about.kind === 'expression' ? <TeX tex={about.label} /> : about.label}
+              {about.of ? <span className="lg-about-of"> · {about.of}</span> : null}
             </span>
-            {onClearAbout && (
-              <button type="button" className="lg-reply-cancel" aria-label={`Stop asking about ${about.label}`} title="Clear the selection" onClick={onClearAbout}>
-                ×
-              </button>
-            )}
+            {onClearAbout && <L5Close className="l5-asking-x" label={`Stop asking about ${about.label}`} title="Clear what this is about" onClose={onClearAbout} />}
           </div>
         )}
 
@@ -885,19 +885,6 @@ export function LogosComposer({
         {layout === 'stacked' ? (
           <>
             <div className="l5-crow">
-            {/* the paperclip, inside the pill, to the left of the words */}
-            <button
-              type="button"
-              className="lg-attach l5-clip"
-              onClick={() => fileRef.current?.click()}
-              disabled={drafts.length >= MAX_ATTACHMENTS}
-              aria-label={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
-              title={readDocument ? 'Attach a document or an image' : 'Attach an image or a text file'}
-            >
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                <path d="M21 11.5 12.5 20a5 5 0 0 1-7-7l8-8a3.5 3.5 0 1 1 5 5l-8 8a2 2 0 0 1-3-3l7.5-7.5" />
-              </svg>
-            </button>
             <textarea
               ref={taRef}
               value={value}
@@ -946,20 +933,31 @@ export function LogosComposer({
             />
             </div>
             <div className="l5-ctools">
-            {onCapture ? (
-              <L5Menu
-                label="Add"
-                className="lg-plus"
-                align="start"
-                up
-                button={
-                  <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-                    <path d="M12 5v14M5 12h14" />
-                  </svg>
-                }
-                items={[{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: onCapture }]}
-              />
-            ) : null}
+            {lead && <span className="l5-ctools-lead">{lead}</span>}
+            {/* Logos 5.5: four controls — "+" holds Attach, Make, Search my files and ∑; then the length, Voice and Send */}
+            <L5Menu
+              label="Add"
+              className="lg-plus"
+              align="start"
+              up
+              button={
+                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
+                  <path d="M12 5v14M5 12h14" />
+                </svg>
+              }
+              items={[
+                {
+                  label: 'Attach',
+                  hint: readDocument ? 'A document or an image' : 'An image or a text file',
+                  disabled: drafts.length >= MAX_ATTACHMENTS,
+                  onSelect: () => fileRef.current?.click(),
+                },
+                ...(plusItems ?? []),
+                ...(onSearchFiles ? [{ label: 'Search my files', hint: 'Conversations, files and what was made', onSelect: onSearchFiles }] : []),
+                ...(mathAvailable ? [{ label: keypad ? 'Hide ∑ symbols' : '∑ Mathematical symbols', onSelect: () => setKeypad((k) => !k) }] : []),
+                ...(onCapture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', sep: true, onSelect: onCapture }] : []),
+              ]}
+            />
             <input
               ref={fileRef}
               type="file"
@@ -976,20 +974,6 @@ export function LogosComposer({
               {meter}
               {voiceButton}
               {micOn && <HoldMic mic={mic} onHold={setHold} />}
-              {/* Appears only when mathematics is in play, and stays put once it
-                  has — see lib/math-context.ts for why that hysteresis matters. */}
-              {mathAvailable && (
-                <button
-                  type="button"
-                  className={`lg-mathbtn${keypad ? ' is-on' : ''}`}
-                  onClick={() => setKeypad((k) => !k)}
-                  aria-pressed={keypad}
-                  aria-label={keypad ? 'Hide mathematical symbols' : 'Mathematical symbols'}
-                  title={keypad ? 'Hide symbols' : 'Mathematical symbols'}
-                >
-                  ∑
-                </button>
-              )}
               {waiting && !group ? (
                 <button type="button" className="lg-send is-waiting" disabled aria-label="Sent — waiting for the first words" title="Sent — waiting for the first words">
                   <span className="lg-send-spin" aria-hidden="true" />
@@ -1012,8 +996,8 @@ export function LogosComposer({
                   disabled={!canSend}
                   aria-label="Send"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-                    <path d="M12 19V5M5 12l7-7 7 7" />
+                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                    <path d="M12 19V5M6 11l6-6 6 6" />
                   </svg>
                 </button>
               )}

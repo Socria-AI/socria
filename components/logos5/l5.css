@@ -97,7 +97,7 @@
 }
 .logos-root .l5-brand-w {
   font-family: var(--l5-serif);
-  font-size: 24px;
+  font-size: 18px;
   line-height: 1;
   letter-spacing: -0.01em;
 }
@@ -128,63 +128,15 @@
   gap: 6px;
 }
 
-/* a square for one glyph (buttons.css .l5-icon-btn): no frame until pointed
-   at, down a pixel when pressed; in the bars, beside framed keys, it is framed */
-.logos-root .l5-iconbtn {
-  display: inline-grid;
-  place-items: center;
-  width: 36px;
-  height: 36px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--l5b-ink-2);
-  font: inherit;
-  font-size: 18px;
-  line-height: 1;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s, box-shadow 0.15s, transform 0.12s;
-}
-.logos-root .l5-iconbtn:active:not(:disabled) {
-  transform: translateY(1px);
-}
-/* More, in the Universal Map's bar and a line of thinking's: one of the keys
-   beside it — card stock, a hairline edge, a ledge, their 32px */
-.logos-root :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-iconbtn {
-  width: 32px;
-  height: 32px;
-  border-color: var(--l5b-edge);
-  border-radius: var(--l5b-r-sm);
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
-}
-.logos-root :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-iconbtn:hover {
-  border-color: var(--l5b-edge-hi);
-  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
-  color: var(--l5b-ink);
-}
-.logos-root :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-iconbtn:active {
-  box-shadow: none;
-}
-.logos-root :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-iconbtn[aria-expanded='true'] {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
-  color: var(--l5b-fill);
-}
-.logos-root .l5-iconbtn:focus-visible,
+/* a glyph button is .l5-icon (l5-controls.css): a 32px circle, quiet until
+   pointed at; More in the bars is one of them, not a framed key */
+.logos-root .l5-icon:focus-visible,
 .logos-root .l5-act:focus-visible,
 .logos-root .l5-stagebtn:focus-visible,
 .logos-root .l5-fx-chip:focus-visible,
 .logos-root .l5-start:focus-visible {
   outline: 2px solid var(--lg-primary);
   outline-offset: 2px;
-}
-.logos-root .l5-iconbtn.is-sm {
-  width: 30px;
-  height: 30px;
-  font-size: 16px;
 }
 
 .logos-root .l5-stagebtn {
@@ -209,17 +161,11 @@
   color: var(--l5-on-primary);
 }
 .logos-root .l5-count {
-  min-width: 20px;
-  height: 20px;
-  padding: 0 6px;
-  border-radius: 999px;
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
-  color: var(--lg-primary);
-  font-size: 11.5px;
-  font-weight: 600;
-  display: inline-grid;
-  place-items: center;
+  /* counts are plain tabular type, never badges (Logos 5.5) */
+  font-size: 12.5px;
+  font-weight: 400;
   font-variant-numeric: tabular-nums;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
 }
 .logos-root .l5-stagebtn.is-on .l5-count {
   background: rgba(var(--l5-on-primary-rgb), 0.2);
@@ -233,7 +179,7 @@
   width: 8px;
   height: 8px;
   border-radius: 50%;
-  background: var(--lg-secondary, #b8a26b);
+  background: var(--lg-primary);
   box-shadow: 0 0 0 2px var(--lg-paper);
 }
 
@@ -241,7 +187,7 @@
 .logos-root .l5-menuhost {
   position: relative;
 }
-.logos-root .l5-menu-list {
+.logos-root .l5-menuhost > .l5-menu {
   position: absolute;
   z-index: 90;
   top: calc(100% + 6px);
@@ -249,56 +195,26 @@
   max-width: min(320px, calc(100vw - 24px));
   max-height: min(70vh, 520px);
   overflow-y: auto;
-  padding: 6px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 14px;
-  background: var(--l5-surface);
-  box-shadow: 0 18px 50px -20px rgba(var(--shadow-rgb, 35, 36, 31), 0.35);
 }
-.logos-root .l5-menu-list.is-end {
+.logos-root .l5-menu.is-end {
   right: 0;
 }
-.logos-root .l5-menu-list.is-start {
+.logos-root .l5-menu.is-start {
   left: 0;
 }
-.logos-root .l5-menu-list.is-up {
+.logos-root .l5-menu.is-up {
   top: auto;
   bottom: calc(100% + 6px);
 }
-.logos-root .l5-menu-list hr {
-  border: 0;
-  border-top: 1px solid var(--l5-hair);
-  margin: 6px 4px;
-}
-.logos-root .l5-menu-list [role='menuitem'] {
-  display: flex;
+/* a menu item with a hint under its name (L5Menu): the name and the hint stack */
+.logos-root .l5-menu .l5-mi.has-hint {
   flex-direction: column;
   align-items: flex-start;
+  justify-content: center;
   gap: 1px;
-  width: 100%;
-  min-height: 40px;
-  padding: 8px 10px;
-  border: 0;
-  border-radius: 9px;
-  background: transparent;
-  color: var(--lg-ink);
-  font: inherit;
-  font-size: 14px;
-  text-align: left;
-  cursor: pointer;
-}
-.logos-root .l5-menu-list [role='menuitem'] small {
-  font-size: 12px;
-  color: var(--lg-ink-40);
-}
-.logos-root .l5-menu-list [role='menuitem']:hover:not(:disabled),
-.logos-root .l5-menu-list [role='menuitem']:focus-visible {
-  background: rgba(var(--l5-tint-rgb), 0.07);
-  outline: none;
-}
-.logos-root .l5-menu-list [role='menuitem']:disabled {
-  opacity: 0.45;
-  cursor: default;
+  height: auto;
+  min-height: 36px;
+  padding: 7px 11px;
 }
 
 /* ── the body: the conversation, and the stage beside it ──────────── */
@@ -386,7 +302,7 @@
 }
 .logos-root .l5-stagehead-t small {
   font-family: var(--lg-sans);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-40);
 }
 .logos-root .l5-stagehead-acts {
@@ -458,7 +374,7 @@
   background: var(--l5-surface);
   color: var(--lg-ink);
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
   text-align: left;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
@@ -478,14 +394,14 @@
   box-shadow: var(--l5-shadow);
 }
 .logos-root .l5-pickup-k {
-  font-size: 11.5px;
+  font-size: 12.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--lg-primary);
 }
 .logos-root .l5-pickup-t {
   font-family: var(--l5-serif);
-  font-size: 19px;
+  font-size: 18px;
   color: var(--lg-ink);
 }
 .logos-root .l5-pickup-q {
@@ -513,7 +429,7 @@
 .logos-root .l5-said {
   max-width: min(86%, 560px);
   padding: 10px 15px 11px;
-  border-radius: 18px 18px 6px 18px;
+  border-radius: 16px 16px 6px 16px;
   background: var(--l5-card);
   color: var(--l5-card-ink);
   font-size: 15.5px;
@@ -522,7 +438,7 @@
   overflow-wrap: anywhere;
 }
 .logos-root .l5-u.is-other .l5-said {
-  border-radius: 18px 18px 18px 6px;
+  border-radius: 16px 16px 16px 6px;
   background: var(--l5-surface);
   border: 1px solid var(--l5-hair);
   box-shadow: inset 3px 0 0 var(--by, transparent);
@@ -537,7 +453,7 @@
   top: 4px;
   bottom: 30px;
   width: 3px;
-  border-radius: 3px;
+  border-radius: 6px;
   background: var(--lg-primary);
 }
 .logos-root .l5-msg.is-flash .l5-said,
@@ -575,7 +491,7 @@
   place-items: center;
   background: var(--by, rgba(var(--l5-tint-rgb), 0.12));
   color: #fff;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 .logos-root .l5-av.is-socria {
   background: var(--l5-raise);
@@ -589,11 +505,11 @@
   padding: 6px 10px;
   border: 0;
   border-left: 2px solid rgba(var(--l5-tint-rgb), 0.3);
-  border-radius: 0 8px 8px 0;
+  border-radius: 0 10px 10px 0;
   background: rgba(var(--l5-tint-rgb), 0.05);
   color: var(--lg-ink-60);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   text-align: left;
   white-space: nowrap;
   overflow: hidden;
@@ -633,7 +549,7 @@
 
 /* Socria's words: a reading measure, editorial */
 .logos-root .l5-prose {
-  font-size: 16.5px;
+  font-size: 15.5px;
   line-height: 1.72;
   color: var(--lg-ink);
   overflow-wrap: anywhere;
@@ -685,7 +601,7 @@
 }
 .logos-root .l5-prose .socria-code {
   padding: 0.08em 0.36em;
-  border-radius: 5px;
+  border-radius: 6px;
   background: rgba(var(--l5-tint-rgb), 0.08);
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.86em;
@@ -693,7 +609,7 @@
 .logos-root .l5-prose .socria-codeblock {
   margin: 0 0 1em;
   border: 1px solid var(--l5-hair);
-  border-radius: 12px;
+  border-radius: 10px;
   overflow: hidden;
   background: var(--l5-code-bg);
 }
@@ -703,18 +619,18 @@
   align-items: center;
   padding: 5px 8px 5px 12px;
   border-bottom: 1px solid var(--l5-hair);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-40);
 }
 .logos-root .l5-prose .socria-codeblock-head button {
   min-height: 28px;
   padding: 0 10px;
   border: 0;
-  border-radius: 7px;
+  border-radius: 6px;
   background: transparent;
   color: var(--lg-ink-60);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   cursor: pointer;
 }
 .logos-root .l5-prose .socria-codeblock pre {
@@ -736,12 +652,12 @@
   margin: 0 0 1em;
   overflow-x: auto;
   border: 1px solid var(--l5-hair);
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .logos-root .l5-prose table {
   border-collapse: collapse;
   width: 100%;
-  font-size: 14.5px;
+  font-size: 15.5px;
 }
 .logos-root .l5-prose th,
 .logos-root .l5-prose td {
@@ -788,7 +704,7 @@
   align-items: center;
   gap: 4px 10px;
   margin-top: 8px;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5-offer-take,
@@ -821,11 +737,11 @@
   max-width: 560px;
   padding: 12px 14px;
   border: 1px solid var(--l5-hair);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--l5-surface, #fffdf8);
 }
 .logos-root .l5-writeup-k {
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 0.06em;
   text-transform: uppercase;
   color: var(--lg-ink-40);
@@ -833,12 +749,12 @@
 .logos-root .l5-writeup-t {
   font-family: var(--l5-serif);
   font-weight: 400;
-  font-size: 19px;
+  font-size: 18px;
   line-height: 1.25;
 }
 .logos-root .l5-writeup-o {
   margin: 2px 0 4px;
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.5;
   color: var(--lg-ink-60);
 }
@@ -919,7 +835,7 @@
   background: var(--l5-surface);
   color: var(--lg-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   cursor: pointer;
   transition: border-color 0.15s, background 0.15s;
 }
@@ -962,7 +878,7 @@
   min-height: 32px;
   padding: 0 9px;
   border: 0;
-  border-radius: 8px;
+  border-radius: 10px;
   background: transparent;
   color: var(--lg-ink-40);
   font: inherit;
@@ -987,7 +903,7 @@
   outline: none;
   background: transparent;
   font: inherit;
-  font-size: 16px;
+  font-size: 15.5px;
   line-height: 1.5;
   color: var(--lg-ink);
 }
@@ -1009,7 +925,7 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--lg-ink-40);
 }
 .logos-root .l5-dots {
@@ -1069,10 +985,10 @@
 .logos-root .l5-error {
   margin: 0 0 16px;
   padding: 10px 14px;
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(var(--l5-no-rgb), 0.09);
   color: var(--l5-no-ink);
-  font-size: 14px;
+  font-size: 13.5px;
 }
 /* send it again, from the sentence that said it failed */
 .logos-root .l5-error-retry {
@@ -1100,7 +1016,7 @@
 }
 .logos-root .l5-empty {
   margin: 0;
-  font-size: 14px;
+  font-size: 13.5px;
   font-style: italic;
   color: var(--lg-ink-40);
 }
@@ -1124,7 +1040,7 @@
   border-radius: 999px;
   background: var(--l5-surface);
   box-shadow: var(--l5-shadow);
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5-linkbar-dot {
@@ -1166,7 +1082,7 @@
   box-shadow: var(--l5-shadow);
   color: var(--lg-ink-60);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   cursor: pointer;
 }
 
@@ -1191,7 +1107,7 @@
   gap: 6px;
   padding: 10px 10px 8px 14px;
   border: 1px solid var(--l5-hair);
-  border-radius: 22px;
+  border-radius: 16px;
   background: var(--l5-surface);
   box-shadow: var(--l5-shadow);
   transition: border-color 0.15s, box-shadow 0.15s;
@@ -1204,7 +1120,7 @@
   width: 100%;
   min-height: 26px;
   padding: 4px 2px;
-  font-size: 16px;
+  font-size: 15.5px;
   line-height: 1.5;
 }
 /* Stacked, the words are a row of a column: their height is the one the
@@ -1253,14 +1169,14 @@
   box-shadow: var(--l5b-ledge);
   color: var(--l5b-ink);
   font-family: var(--lg-sans);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   -webkit-tap-highlight-color: transparent;
   transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
 }
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn .nm {
   font-family: var(--lg-sans);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   letter-spacing: 0;
   color: inherit;
@@ -1275,7 +1191,7 @@
   transform: none;
 }
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn:active {
-  transform: translateY(1px);
+  transform: none;
   box-shadow: none;
 }
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn:focus-visible {
@@ -1284,9 +1200,9 @@
 }
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn.open,
 .logos-root .l5-ctools .l5-make.is-set .mp-btn {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  border-color: transparent;
+  background: rgba(var(--l5b-fill-rgb), 0.08);
+  box-shadow: none;
   color: var(--l5b-fill);
   transform: none;
 }
@@ -1356,11 +1272,11 @@
 .logos-root .l5-make-x {
   width: 24px;
   height: 24px;
-  border-radius: 7px;
+  border-radius: 6px;
   border: 0;
   background: transparent;
   color: var(--l5b-ink-2);
-  font-size: 16px;
+  font-size: 15.5px;
   line-height: 1;
   cursor: pointer;
   transition: background-color 0.15s, color 0.15s;
@@ -1382,7 +1298,7 @@
 }
 /* + (what to add) opens a menu, so it is a framed key, as More is; the
    microphone and the paperclip are glyphs that take a wash when pointed at */
-.logos-root .l5-ctools .lg-plus .l5-iconbtn,
+.logos-root .l5-ctools .lg-plus .l5-icon,
 .logos-root .l5-ctools .lg-attach {
   width: 32px;
   height: 32px;
@@ -1391,19 +1307,19 @@
   background: var(--l5b-face);
   box-shadow: var(--l5b-ledge);
 }
-.logos-root .l5-ctools .lg-plus .l5-iconbtn:hover,
+.logos-root .l5-ctools .lg-plus .l5-icon:hover,
 .logos-root .l5-ctools .lg-attach:hover:not(:disabled) {
   border-color: var(--l5b-edge-hi);
   background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
   color: var(--l5b-ink);
 }
-.logos-root .l5-ctools .lg-plus .l5-iconbtn:active {
+.logos-root .l5-ctools .lg-plus .l5-icon:active {
   box-shadow: none;
 }
-.logos-root .l5-ctools .lg-plus .l5-iconbtn[aria-expanded='true'] {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+.logos-root .l5-ctools .lg-plus .l5-icon[aria-expanded='true'] {
+  border-color: transparent;
+  background: rgba(var(--l5b-fill-rgb), 0.08);
+  box-shadow: none;
   color: var(--l5b-fill);
 }
 .logos-root :is(.l5-ctools, .l5h-find-row) .lg-mic {
@@ -1437,43 +1353,40 @@
   color: var(--l5b-ink);
 }
 .logos-root .l5-ctools .lg-mathbtn:active {
-  transform: translateY(1px);
+  transform: none;
   box-shadow: none;
 }
 .logos-root .l5-ctools .lg-mathbtn.is-on {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  border-color: transparent;
+  background: rgba(var(--l5b-fill-rgb), 0.08);
+  box-shadow: none;
   color: var(--l5b-fill);
 }
 .logos-root .l5-ctools .lg-mathbtn:focus-visible {
   outline: 2px solid var(--l5b-focus);
   outline-offset: 2px;
 }
-/* send: one glyph, so a circle — made as the primary key is (buttons.css
-   .is-primary): lit from above, a darker lip, a little weight under it */
+/* send: one glyph, so a circle — the primary (l5-controls.css .is-send):
+   a flat fill; unfilled while there is nothing to send */
 .logos-root .l5-ctools .lg-send {
   width: 36px;
   height: 36px;
-  border: 1px solid color-mix(in srgb, var(--l5b-fill) 78%, #000);
+  border: 1px solid var(--l5b-fill);
   border-radius: 50%;
-  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
-    0 6px 14px -9px rgba(var(--l5b-fill-rgb), 0.9);
+  background: var(--l5b-fill);
+  box-shadow: none;
   color: var(--l5b-on-fill);
   -webkit-tap-highlight-color: transparent;
   transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, opacity 0.15s, transform 0.12s;
 }
 .logos-root .l5-ctools .lg-send:not(:disabled):hover {
   border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
-  transform: translateY(-1px);
+  background: color-mix(in srgb, var(--l5b-fill) 88%, #000);
+  transform: translateY(-2px);
 }
 .logos-root .l5-ctools .lg-send:not(:disabled):active {
-  transform: translateY(1px);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
+  transform: none;
+  box-shadow: none;
 }
 /* nothing to send yet: the same key, unlit (still lit while the reply is on its way) */
 .logos-root .l5-ctools .lg-send:disabled:not(.is-waiting) {
@@ -1496,10 +1409,10 @@
   height: 14px;
 }
 @media (prefers-reduced-motion: reduce) {
-  .logos-root :is(.l5-iconbtn, .l5-ctools .mp-btn, .l5h-find-pick .mp-btn, .l5-ctools .lg-mic, .l5-ctools .lg-mathbtn, .l5-ctools .lg-send) {
+  .logos-root :is(.l5-icon, .l5-ctools .mp-btn, .l5h-find-pick .mp-btn, .l5-ctools .lg-mic, .l5-ctools .lg-mathbtn, .l5-ctools .lg-send) {
     transition: none;
   }
-  .logos-root :is(.l5-iconbtn, .l5-ctools .mp-btn, .l5h-find-pick .mp-btn, .l5-ctools .lg-mathbtn, .l5-ctools .lg-send):is(:hover, :active) {
+  .logos-root :is(.l5-icon, .l5-ctools .mp-btn, .l5h-find-pick .mp-btn, .l5-ctools .lg-mathbtn, .l5-ctools .lg-send):is(:hover, :active) {
     transform: none !important;
   }
 }
@@ -1559,14 +1472,14 @@
     background: transparent;
     color: var(--lg-primary);
     font: inherit;
-    font-size: 14px;
+    font-size: 13.5px;
     cursor: pointer;
   }
   .logos-root .l5-stage-x {
     display: none;
   }
   .logos-root .l5-stagehead-t {
-    font-size: 16px;
+    font-size: 15.5px;
   }
   .logos-root .l5-stage .ws-top {
     padding: 6px 8px;
@@ -1607,12 +1520,12 @@
   .logos-root .l5-title {
     font-size: 17px;
   }
-  .logos-root .l5-iconbtn {
+  .logos-root .l5-icon {
     width: 44px;
     height: 44px;
   }
   /* the bar's keys are a thumb wide on a phone, at the larger key's radius */
-  .logos-root .l5-head-end > .l5-menuhost > .l5-iconbtn {
+  .logos-root .l5-head-end > .l5-menuhost > .l5-icon {
     width: 44px;
     height: 44px;
     border-radius: var(--l5b-r);
@@ -1639,7 +1552,7 @@
     padding: 0 10px calc(10px + env(safe-area-inset-bottom, 0px));
   }
   .logos-root .l5-prose {
-    font-size: 16px;
+    font-size: 15.5px;
   }
   .logos-root .l5-said {
     max-width: 90%;
@@ -1663,7 +1576,7 @@
   .logos-root .l5-start {
     min-height: 44px;
   }
-  .logos-root .l5-ctools .lg-plus .l5-iconbtn,
+  .logos-root .l5-ctools .lg-plus .l5-icon,
   .logos-root .l5-ctools .lg-attach,
   .logos-root .l5-ctools .lg-send,
   .logos-root .l5-ctools .lg-mic,
@@ -1672,7 +1585,7 @@
     height: 44px;
   }
   /* a thumb-wide key takes the larger key's radius (the send stays a circle) */
-  .logos-root .l5-ctools :is(.lg-plus .l5-iconbtn, .lg-attach, .lg-mic, .lg-mathbtn) {
+  .logos-root .l5-ctools :is(.lg-plus .l5-icon, .lg-attach, .lg-mic, .lg-mathbtn) {
     border-radius: var(--l5b-r);
   }
   /* Make and the length dial were 32px tall in a row of 44px buttons */
@@ -1700,7 +1613,7 @@
 
 /* hover only where there is hovering: on a touch screen a tapped control would stay lit */
 @media (hover: hover) {
-  .logos-root .l5-iconbtn:hover {
+  .logos-root .l5-icon:hover {
     background: var(--l5b-wash);
     color: var(--l5b-ink);
   }
@@ -1740,14 +1653,14 @@
   gap: 10px;
   padding: 26px 24px 20px;
   border: 1px solid var(--l5-hair, rgba(53, 70, 32, 0.14));
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--l5-paper-hi, #fffdf8);
   color: var(--lg-ink);
   box-shadow: 0 40px 90px -50px rgba(var(--shadow-rgb, 20, 20, 16), 0.6);
 }
 .logos-root .l5-guestwall-k {
   margin: 0;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1757,12 +1670,12 @@
   margin: 0;
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
   font-weight: 400;
-  font-size: 30px;
+  font-size: 32px;
   line-height: 1.1;
 }
 .logos-root .l5-guestwall-d {
   margin: 0 0 6px;
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.5;
   color: var(--lg-ink-60);
 }
@@ -1779,7 +1692,7 @@
   border-radius: 999px;
   background: var(--lg-primary);
   color: var(--l5-on-primary, #fff);
-  font-size: 15px;
+  font-size: 15.5px;
   font-weight: 500;
   text-decoration: none;
 }
@@ -1791,12 +1704,12 @@
   background: transparent;
   color: var(--lg-ink);
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15.5px;
   cursor: pointer;
 }
 .logos-root .l5-guestwall-in {
   margin: 4px 0 0;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5-guestwall-in a {
@@ -1885,7 +1798,7 @@
   }
   .logos-root .l5-guestmeter-s {
     display: inline;
-    font-size: 13px;
+    font-size: 13.5px;
     white-space: nowrap;
   }
   .logos-root .l5-guestmeter {
@@ -2010,7 +1923,7 @@
   }
   .logos-root .l5-guestnudge-t {
     flex: 1 1 calc(100% - 80px);
-    font-size: 13px;
+    font-size: 13.5px;
   }
   .logos-root .l5-guestnudge-go {
     margin-left: 40px;
@@ -2028,15 +1941,15 @@
   margin: 0 0 6px;
   padding: 7px 12px 8px;
   border: 1px solid rgba(var(--l5-tint-rgb), 0.18);
-  border-radius: 14px 14px 5px 14px;
+  border-radius: 16px 16px 6px 16px;
   background: rgba(var(--l5-tint-rgb), 0.035);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.45;
   color: var(--lg-ink);
   text-align: right;
 }
 .logos-root .l5-u.is-other .l5-did {
-  border-radius: 14px 14px 14px 5px;
+  border-radius: 16px 16px 16px 6px;
   text-align: left;
 }
 .logos-root .l5-did-row {
@@ -2062,7 +1975,7 @@
   margin: 14px 0 4px;
   padding: 12px 14px 12px;
   border: 1px solid var(--l5-hair);
-  border-radius: 12px;
+  border-radius: 10px;
   background: rgba(var(--l5-tint-rgb), 0.018);
 }
 .logos-root .l5-slice-head {
@@ -2086,7 +1999,7 @@
   background: none;
   color: var(--lg-primary);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
 }
@@ -2121,7 +2034,7 @@
   border-color: var(--lg-primary);
 }
 .logos-root .l5-slice-ck {
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -2139,7 +2052,7 @@
 }
 .logos-root .l5-slice-card.is-pull {
   border-color: var(--lg-tension, #9c5b3c);
-  border-radius: 4px;
+  border-radius: 6px;
 }
 .logos-root .l5-slice-card.is-pull .l5-slice-ck {
   color: var(--lg-tension, #9c5b3c);
@@ -2156,7 +2069,7 @@
 }
 .logos-root .l5-slice-card.is-open .l5-slice-ct {
   font-family: var(--l5-serif);
-  font-size: 16px;
+  font-size: 18px;
   font-style: italic;
   line-height: 1.25;
 }

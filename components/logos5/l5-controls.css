@@ -1,0 +1,313 @@
+/* components/logos5/l5-controls.css — Logos 5.5: how every control looks.
+ *
+ * Replaces buttons.css, buttons-soft.css and the .l5s-art-pill key in
+ * redesign.css. Load it after l5.css and delete those three.
+ *
+ *   Fill means do.        .l5-btn.is-primary — at most one per surface
+ *   Wash means here.      [aria-pressed|aria-selected|aria-expanded=true], .is-on
+ *   Hairline means you can.   .l5-btn (default), .l5-chip, .l5-icon.is-framed
+ *
+ * Heights 40 / 32 (.is-sm); hit area 44 on coarse pointers. Every action is
+ * 999px. Every colour is a theme token, so Paper, White, Dark, One and Night
+ * draw it in their own light.
+ */
+
+:is(.logos-root, .lg-tokens),
+.logos-root .l5 {
+  --c-ink: var(--lg-ink, #23241f);
+  --c-ink-rgb: var(--lg-ink-rgb, 35, 36, 31);
+  --c-fill: var(--lg-primary, #354620);
+  --c-fill-rgb: var(--lg-primary-rgb, 53, 70, 32);
+  --c-on-fill: var(--l5-on-primary, #f5f3eb);
+  --c-tension: var(--lg-tension, #9c5b3c);
+  --c-face: var(--l5-surface, var(--lg-paper, #f5f3eb));
+
+  --c-ink-70: rgba(var(--c-ink-rgb), 0.7);
+  --c-ink-45: rgba(var(--c-ink-rgb), 0.45);
+  --c-ink-25: rgba(var(--c-ink-rgb), 0.25);
+  --c-edge: rgba(var(--c-ink-rgb), 0.16);   /* a control's hairline */
+  --c-edge-off: rgba(var(--c-ink-rgb), 0.12);
+  --c-rule: rgba(var(--c-fill-rgb), 0.14);  /* a divider */
+  --c-shade: rgba(var(--c-ink-rgb), 0.06);  /* hover */
+  --c-wash: rgba(var(--c-fill-rgb), 0.08);  /* here, on, yours */
+
+  --c-e1: 0 1px 2px rgba(35, 36, 31, 0.04);
+  --c-e2: 0 14px 28px -16px rgba(35, 36, 31, 0.4);
+  --c-e3: 0 40px 90px -50px rgba(31, 31, 31, 0.55);
+  --c-lit: 0 0 0 2px rgba(var(--c-fill-rgb), 0.16);
+}
+
+/* ── buttons ─────────────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-btn {
+  --h: 40px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  height: var(--h);
+  padding: 0 16px;
+  box-sizing: border-box;
+  border: 1px solid var(--c-edge);
+  border-radius: 999px;
+  background: var(--c-face);
+  color: var(--c-ink);
+  font: inherit;
+  font-family: var(--lg-sans, inherit);
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: background-color 0.15s, color 0.15s, border-color 0.15s, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-sm { --h: 32px; padding: 0 12px; }
+:is(.logos-root, .lg-tokens) .l5-btn svg { width: 16px; height: 16px; flex: none; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-sm svg { width: 14px; height: 14px; }
+:is(.logos-root, .lg-tokens) .l5-btn:hover:not(:disabled) { background: var(--c-shade); }
+
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary {
+  padding: 0 18px;
+  border-color: var(--c-fill);
+  background: var(--c-fill);
+  color: var(--c-on-fill);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-sm.is-primary { padding: 0 14px; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:hover:not(:disabled) {
+  background: color-mix(in srgb, var(--c-fill) 88%, #000);
+  transform: translateY(-2px);
+}
+:is(.logos-root, .lg-tokens) .l5-btn .l5-ar { transition: transform 0.2s; }
+:is(.logos-root, .lg-tokens) .l5-btn:hover .l5-ar { transform: translateX(3px); }
+
+:is(.logos-root, .lg-tokens) .l5-btn.is-quiet { border-color: transparent; background: transparent; color: var(--c-ink-70); }
+:is(.logos-root, .lg-tokens) .l5-btn.is-quiet:hover:not(:disabled) { background: var(--c-shade); color: var(--c-ink); }
+
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger { border-color: color-mix(in srgb, var(--c-tension) 40%, transparent); color: var(--c-tension); }
+
+:is(.logos-root, .lg-tokens) .l5-btn:disabled,
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:disabled {
+  border-color: var(--c-edge-off);
+  background: transparent;
+  color: var(--c-ink-25);
+  cursor: default;
+  transform: none;
+}
+
+/* ── one icon button ─────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn) {
+  display: inline-grid;
+  place-items: center;
+  flex: none;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  box-sizing: border-box;
+  border: 1px solid transparent;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-ink-70);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s, color 0.15s;
+}
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn) svg { width: 16px; height: 16px; }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn):hover:not(:disabled) { background: var(--c-shade); color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-lg { width: 40px; height: 40px; }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-framed { border-color: var(--c-edge); background: var(--c-face); }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send { background: var(--c-fill); color: var(--c-on-fill); }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send:disabled { border-color: var(--c-edge-off); background: transparent; color: var(--c-ink-25); }
+/* the one close: × top right of whatever it closes */
+:is(.logos-root, .lg-tokens) .l5-close { margin: -6px -6px 0 0; }
+
+/* ── the switch (views, time ranges) ─────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 36px;
+  padding: 3px;
+  box-sizing: border-box;
+  border: 1px solid var(--c-edge);
+  border-radius: 999px;
+}
+:is(.logos-root, .lg-tokens) .l5-switch-i {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-ink-70);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+}
+:is(.logos-root, .lg-tokens) .l5-switch-i:hover { color: var(--c-ink); }
+/* counts are plain tabular type, never badges */
+:is(.logos-root, .lg-tokens) .l5-count { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--c-ink-45); }
+/* something new in a view you aren't on */
+:is(.logos-root, .lg-tokens) .l5-new { position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 999px; background: var(--c-fill); }
+
+/* ── chips: hairline actions; a tapped chip becomes your message ──── */
+:is(.logos-root, .lg-tokens) .l5-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  max-width: 100%;
+  height: 32px;
+  padding: 0 12px;
+  box-sizing: border-box;
+  border: 1px solid var(--c-edge);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  cursor: pointer;
+}
+:is(.logos-root, .lg-tokens) .l5-chip:hover { background: var(--c-shade); }
+
+/* ── WASH MEANS HERE — the one selected / on treatment ───────────── */
+:is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon, .l5-iconbtn, .l5-icon-btn, .l5-switch-i, .l5-chip, .l5-row):is([aria-pressed='true'], [aria-selected='true'], [aria-expanded='true'], .is-on) {
+  border-color: transparent;
+  background: var(--c-wash);
+  color: var(--c-fill);
+  box-shadow: none;
+}
+:is(.logos-root, .lg-tokens) :is([aria-selected='true'], .is-on) .l5-count { color: inherit; }
+
+/* ── menus ───────────────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) :is(.l5-menu, .l5-menu-list) {
+  display: flex;
+  flex-direction: column;
+  min-width: 220px;
+  padding: 5px;
+  border: 1px solid var(--c-rule);
+  border-radius: 16px;
+  background: var(--lg-panel, #faf8f2);
+  box-shadow: var(--c-e2);
+}
+:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  height: 36px;
+  padding: 0 11px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--c-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+  cursor: pointer;
+}
+:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']):is(:hover, :focus-visible) { background: var(--c-shade); }
+:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']) :is(small, .l5-hint) { font-size: 12.5px; font-weight: 400; color: var(--c-ink-70); }
+:is(.logos-root, .lg-tokens) .l5-mi.is-danger { color: var(--c-tension); }
+:is(.logos-root, .lg-tokens) :is(.l5-menu, .l5-menu-list) hr { height: 1px; margin: 4px 6px; border: 0; background: var(--c-rule); }
+
+/* ── rows: list items, topics, hubs (inside a holder: radius 10) ──── */
+:is(.logos-root, .lg-tokens) .l5-row { border-radius: 10px; cursor: pointer; }
+:is(.logos-root, .lg-tokens) .l5-row:hover:not(.is-on) { background: var(--c-shade); }
+
+/* ── holders: composer, panels, floating cards ───────────────────── */
+:is(.logos-root, .lg-tokens) .l5-holder { border: 1px solid var(--c-rule); border-radius: 16px; background: var(--lg-panel, #faf8f2); box-shadow: var(--c-e1); }
+:is(.logos-root, .lg-tokens) .l5-holder.is-floating { box-shadow: var(--c-e2); }
+:is(.logos-root, .lg-tokens) .l5-holder.is-lit { box-shadow: var(--c-lit), var(--c-e1); }
+
+/* ── the label: the one eyebrow ──────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-label {
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-ink-45);
+}
+
+/* ── focus, motion, contrast ─────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon, .l5-iconbtn, .l5-icon-btn, .l5-switch-i, .l5-chip, .l5-mi, .l5-row):focus-visible {
+  outline: 2px solid var(--c-fill);
+  outline-offset: 2px;
+}
+@media (pointer: coarse) {
+  :is(.logos-root, .lg-tokens) :is(.l5-btn.is-sm, .l5-icon, .l5-iconbtn, .l5-icon-btn, .l5-chip) { min-height: 44px; min-width: 44px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-btn .l5-ar) { transition: none; transform: none !important; }
+}
+@media (forced-colors: active) {
+  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-chip, .l5-switch) { border: 1px solid ButtonText; }
+}
+
+/* ── carried over ─────────────────────────────────────────────────────
+ * What buttons.css held that other sheets and surfaces still lean on, drawn
+ * in 5.5's terms. The --l5b-* names stay because universe.css, voice.css,
+ * study.css, objects.css, write.css and globals.css read them; they now say
+ * the 5.5 values, so those surfaces follow without being rewritten.
+ */
+:is(.logos-root, .lg-tokens),
+.logos-root .l5 {
+  --l5b-r: 999px;
+  --l5b-r-sm: 999px;
+  --l5b-face: var(--c-face);
+  --l5b-edge: var(--c-edge);
+  --l5b-edge-hi: rgba(var(--c-ink-rgb), 0.26);
+  --l5b-ledge: none;
+  --l5b-ink: var(--c-ink);
+  --l5b-ink-2: var(--c-ink-70);
+  --l5b-wash: var(--c-shade);
+  --l5b-fill: var(--c-fill);
+  --l5b-fill-rgb: var(--c-fill-rgb);
+  --l5b-on-fill: var(--c-on-fill);
+  --l5b-danger: var(--c-tension);
+  --l5b-focus: var(--c-fill);
+}
+
+/* the full-width way on, inside a card or a sheet */
+:is(.logos-root, .lg-tokens) .l5-btn.is-wide { width: 100%; --h: 46px; font-size: 15.5px; }
+/* the one action that cannot be undone, confirmed */
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger.is-solid { border-color: var(--c-tension); background: var(--c-tension); color: #fff; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--c-tension) 8%, transparent); }
+/* Socria One's blue, for the button that buys it and nothing else (it stays inside One's lock) */
+:is(.logos-root, .lg-tokens) .l5-btn.is-one { --c-fill: var(--lg-one, #26485a); --c-on-fill: #fff; --c-focus: var(--lg-one, #26485a); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) :is(.logos-root, .lg-tokens) .l5-btn.is-one { --c-on-fill: var(--lg-paper); }
+
+/* a choice of one inside a panel: the same tray as the switch; the chosen one is the wash */
+:is(.logos-root, .lg-tokens) .l5-seg { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 3px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 999px; }
+:is(.logos-root, .lg-tokens) .l5-seg-b { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--c-ink-70); font: inherit; font-size: 13.5px; font-weight: 500; white-space: nowrap; cursor: pointer; }
+:is(.logos-root, .lg-tokens) .l5-seg-b:hover { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-seg-b:is([aria-pressed='true'], [aria-selected='true'], .is-on) { background: var(--c-wash); color: var(--c-fill); box-shadow: none; }
+:is(.logos-root, .lg-tokens) .l5-seg-b:focus-visible { outline: 2px solid var(--c-fill); outline-offset: 2px; }
+
+/* a menu item's glyph, and a break between sections */
+:is(.logos-root, .lg-tokens) .l5-mi svg { width: 16px; height: 16px; flex: none; color: var(--c-ink-70); }
+:is(.logos-root, .lg-tokens) .l5-mi.is-on { color: var(--c-fill); }
+:is(.logos-root, .lg-tokens) .l5-mi:disabled { color: var(--c-ink-25); cursor: default; }
+:is(.logos-root, .lg-tokens) .l5-menu-sep { height: 1px; margin: 4px 6px; background: var(--c-rule); }
+
+/* the composer's own tools are words and glyphs, not keys: no frame until pointed at */
+.logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn,
+.logos-root .sv-btn,
+.logos-root .l5-ctools .lg-plus .l5-icon,
+.logos-root .l5-ctools .lg-attach,
+.logos-root .l5-ctools .lg-mathbtn { border-color: transparent; background: transparent; box-shadow: none; }
+.logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn:hover,
+.logos-root .sv-btn:hover,
+.logos-root .l5-ctools .lg-plus .l5-icon:hover,
+.logos-root .l5-ctools .lg-attach:hover:not(:disabled),
+.logos-root .l5-ctools .lg-mathbtn:hover { border-color: transparent; background: var(--c-shade); }
+.logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn.open,
+.logos-root .l5-ctools .l5-make.is-set .mp-btn,
+.logos-root .l5-ctools .lg-plus .l5-icon[aria-expanded='true'] { border-color: transparent; background: var(--c-wash); color: var(--c-fill); box-shadow: none; }
+/* nothing travels when pressed */
+.logos-root :is(.mp-btn, .sv-btn, .lg-mathbtn, .lg-attach):active { transform: none; }

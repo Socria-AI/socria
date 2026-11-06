@@ -138,7 +138,7 @@ const WRITTEN = '# The causes of World War One\n\nNo single cause; four pressure
   ok('Content holds it as a card: its title, who wrote it, how long, how it opens', cards.length === 1 && card?.id === 'write:a1' && card.title === 'The causes of World War One' && /^Written by Socria · \d+ words$/.test(card.meta) && card.snippet === 'No single cause; four pressures met in 1914.' && card.text === WRITTEN, J(card));
   const w = V.writeUpParts(WRITTEN);
   const inChat = html(h(V.L5Message, { m: msgs[1], side: 'socria', who: 'Socria', group: false, cont: false, showQuote: false, canReply: false, writeUp: { id: 'write:a1', ...w }, onOpenContent: () => {} }));
-  ok('in Chat: a card — its title, its opening and the way to it in Content', /Written in Content/.test(inChat) && inChat.includes('The causes of World War One') && inChat.includes('No single cause; four pressures met in 1914.') && /Read it in Content · \d+ words/.test(inChat));
+  ok('in Chat: a card — its title, its opening and the way to it in Files (5.5: the view is called Files)', /Written in Files/.test(inChat) && inChat.includes('The causes of World War One') && inChat.includes('No single cause; four pressures met in 1914.') && /Read it in Files · \d+ words/.test(inChat));
   ok('  never the same pages twice: the sections are not in the conversation', !inChat.includes('Arms races made speed decisive') && !inChat.includes('Two blocs'));
   const ordinary = html(h(V.L5Message, { m: msgs[3], side: 'socria', who: 'Socria', group: false, cont: false, showQuote: false, canReply: false }));
   ok('  an ordinary reply is drawn as itself', ordinary.includes('Most historians start with the alliances.') && !/Written in Content/.test(ordinary));
@@ -197,7 +197,7 @@ for (const [t, view, intent] of [
 console.log('\n=== Streaming, rendering and fallback ===');
 {
   const writing = html(h(V.L5Pending, { text: '# The causes of World War One\n\nNo single cause', group: false, place: 'content' }));
-  ok('a write-up arriving is said in Chat — "Writing in Content", its title, how far along — not spilled into it', /Writing in Content/.test(writing) && writing.includes('The causes of World War One') && /\d+ words so far/.test(writing) && !writing.includes('No single cause'));
+  ok('a write-up arriving is said in Chat — "Writing in Files", its title, how far along — not spilled into it', /Writing in Files/.test(writing) && writing.includes('The causes of World War One') && /\d+ words so far/.test(writing) && !writing.includes('No single cause'));
   ok('  before any words: thinking, as always', /Thinking…/.test(html(h(V.L5Pending, { text: '', group: false, place: 'content' }))));
   ok('  an ordinary reply streams in the conversation', html(h(V.L5Pending, { text: 'Four downs, ten yards.', group: false })).includes('Four downs, ten yards.'));
   const cut = V.writeUpParts('# Notes on alliances');

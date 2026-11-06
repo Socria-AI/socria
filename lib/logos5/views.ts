@@ -31,7 +31,8 @@ export const VIEW_ORDER: readonly Viewport[] = ['chat', 'content', 'artifacts', 
 
 export const VIEW_LABELS: Record<Viewport, string> = {
   chat: 'Chat',
-  content: 'Content',
+  // Logos 5.5: the view is called Files — what you brought; its id stays 'content'
+  content: 'Files',
   artifacts: 'Artifacts',
   logic_map: 'Logic Map',
 };
@@ -42,7 +43,7 @@ export type BesideId = Viewport;
 /** What each view is called when it is beside another. */
 export const SPLIT_NAMES: Record<BesideId, string> = {
   chat: 'Conversation',
-  content: 'Content',
+  content: 'Files',
   artifacts: 'Artifacts',
   logic_map: 'Logic Map',
 };
@@ -303,7 +304,8 @@ export const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top:
 
 /** Where the panel beside the view docks, for where the conversation was put (null: never chosen). */
 export function besideSide(s: Screen, chat: Side | null): Side {
-  if (!chat || !s.beside) return 'right';
+  // never chosen: the conversation beside a view docks on the left (Logos 5.5, Screen 1); anything else beside, on the right
+  if (!chat || !s.beside) return s.beside === 'chat' ? 'left' : 'right';
   if (s.beside === 'chat') return chat;
   if (s.view === 'chat') return OPPOSITE[chat];
   return 'right';

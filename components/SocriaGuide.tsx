@@ -476,10 +476,10 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
           Bring your <em>own</em> material.
         </>
       ),
-      stand: 'Documents, notes and pictures are read into Content. Files are sorted into topics in their own words, and practice is made from them when you ask.',
+      stand: 'Documents, notes and pictures are read into Files. Files are sorted into topics in their own words, and practice is made from them when you ask.',
       steps: [
         <>Press the paperclip, or drop files on the box.</>,
-        <>Open Content: each one is a card — drag to arrange, drop one on another to stack them.</>,
+        <>Open Files: each one is a card — drag to arrange, drop one on another to stack them.</>,
         <>Ask about any of it in the conversation, or ask for practice from it.</>,
       ],
       note: 'Your documents are never changed.',

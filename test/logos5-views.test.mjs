@@ -19,10 +19,10 @@ const after = (text, now, narrow = false, o = {}) => V.afterSend(V.routeTurn({ t
 
 console.log('\n=== views: the four, and where a line of thinking opens ===');
 ok('the four views, in Alex’s order', J(V.VIEW_ORDER) === J(['chat', 'content', 'artifacts', 'logic_map']));
-ok('named Chat, Content, Artifacts, Logic Map — "Components" is gone', J(Object.values(V.VIEW_LABELS)) === J(['Chat', 'Content', 'Artifacts', 'Logic Map']));
+ok('named Chat, Files, Artifacts, Logic Map — 5.5 calls Content "Files" (its id stays content)', J(Object.values(V.VIEW_LABELS)) === J(['Chat', 'Files', 'Artifacts', 'Logic Map']) && 'content' in V.VIEW_LABELS);
 ok('a line of thinking opens on Chat, nothing beside it', same(V.OPENING, S('chat')));
 ok('Split View puts the views themselves beside each other — no panels of its own', J(Object.keys(V.SPLIT_NAMES)) === J(['chat', 'content', 'artifacts', 'logic_map']) && V.SPLIT_SECTIONS === undefined);
-ok('…each named as its tab is (the conversation, beside, is "Conversation")', J(Object.values(V.SPLIT_NAMES)) === J(['Conversation', 'Content', 'Artifacts', 'Logic Map']));
+ok('…each named as its tab is (the conversation, beside, is "Conversation")', J(Object.values(V.SPLIT_NAMES)) === J(['Conversation', 'Files', 'Artifacts', 'Logic Map']));
 
 console.log('\n=== rule A: a conversation is read in Chat; the Logic Map never opens for it ===');
 for (const t of ['what is tax incidence?', 'I think the plan works because rent is low', 'ok', 'why does that follow?']) {
@@ -245,7 +245,7 @@ console.log('\n=== the Content canvas: placed, nested, kept ===');
 console.log('\n=== where the conversation sits: any edge, as the person put it ===');
 {
   ok('four sides, each with its opposite', J(V.SIDES) === J(['left', 'right', 'top', 'bottom']) && V.SIDES.every((s) => V.OPPOSITE[V.OPPOSITE[s]] === s && V.OPPOSITE[s] !== s));
-  ok('never chosen: the panel beside is on the right, as it always was', V.besideSide(S('artifacts', 'chat'), null) === 'right' && V.besideSide(S('chat', 'logic_map'), null) === 'right' && V.besideSide(S('content', 'logic_map'), null) === 'right');
+  ok('never chosen: the conversation beside docks on the left (5.5); anything else beside, on the right', V.besideSide(S('artifacts', 'chat'), null) === 'left' && V.besideSide(S('logic_map', 'chat'), null) === 'left' && V.besideSide(S('chat', 'logic_map'), null) === 'right' && V.besideSide(S('content', 'logic_map'), null) === 'right');
   ok('chosen, the conversation beside sits on that side', V.SIDES.every((s) => V.besideSide(S('logic_map', 'chat'), s) === s));
   ok('  with the conversation the view, what is beside goes to the far side — the conversation stays where it was put', V.besideSide(S('chat', 'artifacts'), 'left') === 'right' && V.besideSide(S('chat', 'artifacts'), 'right') === 'left' && V.besideSide(S('chat', 'content'), 'top') === 'bottom');
   ok('  two other views beside each other are not the conversation: the right, as before', V.besideSide(S('content', 'logic_map'), 'left') === 'right');

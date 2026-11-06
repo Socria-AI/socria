@@ -1,20 +1,22 @@
 /* components/logos5/memory.css — Memory, in Logos 5 (MemoryView, MemoryNetwork, MemoryParts).
  *
  * Drawn in the Logos 5 tokens (l5.css) and Logos's own (--lg-*), so a dark
- * ground recolours it with everything else. The eight regions each have a
- * colour of their own, declared here for paper and again for the dark grounds:
- * olive, gold, slate, sage, rose, heather, sand and dusk, quiet enough that the
- * marks — never colour alone — carry the meaning. */
+ * ground recolours it with everything else. Logos 5.5: the eight regions are
+ * told apart by where they are and their labels, not by a hue each — on a
+ * Thinking Map every colour already means one thing. They all draw in one
+ * ink (--l5mm-region); a memory's status (confirmed, proposed, changed,
+ * contradicted) keeps its own marks and colours. */
 
 .logos-root .l5 .l5mm-wrap {
-  --l5mm-identity: #3d4f25;
-  --l5mm-goals: #a3843e;
-  --l5mm-work: #3e5f66;
-  --l5mm-learning: #5f7f68;
-  --l5mm-people: #8a5f62;
-  --l5mm-prefs: #74657d;
-  --l5mm-recent: #8b7e6a;
-  --l5mm-questions: #5b6f8c;
+  --l5mm-region: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
+  --l5mm-identity: var(--l5mm-region);
+  --l5mm-goals: var(--l5mm-region);
+  --l5mm-work: var(--l5mm-region);
+  --l5mm-learning: var(--l5mm-region);
+  --l5mm-people: var(--l5mm-region);
+  --l5mm-prefs: var(--l5mm-region);
+  --l5mm-recent: var(--l5mm-region);
+  --l5mm-questions: var(--l5mm-region);
   --l5mm-ink-mark: var(--lg-primary);
   --l5mm-gold: var(--lg-secondary, #b8a26b);
   --l5mm-gold-ink: #8a7230;
@@ -31,14 +33,14 @@
   overflow: hidden;
 }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .l5 .l5mm-wrap {
-  --l5mm-identity: #a9c27a;
-  --l5mm-goals: #d8b866;
-  --l5mm-work: #8fbcc4;
-  --l5mm-learning: #9cc4a8;
-  --l5mm-people: #d39ca0;
-  --l5mm-prefs: #b7a6c4;
-  --l5mm-recent: #c9bba3;
-  --l5mm-questions: #9fb4d4;
+  --l5mm-identity: var(--l5mm-region);
+  --l5mm-goals: var(--l5mm-region);
+  --l5mm-work: var(--l5mm-region);
+  --l5mm-learning: var(--l5mm-region);
+  --l5mm-people: var(--l5mm-region);
+  --l5mm-prefs: var(--l5mm-region);
+  --l5mm-recent: var(--l5mm-region);
+  --l5mm-questions: var(--l5mm-region);
   --l5mm-gold-ink: #d8c288;
   --l5mm-tension: #e39a7a;
 }
@@ -82,7 +84,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-fine {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   margin: 0;
 }
@@ -176,7 +178,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   background: none;
   outline: none;
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--lg-ink);
 }
 .logos-root .l5 .l5mm-search kbd {
@@ -199,7 +201,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   border: 1px solid var(--l5-hair);
   background: var(--l5-surface);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   display: inline-flex;
   align-items: center;
@@ -207,7 +209,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   cursor: pointer;
 }
 .logos-root .l5 .l5mm-chip span {
-  font-size: 11px;
+  font-size: 10.5px;
   opacity: 0.75;
 }
 .logos-root .l5 .l5mm-chip.is-on {
@@ -266,13 +268,13 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 .logos-root .l5 .l5mm-reg-nm small {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .logos-root .l5 .l5mm-reg-ct {
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   font-variant-numeric: tabular-nums;
 }
@@ -320,11 +322,11 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   padding: 11px 4px;
   border-radius: 0;
   border-bottom: 1px solid var(--l5-hair);
-  font-size: 14.5px;
+  font-size: 15.5px;
 }
 .logos-root .l5 .l5mm-row.is-big small {
   display: block;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   margin-top: 2px;
 }
@@ -335,7 +337,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   border: 0;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-primary);
   text-decoration: underline;
   text-underline-offset: 3px;
@@ -352,7 +354,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   display: flex;
   gap: 8px;
   margin: 0;
-  font-size: 11.5px;
+  font-size: 12.5px;
   line-height: 1.45;
   color: var(--lg-ink-60);
 }
@@ -363,7 +365,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   display: inline-flex;
   align-items: center;
   gap: 4px;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-primary);
   text-decoration: none;
 }
@@ -651,7 +653,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   cursor: pointer;
 }
 .logos-root .l5 .l5mm-inner-t {
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   fill: var(--c);
   stroke-width: 4px;
@@ -734,7 +736,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 .logos-root .l5 .l5mm-hint {
   font-family: var(--l5-serif);
   font-style: italic;
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--lg-ink-60);
   padding: 5px 14px;
   border-radius: 16px;
@@ -793,7 +795,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   background: var(--l5mm-veil);
   border: 1px solid var(--l5-hair);
   box-shadow: var(--l5-shadow);
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-legend span {
@@ -831,7 +833,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   background: var(--l5mm-veil);
   box-shadow: var(--l5-shadow);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   cursor: pointer;
 }
@@ -871,7 +873,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 .logos-root .l5 .l5mm-zoom .l5mm-fit {
   width: auto;
   padding: 0 11px;
-  font-size: 12px;
+  font-size: 12.5px;
 }
 .logos-root .l5 .l5mm-zoom i {
   width: 1px;
@@ -922,7 +924,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   min-height: 24px;
   padding: 0 10px;
   border-radius: 12px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   color: var(--lg-ink);
   background: rgba(var(--l5-tint-rgb), 0.06);
@@ -967,7 +969,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   height: 26px;
   padding: 0 10px;
   border-radius: 13px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink);
   background: var(--l5-surface);
   border: 1px solid var(--l5-hair);
@@ -991,7 +993,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   align-items: center;
   justify-content: space-between;
   gap: 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-change-h b {
@@ -1002,7 +1004,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   display: grid;
   grid-template-columns: 42px minmax(0, 1fr);
   gap: 4px 8px;
-  font-size: 13px;
+  font-size: 13.5px;
 }
 .logos-root .l5 .l5mm-lb {
   font-size: 10.5px;
@@ -1032,7 +1034,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   border: 1px solid rgba(var(--l5-tint-rgb), 0.22);
   background: var(--l5-surface);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   color: var(--lg-ink);
   display: inline-flex;
@@ -1093,14 +1095,14 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   color: var(--lg-primary);
 }
 .logos-root .l5 .l5mm-why-t {
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.35;
   color: var(--lg-ink);
   min-width: 0;
 }
 .logos-root .l5 .l5mm-why-t small {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-lnk {
@@ -1112,7 +1114,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   border-radius: 8px;
   background: none;
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-primary);
   cursor: pointer;
   white-space: nowrap;
@@ -1155,7 +1157,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   display: flex;
   align-items: center;
   gap: 8px;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--lg-ink);
   min-width: 0;
   overflow: hidden;
@@ -1177,7 +1179,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   color: var(--lg-ink);
 }
 .logos-root .l5 .l5mm-hist-d {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   padding-top: 1px;
 }
@@ -1216,7 +1218,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 .logos-root .l5 .l5mm-hist-t small,
 .logos-root .l5 .l5mm-hist-o {
   display: block;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-hist-o {
@@ -1224,7 +1226,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   border: 0;
   background: none;
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12.5px;
   text-align: left;
   cursor: pointer;
   text-decoration: underline;
@@ -1338,7 +1340,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 .logos-root .l5 .l5mm-tl-d {
   padding-top: 16px;
   text-align: right;
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
   font-variant-numeric: tabular-nums;
 }
@@ -1397,7 +1399,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 600;
   color: var(--lg-ink);
 }
@@ -1409,7 +1411,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   height: 22px;
   padding: 0 9px;
   border-radius: 11px;
-  font-size: 11px;
+  font-size: 10.5px;
   display: inline-flex;
   align-items: center;
   border: 1px solid var(--l5-hair);
@@ -1430,7 +1432,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 .logos-root .l5 .l5mm-src {
   margin-left: auto;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-ft {
@@ -1445,7 +1447,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   background: rgba(var(--l5-tint-rgb), 0.035);
   border: 1px solid var(--l5-hair);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.35;
   color: var(--lg-ink);
   text-align: left;
@@ -1473,14 +1475,14 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 .logos-root .l5 .l5mm-ft-ar em {
   font-family: var(--l5-serif);
-  font-size: 15px;
+  font-size: 18px;
   color: var(--l5mm-tension);
 }
 .logos-root .l5 .l5mm-note {
   margin: 0;
   font-family: var(--l5-serif);
   font-style: italic;
-  font-size: 14.5px;
+  font-size: 18px;
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.82);
 }
 .logos-root .l5 .l5mm-reach {
@@ -1488,7 +1490,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   align-items: center;
   flex-wrap: wrap;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-rchip {
@@ -1498,7 +1500,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   border: 1px solid var(--l5-hair);
   background: var(--lg-paper);
   font: inherit;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: var(--lg-ink);
   cursor: pointer;
 }
@@ -1509,7 +1511,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   margin: 8px 0;
   font-family: var(--l5-serif);
   font-style: italic;
-  font-size: 15px;
+  font-size: 18px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-once {
@@ -1524,7 +1526,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 .logos-root .l5 .l5mm-once p {
   margin: 0;
-  font-size: 13px;
+  font-size: 13.5px;
   color: var(--lg-ink);
 }
 .logos-root .l5 .l5mm-once .l5mm-ico {
@@ -1581,12 +1583,12 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 .logos-root .l5 .l5mm-mini-t {
   font-family: var(--lg-sans);
-  font-size: 11px;
+  font-size: 10.5px;
   fill: var(--lg-ink);
 }
 .logos-root .l5 .l5mm-mini-k {
   font-family: var(--lg-sans);
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
@@ -1617,7 +1619,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   gap: 10px;
   font-family: var(--l5-serif);
   font-style: italic;
-  font-size: 15px;
+  font-size: 18px;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5mm-empty h2 {
@@ -1670,7 +1672,7 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 }
 .logos-root .l5 .l5mm.is-narrow .l5mm-legend.is-pop {
   grid-template-columns: repeat(2, auto) 24px;
-  font-size: 11px;
+  font-size: 10.5px;
 }
 .logos-root .l5 .l5mm.is-narrow .l5mm-legend.is-pop .l5mm-legend-x {
   grid-column: 3;

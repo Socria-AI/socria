@@ -18,7 +18,7 @@ import { useEffect, useId, useRef } from 'react';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { comparisonRows, LIMIT_HEADLINE } from '@/lib/entitlements';
 import './one/one-sheet.css';
-import './logos5/buttons.css';
+import './logos5/l5-controls.css';
 
 /** The ✓ in the One column: drawn, so it is the same weight in every font. */
 export function OneCheck() {
@@ -80,7 +80,7 @@ export function SocriaOneModal({
       <div className="os-back" onClick={onClose} aria-hidden="true" />
       <div className="os-sheet is-wide">
         <span className="os-grab" aria-hidden="true" />
-        <button type="button" className="os-x l5-icon-btn" onClick={onClose} aria-label="Close">
+        <button type="button" className="os-x l5-icon" onClick={onClose} aria-label="Close">
           <OneClose />
         </button>
 

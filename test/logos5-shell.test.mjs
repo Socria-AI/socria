@@ -24,16 +24,16 @@ console.log('\n=== the screen is the four views ===');
 ok('a line of thinking is L5Layout over the view that is open', /<L5Layout\s+view=\{studyTab\}/.test(app) && /primary=\{primaryEl\}/.test(app));
 ok('  each view has its own body: Chat the thread, Content, Artifacts, the Logic Map', /const viewEl = \(v: Viewport\) => \(v === 'chat' \? l5Thread : v === 'content' \? contentView : v === 'artifacts' \? artifactsView : logicView\)/.test(app) && /const primaryEl = viewEl\(studyTab\)/.test(app));
 ok('  …and the view beside is drawn by the same body its tab draws', /const besideEl = screen\.beside && screen\.beside !== studyTab \? viewEl\(screen\.beside\) : null/.test(app) && !/besidePanelOf/.test(app));
-ok('  the tab row is gone: a full view is left by Back to chat, and the canvas (Zoom out) holds what each view holds', !/<L5Tabs\b/.test(app) && /const viewBarEl =/.test(app) && /<L5Canvas\b/.test(app) && /map\.nodes\.length/.test(app) && /for \(const c of contentItems\)/.test(app));
+ok('  5.5: the four views are a switch in the header, not a tab row; the canvas (Zoom out) still holds what each view holds', !/<L5Tabs\b/.test(app) && /<L5Switch\s+label="Views"/.test(app) && /switcher=\{switchEl\}/.test(app) && /<L5Canvas\b/.test(app) && /map\.nodes\.length/.test(app) && /for \(const c of contentItems\)/.test(app));
 ok('  the tabs are a tablist that takes the arrow keys', /role="tablist"/.test(shell) && /ArrowRight/.test(shell) && /aria-selected=\{on\}/.test(shell) && /tabIndex=\{on \? 0 : -1\}/.test(shell));
 ok('"Components" is called Content everywhere it is said', !/label: 'Components'/.test(app) && !/'components'/.test(app));
 ok('the floating, draggable conversation box is retired: Split View docks it instead', !existsSync(join(root, 'components/logos5/L5Line.tsx')) && !existsSync(join(root, 'lib/logos5/box.ts')) && !/<L5Line/.test(app));
 ok('the binary "where do you want to start?" panel is gone; the recommended topic is marked on its card', !/<StartPanel/.test(app) && /Recommended start/.test(read('components/logos5/Study.tsx')));
 
 console.log('\n=== the top bar: only what is global ===');
-ok('← Universal Map, top left, with its label', /aria-label="Back to the Universal Map"/.test(shell) && /<span>Universal Map<\/span>/.test(shell));
+ok('the mark, top left, goes back to the Universal Map; then a label and the line\'s name in italic', /aria-label="Back to the Universal Map"/.test(shell) && /src="\/socria-mark\.png"/.test(shell) && /<span className="l5-label">\{kind\}<\/span>/.test(shell) && /className="l5v-title"/.test(shell));
 ok('  it is no longer hidden in the ⋯ menu', !/label: 'Universal Map', hint: 'Every conversation, as one map'/.test(app));
-ok('search in the middle of the bar, ⌘K / Ctrl K', /className="l5v-search"/.test(shell) && /aria-keyshortcuts="Meta\+K Control\+K"/.test(shell));
+ok('search at the bar\'s end, a quiet key with ⌘K / Ctrl K', /className="l5-btn is-sm is-quiet l5v-search"/.test(shell) && /aria-keyshortcuts="Meta\+K Control\+K"/.test(shell));
 ok('  ⌘K / Ctrl K opens it from anywhere in Logos 5', /\(e\.metaKey \|\| e\.ctrlKey\) && !e\.altKey && !e\.shiftKey && e\.key\.toLowerCase\(\) === 'k'/.test(app));
 ok('  a result opens where it lives', /function openHit\(h: Hit\)/.test(app) && /openFromHome\(sid, local\)/.test(app) && /openCite\(docId, block\)/.test(app));
 ok('Split View replaces "+ View": the Logic Map’s workspace has no "+ View"', /addViews=\{false\}/.test(app) && /props\.addViews === false \? null : addView/.test(read('components/workspace/Workspace.tsx')));
@@ -41,7 +41,7 @@ ok('  the drawer is a menu that closes on Escape: the views, then the artifacts 
 ok('  …offering only what this line of thinking has (splitMenu)', /const splitChoices = splitMenu\(\{/.test(app) && /<SplitView menu=\{splitChoices\}/.test(app));
 ok('  the panel beside is resized by a separator that takes the arrow keys', /role="separator"/.test(shell) && /aria-valuenow/.test(shell) && /ArrowLeft/.test(shell));
 ok('Synthesize is the Content and Logic Map views’ own action, not the bar’s', /\(studyTab === 'content' \|\| studyTab === 'logic_map'\) && canSynthesize\(map\)/.test(app) && !/label: synthBusy === 'workspace' \? 'Reading your map…' : 'Synthesize'/.test(app));
-ok('Memory lives in the profile: the account chip’s own menu', /label: 'Memory', hint: 'What Socria remembers about you'/.test(app) && /items\?\.length/.test(read('components/account/AccountControl.tsx')) && !/<MindButton/.test(app));
+ok('Memory: in the profile\'s own menu, and (5.5) its glyph in the header for a signed-in account', /label: 'Memory', hint: 'What Socria remembers about you'/.test(app) && /items\?\.length/.test(read('components/account/AccountControl.tsx')) && /memory=\{cloud \? <MindButton onOpen=\{\(\) => setL5Mind\(true\)\} \/> : null\}/.test(app));
 
 console.log('\n=== the omnibox ===');
 ok('Enter sends; Shift+Enter is a new line; a word being composed is not sent', /e\.key === 'Enter' && !e\.shiftKey && !\(e\.nativeEvent as KeyboardEvent\)\.isComposing/.test(composer));
@@ -51,8 +51,8 @@ ok('it grows with what is written to 240px, then scrolls inside', /const cap = 2
 ok('  a scrollbar only when there is more than the box shows — never words out of reach', /el\.style\.overflowY = el\.scrollHeight > el\.clientHeight \+ 1 \? 'auto' : 'hidden';/.test(composer));
 ok('  filled while hidden, it is not measured at nothing', /if \(!el\.clientWidth\) \{\s*el\.style\.height = '';/.test(composer));
 ok('  measured again when its width changes, or the font arrives', /new ResizeObserver\(\(\) => \{\s*if \(el\.clientWidth && el\.clientWidth !== grownAt\.current\) grow\(\);/.test(composer) && /addEventListener\?\.\('loadingdone', grow\)/.test(composer));
-ok('the paperclip is inside the pill, at its left', /<div className="l5-crow">/.test(composer) && /className="lg-attach l5-clip"/.test(composer) && composer.indexOf('l5-clip') < composer.indexOf('<textarea', composer.indexOf('l5-crow')));
-ok('a pill: radius 28px, a neutral shadow, centred, at most 768px', /border-radius: 28px;/.test(css) && /width: min\(768px, calc\(100% - 32px\)\)/.test(css));
+ok('5.5: the words alone in their row; Attach is under "+", with Make, Search my files and ∑', /<div className="l5-crow">\s*<textarea/.test(composer) && !/className="lg-attach l5-clip"/.test(composer) && /label: 'Attach',/.test(composer) && /\.\.\.\(plusItems \?\? \[\]\)/.test(composer) && /label: 'Search my files'/.test(composer));
+ok('a holder: radius 16 (5.5), centred, at most 768px', /border-radius: 16px;/.test(css) && /width: min\(768px, calc\(100% - 32px\)\)/.test(css));
 ok('Chat is one centred column, 768px at most', /\.l5v-body\.is-chat \.l5-thread-in,\s*\.l5v-body\.is-chat \.l5-dock \{\s*max-width: 768px;/.test(css));
 
 console.log('\n=== type ===');
@@ -68,7 +68,7 @@ ok('  a shimmer and a status the screen reader is told', /className="l5v-working
 console.log('\n=== rules A–D, wired ===');
 ok('a turn is read once, before it is sent, by the runtime’s own reader', /const route = routeTurn\(\{ text: content, attachments: atts/.test(app) && /setScreen\(\(sc\) => afterSend\(route, sc, narrowRef\.current\)\)/.test(app));
 ok('  a question asked on a card is answered on the card: the screen does not move', /if \(l5 && !fromCard\)/.test(app));
-ok('rule B: an attached document is read into Content and said under the turn — not opened', /if \(opened && !l5\) setDisplayToOpen\(opened\)/.test(app) && /Added to Content/.test(app));
+ok('rule B: an attached document is read into Files and said under the turn — not opened', /if \(opened && !l5\) setDisplayToOpen\(opened\)/.test(app) && /Added to Files/.test(app));
 ok('rule C: something made because it was asked is shown in Artifacts', /setScreen\(\(s\) => onMade\(true, s, narrowRef\.current\)\)/.test(app));
 ok('  made in the background, the tab is marked and the screen stays', /setArtFresh\(true\)/.test(app));
 ok('a document opened goes to Content, made things to Artifacts', /a document is Content: read there/.test(app));

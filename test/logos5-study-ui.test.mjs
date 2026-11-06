@@ -56,8 +56,8 @@ console.log('\n=== the three views ===');
   const items = [{ id: 'components', label: 'Components', count: 3 }, { id: 'artifacts', label: 'Artifacts', count: 0, fresh: true }, { id: 'logic', label: 'Logic Map', count: 7 }];
   const s = html(h(U.L5Switch, { items, value: 'components', onChange: none, label: 'Views' }));
   ok('three views, the open one selected', (s.match(/role="tab"/g) ?? []).length === 3 && /aria-selected="true"[^>]*>Components/.test(s), s);
-  ok('each counted, and nothing said when there is nothing', s.includes('l5-switch-n">3<') && s.includes('l5-switch-n">7<') && !s.includes('l5-switch-n">0<'));
-  ok('something new in a view not open is marked', s.includes('l5-switch-dot') && !html(h(U.L5Switch, { items, value: 'artifacts', onChange: none, label: 'Views' })).includes('l5-switch-dot'));
+  ok('each counted, and nothing said when there is nothing', s.includes('l5-count">3<') && s.includes('l5-count">7<') && !s.includes('l5-count">0<'));
+  ok('something new in a view not open is marked', s.includes('l5-new') && !html(h(U.L5Switch, { items, value: 'artifacts', onChange: none, label: 'Views' })).includes('l5-new'));
 
   const c = html(h(U.ComponentsEmpty, { said: [{ id: 'm1', text: 'I have an exam on adjusting entries' }], onFiles: none, reading: null, onShow: none, narrow: false }));
   ok('components, empty: nothing to sort, and where to drop files', c.includes('Nothing to sort yet.') && c.includes('Drop files here') && c.includes('type="file"'));
@@ -69,7 +69,7 @@ console.log('\n=== the three views ===');
   const arts = [{ key: 'd:1', kind: 'Chart', title: 'Runway by month', render: () => h('div', null, 'CHART-BODY') }, { key: 'p:2', kind: 'Practice', title: 'Adjusting entries', render: () => h('div', null, 'PRACTICE-BODY') }];
   const a = html(h(U.ArtifactsView, { items: arts, selected: null, onSelect: none, narrow: false }));
   ok('artifacts: the newest is shown at full size, said to be made from the conversation', a.includes('PRACTICE-BODY') && !a.includes('CHART-BODY') && a.includes('Artifact · Practice · made from the conversation'));
-  ok('artifacts: the others a press away', (a.match(/class="l5s-art-pill/g) ?? []).length === 2 && a.includes('Runway by month'));
+  ok('artifacts: the others a press away', (a.match(/class="l5-chip l5s-art-pill/g) ?? []).length === 2 && a.includes('Runway by month'));
   ok('artifacts: the one chosen is the one shown', html(h(U.ArtifactsView, { items: arts, selected: 'd:1', onSelect: none, narrow: false })).includes('CHART-BODY'));
 }
 
@@ -79,9 +79,9 @@ console.log('\n=== asking about a card ===');
   const s = html(h(U.L5Ask, { label: 'Runway', exchange: { q: 'Why does this matter?', a: 'It sets how long you can wait.', streaming: false }, came: { said: 'Came from 2 messages', onShow: none }, quick, onAsk: none, onClose: none, busy: false }));
   ok('it says which card is asked about', s.includes('Asking about') && s.includes('Runway'));
   ok('the last question and its answer, and where the card came from', s.includes('Why does this matter?') && s.includes('It sets how long you can wait.') && s.includes('Came from 2 messages ›'));
-  ok('the quick questions, and a place to ask the next', s.includes('Challenge it') && s.includes('What rests on this?') && s.includes('Ask about this card…'));
+  ok('the quick questions, and a place to ask the next', s.includes('Challenge it') && s.includes('What rests on this?') && s.includes('placeholder="Ask about this card"'));
   const streaming = html(h(U.L5Ask, { label: 'Runway', exchange: { q: 'Why?', a: '', streaming: true }, came: { said: 'Came from 2 messages' }, quick, onAsk: none, onClose: none, busy: true }));
-  ok('while the answer is on its way: thinking, and nothing else to press', streaming.includes('Thinking…') && !streaming.includes('Came from') && /class="l5-ask-chip"[^>]*disabled/.test(streaming));
+  ok('while the answer is on its way: thinking, and nothing else to press', streaming.includes('Thinking…') && !streaming.includes('Came from') && /class="l5-chip l5-ask-chip"[^>]*disabled/.test(streaming));
 }
 
 console.log('\n=== the question a reply ends on ===');

@@ -13,8 +13,28 @@ import { MakeGallery } from './MakeGallery';
 import { useTemplates } from './useTemplates';
 import '@/app/app-shell.css';
 
-export function MakePicker({ value, onChange }: { value: string | null; onChange: (next: string | null) => void }) {
-  const [open, setOpen] = useState(false);
+export function MakePicker({
+  value,
+  onChange,
+  open: openProp,
+  onOpenChange,
+  bare = false,
+}: {
+  value: string | null;
+  onChange: (next: string | null) => void;
+  /** opened from elsewhere — Logos 5.5 keeps Make under the composer's "+" */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  /** no button of its own until something is chosen: then the choice shows, with its × */
+  bare?: boolean;
+}) {
+  const [openOwn, setOpenOwn] = useState(false);
+  const open = openProp ?? openOwn;
+  const setOpen = (v: boolean | ((was: boolean) => boolean)) => {
+    const next = typeof v === 'function' ? v(open) : v;
+    setOpenOwn(next);
+    onOpenChange?.(next);
+  };
   const box = useRef<HTMLDivElement>(null);
   useEffect(() => {
     if (!open) return;
@@ -37,6 +57,7 @@ export function MakePicker({ value, onChange }: { value: string | null; onChange
   return (
     <span className="app-root app-inline">
       <div className={`mp l5-make${now ? ' is-set' : ''}`} ref={box} data-tour="make">
+        {(!bare || now) && (
         <button
           type="button"
           className={`mp-btn${open ? ' open' : ''}`}
@@ -54,6 +75,7 @@ export function MakePicker({ value, onChange }: { value: string | null; onChange
           </svg>
           <span className="nm">{now ? now.label : 'Make'}</span>
         </button>
+        )}
         {now && (
           <button type="button" className="l5-make-x" onClick={() => onChange(null)} aria-label={`Stop making a ${now.label.toLowerCase()}`} title="Just send a message">
             ×

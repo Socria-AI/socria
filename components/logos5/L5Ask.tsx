@@ -10,6 +10,7 @@
 // with the card as its Point & Ask subject: nothing new is stored.
 
 import { useState } from 'react';
+import { L5Close } from './L5Chrome';
 
 export interface AskExchange {
   /** what was asked about the card, in the person's words */
@@ -49,12 +50,10 @@ export function L5Ask({
     <div className="l5-ask" role="group" aria-label={`Asking about ${label}`}>
       <div className="l5-ask-head">
         <span className="l5-ask-what">
-          <span className="l5-ask-k">Asking about</span>
+          <span className="l5-label l5-ask-k">Asking about</span>
           <span className="l5-ask-t">{label}</span>
         </span>
-        <button type="button" className="l5-ask-x" aria-label="Close" onClick={onClose}>
-          ×
-        </button>
+        <L5Close className="l5-ask-x" label="Close" onClose={onClose} />
       </div>
       {exchange && (
         <>
@@ -89,7 +88,7 @@ export function L5Ask({
       )}
       <div className="l5-ask-chips">
         {quick.map((q) => (
-          <button key={q.label} type="button" className="l5-ask-chip" disabled={busy} onClick={() => send(q.text)}>
+          <button key={q.label} type="button" className="l5-chip l5-ask-chip" disabled={busy} onClick={() => send(q.text)}>
             {q.label}
           </button>
         ))}
@@ -101,8 +100,8 @@ export function L5Ask({
           send(text);
         }}
       >
-        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask about this card…" aria-label={`Ask about ${label}`} style={{ fontSize: 16 }} />
-        <button type="submit" className="l5-ask-go" aria-label="Ask" disabled={!text.trim() || busy}>
+        <input value={text} onChange={(e) => setText(e.target.value)} placeholder="Ask about this card" aria-label={`Ask about ${label}`} />
+        <button type="submit" className="l5-icon is-send l5-ask-go" aria-label="Ask" disabled={!text.trim() || busy}>
           <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
             <path d="M12 19V5M6 11l6-6 6 6" />
           </svg>

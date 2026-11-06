@@ -890,7 +890,7 @@ export function ArtifactsView({
       {(items.length > 1 || onWrite || onMake) && (
         <div className="l5s-arts-strip" role="tablist" aria-label="Artifacts">
           {items.map((it) => (
-            <button key={it.key} type="button" role="tab" aria-selected={it.key === cur.key} className={`l5s-art-pill${it.key === cur.key ? ' is-on' : ''}`} onClick={() => onSelect(it.key)}>
+            <button key={it.key} type="button" role="tab" aria-selected={it.key === cur.key} className={`l5-chip l5s-art-pill${it.key === cur.key ? ' is-on' : ''}`} onClick={() => onSelect(it.key)}>
               <span className="l5s-art-k">{it.kind}</span>
               <span className="l5s-art-t">{it.title}</span>
             </button>
@@ -910,7 +910,7 @@ export function ArtifactsView({
       {choosing && choices}
       <section className={`l5s-art${cur.bare ? ' is-bare' : ''}`} aria-label={cur.title}>
         {/* the person's writing has its own chrome, and needs no label over it */}
-        {!cur.bare && <p className="l5s-art-eyebrow">{cur.eyebrow ?? `Artifact · ${cur.kind} · made from the conversation`}</p>}
+        {!cur.bare && <p className="l5-label l5s-art-eyebrow">{cur.eyebrow ?? `Artifact · ${cur.kind} · made from the conversation`}</p>}
         <div className="l5s-art-body">{cur.render()}</div>
       </section>
     </div>

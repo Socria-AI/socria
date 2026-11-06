@@ -90,7 +90,7 @@
   }
 }
 
-/* close — placed here; its look is .l5-icon-btn (components/logos5/buttons.css) */
+/* close — placed here; its look is .l5-icon (components/logos5/l5-controls.css) */
 :is(.logos-root, .lg-tokens) .os-x {
   position: absolute;
   top: 10px;

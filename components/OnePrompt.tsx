@@ -29,7 +29,7 @@ import { COUNTER_NOUN, COUNTERS, resetsAt, type Counter } from '@/lib/entitlemen
 import { OneClose } from './SocriaOneModal';
 import type { OnePromptView } from './useOnePrompt';
 import './one/one-sheet.css';
-import './logos5/buttons.css';
+import './logos5/l5-controls.css';
 
 /**
  * The allowance a limit prompt is about, as a count — "3 of 3 conversations
@@ -93,7 +93,7 @@ export function OnePrompt({
       <div className="os-back" onClick={onDismiss} aria-hidden="true" />
       <div className={`os-sheet is-${view.category}`}>
         <span className="os-grab" aria-hidden="true" />
-        <button type="button" className="os-x l5-icon-btn" onClick={onDismiss} aria-label="Close">
+        <button type="button" className="os-x l5-icon" onClick={onDismiss} aria-label="Close">
           <OneClose />
         </button>
 

@@ -69,8 +69,8 @@ ok('the end stays in view: the dock and the thread are both watched', /<div clas
 ok('  "↓ Latest" is placed from the dock’s measured height', /setProperty\('--l5-dock-h'/.test(app));
 ok('  only scrolling up leaves the end', /if \(!atEnd && atEndRef\.current && t\.scrollTop >= wasTop - 1\)/.test(app));
 ok(
-  'on a phone, a new line of thinking and search are in ⋯, so the title has room',
-  /onSearch=\{phone \? undefined :/.test(app) && /onNew=\{phone \? undefined :/.test(app) && /label: 'Search everything'/.test(app)
+  'a new line of thinking is in ⋯ (5.5: no "+" in the header); on a phone search is there too, so the title has room',
+  /onSearch=\{phone \? undefined :/.test(app) && /\.\.\.\(activeId && !l5Home \? \[\{ label: 'New line of thinking'/.test(app) && /label: 'Search everything'/.test(app)
 );
 ok('  and the guest meter is said in words', /className="l5-guestmeter-s"/.test(app));
 ok('big-screen mode is not offered on a phone', /\.\.\.\(!phone \|\| cabin/.test(app));

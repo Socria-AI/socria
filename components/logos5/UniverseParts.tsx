@@ -18,7 +18,7 @@ import { useVoiceInput } from '@/components/useVoiceInput';
 import { HoldMic, type Hold } from '@/components/LogosComposer';
 import { clock, insertSpoken } from '@/lib/logos4/voice';
 import { MathText } from '@/components/TeX';
-import './buttons.css';
+import './l5-controls.css';
 
 /** A colour key as the theme draws it. */
 export const colorVar = (key: string | null | undefined) => (key ? `var(--sc-${key})` : 'var(--sc-none)');
@@ -181,7 +181,7 @@ export function PreviewCard({
           <span>{kindLine(tile)}</span>
           {home && <span className="l5h-pv-g">· {home.name}</span>}
         </span>
-        <button type="button" className="l5-icon-btn is-sm l5h-pv-x" aria-label="Close" onClick={acts.onClose}>
+        <button type="button" className="l5-icon is-sm l5h-pv-x" aria-label="Close" onClick={acts.onClose}>
           <ActIcon name="close" />
         </button>
       </div>
@@ -251,7 +251,7 @@ export function PreviewCard({
         )}
         <button
           type="button"
-          className={`l5-icon-btn is-framed l5h-pv-more${more ? ' is-on' : ''}`}
+          className={`l5-icon is-framed l5h-pv-more${more ? ' is-on' : ''}`}
           aria-label="More"
           title="More"
           aria-haspopup="menu"

@@ -191,7 +191,7 @@
   border-top: 1px solid var(--l5-hair);
 }
 .logos-root .l5-prose.is-reply .socria-table.is-compare {
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.45;
 }
 .logos-root .l5-prose.is-reply .socria-table.is-compare :is(th, td) {

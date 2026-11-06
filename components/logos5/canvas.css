@@ -52,7 +52,6 @@
   border-radius: 999px;
   background: color-mix(in srgb, var(--lcv-card) 94%, transparent);
   box-shadow: 0 8px 24px -16px rgba(0, 0, 0, 0.35);
-  backdrop-filter: blur(6px);
   white-space: nowrap;
 }
 .logos-root .lcv-seg,
@@ -77,7 +76,7 @@
   background: transparent;
   color: rgba(var(--lcv-ink-rgb), 0.66);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   padding: 6px 12px;
   border-radius: 999px;
   cursor: pointer;
@@ -218,7 +217,7 @@
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 600;
   letter-spacing: 0.01em;
   color: rgba(var(--lcv-ink-rgb), 0.55);
@@ -244,20 +243,20 @@
 .logos-root .lcv-ask {
   max-width: 94%;
   padding: 8px 12px;
-  border-radius: 14px 14px 4px 14px;
+  border-radius: 16px 16px 6px 16px;
   background: rgba(var(--lcv-ink-rgb), 0.075);
   color: var(--lcv-ink);
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.42;
 }
 .logos-root .lcv-said {
-  font-size: 13px;
+  font-size: 13.5px;
   line-height: 1.55;
   color: rgba(var(--lcv-ink-rgb), 0.84);
 }
 .logos-root .lcv-said.is-synth {
   font-family: var(--l5-serif, 'Instrument Serif', serif);
-  font-size: 17px;
+  font-size: 18px;
   color: var(--lcv-ink);
 }
 .logos-root .lcv-said.is-wait {
@@ -267,7 +266,7 @@
 .logos-root .lcv-loose {
   width: 330px;
   text-align: center;
-  font-size: 11px;
+  font-size: 10.5px;
   letter-spacing: 0.08em;
   text-transform: uppercase;
   font-weight: 600;
@@ -336,14 +335,14 @@
 }
 .logos-root .lcv-title {
   margin-top: 7px;
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 600;
   line-height: 1.3;
 }
 .logos-root .lcv-card.is-content .lcv-title {
   font-family: var(--l5-serif, 'Instrument Serif', serif);
   font-weight: 400;
-  font-size: 22px;
+  font-size: 18px;
   line-height: 1.12;
 }
 .logos-root .lcv-prev {
@@ -370,7 +369,7 @@
 }
 .logos-root .lcv-note {
   margin-top: 8px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: rgba(var(--lcv-ink-rgb), 0.45);
 }
 .logos-root .lcv-text {
@@ -380,7 +379,7 @@
 }
 .logos-root .lcv-meta {
   margin-top: 6px;
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: rgba(var(--lcv-ink-rgb), 0.45);
 }
 .logos-root .lcv-art {
@@ -419,9 +418,9 @@
   padding: 7px 9px 8px;
   border: 1px solid rgba(var(--lcv-ink-rgb), 0.13);
   border-left: 3px solid #c8a85a;
-  border-radius: 8px;
+  border-radius: 10px;
   background: color-mix(in srgb, var(--lcv-card) 92%, #f2e7c4);
-  font-size: 12px;
+  font-size: 12.5px;
   line-height: 1.38;
   text-align: left;
   max-width: 260px;
@@ -451,7 +450,7 @@
   color: #5b7a3c;
 }
 .logos-root .lcv-more {
-  font-size: 11.5px;
+  font-size: 12.5px;
   color: rgba(var(--lcv-ink-rgb), 0.45);
 }
 
@@ -475,7 +474,7 @@
   overflow: auto;
   padding: 14px 18px 16px;
   border: 1px solid var(--lcv-hair);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--lcv-card);
   box-shadow: 0 30px 70px -30px rgba(var(--lcv-ink-rgb), 0.55);
   animation: lcv-grow 0.22s ease-out;
@@ -514,7 +513,7 @@
 .logos-root .lcv-focus.is-content .lcv-focus-t {
   font-family: var(--l5-serif, 'Instrument Serif', serif);
   font-weight: 400;
-  font-size: 28px;
+  font-size: 32px;
 }
 .logos-root .lcv-focus-b .ln {
   margin: 0;
@@ -532,7 +531,7 @@
   background: transparent;
   color: var(--lcv-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   cursor: pointer;
 }
 .logos-root .lcv-act:hover {
@@ -561,7 +560,7 @@
   margin: 80px auto 0;
   text-align: center;
   color: rgba(var(--lcv-ink-rgb), 0.6);
-  font-size: 14px;
+  font-size: 13.5px;
   line-height: 1.6;
 }
 
@@ -607,7 +606,7 @@
   left: 0;
   width: auto;
   max-height: 78%;
-  border-radius: 18px 18px 0 0;
+  border-radius: 16px 16px 0 0;
   z-index: 6;
 }
 
@@ -628,7 +627,7 @@
   border-bottom: 1px solid var(--l5-hair, rgba(35, 36, 31, 0.12));
 }
 .logos-root .l5v-viewbar-t {
-  font-size: 14px;
+  font-size: 13.5px;
   font-weight: 500;
 }
 .logos-root .l5v-viewbar-a {

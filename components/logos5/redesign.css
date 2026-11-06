@@ -57,12 +57,6 @@
 }
 .logos-root .l5 .l5-eyebrow {
   flex: 0 0 auto;
-  font-family: var(--lg-sans);
-  font-size: 11.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
-  text-transform: uppercase;
-  color: var(--lg-ink-40);
 }
 .logos-root .l5 .l5-where .l5-title,
 .logos-root .l5 .l5-head.has-center .l5-where .l5-title {
@@ -99,9 +93,9 @@
 }
 .logos-root .l5 .l5-unibtn.is-on,
 .logos-root .l5 .l5-unibtn.is-list.is-on {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
+  border-color: transparent;
+  background: rgba(var(--l5b-fill-rgb), 0.08);
+  box-shadow: none;
   color: var(--l5b-fill);
 }
 .logos-root .l5 .l5-unibtn.is-on svg {
@@ -116,7 +110,7 @@
   border-radius: 999px;
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
   color: var(--lg-primary);
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
 }
 .logos-root .l5 .l5-unibtn.is-on .l5-count {
@@ -130,71 +124,81 @@
   color: var(--lg-ink-60);
 }
 
-/* ── the switch ──────────────────────────────────────────────────── */
+/* ── the switch (Logos 5.5) ─────────────────────────────────────────
+   A hairline tray, 36 tall; items 28 tall at UI 13.5 in ink 70; the one chosen
+   is the wash with primary text (l5-controls.css). Counts are plain tabular
+   type, never badges; something new in a view you are not on is a 6px primary
+   dot. These carry .l5 so they hold against the older rules below. */
 .logos-root .l5 .l5-switch {
   display: inline-flex;
   align-items: center;
-  height: 40px;
+  gap: 2px;
+  height: 36px;
   padding: 3px;
-  border: 1px solid var(--l5-hair);
+  box-sizing: border-box;
+  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16);
   border-radius: 999px;
-  background: var(--l5-paper-hi);
-  font-size: 13.5px;
+  background: transparent;
 }
 .logos-root .l5 .l5-switch-i {
   position: relative;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  gap: 7px;
-  height: 32px;
+  gap: 6px;
+  height: 28px;
   padding: 0 14px;
   border: 0;
   border-radius: 999px;
   background: transparent;
-  color: var(--lg-ink-60);
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
   font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
-  transition: background 0.2s, color 0.2s;
+  transition: background-color 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
 }
-.logos-root .l5 .l5-switch-i.is-on {
-  background: var(--lg-primary);
-  color: var(--l5-on-primary);
+.logos-root .l5 .l5-switch-i:hover {
+  color: var(--lg-ink);
 }
-.logos-root .l5 .l5-switch-n {
-  display: inline-grid;
-  place-items: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  border-radius: 999px;
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
+.logos-root .l5 .l5-switch-i:is([aria-selected='true'], .is-on) {
+  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08);
   color: var(--lg-primary);
-  font-size: 11px;
-  font-weight: 600;
 }
-.logos-root .l5 .l5-switch-i.is-on .l5-switch-n {
-  background: rgba(var(--l5-on-primary-rgb), 0.22);
-  color: var(--l5-on-primary);
+.logos-root .l5 .l5-switch-i .l5-count {
+  min-width: 0;
+  height: auto;
+  padding: 0;
+  border-radius: 0;
+  background: none;
+  font-size: 12.5px;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
 }
-.logos-root .l5 .l5-switch-dot {
+.logos-root .l5 .l5-switch-i:is([aria-selected='true'], .is-on) .l5-count {
+  color: inherit;
+}
+.logos-root .l5 .l5-switch-i .l5-new {
   position: absolute;
-  top: 5px;
+  top: 4px;
   right: 6px;
   width: 6px;
   height: 6px;
-  border-radius: 50%;
-  background: var(--lg-secondary, #b8a26b);
+  border-radius: 999px;
+  background: var(--lg-primary);
+}
+.logos-root .l5 .l5-switch-i:focus-visible {
+  outline: 2px solid var(--lg-primary);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5-switch.is-wide {
   display: flex;
   width: 100%;
-  height: 44px;
 }
 .logos-root .l5 .l5-switch.is-wide .l5-switch-i {
   flex: 1 1 0;
-  height: 36px;
   padding: 0 6px;
 }
 .logos-root .l5 .l5x-tabs {
@@ -343,7 +347,7 @@
 }
 .logos-root .l5 .l5x-convo-t {
   font-family: var(--l5-serif);
-  font-size: 17px;
+  font-size: 18px;
 }
 .logos-root .l5 .l5x-convo-fold {
   margin-left: 6px;
@@ -351,7 +355,7 @@
   border: 0;
   background: none;
   font-family: var(--lg-sans);
-  font-size: 12px;
+  font-size: 12.5px;
   color: var(--lg-ink-40);
   cursor: pointer;
 }
@@ -390,10 +394,8 @@
 .logos-root .l5 .l5x-omni .lg-composer-box,
 .logos-root .l5 .l5x-convo .lg-composer-box {
   border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
-  border-radius: 22px;
+  border-radius: 16px;
   background: rgba(var(--l5-surface-rgb), 0.94);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
   box-shadow: var(--l5-shadow-up);
 }
 /* ── THE CONVERSATION BOX, MOVED (components/logos5/L5Line.tsx) ───────
@@ -462,8 +464,6 @@
   border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
   border-radius: 999px;
   background: rgba(var(--l5-surface-rgb), 0.94);
-  -webkit-backdrop-filter: blur(10px);
-  backdrop-filter: blur(10px);
   box-shadow: var(--l5-shadow-up);
   cursor: grab;
   user-select: none;
@@ -506,7 +506,7 @@
   min-width: 0;
   max-width: none;
   border: 1px solid var(--l5-hair);
-  border-radius: 20px;
+  border-radius: 16px;
   overflow: hidden;
   box-shadow:
     0 2px 6px rgba(var(--shadow-rgb, 35, 36, 31), 0.06),
@@ -560,7 +560,7 @@
   max-height: 42vh;
   padding: 12px 16px 12px;
   border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(var(--l5-surface-rgb), 0.97);
   box-shadow: var(--l5-shadow-up);
 }
@@ -579,7 +579,7 @@
 .logos-root .l5 .l5x-peek-body {
   min-height: 0;
   overflow-y: auto;
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.6;
 }
 .logos-root .l5 .l5x-thinking {
@@ -620,44 +620,36 @@
   font-size: 12.5px;
   cursor: pointer;
 }
-.logos-root .l5 .l5x-x {
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--lg-ink-60);
-  font-size: 16px;
-  cursor: pointer;
-}
 
 /* ── the conversation, restyled ──────────────────────────────────── */
 .logos-root .l5 .l5-said {
   max-width: 88%;
   padding: 9px 13px 10px;
-  border-radius: 14px 14px 5px 14px;
+  border-radius: 16px 16px 6px 16px;
   background: var(--l5-bubble);
   color: var(--l5-card-ink);
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.5;
 }
 .logos-root .l5 .l5-a .l5-who {
   font-family: var(--l5-serif);
   font-style: italic;
   font-weight: 400;
-  font-size: 14px;
+  font-size: 13.5px;
   color: var(--lg-primary);
 }
 .logos-root .l5 .l5x-convo .l5-prose,
 .logos-root .l5 .l5x-sheet .l5-prose {
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.62;
 }
 .logos-root .l5 .socria-ask {
   font-family: var(--l5-serif);
   font-style: italic;
-  font-size: 1.06em;
-  color: var(--lg-primary);
+  font-size: 18px;
+  line-height: 1.4;
+  /* Socria's question is in ink: green is yours — your words, your map's "supports" */
+  color: var(--lg-ink);
 }
 .logos-root .l5 .l5-fx-chip {
   min-height: 26px;
@@ -674,12 +666,14 @@
 
 /* ── "Asking about": a card, asked about on the map ───────────────── */
 .logos-root .l5 .lg-acts.is-ask {
-  width: 300px;
-  padding: 14px 14px 10px;
-  border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
+  /* Logos 5.5: the ask card is a holder like any other — 310 wide, panel
+     paper, a rule, radius 16, elevation 2, no blur (l5v.css draws inside it) */
+  width: 310px;
+  padding: 16px 16px 12px;
+  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
   border-radius: 16px;
-  background: var(--l5-paper-hi);
-  box-shadow: var(--l5-shadow-up);
+  background: var(--lg-panel, #faf8f2);
+  box-shadow: 0 14px 28px -16px rgba(35, 36, 31, 0.4);
 }
 /* beside the card it asks about: placed by its own edge, not its centre */
 .logos-root .l5 .lg-acts.is-beside {
@@ -702,34 +696,18 @@
   flex-direction: column;
   gap: 2px;
 }
-.logos-root .l5 .l5-ask-k {
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lg-primary);
-}
+
 .logos-root .l5 .l5-ask-t {
   font-family: var(--l5-serif);
-  font-size: 16px;
+  font-size: 18px;
   line-height: 1.2;
-}
-.logos-root .l5 .l5-ask-x {
-  flex: 0 0 auto;
-  width: 26px;
-  height: 26px;
-  border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--lg-ink-60);
-  font-size: 15px;
-  cursor: pointer;
 }
 .logos-root .l5 .l5-ask-q {
   align-self: flex-end;
   max-width: 88%;
   margin: 0;
   padding: 7px 11px 8px;
-  border-radius: 12px 12px 4px 12px;
+  border-radius: 10px 10px 6px 10px;
   background: var(--l5-bubble);
   font-size: 13.5px;
   line-height: 1.45;
@@ -852,12 +830,12 @@
 }
 .logos-root .l5 .l5s-cempty-head p {
   margin: 0;
-  font-size: 15px;
+  font-size: 15.5px;
   line-height: 1.6;
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5s-eyebrow {
-  font-size: 11.5px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0.14em;
   text-transform: uppercase;
@@ -871,7 +849,7 @@
   gap: 8px;
   padding: 34px;
   border: 1.5px dashed rgba(var(--l5-tint-rgb), 0.3);
-  border-radius: 18px;
+  border-radius: 16px;
   background: rgba(var(--l5-surface-rgb), 0.7);
   color: var(--lg-ink);
   font: inherit;
@@ -883,7 +861,7 @@
 }
 .logos-root .l5 .l5s-cdrop-t {
   font-family: var(--l5-serif);
-  font-size: 19px;
+  font-size: 18px;
 }
 .logos-root .l5 .l5s-cdrop-t u {
   text-decoration-color: rgba(var(--l5-tint-rgb), 0.4);
@@ -902,11 +880,11 @@
 .logos-root .l5 .l5s-csaid-i {
   padding: 12px 16px;
   border: 1px solid var(--l5-hair);
-  border-radius: 12px;
+  border-radius: 10px;
   background: var(--l5-paper-hi);
   color: var(--lg-ink);
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15.5px;
   line-height: 1.5;
   text-align: left;
   cursor: pointer;
@@ -925,54 +903,11 @@
   gap: 8px;
   max-width: 960px;
 }
-/* each thing made, and + Write / + Make: keys (buttons.css, the small
-   secondary) — card stock with a hairline edge and a ledge, not outline pills;
-   the one open is pressed in, in the primary, as an open menu's key is */
+/* each thing made, and + Write / + Make: hairline chips (.l5-chip,
+   l5-controls.css) — the one open takes the wash, as anything open does */
 .logos-root .l5 .l5s-art-pill {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
   max-width: 320px;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 1px solid var(--l5b-edge);
-  border-radius: var(--l5b-r-sm);
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
-  color: var(--l5b-ink);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
   white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
-}
-.logos-root .l5 .l5s-art-pill:hover {
-  border-color: var(--l5b-edge-hi);
-  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
-}
-.logos-root .l5 .l5s-art-pill:active {
-  transform: translateY(1px);
-  box-shadow: none;
-}
-.logos-root .l5 .l5s-art-pill:focus-visible {
-  outline: 2px solid var(--l5b-focus);
-  outline-offset: 2px;
-}
-.logos-root .l5 .l5s-art-pill:is(.is-on, [aria-expanded='true']) {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
-  color: var(--l5b-fill);
-}
-@media (prefers-reduced-motion: reduce) {
-  .logos-root .l5 .l5s-art-pill {
-    transition: none;
-  }
-  .logos-root .l5 .l5s-art-pill:active {
-    transform: none;
-  }
 }
 /* choose what to make (lib/logos5/make.ts): in the empty Artifacts, and under "+ Make" */
 .logos-root .l5 .l5s-make-h {
@@ -994,7 +929,7 @@
   flex: none;
   padding-right: 8px;
   border-right: 1px solid var(--l5b-edge);
-  font-size: 12px;
+  font-size: 12.5px;
   font-weight: 500;
   letter-spacing: 0;
   text-transform: none;
@@ -1016,16 +951,12 @@
   gap: 12px;
   padding: 22px 24px 24px;
   border: 1px solid var(--l5-hair);
-  border-radius: 18px;
+  border-radius: 16px;
   background: var(--l5-paper-hi);
   box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.05), 0 18px 50px -24px rgba(var(--shadow-rgb, 35, 36, 31), 0.3);
 }
 .logos-root .l5 .l5s-art-eyebrow {
   margin: 0;
-  font-size: 10.5px;
-  letter-spacing: 0.06em;
-  text-transform: uppercase;
-  color: var(--lg-ink-40);
 }
 .logos-root .l5 .l5s-art-body {
   /* the box an artifact is drawn in: everything it draws stays inside it */
@@ -1045,7 +976,7 @@
   /* the view's height less the bar, the strip, the card's own head and the composer floating below */
   height: clamp(360px, calc(100vh - 390px), 680px);
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .logos-root .l5 .l5s-art-body > * {
   flex: 1 1 auto;
@@ -1074,7 +1005,7 @@
   background: var(--l5-raise, transparent);
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.82);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   cursor: pointer;
 }
 .logos-root .l5 .l5m-tool:hover,
@@ -1100,7 +1031,7 @@
   position: relative;
   height: clamp(360px, calc(100vh - 430px), 640px);
   overflow: hidden;
-  border-radius: 12px;
+  border-radius: 10px;
 }
 .logos-root .l5 .l5m-side {
   flex: 0 0 min(300px, 40%);
@@ -1116,18 +1047,8 @@
   justify-content: space-between;
   padding: 6px 6px 6px 12px;
   border-bottom: 1px solid var(--l5-hair);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 600;
-}
-.logos-root .l5 .l5m-x {
-  width: 32px;
-  height: 32px;
-  border: 0;
-  border-radius: 8px;
-  background: none;
-  color: inherit;
-  font-size: 18px;
-  cursor: pointer;
 }
 .logos-root .l5 .l5m-side-body {
   flex: 1 1 auto;
@@ -1166,7 +1087,7 @@
   margin: 8px 0 6px;
   font-family: var(--l5-serif);
   font-weight: 400;
-  font-size: 34px;
+  font-size: 32px;
   line-height: 1.05;
   letter-spacing: -0.01em;
 }
@@ -1176,11 +1097,12 @@
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5c-k {
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-family: var(--lg-sans);
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
 }
 .logos-root .l5 .l5c-find {
   display: flex;
@@ -1239,7 +1161,7 @@
 }
 .logos-root .l5 .l5c-t {
   font-family: var(--l5-serif);
-  font-size: 19px;
+  font-size: 18px;
   line-height: 1.2;
 }
 .logos-root .l5 .l5c-s {
@@ -1273,7 +1195,7 @@
   color: var(--lg-primary);
   font-family: var(--l5-serif);
   font-style: italic;
-  font-size: 16px;
+  font-size: 18px;
   cursor: pointer;
 }
 
@@ -1307,7 +1229,7 @@
     max-height: 82%;
     padding: 4px 16px calc(12px + env(safe-area-inset-bottom, 0px));
     border-top: 1px solid var(--l5-hair);
-    border-radius: 22px 22px 0 0;
+    border-radius: 16px 16px 0 0;
     background: var(--l5-paper-hi);
     box-shadow: 0 -20px 60px -30px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
   }
@@ -1343,7 +1265,7 @@
     overflow: hidden;
     -webkit-line-clamp: 1;
     -webkit-box-orient: vertical;
-    font-size: 15px;
+    font-size: 15.5px;
     line-height: 1.5;
   }
   .logos-root .l5 .l5x-sheet .l5-col {
@@ -1391,7 +1313,7 @@
     font-size: 17px;
   }
   .logos-root .l5 .lg-acts.is-ask {
-    width: min(300px, calc(100vw - 32px));
+    width: min(310px, calc(100vw - 32px));
   }
   .logos-root .l5 .l5s-arts {
     padding: 16px 12px 24px;
