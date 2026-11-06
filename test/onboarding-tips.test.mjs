@@ -44,6 +44,20 @@ ok('search once there is more than one line of thinking — said with this keybo
 })());
 ok('nobody past their first fortnight gets tips', TIPS.filter((t) => t.kind === 'tip').every((t) => pickTip(ctx({ newUser: false, mapCard: true, replies: 3, lines: 3 }), ledger({ seen: TIPS.filter((x) => x.kind === 'feature').map((x) => x.id) }), NOW, none)?.id !== t.id) && NEW_FOR_MS === 14 * 86400000);
 
+console.log('\n=== a guest: the map at once, one hint about it, the rest as they come to it ===');
+const guest = (o = {}) => ctx({ guest: true, where: 'home', replies: 0, lines: 0, ...o });
+const nodes = TIPS.find((t) => t.id === 'g.nodes');
+ok('a guest on the Universal Map gets one hint first: what the map is made of, and how to move about it', pickTip(guest(), ledger(), NOW, none)?.id === 'g.nodes' && /nodes/.test(nodes.body) && /press one/.test(nodes.body) && /drag/.test(nodes.body));
+ok('  a tip, so its only button is "Got it": optional, and nothing in the way', nodes.kind === 'tip' && !nodes.action);
+ok('  once: a guest who has seen it (or pressed Got it) never sees it again, coming back or not', pickTip(guest(), ledger({ seen: ['g.nodes'] }), NOW, none) === null);
+ok('  never to an account: the registered onboarding is as it was', pickTip(ctx({ where: 'home', replies: 0, lines: 0 }), ledger(), NOW, none) === null && pickTip(ctx({ where: 'home', replies: 0, lines: 0, guest: false }), ledger(), NOW, none) === null);
+ok('  only on the map, not in a conversation', pickTip(guest({ where: 'line', replies: 0 }), ledger(), NOW, none) === null);
+ok('then guidance as they explore, one thing at a time: the Logic Map once it is drawn, Make, the way home', pickTip(guest({ where: 'line', replies: 1, mapCard: true }), ledger({ seen: ['g.nodes'] }), NOW, none)?.id === 'l5.map' && pickTip(guest({ where: 'line', replies: 1 }), ledger({ seen: ['g.nodes', 'l5.map'] }), NOW, none)?.id === 'l5.make' && pickTip(guest({ where: 'line', replies: 2 }), ledger({ seen: ['g.nodes', 'l5.map', 'l5.make'] }), NOW, none)?.id === 'l5.home');
+ok('  never two in a row: a moment between them', pickTip(guest({ where: 'line', replies: 1, mapCard: true }), ledger({ seen: ['g.nodes'], lastTipAt: NOW - 5000 }), NOW, { tips: 1, features: 0 }) === null);
+const appSrc = read('components/LogosApp.tsx');
+ok('  never over the box to start in: on a phone it sits above its target instead', nodes.clear === '.l5h-find' && /const clear = below && tip\.clear \? visibleOf\(tip\.clear\) : null;/.test(read('components/logos5/L5Tip.tsx')) && /below = false;/.test(read('components/logos5/L5Tip.tsx')));
+ok('the app says who is a guest to the tips', /can: \{ split: !narrow, capture: !!LOGOS4\.capture, voice: voiceOffered \},\s*guest,/.test(appSrc));
+
 console.log('\n=== features: now and then, never the first thing, never on a tips visit ===');
 const old = (o = {}) => ctx({ newUser: false, ...o });
 ok('List, on the Universal Map, once there are conversations to list', pickTip(old({ where: 'home', replies: 0, lines: 2 }), ledger(), NOW, none)?.id === 'f.list');
@@ -56,9 +70,10 @@ ok('Voice only where it can be used; Split View only where there is room for it'
 ok('every feature has a "Show me"; no tip has one', TIPS.every((t) => (t.kind === 'feature') === !!t.action));
 
 console.log('\n=== every card points at something that is there ===');
-const sources = ['components/LogosApp.tsx', 'components/logos5/L5Canvas.tsx', 'components/logos5/L5Views.tsx', 'components/logos5/MakePicker.tsx', 'components/logos5/L5Chrome.tsx', 'components/logos5/SocriaVoice.tsx'].map(read).join('\n');
+const sources = ['components/LogosApp.tsx', 'components/logos5/L5Canvas.tsx', 'components/logos5/L5Views.tsx', 'components/logos5/MakePicker.tsx', 'components/logos5/L5Chrome.tsx', 'components/logos5/SocriaVoice.tsx', 'components/logos5/Universe.tsx', 'components/logos5/UniverseBubbles.tsx'].map(read).join('\n');
 const has = (cls) => sources.includes(cls);
 const anchorsOk = {
+  'g.nodes': has('className="l5h-go"') && has("'l5b-hub'"),
   'l5.map': has('lcv-card is-${c.tone}'),
   'l5.make': has('data-tour="make"'),
   'l5.home': has('className="l5v-home"') && has('className="lcv-home"'),
@@ -95,7 +110,7 @@ ok('only a free, signed-in account gets the button', /\{planKnown && !one && \(\
 ok('the welcome-back is said small — never as a sheet over the work', /view=\{onePrompt\?\.reason === 'welcome-back' \? null : onePrompt\}/.test(app) && /onePrompt\?\.open && onePrompt\.reason === 'welcome-back'/.test(app));
 ok('  "See Socria One" opens the plan, as the ⋯ menu does; "Not now" counts as a dismissal', /onSee: \(\) => \{\s*acceptPrompt\(\);\s*askOne\(\);/.test(app) && /onLater: dismissPrompt/.test(app));
 ok('it is asked for once a visit, on the Universal Map with nothing else on screen — its rules decide', /<WelcomeBack\s+ready=\{!!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun\.synced && !introWanted && !whatsNewShown && !busy && !oneOpen && !acctOpen && !guideOpen\}/.test(app));
-ok('cards never over the welcome, a sheet, the tour, AR Mode, search, Voice’s sheets or big-screen mode', /hidden=\{\s*introWanted \|\| whatsNewShown \|\| guideOpen \|\| oneOpen \|\| !!onePrompt\?\.open \|\| acctOpen \|\| captureOpen \|\| tourOpen \|\| arOpen \|\| !!searchOpen \|\| !!voiceSheet \|\| togetherReadOnly \|\| cabin/.test(app));
+ok('cards never over the welcome, a sheet, the tour, AR Mode, search, Voice’s sheets, big-screen mode or a guest\'s card', /hidden=\{\s*introWanted \|\| whatsNewShown \|\| guideOpen \|\| oneOpen \|\| !!onePrompt\?\.open \|\| acctOpen \|\| captureOpen \|\| tourOpen \|\| arOpen \|\| !!searchOpen \|\| !!voiceSheet \|\| togetherReadOnly \|\| cabin \|\| guestWall/.test(app));
 ok('  and none begins while an answer is arriving', /quiet=\{busy \|\| !!streaming \|\| hydrating \|\| organizing \|\| sortPending\}/.test(app));
 
 console.log(`\n${pass} passed, ${fail} failed`);

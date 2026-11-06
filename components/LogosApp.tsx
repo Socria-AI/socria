@@ -288,7 +288,7 @@ import { lastReplyIn, skipsMap } from '@/lib/map-skip';
 import { OWED_PACE_MS, OWED_PER_DAY, countDrawn, drawnOn, nextOwed, readOwed, writeOwed } from '@/lib/logos5/merge';
 import { FirstRunIntro } from '@/components/onboarding/FirstRunIntro';
 import { WhatsNew } from '@/components/onboarding/WhatsNew';
-import { GUEST_NUDGE_AT, GUEST_TURNS, guestTurnsUsed } from '@/lib/guest-limits';
+import { GUEST_TURNS, guestTurnsUsed } from '@/lib/guest-limits';
 import { GuestNudge, GuestWall } from '@/components/logos5/GuestWall';
 import { useFirstRun } from '@/components/useFirstRun';
 import { wantsWelcome, wantsWhatsNew } from '@/lib/first-run';
@@ -1613,20 +1613,28 @@ export function LogosApp({
   /** the messages a guest has sent, of GUEST_TURNS (lib/guest-limits.ts) */
   const guestUsed = guest ? sessions.reduce((n, x) => n + guestTurnsUsed(x.messages), 0) : 0;
   const guestUsedNow = () => sessionsRef.current.reduce((n, x) => n + guestTurnsUsed(x.messages), 0);
-  // A guest using Socria a lot: the sign-up card at the bottom, once a tab, from the third message (GuestNudge)
-  const [nudgeShut, setNudgeShut] = useState(() => {
-    try {
-      return typeof window !== 'undefined' && window.sessionStorage.getItem('socria.guestNudge.v1') === '1';
-    } catch {
-      return false;
-    }
-  });
-  const shutNudge = () => {
-    setNudgeShut(true);
-    try {
-      window.sessionStorage.setItem('socria.guestNudge.v1', '1');
-    } catch {}
-  };
+  // A GUEST WHO WANTS TO SAVE asks (the header's Save, or ⌘/Ctrl S), and is told where their work is kept and
+  // what an account keeps (GuestWall, `save`). Nothing asks them for an account while they explore.
+  const [guestSave, setGuestSave] = useState(false);
+  const askSave = useCallback(() => {
+    setGuestSave(true);
+    setGuestWall(true);
+  }, []);
+  const closeGuestWall = useCallback(() => {
+    setGuestWall(false);
+    setGuestSave(false);
+  }, []);
+  useEffect(() => {
+    if (!guest || guestUsed === 0) return;
+    const key = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && !e.altKey && !e.shiftKey && e.key.toLowerCase() === 's') {
+        e.preventDefault();
+        askSave();
+      }
+    };
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [guest, guestUsed, askSave]);
 
   // THE GUIDE NO LONGER OPENS ITSELF. A modal of miniature demonstrations
   // before a word has been said was Logos explaining itself in place of
@@ -2382,8 +2390,9 @@ export function LogosApp({
       setActiveId(target);
       activeIdRef.current = target;
       // LOGOS 5 opens on the Universal Map — unless a link, a Project or a
-      // first message chose a line of thinking, or there is nothing on it yet
-      if (!wanted && !pendingStart && sorted.some((x) => x.messages.length > 0)) setL5Home(true);
+      // first message chose a line of thinking, or there is nothing on it yet.
+      // A guest opens on it even then: nothing to get through first, the map and its box (lib/first-run.ts wantsWelcome)
+      if (!wanted && !pendingStart && (sorted.some((x) => x.messages.length > 0) || !isSignedIn)) setL5Home(true);
       chronRef.current = [...(sorted.find((s) => s.id === target)?.messages ?? [])];
       if (!pendingStart) restoreView(target, 'load');
       setHydrating(false);
@@ -8201,7 +8210,7 @@ export function LogosApp({
   // clear of whatever box is there.
   // Out of messages, it stays — the one thing to say until they sign up — and cannot be closed.
   const guestSpent = guest && guestUsed >= GUEST_TURNS;
-  const nudgeOpen = guest && !guestWall && !busy && (guestSpent || (!nudgeShut && guestUsed >= GUEST_NUDGE_AT));
+  const nudgeOpen = guest && !guestWall && !busy && guestSpent;
   // ONE BOARD (lib/logos5/oneView.ts): a wide screen's way of showing a line of thinking that has something in it.
   // A shared room keeps the conversation as it was. The turn the sheet reads is the newest, unless another was pressed.
   const oneView = oneViewOn({ narrow, line: l5 && !!activeId && !l5Home && !l5Mind && !hydrating && !room.active, turns: messages.length, busy: busyHere });
@@ -8210,7 +8219,7 @@ export function LogosApp({
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
       {convoNotes}
-      {nudgeOpen && <GuestNudge inline open spent={guestSpent} signUpHref={signUpHref} onClose={shutNudge} />}
+      {nudgeOpen && <GuestNudge inline open signUpHref={signUpHref} />}
       {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}
       {voicePanel(false)}
       {/* resting: one line over the box — they can still draft; sending waits for the reset */}
@@ -9359,9 +9368,17 @@ export function LogosApp({
         {/* a phone's meter, said in words: dots alone said nothing to anyone, a screen reader least of all */}
         <span className="l5-guestmeter-s">{Math.max(0, GUEST_TURNS - guestUsed)} left</span>
       </span>
-      <a className="l5-signin" href={signInHref}>
-        Sign in
-      </a>
+      {/* once there is something to keep, Save takes Sign in's place (and its room): it says where the work is kept,
+          and what an account keeps — with Sign up free and Sign in (GuestWall) */}
+      {guestUsed > 0 ? (
+        <button type="button" className="l5-signin l5-guestsave" onClick={askSave} title="Keep this conversation and its map (⌘/Ctrl S)">
+          Save
+        </button>
+      ) : (
+        <a className="l5-signin" href={signInHref}>
+          Sign in
+        </a>
+      )}
     </div>
   ) : isSignedIn ? (
     // a free account: Socria One a press away, beside the account — and, on a return, a word under it
@@ -9838,10 +9855,11 @@ export function LogosApp({
             lines: withWork.length,
             newUser: tipsNew,
             can: { split: !narrow, capture: !!LOGOS4.capture, voice: voiceOffered },
+            guest,
           }}
           quiet={busy || !!streaming || hydrating || organizing || sortPending}
           hidden={
-            introWanted || whatsNewShown || guideOpen || oneOpen || !!onePrompt?.open || acctOpen || captureOpen || tourOpen || arOpen || !!searchOpen || !!voiceSheet || togetherReadOnly || cabin
+            introWanted || whatsNewShown || guideOpen || oneOpen || !!onePrompt?.open || acctOpen || captureOpen || tourOpen || arOpen || !!searchOpen || !!voiceSheet || togetherReadOnly || cabin || guestWall
           }
           onAction={doTipAction}
         />
@@ -10121,9 +10139,9 @@ export function LogosApp({
               onPoint={pointAtElement}
             />
           )}
-          <GuestWall open={guestWall && guest} spent={guest && guestUsed >= GUEST_TURNS} signUpHref={signUpHref} signInHref={signInHref} onClose={() => setGuestWall(false)} />
+          <GuestWall open={guestWall && guest} spent={!guestSave && guest && guestUsed >= GUEST_TURNS} save={guestSave} signUpHref={signUpHref} signInHref={signInHref} onClose={closeGuestWall} />
           {/* floating only where the conversation's dock is not on screen to hold it */}
-          <GuestNudge open={nudgeOpen && !(convoOpen && !homeShown && !mindShown)} spent={guestSpent} signUpHref={signUpHref} onClose={shutNudge} />
+          <GuestNudge open={nudgeOpen && !(convoOpen && !homeShown && !mindShown)} signUpHref={signUpHref} />
           {searchOpen !== null && (
             <GlobalSearch
               sessions={sessions}

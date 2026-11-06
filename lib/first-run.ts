@@ -305,8 +305,9 @@ export const NEW_ACCOUNT_MS = 7 * 24 * 60 * 60 * 1000;
 /**
  * Show the onboarding (components/onboarding/FirstRunIntro.tsx)?
  *
- * To a GUEST, as the premise always was: only with nothing here yet
- * (wantsIntro). To somebody SIGNED IN, once per account: when the account is
+ * Never to a GUEST: a guest goes straight to the Universal Map, with one
+ * small hint and the rest said as they come to it (lib/logos5/tips.ts), and
+ * nothing in the way of trying Socria. To somebody SIGNED IN, once per account: when the account is
  * new — made within NEW_ACCOUNT_MS — and the account's own record, merged in
  * first (`synced`, so a second device does not show it again), says they
  * have not been through it. Work does not stop it for them: a guest who
@@ -318,7 +319,7 @@ export function wantsWelcome(
   s: FirstRun,
   ctx: { work: number; carried: boolean; hydrated: boolean; signedIn: boolean; synced: boolean; accountAgeMs: number | null }
 ): boolean {
-  if (!ctx.signedIn) return wantsIntro(s, ctx);
+  if (!ctx.signedIn) return false;
   if (!ctx.hydrated || !ctx.synced) return false;
   if (has(s, 'socria.intro')) return false;
   if (ctx.carried) return false;

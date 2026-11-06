@@ -71,7 +71,7 @@ console.log('\n=== what it switched on is the new screen\'s, for everybody ===')
   const app = read('components/LogosApp.tsx');
   // The gate choosing the screen (Logos 5 where it was open, the Logos 4 layout elsewhere) was archived: Logos 5 is everybody's.
   ok('the deployment\'s switch is never read alone here', !/LOGOS5\.on/.test(app));
-  ok('opening on the map, and a first message put in its box, as they land', /if \(!wanted && !pendingStart && sorted\.some\(\(x\) => x\.messages\.length > 0\)\) setL5Home\(true\);/.test(app) && /const \{ id, message \} = pendingStart;[\s\S]{0,160}setHomeStart\(message\);/.test(app));
+  ok('opening on the map (a guest even with nothing yet), and a first message put in its box, as they land', /if \(!wanted && !pendingStart && \(sorted\.some\(\(x\) => x\.messages\.length > 0\) \|\| !isSignedIn\)\) setL5Home\(true\);/.test(app) && /const \{ id, message \} = pendingStart;[\s\S]{0,160}setHomeStart\(message\);/.test(app));
   ok('the Core chats are moved in only on the new screen', /if \(!l5 \|\| !cloud \|\| hydrating \|\| !firstRun\.ready\) return;[\s\S]{0,400}\/api\/conversations\/merge/.test(app));
   ok('  and listed beside these only there', /if \(!l5\) return \[\];[\s\S]{0,600}kind: 'core' as const/.test(app));
   ok('the welcome on the map only on the map', /const homeShown = l5 && /.test(app) && /const whatsNewShown =\s*homeShown &&/.test(app));

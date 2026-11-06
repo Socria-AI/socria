@@ -3,13 +3,11 @@
 // Signed out, Logos 5 gives one line of thinking and its map (lib/guest-pass.ts), and in it
 // GUEST_TURNS messages. The server holds the line (app/api/logos/chat counts the guest's own
 // messages in the turn it is sent); the app counts the same way to say how many are left and to
-// show the sign-up card before a turn it would refuse.
+// show the sign-up card before a turn it would refuse. Nothing else asks a guest for an account:
+// they ask, when they want to keep their work (the header's Save, components/logos5/GuestWall.tsx).
 
 /** Messages a guest may send in their one line of thinking. */
 export const GUEST_TURNS = 5;
-
-/** From this many messages, a guest is shown the sign-up card at the bottom of the screen (GuestNudge). */
-export const GUEST_NUDGE_AT = 3;
 
 /** How many messages a guest has sent: their own turns, across what they hold. */
 export function guestTurnsUsed(messages: readonly { role?: unknown }[] | null | undefined): number {

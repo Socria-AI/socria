@@ -115,7 +115,7 @@ console.log('=== who sees the welcome (the onboarding) ===');
   ok('not before the list has loaded', !wantsWelcome(fresh, me({ hydrated: false })));
   ok('never twice, on any device', !wantsWelcome(reach(fresh, 'socria.intro').state, me()) && !wantsWelcome(reach(fresh, 'socria.intro', 1, { skipped: true }).state, me()));
   ok('not when a sentence was carried in from /onboarding', !wantsWelcome(fresh, me({ carried: true })));
-  ok('a guest, as the premise always was: only with nothing here yet', wantsWelcome(fresh, me({ signedIn: false, synced: false, accountAgeMs: null })) && !wantsWelcome(fresh, me({ signedIn: false, work: 2 })));
+  ok('never a guest: a guest goes straight to the Universal Map, nothing to get through first', !wantsWelcome(fresh, me({ signedIn: false, synced: false, accountAgeMs: null })) && !wantsWelcome(fresh, me({ signedIn: false, work: 0 })) && !wantsWelcome(fresh, me({ signedIn: false, work: 2 })));
 }
 
 console.log('=== who sees Core\'s one line ===');

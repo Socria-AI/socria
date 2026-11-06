@@ -3307,11 +3307,30 @@ building, writing, researching): that is the one quiet line Socria is told
 steps back behind the cards. Starting lifts the page away onto their first
 conversation.
 
-**Who sees it** (`lib/first-run.ts` `wantsWelcome`): a guest with nothing here,
-as before. A signed-in account sees it once, made within the last week, whose
+**Who sees it** (`lib/first-run.ts` `wantsWelcome`): never a guest (below). A signed-in account sees it once, made within the last week, whose
 record — merged from the account first, so a second device never shows it again
 — has not reached `socria.intro`. A guest who signs up and brings their line of
 thinking along sees it now; they used to miss it.
+
+**A guest** (November 2026) gets no welcome. They open straight on the Universal
+Map (`LogosApp`: a guest opens on it even with nothing there yet), and a moment
+later one small card: "Your thinking, as a map" — start in the box below; what
+they think through lands as nodes; press one to see it, again to open it; drag
+the empty space to look around (`lib/logos5/tips.ts` `g.nodes`, guests only,
+pointing at the map's start button and never covering the box at its foot). It
+has only "Got it", it is shown once, and a guest who comes back never sees it
+again (the seen list in this browser). Everything else is said where they come
+to it, by the tips below: the Logic Map once it is drawn, Make, the way back to
+the map, one at a time and each once.
+
+Nothing asks a guest for an account while they explore: the "Enjoying Socria?"
+card from the third message is gone. Two cards remain, both at a limit — the
+messages used up, and a second line of thinking (`GuestWall`). A guest who wants
+to keep what they made asks for it: once there is something to keep, **Save**
+takes Sign in's place, top right (⌘/Ctrl S does the same), and says plainly that
+their work is kept in this browser for now and that an account keeps it on any
+device — Sign up free, Not now, or Sign in. Signing up brings the line of
+thinking along, as before; the registered welcome is unchanged.
 
 **What it starts counts.** The first message opens a line of thinking of its own
 (`startFromHome`) and is charged like any other new conversation. That is so

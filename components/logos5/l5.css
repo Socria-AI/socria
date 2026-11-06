@@ -1765,6 +1765,12 @@
   color: #9c5b3c;
   border-color: rgba(156, 91, 60, 0.3);
 }
+/* Save, in Sign in's place once a guest has something to keep: the same filled key, as a button */
+.logos-root button.l5-guestsave {
+  border: 0;
+  font-family: inherit;
+  cursor: pointer;
+}
 .logos-root .l5-signin {
   display: inline-flex;
   align-items: center;

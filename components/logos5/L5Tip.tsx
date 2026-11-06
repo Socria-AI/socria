@@ -66,8 +66,15 @@ export function L5Tip({
       // above, it clears the whole of what it must not cover (the box someone types in), not just its target
       const keep = tip.avoid ? a.closest(tip.avoid) : null;
       const top = keep ? Math.min(r.top, keep.getBoundingClientRect().top) : r.top;
-      const below = r.bottom + GAP + h <= innerHeight - EDGE || top - GAP - h < EDGE;
       const x = Math.max(EDGE, Math.min(innerWidth - EDGE - w, cx - w / 2));
+      let below = r.bottom + GAP + h <= innerHeight - EDGE || top - GAP - h < EDGE;
+      // below, it never covers what it must keep clear (the box to start in, on a phone): above, when there is room
+      const clear = below && tip.clear ? visibleOf(tip.clear) : null;
+      if (clear && top - GAP - h >= EDGE) {
+        const k = clear.getBoundingClientRect();
+        const y0 = r.bottom + GAP;
+        if (y0 + h > k.top && y0 < k.bottom && x + w > k.left && x < k.right) below = false;
+      }
       const y = below ? r.bottom + GAP : top - GAP - h;
       const arrow = Math.max(16, Math.min(w - 16, cx - x));
       setPlace((p) => (p && Math.abs(p.x - x) < 0.5 && Math.abs(p.y - y) < 0.5 && p.side === (below ? 'below' : 'above') && Math.abs(p.arrow - arrow) < 0.5 ? p : { x, y, side: below ? 'below' : 'above', arrow }));
@@ -75,7 +82,7 @@ export function L5Tip({
     };
     raf = requestAnimationFrame(measure);
     return () => cancelAnimationFrame(raf);
-  }, [tip.anchor, tip.avoid]);
+  }, [tip.anchor, tip.avoid, tip.clear]);
 
   useEffect(() => {
     const key = (e: KeyboardEvent) => {

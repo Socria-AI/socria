@@ -31,7 +31,9 @@ above.
 
 A signed-out guest has their own smaller pass (`lib/guest-limits.ts`: five
 messages and one map in one conversation, kept in the browser). Signing up
-brings that conversation along.
+brings that conversation along. A guest is asked for an account only at a limit;
+otherwise they ask — the header's Save, once they have something to keep
+(`docs/LOGOS-5-RUNTIME.md` §36).
 
 ## What was removed
 

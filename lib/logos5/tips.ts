@@ -29,6 +29,8 @@ export interface Tip {
   anchor: string;
   /** what the card must not cover when it sits above (the box someone types in): it sits above that instead */
   avoid?: string;
+  /** what the card must never cover from below (the box at the foot of the map): it sits above its target instead */
+  clear?: string;
   /** what "Show me" does — features only */
   action?: TipAction;
   /** when it can be said at all */
@@ -52,9 +54,22 @@ export interface TipContext {
   toured: boolean;
   /** what this person can use */
   can: { split: boolean; capture: boolean; voice: boolean };
+  /** signed out: a guest, who gets no welcome — the map, and one hint about it, first */
+  guest?: boolean;
 }
 
 export const TIPS: readonly Tip[] = [
+  // ── a guest's one hint, on arriving: what the map is made of and how to move about it. Optional ("Got it"),
+  // once, never in the way; everything else is said where they come to it (the tips below) ──
+  {
+    id: 'g.nodes',
+    kind: 'tip',
+    title: 'Your thinking, as a map',
+    body: 'Start in the box below. What you think through lands here as nodes: press one to see it, press again to open it, and drag the empty space to look around.',
+    anchor: '.l5h-empty .l5h-go, .l5b-hub',
+    clear: '.l5h-find',
+    when: (c) => !!c.guest && c.where === 'home',
+  },
   // ── tips: the few things a new person needs, once they have started ──
   {
     id: 'l5.map',

@@ -184,12 +184,16 @@ ok('the server refuses the sixth, with the sign-up note', /if \(guest && guestTu
 ok('the app shows the note before sending a sixth', /guestUsedNow\(\) >= GUEST_TURNS \|\| guestHasAnother/.test(app));
 ok('top right, a guest sees what is left and Sign in', /const accountEl = guest \?/.test(app) && /className="l5-signin" href=\{signInHref\}/.test(app) && /free left/.test(app));
 
-ok('a guest using it a lot: the sign-up card, from the third message, once a tab', /export const GUEST_NUDGE_AT = 3;/.test(lim) && /const nudgeOpen = guest && !guestWall && !busy && \(guestSpent \|\| \(!nudgeShut && guestUsed >= GUEST_NUDGE_AT\)\);/.test(app) && /socria\.guestNudge\.v1/.test(app));
-ok('  in the dock above the box, in its flow, with the conversation on screen', /\{nudgeOpen && <GuestNudge inline open spent=\{guestSpent\}/.test(app));
+ok('exploring is never interrupted to ask for an account: no card from the third message any more', !/GUEST_NUDGE_AT/.test(lim) && !/GUEST_NUDGE_AT/.test(app) && !/Enjoying Socria\?/.test(wall) && !/socria\.guestNudge\.v1/.test(app));
+ok('  the only card that comes unasked: messages used up, said for as long as it is true, with no close', /const guestSpent = guest && guestUsed >= GUEST_TURNS;/.test(app) && /const nudgeOpen = guest && !guestWall && !busy && guestSpent;/.test(app) && /You&rsquo;ve used your \{GUEST_TURNS\} free messages\./.test(wall) && !/l5-guestnudge-x/.test(wall));
+ok('  in the dock above the box, in its flow, with the conversation on screen', /\{nudgeOpen && <GuestNudge inline open signUpHref=\{signUpHref\} \/>\}/.test(app));
 ok('  floating only where no dock holds it, and lifted clear of the box', /<GuestNudge open=\{nudgeOpen && !\(convoOpen && !homeShown && !mindShown\)\}/.test(app) && /function useComposerLift/.test(wall) && /'\.logos-root \.lg-composer'/.test(wall));
-ok('  messages used up: said for as long as it is true, with no close', /const guestSpent = guest && guestUsed >= GUEST_TURNS;/.test(app) && /You&rsquo;ve used your \{GUEST_TURNS\} free messages\./.test(wall) && /\{!spent && \(/.test(wall));
-ok('  and the wall, out of messages, says "Not now" rather than promising more', /\{spent \? 'Not now' : 'Keep going with this one'\}/.test(wall) && /<GuestWall open=\{guestWall && guest\} spent=\{guest && guestUsed >= GUEST_TURNS\}/.test(app));
-ok('  saying what an account really adds (no claim of speed)', /better answers and more of it/.test(wall) && /remember you/.test(wall) && !/faster/i.test(wall));
+ok('  and the wall, out of messages, says "Not now" rather than promising more', /\{spent \|\| save \? 'Not now' : 'Keep going with this one'\}/.test(wall) && /<GuestWall open=\{guestWall && guest\} spent=\{!guestSave && guest && guestUsed >= GUEST_TURNS\} save=\{guestSave\}/.test(app));
+ok('a guest who wants to save asks: Save, top right in Sign in\'s place, once there is something to keep', /\{guestUsed > 0 \? \(\s*<button type="button" className="l5-signin l5-guestsave" onClick=\{askSave\}/.test(app) && /Have an account\? <a href=\{signInHref\}>Sign in<\/a>/.test(wall));
+ok('  and no tip shows behind the card', /togetherReadOnly \|\| cabin \|\| guestWall\s*\}/.test(app));
+ok('  or ⌘/Ctrl S, as anywhere else — and only with something to keep', /if \(!guest \|\| guestUsed === 0\) return;/.test(app) && /\(e\.metaKey \|\| e\.ctrlKey\) && !e\.altKey && !e\.shiftKey && e\.key\.toLowerCase\(\) === 's'/.test(app) && /e\.preventDefault\(\);\s*askSave\(\);/.test(app));
+ok('  told plainly where it is kept now, and what an account keeps: Sign up free, or Not now', /Saved in this browser/.test(wall) && /Keep it for good/.test(wall) && /kept in this browser for now/.test(wall) && /in your account, on any device/.test(wall));
+ok('a guest with nothing yet opens on the Universal Map, not an empty conversation', /\(sorted\.some\(\(x\) => x\.messages\.length > 0\) \|\| !isSignedIn\)\) setL5Home\(true\)/.test(app));
 
 console.log(`\nguest: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
