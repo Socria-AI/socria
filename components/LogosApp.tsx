@@ -201,6 +201,8 @@ import { depthAsked } from '@/lib/reply-layout';
 import { ModelArtifact } from './logos5/ModelTools';
 import { L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
+import { StudyDesk, drawsInCard, type DeskItem } from './logos5/StudyDesk';
+import { deskTopicsOf, fileTitle, onMap } from '@/lib/logos5/studyDesk';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView, type SharedIn } from './logos5/Universe';
 import { MemoryView } from './logos5/MemoryView';
@@ -6241,6 +6243,17 @@ export function LogosApp({
   const [studyNote, setStudyNote] = useState<string | null>(null);
   /** the topic opened by "Recommend for me", whose reason is shown with it */
   const [studyWhy, setStudyWhy] = useState<string | null>(null);
+  // STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4): the artifact opened at full size from the desk, per line of
+  // thinking. What is heavy to draw (your writing, a model, a 3D scene) opens at full size when it is chosen —
+  // by you, or by the conversation pointing at it — and "All artifacts" brings the desk back.
+  const [deskFull, setDeskFull] = useState<Record<string, string | null>>({});
+  const deskPick = artSel[activeId ?? ''] ?? null;
+  useEffect(() => {
+    const sid = activeIdRef.current;
+    if (!sid || !deskPick) return;
+    const it = artifactListRef.current.find((a) => a.key === deskPick);
+    if (it && !drawsInCard(it.kind)) setDeskFull((m) => (m[sid] === deskPick ? m : { ...m, [sid]: deskPick }));
+  }, [deskPick]);
   // HOME IS THE UNIVERSAL MAP (lib/logos5/universe.ts). Logos 5 opens on every
   // conversation merged into one mind map, not on a list: a line of thinking is
   // opened from the map, and a new one begun from it. The rail is put away; it
@@ -8342,12 +8355,56 @@ export function LogosApp({
   artShownRef.current = (artifactItems.find((i) => i.key === artKey) ?? artifactItems[artifactItems.length - 1])?.key ?? null;
   // what Artifacts holds, by name — for "open the habit tracker", said or typed (lib/logos5/commands.ts)
   artifactListRef.current = artifactItems.map((a) => ({ key: a.key, kind: a.kind, title: a.title }));
-  const artifactsView = (
+  // STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4; components/logos5/StudyDesk.tsx): a study with files, on a
+  // wide screen, shows its files and their topics on the left and what was made from them in the middle as cards,
+  // for the topic chosen or for all of them. The card the conversation last pointed at is lit. One opened at full
+  // size is the one-at-a-time view below, with the way back to the desk.
+  const deskOn = !!study && study.state.files.length > 0 && !narrow && studyTab === 'artifacts';
+  const deskTopics = deskOn && study ? deskTopicsOf(study.state.topics) : [];
+  const deskOpen = deskOn ? deskFull[activeId ?? ''] ?? null : null;
+  const deskOpenItem = deskOpen ? artifactItems.find((a) => a.key === deskOpen) ?? null : null;
+  const deskItems: DeskItem[] =
+    deskOn && study
+      ? artifactItems.map((a) => {
+          const pr = a.key.startsWith('p:') ? study.state.practice.find((p) => `p:${p.id}` === a.key) : undefined;
+          const file = pr ? study.state.files.find((f) => deskTopics.find((t) => t.id === pr.topic)?.docs.includes(f.doc)) : undefined;
+          return { key: a.key, kind: a.kind, title: a.title, ...(pr ? { topic: pr.topic } : {}), ...(file ? { source: `from ${fileTitle(file.name)}` } : {}), render: a.bare ? undefined : a.render };
+        })
+      : [];
+  /** an artifact opened at full size from the desk — and the desk again */
+  const deskOpenAt = (key: string | null) => {
+    const sid = activeIdRef.current;
+    if (!sid) return;
+    setDeskFull((m) => ({ ...m, [sid]: key }));
+    if (key) showArtifact(key);
+  };
+  const artifactsView = deskOn && study && !deskOpenItem ? (
+    <StudyDesk
+      course={study.state.course}
+      files={study.state.files}
+      topics={deskTopics}
+      mapped={onMap(deskTopics, map.nodes.map((n) => n.label))}
+      start={study.state.start}
+      topic={studyTopic}
+      onTopic={pickTopic}
+      items={deskItems}
+      lit={artKey}
+      onOpen={(key) => deskOpenAt(key)}
+      onAddFiles={() => openFull('content')}
+    />
+  ) : (
     <>
+      {deskOpenItem && (
+        <div className="l5sd-back">
+          <button type="button" className="l5-btn is-sm is-quiet" onClick={() => deskOpenAt(null)}>
+            <span className="l5-ar" aria-hidden="true">←</span> All artifacts
+          </button>
+        </div>
+      )}
       <ArtifactsView
         items={artifactItems}
-        selected={artKey}
-        onSelect={showArtifact}
+        selected={deskOpenItem ? deskOpenItem.key : artKey}
+        onSelect={deskOpenItem ? (key) => deskOpenAt(key) : showArtifact}
         narrow={narrow}
         onWrite={limits.draftSpace && !writingShown ? openWriting : undefined}
         // choose what to make, then say what it is about: in the conversation, beside (on a phone, as the view)
@@ -8659,7 +8716,9 @@ export function LogosApp({
     setScreen((s) => dock(c.beside, s));
   }
   /** Where the conversation is now: as it was put, or — never put — where the panel beside leaves it. */
-  const chatSideNow: ChatSide = chatSide ?? 'left';
+  // never put: on the left beside the map (Screen 1); on the right beside a study's desk, read left to right (Screen 4)
+  const chatSideFresh: ChatSide = deskOn && studyTab === 'artifacts' ? 'right' : 'left';
+  const chatSideNow: ChatSide = chatSide ?? chatSideFresh;
   /**
    * The conversation put on a side from Split View or in words: kept, and — when it is not on screen
    * beside the view — brought beside it, so the choice is seen. On the conversation's own view, with
@@ -8720,7 +8779,7 @@ export function LogosApp({
         writeBesideShare(browserStorage(), s);
       }}
       // THE CONVERSATION, WHERE THEY PUT IT: dragged to an edge or a side pressed — left, right, top or bottom
-      side={besideSide(screen, chatSide)}
+      side={besideSide(screen, chatSide, chatSideFresh)}
       onSide={screen.view === 'chat' || screen.beside === 'chat' ? (side) => {
         const at = chatSideFor(screen, side);
         if (at) putChatSide(at);

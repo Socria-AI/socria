@@ -1,0 +1,323 @@
+/* components/logos5/study-desk.css — STUDY, READ LEFT TO RIGHT (Logos 5.5, Screen 4).
+ *
+ * Your files (300, panel paper, a rule on the right), then what was made from
+ * them as cards (two columns, gap 16). The conversation docks on the right
+ * with Split View. Every value is a 5.5 step: type 32/18/15.5/13.5/12.5/10.5,
+ * radii 999/16/10/6, the wash for what is chosen, primary only for what is
+ * yours. */
+
+.logos-root .l5 .l5sd {
+  display: grid;
+  grid-template-columns: 300px minmax(0, 1fr);
+  height: 100%;
+  min-height: 0;
+}
+.logos-root .l5 .l5sd.is-folded {
+  grid-template-columns: minmax(0, 1fr);
+}
+.logos-root .l5 .l5sd-unfold {
+  gap: 6px;
+}
+
+/* ── your files ─────────────────────────────────────────────────────── */
+.logos-root .l5 .l5sd-files {
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  border-right: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
+  background: var(--lg-panel, #faf8f2);
+}
+.logos-root .l5 .l5sd-head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  height: 48px;
+  padding: 0 12px 0 24px;
+  border-bottom: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
+}
+.logos-root .l5 .l5sd-head-acts {
+  display: flex;
+  gap: 2px;
+  margin-left: auto;
+}
+.logos-root .l5 .l5sd-list {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  margin: 0;
+  padding: 12px 12px 16px;
+  list-style: none;
+}
+.logos-root .l5 .l5sd-file {
+  margin: 0 0 6px;
+}
+.logos-root .l5 .l5sd-file-b {
+  display: grid;
+  grid-template-columns: 16px minmax(0, 1fr);
+  align-items: start;
+  gap: 8px;
+  width: 100%;
+  padding: 8px 8px 8px 4px;
+  border: 0;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.logos-root .l5 .l5sd-file-b:hover {
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06);
+}
+.logos-root .l5 .l5sd-chev {
+  margin-top: 3px;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+}
+.logos-root .l5 .l5sd-file-tx {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.logos-root .l5 .l5sd-file-t {
+  font-family: var(--l5-serif);
+  font-size: 18px;
+  line-height: 1.25;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .l5 .l5sd-meta {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
+}
+.logos-root .l5 .l5sd-rest {
+  display: block;
+  padding: 10px 8px 4px 28px;
+}
+.logos-root .l5 .l5sd-topics {
+  margin: 2px 0 6px;
+  padding: 0 0 0 18px;
+  list-style: none;
+}
+.logos-root .l5 .l5sd-topic {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  height: 32px;
+  padding: 0 10px;
+  border: 0;
+  background: transparent;
+  color: var(--lg-ink);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  text-align: left;
+}
+.logos-root .l5 .l5sd-topic-t {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .l5 .l5sd-topic.is-on .l5-count {
+  color: var(--lg-primary);
+}
+.logos-root .l5 .l5sd-hint {
+  flex: none;
+  font-size: 12.5px;
+  font-weight: 400;
+  color: var(--lg-primary);
+}
+/* on your map: the primary, filled; not yet: a hairline ring */
+.logos-root .l5 .l5sd-dot {
+  flex: none;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  box-sizing: border-box;
+  border: 1.5px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.25);
+  border-radius: 999px;
+}
+.logos-root .l5 .l5sd-dot.is-on {
+  border-color: var(--lg-primary);
+  background: var(--lg-primary);
+}
+.logos-root .l5 .l5sd-key {
+  display: flex;
+  gap: 16px;
+  margin: 0;
+  padding: 12px 24px;
+  border-top: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
+  font-size: 12.5px;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
+}
+.logos-root .l5 .l5sd-key span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+/* ── the middle ─────────────────────────────────────────────────────── */
+.logos-root .l5 .l5sd-mid {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+  min-height: 0;
+  overflow-y: auto;
+  padding: 26px 24px 24px;
+  /* the grid answers to the room the middle has, not the window: the conversation beside takes some */
+  container-type: inline-size;
+}
+.logos-root .l5 .l5sd-top {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+}
+.logos-root .l5 .l5sd-top-t {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+.logos-root .l5 .l5sd-top-t .l5-label {
+  margin: 0 0 6px;
+}
+.logos-root .l5 .l5sd-display {
+  margin: 0 0 4px;
+  font-family: var(--l5-serif);
+  font-size: 32px;
+  font-weight: 400;
+  line-height: 1.08;
+  letter-spacing: -0.015em;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5sd-top .l5sd-meta {
+  margin: 0;
+}
+.logos-root .l5 .l5sd-top-a {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.logos-root .l5 .l5sd-kinds > .l5-icon {
+  width: auto;
+  padding: 0 12px;
+  border-radius: 999px;
+}
+.logos-root .l5 .l5sd-kinds-b {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 13.5px;
+  font-weight: 500;
+}
+.logos-root .l5 .l5sd-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  align-items: start;
+}
+.logos-root .l5 .l5sd-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
+  padding: 18px 20px 20px;
+  scroll-margin: 16px;
+}
+.logos-root .l5 .l5sd-card-k {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+}
+.logos-root .l5 .l5sd-card-k .l5sd-meta {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.logos-root .l5 .l5sd-card-k .l5-label {
+  flex: none;
+}
+.logos-root .l5 .l5sd-card-open {
+  margin: -6px -8px -6px auto;
+}
+.logos-root .l5 .l5sd-card-t {
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-size: 18px;
+  font-weight: 400;
+  line-height: 1.25;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5sd-card-b {
+  min-width: 0;
+  max-height: 460px;
+  overflow: auto;
+}
+.logos-root .l5 .l5sd-card-b.is-closed {
+  padding-top: 4px;
+}
+.logos-root .l5 .l5sd-none {
+  padding: 40px 0;
+}
+.logos-root .l5 .l5sd-none-t {
+  margin: 0 0 6px;
+  font-family: var(--l5-serif);
+  font-size: 18px;
+  color: var(--lg-ink);
+}
+@container (max-width: 760px) {
+  .logos-root .l5 .l5sd-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+/* practice drawn in its card: the card already says what it is and what it is called, so the practice keeps
+   to its blanks, one column, and its source */
+.logos-root .l5 .l5sd-card-b .l5s-practice {
+  flex-direction: column;
+  gap: 14px;
+  max-width: none;
+  margin: 0;
+  padding: 0;
+}
+.logos-root .l5 .l5sd-card-b .l5s-pr-k,
+.logos-root .l5 .l5sd-card-b .l5s-pr-t {
+  display: none;
+}
+.logos-root .l5 .l5sd-card-b .l5s-pr-side {
+  position: static;
+  flex: 0 0 auto;
+  width: 100%;
+}
+@media (max-width: 900px) {
+  .logos-root .l5 .l5sd {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .logos-root .l5 .l5sd-files {
+    border-right: 0;
+    border-bottom: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
+  }
+}
+
+/* in the view: the desk draws from the view's top edge, and its middle leaves the view's own actions their row */
+.logos-root .l5 .l5v-body > .l5v-primary:has(> .l5v-acts) > .l5v-primary-in:has(> .l5sd) {
+  padding-top: 0;
+}
+.logos-root .l5 .l5v-primary:has(> .l5v-acts) .l5sd-mid {
+  padding-top: 64px;
+}
+.logos-root .l5 .l5v-primary:has(> .l5v-acts) .l5sd-head {
+  height: 56px;
+}
+/* one artifact at full size, opened from the desk: the way back */
+.logos-root .l5 .l5sd-back {
+  padding: 0 24px 8px;
+}
+.logos-root .l5 .l5sd-back .l5-btn {
+  gap: 6px;
+}

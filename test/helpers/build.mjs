@@ -334,6 +334,8 @@ const MODULES = [
   'test/helpers/mr-under-test.ts',
   // Logos 5's four views, titles, Content (lib/logos5/views.ts, title.ts, content.ts, contentBoard.ts)
   'test/helpers/l5views-under-test.ts',
+  // Study, read left to right (Logos 5.5, Screen 4): the desk, its facts, where the conversation docks
+  'test/helpers/study-desk-under-test.tsx',
   // adaptive response rendering: the inline vocabulary, its planner, its gate and its components
   'test/helpers/inline-under-test.tsx',
   // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws

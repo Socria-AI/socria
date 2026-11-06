@@ -302,10 +302,14 @@ export type Side = 'left' | 'right' | 'top' | 'bottom';
 export const SIDES: readonly Side[] = ['left', 'right', 'top', 'bottom'];
 export const OPPOSITE: Record<Side, Side> = { left: 'right', right: 'left', top: 'bottom', bottom: 'top' };
 
-/** Where the panel beside the view docks, for where the conversation was put (null: never chosen). */
-export function besideSide(s: Screen, chat: Side | null): Side {
-  // never chosen: the conversation beside a view docks on the left (Logos 5.5, Screen 1); anything else beside, on the right
-  if (!chat || !s.beside) return s.beside === 'chat' ? 'left' : 'right';
+/**
+ * Where the panel beside the view docks, for where the conversation was put (null: never chosen).
+ * Never chosen, the conversation docks on `fresh`: the left beside the Logic Map (Logos 5.5,
+ * Screen 1), the right beside a study's desk, read left to right (Screen 4).
+ */
+export function besideSide(s: Screen, chat: Side | null, fresh: Side = 'left'): Side {
+  // anything else beside, on the right
+  if (!chat || !s.beside) return s.beside === 'chat' ? fresh : 'right';
   if (s.beside === 'chat') return chat;
   if (s.view === 'chat') return OPPOSITE[chat];
   return 'right';

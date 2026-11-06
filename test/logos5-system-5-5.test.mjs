@@ -92,7 +92,7 @@ ok('folded, the first tool unfolds the conversation: "Conversation n"', /lead=\{
 console.log('\n=== the Logic Map ===');
 ok('asking about a card: Challenge it · Trace it back · Take it to research', /label: 'Challenge it'/.test(app) && /label: 'Trace it back'/.test(app) && /label: 'Take it to research'/.test(app));
 ok('the legend is type at the foot: supports, depends on, conflicts, relates, and how many ideas', /<ul className="l5v-legend" aria-label="What the lines mean">/.test(app) && /is-conflicts[\s\S]{0,80}conflicts/.test(app) && /\{map\.nodes\.length\} \{map\.nodes\.length === 1 \? 'idea' : 'ideas'\}/.test(app));
-ok('the conversation beside docks on the left unless put elsewhere', /return s\.beside === 'chat' \? 'left' : 'right';/.test(read('lib/logos5/views.ts')) && /const chatSideNow: ChatSide = chatSide \?\? 'left';/.test(app));
+ok('the conversation beside docks on the left unless put elsewhere — on the right beside a study\'s desk (Screen 4)', /fresh: Side = 'left'/.test(read('lib/logos5/views.ts')) && /return s\.beside === 'chat' \? fresh : 'right';/.test(read('lib/logos5/views.ts')) && /const chatSideFresh: ChatSide = deskOn && studyTab === 'artifacts' \? 'right' : 'left';/.test(app) && /const chatSideNow: ChatSide = chatSide \?\? chatSideFresh;/.test(app));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);
