@@ -5,7 +5,7 @@ canvas zoomed out, the Universal Map, Memory, Study) and replaces the chrome
 around it with one consistent system. The design handoff is "Logos 5.5 System"
 (November 2026): six type steps, four radii, four elevations and three control
 states, applied to the Logic Map docked, the Logic Map folded with a card being
-asked about, Study, and Home.
+asked about, Study, and Home with Memory on the Universal Map.
 
 **Fill means do. Wash means here. A hairline means you can.**
 
@@ -132,21 +132,70 @@ something is chosen.
   hairline chips; the input serif italic, Send unfilled until there is
   something to send. Focus, lit and dim are the map's existing states.
 
-## 6. Not finished in this pass
+## 6. Screen 4 — Study, read left to right
 
-- **Screen 4, Study** (Files · Artifacts · conversation, a topic filtering a
-  grid of cards, the card the conversation points at lit): the system above is
-  applied to Study's existing screen; the three-column rebuild is the next
-  pass.
-- **Screen 3, Home with Memory on the Universal Map** (the newest part of the
-  handoff): in progress separately — tethered memories beside the chats they
-  came from, the Memory key with its waiting count, the link card that names
-  the memory, and "What it taught Socria" on a chat's card.
+`components/logos5/StudyDesk.tsx`, its facts in `lib/logos5/studyDesk.ts`, its
+sheet `study-desk.css`. The Artifacts view of a study that has files, on a wide
+screen, as the view (beside another view it stays the one-at-a-time strip):
+
+- **Your files**, 300 wide on the panel paper: each file by what the person
+  would call it ("Lecture 9 Adjusting Entries"), its line ("PDF · 7 topics · 5
+  on your map"), and, opened, its topics. A topic is **on your map** (the
+  filled dot) only when an idea on the Logic Map carries its name; otherwise
+  the hairline ring — said in words too, and keyed at the foot. "start here"
+  marks where Socria recommends starting. Topics from no file are listed under
+  "From the conversation". **+** goes to Files to add more; the fold key puts
+  the column away and "Your files n" brings it back.
+- **What was made**, in the middle as cards (`.l5-holder`, two columns, gap
+  16; one column when the middle is under 760 — measured by the middle, so the
+  conversation beside takes its room). An artifact belongs to a topic when it
+  was made for it (practice) or its title names it. Choosing a topic — the
+  same choice as on Files' board — narrows the middle to it; "All kinds" picks
+  a kind; "Show all n" takes both back.
+- **The card the conversation points at** (`artKey`, the one last made or
+  opened) is lit and scrolled into view.
+- **Heavy things** — your writing, a model, a simulation, a 3D scene — are not
+  drawn in a card; the card offers Open. Chosen (by you or by the
+  conversation), they open at full size in the one-at-a-time view with
+  "← All artifacts" back to the desk.
+- **The conversation** docks on the **right** beside the desk unless the
+  person put it elsewhere (`besideSide(screen, chat, fresh)`; the left stays
+  the default beside the map).
+
+## 7. Screen 3 — Memory on the Universal Map
+
+The newest part of the handoff. The map itself does not change; memory is a
+layer on it, shown by default when signed in and absent signed out.
+
+- Each memory hangs off the conversation it came from, placed last so nothing
+  else moves; between two subjects already joined by a shared idea it becomes
+  that link's card (Edit · Forget). Its kind comes only from its provenance:
+  "In your words", "From your file", or "Socria's reading".
+- **The Memory key** sits between All subjects and View with the count of
+  readings waiting; it is kept with the view (`display.memory`).
+- A conversation's card gains **What it taught Socria**, with That's right
+  and Not quite (the Memory view's own `PATCH /api/mind/node`).
+- Private, off-the-record and sensitive conversations show nothing: the server
+  never sends their memories, and the client drops any conversation whose
+  messages do not fold to `full`.
+- The detail, and what the data cannot yet say, is in `docs/LOGOS-5.md` §5
+  (Memory on the map).
+
+## 8. Not finished
+
+- **Readings seen once** are not on the map: they live in the pending ledger,
+  which the Logos memory feed deliberately does not send. "Waiting" on the map
+  is a memory held tentatively. Showing the ledger needs a server change.
+- A corroborated reading keeps only the second conversation's id, so it hangs
+  off that one; files added on the Memory page or a Project sheet name no
+  conversation, so their memories appear once they come up in one.
+- This month and All time draw no memory, as the handoff says for this pass.
+- On a phone the desk is not drawn: Artifacts stays one at a time.
 - The phone sheet, and the White, Dark and Celestial themes, use the same
   tokens and were not drawn separately in the handoff; they were checked only
   where the browser runs below went.
 
-## 7. How it is held
+## 9. How it is held
 
 - `test/logos5-system-5-5.test.mjs` reads the sources: the old sheets gone and
   never imported; the three states; the one icon, menu, close and label; every
@@ -156,6 +205,12 @@ something is chosen.
   the four composer controls, Make under "+", the asking line, the white
   composer, Conversation n; the ask card's moves, the legend, and the
   conversation docked left.
+- `test/logos5-study-desk.test.mjs`: what a file is and holds, on your map,
+  which artifact belongs to which topic, what the middle shows, the desk drawn
+  (files, topics, dots, cards, the lit card, heavy things not drawn, Show
+  all), the conversation docked right, and the wiring in `LogosApp.tsx`.
+- `test/logos5-map-memory.test.mjs`: memory's kinds from provenance, where
+  each hangs, what is left off, the key, the card, That's right / Not quite.
 - The suites that asserted the old chrome (`logos5-shell`, `logos5-canvas`,
   `logos5-views`, `logos5-study-ui`, `four-views`, `ar-mode`,
   `onboarding-tips`, `ux-polish`, `logos3-chat-notes`) now assert the 5.5
@@ -163,4 +218,6 @@ something is chosen.
 - Browser: the real app with the local stand-ins at 1440×900 — a line of
   thinking zoomed out, Chat, the Logic Map with the conversation docked, the
   map folded, a card asked about, Files and Artifacts
-  (`.journeys/l55-shots.mjs`).
+  (`.journeys/l55-shots.mjs`); a study — two files sorted into topics,
+  practice made, the desk, a topic chosen, the conversation beside on the
+  right, the files folded (`.journeys/l55-study.mjs`).
