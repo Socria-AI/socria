@@ -25,11 +25,19 @@
 // Each lens, and each week, comes in drawn: the circles open, the sessions
 // rise into place, the spokes and joins are drawn out to what they hang from,
 // the quick questions settle, and the card arrives last over its curve.
+//
+// With Memory on (signed in), what Socria remembers comes in just before the
+// card: each memory a small mark and its words on a paper chip, on a dotted
+// tether from the conversation it came from — a ring in your words, a square
+// from your file, a grey ring Socria's reading seen twice, a dashed gold ring
+// a reading still waiting for a second conversation. One from two subjects the
+// map already joins is said on that curve's card instead, with Edit and Forget.
 
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { cameraTransform, fitCamera, isDrag, keepInView, pinchCamera, readWheel, toWorld, zoomAt, KEY_PAN, type Camera } from '@/lib/canvas';
 import { boxAround, freshness, nearestWay, noteBox, type Box, type Match, type SharedIdea, type Tile } from '@/lib/logos5/universe';
 import { bubbleLayout, foldedBox, type BubbleCluster, type BubbleLens, type BubbleLink } from '@/lib/logos5/bubbles';
+import { mapProvenance, type MapMemory } from '@/lib/logos5/memoryAtlas';
 import { PROJECT_COLOR_KEYS, type Homes } from '@/lib/logos5/spatial';
 import type { Arrangement } from '@/lib/logos5/arrange';
 import { MadeMark, StarMark, colorVar, shortDate, tileSaid } from './UniverseParts';
@@ -66,6 +74,15 @@ export interface BubbleActs {
   onBack?: (id: string) => void;
 }
 
+/** What Socria remembers, for the map to draw (Memory on, signed in), and what can be done from a link's card. */
+export interface MapMemoryLayer {
+  list: readonly MapMemory[];
+  /** new words for it — theirs from then on */
+  onEdit: (id: string, text: string) => void;
+  /** forgotten for good */
+  onForget: (id: string) => void;
+}
+
 type Drag =
   | { kind: 'nodes'; ids: string[]; dx: number; dy: number; over: string | null }
   | { kind: 'note'; id: string; dx: number; dy: number }
@@ -92,7 +109,9 @@ const useBeforePaint = typeof window === 'undefined' ? useEffect : useLayoutEffe
 /** what a drag is over when it is over "+ New project" */
 const NEW_PROJECT = '+new';
 /** when each thing arrives as the map comes in, in ms */
-const ARRIVE = { circle: 0, circleStep: 70, hub: 140, hubStep: 70, line: 240, dot: 380, dotStep: 34, link: 760, linkStep: 90, card: 980 } as const;
+const ARRIVE = { circle: 0, circleStep: 70, hub: 140, hubStep: 70, line: 240, dot: 380, dotStep: 34, link: 760, linkStep: 90, mem: 800, memStep: 30, card: 980 } as const;
+/** a memory's mark, and the chip's padding before it: where the mark's centre is from the chip's end */
+const MEM_INSET = 5 + 11 / 2;
 
 export function BubbleMap({
   lens,
@@ -118,6 +137,7 @@ export function BubbleMap({
   all,
   opened,
   backOf,
+  memory = null,
   acts,
 }: {
   lens: BubbleLens;
@@ -152,6 +172,8 @@ export function BubbleMap({
   opened?: ReadonlySet<string>;
   /** a conversation's subject from before this week: the last of it, for a ↩ by its subject's name */
   backOf?: ReadonlyMap<string, { id: string; at: number }>;
+  /** what Socria remembers, hung beside what it came from; null with Memory off, signed out, or nothing to draw */
+  memory?: MapMemoryLayer | null;
   acts: BubbleActs;
 }) {
   const box = useRef<HTMLDivElement>(null);
@@ -168,6 +190,9 @@ export function BubbleMap({
   const [palette, setPalette] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<{ key: string; name: string } | null>(null);
   const [linkEdit, setLinkEdit] = useState<{ id: string; label: string } | null>(null);
+  /** the memory on a link's card: its words being changed, or being forgotten */
+  const [memEdit, setMemEdit] = useState<{ id: string; text: string } | null>(null);
+  const [memForget, setMemForget] = useState<string | null>(null);
   const [noteText, setNoteText] = useState('');
   /** a new Project being named — with what was dropped on it */
   const [making, setMaking] = useState<{ ids: string[]; name: string } | null>(null);
@@ -176,10 +201,14 @@ export function BubbleMap({
   const lastTap = useRef<{ id: string; t: number } | null>(null);
 
   const folded = useMemo(() => new Set(Object.entries(arr.frames).filter(([, f]) => f.collapsed).map(([k]) => k)), [arr.frames]);
+  // what the layout needs of a memory: its words and where it came from (the rest is how it is drawn)
+  const memIn = useMemo(() => memory?.list.map((m) => ({ id: m.id, text: m.text, from: m.from })), [memory?.list]);
   const L = useMemo(
-    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject && lens === 'week', strictToday: lens === 'today' }),
-    [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject]
+    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject && lens === 'week', strictToday: lens === 'today', ...(memIn?.length ? { memories: memIn } : {}) }),
+    [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject, memIn]
   );
+  const memOf = useMemo(() => new Map((memory?.list ?? []).map((m) => [m.id, m])), [memory?.list]);
+  const titleOf = (id: string) => tileById.get(id)?.title ?? null;
   const notes = lens === 'week' ? arr.notes : [];
   const content = useMemo<Box>(() => boxAround([L.bounds, ...notes.map(noteBox)]), [L.bounds, notes]);
   const sel = useMemo(() => new Set(selected), [selected]);
@@ -504,6 +533,11 @@ export function BubbleMap({
   const over = drag?.kind === 'nodes' ? drag.over : null;
   const cardLink: BubbleLink | null = L.card ? linkOf.get(L.card.link) ?? null : null;
   const own = cardLink?.own ? ownOf.get(cardLink.own) ?? null : null;
+  const cardMem = L.card?.memory ? memOf.get(L.card.memory) ?? null : null;
+  /** a memory's mark on the map: lit with what it came from, dimmed when a search leaves all of that out */
+  const memLit = (from: readonly string[]) => (litSet ? (from.some((id) => litSet.has(id)) ? ' is-lit' : ' is-quiet') : '');
+  const memDim = (from: readonly string[]) => (matchOf && from.every((id) => !matchOf(id)) ? ' is-dim' : '');
+  const memArrives = (i: number) => Math.min(ARRIVE.card - 40, ARRIVE.mem + i * ARRIVE.memStep);
 
   return (
     <div
@@ -538,6 +572,16 @@ export function BubbleMap({
                 <path className="l5b-draw" d={pathOf(l)} pathLength={1} style={css({ '--d': `${ARRIVE.link + L.links.indexOf(l) * ARRIVE.linkStep}ms` })} />
               </mask>
             ))}
+            {L.memories.map((mm, i) =>
+              mm.from.map((f) => {
+                const d = tetherOf(at(f), mm);
+                return d ? (
+                  <mask key={`t:${mm.id}:${f}`} id={`l5b-t-${maskId(`${mm.id}-${f}`)}`} maskUnits="userSpaceOnUse" x={content.x - 400} y={content.y - 400} width={content.w + 800} height={content.h + 800}>
+                    <path className="l5b-draw" d={d} pathLength={1} style={css({ '--d': `${memArrives(i)}ms` })} />
+                  </mask>
+                ) : null;
+              })
+            )}
           </defs>
           {L.clusters
             .filter((c) => !c.folded)
@@ -582,6 +626,14 @@ export function BubbleMap({
               </path>
             </g>
           ))}
+          {/* what Socria remembers: a dotted tether from each conversation it came from, drawn out to its mark */}
+          {L.memories.map((mm) =>
+            mm.from.map((f) => {
+              const d = tetherOf(at(f), mm);
+              const m = memOf.get(mm.id);
+              return d && m ? <path key={`t:${mm.id}:${f}`} className={`l5b-tether${m.waiting ? ' is-waiting' : ''}${memLit(mm.from)}${memDim(mm.from)}`} d={d} mask={`url(#l5b-t-${maskId(`${mm.id}-${f}`)})`} /> : null;
+            })
+          )}
         </svg>
 
         {L.clusters.map((c) =>
@@ -783,7 +835,62 @@ export function BubbleMap({
           );
         })}
 
-        {L.card && (
+        {L.memories.map((mm, i) => {
+          const m = memOf.get(mm.id);
+          if (!m) return null;
+          const said = mapProvenance(m, mm.from[0], titleOf);
+          const where = mm.from.map((f) => `“${titleOf(f) ?? 'a conversation'}”`).join(' and ');
+          return (
+            <button
+              key={mm.id}
+              type="button"
+              data-control
+              className={`l5b-mem is-${m.source}${m.waiting ? ' is-waiting' : ''}${m.confirmed ? ' is-confirmed' : ''}${mm.end === 'end' ? ' is-end' : ''}${memLit(mm.from)}${memDim(mm.from)}`}
+              // held by its mark, so words measured a little longer or shorter than allowed for grow away from it
+              style={{ left: mm.end === 'end' ? mm.x + MEM_INSET : mm.x - MEM_INSET, top: mm.box.y, ...css({ '--d': `${memArrives(i)}ms` }) }}
+              title={`${m.text} — ${said}`}
+              aria-label={`What Socria remembers: ${m.text}, ${said}. From ${where}.`}
+              tabIndex={matchOf && memDim(mm.from) ? -1 : 0}
+              onPointerEnter={(e) => e.pointerType === 'mouse' && setHover(mm.from[0])}
+              onPointerLeave={() => setHover((x) => (x === mm.from[0] ? null : x))}
+              onClick={() => {
+                // the conversation it came from, and its card, where what it taught is listed
+                acts.onSelect([mm.from[0]]);
+                acts.onPreview(mm.from[0], screenRect(mm.from[0]));
+              }}
+            >
+              <span className="l5b-mem-m" aria-hidden="true" />
+              <span className="l5b-mem-t">{mm.words}</span>
+            </button>
+          );
+        })}
+
+        {L.card && cardMem && cardLink && (
+          <MemoryCard
+            m={cardMem}
+            link={cardLink}
+            box={L.card}
+            arrives={ARRIVE.card}
+            titleOf={titleOf}
+            subjectOf={(id) => L.byId.get(id)?.g ?? null}
+            editing={memEdit?.id === cardMem.id ? memEdit.text : null}
+            forgetting={memForget === cardMem.id}
+            onHover={(on) => setHover(on ? cardLink.a : null)}
+            onEdit={(text) => setMemEdit(text === null ? null : { id: cardMem.id, text })}
+            onSave={(text) => {
+              setMemEdit(null);
+              if (text.trim() && text.trim() !== cardMem.text) memory?.onEdit(cardMem.id, text.trim());
+            }}
+            onForget={(sure) => {
+              if (sure === null) return setMemForget(null);
+              if (!sure) return setMemForget(cardMem.id);
+              setMemForget(null);
+              memory?.onForget(cardMem.id);
+            }}
+          />
+        )}
+
+        {L.card && !cardMem && (
           <div
             className={`l5b-card${cardLink?.kind === 'own' ? ' is-own' : ' is-idea'}`}
             style={{ left: L.card.x, top: L.card.y, width: L.card.w, ...css({ '--d': `${ARRIVE.card}ms` }) }}
@@ -886,6 +993,146 @@ export function BubbleMap({
 
 /** A link's curve, as drawn. */
 const pathOf = (l: Pick<BubbleLink, 'p0' | 'c' | 'p1'>) => `M${l.p0.x},${l.p0.y} Q${l.c.x},${l.c.y} ${l.p1.x},${l.p1.y}`;
+/** A memory's tether: from the edge of what it came from to the edge of its mark. */
+function tetherOf(from: { x: number; y: number; r: number } | null, to: { x: number; y: number }): string | null {
+  if (!from) return null;
+  const d = Math.hypot(to.x - from.x, to.y - from.y);
+  if (d <= from.r + 7) return null;
+  const ux = (to.x - from.x) / d;
+  const uy = (to.y - from.y) / d;
+  const r1 = (v: number) => Math.round(v * 10) / 10;
+  return `M${r1(from.x + ux * from.r)},${r1(from.y + uy * from.r)} L${r1(to.x - ux * 7)},${r1(to.y - uy * 7)}`;
+}
+
+/** How a memory is known, as its card's label says it. */
+const MEM_KIND: Record<MapMemory['source'], string> = { words: 'in your words', file: 'from your file', reading: 'Socria’s reading' };
+
+/**
+ * The card over a curve, when what joins the two subjects is something Socria
+ * remembers from both: the memory, where it was said, and Edit · Forget —
+ * at the place and width the computed card has.
+ */
+function MemoryCard({
+  m,
+  link,
+  box,
+  arrives,
+  titleOf,
+  subjectOf,
+  editing,
+  forgetting,
+  onHover,
+  onEdit,
+  onSave,
+  onForget,
+}: {
+  m: MapMemory;
+  link: BubbleLink;
+  box: { x: number; y: number; w: number };
+  arrives: number;
+  titleOf: (id: string) => string | null;
+  subjectOf: (id: string) => string | null;
+  editing: string | null;
+  forgetting: boolean;
+  onHover: (on: boolean) => void;
+  onEdit: (text: string | null) => void;
+  onSave: (text: string) => void;
+  onForget: (sure: boolean | null) => void;
+}) {
+  // the conversations it came from at either end of the curve: its own, in each subject
+  const ga = subjectOf(link.a);
+  const gb = subjectOf(link.b);
+  const a = m.from.find((id) => subjectOf(id) === ga) ?? link.a;
+  const b = m.from.find((id) => id !== a && subjectOf(id) === gb) ?? link.b;
+  const A = <em>{titleOf(a) ?? 'a conversation'}</em>;
+  const B = <em>{titleOf(b) ?? 'a conversation'}</em>;
+  const both = m.saidIn.includes(a) && m.saidIn.includes(b);
+  const one = m.saidIn.includes(a) ? A : m.saidIn.includes(b) ? B : null;
+  const other = m.saidIn.includes(a) ? B : A;
+  return (
+    <div
+      className={`l5b-card is-memory${m.waiting ? ' is-waiting' : ''}`}
+      style={{ left: box.x, top: box.y, width: box.w, ...css({ '--d': `${arrives}ms` }) }}
+      data-control
+      onPointerEnter={() => onHover(true)}
+      onPointerLeave={() => onHover(false)}
+    >
+      <p className="l5b-card-k">
+        Socria remembers · <span className="l5b-card-kk">{MEM_KIND[m.source]}</span>
+      </p>
+      {editing !== null ? (
+        <form
+          className="l5b-card-edit"
+          onSubmit={(e) => {
+            e.preventDefault();
+            onSave(editing);
+          }}
+        >
+          <input autoFocus value={editing} maxLength={80} aria-label="What Socria remembers, in your words" onChange={(e) => onEdit(e.target.value)} onKeyDown={(e) => e.key === 'Escape' && onEdit(null)} />
+          <button type="submit" className="l5h-btn" disabled={!editing.trim()}>
+            Keep
+          </button>
+        </form>
+      ) : (
+        <p className={`l5b-card-mem is-${m.source}${m.waiting ? ' is-waiting' : ''}${m.confirmed ? ' is-confirmed' : ''}`}>
+          <span className="l5b-mem-m" aria-hidden="true" />
+          <span>{/[.!?…]$/.test(m.text) ? m.text : `${m.text}.`}</span>
+        </p>
+      )}
+      <p className="l5b-card-s">
+        {m.source === 'words' ? (
+          both ? (
+            <>You said it in {A} and again in {B}.</>
+          ) : one ? (
+            <>
+              You said it in {one}, and it came up again in {other}.
+            </>
+          ) : (
+            <>
+              In your words; it came up in {A} and in {B}.
+            </>
+          )
+        ) : m.source === 'file' ? (
+          <>
+            From your file{m.fileName ? <> {<em>{m.fileName}</em>}</> : null}; it came up in {A} and in {B}.
+          </>
+        ) : (
+          <>
+            Socria read it in {A} and again in {B}.{m.confirmed ? ' You said it’s right.' : ''}
+          </>
+        )}
+        {link.idea ? (
+          <>
+            {' '}
+            The map joins them by <em>{link.idea}</em>.
+          </>
+        ) : null}
+      </p>
+      {forgetting ? (
+        <span className="l5b-card-sure" role="group" aria-label={`Forget ${m.text}`}>
+          <span>Forget it for good? Socria won’t learn it again.</span>
+          <button type="button" className="l5b-card-lnk is-danger" onClick={() => onForget(true)}>
+            Forget
+          </button>
+          <button type="button" className="l5b-card-lnk" autoFocus onClick={() => onForget(null)}>
+            Keep it
+          </button>
+        </span>
+      ) : (
+        editing === null && (
+          <span className="l5b-card-links">
+            <button type="button" className="l5b-card-lnk" onClick={() => onEdit(m.text)}>
+              Edit
+            </button>
+            <button type="button" className="l5b-card-lnk" onClick={() => onForget(false)}>
+              Forget
+            </button>
+          </span>
+        )
+      )}
+    </div>
+  );
+}
 /** A link's key, as an id a mask can be found by. */
 const maskId = (key: string) => key.replace(/[^A-Za-z0-9_-]/g, '_');
 

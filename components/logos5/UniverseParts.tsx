@@ -2,8 +2,9 @@
 // components/logos5/UniverseParts.tsx — the pieces the Universal Map is made of.
 //
 // A conversation's kind as a glyph, and its marks; the card that
-// opens when one is pressed; the box that finds or starts; the View menu; the
-// tray of hidden ones; and the bar for several chosen at once. The map itself
+// opens when one is pressed (and, with Memory on, what the conversation taught
+// Socria); the box that finds or starts; the View menu; the tray of hidden
+// ones; and the bar for several chosen at once. The map itself
 // is UniverseBubbles.tsx, the line through time UniverseTime.tsx, and the
 // whole is Universe.tsx.
 
@@ -136,6 +137,87 @@ export interface PreviewActs {
   onClose: () => void;
 }
 
+/** What a conversation taught Socria, for its card: each memory, how it is known, and the two answers to a reading still waiting. */
+export interface Taught {
+  list: { id: string; text: string; source: 'words' | 'file' | 'reading'; waiting: boolean; confirmed: boolean; said: string }[];
+  /** "That's right" */
+  onConfirm: (id: string) => void;
+  /** "Not quite": the words as they should be, theirs from then on */
+  onCorrect: (id: string, text: string) => void;
+  /** the rest of it, in Memory */
+  onMore?: () => void;
+}
+
+/** a card shows this many of what a conversation taught; the rest are in Memory */
+const TAUGHT_MAX = 5;
+
+/**
+ * What a conversation taught Socria, under what Socria asked: each memory with
+ * its mark and how it is known, and on a reading still waiting, That's right or
+ * Not quite (which opens its words to be put right).
+ */
+function TaughtList({ taught }: { taught: Taught }) {
+  const [fixing, setFixing] = useState<{ id: string; text: string } | null>(null);
+  const shown = taught.list.slice(0, TAUGHT_MAX);
+  const more = taught.list.length - shown.length;
+  return (
+    <section className="l5h-pv-mem" aria-label={`What it taught Socria: ${taught.list.length}`}>
+      <span className="l5h-pv-mem-k">What it taught Socria · {taught.list.length}</span>
+      {shown.map((m) => (
+        <div key={m.id} className={`l5h-pv-mem-row is-${m.source}${m.waiting ? ' is-waiting' : ''}${m.confirmed ? ' is-confirmed' : ''}`}>
+          <span className="l5b-mem-m" aria-hidden="true" />
+          <span className="l5h-pv-mem-b">
+            {fixing?.id === m.id ? (
+              <form
+                className="l5h-pv-mem-fix"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  const t = fixing.text.trim();
+                  if (t && t !== m.text) taught.onCorrect(m.id, t);
+                  setFixing(null);
+                }}
+              >
+                <input autoFocus value={fixing.text} maxLength={80} aria-label="What Socria should remember, in your words" onChange={(e) => setFixing({ id: m.id, text: e.target.value })} onKeyDown={(e) => e.key === 'Escape' && (e.stopPropagation(), setFixing(null))} style={{ fontSize: 16 }} />
+                <span className="l5h-pv-mem-acts">
+                  <button type="submit" className="l5-btn is-sm" disabled={!fixing.text.trim()}>
+                    Keep
+                  </button>
+                  <button type="button" className="l5-btn is-sm is-quiet" onClick={() => setFixing(null)}>
+                    Cancel
+                  </button>
+                </span>
+              </form>
+            ) : (
+              <>
+                <span className="l5h-pv-mem-t">{m.text}</span>
+                <span className="l5h-pv-mem-s">{m.said}</span>
+                {m.waiting && (
+                  <span className="l5h-pv-mem-acts">
+                    <button type="button" className="l5-btn is-sm" onClick={() => taught.onConfirm(m.id)} title="Yes — this is right. Socria holds it as yours, and won’t reword it.">
+                      That’s right
+                    </button>
+                    <button type="button" className="l5-btn is-sm is-quiet" onClick={() => setFixing({ id: m.id, text: m.text })} title="Put it in your own words; Socria keeps them from then on">
+                      Not quite
+                    </button>
+                  </span>
+                )}
+              </>
+            )}
+          </span>
+        </div>
+      ))}
+      {more > 0 &&
+        (taught.onMore ? (
+          <button type="button" className="l5h-link l5h-pv-mem-more" onClick={taught.onMore}>
+            {more === 1 ? 'One more' : `${more} more`} in Memory →
+          </button>
+        ) : (
+          <span className="l5h-pv-mem-more">{more === 1 ? 'One more' : `${more} more`} in Memory</span>
+        ))}
+    </section>
+  );
+}
+
 export function PreviewCard({
   tile,
   home,
@@ -147,6 +229,7 @@ export function PreviewCard({
   acts,
   style,
   sheet,
+  taught,
 }: {
   tile: Tile;
   /** where it is on the map by subject */
@@ -161,6 +244,8 @@ export function PreviewCard({
   style?: CSSProperties;
   /** a phone: from the foot of the screen */
   sheet?: boolean;
+  /** what it taught Socria (Memory on, signed in); absent when it taught nothing, or was off the record */
+  taught?: Taught;
 }) {
   const [moving, setMoving] = useState(false);
   const [naming, setNaming] = useState<string | null>(null);
@@ -202,6 +287,7 @@ export function PreviewCard({
           <span className="l5h-open" aria-hidden="true" /> Socria asked: <em>{tile.open}</em>
         </p>
       )}
+      {taught && taught.list.length > 0 && <TaughtList key={tile.id} taught={taught} />}
       {suggested && acts.onFileHere && (
         <p className="l5h-pv-sugg">
           It is about <b className="l5h-pv-name">{suggested}</b>, but not filed there.{' '}

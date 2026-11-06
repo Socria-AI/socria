@@ -3731,3 +3731,292 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   border-radius: 50%;
   background: var(--lg-primary);
 }
+
+/* ── what Socria remembers, on the map (UniverseBubbles.tsx, Memory on) ──
+ * Each memory hangs from the conversation it came from on a dotted tether: a
+ * mark and its words in the serif italic, on a paper chip. The mark says how it
+ * is known — a ring in your words, a square from your file, a grey ring
+ * Socria's reading seen twice, a dashed gold ring a reading still waiting for a
+ * second conversation (gold is already the map's colour for waiting). The same
+ * marks are on a conversation's card and on a curve's card. */
+.logos-root .l5 .l5b-tether {
+  fill: none;
+  stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  stroke-width: 1.2;
+  stroke-dasharray: 1 3;
+  stroke-linecap: round;
+  transition: stroke 0.2s, opacity 0.2s;
+}
+.logos-root .l5 .l5b-tether.is-waiting {
+  stroke: var(--l5h-gold);
+}
+.logos-root .l5 .l5b-tether.is-lit {
+  stroke: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
+}
+.logos-root .l5 .l5b-tether.is-waiting.is-lit {
+  stroke: var(--l5h-gold);
+}
+.logos-root .l5 .l5b-tether:is(.is-quiet, .is-dim) {
+  opacity: 0.35;
+}
+.logos-root .l5 .l5b-mem {
+  position: absolute;
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  padding: 1px 5px;
+  border: 0;
+  border-radius: 4px;
+  background: var(--lg-paper);
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-weight: 400;
+  font-size: 15px;
+  line-height: 18px;
+  white-space: nowrap;
+  color: var(--lg-ink);
+  text-align: left;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  transition: opacity 0.2s, box-shadow 0.2s;
+}
+/* the mark at the end nearest what it hangs from: words to its left */
+.logos-root .l5 .l5b-mem.is-end {
+  flex-direction: row-reverse;
+  transform: translateX(-100%);
+}
+.logos-root .l5 .l5b-mem:hover {
+  box-shadow: 0 0 0 1px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16);
+}
+.logos-root .l5 .l5b-mem:focus-visible {
+  outline: 2px solid rgba(var(--l5h-gold-rgb), 0.95);
+  outline-offset: 2px;
+}
+.logos-root .l5 .l5b-mem.is-dim {
+  opacity: 0.28;
+}
+.logos-root .l5 .l5b.has-lit .l5b-mem:not(.is-lit):not(:hover) {
+  opacity: 0.55;
+}
+.logos-root .l5 .l5b-mem-m {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--lg-ink);
+  background: var(--lg-paper);
+}
+/* from your file */
+.logos-root .l5 :is(.l5b-mem, .l5h-pv-mem-row, .l5b-card-mem).is-file .l5b-mem-m {
+  border-radius: 2px;
+}
+/* Socria's reading, seen twice */
+.logos-root .l5 :is(.l5b-mem, .l5h-pv-mem-row, .l5b-card-mem).is-reading .l5b-mem-m {
+  border-color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
+}
+/* waiting for a second conversation */
+.logos-root .l5 :is(.l5b-mem, .l5h-pv-mem-row, .l5b-card-mem).is-waiting .l5b-mem-m {
+  border-style: dashed;
+  border-color: var(--l5h-gold);
+}
+/* a reading they said is right: theirs now, a solid ring */
+.logos-root .l5 :is(.l5b-mem, .l5h-pv-mem-row, .l5b-card-mem).is-reading.is-confirmed .l5b-mem-m {
+  border-color: var(--lg-ink);
+}
+/* it comes in last: after the quick questions settle, before the card */
+.logos-root .l5 .l5b-mem {
+  animation: l5b-fade 0.3s ease-out var(--d, 0ms) both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5 .l5b-mem {
+    animation: none;
+  }
+}
+
+/* the key among the map's tools: how many readings wait for the person, a gold count */
+.logos-root .l5 .l5h-mem-n {
+  display: inline-grid;
+  place-items: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  box-sizing: border-box;
+  border-radius: 999px;
+  background: var(--l5h-gold);
+  color: var(--l5h-gold-on);
+  font-size: 10.5px;
+  font-weight: 600;
+  line-height: 1;
+  font-variant-numeric: tabular-nums;
+}
+/* the legend's one line, beside the box while Memory is on */
+.logos-root .l5 .l5h-lg-mem {
+  width: 11px;
+  height: 11px;
+  box-sizing: border-box;
+  border-radius: 50%;
+  border: 2px solid var(--lg-ink);
+  background: var(--lg-paper);
+}
+
+/* a curve's card, when what joins the two subjects is something Socria remembers from both */
+.logos-root .l5 .l5b-card.is-memory {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 14px 18px 14px 20px;
+}
+.logos-root .l5 .l5b-card-k {
+  margin: 0;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+}
+/* where it breaks, it breaks before how it is known */
+.logos-root .l5 .l5b-card-kk {
+  white-space: nowrap;
+}
+.logos-root .l5 .l5b-card-mem {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0;
+  font-family: var(--l5-serif);
+  font-size: 23px;
+  line-height: 1.1;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5b-card-mem .l5b-mem-m {
+  width: 12px;
+  height: 12px;
+}
+.logos-root .l5 :is(.l5b-card-links, .l5b-card-sure) {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 4px 14px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
+}
+.logos-root .l5 .l5b-card-sure > span {
+  flex-basis: 100%;
+  font-weight: 400;
+}
+.logos-root .l5 .l5b-card-lnk {
+  margin: 0;
+  padding: 0;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+.logos-root .l5 .l5b-card-lnk:hover,
+.logos-root .l5 .l5b-card-lnk:focus-visible {
+  color: var(--lg-ink);
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.logos-root .l5 .l5b-card-lnk.is-danger {
+  color: var(--l5h-danger);
+}
+
+/* what a conversation taught Socria, on its card, under what Socria asked */
+.logos-root .l5 .l5h-pv-mem {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  margin-top: 2px;
+}
+.logos-root .l5 .l5h-pv-mem-k {
+  padding-bottom: 8px;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+}
+.logos-root .l5 .l5h-pv-mem-row {
+  display: grid;
+  grid-template-columns: 12px minmax(0, 1fr);
+  gap: 10px;
+  align-items: start;
+  padding: 8px 0;
+  border-top: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
+}
+.logos-root .l5 .l5h-pv-mem-row .l5b-mem-m {
+  margin-top: 5px;
+}
+.logos-root .l5 .l5h-pv-mem-b {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.logos-root .l5 .l5h-pv-mem-t {
+  font-family: var(--l5-serif);
+  font-style: italic;
+  font-size: 16px;
+  line-height: 1.3;
+  color: var(--lg-ink);
+  overflow-wrap: anywhere;
+}
+.logos-root .l5 .l5h-pv-mem-s {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
+}
+.logos-root .l5 .l5h-pv-mem-acts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 6px;
+}
+.logos-root .l5 .l5h-pv-mem-fix {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.logos-root .l5 .l5h-pv-mem-fix input {
+  min-width: 0;
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--l5-hair);
+  border-radius: 10px;
+  background: var(--l5-surface);
+  color: var(--lg-ink);
+  font-family: var(--l5-serif);
+  font-style: italic;
+  outline: none;
+}
+.logos-root .l5 .l5h-pv-mem-fix input:focus {
+  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.38);
+}
+.logos-root .l5 .l5h-pv-mem-more {
+  align-self: flex-start;
+  margin-top: 4px;
+  font-size: 12.5px;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
+}
+
+/* Night: the chip on the glass the map's words already use */
+html[data-theme="night"] .logos-root .l5 .l5b-mem {
+  background: rgba(10, 16, 38, 0.6);
+  -webkit-backdrop-filter: blur(16px) saturate(150%);
+  backdrop-filter: blur(16px) saturate(150%);
+  box-shadow: inset 0 0 0 1px rgba(170, 190, 255, 0.16);
+  color: rgba(228, 232, 250, 0.92);
+}
+html[data-theme="night"] .logos-root .l5 .l5b-mem-m {
+  background: rgba(10, 16, 38, 0.9);
+}
+/* its words being put right: the mark stays level with the field */
+.logos-root .l5 .l5h-pv-mem-row:has(.l5h-pv-mem-fix) .l5b-mem-m {
+  margin-top: 12px;
+}

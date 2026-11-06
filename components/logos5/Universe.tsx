@@ -17,6 +17,13 @@
 // card; pressing again, or Continue, opens it.
 // Everything arranged can be undone. Each lens comes in drawn.
 //
+// Signed in, what Socria remembers is on the map too (Memory, a key among the
+// tools, on until it is turned off): each memory beside the conversation it
+// came from, read from the same private-filtered feed the Memory view reads
+// (/api/mind?scope=logos, lib/logos5/memoryAtlas.ts mapMemoriesOf); a
+// conversation's card says what it taught Socria, and a reading still waiting
+// can be confirmed or corrected there, through the store's own route.
+//
 // The pieces: UniverseBubbles.tsx (the map), UniverseTime.tsx (the line),
 // UniverseParts.tsx (the card, the box, the menus).
 
@@ -27,12 +34,14 @@ import { TODAY_EMPTY, dayBounds } from '@/lib/logos5/views';
 import { monthStart } from '@/lib/logos5/timeline';
 import { OTHER } from '@/lib/logos5/subjects';
 import * as A from '@/lib/logos5/arrange';
+import { mapMemoriesOf, mapProvenance, type MemoryIn, type ProvIn } from '@/lib/logos5/memoryAtlas';
+import { logosPersistPolicy } from '@/lib/mind/logos-turn';
 import { useArrangement } from './useArrangement';
-import { BubbleMap, type BubbleActs } from './UniverseBubbles';
+import { BubbleMap, type BubbleActs, type MapMemoryLayer } from './UniverseBubbles';
 import { TimeView } from './UniverseTime';
 import type { Attachment } from '@/lib/logos-attachments';
 import type { Intent } from '@/lib/logos5/study';
-import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, shortDate, type Found } from './UniverseParts';
+import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, shortDate, type Found, type Taught } from './UniverseParts';
 import './universe.css';
 
 const newId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -110,6 +119,7 @@ export function UniverseView({
   notice = null,
   initial,
   now: nowGiven,
+  memory: memoryGiven,
 }: {
   conversations: readonly UniverseIn[];
   /** the person's Projects; undefined when there are none to have (signed out, or not loaded) */
@@ -170,6 +180,8 @@ export function UniverseView({
   initial?: A.Arrangement;
   /** the time to read "recent" and "today" against (a test; otherwise now) */
   now?: number;
+  /** what Socria remembers (a test; otherwise read from /api/mind?scope=logos, signed in) */
+  memory?: readonly MemoryIn[];
 }) {
   const { arr, put } = useArrangement(signedIn, initial);
   const arrRef = useRef(arr);
@@ -251,6 +263,47 @@ export function UniverseView({
     [matches, tiles, hidden, allHomes]
   );
   const resume = useMemo(() => resumeOf(tiles.filter((t) => !hidden.has(t.id))), [tiles, hidden]);
+
+  // ── what Socria remembers: signed in only, and only what the private-filtered feed holds ──
+  const [memNodes, setMemNodes] = useState<readonly MemoryIn[] | null>(memoryGiven ?? null);
+  const readMemory = useCallback(async () => {
+    if (!signedIn || memoryGiven) return;
+    try {
+      const r = await fetch('/api/mind?scope=logos', { cache: 'no-store' });
+      const j = r.ok ? await r.json().catch(() => null) : null;
+      // a store that cannot be read is no memory to show, and no key for it
+      if (!j || j.storage?.ok === false || !Array.isArray(j.nodes)) return;
+      setMemNodes(j.nodes as MemoryIn[]);
+    } catch {
+      /* the map is the same without it */
+    }
+  }, [signedIn, memoryGiven]);
+  useEffect(() => {
+    // signed out (again), nothing of it stays on the map
+    if (!signedIn && !memoryGiven) setMemNodes(null);
+    void readMemory();
+  }, [readMemory, signedIn, memoryGiven]);
+  /**
+   * The conversations that contribute nothing, whatever a memory's record
+   * says: off the record, or read as sensitive — by the rule the chat itself
+   * keeps (lib/mind/logos-turn.ts), folded over everything they said in it.
+   * Read only for the conversations a memory names.
+   */
+  const quiet = useMemo(() => {
+    const out = new Set<string>();
+    if (!memNodes) return out;
+    const named = new Set<string>();
+    for (const n of memNodes) for (const g of (n.provenance ?? []) as ProvIn[]) if (g.conversationId) named.add(g.conversationId);
+    for (const c of conversations) {
+      if (!named.has(c.id)) continue;
+      const said = (c.messages ?? []).filter((m) => m.role === 'user' && typeof m.content === 'string').map((m) => m.content as string);
+      if (said.length && logosPersistPolicy(said) !== 'full') out.add(c.id);
+    }
+    return out;
+  }, [memNodes, conversations]);
+  const memories = useMemo(() => (memNodes ? mapMemoriesOf(memNodes, now, { quiet }) : []), [memNodes, now, quiet]);
+  /** Memory is on: signed in, a memory to read, and the person has not turned it off */
+  const memOn = !!memNodes && arr.display.memory;
   const starredTiles = useMemo(() => arr.starred.map((id) => tileById.get(id)).filter((t): t is Tile => !!t), [arr.starred, tileById]);
 
   const [sel, setSel] = useState<string[]>([]);
@@ -570,8 +623,56 @@ export function UniverseView({
     setSel((cur) => (cur.every((id) => tileById.has(id) && !hidden.has(id)) ? cur : cur.filter((id) => tileById.has(id) && !hidden.has(id))));
   }, [tileById, hidden]);
 
+  // ── what Socria remembers, changed: the store's own route, shown at once and then read again ──
+  const memNodesRef = useRef(memNodes);
+  memNodesRef.current = memNodes;
+  const writeMemory = useCallback(
+    async (id: string, method: 'PATCH' | 'DELETE', body: Record<string, unknown>, local: (n: MemoryIn) => MemoryIn | null, done: string) => {
+      const before = memNodesRef.current;
+      if (!before) return;
+      setMemNodes(before.flatMap((n) => (n.id !== id ? [n] : local(n) ?? [])));
+      try {
+        const r = await fetch('/api/mind/node', { method, headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ id, ...body }) });
+        const j = await r.json().catch(() => null);
+        if (!r.ok || j?.ok === false) throw new Error('not saved');
+        setSaid(done);
+        void readMemory();
+      } catch {
+        setMemNodes(before);
+        setSaid('That could not be saved just now.');
+      }
+    },
+    [readMemory]
+  );
+  const mine = (kind: string, note: string, review?: string): ProvIn => ({ kind, surface: 'user', at: Date.now(), note, ...(review ? { review } : {}) });
+  /** "That's right": held as theirs, never reworded again (lib/mind/apply.ts confirmNode) */
+  const confirmMemory = (id: string) =>
+    void writeMemory(id, 'PATCH', { confirm: true }, (n) => ({ ...n, status: n.status === 'tentative' || n.status === 'uncertain' ? 'active' : n.status, provenance: [...(n.provenance ?? []), mine('stated', 'confirmed by you', 'confirmed')] }), 'Confirmed — Socria holds it as yours, and won’t reword it.');
+  /** "Not quite", or Edit: their words, kept as theirs from then on (PATCH, recorded as edited by hand) */
+  const correctMemory = (id: string, text: string) =>
+    void writeMemory(id, 'PATCH', { label: text.slice(0, 80) }, (n) => ({ ...n, label: text.slice(0, 80), provenance: [...(n.provenance ?? []), mine('stated', 'edited by hand')] }), 'Kept in your words — Socria won’t reword it.');
+  const forgetMemory = (id: string) => void writeMemory(id, 'DELETE', {}, () => null, 'Forgotten — Socria won’t learn it again.');
+  // the layer the map draws: only with Memory on, and only what came from a conversation
+  const memLayer = useMemo<MapMemoryLayer | null>(
+    () => (memOn && memories.length ? { list: memories, onEdit: correctMemory, onForget: forgetMemory } : null),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [memOn, memories, writeMemory]
+  );
+
   // ── the card beside a pressed conversation ──
   const previewTile = preview ? tileById.get(preview.id) ?? null : null;
+  /** what a conversation taught Socria, for its card: nothing from one off the record (its memories name it nowhere) */
+  const taughtBy = (id: string): Taught | undefined => {
+    const list = memories.filter((m) => m.from.includes(id));
+    if (!list.length) return undefined;
+    return {
+      list: list.map((m) => ({ id: m.id, text: m.text, source: m.source, waiting: m.waiting, confirmed: m.confirmed, said: mapProvenance(m, id, (x) => tileById.get(x)?.title ?? null) })),
+      onConfirm: confirmMemory,
+      onCorrect: correctMemory,
+      onMore: onMind,
+    };
+  };
+  const previewTaught = previewTile && memOn ? taughtBy(previewTile.id) : undefined;
   const pvStyle = (() => {
     if (!preview?.at || narrow || !mainRef.current) return undefined;
     const box = mainRef.current.getBoundingClientRect();
@@ -579,8 +680,10 @@ export function UniverseView({
     const a = preview.at;
     const right = a.right + 12 + W <= box.right - 8;
     const left = right ? a.right - box.left + 12 : Math.max(8, a.left - box.left - W - 12);
-    const top = Math.max(64, Math.min(a.top - box.top, box.height - 440));
-    return { left, top, width: W };
+    // what it taught Socria makes the card taller: raised by about that much, and never past the foot of the screen (it scrolls)
+    const taughtH = previewTaught ? 52 + Math.min(previewTaught.list.length, 5) * 58 + previewTaught.list.slice(0, 5).filter((m) => m.waiting).length * 40 : 0;
+    const top = Math.max(64, Math.min(a.top - box.top, box.height - 440 - taughtH));
+    return previewTaught ? { left, top, width: W, maxHeight: box.height - top - 16 } : { left, top, width: W };
   })();
   const previewHome = previewTile ? homes.of.get(previewTile.id) ?? allHomes.of.get(previewTile.id) ?? null : null;
   const previewSuggested = previewTile && homes.suggested.has(previewTile.id) && previewHome?.projectId ? previewHome : null;
@@ -598,6 +701,7 @@ export function UniverseView({
           .map((l) => ({ id: l.id, title: tileById.get(l.a === previewTile.id ? l.b : l.a)?.title ?? 'a conversation no longer here', label: l.label }))}
         style={pvStyle}
         sheet={narrow}
+        taught={previewTaught}
         acts={{
           onOpen: () => open(previewTile),
           onStar: () => commit((a) => A.setIn(a, 'starred', [previewTile.id], !starredSet.has(previewTile.id))),
@@ -913,9 +1017,13 @@ export function UniverseView({
         all={lens === 'week' ? shown : todayTiles}
         opened={opened}
         backOf={backOf}
+        memory={memLayer}
         acts={mapActs}
       />
     );
+  /** readings still waiting for the person, among what this map draws */
+  const drawn = lens === 'week' ? scoped : lens === 'today' ? todayTiles : [];
+  const waiting = memOn ? memories.filter((m) => m.waiting && m.from.some((id) => drawn.some((t) => t.id === id))).length : 0;
 
   return (
     <section className={`l5h${narrow ? ' is-narrow' : ''}${contents ? ' has-contents' : ''}`} aria-label="Universal Map">
@@ -966,6 +1074,28 @@ export function UniverseView({
                       <span className="l5h-tool-l">{arr.projects ? `${arr.projects.length} of ${homes.list.length} subjects` : 'All subjects'} ▾</span>
                     </button>
                   )}
+                  {/* Memory: what Socria remembers, on the map — signed in, with a memory to read; kept with the arrangement, not undone */}
+                  {memNodes && isSky && (
+                    <button
+                      type="button"
+                      className={`l5h-tool is-mem${arr.display.memory ? ' is-on' : ''}`}
+                      aria-pressed={arr.display.memory}
+                      aria-label={`Memory — what Socria remembers, on the map${waiting ? `; ${waiting} waiting for you` : ''}`}
+                      onClick={() => prefer((a) => A.setDisplay(a, { memory: !a.display.memory }))}
+                      title="What Socria remembers, on the map"
+                    >
+                      <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                        <circle cx="12" cy="12.5" r="3.2" />
+                        <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8" />
+                      </svg>
+                      <span className="l5h-tool-l">Memory</span>
+                      {waiting > 0 && (
+                        <span className="l5h-mem-n" aria-hidden="true">
+                          {waiting}
+                        </span>
+                      )}
+                    </button>
+                  )}
                   <button type="button" className={`l5h-tool l5h-viewbtn${viewOpen ? ' is-on' : ''}`} aria-expanded={viewOpen} onClick={() => setViewOpen((v) => !v)}>
                     <svg viewBox="0 0 24 24" width="15" height="15" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
                       <path d="M4 7h10M18 7h2M4 17h4M12 17h8M14 4.5v5M8 14.5v5" />
@@ -977,6 +1107,15 @@ export function UniverseView({
             </div>
           )}
           <div className="l5h-foot" ref={footRef}>
+            {/* what the new mark means, beside the box while Memory is on and there is room */}
+            {memOn && isSky && !narrow && !contents && (
+              <ul className="l5h-legend" aria-label="What the marks mean">
+                <li>
+                  <span className="l5h-lg-mem" aria-hidden="true" />
+                  what Socria remembers
+                </li>
+              </ul>
+            )}
             <div className="l5h-omni">{findEl}</div>
           </div>
           {viewOpen && (
