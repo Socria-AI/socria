@@ -115,6 +115,13 @@ async function turn(body, { reply = 'Here it is.', script = [], env = {}, uid } 
 
 const STEPS = [U('How do I solve 2x + 3 = 11?'), A(ASKING), U('just show me the steps')];
 
+/**
+ * A turn's prompt, byte for byte, but for the clock: each turn is told the time to the minute
+ * (lib/runtime/epistemic.ts nowLine), so two turns either side of a minute differ there and
+ * nowhere else. Everything else must still match exactly.
+ */
+const promptOf = (call) => JSON.stringify(call?.messages ?? null).replace(/NOW: [^"\\]*? where they are/g, 'NOW: <the time> where they are');
+
 /** The reply's ceiling as it reaches the provider: max_tokens on a classic model, max_completion_tokens on a reasoning one (lib/model-params.ts). */
 const capOf = (call) => call?.max_tokens ?? call?.max_completion_tokens;
 
@@ -123,13 +130,13 @@ console.log('\n=== MR off is the route as it was ===');
   // MR is on by default: "off" (or 0/false/no) is the route as it was
   const unset = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'false' } });
   const off = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'off' } });
-  ok('"false" and "off" send byte-identical prompts', unset.status === 200 && JSON.stringify(unset.streamed.messages) === JSON.stringify(off.streamed.messages));
+  ok('"false" and "off" send byte-identical prompts', unset.status === 200 && promptOf(unset.streamed) === promptOf(off.streamed));
   ok('  no MR header, no [mr] line, no ledger rows', unset.mr === null && off.mr === null && unset.log.length === 0 && off.log.length === 0 && ledger().length === 0, `${unset.mr} ${unset.log.length} ${ledger().length}`);
   ok('  the same max_tokens', capOf(unset.streamed) === capOf(off.streamed));
   const byDefault = await turn({ messages: STEPS }, { env: { LOGOS_MR: undefined } });
   ok('MR runs by default (LOGOS_MR unset): traced and enforced', /^mr1;arm=full;/.test(byDefault.mr ?? '') && /;enf=1;/.test(byDefault.mr ?? ''), byDefault.mr);
   const sh = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'shadow' } });
-  ok('shadow: the identical prompt and ceiling…', JSON.stringify(sh.streamed.messages) === JSON.stringify(off.streamed.messages) && capOf(sh.streamed) === capOf(off.streamed));
+  ok('shadow: the identical prompt and ceiling…', promptOf(sh.streamed) === promptOf(off.streamed) && capOf(sh.streamed) === capOf(off.streamed));
   ok('  …and the decision it WOULD have enforced, traced', /;enf=0;/.test(sh.mr ?? '') && /;a=direct;/.test(sh.mr ?? ''), sh.mr);
 }
 
@@ -229,7 +236,7 @@ console.log('\n=== failure is the route without MR ===');
 {
   const off = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'off' } });
   const r = await turn({ messages: STEPS }, { env: { LOGOS_MR: 'on', MR_TEST_FAULT: 'throw' } });
-  ok('an MR fault: the turn still answers, exactly as with MR off', r.status === 200 && r.received.length > 0 && r.mr === null && JSON.stringify(r.streamed.messages) === JSON.stringify(off.streamed.messages));
+  ok('an MR fault: the turn still answers, exactly as with MR off', r.status === 200 && r.received.length > 0 && r.mr === null && promptOf(r.streamed) === promptOf(off.streamed));
 }
 
 console.log('\n=== cost: no extra model call unless deliberation is on ===');
