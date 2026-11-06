@@ -40,7 +40,12 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: 20
+          # The Node the app runs on. supabase-js (2.108) builds its realtime
+          # client when a client is made, and on Node 20, which has no
+          # WebSocket of its own, that throws: every database call would fail.
+          # Production has made those calls since that version arrived, so it
+          # runs 22 or later; CI on 20 tested a runtime the app cannot run on.
+          node-version: 22
           cache: npm
 
       - name: Install
