@@ -147,16 +147,18 @@ const WRITTEN = '# The causes of World War One\n\nNo single cause; four pressure
   ok('copying it gives its words, not markup', V.contentAsText(WRITTEN).includes('No single cause'));
 }
 
-console.log('\n=== The Logic Map tracks the conversation ===');
+console.log('\n=== The Logic Map tracks the conversation (and draws the subject apart from it) ===');
 {
   const s = screen('Map out my decision');
   ok('"Map out my decision" — structure: the Logic Map, the conversation beside it', route('Map out my decision').intent === 'structure' && s.view === 'logic_map' && s.beside === 'chat');
   for (const t of [FOOTBALL, 'How does scoring work?', 'Compare renting and buying a flat', 'Can you put that in a table?']) ok(`"${t}" — never opens the Logic Map`, screen(t).view === 'chat', J(screen(t)));
   ok('it is live while it is looked at, and drawn on a light cadence otherwise — not on every turn', V.needsMap({ route: route('why?'), view: 'logic_map', filler: false, turnsSinceMap: 0, neverDrawn: false }).map && !V.needsMap({ route: route('why?'), view: 'chat', filler: false, turnsSinceMap: 1, neverDrawn: false }).map);
   const I = V.mapInstructions();
-  ok('the map pass is told the map tracks this conversation, not the subject', /THE MAP TRACKS THIS CONVERSATION, NOT THE SUBJECT/.test(I) && /not an encyclopedia entry on the topic/.test(I));
-  ok('  a learning conversation is mapped as questions, the gist of each answer, and what came next', /learning\s+their questions, what answered each \(the gist, one idea per answer\)/.test(I) && /Not a concept map of the subject/.test(I));
-  ok('  a term explained in passing is not a node unless they took it up', /explained in passing is not a node unless they/.test(I));
+  // Logos 5.5: the map holds the person's thinking AND, as a layer of its own, a drawing of the subject
+  // (test/logic-map-universal.test.mjs) — their thinking is still tracked exactly as before
+  ok('the map pass is told the map holds their thinking, and a drawing of the subject apart from it', /ONE MAP, TWO KINDS OF THING ON IT/.test(I) && /they must never be confused/.test(I) && /"origin": "drawn"/.test(I));
+  ok('  a learning conversation is mapped as questions, the gist of each answer, and what came next', /learning\s+their questions, what answered each \(the gist, one idea per answer\)/.test(I));
+  ok('  a term explained in passing is not one of their nodes unless they took it up', /explained in passing is not one of THEIR nodes unless they took it up/.test(I));
   ok('  and its existing tracking is kept: claims, tensions, decisions, the person\'s own words', /deciding\s+goals, options/.test(I) && /Never mark something resolved, supported, or revised that THEY have not/.test(I));
   ok('a picture is drawn when asked; unasked, never — Socria offers it in words instead', /WHEN THEY ASK, YOU DRAW/.test(I) && /NOT ASKED, NOT DRAWN/.test(I) && !/Beyond an explicit request, emit one when/.test(I));
 }

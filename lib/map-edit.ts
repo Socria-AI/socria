@@ -25,7 +25,8 @@
 // a suggestion.
 
 import type { LogosNodeStatus, LogosRelation, LogosNode, ThinkingMap } from './logos';
-import { MAP_LABEL_MAX, mapCaps } from './logos';
+import { DRAWING_LIMITS, MAP_LABEL_MAX, NODE_TYPES, RELATIONS, mapCaps } from './logos';
+import { withDrawing, type Drawing } from './logos5/drawing';
 
 export type MapEdit =
   | { op: 'remove'; id: string }
@@ -33,8 +34,23 @@ export type MapEdit =
   | { op: 'status'; id: string; status: LogosNodeStatus }
   | { op: 'link'; from: string; to: string; relation?: LogosRelation }
   | { op: 'unlink'; from: string; to: string }
-  /** a node the person chose to take — a Socria suggestion keeps origin 'socria' */
-  | { op: 'add'; node: { label: string; type: LogosNode['type']; role?: LogosNode['role']; origin?: LogosNode['origin'] }; near?: string };
+  /** a node the person chose to take — a Socria suggestion keeps origin 'socria'; a part added to a drawing, 'drawn' */
+  | { op: 'add'; node: { label: string; type: LogosNode['type']; role?: LogosNode['role']; origin?: LogosNode['origin']; detail?: string; at?: string; group?: string }; near?: string }
+  // ── A DRAWING, EDITED (Logos 5.5): what a part is, what it says when opened, where it sits, what a line says ──
+  /** what kind of thing a card is — a step that is really an event, a concept that is a component */
+  | { op: 'retype'; id: string; type: LogosNode['type'] }
+  /** what a card says when it is opened (empty clears it) */
+  | { op: 'detail'; id: string; detail: string }
+  /** when, or in what order, it comes — "1789", "Stage 2" (empty clears it) */
+  | { op: 'at'; id: string; at: string }
+  /** the region it sits inside — "Nucleus", "Cytoplasm" (empty takes it out) */
+  | { op: 'group'; id: string; group: string }
+  /** what a connection says, and what kind it is: "evaporates", "is eaten by" (an empty label clears it) */
+  | { op: 'edge'; from: string; to: string; label?: string; relation?: LogosRelation }
+  /** what the drawing is of — "The water cycle" (empty clears it) */
+  | { op: 'title'; title: string }
+  /** a drawing put on the map — a reply's diagram opened there (lib/logos5/drawing.ts); the drawing before gives way */
+  | { op: 'drawing'; drawing: Drawing };
 
 /** The most labels a map remembers removing. Past this the oldest is forgotten. */
 export const MAX_REMOVED = 40;
@@ -94,6 +110,8 @@ const quote = (s: string) => `“${s}”`;
 
 export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): EditOutcome {
   const caps = mapCaps(map);
+  /** what the edits set on the map itself (its title, and the shape a drawing put on it) */
+  const out0: { title?: string; building?: ThinkingMap['building'] } = { title: map.title, building: map.building };
   let nodes = [...map.nodes];
   let edges = [...map.edges];
   let removed = [...(map.removed ?? [])];
@@ -150,7 +168,12 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       if (nodes.length >= caps.nodes) { refused.push(`The map holds ${caps.nodes} cards, and has them. Take one off or merge two, and ${quote(label)} can go in.`); continue; }
       let id = 'n_' + keyOf(label).replace(/\s+/g, '_').slice(0, 24);
       while (byId(id)) id += '_';
-      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}) }];
+      const extra: Partial<LogosNode> = {};
+      for (const f of ['detail', 'at', 'group'] as const) {
+        const v = String(edit.node[f] ?? '').replace(/\s+/g, ' ').trim().slice(0, DRAWING_LIMITS[f]);
+        if (v && !(f === 'detail' && keyOf(v) === keyOf(label))) extra[f] = v;
+      }
+      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra }];
       // A removal of the same wording is forgotten: they asked for it back.
       removed = removed.filter((r) => r !== keyOf(label));
       if (edit.near && byId(edit.near)) edges = [...edges, { from: id, to: edit.near, relation: 'relates', strength: 'normal' }];
@@ -161,12 +184,68 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
       const before = edges.length;
       edges = edges.filter((e) => !((e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id)));
       applied.push({ edit, said: edges.length < before ? `Disconnected ${quote(a.label)} from ${quote(b.label)}.` : `${quote(a.label)} and ${quote(b.label)} were not connected.` });
+    } else if (edit.op === 'retype') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      if (!(NODE_TYPES as readonly string[]).includes(edit.type)) { refused.push(`A card cannot be a ${String(edit.type)}.`); continue; }
+      nodes = nodes.map((x) => (x.id === n.id ? { ...x, type: edit.type } : x));
+      applied.push({ edit, said: n.type === edit.type ? `${quote(n.label)} was already a ${edit.type}.` : `${quote(n.label)} is now a ${edit.type}.` });
+    } else if (edit.op === 'detail' || edit.op === 'at' || edit.op === 'group') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      const field = edit.op;
+      const raw = edit.op === 'detail' ? edit.detail : edit.op === 'at' ? edit.at : edit.group;
+      const value = String(raw ?? '').replace(/\s+/g, ' ').trim().slice(0, DRAWING_LIMITS[field]);
+      // a card's detail that only repeats its label says nothing more (lib/logos.ts sanitizeMap drops it too)
+      const empty = !value || (field === 'detail' && keyOf(value) === keyOf(n.label));
+      nodes = nodes.map((x) => {
+        if (x.id !== n.id) return x;
+        const { [field]: _gone, ...rest } = x;
+        return empty ? (rest as LogosNode) : { ...rest, [field]: value };
+      });
+      const what = field === 'detail' ? 'what it says when opened' : field === 'at' ? 'when it comes' : 'where it sits';
+      applied.push({ edit, said: empty ? `Cleared ${what} on ${quote(n.label)}.` : field === 'group' ? `Put ${quote(n.label)} in ${quote(value)}.` : field === 'at' ? `${quote(n.label)} now comes at ${quote(value)}.` : `Set ${what} on ${quote(n.label)}.` });
+    } else if (edit.op === 'edge') {
+      const a = byId(edit.from), b = byId(edit.to);
+      if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }
+      const at = edges.findIndex((e) => (e.from === a.id && e.to === b.id) || (e.from === b.id && e.to === a.id));
+      if (at < 0) { refused.push(`${quote(a.label)} and ${quote(b.label)} are not connected.`); continue; }
+      const relation = edit.relation === undefined ? undefined : (RELATIONS as readonly string[]).includes(edit.relation) ? edit.relation : null;
+      if (edit.relation !== undefined && !relation) { refused.push(`A connection cannot be a ${String(edit.relation)}.`); continue; }
+      const e0 = edges[at];
+      let e1 = { ...e0, ...(relation ? { relation } : {}) };
+      if (edit.label !== undefined) {
+        const label = edit.label.replace(/\s+/g, ' ').trim().slice(0, DRAWING_LIMITS.edgeLabel);
+        const { label: _old, ...rest } = e1;
+        e1 = label ? { ...rest, label } : rest;
+      }
+      edges = edges.map((e, i) => (i === at ? e1 : e));
+      const says = e1.label ? `now says ${quote(e1.label)}` : edit.label !== undefined ? 'says nothing now' : `is now ${e1.relation.replace(/_/g, ' ')}`;
+      applied.push({ edit, said: `The line from ${quote(a.label)} to ${quote(b.label)} ${says}.` });
+    } else if (edit.op === 'drawing') {
+      const put = withDrawing({ ...map, nodes, edges, removed, title: out0.title, building: out0.building }, edit.drawing);
+      if ('refused' in put) { refused.push(put.refused); continue; }
+      nodes = put.map.nodes;
+      edges = put.map.edges;
+      removed = put.map.removed ?? [];
+      out0.title = put.map.title;
+      out0.building = put.map.building;
+      const what = edit.drawing.title ? quote(edit.drawing.title) : 'the diagram';
+      applied.push({ edit, said: `Drew ${what} on the Logic Map.` });
+    } else if (edit.op === 'title') {
+      const title = edit.title.replace(/\s+/g, ' ').trim().slice(0, DRAWING_LIMITS.title);
+      out0.title = title || undefined;
+      applied.push({ edit, said: title ? `Called the drawing ${quote(title)}.` : 'Took the title off the drawing.' });
     }
   }
 
   const out: ThinkingMap = { ...map, nodes, edges };
   if (removed.length) out.removed = removed;
   else delete out.removed;
+  if (out0.title) out.title = out0.title;
+  else delete out.title;
+  if (out0.building) out.building = out0.building;
+  else delete out.building;
   return { map: out, applied, refused };
 }
 

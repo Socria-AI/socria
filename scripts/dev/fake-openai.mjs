@@ -259,11 +259,60 @@ function conversationOf(messages) {
   });
 }
 
+/**
+ * THE SUBJECT, DRAWN (Logos 5.5): what a well-behaved map pass returns when
+ * the person's latest words name something with a shape — a cycle, a process,
+ * a classification, a concept map, the parts of a cell, a chronology, causes.
+ * Every part of a drawing is "origin": "drawn"; their own question stays
+ * theirs. Scripted, and true to the subject, so a journey can show the Logic
+ * Map drawing it.
+ */
+const D = (id, type, label, extra = {}) => ({ id, type, label, status: 'open', origin: 'drawn', ...extra });
+const E = (from, to, relation, extra = {}) => ({ from, to, relation, ...extra });
+const QN = (label) => ({ id: 'q', type: 'question', label, status: 'open' });
+const DRAWINGS = [
+  [/water cycle/, () => ({
+    context: 'learning', title: 'The water cycle', building: { kind: 'cycle', by: 'extractor', confidence: 0.9, why: 'stages that return to where they began' },
+    nodes: [QN('How does the water cycle work?'), D('ev', 'process', 'Evaporation', { role: 'stage', detail: 'The sun heats oceans, lakes and rivers, and water rises as vapour.' }), D('co', 'process', 'Condensation', { role: 'stage', detail: 'The vapour cools as it rises and forms cloud droplets.' }), D('pr', 'process', 'Precipitation', { role: 'stage', detail: 'Droplets merge until they are heavy enough to fall as rain, snow or hail.' }), D('cl', 'process', 'Collection', { role: 'stage', detail: 'Water gathers in seas, lakes, rivers and the ground, ready to rise again.' })],
+    edges: [E('ev', 'co', 'becomes', { label: 'rises and cools' }), E('co', 'pr', 'leads_to', { label: 'droplets merge' }), E('pr', 'cl', 'flows_to', { label: 'falls' }), E('cl', 'ev', 'leads_to', { label: 'heated again' }), E('q', 'ev', 'applies_to')],
+  })],
+  [/bill becomes? (?:a )?law|flow ?chart/, () => ({
+    context: 'learning', title: 'How a bill becomes law', building: { kind: 'process', by: 'extractor', confidence: 0.9, why: 'steps in order, with where it can stop' },
+    nodes: [D('in', 'event', 'Bill introduced', { role: 'start', detail: 'A member of the House or Senate introduces it.' }), D('cm', 'step', 'Committee review', { role: 'step', detail: 'A committee studies, amends and votes to send it on.' }), D('fv', 'step', 'Floor vote', { role: 'branch', detail: 'The whole chamber debates and votes.' }), D('oc', 'step', 'Other chamber', { role: 'step', detail: 'The other chamber passes the same text.' }), D('pr', 'step', 'President', { role: 'branch', detail: 'The President signs it or vetoes it.' }), D('vo', 'step', 'Veto override', { role: 'branch', detail: 'Two-thirds of both chambers can override a veto.' }), D('law', 'event', 'Becomes law', { role: 'end' }), D('dies', 'event', 'Bill dies', { role: 'end' })],
+    edges: [E('in', 'cm', 'precedes'), E('cm', 'fv', 'precedes'), E('fv', 'oc', 'leads_to', { when: 'passes' }), E('fv', 'dies', 'leads_to', { when: 'fails' }), E('oc', 'pr', 'precedes'), E('pr', 'law', 'leads_to', { when: 'signs' }), E('pr', 'vo', 'leads_to', { when: 'vetoes' }), E('vo', 'law', 'leads_to', { when: 'two-thirds' })],
+  })],
+  [/types of rock|kinds of rock|rock (?:types|classification)/, () => ({
+    context: 'learning', title: 'Types of rock', building: { kind: 'hierarchy', by: 'extractor', confidence: 0.9, why: 'a classification' },
+    nodes: [D('r', 'category', 'Rock', { role: 'category' }), D('ig', 'category', 'Igneous', { role: 'member', detail: 'Formed as magma or lava cools and hardens.' }), D('se', 'category', 'Sedimentary', { role: 'member', detail: 'Formed from layers of sediment pressed together.' }), D('me', 'category', 'Metamorphic', { role: 'member', detail: 'Formed when heat and pressure change existing rock.' }), D('gr', 'entity', 'Granite', { role: 'member' }), D('ba', 'entity', 'Basalt', { role: 'member' }), D('sa', 'entity', 'Sandstone', { role: 'member' }), D('li', 'entity', 'Limestone', { role: 'member' }), D('ma', 'entity', 'Marble', { role: 'member' }), D('sl', 'entity', 'Slate', { role: 'member' })],
+    edges: [E('ig', 'r', 'is_a'), E('se', 'r', 'is_a'), E('me', 'r', 'is_a'), E('gr', 'ig', 'is_a'), E('ba', 'ig', 'is_a'), E('sa', 'se', 'is_a'), E('li', 'se', 'is_a'), E('ma', 'me', 'is_a'), E('sl', 'me', 'is_a')],
+  })],
+  [/photosynthesis/, () => ({
+    context: 'learning', title: 'Photosynthesis', building: { kind: 'concept', by: 'extractor', confidence: 0.85, why: 'how the ideas connect' },
+    nodes: [D('ps', 'process', 'Photosynthesis', { role: 'concept', detail: 'Plants turn light, water and carbon dioxide into sugar and oxygen.' }), D('sun', 'entity', 'Sunlight', { role: 'concept' }), D('chl', 'entity', 'Chlorophyll', { role: 'concept', detail: 'The green pigment in chloroplasts that absorbs light.' }), D('co2', 'entity', 'Carbon dioxide', { role: 'concept' }), D('h2o', 'entity', 'Water', { role: 'concept' }), D('glu', 'entity', 'Glucose', { role: 'concept', detail: 'The sugar the plant uses for energy and growth.' }), D('o2', 'entity', 'Oxygen', { role: 'concept' })],
+    edges: [E('sun', 'chl', 'relates', { label: 'absorbed by' }), E('chl', 'ps', 'causes', { label: 'drives' }), E('co2', 'ps', 'flows_to', { label: 'taken in' }), E('h2o', 'ps', 'flows_to', { label: 'taken in' }), E('ps', 'glu', 'causes', { label: 'produces' }), E('ps', 'o2', 'causes', { label: 'releases' })],
+  })],
+  [/plant cell|parts of a cell|labell?ed diagram/, () => ({
+    context: 'learning', title: 'A plant cell', building: { kind: 'parts', by: 'extractor', confidence: 0.9, why: 'what it is made of' },
+    nodes: [D('c', 'entity', 'Plant cell', { role: 'whole' }), D('w', 'component', 'Cell wall', { role: 'part', group: 'Boundary', detail: 'A rigid layer of cellulose that gives the cell its shape.' }), D('m', 'component', 'Cell membrane', { role: 'part', group: 'Boundary', detail: 'Controls what enters and leaves.' }), D('n', 'component', 'Nucleus', { role: 'part', group: 'Cytoplasm', detail: 'Holds the DNA and directs the cell.' }), D('ch', 'component', 'Chloroplast', { role: 'part', group: 'Cytoplasm', detail: 'Where photosynthesis happens.' }), D('v', 'component', 'Vacuole', { role: 'part', group: 'Cytoplasm', detail: 'Stores water and keeps the cell firm.' }), D('mi', 'component', 'Mitochondrion', { role: 'part', group: 'Cytoplasm', detail: 'Releases energy from glucose.' })],
+    edges: [E('w', 'c', 'part_of'), E('m', 'c', 'part_of'), E('n', 'c', 'part_of'), E('ch', 'c', 'part_of'), E('v', 'c', 'part_of'), E('mi', 'c', 'part_of')],
+  })],
+  [/space race/, () => ({
+    context: 'learning', title: 'The space race', building: { kind: 'timeline', by: 'extractor', confidence: 0.9, why: 'events in order' },
+    nodes: [D('s1', 'event', 'Sputnik 1', { at: '1957', detail: 'The Soviet Union launches the first artificial satellite.' }), D('ex', 'event', 'Explorer 1', { at: '1958', detail: 'The first US satellite.' }), D('ga', 'event', 'Gagarin orbits Earth', { at: '1961' }), D('te', 'event', 'Tereshkova in orbit', { at: '1963', detail: 'The first woman in space.' }), D('le', 'event', 'First spacewalk', { at: '1965', detail: 'Alexei Leonov leaves Voskhod 2.' }), D('ap', 'event', 'Apollo 11 lands', { at: '1969', detail: 'Armstrong and Aldrin walk on the Moon.' })],
+    edges: [E('s1', 'ex', 'precedes'), E('ex', 'ga', 'precedes'), E('ga', 'te', 'precedes'), E('te', 'le', 'precedes'), E('le', 'ap', 'precedes')],
+  })],
+];
+
 /** A Thinking Map for the conversation so far: deterministic, from the person's own sentences. */
 function mapReply(messages) {
   const transcript = messages.map((m) => String(m.content ?? '')).join('\n');
   const said = allUser(messages).join(' ');
   const lower = said.toLowerCase();
+  // the person's latest words: the map pass sends the conversation as one transcript ("User: …" / "Logos: …")
+  const said1 = allUser(messages).slice(-1)[0] ?? '';
+  const lines = [...said1.matchAll(/^User: (.*)$/gm)].map((m) => m[1]);
+  const latest = (lines.length ? lines[lines.length - 1] : said1).toLowerCase();
+  for (const [re, draw] of DRAWINGS) if (re.test(latest)) return { ask: { action: 'discuss', artifact: 'map' }, ...draw() };
   if (/\b(chart|plot|graph|pie)\b/.test(lower) && /\d/.test(lower)) {
     return {
       context: 'analysing',

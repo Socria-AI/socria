@@ -78,6 +78,11 @@ const OUT: Record<LogosRelation, string> = {
   justifies: 'justifies',
   equivalent_to: 'equivalent to',
   applies_to: 'applies to',
+  causes: 'causes',
+  inhibits: 'inhibits',
+  is_a: 'is a kind of',
+  flows_to: 'flows to',
+  becomes: 'becomes',
 };
 const IN: Record<LogosRelation, string> = {
   supports: 'supported by',
@@ -93,6 +98,11 @@ const IN: Record<LogosRelation, string> = {
   justifies: 'justified by',
   equivalent_to: 'equivalent to',
   applies_to: 'applied by',
+  causes: 'caused by',
+  inhibits: 'inhibited by',
+  is_a: 'includes',
+  flows_to: 'receives from',
+  becomes: 'comes from',
 };
 
 /** A relation as the node at one end would say it. */

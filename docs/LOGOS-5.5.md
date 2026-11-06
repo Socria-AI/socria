@@ -223,7 +223,86 @@ the four views and the zoomed-out canvas as they were.
 - **Nothing floats over the board.** The view's own actions are gone from
   it: Synthesize and AR Mode are in More.
 
-## 9. Not finished
+## 9. The Logic Map draws almost anything
+
+The Logic Map was a picture of the person's reasoning and nothing else: its
+extractor was told "the map tracks this conversation, not the subject", a
+concept map of the subject was refused, diagram requests went to Artifacts,
+and sixteen cards were the most any map held. It keeps its name and its
+analysis, and now draws the subject too.
+
+- **One map, two kinds of thing** (`lib/logos.ts` `mapInstructions`). The
+  person's thinking — questions, claims, evidence, assumptions, values,
+  decisions, doubts, how they relate — is analysed exactly as before. Beside
+  it the map can hold **a drawing of the subject**: every part of it
+  `"origin": "drawn"`, a `title` ("The water cycle"), and `building.kind` for
+  its shape. The two are never merged: their question `applies_to` the part
+  it is about.
+- **What a drawing can say.** New kinds of thing (entity, process, event,
+  state, actor, component, category, quantity) and of connection (causes,
+  inhibits, is a kind of, flows to, becomes); words along a line (`label`);
+  when a part comes (`at`: "1789", "Stage 2"); the region it sits in
+  (`group`); what it says when opened (`detail`). A drawing holds 24 parts
+  and 36 lines; nothing else grows. Labels on a drawing are 1–4 words; the
+  rest goes in `detail`.
+- **Five new shapes** (`lib/representation.ts`): cycle, hierarchy, concept
+  map, cause and effect, parts, each with its roles, what it is called ("as a
+  fishbone", "into a family tree") and how it is satisfied.
+- **When it draws.** Asked for, always: a flowchart, a cycle, a hierarchy or
+  org chart, a family tree, a concept map, a cause-and-effect or fishbone
+  diagram, a labelled diagram, a block or system diagram, "draw the water
+  cycle", "diagram how vaccines work" open the Logic Map
+  (`lib/runtime/orchestrate.ts` `diagramAsked`), and the map pass is told the
+  shape asked for. Unasked, when a question's subject has a shape — "explain
+  the water cycle", "what caused World War I?", "how is Parliament
+  structured?", "the stages of mitosis", "a timeline of the French
+  Revolution" — it stays a question in the conversation (the reply draws its
+  own small diagram) and the map draws the subject **in the background**
+  (`drawable`, `needsMap` `draw`), never opening a view — for Socria One and
+  a guest; a signed-in free account's week of tokens is not spent on a pass
+  nobody asked for, so there the reply's diagram waits for **Open on the
+  Logic Map**, which needs no model. A person's own
+  story, one event or a body failing is never drawn. A picture of a field or
+  a function, a Venn diagram, and anything made from the Make list ("Make a
+  flowchart: …") are still made in Artifacts.
+- **Six lenses for a drawing** (`lib/logos5/diagramLayout.ts`): **Cycle**
+  (the stages round a ring, the last arc back to the first), **Tree** (a
+  tidy tree, parents over their children), **Parts** (each whole a region
+  with its parts inside), **Concepts** (the most connected idea at the
+  centre, every line labelled in words), a **dated Timeline** (events on an
+  axis spaced by when they happened, dots on the axis) and the **Flow** lens
+  upgraded (a pill where it starts or ends, a marked corner where it
+  divides, the condition or the words on each line). A drawing's cards are
+  words only; its kind is in the inspector. Its own lens leads and is first
+  among the tabs; the graph shows its line words too.
+- **Inspect and edit** (`components/logos5/MapInspector.tsx`). A pressed
+  card says whose it is ("Drawn by Socria · a process"), what it says opened
+  and its lines; **Edit** changes its name, kind, detail, time, region and
+  the words and kind of each of its lines — deterministic edits
+  (`lib/map-edit.ts`: retype, detail, at, group, edge, title, drawing), one
+  change for Undo. A part taken off stays off.
+- **With Artifacts and the conversation** (`lib/logos5/drawing.ts`). **Keep
+  in Artifacts**, beside the drawing's title, files it as a Diagram display
+  (once; pressed again it opens). **Open on the Logic Map**, under a reply's
+  cycle, tree, flow or causes diagram, puts it on the map as a drawing (the
+  one before gives way; the person's thinking is untouched) and opens it
+  beside the board. The board's pinned card is named by the drawing ("Logic
+  Map · The water cycle"); the key at the map's foot drops the reasoning
+  lines when only a drawing is drawn.
+- **Kept as it was.** Every map saved before reads back exactly as it was
+  (`test/fixtures/legacy-maps.json`, sixteen maps saved by the old
+  sanitizer); a mathematical map still reads "quantity" as a given and
+  "process" as a concept; "stage" and "part" keep their old meanings outside
+  a cycle or a breakdown; a map holding a drawing is never rewired whole by
+  the shape repair. AR Mode has words for every new connection.
+- **The free plan.** Nothing changes in what is counted: a drawing's parts
+  are Logic Map nodes like any others, by the map pass or by "Open on the
+  Logic Map", and Keep counts as an artifact. When the month's nodes cannot
+  hold a whole drawing, the person's own new ideas are kept first and the
+  drawing is kept whole or not at all — never half a drawing, never charged
+  for a part not kept (`lib/quota-map.ts` `keepAddedNodes`).
+
+## 10. Not finished
 
 - **Readings seen once** are not on the map: they live in the pending ledger,
   which the Logos memory feed deliberately does not send. "Waiting" on the map
@@ -242,8 +321,17 @@ the four views and the zoomed-out canvas as they were.
 - The phone sheet, and the White, Dark and Celestial themes, use the same
   tokens and were not drawn separately in the handoff; they were checked only
   where the browser runs below went.
+- **The Logic Map's drawings.** One drawing per map: a second subject
+  replaces the first (Undo brings it back). On a phone the camera centres a
+  drawing without allowing for the floating composer, so its lowest part can
+  sit under it until the map is moved. A concept map of a pure chain is one
+  long column (the Flow lens draws it better), and a very dense concept map
+  can run a line behind a card. Keep in Artifacts files the drawing but does
+  not open it beside the board. The map pass draws only what the model
+  writes: the drawings in the browser runs below came from the local
+  stand-in model, not a live one.
 
-## 10. How it is held
+## 11. How it is held
 
 - `test/logos5-system-5-5.test.mjs` reads the sources: the old sheets gone and
   never imported; the three states; the one icon, menu, close and label; every
@@ -264,6 +352,15 @@ the four views and the zoomed-out canvas as they were.
   off the board, wires, the tray) and the sheet; the wiring in LogosApp.
 - `test/logos5-map-memory.test.mjs`: memory's kinds from provenance, where
   each hangs, what is left off, the key, the card, That's right / Not quite.
+- `test/logic-map-universal.test.mjs`: the new kinds, connections and
+  fields; every old map read back unchanged; the caps; the five shapes;
+  diagram requests routed (and pictures, the Make list and conversation not
+  moved); the background drawing and the map pass's instructions; every edit;
+  the free plan's whole-or-nothing rule; AR words and lenses; a drawing
+  between a reply, the map and Artifacts.
+- `test/logos5-diagram-layout.test.mjs`: the cycle, tree, parts, concept and
+  dated-timeline lenses — no overlaps, nothing lost, every line once, the
+  same picture every time, on 160 seeded maps per lens and the odd ones.
 - The suites that asserted the old chrome (`logos5-shell`, `logos5-canvas`,
   `logos5-views`, `logos5-study-ui`, `four-views`, `ar-mode`,
   `onboarding-tips`, `ux-polish`, `logos3-chat-notes`) now assert the 5.5
@@ -276,4 +373,8 @@ the four views and the zoomed-out canvas as they were.
   right, the files folded (`.journeys/l55-study.mjs`); the board — three
   turns, a file, a drawing; a turn read; Fold; each tab; Split View with the
   Logic Map and with an artifact; at 1440, 1100 and a phone
-  (`.journeys/l55-board.mjs`).
+  (`.journeys/l55-board.mjs`); the Logic Map drawing a water cycle (asked
+  for, inspected, edited, kept in Artifacts, seen as Graph and Flow), how a
+  bill becomes law, the types of rock, photosynthesis, a plant cell and the
+  space race, and a reply's diagram opened on the map, at 1440 and on a
+  phone (`.journeys/lm-diagrams.mjs`, `.journeys/lm-phone.mjs`).

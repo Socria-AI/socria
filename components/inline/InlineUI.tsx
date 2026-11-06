@@ -43,6 +43,8 @@ export interface InlineHost {
   onChoose?: (text: string) => void;
   /** a chart or a comparison opened as a full artifact in the Artifacts view (once; after that, what it made opens) */
   onOpen?: (n: number, spec: InlineSpec) => void;
+  /** a diagram opened on the Logic Map, as a drawing to open, edit, inspect and keep (Logos 5.5, lib/logos5/drawing.ts) */
+  onMap?: (n: number, spec: InlineSpec) => void;
   /** choices can still be tapped — nothing has been said since this reply */
   live?: boolean;
   /**
@@ -162,7 +164,7 @@ function drawn(spec: InlineSpec, n: number, host: InlineHost | undefined, state:
     case 'claim':
       return <InlineClaim spec={spec} state={state} onState={setState} shared={!!host?.onState} renderInline={renderInline} />;
     case 'diagram':
-      return <InlineDiagram spec={spec} state={state} onState={setState} renderInline={renderInline} />;
+      return <InlineDiagram spec={spec} state={state} onState={setState} renderInline={renderInline} onMap={host?.onMap ? () => host.onMap!(n, spec) : undefined} />;
     case 'balance':
       return <InlineBalance spec={spec} renderInline={renderInline} />;
     case 'equation':
@@ -1881,7 +1883,7 @@ function InlineSteps({ spec, state, onState, renderInline }: { spec: StepsSpec; 
  * its weight and line — heavy for an underlying cause, a bar for the trigger,
  * dashed for an amplifier, filled for the effect — never by colour alone.
  */
-function InlineDiagram({ spec, state, onState, renderInline }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline }) {
+function InlineDiagram({ spec, state, onState, renderInline, onMap }: { spec: DiagramSpec; state?: InlineState; onState: (s: InlineState) => void; renderInline: RenderInline; onMap?: () => void }) {
   const id = useId();
   const marker = `lnarrow${id.replace(/[^A-Za-z0-9_-]/g, '')}`;
   const [ref, width] = useWidth<HTMLDivElement>(600);
@@ -1991,6 +1993,17 @@ function InlineDiagram({ spec, state, onState, renderInline }: { spec: DiagramSp
       </p>
       <div className="ln-foot">
         <span className="ln-basis">{cur ? '' : spec.nodes.some((nd) => nd.detail) ? 'Open a part to read more' : 'Open a part to see what it connects to'}</span>
+        {onMap && (
+          <button type="button" className="ln-open ln-to-map" onClick={onMap} title="Draw this on the Logic Map, to open, edit and keep">
+            <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <circle cx="4" cy="4" r="1.8" />
+              <circle cx="12" cy="5" r="1.8" />
+              <circle cx="7" cy="12" r="1.8" />
+              <path d="M5.6 4.4 10.3 4.8M11 6.6 8 10.6M4.6 5.7 6.3 10.3" />
+            </svg>
+            Open on the Logic Map
+          </button>
+        )}
       </div>
     </div>
   );

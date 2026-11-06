@@ -69,7 +69,11 @@ import {
   type LensId,
   type Placed,
   buildMatrix,
+  type GroupBox,
 } from '@/lib/logos-layout';
+import { MapInspector } from '@/components/logos5/MapInspector';
+import { drawingOf } from '@/lib/logos5/drawing';
+import { layoutConcept, layoutCycle, layoutDatedTimeline, layoutParts, layoutTree } from '@/lib/logos5/diagramLayout';
 import { attachmentsOf, GRAMMARS, spineOf } from '@/lib/representation';
 import { ObjectFigure } from '@/components/objects/ObjectFigure';
 import { objOf, type ThoughtObject } from '@/lib/objects';
@@ -199,6 +203,8 @@ export function ThinkingMap({
   grounded,
   onAddContext,
   onEdit,
+  onEdits,
+  onKeepDrawing,
   emerging,
   onAskAbout,
   onModelEdited,
@@ -254,6 +260,10 @@ export function ThinkingMap({
   onAddContext?: (node: MapNodeRef) => void;
   /** the person edits the map by hand — remove a card, change its status (lib/map-edit.ts) */
   onEdit?: (edit: MapEdit) => void;
+  /** several edits made at once, as one change — a card edited in its inspector (components/logos5/MapInspector.tsx) */
+  onEdits?: (edits: MapEdit[]) => void;
+  /** the map's drawing filed in Artifacts as a Diagram display (Logos 5.5, lib/logos5/drawing.ts) */
+  onKeepDrawing?: () => void;
   /**
    * The first map, arriving: cards rise one after another and the lines
    * between them draw. A fact about this moment (the person's language has
@@ -510,6 +520,7 @@ export function ThinkingMap({
   const dragAtRef = useRef<{ id: string; x: number; y: number } | null>(null);
   /** the cards and connectors as last rendered, for re-routing a dragged card's lines */
   const placedNowRef = useRef<Placed[]>([]);
+  const groupsNowRef = useRef<GroupBox[]>([]);
   const connNowRef = useRef<Connector[]>([]);
 
   // Hold the graph still while a menu is open or a card is in the hand — a
@@ -533,7 +544,11 @@ export function ThinkingMap({
       }
       return boundsOf(rects);
     }
-    return boundsOf(placedNowRef.current.map((p) => ({ x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h })));
+    // the regions a drawing's parts sit in are part of the picture too (Logos 5.5): fitted with the cards
+    return boundsOf([
+      ...placedNowRef.current.map((p) => ({ x: p.x - p.w / 2, y: p.y - p.h / 2, w: p.w, h: p.h })),
+      ...groupsNowRef.current.map((g) => ({ x: g.x, y: g.y, w: g.w, h: g.h })),
+    ]);
   };
 
   /** Fit was asked for by name: show ALL of it, however small that makes it. */
@@ -1167,7 +1182,13 @@ export function ThinkingMap({
     if (lens === 'tensions') return layoutTensions(map, w, h);
     if (lens === 'solve') return layoutSolve(map, w, h);
     if (lens === 'flow') return layoutFlow(map, w, h);
-    if (lens === 'timeline') return layoutTimeline(map, w, h);
+    // a drawing's dates set it on its axis, spaced by when they fell (Logos 5.5); a timeline without them as before
+    if (lens === 'timeline') return layoutDatedTimeline(map, w, h) ?? layoutTimeline(map, w, h);
+    // THE SUBJECT, DRAWN (Logos 5.5, lib/logos5/diagramLayout.ts)
+    if (lens === 'cycle') return layoutCycle(map, w, h);
+    if (lens === 'tree') return layoutTree(map, w, h);
+    if (lens === 'parts') return layoutParts(map, w, h);
+    if (lens === 'concept') return layoutConcept(map, w, h);
     if (lens === 'work') return layoutWork(map, w, h, objH);
     return layoutEvidence(map, w, h);
   }, [lens, map, size, workspace, objH]);
@@ -1331,6 +1352,12 @@ export function ThinkingMap({
       const cx = (ax + bx) / 2 - (dy / len) * off;
       const cy = (ay + by) / 2 + (dx / len) * off;
       el.setAttribute('d', `M ${ax} ${ay} Q ${cx} ${cy} ${bx} ${by}`);
+      // what the line says sits at the curve's middle (Logos 5.5)
+      const t = labelElRef.current.get(key);
+      if (t) {
+        t.setAttribute('x', String(Math.round(((ax + 2 * cx + bx) / 4) * 10) / 10));
+        t.setAttribute('y', String(Math.round(((ay + 2 * cy + by) / 4 - 6) * 10) / 10));
+      }
     }
   }, []);
 
@@ -1522,6 +1549,11 @@ export function ThinkingMap({
   }, [map.nodes]);
   const caption =
     staticLayout?.caption ?? LENSES.find((l) => l.id === lens)!.caption;
+  /** What the map's drawing is of, when it holds one (Logos 5.5): it names the plate, and it can be kept. */
+  const drawnTitle = useMemo(() => {
+    const d = drawingOf(map);
+    return d ? d.title || 'A drawing' : null;
+  }, [map]);
   /** Where the surface's close goes: the map, or the first lens the reader may open that is not the surface. */
   const closeTo = lenses.find((l) => l !== 'plot' && !lensLocked(l)) ?? null;
   /** The model on the plate when the plot lens is showing one — the design's "working surface". */
@@ -1574,9 +1606,14 @@ export function ThinkingMap({
           path: '',
           relation: e.relation as LogosRelation,
           strength: e.strength,
+          // what the line says (Logos 5.5): placed at its middle by the graph's own loop (paint)
+          ...(e.label ? { label: e.label, lx: 0, ly: 0 } : {}),
         }))
       : rerouted(staticLayout?.connectors ?? [], placedWithPins, lensPins);
   placedNowRef.current = lens === 'graph' ? [] : cards;
+  // the regions behind a parts diagram's cards (Logos 5.5) — not moved with a pinned card, so they hold only while none is
+  const groups: GroupBox[] = lens === 'graph' || Object.keys(lensPins).length ? [] : (staticLayout?.groups ?? []);
+  groupsNowRef.current = groups;
   connNowRef.current = lens === 'graph' ? [] : connectors;
 
   // Each new lens, and each new arrangement of a laid-out one: the camera
@@ -1598,7 +1635,7 @@ export function ThinkingMap({
           names the lens and asks its question — the caption that was already
           written for every lens and was printed at the FOOT of the panel,
           where it arrived after the thing it was meant to introduce. */}
-      {lenses.length > 1 && (
+      {(lenses.length > 1 || !!drawnTitle) && (
         <div className="mp-top">
           {surfaceTitle ? (
             // A WORKING SURFACE, named as the design names it: "{what} surface ·
@@ -1632,8 +1669,14 @@ export function ThinkingMap({
             </>
           ) : (
             <>
-              <span className="l">{LENSES.find((l) => l.id === lens)?.label ?? 'Map'}</span>
-              <span className="st">{caption}</span>
+              {/* A DRAWING IS NAMED BY WHAT IT IS OF (Logos 5.5): "The water cycle", its lens and question beside it */}
+              <span className={`l${drawnTitle ? ' is-title' : ''}`}>{drawnTitle ?? LENSES.find((l) => l.id === lens)?.label ?? 'Map'}</span>
+              <span className="st">{drawnTitle ? `${LENSES.find((l) => l.id === lens)?.label ?? 'Map'} · ${caption}` : caption}</span>
+              {drawnTitle && onKeepDrawing && (
+                <button type="button" className="mp-keep" onClick={onKeepDrawing} title="Keep this drawing in Artifacts, as a diagram">
+                  Keep in Artifacts
+                </button>
+              )}
             </>
           )}
         </div>
@@ -1887,6 +1930,18 @@ export function ThinkingMap({
             it would lie over the plot and the Board like a sheet of glass. */}
         {isCanvas && (
           <div className="lg-map-world" ref={worldRef}>
+        {/* WHAT SITS INSIDE WHAT (Logos 5.5): a parts diagram's regions, behind its cards, deepest last */}
+        {groups.map((g) => (
+          <div
+            key={g.key}
+            className={`lg-group is-d${Math.min(3, g.depth ?? 0)}`}
+            style={{ left: g.x, top: g.y, width: g.w, height: g.h }}
+            aria-hidden="true"
+          >
+            {/* a whole's own card names its region (lib/logos5/diagramLayout.ts): its label is not said twice */}
+            {!g.key.startsWith('whole~') && <span className="lg-group-label">{g.label}</span>}
+          </div>
+        ))}
         <svg className="lg-edges" aria-hidden="true">
           <defs>
             <marker
@@ -1899,6 +1954,10 @@ export function ThinkingMap({
               orient="auto-start-reverse"
             >
               <path d="M0,1 L7,4 L0,7" fill="none" stroke="currentColor" strokeWidth="1.2" />
+            </marker>
+            {/* where a dated event sits on its axis (Logos 5.5): the dot at the foot of its tick */}
+            <marker id="lg-dot" viewBox="0 0 8 8" refX="4" refY="4" markerWidth="7" markerHeight="7">
+              <circle cx="4" cy="4" r="3" fill="currentColor" />
             </marker>
           </defs>
           {connectors.map((c) => {
@@ -1921,7 +1980,7 @@ export function ThinkingMap({
                   pathLength={1}
                   fill="none"
                   markerEnd={c.arrow ? 'url(#lg-arrow)' : undefined}
-                  markerStart={c.double ? 'url(#lg-arrow)' : undefined}
+                  markerStart={c.double ? 'url(#lg-arrow)' : c.key.startsWith('tick~') ? 'url(#lg-dot)' : undefined}
                 />
                 {c.label && c.lx != null && c.ly != null && (
                   <text
@@ -2044,7 +2103,9 @@ export function ThinkingMap({
                   p.node.flag ? ` lg-flag-${p.node.flag}` : ''
                 }${p.branch ? ' is-branch' : ''}${shapeLens && !p.loose ? ' is-shaped' : ''}${
                   picked?.has(p.id) ? ' is-picked' : ''
-                }${p.node.origin === 'socria' ? ' is-socria' : ''}${linked?.has(p.id) ? ' is-linked' : ''}`}
+                }${p.node.origin === 'socria' ? ' is-socria' : ''}${p.node.origin === 'drawn' ? ' is-drawn' : ''}${
+                  p.shape ? ` is-shape-${p.shape}` : ''
+                }${p.bare ? ' is-bare' : ''}${linked?.has(p.id) ? ' is-linked' : ''}`}
                 title={shapeLens && p.node.role ? `${p.node.role} · ${p.node.type}` : undefined}
                 aria-haspopup="menu"
                 aria-expanded={menuFor === p.id}
@@ -2219,6 +2280,8 @@ export function ThinkingMap({
                 style={{ left: menu.x, top: menu.y, maxHeight: menu.maxH, overflowY: 'auto' }}
                 onClick={(ev) => ev.stopPropagation()}
               >
+                {/* WHAT THIS CARD IS (Logos 5.5): whose, what kind, what it says opened — and Edit */}
+                <MapInspector key={node.id} node={node} map={map} onEdits={onEdits ?? (onEdit ? (es) => es.forEach((x) => onEdit(x)) : undefined)} />
                 {askCard?.({ id: node.id, label: node.label, type: node.type }, () => setMenu(null))}
                 {/* with the ask first, the card's other actions are a press away beneath it */}
                 <MoreActs folded={!!askCard}>

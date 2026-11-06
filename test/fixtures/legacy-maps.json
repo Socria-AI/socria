@@ -1,0 +1,1432 @@
+{
+ "note": "Logic Maps as the sanitizer before Logos 5.5 saved them (lib/logos.ts at a404afa). The universal map must read every one back exactly as it was: test/logic-map-universal.test.mjs.",
+ "maps": [
+  {
+   "name": "shapes:ONBOARDING_CLOUD",
+   "saved": {
+    "nodes": [
+     {
+      "id": "ux",
+      "type": "constraint",
+      "label": "user experience",
+      "status": "open"
+     },
+     {
+      "id": "steps",
+      "type": "constraint",
+      "label": "steps involved",
+      "status": "open"
+     },
+     {
+      "id": "info",
+      "type": "constraint",
+      "label": "information to be provided",
+      "status": "open"
+     },
+     {
+      "id": "easy",
+      "type": "value",
+      "label": "easy access",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "easy",
+      "to": "ux",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "steps",
+      "to": "ux",
+      "relation": "relates",
+      "strength": "normal"
+     }
+    ],
+    "context": "planning"
+   }
+  },
+  {
+   "name": "shapes:ONBOARDING_REPAIRED",
+   "saved": {
+    "nodes": [
+     {
+      "id": "ux",
+      "type": "constraint",
+      "label": "user experience",
+      "status": "open",
+      "role": "value"
+     },
+     {
+      "id": "steps",
+      "type": "constraint",
+      "label": "steps involved",
+      "status": "open",
+      "role": "note"
+     },
+     {
+      "id": "info",
+      "type": "constraint",
+      "label": "information to be provided",
+      "status": "open",
+      "role": "constraint"
+     },
+     {
+      "id": "easy",
+      "type": "value",
+      "label": "easy access",
+      "status": "open",
+      "role": "value"
+     },
+     {
+      "id": "landing",
+      "type": "concept",
+      "label": "Landing",
+      "status": "open",
+      "role": "start"
+     },
+     {
+      "id": "intro",
+      "type": "concept",
+      "label": "Intro",
+      "status": "open",
+      "role": "step"
+     },
+     {
+      "id": "signup",
+      "type": "step",
+      "label": "Sign up",
+      "status": "open",
+      "role": "step"
+     }
+    ],
+    "edges": [
+     {
+      "from": "landing",
+      "to": "intro",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "intro",
+      "to": "signup",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "easy",
+      "to": "landing",
+      "relation": "applies_to",
+      "strength": "normal"
+     },
+     {
+      "from": "info",
+      "to": "signup",
+      "relation": "applies_to",
+      "strength": "normal"
+     },
+     {
+      "from": "ux",
+      "to": "intro",
+      "relation": "applies_to",
+      "strength": "normal"
+     },
+     {
+      "from": "steps",
+      "to": "landing",
+      "relation": "applies_to",
+      "strength": "normal"
+     }
+    ]
+   }
+  },
+  {
+   "name": "synthesis:ARGUMENT",
+   "saved": {
+    "nodes": [
+     {
+      "id": "c",
+      "type": "claim",
+      "label": "Four-day weeks raise output",
+      "status": "supported",
+      "role": "claim"
+     },
+     {
+      "id": "e1",
+      "type": "evidence",
+      "label": "UK pilot: revenue held steady",
+      "status": "open",
+      "role": "evidence"
+     },
+     {
+      "id": "e2",
+      "type": "evidence",
+      "label": "Iceland trials: wellbeing up",
+      "status": "open",
+      "role": "evidence"
+     },
+     {
+      "id": "a",
+      "type": "assumption",
+      "label": "Output can be measured fairly",
+      "status": "open",
+      "role": "assumption"
+     },
+     {
+      "id": "o",
+      "type": "counterpoint",
+      "label": "Self-selected firms",
+      "status": "open",
+      "role": "objection"
+     }
+    ],
+    "edges": [
+     {
+      "from": "e1",
+      "to": "c",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "e2",
+      "to": "c",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "a",
+      "to": "c",
+      "relation": "depends",
+      "strength": "normal"
+     },
+     {
+      "from": "o",
+      "to": "e1",
+      "relation": "conflicts",
+      "strength": "normal"
+     }
+    ],
+    "context": "writing",
+    "building": {
+     "kind": "argument",
+     "by": "inferred",
+     "confidence": 0.8
+    }
+   }
+  },
+  {
+   "name": "synthesis:CONTRADICTORY",
+   "saved": {
+    "nodes": [
+     {
+      "id": "fast",
+      "type": "claim",
+      "label": "Shipping weekly keeps quality high",
+      "status": "supported",
+      "role": "claim"
+     },
+     {
+      "id": "slow",
+      "type": "claim",
+      "label": "Long release cycles keep quality high",
+      "status": "supported",
+      "role": "claim"
+     },
+     {
+      "id": "data",
+      "type": "evidence",
+      "label": "Our bug rate fell after weekly releases",
+      "status": "open",
+      "role": "evidence"
+     },
+     {
+      "id": "team",
+      "type": "assumption",
+      "label": "The team can sustain a weekly pace",
+      "status": "open",
+      "role": "assumption"
+     }
+    ],
+    "edges": [
+     {
+      "from": "fast",
+      "to": "slow",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "data",
+      "to": "fast",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "team",
+      "to": "fast",
+      "relation": "depends",
+      "strength": "normal"
+     }
+    ],
+    "context": "analysing",
+    "building": {
+     "kind": "argument",
+     "by": "inferred",
+     "confidence": 0.7
+    }
+   }
+  },
+  {
+   "name": "synthesis:DECISION",
+   "saved": {
+    "nodes": [
+     {
+      "id": "d",
+      "type": "decision",
+      "label": "Move to Lisbon?",
+      "status": "open",
+      "role": "branch"
+     },
+     {
+      "id": "stay",
+      "type": "decision",
+      "label": "Stay in Leeds",
+      "status": "open",
+      "role": "option"
+     },
+     {
+      "id": "move",
+      "type": "decision",
+      "label": "Move to Lisbon",
+      "status": "open",
+      "role": "option"
+     },
+     {
+      "id": "cost",
+      "type": "value",
+      "label": "Cost of living",
+      "status": "open",
+      "role": "criterion"
+     },
+     {
+      "id": "friends",
+      "type": "value",
+      "label": "Close friends nearby",
+      "status": "open",
+      "role": "criterion"
+     },
+     {
+      "id": "career",
+      "type": "goal",
+      "label": "Career growth",
+      "status": "open",
+      "role": "criterion"
+     },
+     {
+      "id": "unsure",
+      "type": "question",
+      "label": "Can I keep my job remotely?",
+      "status": "open",
+      "role": "question"
+     }
+    ],
+    "edges": [
+     {
+      "from": "cost",
+      "to": "move",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "friends",
+      "to": "stay",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "friends",
+      "to": "move",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "career",
+      "to": "move",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "unsure",
+      "to": "move",
+      "relation": "applies_to",
+      "strength": "normal"
+     }
+    ],
+    "context": "deciding",
+    "building": {
+     "kind": "decision",
+     "by": "inferred",
+     "confidence": 0.8
+    }
+   }
+  },
+  {
+   "name": "synthesis:LARGE",
+   "saved": {
+    "nodes": [
+     {
+      "id": "x0",
+      "type": "question",
+      "label": "Idea number 0 about the community garden",
+      "status": "supported"
+     },
+     {
+      "id": "x1",
+      "type": "idea",
+      "label": "Idea number 1 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x2",
+      "type": "idea",
+      "label": "Idea number 2 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x3",
+      "type": "idea",
+      "label": "Idea number 3 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x4",
+      "type": "idea",
+      "label": "Idea number 4 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x5",
+      "type": "value",
+      "label": "Idea number 5 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x6",
+      "type": "idea",
+      "label": "Idea number 6 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x7",
+      "type": "question",
+      "label": "Idea number 7 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x8",
+      "type": "idea",
+      "label": "Idea number 8 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x9",
+      "type": "idea",
+      "label": "Idea number 9 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x10",
+      "type": "value",
+      "label": "Idea number 10 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x11",
+      "type": "idea",
+      "label": "Idea number 11 about the community garden",
+      "status": "supported"
+     },
+     {
+      "id": "x12",
+      "type": "idea",
+      "label": "Idea number 12 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x13",
+      "type": "idea",
+      "label": "Idea number 13 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x14",
+      "type": "question",
+      "label": "Idea number 14 about the community garden",
+      "status": "open"
+     },
+     {
+      "id": "x15",
+      "type": "value",
+      "label": "Idea number 15 about the community garden",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "x0",
+      "to": "x1",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "x1",
+      "to": "x4",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "x2",
+      "to": "x7",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "x3",
+      "to": "x10",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "x4",
+      "to": "x13",
+      "relation": "relates",
+      "strength": "normal"
+     }
+    ],
+    "context": "brainstorming",
+    "building": {
+     "kind": "brainstorm",
+     "by": "inferred",
+     "confidence": 0.6
+    }
+   }
+  },
+  {
+   "name": "synthesis:LAUNCH",
+   "saved": {
+    "nodes": [
+     {
+      "id": "g",
+      "type": "goal",
+      "label": "Launch in March",
+      "status": "open",
+      "role": "goal"
+     },
+     {
+      "id": "beta",
+      "type": "step",
+      "label": "Private beta",
+      "status": "open",
+      "role": "action"
+     },
+     {
+      "id": "fix",
+      "type": "step",
+      "label": "Fix top beta issues",
+      "status": "open",
+      "role": "action"
+     },
+     {
+      "id": "site",
+      "type": "step",
+      "label": "Landing page and waitlist",
+      "status": "open",
+      "role": "action"
+     },
+     {
+      "id": "press",
+      "type": "step",
+      "label": "Press embargo briefings",
+      "status": "open",
+      "role": "action"
+     },
+     {
+      "id": "ship",
+      "type": "milestone",
+      "label": "Public launch",
+      "status": "open",
+      "role": "milestone"
+     },
+     {
+      "id": "budget",
+      "type": "constraint",
+      "label": "£20k marketing budget",
+      "status": "open",
+      "role": "constraint"
+     }
+    ],
+    "edges": [
+     {
+      "from": "beta",
+      "to": "fix",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "fix",
+      "to": "ship",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "site",
+      "to": "press",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "press",
+      "to": "ship",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "ship",
+      "to": "g",
+      "relation": "leads_to",
+      "strength": "normal"
+     },
+     {
+      "from": "budget",
+      "to": "press",
+      "relation": "applies_to",
+      "strength": "normal"
+     }
+    ],
+    "context": "planning",
+    "building": {
+     "kind": "plan",
+     "by": "inferred",
+     "confidence": 0.8
+    }
+   }
+  },
+  {
+   "name": "synthesis:MODEL",
+   "saved": {
+    "nodes": [
+     {
+      "id": "x",
+      "type": "unknown",
+      "label": "Displacement x(t)",
+      "status": "open",
+      "role": "variable"
+     },
+     {
+      "id": "k",
+      "type": "given",
+      "label": "Spring constant k",
+      "status": "open",
+      "role": "parameter"
+     },
+     {
+      "id": "c",
+      "type": "given",
+      "label": "Damping c",
+      "status": "open",
+      "role": "parameter"
+     },
+     {
+      "id": "eq",
+      "type": "equation",
+      "label": "m x'' + c x' + k x = 0",
+      "status": "open",
+      "tex": "m\\ddot x + c\\dot x + kx = 0",
+      "role": "equation"
+     }
+    ],
+    "edges": [
+     {
+      "from": "k",
+      "to": "eq",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "c",
+      "to": "eq",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "x",
+      "to": "eq",
+      "relation": "part_of",
+      "strength": "normal"
+     }
+    ],
+    "context": "math",
+    "building": {
+     "kind": "model",
+     "by": "inferred",
+     "confidence": 0.9
+    },
+    "viz": {
+     "kind": "function",
+     "expr": "exp(-0.2*x)*cos(2*x)",
+     "varName": "x",
+     "view": {
+      "xMin": -6,
+      "xMax": 6
+     },
+     "params": [],
+     "title": "Damped oscillation"
+    }
+   }
+  },
+  {
+   "name": "synthesis:ONBOARDING",
+   "saved": {
+    "nodes": [
+     {
+      "id": "select",
+      "type": "step",
+      "label": "Select what you are",
+      "status": "open",
+      "role": "step"
+     },
+     {
+      "id": "tailor",
+      "type": "step",
+      "label": "Tailor experience to user type",
+      "status": "open",
+      "role": "step"
+     },
+     {
+      "id": "easy",
+      "type": "value",
+      "label": "Easy access onboarding",
+      "status": "supported",
+      "role": "value"
+     },
+     {
+      "id": "welcome",
+      "type": "idea",
+      "label": "Personalized welcome",
+      "status": "supported"
+     },
+     {
+      "id": "tutorials",
+      "type": "idea",
+      "label": "Interactive tutorials",
+      "status": "open"
+     },
+     {
+      "id": "tours",
+      "type": "idea",
+      "label": "Guided tours",
+      "status": "open"
+     },
+     {
+      "id": "examples",
+      "type": "idea",
+      "label": "Example use cases",
+      "status": "open"
+     },
+     {
+      "id": "annoy",
+      "type": "constraint",
+      "label": "Avoid being annoying",
+      "status": "open",
+      "role": "constraint"
+     },
+     {
+      "id": "need",
+      "type": "question",
+      "label": "What does Socria need to know about a new user?",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "select",
+      "to": "tailor",
+      "relation": "precedes",
+      "strength": "normal"
+     },
+     {
+      "from": "easy",
+      "to": "select",
+      "relation": "applies_to",
+      "strength": "normal"
+     },
+     {
+      "from": "annoy",
+      "to": "tailor",
+      "relation": "applies_to",
+      "strength": "normal"
+     },
+     {
+      "from": "welcome",
+      "to": "tailor",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "tutorials",
+      "to": "tailor",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "tours",
+      "to": "tailor",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "examples",
+      "to": "tutorials",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "easy",
+      "to": "welcome",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "need",
+      "to": "select",
+      "relation": "applies_to",
+      "strength": "normal"
+     }
+    ],
+    "context": "planning",
+    "building": {
+     "kind": "process",
+     "by": "inferred",
+     "confidence": 0.8
+    },
+    "ask": {
+     "action": "map",
+     "artifact": "map",
+     "topic": "Socria onboarding"
+    }
+   }
+  },
+  {
+   "name": "synthesis:RESEARCH",
+   "saved": {
+    "nodes": [
+     {
+      "id": "q",
+      "type": "question",
+      "label": "Does light colour change germination rate?",
+      "status": "open",
+      "role": "question"
+     },
+     {
+      "id": "h1",
+      "type": "conjecture",
+      "label": "Red light speeds germination",
+      "status": "open",
+      "role": "hypothesis"
+     },
+     {
+      "id": "h0",
+      "type": "conjecture",
+      "label": "No difference between colours",
+      "status": "open",
+      "role": "hypothesis"
+     },
+     {
+      "id": "m",
+      "type": "step",
+      "label": "Three trays under red, blue, white LEDs",
+      "status": "open",
+      "role": "method"
+     },
+     {
+      "id": "measure",
+      "type": "step",
+      "label": "Count sprouts daily for 10 days",
+      "status": "open",
+      "role": "method"
+     },
+     {
+      "id": "ctrl",
+      "type": "constraint",
+      "label": "Same soil, water and temperature",
+      "status": "open",
+      "role": "constraint"
+     },
+     {
+      "id": "prior",
+      "type": "evidence",
+      "label": "Phytochrome responds to red light",
+      "status": "open",
+      "role": "finding"
+     }
+    ],
+    "edges": [
+     {
+      "from": "h1",
+      "to": "q",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "h0",
+      "to": "q",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "m",
+      "to": "h1",
+      "relation": "depends",
+      "strength": "normal"
+     },
+     {
+      "from": "measure",
+      "to": "m",
+      "relation": "part_of",
+      "strength": "normal"
+     },
+     {
+      "from": "prior",
+      "to": "h1",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "ctrl",
+      "to": "m",
+      "relation": "applies_to",
+      "strength": "normal"
+     }
+    ],
+    "context": "researching",
+    "building": {
+     "kind": "research",
+     "also": [
+      "process"
+     ],
+     "by": "inferred",
+     "confidence": 0.8
+    }
+   }
+  },
+  {
+   "name": "synthesis:SPARSE",
+   "saved": {
+    "nodes": [
+     {
+      "id": "a",
+      "type": "idea",
+      "label": "Start a podcast",
+      "status": "open"
+     },
+     {
+      "id": "b",
+      "type": "question",
+      "label": "Who would listen?",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "b",
+      "to": "a",
+      "relation": "relates",
+      "strength": "normal"
+     }
+    ]
+   }
+  },
+  {
+   "name": "synthesis:UNRESOLVED",
+   "saved": {
+    "nodes": [
+     {
+      "id": "q1",
+      "type": "question",
+      "label": "Do I want to manage people?",
+      "status": "open"
+     },
+     {
+      "id": "q2",
+      "type": "question",
+      "label": "Is the pay difference worth it?",
+      "status": "open"
+     },
+     {
+      "id": "q3",
+      "type": "question",
+      "label": "What would I miss about building?",
+      "status": "open"
+     },
+     {
+      "id": "q4",
+      "type": "question",
+      "label": "Who could I ask that has done it?",
+      "status": "open"
+     },
+     {
+      "id": "q5",
+      "type": "question",
+      "label": "Can I go back if it is wrong?",
+      "status": "open"
+     },
+     {
+      "id": "i1",
+      "type": "idea",
+      "label": "Try leading one project first",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "i1",
+      "to": "q1",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "q2",
+      "to": "q1",
+      "relation": "relates",
+      "strength": "normal"
+     },
+     {
+      "from": "q5",
+      "to": "i1",
+      "relation": "relates",
+      "strength": "normal"
+     }
+    ],
+    "context": "reflecting"
+   }
+  },
+  {
+   "name": "math: solving a quadratic, with quantities and operations",
+   "saved": {
+    "nodes": [
+     {
+      "id": "q",
+      "type": "question",
+      "label": "Solve x^2 - 5x + 6 = 0",
+      "status": "open"
+     },
+     {
+      "id": "g",
+      "type": "given",
+      "label": "a = 1, b = -5, c = 6",
+      "status": "open"
+     },
+     {
+      "id": "eq",
+      "type": "equation",
+      "label": "x^2 - 5x + 6 = 0",
+      "status": "open",
+      "tex": "x^2 - 5x + 6 = 0"
+     },
+     {
+      "id": "f",
+      "type": "step",
+      "label": "(x - 2)(x - 3) = 0",
+      "status": "open"
+     },
+     {
+      "id": "x",
+      "type": "unknown",
+      "label": "x",
+      "status": "open"
+     },
+     {
+      "id": "r",
+      "type": "result",
+      "label": "x = 2 or x = 3",
+      "status": "resolved"
+     }
+    ],
+    "edges": [
+     {
+      "from": "eq",
+      "to": "f",
+      "relation": "transforms_to",
+      "strength": "normal",
+      "op": "factor"
+     },
+     {
+      "from": "f",
+      "to": "r",
+      "relation": "transforms_to",
+      "strength": "normal",
+      "op": "zero product"
+     },
+     {
+      "from": "g",
+      "to": "eq",
+      "relation": "applies_to",
+      "strength": "normal"
+     },
+     {
+      "from": "q",
+      "to": "x",
+      "relation": "relates",
+      "strength": "normal"
+     }
+    ],
+    "context": "math",
+    "intent": "learning"
+   }
+  },
+  {
+   "name": "planning: a hiring process with old near-miss types",
+   "saved": {
+    "nodes": [
+     {
+      "id": "a",
+      "type": "concept",
+      "label": "Our hiring process",
+      "status": "open"
+     },
+     {
+      "id": "b",
+      "type": "concept",
+      "label": "Referral bonus",
+      "status": "open"
+     },
+     {
+      "id": "c",
+      "type": "step",
+      "label": "Phone screen",
+      "status": "open"
+     },
+     {
+      "id": "d",
+      "type": "step",
+      "label": "Take-home task",
+      "status": "open"
+     },
+     {
+      "id": "e",
+      "type": "goal",
+      "label": "Hire two engineers by March",
+      "status": "open",
+      "origin": "socria"
+     },
+     {
+      "id": "f",
+      "type": "concept",
+      "label": "Slow approvals",
+      "status": "open"
+     },
+     {
+      "id": "g",
+      "type": "consequence",
+      "label": "Candidates drop out",
+      "status": "open"
+     },
+     {
+      "id": "h",
+      "type": "idea",
+      "label": "Applicant tracker",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c",
+      "to": "d",
+      "relation": "precedes",
+      "strength": "normal",
+      "when": "passes the screen"
+     },
+     {
+      "from": "f",
+      "to": "g",
+      "relation": "leads_to",
+      "strength": "normal"
+     },
+     {
+      "from": "b",
+      "to": "e",
+      "relation": "supports",
+      "strength": "strong"
+     },
+     {
+      "from": "a",
+      "to": "c",
+      "relation": "part_of",
+      "strength": "normal"
+     }
+    ],
+    "removed": [
+     "old idea about agencies"
+    ],
+    "context": "planning",
+    "building": {
+     "kind": "process",
+     "by": "inferred",
+     "confidence": 0.8,
+     "why": "steps a candidate goes through"
+    }
+   }
+  },
+  {
+   "name": "argument: a crowded map past the old cap",
+   "saved": {
+    "nodes": [
+     {
+      "id": "c0",
+      "type": "evidence",
+      "label": "Point number 1 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c1",
+      "type": "claim",
+      "label": "Point number 2 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c2",
+      "type": "claim",
+      "label": "Point number 3 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c3",
+      "type": "evidence",
+      "label": "Point number 4 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c4",
+      "type": "claim",
+      "label": "Point number 5 about remote work",
+      "status": "open",
+      "merged": [
+       "a duplicate point"
+      ]
+     },
+     {
+      "id": "c5",
+      "type": "claim",
+      "label": "Point number 6 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c6",
+      "type": "evidence",
+      "label": "Point number 7 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c7",
+      "type": "claim",
+      "label": "Point number 8 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c8",
+      "type": "claim",
+      "label": "Point number 9 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c9",
+      "type": "evidence",
+      "label": "Point number 10 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c10",
+      "type": "claim",
+      "label": "Point number 11 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c11",
+      "type": "claim",
+      "label": "Point number 12 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c12",
+      "type": "evidence",
+      "label": "Point number 13 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c13",
+      "type": "claim",
+      "label": "Point number 14 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c14",
+      "type": "claim",
+      "label": "Point number 15 about remote work",
+      "status": "open"
+     },
+     {
+      "id": "c15",
+      "type": "evidence",
+      "label": "Point number 16 about remote work",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "c1",
+      "to": "c0",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c2",
+      "to": "c1",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c3",
+      "to": "c2",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c4",
+      "to": "c3",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c5",
+      "to": "c4",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c6",
+      "to": "c5",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c7",
+      "to": "c6",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c8",
+      "to": "c7",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c9",
+      "to": "c8",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c10",
+      "to": "c9",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c11",
+      "to": "c10",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c12",
+      "to": "c11",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c13",
+      "to": "c12",
+      "relation": "conflicts",
+      "strength": "normal"
+     },
+     {
+      "from": "c14",
+      "to": "c13",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "c15",
+      "to": "c14",
+      "relation": "conflicts",
+      "strength": "normal"
+     }
+    ]
+   }
+  },
+  {
+   "name": "learning: a question and the gist of each answer",
+   "saved": {
+    "nodes": [
+     {
+      "id": "q1",
+      "type": "question",
+      "label": "Why is the sky blue?",
+      "status": "open"
+     },
+     {
+      "id": "a1",
+      "type": "concept",
+      "label": "Rayleigh scattering",
+      "status": "open",
+      "origin": "source"
+     },
+     {
+      "id": "q2",
+      "type": "question",
+      "label": "Then why are sunsets red?",
+      "status": "open"
+     },
+     {
+      "id": "a2",
+      "type": "idea",
+      "label": "Longer path through air scatters blue away",
+      "status": "open"
+     }
+    ],
+    "edges": [
+     {
+      "from": "a1",
+      "to": "q1",
+      "relation": "supports",
+      "strength": "normal"
+     },
+     {
+      "from": "q2",
+      "to": "q1",
+      "relation": "revises",
+      "strength": "normal"
+     },
+     {
+      "from": "a2",
+      "to": "q2",
+      "relation": "supports",
+      "strength": "normal"
+     }
+    ],
+    "context": "learning"
+   }
+  }
+ ]
+}

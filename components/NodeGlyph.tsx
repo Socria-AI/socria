@@ -229,6 +229,64 @@ const PATHS: Record<LogosNodeType, JSX.Element> = {
       <path d="M4.4 11.6 11.6 4.4" />
     </>
   ),
+  // THE UNIVERSAL MAP'S KINDS OF THING (Logos 5.5)
+  // a solid thing: a box with a face
+  entity: (
+    <>
+      <rect x="3" y="3" width="10" height="10" rx="2" />
+      <path d="M3 7h10" />
+    </>
+  ),
+  // something happening: a turning arrow
+  process: (
+    <>
+      <path d="M12.4 6.2A4.6 4.6 0 1 0 12.6 9.6" />
+      <path d="M12.8 3.6v2.8H10" />
+    </>
+  ),
+  // a point in time: a pin on a line
+  event: (
+    <>
+      <path d="M2.5 12.5h11" />
+      <circle cx="8" cy="7" r="2.6" />
+      <path d="M8 9.6v2.9" />
+    </>
+  ),
+  // a condition held: a gauge
+  state: (
+    <>
+      <path d="M3 11.5a5 5 0 0 1 10 0" />
+      <path d="M8 11.5 10.4 7.6" />
+    </>
+  ),
+  // someone who acts: a head and shoulders
+  actor: (
+    <>
+      <circle cx="8" cy="5.6" r="2.4" />
+      <path d="M3.6 13.2a4.4 4.4 0 0 1 8.8 0" />
+    </>
+  ),
+  // a part: one block of three
+  component: (
+    <>
+      <rect x="2.6" y="2.6" width="4.8" height="4.8" rx="1" />
+      <rect x="8.6" y="8.6" width="4.8" height="4.8" rx="1" />
+      <path d="M8.6 5h4.8M5 8.6v4.8" />
+    </>
+  ),
+  // a class: a branching bracket
+  category: (
+    <>
+      <path d="M4 3v10" />
+      <path d="M4 5h4M4 8h6M4 11h8" />
+    </>
+  ),
+  // something measured: rising bars
+  quantity: (
+    <>
+      <path d="M3.5 13V9.5M8 13V6.5M12.5 13V3.5" />
+    </>
+  ),
 };
 
 export function NodeGlyph({ type }: { type: LogosNodeType }) {

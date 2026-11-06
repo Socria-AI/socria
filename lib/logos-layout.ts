@@ -20,6 +20,7 @@ import type {
   ThinkingMap,
 } from './logos';
 import { compileFunction, type CompiledFn } from './logos-math';
+import { DIAGRAM_KINDS } from './logos';
 import {
   attachmentsOf,
   backEdges,
@@ -29,9 +30,11 @@ import {
   spineOf,
   transitionsOf,
   type Building,
+  hasLoop,
+  satisfies,
 } from './representation';
 
-export type LensId = 'work' | 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix' | 'flow' | 'timeline';
+export type LensId = 'work' | 'graph' | 'structure' | 'tensions' | 'evidence' | 'solve' | 'plot' | 'board' | 'matrix' | 'flow' | 'timeline' | 'cycle' | 'tree' | 'parts' | 'concept';
 
 export interface Placed {
   id: string;
@@ -52,6 +55,34 @@ export interface Placed {
    * or a state in its trail.
    */
   objRef?: { id: string; at: number; live: boolean; undone?: boolean };
+  /**
+   * HOW THE CARD IS DRAWN in a diagram (Logos 5.5): a pill where a flow starts
+   * or ends, a diamond where it divides, a round stage on a cycle, a dot on a
+   * timeline's axis. Absent: the ordinary card.
+   */
+  shape?: 'pill' | 'diamond' | 'stage' | 'event';
+  /**
+   * WORDS ONLY: the card shows its label and nothing else — no kind line, no
+   * glyph — because the diagram's shape already says what each box is. Its
+   * kind is still there when it is inspected.
+   */
+  bare?: boolean;
+}
+
+/**
+ * A REGION OF A DIAGRAM — a container, a lane, a compartment — drawn behind
+ * the cards it holds, with its name on it. (x, y) is its top-left corner, in
+ * the same space as the cards' centres.
+ */
+export interface GroupBox {
+  key: string;
+  label: string;
+  x: number;
+  y: number;
+  w: number;
+  h: number;
+  /** 0 for an outer region, 1 for one inside it */
+  depth?: number;
 }
 
 export interface Connector {
@@ -81,6 +112,8 @@ export interface Connector {
 export interface Layout {
   placed: Placed[];
   connectors: Connector[];
+  /** the regions drawn behind the cards — a whole and its parts, a lane, a group (Logos 5.5) */
+  groups?: GroupBox[];
   /** the italic line under the map, naming the question this lens answers */
   caption: string;
   /** shown when the lens has nothing to draw yet */
@@ -89,6 +122,12 @@ export interface Layout {
 
 export const LENSES: { id: LensId; label: string; caption: string }[] = [
   { id: 'work', label: 'Work', caption: 'The thing itself, and what each step did to it.' },
+  // ANYTHING AT ALL, DRAWN (Logos 5.5): the shapes a subject takes — first among the tabs, because they are offered
+  // only when the map holds that shape, and then it is the thing being looked at
+  { id: 'cycle', label: 'Cycle', caption: 'Each stage leads to the next, and round again.' },
+  { id: 'tree', label: 'Tree', caption: 'What sits under what.' },
+  { id: 'parts', label: 'Parts', caption: 'What it is made of, and what sits inside what.' },
+  { id: 'concept', label: 'Concepts', caption: 'How the ideas connect, in words.' },
   { id: 'flow', label: 'Flow', caption: 'What happens, in what order, and where it branches.' },
   { id: 'timeline', label: 'Timeline', caption: 'What happened, and in what order.' },
   { id: 'graph', label: 'Graph', caption: 'See how everything connects.' },
@@ -115,6 +154,11 @@ export const RELATION_LABEL: Record<LogosRelation, string> = {
   justifies: 'justifies',
   equivalent_to: 'equivalent to',
   applies_to: 'applies to',
+  causes: 'causes',
+  inhibits: 'inhibits',
+  is_a: 'is a kind of',
+  flows_to: 'flows to',
+  becomes: 'becomes',
 };
 
 const CARD_W = 150;
@@ -229,7 +273,7 @@ export function reasoningLens(lenses: LensId[], building?: Building | null): Len
  * solution, the objects being worked on) is not a shape of the thinking; it is
  * in Artifacts (MADE_LENSES), one artifact per lens.
  */
-export const IDEA_LENSES: readonly LensId[] = ['graph', 'structure', 'flow', 'timeline', 'tensions', 'evidence', 'matrix'];
+export const IDEA_LENSES: readonly LensId[] = ['graph', 'structure', 'flow', 'timeline', 'cycle', 'tree', 'parts', 'concept', 'tensions', 'evidence', 'matrix'];
 /** The lenses Logos 5 shows in Artifacts rather than on the Logic Map. The Board is Logos 3's alone. */
 export const MADE_LENSES = ['plot', 'solve', 'work'] as const;
 export type MadeLens = (typeof MADE_LENSES)[number];
@@ -304,7 +348,25 @@ export function availableLenses(map: ThinkingMap, opts: { workspace?: boolean } 
     const ordered = spine.size >= 2 && transitionsOf(map, spine).length >= 1;
     const events = map.nodes.some((n) => n.role === 'event' || n.role === 'period');
     if (ordered && kind !== 'timeline') shapes.push('flow');
-    if (ordered && (kind === 'timeline' || events)) shapes.push('timeline');
+    // a drawing's dated events are a timeline whether or not a spine was read in them (Logos 5.5): at least two
+    // with a time, and the drawing is a chronology or holds events
+    const dated = map.nodes.filter((n) => typeof n.at === 'string' && n.at.trim()).length >= 2 && (kind === 'timeline' || map.nodes.some((n) => n.type === 'event'));
+    if ((ordered && (kind === 'timeline' || events)) || dated) shapes.push('timeline');
+  }
+
+  // THE SUBJECT, DRAWN (Logos 5.5, lib/logos5/diagramLayout.ts). A drawing earns the lens that draws its shape,
+  // and only when the map holds that shape — the structure is the evidence, as it is for the shapes above: a cycle
+  // when a loop runs through it, a tree when it has a hierarchy, the parts when something is taken apart or its
+  // parts sit in regions, a concept map when its lines say what joins them.
+  // Offered on a map that holds a drawing, or is read as one of a drawing's shapes: a map of someone's own
+  // thinking keeps exactly the lenses it had.
+  const drawings: LensId[] = [];
+  const drawingMap = map.nodes.some((n) => n.origin === 'drawn') || (!!map.building && DIAGRAM_KINDS.has(map.building.kind));
+  if (drawingMap) {
+    if (hasLoop(map)) drawings.push('cycle');
+    if (satisfies(map, 'hierarchy')) drawings.push('tree');
+    if (satisfies(map, 'parts') || map.nodes.filter((n) => n.group).length >= 2) drawings.push('parts');
+    if (map.edges.filter((e) => e.label).length >= 2 || (map.building?.kind === 'concept' && satisfies(map, 'concept'))) drawings.push('concept');
   }
 
   // The concept views. They read the SHAPE of an argument — what supports
@@ -321,6 +383,8 @@ export function availableLenses(map: ThinkingMap, opts: { workspace?: boolean } 
   // first, and one whose reading is an ordered shape shows that shape first.
   if (map.building && GRAMMARS[map.building.kind].ordered) out.unshift(...shapes);
   else out.push(...shapes);
+  // a drawing's own shapes first, ahead of the web of it (which lens leads is leadLens's to say)
+  out.unshift(...drawings.filter((l) => !out.includes(l)));
 
   // A comparison is a table, not a graph, and it is offered whenever the map
   // is already making one — options judged against criteria. Placed ahead of
@@ -1215,9 +1279,16 @@ export function layoutFlow(map: ThinkingMap, w: number, h: number): Layout {
       relation: e.relation,
       strength: e.strength,
       arrow: true,
-      ...(e.when ? { label: e.when.length > 26 ? e.when.slice(0, 25) + '…' : e.when, lx, ly } : {}),
+      // what the line says: its condition, else its own words (a drawing's, Logos 5.5)
+      ...((e.when ?? e.label) ? { label: (() => { const t = (e.when ?? e.label)!; return t.length > 26 ? t.slice(0, 25) + '…' : t; })(), lx, ly } : {}),
     };
   });
+  // A FLOWCHART'S SHAPES (Logos 5.5): a drawn flow starts and ends in a pill and divides at a diamond
+  for (const p of placed) {
+    if (p.node.origin !== 'drawn' || p.loose) continue;
+    const shape = p.node.role === 'start' || p.node.role === 'end' ? 'pill' : p.node.role === 'branch' ? 'diamond' : undefined;
+    if (shape) p.shape = shape;
+  }
   return { placed, connectors, caption: cap };
 }
 

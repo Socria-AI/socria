@@ -112,6 +112,7 @@ import { readLength, rememberLength } from '@/lib/socria-model-store';
 import { ConcisePicker } from '@/components/logos5/ConcisePicker';
 import { MakePicker } from '@/components/logos5/MakePicker';
 import { askFor, makeChoice } from '@/lib/logos5/make';
+import { drawingFromInline, drawingOf, diagramFromDrawing } from '@/lib/logos5/drawing';
 import { saveTemplate, templateChoice, templateOf, templatePayload } from '@/lib/logos5/templates';
 import { useTemplates } from '@/components/logos5/useTemplates';
 import { MADE_OFFER, madeAsked, madeListed, madeOffer, mapArtifacts, pictureRepeatsDisplay, plotArtifact, readMade, writeMade, type MadeKey, type MadeRecord } from '@/lib/logos5/artifacts';
@@ -3523,7 +3524,7 @@ export function LogosApp({
     // THE FREE PLAN'S NODES (lib/entitlements.ts): ten a month across every map, the ones added by hand
     // included. Past them, an addition is refused here, with the paywall; the rest of an edit is not.
     const counting = !one && !!isSignedIn;
-    const adding = edits.some((e) => e.op === 'add');
+    const adding = edits.some((e) => e.op === 'add' || e.op === 'drawing');
     if (counting && adding && spentOf('nodes')) {
       if (!ask('nodes-spent')) setError(boundaryNote('nodes'));
       return null;
@@ -3587,7 +3588,7 @@ export function LogosApp({
       const n = out.map.nodes.find((x) => mapKeyOf(x.label) === mapKeyOf(last.node.label));
       if (n) touchedRef.current = { id: n.id, label: n.label, ...(last.near ? { near: last.near } : {}) };
     } else if (last?.op === 'remove') touchedRef.current = null;
-    else if (last) {
+    else if (last && last.op !== 'title' && last.op !== 'drawing') {
       const n = out.map.nodes.find((x) => x.id === ('id' in last ? last.id : last.from));
       if (n) touchedRef.current = { id: n.id, label: n.label };
     }
@@ -4883,6 +4884,8 @@ export function LogosApp({
       turnsSinceMap: turnsSince(said, m.drawnAt),
       neverDrawn: !m.drawnAt && !m.nodes.length,
       everyTurn: MAP_EVERY_TURN,
+      // a subject's shape is drawn unasked for Socria One and a guest; a free account's week of tokens is not spent on it
+      drawUnasked: one || !isSignedIn,
     }).map;
   }
 
@@ -6206,6 +6209,58 @@ export function LogosApp({
     const prose = content.replace(/```[\s\S]*?```/g, ' ').replace(/\$\$[\s\S]*?\$\$/g, ' ').replace(/[*_#>`]/g, '').replace(/\s+/g, ' ').trim();
     const first = prose.split(/(?<=[.!?])\s/)[0] ?? prose;
     return first.length > 140 ? `${first.slice(0, 137).trimEnd()}…` : first;
+  }
+
+  /**
+   * OPEN ON THE LOGIC MAP (Logos 5.5): a reply's diagram put on the map as a drawing — every part
+   * "drawn", to open, edit, inspect and keep (lib/logos5/drawing.ts). An edit like any other: Undo takes
+   * it back, the free plan counts its parts, and the drawing before it gives way. The map is shown.
+   */
+  function mapInline(msg: Msg, n: number, spec: InlineSpec) {
+    if (spec.type !== 'diagram') return;
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+      setError('You can look at this line of thinking, but not change it.');
+      return;
+    }
+    const drawing = drawingFromInline(spec);
+    // already there (opened before, from this reply or one like it): shown, not drawn again
+    const there = drawingOf(mapRef.current);
+    const same = !!there && there.title === drawing.title && there.nodes.length === drawing.nodes.length && drawing.nodes.every((d) => there.nodes.some((x) => x.label === d.label));
+    if (!same && !editMap([{ op: 'drawing', drawing }])) return;
+    void msg;
+    void n;
+    // shown where it can be opened and edited: beside the board on a wide screen (One view), else the Logic Map view
+    if (l5) {
+      if (oneView) setBoardBeside('logic_map');
+      else setScreen(() => fit({ view: 'logic_map', beside: 'chat' }, narrowRef.current));
+    }
+  }
+
+  /**
+   * KEEP IN ARTIFACTS (Logos 5.5): the Logic Map's drawing filed as a Diagram display, to keep and work
+   * with as an artifact (lib/logos5/drawing.ts diagramFromDrawing). The person's own thinking stays on the
+   * map. Kept once: pressed again, the diagram it made opens. The free plan's artifacts count it
+   * (commitObjects), as they count anything made.
+   */
+  function keepDrawing() {
+    if (!workspaceOn) return;
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+      setError('You can look at this line of thinking, but not change it.');
+      return;
+    }
+    const state = diagramFromDrawing(mapRef.current);
+    if (!state) return;
+    const space = spaceOf(mapRef.current);
+    const sameAs = (o: ThoughtObject) => {
+      const cur = currentOf(o) as { title?: string; nodes?: { label?: string }[] } | null;
+      return o.kind === 'diagram' && cur?.title === state.title && (cur?.nodes?.length ?? 0) === (state.nodes as unknown[]).length;
+    };
+    const had = space.objs.find(sameAs);
+    if (had) return showObject(had.id);
+    const made = makeDisplay(space, 'diagram', state, 'socria');
+    if (!made.ok) return setError(made.says);
+    if (!commitObjects(made.space, objOf(made.space, made.obj.id))) return;
+    showObject(made.obj.id);
   }
 
   function openInline(msg: Msg, n: number, spec: InlineSpec) {
@@ -7759,6 +7814,8 @@ export function LogosApp({
             grounded={groundedCounts}
             onAddContext={openAddContext}
             onEdit={(edit) => editMap([edit])}
+            onEdits={(edits) => editMap(edits)}
+            onKeepDrawing={workspaceOn ? keepDrawing : undefined}
             // ASK ABOUT THIS: the selection is already canonical on the model, so
             // the turn carries the object's IDENTITY and the reply reasons about
             // the object — its provenance, its dependency chain, what it rests on
@@ -8554,7 +8611,7 @@ export function LogosApp({
         onShowNodes={showNodes}
         onOpenObject={showObject}
         {...(m.role === 'assistant' && m.id && !togetherReadOnly
-          ? { onInline: keepInline, onOpenInline: openInline, ...(solo && !busy ? { onExplore: chooseInline } : {}), ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
+          ? { onInline: keepInline, onOpenInline: openInline, onMapInline: mapInline, ...(solo && !busy ? { onExplore: chooseInline } : {}), ...(latest && solo && !busy ? { onChoose: chooseInline } : {}) }
           : {})}
         writeUp={writeUp}
         onOpenContent={openContent}
@@ -8738,13 +8795,21 @@ export function LogosApp({
           overlay={wsCard}
         />
       )}
-      {/* Logos 5.5: what the lines mean, and how many ideas there are — type at the foot, not a key with swatches */}
+      {/* Logos 5.5: what the lines mean, and how many ideas there are — type at the foot, not a key with swatches.
+          A drawing's lines say what they mean on themselves, so its key is only the count */}
       {map.nodes.length > 0 && (
         <ul className="l5v-legend" aria-label="What the lines mean">
-          <li className="is-supports"><i aria-hidden="true" />supports</li>
-          <li className="is-depends"><i aria-hidden="true" />depends on</li>
-          <li className="is-conflicts"><i aria-hidden="true" />conflicts</li>
-          <li className="is-relates"><i aria-hidden="true" />relates</li>
+          {(() => {
+            const drawnIds = new Set(map.nodes.filter((n) => n.origin === 'drawn').map((n) => n.id));
+            return !drawnIds.size || map.edges.some((e) => !drawnIds.has(e.from) && !drawnIds.has(e.to));
+          })() && (
+            <>
+              <li className="is-supports"><i aria-hidden="true" />supports</li>
+              <li className="is-depends"><i aria-hidden="true" />depends on</li>
+              <li className="is-conflicts"><i aria-hidden="true" />conflicts</li>
+              <li className="is-relates"><i aria-hidden="true" />relates</li>
+            </>
+          )}
           <li className="is-count">
             {map.nodes.length} {map.nodes.length === 1 ? 'idea' : 'ideas'} · {mapping ? 'drawing…' : 'up to date'}
           </li>
@@ -8884,6 +8949,8 @@ export function LogosApp({
               ideas.length
                 ? {
                     ideas,
+                    // a drawing names the card by what it is of (Logos 5.5, lib/logos5/drawing.ts)
+                    title: drawingOf(map)?.title ?? null,
                     lit,
                     at: litAt,
                     picked: focus?.kind === 'node' ? focus.id : null,
@@ -9123,7 +9190,7 @@ export function LogosApp({
               host={{
                 state,
                 live,
-                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec) } : {}),
+                ...(live && !togetherReadOnly ? { onState: (n: number, st: InlineState) => keepInline(msg, n, st), onOpen: (n: number, spec: InlineSpec) => openInline(msg, n, spec), onMap: (n: number, spec: InlineSpec) => mapInline(msg, n, spec) } : {}),
               }}
               renderInline={(t, k) => <RichInline text={t} math keyBase={`cv-${el.key}-${k}`} />}
             />

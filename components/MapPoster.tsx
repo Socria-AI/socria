@@ -80,6 +80,14 @@ const TONE: Record<LogosNodeType, string> = {
   lemma: ACCENT,
   conjecture: SECONDARY,
   counterexample: TENSION,
+  entity: PRIMARY,
+  process: ACCENT,
+  event: SECONDARY,
+  state: INK_40,
+  actor: '#8A6B4A',
+  component: PRIMARY,
+  category: '#6B5F7A',
+  quantity: ACCENT,
 };
 
 // Edge colours from the .lg-conn-* rules, dashes where the live map dashes.
@@ -97,6 +105,11 @@ const EDGE: Record<LogosRelation, { colour: string; dash?: string }> = {
   justifies: { colour: '#6E93A3' },
   equivalent_to: { colour: '#6E7FA3', dash: '8 3 2 3' },
   applies_to: { colour: '#B9BFB1', dash: '2 3' },
+  causes: { colour: '#A08E5E' },
+  inhibits: { colour: TENSION, dash: '4 3' },
+  is_a: { colour: '#8E8C7A' },
+  flows_to: { colour: '#6E93A3' },
+  becomes: { colour: PRIMARY },
 };
 
 // Fonts the SVG can count on inside an <img>: whatever the machine has.

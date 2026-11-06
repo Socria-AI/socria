@@ -29,7 +29,7 @@
 // Pure. No model, no network, no clock (time arrives in the input).
 
 import { quickPlot } from './plot-ask';
-import { OWN_TIMELINE } from './asks';
+import { OWN_TIMELINE, TIMELINE_NAMED, ownTimeline, partsShape } from './asks';
 import { constructAsk } from '../cognition/assist';
 import { readViewRequest } from '../view-request';
 import { wantedSimulation } from '../model/wants';
@@ -89,6 +89,103 @@ const STRUCTURE = new RegExp(
   ].join('|'),
   'i'
 );
+
+/**
+ * THE SHAPES A DIAGRAM CAN TAKE ON THE LOGIC MAP (Logos 5.5): each is one of
+ * its grammars (lib/representation.ts GRAMMAR_IDS), so the shape asked for is
+ * the shape the map is read as and the lens it opens on.
+ */
+export type DiagramShape = 'process' | 'cycle' | 'hierarchy' | 'concept' | 'causal' | 'parts' | 'system' | 'timeline';
+
+/**
+ * A DIAGRAM, ASKED FOR BY WHAT IT IS — a flowchart, a cycle diagram, a
+ * hierarchy or an org chart, a family tree, a concept map, a cause-and-effect
+ * or fishbone diagram, a labelled diagram of the parts, a block or system
+ * diagram. The Logic Map draws almost anything that has parts and connections
+ * (lib/logos.ts mapInstructions, THE SUBJECT, DRAWN), so these open it. A
+ * picture of a field, a force or a function is not one of these: it is made
+ * in Artifacts, as before; so is a Venn diagram, a display of its own.
+ */
+const DIAGRAM_NAMED: readonly (readonly [DiagramShape, RegExp])[] = [
+  ['process', /\bflow\s*-?\s*charts?\b|\bflow\s+diagrams?\b|\bprocess\s+(?:maps?|diagrams?|flow\s*charts?)\b|\bswim\s*-?\s*lane\s+diagrams?\b|\bworkflow\s+(?:diagram|chart|map)s?\b|\bstate\s+(?:machine|transition)\s+diagrams?\b/i],
+  ['cycle', /\b(?:cycle|life\s*-?\s*cycle|feedback\s+loop|loop)\s+(?:diagram|chart|map)s?\b|\bcircular\s+(?:diagram|flow\s*chart)s?\b/i],
+  ['hierarchy', /\b(?:hierarchy|hierarchical|tree|taxonomy|classification|breakdown)\s+(?:diagram|chart|map)s?\b|\borg(?:ani[sz]ation(?:al)?)?\s+charts?\b|\borganogram\b|\bfamily\s+trees?\b|\bwork\s+breakdown\s+structure\b|\bphylogenetic\s+trees?\b/i],
+  ['concept', /\bconcept\s+(?:diagrams?|webs?)\b|\bknowledge\s+maps?\b|\bspider\s+(?:diagram|map)s?\b/i],
+  ['causal', /\bcause[- ](?:and|&)[- ]effect\s+(?:diagram|chart|map)s?\b|\bfish\s*-?\s*bone(?:\s+diagram)?s?\b|\bishikawa\b|\bcausal\s+loop\s+diagrams?\b|\broot[- ]cause\s+(?:diagram|tree|map)s?\b/i],
+  ['parts', /\b(?:parts|anatomy|anatomical|components?|labell?ed)\s+diagrams?\b|\bexploded\s+view\b/i],
+  ['system', /\b(?:block|system|systems|architecture|network|context)\s+diagrams?\b|\b(?:er|entity[- ]relationship)\s+diagrams?\b/i],
+  ['timeline', /\btimeline\s+(?:diagram|map)s?\b/i],
+];
+
+/**
+ * …or by drawing what has that shape: "draw the water cycle", "diagram the
+ * stages of mitosis", "show me the hierarchy of the Catholic Church",
+ * "sketch the causes of the Great Depression", "draw how a bill becomes law".
+ * The thing drawn is named, and it has parts in an order, a loop or a tree —
+ * "draw the field" names none of these, and is a picture.
+ */
+const DRAW_THE = String.raw`(?:out\s+)?(?:for\s+(?:me|us)\s+)?(?:the\s+|a\s+|an\s+|my\s+|our\s+)?`;
+const DRAWN_AS: readonly (readonly [DiagramShape, RegExp])[] = [
+  ['cycle', new RegExp(String.raw`\b(?:draw|diagram|sketch|show\s+(?:me|us))\s+${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:life\s*-?\s*cycle|cycle|feedback\s+loop)s?\b`, 'i')],
+  ['hierarchy', new RegExp(String.raw`\b(?:draw|diagram|sketch|show\s+(?:me|us))\s+${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:hierarchy|chain\s+of\s+command|family\s+tree|taxonomy|classification)\b`, 'i')],
+  ['process', new RegExp(String.raw`\b(?:draw|diagram|sketch)\s+${DRAW_THE}(?:[\w'-]+\s+){0,3}?(?:process|workflow|pipeline|stages|steps|phases|supply\s+chain|food\s+(?:chain|web))\b|\b(?:draw|diagram)\s+(?:out\s+)?(?:for\s+(?:me|us)\s+)?how\s+(?:[\w'-]+\s+){1,6}?(?:works?|happens?|becomes?|forms?|is\s+(?:made|produced|formed|passed)|are\s+(?:made|produced|formed)|develops?|spreads?|flows?)\b`, 'i')],
+  ['causal', new RegExp(String.raw`\b(?:draw|diagram|sketch|show\s+(?:me|us))\s+${DRAW_THE}(?:(?:main|root|key|underlying|likely)\s+)?(?:causes|effects|consequences)\s+(?:of|and)\b`, 'i')],
+  ['parts', new RegExp(String.raw`\b(?:draw|diagram|sketch)\s+${DRAW_THE}(?:main\s+)?(?:parts|anatomy|components|layers|organelles)\s+(?:of|in)\b`, 'i')],
+];
+
+/** A diagram of something with that shape, named: "a diagram of the water cycle", "a chart of the stages of grief". */
+const DIAGRAM_OF = new RegExp(
+  String.raw`\b(?:diagram|chart|map|illustration|picture)\s+(?:of|showing|for|explaining|that\s+shows|to\s+show)\s+(?:me\s+)?(?:the\s+|a\s+|an\s+)?(?:[\w'-]+\s+){0,4}?(?:(life\s*-?\s*cycle|cycle|feedback\s+loop)|(process|workflow|pipeline|stages|steps|phases|supply\s+chain|food\s+(?:chain|web))|(hierarchy|chain\s+of\s+command|family\s+tree|taxonomy|classification|organi[sz]ation(?:al)?\s+structure)|(causes|effects|consequences)|(parts|anatomy|components|layers|organelles))\b`,
+  'i'
+);
+const OF_SHAPES: readonly DiagramShape[] = ['cycle', 'process', 'hierarchy', 'causal', 'parts'];
+/** …or a diagram of how something works: "a diagram of how a bill becomes law". */
+const DIAGRAM_OF_HOW = /\b(?:diagram|map)\s+(?:of|showing|explaining|that\s+shows|to\s+show)\s+(?:me\s+)?how\s+(?:[\w'-]+\s+){1,6}?(?:works?|happens?|becomes?|forms?|is\s+(?:made|produced|formed|passed)|are\s+(?:made|produced|formed)|develops?|spreads?|flows?)\b/i;
+
+/**
+ * Made in Artifacts all the same: Artifacts named ("a flowchart in
+ * Artifacts"), or the request the Make list sends for a flowchart picked
+ * from it ("Make a flowchart: how a bill becomes law", lib/logos5/make.ts).
+ */
+const INTO_ARTIFACTS = /\b(?:in|into|to|as)\s+(?:an?\s+|the\s+|my\s+)?artifacts?\b/i;
+const MADE_FROM_LIST = /^make\s+an?\s+[\w\s/-]{2,40}?(?::|\s+from\s+this\s+conversation\b)/i;
+
+/** The diagram a turn asks for, and its shape — null when it asks for none (or for one to be made in Artifacts). */
+export function diagramAsked(text: string): DiagramShape | null {
+  const t = clean(normalizeTyping(text ?? ''));
+  if (!t || INTO_ARTIFACTS.test(t) || MADE_FROM_LIST.test(t) || /\bvenn\b/i.test(t)) return null;
+  for (const [shape, re] of DIAGRAM_NAMED) if (re.test(t)) return shape;
+  for (const [shape, re] of DRAWN_AS) if (re.test(t)) return shape;
+  const of = DIAGRAM_OF.exec(t);
+  if (of) for (let g = 1; g <= OF_SHAPES.length; g++) if (of[g]) return OF_SHAPES[g - 1];
+  if (DIAGRAM_OF_HOW.test(t)) return 'process';
+  return null;
+}
+
+/**
+ * THE SUBJECT HAS A SHAPE WORTH SEEING (Logos 5.5): a question whose answer
+ * is a cycle, a hierarchy, a chain of causes, the stages of a process or the
+ * kinds of a thing — "explain the water cycle", "how is the UK parliament
+ * structured?", "what caused World War I?", "what are the stages of mitosis?".
+ * It is still a question, answered in the conversation (rule A — the reply
+ * draws its own small diagram, lib/runtime/presentation.ts); the Logic Map
+ * draws the subject beside it, in the background, where it can be opened,
+ * inspected and edited. Read by the same reader the reply's diagram uses
+ * (lib/runtime/asks.ts partsShape), so a person's own story, one event or a
+ * body failing is never drawn.
+ */
+const STAGES_OF = /\b(?:the\s+)?(?:stages|phases|steps)\s+(?:of|in)\s+(?!(?:my|our|your|this|that)\b)\S|\b(?:the\s+)?process\s+of\s+(?!(?:my|our|your|elimination)\b)\S|\bhow\s+(?:does|do|is|are)\s+(?:a\s+|an\s+|the\s+)?(?:[\w'-]+\s+){1,4}?(?:become|becomes|made|produced|formed|passed)\b/i;
+export function drawable(text: string): DiagramShape | null {
+  const t = clean(normalizeTyping(text ?? ''));
+  if (!t || t.length > 400) return null;
+  const parts = partsShape(t);
+  if (parts === 'cycle') return 'cycle';
+  if (parts === 'tree' || parts === 'types') return 'hierarchy';
+  if (parts === 'causes' || parts === 'effects') return 'causal';
+  if (STAGES_OF.test(t) && !/\b(?:my|our)\b/i.test(t)) return 'process';
+  if (TIMELINE_NAMED.test(t) && !ownTimeline(t)) return 'timeline';
+  return null;
+}
 
 /** Active recall, asked for: a practice set is an artifact. */
 const PRACTICE = /\b(?:flash\s*cards?|quiz\s+me|test\s+me|practice\s+(?:questions?|problems?|set|test)|make\s+(?:me\s+)?(?:a\s+)?quiz|spaced\s+repetition)\b/i;
@@ -166,6 +263,10 @@ export interface TurnRoute {
   reasons: string[];
   /** which view this turn reveals; null keeps the one they are on */
   reveal: { view: Viewport; beside: 'chat' | null } | null;
+  /** a diagram asked for, and its shape: the Logic Map draws it (diagramAsked) */
+  diagram?: DiagramShape;
+  /** a question whose subject has a shape worth seeing: the map pass draws it in the background (drawable) */
+  draw?: DiagramShape;
 }
 
 /**
@@ -212,7 +313,17 @@ export function routeTurn(t: TurnInput): TurnRoute {
   if (STRUCTURE.test(text) || (view && MAP_LENSES.has(view.lens) && !tableInReply(text))) {
     reasons.push(view && MAP_LENSES.has(view.lens) ? `structure:lens:${view.lens}` : 'structure:asked');
     // the reply is read beside the map it draws (on a phone, the map alone)
-    return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' } };
+    const asked = diagramAsked(text);
+    return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' }, ...(asked ? { diagram: asked } : {}) };
+  }
+
+  // A DIAGRAM, asked for by what it is or by drawing something that has its shape (Logos 5.5): the Logic
+  // Map draws it — a flowchart, a cycle, a hierarchy, the parts of something — and Keep files it in
+  // Artifacts. A picture of a field or a function is still made there (below).
+  const diagram = diagramAsked(text);
+  if (diagram) {
+    reasons.push(`structure:diagram:${diagram}`);
+    return { intent: 'structure', reasons, reveal: { view: 'logic_map', beside: 'chat' }, diagram };
   }
 
   // A QUICK PLOT — one function, a range at most — is drawn in the conversation as a graph to change, and
@@ -265,7 +376,10 @@ export function routeTurn(t: TurnInput): TurnRoute {
 
   if (inline) reasons.push(`inline:${inline}`);
   reasons.push('conversation');
-  return { intent: 'conversation', reasons, reveal: null };
+  // a subject with a shape worth seeing: still conversation, and the map draws it beside (drawable)
+  const draw = drawable(text);
+  if (draw) reasons.push(`draw:${draw}`);
+  return { intent: 'conversation', reasons, reveal: null, ...(draw ? { draw } : {}) };
 }
 
 // ── which work runs ──────────────────────────────────────────────────
@@ -276,10 +390,13 @@ export function routeTurn(t: TurnInput): TurnRoute {
  * The extractor reads ~19k tokens of instructions and the conversation, and
  * used to run after every turn. It runs now when the turn asked for something
  * to be built or a structure to be drawn; while the Logic Map is the view they
- * are looking at (it is live while it is looked at); and in the background on
- * a light cadence — once a line of thinking has a few substantive turns, then
- * every few more — so the Universal Map, search and anything that reads the
- * stored map (the 5-node rewards challenge among them) still see maps.
+ * are looking at (it is live while it is looked at); when the question's
+ * subject has a shape worth seeing — a cycle, a hierarchy, causes, stages —
+ * which the map draws beside the answer without opening (Logos 5.5, `draw`);
+ * and in the background on a light cadence — once a line of thinking has a
+ * few substantive turns, then every few more — so the Universal Map, search
+ * and anything that reads the stored map (the 5-node rewards challenge among
+ * them) still see maps.
  */
 export const MAP_FIRST_AFTER = 3;
 export const MAP_EVERY = 4;
@@ -296,6 +413,12 @@ export interface MapNeedInput {
   neverDrawn: boolean;
   /** a deployment that wants the old behaviour: a map pass after every turn */
   everyTurn?: boolean;
+  /**
+   * Whether a subject with a shape is drawn in the background, unasked (route.draw). Off for a signed-in
+   * free account (lib/token-allowance.ts): a pass nobody asked for would spend the week's tokens. The
+   * reply's own diagram still shows, and Open on the Logic Map draws it there without a model.
+   */
+  drawUnasked?: boolean;
 }
 
 export function needsMap(i: MapNeedInput): { map: boolean; why: string } {
@@ -305,6 +428,7 @@ export function needsMap(i: MapNeedInput): { map: boolean; why: string } {
   if (i.filler) return { map: false, why: 'filler' };
   if (i.everyTurn) return { map: true, why: 'every-turn' };
   if (i.view === 'logic_map') return { map: true, why: 'open' };
+  if (i.route.draw && i.drawUnasked !== false) return { map: true, why: 'draw' };
   if (i.neverDrawn ? i.turnsSinceMap >= MAP_FIRST_AFTER : i.turnsSinceMap >= MAP_EVERY) return { map: true, why: 'cadence' };
   return { map: false, why: 'not-needed' };
 }

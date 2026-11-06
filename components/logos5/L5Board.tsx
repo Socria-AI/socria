@@ -54,6 +54,8 @@ export interface BoardMap {
   onIdea: (id: string) => void;
   /** the Logic Map, large beside the board, to edit */
   onOpen: () => void;
+  /** what the map's drawing is of, when it holds one — "The water cycle" (Logos 5.5) */
+  title?: string | null;
 }
 
 const BOARD_W = 320 + 112 + 440 + 112 + 320 + 64;
@@ -258,7 +260,7 @@ export function L5Board({
                   <button type="button" className="lob-map-k" onClick={map.onOpen} title="Open the Logic Map beside the board, to edit it">
                     <span className="lob-dot" aria-hidden="true" />
                     <span className="l5-label">
-                      Logic Map · {map.ideas.length} {map.ideas.length === 1 ? 'idea' : 'ideas'}
+                      {map.title ? <>Logic Map · {map.title}</> : <>Logic Map · {map.ideas.length} {map.ideas.length === 1 ? 'idea' : 'ideas'}</>}
                     </span>
                   </button>
                   <span className="lob-n">{pinnedLabel(map.at, map.lit.size)}</span>

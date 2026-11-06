@@ -338,6 +338,10 @@ const MODULES = [
   'test/helpers/study-desk-under-test.tsx',
   // One board, the chatbox is the chat (Logos 5.5, VIII · One view)
   'test/helpers/one-view-under-test.tsx',
+  // The universal Logic Map's diagram lenses: cycle, tree, parts, concept map, a dated timeline (Logos 5.5)
+  'test/helpers/diagram-layout-under-test.ts',
+  // The universal Logic Map: the model, diagram routing, the map pass's instructions, edits, the free plan's rule
+  'test/helpers/universal-map-under-test.ts',
   // adaptive response rendering: the inline vocabulary, its planner, its gate and its components
   'test/helpers/inline-under-test.tsx',
   // what to make, seen before it is chosen: the gallery, its templates, the artifacts the map draws

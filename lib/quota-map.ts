@@ -35,11 +35,30 @@ export function addedNodes(before: MapLike | null | undefined, after: MapLike): 
  * `after` keeping only the first `allow` of its new nodes: the rest are taken
  * back out, with every connection that touched them. What `before` had stays,
  * whatever this pass did to it.
+ *
+ * A DRAWING IS KEPT WHOLE OR NOT AT ALL (Logos 5.5). Half a water cycle is a
+ * wrong water cycle, so when `whole` marks the nodes of a drawing (origin
+ * "drawn"), the person's own new ideas are kept first, and the drawing's new
+ * nodes only if every one of them fits in what is left. `kept` is how many new
+ * nodes stay — what the pass is charged for, never more.
  */
-export function keepAddedNodes<T extends MapLike>(after: T, before: MapLike | null | undefined, allow: number): { map: T; dropped: string[] } {
+export function keepAddedNodes<T extends MapLike>(
+  after: T,
+  before: MapLike | null | undefined,
+  allow: number,
+  whole?: (id: string) => boolean
+): { map: T; dropped: string[]; kept: number } {
   const added = addedNodes(before, after);
-  if (added.length <= allow) return { map: after, dropped: [] };
-  const dropped = new Set(added.slice(Math.max(0, allow)));
+  const room = Math.max(0, allow);
+  if (added.length <= room) return { map: after, dropped: [], kept: added.length };
+  let keep: string[];
+  if (whole && added.some(whole)) {
+    const own = added.filter((id) => !whole(id)).slice(0, room);
+    const drawing = added.filter(whole);
+    keep = drawing.length <= room - own.length ? [...own, ...drawing] : own;
+  } else keep = added.slice(0, room);
+  const kept = new Set(keep);
+  const dropped = new Set(added.filter((id) => !kept.has(id)));
   return {
     map: {
       ...after,
@@ -47,6 +66,7 @@ export function keepAddedNodes<T extends MapLike>(after: T, before: MapLike | nu
       edges: after.edges.filter((e) => !dropped.has(e.from) && !dropped.has(e.to)),
     },
     dropped: [...dropped],
+    kept: kept.size,
   };
 }
 

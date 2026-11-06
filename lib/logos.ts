@@ -81,6 +81,19 @@ export const NODE_TYPES = [
   'lemma', // a proven stepping-stone another statement leans on
   'conjecture', // believed but not yet established
   'counterexample', // a case that defeats a claim or conjecture
+  // ANYTHING AT ALL, DRAWN (Logos 5.5, the universal Logic Map). What a thing
+  // IS when the map shows a subject rather than an argument: the parts of a
+  // cell, the stages of the water cycle, the people in a story, the branches of
+  // government. Kept deliberately few — a diagram needs to know what kind of
+  // thing a box is, not a taxonomy of everything; the label says the rest.
+  'entity', // a thing: an object, organism, organ, substance, place, institution being described
+  'process', // something that happens or is done: a reaction, a mechanism, an activity
+  'event', // something that happened (or happens) at a point in time
+  'state', // a condition or phase something is in: ice, resting potential, recession
+  'actor', // someone who acts: a person, a role, an organisation
+  'component', // a part of a system or of a whole
+  'category', // a class or group in a classification
+  'quantity', // something measured that rises and falls: temperature, demand, CO₂
 ] as const;
 export type LogosNodeType = (typeof NODE_TYPES)[number];
 
@@ -109,6 +122,17 @@ export const RELATIONS = [
    * shape hierarchical instead of one flat canvas (lib/representation.ts).
    */
   'applies_to',
+  // ANYTHING AT ALL, DRAWN (Logos 5.5): how the parts of a subject connect.
+  /** A brings B about — a cause and its effect, a stimulus and its response */
+  'causes',
+  /** A holds B back or reduces it — a negative influence, an inhibitor */
+  'inhibits',
+  /** A is a kind of B — a classification, a taxonomy */
+  'is_a',
+  /** something moves from A to B — energy, matter, money, information, blood */
+  'flows_to',
+  /** A turns into B — a state change, a stage of a cycle, a transformation in kind */
+  'becomes',
 ] as const;
 export type LogosRelation = (typeof RELATIONS)[number];
 
@@ -241,9 +265,35 @@ export interface LogosNode {
    */
   obj?: string;
   objAt?: number;
+  /**
+   * WHEN, for a thing in time — "1789", "c. 3000 BCE", "June 1940", "Day 3" —
+   * as it would be written on a timeline. Read by the timeline lens to place
+   * and order events; never parsed into a date anywhere it would be shown.
+   */
+  at?: string;
+  /**
+   * THE REGION IT SITS IN — the organelle, the branch, the lane, the phase:
+   * "Chloroplast", "Legislative branch", "Light reactions". Drawn as a
+   * labelled region around everything sharing it, so a diagram can show
+   * containment without a card for every container.
+   */
+  group?: string;
+  /**
+   * WHAT THE CARD WOULD SAY IF IT HAD ROOM — the explanation behind a short
+   * label, shown when the card is inspected and never on the canvas, so a
+   * diagram stays nearly wordless and loses nothing.
+   */
+  detail?: string;
 }
 
-export const NODE_ORIGINS = ['socria', 'source', 'computed'] as const;
+/**
+ * Where a node came from. 'drawn' is the universal Logic Map's (Logos 5.5):
+ * SOCRIA DREW IT to show the subject — a stage of a cycle, a part of a cell,
+ * an event in a history — so what the map explains is never mistaken for
+ * what the person believes. The claim, evidence and assumption analysis reads
+ * the person's own nodes; a drawn node is the subject, made visible.
+ */
+export const NODE_ORIGINS = ['socria', 'source', 'computed', 'drawn'] as const;
 export type NodeOrigin = (typeof NODE_ORIGINS)[number];
 
 export interface LogosEdge {
@@ -255,11 +305,24 @@ export interface LogosEdge {
   op?: string;
   /** the condition this transition is taken on — "chooses Logos", "has an account" */
   when?: string;
+  /**
+   * WHAT THE LINE SAYS — the link phrase of a concept map ("is eaten by",
+   * "produces", "evaporates"), a few words read along the connection. The
+   * relation says what KIND of connection it is; the label says it in the
+   * subject's own terms.
+   */
+  label?: string;
 }
 
 export interface ThinkingMap {
   nodes: LogosNode[];
   edges: LogosEdge[];
+  /**
+   * WHAT THE DIAGRAM IS OF, in a few words — "The water cycle", "How a bill
+   * becomes law" — when the map draws a subject (Logos 5.5). The person's own
+   * thinking needs no title; a drawing of something does.
+   */
+  title?: string;
   /** the kind of thinking the map currently reflects, inferred not chosen */
   context?: ThinkingContext;
   /** for math: how they're engaging — learning drives the Answer Guard */
@@ -388,6 +451,24 @@ const MAX_WHEN = 60;
 // canvas becoming the spaghetti the cap exists to prevent.
 const MAX_NODES_SHAPED = 22;
 const MAX_EDGES_SHAPED = 32;
+// A DRAWING OF A SUBJECT — a cycle, a hierarchy, the parts of something, a
+// concept map, a system — is a diagram on purpose, and its parts are its
+// content: the water cycle has its stages whether or not anyone argued about
+// them. It still has a ceiling (past two dozen boxes a diagram stops being
+// read), and it is the only shape allowed past the thinking aid's.
+const MAX_NODES_DIAGRAM = 24;
+const MAX_EDGES_DIAGRAM = 36;
+const MAX_AT = 24;
+const MAX_GROUP = 32;
+const MAX_DETAIL = 300;
+const MAX_EDGE_LABEL = 32;
+const MAX_TITLE = 60;
+/** What a drawing's fields hold, for an edit by hand to cut to exactly what a saved map keeps (lib/map-edit.ts). */
+export const DRAWING_LIMITS = { at: MAX_AT, group: MAX_GROUP, detail: MAX_DETAIL, edgeLabel: MAX_EDGE_LABEL, title: MAX_TITLE } as const;
+/** The shapes that are drawings of a subject rather than of someone's reasoning. */
+// the shapes only a drawing takes — a system is also a shape of someone's own thinking, so it is not one of them
+// (a drawn system has drawn parts, and the drawing's room comes from those)
+export const DIAGRAM_KINDS: ReadonlySet<string> = new Set(['cycle', 'hierarchy', 'concept', 'causal', 'parts']);
 
 /**
  * The near misses worth naming, mapped to the type they actually are.
@@ -411,14 +492,45 @@ const NODE_TYPE_ALIASES: Record<string, LogosNodeType> = {
   result_of: 'consequence',
   risk: 'consequence',
   cause: 'concept',
-  mechanism: 'concept',
-  process: 'concept',
+  mechanism: 'process',
   principle: 'concept',
+  // the universal map's kinds of thing (Logos 5.5): near misses for each
+  thing: 'entity',
+  object: 'entity',
+  organism: 'entity',
+  organ: 'entity',
+  substance: 'entity',
+  material: 'entity',
+  molecule: 'entity',
+  place: 'entity',
+  location: 'entity',
+  reaction: 'process',
+  activity: 'process',
+  procedure: 'process',
+  happening: 'event',
+  occurrence: 'event',
+  person: 'actor',
+  role: 'actor',
+  agent: 'actor',
+  organisation: 'actor',
+  organization: 'actor',
+  institution: 'actor',
+  part: 'component',
+  module: 'component',
+  subsystem: 'component',
+  element: 'component',
+  class: 'category',
+  group: 'category',
+  kind: 'category',
+  taxon: 'category',
+  level: 'quantity',
+  rate: 'quantity',
+  amount: 'quantity',
+  measure: 'quantity',
   law: 'theorem',
   rule: 'theorem',
   formula: 'equation',
   variable: 'unknown',
-  quantity: 'given',
   parameter: 'given',
   condition: 'constraint',
   requirement: 'constraint',
@@ -441,15 +553,41 @@ const NODE_TYPE_ALIASES: Record<string, LogosNodeType> = {
   phase: 'step',
 };
 
+/**
+ * A MATHEMATICAL MAP READS THREE WORDS AS IT ALWAYS DID. Before the universal
+ * map (Logos 5.5) "process" and "mechanism" were drawn as concepts and
+ * "quantity" as a given — the value a problem hands you, which the working
+ * lens solves from. They are kinds of thing in a drawing now; in a
+ * mathematical map they still mean what they meant.
+ */
+const MATH_READS: Readonly<Record<string, LogosNodeType>> = { process: 'concept', mechanism: 'concept', quantity: 'given' };
+
 /** The node type to draw this as. Never null — see the note at the call site. */
-function resolveNodeType(raw: unknown): LogosNodeType {
+function resolveNodeType(raw: unknown, context?: ThinkingContext): LogosNodeType {
   if (typeof raw !== 'string') return 'idea';
   const t = raw.trim().toLowerCase().replace(/\s+/g, '_');
+  if (context === 'math' && MATH_READS[t]) return MATH_READS[t];
   if (NODE_TYPES.includes(t as LogosNodeType)) return t as LogosNodeType;
   const alias = NODE_TYPE_ALIASES[t];
   if (alias && NODE_TYPES.includes(alias)) return alias;
   return 'idea';
 }
+
+/**
+ * TWO ROLES MEAN WHAT THEY ALWAYS MEANT OUTSIDE THE SHAPES THAT OWN THEM.
+ * Before the universal map (Logos 5.5) a "stage" was a step and a "part" a
+ * component, in every map. They are roles of their own now — the stage of a
+ * cycle, the part of a breakdown — and only there: a flowchart's "stage" is
+ * still one of its steps, so its order is still read.
+ */
+function roleIn(role: Role | undefined, kind: string | undefined): Role | undefined {
+  if (role === 'stage' && kind !== 'cycle') return 'step';
+  if (role === 'part' && kind !== 'parts' && kind !== 'hierarchy') return 'component';
+  return role;
+}
+
+/** A text's words, for comparing two: case, punctuation and spacing do not count. */
+const wordsOf = (t: string) => t.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, ' ').trim();
 
 /** The longest label a card keeps — the edits that write one (lib/map-edit.ts) use the same. */
 export const MAP_LABEL_MAX = MAX_LABEL;
@@ -460,15 +598,24 @@ export const MAP_LABEL_MAX = MAX_LABEL;
  * the limit, with a sentence, rather than taken and then quietly dropped on
  * the next save (lib/map-edit.ts).
  */
-export function mapCaps(map: { context?: unknown; building?: unknown }): { nodes: number; edges: number } {
+export function mapCaps(map: { context?: unknown; building?: unknown; nodes?: unknown }): { nodes: number; edges: number } {
   const isMath = map?.context === 'math';
   const building = sanitizeBuilding(map?.building);
+  // a drawing of a subject — by its shape, or by what it holds (Socria drew it)
+  const drawn = Array.isArray(map?.nodes) && map.nodes.some((n) => !!n && typeof n === 'object' && (n as { origin?: unknown }).origin === 'drawn');
+  if (!isMath && ((!!building && DIAGRAM_KINDS.has(building.kind)) || drawn)) return { nodes: MAX_NODES_DIAGRAM, edges: MAX_EDGES_DIAGRAM };
   const shaped = !!building && ['process', 'plan', 'timeline'].includes(building.kind);
   return {
     nodes: isMath ? MAX_NODES_MATH : shaped ? MAX_NODES_SHAPED : MAX_NODES,
     edges: isMath ? MAX_EDGES_MATH : shaped ? MAX_EDGES_SHAPED : MAX_EDGES,
   };
 }
+
+/**
+ * The relations that read one way only, so A→B and B→A are two connections.
+ * A cycle has both "spring becomes summer" and, eventually, its way back.
+ */
+const DIRECTED: ReadonlySet<LogosRelation> = new Set<LogosRelation>(['transforms_to', 'implies', 'precedes', 'leads_to', 'applies_to', 'causes', 'inhibits', 'is_a', 'flows_to', 'becomes']);
 
 export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap {
   if (!raw || typeof raw !== 'object') return { ...EMPTY_MAP };
@@ -478,7 +625,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     : undefined;
   const isMath = context === 'math';
   const building = sanitizeBuilding(raw.building);
-  const { nodes: nodeCap, edges: edgeCap } = mapCaps({ context, building: raw.building });
+  const { nodes: nodeCap, edges: edgeCap } = mapCaps({ context, building: raw.building, nodes: raw.nodes });
   const intent: MathIntent | undefined =
     isMath && MATH_INTENTS.includes(raw.intent) ? (raw.intent as MathIntent) : undefined;
   const str = (v: any, n: number) =>
@@ -500,7 +647,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       // stopped working. Near misses are mapped to their nearest kin and
       // anything else becomes an idea, which draws correctly and says the
       // true thing: we know what they thought, not what to call it.
-      const type = resolveNodeType(n?.type);
+      const type = resolveNodeType(n?.type, context);
       if (!id || !label) return null;
       const status: LogosNodeStatus = NODE_STATUSES.includes(n?.status)
         ? (n.status as LogosNodeStatus)
@@ -515,8 +662,11 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         : undefined;
       const note = str(n?.note, MAX_NOTE);
       const by = sanitizeByRef(n?.by);
-      const role = sanitizeRole(n?.role);
+      const role = roleIn(sanitizeRole(n?.role), building?.kind);
       const origin: NodeOrigin | undefined = NODE_ORIGINS.includes(n?.origin) ? (n.origin as NodeOrigin) : undefined;
+      const at = str(n?.at, MAX_AT);
+      const group = str(n?.group, MAX_GROUP);
+      const detail = str(n?.detail, MAX_DETAIL);
       return {
         id,
         type,
@@ -531,6 +681,10 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ...(origin ? { origin } : {}),
         ...(typeof n?.obj === 'string' && /^[A-Za-z0-9_]{1,16}$/.test(n.obj) ? { obj: n.obj } : {}),
         ...(typeof n?.obj === 'string' && Number.isInteger(n?.objAt) && n.objAt >= 0 && n.objAt < 64 ? { objAt: n.objAt } : {}),
+        ...(at ? { at } : {}),
+        ...(group ? { group } : {}),
+        // a detail that only says the label again says nothing more
+        ...(detail && wordsOf(detail) !== wordsOf(label) ? { detail } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {
@@ -562,7 +716,8 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         : 'normal';
       const op = str(e?.op, MAX_OP);
       const when = str(e?.when, MAX_WHEN);
-      return { from, to, relation, strength, ...(op ? { op } : {}), ...(when ? { when } : {}) };
+      const label = str(e?.label, MAX_EDGE_LABEL);
+      return { from, to, relation, strength, ...(op ? { op } : {}), ...(when ? { when } : {}), ...(label ? { label } : {}) };
     })
     .filter((e: LogosEdge | null): e is LogosEdge => {
       // Drop dangling edges — they'd render as lines into empty space.
@@ -573,7 +728,7 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       const key =
         // A sequence can loop back, and a detail applies one way: both are
         // directional, so A→B and B→A are two different edges.
-        e.relation === 'transforms_to' || e.relation === 'implies' || e.relation === 'precedes' || e.relation === 'leads_to' || e.relation === 'applies_to'
+        DIRECTED.has(e.relation)
           ? `${e.from}>${e.to}:${e.relation}`
           : [e.from, e.to].sort().join('~') + e.relation;
       if (edgeSeen.has(key)) return false;
@@ -666,9 +821,11 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
     .filter(Boolean)
     .slice(-40);
 
+  const title = str(raw.title, MAX_TITLE);
   return {
     nodes,
     edges,
+    ...(title ? { title } : {}),
     ...(removed.length ? { removed } : {}),
     ...(history ? { history } : {}),
     ...(Number.isFinite(raw.drawnAt) && raw.drawnAt > 0 ? { drawnAt: Math.floor(raw.drawnAt) } : {}),
@@ -953,6 +1110,11 @@ const LINEAGE_PHRASE: Record<LogosRelation, [string, string]> = {
   equivalent_to: ['is equivalent to', 'is equivalent to'],
   justifies: ['justifies', 'is justified by'],
   applies_to: ['applies to', 'is shaped by'],
+  causes: ['causes', 'is caused by'],
+  inhibits: ['holds back', 'is held back by'],
+  is_a: ['is a kind of', 'includes'],
+  flows_to: ['flows to', 'receives from'],
+  becomes: ['becomes', 'comes from'],
 };
 
 /** How one node sits against the rest of the map, in plain language. */
@@ -1251,8 +1413,9 @@ Return ONLY JSON, exactly this shape:
   "ask": {"action": "discuss|explore|explain|question|map|construct|modify|remove|compute|simulate|estimate|represent|compare|trace|research|verify", "artifact": "answer|map|model|simulation|plot|diagram|estimate|draft|research|comparison|display", "topic": "the subject in their words", "domain": "the field, if it is clear", "formal": {"outcome": "what is being explained, or what the model is of", "inputs": ["what explains it"], "states": ["named states, bodies, compartments, stocks"], "parameters": ["named coefficients or constants"], "equations": ["an equation THEY wrote"], "method": "a method THEY named — never one you chose", "data": "data they referred to or supplied"}, "operations": ["manipulate", "run", "fit", "compare"]},
   "propose": { … a structured model — see PROPOSING A STRUCTURED MODEL below. A SIBLING OF "viz", never inside it },
   "intent": "learning|verification|utility|exploration",  // ONLY for context=math
-  "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "role": "<its structural role in what they are building>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint"}],
-  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to|applies_to", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge", "when": "the condition a transition is taken on"}],
+  "title": "what a drawing of a subject is of, in a few words — ONLY when the map draws a subject (see ONE MAP, TWO KINDS OF THING)",
+  "nodes": [{"id": "short_snake_case_id", "type": "<node type>", "role": "<its structural role in what they are building>", "label": "a short phrase in their own framing", "status": "open|supported|resolved|revised", "merged": ["label of a node folded into this one"], "tex": "LaTeX for this node, if mathematical", "flag": "error|verified", "note": "a short annotation or repair hint", "origin": "drawn — ONLY on a node of a drawing of the subject", "detail": "a drawn node's explanation, one or two sentences, shown when it is inspected", "at": "when, for a thing in time: 1789, c. 3000 BCE, June 1940", "group": "the region it sits in: Chloroplast, Light reactions, Legislative branch"}],
+  "edges": [{"from": "node_id", "to": "node_id", "relation": "supports|conflicts|depends|relates|leads_to|revises|precedes|part_of|transforms_to|implies|justifies|equivalent_to|applies_to|causes|inhibits|is_a|flows_to|becomes", "strength": "weak|normal|strong", "op": "the operation on a transforms_to edge", "when": "the condition a transition is taken on", "label": "1–3 words read along the line, in the subject's terms: evaporates, is eaten by, produces"}],
   "viz": {"kind": "function|limit|derivative|riemann|taylor|sequence|vectors|matrix|distribution|ode|supply-demand|ppc|ad-as|diagram|simulation", "sim": {"object": "black-hole|orbit|oscillator|projectile"}, "parts": [{"o": "curve|path|data|band|errorbar|callout|point|segment|line|vector|region|rects|sequence|vrule|hrule|label", "expr": "for a curve, y in terms of x", "param": "for a path, the letter both coordinates are written in", "from": 0, "to": 6.2832, "closed": true, "x": 0, "y": 0, "x1": 0, "y1": 0, "x2": 0, "y2": 0, "at": 0, "slope": 1, "pts": [{"x": 0, "y": 0}], "bars": [{"x0": 0, "x1": 1, "y": 2}], "text": "for a label or callout", "points": [{"x": 1, "y": 3.4}], "fit": true, "connect": false, "lower": "for a band, the bottom edge in terms of x", "upper": "the top edge", "dy": 0.5, "dx": 0.2, "toX": 0, "toY": 0, "tone": "primary|accent|tension|muted|ghost", "dashed": false, "label": "short"}], "quantities": [{"tex": "K_a", "expr": "10^(-p)", "help": "what it is, without the number"}], "says": {"caption": "one line under the picture", "narration": "what is happening now", "ask": "a question to sit with while the guard is up"}, "expr": "the function in plain notation", "varName": "x", "a": 0, "b": 1, "rule": "left|right|midpoint", "matrix": [[1, 1], [0, 1]], "vectors": [{"x": 2, "y": 1, "label": "u"}], "dist": "normal|binomial|poisson|exponential", "demand": {"intercept": 100, "slope": -1}, "supply": {"intercept": 20, "slope": 1}, "control": {"kind": "ceiling|floor", "at": 45}, "tax": 12, "surplus": true, "frontier": {"xMax": 100, "yMax": 80, "bowed": true, "grows": "both|x|y"}, "ad": {"intercept": 140, "slope": -1}, "sras": {"intercept": 20, "slope": 1}, "potential": 60, "axes": {"x": "Guns", "y": "Butter"}, "partial": true, "ghost": true, "overlays": [{"id": "short_id", "expr": "x^2", "label": "optional", "visible": true, "source": "user"}], "view": {"xMin": -6, "xMax": 6}, "params": [{"id": "a", "min": -3, "max": 3, "step": 0.1, "value": 1}], "title": "a short line naming what is being shown"}
 }
 
@@ -1325,8 +1488,24 @@ SEMANTIC TYPE AND STRUCTURAL ROLE ARE DIFFERENT, AND A NODE HAS BOTH.
 - THE SHAPE CAN CHANGE. If what they are building has genuinely changed, change "kind" — and keep every idea already on the map, re-roled for the new shape. Never discard thinking to make a shape fit.
 - Keep a node's id when its role changes.
 
-THE MAP TRACKS THIS CONVERSATION, NOT THE SUBJECT.
-Whatever the context, the map is how THIS conversation's thinking developed — the questions asked, the ideas put forward, the arguments, decisions, connections and changes of mind — not an encyclopedia entry on the topic. Socria's explanation of something becomes at most one node for what it established, attached to the question it answered; the subject's own taxonomy (every term, rule or category an explanation mentioned) is not drawn unless the person worked with it. "How does American football work?" followed by "and scoring?" is a question, the gist of the answer (four downs to gain ten yards), and a follow-up question about scoring — not a map of football.
+ONE MAP, TWO KINDS OF THING ON IT.
+The Logic Map draws almost anything. It can hold two kinds of thing, and they must never be confused:
+
+1. THE PERSON'S THINKING — their questions, ideas, claims, evidence, assumptions, values, decisions, doubts and changes of mind, as this conversation developed them. No "origin" (or the existing origins for suggestions, sources and computations). Everything below about contexts, whose thinking it is, settling and reorganising applies to it exactly as it always has. "How does American football work?" followed by "and scoring?" is two of their questions, not their beliefs about football.
+
+2. THE SUBJECT, DRAWN — a diagram of the thing being discussed: the stages of a cycle, the steps of a process, the parts of a whole, a classification, what causes what, a chronology, how the parts of a system connect, how the concepts of a field relate. Every node of a drawing carries "origin": "drawn": Socria drew it, it is the subject made visible, and it is never the person's belief, value, goal or decision. Give the map a "title" ("The water cycle", "How a bill becomes law") and choose "building.kind" for the drawing's shape (cycle, process, hierarchy, parts, causal, timeline, system, concept, comparison).
+
+WHEN THEY ASK, DRAW IT. "Draw", "diagram", "map out how", "a flowchart of", "a timeline of", "a concept map of", "the life cycle of", "a tree of", "the parts of", "show me how X works" — a drawing is REQUIRED, in the shape they named, whatever the subject. Never answer a request for a drawing with a description of one.
+
+WHEN IT WOULD TEACH, DRAW IT. Without being asked, draw the subject when the conversation is explaining something with a definite structure — at least three parts that relate in a fixed way (a sequence, a loop, a hierarchy, containment, causes and effects, a chronology, a system with flows) — and seeing that structure would make it clearer than reading about it: "how does photosynthesis work", "what are the stages of mitosis", "what caused the First World War", "explain the nitrogen cycle", "how is the US government organised". Do NOT draw: a definition or a single fact, small talk, a personal decision or argument (map their thinking instead), a calculation (that is the solution chain), anything already shown as an interactive picture in "viz", or a structure with fewer than three parts.
+
+ACCURACY BEFORE COMPLETENESS. Draw what is true and standard about the subject, in its standard terms, and nothing invented: three correct stages beat six guessed ones. Use the relation that is actually true — causes, inhibits, is_a, part_of, flows_to, becomes, precedes, leads_to — and name the link with "label" where the relation alone would not say it ("is eaten by", "evaporates", "if yes").
+
+ALMOST NO WORDS ON THE DRAWING. A drawn node's "label" is a name of 1–4 words ("Evaporation", "Left ventricle", "Treaty of Versailles"), never a sentence. What the node means goes in "detail" — one or two plain sentences, shown only when the card is inspected. A time goes in "at", a containing region in "group", a link's wording in the edge's "label". Up to 24 nodes for a drawing; fewer is better.
+
+BOTH AT ONCE. A learner's map can hold the drawing and their own thinking about it: their question or misconception is their node, connected to the drawn part it concerns ("applies_to" from theirs to the drawn one). Their nodes never get "origin": "drawn"; drawn nodes are never typed as their belief, value, goal or decision, never "supported" or "resolved" on their behalf, and never merged with their nodes.
+
+KEEP A DRAWING CURRENT, NOT FRESH. While the conversation is about the same subject, keep the drawing's ids, correct it, extend it with what was just explained, and keep its shape; replace it only when the subject changes. What the person removed stays removed. When they want it drawn another way ("show it as a timeline", "make it a tree"), keep every node and re-shape it.
 
 READ THE CONTEXT SECOND.
 People do not only make decisions. Work out what kind of thinking is actually happening and let that decide which node types earn their place. A map full of goals and tradeoffs is wrong for someone drafting a chapter, and a map of themes and characters is wrong for someone choosing a job.
@@ -1335,7 +1514,7 @@ People do not only make decisions. Work out what kind of thinking is actually ha
   writing       the central idea (goal), claims, evidence, counterpoints, structure (part_of), unresolved questions
   creating      concepts, themes, characters, relationships, conflicts (tension), possibilities (idea), chronology (precedes), open questions
   researching   research questions, claims, sources, supporting AND challenging evidence, uncertainty, disagreements (tension)
-  learning      their questions, what answered each (the gist, one idea per answer), what they then understood, doubted or got wrong, and the next question — in the order the conversation took (precedes, depends). Not a concept map of the subject: a term explained in passing is not a node unless they took it up
+  learning      their questions, what answered each (the gist, one idea per answer), what they then understood, doubted or got wrong, and the next question — in the order the conversation took (precedes, depends). A term explained in passing is not one of THEIR nodes unless they took it up; when the subject itself has a structure worth seeing, draw it (origin "drawn") and attach their questions to the parts they concern
   planning      goals, constraints, dependencies, milestones, unknowns (question)
   brainstorming ideas, how they cluster (relates), unexplored branches (question)
   reflecting    themes, tensions, motivations, values, questions
@@ -1497,11 +1676,13 @@ Node types mean:
   result = the final answer
   error = a mistake, or where the reasoning diverged
 
-Relations mean: applies_to (A is a detail that bears on B — a constraint on a step, a question about a branch), supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act), transforms_to (expression A becomes expression B via an operation — the solution chain), implies (A logically implies B — proofs), justifies (a theorem/definition/property justifies a step).
-- Labels are short phrases (2–8 words) in THEIR language, not yours. Never full sentences.
+Relations mean: applies_to (A is a detail that bears on B — a constraint on a step, a question about a branch), supports (A is a reason for B), conflicts (A pulls against B), depends (B requires A, including a prerequisite), relates (loose association), leads_to (A produces B), revises (A is a later version of B), precedes (A comes before B in time or sequence), part_of (A sits inside B — a section within a piece, a scene within an act, an organelle within a cell), transforms_to (expression A becomes expression B via an operation — the solution chain), implies (A logically implies B — proofs), justifies (a theorem/definition/property justifies a step), causes (A brings B about), inhibits (A holds B back or reduces it), is_a (A is a kind of B — a classification), flows_to (something moves from A to B — energy, matter, money, information, blood), becomes (A turns into B — a state change, the next stage of a cycle).
+
+Node types for a drawing of a subject, beside the ones above: entity (a thing — an object, organism, organ, substance, place), process (something that happens or is done), event (something that happened at a time), state (a condition or phase), actor (a person, role or organisation that acts), component (a part of a system), category (a class in a classification), quantity (something measured that rises and falls). Reasoning types (claim, evidence, assumption, belief, value, goal, decision) stay the person's: a drawing explains, it does not argue.
+- Labels of THEIR nodes are short phrases (2–8 words) in THEIR language, not yours. Labels of DRAWN nodes are names of 1–4 words in the subject's standard terms. Never full sentences on the map.
 - Prefer typing precisely: a stated priority is a value, not an idea; "I've decided X" is a decision; a cost of a choice is a consequence.
-- Maximum 16 nodes — 26 for mathematics, where a solution chain or a proof is legitimately longer. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
-- Only include what the conversation actually supports. Never invent reasoning they haven't expressed.
+- Maximum 16 nodes — 26 for mathematics, where a solution chain or a proof is legitimately longer, and 24 for a drawing of a subject. When it would grow past that, merge or drop the least load-bearing node instead. A small sharp map beats a big one.
+- THEIR thinking holds only what the conversation actually supports: never invent reasoning they haven't expressed. A DRAWING holds what is true about the subject — what Socria explained, or standard knowledge it would explain — and nothing guessed.
 - Connect nodes wherever a real relationship exists — an unconnected node is usually a sign the map is wrong.
 - A user message beginning with [on "…"] was said while they were looking closely at that specific node. Attach what it adds to that node — sharpen, extend or revise it — rather than creating a parallel node beside it.
 

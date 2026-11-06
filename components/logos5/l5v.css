@@ -996,7 +996,7 @@
    the map's own name row goes, unless it carries a control */
 .l5v-logic .lg-panel-head,
 .l5v-logic .mp-top .st,
-.l5v-logic .mp-top:not(:has(.mp-x, .mp-ask)) {
+.l5v-logic .mp-top:not(:has(.mp-x, .mp-ask, .mp-keep)) {
   display: none;
 }
 /* every card already names its kind: no colour key at the map's foot */

@@ -113,6 +113,8 @@ export interface L5MessageProps {
   onExplore?: (text: string) => void;
   /** an inline element opened in Artifacts as a full artifact */
   onOpenInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
+  /** a reply's diagram, opened on the Logic Map as a drawing (Logos 5.5) */
+  onMapInline?: (m: LogosMsg, n: number, spec: InlineSpec) => void;
   /**
    * A write-up they asked to read and keep (lib/logos5/content.ts): filed in
    * Content and read there, so the conversation shows its title and opening and
@@ -223,7 +225,7 @@ export function L5Message(p: L5MessageProps) {
   const objFx = m.role === 'assistant' ? p.effect?.objects ?? [] : [];
   const whose = p.who === 'You' ? 'your' : `${p.who}’s`;
   // the reply's inline elements: what was done with them, and where their actions go
-  const { onInline, onChoose, onExplore, onOpenInline, latest } = p;
+  const { onInline, onChoose, onExplore, onOpenInline, onMapInline, latest } = p;
   const inline = useMemo<InlineHost | undefined>(
     () =>
       m.role === 'assistant'
@@ -233,10 +235,11 @@ export function L5Message(p: L5MessageProps) {
             onChoose: latest ? onChoose : undefined,
             onExplore,
             onOpen: onOpenInline ? (n, spec) => onOpenInline(m, n, spec) : undefined,
+            onMap: onMapInline ? (n, spec) => onMapInline(m, n, spec) : undefined,
             live: !!latest,
           }
         : undefined,
-    [m, onInline, onChoose, onExplore, onOpenInline, latest]
+    [m, onInline, onChoose, onExplore, onOpenInline, onMapInline, latest]
   );
 
   return (

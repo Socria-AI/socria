@@ -60,6 +60,15 @@ export const GRAMMAR_IDS = [
   'research',
   'model',
   'brainstorm',
+  // ANYTHING AT ALL, DRAWN (Logos 5.5, the universal Logic Map): the shapes a
+  // subject takes when the map draws the subject itself — the stages of a
+  // cycle, a classification, how the ideas of a field relate, what causes
+  // what, what something is made of.
+  'cycle',
+  'hierarchy',
+  'concept',
+  'causal',
+  'parts',
 ] as const;
 export type GrammarId = (typeof GRAMMAR_IDS)[number];
 
@@ -103,6 +112,17 @@ export const ROLES = [
   // possibilities
   'idea',
   'cluster',
+  // ANYTHING AT ALL, DRAWN (Logos 5.5)
+  'stage', // a stage of a cycle
+  'category', // a class with things under it
+  'member', // something that belongs to a class
+  'concept', // an idea in a concept map
+  'cause', // what brings something about
+  'effect', // what is brought about
+  'whole', // the thing that has parts
+  'part', // one of its parts
+  'input', // what goes into a process or system
+  'output', // what comes out of it
   // DETAILS — what bears on a part of the shape rather than being one
   'constraint',
   'value',
@@ -115,8 +135,12 @@ export type Role = (typeof ROLES)[number];
 /** Roles that are, in every grammar, details of something rather than a part of the spine. */
 export const DETAIL_ROLES: ReadonlySet<Role> = new Set<Role>(['constraint', 'value', 'risk', 'condition', 'note']);
 
-/** The relations that put one part of a shape before another. */
-export const SEQUENCE_RELATIONS: ReadonlySet<LogosEdge['relation']> = new Set<LogosEdge['relation']>(['precedes', 'leads_to']);
+/**
+ * The relations that put one part of a shape before another. A state change
+ * (ice becomes water) and a cause before its effect are orders too, so a
+ * cycle and a causal chain are drawn from the same transitions a flow is.
+ */
+export const SEQUENCE_RELATIONS: ReadonlySet<LogosEdge['relation']> = new Set<LogosEdge['relation']>(['precedes', 'leads_to', 'becomes', 'causes', 'flows_to']);
 
 export interface Grammar {
   id: GrammarId;
@@ -183,7 +207,7 @@ export const GRAMMARS: Record<GrammarId, Grammar> = {
     spine: ['component', 'flow'],
     roles: { component: 'a part of the system', flow: 'something that moves between parts' },
     called: ['system', 'network', 'architecture', 'ecosystem', 'dependency map', 'dependencies'],
-    draws: ['graph', 'structure'],
+    draws: ['concept', 'graph', 'structure'],
     ordered: false,
   },
   decision: {
@@ -252,8 +276,68 @@ export const GRAMMARS: Record<GrammarId, Grammar> = {
     builds: 'possibilities that are not organised yet — ideas, how they cluster, what pulls against what, the open questions',
     spine: ['idea', 'cluster'],
     roles: { idea: 'a possibility', cluster: 'a group of related possibilities' },
-    called: ['brainstorm', 'mind map', 'mindmap', 'concept map', 'ideas', 'cloud'],
+    called: ['brainstorm', 'mind map', 'mindmap', 'ideas', 'cloud'],
     draws: ['graph'],
+    ordered: false,
+  },
+  cycle: {
+    id: 'cycle',
+    label: 'Cycle',
+    builds: 'stages that repeat — each leads to the next, and the last leads back to the first (the water cycle, the cell cycle, a life cycle, a feedback loop)',
+    spine: ['stage', 'step', 'state', 'event'],
+    roles: {
+      stage: 'one stage of the cycle',
+      step: 'something that happens on the way round',
+      state: 'a form or condition the thing is in between stages',
+      event: 'a moment that recurs each time round',
+    },
+    called: ['cycle', 'life cycle', 'lifecycle', 'loop', 'feedback loop', 'circular diagram', 'cycle diagram', 'round'],
+    draws: ['cycle', 'flow'],
+    ordered: true,
+  },
+  hierarchy: {
+    id: 'hierarchy',
+    label: 'Hierarchy',
+    builds: 'a tree — what sits at the top, what sits under it, and under that (a classification, an organisation chart, a family tree, a breakdown)',
+    spine: ['category', 'member', 'whole', 'part'],
+    roles: {
+      category: 'a class or level with things under it',
+      member: 'something that belongs under a category',
+      whole: 'the top of a breakdown',
+      part: 'something it breaks down into',
+    },
+    called: ['hierarchy', 'tree', 'tree diagram', 'taxonomy', 'classification', 'org chart', 'organisation chart', 'organization chart', 'family tree', 'breakdown', 'outline'],
+    draws: ['tree', 'structure'],
+    ordered: false,
+  },
+  concept: {
+    id: 'concept',
+    label: 'Concept map',
+    builds: 'how the ideas of a subject relate — concepts joined by labelled links that read as sentences ("plants · produce · oxygen")',
+    spine: ['concept'],
+    roles: { concept: 'one idea of the subject, a word or two' },
+    called: ['concept map', 'concept diagram', 'knowledge map', 'map of the ideas', 'map of the concepts', 'web of ideas'],
+    draws: ['concept', 'graph'],
+    ordered: false,
+  },
+  causal: {
+    id: 'causal',
+    label: 'Cause and effect',
+    builds: 'what causes what — the causes, the effects, the chains between them, what holds something back, and the loops where an effect feeds its own cause',
+    spine: ['cause', 'effect'],
+    roles: { cause: 'something that brings an effect about', effect: 'something that is brought about' },
+    called: ['cause and effect', 'causes and effects', 'causal map', 'causal diagram', 'causal chain', 'fishbone', 'root causes', 'chain of causes'],
+    draws: ['flow', 'concept', 'graph'],
+    ordered: true,
+  },
+  parts: {
+    id: 'parts',
+    label: 'Parts',
+    builds: 'what something is made of — the whole, its parts, what sits inside what, and what each part does (a cell, an engine, the heart, an organisation\'s departments)',
+    spine: ['whole', 'part', 'component'],
+    roles: { whole: 'the thing being taken apart', part: 'one of its parts', component: 'a working part, inside a whole' },
+    called: ['parts', 'labelled diagram', 'labeled diagram', 'anatomy', 'cross-section', 'cross section', 'parts diagram', 'structure diagram', 'block diagram', 'exploded view'],
+    draws: ['parts', 'tree'],
     ordered: false,
   },
 };
@@ -278,7 +362,6 @@ export const isRole = (v: unknown): v is Role => typeof v === 'string' && (ROLES
 
 /** A small table of near misses, so a reasonable word still lands on the right role. */
 const ROLE_ALIASES: Record<string, Role> = {
-  stage: 'step',
   phase: 'step',
   screen: 'step',
   activity: 'step',
@@ -293,8 +376,28 @@ const ROLE_ALIASES: Record<string, Role> = {
   outcome: 'end',
   objective: 'goal',
   deliverable: 'milestone',
-  part: 'component',
   module: 'component',
+  // the universal map's roles (Logos 5.5)
+  parent: 'category',
+  class: 'category',
+  subcategory: 'category',
+  root: 'whole',
+  child: 'member',
+  instance: 'member',
+  example_of: 'member',
+  container: 'whole',
+  system_whole: 'whole',
+  piece: 'part',
+  organelle: 'part',
+  region: 'part',
+  driver: 'cause',
+  reason_for: 'cause',
+  impact: 'effect',
+  consequence: 'effect',
+  ingredient: 'input',
+  reactant: 'input',
+  product: 'output',
+  term: 'concept',
   choice: 'option',
   factor: 'criterion',
   dimension_: 'dimension',
@@ -451,6 +554,39 @@ const count = (map: Mapish, pred: (n: LogosNode) => boolean) => map.nodes.filter
 const rel = (map: Mapish, ...rs: LogosEdge['relation'][]) => map.edges.filter((e) => rs.includes(e.relation)).length;
 const clamp = (x: number) => Math.max(0, Math.min(1, x));
 
+/** Is there a closed loop of sequence edges at least `min` long? A cycle's last stage leads back to its first. */
+export function hasLoop(map: Mapish, min = 3): boolean {
+  const next = new Map<string, string[]>();
+  for (const e of map.edges) if (SEQUENCE_RELATIONS.has(e.relation)) next.set(e.from, [...(next.get(e.from) ?? []), e.to]);
+  const ids = [...next.keys()];
+  for (const start of ids) {
+    // depth-first from each start, looking for the way back to it
+    const stack: [string, number][] = [[start, 0]];
+    const seen = new Set<string>();
+    while (stack.length) {
+      const [id, d] = stack.pop()!;
+      for (const t of next.get(id) ?? []) {
+        if (t === start && d + 1 >= min) return true;
+        if (!seen.has(t)) {
+          seen.add(t);
+          stack.push([t, d + 1]);
+        }
+      }
+    }
+  }
+  return false;
+}
+
+/** How tree-like the containment and classification on the map is: edges, and whether every child has one parent. */
+function treeness(map: Mapish): number {
+  const up = map.edges.filter((e) => e.relation === 'part_of' || e.relation === 'is_a');
+  if (up.length < 2) return 0;
+  const parents = new Map<string, Set<string>>();
+  for (const e of up) parents.set(e.from, new Set([...(parents.get(e.from) ?? []), e.to]));
+  const single = [...parents.values()].every((p) => p.size === 1);
+  return clamp(up.length / 5) * (single ? 1 : 0.6);
+}
+
 /**
  * HOW STRONGLY THE STRUCTURE ON THE MAP IS EACH SHAPE — read from canonical
  * state, never from words. Roles count most, because a role is the
@@ -483,12 +619,24 @@ export function structuralScores(map: Mapish): Record<GrammarId, number> {
     research: clamp(roleOf('research') * 0.9 + (inquiry ? 0.3 : 0) + (count(map, (n) => n.type === 'question') && support ? 0.1 : 0)),
     model: clamp((map.models?.docs?.length ? 0.9 : 0) + (map.viz ? 0.6 : 0) + (map.context === 'math' ? 0.4 : 0) + clamp(quantities / 4) * 0.4),
     brainstorm: clamp(map.nodes.length >= 3 ? share(map, ['idea', 'cluster'], ['idea']) * 0.8 + (typedEdges <= 1 ? 0.15 : 0) + (ideas >= 4 ? 0.1 : 0) : 0),
+    cycle: clamp(roleOf('cycle') * 0.6 + (hasLoop(map) ? 0.55 : 0)),
+    hierarchy: clamp(roleOf('hierarchy') * 0.7 + treeness(map) * 0.6),
+    concept: clamp(
+      (map.nodes.length >= 3 ? share(map, ['concept'], ['concept']) * 0.5 : 0) +
+        (map.edges.length >= 2 ? (map.edges.filter((e) => !!e.label).length / map.edges.length) * 0.45 : 0)
+    ),
+    causal: clamp(roleOf('causal') * 0.7 + rel(map, 'causes', 'inhibits') * 0.12),
+    parts: clamp(
+      roleOf('parts') * 0.7 + (rel(map, 'part_of') >= 3 ? 0.25 : 0) + (new Set(map.nodes.map((n) => n.group).filter(Boolean)).size >= 2 ? 0.2 : 0)
+    ),
   };
 }
 
 /** Does the structure on the map actually hold this shape? What the repair pass checks. */
 export function satisfies(map: Mapish, kind: GrammarId): boolean {
   const g = GRAMMARS[kind];
+  // a cycle is an order that comes back round: the loop is the shape
+  if (kind === 'cycle') return spineOf(map, kind).size >= 3 && hasLoop(map);
   if (g.ordered) {
     const spine = spineOf(map, kind);
     return spine.size >= 2 && transitionsOf(map, spine).length >= 1;
@@ -508,6 +656,12 @@ export function satisfies(map: Mapish, kind: GrammarId): boolean {
       return count(map, (n) => n.role === 'component') >= 3;
     case 'brainstorm':
       return map.nodes.length >= 1;
+    case 'hierarchy':
+      return rel(map, 'part_of', 'is_a') >= 2;
+    case 'concept':
+      return map.nodes.length >= 3 && map.edges.length >= 2;
+    case 'parts':
+      return rel(map, 'part_of') >= 2 || count(map, (n) => !!n.group) >= 3;
     default:
       return false;
   }

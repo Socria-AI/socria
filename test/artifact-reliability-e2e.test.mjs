@@ -164,7 +164,8 @@ const objsOf = (r) => r.json?.map?.objects?.objs ?? [];
 const ASKS = [
   ['a chart', 'Make a bar chart of my spending: rent 1200, food 400, transport 150', 'data'],
   ['a comparison table', 'Make a comparison table of the iPhone 16 and the Pixel 9', 'compare'],
-  ['a flowchart', 'Make a flowchart of how to make a cup of tea', 'diagram'],
+  // a flowchart picked from the Make list is made in Artifacts; typed, it is the Logic Map's to draw (below)
+  ['a flowchart', 'Make a flowchart: how to make a cup of tea', 'diagram'],
   ['a Venn diagram', 'Make a venn diagram of mitosis and meiosis', 'venn'],
   ['a checklist', 'Make me a checklist for moving house', 'plan'],
   ['a study plan', 'Make me a study plan for my history essay due next Friday', 'plan'],
@@ -179,6 +180,13 @@ for (const tier of Object.keys(TIERS)) {
     ok(`${what}: made, the kind asked for`, r.status === 200 && r.json?.display?.ok === true && made?.kind === kind, J({ status: r.status, display: r.json?.display }));
     ok(`  every call on ${OWN[tier]}, nothing refused`, r.calls.length > 0 && r.calls.every((c) => c.model === OWN[tier] && c.outcome === 'ok'), J(outcomes(r)));
   }
+}
+
+console.log('\n=== a diagram the Logic Map draws is not also made in Artifacts (Logos 5.5) ===');
+for (const tier of Object.keys(TIERS)) {
+  const r = await mapTurn('Make a flowchart of how to make a cup of tea', tier);
+  const userOf = (p) => (p?.messages ?? []).filter((m) => m.role === 'user').map((m) => String(m.content ?? '')).join('\n');
+  ok(`${tier}: no display drafted or made; the map pass is told the shape asked for`, r.status === 200 && !r.json?.display && objsOf(r).length === 0 && r.calls.some((c) => isMap(c.params) && /=== ASKED FOR THIS TURN ===/.test(userOf(c.params)) && /"kind": "process"/.test(userOf(c.params))) && !r.calls.some((c) => isDraft(c.params)), J({ status: r.status, display: r.json?.display, calls: outcomes(r) }));
 }
 
 console.log('\n=== how each tier is asked (lib/model-params.ts) ===');

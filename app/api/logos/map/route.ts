@@ -76,7 +76,7 @@ import {
 import { dropRemoved } from '@/lib/map-edit';
 import { sanitizeViz } from '@/lib/logos-viz';
 import { readPlotRequest, sameCurve } from '@/lib/plot-words';
-import { askedToSee } from '@/lib/runtime/orchestrate';
+import { askedToSee, diagramAsked, drawable, type DiagramShape } from '@/lib/runtime/orchestrate';
 import { lastReplyIn } from '@/lib/map-skip';
 import { isSynthesisText } from '@/lib/logos-synthesis';
 import { settle, unanswered } from '@/lib/model/ask';
@@ -94,6 +94,22 @@ export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
 const MAX_HISTORY = 16;
+
+/**
+ * THE DRAWING THIS TURN ASKS FOR, IN A LINE (Logos 5.5) — after the map as it
+ * stands, so the instructions above stay the same on every call (and in the
+ * provider's cache). Asked for, it is drawn; a subject with a shape is drawn
+ * if it would teach.
+ */
+function drawingAsked(drawing: DiagramShape | null, shaped: DiagramShape | null): string {
+  const kind = drawing ?? shaped;
+  if (!kind) return '';
+  const g = GRAMMARS[kind];
+  const what = `${/^[aeiou]/i.test(g.label) ? 'an' : 'a'} ${g.label.toLowerCase()} — ${g.builds}`;
+  return drawing
+    ? `\n\n=== ASKED FOR THIS TURN ===\nA diagram of what they named, drawn as ${what}. Draw it: every node of it "origin": "drawn", a "title", and "building": {"kind": "${kind}"}. Their own thinking is kept as it is, never reshaped to fit the drawing.`
+    : `\n\n=== THIS TURN'S SUBJECT ===\nWhat they asked about has the shape of ${what}. Draw it beside their thinking if seeing it would teach (every node "origin": "drawn", a "title", "building": {"kind": "${kind}"}); if it would not, leave the map as it is.`;
+}
 
 /**
  * The map, answered by the engine's own simulation of what was named.
@@ -230,13 +246,28 @@ export async function POST(req: NextRequest) {
       }
     }
     if (added.length) {
-      const took = await consume(userId, plan, 'nodes', added.length, { upTo: true });
+      // A DRAWING IS KEPT WHOLE OR NOT AT ALL (lib/quota-map.ts): when this pass adds one and the month's
+      // nodes cannot hold everything it added, the room is read first and only what will be kept is taken —
+      // the person's own new ideas first, the drawing only if all of it fits. Never charged for a node not kept.
+      const drawnNew = new Set(map.nodes.filter((n) => n.origin === 'drawn').map((n) => n.id));
+      const whole = drawnNew.size ? (id: string) => drawnNew.has(id) : undefined;
+      let want = added.length;
+      let room: Awaited<ReturnType<typeof left>> | null = null;
+      if (whole && added.some(whole)) {
+        room = await left(userId, plan, 'nodes');
+        if (room.unavailable) {
+          const r = refusal('nodes', room);
+          return NextResponse.json({ map: current, ...r.body }, { status: r.status });
+        }
+        if (room.left !== null && room.left < added.length) want = keepAddedNodes(map, current, room.left, whole).kept;
+      }
+      const took = want > 0 ? await consume(userId, plan, 'nodes', want, { upTo: true }) : { ok: false, granted: 0, used: room?.used ?? 0, limit: room?.limit ?? null, unavailable: false };
       if (took.unavailable) {
         const r = refusal('nodes', took);
         return NextResponse.json({ map: current, ...r.body }, { status: r.status });
       }
       if (took.granted < added.length) {
-        map = keepAddedNodes(map, current, took.granted).map;
+        map = keepAddedNodes(map, current, took.granted, took.granted === want ? whole : undefined).map;
         reached = { counter: 'nodes', used: took.used, limit: took.limit };
       }
     }
@@ -321,6 +352,16 @@ export async function POST(req: NextRequest) {
   // pass restructures what is there rather than starting over, and it wins
   // over whatever the extractor or the structure would have read.
   const stated: GrammarId | null = statedBuilding(said);
+  // ── A DIAGRAM ASKED FOR, OR A SUBJECT WITH A SHAPE (Logos 5.5) ──────
+  //
+  // "Draw a flowchart of how a bill becomes law" is the Logic Map's to draw
+  // (lib/runtime/orchestrate.ts diagramAsked): no display is drafted in
+  // Artifacts beside it, and the extractor is told the shape asked for. "What
+  // caused World War I?" has a shape worth seeing (drawable): the extractor is
+  // told it may draw it. Their own thinking is never restructured for either —
+  // a drawing is its own layer on the map (lib/logos.ts, THE SUBJECT, DRAWN).
+  const drawing: DiagramShape | null = typeof said === 'string' ? diagramAsked(said) : null;
+  const shaped: DiagramShape | null = !drawing && typeof said === 'string' ? drawable(said) : null;
   const asked: ThinkingMap = stated
     ? { ...current, building: readBuilding({ map: current, stated, prev: current.building }) ?? undefined }
     : current;
@@ -369,7 +410,7 @@ export async function POST(req: NextRequest) {
   // sent back once with what was wrong (display-propose.ts repairFor); what
   // comes back is checked the same way. Nothing is ever substituted for it:
   // when it still does not hold, the turn says so in a sentence.
-  const displayWords = readDisplayRequest(said, { stated });
+  const displayWords = drawing ? null : readDisplayRequest(said, { stated });
   // THEIR TEMPLATE: a custom artifact asked for from one of their own templates carries it on the
   // message (lib/logos5/templates.ts) — read through the kind's own sanitizer, never taken as written
   const theirTemplate = (() => {
@@ -535,6 +576,7 @@ export async function POST(req: NextRequest) {
               // the objects the person is working on exist as themselves —
               // nodes refer to them, never copy or "compute" their values
               objectsForExtractor(current.objects) +
+              drawingAsked(drawing, shaped) +
               `\n\n=== THE CONVERSATION ===\n${transcript}` +
               (withPicture ? '' : NO_PICTURE),
           },
@@ -615,7 +657,11 @@ export async function POST(req: NextRequest) {
     if (shape) next.building = shape;
     else delete next.building;
     const claimed = shape && (shape.by === 'person' || proposedShape?.kind === shape.kind) ? shape.kind : null;
-    if (claimed && claimed !== 'model' && next.nodes.length >= 3 && !satisfies(next, claimed)) {
+    // A DRAWING IS NEVER RESHAPED THIS WAY (Logos 5.5): the restructure rewires every edge on the map,
+    // and a map holding a drawing holds the person's thinking beside it, which no drawing's shape may
+    // rewire. A drawing that is not its shape is shown in a lens that fits what it is (lib/logos-layout.ts).
+    const holdsDrawing = next.nodes.some((n) => n.origin === 'drawn');
+    if (claimed && claimed !== 'model' && !holdsDrawing && next.nodes.length >= 3 && !satisfies(next, claimed)) {
       try {
         const again = await openai.chat.completions.create({
           model: served,
@@ -724,7 +770,9 @@ export async function POST(req: NextRequest) {
     // Asked for in their words, it has been drafting beside this extraction
     // (`startEarly`); read so by the extractor alone, or made from the map, it
     // is made now, from what the extraction found.
+    // a diagram the Logic Map draws (diagramAsked) is not also made in Artifacts, whatever the extractor proposed
     const displayAsked =
+      !drawing &&
       !answeredByScene() &&
       (!!displayWords ||
         (next.ask?.action === 'construct' && (next.ask.artifact === 'display' || (next.ask.artifact === 'comparison' && !next.viz))));

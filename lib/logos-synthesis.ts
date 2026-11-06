@@ -680,6 +680,11 @@ const HEADING: Record<GrammarId, string> = {
   research: 'What you’re investigating',
   model: 'The model you’ve built',
   brainstorm: 'What you’re exploring',
+  cycle: 'The cycle as drawn',
+  hierarchy: 'How it breaks down',
+  concept: 'How the ideas connect',
+  causal: 'What causes what',
+  parts: 'What it is made of',
 };
 
 const titleCase = (s: string) => s.charAt(0).toUpperCase() + s.slice(1);
