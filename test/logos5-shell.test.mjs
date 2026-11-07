@@ -37,8 +37,7 @@ ok('search at the bar\'s end, a word with ⌘K / Ctrl K (Revision II: icons beco
 ok('  ⌘K / Ctrl K opens it from anywhere in Logos 5', /\(e\.metaKey \|\| e\.ctrlKey\) && !e\.altKey && !e\.shiftKey && e\.key\.toLowerCase\(\) === 'k'/.test(app));
 ok('  a result opens where it lives', /function openHit\(h: Hit\)/.test(app) && /openFromHome\(sid, local\)/.test(app) && /openCite\(docId, block\)/.test(app));
 ok('Split View replaces "+ View": the Logic Map’s workspace has no "+ View"', /addViews=\{false\}/.test(app) && /props\.addViews === false \? null : addView/.test(read('components/workspace/Workspace.tsx')));
-ok('  the drawer is a menu that closes on Escape: the views, then the artifacts by name', /role="menu"/.test(shell) && /e\.key === 'Escape'/.test(shell) && /\{menu\.views\.map\(item\)\}/.test(shell) && /\{menu\.artifacts\.map\(item\)\}/.test(shell) && !/SPLIT_SECTIONS/.test(shell));
-ok('  …offering only what this line of thinking has (splitMenu)', /const splitChoices = splitMenu\(\{/.test(app) && /<SplitView menu=\{splitChoices\}/.test(app));
+ok('  Split View is gone: no menu in the shell, nothing in the header for it', !/export function SplitView/.test(shell) && !/<SplitView/.test(app) && !/l5v-split/.test(shell));
 ok('  the panel beside is resized by a separator that takes the arrow keys', /role="separator"/.test(shell) && /aria-valuenow/.test(shell) && /ArrowLeft/.test(shell));
 ok('Synthesize is the Content and Logic Map views’ own action, not the bar’s', /\(studyTab === 'content' \|\| studyTab === 'logic_map'\) && canSynthesize\(map\)/.test(app) && !/label: synthBusy === 'workspace' \? 'Reading your map…' : 'Synthesize'/.test(app));
 // the name chip opens account settings directly (November 2026) — no menu in between; Memory keeps its own glyph

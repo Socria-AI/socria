@@ -372,6 +372,12 @@ The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space
 - **Hover lights what it made**: a reply hovered or focused outlines on the canvas the ideas, made things and files
   from that turn. Pressing a reply opens the first idea it lit.
 
+### 8.6 Split View is gone
+
+- The **Split View** button and its menu are removed from the header and from the view's own actions, with its
+  tutorial in What Socria does and its feature tip. Things still open beside the space by being pressed (a made
+  thing, the Logic Map, a file), and the words "put the Logic Map beside" still work.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

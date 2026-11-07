@@ -39,7 +39,7 @@ console.log('=== one onboarding, no Logos-only sequence ===');
   // "What Socria does" is short tutorials of the screen as it is (components/SocriaGuide.tsx, test/socria-guide.test.mjs).
   const guide = read('components/SocriaGuide.tsx');
   ok('the guide is "What Socria does": tutorials of the screen as it is, opened from the ⋯ menu', /label: 'What Socria does'/.test(read('components/LogosApp.tsx')) && /<SocriaGuide\s+open=\{guideOpen\}\s+onClose=\{closeGuide\}/.test(read('components/LogosApp.tsx')) && /export function SocriaGuide/.test(guide));
-  ok('  each shown in miniature, told in three steps', /demo: HomeDemo/.test(guide) && /demo: SplitDemo/.test(guide) && /demo: CaptureDemo/.test(guide) && /className="sg-steps"/.test(guide));
+  ok('  each shown in miniature, told in three steps', /demo: HomeDemo/.test(guide) && /demo: MakeDemo/.test(guide) && !/SplitDemo/.test(guide) && /demo: CaptureDemo/.test(guide) && /className="sg-steps"/.test(guide));
   ok('  and honest about its limits — voice is experimental, Memory needs an account', /Socria Voice is experimental\. It can mishear, so anything that cannot be undone asks first\./.test(guide) && /Memory is kept for an account — sign in to have one\./.test(guide));
   // Logos 3's own first screen (its conversation outside Logos 5) was archived with the Logos 4 layout.
   ok('the starting points are large cards with icons and a line each', /className=\{`ob-way/.test(intro) && /ob-way-d/.test(intro) && /<ObIcon/.test(intro));

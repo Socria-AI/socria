@@ -175,7 +175,7 @@ import { interfaceSaid, readInterfaceRequest } from '@/lib/workspace/interface-r
 import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
-import { L5Layout, L5TopBar, L5Working, SplitView } from '@/components/logos5/L5Views';
+import { L5Layout, L5TopBar, L5Working } from '@/components/logos5/L5Views';
 import { L5Canvas, MapPreview, type CanvasCard } from '@/components/logos5/L5Canvas';
 import dynamic from 'next/dynamic';
 import type { ArAccess } from '@/lib/ar-access';
@@ -195,7 +195,7 @@ import { Inline as RichInline } from '@/components/RichText';
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
 import { ContentView, PlainReader, WriteUpReader } from '@/components/logos5/ContentView';
 import { broughtBy, contentOf, isWriteUp, writeUpId, writeUpParts } from '@/lib/logos5/content';
-import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, splitMenu, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type SplitChoice, type Viewport } from '@/lib/logos5/views';
+import { OPENING, SPLIT_NAMES, VIEW_LABELS, afterSend, besideSide, chatSideFor, chatVisible, choose, dock, fit, onMade, readBesideShare, readChatSide, screenForRequest, writeBesideShare, writeChatSide, type ModelTool, type Screen, type Side as ChatSide, type Viewport } from '@/lib/logos5/views';
 import { acceptTitle } from '@/lib/logos5/title';
 import { needsMap, routeTurn, tableInReply, turnsSince, type TurnRoute } from '@/lib/runtime/orchestrate';
 import type { Hit, IndexDoc } from '@/lib/runtime/representation';
@@ -210,7 +210,7 @@ import { L5Board, type BoardIdea } from './logos5/L5Board';
 import { L5Space, type SpaceIdea, type SpaceThing } from './logos5/L5Space';
 import { firstTurnOf, openIdeaOf } from '@/lib/logos5/ideas';
 import { hubNameEl, morph, pageTitleEl } from '@/lib/logos5/morph';
-import { aheadOf, besideOnBoard, litBy, oneViewOn, relationLine, sheetTurn, shelfOf, toggleBeside } from '@/lib/logos5/oneView';
+import { aheadOf, besideOnBoard, litBy, oneViewOn, relationLine, sheetTurn, shelfOf } from '@/lib/logos5/oneView';
 import { deskTopicsOf, fileTitle, onMap } from '@/lib/logos5/studyDesk';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView, type SharedIn } from './logos5/Universe';
@@ -9173,14 +9173,6 @@ export function LogosApp({
         );
       })()
     : null;
-  const splitChoices = splitMenu({
-    view: oneView ? 'chat' : studyTab,
-    beside: oneView ? boardBeside : screen.beside,
-    artifacts: artifactItems.map((a) => ({ key: a.key, kind: a.kind, title: a.title })),
-    open: artShownRef.current,
-    content: contentItems.length,
-    ideas: map.nodes.length,
-  });
   const viewEl = (v: Viewport) => (v === 'chat' ? l5Thread : v === 'content' ? contentView : v === 'artifacts' ? artifactsView : logicView);
   // one view: the board is the view, and what is beside it is the board's own (never the conversation, the chatbox)
   // a phone has no room beside the page: what is opened from it takes the screen, with the way back to the page above it
@@ -9198,27 +9190,6 @@ export function LogosApp({
     ) : null;
   const primaryEl = oneView ? phoneBeside ?? boardEl : viewEl(studyTab);
   const besideEl = oneView ? (boardBeside && !narrow ? viewEl(boardBeside) : null) : screen.beside && screen.beside !== studyTab ? viewEl(screen.beside) : null;
-  /** A Split View choice: a view beside, or Artifacts beside on an artifact named; chosen again, it goes. */
-  function pickSplit(c: SplitChoice | null) {
-    const sid = activeIdRef.current;
-    if (oneView) {
-      // Split View on the board: one thing large beside it — an artifact to use, the Logic Map to edit, a file to read
-      if (!c) return setBoardBeside(null);
-      if (c.artifact) {
-        if (c.on) return setBoardBeside(null);
-        if (sid) setArtSel((m) => ({ ...m, [sid]: c.artifact! }));
-        return setBoardBeside('artifacts');
-      }
-      return setBoardBeside((b) => toggleBeside(b, c.beside));
-    }
-    if (!c) return setScreen((s) => ({ ...s, beside: null }));
-    if (c.artifact) {
-      if (c.on) return setScreen((s) => ({ ...s, beside: null }));
-      if (sid) setArtSel((m) => ({ ...m, [sid]: c.artifact! }));
-      return setScreen((s) => fit({ ...s, beside: 'artifacts' }, narrowRef.current));
-    }
-    setScreen((s) => dock(c.beside, s));
-  }
   /** Where the conversation is now: as it was put, or — never put — where the panel beside leaves it. */
   // never put: on the left beside the map (Screen 1); on the right beside a study's desk, read left to right (Screen 4)
   const chatSideFresh: ChatSide = deskOn && studyTab === 'artifacts' ? 'right' : 'left';
@@ -9247,7 +9218,6 @@ export function LogosApp({
   const viewActsEl =
     !narrow && activeId && !zoomed ? (
       <>
-        <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} chatSide={chatSideNow} onChatSide={chatSideChosen} />
         {synthAction}
         {studyTab === 'logic_map' && (
           // AR MODE: the Logic Map, moved with your hands — early access; everybody else sees a preview and the waitlist
@@ -9590,7 +9560,6 @@ export function LogosApp({
       onRail={() => upToMap(() => setL5List(true))}
       railOpen={l5Home && l5List}
       switcher={switchEl}
-      split={oneView && !narrow ? <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} board /> : undefined}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
       memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} waiting={memWaiting} /> : null}
       presence={
@@ -9646,7 +9615,6 @@ export function LogosApp({
     else if (a === 'capture') setCaptureOpen(true);
     else if (a === 'search') setSearchOpen(Date.now());
     else if (a === 'voice') pressVoice();
-    else if (a === 'split') document.querySelector<HTMLButtonElement>('.l5v-split button')?.click();
   }
   zoomOkRef.current = !!l5 && !!activeId && !homeShown && !mindShown && studyTab === 'chat' && !zoomed && !oneView && messages.length > 0;
   function goHome() {

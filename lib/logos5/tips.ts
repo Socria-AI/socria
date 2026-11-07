@@ -7,7 +7,7 @@
 //            the Logic Map their words are making, Make, the Universal Map,
 //            search. Only in their first fortnight, one at a time, each once.
 //   feature  now and then, something worth knowing they have not used —
-//            List, Split View, the tutorials, Quick capture, Voice. At most
+//            List, the tutorials, Quick capture, Voice. At most
 //            one a visit, days apart, each once, with a "Show me".
 //
 // Never two at once, never over anything else (an onboarding, a sheet, a
@@ -18,7 +18,7 @@
 
 export type TipKind = 'tip' | 'feature';
 /** what a feature's "Show me" does — the app knows how */
-export type TipAction = 'list' | 'split' | 'guide' | 'capture' | 'voice' | 'search';
+export type TipAction = 'list' | 'guide' | 'capture' | 'voice' | 'search';
 
 export interface Tip {
   id: string;
@@ -114,15 +114,6 @@ export const TIPS: readonly Tip[] = [
     anchor: '.l5-unibtn.is-list',
     action: 'list',
     when: (c) => c.where === 'home' && c.lines >= 2,
-  },
-  {
-    id: 'f.split',
-    kind: 'feature',
-    title: 'Two things side by side',
-    body: 'Split View opens one thing large beside what you are on — an artifact to use, the Logic Map to edit, a file to read.',
-    anchor: '.l5v-split',
-    action: 'split',
-    when: (c) => c.where === 'line' && c.can.split && c.replies >= 2,
   },
   {
     id: 'f.guide',

@@ -56,11 +56,7 @@ console.log('=== the shell: a view beside another, as its tab draws it ===');
 
 console.log('\n=== the menu: only what is open here ===');
 {
-  const closed = html(h(V.SplitView, { menu: { views: [], artifacts: [] }, besideOn: false, onPick: () => {} }));
-  ok('the header button: Split View, a menu, closed until pressed', /aria-haspopup="menu"/.test(closed) && /aria-expanded="false"/.test(closed) && closed.includes('Split View'));
-  const shell = read('components/logos5/L5Views.tsx');
-  ok('  open: the views, then a group of artifacts by name, and a way to close what is beside', /\{menu\.views\.map\(item\)\}/.test(shell) && /aria-label="Artifacts" className="l5v-menu-sec"/.test(shell) && /Close the view beside/.test(shell));
-  ok('  with nothing else open, it says so rather than offering empty views', /Nothing else is open yet/.test(shell));
+  ok('Split View, the header menu, is gone: nothing a person can reach puts a view beside', !/export function SplitView/.test(read('components/logos5/L5Views.tsx')) && !/<SplitView/.test(read('components/LogosApp.tsx')));
   const m = V.splitMenu({ view: 'content', beside: 'artifacts', artifacts: [{ key: 'm:1', kind: 'Model', title: 'Saddle' }, { key: 's:2', kind: 'CAD', title: 'Desk' }], open: 'm:1', content: 3, ideas: 0 });
   ok('from Content: the conversation; no Logic Map while it holds no ideas; the model and the CAD scene by name', J(m.views.map((c) => c.beside)) === J(['chat']) && J(m.artifacts.map((c) => c.label)) === J(['Saddle', 'Desk']) && m.artifacts[0].on);
 }

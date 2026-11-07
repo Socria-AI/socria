@@ -2,19 +2,18 @@
 // components/logos5/L5Views.tsx — THE LOGOS 5 SHELL (Alex Tran, Logos 5 Comments v2).
 //
 // A line of thinking is four views — Chat, Content, Artifacts, Logic Map —
-// switched in a tab row; a second can be open beside whichever is open
-// (Split View: the conversation, Content, the Logic Map, or an artifact by
-// name — only what this line of thinking has); the header keeps only what is
-// global: the way back to the Universal Map, search, Split View, and the account.
+// switched in a tab row; something opened (a made thing, the Logic Map, a file)
+// can sit beside the view. The header keeps only what is global: the way back
+// to the Universal Map, search, and the account. (Split View, the menu that
+// put a view beside, is gone: things open beside by being pressed.)
 //
 // Every control here is a button with a name, the tabs are a tablist with
-// arrow keys, the divider is a separator that takes the arrow keys, and the
-// Split View drawer is a menu that closes on Escape. Behaviour lives in
+// arrow keys, and the divider is a separator that takes the arrow keys. Behaviour lives in
 // lib/logos5/views.ts; this file only draws it.
 
-import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from 'react';
 import { L5Close } from './L5Chrome';
-import { SIDES, VIEW_LABELS, VIEW_ORDER, clampShare, nearestSide, shareAt, type Side, type SplitChoice, type Viewport } from '@/lib/logos5/views';
+import { SIDES, VIEW_LABELS, VIEW_ORDER, clampShare, nearestSide, shareAt, type Side, type Viewport } from '@/lib/logos5/views';
 
 const isMac = () => typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '');
 
@@ -35,7 +34,6 @@ export function L5TopBar({
   onSearch,
   memory,
   zoom,
-  split,
   presence,
   menu,
   account,
@@ -56,8 +54,6 @@ export function L5TopBar({
   memory?: ReactNode;
   /** the way to the line of thinking zoomed out (components/logos5/L5Canvas.tsx) */
   zoom?: ReactNode;
-  /** Split View — desktop only */
-  split?: ReactNode;
   presence?: ReactNode;
   menu?: ReactNode;
   account?: ReactNode;
@@ -93,7 +89,6 @@ export function L5TopBar({
       <div className="l5v-top-c">{switcher}</div>
       <div className="l5v-top-r">
         {zoom}
-        {split}
         {onSearch && (
           <button type="button" className="l5-link l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K" title="Search everything">
             <span>Search</span>
@@ -166,126 +161,6 @@ export function L5Tabs({
   );
 }
 
-// ── Split View ───────────────────────────────────────────────────────
-
-/** Two views side by side: the open one, and whatever is chosen here — only what this line of thinking has (lib/logos5/views.ts splitMenu). */
-export function SplitView({
-  menu,
-  besideOn,
-  onPick,
-  chatSide,
-  onChatSide,
-  board = false,
-}: {
-  menu: { views: SplitChoice[]; artifacts: SplitChoice[] };
-  /** something is open beside the view */
-  besideOn: boolean;
-  /** a choice, or null to close what is beside */
-  onPick: (c: SplitChoice | null) => void;
-  /** where the conversation sits when it shares the screen, and the way to put it elsewhere */
-  chatSide?: Side;
-  onChatSide?: (side: Side) => void;
-  /** One view (Logos 5): "Split View" in the header, opening one thing large beside the board */
-  board?: boolean;
-}) {
-  const [open, setOpen] = useState(false);
-  const wrap = useRef<HTMLSpanElement>(null);
-  const menuId = useId();
-  useEffect(() => {
-    if (!open) return;
-    const off = (e: PointerEvent) => {
-      if (!wrap.current?.contains(e.target as Node)) setOpen(false);
-    };
-    const esc = (e: globalThis.KeyboardEvent) => {
-      if (e.key === 'Escape') setOpen(false);
-    };
-    document.addEventListener('pointerdown', off);
-    document.addEventListener('keydown', esc);
-    return () => {
-      document.removeEventListener('pointerdown', off);
-      document.removeEventListener('keydown', esc);
-    };
-  }, [open]);
-  const pick = (c: SplitChoice | null) => {
-    setOpen(false);
-    onPick(c);
-  };
-  const item = (c: SplitChoice) => (
-    <button key={c.artifact ?? c.beside} type="button" role="menuitemradio" aria-checked={c.on} className={`l5v-mi${c.on ? ' is-on' : ''}`} onClick={() => pick(c)}>
-      <span className="l5v-mi-t">{c.label}</span>
-      <span className="l5v-mi-s">{c.says}</span>
-    </button>
-  );
-  const nothing = !menu.views.length && !menu.artifacts.length;
-  return (
-    <span className="l5v-split" ref={wrap}>
-      <button
-        type="button"
-        className={`l5-btn is-sm${besideOn ? ' is-on' : ''}${board ? ' l5v-splitb' : ''}`}
-        aria-haspopup="menu"
-        aria-expanded={open}
-        aria-controls={open ? menuId : undefined}
-        aria-label={board ? 'Split View: open one thing large beside the board' : 'Split View: open a view beside this one'}
-        title={board ? 'Open an artifact, the Logic Map or a file large beside the board' : 'Open a view beside this one'}
-        onClick={() => setOpen((v) => !v)}
-      >
-        {board ? (
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-            <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
-            <path d="M12 4.5v15" />
-          </svg>
-        ) : (
-          <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-            <path d="M12 5v14M5 12h14" />
-          </svg>
-        )}
-        <span>{board ? 'Split View' : 'View'}</span>
-      </button>
-      {open && (
-        <div className="l5v-menu l5-menu" role="menu" id={menuId} aria-label="Open beside">
-          <p className="l5v-menu-h">Open beside the view</p>
-          {menu.views.map(item)}
-          {menu.artifacts.length > 0 && (
-            <div role="group" aria-label="Artifacts" className="l5v-menu-sec">
-              <p className="l5v-menu-s">Artifacts</p>
-              {menu.artifacts.map(item)}
-            </div>
-          )}
-          {nothing && <p className="l5v-menu-none">Nothing else is open yet. What you make, bring in or map can be put here.</p>}
-          {onChatSide && (
-            <div role="group" aria-label="Where the conversation sits" className="l5v-menu-sec">
-              <p className="l5v-menu-s">The conversation sits</p>
-              <div className="l5v-menu-sides">
-                {SIDES.map((sd) => (
-                  <button
-                    key={sd}
-                    type="button"
-                    role="menuitemradio"
-                    aria-checked={chatSide === sd}
-                    className={`l5v-menu-side${chatSide === sd ? ' is-on' : ''}`}
-                    onClick={() => {
-                      setOpen(false);
-                      onChatSide(sd);
-                    }}
-                  >
-                    <SideGlyph side={sd} size={18} />
-                    <span>{SIDE_LABEL[sd]}</span>
-                  </button>
-                ))}
-              </div>
-            </div>
-          )}
-          {besideOn && (
-            <button type="button" role="menuitem" className="l5v-mi is-close" onClick={() => pick(null)}>
-              Close the view beside
-            </button>
-          )}
-        </div>
-      )}
-    </span>
-  );
-}
-
 // ── the layout ───────────────────────────────────────────────────────
 
 /** A side, drawn: the screen's outline with the panel docked on that edge. Hand-drawn on the 24 grid, no fill. */
@@ -299,7 +174,6 @@ export function SideGlyph({ side, size = 15 }: { side: Side; size?: number }) {
   );
 }
 
-const SIDE_LABEL: Record<Side, string> = { left: 'Left', right: 'Right', top: 'Top', bottom: 'Bottom' };
 
 export function L5Layout({
   view,

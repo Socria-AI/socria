@@ -158,37 +158,6 @@ const ViewsDemo = (
   </div>
 );
 
-const SplitDemo = (
-  <div className="sg-d sg-d-split">
-    <div className="sg-screen" aria-hidden="true">
-      <div className="sg-screen-bar">
-        <i />
-        <i />
-        <i />
-      </div>
-      <div className="sg-screen-body">
-        <span className="sg-bars is-wide">
-          <i style={{ height: '70%' }} />
-          <i style={{ height: '42%' }} />
-          <i style={{ height: '88%' }} />
-          <i style={{ height: '30%' }} />
-        </span>
-        <div className="sg-convo">
-          <span className="sg-convo-h">
-            <b>⠿</b> Conversation
-          </span>
-          <span className="sg-line w70" />
-          <span className="sg-line w50" />
-          <span className="sg-convo-box" />
-        </div>
-      </div>
-    </div>
-    <p className="sg-said sg-in" style={at(0.4)}>
-      Dragged to an edge · or a side pressed · or “put the chat on the left”
-    </p>
-  </div>
-);
-
 const MakeDemo = (
   <div className="sg-d sg-d-make">
     <div className="sg-tiles" aria-hidden="true">
@@ -436,23 +405,6 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
       ],
       note: 'Everything on the Logic Map is something you said. Nothing on it is Socria’s opinion.',
       demo: ViewsDemo,
-    },
-    {
-      id: 'split',
-      name: 'Split View',
-      title: (
-        <>
-          Two views side by side — the conversation <em>wherever</em> you want it.
-        </>
-      ),
-      stand: 'Split View opens a second view beside the one you are in. The conversation docks on the side you choose — left, right, top or bottom — and stays there.',
-      steps: [
-        <>Press Split View, top right, and pick what goes beside.</>,
-        <>Drag the conversation by its header to any edge, or press one of its four side buttons.</>,
-        <>Or say it: “put the chat on the left”.</>,
-      ],
-      note: 'A phone shows one view at a time, so there is nothing to place there.',
-      demo: SplitDemo,
     },
     {
       id: 'make',

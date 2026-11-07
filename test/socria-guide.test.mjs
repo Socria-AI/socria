@@ -45,8 +45,8 @@ ok(
 console.log('\n=== the tutorials: the screen as it is, in the order it is met ===');
 const T = V.socriaTutorials({ capture: true, memory: true });
 ok(
-  'eleven, from the Universal Map to Memory',
-  J(T.map((t) => t.id)) === J(['home', 'start', 'views', 'split', 'make', 'content', 'write', 'capture', 'search', 'voice', 'memory']),
+  'ten, from the Universal Map to Memory (Split View gone)',
+  J(T.map((t) => t.id)) === J(['home', 'start', 'views', 'make', 'content', 'write', 'capture', 'search', 'voice', 'memory']),
   J(T.map((t) => t.id))
 );
 ok(
@@ -63,7 +63,7 @@ ok(
   T.every((t) => (html(h('h2', null, t.title)).match(/<em>/g) || []).length === 1)
 );
 const noCap = V.socriaTutorials({ capture: false, memory: true });
-ok('Quick capture is taught only where it is on', noCap.length === 10 && !noCap.some((t) => t.id === 'capture'));
+ok('Quick capture is taught only where it is on', noCap.length === 9 && !noCap.some((t) => t.id === 'capture'));
 const tries = Object.fromEntries(T.filter((t) => t.try).map((t) => [t.id, t.try.run]));
 ok(
   'each that can be tried names the press it stands for',
@@ -78,11 +78,6 @@ ok(
   'Memory says plainly when it needs an account',
   /sign in to have one/.test(V.socriaTutorials({ capture: true, memory: false }).find((t) => t.id === 'memory').note) && !/sign in/.test(T.find((t) => t.id === 'memory').note)
 );
-const split = T.find((t) => t.id === 'split');
-ok(
-  'Split View teaches the conversation on any side — dragged, pressed, or said',
-  /left, right, top or bottom/.test(split.stand) && /any edge/.test(text(split.steps)) && /put the chat on the left/.test(text(split.steps))
-);
 ok('Voice is honest: experimental, and it asks before what cannot be undone', /experimental/i.test(T.find((t) => t.id === 'voice').note) && /asks first/.test(T.find((t) => t.id === 'voice').note));
 const words = T.map((t) => [text(t.title), t.stand, text(t.steps), t.note ?? ''].join(' ')).join(' ');
 ok('the voice: no banned word', !/\b(powerful|seamless|revolutionary|effortless|10x|unlock|supercharge|game-changing)\b/i.test(words));
@@ -94,19 +89,19 @@ const g = html(h(V.SocriaGuide, { open: true, onClose: () => {}, actions: { onHo
 ok('a dialog, named by its headline', /role="dialog" aria-modal="true" aria-labelledby="sg-title"/.test(g) && /id="sg-title"/.test(g));
 ok(
   'the contents: every tutorial, numbered, the count said in words',
-  (g.match(/class="sg-toc-b/g) || []).length === 11 && /Eleven things, in the order you’ll meet them\./.test(g) && />01</.test(g) && />11</.test(g)
+  (g.match(/class="sg-toc-b/g) || []).length === 10 && /Ten things, in the order you’ll meet them\./.test(g) && />01</.test(g) && />10</.test(g)
 );
 ok('  the first is where Socria opens: the Universal Map', /Everything you’ve thought through, on <em>one<\/em> map\./.test(g) && /aria-current="step"/.test(g));
 ok('  opened like a spread: a roman numeral in moss italic, the name as a micro-label', /<span class="sg-num">I<\/span><span class="sg-lbl">The Universal Map<\/span>/.test(g));
-ok('  how far in, and the way on', /1 of 11/.test(g) && /class="sg-next">Next/.test(g) && !/class="sg-back"/.test(g));
+ok('  how far in, and the way on', /1 of 10/.test(g) && /class="sg-next">Next/.test(g) && !/class="sg-back"/.test(g));
 ok('  a way to try it, when there is one', /class="sg-try">Open the Universal Map/.test(g) && !/class="sg-try"/.test(html(h(V.SocriaGuide, { open: true, onClose: () => {} }))));
 ok(
   '  its miniature is a figure, named for a screen reader; the moving parts are hidden from one',
   /<figure class="sg-plate" aria-label="The Universal Map, shown in miniature">/.test(g) && /aria-hidden="true"/.test(g)
 );
-ok('  where it is, said politely when it changes', /class="sg-sr" aria-live="polite">1 of 11: The Universal Map</.test(g));
+ok('  where it is, said politely when it changes', /class="sg-sr" aria-live="polite">1 of 10: The Universal Map</.test(g));
 ok('closed, it is nothing', html(h(V.SocriaGuide, { open: false, onClose: () => {} })) === '');
-ok('without Quick capture, ten', /Ten things, in the order/.test(html(h(V.SocriaGuide, { open: true, onClose: () => {}, capture: false }))));
+ok('without Quick capture, nine', /Nine things, in the order/.test(html(h(V.SocriaGuide, { open: true, onClose: () => {}, capture: false }))));
 ok('the keys: ← →, Home, End, Escape', /ArrowRight/.test(guideSrc) && /ArrowLeft/.test(guideSrc) && /'Home'/.test(guideSrc) && /'End'/.test(guideSrc) && /Escape/.test(guideSrc));
 
 console.log('\n=== the brand book, in the sheets ===');
