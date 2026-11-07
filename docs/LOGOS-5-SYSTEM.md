@@ -325,6 +325,31 @@ in `lib/logos5/ideas.ts`), and the page of §8 is a press away.
   Made, Words, an older idea opened, the page and back, at 1440 and on an
   iPhone 13).
 
+### 8.3 Revision IV — the one space, in colour
+
+The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space-colour.css`, loaded after
+`space.css`, and small edits to `L5Space.tsx`). Layout and behaviour are §8.2's; what changes:
+
+- **Colour by kind, the row as its legend.** Ideas in moss, what was brought in slate, what Socria made in
+  vermilion, questions (the one asked, assumptions, unknowns, misconceptions) in mustard, what stands against in
+  rust, givens in ink (`ideaTone` in `lib/logos5/ideas.ts`). Each idea carries its node glyph
+  (`components/NodeGlyph.tsx`); lines and their words take the colour of what they say (map, "read from", "made",
+  the dashed "but").
+- **Socria's question stands out.** It sits in a gold panel in the open idea. "Answering" at the chatbox names that
+  question (the newest turn's closing question; the idea only when there is none). Pressed while the chatbox is
+  answering it ("Answer below ↓"), the panel puts the cursor in the box.
+- **The person's own words, circled.** Two or three words of the open idea that the person said in the turn it came
+  from (`markPhrase`), circled with the design system's `InkMark`; none when they said none of it.
+- **Fit and motion.** Columns 250 · 224 · 400 · 254 fit a 1440 screen. Cards lift 2px on hover; when a line of
+  thinking opens, cards settle in reading order and the lines draw after the last one (once; not when the open idea
+  changes; none with reduced motion).
+- **Linked to what exists.** Memory's gold count is what Memory's Review holds (changes proposed, from
+  `/api/mind/changes`, read again when Memory closes). Listen, beside Copy and Retry on the open reply, reads it aloud
+  with the browser's own voice, as the easy-view artifacts do. Socria One is the word in its slate with its dot, still
+  opening the plan sheet. The wordmark top left is Instrument Serif.
+- **Checked by** `test/logos5-space.test.mjs` (tones, the circled phrase, the markup, the wiring) and
+  `.journeys/os-check.mjs` at 1440 and on an iPhone 13.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

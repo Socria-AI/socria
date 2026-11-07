@@ -154,5 +154,38 @@ const css = read('components/logos5/space.css');
 ok('  in Words a stepped-back card fades but its turn’s words stay sharp', /\.ls-it\.is-back > :not\(\.ls-word\) \{ opacity: 0\.22; \}/.test(css));
 ok('the stylesheet: the row, the folded corner, the boxed chatbox, a phone’s column', /\.ls-kd\.is-on/.test(css) && /\.ls-file::after/.test(css) && /\.ls-chat \.l5-dock \.lg-composer\.is-ruled \.lg-composer-box/.test(css) && /\.ls-feed/.test(css));
 
+
+console.log('\n=== Revision IV: colour by what a thing is ===');
+ok('a question, an assumption, an unknown, a misconception: mustard', ['question', 'assumption', 'unknown', 'misconception'].every((t) => S.ideaTone({ type: t }) === 'question'));
+ok('  a tension, a counterpoint, an error: rust; a given or a constraint: ink; anything else is yours (moss)', S.ideaTone({ type: 'tension' }) === 'against' && S.ideaTone({ type: 'counterpoint' }) === 'against' && S.ideaTone({ type: 'given' }) === 'given' && S.ideaTone({ type: 'constraint' }) === 'given' && S.ideaTone({ type: 'claim' }) === 'yours' && S.ideaTone({ type: 'step' }) === 'yours');
+ok('  a role counts as well as a type', S.ideaTone({ type: 'idea', role: 'constraint' }) === 'given');
+const mp = S.markPhrase('Left edge height is the lowest point of each strip', 'Too small, because x squared is going up so the left edge height is always the lowest point of each strip');
+ok('the circled phrase: two or three of the person’s own words in the idea, the ones that say most, starting and ending on a word that matters', mp && mp.mark === 'Left edge height' && mp.pre === '' && mp.post === ' is the lowest point of each strip', J(mp));
+ok('  short enough to circle on one line', (() => { const m = S.markPhrase('The war plans made mobilisation mean war', 'the war plans made mobilisation mean war'); return !!m && m.mark.length <= 24 && m.mark.split(' ').length <= 3; })());
+ok('  none when they said none of it, or said only small words', S.markPhrase('A flatshare at £750', 'I want to save £300') === null && S.markPhrase('The cost of it', 'of the it') === null && S.markPhrase('x', '') === null);
+ok('  a short idea said whole may be circled whole; a long one only in part', J(S.markPhrase('Save £300', 'I want to save £300')) === J({ pre: '', mark: 'Save £300', post: '' }) && S.markPhrase('Bake less bread on Tuesdays', 'bake less bread on tuesdays')?.mark !== 'Bake less bread on Tuesdays');
+ok('  punctuation stays outside the circle', S.markPhrase('It is too much water.', 'too much water')?.post === '.');
+
+console.log('\n=== Revision IV: the space drawn in colour ===');
+const v4 = html(h(S.L5Space, props({ openId: 'save', openTurn: 2 })));
+ok('the row is the legend: each kind button says its kind', ['all', 'ideas', 'brought', 'made', 'words'].every((k) => v4.includes(`data-kind="${k}"`)));
+ok('  every idea has a tone and its node glyph in its head', /data-tone="question"/.test(v4) && /data-tone="given"/.test(v4) && /data-tone="yours"/.test(v4) && /class="ls-k-g"[^>]*><svg class="lg-node-glyph"/.test(v4));
+ok('  the open idea’s head has its glyph too', /class="ls-open"[\s\S]*?class="ls-k-g"/.test(v4));
+ok('  the phrase in your own words is circled with the design system’s ink mark', /<h2 class="ls-stmt">[\s\S]*?Save £300[\s\S]*?<svg[\s\S]*?<\/h2>/.test(v4) && /pathLength="1"/.test(v4));
+ok('arriving: the space opens settling, each card numbered in reading order, the lines after the last card', /class="ls is-all is-arriving"/.test(v4) && /--ls-base:/.test(v4) && /--i:0/.test(v4) && /--i:1/.test(v4));
+ok('  the phone keeps its column (no arrival)', !/is-arriving/.test(html(h(S.L5Space, props({ narrow: true })))));
+const css4 = read('components/logos5/space-colour.css');
+ok('the stylesheet: tones, slate files, vermilion made, the gold question panel, lines by kind, the arrival, reduced motion', /\[data-tone='question'\]/.test(css4) && /\.ls-file \{[^}]*--ls-tint-slate/.test(css4) && /\.ls-made \.ls-k \{ color: var\(--ls-verm-ink\)/.test(css4) && /\.ls-open \.socria-asks \{/.test(css4) && /\.ls-ln\.is-read path/.test(css4) && /@keyframes ls-draw/.test(css4) && /prefers-reduced-motion/.test(css4));
+ok('  loaded after space.css', /import '\.\/space\.css';[\s\S]{0,160}import '\.\/space-colour\.css';/.test(read('components/logos5/L5Space.tsx')));
+
+console.log('\n=== Revision IV: linked to what exists ===');
+const app4 = read('components/LogosApp.tsx');
+ok('"Answering" names Socria’s question, the idea only when there is none', /label: newestTurn\.asks\?\.trim\(\) \|\| openNode\?\.label \|\| null/.test(app4));
+ok('  pressing the question while answering it puts the cursor in the chatbox', /onAnswer=\{\(\) => focusComposer\(\)\}/.test(app4) && /closest\?\.\('\.socria-asks'\)/.test(read('components/logos5/L5Space.tsx')));
+ok('Memory’s gold count is what its Review holds: changes proposed, read again when Memory closes', /fetch\('\/api\/mind\/changes\?scope=logos'/.test(app4) && /c\?\.review === 'proposed'/.test(app4) && /\}, \[cloud, l5Mind\]\);/.test(app4) && /<MindButton onOpen=\{\(\) => setL5Mind\(true\)\} waiting=\{memWaiting\} \/>/.test(app4));
+ok('Listen reads the open reply aloud with the browser’s own voice', /msgEl\(messages\[ot\.replyAt\], ot\.replyAt, undefined, \{ listen: true \}\)/.test(app4) && /function ListenButton/.test(read('components/logos5/L5Message.tsx')) && /SpeechSynthesisUtterance/.test(read('components/logos5/L5Message.tsx')));
+const r2 = read('components/logos5/revision2.css');
+ok('the wordmark top left in Instrument Serif; Socria One the word in its slate, no pill', /\.l5v-home-w \{ font-family: var\(--l5-serif/.test(r2) && /\.l5-onebtn \{ height: auto; padding: 0; border: 0;[^}]*color: #26485a/.test(r2));
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

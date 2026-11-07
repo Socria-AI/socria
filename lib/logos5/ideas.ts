@@ -403,3 +403,71 @@ export function forwardIn(kind: SpaceKind, card: 'idea' | 'brought' | 'made' | '
   if (kind === 'ideas') return card === 'idea' || card === 'open';
   return kind === card;
 }
+
+// ── Revision IV: colour by what a thing is ───────────────────────────
+
+/**
+ * An idea's colour (Revision IV, the brand's four-colour code): a question — the one asked, an assumption,
+ * an unknown, a misconception — in mustard; what stands against in rust; what was given in ink; anything
+ * else, the person's own thinking, in moss.
+ */
+export type IdeaTone = 'yours' | 'question' | 'against' | 'given';
+const TONE_QUESTION = new Set(['question', 'assumption', 'unknown', 'misconception']);
+const TONE_AGAINST = new Set(['tension', 'counterpoint', 'error']);
+const TONE_GIVEN = new Set(['given', 'constraint']);
+export function ideaTone(n: { type: string; role?: string | null }): IdeaTone {
+  const is = (s: Set<string>) => s.has(n.type) || (!!n.role && s.has(n.role));
+  if (n.type === 'question' || is(TONE_QUESTION)) return 'question';
+  if (is(TONE_AGAINST)) return 'against';
+  if (is(TONE_GIVEN)) return 'given';
+  return 'yours';
+}
+
+const STOP = new Set(['the', 'a', 'an', 'of', 'to', 'is', 'are', 'was', 'and', 'or', 'in', 'on', 'it', 'its', 'for', 'with', 'that', 'this', 'be', 'as', 'at', 'by', 'i', 'you', 'my', 'your', 'so', 'but', 'if', 'than', 'then']);
+const norm = (w: string) => w.toLowerCase().replace(/[^\p{L}\p{N}]+/gu, '');
+
+/**
+ * The phrase in the open idea worth circling (Revision IV): words the person said themselves in the turn it came
+ * from — their own words, kept. Of each run of them, the two or three words (starting and ending on a word that
+ * matters, short enough to circle on one line) that say the most; never the whole of a long idea. Null when they
+ * said none of it.
+ */
+export function markPhrase(label: string, said: string | null | undefined): { pre: string; mark: string; post: string } | null {
+  const own = new Set((said ?? '').split(/\s+/).map(norm).filter(Boolean));
+  if (!own.size) return null;
+  const words = [...label.matchAll(/\S+/g)].map((m) => ({ w: norm(m[0]), at: m.index ?? 0, end: (m.index ?? 0) + m[0].length }));
+  const big = (i: number) => !!words[i].w && !STOP.has(words[i].w);
+  const MAX_CHARS = 24;
+  let best: { from: number; to: number; score: number } | null = null;
+  const consider = (from: number, to: number) => {
+    // windows of two or three words inside the run, starting and ending on a word that matters
+    for (let i = from; i < to; i++) {
+      for (let n = 3; n >= 2; n--) {
+        const j = i + n;
+        if (j > to || !big(i) || !big(j - 1)) continue;
+        if (label.slice(words[i].at, words[j - 1].end).length > MAX_CHARS) continue;
+        let score = 0;
+        for (let k = i; k < j; k++) if (big(k)) score += words[k].w.length;
+        if (!best || score > best.score || (score === best.score && i >= best.from)) best = { from: i, to: j, score };
+      }
+    }
+  };
+  let start = -1;
+  words.forEach((x, i) => {
+    const hit = !!x.w && own.has(x.w);
+    if (hit && start < 0) start = i;
+    if (!hit && start >= 0) {
+      consider(start, i);
+      start = -1;
+    }
+  });
+  if (start >= 0) consider(start, words.length);
+  if (!best) return null;
+  const { from, to } = best as { from: number; to: number };
+  if (from === 0 && to === words.length && words.length > 3) return null;
+  const a = words[from].at;
+  const b = words[to - 1].end;
+  // punctuation stuck to the last word stays outside the circle
+  const tail = label.slice(a, b).match(/[.,;:!?)"”’]+$/)?.[0] ?? '';
+  return { pre: label.slice(0, a), mark: label.slice(a, b - tail.length), post: tail + label.slice(b) };
+}

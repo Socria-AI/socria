@@ -54,7 +54,8 @@
 .logos-root .l5 .l5v-where .l5-label { display: none; }
 .logos-root .l5 .l5v-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 19px; font-weight: 400; line-height: 1.2; color: var(--c-ink); }
 .logos-root .l5 .l5v-home img { width: 22px; height: 22px; }
-.logos-root .l5 .l5v-home-w { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+/* the wordmark in Instrument Serif (Revision IV): the name is said, not operated */
+.logos-root .l5 .l5v-home-w { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 21px; font-weight: 400; line-height: 1; letter-spacing: 0; }
 /* the tabs fill the bar: the chosen one underlined at its foot */
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch { height: 56px; gap: 28px; }
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch-i { height: 56px; }
@@ -303,3 +304,9 @@ html[data-l5-morph='in']::view-transition-new(root) { animation: l5-morph-arrive
   ::view-transition-old(*),
   ::view-transition-new(*) { animation: none !important; }
 }
+
+/* Socria One in the header (Revision IV): the word in Socria One's slate, serif italic, after its dot — no pill */
+.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn { height: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; gap: 7px; color: #26485a; font-size: 18px; transition: color 0.2s; }
+.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn i { width: 6px; height: 6px; background: #26485a; }
+.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn:hover { color: var(--c-ink); border: 0; }
+.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn.has-note { box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }

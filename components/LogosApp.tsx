@@ -5996,6 +5996,23 @@ export function LogosApp({
   const [readingFiles, setReadingFiles] = useState<string | null>(null);
   /** Memory: what Socria remembers, as its own place (components/logos5/MemoryView.tsx) */
   const [l5Mind, setL5Mind] = useState(false);
+  // MEMORY, WAITING (Revision IV): the header's gold count is what Memory's Review holds — the changes proposed and not
+  // yet confirmed (/api/mind/changes, the private-filtered feed MemoryView reads). Read when signed in, and again
+  // whenever Memory closes, so a decision made there is reflected here.
+  const [memWaiting, setMemWaiting] = useState(0);
+  useEffect(() => {
+    if (!cloud || l5Mind) return;
+    let live = true;
+    fetch('/api/mind/changes?scope=logos', { cache: 'no-store' })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j: { changes?: { review?: string }[] } | null) => {
+        if (live) setMemWaiting(Array.isArray(j?.changes) ? j.changes.filter((c) => c?.review === 'proposed').length : 0);
+      })
+      .catch(() => undefined);
+    return () => {
+      live = false;
+    };
+  }, [cloud, l5Mind]);
   /** something new landed on the stage while it was put away */
   const [stageFresh, setStageFresh] = useState(false);
   /** something was made in the background while Artifacts was not open: the tab says so, the screen does not move */
@@ -8637,7 +8654,7 @@ export function LogosApp({
     ...(mapping ? [{ label: 'Drawing the Logic Map', state: 'now' as const }] : []),
   ];
   /** One message as the conversation draws it — in the thread, and, in one view, in the sheet above the chatbox. */
-  const msgEl = (m: Msg, i: number, go?: ReactNode) => {
+  const msgEl = (m: Msg, i: number, go?: ReactNode, opts?: { listen?: boolean }) => {
     if (m.synthesis) {
       return (
         <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="l5-synth">
@@ -8696,6 +8713,7 @@ export function LogosApp({
         offer={offer}
         disclose={disclose}
         {...(go ? { go } : {})}
+        {...(opts?.listen && m.role === 'assistant' ? { listen: true } : {})}
       />
       {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
       {brought.length > 0 && (
@@ -9038,7 +9056,7 @@ export function LogosApp({
           const openNode = openId ? map.nodes.find((n) => n.id === openId) ?? null : null;
           const body = (
             <>
-              {ot && ot.replyAt !== undefined && messages[ot.replyAt] ? msgEl(messages[ot.replyAt], ot.replyAt) : null}
+              {ot && ot.replyAt !== undefined && messages[ot.replyAt] ? msgEl(messages[ot.replyAt], ot.replyAt, undefined, { listen: true }) : null}
               {!ot && openNode ? <p className="ls-note">{openNode.detail || 'Put on the map as the conversation went.'}</p> : null}
               {atNewest && streaming && (
                 <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />
@@ -9079,7 +9097,8 @@ export function LogosApp({
           const newestTurn = last !== null ? turns[last] : null;
           const answering =
             newestTurn && answerHidden !== newestTurn.key
-              ? answeringOf({ newest: atNewest, asks: !!ot?.asks, pending: !!newestTurn.pending || busyHere, about: !!focusBrief, label: openNode?.label ?? null })
+              ? // Revision IV: "Answering" names Socria's question itself, the idea only when there is none to name
+                answeringOf({ newest: atNewest, asks: !!ot?.asks, pending: !!newestTurn.pending || busyHere, about: !!focusBrief, label: newestTurn.asks?.trim() || openNode?.label || null })
               : null;
           return (
             <L5Space
@@ -9111,6 +9130,7 @@ export function LogosApp({
                 setFocus({ kind: 'node', id });
               }}
               onPage={() => setSpaceView(false)}
+              onAnswer={() => focusComposer()}
               onZoomOut={() => upToMap()}
               narrow={narrow}
               follow={atNewest && (busyHere || !!streaming)}
@@ -9578,7 +9598,7 @@ export function LogosApp({
       switcher={switchEl}
       split={oneView && !narrow ? <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} board /> : undefined}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
-      memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} /> : null}
+      memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} waiting={memWaiting} /> : null}
       presence={
         <>
           <ChallengeChip enabled={cloud} progress={!(railOpen && !chromeHidden)} onOpenAccount={() => setAcctOpen(true)} />

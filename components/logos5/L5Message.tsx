@@ -137,6 +137,48 @@ export interface L5MessageProps {
   disclose?: boolean;
   /** on the page (the one view), first in the actions row: the way to what this turn made — "Open the live graph beside this →" */
   go?: ReactNode;
+  /** Listen (Revision IV, the open idea in the space): Socria's reply read aloud by the browser's own voice */
+  listen?: boolean;
+}
+
+/**
+ * LISTEN: the reply read aloud by the browser's speech synthesis, as the easy-view artifacts read theirs
+ * (components/display/EasyFigure.tsx) — no account, no allowance, nothing sent anywhere. Pressed again, it stops.
+ * Where the browser has no voice, there is no button.
+ */
+function ListenButton({ text }: { text: string }) {
+  const [ok, setOk] = useState(false);
+  const [on, setOn] = useState(false);
+  useEffect(() => {
+    const has = typeof window !== 'undefined' && 'speechSynthesis' in window && typeof SpeechSynthesisUtterance !== 'undefined';
+    setOk(has);
+    return () => {
+      if (has) window.speechSynthesis.cancel();
+    };
+  }, []);
+  if (!ok || !text.trim()) return null;
+  return (
+    <button
+      type="button"
+      className={`l5-act l5-listen${on ? ' is-on' : ''}`}
+      aria-pressed={on}
+      aria-label={on ? 'Stop reading aloud' : 'Read this aloud'}
+      title={on ? 'Stop' : 'Listen'}
+      onClick={() => {
+        const synth = window.speechSynthesis;
+        synth.cancel();
+        if (on) return setOn(false);
+        const u = new SpeechSynthesisUtterance(text);
+        u.rate = 0.95;
+        u.onend = () => setOn(false);
+        u.onerror = () => setOn(false);
+        setOn(true);
+        synth.speak(u);
+      }}
+    >
+      <span className="l5-act-l">{on ? 'Stop' : 'Listen'}</span>
+    </button>
+  );
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -433,6 +475,7 @@ export function L5Message(p: L5MessageProps) {
               <span className="l5-act-l">Retry</span>
             </button>
           )}
+          {p.listen && m.role === 'assistant' && m.content && <ListenButton text={contentAsText(m.content)} />}
           {p.onEdit && (
             <button type="button" className="l5-act" onClick={() => setEditing(true)} aria-label="Edit your message" title="Edit">
               <Icon d={I.edit} />

@@ -1,0 +1,145 @@
+/* components/logos5/space-colour.css — ONE SPACE, IN COLOUR. (Logos 5.5, Revision IV.)
+ *
+ * Load after space.css. Nothing here moves or renames what L5Space.tsx draws; it
+ * colours it by the four-colour code, gives Socria's question a panel, fits the
+ * four columns on a 1440 screen and adds the hover lift and the arrival.
+ *   yours     moss       ideas you put into words, the lines between them
+ *   brought   slate      files and photos, "read from"
+ *   made      vermilion  what Socria made, "made"
+ *   question  mustard    your question, assumptions, Socria asks, Answering
+ *   against   rust       tensions and conflicts, the dashed "but"
+ * Needs the small L5Space.tsx edits listed in the handoff README (data-kind,
+ * data-tone, the glyph span, the line classes, --i, is-arriving).
+ */
+
+.logos-root .ls {
+  --ls-moss: #5e7633;
+  --ls-moss-ink: #465a26;
+  --ls-slate: #3a6ea5;
+  --ls-slate-ink: #2d5582;
+  --ls-verm: #d8402f;
+  --ls-verm-ink: #b03526;
+  --ls-mustard: #e8b62c;
+  --ls-mustard-dot: #c99a12;
+  --ls-mustard-ink: #6f5f2c;
+  --ls-rust: #9c5b3c;
+  --ls-rust-ink: #8a4f33;
+  --ls-gold: #b8a26b;
+  --ls-card: #fffefa;
+  --ls-tint-slate: color-mix(in oklab, var(--ls-slate) 8%, var(--ls-card));
+  --ls-tint-mustard: color-mix(in oklab, var(--ls-mustard) 14%, var(--ls-card));
+  --ls-rest: 0 1px 2px rgba(35, 36, 31, 0.04);
+  --ls-lift: 0 1px 2px rgba(35, 36, 31, 0.05), 0 14px 28px -16px rgba(35, 36, 31, 0.4);
+}
+
+/* ── fit: dev's gutters, narrower columns — four columns on a 1440 screen ── */
+.logos-root .ls-col { width: 224px; }
+.logos-root .ls-col.is-frame { width: 250px; }
+.logos-root .ls-col.has-open { width: 400px; }
+.logos-root .ls-col.is-made { width: 254px; }
+
+/* ── the row is the legend: each kind's glyph and underline in its colour ── */
+.logos-root .ls-kd { --kd: var(--c-moss); }
+.logos-root .ls-kd[data-kind='ideas'] { --kd: var(--ls-moss); }
+.logos-root .ls-kd[data-kind='brought'] { --kd: var(--ls-slate); }
+.logos-root .ls-kd[data-kind='made'] { --kd: var(--ls-verm); }
+.logos-root .ls-kd[data-kind='words'] { --kd: var(--ls-gold); }
+.logos-root .ls-kd:not([data-kind='all']) svg { color: var(--kd); }
+.logos-root .ls-kd.is-on { box-shadow: inset 0 -2px 0 var(--kd); }
+
+/* ── every card: a resting shadow, a 2px lift on hover ── */
+.logos-root :is(.ls-idea, .ls-file, .ls-made) {
+  box-shadow: var(--ls-rest);
+  transition: transform 0.3s var(--c-ease), box-shadow 0.3s var(--c-ease), border-color 0.2s;
+}
+.logos-root :is(.ls-idea, .ls-file, .ls-made):hover { transform: translateY(-2px); box-shadow: var(--ls-lift); }
+.logos-root .ls-k-g { flex: none; display: inline-flex; margin-right: 7px; color: var(--ls-dot, currentColor); }
+.logos-root .ls-k > span:first-child { display: inline-flex; align-items: center; min-width: 0; }
+
+/* IDEA, by what it is */
+.logos-root .ls-idea { gap: 6px; padding: 11px 13px 12px; background: var(--ls-card); }
+.logos-root .ls-idea[data-tone='yours'] { --ls-dot: var(--ls-moss); border-color: rgba(94, 118, 51, 0.28); }
+.logos-root .ls-idea[data-tone='yours'] .ls-k { color: var(--ls-moss-ink); }
+.logos-root .ls-idea[data-tone='question'] { --ls-dot: var(--ls-mustard-dot); border-color: rgba(232, 182, 44, 0.55); background: var(--ls-tint-mustard); }
+.logos-root .ls-idea[data-tone='question'] .ls-k { color: var(--ls-mustard-ink); }
+.logos-root .ls-idea[data-tone='against'] { --ls-dot: var(--ls-rust); border-color: rgba(156, 91, 60, 0.4); }
+.logos-root .ls-idea[data-tone='against'] .ls-k { color: var(--ls-rust-ink); }
+.logos-root .ls-idea[data-tone='given'] { --ls-dot: rgba(var(--c-ink-rgb), 0.5); }
+.logos-root .ls-idea.is-question .ls-t { font-size: 21px; line-height: 1.16; }
+.logos-root .ls-idea:hover { border-color: rgba(var(--c-moss-rgb), 0.45); }
+.logos-root .ls-idea.is-lit { --ls-dot: var(--ls-moss); border-color: var(--c-moss); background: #eef1e6; }
+
+/* FILE: brought, in slate */
+.logos-root .ls-file { gap: 7px; padding: 11px 13px 12px; border-color: rgba(58, 110, 165, 0.3); background: var(--ls-tint-slate); }
+.logos-root .ls-file::after { background: linear-gradient(225deg, var(--c-paper) 50%, rgba(58, 110, 165, 0.3) 50%, #dde5ee 56%); }
+.logos-root .ls-file .ls-k { color: var(--ls-slate-ink); }
+.logos-root .ls-file .ls-k > span:first-child::before { content: ''; flex: none; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--ls-slate); }
+.logos-root .ls-file .ls-prev { border: 1px solid rgba(58, 110, 165, 0.18); background: var(--ls-card); }
+.logos-root .ls-file:hover .ls-t { color: var(--ls-slate-ink); }
+
+/* MADE: in vermilion, its preview under a hairline */
+.logos-root .ls-made { gap: 8px; padding: 11px 13px 12px; border-color: rgba(216, 64, 47, 0.3); background: var(--ls-card); }
+.logos-root .ls-made:hover { border-color: rgba(216, 64, 47, 0.55); }
+.logos-root .ls-made .ls-k { color: var(--ls-verm-ink); }
+.logos-root .ls-made .ls-k > span:first-child::before { content: ''; flex: none; width: 7px; height: 7px; margin-right: 7px; background: var(--ls-verm); }
+.logos-root .ls-made .ls-prev { padding: 10px 0 4px; border-top: 1px solid rgba(216, 64, 47, 0.16); }
+.logos-root .ls-made .ls-go { color: var(--ls-moss-ink); }
+
+/* THE OPEN IDEA: highest on the page; Socria's question in a gold panel */
+.logos-root .ls-open { gap: 0; padding: 18px 20px 14px; border: 1.5px solid var(--c-moss); border-radius: 12px; background: var(--ls-card); box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 30px 56px -30px rgba(35, 36, 31, 0.55); }
+.logos-root .ls-open > .ls-k { --ls-dot: var(--ls-moss); }
+.logos-root .ls-open > .ls-k[data-tone='question'] { --ls-dot: var(--ls-mustard-dot); }
+.logos-root .ls-open .ls-you { margin-top: 12px; }
+.logos-root .ls-stmt { margin-top: 10px; font-size: 30px; line-height: 1.12; }
+.logos-root .ls-body { margin-top: 12px; padding-top: 12px; }
+.logos-root .ls-open .socria-asks { position: relative; margin: 14px 0 0; padding: 12px 15px 14px; border: 1px solid rgba(232, 182, 44, 0.5); border-radius: 9px; background: var(--ls-tint-mustard); }
+.logos-root .ls-open .socria-asks-k { display: inline-flex; align-items: center; gap: 7px; color: var(--ls-mustard-ink); }
+.logos-root .ls-open .socria-asks-k::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ls-mustard); }
+.logos-root .ls-open .l5-prose.is-reply .socria-asks-q { margin: 6px 0 0; font-size: 24px; line-height: 1.16; }
+/* only while the chatbox is answering it */
+.logos-root .ls:has(.ls-answering) .ls-open .socria-asks::after { content: 'Answer below ↓'; position: absolute; top: 12px; right: 15px; font-size: 12px; font-weight: 500; color: var(--ls-mustard-ink); }
+
+/* ── the lines and their words, in the colour of what they say ── */
+.logos-root .ls-ln path { stroke-width: 1.4; stroke-opacity: 0.55; transition: stroke-opacity 0.25s; }
+.logos-root .ls-ln.is-map path { stroke: var(--ls-moss); }
+.logos-root .ls-ln.is-read path { stroke: var(--ls-slate); stroke-opacity: 0.75; }
+.logos-root .ls-ln.is-made path { stroke: var(--ls-verm); stroke-opacity: 0.75; }
+.logos-root .ls-ln.is-against path { stroke: var(--ls-rust); stroke-opacity: 0.85; }
+.logos-root .ls-ln.is-back path { stroke-opacity: 0.14; }
+.logos-root .ls-lw { padding: 0 4px; font-size: 13px; }
+.logos-root .ls-lw.is-map { color: var(--ls-moss-ink); }
+.logos-root .ls-lw.is-read { color: var(--ls-slate-ink); }
+.logos-root .ls-lw.is-made { color: var(--ls-verm-ink); }
+.logos-root .ls-lw.is-against { color: var(--ls-rust-ink); }
+
+/* ── Words: each turn's note in the thread's gold ── */
+.logos-root .ls-word { margin: -6px -12px 0 22px; border-color: rgba(184, 162, 107, 0.6); background: #fbf6e6; font-size: 12.5px; }
+.logos-root .ls-word-n { color: var(--ls-mustard-ink); }
+
+/* ── the chatbox: Answering is the question, in the question's gold ── */
+.logos-root .ls-answering { padding: 5px 7px 5px 10px; border-color: rgba(232, 182, 44, 0.55); background: var(--ls-tint-mustard); color: var(--ls-mustard-ink); }
+.logos-root .ls-answering::before { content: ''; flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--ls-mustard); }
+.logos-root .ls-answering b { color: var(--c-ink); }
+.logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .lg-composer-box { box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 20px 40px -26px rgba(35, 36, 31, 0.45); }
+
+/* ── arriving: cards settle, then the lines draw (once, when the space opens) ── */
+@keyframes ls-settle { from { opacity: 0; transform: translateY(20px); } }
+@keyframes ls-draw { to { stroke-dashoffset: 0; } }
+@keyframes ls-fade { from { opacity: 0; } }
+.logos-root .ls.is-arriving .ls-it { animation: ls-settle 1s var(--c-ease) both; animation-delay: calc(60ms + var(--i, 0) * 70ms); }
+.logos-root .ls.is-arriving .ls-ln path[pathLength] { stroke-dasharray: 1; stroke-dashoffset: 1; animation: ls-draw 1.2s var(--c-ease) forwards; animation-delay: calc(var(--ls-base, 900ms) + var(--j, 0) * 120ms); }
+.logos-root .ls.is-arriving .ls-ln.is-against path,
+.logos-root .ls.is-arriving .ls-lw { animation: ls-fade 0.6s var(--c-ease) both; animation-delay: calc(var(--ls-base, 900ms) + var(--j, 0) * 120ms); }
+
+/* ── dark themes: tints from the theme's own ink ── */
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls {
+  --ls-card: rgba(var(--c-ink-rgb), 0.04);
+  --ls-tint-slate: rgba(58, 110, 165, 0.16);
+  --ls-tint-mustard: rgba(232, 182, 44, 0.14);
+}
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-word { background: rgba(184, 162, 107, 0.14); }
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root :is(.ls-idea, .ls-file, .ls-made):hover { transform: none; }
+  .logos-root .ls.is-arriving :is(.ls-it, .ls-lw, .ls-ln path) { animation: none; stroke-dasharray: none; stroke-dashoffset: 0; }
+}

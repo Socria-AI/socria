@@ -12,6 +12,9 @@
 // Its rules are lib/logos5/ideas.ts; this file draws them.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { InkMark } from '@/components/ds';
+import { NodeGlyph } from '@/components/NodeGlyph';
+import type { LogosNodeType } from '@/lib/logos';
 import type { CanvasTurn } from '@/lib/logos5/canvas';
 import { pinchOut } from '@/lib/logos5/morph';
 import { roman } from '@/lib/logos5/oneView';
@@ -21,8 +24,10 @@ import {
   forwardIn,
   ideaKey,
   ideaLayout,
+  ideaTone,
   ideasCount,
   madeKey,
+  markPhrase,
   OPEN_KEY,
   spaceLinks,
   trailRows,
@@ -31,6 +36,8 @@ import {
   type SpaceKind,
 } from '@/lib/logos5/ideas';
 import './space.css';
+// Revision IV: colour by kind, Socria's question in a gold panel, four columns on a 1440 screen, the arrival
+import './space-colour.css';
 
 /** A preview is something to look at here, not to use: nothing in it takes focus or a click. */
 function Inert({ children }: { children: ReactNode }) {
@@ -128,6 +135,7 @@ export function L5Space({
   onDismissAnswering,
   onIdea,
   onPage,
+  onAnswer,
   onZoomOut,
   narrow = false,
   follow = false,
@@ -156,6 +164,8 @@ export function L5Space({
   onIdea: (id: string) => void;
   /** the conversation as a page, every turn in order */
   onPage: () => void;
+  /** Socria's question pressed while the chatbox is answering it: the cursor goes to the box */
+  onAnswer?: () => void;
   onZoomOut?: () => void;
   narrow?: boolean;
   /** the open reply is still arriving: its last words stay in view */
@@ -166,6 +176,26 @@ export function L5Space({
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<HTMLElement>(null);
+
+  // ARRIVING (Revision IV): when the space opens — a line of thinking opened, or come back to — the cards settle
+  // in reading order and then the lines draw. Once: the open idea changing within the line does not replay it.
+  const [arriving, setArriving] = useState(true);
+  useEffect(() => {
+    const t = setTimeout(() => setArriving(false), 2400);
+    return () => clearTimeout(t);
+  }, []);
+  // "Answer below ↓": Socria's question, pressed while the chatbox is answering it, puts the cursor in the box
+  const answerRef = useRef(onAnswer);
+  answerRef.current = answering ? onAnswer : undefined;
+  useEffect(() => {
+    const el = openRef.current;
+    if (!el) return;
+    const on = (e: MouseEvent) => {
+      if (answerRef.current && (e.target as HTMLElement | null)?.closest?.('.socria-asks')) answerRef.current();
+    };
+    el.addEventListener('click', on);
+    return () => el.removeEventListener('click', on);
+  });
 
   // ONE SPACE: a pinch outward goes up a level, to this line on the Universal Map (lib/logos5/morph.ts)
   const zoomOutRef = useRef(onZoomOut);
@@ -308,6 +338,17 @@ export function L5Space({
     return () => ro.disconnect();
   }, [follow, openKey]);
 
+  // READING ORDER (Revision IV): the frame column, then each column top to bottom, then what was made — the order
+  // the cards settle in when the space opens
+  const inFrame = new Set(layout.frame);
+  const placed = !!open && (inFrame.has(open.id) || layout.columns.some((c) => c.includes(open.id)));
+  const orderOf = useMemo(() => {
+    const keys = [...layout.frame.map(ideaKey), ...brought.map((b) => broughtKey(b.key)), ...layout.columns.flat().map(ideaKey)];
+    if (!placed) keys.push(OPEN_KEY);
+    keys.push(...made.map((m) => madeKey(m.key)));
+    return new Map(keys.map((k, i) => [k, i]));
+  }, [layout, brought, made, placed]);
+  const order = (k: string) => ({ ['--i' as string]: orderOf.get(k) ?? 0 });
   const tag = (t: number | null) => (t === null ? null : <span className="ls-tn">turn {roman(t + 1)}</span>);
   const back = (k: string) => (forwardIn(kind, cardKindOf(k)) ? '' : ' is-back');
   const turnWords = (t: number) => {
@@ -344,15 +385,22 @@ export function L5Space({
   const ideaEl = (n: SpaceIdea, small = false) => {
     const k = ideaKey(n.id);
     return (
-      <div key={k} className={`ls-it${back(k)}`} data-k={k}>
+      <div key={k} className={`ls-it${back(k)}`} data-k={k} style={order(k)}>
         <button
           type="button"
           className={`ls-idea is-${n.type === 'question' ? 'question' : 'idea'}${lit.has(n.id) ? ' is-lit' : ''}${picked === n.id ? ' is-picked' : ''}${small ? ' is-small' : ''}`}
+          data-tone={ideaTone(n)}
           onClick={() => onIdea(n.id)}
           title={`Open “${n.label}”`}
         >
           <span className="ls-k">
-            <span>{n.type === 'question' ? 'Your question' : n.kind}{picked === n.id ? ' · asking about' : ''}</span>
+            <span>
+              <span className="ls-k-g" aria-hidden="true">
+                <NodeGlyph type={n.type as LogosNodeType} />
+              </span>
+              {n.type === 'question' ? 'Your question' : n.kind}
+              {picked === n.id ? ' · asking about' : ''}
+            </span>
             {tag(n.turn)}
           </span>
           <span className="ls-t">{n.label}</span>
@@ -364,7 +412,7 @@ export function L5Space({
   const thingEl = (c: SpaceThing, what: 'brought' | 'made') => {
     const k = what === 'brought' ? broughtKey(c.key) : madeKey(c.key);
     return (
-      <div key={k} className={`ls-it${back(k)}`} data-k={k}>
+      <div key={k} className={`ls-it${back(k)}`} data-k={k} style={order(k)}>
         <div
           className={`ls-${what === 'brought' ? 'file' : 'made'}`}
           role={c.onOpen ? 'button' : undefined}
@@ -395,11 +443,20 @@ export function L5Space({
     );
   };
   const t = openTurn !== null ? turns[openTurn] : null;
+  // the phrase circled: the part of the open idea in the person's own words, from the turn it came from
+  const mark = open ? markPhrase(open.label, t?.asked) : null;
   const openEl = (
-    <div key={openKey} className={`ls-it is-open${back(openKey)}`} data-k={openKey}>
+    <div key={openKey} className={`ls-it is-open${back(openKey)}`} data-k={openKey} style={order(openKey)}>
       <article ref={openRef} className="ls-open" aria-label={open ? `Open: ${open.label}` : 'The newest reply'}>
-        <span className="ls-k">
-          <span>{open ? `${open.type === 'question' ? 'Your question' : open.kind} · open` : t?.pending ? 'Thinking' : 'Socria'}</span>
+        <span className="ls-k" data-tone={open && ideaTone(open) === 'question' ? 'question' : undefined}>
+          <span>
+            {open && (
+              <span className="ls-k-g" aria-hidden="true">
+                <NodeGlyph type={open.type as LogosNodeType} />
+              </span>
+            )}
+            {open ? `${open.type === 'question' ? 'Your question' : open.kind} · open` : t?.pending ? 'Thinking' : 'Socria'}
+          </span>
           {openTurn !== null && <span className="ls-tn">turn {roman(openTurn + 1)}{openTurn === turns.length - 1 ? ' · newest' : ''}</span>}
         </span>
         {t?.asked && (
@@ -407,7 +464,19 @@ export function L5Space({
             <b>You</b>“{t.asked}”
           </p>
         )}
-        {open && <h2 className="ls-stmt">{open.label}</h2>}
+        {open && (
+          <h2 className="ls-stmt">
+            {mark ? (
+              <>
+                {mark.pre}
+                <InkMark shape="circle">{mark.mark}</InkMark>
+                {mark.post}
+              </>
+            ) : (
+              open.label
+            )}
+          </h2>
+        )}
         <div className="ls-body">{openBody}</div>
       </article>
       {words(openKey)}
@@ -424,7 +493,7 @@ export function L5Space({
   const kindsEl = (
     <nav className="ls-kinds" aria-label="Bring forward">
       {(['all', 'ideas', 'brought', 'made', 'words'] as SpaceKind[]).map((k) => (
-        <button key={k} type="button" className={`ls-kd${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
+        <button key={k} type="button" data-kind={k} className={`ls-kd${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
           {!narrow && <KindGlyph k={k} />}
           {KIND_NAMES[k]}
           {k !== 'all' && <span className="ls-c">{narrow && k === 'words' ? turns.length : counts[k]}</span>}
@@ -527,25 +596,29 @@ export function L5Space({
   }
 
   // ── A WIDE SCREEN: the space, left to right ──
-  const inFrame = new Set(layout.frame);
-  const placed = open && (inFrame.has(open.id) || layout.columns.some((c) => c.includes(open.id)));
   const col = (ids: string[]) => ids.map((id) => (open && id === open.id ? openEl : byId.get(id) ? ideaEl(byId.get(id)!) : null));
   return (
-    <div ref={rootRef} className={`ls is-${kind}`}>
+    <div
+      ref={rootRef}
+      className={`ls is-${kind}${arriving ? ' is-arriving' : ''}`}
+      // the lines start drawing once the last card has settled
+      style={{ ['--ls-base' as string]: `${(ideas.length + brought.length + made.length + (placed ? 0 : 1)) * 70 + 300}ms` }}
+    >
       {kindsEl}
       <div className="ls-canvas l5-dots" ref={scrollRef}>
         <div className="ls-cols" ref={colsRef}>
           <svg className="ls-edges" width={drawn.w} height={drawn.h} aria-hidden="true">
             {drawn.lines.map((l, i) => (
-              <g key={i} className={`ls-ln is-${l.kind}${l.back ? ' is-back' : ''}`}>
-                <path d={l.d} strokeDasharray={l.dashed ? '4 4' : undefined} />
+              <g key={i} className={`ls-ln is-${l.dashed ? 'against' : l.kind}${l.back ? ' is-back' : ''}`} style={{ ['--j' as string]: i }}>
+                {/* a solid line is drawn in when the space opens (pathLength 1: CSS draws it from 1 to 0) */}
+                <path d={l.d} pathLength={l.dashed ? undefined : 1} strokeDasharray={l.dashed ? '4 4' : undefined} />
               </g>
             ))}
             {drawn.thread && <path className="ls-thread" d={drawn.thread} />}
           </svg>
           {drawn.lines.map((l, i) =>
             l.word && !l.back ? (
-              <span key={`w${i}`} className="ls-lw" style={{ left: l.x, top: l.y }}>
+              <span key={`w${i}`} className={`ls-lw is-${l.dashed ? 'against' : l.kind}`} style={{ left: l.x, top: l.y, ['--j' as string]: i }}>
                 {l.word}
               </span>
             ) : null
