@@ -1,0 +1,164 @@
+/* components/logos5/page.css — THE ONE VIEW, SET AS A PAGE. (Logos 5.5, Revision II · Screen 7.)
+ *
+ * Three columns on paper grain, divided by 1px rules, no floating cards: the
+ * Logic Map 360 (300 in Split view), the conversation flexible, "Brought and
+ * made" 340. Widths move over 0.55s on the one curve. Focus dims what is
+ * outside the chosen part to 0.32. The controls themselves (.l5-turn,
+ * .l5-cell, .l5-compose, .l5-link) are l5-controls.css.
+ */
+
+.logos-root .lp {
+  --lp-map: 360px;
+  --lp-made: 340px;
+  position: relative;
+  display: grid;
+  grid-template-columns: var(--lp-map) minmax(0, 1fr) var(--lp-made);
+  height: 100%;
+  min-height: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  color: var(--c-ink);
+  transition: grid-template-columns 0.55s var(--c-ease);
+}
+.logos-root .lp.is-split {
+  --lp-map: 300px;
+  grid-template-columns: var(--lp-map) minmax(0, 1fr);
+}
+@media (max-width: 1240px) {
+  .logos-root .lp { --lp-map: 300px; --lp-made: 300px; }
+}
+
+.logos-root .lp-col {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  transition: opacity 0.3s var(--c-ease);
+}
+.logos-root .lp-col + .lp-col { border-left: 1px solid var(--c-rule); }
+.logos-root .lp .is-dim { opacity: 0.32; }
+.logos-root .lp .is-dim:is(:hover, :focus-within) { opacity: 0.7; }
+
+/* a column's head: a label, and what it reads at the right */
+.logos-root .lp-head {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  min-height: 20px;
+  margin-bottom: 14px;
+}
+.logos-root .lp-head-k { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
+.logos-root .lp-head-k:hover .l5-label { color: var(--c-moss); }
+.logos-root .lp-head-k:disabled { cursor: default; }
+.logos-root .lp-head-k:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 3px; }
+.logos-root .lp-meta { font-size: 12.5px; color: var(--c-ink-60); font-variant-numeric: tabular-nums; white-space: nowrap; }
+.logos-root .lp-empty { margin: 0; max-width: 34ch; font-size: 12.5px; line-height: 1.55; color: var(--c-ink-60); }
+
+/* ── THE LOGIC MAP ──────────────────────────────────────────────────── */
+
+.logos-root .lp-map { padding: 28px 24px 24px; overflow-y: auto; }
+.logos-root .lp-ideas { display: flex; flex-direction: column; gap: 14px; }
+.logos-root .lp-node {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  width: 100%;
+  padding: 10px 12px 11px;
+  box-sizing: border-box;
+  border: 1px solid rgba(var(--c-moss-rgb), 0.16);
+  border-radius: 9px;
+  background: var(--lg-panel-solid, #fff);
+  color: var(--c-ink);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.2s, background-color 0.2s, color 0.2s;
+}
+.logos-root .lp-node:hover { border-color: rgba(var(--c-moss-rgb), 0.45); }
+.logos-root .lp-node:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .lp-node-k { font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .lp-node-t { font-size: 13.5px; line-height: 1.38; overflow-wrap: anywhere; }
+.logos-root .lp-node.is-question .lp-node-t { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 17px; line-height: 1.25; }
+/* lit: from the turn being read */
+.logos-root .lp-node.is-lit { border-color: var(--c-moss); background: #eef1e6; }
+.logos-root .lp-node.is-lit .lp-node-k { color: var(--c-moss); }
+/* ahead: not come up yet */
+.logos-root .lp-node.is-ahead { border: 1px dashed rgba(var(--c-ink-rgb), 0.3); background: transparent; color: var(--c-ink-60); }
+/* the one the chatbox asks about */
+.logos-root .lp-node.is-picked { box-shadow: inset 0 0 0 1px var(--c-moss); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .lp-node { background: rgba(var(--c-ink-rgb), 0.04); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .lp-node.is-lit { background: rgba(var(--c-moss-rgb), 0.18); }
+
+.logos-root .lp-givens { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+
+/* steps hang from a 1px rail, each with a dot: done filled, now a ring, ahead a hairline ring */
+.logos-root .lp-steps { position: relative; display: flex; flex-direction: column; gap: 10px; margin: 0; padding: 0 0 0 22px; list-style: none; }
+.logos-root .lp-steps::before { content: ''; position: absolute; left: 4px; top: 14px; bottom: 14px; width: 1px; background: rgba(var(--c-ink-rgb), 0.2); }
+.logos-root .lp-step { position: relative; }
+.logos-root .lp-step-dot { position: absolute; left: -22px; top: 14px; width: 9px; height: 9px; box-sizing: border-box; border-radius: 50%; background: var(--c-paper); }
+.logos-root .lp-step.is-done .lp-step-dot { background: var(--c-moss); }
+.logos-root .lp-step.is-now .lp-step-dot { border: 2px solid var(--c-moss); }
+.logos-root .lp-step.is-ahead .lp-step-dot { border: 1px solid rgba(var(--c-ink-rgb), 0.3); }
+
+.logos-root .lp-more { align-self: flex-start; }
+.logos-root .lp-cap { margin: auto 0 0; padding-top: 18px; max-width: 34ch; font-size: 12.5px; line-height: 1.5; color: var(--c-ink-60); }
+
+/* ── THE CONVERSATION ───────────────────────────────────────────────── */
+
+.logos-root .lp-convo { padding: 28px 48px 20px 40px; }
+.logos-root .lp-convo > .lp-head { padding-left: 36px; }
+.logos-root .lp-turns { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+/* anchored to the foot: a short conversation sits by the chatbox */
+.logos-root .lp-turns-in { display: flex; flex-direction: column; justify-content: flex-end; min-height: 100%; }
+.logos-root .lp-turns-in > .l5-turn:first-child { border-top: 0; }
+.logos-root .lp-fold { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.logos-root .l5-turn.is-folded.is-synth .l5-turn-q1 { font-style: normal; }
+.logos-root .lp-compose { flex: none; padding-left: 36px; }
+.logos-root .lp-compose > * { width: 100%; }
+
+/* The open turn draws its messages as the conversation does (components/logos5/L5Message.tsx), set as a page:
+   "You" over your words; Socria's prose in a reading measure; "Socria asks" and the question, the largest type here. */
+.logos-root .lp .l5-turn.is-open .l5-msg { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; max-width: none; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u { display: flex; flex-direction: column; gap: 4px; align-items: stretch; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u .l5-who { order: -1; display: block; margin: 0; padding: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u .l5-who .l5-av { display: none; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u .l5-said { align-self: stretch; max-width: 60ch; margin: 0; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; font-size: 15px; line-height: 1.55; color: var(--c-ink-70); }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u { position: relative; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u .l5-acts { position: absolute; top: -6px; right: 0; margin: 0 !important; opacity: 0; transition: opacity 0.2s; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-u:is(:hover, :focus-within) .l5-acts { opacity: 1; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-a { margin-top: 14px; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-a > .l5-who { display: none; }
+.logos-root .lp .l5-turn.is-open .l5-prose.is-reply { max-width: 60ch; font-size: 15.5px; line-height: 1.7; }
+.logos-root .lp .l5-turn.is-open .l5-slice { display: none; }
+/* the actions: words, Copy and Retry as meta, the way to what the turn made first */
+.logos-root .lp .l5-turn.is-open .l5-acts { display: flex; align-items: center; gap: 20px; min-height: 32px; margin: 10px 0 0; padding: 0; opacity: 1; }
+.logos-root .lp .l5-turn.is-open .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
+.logos-root .lp .l5-turn.is-open .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-45); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; transition: color 0.2s; }
+.logos-root .lp .l5-turn.is-open .l5-act:hover { background: none; color: var(--c-ink); }
+.logos-root .lp .l5-turn.is-open .l5-act svg { display: none; }
+.logos-root .lp .l5-turn.is-open .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
+.logos-root .lp .l5-turn.is-open .l5-acts > .l5-link.is-go { margin-right: auto; }
+
+/* ── BROUGHT AND MADE ───────────────────────────────────────────────── */
+
+.logos-root .lp-made { padding: 28px 24px 24px; overflow-y: auto; }
+.logos-root .lp-cells { display: flex; flex-direction: column; }
+.logos-root .lp-cell { cursor: pointer; }
+.logos-root .lp-cell:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .lp-cell-k { display: flex; align-items: baseline; justify-content: space-between; gap: 10px; }
+.logos-root .lp-cell-n { display: inline-flex; align-items: center; gap: 6px; font-size: 12.5px; color: var(--c-ink-45); white-space: nowrap; }
+.logos-root .lp-cell-n.is-now { color: var(--c-moss); }
+.logos-root .lp-dot { width: 5px; height: 5px; border-radius: 50%; background: var(--c-moss); }
+.logos-root .lp-cell-p { position: relative; max-height: 220px; margin-top: 6px; overflow: hidden; }
+.logos-root .lp-cell-p img { display: block; max-width: 100%; max-height: 200px; object-fit: cover; }
+.logos-root .lp-inert { pointer-events: none; }
+.logos-root .lp-inert > * { margin: 0 !important; }
+.logos-root .lp-cell-go { align-self: flex-start; min-height: 24px; margin-top: 4px; font-size: 12.5px; }
+.logos-root .lp-cell:hover .lp-cell-go .l5-ar { transform: translateX(3px); }
+.logos-root .lp-cell:hover .l5-cell-title { color: var(--c-moss); }
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lp,
+  .logos-root .lp-col { transition: none; }
+}

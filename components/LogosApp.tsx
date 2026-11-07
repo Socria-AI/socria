@@ -12,7 +12,7 @@
 // deliberately not derived from the reply — it grows and REORGANIZES while the
 // answer is still arriving, which is the whole interaction being tested here.
 
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useUser } from '@clerk/nextjs';
 import { ThinkingMap, VIEW_RESET, type MapNodeRef, type ObjectAction } from '@/components/ThinkingMap';
 import { sanitizeViz } from '@/lib/logos-viz';
@@ -206,8 +206,8 @@ import { ModelArtifact } from './logos5/ModelTools';
 import { L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { StudyDesk, drawsInCard, type DeskItem } from './logos5/StudyDesk';
-import { L5Board, ReplySheet, type BoardIdea } from './logos5/L5Board';
-import { besideOnBoard, litBy, madeLink, oneViewOn, sheetTurn, stepTurn, toggleBeside, turnOfLabel } from '@/lib/logos5/oneView';
+import { L5Board, type BoardIdea } from './logos5/L5Board';
+import { aheadOf, besideOnBoard, litBy, oneViewOn, sheetTurn, toggleBeside } from '@/lib/logos5/oneView';
 import { deskTopicsOf, fileTitle, onMap } from '@/lib/logos5/studyDesk';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView, type SharedIn } from './logos5/Universe';
@@ -220,6 +220,7 @@ import './logos5/l5-controls.css';
 import './one/one-sheet.css';
 import './logos5/redesign.css';
 import './logos5/l5v.css';
+import './logos5/revision2.css';
 import { CaptureInbox } from './CaptureInbox';
 import { EasyCapture } from './logos5/EasyCapture';
 import { CabinDock } from './logos5/CabinDock';
@@ -6385,10 +6386,14 @@ export function LogosApp({
   const [boardBeside, setBoardBeside] = useState<'content' | 'artifacts' | 'logic_map' | null>(null);
   const [reading, setReading] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(true);
+  // Revision II: the page's focus is set by the header's tabs and nothing else — what the screen's rules choose
+  // (an artifact made, a file read) never dims the conversation
+  const [pageFocus, setPageFocus] = useState<Viewport>('chat');
   useEffect(() => {
     setBoardBeside(null);
     setReading(null);
     setSheetOpen(true);
+    setPageFocus('chat');
   }, [activeId]);
   // sent: what was being read folds onto the board, and the new turn opens above the chatbox as it arrives
   const lastRole = messages[messages.length - 1]?.role;
@@ -6396,6 +6401,7 @@ export function LogosApp({
     if (lastRole !== 'user') return;
     setReading(null);
     setSheetOpen(true);
+    setPageFocus('chat');
   }, [messages.length, lastRole]);
   // HOME IS THE UNIVERSAL MAP (lib/logos5/universe.ts). Logos 5 opens on every
   // conversation merged into one mind map, not on a list: a line of thinking is
@@ -8298,25 +8304,8 @@ export function LogosApp({
         guide={guarded && l5 ? { onHint: () => void send('Can I have another hint?'), onReveal: reveal, busy } : null}
         // folded over a view (the conversation not on screen): its first tool unfolds the conversation beside the view
         lead={
-          oneView ? (
-            // folded: the reply laid on the board as a turn — the newest opens above the chatbox again from here
-            sheetAt === null && boardTurns.length > 0 ? (
-              <button
-                type="button"
-                className="l5-btn is-sm is-quiet lob-unfold"
-                onClick={() => {
-                  setReading(null);
-                  setSheetOpen(true);
-                }}
-                title="Open the newest reply above the chatbox"
-              >
-                Turn {boardTurns.length}
-                <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                  <path d="M7 14l5-5 5 5" />
-                </svg>
-              </button>
-            ) : null
-          ) : !convoOpen && !narrow && activeId && messages.length > 0 ? (
+          // on the page the conversation is always on screen: nothing to unfold
+          oneView ? null : !convoOpen && !narrow && activeId && messages.length > 0 ? (
             <button type="button" className="l5-btn is-sm is-quiet l5-unfold" onClick={() => setScreen((sc) => dock('chat', sc))} title="Unfold the conversation beside this view">
               <svg viewBox="0 0 24 24" width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
                 <rect x="3.5" y="4.5" width="17" height="15" rx="2.5" />
@@ -8625,7 +8614,7 @@ export function LogosApp({
     ...(mapping ? [{ label: 'Drawing the Logic Map', state: 'now' as const }] : []),
   ];
   /** One message as the conversation draws it — in the thread, and, in one view, in the sheet above the chatbox. */
-  const msgEl = (m: Msg, i: number) => {
+  const msgEl = (m: Msg, i: number, go?: ReactNode) => {
     if (m.synthesis) {
       return (
         <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="l5-synth">
@@ -8683,6 +8672,7 @@ export function LogosApp({
         onOpenContent={openContent}
         offer={offer}
         disclose={disclose}
+        {...(go ? { go } : {})}
       />
       {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
       {brought.length > 0 && (
@@ -8777,7 +8767,7 @@ export function LogosApp({
             </div>
           )}
 
-          {messages.map(msgEl)}
+          {messages.map((m, i) => msgEl(m, i))}
 
           {chatNotes}
           <SocriaAnswering names={answeringOthers} />
@@ -8954,7 +8944,7 @@ export function LogosApp({
             turn: turnOfEntry(c.id, turns),
             preview: c.image ? (
               // eslint-disable-next-line @next/next/no-img-element
-              <img src={c.image} alt="" className="lob-img" />
+              <img src={c.image} alt="" className="lp-img" />
             ) : null,
             ...(c.meta ? { note: c.meta } : {}),
             onOpen: () => {
@@ -8963,49 +8953,45 @@ export function LogosApp({
             },
           });
         }
-        // the Logic Map, pinned: the ideas the turn being read lit, the one asked about, all of them on its tab
+        // the Logic Map column: the ideas the turn being read lit, the ones a later turn put there (dashed), the one asked about
         const litAt = sheetAt ?? (turns.length ? turns.length - 1 : null);
-        const lit = litBy(litAt !== null ? turns[litAt] : null, links?.fromMsg);
+        // what each message put on the map: the map's own record, and the cards their words name (lib/logos5/linking.ts)
+        const byMsg = new Map<string, string[]>(links?.fromMsg ?? []);
+        for (const [node, ids] of links?.fromNode ?? []) for (const id of ids) byMsg.set(id, [...new Set([...(byMsg.get(id) ?? []), node])]);
+        const lit = litBy(litAt !== null ? turns[litAt] : null, byMsg);
+        const ahead = aheadOf(turns, byMsg, litAt);
         const kindOf = (n: (typeof map.nodes)[number]) => {
           const k = String(n.role ?? n.type).replace(/_/g, ' ');
           return k.charAt(0).toUpperCase() + k.slice(1);
         };
-        const ideas: BoardIdea[] = map.nodes.map((n) => ({ id: n.id, type: n.type, kind: kindOf(n), label: n.label }));
-        // THE SHEET: the turn being read, in full, as the conversation draws it
+        const ideas: BoardIdea[] = map.nodes.map((n) => ({ id: n.id, type: n.type, role: n.role ?? null, kind: kindOf(n), label: n.label }));
+        // THE OPEN TURN: the turn being read, drawn as the conversation draws it — you, the prose, Socria's question,
+        // then the actions, the first of them the way to what the turn made ("Open the live graph beside this →")
         const t = sheetAt !== null ? turns[sheetAt] : null;
         const newest = sheetAt !== null && sheetAt === turns.length - 1;
         const made = t ? cards.find((c) => c.turn === t.index && c.tone !== 'content' && c.onOpen) : undefined;
-        const madeSaid = made ? madeLink(made.kicker.split(' · ')[1] ?? made.kicker) : null;
-        const sheet =
-          t && sheetAt !== null ? (
-            <ReplySheet
-              label={turnOfLabel(sheetAt, turns.length)}
-              onUp={stepTurn(sheetAt, turns.length, 'up') !== null ? () => setReading(stepTurn(sheetAt, turns.length, 'up')) : null}
-              onDown={stepTurn(sheetAt, turns.length, 'down') !== null ? () => setReading(stepTurn(sheetAt, turns.length, 'down')) : null}
-              onFold={() => setSheetOpen(false)}
-              follow={newest && (busyHere || !!streaming)}
-              foot={
-                made && madeSaid ? (
-                  <button type="button" className="lob-made" onClick={() => made.onOpen?.()}>
-                    {madeSaid} <span className="l5-ar" aria-hidden="true">→</span>
-                  </button>
-                ) : null
-              }
-            >
-              {t.askedAt !== undefined && messages[t.askedAt] ? msgEl(messages[t.askedAt], t.askedAt) : null}
-              {t.replyAt !== undefined && messages[t.replyAt] ? msgEl(messages[t.replyAt], t.replyAt) : null}
-              {newest && streaming && (
-                <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />
-              )}
-              {newest && synthBusy && <SynthesisPending scope={synthBusy} />}
-              {newest && busyHere && !streaming && <L5Working steps={workingSteps} onStop={stopAnswer} />}
-              {newest && error && (
-                <p className="l5-error" role="alert">
-                  {error}
-                </p>
-              )}
-            </ReplySheet>
-          ) : null;
+        const madeNoun = made ? (made.kicker.split(' · ')[1] ?? made.kicker).toLowerCase() : null;
+        const go = made && madeNoun ? (
+          <button type="button" className="l5-link is-go" onClick={() => made.onOpen?.()}>
+            Open the {madeNoun} beside this <span className="l5-ar" aria-hidden="true">→</span>
+          </button>
+        ) : null;
+        const open = t ? (
+          <>
+            {t.askedAt !== undefined && messages[t.askedAt] ? msgEl(messages[t.askedAt], t.askedAt) : null}
+            {t.replyAt !== undefined && messages[t.replyAt] ? msgEl(messages[t.replyAt], t.replyAt, go) : null}
+            {newest && streaming && (
+              <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />
+            )}
+            {newest && synthBusy && <SynthesisPending scope={synthBusy} />}
+            {newest && busyHere && !streaming && <L5Working steps={workingSteps} onStop={stopAnswer} />}
+            {newest && error && (
+              <p className="l5-error" role="alert">
+                {error}
+              </p>
+            )}
+          </>
+        ) : null;
         return (
           <L5Board
             turns={turns}
@@ -9015,9 +9001,10 @@ export function LogosApp({
               ideas.length
                 ? {
                     ideas,
-                    // a drawing names the card by what it is of (Logos 5, lib/logos5/drawing.ts)
+                    // a drawing names the column by what it is of (Logos 5, lib/logos5/drawing.ts)
                     title: drawingOf(map)?.title ?? null,
                     lit,
+                    ahead,
                     at: litAt,
                     picked: focus?.kind === 'node' ? focus.id : null,
                     onIdea: (id) => {
@@ -9028,18 +9015,15 @@ export function LogosApp({
                   }
                 : null
             }
-            camera={studyTab}
+            camera={pageFocus}
             besideOpen={!!boardBeside}
+            follow={newest && (busyHere || !!streaming)}
             onRead={(i) => {
               setReading(i);
               setSheetOpen(true);
             }}
-            dock={
-              <div className="lob-pane">
-                {sheet}
-                {l5Dock}
-              </div>
-            }
+            open={open}
+            composer={l5Dock}
           />
         );
       })()
@@ -9209,6 +9193,7 @@ export function LogosApp({
   const moveCamera = (v: Viewport) => {
     handChoseRef.current = Date.now();
     setStudyTab(v);
+    setPageFocus(v);
     if (v === 'chat') {
       setReading(null);
       setSheetOpen(true);
@@ -9408,24 +9393,15 @@ export function LogosApp({
     </span>
   ) : null;
   const moreEl = (
-    <L5Menu
-      label="More"
-      items={l5Menu}
-      button={
-        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-          <circle cx="5.5" cy="12" r="1.6" />
-          <circle cx="12" cy="12" r="1.6" />
-          <circle cx="18.5" cy="12" r="1.6" />
-        </svg>
-      }
-    />
+    // Revision II: a word, not a glyph
+    <L5Menu label="More" items={l5Menu} word button="More" />
   );
   // THE SWITCH (Logos 5): the four views in the header's middle — Chat · Files n · Artifacts n · Logic Map. Zoomed out
   // (the canvas), none is chosen; pressing one brings it close.
   const switchEl = activeId ? (
     <L5Switch
       label="Views"
-      value={oneView ? studyTab : zoomed ? '' : studyTab}
+      value={oneView ? pageFocus : zoomed ? '' : studyTab}
       // on the board the tabs move the camera (each brings its part forward); elsewhere they open the view
       onChange={(v) => (oneView ? moveCamera(v as Viewport) : openFull(v as Viewport))}
       items={[
@@ -9441,6 +9417,12 @@ export function LogosApp({
       kind={projectName ? 'Project' : study ? 'Study' : messages.length ? 'Line of thinking' : ''}
       title={projectName || (active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : '')}
       onHome={goHome}
+      // "Sessions /": your lines of thinking, listed on the Universal Map
+      onRail={() => {
+        goHome();
+        setL5List(true);
+      }}
+      railOpen={l5Home && l5List}
       switcher={switchEl}
       split={oneView ? <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} board /> : undefined}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}

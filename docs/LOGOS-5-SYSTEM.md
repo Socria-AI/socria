@@ -182,46 +182,66 @@ layer on it, shown by default when signed in and absent signed out.
 - The detail, and what the data cannot yet say, is in `docs/LOGOS-5.md` §5
   (Memory on the map).
 
-## 8. VIII · One view — one board, the chatbox is the chat
+## 8. Revision II — the one view, set as a page
 
-The newest part of the handoff. On a wide screen (1024 and over) a line of
-thinking with something in it is one board, built on the canvas
-(`components/logos5/L5Board.tsx`, its rules in `lib/logos5/oneView.ts`,
-`board.css`). It is the line of thinking's only view there; the phone keeps
-the four views and the zoomed-out canvas as they were.
+Revision II ("set as a page", November 2026) answers the feedback that Logos
+read like a cheaper chat app by leaning into printed matter. Socria's question
+is the largest type on screen; the chatbox is a ruled line you write on;
+surfaces are divided by hairlines, not cards; the chosen tab is underlined;
+icons become words; paper grain sits under everything; there is one filled
+control per screen. The sheets: `components/logos5/l5-controls.css` (the
+controls, Revision II's own, with the first sheet's names — `.l5-btn`,
+`.l5-icon`, `.l5-switch`, `.l5-chip`, `.l5-seg`, `.l5-holder` — drawn in its
+terms), `page.css` (the one view), `revision2.css` (paper, header, chatbox,
+sheets and the Universal Map, loaded last).
 
-- **The board.** The conversation runs down the middle as turn cards (your
-  words in the wash, then Socria, "Turn n", the gist) on a spine; what each
-  turn brought or made sits on the right, wired to its turn ("File ·
-  Brought", "Artifact · Live graph"). The Logic Map is **one pinned card** on
-  the left: the question first, then the ideas the turn being read put on the
-  map (lit), then the rest — five, "+ n more ideas"; pressing an idea asks
-  about it; pressing the card's name opens the map beside, to edit.
-- **The chatbox is the chat.** The turn being read — the newest unless
-  another was pressed — opens in full above the chatbox, drawn exactly as the
-  conversation draws it (one renderer, `msgEl`, for both): "Socria · Turn 3
-  of 3", ↑ ↓ through the turns, Fold. Folded, every turn is on the board and
-  the chatbox's first tool is "Turn n ⌃". Sending opens the new turn above
-  the chatbox. Under the reply, "{kind}, beside this turn →" opens what it
-  made.
-- **One line for the guide.** "Guiding, not solving" and "Asking about" are
-  the chatbox's first line, with Another hint and Show solution at its end
-  (`LogosComposer` `guide`); the bar that floated over the conversation is
-  gone in Logos 5.
-- **The tabs move the board.** Each brings its part forward and the rest
-  steps back (the card stays opaque; what is in it fades); Logic Map opens
-  all the ideas on the pinned card. The screen's own rules
-  (`lib/logos5/views.ts`: what a sent turn does, rule C) are kept and read
-  as the camera. The filters, the zoom group and Back to chat are gone; zoom
-  is a tray in the corner (− % + fit).
-- **Split View stays.** In the header ("Split View"), it opens one thing
-  large beside the board — an artifact to use, the Logic Map to edit, a file
-  to read — never the conversation, which is the chatbox. A card pressed on
-  the board opens there too. The board fits itself to the room left; the
-  reply and the chatbox stay full size. A study's Artifacts, beside the
-  board, is the desk of §6.
-- **Nothing floats over the board.** The view's own actions are gone from
-  it: Synthesize and AR Mode are in More.
+On a wide screen (1024 and over) a line of thinking with something in it is
+one page in three columns divided by 1px rules (`components/logos5/L5Board.tsx`,
+its rules in `lib/logos5/oneView.ts`). The phone keeps the four views.
+
+- **The Logic Map, left** (360; 300 in Split view; the only dot grid). The
+  question; the givens side by side; the steps on a rail — a filled dot for
+  done, a ring for now, a hairline ring for ahead (`stepStates`); then every
+  other idea. Ideas from the turn being read are **lit** (moss, `#EEF1E6`);
+  ideas a later turn put there are **dashed** — they have not come up yet
+  (`aheadOf`). What a turn lit is the map's own record and the cards whose
+  labels its words name (`lib/logos5/linking.ts`, both directions). Pressing
+  an idea asks about it; the column's name opens the map beside, to edit.
+- **The conversation, middle.** Every turn is numbered in lowercase roman
+  (`roman`). The one being read is open — "You" over your words, Socria's
+  prose in a 60ch measure, "Socria asks" in gold ink over the question at
+  serif 30, then the actions: "Open the {thing} beside this →" first, Copy and
+  Retry as quiet words. The rest are folded to two lines: "You · …" and the
+  question the reply ended on (`closingAsk`). Pressing one opens it and folds
+  the rest; the head says "Reading turn iii of iii". The turns are anchored
+  to the foot, by the chatbox.
+- **The chatbox is a ruled line** (`LogosComposer`, stacked): the guide row
+  ("Guiding, not solving · Asking about · {topic} ×") above; the words in
+  serif italic on the line, with Send → at its end (the one filled control;
+  a hairline ring when there is nothing to send); under it "+ Add a file, a
+  photo or your voice" (Attach, Make, Search my files, ∑ in its menu) on the
+  left, and Another hint and Show solution on the right while Socria guides.
+- **Brought and made, right** (340). Cells between hairlines: the kind and
+  "Turn n", a serif title, the thing itself (shown, not used) or a line, and
+  "Open beside →". The cell the turn being read made goes moss with a dot.
+- **The tabs set focus, and only the tabs.** Chat leaves everything; Logic
+  Map keeps the map; Files and Artifacts keep their cells; the rest dims to
+  0.32. What the screen's own rules choose (an artifact made, a file read)
+  never dims the conversation (`pageFocus`).
+- **Split view stays.** In the header ("Split view", a word with a dot), it
+  opens one thing large beside the page; the right column gives way and the
+  map narrows.
+- **A closing question set apart.** A reply that ends on a question with at
+  least 25 words before it sets the question apart under "Socria asks" —
+  a one-paragraph reply too (`lib/reply-layout.ts`, `RichText`).
+- **The header.** The mark, then "Sessions /" (your lines of thinking, on the
+  Universal Map) and the line's name in serif italic; the tabs underlined at
+  full bar height; Split view, Search ⌘K, Memory and More as words; the
+  account a hairline ring. A guest's allowance and Save are words too.
+- **The Universal Map** is paper (no dot grid): Search and List as words,
+  the lenses underlined, the map's tools as words, "Pick up where you left
+  off" a line, and the start box a ruled line with its way on the one
+  filled control.
 
 ## 9. The Logic Map draws almost anything
 
@@ -339,9 +359,20 @@ its own glyph beside it.
 - **One view on a phone** was not drawn in the handoff: a phone keeps the
   four views and the zoomed-out canvas. A shared room (others thinking
   together) keeps the conversation as it was.
-- On the board, what was made outside any turn (a model, the writing, a
-  kept artifact) sits at the foot beside the sheet, wired to no turn; a
-  display has no record of the turn that asked for it.
+- **Revision II, not yet everywhere.** The one view, the header, the
+  chatbox, the controls and the Universal Map's chrome are Revision II.
+  Screens 1, 2 and 4 (the Logic Map docked, the ask card, Study) and the
+  Memory layer take the new controls through the shared sheet but were not
+  rebuilt to their Revision II specs; the inline elements inside replies
+  (charts, tables, steps) keep their own rounded frames. The live-graph cell
+  shows the reply's graph, not the handoff's rectangles drawing, and Split
+  view uses the existing panel beside (its share of the width, not a fixed
+  520). The model picker was already gone; the length control (Balanced)
+  stays in the chatbox foot. Memory's gold waiting count is wired to the
+  word but not yet fed a number.
+- What was made outside any turn (a model, the writing, a kept artifact)
+  sits in Brought and made with no "Turn n"; a display has no record of the
+  turn that asked for it.
 - The phone sheet, and the White, Dark and Celestial themes, use the same
   tokens and were not drawn separately in the handoff; they were checked only
   where the browser runs below went.

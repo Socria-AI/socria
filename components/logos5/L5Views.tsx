@@ -66,19 +66,25 @@ export function L5TopBar({
   return (
     <header className={`l5v-top${narrow ? ' is-narrow' : ''}`}>
       <div className="l5v-top-l">
-        {onRail && (
-          <button type="button" className="l5-icon l5v-rail" onClick={onRail} aria-expanded={!!railOpen} aria-label="Your lines of thinking" title="Your lines of thinking">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M4 7h16M4 12h16M4 17h10" />
-            </svg>
-          </button>
-        )}
         <button type="button" className="l5v-home" onClick={onHome} aria-label="Back to the Universal Map" title="Your Universal Map">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src="/socria-mark.png" alt="" width={22} height={22} />
           {!narrow && <span className="l5v-home-w">Socria</span>}
         </button>
-        {(kind || title) && <span className="l5v-rule" aria-hidden="true" />}
+        {(onRail || kind || title) && <span className="l5v-rule" aria-hidden="true" />}
+        {/* Revision II: the rail's glyph is a breadcrumb — "Sessions /" then the line's name in serif italic */}
+        {onRail && !narrow && (
+          <>
+            <button type="button" className="l5v-crumb" onClick={onRail} aria-expanded={!!railOpen} title="Your lines of thinking">
+              Sessions
+            </button>
+            {title && (
+              <span className="l5v-slash" aria-hidden="true">
+                /
+              </span>
+            )}
+          </>
+        )}
         <h1 className="l5v-where" title={[kind, title].filter(Boolean).join(' · ')}>
           {kind && !narrow && <span className="l5-label">{kind}</span>}
           {title && <span className="l5v-title">{title}</span>}
@@ -89,13 +95,9 @@ export function L5TopBar({
         {zoom}
         {split}
         {onSearch && (
-          <button type="button" className="l5-btn is-sm is-quiet l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K" title="Search everything">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <circle cx="11" cy="11" r="6.5" />
-              <path d="M20 20l-4.2-4.2" />
-            </svg>
-            {!narrow && <span>Search</span>}
-            {!narrow && <kbd className="l5v-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
+          <button type="button" className="l5-link l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K" title="Search everything">
+            <span>Search</span>
+            {!narrow && <kbd className="l5v-kbd l5-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
           </button>
         )}
         {memory}

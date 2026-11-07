@@ -1,0 +1,267 @@
+/* components/logos5/revision2.css — Logos 5.5, Revision II ("set as a page"): the chrome around every view.
+ *
+ * Loaded last, after l5v.css, so it settles what the older sheets drew:
+ *   paper     the workspace is paper with grain; the dot grid only behind a Logic Map
+ *   header    56 tall, a rule below; "Sessions / name" breadcrumb; underlined tabs; words, not icons; a ringed avatar
+ *   chatbox   a ruled line you write on, Send at its end; "+ Add…" and the guide's two ways out in the foot
+ *   sheets    whatever floats is paper, a hairline, square, no shadow, no blur
+ * The controls themselves are l5-controls.css; the one view's page is page.css.
+ */
+
+/* ── paper ──────────────────────────────────────────────────────────── */
+.logos-root .l5 {
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+}
+.logos-root .l5 .l5v-body,
+.logos-root .l5 .l5v-primary,
+.logos-root .l5 .l5v-primary-in { background: transparent; }
+
+/* ── the header ─────────────────────────────────────────────────────── */
+.logos-root .l5 .l5v-top {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+  align-items: stretch;
+  gap: 24px;
+  height: 56px;
+  min-height: 56px;
+  padding: 0 24px;
+  box-sizing: border-box;
+  border-bottom: 1px solid var(--c-rule);
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.logos-root .l5 .l5v-top-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
+.logos-root .l5 .l5v-top-c { display: flex; align-items: stretch; justify-content: center; min-width: 0; }
+.logos-root .l5 .l5v-top-r { display: flex; align-items: center; justify-content: flex-end; gap: 22px; min-width: 0; }
+.logos-root .l5 .l5v-top .l5v-rule { width: 1px; height: 20px; background: var(--c-rule-2); }
+/* the breadcrumb: "Sessions" (a word that opens the list) / the line's name in serif italic */
+.logos-root .l5 .l5v-crumb { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--c-ink-70); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; transition: color 0.2s; }
+.logos-root .l5 .l5v-crumb:hover { color: var(--c-ink); }
+.logos-root .l5 .l5v-crumb[aria-expanded='true'] { color: var(--c-moss); }
+.logos-root .l5 .l5v-crumb:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .l5 .l5v-slash { flex: none; color: var(--c-ink-25); font-size: 15px; }
+.logos-root .l5 .l5v-where { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0; }
+.logos-root .l5 .l5v-where .l5-label { display: none; }
+.logos-root .l5 .l5v-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 19px; font-weight: 400; line-height: 1.2; color: var(--c-ink); }
+.logos-root .l5 .l5v-home img { width: 22px; height: 22px; }
+.logos-root .l5 .l5v-home-w { font-size: 14px; font-weight: 600; letter-spacing: 0.01em; }
+/* the tabs fill the bar: the chosen one underlined at its foot */
+.logos-root .l5 .l5v-top-c .l5-switch { height: 56px; gap: 28px; }
+.logos-root .l5 .l5v-top-c .l5-switch-i { height: 56px; }
+/* the words at the end */
+.logos-root .l5 .l5v-top-r :is(.l5-btn, .l5-link) { min-height: 32px; }
+.logos-root .l5 .l5v-search { gap: 8px; color: var(--c-ink-70); }
+.logos-root .l5 .l5v-search svg { display: none; }
+.logos-root .l5 .l5v-kbd,
+.logos-root .l5 .l5v-search kbd { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 4px; background: none; box-shadow: none; font: inherit; font-size: 11px; font-weight: 500; color: var(--c-ink-45); }
+/* "Split view": a word with a 6px dot, ink 25 off and moss on */
+.logos-root .l5 .l5v-splitb { gap: 8px; color: var(--c-ink-70); box-shadow: none; }
+.logos-root .l5 .l5v-splitb svg { display: none; }
+.logos-root .l5 .l5v-splitb::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c-ink-25); transition: background-color 0.2s; }
+.logos-root .l5 .l5v-splitb.is-on { color: var(--c-ink); box-shadow: none; }
+.logos-root .l5 .l5v-splitb.is-on::before { background: var(--c-moss); }
+/* every word at the end is UI type: 13.5, no underline */
+.logos-root .l5 .l5v-top-r :is(.l5-link, .l5-btn:not(.is-primary), .l5-signin) { font-size: 13.5px; font-weight: 500; text-decoration: none; }
+.logos-root .l5 .l5-mindbtn { width: auto; height: auto; min-height: 32px; border-radius: 0; background: none; color: var(--c-ink-70); }
+.logos-root .l5 .l5-mindbtn:hover { background: none; color: var(--c-ink); }
+/* the account: the name as a word, the initial in a hairline ring, no fill */
+.logos-root .l5 .l5v-top-r .l5-avatar { width: 28px; height: 28px; min-width: 28px; box-sizing: border-box; display: grid; place-items: center; padding: 0; border: 1px solid var(--c-edge); border-radius: 50%; background: none; box-shadow: none; color: var(--c-ink); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
+.logos-root .l5 .l5v-top-r .who-btn { gap: 8px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); font-size: 13.5px; font-weight: 500; }
+.logos-root .l5 .l5v-top-r .who-btn:hover { background: none; color: var(--c-ink); }
+.logos-root .l5 .l5v-top-r .who-btn :is(.avatar, .av-sm) { width: 28px; height: 28px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 50%; background: none; box-shadow: none; color: var(--c-ink); font-size: 11.5px; font-weight: 600; }
+/* a guest: what is left, said in words; Sign in and Save are words — the one filled control is Send */
+.logos-root .l5 .l5-guestacct { gap: 22px; margin: 0; }
+.logos-root .l5 .l5-guestmeter { height: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-60); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.logos-root .l5 .l5-guestmeter-dots i { background: var(--c-moss); }
+.logos-root .l5 .l5-guestmeter-dots i.is-used { background: var(--c-ink-25); transform: none; }
+.logos-root .l5 .l5-signin,
+.logos-root .l5 button.l5-guestsave { height: auto; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; filter: none; color: var(--c-moss); font: inherit; font-size: 13.5px; font-weight: 500; text-decoration: none; cursor: pointer; transition: color 0.2s; }
+.logos-root .l5 .l5-signin:hover,
+.logos-root .l5 button.l5-guestsave:hover { background: none; color: var(--c-ink); filter: none; box-shadow: none; }
+.logos-root .l5 .l5-signin:active { transform: none; }
+
+/* words are words wherever they are: l5.css's older underlined link may load after l5-controls.css */
+.logos-root .l5 .l5-link { text-decoration: none; }
+
+/* ── the chatbox: a ruled line ──────────────────────────────────────── */
+.logos-root .l5 .lg-composer.is-ruled { margin: 0; }
+.logos-root .l5 .lp-compose .lg-composer.is-ruled { padding: 0; }
+.logos-root .l5 .lg-composer.is-ruled .lg-composer-box,
+.logos-root .l5 .lg-composer.is-ruled .lg-composer-box:focus-within,
+.logos-root .l5 .l5-dock .lg-composer.is-ruled .lg-composer-box,
+.logos-root .l5 .l5-dock .lg-composer.is-ruled .lg-composer-box:focus-within {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 16px 0 0;
+  border: 0;
+  border-top: 1px solid var(--c-rule);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+}
+.logos-root .l5 .lp-compose .lg-composer.is-ruled .lg-composer-box { padding-top: 16px; }
+.logos-root .l5 .lg-composer.is-ruled .l5-crow.l5-compose-line {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  padding: 0 0 10px;
+  border-bottom: 1px solid var(--c-line);
+  transition: border-color 0.2s;
+}
+.logos-root .l5 .lg-composer.is-ruled .l5-crow.l5-compose-line:focus-within { border-bottom-color: var(--c-moss); }
+.logos-root .l5 .lg-composer.is-ruled .l5-compose-line > textarea,
+.logos-root .l5 .l5-dock .lg-composer.is-ruled .l5-compose-line > textarea {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 30px;
+  padding: 0 0 5px;
+  border: 0;
+  outline: 0;
+  background: none;
+  box-shadow: none;
+  resize: none;
+  font-family: var(--l5-serif, 'Instrument Serif', serif);
+  font-style: italic;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--c-ink);
+}
+.logos-root .l5 .lg-composer.is-ruled textarea::placeholder {
+  font-family: var(--l5-serif, 'Instrument Serif', serif);
+  font-style: italic;
+  font-size: 24px;
+  line-height: 1.25;
+  color: var(--c-ink-45);
+  opacity: 1;
+}
+/* Send: the surface's one filled control — "Send →"; nothing to send, a hairline ring */
+.logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary { width: auto; min-width: 0; height: 40px; padding: 0 18px; margin-bottom: 2px; }
+.logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary.is-waiting { width: 40px; padding: 0; }
+.logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary:disabled:not(.is-waiting) { background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); }
+/* the foot */
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools.l5-compose-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  min-height: 28px;
+  margin: 0;
+  font-size: 12.5px;
+  color: var(--c-ink-60);
+}
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-start { display: inline-flex; align-items: center; gap: 14px; min-width: 0; }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-end { display: inline-flex; align-items: center; gap: 18px; margin-left: auto; }
+.logos-root .l5 .lg-composer.is-ruled .lg-plus > .l5-link { min-height: 28px; font-size: 12.5px; font-weight: 500; color: var(--c-ink-60); }
+.logos-root .l5 .lg-composer.is-ruled .lg-plus > .l5-link:hover,
+.logos-root .l5 .lg-composer.is-ruled .lg-plus > .l5-link[aria-expanded='true'] { color: var(--c-ink); }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-mid { display: inline-flex; align-items: center; gap: 4px; margin: 0; }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-mid .mp-btn { height: 28px; padding: 0 6px; border: 0; border-radius: 0; background: none; font-size: 12.5px; color: var(--c-ink-60); }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-mid .mp-btn:hover { background: none; color: var(--c-ink); }
+.logos-root .l5 .lg-composer.is-ruled .l5-guide-acts { display: inline-flex; align-items: center; gap: 18px; }
+.logos-root .l5 .lg-composer.is-ruled .l5-guide-acts .l5-link { min-height: 28px; font-size: 13px; }
+.logos-root .l5 .lg-composer.is-ruled .l5-guide-acts .l5-guide-reveal { color: var(--c-ink-45); }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-end :is(.lg-mic, .sv-btn) { width: 28px; height: 28px; min-width: 28px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-60); }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-end :is(.lg-mic, .sv-btn):hover:not(:disabled) { background: none; color: var(--c-ink); }
+.logos-root .l5 .lg-composer.is-ruled .l5-ctools-end .sv-btn.is-on { background: none; color: var(--c-moss); }
+/* the guide row: dot · "Guiding, not solving" · "Asking about" · topic · × — on one line, no box */
+.logos-root .l5 .lg-composer.is-ruled .l5-asking.l5-compose-guide {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+  min-height: 28px;
+  margin: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  font-size: 13px;
+  color: var(--c-ink-70);
+}
+.logos-root .l5 .lg-composer.is-ruled .l5-guide { display: inline-flex; align-items: center; gap: 10px; color: var(--c-ink-70); font-size: 13px; font-weight: 500; white-space: nowrap; }
+.logos-root .l5 .lg-composer.is-ruled .l5-guide-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--c-moss); box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14); }
+.logos-root .l5 .lg-composer.is-ruled .l5-guide-sep { color: var(--c-ink-25); }
+.logos-root .l5 .lg-composer.is-ruled .l5-asking-t { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 17px; line-height: 1.2; color: var(--c-ink); }
+.logos-root .l5 .lg-composer.is-ruled .l5-asking-x { margin: 0; }
+/* the dock under the page's conversation: no frame of its own */
+.logos-root .l5 .lp-compose .l5-dock { max-width: none; margin: 0; padding: 0; background: none; }
+.logos-root .l5 .lp-compose .l5-dock > * + * { margin-top: 10px; }
+
+/* ── whatever floats: paper, a hairline, square, no shadow ──────────── */
+.logos-root .l5 :is(.l5v-menu, .l5x-sheet, .l5-ask, .l5x-pop, .l5-tip, .tip-card, .lg-pop, .l5v-beside) {
+  border-radius: 0;
+  box-shadow: none;
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.logos-root .l5 :is(.l5v-menu, .l5x-sheet, .l5-ask, .l5x-pop) {
+  border: 1px solid var(--c-rule-2);
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+}
+.logos-root .l5 .l5v-beside { border-left: 1px solid var(--c-rule); background-color: var(--c-paper); background-image: var(--c-grain); }
+.logos-root .l5 .l5v-beside-head { border-bottom: 1px solid var(--c-rule); background: none; }
+.logos-root .l5 .l5v-beside-t { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .l5 .l5v-divider { background: transparent; }
+
+@media (max-width: 760px) {
+  .logos-root .l5 .l5v-top { gap: 12px; padding: 0 14px; }
+  .logos-root .l5 .l5v-top-r { gap: 14px; }
+  .logos-root .l5 .lg-composer.is-ruled .l5-compose-line > textarea,
+  .logos-root .l5 .lg-composer.is-ruled textarea::placeholder { font-size: 20px; }
+  .logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary { height: 36px; padding: 0 14px; }
+}
+
+/* ── home: the Universal Map (Screens 3 and 5) ──────────────────────────
+   Paper, no tray, no keys: Search and List are words; the lenses are tabs with the chosen one underlined; the
+   map's tools are words; "Pick up where you left off" is a line, not a box; the start box is a ruled line, its
+   way on the one filled control. */
+.logos-root .l5 .l5-head-end .l5-unibtn { height: auto; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); font-size: 13.5px; font-weight: 500; }
+.logos-root .l5 .l5-head-end .l5-unibtn svg { display: none; }
+.logos-root .l5 .l5-head-end .l5-unibtn:hover { background: none; color: var(--c-ink); }
+.logos-root .l5 .l5-head-end .l5-unibtn:is(.is-on, [aria-pressed='true']) { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+.logos-root .l5 .l5-head-end { gap: 22px; }
+
+.logos-root .l5 .l5h-main .l5h-lens { gap: 20px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
+.logos-root .l5 .l5h-main .l5h-lens-pill { display: none; }
+.logos-root .l5 .l5h-main .l5h-lens button,
+.logos-root .l5 .l5h-main .l5h-lens:not(.is-measured) button.is-on { min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-60); font-size: 13.5px; transition: color 0.2s, box-shadow 0.2s; }
+.logos-root .l5 .l5h-main .l5h-lens button:hover { color: var(--c-ink); }
+.logos-root .l5 .l5h-main .l5h-lens button.is-on { color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+
+.logos-root .l5 .l5h-main .l5h-tools { gap: 20px; align-items: center; }
+.logos-root .l5 .l5h-main .l5h-tool { min-height: 32px; height: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); font-size: 13.5px; }
+.logos-root .l5 .l5h-main .l5h-tool:not(:has(.l5h-tool-l)) { width: auto; min-width: 20px; }
+.logos-root .l5 .l5h-main .l5h-tool:hover:not(:disabled) { background: none; color: var(--c-ink); transform: none; }
+.logos-root .l5 .l5h-main .l5h-tool.is-on { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+.logos-root .l5 .l5h-main .l5h-tool:is(.is-select, .l5h-viewbtn) svg { display: none; }
+
+.logos-root .l5 .l5h-main .l5h-pick { padding: 0 0 0 16px; border: 0; border-left: 1px solid var(--c-rule-2); border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); }
+.logos-root .l5 .l5h-main .l5h-pick:hover { background: none; color: var(--c-ink); transform: none; }
+.logos-root .l5 .l5h-main .l5h-pick > span[aria-hidden]:first-child:not(:last-child) { display: none; }
+.logos-root .l5 .l5h-main .l5h-pick-t { color: var(--c-moss); }
+
+.logos-root .l5 .l5h-main .l5h-zoom { border: 0; border-radius: 0; background: none; box-shadow: none; }
+.logos-root .l5 .l5h-main .l5h-zoom button { border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-60); font-variant-numeric: tabular-nums; }
+.logos-root .l5 .l5h-main .l5h-zoom button:hover { background: none; color: var(--c-ink); }
+
+.logos-root .l5 .l5h-main .l5h-find,
+.logos-root .l5 .l5h-main .l5h-find:focus-within { min-height: 48px; padding: 0 0 8px; border: 0; border-bottom: 1px solid var(--c-line); border-radius: 0; background: none; box-shadow: none; }
+.logos-root .l5 .l5h-main .l5h-find:focus-within { border-bottom-color: var(--c-moss); }
+.logos-root .l5 .l5h-main .l5h-find input,
+.logos-root .l5 .l5h-main .l5h-find input::placeholder { font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 22px; }
+.logos-root .l5 .l5h-main .l5h-find input::placeholder { color: var(--c-ink-45); }
+.logos-root .l5 .l5h-main .l5h-find :is(.mp-btn, .sv-btn, .lg-mic, .l5h-find-att) { border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-60); }
+.logos-root .l5 .l5h-main .l5h-find :is(.mp-btn, .sv-btn, .lg-mic, .l5h-find-att):hover { background: none; color: var(--c-ink); }
+.logos-root .l5 .l5h-main .l5h-find .sv-btn .sv-exp { display: none; }
+.logos-root .l5 .l5h-main .l5h-find-go { border: 0; background: var(--c-ink); box-shadow: none; color: var(--c-paper); }
+.logos-root .l5 .l5h-main .l5h-find-go:hover:not(:disabled) { border: 0; background: var(--c-moss); transform: translateY(-2px); }
+.logos-root .l5 .l5h-main .l5h-find-go:disabled { opacity: 1; background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); }
+/* the Universal Map is paper: the dot grid belongs behind a Logic Map only (Celestial keeps its own sky) */
+html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) .logos-root .l5 .l5h-main { background-image: var(--c-grain); background-size: auto; }

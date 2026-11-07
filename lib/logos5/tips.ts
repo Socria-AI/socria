@@ -77,7 +77,7 @@ export const TIPS: readonly Tip[] = [
     title: 'Your thinking, drawn',
     body: 'As you talk, Socria draws your ideas as a Logic Map. Open it to move them, question them and see what connects.',
     // the canvas's map card, or the board's, pinned (Logos 5 One view)
-    anchor: '.lcv-card.is-map, .lob-map',
+    anchor: '.lcv-card.is-map, .lp-map',
     when: (c) => c.where === 'line' && c.replies >= 1 && c.mapCard,
   },
   {

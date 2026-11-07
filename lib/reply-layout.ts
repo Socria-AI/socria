@@ -651,9 +651,11 @@ export function layoutReply(blocks: Block[], o: LayoutOptions = {}): Piece[] {
   /** the paragraph still being written is prose */
   const prose = (i: number) => i === blocks.length || PROSE_KINDS.has(blocks[i].kind);
   const disclose = o.disclose !== false;
-  // a reply that has landed and ends by asking keeps its question out of any fold
+  // a reply that has landed and ends by asking keeps its question out of any fold — a one-paragraph reply too
+  // (Logos 5.5, Revision II: Socria's question is set apart under "Socria asks" whenever it earns it; the
+  // renderer still asks RichText's setsApart whether there is enough before it to stand apart from)
   const last = blocks[blocks.length - 1];
-  const askAt = !o.streaming && last?.kind === 'p' && endsAsQuestion(stripMarks(last.text)) && blocks.length > 1 ? blocks.length - 1 : -1;
+  const askAt = !o.streaming && last?.kind === 'p' && endsAsQuestion(stripMarks(last.text)) ? blocks.length - 1 : -1;
 
   const pieces: Piece[] = [];
   let fold = null as Fold | null;

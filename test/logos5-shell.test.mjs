@@ -33,7 +33,7 @@ ok('the binary "where do you want to start?" panel is gone; the recommended topi
 console.log('\n=== the top bar: only what is global ===');
 ok('the mark, top left, goes back to the Universal Map; then a label and the line\'s name in italic', /aria-label="Back to the Universal Map"/.test(shell) && /src="\/socria-mark\.png"/.test(shell) && /<span className="l5-label">\{kind\}<\/span>/.test(shell) && /className="l5v-title"/.test(shell));
 ok('  it is no longer hidden in the ⋯ menu', !/label: 'Universal Map', hint: 'Every conversation, as one map'/.test(app));
-ok('search at the bar\'s end, a quiet key with ⌘K / Ctrl K', /className="l5-btn is-sm is-quiet l5v-search"/.test(shell) && /aria-keyshortcuts="Meta\+K Control\+K"/.test(shell));
+ok('search at the bar\'s end, a word with ⌘K / Ctrl K (Revision II: icons become words)', /className="l5-link l5v-search"/.test(shell) && /<span>Search<\/span>/.test(shell) && /aria-keyshortcuts="Meta\+K Control\+K"/.test(shell));
 ok('  ⌘K / Ctrl K opens it from anywhere in Logos 5', /\(e\.metaKey \|\| e\.ctrlKey\) && !e\.altKey && !e\.shiftKey && e\.key\.toLowerCase\(\) === 'k'/.test(app));
 ok('  a result opens where it lives', /function openHit\(h: Hit\)/.test(app) && /openFromHome\(sid, local\)/.test(app) && /openCite\(docId, block\)/.test(app));
 ok('Split View replaces "+ View": the Logic Map’s workspace has no "+ View"', /addViews=\{false\}/.test(app) && /props\.addViews === false \? null : addView/.test(read('components/workspace/Workspace.tsx')));
@@ -47,12 +47,12 @@ ok('the name chip opens account settings directly; Memory has its glyph in the h
 console.log('\n=== the omnibox ===');
 ok('Enter sends; Shift+Enter is a new line; a word being composed is not sent', /e\.key === 'Enter' && !e\.shiftKey && !\(e\.nativeEvent as KeyboardEvent\)\.isComposing/.test(composer));
 ok('  nothing is sent again while the answer has not begun', /canSend && !waiting/.test(composer) && /waiting=\{busy && !streaming && !group/.test(app) || /waiting=\{/.test(app));
-ok('  the send button spins until the first words arrive', /className="lg-send is-waiting" disabled/.test(composer) && /\.lg-send-spin \{/.test(css));
+ok('  the send button spins until the first words arrive', /className="l5-btn is-primary lg-send is-waiting" disabled/.test(composer) && /\.lg-send-spin \{/.test(css));
 ok('it grows with what is written to 240px, then scrolls inside', /const cap = 240;/.test(composer) && /el\.style\.height = Math\.min\(el\.scrollHeight, cap\) \+ 'px';/.test(composer));
 ok('  a scrollbar only when there is more than the box shows — never words out of reach', /el\.style\.overflowY = el\.scrollHeight > el\.clientHeight \+ 1 \? 'auto' : 'hidden';/.test(composer));
 ok('  filled while hidden, it is not measured at nothing', /if \(!el\.clientWidth\) \{\s*el\.style\.height = '';/.test(composer));
 ok('  measured again when its width changes, or the font arrives', /new ResizeObserver\(\(\) => \{\s*if \(el\.clientWidth && el\.clientWidth !== grownAt\.current\) grow\(\);/.test(composer) && /addEventListener\?\.\('loadingdone', grow\)/.test(composer));
-ok('5.5: the words alone in their row; Attach is under "+", with Make, Search my files and ∑', /<div className="l5-crow">\s*<textarea/.test(composer) && !/className="lg-attach l5-clip"/.test(composer) && /label: 'Attach',/.test(composer) && /\.\.\.\(plusItems \?\? \[\]\)/.test(composer) && /label: 'Search my files'/.test(composer));
+ok('5.5: the words on a ruled line with Send; Attach is under "+ Add…", with Make, Search my files and ∑', /<div className="l5-crow l5-compose-line">\s*<textarea/.test(composer) && !/className="lg-attach l5-clip"/.test(composer) && /label: 'Attach',/.test(composer) && /\.\.\.\(plusItems \?\? \[\]\)/.test(composer) && /label: 'Search my files'/.test(composer));
 ok('a holder: radius 16 (5.5), centred, at most 768px', /border-radius: 16px;/.test(css) && /width: min\(768px, calc\(100% - 32px\)\)/.test(css));
 ok('Chat is one centred column, 768px at most', /\.l5v-body\.is-chat \.l5-thread-in,\s*\.l5v-body\.is-chat \.l5-dock \{\s*max-width: 768px;/.test(css));
 

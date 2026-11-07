@@ -135,6 +135,8 @@ export interface L5MessageProps {
    * someone asked to read in full is shown in full. Folding by default.
    */
   disclose?: boolean;
+  /** on the page (the one view), first in the actions row: the way to what this turn made — "Open the live graph beside this →" */
+  go?: ReactNode;
 }
 
 function CopyButton({ text, label }: { text: string; label: string }) {
@@ -415,8 +417,9 @@ export function L5Message(p: L5MessageProps) {
         </div>
       )}
 
-      {(m.content || p.onRetry) && !editing && (
+      {(m.content || p.onRetry || p.go) && !editing && (
         <div className="l5-acts" role="group" aria-label={`Actions for ${whose} message`}>
+          {p.go}
           {m.content && <CopyButton text={m.role === 'assistant' ? contentAsText(m.content) : m.content} label={`Copy ${whose} message`} />}
           {p.canReply && p.onReply && (
             <button type="button" className="l5-act" onClick={() => p.onReply!(m)} aria-label={`Reply to ${whose} message`} title="Reply">

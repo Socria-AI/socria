@@ -31,6 +31,8 @@ export interface CanvasTurn {
   replyAt?: number;
   asked: string;
   said: string;
+  /** the question the reply ends on, when it ends on one — what a folded turn shows (Logos 5.5, the page) */
+  asks?: string;
   /** Socria is still writing this turn's reply */
   pending?: boolean;
   /** a synthesis — where the thinking stands — rather than a reply */
@@ -127,6 +129,20 @@ export function excerpt(content: unknown, max = 180): string {
   return `${cut.slice(0, cut.lastIndexOf(' ') > max * 0.6 ? cut.lastIndexOf(' ') : max).trimEnd()}…`;
 }
 
+/**
+ * The question a reply ends on: its last sentence, when that sentence asks
+ * something — "If 1 to 3 is cut into 4 equal pieces, how wide is each one?".
+ * Empty when the reply does not end on a question.
+ */
+export function closingAsk(content: unknown, max = 160): string {
+  const t = plainText(content).trim();
+  if (!t.endsWith('?')) return '';
+  const m = /([^.!?…\n]*\?)["'’”)\]]*\s*$/.exec(t);
+  const q = (m?.[1] ?? '').trim().replace(/^[—–-]\s*/, '');
+  if (!q) return '';
+  return q.length > max ? `${q.slice(0, max).replace(/\s+\S*$/, '')}…` : q;
+}
+
 /** The conversation as turns: a question and its reply, in order. Synthesis is a turn of its own. */
 export function canvasTurns(messages: readonly CanvasMsg[], opts: { pending?: boolean } = {}): CanvasTurn[] {
   const turns: CanvasTurn[] = [];
@@ -148,11 +164,13 @@ export function canvasTurns(messages: readonly CanvasMsg[], opts: { pending?: bo
     }
     if (m.role !== 'assistant') return;
     const said = excerpt(m.content, 200);
+    const asks = closingAsk(m.content);
     if (open && open.replyAt === undefined) {
       open.replyId = m.id;
       open.replyAt = at;
       open.said = said;
-    } else start({ asked: '', said, replyId: m.id, replyAt: at });
+      if (asks) open.asks = asks;
+    } else start({ asked: '', said, replyId: m.id, replyAt: at, ...(asks ? { asks } : {}) });
     open = null;
   });
   // the turn still being answered

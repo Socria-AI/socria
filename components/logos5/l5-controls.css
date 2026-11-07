@@ -1,313 +1,334 @@
-/* components/logos5/l5-controls.css — Logos 5: how every control looks.
+/* components/logos5/l5-controls.css — Logos 5.5, Revision II ("set as a page").
  *
  * Replaces buttons.css, buttons-soft.css and the .l5s-art-pill key in
- * redesign.css. Load it after l5.css and delete those three.
+ * redesign.css, and supersedes the first 5.5 sheet (pills, washes, holders).
+ * Load after l5.css.
  *
- *   Fill means do.        .l5-btn.is-primary — at most one per surface
- *   Wash means here.      [aria-pressed|aria-selected|aria-expanded=true], .is-on
- *   Hairline means you can.   .l5-btn (default), .l5-chip, .l5-icon.is-framed
+ *   One filled control per surface   .l5-btn.is-primary  (ink, moss on hover)
+ *   Everything else is a word         .l5-link, .l5-link.is-go (moss, →)
+ *   Chosen is underlined              [aria-selected|aria-pressed=true], .is-on
+ *   Hairlines, not cards              .l5-cell, .l5-sheet, .l5-turn
  *
- * Heights 40 / 32 (.is-sm); hit area 44 on coarse pointers. Every action is
- * 999px. Every colour is a theme token, so Paper, White, Dark, One and Night
- * draw it in their own light.
+ * Every colour is a theme token so Paper, White, Dark, One and Night draw it
+ * in their own light. The second half of the file draws the first sheet's
+ * names (.l5-btn, .l5-icon, .l5-switch, .l5-chip, .l5-seg, .l5-holder) in
+ * these terms, so surfaces not yet rebuilt follow without being rewritten.
  */
 
 :is(.logos-root, .lg-tokens),
 .logos-root .l5 {
   --c-ink: var(--lg-ink, #23241f);
   --c-ink-rgb: var(--lg-ink-rgb, 35, 36, 31);
-  --c-fill: var(--lg-primary, #354620);
-  --c-fill-rgb: var(--lg-primary-rgb, 53, 70, 32);
-  --c-on-fill: var(--l5-on-primary, #f5f3eb);
+  --c-moss: var(--lg-primary, #354620);
+  --c-moss-rgb: var(--lg-primary-rgb, 53, 70, 32);
+  --c-paper: var(--lg-paper, #f5f3eb);
+  --c-gold-ink: #6f5f2c;            /* "Socria asks" only */
+  --c-gold: #b8a26b;                /* waiting counts only */
   --c-tension: var(--lg-tension, #9c5b3c);
-  --c-face: var(--l5-surface, var(--lg-paper, #f5f3eb));
 
   --c-ink-70: rgba(var(--c-ink-rgb), 0.7);
+  --c-ink-60: rgba(var(--c-ink-rgb), 0.6);
   --c-ink-45: rgba(var(--c-ink-rgb), 0.45);
   --c-ink-25: rgba(var(--c-ink-rgb), 0.25);
-  --c-edge: rgba(var(--c-ink-rgb), 0.16);   /* a control's hairline */
-  --c-edge-off: rgba(var(--c-ink-rgb), 0.12);
-  --c-rule: rgba(var(--c-fill-rgb), 0.14);  /* a divider */
-  --c-shade: rgba(var(--c-ink-rgb), 0.06);  /* hover */
-  --c-wash: rgba(var(--c-fill-rgb), 0.08);  /* here, on, yours */
+  --c-line: rgba(var(--c-ink-rgb), 0.3);     /* the ruled line you write on */
+  --c-edge: rgba(var(--c-ink-rgb), 0.16);    /* kbd, avatar */
+  --c-rule: rgba(var(--c-moss-rgb), 0.14);   /* dividers */
+  --c-rule-2: rgba(var(--c-moss-rgb), 0.22); /* cell tops, sheet borders */
+  --c-hover-row: rgba(var(--c-ink-rgb), 0.025);
+  --c-ease: cubic-bezier(0.16, 1, 0.3, 1);
 
-  --c-e1: 0 1px 2px rgba(35, 36, 31, 0.04);
-  --c-e2: 0 14px 28px -16px rgba(35, 36, 31, 0.4);
-  --c-e3: 0 40px 90px -50px rgba(31, 31, 31, 0.55);
-  --c-lit: 0 0 0 2px rgba(var(--c-fill-rgb), 0.16);
+  --c-grain: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='240' height='240'%3E%3Cfilter id='g'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.8' numOctaves='2' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .14 0 0 0 0 .14 0 0 0 0 .12 0 0 0 .18 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23g)'/%3E%3C/svg%3E");
+  --c-dots: radial-gradient(circle, rgba(var(--c-moss-rgb), 0.1) 1px, transparent 1px);
+
+  /* the first sheet's names, kept for surfaces that read them */
+  --c-fill: var(--c-moss);
+  --c-fill-rgb: var(--c-moss-rgb);
+  --c-on-fill: var(--c-paper);
+  --c-face: transparent;
+  --c-shade: var(--c-hover-row);
+  --c-wash: transparent;
+}
+/* grain is drawn on paper only: on dark grounds it would read as dust */
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) :is(.logos-root, .lg-tokens) {
+  --c-grain: none;
 }
 
-/* ── buttons ─────────────────────────────────────────────────────── */
-:is(.logos-root, .lg-tokens) .l5-btn {
-  --h: 40px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: var(--h);
-  padding: 0 16px;
-  box-sizing: border-box;
-  border: 1px solid var(--c-edge);
-  border-radius: 999px;
-  background: var(--c-face);
-  color: var(--c-ink);
-  font: inherit;
-  font-family: var(--lg-sans, inherit);
-  font-size: 13.5px;
-  font-weight: 500;
-  line-height: 1;
-  white-space: nowrap;
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s, color 0.15s, border-color 0.15s, transform 0.2s cubic-bezier(0.16, 1, 0.3, 1);
-}
-:is(.logos-root, .lg-tokens) .l5-btn.is-sm { --h: 32px; padding: 0 12px; }
-:is(.logos-root, .lg-tokens) .l5-btn svg { width: 16px; height: 16px; flex: none; }
-:is(.logos-root, .lg-tokens) .l5-btn.is-sm svg { width: 14px; height: 14px; }
-:is(.logos-root, .lg-tokens) .l5-btn:hover:not(:disabled) { background: var(--c-shade); }
+/* ── grounds ─────────────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-paper { background-color: var(--c-paper); background-image: var(--c-grain); }
+/* the dot grid belongs to the Logic Map and nothing else */
+:is(.logos-root, .lg-tokens) .l5-dots { background-image: var(--c-dots); background-size: 26px 26px; }
 
+/* ── the one filled control ──────────────────────────────────────── */
 :is(.logos-root, .lg-tokens) .l5-btn.is-primary {
-  padding: 0 18px;
-  border-color: var(--c-fill);
-  background: var(--c-fill);
-  color: var(--c-on-fill);
+  display: inline-flex; align-items: center; justify-content: center; gap: 8px; flex: none;
+  height: 40px; padding: 0 18px; box-sizing: border-box;
+  border: 0; border-radius: 999px;
+  background: var(--c-ink); color: var(--c-paper);
+  font: inherit; font-size: 13.5px; font-weight: 500; line-height: 1; white-space: nowrap;
+  cursor: pointer; transition: background-color 0.2s, transform 0.2s var(--c-ease);
 }
-:is(.logos-root, .lg-tokens) .l5-btn.is-sm.is-primary { padding: 0 14px; }
-:is(.logos-root, .lg-tokens) .l5-btn.is-primary:hover:not(:disabled) {
-  background: color-mix(in srgb, var(--c-fill) 88%, #000);
-  transform: translateY(-2px);
-}
-:is(.logos-root, .lg-tokens) .l5-btn .l5-ar { transition: transform 0.2s; }
-:is(.logos-root, .lg-tokens) .l5-btn:hover .l5-ar { transform: translateX(3px); }
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:hover:not(:disabled) { background: var(--c-moss); color: var(--c-paper); transform: translateY(-2px); }
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:disabled { background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); cursor: default; transform: none; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary.is-sm { height: 32px; padding: 0 14px; }
 
-:is(.logos-root, .lg-tokens) .l5-btn.is-quiet { border-color: transparent; background: transparent; color: var(--c-ink-70); }
-:is(.logos-root, .lg-tokens) .l5-btn.is-quiet:hover:not(:disabled) { background: var(--c-shade); color: var(--c-ink); }
-
-:is(.logos-root, .lg-tokens) .l5-btn.is-danger { border-color: color-mix(in srgb, var(--c-tension) 40%, transparent); color: var(--c-tension); }
-
-:is(.logos-root, .lg-tokens) .l5-btn:disabled,
-:is(.logos-root, .lg-tokens) .l5-btn.is-primary:disabled {
-  border-color: var(--c-edge-off);
-  background: transparent;
-  color: var(--c-ink-25);
-  cursor: default;
-  transform: none;
+/* ── words: every other action ───────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-link {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 32px;
+  padding: 0; border: 0; background: none;
+  color: var(--c-ink-70); font: inherit; font-size: 13.5px; font-weight: 500; white-space: nowrap; text-decoration: none;
+  cursor: pointer; transition: color 0.2s;
 }
+:is(.logos-root, .lg-tokens) .l5-link:hover:not(:disabled) { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-link.is-strong { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-link.is-strong:hover { color: var(--c-moss); }
+/* goes somewhere: moss, with an arrow that slides */
+:is(.logos-root, .lg-tokens) .l5-link.is-go { color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-link.is-go:hover { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) :is(.l5-link, .l5-btn) .l5-ar { transition: transform 0.2s var(--c-ease); }
+:is(.logos-root, .lg-tokens) :is(.l5-link, .l5-btn):hover .l5-ar { transform: translateX(3px); }
+:is(.logos-root, .lg-tokens) .l5-link.is-meta { min-height: 24px; font-size: 12.5px; color: var(--c-ink-45); }
+:is(.logos-root, .lg-tokens) .l5-link.is-meta:hover:not(:disabled) { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-link:disabled { color: var(--c-ink-25); cursor: default; }
+:is(.logos-root, .lg-tokens) .l5-link svg { width: 14px; height: 14px; flex: none; }
 
-/* ── one icon button ─────────────────────────────────────────────── */
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn) {
-  display: inline-grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  box-sizing: border-box;
-  border: 1px solid transparent;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--c-ink-70);
-  font: inherit;
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+/* ── tabs, lenses, options: chosen is underlined ─────────────────── */
+:is(.logos-root, .lg-tokens) .l5-tabs { display: flex; align-items: stretch; gap: 28px; align-self: stretch; }
+:is(.logos-root, .lg-tokens) .l5-tabs.is-tight { gap: 20px; }
+:is(.logos-root, .lg-tokens) .l5-tab {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  padding: 0; border: 0; border-radius: 0; background: none;
+  color: var(--c-ink-60); font: inherit; font-size: 13.5px; font-weight: 500; white-space: nowrap;
+  cursor: pointer; transition: color 0.2s, box-shadow 0.2s;
 }
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn) svg { width: 16px; height: 16px; }
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn):hover:not(:disabled) { background: var(--c-shade); color: var(--c-ink); }
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-lg { width: 40px; height: 40px; }
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-framed { border-color: var(--c-edge); background: var(--c-face); }
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send { background: var(--c-fill); color: var(--c-on-fill); }
-:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send:disabled { border-color: var(--c-edge-off); background: transparent; color: var(--c-ink-25); }
-/* the one close: × top right of whatever it closes */
-:is(.logos-root, .lg-tokens) .l5-close { margin: -6px -6px 0 0; }
-
-/* ── the switch (views, time ranges) ─────────────────────────────── */
-:is(.logos-root, .lg-tokens) .l5-switch {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-  height: 36px;
-  padding: 3px;
-  box-sizing: border-box;
-  border: 1px solid var(--c-edge);
-  border-radius: 999px;
-}
-:is(.logos-root, .lg-tokens) .l5-switch-i {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 28px;
-  padding: 0 14px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--c-ink-70);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-}
-:is(.logos-root, .lg-tokens) .l5-switch-i:hover { color: var(--c-ink); }
-/* counts are plain tabular type, never badges */
+:is(.logos-root, .lg-tokens) .l5-tab:hover { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-tab:is([aria-selected='true'], [aria-pressed='true'], .is-on) { color: var(--c-ink); background: none; box-shadow: inset 0 -2px 0 var(--c-moss); }
 :is(.logos-root, .lg-tokens) .l5-count { font-size: 12.5px; font-variant-numeric: tabular-nums; color: var(--c-ink-45); }
-/* something new in a view you aren't on */
-:is(.logos-root, .lg-tokens) .l5-new { position: absolute; top: 4px; right: 6px; width: 6px; height: 6px; border-radius: 999px; background: var(--c-fill); }
+:is(.logos-root, .lg-tokens) :is([aria-selected='true'], .is-on) .l5-count { color: var(--c-ink-45); }
+:is(.logos-root, .lg-tokens) .l5-new { position: absolute; top: 16px; right: -9px; width: 6px; height: 6px; border-radius: 50%; background: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-badge { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; border-radius: 999px; background: var(--c-gold); color: #fff; font-size: 10.5px; font-weight: 600; font-variant-numeric: tabular-nums; }
 
-/* ── chips: hairline actions; a tapped chip becomes your message ──── */
-:is(.logos-root, .lg-tokens) .l5-chip {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  max-width: 100%;
-  height: 32px;
-  padding: 0 12px;
-  box-sizing: border-box;
-  border: 1px solid var(--c-edge);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--c-ink);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
-:is(.logos-root, .lg-tokens) .l5-chip:hover { background: var(--c-shade); }
+/* ── the label ───────────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-label { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
+:is(.logos-root, .lg-tokens) .l5-label.is-asks { color: var(--c-gold-ink); }
+:is(.logos-root, .lg-tokens) .l5-label.is-lit { color: var(--c-moss); }
 
-/* ── WASH MEANS HERE — the one selected / on treatment ───────────── */
-:is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon, .l5-iconbtn, .l5-icon-btn, .l5-switch-i, .l5-chip, .l5-row):is([aria-pressed='true'], [aria-selected='true'], [aria-expanded='true'], .is-on) {
-  border-color: transparent;
-  background: var(--c-wash);
-  color: var(--c-fill);
-  box-shadow: none;
+/* ── kbd + avatar ────────────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-kbd { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 4px; background: none; font: inherit; font-size: 11px; font-weight: 500; color: var(--c-ink-45); }
+:is(.logos-root, .lg-tokens) .l5-avatar { width: 28px; height: 28px; box-sizing: border-box; display: grid; place-items: center; border: 1px solid var(--c-edge); border-radius: 50%; background: none; color: var(--c-ink); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
+
+/* ── turns: the conversation ─────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-turn { --gut: 36px; display: grid; grid-template-columns: var(--gut) minmax(0, 1fr); border-top: 1px solid var(--c-rule); }
+:is(.logos-root, .lg-tokens) .l5-turn.is-narrow { --gut: 30px; }
+:is(.logos-root, .lg-tokens) .l5-turn-n { font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; color: var(--c-ink-45); }
+/* folded */
+:is(.logos-root, .lg-tokens) .l5-turn.is-folded { width: 100%; margin: 0; padding: 14px 0; border-left: 0; border-right: 0; border-bottom: 0; background: none; color: inherit; font: inherit; text-align: left; cursor: pointer; transition: background-color 0.2s; }
+:is(.logos-root, .lg-tokens) .l5-turn.is-folded:hover { background: var(--c-hover-row); }
+:is(.logos-root, .lg-tokens) .l5-turn.is-folded .l5-turn-n { font-size: 17px; line-height: 18px; }
+:is(.logos-root, .lg-tokens) .l5-turn-you1 { display: block; font-size: 13px; line-height: 18px; color: var(--c-ink-60); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+:is(.logos-root, .lg-tokens) .l5-turn-q1 { display: block; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 17px; line-height: 22px; color: var(--c-ink); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* open */
+:is(.logos-root, .lg-tokens) .l5-turn.is-open { padding: 20px 0 4px; }
+:is(.logos-root, .lg-tokens) .l5-turn.is-open .l5-turn-n { font-size: 20px; line-height: 16px; }
+:is(.logos-root, .lg-tokens) .l5-turn-body { display: flex; flex-direction: column; gap: 14px; min-width: 0; }
+:is(.logos-root, .lg-tokens) .l5-you { display: flex; flex-direction: column; gap: 4px; }
+:is(.logos-root, .lg-tokens) .l5-you p { margin: 0; font-size: 15px; line-height: 1.55; color: var(--c-ink-70); }
+:is(.logos-root, .lg-tokens) .l5-asks { display: flex; flex-direction: column; gap: 8px; padding-top: 4px; }
+:is(.logos-root, .lg-tokens) .l5-asks-q { --q: 30px; margin: 0; max-width: 24em; font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: var(--q); line-height: 1.18; letter-spacing: -0.01em; text-wrap: pretty; }
+:is(.logos-root, .lg-tokens) .l5-asks-q em { color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .is-narrow .l5-asks-q { --q: 26px; }
+:is(.logos-root, .lg-tokens) .is-narrower .l5-asks-q { --q: 24px; }
+:is(.logos-root, .lg-tokens) .l5-turn-acts { display: flex; align-items: center; gap: 20px; min-height: 32px; }
+:is(.logos-root, .lg-tokens) .l5-turn-acts .l5-spacer { flex: 1; }
+
+/* ── the chatbox: a ruled line ───────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-compose { display: flex; flex-direction: column; gap: 14px; padding-top: 16px; border-top: 1px solid var(--c-rule); }
+:is(.logos-root, .lg-tokens) .l5-compose-guide { display: flex; align-items: center; gap: 10px; min-width: 0; min-height: 28px; font-size: 13px; color: var(--c-ink-70); }
+:is(.logos-root, .lg-tokens) .l5-compose-guide .l5-dot { flex: none; width: 6px; height: 6px; border-radius: 50%; background: var(--c-moss); box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14); }
+:is(.logos-root, .lg-tokens) .l5-compose-topic { flex: none; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 17px; line-height: 1.2; color: var(--c-ink); white-space: nowrap; }
+:is(.logos-root, .lg-tokens) .l5-compose-line { display: flex; align-items: flex-end; gap: 16px; padding-bottom: 10px; border-bottom: 1px solid var(--c-line); transition: border-color 0.2s; }
+:is(.logos-root, .lg-tokens) .l5-compose-line :is(textarea, [contenteditable]) {
+  flex: 1; min-width: 0; padding: 0 0 5px; border: 0; outline: 0; background: none; resize: none; box-shadow: none;
+  font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 24px; line-height: 1.25; color: var(--c-ink);
 }
-:is(.logos-root, .lg-tokens) :is([aria-selected='true'], .is-on) .l5-count { color: inherit; }
+:is(.logos-root, .lg-tokens) .l5-compose-line textarea::placeholder { color: var(--c-ink-45); opacity: 1; }
+:is(.logos-root, .lg-tokens) .is-narrow .l5-compose-line :is(textarea, [contenteditable]) { font-size: 22px; }
+:is(.logos-root, .lg-tokens) .l5-compose-line:focus-within { border-bottom-color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-compose-foot { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 24px; font-size: 12.5px; color: var(--c-ink-60); }
+:is(.logos-root, .lg-tokens) .l5-compose-foot > span { display: inline-flex; align-items: center; gap: 18px; min-width: 0; }
+/* folded / on a map: the chatbox sits on a paper band along the foot */
+:is(.logos-root, .lg-tokens) .l5-band { position: absolute; left: 0; right: 0; bottom: 0; display: flex; justify-content: center; gap: 32px; padding: 18px 24px 20px; background: var(--c-paper); background-image: var(--c-grain); border-top: 1px solid var(--c-rule); }
+:is(.logos-root, .lg-tokens) .l5-band > .l5-compose { flex: 0 1 680px; padding-top: 0; border-top: 0; }
+
+/* ── hairlines, not cards ────────────────────────────────────────── */
+:is(.logos-root, .lg-tokens) .l5-cell { display: flex; flex-direction: column; gap: 6px; padding: 16px 0 20px; border-top: 1px solid var(--c-rule-2); transition: opacity 0.3s; }
+:is(.logos-root, .lg-tokens) .l5-cell.is-lit { padding-top: 15px; border-top: 2px solid var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-cell-title { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 19px; line-height: 1.2; color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-cell-meta { font-size: 12.5px; color: var(--c-ink-60); }
+/* anything that floats: paper, a hairline, square corners, no shadow */
+:is(.logos-root, .lg-tokens) .l5-sheet { box-sizing: border-box; padding: 18px 20px 16px; background-color: var(--c-paper); background-image: var(--c-grain); border: 1px solid var(--c-rule-2); border-radius: 0; box-shadow: none; }
+/* list rows (sessions, files, topics) */
+:is(.logos-root, .lg-tokens) .l5-row { padding: 10px 12px; border-top: 1px solid var(--c-rule); border-radius: 0; cursor: pointer; transition: background-color 0.2s; }
+:is(.logos-root, .lg-tokens) .l5-row:hover { background: var(--c-hover-row); }
+:is(.logos-root, .lg-tokens) .l5-row:is([aria-current='true'], .is-on) { position: relative; background: none; color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-row:is([aria-current='true'], .is-on)::before { content: ""; position: absolute; left: -4px; top: 19px; width: 6px; height: 6px; border-radius: 50%; background: var(--c-moss); }
+/* moves: options that read as a list */
+:is(.logos-root, .lg-tokens) .l5-moves { display: flex; flex-direction: column; border-bottom: 1px solid var(--c-rule); }
+:is(.logos-root, .lg-tokens) .l5-move { display: flex; align-items: center; justify-content: space-between; min-height: 40px; padding: 0; border: 0; border-top: 1px solid var(--c-rule); background: none; font: inherit; font-size: 13.5px; font-weight: 500; color: var(--c-ink); cursor: pointer; transition: color 0.2s; }
+:is(.logos-root, .lg-tokens) .l5-move:hover { color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-move::after { content: "→"; }
 
 /* ── menus ───────────────────────────────────────────────────────── */
-:is(.logos-root, .lg-tokens) :is(.l5-menu, .l5-menu-list) {
-  display: flex;
-  flex-direction: column;
-  min-width: 220px;
-  padding: 5px;
-  border: 1px solid var(--c-rule);
-  border-radius: 16px;
-  background: var(--lg-panel, #faf8f2);
-  box-shadow: var(--c-e2);
-}
-:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']) {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  height: 36px;
-  padding: 0 11px;
-  border: 0;
-  border-radius: 10px;
-  background: transparent;
-  color: var(--c-ink);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  text-align: left;
-  cursor: pointer;
-}
-:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']):is(:hover, :focus-visible) { background: var(--c-shade); }
-:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']) :is(small, .l5-hint) { font-size: 12.5px; font-weight: 400; color: var(--c-ink-70); }
+:is(.logos-root, .lg-tokens) :is(.l5-menu, .l5-menu-list) { display: flex; flex-direction: column; min-width: 220px; padding: 4px 0; background-color: var(--c-paper); background-image: var(--c-grain); border: 1px solid var(--c-rule-2); border-radius: 0; box-shadow: none; }
+:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']) { display: flex; align-items: center; justify-content: space-between; gap: 10px; min-height: 36px; height: auto; padding: 0 14px; border: 0; border-radius: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 500; color: var(--c-ink); text-align: left; cursor: pointer; }
+:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']):is(:hover, :focus-visible) { background: var(--c-hover-row); color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) :is(.l5-mi, .l5-menu-list [role='menuitem']) :is(small, .l5-hint) { font-size: 12.5px; font-weight: 400; color: var(--c-ink-60); }
+:is(.logos-root, .lg-tokens) .l5-mi svg { width: 16px; height: 16px; flex: none; color: var(--c-ink-60); }
+:is(.logos-root, .lg-tokens) .l5-mi.is-on { color: var(--c-moss); box-shadow: inset 2px 0 0 var(--c-moss); }
 :is(.logos-root, .lg-tokens) .l5-mi.is-danger { color: var(--c-tension); }
-:is(.logos-root, .lg-tokens) :is(.l5-menu, .l5-menu-list) hr { height: 1px; margin: 4px 6px; border: 0; background: var(--c-rule); }
+:is(.logos-root, .lg-tokens) .l5-mi:disabled { color: var(--c-ink-25); cursor: default; }
+:is(.logos-root, .lg-tokens) :is(.l5-menu, .l5-menu-list) hr,
+:is(.logos-root, .lg-tokens) .l5-menu-sep { height: 1px; margin: 4px 14px; border: 0; background: var(--c-rule); }
 
-/* ── rows: list items, topics, hubs (inside a holder: radius 10) ──── */
-:is(.logos-root, .lg-tokens) .l5-row { border-radius: 10px; cursor: pointer; }
-:is(.logos-root, .lg-tokens) .l5-row:hover:not(.is-on) { background: var(--c-shade); }
-
-/* ── holders: composer, panels, floating cards ───────────────────── */
-:is(.logos-root, .lg-tokens) .l5-holder { border: 1px solid var(--c-rule); border-radius: 16px; background: var(--lg-panel, #faf8f2); box-shadow: var(--c-e1); }
-:is(.logos-root, .lg-tokens) .l5-holder.is-floating { box-shadow: var(--c-e2); }
-:is(.logos-root, .lg-tokens) .l5-holder.is-lit { box-shadow: var(--c-lit), var(--c-e1); }
-
-/* ── the label: the one eyebrow ──────────────────────────────────── */
-:is(.logos-root, .lg-tokens) .l5-label {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: var(--c-ink-45);
-}
-
-/* ── focus, motion, contrast ─────────────────────────────────────── */
-:is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-icon, .l5-iconbtn, .l5-icon-btn, .l5-switch-i, .l5-chip, .l5-mi, .l5-row):focus-visible {
-  outline: 2px solid var(--c-fill);
-  outline-offset: 2px;
-}
+/* ── focus, motion, touch, contrast ──────────────────────────────── */
+:is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-link, .l5-tab, .l5-move, .l5-mi, .l5-row, .l5-turn.is-folded, .l5-icon, .l5-chip, .l5-switch-i, .l5-seg-b):focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 @media (pointer: coarse) {
-  :is(.logos-root, .lg-tokens) :is(.l5-btn.is-sm, .l5-icon, .l5-iconbtn, .l5-icon-btn, .l5-chip) { min-height: 44px; min-width: 44px; }
+  :is(.logos-root, .lg-tokens) :is(.l5-link, .l5-tab, .l5-move, .l5-mi, .l5-icon, .l5-chip) { min-height: 44px; }
+  :is(.logos-root, .lg-tokens) .l5-icon { min-width: 44px; }
 }
 @media (prefers-reduced-motion: reduce) {
-  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-btn .l5-ar) { transition: none; transform: none !important; }
+  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-link .l5-ar, .l5-btn .l5-ar) { transition: none; transform: none !important; }
 }
 @media (forced-colors: active) {
-  :is(.logos-root, .lg-tokens) :is(.l5-btn, .l5-chip, .l5-switch) { border: 1px solid ButtonText; }
+  :is(.logos-root, .lg-tokens) .l5-tab:is([aria-selected='true'], [aria-pressed='true'], .is-on),
+  :is(.logos-root, .lg-tokens) .l5-switch-i:is([aria-selected='true'], [aria-pressed='true'], .is-on) { text-decoration: underline; }
+  :is(.logos-root, .lg-tokens) .l5-btn.is-primary { border: 1px solid ButtonText; }
 }
 
+/* ══ THE FIRST SHEET'S NAMES, IN THESE TERMS ═══════════════════════
+ * Surfaces not yet rebuilt still say .l5-btn, .l5-icon, .l5-switch, .l5-chip,
+ * .l5-seg and .l5-holder. They are drawn here as Revision II draws things: a
+ * plain button is a word, a glyph button is a bare glyph, a switch is a row of
+ * underlined tabs, a chip is a word on a hairline, a holder is a sheet.
+ */
+
+/* a plain button is a word */
+:is(.logos-root, .lg-tokens) .l5-btn {
+  --h: 32px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 6px;
+  min-height: var(--h); height: auto; padding: 0; box-sizing: border-box;
+  border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: var(--c-ink-70); font: inherit; font-family: var(--lg-sans, inherit); font-size: 13.5px; font-weight: 500; line-height: 1.2; white-space: nowrap;
+  cursor: pointer; -webkit-tap-highlight-color: transparent;
+  transition: color 0.2s, transform 0.2s var(--c-ease);
+}
+:is(.logos-root, .lg-tokens) .l5-btn.is-sm { --h: 28px; font-size: 13px; }
+:is(.logos-root, .lg-tokens) .l5-btn svg { width: 15px; height: 15px; flex: none; }
+:is(.logos-root, .lg-tokens) .l5-btn:hover:not(:disabled) { color: var(--c-ink); background: none; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-quiet { color: var(--c-ink-60); }
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger { color: var(--c-tension); }
+:is(.logos-root, .lg-tokens) .l5-btn.is-danger.is-solid { padding: 0 18px; min-height: 40px; border-radius: 999px; background: var(--c-tension); color: #fff; }
+:is(.logos-root, .lg-tokens) .l5-btn:disabled { color: var(--c-ink-25); cursor: default; transform: none; }
+:is(.logos-root, .lg-tokens) .l5-btn:is([aria-pressed='true'], [aria-selected='true'], [aria-expanded='true'], .is-on):not(.is-primary) { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+/* the full-width way on inside a sheet is the sheet's one filled control */
+:is(.logos-root, .lg-tokens) .l5-btn.is-wide { width: 100%; --h: 46px; min-height: 46px; padding: 0 18px; border-radius: 999px; background: var(--c-ink); color: var(--c-paper); font-size: 15px; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-wide:hover:not(:disabled) { background: var(--c-moss); color: var(--c-paper); }
+/* Socria One's blue, for the button that buys it and nothing else (it stays inside One's lock) */
+:is(.logos-root, .lg-tokens) .l5-btn.is-one { --c-ink: var(--lg-one, #26485a); }
+:is(.logos-root, .lg-tokens) .l5-btn.is-one.is-primary,
+:is(.logos-root, .lg-tokens) .l5-btn.is-one.is-wide { background: var(--lg-one, #26485a); color: #fff; }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) :is(.logos-root, .lg-tokens) .l5-btn.is-one:is(.is-primary, .is-wide) { color: var(--lg-paper); }
+
+/* a glyph button is a bare glyph: no ring, no wash — it darkens */
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn) {
+  display: inline-grid; place-items: center; flex: none;
+  width: 32px; height: 32px; padding: 0; box-sizing: border-box;
+  border: 0; border-radius: 0; background: none; box-shadow: none;
+  color: var(--c-ink-60); font: inherit; cursor: pointer;
+  transition: color 0.2s;
+}
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn) svg { width: 16px; height: 16px; }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn):hover:not(:disabled) { background: none; color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn):disabled { color: var(--c-ink-25); cursor: default; }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-lg { width: 40px; height: 40px; }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-framed { border: 0; background: none; }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn):is([aria-pressed='true'], [aria-expanded='true'], .is-on) { background: none; color: var(--c-moss); }
+/* the send glyph is the surface's one filled control */
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send { border-radius: 999px; background: var(--c-ink); color: var(--c-paper); }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send:hover:not(:disabled) { background: var(--c-moss); color: var(--c-paper); }
+:is(.logos-root, .lg-tokens) :is(.l5-icon, .l5-iconbtn, .l5-icon-btn).is-send:disabled { background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); }
+/* close is × at the top right of whatever it closes */
+:is(.logos-root, .lg-tokens) .l5-close { margin: -6px -6px 0 0; }
+
+/* a switch (views, time ranges) is a row of underlined tabs */
+:is(.logos-root, .lg-tokens) .l5-switch { display: inline-flex; align-items: stretch; gap: 28px; height: 100%; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; }
+:is(.logos-root, .lg-tokens) .l5-switch-i {
+  position: relative; display: inline-flex; align-items: center; gap: 6px;
+  height: auto; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none;
+  color: var(--c-ink-60); font: inherit; font-size: 13.5px; font-weight: 500; white-space: nowrap;
+  cursor: pointer; transition: color 0.2s, box-shadow 0.2s;
+}
+:is(.logos-root, .lg-tokens) .l5-switch-i:hover { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-switch-i:is([aria-pressed='true'], [aria-selected='true'], .is-on) { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-switch-i .l5-new { top: 50%; right: -9px; margin-top: -9px; }
+
+/* a choice of one inside a panel: the same underline */
+:is(.logos-root, .lg-tokens) .l5-seg { display: inline-flex; align-items: stretch; gap: 20px; height: auto; padding: 0; border: 0; border-radius: 0; }
+:is(.logos-root, .lg-tokens) .l5-seg-b { display: inline-flex; align-items: center; gap: 6px; min-height: 32px; height: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-60); font: inherit; font-size: 13.5px; font-weight: 500; white-space: nowrap; cursor: pointer; transition: color 0.2s, box-shadow 0.2s; }
+:is(.logos-root, .lg-tokens) .l5-seg-b:hover { color: var(--c-ink); }
+:is(.logos-root, .lg-tokens) .l5-seg-b:is([aria-pressed='true'], [aria-selected='true'], .is-on) { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+
+/* a chip is a word on a hairline; a tapped chip becomes your message */
+:is(.logos-root, .lg-tokens) .l5-chip {
+  display: inline-flex; align-items: center; gap: 8px; max-width: 100%;
+  min-height: 32px; height: auto; padding: 0; box-sizing: border-box;
+  border: 0; border-bottom: 1px solid var(--c-rule-2); border-radius: 0; background: none;
+  color: var(--c-ink); font: inherit; font-size: 13.5px; font-weight: 500; text-align: left;
+  cursor: pointer; transition: color 0.2s, border-color 0.2s;
+}
+:is(.logos-root, .lg-tokens) .l5-chip:hover { background: none; color: var(--c-moss); border-bottom-color: var(--c-moss); }
+:is(.logos-root, .lg-tokens) .l5-chip:is([aria-pressed='true'], [aria-selected='true'], .is-on) { color: var(--c-moss); border-bottom: 2px solid var(--c-moss); }
+
+/* a holder is a sheet: paper, a hairline, square, no shadow */
+:is(.logos-root, .lg-tokens) .l5-holder { border: 1px solid var(--c-rule-2); border-radius: 0; background-color: var(--c-paper); background-image: var(--c-grain); box-shadow: none; }
+:is(.logos-root, .lg-tokens) .l5-holder:is(.is-floating, .is-lit) { box-shadow: none; }
+:is(.logos-root, .lg-tokens) .l5-holder.is-lit { border-color: var(--c-moss); }
+
 /* ── carried over ─────────────────────────────────────────────────────
- * What buttons.css held that other sheets and surfaces still lean on, drawn
- * in 5.5's terms. The --l5b-* names stay because universe.css, voice.css,
- * study.css, objects.css, write.css and globals.css read them; they now say
- * the 5.5 values, so those surfaces follow without being rewritten.
+ * The --l5b-* names stay because universe.css, voice.css, study.css,
+ * objects.css, write.css and globals.css read them; they now say Revision
+ * II's values (square, no ledge, no wash), so those surfaces follow.
  */
 :is(.logos-root, .lg-tokens),
 .logos-root .l5 {
-  --l5b-r: 999px;
-  --l5b-r-sm: 999px;
-  --l5b-face: var(--c-face);
-  --l5b-edge: var(--c-edge);
+  --l5b-r: 0px;
+  --l5b-r-sm: 0px;
+  --l5b-face: transparent;
+  --l5b-edge: var(--c-rule-2);
   --l5b-edge-hi: rgba(var(--c-ink-rgb), 0.26);
   --l5b-ledge: none;
   --l5b-ink: var(--c-ink);
   --l5b-ink-2: var(--c-ink-70);
-  --l5b-wash: var(--c-shade);
-  --l5b-fill: var(--c-fill);
-  --l5b-fill-rgb: var(--c-fill-rgb);
-  --l5b-on-fill: var(--c-on-fill);
+  --l5b-wash: var(--c-hover-row);
+  --l5b-fill: var(--c-ink);
+  --l5b-fill-rgb: var(--c-ink-rgb);
+  --l5b-on-fill: var(--c-paper);
   --l5b-danger: var(--c-tension);
-  --l5b-focus: var(--c-fill);
+  --l5b-focus: var(--c-moss);
 }
 
-/* the full-width way on, inside a card or a sheet */
-:is(.logos-root, .lg-tokens) .l5-btn.is-wide { width: 100%; --h: 46px; font-size: 15.5px; }
-/* the one action that cannot be undone, confirmed */
-:is(.logos-root, .lg-tokens) .l5-btn.is-danger.is-solid { border-color: var(--c-tension); background: var(--c-tension); color: #fff; }
-:is(.logos-root, .lg-tokens) .l5-btn.is-danger:hover:not(:disabled) { background: color-mix(in srgb, var(--c-tension) 8%, transparent); }
-/* Socria One's blue, for the button that buys it and nothing else (it stays inside One's lock) */
-:is(.logos-root, .lg-tokens) .l5-btn.is-one { --c-fill: var(--lg-one, #26485a); --c-on-fill: #fff; --c-focus: var(--lg-one, #26485a); }
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) :is(.logos-root, .lg-tokens) .l5-btn.is-one { --c-on-fill: var(--lg-paper); }
-
-/* a choice of one inside a panel: the same tray as the switch; the chosen one is the wash */
-:is(.logos-root, .lg-tokens) .l5-seg { display: inline-flex; align-items: center; gap: 2px; height: 36px; padding: 3px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 999px; }
-:is(.logos-root, .lg-tokens) .l5-seg-b { display: inline-flex; align-items: center; gap: 6px; height: 28px; padding: 0 12px; border: 0; border-radius: 999px; background: transparent; color: var(--c-ink-70); font: inherit; font-size: 13.5px; font-weight: 500; white-space: nowrap; cursor: pointer; }
-:is(.logos-root, .lg-tokens) .l5-seg-b:hover { color: var(--c-ink); }
-:is(.logos-root, .lg-tokens) .l5-seg-b:is([aria-pressed='true'], [aria-selected='true'], .is-on) { background: var(--c-wash); color: var(--c-fill); box-shadow: none; }
-:is(.logos-root, .lg-tokens) .l5-seg-b:focus-visible { outline: 2px solid var(--c-fill); outline-offset: 2px; }
-
-/* a menu item's glyph, and a break between sections */
-:is(.logos-root, .lg-tokens) .l5-mi svg { width: 16px; height: 16px; flex: none; color: var(--c-ink-70); }
-:is(.logos-root, .lg-tokens) .l5-mi.is-on { color: var(--c-fill); }
-:is(.logos-root, .lg-tokens) .l5-mi:disabled { color: var(--c-ink-25); cursor: default; }
-:is(.logos-root, .lg-tokens) .l5-menu-sep { height: 1px; margin: 4px 6px; background: var(--c-rule); }
-
-/* the composer's own tools are words and glyphs, not keys: no frame until pointed at */
+/* the composer's own tools are words and glyphs, not keys */
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn,
 .logos-root .sv-btn,
 .logos-root .l5-ctools .lg-plus .l5-icon,
 .logos-root .l5-ctools .lg-attach,
-.logos-root .l5-ctools .lg-mathbtn { border-color: transparent; background: transparent; box-shadow: none; }
+.logos-root .l5-ctools .lg-mathbtn { border-color: transparent; border-radius: 0; background: transparent; box-shadow: none; }
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn:hover,
 .logos-root .sv-btn:hover,
 .logos-root .l5-ctools .lg-plus .l5-icon:hover,
 .logos-root .l5-ctools .lg-attach:hover:not(:disabled),
-.logos-root .l5-ctools .lg-mathbtn:hover { border-color: transparent; background: var(--c-shade); }
+.logos-root .l5-ctools .lg-mathbtn:hover { border-color: transparent; background: transparent; color: var(--c-ink); }
 .logos-root :is(.l5-ctools, .l5h-find-pick) .mp-btn.open,
 .logos-root .l5-ctools .l5-make.is-set .mp-btn,
-.logos-root .l5-ctools .lg-plus .l5-icon[aria-expanded='true'] { border-color: transparent; background: var(--c-wash); color: var(--c-fill); box-shadow: none; }
+.logos-root .l5-ctools .lg-plus .l5-icon[aria-expanded='true'] { border-color: transparent; background: transparent; color: var(--c-moss); box-shadow: none; }
 /* nothing travels when pressed */
 .logos-root :is(.mp-btn, .sv-btn, .lg-mathbtn, .lg-attach):active { transform: none; }

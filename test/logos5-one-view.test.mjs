@@ -6,9 +6,11 @@
 //             card's ideas (question first, lit next, all on the Logic Map
 //             tab); the board's zoom, fitted beside
 //   canvas    each turn knows where its question and reply are
-//   L5Board   no bar (no filters, no Back to chat); one pinned Logic Map card;
-//             the turn being read is not on the board; cards wired to turns;
-//             zoom a tray in the corner; the sheet: Turn i of n, ↑ ↓, Fold
+//   L5Board   Revision II, the one view set as a page: three columns — the
+//             Logic Map (steps on a rail, lit and dashed ideas), the
+//             conversation (turns in roman numerals, one open, the rest
+//             folded; the ruled chatbox at its foot), brought and made (cells
+//             marking their turn); the tabs dim what is outside their part
 //   wiring    LogosApp: the board as the view on a wide screen, tabs move the
 //             camera, Split View in the header opens beside the board, the
 //             guard on the chatbox's first line, the phone keeps its canvas
@@ -83,53 +85,68 @@ const turns = O.canvasTurns(MSGS, { pending: true });
 ok('question and reply placed', turns[0].askedAt === 0 && turns[0].replyAt === 1 && turns[1].askedAt === 2 && turns[1].replyAt === undefined);
 ok('  a question not yet saved (no id) is still a turn, and the one being answered', turns.length === 2 && turns[1].pending === true);
 
-console.log('\n=== L5Board: one board ===');
-const T = O.canvasTurns([...MSGS.slice(0, 2), { id: 'u2', role: 'user', content: 'riemann sums' }, { id: 'a2', role: 'assistant', content: 'A Riemann sum is that guess done several times.' }, { id: 'u3', role: 'user', content: 'and how do i do it' }, { id: 'a3', role: 'assistant', content: 'The next step is how wide each piece is.' }]);
+console.log('\n=== Revision II: numerals, the turn being read, steps, ideas not come up yet ===');
+ok('turns in lowercase roman: i, iv, ix, xii, xl, mcmxcix; nothing for none', O.roman(1) === 'i' && O.roman(4) === 'iv' && O.roman(9) === 'ix' && O.roman(12) === 'xii' && O.roman(40) === 'xl' && O.roman(1999) === 'mcmxcix' && O.roman(0) === '' && O.roman(-2) === '' && O.roman(2.5) === '');
+ok('  past 3999, plain digits', O.roman(4000) === '4000');
+ok('"Reading turn iii of iii"; nothing when there is nothing to read', O.readingLabel(2, 3) === 'Reading turn iii of iii' && O.readingLabel(0, 1) === 'Reading turn i of i' && O.readingLabel(null, 3) === '' && O.readingLabel(0, 0) === '');
+const STEPS = [{ id: 'a' }, { id: 'b' }, { id: 'c' }, { id: 'd' }];
+const st = O.stepStates(STEPS, new Set(['b']));
+ok('steps: before the one the turn lit are done, it is now, after it ahead', st.get('a') === 'done' && st.get('b') === 'now' && st.get('c') === 'ahead' && st.get('d') === 'ahead');
+ok('  the last lit step is now; none lit — all done', O.stepStates(STEPS, new Set(['a', 'c'])).get('c') === 'now' && O.stepStates(STEPS, new Set(['a', 'c'])).get('b') === 'done' && [...O.stepStates(STEPS, new Set()).values()].every((v) => v === 'done'));
+const TT = [{ askedId: 'u1', replyId: 'a1' }, { askedId: 'u2', replyId: 'a2' }, { askedId: 'u3', replyId: 'a3' }];
+const FM = new Map([['u1', ['q']], ['u2', ['s1', 'q']], ['a2', ['s2']], ['u3', ['s3']]]);
+ok('ideas not come up yet: put there first by a later turn', J([...O.aheadOf(TT, FM, 0)].sort()) === J(['s1', 's2', 's3']) && J([...O.aheadOf(TT, FM, 1)]) === J(['s3']) && O.aheadOf(TT, FM, 2).size === 0);
+ok('  nothing read, or no record: none ahead', O.aheadOf(TT, FM, null).size === 0 && O.aheadOf(TT, null, 0).size === 0);
+ok('a map idea\'s shelf: the question, a given, a step on the way, any other idea', O.shelfOf({ type: 'question' }) === 'question' && O.shelfOf({ type: 'given' }) === 'given' && O.shelfOf({ type: 'unknown' }) === 'given' && O.shelfOf({ type: 'step' }) === 'step' && O.shelfOf({ type: 'result' }) === 'step' && O.shelfOf({ type: 'process', role: 'step' }) === 'step' && O.shelfOf({ type: 'concept' }) === 'idea' && O.shelfOf({ type: 'claim', role: 'branch' }) === 'idea');
+ok('the question a reply ends on — what a folded turn shows', O.closingAsk('Width times height. If you cut it into 4 strips, how wide is each one?') === 'If you cut it into 4 strips, how wide is each one?' && O.closingAsk('No question here.') === '' && O.closingAsk('— Is that the share you expected?') === 'Is that the share you expected?');
+
+console.log('\n=== L5Board: the one view set as a page ===');
+const T = O.canvasTurns([...MSGS.slice(0, 2), { id: 'u2', role: 'user', content: 'riemann sums' }, { id: 'a2', role: 'assistant', content: 'A Riemann sum is that guess done several times. Which edge would you take the height from?' }, { id: 'u3', role: 'user', content: 'and how do i do it' }, { id: 'a3', role: 'assistant', content: 'The next step is how wide each piece is.' }]);
+ok('canvas: a turn keeps the question its reply ends on', T[1].asks === 'Which edge would you take the height from?' && T[0].asks === undefined);
 const cards = [
   { key: 'c:f', lane: 'made', tone: 'content', kicker: 'File · Brought', title: 'Week 6 · Riemann sums.pdf', turn: 0, preview: null, note: '4 pages · read', onOpen: () => {} },
   { key: 'e:g', lane: 'made', tone: 'artifact', kicker: 'Artifact · Live graph', title: 'Rectangles under x²', turn: 2, preview: h('svg', { className: 'GRAPH' }), note: '4 rectangles · heights from the left', onOpen: () => {} },
 ];
 const ideas = NODES.map((n) => ({ ...n, kind: n.type[0].toUpperCase() + n.type.slice(1) }));
-const board = (o = {}) => html(h(O.L5Board, { turns: T, reading: 2, cards, map: { ideas, lit: new Set(['s3']), at: 2, picked: 's3', onIdea: () => {}, onOpen: () => {} }, camera: 'chat', dock: h('div', { className: 'DOCK' }, 'THE CHATBOX'), besideOpen: false, onRead: () => {}, ...o }));
+const MAP = { ideas, lit: new Set(['s3']), ahead: new Set(['s5']), at: 2, picked: 's3', onIdea: () => {}, onOpen: () => {} };
+const board = (o = {}) => html(h(O.L5Board, { turns: T, reading: 2, cards, map: MAP, camera: 'chat', open: h('div', { className: 'OPEN' }, 'THE OPEN TURN'), composer: h('div', { className: 'DOCK' }, 'THE CHATBOX'), besideOpen: false, onRead: () => {}, ...o }));
 const b = board();
-ok('no bar: no filters, no zoom group, no Back to chat', !/Everything|Back to chat|lcv-bar|lcv-seg/.test(b));
-ok('one Logic Map card, pinned, its count and the turn it reads', (b.match(/class="lob-map /g) || []).length === 1 && b.includes('Logic Map · 7 ideas') && b.includes('Pinned · turn 3 lit'));
-ok('  the question first and whole-width; the lit one marked; the one asked about pressed', /lob-idea is-q/.test(b) && /lob-idea is-lit is-picked" aria-pressed="true"/.test(b) && b.includes('+ 2 more ideas'));
-ok('the turn being read is not on the board: it is open above the chatbox', (b.match(/class="lob-turn/g) || []).length === 2 && !b.includes('data-turn="2"') && b.includes('data-turn="0"'));
-ok('  a turn: your words in your bubble, then Socria, Turn n, the gist', /<span class="lob-you">i need you to teach me rectangles<\/span>/.test(b) && /Socria<\/span><span class="lob-n">Turn 1<\/span>/.test(b));
-ok('what was brought and made on the right, each wired to its turn', /lob-card is-content" data-part="content" data-card-turn="0"/.test(b) && /lob-card is-artifact" data-part="artifacts" data-card-turn="2"/.test(b) && b.includes('class="lob-wires"'));
-ok('  a drawing is shown, not used: inert', /lob-inert" aria-hidden="true"><svg class="GRAPH"/.test(b));
-ok('zoom is a tray in the corner: −, the percentage, +, fit', /class="lob-tray" role="group" aria-label="Zoom"/.test(b) && b.includes('100%') && b.includes('aria-label="Fit the board to the screen"'));
-ok('the dock — the sheet and the chatbox — at the foot of the spine', /class="lob-dock"><div class="DOCK">THE CHATBOX<\/div>/.test(b));
-const folded = board({ reading: null });
-ok('folded: every turn is on the board', (folded.match(/class="lob-turn/g) || []).length === 3);
+ok('three columns, no bar: no filters, no zoom tray, no Back to chat, no floating sheet', /class="lp cam-chat"/.test(b) && /lp-col lp-map l5-dots/.test(b) && /lp-col lp-convo/.test(b) && /lp-col lp-made/.test(b) && !/Everything|Back to chat|lcv-bar|lob-tray|lob-sheet|aria-label="Zoom"/.test(b));
+ok('the dot grid only behind the Logic Map', (b.match(/l5-dots/g) || []).length === 1);
+ok('the Logic Map: its count, and the turn that lit it', b.includes('Logic Map · 7 ideas') && b.includes('Turn iii lit'));
+ok('  the question first; steps on a rail — done, now, ahead; the lit one marked; the asked-about one pressed', /lp-node is-question/.test(b) && /lp-steps/.test(b) && /lp-step is-done/.test(b) && /lp-step is-now/.test(b) && /lp-step is-ahead/.test(b) && /lp-node is-step is-lit is-picked" aria-pressed="true"/.test(b));
+ok('  an idea not come up yet is dashed; the caption says so', /lp-node is-step is-ahead/.test(b) && b.includes('Dashed ones haven’t come up yet.'));
+ok('the conversation: its count and the turn being read', b.includes('The conversation · 3 turns') && b.includes('Reading turn iii of iii'));
+ok('  earlier turns folded to two lines: numeral, "You · …", Socria\'s question', (b.match(/l5-turn is-folded/g) || []).length === 2 && /<span class="l5-turn-n" aria-hidden="true">i\.<\/span>/.test(b) && b.includes('You · i need you to teach me rectangles') && b.includes('Which edge would you take the height from?'));
+ok('  the turn being read is open, with its numeral, and holds the turn as drawn', /l5-turn is-open" data-turn="2"/.test(b) && /iii\.<\/span><div class="l5-turn-body"><div class="OPEN">THE OPEN TURN<\/div>/.test(b));
+ok('  the chatbox at the foot of the conversation', /class="lp-compose"><div class="DOCK">THE CHATBOX<\/div>/.test(b));
+ok('brought and made: cells, each marking its turn; the turn being read\'s goes moss with a dot', b.includes('Brought and made · 2') && /l5-cell lp-cell is-content" data-part="content"/.test(b) && /l5-cell lp-cell is-artifact is-now" data-part="artifacts"/.test(b) && /lp-cell-n is-now"><span class="lp-dot"/.test(b) && b.includes('Turn i<') );
+ok('  a drawing is shown, not used: inert; and it opens beside', /lp-inert" aria-hidden="true"><svg class="GRAPH"/.test(b) && b.includes('Open beside'));
+const first = board({ reading: 0 });
+ok('an earlier turn open: the others fold, and the reading says so', /l5-turn is-open" data-turn="0"/.test(first) && (first.match(/l5-turn is-folded/g) || []).length === 2 && first.includes('Reading turn i of iii'));
 const onMap = board({ camera: 'logic_map' });
-ok('the Logic Map tab: all the ideas, everything else steps back', !onMap.includes('more ideas') && (onMap.match(/class="lob-idea[ "]/g) || []).length === 7 && /lob-turn is-back/.test(onMap) && /lob-card is-content is-back/.test(onMap) && !/lob-map l5-holder is-back/.test(onMap));
+ok('the Logic Map tab: the map stays, everything else dims; all the ideas', /lp-col lp-map l5-dots"/.test(onMap) && /lp-col lp-convo is-dim/.test(onMap) && /is-content is-dim/.test(onMap) && /is-artifact is-now is-dim/.test(onMap) && !onMap.includes('more idea'));
 const onFiles = board({ camera: 'content' });
-ok('the Files tab: what was brought forward', !/lob-card is-content is-back/.test(onFiles) && /lob-card is-artifact is-back/.test(onFiles) && /lob-map l5-holder is-back/.test(onFiles));
-ok('no ideas yet: no map card', !board({ map: null }).includes('class="lob-map '));
-
-console.log('\n=== ReplySheet: the chatbox is the chat ===');
-const sheet = html(h(O.ReplySheet, { label: 'Turn 3 of 3', onUp: () => {}, onDown: null, onFold: () => {}, follow: false, foot: h('button', { className: 'lob-made' }, 'Live graph, beside this turn') }, h('p', null, 'THE REPLY')));
-ok('Socria, Turn 3 of 3, ↑ ↓ and Fold', sheet.includes('Socria') && sheet.includes('Turn 3 of 3') && sheet.includes('aria-label="The turn before"') && /aria-label="The turn after"[^>]*disabled|disabled=""[^>]*aria-label="The turn after"/.test(sheet) && sheet.includes('Fold'));
-ok('  the turn in full, and the way to what it made', sheet.includes('<p>THE REPLY</p>') && sheet.includes('Live graph, beside this turn'));
+ok('the Files tab: only what was brought stays', /lp-map l5-dots is-dim/.test(onFiles) && /lp-convo is-dim/.test(onFiles) && /is-content" data-part/.test(onFiles) && /is-artifact is-now is-dim/.test(onFiles));
+const split = board({ besideOpen: true });
+ok('Split view: the right column gives way to what is open beside', /class="lp cam-chat is-split"/.test(split) && !/lp-made/.test(split));
+ok('no ideas yet: the column says where they will land', board({ map: null }).includes('Ideas you put into words land here'));
 
 console.log('\n=== wired into LogosApp ===');
 const app = read('components/LogosApp.tsx');
-ok('the board is the view on a wide screen; the phone keeps its canvas', /const oneView = oneViewOn\(\{ narrow,/.test(app) && /const primaryEl = oneView \? boardEl : viewEl\(studyTab\);/.test(app) && /const canvasEl = zoomed && !oneView/.test(app));
-ok('  the turn read is the one pressed, else the newest; a send opens the newest', /const sheetAt = oneView && sheetOpen \? sheetTurn\(boardTurns\.length, reading\) : null;/.test(app) && /if \(lastRole !== 'user'\) return;\s*setReading\(null\);\s*setSheetOpen\(true\);/.test(app));
-ok('  the sheet draws a turn as the conversation does (one message renderer for both)', /const msgEl = \(m: Msg, i: number\) =>/.test(app) && /\{messages\.map\(msgEl\)\}/.test(app) && /msgEl\(messages\[t\.askedAt\], t\.askedAt\)/.test(app) && /msgEl\(messages\[t\.replyAt\], t\.replyAt\)/.test(app));
-ok('  the pinned card lights what the turn being read put on the map', /litBy\(litAt !== null \? turns\[litAt\] : null, links\?\.fromMsg\)/.test(app));
-ok('the tabs move the camera; elsewhere they open the view', /onChange=\{\(v\) => \(oneView \? moveCamera\(v as Viewport\) : openFull\(v as Viewport\)\)\}/.test(app) && /camera=\{studyTab\}/.test(app));
-ok('Split View in the header opens one thing beside the board; never the conversation', /split=\{oneView \? <SplitView menu=\{splitChoices\} besideOn=\{!!besideEl\} onPick=\{pickSplit\} board \/> : undefined\}/.test(app) && /return setBoardBeside\(\(b\) => toggleBeside\(b, c\.beside\)\);/.test(app) && /view: oneView \? 'chat' : studyTab,/.test(app));
-ok('  nothing floats over the board: no view actions, no floating composer', /actions=\{oneView \? null : viewActsEl\}/.test(app) && /omni=\{oneView \|\| convoOpen \|\| zoomed \? null : l5Dock\}/.test(app));
+ok('the page is the view on a wide screen; the phone keeps its canvas', /const oneView = oneViewOn\(\{ narrow,/.test(app) && /const primaryEl = oneView \? boardEl : viewEl\(studyTab\);/.test(app) && /const canvasEl = zoomed && !oneView/.test(app));
+ok('  the turn read is the one pressed, else the newest; a send opens the newest and gives focus back to the conversation', /const sheetAt = oneView && sheetOpen \? sheetTurn\(boardTurns\.length, reading\) : null;/.test(app) && /if \(lastRole !== 'user'\) return;\s*setReading\(null\);\s*setSheetOpen\(true\);\s*setPageFocus\('chat'\);/.test(app));
+ok('  the open turn is drawn as the conversation draws it (one message renderer), the way to what it made first in its actions', /const msgEl = \(m: Msg, i: number, go\?: ReactNode\) =>/.test(app) && /\{messages\.map\(\(m, i\) => msgEl\(m, i\)\)\}/.test(app) && /msgEl\(messages\[t\.askedAt\], t\.askedAt\)/.test(app) && /msgEl\(messages\[t\.replyAt\], t\.replyAt, go\)/.test(app) && /Open the \{madeNoun\} beside this/.test(app));
+ok('  the Logic Map column lights what the turn being read put there — the record and the cards its words name', /litBy\(litAt !== null \? turns\[litAt\] : null, byMsg\)/.test(app) && /aheadOf\(turns, byMsg, litAt\)/.test(app) && /links\?\.fromNode/.test(app));
+ok('the tabs set focus, and only the tabs: what the screen picks never dims the conversation', /onChange=\{\(v\) => \(oneView \? moveCamera\(v as Viewport\) : openFull\(v as Viewport\)\)\}/.test(app) && /camera=\{pageFocus\}/.test(app) && /setPageFocus\(v\);/.test(app) && /value=\{oneView \? pageFocus :/.test(app));
+ok('Split View in the header opens one thing beside the page; never the conversation', /split=\{oneView \? <SplitView menu=\{splitChoices\} besideOn=\{!!besideEl\} onPick=\{pickSplit\} board \/> : undefined\}/.test(app) && /return setBoardBeside\(\(b\) => toggleBeside\(b, c\.beside\)\);/.test(app) && /view: oneView \? 'chat' : studyTab,/.test(app));
+ok('  nothing floats over the page: no view actions, no floating composer; the chatbox is the page\'s', /actions=\{oneView \? null : viewActsEl\}/.test(app) && /omni=\{oneView \|\| convoOpen \|\| zoomed \? null : l5Dock\}/.test(app) && /composer=\{l5Dock\}/.test(app));
 ok('the guard is the chatbox\'s first line, not a bar', /guide=\{guarded && l5 \? \{ onHint: \(\) => void send\('Can I have another hint\?'\), onReveal: reveal, busy \} : null\}/.test(app) && /\{guarded && !l5 && \(/.test(app));
+ok('"Sessions /" in the header goes to your lines of thinking', /onRail=\{\(\) => \{\s*goHome\(\);\s*setL5List\(true\);/.test(app));
 const composer = read('components/LogosComposer.tsx');
-ok('  "Guiding, not solving" at its start, Another hint and Show solution at its end, beside "Asking about"', /Guiding, not solving/.test(composer) && /l5-guide-acts/.test(composer) && /Another hint/.test(composer) && /Show solution/.test(composer) && /\(about \|\| guide\) &&/.test(composer));
-const css = read('components/logos5/board.css');
-const sizes = [...css.matchAll(/font-size:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
-const radii = [...css.matchAll(/border-radius:\s*([\d.]+)px/g)].map((m) => Number(m[1]));
-ok('the board\'s sheet keeps the six steps and four radii; no blur', sizes.every((n) => [32, 18, 15.5, 13.5, 12.5, 10.5].includes(n)) && radii.every((n) => [999, 16, 10, 6].includes(n)) && !/backdrop-filter|blur\(/.test(css), J({ sizes, radii }));
-
+ok('the chatbox is a ruled line: the words and Send on it, "+ Add…" and the guide\'s ways out under it', /l5-crow l5-compose-line/.test(composer) && /Send <span className="l5-ar" aria-hidden="true">→<\/span>/.test(composer) && /l5-ctools l5-compose-foot/.test(composer) && /\+ Add a file, a photo or your voice/.test(composer) && /l5-guide-acts/.test(composer) && /Another hint/.test(composer) && /Show solution/.test(composer) && /\(about \|\| guide\) &&/.test(composer) && /Guiding, not solving/.test(composer));
+const css = read('components/logos5/page.css') + read('components/logos5/revision2.css');
+const radii = [...css.matchAll(/border-radius:\s*([\d.]+)(px|%)/g)].map((m) => m[1] + m[2]);
+ok('the page and its chrome: square or round (999, 50%), map nodes 9, kbd 4 — no other radius; no blur, no drop shadow', radii.every((r) => ['0px', '999px', '50%', '9px', '4px'].includes(r)) && !/backdrop-filter:\s*blur|blur\(/.test(css) && !/box-shadow:\s*0 \d+px \d+px/.test(css), J(radii));
 console.log(`\none view: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

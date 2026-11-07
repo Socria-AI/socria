@@ -118,3 +118,76 @@ export function madeLink(noun: string | null | undefined): string | null {
   const n = (noun ?? '').trim();
   return n ? `${n}, beside this turn` : null;
 }
+
+// ── Revision II: the one view set as a page ──────────────────────────
+
+/** A turn's numeral, as the page sets it: 1 → "i", 4 → "iv", 12 → "xii". Lowercase roman; plain digits past 3999. */
+export function roman(n: number): string {
+  if (!Number.isInteger(n) || n <= 0) return '';
+  if (n >= 4000) return String(n);
+  const table: readonly [number, string][] = [
+    [1000, 'm'], [900, 'cm'], [500, 'd'], [400, 'cd'], [100, 'c'], [90, 'xc'],
+    [50, 'l'], [40, 'xl'], [10, 'x'], [9, 'ix'], [5, 'v'], [4, 'iv'], [1, 'i'],
+  ];
+  let out = '';
+  let left = n;
+  for (const [v, s] of table) while (left >= v) (out += s), (left -= v);
+  return out;
+}
+
+/** "Reading turn iii of iii" */
+export function readingLabel(at: number | null, count: number): string {
+  return at === null || count <= 0 ? '' : `Reading turn ${roman(at + 1)} of ${roman(count)}`;
+}
+
+export type StepState = 'done' | 'now' | 'ahead';
+
+/**
+ * Where each step on the Logic Map stands, read from the turn being read: the
+ * last step it lit is "now", the steps before it are done, the ones after it
+ * are ahead (drawn dashed — they have not come up yet). With no step lit,
+ * every step is done: nothing says the person is anywhere in particular.
+ */
+export function stepStates(steps: readonly { id: string }[], lit: ReadonlySet<string>): Map<string, StepState> {
+  const out = new Map<string, StepState>();
+  let now = -1;
+  steps.forEach((s, i) => {
+    if (lit.has(s.id)) now = i;
+  });
+  steps.forEach((s, i) => out.set(s.id, now < 0 || i < now ? 'done' : i === now ? 'now' : 'ahead'));
+  return out;
+}
+
+/**
+ * The ideas that have not come up yet when turn `at` is read: those first put
+ * on the map by a later turn. They are drawn dashed. An idea no turn can be
+ * traced to is never "ahead" — it is simply on the map.
+ */
+export function aheadOf(
+  turns: readonly { askedId?: string; replyId?: string }[],
+  fromMsg: ReadonlyMap<string, readonly string[]> | null | undefined,
+  at: number | null
+): Set<string> {
+  const out = new Set<string>();
+  if (!fromMsg || at === null) return out;
+  const seen = new Set<string>();
+  turns.forEach((t, i) => {
+    for (const id of litBy(t, fromMsg)) {
+      if (seen.has(id)) continue;
+      seen.add(id);
+      if (i > at) out.add(id);
+    }
+  });
+  return out;
+}
+
+/** What a Logic Map idea is on the page: the question, a given, a step on the way, or an idea of any other kind. */
+export type IdeaShelf = 'question' | 'given' | 'step' | 'idea';
+const STEP_TYPES = new Set(['step', 'transformation', 'equation', 'inference', 'verification', 'result']);
+const STEP_ROLES = new Set(['start', 'step', 'end']);
+export function shelfOf(n: { type: string; role?: string | null }): IdeaShelf {
+  if (n.type === 'question') return 'question';
+  if (n.type === 'given' || n.type === 'unknown') return 'given';
+  if (STEP_TYPES.has(n.type) || (n.role && STEP_ROLES.has(n.role))) return 'step';
+  return 'idea';
+}

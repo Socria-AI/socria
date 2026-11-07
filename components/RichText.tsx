@@ -514,17 +514,25 @@ function EditorialText({ text, tail, joins, math, cite, askLast, inline, streami
           const b = blocks[p.i];
           const split = apart && b.kind === 'p' ? closingQuestion(b.text) : null;
           if (!split) return draw(p.i, `b${p.i}`);
+          // Logos 5.5 (Revision II): the question on its own, under "Socria asks" — the largest type in the reply
           return (
-            <p key={`b${p.i}`} className="socria-asks">
+            <Fragment key={`b${p.i}`}>
               {split.body && (
-                <>
-                  <Inline text={split.body} math={math} keyBase={`b${p.i}a`} cite={cite} code />{' '}
-                </>
+                <p>
+                  <Inline text={split.body} math={math} keyBase={`b${p.i}a`} cite={cite} code />
+                </p>
               )}
-              <em className="socria-ask">
-                <Inline text={split.question} math={math} keyBase={`b${p.i}q`} cite={cite} code />
-              </em>
-            </p>
+              <div className="socria-asks" role="group" aria-label="Socria asks">
+                <span className="l5-label is-asks socria-asks-k" aria-hidden="true">
+                  Socria asks
+                </span>
+                <p className="socria-asks-q">
+                  <em className="socria-ask">
+                    <Inline text={split.question} math={math} keyBase={`b${p.i}q`} cite={cite} code />
+                  </em>
+                </p>
+              </div>
+            </Fragment>
           );
         }
         // a part's fold is titled by its heading; a fold the paragraphs earned, by the sentence it opens on

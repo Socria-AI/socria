@@ -77,7 +77,7 @@ const anchorsOk = {
   'l5.map': has('lcv-card is-${c.tone}'),
   'l5.make': has('data-tour="make"'),
   'l5.home': has('className="l5v-home"') && has('className="lcv-home"'),
-  'l5.search': has('is-quiet l5v-search"') && has('l5-unibtn l5-searchbtn'),
+  'l5.search': has('l5-link l5v-search"') && has('l5-unibtn l5-searchbtn'),
   'f.list': has('l5-unibtn is-list'),
   'f.split': has('className="l5v-split"'),
   'f.guide': has('l5-menuhost'),

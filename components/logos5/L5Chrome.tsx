@@ -45,6 +45,7 @@ export function L5Menu({
   align = 'end',
   up = false,
   className = '',
+  word = false,
 }: {
   /** what the button is called, for a screen reader */
   label: string;
@@ -53,6 +54,8 @@ export function L5Menu({
   align?: 'start' | 'end';
   up?: boolean;
   className?: string;
+  /** the button is a word (Revision II: icons become words), not a glyph */
+  word?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const root = useRef<HTMLDivElement>(null);
@@ -80,7 +83,7 @@ export function L5Menu({
   // one menu, .l5-menu (l5-controls.css), and each item the one .l5-mi
   return (
     <div ref={root} className={`l5-menuhost ${className}`}>
-      <button type="button" className="l5-icon" aria-label={label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((v) => !v)}>
+      <button type="button" className={word ? 'l5-link' : 'l5-icon'} aria-label={word ? undefined : label} title={label} aria-haspopup="menu" aria-expanded={open} aria-controls={open ? id : undefined} onClick={() => setOpen((v) => !v)}>
         {button}
       </button>
       {open && (
@@ -224,13 +227,12 @@ export function L5Header({
 // ── Memory's door (the Mind Graph, drawn) ──
 
 /** A neuron: what Socria remembers, as its own place. */
-export function MindButton({ onOpen }: { onOpen: () => void }) {
+export function MindButton({ onOpen, waiting = 0 }: { onOpen: () => void; waiting?: number }) {
+  // Revision II: icons become words — "Memory", with a gold count when something waits to be confirmed
   return (
-    <button type="button" className="l5-icon l5-mindbtn" onClick={onOpen} aria-label="Memory — what Socria remembers" title="Memory — what Socria remembers">
-      <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-        <circle cx="12" cy="12.5" r="3.2" />
-        <path d="M12 9.3V4.5M9.3 14.2l-4.2 2.8M14.7 14.2l4.2 2.8M12 4.5l-2.2-1.6M12 4.5l2.2-1.6M5.1 17l-1.9.2M18.9 17l1.9.2" />
-      </svg>
+    <button type="button" className="l5-link l5-mindbtn" onClick={onOpen} aria-label={waiting > 0 ? `Memory — ${waiting} waiting` : 'Memory — what Socria remembers'} title="Memory — what Socria remembers">
+      Memory
+      {waiting > 0 && <span className="l5-badge">{waiting}</span>}
     </button>
   );
 }

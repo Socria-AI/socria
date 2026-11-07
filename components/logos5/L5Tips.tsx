@@ -66,7 +66,7 @@ export function L5Tips({
     const look = () => {
       const store = storage();
       if (!store) return;
-      const c: TipContext = { ...ctxRef.current, mapCard: visible('.lcv-card.is-map, .lob-map'), mac, toured: !!store.getItem(LOGOS_TOUR_KEY) };
+      const c: TipContext = { ...ctxRef.current, mapCard: visible('.lcv-card.is-map, .lp-map'), mac, toured: !!store.getItem(LOGOS_TOUR_KEY) };
       const now = Date.now();
       const pick = pickTip(c, { seen: readSeen(store), ...parseLedger(store.getItem(TIP_LEDGER_KEY)) }, now, visit.current);
       if (!pick || !visible(pick.anchor)) return;

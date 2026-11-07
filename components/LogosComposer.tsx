@@ -758,7 +758,7 @@ export function LogosComposer({
   }, []);
 
   return (
-    <div className="lg-composer" data-tour="composer" ref={rootRef}>
+    <div className={`lg-composer${layout === 'stacked' ? ' is-ruled' : ''}`} data-tour="composer" ref={rootRef}>
       <div
         className={`lg-composer-box${dragging ? ' is-dropping' : ''}`}
         onDragEnter={(e) => {
@@ -799,7 +799,7 @@ export function LogosComposer({
         {(about || guide) && (
           // Logos 5: what the composer is asking about, said in one line above it — a label, the topic or card, the one clear;
           // and, while Socria is guiding rather than solving, that said at its start and the two ways out at its end
-          <div className={`lg-about-chip l5-asking${guide ? ' has-guide' : ''}`} role="status" aria-live="polite">
+          <div className={`lg-about-chip l5-asking l5-compose-guide${guide ? ' has-guide' : ''}`} role="status" aria-live="polite">
             {guide && (
               <span className="l5-guide">
                 <span className="l5-guide-dot" aria-hidden="true" />
@@ -821,12 +821,13 @@ export function LogosComposer({
                 {onClearAbout && <L5Close className="l5-asking-x" label={`Stop asking about ${about.label}`} title="Clear what this is about" onClose={onClearAbout} />}
               </>
             )}
-            {guide && (
+            {/* in the stacked layout (Logos 5) the two ways out sit in the foot, so the topic stays whole at 620px */}
+            {guide && layout !== 'stacked' && (
               <span className="l5-guide-acts">
-                <button type="button" className="l5-chip l5-guide-hint" disabled={guide.busy} onClick={guide.onHint}>
+                <button type="button" className="l5-link is-strong l5-guide-hint" disabled={guide.busy} onClick={guide.onHint}>
                   Another hint
                 </button>
-                <button type="button" className="l5-btn is-sm is-quiet l5-guide-reveal" onClick={guide.onReveal}>
+                <button type="button" className="l5-link l5-guide-reveal" onClick={guide.onReveal}>
                   Show solution
                 </button>
               </span>
@@ -916,7 +917,8 @@ export function LogosComposer({
 
         {layout === 'stacked' ? (
           <>
-            <div className="l5-crow">
+            {/* Logos 5.5 (Revision II): the chatbox is a ruled line you write on, with Send at its end */}
+            <div className="l5-crow l5-compose-line">
             <textarea
               ref={taRef}
               value={value}
@@ -963,63 +965,18 @@ export function LogosComposer({
                 }
               }}
             />
-            </div>
-            <div className="l5-ctools">
-            {lead && <span className="l5-ctools-lead">{lead}</span>}
-            {/* Logos 5: four controls — "+" holds Attach, Make, Search my files and ∑; then the length, Voice and Send */}
-            <L5Menu
-              label="Add"
-              className="lg-plus"
-              align="start"
-              up
-              button={
-                <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-                  <path d="M12 5v14M5 12h14" />
-                </svg>
-              }
-              items={[
-                {
-                  label: 'Attach',
-                  hint: readDocument ? 'A document or an image' : 'An image or a text file',
-                  disabled: drafts.length >= MAX_ATTACHMENTS,
-                  onSelect: () => fileRef.current?.click(),
-                },
-                ...(plusItems ?? []),
-                ...(onSearchFiles ? [{ label: 'Search my files', hint: 'Conversations, files and what was made', onSelect: onSearchFiles }] : []),
-                ...(mathAvailable ? [{ label: keypad ? 'Hide ∑ symbols' : '∑ Mathematical symbols', onSelect: () => setKeypad((k) => !k) }] : []),
-                ...(onCapture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', sep: true, onSelect: onCapture }] : []),
-              ]}
-            />
-            <input
-              ref={fileRef}
-              type="file"
-              multiple
-              accept={readDocument ? DOC_ACCEPT : PLAIN_ACCEPT}
-              className="lg-file"
-              onChange={(e) => {
-                if (e.target.files?.length) void takeFiles(e.target.files);
-                e.target.value = '';
-              }}
-            />
-              {footer && <span className="l5-ctools-mid">{footer}</span>}
-              <span className="l5-ctools-end">
-              {meter}
-              {voiceButton}
-              {micOn && <HoldMic mic={mic} onHold={setHold} />}
               {waiting && !group ? (
-                <button type="button" className="lg-send is-waiting" disabled aria-label="Sent — waiting for the first words" title="Sent — waiting for the first words">
+                <button type="button" className="l5-btn is-primary lg-send is-waiting" disabled aria-label="Sent — waiting for the first words" title="Sent — waiting for the first words">
                   <span className="lg-send-spin" aria-hidden="true" />
                 </button>
               ) : onStop && busy && !group ? (
-                <button type="button" className="lg-send is-stop" onClick={onStop} aria-label="Stop the answer" title="Stop">
-                  <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-                    <rect x="7" y="7" width="10" height="10" rx="2" />
-                  </svg>
+                <button type="button" className="l5-btn is-primary lg-send is-stop" onClick={onStop} aria-label="Stop the answer" title="Stop">
+                  Stop
                 </button>
               ) : (
                 <button
                   type="button"
-                  className="lg-send"
+                  className="l5-btn is-primary lg-send"
                   onClick={() => {
                     if (!canSend) return;
                     onSend();
@@ -1028,11 +985,62 @@ export function LogosComposer({
                   disabled={!canSend}
                   aria-label="Send"
                 >
-                  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-                    <path d="M12 19V5M6 11l6-6 6 6" />
-                  </svg>
+                  Send <span className="l5-ar" aria-hidden="true">→</span>
                 </button>
               )}
+            </div>
+            {/* the foot: "+ Add a file, a photo or your voice" (Attach, Make, Search my files and ∑ in its menu) on the
+                left; on the right, while Socria guides rather than solves, the two ways out — then the week's meter and Voice */}
+            <div className="l5-ctools l5-compose-foot">
+              <span className="l5-ctools-start">
+                {lead && <span className="l5-ctools-lead">{lead}</span>}
+                <L5Menu
+                  label="Add a file, a photo or your voice"
+                  className="lg-plus"
+                  align="start"
+                  up
+                  word
+                  button={<span className="l5-add">+ Add a file, a photo or your voice</span>}
+                  items={[
+                    {
+                      label: 'Attach',
+                      hint: readDocument ? 'A document or an image' : 'An image or a text file',
+                      disabled: drafts.length >= MAX_ATTACHMENTS,
+                      onSelect: () => fileRef.current?.click(),
+                    },
+                    ...(plusItems ?? []),
+                    ...(onSearchFiles ? [{ label: 'Search my files', hint: 'Conversations, files and what was made', onSelect: onSearchFiles }] : []),
+                    ...(mathAvailable ? [{ label: keypad ? 'Hide ∑ symbols' : '∑ Mathematical symbols', onSelect: () => setKeypad((k) => !k) }] : []),
+                    ...(onCapture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', sep: true, onSelect: onCapture }] : []),
+                  ]}
+                />
+                <input
+                  ref={fileRef}
+                  type="file"
+                  multiple
+                  accept={readDocument ? DOC_ACCEPT : PLAIN_ACCEPT}
+                  className="lg-file"
+                  onChange={(e) => {
+                    if (e.target.files?.length) void takeFiles(e.target.files);
+                    e.target.value = '';
+                  }}
+                />
+                {footer && <span className="l5-ctools-mid">{footer}</span>}
+              </span>
+              <span className="l5-ctools-end">
+                {guide && (
+                  <span className="l5-guide-acts">
+                    <button type="button" className="l5-link is-strong l5-guide-hint" disabled={guide.busy} onClick={guide.onHint}>
+                      Another hint
+                    </button>
+                    <button type="button" className="l5-link l5-guide-reveal" onClick={guide.onReveal}>
+                      Show solution
+                    </button>
+                  </span>
+                )}
+                {meter}
+                {voiceButton}
+                {micOn && <HoldMic mic={mic} onHold={setHold} />}
               </span>
             </div>
           </>

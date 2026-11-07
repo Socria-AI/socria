@@ -2,5 +2,5 @@
 // turns read from a conversation (lib/logos5/canvas.ts), and the board and its sheet drawn
 // (components/logos5/L5Board.tsx) — one bundle, for test/logos5-one-view.test.mjs.
 export * from '@/lib/logos5/oneView';
-export { canvasTurns } from '@/lib/logos5/canvas';
-export { L5Board, ReplySheet } from '@/components/logos5/L5Board';
+export { canvasTurns, closingAsk } from '@/lib/logos5/canvas';
+export { L5Board } from '@/components/logos5/L5Board';
