@@ -348,6 +348,18 @@ The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space
 - **Checked by** `test/logos5-space.test.mjs` (tones, the markup, the wiring) and
   `.journeys/os-check.mjs` at 1440 and on an iPhone 13.
 
+### 8.4 Revision V — Socria's bubble
+
+- **Socria's reply is its own bubble** under the open idea, with a small pointer up at it: the Socria mark, the reply
+  in words (its opening sentence plain, not a headline), the question in larger serif, then Copy, Reply, Retry,
+  Listen. It is the one part of the space that is a conversation; pressing the question puts the cursor in the
+  chatbox. With no idea open yet, the bubble stands alone.
+- **The open idea holds the idea and what was made for it**: its glyph and statement, then the open turn's visual
+  drawn large (the comparison, the diagram, the steps), pressed to open beside the space. The bubble then keeps to
+  words.
+- **Less to read**: no "Answering" chip and no "Answer below"; no "YOU" quote; cards say what they are by glyph and
+  colour, with no kind words or turn tags; lines carry no words; no hint text in the row.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

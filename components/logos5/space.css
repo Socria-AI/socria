@@ -92,17 +92,17 @@
 .logos-root .ls-stmt { margin: 0; font-family: var(--l5-serif, 'Instrument Serif', serif); font-weight: 400; font-size: 27px; line-height: 1.14; letter-spacing: -0.01em; }
 .logos-root .ls-body { padding-top: 11px; border-top: 1px solid var(--c-rule); min-width: 0; }
 /* the reply, drawn as the conversation draws it, set inside the card */
-.logos-root .ls-open .l5-msg { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; max-width: none; }
-.logos-root .ls-open .l5-msg.l5-a > .l5-who { display: none; }
-.logos-root .ls-open .l5-prose.is-reply { max-width: none; font-size: 14.5px; line-height: 1.62; }
-.logos-root .ls-open .l5-prose.is-reply .socria-asks-q { font-size: 22px; }
-.logos-root .ls-open .l5-slice { display: none; }
-.logos-root .ls-open .l5-acts { display: flex; align-items: center; gap: 18px; min-height: 28px; margin: 8px 0 0; padding: 0; opacity: 1; }
-.logos-root .ls-open .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
-.logos-root .ls-open .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-45); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
-.logos-root .ls-open .l5-act:hover { background: none; color: var(--c-ink); }
-.logos-root .ls-open .l5-act svg { display: none; }
-.logos-root .ls-open .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
+.logos-root :is(.ls-open, .ls-bub) .l5-msg { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; max-width: none; }
+.logos-root :is(.ls-open, .ls-bub) .l5-msg.l5-a > .l5-who { display: none; }
+.logos-root :is(.ls-open, .ls-bub) .l5-prose.is-reply { max-width: none; font-size: 14.5px; line-height: 1.62; }
+.logos-root :is(.ls-open, .ls-bub) .l5-prose.is-reply .socria-asks-q { font-size: 22px; }
+.logos-root :is(.ls-open, .ls-bub) .l5-slice { display: none; }
+.logos-root :is(.ls-open, .ls-bub) .l5-acts { display: flex; align-items: center; gap: 18px; min-height: 28px; margin: 8px 0 0; padding: 0; opacity: 1; }
+.logos-root :is(.ls-open, .ls-bub) .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
+.logos-root :is(.ls-open, .ls-bub) .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-45); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.logos-root :is(.ls-open, .ls-bub) .l5-act:hover { background: none; color: var(--c-ink); }
+.logos-root :is(.ls-open, .ls-bub) .l5-act svg { display: none; }
+.logos-root :is(.ls-open, .ls-bub) .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
 
 /* WORDS: each turn beside what it made */
 .logos-root .ls-word { position: relative; z-index: 3; display: flex; flex-direction: column; gap: 3px; margin: -6px -14px 0 24px; padding: 8px 11px 9px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 12px 12px 12px 3px; background: var(--c-paper); box-sizing: border-box; font-size: 13px; line-height: 1.45; color: var(--c-ink-70); }
@@ -181,4 +181,34 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 /* Revision IV, what space-colour.css leans on: the node glyph sits at 12px in a card's head; Socria's question can
    be pressed while the chatbox is answering it */
 .logos-root .ls-k-g svg { display: block; width: 12px; height: 12px; }
-.logos-root .ls:has(.ls-answering) .ls-open .socria-asks { cursor: pointer; }
+
+/* ── Revision V: Socria's bubble, the idea and its visual ─────────────────────────────
+   The open idea holds only the idea and what was made for it; Socria's reply is its own bubble under it, pointing
+   at it — the one part of the space that is a conversation. Cards say what they are by glyph and colour alone. */
+.logos-root .ls-t .ls-k-g { display: inline-flex; vertical-align: -2px; margin-right: 8px; color: var(--ls-dot, currentColor); }
+.logos-root .ls-stmt .ls-k-g { vertical-align: 2px; margin-right: 10px; }
+.logos-root .ls-stmt .ls-k-g svg { width: 16px; height: 16px; }
+.logos-root .ls-tt { display: inline-flex; align-items: center; gap: 8px; font-weight: 500; }
+.logos-root .ls-file .ls-tt::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ls-slate, #3a6ea5); }
+.logos-root .ls-made .ls-tt::before { content: ''; flex: none; width: 7px; height: 7px; background: var(--ls-verm, #d8402f); }
+.logos-root .ls-file .ls-tt { font-weight: 400; }
+.logos-root .ls-open { gap: 0; }
+.logos-root .ls-hero { margin-top: 14px; cursor: pointer; }
+.logos-root .ls-hero .ln { margin: 0 !important; }
+.logos-root .ls-bub { position: relative; margin-top: 16px; padding: 12px 16px 10px; border: 1px solid rgba(var(--c-moss-rgb), 0.22); border-radius: 18px 18px 18px 6px; background: #fff; box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 22px 44px -28px rgba(35, 36, 31, 0.5); }
+.logos-root .ls-bub.has-tail::before { content: ''; position: absolute; left: 44px; top: -8px; width: 14px; height: 14px; background: #fff; border-left: 1px solid rgba(var(--c-moss-rgb), 0.22); border-top: 1px solid rgba(var(--c-moss-rgb), 0.22); transform: rotate(45deg); }
+.logos-root .ls-bub:not(.has-tail) { margin-top: 0; }
+.logos-root .ls-bub-who { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #465a26); }
+.logos-root .ls-bub-who img { display: block; width: 15px; height: 15px; }
+.logos-root .ls-bub-who .ls-tn { font-family: inherit; font-style: normal; font-size: 12px; font-weight: 500; }
+.logos-root .ls-bub .ls-body { margin: 6px 0 0; padding: 0; border: 0; }
+.logos-root .ls-bub .l5-prose.is-reply { font-size: 14.5px; line-height: 1.55; color: var(--c-ink-70); }
+.logos-root .ls-bub .socria-asks { margin: 10px 0 0; padding: 0; border: 0; background: none; cursor: pointer; }
+.logos-root .ls-bub .socria-asks-k { display: none; }
+.logos-root .ls-bub .l5-prose.is-reply .socria-asks-q { margin: 0; font-size: 24px; line-height: 1.15; color: var(--c-ink); }
+/* what the open turn made is drawn in the idea above: the bubble keeps to words */
+.logos-root .ls-bub.has-hero .ln { display: none; }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-bub,
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-bub.has-tail::before { background: rgba(var(--c-ink-rgb), 0.06); }
+/* in the bubble the reply's opening sentence is said, not set as a headline: the question is what stands out */
+.logos-root .ls-bub .l5-prose.is-reply .socria-lead { margin: 0 0 6px; font-family: inherit; font-size: 15px; line-height: 1.5; font-weight: 500; letter-spacing: 0; color: var(--c-ink); }

@@ -129,8 +129,7 @@ export function L5Space({
   lit,
   picked,
   composer,
-  answering,
-  onDismissAnswering,
+  openHero,
   onIdea,
   onPage,
   onAnswer,
@@ -155,9 +154,8 @@ export function L5Space({
   /** the idea the chatbox asks about */
   picked: string | null;
   composer: ReactNode;
-  /** what the chatbox is answering, when Socria's newest reply asked something */
-  answering: string | null;
-  onDismissAnswering?: () => void;
+  /** what the open turn made, drawn large in the open idea (the visual carries it; the bubble keeps to words) */
+  openHero?: { node: ReactNode; onOpen?: () => void } | null;
   /** an idea pressed: it opens, with the turn it came from */
   onIdea: (id: string) => void;
   /** the conversation as a page, every turn in order */
@@ -173,7 +171,7 @@ export function L5Space({
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
-  const openRef = useRef<HTMLElement>(null);
+  const openRef = useRef<HTMLDivElement>(null);
 
   // ARRIVING (Revision IV): when the space opens — a line of thinking opened, or come back to — the cards settle
   // in reading order and then the lines draw. Once: the open idea changing within the line does not replay it.
@@ -182,9 +180,9 @@ export function L5Space({
     const t = setTimeout(() => setArriving(false), 2400);
     return () => clearTimeout(t);
   }, []);
-  // "Answer below ↓": Socria's question, pressed while the chatbox is answering it, puts the cursor in the box
+  // Socria's question, pressed, puts the cursor in the chatbox
   const answerRef = useRef(onAnswer);
-  answerRef.current = answering ? onAnswer : undefined;
+  answerRef.current = onAnswer;
   useEffect(() => {
     const el = openRef.current;
     if (!el) return;
@@ -347,7 +345,6 @@ export function L5Space({
     return new Map(keys.map((k, i) => [k, i]));
   }, [layout, brought, made, placed]);
   const order = (k: string) => ({ ['--i' as string]: orderOf.get(k) ?? 0 });
-  const tag = (t: number | null) => (t === null ? null : <span className="ls-tn">turn {roman(t + 1)}</span>);
   const back = (k: string) => (forwardIn(kind, cardKindOf(k)) ? '' : ' is-back');
   const turnWords = (t: number) => {
     const turn = turns[t];
@@ -391,17 +388,13 @@ export function L5Space({
           onClick={() => onIdea(n.id)}
           title={`Open “${n.label}”`}
         >
-          <span className="ls-k">
-            <span>
-              <span className="ls-k-g" aria-hidden="true">
-                <NodeGlyph type={n.type as LogosNodeType} />
-              </span>
-              {n.type === 'question' ? 'Your question' : n.kind}
-              {picked === n.id ? ' · asking about' : ''}
+          {/* Revision V: the glyph and the colour say what it is; no kind word, no turn tag */}
+          <span className="ls-t">
+            <span className="ls-k-g" aria-hidden="true" title={n.type === 'question' ? 'Your question' : n.kind}>
+              <NodeGlyph type={n.type as LogosNodeType} />
             </span>
-            {tag(n.turn)}
+            {n.label}
           </span>
-          <span className="ls-t">{n.label}</span>
         </button>
         {words(k)}
       </div>
@@ -419,22 +412,13 @@ export function L5Space({
           onKeyDown={press(c.onOpen)}
           aria-label={`${c.kicker}${c.title ? `: ${c.title}` : ''}${c.onOpen ? '. Open it' : ''}`}
         >
-          <span className="ls-k">
-            <span>{c.kicker}</span>
-            {tag(c.turn)}
-          </span>
-          {c.title && <span className="ls-t">{c.title}</span>}
+          <span className="ls-t ls-tt">{c.title || c.kicker}</span>
           {c.preview ? (
             <div className="ls-prev">
               <Inert>{c.preview}</Inert>
             </div>
           ) : null}
-          {c.note && <span className="ls-note">{c.note}</span>}
-          {c.onOpen && what === 'made' && (
-            <span className="ls-go" aria-hidden="true">
-              Open it <span className="l5-ar">→</span>
-            </span>
-          )}
+          {c.note && what === 'brought' && <span className="ls-note">{c.note}</span>}
         </div>
         {words(k)}
       </div>
@@ -442,27 +426,40 @@ export function L5Space({
   };
   const t = openTurn !== null ? turns[openTurn] : null;
   const openEl = (
-    <div key={openKey} className={`ls-it is-open${back(openKey)}`} data-k={openKey} style={order(openKey)}>
-      <article ref={openRef} className="ls-open" aria-label={open ? `Open: ${open.label}` : 'The newest reply'}>
-        <span className="ls-k" data-tone={open && ideaTone(open) === 'question' ? 'question' : undefined}>
-          <span>
-            {open && (
-              <span className="ls-k-g" aria-hidden="true">
-                <NodeGlyph type={open.type as LogosNodeType} />
-              </span>
-            )}
-            {open ? `${open.type === 'question' ? 'Your question' : open.kind} · open` : t?.pending ? 'Thinking' : 'Socria'}
-          </span>
-          {openTurn !== null && <span className="ls-tn">turn {roman(openTurn + 1)}{openTurn === turns.length - 1 ? ' · newest' : ''}</span>}
+    <div key={openKey} ref={openRef} className={`ls-it is-open${back(openKey)}`} data-k={openKey} style={order(openKey)}>
+      {/* THE OPEN IDEA (Revision V): the idea and what was made for it — the visual carries it */}
+      {open && (
+        <article className="ls-open" aria-label={`Open: ${open.label}`}>
+          <h2 className="ls-stmt">
+            <span className="ls-k-g" aria-hidden="true">
+              <NodeGlyph type={open.type as LogosNodeType} />
+            </span>
+            {open.label}
+          </h2>
+          {openHero && (
+            <div
+              className="ls-hero"
+              role={openHero.onOpen ? 'button' : undefined}
+              tabIndex={openHero.onOpen ? 0 : undefined}
+              onClick={openHero.onOpen}
+              onKeyDown={press(openHero.onOpen)}
+              aria-label={openHero.onOpen ? 'Open it beside the space' : undefined}
+            >
+              {openHero.node}
+            </div>
+          )}
+        </article>
+      )}
+      {/* SOCRIA'S BUBBLE: the reply in words, its own bubble pointing at the idea — the one place it is a conversation */}
+      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}`} aria-label="Socria’s reply">
+        <span className="ls-bub-who">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
+          <img src="/socria-mark.png" alt="" width={15} height={15} />
+          Socria
+          {openTurn !== null && <span className="ls-tn">{t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
         </span>
-        {t?.asked && (
-          <p className="ls-you">
-            <b>You</b>“{t.asked}”
-          </p>
-        )}
-        {open && <h2 className="ls-stmt">{open.label}</h2>}
         <div className="ls-body">{openBody}</div>
-      </article>
+      </div>
       {words(openKey)}
     </div>
   );
@@ -484,11 +481,6 @@ export function L5Space({
         </button>
       ))}
       <span className="ls-sp" />
-      {!narrow && (
-        <span className="ls-arr">
-          {kind === 'words' ? 'Each turn beside what it made, in order' : kind === 'all' ? 'Laid out by how it connects' : 'Nothing moves. The rest steps back.'}
-        </span>
-      )}
       <button type="button" className="l5-link is-go ls-page" onClick={onPage}>
         {narrow ? 'As a conversation' : 'Read as a conversation'} <span className="l5-ar">→</span>
       </button>
@@ -496,16 +488,6 @@ export function L5Space({
   );
   const chatEl = (
     <div className="ls-chat">
-      {answering && (
-        <span className="ls-answering" role="status">
-          Answering <b>{answering}</b>
-          {onDismissAnswering && (
-            <button type="button" className="ls-answering-x" onClick={onDismissAnswering} aria-label="Ask something new instead">
-              ×
-            </button>
-          )}
-        </span>
-      )}
       {composer}
     </div>
   );
@@ -600,13 +582,6 @@ export function L5Space({
             ))}
             {drawn.thread && <path className="ls-thread" d={drawn.thread} />}
           </svg>
-          {drawn.lines.map((l, i) =>
-            l.word && !l.back ? (
-              <span key={`w${i}`} className={`ls-lw is-${l.dashed ? 'against' : l.kind}`} style={{ left: l.x, top: l.y, ['--j' as string]: i }}>
-                {l.word}
-              </span>
-            ) : null
-          )}
           {(layout.frame.length > 0 || brought.length > 0) && (
             <div className="ls-col is-frame">
               {col(layout.frame)}

@@ -208,7 +208,7 @@ import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type Artifact
 import { StudyDesk, drawsInCard, type DeskItem } from './logos5/StudyDesk';
 import { L5Board, type BoardIdea } from './logos5/L5Board';
 import { L5Space, type SpaceIdea, type SpaceThing } from './logos5/L5Space';
-import { answeringOf, firstTurnOf, openIdeaOf } from '@/lib/logos5/ideas';
+import { firstTurnOf, openIdeaOf } from '@/lib/logos5/ideas';
 import { hubNameEl, morph, pageTitleEl } from '@/lib/logos5/morph';
 import { aheadOf, besideOnBoard, litBy, oneViewOn, relationLine, sheetTurn, shelfOf, toggleBeside } from '@/lib/logos5/oneView';
 import { deskTopicsOf, fileTitle, onMap } from '@/lib/logos5/studyDesk';
@@ -6414,7 +6414,6 @@ export function LogosApp({
   // chatbox's "Answering" line can be set aside for the turn it names.
   const [spaceView, setSpaceView] = useState(true);
   const [spaceOpen, setSpaceOpen] = useState<string | null>(null);
-  const [answerHidden, setAnswerHidden] = useState<string | null>(null);
   useEffect(() => {
     setBoardBeside(null);
     setReading(null);
@@ -9094,12 +9093,8 @@ export function LogosApp({
               ...(c.note ? { note: c.note } : {}),
               ...(c.onOpen ? { onOpen: c.onOpen } : {}),
             }));
-          const newestTurn = last !== null ? turns[last] : null;
-          const answering =
-            newestTurn && answerHidden !== newestTurn.key
-              ? // Revision IV: "Answering" names Socria's question itself, the idea only when there is none to name
-                answeringOf({ newest: atNewest, asks: !!ot?.asks, pending: !!newestTurn.pending || busyHere, about: !!focusBrief, label: newestTurn.asks?.trim() || openNode?.label || null })
-              : null;
+          // Revision V: what the open turn made is drawn large in the open idea; the bubble under it keeps to words
+          const heroCard = openTurn !== null ? cards.find((c) => c.turn === openTurn && c.tone !== 'content' && c.preview) : undefined;
           return (
             <L5Space
               key={activeId ?? 'space'}
@@ -9115,8 +9110,7 @@ export function LogosApp({
               lit={litBy(ot, byMsg)}
               picked={focus?.kind === 'node' ? focus.id : null}
               composer={l5Dock}
-              answering={answering}
-              onDismissAnswering={() => newestTurn && setAnswerHidden(newestTurn.key)}
+              openHero={heroCard ? { node: heroCard.preview, ...(heroCard.onOpen ? { onOpen: heroCard.onOpen } : {}) } : null}
               onIdea={(id) => {
                 // the newest turn's idea is where the space rests; any other opens with the turn it came from, and is asked about
                 if (id === auto && !chosen) return;

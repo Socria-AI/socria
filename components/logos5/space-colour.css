@@ -96,8 +96,6 @@
 .logos-root .ls-open .socria-asks-k { display: inline-flex; align-items: center; gap: 7px; color: var(--ls-mustard-ink); }
 .logos-root .ls-open .socria-asks-k::before { content: ''; width: 7px; height: 7px; border-radius: 50%; background: var(--ls-mustard); }
 .logos-root .ls-open .l5-prose.is-reply .socria-asks-q { margin: 6px 0 0; font-size: 24px; line-height: 1.16; }
-/* only while the chatbox is answering it */
-.logos-root .ls:has(.ls-answering) .ls-open .socria-asks::after { content: 'Answer below ↓'; position: absolute; top: 12px; right: 15px; font-size: 12px; font-weight: 500; color: var(--ls-mustard-ink); }
 
 /* ── the lines and their words, in the colour of what they say ── */
 .logos-root .ls-ln path { stroke-width: 1.4; stroke-opacity: 0.55; transition: stroke-opacity 0.25s; }
