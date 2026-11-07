@@ -261,3 +261,33 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-tb { background: rgba(var(--c-ink-rgb), 0.06); }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-bub.has-earlier { box-shadow: 0 6px 0 -3px rgba(var(--c-ink-rgb), 0.05), 0 6px 0 -2px rgba(var(--c-ink-rgb), 0.16), 0 12px 0 -7px rgba(var(--c-ink-rgb), 0.04), 0 12px 0 -6px rgba(var(--c-ink-rgb), 0.12); }
 @media (prefers-reduced-motion: reduce) { .logos-root .ls-thread { animation: none; } }
+
+/* ── A made thing, seen whole (the consistency pass) ─────────────────────────────────────
+   On the canvas a made thing is drawn to fit its card — laid out at a reading width and scaled down, so a table or
+   a comparison shows whole rather than cut at the card's edge — with a soft fade when it is tall. Pressed, it opens
+   large over the space (.ls-lb) to look into, and from there beside the space to work with. */
+.logos-root .ls-prev.is-fit { max-height: 210px; }
+.logos-root .ls-prev.is-fit > .ls-inert { width: 440px; max-height: 382px; overflow: hidden; zoom: 0.55; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
+.logos-root .ls-enl { position: absolute; right: 6px; bottom: 6px; z-index: 1; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: color-mix(in oklab, var(--c-paper) 92%, transparent); box-shadow: 0 0 0 1px var(--c-rule-2); font-size: 11.5px; font-weight: 500; color: var(--c-ink-70); opacity: 0; transform: translateY(2px); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
+.logos-root :is(.ls-made, .ls-file).has-prev:is(:hover, :focus-visible) .ls-enl { opacity: 1; transform: none; }
+.logos-root .ls-lb { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 32px; background: rgba(var(--c-ink-rgb), 0.28); animation: ls-lb-in 0.2s ease-out; }
+@keyframes ls-lb-in { from { opacity: 0; } }
+.logos-root .ls-lb-card { width: min(880px, 100%); max-height: calc(100% - 24px); display: flex; flex-direction: column; border: 1px solid var(--c-rule-2); border-radius: 14px; background-color: var(--c-paper); background-image: var(--c-grain); box-shadow: 0 30px 70px -30px rgba(35, 36, 31, 0.6); animation: ls-lb-card 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+@keyframes ls-lb-card { from { transform: translateY(10px) scale(0.98); opacity: 0; } }
+.logos-root .ls-lb-head { flex: none; display: flex; align-items: center; gap: 14px; padding: 14px 16px 12px 20px; border-bottom: 1px solid var(--c-rule); }
+.logos-root .ls-lb-head .ls-tt { font-size: 16px; }
+.logos-root .ls-lb-x { font-size: 20px; line-height: 1; }
+.logos-root .ls-lb-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 20px 22px 24px; }
+.logos-root .ls-lb-body img { display: block; max-width: 100%; margin: 0 auto; }
+.logos-root .ls.is-phone .ls-lb { padding: 12px; align-items: end; }
+.logos-root .ls.is-phone .ls-lb-card { border-radius: 16px 16px 0 0; }
+@media (prefers-reduced-motion: reduce) { .logos-root :is(.ls-lb, .ls-lb-card) { animation: none; } }
+
+/* one focus ring for every control, wherever it is: moss, 2px, outside the control */
+.logos-root :is(.ls-chip, .ls-tchip, .ls-hero, .ls-earlier, .ls-kd, .ls-tb, .l5mm-btn, .l5h-btn, .l5h-link, .l5-unibtn):focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .l5-unibtn-k { margin-left: 6px; height: 18px; font-size: 10.5px; }
+/* the canvas's last column keeps a margin to the edge when scrolled to (a scroller drops its own end padding) */
+.logos-root .ls-cols::after { content: ''; flex: none; width: 1px; height: 1px; }
+/* the row's words never wrap, however narrow the space is beside an open panel */
+.logos-root .ls-kd, .logos-root .ls-page { white-space: nowrap; }
+.logos-root .ls-kinds { overflow-x: auto; scrollbar-width: none; }

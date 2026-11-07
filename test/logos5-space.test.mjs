@@ -197,5 +197,30 @@ ok('  opens at the newest reply; Esc puts it away; a phone has it as a sheet wit
 const css6 = read('components/logos5/space.css');
 ok('  the space and the chatbox keep to its left; on a phone it is pulled up over the space', /\.ls\.has-thread:not\(\.is-phone\) \.ls-canvas \{ margin-right: 440px; \}/.test(css6) && /\.ls\.is-phone \.ls-thread \{[^}]*border-radius: 18px 18px 0 0/.test(css6) && /\.ls-it\.is-glow > \*/.test(css6));
 
+console.log('\n=== consistency pass: made things seen whole, enlarged, found ===');
+{
+  const x = html(h(S.L5Space, props({ made: [{ key: 'budget', kicker: 'Made · Table', title: 'Your month, if you move', turn: 2, preview: h('table', { className: 'the-table' }), onOpen: () => {} }] })));
+  ok('a made thing on the canvas is drawn to fit its card, and pressing it enlarges it (not straight beside)', /class="ls-made has-prev"[^>]*role="button"[^>]*aria-label="Made · Table: Your month, if you move\. Enlarge it"/.test(x) && /class="ls-prev is-fit"/.test(x) && /class="ls-enl"[^>]*>[\s\S]*?Enlarge/.test(x), x.slice(x.indexOf('ls-made'), x.indexOf('ls-made') + 400));
+  const plain = html(h(S.L5Space, props({ made: [{ key: 'plain', kicker: 'Made · Model', title: 'Saddle', turn: 2, onOpen: () => {} }] })));
+  ok('  with nothing to show, it opens beside the space as before', /class="ls-made"[^>]*aria-label="Made · Model: Saddle\. Open it"/.test(plain));
+  const src = read('components/logos5/L5Space.tsx');
+  ok('  enlarged: over the space, its title, the way to work with it beside, and Close; Esc and the backdrop close it', /className="ls-lb" role="dialog" aria-modal="true"/.test(src) && /Work with it beside the space/.test(src) && /aria-label="Close" onClick=\{\(\) => setEnlarged\(null\)\}/.test(src) && /e\.target === e\.currentTarget && setEnlarged\(null\)/.test(src) && /if \(e\.key === 'Escape'\) \{\s*e\.stopPropagation\(\);\s*setEnlarged\(null\);/.test(src));
+  ok('  Made and Brought in the row scroll the canvas to what they bring forward', /kind === 'made' \? '\.ls-col\.is-made' : '\.ls-col\.is-frame'/.test(src));
+  const css = read('components/logos5/space.css');
+  ok('  fitted by laying it out at a reading width and scaling it down; a tall one fades', /\.ls-prev\.is-fit > \.ls-inert \{[^}]*width: 440px;[^}]*zoom: 0\.55;[^}]*mask-image/.test(css));
+  ok('  one focus ring for every control in the space and on the map', /:is\(\.ls-chip, \.ls-tchip, \.ls-hero, \.ls-earlier, \.ls-kd, \.ls-tb, \.l5mm-btn, \.l5h-btn, \.l5h-link, \.l5-unibtn\):focus-visible \{ outline: 2px solid var\(--c-moss\); outline-offset: 2px; \}/.test(css));
+}
+{
+  const app = read('components/LogosApp.tsx');
+  ok('in the one space a view or an artifact asked for opens beside it (no more buttons changing a screen nobody sees)', /if \(oneViewRef\.current\) setBoardBeside\(t === 'chat' \? null : besideOnBoard\(t\)\);/.test(app) && (app.match(/if \(oneViewRef\.current\) setBoardBeside\('artifacts'\);/g) ?? []).length === 2 && /oneViewRef\.current = oneView;/.test(app));
+  ok('  "put X beside" and "close" in words act on what is beside the space', /is open beside the space now\./.test(app) && /Closed what was open beside the space\./.test(app) && /if \(!boardBesideRef\.current\) return \{ said: 'Nothing is open beside the space\.' \};/.test(app));
+  ok('  a message jumped to opens its idea in the space; a search hit opens the line on its idea', /if \(idea\) setSpaceOpen\(idea\);/.test(app) && /if \(oneViewRef\.current && spaceView\) return setSpaceOpen\(node\);/.test(app));
+  ok('  on the Universal Map the menu does not offer to save or move a map that is not on screen', /map\.nodes\.length && activeId && !l5Home && !l5Mind \? \[\{ label: 'Save the map as an image'/.test(app) && /activeId && !l5Home && !l5Mind \? \[\{ label: 'AR Mode'/.test(app));
+  ok('  the account sheet opens Memory in the app, not the old page', /onMemory=\{cloud \? \(\) => setL5Mind\(true\) : undefined\}/.test(app) && /onMemory \? \(/.test(read('components/account/AccountSheet.tsx')));
+  ok('  the Universal Map’s header says More and the shortcut, as a line’s does', /<L5Menu label="More" items=\{menu\} word button="More" \/>/.test(read('components/logos5/L5Chrome.tsx')) && /className="l5-kbd l5-unibtn-k"/.test(app));
+  const ctl = read('components/logos5/l5-controls.css');
+  ok('the paper is light again: its grain barely there (.055, was .18), and drawn once on the Universal Map', /0 0 0 \.055 0'\/%3E/.test(ctl) && /\.l5h-main \{ background-image: none; \}/.test(read('components/logos5/revision2.css')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

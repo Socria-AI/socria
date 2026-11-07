@@ -167,7 +167,7 @@ export function ContentView({
     return (
       <section className="l5c" aria-label="Content">
         <div className="l5c-readhead">
-          <button type="button" className="l5v-link" onClick={onBack}>
+          <button type="button" className="l5-link" onClick={onBack}>
             ← All content
           </button>
           <span className="l5c-readt">{byId.get(opened)?.title ?? 'Document'}</span>
@@ -246,7 +246,7 @@ export function ContentView({
                     <ul className="l5c-spread" aria-label="In this stack">
                       {p.stack.items.map((x) => (
                         <li key={x}>
-                          <button type="button" className="l5v-link" onClick={() => onOpen(x)}>
+                          <button type="button" className="l5-link" onClick={() => onOpen(x)}>
                             {byId.get(x)?.title ?? 'Document'}
                           </button>
                           <button type="button" className="l5c-out" aria-label={`Take “${byId.get(x)?.title ?? 'it'}” out of the stack`} onClick={() => save(unstack(board, x, { x: p.x, y: p.y }))}>

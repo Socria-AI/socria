@@ -409,6 +409,22 @@ Pure, no model call, invisible: no mode, no badge, no setting. `LOGOS_EXPLAIN=of
 - **Did the reply do it**: `checkExplanation` reads a reply for each strategy, for the evals and the tests.
   `X-Socria-Explain` carries content-free strategy codes.
 
+### 8.8 Paper, consistency and broken controls
+
+- **Paper**: the ground is light paper again. Revision II's grain was drawn at .18 and doubled on the Universal Map,
+  which turned the cream into a darker, greyer card. It is now .055, drawn once.
+- **Made things in Everything**: each is drawn to fit its card, laid out at a reading width and scaled down so a
+  table or comparison shows whole, with a fade when tall. Pressed, it opens large over the space (`.ls-lb`) to
+  explore, with "Work with it beside the space". Choosing Made or Brought in the row scrolls the canvas to them.
+- **Controls that changed a screen nobody saw**: in the one space the old views are not drawn, so `setStudyTab`,
+  `showArtifact` and `openStudio` now open the thing beside the space. This fixes More → Write, "Show these on the
+  map", "Open ‹thing›" in a reply, citations, and the studio. Typed or spoken "put X beside" and "close" act on what
+  is beside the space; a message jumped to, or a search hit, opens its idea; on the Universal Map the menu no longer
+  offers to save or move a map that is not on screen; the account sheet opens Memory in the app, and "Take the tour
+  again" falls back to the tutorials where the tour has nothing to point at.
+- **One look**: the Universal Map's header says More and shows the search shortcut, as a line's does; Stop and the
+  Content links use the shared `l5-link`; every control has the same moss focus ring; the guide no longer says "⋯".
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

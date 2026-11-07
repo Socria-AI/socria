@@ -385,7 +385,7 @@ export function L5Working({ steps, onStop }: { steps: { label: string; state: 'd
         ))}
       </ol>
       {onStop && (
-        <button type="button" className="l5v-link" onClick={onStop}>
+        <button type="button" className="l5-link" onClick={onStop}>
           Stop
         </button>
       )}

@@ -174,6 +174,9 @@ export function L5Space({
   const [threadOn, setThreadOn] = useState(false);
   const [hoverTurn, setHoverTurn] = useState<number | null>(null);
   const threadRef = useRef<HTMLDivElement>(null);
+  // A MADE THING, ENLARGED (Revision VI): drawn to fit its card on the canvas; pressed, it opens large over the space
+  // to look into, with the way to work with it beside the space
+  const [enlarged, setEnlarged] = useState<string | null>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
@@ -249,6 +252,17 @@ export function L5Space({
     for (const b of brought) if (b.turn === hoverTurn) g.add(broughtKey(b.key));
     return g;
   }, [hoverTurn, rows, ideas, made, brought]);
+  useEffect(() => {
+    if (!enlarged) return;
+    const on = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation();
+        setEnlarged(null);
+      }
+    };
+    window.addEventListener('keydown', on, true);
+    return () => window.removeEventListener('keydown', on, true);
+  }, [enlarged]);
   // the thread opens at its newest reply; Esc puts it away
   useLayoutEffect(() => {
     const el = threadRef.current;
@@ -368,6 +382,18 @@ export function L5Space({
     return () => ro.disconnect();
   }, [follow, openKey]);
 
+  // THE ROW FINDS WHAT IT BRINGS FORWARD: Made scrolls the canvas to what was made, Brought to what was brought in —
+  // they sit at its far edges, and were often off screen
+  useEffect(() => {
+    if (narrow || (kind !== 'made' && kind !== 'brought')) return;
+    const sc = scrollRef.current;
+    const col = colsRef.current?.querySelector<HTMLElement>(kind === 'made' ? '.ls-col.is-made' : '.ls-col.is-frame');
+    if (!sc || !col) return;
+    const want = Math.max(0, col.offsetLeft - 40);
+    if (typeof sc.scrollTo === 'function') sc.scrollTo({ left: want, behavior: 'smooth' });
+    else sc.scrollLeft = want;
+  }, [kind, narrow]);
+
   // READING ORDER (Revision IV): the frame column, then each column top to bottom, then what was made — the order
   // the cards settle in when the space opens
   const inFrame = new Set(layout.frame);
@@ -436,20 +462,28 @@ export function L5Space({
   };
   const thingEl = (c: SpaceThing, what: 'brought' | 'made') => {
     const k = what === 'brought' ? broughtKey(c.key) : madeKey(c.key);
+    // something to look at is enlarged first; with nothing to show, the card opens beside the space as before
+    const act = c.preview ? () => setEnlarged(k) : c.onOpen;
     return (
       <div key={k} className={`ls-it${back(k)}`} data-k={k} style={order(k)}>
         <div
-          className={`ls-${what === 'brought' ? 'file' : 'made'}`}
-          role={c.onOpen ? 'button' : undefined}
-          tabIndex={c.onOpen ? 0 : undefined}
-          onClick={c.onOpen}
-          onKeyDown={press(c.onOpen)}
-          aria-label={`${c.kicker}${c.title ? `: ${c.title}` : ''}${c.onOpen ? '. Open it' : ''}`}
+          className={`ls-${what === 'brought' ? 'file' : 'made'}${c.preview ? ' has-prev' : ''}`}
+          role={act ? 'button' : undefined}
+          tabIndex={act ? 0 : undefined}
+          onClick={act}
+          onKeyDown={press(act)}
+          aria-label={`${c.kicker}${c.title ? `: ${c.title}` : ''}${c.preview ? '. Enlarge it' : c.onOpen ? '. Open it' : ''}`}
         >
           <span className="ls-t ls-tt">{c.title || c.kicker}</span>
           {c.preview ? (
-            <div className="ls-prev">
+            <div className={`ls-prev${what === 'made' ? ' is-fit' : ''}`}>
               <Inert>{c.preview}</Inert>
+              <span className="ls-enl" aria-hidden="true">
+                <svg viewBox="0 0 16 16" width="12" height="12" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M9.5 2.5h4v4M13.5 2.5 9 7M6.5 13.5h-4v-4M2.5 13.5 7 9" />
+                </svg>
+                Enlarge
+              </span>
             </div>
           ) : null}
           {c.note && what === 'brought' && <span className="ls-note">{c.note}</span>}
@@ -502,6 +536,34 @@ export function L5Space({
       {words(openKey)}
     </div>
   );
+
+  const big = enlarged ? [...made.map((m) => ({ m, k: madeKey(m.key) })), ...brought.map((m) => ({ m, k: broughtKey(m.key) }))].find((x) => x.k === enlarged)?.m ?? null : null;
+  const lightboxEl = big ? (
+    <div className="ls-lb" role="dialog" aria-modal="true" aria-label={big.title || big.kicker} onClick={(e) => e.target === e.currentTarget && setEnlarged(null)}>
+      <div className="ls-lb-card">
+        <div className="ls-lb-head">
+          <span className="ls-t ls-tt">{big.title || big.kicker}</span>
+          <span className="ls-sp" />
+          {big.onOpen && (
+            <button
+              type="button"
+              className="l5-link is-go"
+              onClick={() => {
+                setEnlarged(null);
+                big.onOpen?.();
+              }}
+            >
+              Work with it beside the space <span className="l5-ar">→</span>
+            </button>
+          )}
+          <button type="button" className="l5-icon ls-lb-x" aria-label="Close" onClick={() => setEnlarged(null)}>
+            ×
+          </button>
+        </div>
+        <div className="ls-lb-body">{big.preview}</div>
+      </div>
+    </div>
+  ) : null;
 
   const threadEl = threadOn ? (
     <aside className="ls-thread" aria-label="Socria’s replies">
@@ -675,6 +737,7 @@ export function L5Space({
         </div>
         {chatEl}
         {threadEl}
+        {lightboxEl}
       </div>
     );
   }
@@ -717,6 +780,7 @@ export function L5Space({
       </div>
       {chatEl}
       {threadEl}
+      {lightboxEl}
     </div>
   );
 }

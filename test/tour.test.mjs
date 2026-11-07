@@ -89,7 +89,7 @@ console.log('=== onboarding starts it, after the first answer ===');
   ok('  never over the guide, a sheet, or the first map rising', /const screenBusy = guideOpen \|\| styleOpen \|\| emerging/.test(app));
   ok('  and gives the map a moment, never forever', /mapDrawn \? 900 : 6000/.test(app));
   ok('  taking it writes its own key', /localStorage\.setItem\(LOGOS_TOUR_KEY, '1'\)/.test(app));
-  ok('  and it can be taken again from the account sheet', /onRetakeTour=\{\(\) => setTourOpen\(true\)\}/.test(app));
+  ok('  and it can be taken again from the account sheet — the tutorials instead where the tour has nothing to point at', /onRetakeTour=\{\(\) => \(typeof document !== 'undefined' && document\.querySelectorAll\('\[data-tour\]'\)\.length >= 2 \? setTourOpen\(true\) : setGuideOpen\(true\)\)\}/.test(app));
 }
 
 console.log('=== the note sits beside the control, never on it ===');

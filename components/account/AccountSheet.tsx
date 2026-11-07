@@ -48,7 +48,7 @@ export function AccountSheet({
   onClose,
   isOne = false,
   plan,
-  onRetakeTour,
+  onRetakeTour, onMemory,
 }: {
   open: boolean;
   onClose: () => void;
@@ -63,6 +63,8 @@ export function AccountSheet({
    */
   plan?: PlanState;
   onRetakeTour?: () => void;
+  /** Memory in the app itself (the header's Memory): when given, the sheet opens it there rather than going to /memory */
+  onMemory?: () => void;
 }) {
   const { user } = useUser();
   const { signOut } = useClerk();
@@ -284,10 +286,24 @@ export function AccountSheet({
               <div className="acts">
                 {/* One path to an irreversible action, and it is the one
                     that already has the confirmations. */}
-                <Link className="act" href="/memory" onClick={onClose}>
-                  <span className="t">Memory</span>
-                  <span className="d">What Socria remembers about you, and why</span>
-                </Link>
+                {onMemory ? (
+                  <button
+                    type="button"
+                    className="act"
+                    onClick={() => {
+                      onClose();
+                      onMemory();
+                    }}
+                  >
+                    <span className="t">Memory</span>
+                    <span className="d">What Socria remembers about you, and why</span>
+                  </button>
+                ) : (
+                  <Link className="act" href="/memory" onClick={onClose}>
+                    <span className="t">Memory</span>
+                    <span className="d">What Socria remembers about you, and why</span>
+                  </Link>
+                )}
                 <Link className="act" href="/account/data" onClick={onClose}>
                   <span className="t">Export or delete everything</span>
                   <span className="d">Verbatim, nothing summarised — and it does not come back</span>

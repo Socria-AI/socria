@@ -5128,6 +5128,9 @@ export function LogosApp({
   }
   function setStudyTab(t: Viewport) {
     setScreen((s) => choose(t, s));
+    // ONE SPACE: the tabs are not drawn, so a view asked for opens beside the space (the conversation is the space
+    // itself) — before this, "Show these on the map", a citation or "open the Logic Map" changed a screen nobody saw
+    if (oneViewRef.current) setBoardBeside(t === 'chat' ? null : besideOnBoard(t));
   }
   /**
    * A NEW 3D STUDIO (CAD): an empty Live 3D scene open in Artifacts, with the conversation beside it, so
@@ -5140,6 +5143,7 @@ export function LogosApp({
     askedMakeRef.current = false;
     setArtSel((m) => ({ ...m, [id]: STUDIO }));
     setScreen((s) => onMade(true, s, narrowRef.current));
+    if (oneViewRef.current) setBoardBeside('artifacts');
   }
   /** An artifact, at full size: "w:doc", "d:<display>", "p:<practice>", "m:<model>", "v:plot". Artifacts open beside is already on screen. */
   function showArtifact(key: string) {
@@ -5147,6 +5151,8 @@ export function LogosApp({
     if (!id) return;
     setArtSel((m) => ({ ...m, [id]: key }));
     setScreen((s) => (s.view === 'artifacts' || s.beside === 'artifacts' ? s : choose('artifacts', s)));
+    // one space: Artifacts opens beside it (More → Write, "Open ‹thing›" in a reply, a made card)
+    if (oneViewRef.current) setBoardBeside('artifacts');
   }
   /**
    * The conversation on screen, or not. On a wide screen it docks beside the
@@ -5328,13 +5334,22 @@ export function LogosApp({
       case 'view':
         setL5Home(false);
         setL5Mind(false);
-        if (screenRef.current.view === cmd.view && !l5Home && !l5Mind) return { said: `${cap(VIEW_SAID[cmd.view])} is open.` };
+        if (!oneViewRef.current && screenRef.current.view === cmd.view && !l5Home && !l5Mind) return { said: `${cap(VIEW_SAID[cmd.view])} is open.` };
         setStudyTab(cmd.view);
         return { said: cmd.view === 'chat' ? 'Back to the conversation.' : `Opened ${VIEW_SAID[cmd.view]}.` };
       case 'beside':
       case 'pair': {
         const view = cmd.kind === 'pair' ? cmd.view : screenRef.current.view === cmd.view ? 'chat' : screenRef.current.view;
         const beside = cmd.kind === 'pair' ? cmd.beside : cmd.view;
+        // the one space: the conversation is the space itself, and one thing opens beside it
+        if (oneViewRef.current) {
+          const b = besideOnBoard(beside === 'chat' ? view : beside);
+          if (!b) return { said: 'The conversation is the space itself — it is always here.' };
+          const empty = besideEmpty(b, { content: contentItems.length, ideas: mapRef.current.nodes.length, artifacts: artifactListRef.current.length });
+          if (empty) return { said: empty };
+          setBoardBeside(b);
+          return { said: `${cap(VIEW_SAID[b])} is open beside the space now.` };
+        }
         if (narrowNow) {
           setStudyTab(beside);
           return { said: `A phone shows one view at a time — opened ${VIEW_SAID[beside]}.` };
@@ -5347,9 +5362,14 @@ export function LogosApp({
         return { said: `${cap(VIEW_SAID[beside])} is beside ${VIEW_SAID[view]} now.` };
       }
       case 'close-beside':
+        if (oneViewRef.current) {
+          if (!boardBesideRef.current) return { said: 'Nothing is open beside the space.' };
+          setBoardBeside(null);
+          return { said: 'Closed what was open beside the space.' };
+        }
         if (!screenRef.current.beside) return { said: 'Nothing is open beside — this is one view already.' };
         setScreen((s) => ({ ...s, beside: null }));
-        return { said: 'Closed the split view.' };
+        return { said: 'Closed the view beside.' };
       case 'artifact':
         showArtifact(cmd.key);
         return { said: `Opened “${cmd.title}” in Artifacts.` };
@@ -6413,6 +6433,10 @@ export function LogosApp({
   // which is the chatbox. The turn being read is open in full above the chatbox: the newest, unless another was pressed;
   // folded, every turn is on the board.
   const [boardBeside, setBoardBeside] = useState<'content' | 'artifacts' | 'logic_map' | null>(null);
+  /** the one view (the space or the board) is what is drawn: read by the handlers that open things, set each render */
+  const oneViewRef = useRef(false);
+  const boardBesideRef = useRef(boardBeside);
+  boardBesideRef.current = boardBeside;
   const [reading, setReading] = useState<number | null>(null);
   const [sheetOpen, setSheetOpen] = useState(true);
   // Revision II: the page's focus is set by the header's tabs and nothing else — what the screen's rules choose
@@ -7007,7 +7031,8 @@ export function LogosApp({
         // a document is Content: read there, as it was read in
         const sid = activeIdRef.current;
         if (sid) setContentSel((m) => ({ ...m, [sid]: `doc:${docId}` }));
-        setStudyTab('content');
+        // (the screen, not the space: a document read in is a card on the canvas, opened when pressed)
+        setScreen((s) => choose('content', s));
       } else {
         // what was made is shown in Artifacts, at full size, beside the conversation (Alex's rule C),
         // and the turn that made it says so — unless a new 3D studio was opened by hand since: it is
@@ -7578,6 +7603,13 @@ export function LogosApp({
     if (oneView) {
       const at = boardTurns.findIndex((t) => t.askedId === id || t.replyId === id);
       if (at >= 0) {
+        // the space opens on an idea, not a turn: the one that turn put on the map, when it put one there
+        if (spaceView) {
+          const t = boardTurns[at];
+          const fm = new Map<string, string[]>(links?.fromMsg ?? []);
+          const idea = [t.replyId, t.askedId].flatMap((x) => (x ? fm.get(x) ?? [] : [])).find((n) => mapRef.current.nodes.some((k) => k.id === n));
+          if (idea) setSpaceOpen(idea);
+        }
         setReading(at);
         setSheetOpen(true);
       }
@@ -8058,7 +8090,8 @@ export function LogosApp({
     ...(phone && activeId && !l5Home ? [{ label: 'Search everything', hint: 'Conversations, files and artifacts', onSelect: () => setSearchOpen(Date.now()) }] : []),
     { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
-    ...(map.nodes.length ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
+    // (a line's own map, only while that line is on screen — on the Universal Map it would save one you cannot see)
+    ...(map.nodes.length && activeId && !l5Home && !l5Mind ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
     // a phone is never a big screen: offered where it can apply, and always where it is on to be left
     ...(!phone || cabin
@@ -8066,7 +8099,7 @@ export function LogosApp({
       : []),
     // on a wide screen the line of thinking is one board with nothing floating over it (Logos 5 One view): Synthesize is here
     ...(activeId && !narrow && !l5Home && canSynthesize(map) ? [{ label: 'Synthesize', hint: 'See where your thinking stands', onSelect: () => void synthesize('workspace') }] : []),
-    ...(activeId ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
+    ...(activeId && !l5Home && !l5Mind ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
     ...(!handsWanted
       ? [{ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands }]
       : [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }]),
@@ -8259,6 +8292,7 @@ export function LogosApp({
   // ONE BOARD (lib/logos5/oneView.ts): a wide screen's way of showing a line of thinking that has something in it.
   // A shared room keeps the conversation as it was. The turn the sheet reads is the newest, unless another was pressed.
   const oneView = oneViewOn({ narrow, line: l5 && !!activeId && !l5Home && !l5Mind && !hydrating && !room.active, turns: messages.length, busy: busyHere });
+  oneViewRef.current = oneView;
   const spaceOn = oneView && spaceView;
   const boardTurns = oneView ? canvasTurns(messages, { pending: busyHere || !!streaming }) : [];
   const sheetAt = oneView && sheetOpen ? sheetTurn(boardTurns.length, reading) : null;
@@ -8728,13 +8762,13 @@ export function LogosApp({
         <p className="l5v-ingest" role="note">
           <span className="l5v-ingest-k">Added to Files</span>
           {brought.map((c) => (
-            <button key={c.id} type="button" className="l5v-link" onClick={() => openContent(c.id)}>
+            <button key={c.id} type="button" className="l5-link" onClick={() => openContent(c.id)}>
               {c.title}
             </button>
           ))}
           <button
             type="button"
-            className="l5v-link is-quiet"
+            className="l5-link is-quiet"
             onClick={() => {
               openContent(null);
               setStudyTab('content');
@@ -9210,6 +9244,8 @@ export function LogosApp({
    */
   function chatSideChosen(side: ChatSide): string {
     putChatSide(side);
+    // the one space has no conversation panel to move: Socria's words are the bubble in the space, the chatbox at its foot
+    if (oneViewRef.current) return 'In the space the conversation is Socria’s bubble and the chatbox at the foot — there is no panel to move.';
     if (narrowRef.current) return `On a wider screen the conversation will sit on the ${side}.`;
     const now = screenRef.current;
     if (now.view !== 'chat' && now.beside !== 'chat') setScreen((s) => ({ ...s, beside: 'chat' }));
@@ -9667,6 +9703,8 @@ export function LogosApp({
     switchSession(id);
     if (node)
       setTimeout(() => {
+        // the space shows the idea itself, opened; elsewhere the Logic Map, on it
+        if (oneViewRef.current && spaceView) return setSpaceOpen(node);
         setStudyTab('logic_map');
         showNodes([node]);
       }, 80);
@@ -9833,6 +9871,8 @@ export function LogosApp({
                     <path d="M20 20l-4.2-4.2" />
                   </svg>
                   <span className="l5-unibtn-l">Search</span>
+                  {/* the shortcut said as it is in a line's header */}
+                  {!narrow && <kbd className="l5-kbd l5-unibtn-k">{typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '') ? '⌘K' : 'Ctrl K'}</kbd>}
                 </button>
                 <button type="button" className={`l5-unibtn is-list${l5List ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={l5List} title="Every conversation, as a list">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
@@ -10177,7 +10217,10 @@ export function LogosApp({
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
         isOne={one}
-        onRetakeTour={() => setTourOpen(true)}
+        // the tour points at the map, a card, the chatbox and Make: where those are not on screen (the Universal Map),
+        // the tutorials say the same, one at a time — rather than a tour that ends before it starts
+        onRetakeTour={() => (typeof document !== 'undefined' && document.querySelectorAll('[data-tour]').length >= 2 ? setTourOpen(true) : setGuideOpen(true))}
+        onMemory={cloud ? () => setL5Mind(true) : undefined}
       />
 
       {/* Sleep Mode (lib/sleep.ts): the week's free tokens are spent — said once, with when Socria wakes */}

@@ -270,8 +270,9 @@
 .logos-root .l5 .l5h-main .l5h-find-go { border: 0; background: var(--c-ink); box-shadow: none; color: var(--c-paper); }
 .logos-root .l5 .l5h-main .l5h-find-go:hover:not(:disabled) { border: 0; background: var(--c-moss); transform: translateY(-2px); }
 .logos-root .l5 .l5h-main .l5h-find-go:disabled { opacity: 1; background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); }
-/* the Universal Map is paper: the dot grid belongs behind a Logic Map only (Celestial keeps its own sky) */
-html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) .logos-root .l5 .l5h-main { background-image: var(--c-grain); background-size: auto; }
+/* the Universal Map is paper: the dot grid belongs behind a Logic Map only (Celestial keeps its own sky). The page
+   under it already carries the paper's grain — drawn again here it doubled, and the home read as darker paper. */
+html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) .logos-root .l5 .l5h-main { background-image: none; }
 
 /* a reply's own elements — a chart, a table, worked steps — sit in a square hairline, not a tinted card */
 .logos-root .l5 :is(.ln, .ln-pending) { border-radius: 0; background: transparent; border-color: var(--c-rule-2); box-shadow: none; }

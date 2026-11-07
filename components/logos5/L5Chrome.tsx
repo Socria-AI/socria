@@ -207,17 +207,8 @@ export function L5Header({
           </button>
         )}
         {presence}
-        <L5Menu
-          label="More"
-          items={menu}
-          button={
-            <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor" aria-hidden="true">
-              <circle cx="5.5" cy="12" r="1.6" />
-              <circle cx="12" cy="12" r="1.6" />
-              <circle cx="18.5" cy="12" r="1.6" />
-            </svg>
-          }
-        />
+        {/* the same word as a line's header (Revision II: icons become words) — one More, wherever you are */}
+        <L5Menu label="More" items={menu} word button="More" />
         {account}
       </div>
     </header>

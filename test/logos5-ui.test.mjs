@@ -117,7 +117,7 @@ console.log('\n=== the chrome ===');
   ok('a card tied to no message says so plainly', none.includes('isn’t tied to a message here'));
   const head = html(h(U.L5Header, { railOpen: true, onToggleRail: () => {}, title: 'Two offers', stage: { label: 'Map', count: 4, open: false, fresh: true, onToggle: () => {} }, menu: [{ label: 'Synthesize', onSelect: () => {} }] }));
   ok('the header says where you are, and what the workspace holds', head.includes('Two offers') && head.includes('Map') && head.includes('l5-count">4') && head.includes('is-fresh'));
-  ok('…with one menu for the rest', head.includes('aria-label="More"') && head.includes('aria-haspopup="menu"'));
+  ok('…with one menu for the rest — the word More, as in a line\u2019s header', (head.includes('aria-label="More"') || />More<\/button>/.test(head)) && head.includes('aria-haspopup="menu"'));
   const quiet = html(h(U.L5Header, { railOpen: false, onToggleRail: () => {}, title: 'New', stage: null, menu: [] }));
   ok('nothing in the workspace yet: no workspace button at all', !quiet.includes('l5-stagebtn'));
   const sh = html(h(U.L5StageHead, { title: 'Thinking Map', sub: 'Deciding', onClose: () => {} }));
