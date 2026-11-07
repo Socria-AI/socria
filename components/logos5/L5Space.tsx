@@ -453,9 +453,7 @@ export function L5Space({
       {/* SOCRIA'S BUBBLE: the reply in words, its own bubble pointing at the idea — the one place it is a conversation */}
       <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}`} aria-label="Socria’s reply">
         <span className="ls-bub-who">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img src="/socria-mark.png" alt="" width={15} height={15} />
-          Socria
+          <span className="ls-bub-name">Socria</span>
           {openTurn !== null && <span className="ls-tn">{t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
         </span>
         <div className="ls-body">{openBody}</div>

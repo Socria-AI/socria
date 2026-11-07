@@ -198,8 +198,9 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-bub { position: relative; margin-top: 16px; padding: 12px 16px 10px; border: 1px solid rgba(var(--c-moss-rgb), 0.22); border-radius: 18px 18px 18px 6px; background: #fff; box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 22px 44px -28px rgba(35, 36, 31, 0.5); }
 .logos-root .ls-bub.has-tail::before { content: ''; position: absolute; left: 44px; top: -8px; width: 14px; height: 14px; background: #fff; border-left: 1px solid rgba(var(--c-moss-rgb), 0.22); border-top: 1px solid rgba(var(--c-moss-rgb), 0.22); transform: rotate(45deg); }
 .logos-root .ls-bub:not(.has-tail) { margin-top: 0; }
-.logos-root .ls-bub-who { display: flex; align-items: center; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #465a26); }
-.logos-root .ls-bub-who img { display: block; width: 15px; height: 15px; }
+.logos-root .ls-bub-who { display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #465a26); }
+/* The name, not the mark: Socria in italic moss Instrument Serif. */
+.logos-root .ls-bub-name { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-style: italic; font-weight: 400; font-size: 19px; line-height: 1; letter-spacing: .005em; color: var(--ls-moss, #5e7633); }
 .logos-root .ls-bub-who .ls-tn { font-family: inherit; font-style: normal; font-size: 12px; font-weight: 500; }
 .logos-root .ls-bub .ls-body { margin: 6px 0 0; padding: 0; border: 0; }
 .logos-root .ls-bub .l5-prose.is-reply { font-size: 14.5px; line-height: 1.55; color: var(--c-ink-70); }

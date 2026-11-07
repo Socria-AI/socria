@@ -350,7 +350,7 @@ The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space
 
 ### 8.4 Revision V — Socria's bubble
 
-- **Socria's reply is its own bubble** under the open idea, with a small pointer up at it: the Socria mark, the reply
+- **Socria's reply is its own bubble** under the open idea, with a small pointer up at it: signed "Socria" in italic moss Instrument Serif (no mark), the reply
   in words (its opening sentence plain, not a headline), the question in larger serif, then Copy, Reply, Retry,
   Listen. It is the one part of the space that is a conversation; pressing the question puts the cursor in the
   chatbox. With no idea open yet, the bubble stands alone.
