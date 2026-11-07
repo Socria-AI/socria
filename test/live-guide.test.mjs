@@ -302,6 +302,34 @@ console.log('\n=== drawing: frame to screen, anchored or a 2D note ===');
   ok('an arrow runs between two objects; a diagram is a panel, not on the picture', arrow[0].to && arrow[1].mode === 'fallback' && arrow[1].overlay.kind === 'diagram');
 }
 
+console.log('\n=== drawn by hand: loops, arrows, the way round, ticks ===');
+{
+  const box = { x: 120, y: 80, w: 160, h: 90 };
+  const pts = G.loopPoints(box, 'lid');
+  ok('a loop is the same every time for the same object (it does not jitter between frames)', G.loopPath(box, 'lid') === G.loopPath(box, 'lid') && G.loopPath(box, 'lid') !== G.loopPath(box, 'jar'));
+  const moved = G.loopPoints({ ...box, x: box.x + 37, y: box.y - 12 }, 'lid');
+  ok('  …and moves with its object without changing shape', moved.every((p, i) => Math.abs(p.x - pts[i].x - 37) < 1e-9 && Math.abs(p.y - pts[i].y + 12) < 1e-9));
+  const inside = (pt) => { let c = false; for (let i = 0, j = pts.length - 1; i < pts.length; j = i++) { const a = pts[i], b = pts[j]; if ((a.y > pt.y) !== (b.y > pt.y) && pt.x < ((b.x - a.x) * (pt.y - a.y)) / (b.y - a.y) + a.x) c = !c; } return c; };
+  const mids = [{ x: box.x, y: box.y + box.h / 2 }, { x: box.x + box.w, y: box.y + box.h / 2 }, { x: box.x + box.w / 2, y: box.y }, { x: box.x + box.w / 2, y: box.y + box.h }];
+  ok('  it goes round the thing: the middle of every side is inside it', mids.every(inside), J(mids.map(inside)));
+  const xs = pts.map((p) => p.x), ys = pts.map((p) => p.y);
+  ok('  …without wandering far from it', Math.max(...xs) - Math.min(...xs) < box.w * 1.6 + 40 && Math.max(...ys) - Math.min(...ys) < box.h * 1.6 + 40);
+  ok('  and it runs on past where it began, as a hand does', Math.hypot(pts[0].x - pts[pts.length - 1].x, pts[0].y - pts[pts.length - 1].y) > 4);
+  const a = { x: 40, y: 300 }, b = { x: 260, y: 120 };
+  const ar = G.arrowPaths(a, b, 'jar>lid');
+  ok('an arrow ends where it points, its head at the tip', ar.shaft.endsWith('260 120') && /L260 120 L/.test(ar.head));
+  const nums = ar.head.match(/-?[0-9.]+/g).map(Number);
+  const [lx, ly, , , rx, ry] = nums;
+  ok('  …and the head opens back along the way it came', (lx - b.x) * (a.x - b.x) + (ly - b.y) * (a.y - b.y) > 0 && (rx - b.x) * (a.x - b.x) + (ry - b.y) * (a.y - b.y) > 0, ar.head);
+  const t = G.turnPaths({ x: 200, y: 100 }, 80, 26, 'ccw', 'lid');
+  const tp = t.arc.match(/-?[0-9.]+/g).map(Number);
+  ok('the way round, anticlockwise: it starts at the front and runs left to right along it', tp[1] > 100 && tp[2] < 200 && Number(t.arc.split(' C')[1].split(' ').slice(-2)[0]) > tp[0], t.arc.slice(0, 80));
+  const tc = G.turnPaths({ x: 200, y: 100 }, 80, 26, 'cw', 'lid').arc.match(/-?[0-9.]+/g).map(Number);
+  ok('  clockwise: from the front right, right to left', tc[0] > 200 && tc[1] > 100 && Number(G.turnPaths({ x: 200, y: 100 }, 80, 26, 'cw', 'lid').arc.split(' C')[1].split(' ').slice(-2)[0]) < tc[0]);
+  ok('a tick is one stroke, down then a longer sweep up', /^M[0-9.]+ [0-9.]+ L[0-9.]+ [0-9.]+ Q/.test(G.tickPath(0, 0, 20)));
+  ok('a word sits above its object, or below it when the top of the screen is in the way', G.tagSpot({ ...box, y: 220 }, { w: 800, h: 600 }).below === false && G.tagSpot({ ...box, y: 30 }, { w: 800, h: 600 }).below === true);
+}
+
 console.log('\n=== cost and privacy ===');
 {
   const words = (t) => t.split(/\s+/).filter(Boolean).length;
@@ -320,7 +348,11 @@ console.log('\n=== cost and privacy ===');
   ok('the camera starts only from a press, after saying what is sent and kept; stops on close', /Start the camera/.test(ui) && /Nothing is recorded or kept/.test(ui) && /if \(!open\) \{\s*inflight\.current\?\.abort\(\);\s*stopCamera\(\);/.test(ui));
   ok('  the back camera by default; one camera at a time (hands are stopped)', /useState<'environment' \| 'user'>\('environment'\)/.test(ui) && /if \(handSession\.active\) handSession\.stop\(\);/.test(ui));
   ok('  the mic only while held; an emergency answered before any frame is taken', /onPointerDown=\{\(\) => voice\.press\(\)\}/.test(ui) && /const frame = h\.level === 'emergency' \|\| h\.level === 'stop' \? null : grab\(\);/.test(ui));
-  ok('  pause, replay, adjust, hide, done, next and back are all there', ['Replay', "'Resume' : 'Pause'", 'Adjust', "'Show' : 'Hide'", "'Looking…' : 'Done'", 'aria-label="Next step"', 'aria-label="Previous step"'].every((k) => ui.includes(k)));
+  ok('  pause, replay, adjust, hide, done, next and back are all there', ['Replay', "'Resume' : 'Pause'", 'Adjust', "'Show' : 'Hide'", "'Looking…' : 'I’ve done it'", 'aria-label="Next step"', 'aria-label="Previous step"'].every((k) => ui.includes(k)));
+  const drawn = read('components/logos5/GuideDrawings.tsx');
+  ok('  marks are drawn by hand from the sketch helpers, a guess dashed and said "I think"', /loopPath\(b, seed/.test(drawn) && /arrowPaths\(/.test(drawn) && /turnPaths\(/.test(drawn) && /I think this is the \$\{name\}/.test(drawn) && /is-dashed/.test(drawn));
+  ok('  a frame leaving the device is shown, every time (a flash), and counted as frames sent', /setFlash\(\(f\) => f \+ 1\)/.test(ui) && /frames sent/.test(ui));
+  ok('  an emergency card offers to call only the numbers its own words name', /function callable\(text\?: string\)/.test(ui) && /href=\{`tel:\$\{n\}`\}/.test(ui));
   ok('the steps can be kept in the line of thinking, as Logos 5’s own sequence', (() => { const k = G.keepAsTurn('How do I open this jar?', plan); return /^Live guidance: How do I open this jar\?/.test(k.asked) && /```ui\n\{"type":"sequence","kind":"steps"/.test(k.answer) && /pull-off cap/.test(k.answer); })());
 }
 

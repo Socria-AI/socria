@@ -474,6 +474,22 @@ button in AR Mode); anybody else sees a preview and the waitlist.
   two a step, six seconds apart, only after the picture changed and settled; four checks a step in all.
 - **Kept.** When the task is done, "Keep these steps" adds them to the line of thinking as a steps sequence (a new
   line named for the task if none is open), so the Logic Map and Artifacts have them like any other turn.
+- **How it looks: by hand.** The marks on the picture are drawn the way a friend marks up a photo
+  (`components/logos5/GuideDrawings.tsx`, paths from `lib/guide/sketch.ts`): a loop round the thing that tilts a
+  little and runs past where it began, an arrow that bows with a head of two strokes, the way round as an arc of the
+  lid, a word on a paper tag a little askew in italic serif, joined to its thing by a curved line. Marigold ink over
+  a dark edge so it reads on any picture, drawn on as you watch; a guess is dashed and says "I think this is the
+  lid?". Every wobble is seeded by its object, so a loop keeps its shape as the camera moves. A "model" is a small
+  sketch card beside the thing — a jar and a hand turning its lid, a finger on a button, a plug pulled, a lever
+  pressed — in the manner of a good instruction sheet, and the same sketch is drawn in the card when the picture
+  cannot show the movement.
+- **The card.** Beside the picture on a desk, under it on a phone: signed Socria in italic moss, the steps as a short
+  list (done ones ticked, with what Socria saw when it checked; the current one large in Instrument Serif; the rest
+  waiting), "What I see" when a step is not done yet, and one filled control, "I’ve done it". Replay, pause, adjust
+  and hide are quiet icons by the signature. Asking has a field with the mic and a round send button, three ideas to
+  start from, and on a desk how it works in three lines. The camera bar says how many frames have been sent, and a
+  soft flash marks each one leaving the device. An emergency card offers to call only the numbers its own words name.
+  The sheet keeps to Logos 5's six type sizes and four corners, and `test/logos5-system.test.mjs` now holds it to them.
 
 ## 9. The Logic Map draws almost anything
 
@@ -628,8 +644,9 @@ its own glyph beside it.
   turning or moving much nearer (the overlay falls back instead), and a
   steady hand on a plain lid can still pull a box by up to the few-pixel
   fine-tune. Voice is the push-to-talk transcription; there is no spoken
-  reply. Real 3D models are not drawn: the "model" overlay is a simple 2D
-  drawing of ten common things, animated.
+  reply. Real 3D models are not drawn: the "model" overlay is a hand-drawn
+  sketch (a jar, a bottle, a knob, a lever, a plug and a few movements),
+  animated; things it has no sketch for fall back to the nearest one.
 
 ## 11. How it is held
 
@@ -661,13 +678,15 @@ its own glyph beside it.
 - `test/logos5-diagram-layout.test.mjs`: the cycle, tree, parts, concept and
   dated-timeline lenses — no overlaps, nothing lost, every line once, the
   same picture every time, on 160 seeded maps per lens and the odd ones.
-- `test/live-guide.test.mjs` (91): overlays checked before they are drawn;
+- `test/live-guide.test.mjs` (105): overlays checked before they are drawn;
   danger read from the words; tracking — a moved object found, a blank wall
   not pretended, a pan followed through a flickering patch, a slow pan, a
   hand over a plain lid not chased, a picture whose only detail keeps
   changing not taken for a camera move; the session (ask, guide, check,
   adapt, pause, replay, dismiss, adjust, rationed checks); drawing (anchored,
-  dashed when unsure, a note at the edge when lost); cost and privacy.
+  dashed when unsure, a note at the edge when lost); the hand-drawn marks
+  (the same every frame, moved with their object, a loop round the thing,
+  arrows and turns pointing the right way); cost and privacy.
   `test/guide-route.test.mjs` (42): the route through its real handler —
   signed out, not a tester, an unverified address, the access code without
   an account, a forged grant; an emergency and mains wiring answered with no

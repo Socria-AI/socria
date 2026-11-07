@@ -24,7 +24,7 @@ const chrome = read('components/logos5/L5Chrome.tsx');
 const views = read('components/logos5/L5Views.tsx');
 const composer = read('components/LogosComposer.tsx');
 const controls = read('components/logos5/l5-controls.css');
-const SHEETS = ['l5', 'l5v', 'redesign', 'study', 'canvas', 'tips', 'make-gallery'].map((f) => [f, read(`components/logos5/${f}.css`)]);
+const SHEETS = ['l5', 'l5v', 'redesign', 'study', 'canvas', 'tips', 'make-gallery', 'live-guide'].map((f) => [f, read(`components/logos5/${f}.css`)]);
 
 console.log('\n=== one controls sheet ===');
 ok('buttons.css and buttons-soft.css are gone', !existsSync(join(root, 'components/logos5/buttons.css')) && !existsSync(join(root, 'components/logos5/buttons-soft.css')));

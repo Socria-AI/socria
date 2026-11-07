@@ -19,12 +19,13 @@
 // with AR Mode.
 
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
-import { leastSure, planAsSteps, UNSURE, type GuidePlan, type Overlay, type Pt } from '@/lib/guide/overlay';
+import { leastSure, UNSURE, type GuidePlan, type Overlay } from '@/lib/guide/overlay';
 import { hazardOf } from '@/lib/guide/safety';
 import { placeAnchor, stepAnchors, toGray, trackSize, frameChange, type Anchor, type Gray } from '@/lib/guide/tracking';
 import {
   IDLE,
   MOVED,
+  boxToScreen,
   STILL,
   checkContext,
   coverFit,
@@ -39,6 +40,8 @@ import {
   type Placed,
 } from '@/lib/guide/session';
 import { checkBody } from '@/lib/guide/prompt';
+import { loopPath, tickPath } from '@/lib/guide/sketch';
+import { CameraMarks, HowSketch, Icon, IntroSketch, Tick } from '@/components/logos5/GuideDrawings';
 import { handSession } from '@/lib/hand-session';
 import { useVoiceInput } from '@/components/useVoiceInput';
 import './live-guide.css';
@@ -127,6 +130,10 @@ export function LiveGuide({
   const [now, setNow] = useState(0);
   const [confirmed, setConfirmed] = useState<Record<string, true>>({});
   const [join, setJoin] = useState<'idle' | 'sending' | 'done' | 'error'>('idle');
+  /** what the last check saw, and of which step — said under that step, not the next */
+  const [lastLook, setLastLook] = useState<{ step: number; saw: string; done: boolean } | null>(null);
+  /** bumped each time a frame leaves the device, for the flash that says so */
+  const [flash, setFlash] = useState(0);
 
   const videoRef = useRef<HTMLVideoElement>(null);
   const stageRef = useRef<HTMLDivElement>(null);
@@ -180,6 +187,7 @@ export function LiveGuide({
       stopCamera();
       dispatch({ type: 'restart' });
       setAdjusting(false);
+      setLastLook(null);
     }
   }, [open, stopCamera]);
   useEffect(() => () => stopCamera(), [stopCamera]);
@@ -214,6 +222,7 @@ export function LiveGuide({
     if (!ctx) return null;
     ctx.drawImage(v, 0, 0, size.w, size.h);
     const url = c.toDataURL('image/jpeg', 0.7);
+    setFlash((f) => f + 1);
     const t = trackSize(v.videoWidth, v.videoHeight);
     const tc = (trackCanvas.current ??= document.createElement('canvas'));
     tc.width = t.w;
@@ -260,6 +269,7 @@ export function LiveGuide({
         if (frame) prevGray.current = frame.gray;
         motion.current = { moved: false, stillSince: performance.now(), lastLook: performance.now(), autoChecks: {} };
         setConfirmed({});
+        setLastLook(null);
         dispatch({ type: 'planned', plan });
       } catch (e) {
         if ((e as Error)?.name !== 'AbortError') dispatch({ type: 'failed', error: 'I could not reach Socria just now.' });
@@ -300,6 +310,7 @@ export function LiveGuide({
           prevGray.current = frame.gray;
           setAnchors(anchorsRef.current);
         }
+        setLastLook({ step: st.step, saw: String(j.check.saw ?? ''), done: !!j.check.done });
         dispatch({ type: 'checked', check: j.check });
       } catch {
         dispatch({ type: 'failed', error: 'I could not reach Socria just now.' });
@@ -388,21 +399,26 @@ export function LiveGuide({
 
   const step = currentStep(s);
   const placed: Placed[] = useMemo(() => {
-    if (!s.plan || !step || s.dismissed) return [];
+    // nothing drawn once it is done, or when the card says to get help instead
+    if (!s.plan || !step || s.dismissed || s.phase === 'done' || s.phase === 'safety') return [];
     return placeOverlays({ plan: s.plan, step, anchors, moved: s.moved, fit, now, tracking });
   }, [s.plan, step, s.dismissed, anchors, s.moved, fit, now, tracking]);
-  const fallbacks = placed.filter((p) => p.mode === 'fallback' && p.overlay.kind !== 'diagram' && p.why);
-  // the movement to make, still shown when its object cannot be anchored: a small 2D figure in the step card
+  // the movement to make, as a little sketch of a hand doing it: always in the card on a desk, and on a phone
+  // when the picture cannot show it (its object is not being followed)
   const how = useMemo(() => {
-    const lost = placed.filter((p) => p.mode === 'fallback' && (p.overlay.kind === 'motion' || p.overlay.kind === 'model'));
-    if (!lost.length) return null;
-    const model = lost.find((p) => p.overlay.kind === 'model');
-    const moving = lost.find((p) => p.overlay.motion);
-    const motion = moving?.overlay.motion;
-    const obj = (moving ?? model)?.object;
-    return { model: model?.overlay.model, motion, word: motion ? motionSay(motion, obj?.label) : obj ? `The ${obj.label.toLowerCase()}` : '' };
-  }, [placed]);
-  const diagram = step?.overlays.find((o) => o.kind === 'diagram');
+    if (!s.plan || !step) return null;
+    const marks = step.overlays.filter((o) => o.kind === 'motion' || o.kind === 'model');
+    if (!marks.length) return null;
+    const model = marks.find((o) => o.kind === 'model');
+    const moving = marks.find((o) => o.motion);
+    const target = (moving ?? model)?.target;
+    const obj = target ? s.plan.objects.find((o) => o.id === target) : undefined;
+    const lostNow = placed.some((p) => p.mode === 'fallback' && (p.overlay.kind === 'motion' || p.overlay.kind === 'model'));
+    // a sketch card already drawn beside its object on the picture is not drawn again in the card
+    const onPicture = placed.some((p) => p.overlay.kind === 'model' && p.mode !== 'fallback');
+    if (onPicture && !lostNow) return null;
+    return { model: model?.model, motion: moving?.motion, word: moving?.motion ? motionSay(moving.motion, obj?.label) : obj ? `The ${obj.label.toLowerCase()}` : '', lost: lostNow };
+  }, [s.plan, step, placed]);
   const unsureObj = s.plan && step ? leastSure(s.plan, step) : null;
   const askConfirm = unsureObj && unsureObj.confidence < UNSURE && !confirmed[unsureObj.id] && !s.moved[unsureObj.id] ? unsureObj : null;
 
@@ -429,6 +445,7 @@ export function LiveGuide({
     drag.current = null;
   };
 
+
   const joinWaitlist = async () => {
     setJoin('sending');
     try {
@@ -439,21 +456,41 @@ export function LiveGuide({
     }
   };
 
+  // where a thing that cannot be followed was last seen, so the note can point there
+  const lost = useMemo(() => {
+    const seen = new Map<string, { why: string; angle: number }>();
+    for (const p of placed) {
+      if (p.mode !== 'fallback' || p.overlay.kind === 'diagram' || !p.why || seen.has(p.why)) continue;
+      let angle = -90; // up, unless it is known where it went
+      const id = p.object?.id;
+      const box = id ? (s.moved[id] ?? anchors.find((a) => a.id === id)?.box ?? s.plan?.objects.find((o) => o.id === id)?.box) : undefined;
+      if (box && fit.sw) {
+        const sb = boxToScreen(box, fit);
+        const dx = sb.x + sb.w / 2 - fit.sw / 2;
+        const dy = sb.y + sb.h / 2 - fit.sh / 2;
+        if (Math.hypot(dx, dy) > 24) angle = (Math.atan2(dy, dx) * 180) / Math.PI;
+      }
+      seen.set(p.why, { why: p.why, angle });
+    }
+    return [...seen.values()];
+  }, [placed, anchors, s.moved, s.plan, fit]);
+
   if (!open) return null;
 
-  // ── early access: a preview, and the waitlist ──
+  // ── early access: what it is, drawn, and the waitlist ──
   if (access === 'preview') {
     return (
       <div className="lg5" role="dialog" aria-modal="true" aria-label="Live guidance">
         <div className="lg5-sheet lg5-intro">
+          <IntroSketch />
           <span className="l5-label">Live guidance · early access</span>
-          <h2 className="lg5-h">Point your camera, ask, and Socria shows you how — on the picture.</h2>
-          <p className="lg5-p">Arrows, highlights and the movement to make, drawn on the things in front of you, step by step. It is in early access with AR Mode.</p>
+          <h2 className="lg5-h">Point your camera, ask — and Socria draws the how on the picture.</h2>
+          <p className="lg5-p">A loop round the thing that matters, the movement to make, a little sketch of a hand doing it: step by step, on what is in front of you. It is in early access with AR Mode.</p>
           <div className="lg5-row">
             <button type="button" className="l5-btn is-primary" onClick={joinWaitlist} disabled={join === 'sending' || join === 'done'}>
               {join === 'done' ? 'You are on the waitlist' : join === 'sending' ? 'Joining…' : 'Join the waitlist'}
             </button>
-            <button type="button" className="l5-btn" onClick={onClose}>
+            <button type="button" className="l5-link" onClick={onClose}>
               Not now
             </button>
           </div>
@@ -468,17 +505,38 @@ export function LiveGuide({
     return (
       <div className="lg5" role="dialog" aria-modal="true" aria-label="Live guidance">
         <div className="lg5-sheet lg5-intro">
+          <IntroSketch />
           <span className="l5-label">Live guidance</span>
           <h2 className="lg5-h">Show Socria what you are doing, and it shows you how — on your camera.</h2>
-          <ul className="lg5-list">
-            <li>The camera is on only while this is open. Its picture stays on your screen.</li>
-            <li>A small still frame is sent to Socria only when you ask, or when a step is checked — read, then discarded. Nothing is recorded or kept.</li>
-            <li>The microphone is used only while you hold the mic button.</li>
-            <li>When Socria is not sure what it sees, it says so — check it against what is in front of you.</li>
+          <ul className="lg5-promises">
             <li>
-              <b>Not for emergencies.</b> If someone is hurt or in danger, call your local emergency number first.
+              <Icon name="camera" />
+              <span>
+                <b>The camera stays on your screen.</b> It is on only while this is open.
+              </span>
+            </li>
+            <li>
+              <Icon name="frame" />
+              <span>
+                <b>One still frame, only when you ask</b> or a step is checked — read, then discarded. Nothing is recorded or kept.
+              </span>
+            </li>
+            <li>
+              <Icon name="mic" />
+              <span>
+                <b>The microphone listens only while you hold it.</b>
+              </span>
+            </li>
+            <li>
+              <Icon name="ask" />
+              <span>
+                <b>Honest when unsure.</b> When Socria is not sure what it sees, it says so — check it against what is in front of you.
+              </span>
             </li>
           </ul>
+          <p className="lg5-sos">
+            <b>Not for emergencies.</b> If someone is hurt or in danger, call your local emergency number first.
+          </p>
           {camError && (
             <p className="lg5-note" role="alert">
               {camError}
@@ -499,7 +557,7 @@ export function LiveGuide({
             >
               {camState === 'starting' ? 'Starting the camera…' : 'Start the camera'}
             </button>
-            <button type="button" className="l5-btn" onClick={onClose}>
+            <button type="button" className="l5-link" onClick={onClose}>
               Not now
             </button>
           </div>
@@ -511,52 +569,92 @@ export function LiveGuide({
   }
 
   const busy = s.phase === 'looking' || s.phase === 'checking';
+  const paused = s.phase === 'paused';
+  const total = s.plan?.steps.length ?? 0;
+  const emergency = s.phase === 'safety' && !!s.plan && hazardOf(s.question).level === 'emergency';
+  // the last step's "done", said on a phone, where the list of steps is folded to the one in hand
+  const doneNote = lastLook?.done && lastLook.step === s.step - 1 ? lastLook.saw : null;
+  const motionWords = placed.filter((p) => p.overlay.kind === 'motion' && p.overlay.motion).map((p) => motionSay(p.overlay.motion!, p.object?.label));
+
   return (
-    <div className="lg5 is-live" role="dialog" aria-modal="true" aria-label="Live guidance">
+    <div className={`lg5 is-live${paused ? ' is-paused' : ''}`} role="dialog" aria-modal="true" aria-label="Live guidance">
       <div ref={stageRef} className="lg5-stage">
         <video ref={videoRef} className={`lg5-video${facing === 'user' ? ' is-mirror' : ''}`} playsInline muted aria-label="Your camera" />
-        <svg className={`lg5-ov${adjusting ? ' is-adjusting' : ''}`} width="100%" height="100%" aria-hidden={!adjusting} key={s.replay}>
-          <defs>
-            <marker id="lg5-head" viewBox="0 0 10 10" refX="8" refY="5" markerWidth="7" markerHeight="7" orient="auto-start-reverse">
-              <path d="M0 0 L10 5 L0 10 z" fill="currentColor" />
-            </marker>
-          </defs>
-          {placed.map((p, i) => (p.mode === 'fallback' ? null : <OverlayEl key={i} p={p} paused={s.phase === 'paused'} adjusting={adjusting} onDown={onHandleDown} onMove={onHandleMove} onUp={onHandleUp} />))}
-        </svg>
+        {!s.dismissed && (
+          <CameraMarks
+            key={s.replay}
+            placed={placed}
+            stage={{ w: fit.sw, h: fit.sh }}
+            stepKey={`${s.step}`}
+            paused={paused}
+            adjusting={adjusting}
+            onDown={onHandleDown}
+            onMove={onHandleMove}
+            onUp={onHandleUp}
+          />
+        )}
+        {/* a frame left the device: said, by a soft flash, every time */}
+        {flash > 0 && <div key={flash} className="lg5-flash" aria-hidden="true" />}
+        {busy && (
+          <div className="lg5-seek" aria-live="polite">
+            <svg viewBox="0 0 200 120" aria-hidden="true">
+              <path pathLength={1} d={loopPath({ x: 40, y: 30, w: 120, h: 60 }, 'seek', 6)} />
+            </svg>
+            <span>{s.phase === 'checking' ? 'Checking that step…' : 'Looking…'}</span>
+          </div>
+        )}
         <div className="lg5-top">
           <span className="lg5-live" aria-live="polite">
-            <i aria-hidden="true" /> Camera on
+            <i aria-hidden="true" /> Live
           </span>
-          {s.looks > 0 && <span className="lg5-looks">{s.looks === 1 ? '1 look' : `${s.looks} looks`}</span>}
+          {s.looks > 0 && <span className="lg5-looks">{s.looks === 1 ? '1 frame sent' : `${s.looks} frames sent`}</span>}
           <span className="lg5-sp" />
-          <button type="button" className="lg5-chip" onClick={() => {
-            const next = facing === 'environment' ? 'user' : 'environment';
-            setFacing(next);
-            void startCamera(next);
-          }} aria-label="Turn the camera round">
-            Flip
+          <button
+            type="button"
+            className="lg5-round"
+            onClick={() => {
+              const next = facing === 'environment' ? 'user' : 'environment';
+              setFacing(next);
+              void startCamera(next);
+            }}
+            aria-label="Turn the camera round"
+            title="Turn the camera round"
+          >
+            <Icon name="flip" />
           </button>
-          <button type="button" className="lg5-chip" onClick={onClose} aria-label="Stop the camera and close Live guidance">
-            Close
+          <button type="button" className="lg5-round" onClick={onClose} aria-label="Stop the camera and close Live guidance" title="Close">
+            <Icon name="close" />
           </button>
         </div>
-        {fallbacks.length > 0 && (
-          <div className="lg5-edge" role="status">
-            {[...new Set(fallbacks.map((f) => f.why))].map((w) => (
-              <span key={w} className="lg5-edge-i">
-                ↗ {w}
+        {lost.length > 0 && (
+          <div className="lg5-lost" role="status">
+            {lost.map((l) => (
+              <span key={l.why} className="lg5-lost-i">
+                <svg className="lg5-lost-arrow" viewBox="0 0 24 24" style={{ transform: `rotate(${l.angle}deg)` }} aria-hidden="true">
+                  <path d="M5 12h13M13 7l5 5-5 5" />
+                </svg>
+                {l.why}
               </span>
             ))}
           </div>
         )}
-        {!tracking && s.plan && <div className="lg5-edge is-quiet">Overlays stay where Socria last saw things — move the camera slowly.</div>}
+        {!tracking && s.plan && <div className="lg5-quiet">Overlays stay where Socria last saw things — move the camera slowly.</div>}
       </div>
 
       <div className="lg5-sheet lg5-guide">
         {s.phase === 'safety' && s.plan ? (
           <div className="lg5-safety" role="alert">
-            <span className="l5-label">{hazardOf(s.question).level === 'emergency' ? 'Get help now' : 'Not one to guide'}</span>
+            <span className="l5-label lg5-sos-label">{emergency ? 'Get help now' : 'Not one to guide'}</span>
             {s.plan.escalate && <p className="lg5-escalate">{s.plan.escalate}</p>}
+            {callable(s.plan.escalate).length > 0 && (
+              <div className="lg5-calls">
+                {callable(s.plan.escalate).map((n) => (
+                  <a key={n} className="lg5-call" href={`tel:${n}`}>
+                    <Icon name="phone" size={18} /> Call {n}
+                  </a>
+                ))}
+              </div>
+            )}
             {s.plan.first?.length ? (
               <ol className="lg5-first">
                 {s.plan.first.map((f) => (
@@ -566,111 +664,158 @@ export function LiveGuide({
             ) : null}
             {s.plan.safetyNote && <p className="lg5-p">{s.plan.safetyNote}</p>}
             <div className="lg5-row">
-              <button type="button" className="l5-btn" onClick={() => dispatch({ type: 'restart' })}>
+              <button type="button" className="l5-link" onClick={() => dispatch({ type: 'restart' })}>
                 Ask something else
               </button>
             </div>
           </div>
         ) : s.plan && step && (s.phase === 'guiding' || s.phase === 'checking' || s.phase === 'paused') ? (
-          <div className="lg5-step">
-            {s.plan.safety === 'caution' && <p className="lg5-caution">⚠ {s.plan.safetyNote ?? 'Take care with this one.'}</p>}
-            <div className="lg5-step-h">
-              <span className="l5-label">
-                Step {s.step + 1} of {s.plan.steps.length} · {s.plan.task}
+          <div className="lg5-gc">
+            <div className="lg5-gc-h">
+              <span className="lg5-sig">Socria</span>
+              <span className="lg5-pips" role="img" aria-label={`Step ${s.step + 1} of ${total}`}>
+                {s.plan.steps.map((_, i) => (
+                  <i key={i} className={i < s.step ? 'is-done' : i === s.step ? 'is-now' : ''} />
+                ))}
               </span>
-              {s.phase === 'paused' && <span className="lg5-paused">Paused</span>}
-            </div>
-            <p className="lg5-say" aria-live="polite">
-              {step.said}
-            </p>
-            {missHint(step.tries) && <p className="lg5-hint">{missHint(step.tries)}</p>}
-            {s.saw && <p className="lg5-saw">Socria saw: {s.saw}</p>}
-            {(s.plan.uncertain || s.plan.confidence < 0.5) && (
-              <p className="lg5-unsure">{s.plan.uncertain ? `I’m not sure: ${s.plan.uncertain}` : 'This is my best reading — check it against what you see.'}</p>
-            )}
-            {askConfirm && (
-              <p className="lg5-confirm">
-                Is the dashed box the {askConfirm.label.toLowerCase()}?{' '}
-                <button type="button" className="l5-link" onClick={() => setConfirmed((c) => ({ ...c, [askConfirm.id]: true }))}>
-                  Yes
-                </button>{' '}
-                ·{' '}
-                <button type="button" className="l5-link" onClick={() => setAdjusting(true)}>
-                  No — let me move it
+              <span className="lg5-sp" />
+              <div className="lg5-tools" role="toolbar" aria-label="Guidance tools">
+                <button type="button" className="lg5-ctl" onClick={() => dispatch({ type: 'replay' })} aria-label="Replay" title="Replay the drawing">
+                  <Icon name="replay" />
                 </button>
+                <button type="button" className="lg5-ctl" onClick={() => dispatch({ type: paused ? 'resume' : 'pause' })} aria-label={paused ? 'Resume' : 'Pause'} title={paused ? 'Resume' : 'Pause'}>
+                  <Icon name={paused ? 'play' : 'pause'} />
+                </button>
+                <button type="button" className={`lg5-ctl${adjusting ? ' is-on' : ''}`} aria-pressed={adjusting} onClick={() => setAdjusting((v) => !v)} aria-label="Adjust" title="Move a mark to where the thing really is">
+                  <Icon name="adjust" />
+                </button>
+                <button type="button" className="lg5-ctl" onClick={() => dispatch({ type: s.dismissed ? 'show' : 'dismiss' })} aria-label={s.dismissed ? 'Show' : 'Hide'} title={s.dismissed ? 'Show the drawing' : 'Hide the drawing'}>
+                  <Icon name={s.dismissed ? 'eye' : 'eyeOff'} />
+                </button>
+              </div>
+            </div>
+            <p className="l5-label lg5-task">
+              {s.plan.task} · Step {s.step + 1} of {total}
+              {paused ? ' · Paused' : ''}
+            </p>
+            {s.plan.safety === 'caution' && (
+              <p className="lg5-caution">
+                <b>Careful.</b> {s.plan.safetyNote ?? 'Take care with this one.'}
               </p>
             )}
-            {how && (
-              <figure className="lg5-how">
-                <svg width="96" height="104" viewBox="0 0 96 104" aria-hidden="true">
-                  {how.model ? (
-                    <g transform="translate(5, 4)">
-                      <ModelGlyph shape={how.model} motion={how.motion} />
-                    </g>
-                  ) : (
-                    <g transform="translate(48, 52)" className="lg5-how-cue">
-                      <MotionCue motion={how.motion ?? 'press'} r={30} />
-                    </g>
-                  )}
-                </svg>
-                {how.word && <figcaption>{how.word}</figcaption>}
-              </figure>
+            {doneNote && (
+              <p className="lg5-done-note">
+                <Tick size={16} /> {doneNote}
+              </p>
             )}
-            {diagram?.steps && (
-              <ol className="lg5-diagram" aria-label="Steps at a glance">
-                {diagram.steps.map((d, i) => (
-                  <li key={i}>{d}</li>
-                ))}
-              </ol>
+            <ol className="lg5-steps">
+              {s.plan.steps.map((st, i) => {
+                const now = i === s.step;
+                return (
+                  <li key={st.id} className={i < s.step ? 'is-done' : now ? 'is-now' : 'is-later'} aria-current={now ? 'step' : undefined}>
+                    <span className="lg5-num" aria-hidden="true">
+                      {i < s.step ? <Tick size={15} /> : i + 1}
+                    </span>
+                    <div className="lg5-step-b">
+                      {now ? (
+                        <p className="lg5-say" aria-live="polite">
+                          {step.said}
+                        </p>
+                      ) : (
+                        <p className="lg5-say-sm">{st.say}</p>
+                      )}
+                      {i < s.step && lastLook?.done && lastLook.step === i && <p className="lg5-saw-sm">{lastLook.saw}</p>}
+                      {now && (
+                        <>
+                          {missHint(step.tries) && <p className="lg5-hint">{missHint(step.tries)}</p>}
+                          {lastLook && !lastLook.done && lastLook.step === i && (
+                            <p className="lg5-saw">
+                              <span className="l5-label">What I see</span>
+                              {lastLook.saw}
+                            </p>
+                          )}
+                          {adjusting && <p className="lg5-hint is-adjust">Drag a mark to where the thing really is.</p>}
+                          {askConfirm && !adjusting && (
+                            <p className="lg5-confirm">
+                              Is the dashed loop the {askConfirm.label.toLowerCase()}?{' '}
+                              <button type="button" className="l5-link is-go" onClick={() => setConfirmed((c) => ({ ...c, [askConfirm.id]: true }))}>
+                                Yes
+                              </button>
+                              <span aria-hidden="true"> · </span>
+                              <button type="button" className="l5-link" onClick={() => setAdjusting(true)}>
+                                No — let me move it
+                              </button>
+                            </p>
+                          )}
+                          {how && (
+                            <figure className={`lg5-how${how.lost ? ' is-lost' : ''}`}>
+                              <div className="lg5-how-card">
+                                <HowSketch model={how.model} motion={how.motion} />
+                              </div>
+                              {how.word && <figcaption>{how.word}</figcaption>}
+                            </figure>
+                          )}
+                        </>
+                      )}
+                    </div>
+                  </li>
+                );
+              })}
+            </ol>
+            {(s.plan.uncertain || s.plan.confidence < 0.5) && (
+              <p className="lg5-unsure">
+                <span aria-hidden="true">?</span>
+                {s.plan.uncertain ? `I’m not sure: ${s.plan.uncertain}` : 'This is my best reading — check it against what you see.'}
+              </p>
             )}
             {s.error && <p className="lg5-note">{s.error}</p>}
             <div className="lg5-controls" role="toolbar" aria-label="Guidance">
-              <button type="button" className="l5-btn is-sm" onClick={() => dispatch({ type: 'back' })} disabled={s.step === 0} aria-label="Previous step">
-                ←
+              <button type="button" className="lg5-ctl" onClick={() => dispatch({ type: 'back' })} disabled={s.step === 0} aria-label="Previous step" title="Previous step">
+                <Icon name="back" />
               </button>
-              <button type="button" className="l5-btn is-sm" onClick={() => dispatch({ type: 'replay' })}>
-                Replay
+              <button type="button" className="l5-btn is-primary lg5-done" onClick={() => void check(false)} disabled={busy || paused}>
+                {s.phase === 'checking' ? 'Looking…' : 'I’ve done it'}
               </button>
-              <button type="button" className="l5-btn is-sm" onClick={() => dispatch({ type: s.phase === 'paused' ? 'resume' : 'pause' })}>
-                {s.phase === 'paused' ? 'Resume' : 'Pause'}
-              </button>
-              <button type="button" className={`l5-btn is-sm${adjusting ? ' is-on' : ''}`} aria-pressed={adjusting} onClick={() => setAdjusting((v) => !v)}>
-                Adjust
-              </button>
-              <button type="button" className="l5-btn is-sm" onClick={() => dispatch({ type: s.dismissed ? 'show' : 'dismiss' })}>
-                {s.dismissed ? 'Show' : 'Hide'}
-              </button>
-              <span className="lg5-sp" />
-              <button type="button" className="l5-btn is-sm is-primary" onClick={() => void check(false)} disabled={busy || s.phase === 'paused'}>
-                {s.phase === 'checking' ? 'Looking…' : 'Done'}
-              </button>
-              <button type="button" className="l5-btn is-sm" onClick={() => dispatch({ type: 'next' })} aria-label="Next step">
-                →
+              <button type="button" className="lg5-ctl" onClick={() => dispatch({ type: 'next' })} aria-label="Next step" title="Next step">
+                <Icon name="next" />
               </button>
             </div>
             <p className="lg5-sr" aria-live="polite">
-              {placed
-                .filter((p) => p.overlay.kind === 'motion' && p.overlay.motion)
-                .map((p) => motionSay(p.overlay.motion!, p.object?.label))
-                .join('. ')}
+              {motionWords.join('. ')}
             </p>
           </div>
         ) : s.phase === 'done' && s.plan ? (
-          <div className="lg5-step">
-            <span className="l5-label">Done · {s.plan.task}</span>
-            <p className="lg5-say">That’s it — you did it.</p>
-            {s.saw && <p className="lg5-saw">Socria saw: {s.saw}</p>}
-            <ol className="lg5-diagram">{planAsSteps(s.plan).map((t) => <li key={t}>{t.replace(/^\d+\.\s*/, '')}</li>)}</ol>
+          <div className="lg5-gc lg5-finish">
+            <div className="lg5-gc-h">
+              <span className="lg5-sig">Socria</span>
+            </div>
+            <svg className="lg5-bigtick" viewBox="0 0 64 64" aria-hidden="true">
+              <path pathLength={1} d={tickPath(10, 12, 44)} />
+            </svg>
+            <h2 className="lg5-h">That’s it — you did it.</h2>
+            {lastLook?.done && <p className="lg5-saw-sm is-shown">{lastLook.saw}</p>}
+            <ol className="lg5-steps is-all">
+              {s.plan.steps.map((st) => (
+                <li key={st.id} className="is-done">
+                  <span className="lg5-num" aria-hidden="true">
+                    <Tick size={15} />
+                  </span>
+                  <div className="lg5-step-b">
+                    <p className="lg5-say-sm">{st.say}</p>
+                  </div>
+                </li>
+              ))}
+            </ol>
             <div className="lg5-row">
               {onKeep && (
                 <button type="button" className="l5-btn is-primary" onClick={() => onKeep(s.question, s.plan!)}>
                   Keep these steps
                 </button>
               )}
-              <button type="button" className="l5-btn" onClick={() => dispatch({ type: 'replay' })}>
+              <button type="button" className="l5-link" onClick={() => dispatch({ type: 'replay' })}>
                 Go through again
               </button>
-              <button type="button" className="l5-btn" onClick={() => dispatch({ type: 'restart' })}>
+              <button type="button" className="l5-link" onClick={() => dispatch({ type: 'restart' })}>
                 Ask something else
               </button>
             </div>
@@ -678,219 +823,84 @@ export function LiveGuide({
         ) : null}
 
         {(s.phase === 'idle' || s.phase === 'error' || s.phase === 'looking') && (
-          <form
-            className="lg5-ask"
-            onSubmit={(e) => {
-              e.preventDefault();
-              void ask(question);
-            }}
-          >
-            {s.phase === 'error' && s.error && <p className="lg5-note">{s.error}</p>}
-            <label className="lg5-sr" htmlFor="lg5-q">
-              Ask about what the camera shows
-            </label>
-            <input id="lg5-q" className="lg5-input" value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="How do I open this jar?" disabled={s.phase === 'looking'} autoComplete="off" />
-            {voice.available && (
-              <button
-                type="button"
-                className={`lg5-mic${voice.state === 'recording' ? ' is-on' : ''}`}
-                onPointerDown={() => voice.press()}
-                onPointerUp={() => voice.release()}
-                onPointerLeave={() => voice.state === 'recording' && voice.release()}
-                aria-label={voice.state === 'recording' ? 'Listening — let go to ask' : 'Hold to say your question'}
-              >
-                {voice.state === 'recording' ? 'Listening…' : voice.state === 'transcribing' ? '…' : 'Hold to talk'}
-              </button>
+          <div className="lg5-askbox">
+            <div className="lg5-gc-h">
+              <span className="lg5-sig">Socria</span>
+            </div>
+            <h2 className="lg5-h lg5-ask-h">What do you want to do?</h2>
+            <p className="lg5-p lg5-ask-p">Point the camera at it and ask. I’ll draw the how on the picture.</p>
+            <form
+              className="lg5-ask"
+              onSubmit={(e) => {
+                e.preventDefault();
+                void ask(question);
+              }}
+            >
+              {s.phase === 'error' && s.error && <p className="lg5-note">{s.error}</p>}
+              <label className="lg5-sr" htmlFor="lg5-q">
+                Ask about what the camera shows
+              </label>
+              <div className="lg5-field">
+                <input id="lg5-q" className={`lg5-input${voice.available ? ' has-mic' : ''}`} value={question} onChange={(e) => setQuestion(e.target.value)} placeholder="How do I open this jar?" disabled={s.phase === 'looking'} autoComplete="off" />
+                {voice.available && (
+                  <button
+                    type="button"
+                    className={`lg5-mic${voice.state === 'recording' ? ' is-on' : ''}`}
+                    onPointerDown={() => voice.press()}
+                    onPointerUp={() => voice.release()}
+                    onPointerLeave={() => voice.state === 'recording' && voice.release()}
+                    aria-label={voice.state === 'recording' ? 'Listening — let go to ask' : 'Hold to say your question'}
+                    title="Hold to say it"
+                  >
+                    <Icon name="mic" />
+                  </button>
+                )}
+                <button type="submit" className={`lg5-send${s.phase === 'looking' ? ' is-busy' : ''}`} disabled={!question.trim() || s.phase === 'looking'} aria-label={s.phase === 'looking' ? 'Looking…' : 'Show me'} title="Show me">
+                  <Icon name="arrow" />
+                </button>
+              </div>
+            </form>
+            {s.phase !== 'looking' && (
+              <div className="lg5-ideas" role="group" aria-label="Or start from one of these">
+                {IDEAS.map((q) => (
+                  <button
+                    key={q}
+                    type="button"
+                    className="lg5-idea"
+                    onClick={() => {
+                      setQuestion(q);
+                      document.getElementById('lg5-q')?.focus();
+                    }}
+                  >
+                    {q}
+                  </button>
+                ))}
+              </div>
             )}
-            <button type="submit" className="l5-btn is-primary" disabled={!question.trim() || s.phase === 'looking'}>
-              {s.phase === 'looking' ? 'Looking…' : 'Show me'}
-            </button>
-          </form>
+            <ol className="lg5-howto" aria-label="How it works">
+              <li>
+                <span className="lg5-howto-n">1</span> Point the camera at the thing
+              </li>
+              <li>
+                <span className="lg5-howto-n">2</span> Ask — or hold the mic and say it
+              </li>
+              <li>
+                <span className="lg5-howto-n">3</span> Follow what Socria draws, a step at a time
+              </li>
+            </ol>
+          </div>
         )}
       </div>
     </div>
   );
 }
 
-/** One overlay, drawn on its object. */
-function OverlayEl({
-  p,
-  paused,
-  adjusting,
-  onDown,
-  onMove,
-  onUp,
-}: {
-  p: Placed;
-  paused: boolean;
-  adjusting: boolean;
-  onDown: (e: RPointerEvent<SVGElement>, p: Placed) => void;
-  onMove: (e: RPointerEvent<SVGElement>) => void;
-  onUp: () => void;
-}) {
-  const b = p.box!;
-  const cx = b.x + b.w / 2;
-  const cy = b.y + b.h / 2;
-  const cls = `lg5-o is-${p.overlay.kind}${p.unsure ? ' is-unsure' : ''}${paused ? ' is-paused' : ''}`;
-  const label = p.overlay.text ?? (p.object ? p.object.label : '');
-  const unsureWord = p.unsure && p.object ? `I think this is the ${p.object.label.toLowerCase()}` : '';
-  const handle = adjusting && p.object && p.mode === 'anchored' ? (
-    <rect className="lg5-handle" x={b.x} y={b.y} width={b.w} height={b.h} rx={10} onPointerDown={(e) => onDown(e, p)} onPointerMove={onMove} onPointerUp={onUp} />
-  ) : null;
-  const chip = (text: string, x: number, y: number) => (
-    <g className="lg5-chiptext" transform={`translate(${Math.max(8, x)}, ${Math.max(24, y)})`}>
-      <text x={0} y={0}>
-        {text}
-      </text>
-    </g>
-  );
-  switch (p.overlay.kind) {
-    case 'highlight':
-      return (
-        <g className={cls}>
-          <rect x={b.x - 4} y={b.y - 4} width={b.w + 8} height={b.h + 8} rx={12} />
-          {(label || unsureWord) && chip(unsureWord || label, b.x, b.y - 10)}
-          {handle}
-        </g>
-      );
-    case 'label':
-      return (
-        <g className={cls}>
-          <circle cx={cx} cy={cy} r={5} />
-          <line x1={cx} y1={cy} x2={cx} y2={b.y - 18} />
-          {chip(unsureWord || label, cx - 4, b.y - 24)}
-          {handle}
-        </g>
-      );
-    case 'arrow': {
-      const to: Pt = p.to ?? { x: cx, y: cy };
-      // from the target to its end; with no end, into the target from above and to the left
-      const from: Pt = p.to ? { x: cx, y: cy } : { x: b.x - 70, y: b.y - 60 };
-      return (
-        <g className={cls}>
-          <line className="lg5-arrow" x1={from.x} y1={from.y} x2={to.x} y2={to.y} markerEnd="url(#lg5-head)" />
-          {label && chip(label, (from.x + to.x) / 2 + 8, (from.y + to.y) / 2 - 8)}
-          {handle}
-        </g>
-      );
-    }
-    case 'motion':
-      return (
-        <g className={cls} transform={`translate(${cx}, ${cy})`}>
-          <MotionCue motion={p.overlay.motion ?? 'press'} r={Math.max(28, Math.min(90, Math.min(b.w, b.h) / 2))} />
-          {(label || unsureWord) && chip(unsureWord || label, -Math.min(b.w, 120) / 2, -Math.min(b.h, 160) / 2 - 12)}
-          {handle && <g transform={`translate(${-cx}, ${-cy})`}>{handle}</g>}
-        </g>
-      );
-    case 'model':
-      return (
-        <g className={cls} transform={`translate(${b.x + b.w + 16}, ${b.y})`}>
-          <ModelGlyph shape={p.overlay.model ?? 'box'} motion={p.overlay.motion} />
-          {handle && <g transform={`translate(${-(b.x + b.w + 16)}, ${-b.y})`}>{handle}</g>}
-        </g>
-      );
-    default:
-      return null;
-  }
-}
+/** Ways in, for someone who is not sure what to ask. */
+const IDEAS = ['How do I open this?', 'How does this work?', 'How do I fix this?'];
 
-/** The movement to make, as a small animation centred on the object. */
-function MotionCue({ motion, r }: { motion: string; r: number }) {
-  if (motion === 'twist-ccw' || motion === 'twist-cw') {
-    const cw = motion === 'twist-cw';
-    // three quarters of a circle, its head showing the way round
-    const d = `M ${r} 0 A ${r} ${r} 0 1 ${cw ? 1 : 0} 0 ${cw ? r : -r}`;
-    return (
-      <g className={`lg5-spin${cw ? ' is-cw' : ' is-ccw'}`}>
-        <path d={d} markerEnd="url(#lg5-head)" />
-      </g>
-    );
-  }
-  const dirs: Record<string, [number, number]> = { push: [0, 0], pull: [0, 0], lift: [0, -1], lower: [0, 1], 'slide-left': [-1, 0], 'slide-right': [1, 0], 'slide-up': [0, -1], 'slide-down': [0, 1] };
-  if (motion in dirs && motion !== 'push' && motion !== 'pull') {
-    const [dx, dy] = dirs[motion];
-    return (
-      <g className="lg5-slide" style={{ ['--dx' as string]: `${dx * r * 0.6}px`, ['--dy' as string]: `${dy * r * 0.6}px` }}>
-        <line x1={-dx * r * 0.6} y1={-dy * r * 0.6} x2={dx * r} y2={dy * r} markerEnd="url(#lg5-head)" />
-      </g>
-    );
-  }
-  if (motion === 'push' || motion === 'pull') {
-    return (
-      <g className={`lg5-depth is-${motion}`}>
-        <circle r={r * 0.55} />
-        <circle r={r * 0.25} />
-      </g>
-    );
-  }
-  if (motion === 'squeeze') {
-    return (
-      <g className="lg5-squeeze">
-        <line x1={-r} y1={0} x2={-r * 0.3} y2={0} markerEnd="url(#lg5-head)" />
-        <line x1={r} y1={0} x2={r * 0.3} y2={0} markerEnd="url(#lg5-head)" />
-      </g>
-    );
-  }
-  if (motion === 'tilt' || motion === 'shake') {
-    return (
-      <g className={`lg5-wobble is-${motion}`}>
-        <path d={`M ${-r} ${-r * 0.2} Q 0 ${-r * 0.6} ${r} ${-r * 0.2}`} markerEnd="url(#lg5-head)" />
-      </g>
-    );
-  }
-  // press, tap: a ring that pulses where to press
-  return (
-    <g className="lg5-pulse">
-      <circle r={r * 0.35} />
-      <circle className="lg5-pulse-ring" r={r * 0.35} />
-    </g>
-  );
-}
-
-/** A simple model of the thing, drawn beside it, turning the way it should go. */
-function ModelGlyph({ shape, motion }: { shape: string; motion?: string }) {
-  const turn = motion === 'twist-ccw' ? ' is-ccw' : motion === 'twist-cw' ? ' is-cw' : '';
-  return (
-    <g className={`lg5-model is-${shape}`}>
-      <rect className="lg5-model-card" x={0} y={0} width={86} height={96} rx={10} />
-      <g transform="translate(43, 52)">
-        {shape === 'jar' || shape === 'bottle' ? (
-          <>
-            <path d="M -22 -14 L -22 26 Q 0 36 22 26 L 22 -14" />
-            <ellipse cx={0} cy={-14} rx={22} ry={7} />
-            <g className={`lg5-model-lid${turn}`}>
-              <rect x={-24} y={shape === 'bottle' ? -34 : -28} width={48} height={shape === 'bottle' ? 10 : 12} rx={3} />
-            </g>
-          </>
-        ) : shape === 'screw' || shape === 'knob' ? (
-          <g className={`lg5-model-lid${turn}`}>
-            <circle r={20} />
-            <line x1={-12} y1={0} x2={12} y2={0} />
-            {shape === 'screw' && <line x1={0} y1={-12} x2={0} y2={12} />}
-          </g>
-        ) : shape === 'lever' || shape === 'latch' || shape === 'hinge' ? (
-          <>
-            <rect x={-26} y={8} width={52} height={10} rx={3} />
-            <g className="lg5-model-lever">
-              <rect x={-4} y={-26} width={8} height={36} rx={3} />
-            </g>
-          </>
-        ) : shape === 'plug' || shape === 'cable' ? (
-          <>
-            <rect x={-14} y={-18} width={28} height={24} rx={4} />
-            <line x1={-6} y1={-26} x2={-6} y2={-18} />
-            <line x1={6} y1={-26} x2={6} y2={-18} />
-            <path d="M 0 6 Q 0 24 18 26" />
-          </>
-        ) : (
-          <>
-            <path d="M -22 -10 L 0 -22 L 22 -10 L 22 16 L 0 28 L -22 16 Z" />
-            <path d="M -22 -10 L 0 2 L 22 -10 M 0 2 L 0 28" />
-          </>
-        )}
-      </g>
-    </g>
-  );
+/** The numbers an emergency card offers to call: only those its own words name, never a guess. */
+function callable(text?: string): string[] {
+  return Array.from(new Set((text ?? '').match(/\b(999|112|911|000|111)\b/g) ?? []));
 }
 
 /** For a check's context in tests and the trace: what the step card asks Socria to look for. */
@@ -900,4 +910,3 @@ export function checkLine(s: Parameters<typeof checkContext>[0]): string {
 }
 
 export type { Overlay };
-
