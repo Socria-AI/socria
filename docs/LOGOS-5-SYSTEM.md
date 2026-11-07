@@ -260,7 +260,13 @@ its rules in `lib/logos5/oneView.ts`). The phone keeps the four views.
   the Universal Map, such a conversation lands with the box focused. The map
   already marked those conversations (the gold "?" — Socria is waiting); it
   now says how many, beside Pick up: "3 questions waiting for your answer →",
-  opening the newest.
+  opening the newest. The strip under Today is one line at every width: it
+  takes the room the bar has (up to 880px, clear of the lens), and when it is
+  still short the conversation's name gives way first ("…"), then "Pick up
+  where you left off" becomes "Pick up" and then steps aside, then the waiting
+  words become "questions waiting". The count and its words never wrap and the
+  badge never shrinks below its digits (`revision2.css`, container queries on
+  `.l5h-strip`).
 - **The closing question is earned.** The reply rules
   (`lib/runtime/behavior.ts`) have most replies end on a statement and ask
   only when the answer changes what comes next — more often when someone is

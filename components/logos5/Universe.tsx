@@ -862,9 +862,11 @@ export function UniverseView({
     resume || starredTiles.length || asked.length ? (
       <div className="l5h-strip" aria-label="Pick up, and starred">
         {resume && (
-          <button type="button" className="l5h-pick" onClick={() => open(resume)} title={`Pick up where you left off: ${resume.title}`}>
+          <button type="button" className="l5h-pick" onClick={() => open(resume)} title={`Pick up where you left off: ${resume.title}`} aria-label={`Pick up where you left off: ${resume.title}`}>
             <Glyph look={resume.look} size={13} />
+            {/* the long words where there is room, "Pick up" where there is less, none where there is little (revision2.css) */}
             <span className="l5h-pick-k">Pick up where you left off</span>
+            <span className="l5h-pick-ks">Pick up</span>
             <span className="l5h-pick-t">{resume.title}</span>
             <span aria-hidden="true">→</span>
           </button>
@@ -880,7 +882,9 @@ export function UniverseView({
             <span className="l5-badge" aria-hidden="true">
               {asked.length}
             </span>
-            <span>{asked.length === 1 ? 'question waiting for your answer' : 'questions waiting for your answer'}</span>
+            {/* the long words where there is room, the short ones where there is not (revision2.css) — never wrapped */}
+            <span className="l5h-w-long">{asked.length === 1 ? 'question waiting for your answer' : 'questions waiting for your answer'}</span>
+            <span className="l5h-w-short">{asked.length === 1 ? 'question waiting' : 'questions waiting'}</span>
             <span className="l5-ar" aria-hidden="true">
               →
             </span>

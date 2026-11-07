@@ -286,6 +286,29 @@ html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) 
 .logos-root .l5 .l5h-waiting:hover .l5-ar { transform: translateX(3px); }
 .logos-root .l5 .l5h-waiting .l5-ar { transition: transform 0.2s var(--c-ease); }
 .logos-root .l5 .l5h-waiting:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+/* The strip under Today is one line, always. It was squeezed into 760px however much of the bar stood empty beside
+   it, and the pick-up kept its full width, so "questions waiting for your answer" broke over three lines and the
+   count spilled out of its badge. Now the strip takes the room the bar has (up to 880px, clear of the lens), and
+   when it is still short the conversation's name gives way first (it ends in "…"), then "Pick up where you left
+   off" becomes "Pick up", then steps aside, then the waiting words shorten — the count and its words never wrap
+   and are never squeezed. */
+/* the row has a width to measure: on a desk the title takes the bar up to the lens and the tools (it was only as wide
+   as its words); only its controls take a click, so the empty part of it is still the map */
+.logos-root .l5 .l5h:not(.is-narrow) .l5h-top > .l5h-title { flex: 1 1 0; pointer-events: none; }
+.logos-root .l5 .l5h:not(.is-narrow) .l5h-top > .l5h-title :is(button, a, input, [tabindex]) { pointer-events: auto; }
+.logos-root .l5 .l5h:not(.is-narrow) .l5h-sub { max-width: min(880px, calc(100% - 48px)); }
+.logos-root .l5 .l5h-sub .l5h-strip { container-type: inline-size; align-items: center; }
+.logos-root .l5 .l5h-sub .l5h-pick { flex: 0 1 auto; min-width: 0; }
+.logos-root .l5 .l5h-pick-ks { display: none; color: var(--l5b-ink-2); }
+.logos-root .l5 .l5h-waiting { flex: none; white-space: nowrap; }
+.logos-root .l5 .l5h-w-short { display: none; }
+/* the steps are for a strip that also says what is waiting: on its own, the pick-up has the room for its words */
+@container (max-width: 680px) {
+  .logos-root .l5 .l5h-strip:has(.l5h-waiting) .l5h-pick-k { display: none; }
+  .logos-root .l5 .l5h-strip:has(.l5h-waiting) .l5h-pick-ks { display: inline; }
+}
+@container (max-width: 560px) { .logos-root .l5 .l5h-strip:has(.l5h-waiting) .l5h-pick-ks { display: none; } }
+@container (max-width: 470px) { .logos-root .l5 .l5h-w-long { display: none; } .logos-root .l5 .l5h-w-short { display: inline; } }
 
 /* ── one space: the page and the Universal Map are two levels of one place (lib/logos5/morph.ts) ──
    The line's name travels between the page's title and its bubble; the rest steps back (out) or comes forward (in). */
