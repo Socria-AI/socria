@@ -20,7 +20,8 @@
 // What it answers:
 //   POST /v1/chat/completions      streamed text, or JSON when json_object is asked
 //                                  (a map, a study's topics, journal-entry practice,
-//                                  a reading or proposed edits for the writing space)
+//                                  a reading or proposed edits for the writing space,
+//                                  a Live Guidance plan or check for any camera frame)
 //   POST /v1/audio/transcriptions  {"text": …} — the voice composer's path
 //   POST /v1/responses             a web search (tools: web_search): a short answer
 //                                  citing two fixed example pages (url_citation),
@@ -444,6 +445,42 @@ function entriesReply(user) {
 }
 
 /** An easy view, as a vision model would read a photo of a café menu — unless the photo was never sent. */
+// Live Guidance (app/api/logos/guide): the stand-in sees every frame as a jar on a table. A plan is the
+// jar's three steps; a check says "not yet" the first time it is asked about the twisting step (so the
+// clearer instruction can be seen) and "done" otherwise.
+const guideChecks = new Map();
+function guideReply(system, messages) {
+  const user = messages.find((m) => m?.role === 'user');
+  const text = String((Array.isArray(user?.content) ? user.content.find((c) => c?.type === 'text')?.text : user?.content) ?? '');
+  if (system.includes('SOCRIA LIVE GUIDE — CHECK')) {
+    const step = /^Step: (.*)$/m.exec(text)?.[1] ?? '';
+    const n = (guideChecks.get(step) ?? 0) + 1;
+    guideChecks.set(step, n);
+    if (/twist/i.test(step) && n === 1) {
+      return { done: false, saw: 'The lid is still on, and your hand is on the jar, not the lid.', retry: 'Grip the lid itself and turn it towards you, to the left.', objects: [{ id: 'lid', label: 'Lid', box: { x: 0.4, y: 0.24, w: 0.22, h: 0.1 }, confidence: 0.8 }], confidence: 0.7 };
+    }
+    return { done: true, saw: /lift/i.test(step) ? 'The lid is off.' : /twist/i.test(step) ? 'The lid has turned and looks loose.' : 'One hand is round the jar.', confidence: 0.82 };
+  }
+  guideChecks.clear(); // a new plan starts its checks afresh
+  const q = (/^Question: (.*)$/m.exec(text)?.[1] ?? '').toLowerCase();
+  const jar = /jar|lid|open/.test(q);
+  return {
+    task: jar ? 'Open the jar' : 'Find the thing to work on',
+    objects: [
+      { id: 'jar', label: 'Jar', box: { x: 0.36, y: 0.34, w: 0.28, h: 0.42 }, confidence: 0.86 },
+      { id: 'lid', label: 'Lid', box: { x: 0.38, y: 0.24, w: 0.24, h: 0.1 }, confidence: jar ? 0.62 : 0.4 },
+    ],
+    steps: [
+      { say: 'Hold the jar firmly with your other hand.', check: 'One hand round the jar', overlays: [{ kind: 'highlight', target: 'jar', text: 'hold here' }, { kind: 'label', target: 'jar', text: 'jar' }] },
+      { say: 'Twist the lid anticlockwise — towards you, to the left.', check: 'The lid has turned', overlays: [{ kind: 'motion', target: 'lid', motion: 'twist-ccw' }, { kind: 'model', target: 'lid', model: 'jar', motion: 'twist-ccw' }] },
+      { say: 'Lift the lid straight up and off.', check: 'The lid is off', overlays: [{ kind: 'arrow', target: 'jar', to: 'lid', text: 'lift' }, { kind: 'diagram', steps: ['Hold the jar', 'Twist the lid left', 'Lift it off'] }] },
+    ],
+    confidence: jar ? 0.78 : 0.45,
+    ...(jar ? { uncertain: 'If it will not turn, it may be a press-and-twist cap.' } : { uncertain: 'I am not sure what you want to do with it — point the camera at it and say.' }),
+    safety: 'none',
+  };
+}
+
 function easyReply(messages) {
   const user = messages.find((m) => m?.role === 'user');
   const sawPhoto = Array.isArray(user?.content) && user.content.some((p) => p?.type === 'image_url' && /^data:image\//.test(p.image_url?.url ?? ''));
@@ -652,8 +689,9 @@ const server = http.createServer((req, res) => {
         const offered = system.startsWith('You draft EVERYDAY DISPLAYS') && !isCustom ? /- "([a-z]+)" — [\s\S]*?\n  Example: (\{.*\})\n/.exec(system) : null;
         // an easy view of a photo (app/api/logos/easy): the stand-in reads every photo as the same café menu
         const isEasy = system.startsWith('You make an EASY VIEW of a photo');
+        const isGuide = system.startsWith('SOCRIA LIVE GUIDE');
         const drafted = offered ? (() => { try { return { display: { kind: offered[1], state: JSON.parse(offered[2]) }, gaps: [] }; } catch { return {}; } })() : null;
-        const content = JSON.stringify(isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : drafted ?? {});
+        const content = JSON.stringify(isGuide ? guideReply(system, messages) : isEasy ? easyReply(messages) : isWrite ? writeReply(system) : isMap ? mapReply(conversationOf(messages.slice(1))) : isSort ? sortReply(lastUser(messages)) : isEntries ? entriesReply(lastUser(messages)) : isCustom ? customReply(system, messages.slice(1).map((m) => String(m.content ?? '')).join('\n')) : drafted ?? {});
         return send(res, 200, { id: `chatcmpl-local-${Date.now()}`, object: 'chat.completion', model, choices: [{ index: 0, message: { role: 'assistant', content }, finish_reason: 'stop' }], usage: usageFor(body, content) });
       }
       if (process.env.FAKE_OPENAI_TRACE) {

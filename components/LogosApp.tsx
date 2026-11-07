@@ -177,6 +177,9 @@ import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5TopBar, L5Working } from '@/components/logos5/L5Views';
 import { noteLearningTurn, readLedger } from '@/lib/logos5/learning';
+import { LiveGuide } from '@/components/logos5/LiveGuide';
+import { keepAsTurn } from '@/lib/guide/session';
+import type { GuidePlan } from '@/lib/guide/overlay';
 import { L5Canvas, MapPreview, type CanvasCard } from '@/components/logos5/L5Canvas';
 import dynamic from 'next/dynamic';
 import type { ArAccess } from '@/lib/ar-access';
@@ -6075,6 +6078,8 @@ export function LogosApp({
   /** AR MODE (components/logos5/ARMode.tsx): the Logic Map moved by hand — open, and who may use it (asked when opened, never on load) */
   const [arOpen, setArOpen] = useState(false);
   const [arAccess, setArAccess] = useState<ArAccess | null>(null);
+  // SOCRIA LIVE AR GUIDANCE (components/logos5/LiveGuide.tsx): early access with AR Mode, its camera started only by a press
+  const [liveOpen, setLiveOpen] = useState(false);
   /** the answer came from the server (a failed ask is not kept: the next open asks again) */
   const arKnownRef = useRef(false);
   /** HANDS ON ALL OF LOGOS 5: wanted ('start' asks for the camera as it mounts; 'on' follows a start made in AR Mode) */
@@ -8100,6 +8105,7 @@ export function LogosApp({
     // on a wide screen the line of thinking is one board with nothing floating over it (Logos 5 One view): Synthesize is here
     ...(activeId && !narrow && !l5Home && canSynthesize(map) ? [{ label: 'Synthesize', hint: 'See where your thinking stands', onSelect: () => void synthesize('workspace') }] : []),
     ...(activeId && !l5Home && !l5Mind ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
+    { label: 'Live guidance', hint: 'Point your camera and ask — Socria shows you how, on the picture · early access', onSelect: openGuide },
     ...(!handsWanted
       ? [{ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands }]
       : [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }]),
@@ -9338,6 +9344,29 @@ export function LogosApp({
     if (arKnownRef.current) return;
     void askArAccess();
   }
+  /** Live guidance, opened: who may use it is asked as AR Mode's is; one camera at a time, so AR Mode closes. */
+  function openGuide() {
+    setArOpen(false);
+    setLiveOpen(true);
+    if (!arKnownRef.current) void askArAccess();
+  }
+  /** The guidance kept in the line of thinking: its steps as a sequence, under a turn saying what was asked. */
+  function keepGuide(question: string, plan: GuidePlan) {
+    const { asked, answer } = keepAsTurn(question, plan);
+    const fresh = !activeIdRef.current || l5Home;
+    const post = () => {
+      const t = Date.now();
+      postPair({ id: newMsgId(), at: t, role: 'user', content: asked } as Msg, { id: newMsgId(), at: t + 1, role: 'assistant', content: answer } as Msg);
+      // a line made for these steps is named for the task ("Open the jar"), not for the words of the ask
+      if (fresh && activeIdRef.current && plan.task) setTimeout(() => activeIdRef.current && renameSession(activeIdRef.current, plan.task.slice(0, 80)), 120);
+      refreshMap();
+    };
+    if (fresh) {
+      if (!newFromHome()) return;
+      setTimeout(post, 80);
+    } else post();
+    setLiveOpen(false);
+  }
   /**
    * YOUR HANDS, ON ALL OF LOGOS 5 — a tester's camera on, by their own press, until Stop. Anybody who is not a
    * tester is shown AR Mode instead: its preview, and the waitlist.
@@ -10213,6 +10242,7 @@ export function LogosApp({
 
       {/* The account, over the map — the same sheet /chat opens, so there is
           one account surface in the product rather than two that drift. */}
+      <LiveGuide open={liveOpen} onClose={() => setLiveOpen(false)} access={arAccess ? (arAccess.tester ? 'tester' : 'preview') : 'unknown'} onKeep={keepGuide} sessionId={activeId} />
       <AccountSheet
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
@@ -10314,6 +10344,7 @@ export function LogosApp({
               }}
               onEdit={(edit) => editMap([edit])}
               onHands={() => setHandsWanted((w) => w || 'on')}
+              onGuide={openGuide}
               command={arCommand}
               onPoint={pointAtNode}
               onArmed={(label) => (arArmedRef.current = label)}

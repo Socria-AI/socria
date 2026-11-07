@@ -83,6 +83,7 @@ export function ARMode({
   voice,
   voiceOn = false,
   reply,
+  onGuide,
 }: {
   map: ThinkingMap;
   /** the line of thinking whose card positions these are (lib/canvas-store.ts) */
@@ -108,6 +109,8 @@ export function ARMode({
   voiceOn?: boolean;
   /** Socria's latest answer, so a question asked from here is answered here */
   reply?: { id: string; text: string; pending: boolean } | null;
+  /** Live guidance (components/logos5/LiveGuide.tsx): the camera pointed at the world, and Socria showing how on it */
+  onGuide?: () => void;
 }) {
   const tester = !!access?.tester;
   const preview = !!access && !access.tester;
@@ -1034,6 +1037,11 @@ export function ARMode({
             </span>
           )}
           {tester && voice ? <span className="arm-voice">{voice}</span> : null}
+          {onGuide && (
+            <button type="button" className="arm-btn" onClick={onGuide} title="Point the camera at something and ask — Socria shows you how, on the picture">
+              Live guidance
+            </button>
+          )}
           <button type="button" className="arm-btn" onClick={onClose} aria-label="Leave AR Mode">
             Done
           </button>

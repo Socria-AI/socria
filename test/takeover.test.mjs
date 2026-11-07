@@ -104,6 +104,7 @@ const thinking = [
   'logos/practice',
   'logos/read',
   'logos/easy',
+  'logos/guide',
   'logos/write',
   'logos/synthesize',
   'logos/explore',

@@ -425,6 +425,56 @@ Pure, no model call, invisible: no mode, no badge, no setting. `LOGOS_EXPLAIN=of
 - **One look**: the Universal Map's header says More and shows the search shortcut, as a line's does; Stop and the
   Content links use the shared `l5-link`; every control has the same moss focus ring; the guide no longer says "⋯".
 
+### 8.9 Live guidance — shown on the camera, not just told
+
+A person points their camera at something, asks ("How do I open this jar?") by typing or holding the mic, and
+Socria draws the answer on the live picture: highlights and labels on the things that matter, the movement to make
+(a twist, a lift, a press), a small model turning the right way, and the steps at a glance. It watches for each step
+being done and changes the instruction when it is not. In early access with AR Mode (More → Live guidance, or the
+button in AR Mode); anybody else sees a preview and the waitlist.
+
+- **The pipeline.** Camera (`components/logos5/LiveGuide.tsx`, the back camera by default; hand tracking is stopped
+  so only one thing holds a camera) → one still frame, 512px at most, sent only when the person asks →
+  `POST /api/logos/guide` (`mode: plan`) reads it at low detail into a plan: the objects that matter, with boxes,
+  and two to six steps, each with one to three overlays aimed at those objects → the plan is held to
+  `lib/guide/overlay.ts` (only known overlay kinds, motions and models; boxes brought into the frame, in fractions,
+  percent or thousandths; an overlay aimed at an object it did not see is dropped; at most 6 objects, 8 steps,
+  4 overlays a step) → drawn as SVG over the video (`placeOverlays` in `lib/guide/session.ts`) → Done, or a pause in
+  movement after the picture changed, sends one smaller look (`mode: check`) carrying only the step, what done looks
+  like and the objects' names → done moves on; not yet keeps the step and says it more clearly, with what Socria saw.
+  No image is generated for any frame: the drawing is the plan's instructions, so it moves with the picture.
+- **Overlays stay on their objects.** Between looks the browser follows each object itself
+  (`lib/guide/tracking.ts`), on a 160-pixel greyscale copy, a dozen times a second, with nothing sent. Each object
+  is placed on a frame (the one the model read, the one a check read, or the one showing when the person dragged it)
+  and moves with the camera, measured on the whole middle of the picture against that frame, then is fine-tuned by a
+  few pixels against its own patch. So a hand moving over a plain lid cannot drag the lid's box after it, and errors
+  cannot pile up from frame to frame. Each pixel's difference is capped, so a small part that changes a lot (a hand,
+  a glint) cannot outweigh the rest. An object moved by itself is looked for near where it was last seen, but only
+  if it has texture across it and only on a clean match. When none of that holds, its overlay is not drawn on a
+  guess: after a moment it becomes a note at the edge ("Point the camera at the lid"), and the movement to make is
+  drawn in the step card instead, as the small model or the motion with its words ("Twist the lid anticlockwise").
+- **Pause, replay, dismiss, adjust.** Pause holds the animations and the automatic checks; Replay plays the step's
+  cues again; Hide and Show the overlays; ← and → step; Adjust gives every object a handle to drag to where it really
+  is, and a box put there by hand is believed over any later reading. Space, the arrows and Esc do the same.
+- **Honest about what it sees.** An object read with low confidence is drawn dashed and labelled "I think this is
+  the …", with "Is the dashed box the lid? Yes · No — let me move it". The plan's own doubt is said in the card
+  ("I'm not sure: …"). A check that cannot tell says so and asks to be shown more clearly; it never guesses done.
+- **Safety first, in code.** The question is read for danger before any frame is taken (`lib/guide/safety.ts`): an
+  emergency (not breathing, choking, heavy bleeding, fire, a gas smell, a shock, a person collapsed or in danger) is
+  answered at once with the number to call and the few steps that are safe whatever the details — no model is asked
+  and nothing is drawn. A job that should not be learned from a guide (mains wiring, a gas appliance, brakes or other
+  safety-critical repairs) is a stop with who to call. Knives, saws, ladders, heat and chemicals are a caution, said
+  first. The model's own reading can make it stricter, never looser, and a check that sees danger stops the guidance.
+- **Private.** The camera is on only while Live guidance is open and stops on Close and on leaving; a hidden page
+  pauses the guidance and sends nothing; the microphone is used only while the mic is held. A frame is read and dropped: never stored, logged or kept in
+  the conversation; errors are logged without the frame or the question. The consent screen says all this, and that
+  it is not for emergencies, before the camera is asked for.
+- **Cheap.** A plan is one low-detail call (about 800 tokens out at most) and counts as one image read, like any
+  photo; a check is one smaller call (260 out) and is not counted as an image. Automatic checks are rationed: at most
+  two a step, six seconds apart, only after the picture changed and settled; four checks a step in all.
+- **Kept.** When the task is done, "Keep these steps" adds them to the line of thinking as a steps sequence (a new
+  line named for the task if none is open), so the Logic Map and Artifacts have them like any other turn.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its
@@ -571,6 +621,15 @@ its own glyph beside it.
   one account race for its last nodes, the second keeps exactly what it was
   granted, which can be part of a drawing: the allowance has no way to give
   a node back.
+- **Live guidance** (§8.9) has been run in a browser only against Chromium's
+  test camera and the local stand-in model, never a real camera and a live
+  vision model; how well a real model places boxes is not yet measured. The
+  tracker follows camera moves and small object moves; it does not follow
+  turning or moving much nearer (the overlay falls back instead), and a
+  steady hand on a plain lid can still pull a box by up to the few-pixel
+  fine-tune. Voice is the push-to-talk transcription; there is no spoken
+  reply. Real 3D models are not drawn: the "model" overlay is a simple 2D
+  drawing of ten common things, animated.
 
 ## 11. How it is held
 
@@ -602,6 +661,20 @@ its own glyph beside it.
 - `test/logos5-diagram-layout.test.mjs`: the cycle, tree, parts, concept and
   dated-timeline lenses — no overlaps, nothing lost, every line once, the
   same picture every time, on 160 seeded maps per lens and the odd ones.
+- `test/live-guide.test.mjs` (90): overlays checked before they are drawn;
+  danger read from the words; tracking — a moved object found, a blank wall
+  not pretended, a pan followed through a flickering patch, a slow pan, a
+  hand over a plain lid not chased, a picture whose only detail keeps
+  changing not taken for a camera move; the session (ask, guide, check,
+  adapt, pause, replay, dismiss, adjust, rationed checks); drawing (anchored,
+  dashed when unsure, a note at the edge when lost); cost and privacy.
+  `test/guide-route.test.mjs` (42): the route through its real handler —
+  signed out, not a tester, an unverified address, the access code without
+  an account, a forged grant; an emergency and mains wiring answered with no
+  model asked; frames refused (none, a link, an SVG, too big); a plan shaped,
+  an overlay at nothing dropped, counted as one image read, low detail, no
+  reasoning spent; the model's stop and the words' caution both holding;
+  checks done, not yet, could not tell, danger; images spent.
 - The suites that asserted the old chrome (`logos5-shell`, `logos5-canvas`,
   `logos5-views`, `logos5-study-ui`, `four-views`, `ar-mode`,
   `onboarding-tips`, `ux-polish`, `logos3-chat-notes`) now assert the 5.5
@@ -618,4 +691,8 @@ its own glyph beside it.
   for, inspected, edited, kept in Artifacts, seen as Graph and Flow), how a
   bill becomes law, the types of rock, photosynthesis, a plant cell and the
   space race, and a reply's diagram opened on the map, at 1440 and on a
-  phone (`.journeys/lm-diagrams.mjs`, `.journeys/lm-phone.mjs`).
+  phone (`.journeys/lm-diagrams.mjs`, `.journeys/lm-phone.mjs`); Live
+  guidance with Chromium's test camera — consent, the camera, a plan drawn,
+  Done, not yet, Pause, Hide, Adjust, the last step, Keep these steps; an
+  emergency with no frame sent and the camera released on Close; a phone
+  (`.journeys/live-guide.mjs`, `.journeys/lg-adjust.mjs`).

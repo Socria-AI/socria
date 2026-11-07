@@ -1,0 +1,158 @@
+/* components/logos5/live-guide.css — SOCRIA LIVE AR GUIDANCE.
+ *
+ * The camera, full screen, and what Socria draws on it: mustard, the colour
+ * Socria asks in, with a dark halo so it reads on any picture — a bright
+ * kitchen or a dim cupboard. A guess is dashed. Under the picture, a sheet in
+ * the paper of Logos 5: the step, the controls, the question. Phone first.
+ */
+
+.lg5 {
+  --lg5-ink: #fffdf6;
+  --lg5-cue: #e8b62c;
+  --lg5-cue-rgb: 232, 182, 44;
+  --lg5-halo: rgba(20, 20, 16, 0.55);
+  position: fixed;
+  inset: 0;
+  z-index: 120;
+  display: flex;
+  flex-direction: column;
+  background: #121210;
+  color: var(--lg5-ink);
+  font-family: var(--l5-sans, Inter, system-ui, sans-serif);
+}
+.lg5:not(.is-live) {
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: rgba(18, 18, 16, 0.72);
+}
+
+/* ── the sheet: paper, like the rest of Logos 5 ── */
+.lg5-sheet {
+  box-sizing: border-box;
+  color: #23241f;
+  background-color: #f5f3eb;
+  border-radius: 16px;
+}
+.lg5-intro { width: min(560px, 100%); padding: 22px 22px 18px; box-shadow: 0 30px 70px -30px rgba(0, 0, 0, 0.7); }
+.lg5-h { margin: 8px 0 10px; font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-weight: 400; font-size: 26px; line-height: 1.15; }
+.lg5-p { margin: 0 0 12px; font-size: 14.5px; line-height: 1.55; color: rgba(35, 36, 31, 0.75); }
+.lg5-list { margin: 0 0 14px; padding-left: 18px; font-size: 14px; line-height: 1.55; color: rgba(35, 36, 31, 0.8); }
+.lg5-list li + li { margin-top: 5px; }
+.lg5-row { display: flex; flex-wrap: wrap; gap: 10px; margin-top: 6px; }
+.lg5-note { margin: 8px 0 0; font-size: 13px; color: #a3492b; }
+.lg5-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+.lg5-sp { flex: 1; }
+
+/* ── the stage: the picture and what is drawn on it ── */
+.lg5-stage { position: relative; flex: 1 1 auto; min-height: 0; overflow: hidden; touch-action: none; }
+.lg5-video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; background: #000; }
+.lg5-video.is-mirror { transform: scaleX(-1); }
+.lg5-video.is-hidden { position: absolute; width: 2px; height: 2px; opacity: 0; pointer-events: none; }
+.lg5-ov { position: absolute; inset: 0; pointer-events: none; color: var(--lg5-cue); overflow: visible; }
+.lg5-ov.is-adjusting { pointer-events: auto; }
+
+.lg5-o { fill: none; stroke: var(--lg5-cue); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; filter: drop-shadow(0 0 2px var(--lg5-halo)) drop-shadow(0 1px 6px var(--lg5-halo)); }
+.lg5-o.is-unsure { stroke-dasharray: 8 7; }
+.lg5-o.is-highlight rect { fill: rgba(var(--lg5-cue-rgb), 0.12); animation: lg5-breathe 1.8s ease-in-out infinite; }
+.lg5-o.is-label circle { fill: var(--lg5-cue); }
+.lg5-arrow { stroke-width: 4; stroke-dasharray: 10 8; animation: lg5-march 0.9s linear infinite; }
+.lg5-chiptext text { fill: var(--lg5-ink); stroke: rgba(20, 20, 16, 0.85); stroke-width: 4px; paint-order: stroke; font-size: 15px; font-weight: 600; letter-spacing: 0.01em; }
+.lg5-o.is-unsure .lg5-chiptext text { font-style: italic; }
+
+/* the movement to make */
+.lg5-spin { transform-origin: 0 0; }
+.lg5-spin.is-ccw { animation: lg5-spin-ccw 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.lg5-spin.is-cw { animation: lg5-spin-cw 1.6s cubic-bezier(0.4, 0, 0.2, 1) infinite; }
+.lg5-slide { animation: lg5-slide 1.3s ease-in-out infinite; }
+.lg5-depth circle { animation: lg5-depth-in 1.4s ease-in-out infinite; transform-origin: 0 0; }
+.lg5-depth.is-pull circle { animation-name: lg5-depth-out; }
+.lg5-squeeze { animation: lg5-squeeze 1.2s ease-in-out infinite; }
+.lg5-wobble { transform-origin: 0 0; animation: lg5-tilt 1.4s ease-in-out infinite; }
+.lg5-wobble.is-shake { animation: lg5-shake 0.5s ease-in-out infinite; }
+.lg5-pulse circle { fill: rgba(var(--lg5-cue-rgb), 0.25); }
+.lg5-pulse-ring { animation: lg5-ring 1.3s ease-out infinite; transform-origin: 0 0; }
+
+/* a simple model of the thing, turning the way it should go */
+.lg5-model { stroke: #23241f; stroke-width: 2; }
+.lg5-model-card { fill: rgba(245, 243, 235, 0.94); stroke: rgba(var(--lg5-cue-rgb), 0.9); }
+.lg5-model path, .lg5-model ellipse, .lg5-model circle, .lg5-model rect:not(.lg5-model-card) { fill: rgba(255, 255, 255, 0.7); }
+.lg5-model-lid { transform-origin: 0 -22px; }
+.lg5-model-lid rect, .lg5-model-lid circle { fill: rgba(var(--lg5-cue-rgb), 0.85); }
+.lg5-model-lid.is-ccw { animation: lg5-lid-ccw 1.6s ease-in-out infinite; }
+.lg5-model-lid.is-cw { animation: lg5-lid-cw 1.6s ease-in-out infinite; }
+.lg5-model-lever { transform-origin: 0 8px; animation: lg5-lever 1.6s ease-in-out infinite; }
+.lg5-o.is-model { filter: drop-shadow(0 6px 14px rgba(0, 0, 0, 0.35)); }
+
+/* paused: everything holds still */
+.lg5-o.is-paused, .lg5-o.is-paused * { animation-play-state: paused !important; }
+
+/* adjusting by hand: the boxes can be dragged */
+.lg5-handle { fill: rgba(255, 255, 255, 0.08); stroke: #fff; stroke-width: 2; stroke-dasharray: 4 4; cursor: grab; pointer-events: all; }
+.lg5-handle:active { cursor: grabbing; }
+
+/* the bar over the picture */
+.lg5-top { position: absolute; top: 0; left: 0; right: 0; display: flex; align-items: center; gap: 8px; padding: max(12px, env(safe-area-inset-top)) 14px 12px; background: linear-gradient(rgba(0, 0, 0, 0.45), transparent); }
+.lg5-live { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; }
+.lg5-live i { width: 8px; height: 8px; border-radius: 50%; background: #e0523f; box-shadow: 0 0 0 3px rgba(224, 82, 63, 0.3); }
+.lg5-looks { font-size: 12px; color: rgba(255, 253, 246, 0.75); }
+.lg5-chip { min-height: 36px; padding: 0 14px; border: 1px solid rgba(255, 255, 255, 0.4); border-radius: 999px; background: rgba(20, 20, 16, 0.45); color: var(--lg5-ink); font: inherit; font-size: 13px; font-weight: 500; cursor: pointer; }
+.lg5-chip:focus-visible { outline: 2px solid var(--lg5-cue); outline-offset: 2px; }
+
+/* 2D notes at the edge, when an object cannot be followed */
+.lg5-edge { position: absolute; top: 62px; left: 50%; transform: translateX(-50%); display: flex; flex-direction: column; align-items: center; gap: 6px; max-width: calc(100% - 32px); }
+.lg5-edge-i { padding: 7px 14px; border-radius: 999px; background: rgba(20, 20, 16, 0.72); color: var(--lg5-ink); font-size: 14px; font-weight: 600; box-shadow: 0 0 0 1px rgba(var(--lg5-cue-rgb), 0.6); }
+.lg5-edge.is-quiet { top: auto; bottom: 12px; font-size: 12.5px; color: rgba(255, 253, 246, 0.8); padding: 6px 12px; border-radius: 999px; background: rgba(20, 20, 16, 0.6); }
+
+/* ── the guide sheet, under the picture ── */
+.lg5-guide { flex: none; max-height: 52vh; overflow-y: auto; border-radius: 18px 18px 0 0; padding: 14px 16px max(14px, env(safe-area-inset-bottom)); box-shadow: 0 -20px 40px -24px rgba(0, 0, 0, 0.6); }
+.lg5-step-h { display: flex; align-items: center; gap: 10px; }
+.lg5-paused { font-size: 11.5px; font-weight: 600; padding: 2px 8px; border-radius: 999px; background: rgba(35, 36, 31, 0.08); }
+.lg5-say { margin: 6px 0 4px; font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 24px; line-height: 1.18; }
+.lg5-hint, .lg5-saw, .lg5-unsure, .lg5-confirm { margin: 4px 0 0; font-size: 13.5px; line-height: 1.45; color: rgba(35, 36, 31, 0.72); }
+.lg5-unsure { font-style: italic; }
+.lg5-caution { margin: 0 0 6px; padding: 7px 10px; border-radius: 8px; background: rgba(232, 182, 44, 0.18); font-size: 13.5px; color: #6f5f2c; }
+.lg5-diagram { margin: 10px 0 0; padding-left: 20px; font-size: 13.5px; line-height: 1.5; color: rgba(35, 36, 31, 0.8); }
+.lg5-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 12px; }
+.lg5-controls .l5-btn { min-height: 40px; min-width: 40px; justify-content: center; } /* the arrows are glyphs: full-size targets all the same */
+
+/* the movement to make, in the card, when its object cannot be anchored on the picture */
+.lg5-how { display: flex; align-items: center; gap: 12px; margin: 10px 0 0; }
+.lg5-how svg { flex: none; overflow: visible; color: #b08410; }
+.lg5-how figcaption { font-size: 14px; line-height: 1.4; color: #23241f; }
+.lg5-how-cue { fill: none; stroke: #b08410; stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
+.lg5-how-cue .lg5-pulse circle { fill: rgba(176, 132, 16, 0.2); }
+.lg5-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin-top: 10px; }
+.lg5-input { flex: 1 1 200px; min-height: 44px; padding: 0 14px; border: 1px solid rgba(35, 36, 31, 0.22); border-radius: 12px; background: #fff; font: inherit; font-size: 16px; color: #23241f; }
+.lg5-input:focus-visible { outline: 2px solid #354620; outline-offset: 1px; }
+.lg5-mic { min-height: 44px; padding: 0 14px; border: 1px solid rgba(35, 36, 31, 0.22); border-radius: 12px; background: #fff; font: inherit; font-size: 14px; color: #23241f; cursor: pointer; touch-action: none; user-select: none; }
+.lg5-mic.is-on { background: #354620; color: #f5f3eb; border-color: #354620; }
+
+/* ── safety: the call to make, first ── */
+.lg5-safety { padding: 2px 0 4px; }
+.lg5-escalate { margin: 8px 0 10px; font-size: 18px; line-height: 1.35; font-weight: 600; color: #a3492b; }
+.lg5-first { margin: 0 0 10px; padding-left: 20px; font-size: 15px; line-height: 1.5; }
+
+@media (min-width: 900px) {
+  .lg5.is-live { flex-direction: row; }
+  .lg5-guide { width: 380px; max-height: none; border-radius: 0; box-shadow: -20px 0 40px -24px rgba(0, 0, 0, 0.6); padding: 22px 20px; }
+}
+
+@keyframes lg5-breathe { 50% { fill: rgba(var(--lg5-cue-rgb), 0.24); } }
+@keyframes lg5-march { to { stroke-dashoffset: -36; } }
+@keyframes lg5-spin-ccw { from { transform: rotate(40deg); } to { transform: rotate(-280deg); } }
+@keyframes lg5-spin-cw { from { transform: rotate(-40deg); } to { transform: rotate(280deg); } }
+@keyframes lg5-slide { 0%, 100% { transform: translate(0, 0); opacity: 0.6; } 50% { transform: translate(var(--dx), var(--dy)); opacity: 1; } }
+@keyframes lg5-depth-in { 0% { transform: scale(1.3); opacity: 0.3; } 100% { transform: scale(0.7); opacity: 1; } }
+@keyframes lg5-depth-out { 0% { transform: scale(0.7); opacity: 1; } 100% { transform: scale(1.3); opacity: 0.3; } }
+@keyframes lg5-squeeze { 50% { transform: scaleX(0.85); } }
+@keyframes lg5-tilt { 0%, 100% { transform: rotate(-12deg); } 50% { transform: rotate(12deg); } }
+@keyframes lg5-shake { 0%, 100% { transform: translateX(-4px); } 50% { transform: translateX(4px); } }
+@keyframes lg5-ring { from { transform: scale(1); opacity: 0.9; } to { transform: scale(2.4); opacity: 0; } }
+@keyframes lg5-lid-ccw { 0%, 20% { transform: rotateY(0) translateY(0); } 70%, 100% { transform: translateY(-8px) rotate(-14deg); } }
+@keyframes lg5-lid-cw { 0%, 20% { transform: rotateY(0) translateY(0); } 70%, 100% { transform: translateY(2px) rotate(14deg); } }
+@keyframes lg5-lever { 0%, 20% { transform: rotate(0); } 70%, 100% { transform: rotate(-50deg); } }
+
+@media (prefers-reduced-motion: reduce) {
+  .lg5-o, .lg5-o *, .lg5-how * { animation: none !important; }
+}

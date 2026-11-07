@@ -6,37 +6,16 @@
 // sees the preview and the waitlist.
 
 import { NextResponse } from 'next/server';
-import { auth, currentUser } from '@clerk/nextjs/server';
-import { mayUseAr, waitlistAddress, type ArAccess, type Viewer } from '@/lib/ar-access';
-import { operatorGranted } from '@/lib/socria-one-grant';
-import { isProduction } from '@/lib/environment';
+import { waitlistAddress, type ArAccess } from '@/lib/ar-access';
+import { arTester, arViewer } from '@/lib/ar-server';
 import { onWaitlist } from '@/lib/waitlist';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
-async function viewer(): Promise<Viewer | null> {
-  try {
-    if (!auth().userId) return null;
-    const u = await currentUser();
-    if (!u) return null;
-    return {
-      id: u.id,
-      emails: (u.emailAddresses ?? []).map((e) => ({ address: e.emailAddress, verified: e.verification?.status === 'verified' })),
-    };
-  } catch {
-    return null;
-  }
-}
-
 export async function GET() {
-  const v = await viewer();
-  const tester = mayUseAr(v, {
-    testers: process.env.SOCRIA_AR_TESTERS,
-    admins: process.env.SOCRIA_DASHBOARD_ADMINS,
-    production: isProduction(),
-    granted: (emails) => operatorGranted(emails.map((e) => ({ emailAddress: e.address, verification: { status: e.verified ? 'verified' : 'unverified' } }))),
-  });
+  const v = await arViewer();
+  const tester = arTester(v);
   const email = waitlistAddress(v);
   let waitlisted = false;
   if (!tester && email) {

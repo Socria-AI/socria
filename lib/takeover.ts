@@ -128,6 +128,7 @@ const THINKING_API = [
   '/api/logos/practice',
   '/api/logos/read',
   '/api/logos/easy',
+  '/api/logos/guide',
   '/api/logos/write',
   '/api/logos/synthesize',
   '/api/logos/explore',
