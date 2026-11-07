@@ -232,6 +232,7 @@ console.log('\n=== the session: ask, guide, check, adapt ===');
   const plan = G.sanitizePlan(JAR);
   let s = G.guideReducer(G.IDLE, { type: 'ask', question: 'How do I open this jar?' });
   ok('asking is looking, and counts a look', s.phase === 'looking' && s.looks === 1);
+  ok('  an ask answered from the words alone (an emergency) sends no frame and counts no look', G.guideReducer(G.IDLE, { type: 'ask', question: 'the pan is on fire', framed: false }).looks === 0);
   s = G.guideReducer(s, { type: 'planned', plan });
   ok('a plan starts at its first step', s.phase === 'guiding' && s.step === 0 && G.currentStep(s).said === 'Hold the jar firmly with your other hand.');
   s = G.guideReducer(s, { type: 'pause' });

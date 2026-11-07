@@ -661,7 +661,7 @@ its own glyph beside it.
 - `test/logos5-diagram-layout.test.mjs`: the cycle, tree, parts, concept and
   dated-timeline lenses — no overlaps, nothing lost, every line once, the
   same picture every time, on 160 seeded maps per lens and the odd ones.
-- `test/live-guide.test.mjs` (90): overlays checked before they are drawn;
+- `test/live-guide.test.mjs` (91): overlays checked before they are drawn;
   danger read from the words; tracking — a moved object found, a blank wall
   not pretended, a pan followed through a flickering patch, a slow pan, a
   hand over a plain lid not chased, a picture whose only detail keeps

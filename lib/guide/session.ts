@@ -65,7 +65,8 @@ export const IDLE: GuideState = {
 };
 
 export type GuideAction =
-  | { type: 'ask'; question: string }
+  /** `framed: false` — answered from the words alone (an emergency, a stop): no frame sent, so no look counted */
+  | { type: 'ask'; question: string; framed?: boolean }
   | { type: 'planned'; plan: GuidePlan }
   | { type: 'failed'; error: string }
   | { type: 'next' }
@@ -90,7 +91,7 @@ export const MIN_CHECK_GAP_MS = 6000;
 export function guideReducer(s: GuideState, a: GuideAction): GuideState {
   switch (a.type) {
     case 'ask':
-      return { ...IDLE, phase: 'looking', question: a.question.trim().slice(0, 300), looks: s.looks + 1 };
+      return { ...IDLE, phase: 'looking', question: a.question.trim().slice(0, 300), looks: s.looks + (a.framed === false ? 0 : 1) };
     case 'planned': {
       if (a.plan.safety === 'stop' || !a.plan.steps.length) return { ...s, phase: 'safety', plan: a.plan, step: 0, error: null };
       return { ...s, phase: 'guiding', plan: a.plan, step: 0, error: null, dismissed: false };

@@ -237,7 +237,7 @@ export function LiveGuide({
         dispatch({ type: 'failed', error: 'The camera is not showing anything yet.' });
         return;
       }
-      dispatch({ type: 'ask', question: text });
+      dispatch({ type: 'ask', question: text, framed: !!frame });
       inflight.current?.abort();
       const ac = new AbortController();
       inflight.current = ac;
