@@ -12,7 +12,6 @@
 // Its rules are lib/logos5/ideas.ts; this file draws them.
 
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
-import { InkMark } from '@/components/ds';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import type { LogosNodeType } from '@/lib/logos';
 import type { CanvasTurn } from '@/lib/logos5/canvas';
@@ -27,7 +26,6 @@ import {
   ideaTone,
   ideasCount,
   madeKey,
-  markPhrase,
   OPEN_KEY,
   spaceLinks,
   trailRows,
@@ -443,8 +441,6 @@ export function L5Space({
     );
   };
   const t = openTurn !== null ? turns[openTurn] : null;
-  // the phrase circled: the part of the open idea in the person's own words, from the turn it came from
-  const mark = open ? markPhrase(open.label, t?.asked) : null;
   const openEl = (
     <div key={openKey} className={`ls-it is-open${back(openKey)}`} data-k={openKey} style={order(openKey)}>
       <article ref={openRef} className="ls-open" aria-label={open ? `Open: ${open.label}` : 'The newest reply'}>
@@ -464,19 +460,7 @@ export function L5Space({
             <b>You</b>“{t.asked}”
           </p>
         )}
-        {open && (
-          <h2 className="ls-stmt">
-            {mark ? (
-              <>
-                {mark.pre}
-                <InkMark shape="circle">{mark.mark}</InkMark>
-                {mark.post}
-              </>
-            ) : (
-              open.label
-            )}
-          </h2>
-        )}
+        {open && <h2 className="ls-stmt">{open.label}</h2>}
         <div className="ls-body">{openBody}</div>
       </article>
       {words(openKey)}
