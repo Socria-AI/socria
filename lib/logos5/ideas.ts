@@ -256,6 +256,25 @@ export function trailRows(
   });
 }
 
+// ── the thread: every one of Socria's replies (Revision VI) ──────────
+
+/** How many replies Socria has given in the line (one still arriving counts). */
+export function threadReplies(turns: readonly { said: string; asks?: string; pending?: boolean }[]): number {
+  return turns.filter((t) => !!(t.said || t.asks || t.pending)).length;
+}
+
+/** A reply as the thread says it: what it said, without the question it ends on, and that question on its own. */
+export function threadWords(t: { said: string; asks?: string }): { said: string; asks: string } {
+  const asks = (t.asks || '').trim();
+  let said = (t.said || '').trim();
+  if (asks) {
+    const at = said.lastIndexOf(asks);
+    if (at >= 0) said = said.slice(0, at).trim();
+    else if (asks.startsWith(said.replace(/…$/, '').trim())) said = '';
+  }
+  return { said, asks };
+}
+
 // ── the chatbox ──────────────────────────────────────────────────────
 
 /**

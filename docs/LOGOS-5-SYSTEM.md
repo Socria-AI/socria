@@ -360,6 +360,18 @@ The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space
 - **Less to read**: no "Answering" chip and no "Answer below"; no "YOU" quote; cards say what they are by glyph and
   colour, with no kind words or turn tags; lines carry no words; no hint text in the row.
 
+### 8.5 Revision VI — every one of Socria's replies
+
+- **The stack**: when there are replies before the open one, they sit as two paper edges under Socria's bubble, and
+  its head counts them ("2 earlier replies ↑").
+- **The thread**: pressing the count opens every reply in order, as a column beside the space on a wide screen
+  (`.ls-thread`, 440px; the space and the chatbox keep to its left) and as a sheet pulled up over the space on a
+  phone, with Done. Your words sit as grey bubbles; each reply is signed Socria, says what it said and the question
+  it ended on (`threadWords`, `lib/logos5/ideas.ts`), and lists the ideas it lit and what it made, each pressable.
+  It opens at the newest reply; Esc puts it away.
+- **Hover lights what it made**: a reply hovered or focused outlines on the canvas the ideas, made things and files
+  from that turn. Pressing a reply opens the first idea it lit.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

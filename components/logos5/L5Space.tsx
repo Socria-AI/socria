@@ -28,6 +28,8 @@ import {
   madeKey,
   OPEN_KEY,
   spaceLinks,
+  threadReplies,
+  threadWords,
   trailRows,
   wordTargets,
   type IdeaEdgeLite,
@@ -168,6 +170,10 @@ export function L5Space({
   follow?: boolean;
 }) {
   const [kind, setKind] = useState<SpaceKind>('all');
+  // THE THREAD (Revision VI): every one of Socria's replies, opened from the bubble; a reply hovered lights what it made
+  const [threadOn, setThreadOn] = useState(false);
+  const [hoverTurn, setHoverTurn] = useState<number | null>(null);
+  const threadRef = useRef<HTMLDivElement>(null);
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
@@ -231,6 +237,34 @@ export function L5Space({
     return m;
   }, [targets]);
   const openKey = open ? ideaKey(open.id) : OPEN_KEY;
+  const rows = useMemo(() => trailRows(turns, fromMsg, ideas), [turns, fromMsg, ideas]);
+  const replies = threadReplies(turns);
+  const earlier = Math.max(0, replies - 1);
+  const glow = useMemo(() => {
+    const g = new Set<string>();
+    if (hoverTurn === null) return g;
+    for (const m of rows[hoverTurn]?.made ?? []) g.add(ideaKey(m.id));
+    for (const n of ideas) if (n.turn === hoverTurn) g.add(ideaKey(n.id));
+    for (const m of made) if (m.turn === hoverTurn) g.add(madeKey(m.key));
+    for (const b of brought) if (b.turn === hoverTurn) g.add(broughtKey(b.key));
+    return g;
+  }, [hoverTurn, rows, ideas, made, brought]);
+  // the thread opens at its newest reply; Esc puts it away
+  useLayoutEffect(() => {
+    const el = threadRef.current;
+    if (threadOn && el) el.scrollTop = el.scrollHeight;
+  }, [threadOn, turns.length]);
+  useEffect(() => {
+    if (!threadOn) {
+      setHoverTurn(null);
+      return;
+    }
+    const on = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setThreadOn(false);
+    };
+    window.addEventListener('keydown', on);
+    return () => window.removeEventListener('keydown', on);
+  }, [threadOn]);
   const cardKindOf = (k: string): 'idea' | 'brought' | 'made' | 'open' => (k === openKey ? 'open' : k.startsWith('c:') ? 'brought' : k.startsWith('m:') ? 'made' : 'idea');
 
   // THE LINES: measured once the cards are laid out, and again whenever the space changes size
@@ -319,7 +353,7 @@ export function L5Space({
     }
     const top = r.top - sr.top + sc.scrollTop;
     if (r.top < sr.top || r.top > sr.bottom - 80) sc.scrollTop = Math.max(0, top - 16);
-  }, [openKey, openTurn, narrow, kind]);
+  }, [openKey, openTurn, narrow, kind, threadOn]);
   useEffect(() => {
     const sc = scrollRef.current;
     const el = openRef.current;
@@ -345,7 +379,7 @@ export function L5Space({
     return new Map(keys.map((k, i) => [k, i]));
   }, [layout, brought, made, placed]);
   const order = (k: string) => ({ ['--i' as string]: orderOf.get(k) ?? 0 });
-  const back = (k: string) => (forwardIn(kind, cardKindOf(k)) ? '' : ' is-back');
+  const back = (k: string) => (forwardIn(kind, cardKindOf(k)) ? '' : ' is-back') + (glow.has(k) ? ' is-glow' : '');
   const turnWords = (t: number) => {
     const turn = turns[t];
     if (!turn) return null;
@@ -451,16 +485,101 @@ export function L5Space({
         </article>
       )}
       {/* SOCRIA'S BUBBLE: the reply in words, its own bubble pointing at the idea — the one place it is a conversation */}
-      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}`} aria-label="Socria’s reply">
+      <div className={`ls-bub${open ? ' has-tail' : ''}${openHero ? ' has-hero' : ''}${earlier > 0 ? ' has-earlier' : ''}`} aria-label="Socria’s reply">
         <span className="ls-bub-who">
           <span className="ls-bub-name">Socria</span>
           {openTurn !== null && <span className="ls-tn">{t?.pending ? 'thinking…' : openTurn === turns.length - 1 ? 'just now' : `turn ${roman(openTurn + 1)}`}</span>}
+          {earlier > 0 && (
+            // the replies before this one, stacked under it: pressed, every reply opens as a thread
+            <button type="button" className="ls-earlier" aria-expanded={threadOn} onClick={() => setThreadOn((v) => !v)}>
+              <span className="ls-earlier-n">{earlier}</span>
+              {earlier === 1 ? 'earlier reply' : 'earlier replies'}
+            </button>
+          )}
         </span>
         <div className="ls-body">{openBody}</div>
       </div>
       {words(openKey)}
     </div>
   );
+
+  const threadEl = threadOn ? (
+    <aside className="ls-thread" aria-label="Socria’s replies">
+      {narrow && <span className="ls-grab" aria-hidden="true" />}
+      <div className="ls-thead">
+        <span className="l5-label">Socria · {replies} {replies === 1 ? 'reply' : 'replies'}</span>
+        <button type="button" className="l5-link ls-thx" onClick={() => setThreadOn(false)}>
+          {narrow ? 'Done' : 'Back to the space ×'}
+        </button>
+      </div>
+      <div className="ls-tscroll" ref={threadRef}>
+        {rows.map((r) => {
+          const turn = turns[r.index];
+          if (!turn) return null;
+          const { said, asks } = threadWords(turn);
+          const madeHere = made.filter((m) => m.turn === r.index);
+          const first = r.made[0]?.id ?? null;
+          return (
+            <div key={r.index} className="ls-tturn">
+              {turn.asked && <p className="ls-mine">{turn.asked}</p>}
+              {(said || asks || turn.pending) && (
+                <div
+                  className={`ls-tb${r.index === openTurn ? ' is-now' : ''}${first ? ' is-go' : ''}`}
+                  data-turn={r.index}
+                  role={first ? 'button' : undefined}
+                  tabIndex={first ? 0 : undefined}
+                  onClick={first ? () => onIdea(first) : undefined}
+                  onKeyDown={first ? press(() => onIdea(first)) : undefined}
+                  onMouseEnter={() => setHoverTurn(r.index)}
+                  onMouseLeave={() => setHoverTurn((h) => (h === r.index ? null : h))}
+                  onFocus={() => setHoverTurn(r.index)}
+                  onBlur={() => setHoverTurn((h) => (h === r.index ? null : h))}
+                >
+                  <span className="ls-bub-who">
+                    <span className="ls-bub-name">Socria</span>
+                    <span className="ls-tn">{turn.pending ? 'thinking…' : r.index === turns.length - 1 ? 'just now' : roman(r.index + 1)}</span>
+                  </span>
+                  {turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay">{said}</p>}
+                  {asks && !turn.pending && <p className="ls-task">{asks}</p>}
+                  {(r.made.length > 0 || madeHere.length > 0) && (
+                    <span className="ls-tchips">
+                      {r.made.map((m) => (
+                        <button
+                          key={m.id}
+                          type="button"
+                          className="ls-tchip is-lit"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onIdea(m.id);
+                          }}
+                        >
+                          {m.label}
+                        </button>
+                      ))}
+                      {madeHere.map((m) => (
+                        <button
+                          key={m.key}
+                          type="button"
+                          className="ls-tchip is-made"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            m.onOpen?.();
+                          }}
+                          disabled={!m.onOpen}
+                        >
+                          {m.title || m.kicker}
+                        </button>
+                      ))}
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </aside>
+  ) : null;
 
   const counts: Record<SpaceKind, string> = {
     all: String(ideas.length + brought.length + made.length),
@@ -498,7 +617,7 @@ export function L5Space({
     const rows = trailRows(turns, fromMsg, ideas);
     const list = (ns: SpaceIdea[]) => ns.map((n) => ideaEl(n, true));
     return (
-      <div ref={rootRef} className="ls is-phone">
+      <div ref={rootRef} className={`ls is-phone${threadOn ? ' has-thread' : ''}`}>
         {kindsEl}
         <div className="ls-feed" ref={scrollRef}>
           {kind === 'all' && (
@@ -555,6 +674,7 @@ export function L5Space({
           )}
         </div>
         {chatEl}
+        {threadEl}
       </div>
     );
   }
@@ -564,7 +684,7 @@ export function L5Space({
   return (
     <div
       ref={rootRef}
-      className={`ls is-${kind}${arriving ? ' is-arriving' : ''}`}
+      className={`ls is-${kind}${arriving ? ' is-arriving' : ''}${threadOn ? ' has-thread' : ''}${hoverTurn !== null ? ' is-hovering' : ''}`}
       // the lines start drawing once the last card has settled
       style={{ ['--ls-base' as string]: `${(ideas.length + brought.length + made.length + (placed ? 0 : 1)) * 70 + 300}ms` }}
     >
@@ -596,6 +716,7 @@ export function L5Space({
         </div>
       </div>
       {chatEl}
+      {threadEl}
     </div>
   );
 }

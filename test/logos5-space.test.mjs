@@ -133,15 +133,15 @@ ok('the row brings a kind forward: Everything, Ideas, Brought, Made, Words — b
 ok('  with counts: 6 ideas, 1 brought, 1 made, 3 turns', /Ideas<span class="ls-c">6<\/span>/.test(wide) && /Brought<span class="ls-c">1<\/span>/.test(wide) && /Made<span class="ls-c">1<\/span>/.test(wide) && /Words<span class="ls-c">3 turns<\/span>/.test(wide));
 ok('each kind its own card: ideas, a file with its folded corner, something made, the open idea', /class="ls-idea/.test(wide) && /class="ls-file"/.test(wide) && /class="ls-made"/.test(wide) && /class="ls-open"/.test(wide));
 ok('  Revision V: cards say what they are by glyph and colour, not by kind words or turn tags', !/<span class="ls-tn">turn ii<\/span>/.test(wide) && /class="ls-t"><span class="ls-k-g"/.test(wide) && /class="ls-t ls-tt">Payslip, October\.pdf/.test(wide));
-ok('  the open idea is the idea and what was made for it; Socria’s reply is its own bubble under it', /<h2 class="ls-stmt">[\s\S]*?A flatshare at £750<\/h2>/.test(wide) && /class="ls-bub has-tail"[^>]*aria-label="Socria’s reply"/.test(wide) && /class="ls-bub-who"[\s\S]*?Socria/.test(wide) && /class="ls-bub[^"]*"[\s\S]*?class="reply"/.test(wide) && !/<b>You<\/b>/.test(wide));
+ok('  the open idea is the idea and what was made for it; Socria’s reply is its own bubble under it', /<h2 class="ls-stmt">[\s\S]*?A flatshare at £750<\/h2>/.test(wide) && /class="ls-bub has-tail[^"]*"[^>]*aria-label="Socria’s reply"/.test(wide) && /class="ls-bub-who"[\s\S]*?Socria/.test(wide) && /class="ls-bub[^"]*"[\s\S]*?class="reply"/.test(wide) && !/<b>You<\/b>/.test(wide));
 ok('  the bubble is signed by name, not the mark: Socria in italic moss serif', /class="ls-bub-who"><span class="ls-bub-name">Socria<\/span>/.test(wide) && !/class="ls-bub-who"><img/.test(wide) && /\.ls-bub-name\s*\{[^}]*font-style:\s*italic[^}]*color:\s*var\(--ls-moss/.test(readFileSync(new URL('../components/logos5/space.css', import.meta.url), 'utf8')));
 ok('  lit ideas from the open turn', /ls-idea is-idea is-lit/.test(wide));
 ok('  the question framed first, in its own column', /class="ls-col is-frame"[\s\S]*Your question/.test(wide));
 ok('the chatbox at the foot, with no "Answering" line over it', /class="ls-chat"/.test(wide) && /class="the-chatbox"/.test(wide) && !/ls-answering/.test(wide) && !/Answer below/.test(wide));
-ok('  what the open turn made is drawn large in the open idea; the bubble then keeps to words', (() => { const x = html(h(S.L5Space, props({ openHero: { node: h('div', { className: 'hero-thing' }) } }))); return /class="ls-hero"[\s\S]*?class="hero-thing"/.test(x) && /class="ls-bub has-tail has-hero"/.test(x); })());
+ok('  what the open turn made is drawn large in the open idea; the bubble then keeps to words', (() => { const x = html(h(S.L5Space, props({ openHero: { node: h('div', { className: 'hero-thing' }) } }))); return /class="ls-hero"[\s\S]*?class="hero-thing"/.test(x) && /class="ls-bub has-tail has-hero[^"]*"/.test(x); })());
 ok('  no hint text in the row; no words on the lines', !/ls-arr/.test(wide) && !/class="ls-lw/.test(wide));
 ok('the conversation as a page, a press away', /Read as a conversation/.test(wide));
-ok('a reply with no idea yet is Socria’s bubble alone', (() => { const x = html(h(S.L5Space, props({ openId: null }))); return /class="ls-bub"/.test(x) && !/class="ls-open"/.test(x); })());
+ok('a reply with no idea yet is Socria’s bubble alone', (() => { const x = html(h(S.L5Space, props({ openId: null }))); return /class="ls-bub(?: has-earlier)?"/.test(x) && !/class="ls-open"/.test(x); })());
 const phone = html(h(S.L5Space, props({ narrow: true })));
 ok('a phone: one column — the open idea, what was made from it, what it comes from, then all the ideas', /ls is-phone/.test(phone) && /Made from it/.test(phone) && /It comes from/.test(phone) && /See all 6 ideas/.test(phone) && !/ls-cols/.test(phone));
 ok('  the chatbox at its foot; the row still there', /class="ls-chat"/.test(phone) && /class="ls-kinds"/.test(phone));
@@ -182,6 +182,20 @@ ok('Memory’s gold count is what its Review holds: changes proposed, read again
 ok('Listen reads the open reply aloud with the browser’s own voice', /msgEl\(messages\[ot\.replyAt\], ot\.replyAt, undefined, \{ listen: true \}\)/.test(app4) && /function ListenButton/.test(read('components/logos5/L5Message.tsx')) && /SpeechSynthesisUtterance/.test(read('components/logos5/L5Message.tsx')));
 const r2 = read('components/logos5/revision2.css');
 ok('the wordmark top left in Instrument Serif; Socria One the word in its slate, no pill', /\.l5v-home-w \{ font-family: var\(--l5-serif/.test(r2) && /\.l5-onebtn \{ height: auto; padding: 0; border: 0;[^}]*color: #26485a/.test(r2));
+
+console.log('\n=== Revision VI: every one of Socria’s replies ===');
+ok('the thread counts Socria’s replies, one still arriving included, a question with no reply not', S.threadReplies(cTurns) === 3 && S.threadReplies([...cTurns, { asked: 'and?', said: '', pending: true }]) === 4 && S.threadReplies([...cTurns, { asked: 'and?', said: '' }]) === 3);
+ok('  a reply says what it said, and the question it ends on stands on its own', J(S.threadWords({ said: 'That leaves £240. Would a flatshare still feel like moving out?', asks: 'Would a flatshare still feel like moving out?' })) === J({ said: 'That leaves £240.', asks: 'Would a flatshare still feel like moving out?' }) && J(S.threadWords({ said: 'Let’s see.' })) === J({ said: 'Let’s see.', asks: '' }));
+ok('  a reply that is only its question does not say it twice', S.threadWords({ said: 'What do you take…', asks: 'What do you take home each month?' }).said === '');
+ok('the bubble counts the replies before it, a button that opens the thread', /class="ls-bub has-tail has-earlier"/.test(wide) && /<button type="button" class="ls-earlier" aria-expanded="false"><span class="ls-earlier-n">2<\/span>earlier replies<\/button>/.test(wide));
+ok('  with one reply there is nothing earlier: no count, no stack', (() => { const x = html(h(S.L5Space, props({ turns: cTurns.slice(0, 1), openTurn: 0, openId: 'q' }))); return !/ls-earlier/.test(x) && !/has-earlier/.test(x); })());
+ok('  closed until pressed: the space alone at first', !/class="ls-thread"/.test(wide));
+const sp6 = read('components/logos5/L5Space.tsx');
+ok('the thread: your words, then each reply signed Socria with what it lit and what it made; the newest marked', /className="ls-thread" aria-label="Socria’s replies"/.test(sp6) && /className="ls-mine"/.test(sp6) && /ls-tb\$\{r\.index === openTurn \? ' is-now' : ''\}/.test(sp6) && /ls-tchip is-lit/.test(sp6) && /ls-tchip is-made/.test(sp6));
+ok('  a reply hovered or focused lights what it made on the canvas', /onMouseEnter=\{\(\) => setHoverTurn\(r\.index\)\}/.test(sp6) && /onFocus=\{\(\) => setHoverTurn\(r\.index\)\}/.test(sp6) && /glow\.has\(k\) \? ' is-glow' : ''/.test(sp6));
+ok('  opens at the newest reply; Esc puts it away; a phone has it as a sheet with Done', /el\.scrollTop = el\.scrollHeight/.test(sp6) && /e\.key === 'Escape'\) setThreadOn\(false\)/.test(sp6) && /narrow \? 'Done' : 'Back to the space ×'/.test(sp6));
+const css6 = read('components/logos5/space.css');
+ok('  the space and the chatbox keep to its left; on a phone it is pulled up over the space', /\.ls\.has-thread:not\(\.is-phone\) \.ls-canvas \{ margin-right: 440px; \}/.test(css6) && /\.ls\.is-phone \.ls-thread \{[^}]*border-radius: 18px 18px 0 0/.test(css6) && /\.ls-it\.is-glow > \*/.test(css6));
 
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

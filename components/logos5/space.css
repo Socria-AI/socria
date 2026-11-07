@@ -213,3 +213,51 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-bub.has-tail::before { background: rgba(var(--c-ink-rgb), 0.06); }
 /* in the bubble the reply's opening sentence is said, not set as a headline: the question is what stands out */
 .logos-root .ls-bub .l5-prose.is-reply .socria-lead { margin: 0 0 6px; font-family: inherit; font-size: 15px; line-height: 1.5; font-weight: 500; letter-spacing: 0; color: var(--c-ink); }
+
+/* ── Revision VI: every one of Socria's replies ─────────────────────────────────────────
+   The replies before the open one are stacked under its bubble (two paper edges) with a count in its head;
+   pressed, they open as a thread — a column beside the space on a wide screen, a sheet on a phone. A reply
+   hovered or focused lights what it made on the canvas. */
+.logos-root .ls-bub.has-earlier { margin-bottom: 14px; box-shadow: 0 6px 0 -3px #fbfaf5, 0 6px 0 -2px rgba(var(--c-moss-rgb), 0.2), 0 12px 0 -7px #f8f6ee, 0 12px 0 -6px rgba(var(--c-moss-rgb), 0.14), 0 1px 2px rgba(35, 36, 31, 0.05), 0 26px 44px -28px rgba(35, 36, 31, 0.5); }
+.logos-root .ls-earlier { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 3px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #465a26); cursor: pointer; transition: background 0.2s; }
+.logos-root .ls-earlier:hover, .logos-root .ls-earlier[aria-expanded='true'] { background: rgba(var(--c-moss-rgb), 0.1); }
+.logos-root .ls-earlier:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .ls-earlier-n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: rgba(var(--c-moss-rgb), 0.14); font-size: 11px; font-variant-numeric: tabular-nums; }
+.logos-root .ls-earlier::after { content: '↑'; font-weight: 500; }
+
+.logos-root .ls-thread { position: absolute; z-index: 7; top: 48px; right: 0; bottom: 0; width: 440px; display: flex; flex-direction: column; background-color: var(--c-paper); background-image: var(--c-grain); border-left: 1px solid var(--c-rule); box-shadow: -24px 0 40px -34px rgba(35, 36, 31, 0.5); animation: ls-thread-in 0.28s cubic-bezier(0.2, 0.7, 0.2, 1); }
+@keyframes ls-thread-in { from { transform: translateX(24px); opacity: 0; } }
+.logos-root .ls-thead { flex: none; display: flex; align-items: baseline; justify-content: space-between; padding: 22px 24px 10px; }
+.logos-root .ls-thx { font-size: 12.5px; }
+.logos-root .ls-tscroll { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; scrollbar-width: thin; padding: 6px 24px 28px; display: flex; flex-direction: column; gap: 12px; -webkit-mask-image: linear-gradient(transparent, #000 18px); mask-image: linear-gradient(transparent, #000 18px); }
+.logos-root .ls-tturn { display: flex; flex-direction: column; gap: 12px; }
+.logos-root .ls-mine { align-self: flex-end; max-width: 80%; margin: 0; padding: 8px 12px; border-radius: 14px 14px 4px 14px; background: color-mix(in oklab, var(--c-ink) 7%, var(--c-paper)); border: 1px solid rgba(var(--c-ink-rgb), 0.07); font-size: 13.5px; line-height: 1.45; color: var(--c-ink-70); }
+.logos-root .ls-tb { position: relative; padding: 10px 14px 11px; border: 1px solid rgba(var(--c-moss-rgb), 0.22); border-radius: 16px 16px 16px 5px; background: #fff; box-shadow: 0 1px 2px rgba(35, 36, 31, 0.04); transition: box-shadow 0.2s, border-color 0.2s; }
+.logos-root .ls-tb .ls-bub-name { font-size: 17px; }
+.logos-root .ls-tb.is-go { cursor: pointer; }
+.logos-root .ls-tb:hover, .logos-root .ls-tb:focus-visible { outline: none; border-color: rgba(var(--ls-mus-rgb, 232, 182, 44), 0.75); box-shadow: 0 0 0 3px rgba(var(--ls-mus-rgb, 232, 182, 44), 0.18); }
+.logos-root .ls-tb.is-now { border-color: var(--c-moss); box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 20px 40px -26px rgba(35, 36, 31, 0.5); }
+.logos-root .ls-tsay { margin: 5px 0 0; font-size: 13.5px; line-height: 1.5; color: var(--c-ink-70); }
+.logos-root .ls-task { margin: 6px 0 0; font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 19px; line-height: 1.18; color: var(--c-ink); }
+.logos-root .ls-tchips { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
+.logos-root .ls-tchip { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; text-align: left; }
+.logos-root .ls-tchip:hover { text-decoration: underline; text-underline-offset: 3px; }
+.logos-root .ls-tchip.is-lit { color: var(--ls-moss-ink, #465a26); }
+.logos-root .ls-tchip.is-lit::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ls-moss, #5e7633); }
+.logos-root .ls-tchip.is-made { color: var(--ls-verm-ink, #b03526); }
+.logos-root .ls-tchip.is-made::before { content: ''; flex: none; width: 7px; height: 7px; background: var(--ls-verm, #d8402f); }
+.logos-root .ls-tchip:disabled { cursor: default; text-decoration: none; }
+/* the cards a hovered reply made, lit on the canvas */
+.logos-root .ls-it.is-glow > * { outline: 2px solid rgba(var(--ls-mus-rgb, 232, 182, 44), 0.7); outline-offset: 3px; transition: outline-color 0.2s; }
+/* with the thread open, the space and the chatbox keep to its left */
+.logos-root .ls.has-thread:not(.is-phone) .ls-canvas { margin-right: 440px; }
+.logos-root .ls.has-thread:not(.is-phone) .ls-chat { left: calc(50% - 220px); width: min(760px, calc(100% - 488px)); }
+/* a phone: the thread is a sheet pulled up over the space */
+.logos-root .ls.is-phone .ls-thread { top: 64px; left: 0; width: auto; z-index: 9; border-left: 0; border-radius: 18px 18px 0 0; box-shadow: 0 -20px 40px -20px rgba(35, 36, 31, 0.35); animation-name: ls-sheet-in; }
+@keyframes ls-sheet-in { from { transform: translateY(40px); opacity: 0; } }
+.logos-root .ls-grab { align-self: center; flex: none; width: 38px; height: 4px; margin-top: 10px; border-radius: 2px; background: rgba(var(--c-ink-rgb), 0.2); }
+.logos-root .ls.is-phone .ls-thead { padding: 10px 16px 6px; }
+.logos-root .ls.is-phone .ls-tscroll { padding: 6px 16px 24px; }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-tb { background: rgba(var(--c-ink-rgb), 0.06); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-bub.has-earlier { box-shadow: 0 6px 0 -3px rgba(var(--c-ink-rgb), 0.05), 0 6px 0 -2px rgba(var(--c-ink-rgb), 0.16), 0 12px 0 -7px rgba(var(--c-ink-rgb), 0.04), 0 12px 0 -6px rgba(var(--c-ink-rgb), 0.12); }
+@media (prefers-reduced-motion: reduce) { .logos-root .ls-thread { animation: none; } }
