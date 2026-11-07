@@ -13,9 +13,10 @@
 //
 // Its rules are read in lib/logos5/oneView.ts; this file draws them.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
 import type { CanvasTurn } from '@/lib/logos5/canvas';
-import { forward, mapCardIdeas, partOfTone, readingLabel, roman, shelfOf, stepStates, type Camera } from '@/lib/logos5/oneView';
+import { pinchOut } from '@/lib/logos5/morph';
+import { cameraOfPanel, forward, mapCardIdeas, panelOf, partOfTone, readingLabel, roman, shelfOf, stepStates, type Camera, type PagePanel } from '@/lib/logos5/oneView';
 import type { CanvasCard } from './L5Canvas';
 import './page.css';
 
@@ -39,6 +40,8 @@ export interface BoardIdea {
   /** what it is, as the page says it: "Question", "Step", "Concept" */
   kind: string;
   label: string;
+  /** what it does to another idea, in a line: "conflicts with" · "Italy stayed out" (lib/logos5/oneView.ts relationLine) */
+  rel?: { said: string; to: string } | null;
 }
 
 export interface BoardMap {
@@ -73,6 +76,9 @@ export function L5Board({
   besideOpen,
   follow = false,
   onRead,
+  onZoomOut,
+  narrow = false,
+  onPanel,
 }: {
   turns: CanvasTurn[];
   /** the turn open on the page — the newest unless another was pressed */
@@ -92,9 +98,70 @@ export function L5Board({
   follow?: boolean;
   /** a folded turn pressed: it opens and the rest fold */
   onRead: (turn: number) => void;
+  /** a pinch outward (or Ctrl and the wheel): up a level, to this line on the Universal Map */
+  onZoomOut?: () => void;
+  /** a phone: the three columns are panels side by side, swiped between */
+  narrow?: boolean;
+  /** a phone, swiped to another panel: the header's tab follows */
+  onPanel?: (camera: Camera) => void;
 }) {
   const scrollRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<HTMLElement>(null);
+  const rootRef = useRef<HTMLDivElement>(null);
+  // ONE SPACE: pinching out of the page goes up a level (lib/logos5/morph.ts); pinching in is left to the browser
+  const zoomOutRef = useRef(onZoomOut);
+  zoomOutRef.current = onZoomOut;
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const acc = { n: 0, at: 0 };
+    const on = (e: WheelEvent) => {
+      if (!zoomOutRef.current) return;
+      const r = pinchOut(e, acc, Date.now());
+      if (!r) return;
+      e.preventDefault();
+      if (r === 'move') zoomOutRef.current();
+    };
+    el.addEventListener('wheel', on, { passive: false });
+    return () => el.removeEventListener('wheel', on);
+  }, []);
+  // the right column earns its width: with fewer than two things in it, it is a strip until asked for (or its tab is)
+  const [madeOpen, setMadeOpen] = useState(false);
+  const slim = !narrow && cards.length < 2 && !madeOpen && camera !== 'content' && camera !== 'artifacts';
+
+  // A PHONE: the header's tab brings its panel into view; a swipe to another panel moves the tab
+  const firstPanel = useRef(true);
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!narrow || !el) return;
+    const left = panelOf(camera) * el.clientWidth;
+    if (Math.abs(el.scrollLeft - left) > 4) el.scrollTo?.({ left, behavior: firstPanel.current ? 'auto' : 'smooth' });
+    firstPanel.current = false;
+  }, [narrow, camera]);
+  const cameraRef = useRef(camera);
+  cameraRef.current = camera;
+  const panelRef = useRef(onPanel);
+  panelRef.current = onPanel;
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!narrow || !el) return;
+    let t: ReturnType<typeof setTimeout> | undefined;
+    const settle = () => {
+      const w = el.clientWidth || 1;
+      const p = Math.max(0, Math.min(2, Math.round(el.scrollLeft / w))) as PagePanel;
+      const next = cameraOfPanel(p, cameraRef.current);
+      if (next !== cameraRef.current) panelRef.current?.(next);
+    };
+    const on = () => {
+      if (t) clearTimeout(t);
+      t = setTimeout(settle, 140);
+    };
+    el.addEventListener('scroll', on, { passive: true });
+    return () => {
+      el.removeEventListener('scroll', on);
+      if (t) clearTimeout(t);
+    };
+  }, [narrow]);
   const count = turns.length;
   const newest = reading !== null && reading === count - 1;
 
@@ -149,8 +216,16 @@ export function L5Board({
         onClick={() => map.onIdea(n.id)}
         title={`Ask about “${n.label}”`}
       >
-        <span className="lp-node-k">{n.kind}</span>
+        <span className="lp-node-k">
+          {n.kind}
+          {map.picked === n.id && <span className="lp-node-asking"> · asking about</span>}
+        </span>
         <span className="lp-node-t">{n.label}</span>
+        {n.rel && (
+          <span className="lp-node-rel">
+            {n.rel.said} <em>{n.rel.to}</em>
+          </span>
+        )}
       </button>
     );
   };
@@ -237,17 +312,15 @@ export function L5Board({
   };
 
   const ideaCount = map?.ideas.length ?? 0;
-  const litNote = map && map.at !== null && map.lit.size > 0 ? `Turn ${roman(map.at + 1)} lit` : '';
 
   return (
-    <div className={`lp cam-${camera}${besideOpen ? ' is-split' : ''}`}>
+    <div ref={rootRef} className={`lp cam-${camera}${narrow ? ' is-phone' : ''}${besideOpen ? ' is-split' : ''}${slim && !besideOpen ? ' has-slim' : ''}`}>
       {/* THE LOGIC MAP: one column that reads the turn in view */}
       <section className={`lp-col lp-map l5-dots${dim('map')}`} data-part="map" aria-label="Logic Map">
         <header className="lp-head">
           <button type="button" className="lp-head-k" onClick={map?.onOpen} disabled={!map} title="Open the Logic Map beside the page, to edit it">
             <span className="l5-label">{map?.title ? <>Logic Map · {map.title}</> : <>Logic Map · {ideaCount} {ideaCount === 1 ? 'idea' : 'ideas'}</>}</span>
           </button>
-          {litNote && <span className="lp-meta">{litNote}</span>}
         </header>
         {map && shelves ? (
           <div className="lp-ideas">
@@ -290,17 +363,33 @@ export function L5Board({
         <div className="lp-compose">{composer}</div>
       </section>
 
-      {/* WHAT WAS BROUGHT AND MADE: cells between hairlines, each marking its turn */}
-      {!besideOpen && (
-        <section className="lp-col lp-made" data-part="made" aria-label="Brought and made">
-          <header className="lp-head">
-            <span className="l5-label">Brought and made · {cards.length}</span>
-          </header>
-          <div className="lp-cells">
-            {cards.length ? cards.map(cellEl) : <p className="lp-empty">What you bring in, and what is made as you go — a file, a photo, a chart — sits here beside the turn it came with.</p>}
-          </div>
-        </section>
-      )}
+      {/* WHAT WAS BROUGHT AND MADE: cells between hairlines, each marking its turn — a strip while there is little in it */}
+      {!besideOpen &&
+        (slim ? (
+          <section className="lp-col lp-made is-slim" data-part="made" aria-label="Brought and made">
+            {cards.length ? (
+              <button type="button" className="lp-strip" onClick={() => setMadeOpen(true)} aria-expanded={false} title="Show what was brought and made">
+                <span className="l5-label">Brought and made · {cards.length}</span>
+              </button>
+            ) : (
+              <span className="lp-strip is-empty">
+                <span className="l5-label">Brought and made · 0</span>
+              </span>
+            )}
+          </section>
+        ) : (
+          <section className="lp-col lp-made" data-part="made" aria-label="Brought and made">
+            <header className="lp-head">
+              <span className="l5-label">Brought and made · {cards.length}</span>
+              {madeOpen && cards.length < 2 && (
+                <button type="button" className="l5-link is-meta" onClick={() => setMadeOpen(false)}>
+                  Fold
+                </button>
+              )}
+            </header>
+            <div className="lp-cells">{cards.map(cellEl)}</div>
+          </section>
+        ))}
     </div>
   );
 }

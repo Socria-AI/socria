@@ -34,7 +34,9 @@ const html = (el) => quiet(() => renderToStaticMarkup(el));
 console.log('\n=== oneView: when the board is the view ===');
 ok('a wide screen, a line of thinking with something in it', O.oneViewOn({ narrow: false, line: true, turns: 2, busy: false }));
 ok('  the first message on its way counts', O.oneViewOn({ narrow: false, line: true, turns: 0, busy: true }));
-ok('  not on a phone, not on an empty line, not off a line', !O.oneViewOn({ narrow: true, line: true, turns: 3, busy: false }) && !O.oneViewOn({ narrow: false, line: true, turns: 0, busy: false }) && !O.oneViewOn({ narrow: false, line: false, turns: 3, busy: false }));
+ok('  on a phone too (as panels side by side); not on an empty line, not off a line', O.oneViewOn({ narrow: true, line: true, turns: 3, busy: false }) && !O.oneViewOn({ narrow: false, line: true, turns: 0, busy: false }) && !O.oneViewOn({ narrow: true, line: false, turns: 3, busy: false }));
+ok('  a phone: each tab brings its panel — Logic Map left, the conversation, then brought and made', O.panelOf('logic_map') === 0 && O.panelOf('chat') === 1 && O.panelOf('content') === 2 && O.panelOf('artifacts') === 2);
+ok('  and a swipe to a panel chooses its tab, keeping Files or Artifacts on the third', O.cameraOfPanel(0, 'chat') === 'logic_map' && O.cameraOfPanel(1, 'logic_map') === 'chat' && O.cameraOfPanel(2, 'chat') === 'artifacts' && O.cameraOfPanel(2, 'content') === 'content');
 
 console.log('\n=== oneView: the tabs move the camera ===');
 ok('Chat: everything forward', ['turns', 'content', 'artifacts', 'map'].every((p) => O.forward('chat', p)));
@@ -100,6 +102,28 @@ ok('  nothing read, or no record: none ahead', O.aheadOf(TT, FM, null).size === 
 ok('a map idea\'s shelf: the question, a given, a step on the way, any other idea', O.shelfOf({ type: 'question' }) === 'question' && O.shelfOf({ type: 'given' }) === 'given' && O.shelfOf({ type: 'unknown' }) === 'given' && O.shelfOf({ type: 'step' }) === 'step' && O.shelfOf({ type: 'result' }) === 'step' && O.shelfOf({ type: 'process', role: 'step' }) === 'step' && O.shelfOf({ type: 'concept' }) === 'idea' && O.shelfOf({ type: 'claim', role: 'branch' }) === 'idea');
 ok('the question a reply ends on — what a folded turn shows', O.closingAsk('Width times height. If you cut it into 4 strips, how wide is each one?') === 'If you cut it into 4 strips, how wide is each one?' && O.closingAsk('No question here.') === '' && O.closingAsk('— Is that the share you expected?') === 'Is that the share you expected?');
 
+console.log('\n=== what an idea does to another, in a line ===');
+const EDGES = [
+  { from: 'cl', to: 'q', relation: 'relates' },
+  { from: 'ct', to: 'cl', relation: 'conflicts' },
+  { from: 'ev', to: 'cl2', relation: 'supports' },
+  { from: 'a', to: 'v', relation: 'depends' },
+  { from: 'a', to: 'x', relation: 'supports' },
+];
+const LBL = { q: 'Did the alliances make it inevitable?', cl: 'The alliances made the war inevitable', cl2: 'The war plans made mobilisation mean war', v: 'My partner is here', x: 'Something else', ct: 'Italy stayed out' };
+const rl = (id) => O.relationLine(id, EDGES, (k) => LBL[k]);
+ok('a conflict, said from either end', J(rl('ct')) === J({ said: 'conflicts with', to: 'The alliances made the war inevitable' }) && J(rl('cl')) === J({ said: 'conflicts with', to: 'Italy stayed out' }));
+ok('  what it supports; what it rests on before what it supports', J(rl('ev')) === J({ said: 'supports', to: 'The war plans made mobilisation mean war' }) && rl('a').said === 'rests on');
+ok('  nothing to say: null (relates is not said; nor an idea with no lines)', rl('q') === null && rl('v') === null && rl('nobody') === null);
+ok('  a long name is cut at a word', O.relationLine('p', [{ from: 'p', to: 'z', relation: 'supports' }], () => 'one two three four five six seven eight nine ten eleven twelve', 20).to.endsWith('…'));
+
+console.log('\n=== one space: a pinch out goes up a level ===');
+const acc = { n: 0, at: 0 };
+ok('a pinch outward gathers, then moves; a pinch inward or a plain wheel is not one', O.pinchOut({ ctrlKey: true, deltaY: 40 }, acc, 1000) === 'gathering' && O.pinchOut({ ctrlKey: true, deltaY: 50 }, acc, 1050) === 'move' && O.pinchOut({ ctrlKey: true, deltaY: -40 }, acc, 1100) === null && O.pinchOut({ ctrlKey: false, deltaY: 200 }, acc, 1150) === null);
+const acc2 = { n: 0, at: 0 };
+ok('  a pause starts it over', O.pinchOut({ ctrlKey: true, deltaY: 60 }, acc2, 1000) === 'gathering' && O.pinchOut({ ctrlKey: true, deltaY: 30 }, acc2, 1600) === 'gathering');
+ok('  without a browser to draw it, no move is drawn (the change is simply made)', O.canMorph() === false && O.MORPH_NAME === 'l5-line');
+
 console.log('\n=== L5Board: the one view set as a page ===');
 const T = O.canvasTurns([...MSGS.slice(0, 2), { id: 'u2', role: 'user', content: 'riemann sums' }, { id: 'a2', role: 'assistant', content: 'A Riemann sum is that guess done several times. Which edge would you take the height from?' }, { id: 'u3', role: 'user', content: 'and how do i do it' }, { id: 'a3', role: 'assistant', content: 'The next step is how wide each piece is.' }]);
 ok('canvas: a turn keeps the question its reply ends on', T[1].asks === 'Which edge would you take the height from?' && T[0].asks === undefined);
@@ -107,14 +131,21 @@ const cards = [
   { key: 'c:f', lane: 'made', tone: 'content', kicker: 'File · Brought', title: 'Week 6 · Riemann sums.pdf', turn: 0, preview: null, note: '4 pages · read', onOpen: () => {} },
   { key: 'e:g', lane: 'made', tone: 'artifact', kicker: 'Artifact · Live graph', title: 'Rectangles under x²', turn: 2, preview: h('svg', { className: 'GRAPH' }), note: '4 rectangles · heights from the left', onOpen: () => {} },
 ];
-const ideas = NODES.map((n) => ({ ...n, kind: n.type[0].toUpperCase() + n.type.slice(1) }));
+const ideas = NODES.map((n) => ({ ...n, kind: n.type[0].toUpperCase() + n.type.slice(1), ...(n.id === 'c1' ? { rel: { said: 'conflicts with', to: 'Interval doesn’t start at 0' } } : {}) }));
 const MAP = { ideas, lit: new Set(['s3']), ahead: new Set(['s5']), at: 2, picked: 's3', onIdea: () => {}, onOpen: () => {} };
 const board = (o = {}) => html(h(O.L5Board, { turns: T, reading: 2, cards, map: MAP, camera: 'chat', open: h('div', { className: 'OPEN' }, 'THE OPEN TURN'), composer: h('div', { className: 'DOCK' }, 'THE CHATBOX'), besideOpen: false, onRead: () => {}, ...o }));
 const b = board();
 ok('three columns, no bar: no filters, no zoom tray, no Back to chat, no floating sheet', /class="lp cam-chat"/.test(b) && /lp-col lp-map l5-dots/.test(b) && /lp-col lp-convo/.test(b) && /lp-col lp-made/.test(b) && !/Everything|Back to chat|lcv-bar|lob-tray|lob-sheet|aria-label="Zoom"/.test(b));
 ok('the dot grid only behind the Logic Map', (b.match(/l5-dots/g) || []).length === 1);
-ok('the Logic Map: its count, and the turn that lit it', b.includes('Logic Map · 7 ideas') && b.includes('Turn iii lit'));
+ok('the Logic Map: its count — the lit ideas say which turn, no label needed', b.includes('Logic Map · 7 ideas') && !b.includes('Turn iii lit'));
+ok('  an idea says what it does to another, in a line', b.includes('<span class="lp-node-rel">conflicts with <em>Interval doesn’t start at 0</em></span>'));
+ok('  the one asked about says so in its label', /lp-node-k">Step<span class="lp-node-asking"> · asking about<\/span>/.test(b));
 ok('  the question first; steps on a rail — done, now, ahead; the lit one marked; the asked-about one pressed', /lp-node is-question/.test(b) && /lp-steps/.test(b) && /lp-step is-done/.test(b) && /lp-step is-now/.test(b) && /lp-step is-ahead/.test(b) && /lp-node is-step is-lit is-picked" aria-pressed="true"/.test(b));
+const one = board({ cards: [cards[1]] });
+ok('one thing brought or made: the right column is a strip, its name on end, pressed to open', /class="lp cam-chat has-slim"/.test(one) && /lp-made is-slim/.test(one) && one.includes('Brought and made · 1') && /class="lp-strip"/.test(one) && !one.includes('lp-cell'));
+ok('  nothing yet: a quiet strip; on the Files or Artifacts tab it opens whatever it holds', board({ cards: [] }).includes('lp-strip is-empty') && /lp-cell/.test(board({ cards: [cards[1]], camera: 'artifacts' })));
+const phone = board({ narrow: true });
+ok('a phone: the same page, marked for its panels; never a strip', /class="lp cam-chat is-phone"/.test(phone) && !board({ narrow: true, cards: [cards[1]] }).includes('lp-strip'));
 ok('  an idea not come up yet is dashed; the caption says so', /lp-node is-step is-ahead/.test(b) && b.includes('Dashed ones haven’t come up yet.'));
 ok('the conversation: its count and the turn being read', b.includes('The conversation · 3 turns') && b.includes('Reading turn iii of iii'));
 ok('  earlier turns folded to two lines: numeral, "You · …", Socria\'s question', (b.match(/l5-turn is-folded/g) || []).length === 2 && /<span class="l5-turn-n" aria-hidden="true">i\.<\/span>/.test(b) && b.includes('You · i need you to teach me rectangles') && b.includes('Which edge would you take the height from?'));
@@ -134,15 +165,20 @@ ok('no ideas yet: the column says where they will land', board({ map: null }).in
 
 console.log('\n=== wired into LogosApp ===');
 const app = read('components/LogosApp.tsx');
-ok('the page is the view on a wide screen; the phone keeps its canvas', /const oneView = oneViewOn\(\{ narrow,/.test(app) && /const primaryEl = oneView \? boardEl : viewEl\(studyTab\);/.test(app) && /const canvasEl = zoomed && !oneView/.test(app));
+ok('the page is the view, on a wide screen and a phone; the zoomed-out canvas is not reached from it', /const oneView = oneViewOn\(\{ narrow,/.test(app) && /const primaryEl = oneView \? phoneBeside \?\? boardEl : viewEl\(studyTab\);/.test(app) && /const canvasEl = zoomed && !oneView/.test(app));
 ok('  the turn read is the one pressed, else the newest; a send opens the newest and gives focus back to the conversation', /const sheetAt = oneView && sheetOpen \? sheetTurn\(boardTurns\.length, reading\) : null;/.test(app) && /if \(lastRole !== 'user'\) return;\s*setReading\(null\);\s*setSheetOpen\(true\);\s*setPageFocus\('chat'\);/.test(app));
 ok('  the open turn is drawn as the conversation draws it (one message renderer), the way to what it made first in its actions', /const msgEl = \(m: Msg, i: number, go\?: ReactNode\) =>/.test(app) && /\{messages\.map\(\(m, i\) => msgEl\(m, i\)\)\}/.test(app) && /msgEl\(messages\[t\.askedAt\], t\.askedAt\)/.test(app) && /msgEl\(messages\[t\.replyAt\], t\.replyAt, go\)/.test(app) && /Open the \{madeNoun\} beside this/.test(app));
 ok('  the Logic Map column lights what the turn being read put there — the record and the cards its words name', /litBy\(litAt !== null \? turns\[litAt\] : null, byMsg\)/.test(app) && /aheadOf\(turns, byMsg, litAt\)/.test(app) && /links\?\.fromNode/.test(app));
 ok('the tabs set focus, and only the tabs: what the screen picks never dims the conversation', /onChange=\{\(v\) => \(oneView \? moveCamera\(v as Viewport\) : openFull\(v as Viewport\)\)\}/.test(app) && /camera=\{pageFocus\}/.test(app) && /setPageFocus\(v\);/.test(app) && /value=\{oneView \? pageFocus :/.test(app));
-ok('Split View in the header opens one thing beside the page; never the conversation', /split=\{oneView \? <SplitView menu=\{splitChoices\} besideOn=\{!!besideEl\} onPick=\{pickSplit\} board \/> : undefined\}/.test(app) && /return setBoardBeside\(\(b\) => toggleBeside\(b, c\.beside\)\);/.test(app) && /view: oneView \? 'chat' : studyTab,/.test(app));
+ok('Split View in the header opens one thing beside the page (a wide screen); never the conversation', /split=\{oneView && !narrow \? <SplitView menu=\{splitChoices\} besideOn=\{!!besideEl\} onPick=\{pickSplit\} board \/> : undefined\}/.test(app) && /return setBoardBeside\(\(b\) => toggleBeside\(b, c\.beside\)\);/.test(app) && /view: oneView \? 'chat' : studyTab,/.test(app));
 ok('  nothing floats over the page: no view actions, no floating composer; the chatbox is the page\'s', /actions=\{oneView \? null : viewActsEl\}/.test(app) && /omni=\{oneView \|\| convoOpen \|\| zoomed \? null : l5Dock\}/.test(app) && /composer=\{l5Dock\}/.test(app));
 ok('the guard is the chatbox\'s first line, not a bar', /guide=\{guarded && l5 \? \{ onHint: \(\) => void send\('Can I have another hint\?'\), onReveal: reveal, busy \} : null\}/.test(app) && /\{guarded && !l5 && \(/.test(app));
-ok('"Sessions /" in the header goes to your lines of thinking', /onRail=\{\(\) => \{\s*goHome\(\);\s*setL5List\(true\);/.test(app));
+ok('"Sessions /" in the header goes to your lines of thinking', /onRail=\{\(\) => upToMap\(\(\) => setL5List\(true\)\)\}/.test(app));
+ok('one space: "Sessions /", the mark and a pinch out go up a level with the line\'s name travelling; a conversation on the map comes down into its page', /onHome=\{\(\) => upToMap\(\)\}/.test(app) && /onRail=\{\(\) => upToMap\(\(\) => setL5List\(true\)\)\}/.test(app) && /onZoomOut=\{\(\) => upToMap\(\)\}/.test(app) && /onOpen=\{\(id\) => downToPage\(id\)\}/.test(app) && /morph\(\s*'out'/.test(app) && /morph\('in'/.test(app));
+ok('  on the map, pinching into a conversation until it fills the view opens it', /pinching into a conversation until it fills the view/.test(read('components/logos5/UniverseBubbles.tsx')) && /acts\.onOpen\(id\)/.test(read('components/logos5/UniverseBubbles.tsx')));
+ok('Socria asked and nothing was said since: the box is where the answer goes, and opening it from the map lands there', /waitingAsk \? 'Your answer, in your words…'/.test(app) && /const waitingAsk = lastMsg\?\.role === 'assistant' && !busyHere \? closingAsk\(lastMsg\.content\) : ''/.test(app) && /closingAsk\(last\.content\)\) setTimeout\(\(\) => setComposerFocus/.test(app));
+ok('  on the Universal Map, how many questions are waiting, and the way to the newest', /questions waiting for your answer/.test(read('components/logos5/Universe.tsx')) && /onClick=\{\(\) => open\(asked\[0\]\)\}/.test(read('components/logos5/Universe.tsx')));
+ok('a phone: the page as panels that follow the tabs; what is opened from it takes the screen with the way back; no Split view', /narrow=\{narrow\}\s*onPanel=/.test(app) && /Back to the page/.test(app) && /split=\{oneView && !narrow \?/.test(app));
 const composer = read('components/LogosComposer.tsx');
 ok('the chatbox is a ruled line: the words and Send on it, "+ Add…" and the guide\'s ways out under it', /l5-crow l5-compose-line/.test(composer) && /Send <span className="l5-ar" aria-hidden="true">→<\/span>/.test(composer) && /l5-ctools l5-compose-foot/.test(composer) && /\+ Add a file, a photo or your voice/.test(composer) && /l5-guide-acts/.test(composer) && /Another hint/.test(composer) && /Show solution/.test(composer) && /\(about \|\| guide\) &&/.test(composer) && /Guiding, not solving/.test(composer));
 const css = read('components/logos5/page.css') + read('components/logos5/revision2.css');

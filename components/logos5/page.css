@@ -20,12 +20,14 @@
   color: var(--c-ink);
   transition: grid-template-columns 0.55s var(--c-ease);
 }
+.logos-root .lp.has-slim { --lp-made: 52px; }
 .logos-root .lp.is-split {
   --lp-map: 300px;
   grid-template-columns: var(--lp-map) minmax(0, 1fr);
 }
 @media (max-width: 1240px) {
   .logos-root .lp { --lp-map: 300px; --lp-made: 300px; }
+  .logos-root .lp.has-slim { --lp-made: 52px; }
 }
 
 .logos-root .lp-col {
@@ -86,7 +88,6 @@
 /* ahead: not come up yet */
 .logos-root .lp-node.is-ahead { border: 1px dashed rgba(var(--c-ink-rgb), 0.3); background: transparent; color: var(--c-ink-60); }
 /* the one the chatbox asks about */
-.logos-root .lp-node.is-picked { box-shadow: inset 0 0 0 1px var(--c-moss); }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .lp-node { background: rgba(var(--c-ink-rgb), 0.04); }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .lp-node.is-lit { background: rgba(var(--c-moss-rgb), 0.18); }
 
@@ -161,4 +162,53 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 @media (prefers-reduced-motion: reduce) {
   .logos-root .lp,
   .logos-root .lp-col { transition: none; }
+}
+
+/* the strip: the right column while there is little in it — its name on end, pressed to open */
+.logos-root .lp-made.is-slim { padding: 28px 0 24px; align-items: center; overflow: hidden; }
+.logos-root .lp-strip { display: flex; align-items: flex-start; justify-content: center; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
+.logos-root .lp-strip .l5-label { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; transition: color 0.2s; }
+.logos-root .lp-strip:hover .l5-label { color: var(--c-moss); }
+.logos-root .lp-strip:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -4px; }
+.logos-root .lp-strip.is-empty { cursor: default; }
+.logos-root .lp-strip.is-empty .l5-label { color: var(--c-ink-25); }
+
+/* what an idea does to another, in a line under it */
+.logos-root .lp-node-rel { font-size: 12px; line-height: 1.4; color: var(--c-ink-60); }
+.logos-root .lp-node-rel em { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 13.5px; color: var(--c-ink); }
+.logos-root .lp-node.is-lit .lp-node-rel { color: var(--c-ink-70); }
+/* the idea the chatbox is asking about: ink, not moss, so it is never mistaken for a lit one, and said in its label */
+.logos-root .lp-node.is-picked { border-color: var(--c-ink); box-shadow: inset 0 0 0 1px var(--c-ink); }
+.logos-root .lp-node-asking { letter-spacing: 0.16em; color: var(--c-ink); }
+
+/* ── a phone: the three columns are panels side by side, one screen wide, swiped between ── */
+@media (max-width: 1023px) {
+  .logos-root .lp.is-phone {
+    display: flex;
+    grid-template-columns: none;
+    overflow-x: auto;
+    overflow-y: hidden;
+    scroll-snap-type: x mandatory;
+    overscroll-behavior-x: contain;
+    scrollbar-width: none;
+  }
+  .logos-root .lp.is-phone::-webkit-scrollbar { display: none; }
+  .logos-root .lp.is-phone > .lp-col { flex: 0 0 100%; width: 100%; scroll-snap-align: start; scroll-snap-stop: always; }
+  .logos-root .lp.is-phone .lp-col + .lp-col { border-left: 0; }
+  /* one panel shows at a time: nothing dims */
+  .logos-root .lp.is-phone .is-dim { opacity: 1; }
+  .logos-root .lp.is-phone .lp-map,
+  .logos-root .lp.is-phone .lp-made { padding: 18px 16px 20px; }
+  .logos-root .lp.is-phone .lp-convo { padding: 14px 16px 10px; }
+  .logos-root .lp.is-phone .lp-convo > .lp-head { padding-left: 0; margin-bottom: 8px; }
+  .logos-root .lp.is-phone .l5-turn { --gut: 26px; }
+  .logos-root .lp.is-phone .l5-turn.is-open .l5-turn-n { font-size: 17px; }
+  .logos-root .lp.is-phone .lp-compose { padding-left: 0; }
+  .logos-root .lp.is-phone .l5-prose.is-reply { font-size: 15px; }
+  .logos-root .lp.is-phone .l5-prose.is-reply .socria-asks-q { font-size: 25px; }
+  .logos-root .lp.is-phone .lp-cap { display: none; }
+  /* what was opened from the page, full screen, with the way back */
+  .logos-root .lp-phone-beside { display: flex; flex-direction: column; height: 100%; min-height: 0; }
+  .logos-root .lp-phone-beside .lp-back { flex: none; align-self: flex-start; min-height: 44px; margin: 0 16px; }
+  .logos-root .lp-phone-beside-in { flex: 1 1 auto; min-height: 0; overflow: auto; border-top: 1px solid var(--c-rule); }
 }

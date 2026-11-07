@@ -189,7 +189,7 @@ import type { SleepState } from '@/lib/sleep';
 /** What the Socria One sheet says when it is opened from Sleep Mode. */
 const SLEEP_ONE = 'Socria One has no weekly token allowance, so Socria stays awake — its own fair-use limits are the only ones.';
 import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
-import { canvasElements, canvasTurns, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
+import { canvasElements, canvasTurns, closingAsk, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
 import { Inline as RichInline } from '@/components/RichText';
 import { GlobalSearch } from '@/components/logos5/GlobalSearch';
@@ -207,7 +207,8 @@ import { L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } fr
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { StudyDesk, drawsInCard, type DeskItem } from './logos5/StudyDesk';
 import { L5Board, type BoardIdea } from './logos5/L5Board';
-import { aheadOf, besideOnBoard, litBy, oneViewOn, sheetTurn, toggleBeside } from '@/lib/logos5/oneView';
+import { hubNameEl, morph, pageTitleEl } from '@/lib/logos5/morph';
+import { aheadOf, besideOnBoard, litBy, oneViewOn, relationLine, sheetTurn, shelfOf, toggleBeside } from '@/lib/logos5/oneView';
 import { deskTopicsOf, fileTitle, onMap } from '@/lib/logos5/studyDesk';
 import { L5Ask, type AskExchange } from './logos5/L5Ask';
 import { UniverseView, type SharedIn } from './logos5/Universe';
@@ -8222,6 +8223,9 @@ export function LogosApp({
   const oneView = oneViewOn({ narrow, line: l5 && !!activeId && !l5Home && !l5Mind && !hydrating && !room.active, turns: messages.length, busy: busyHere });
   const boardTurns = oneView ? canvasTurns(messages, { pending: busyHere || !!streaming }) : [];
   const sheetAt = oneView && sheetOpen ? sheetTurn(boardTurns.length, reading) : null;
+  /** the question Socria's last reply ended on, when nothing has been said since (lib/logos5/canvas.ts closingAsk) */
+  const lastMsg = messages[messages.length - 1];
+  const waitingAsk = lastMsg?.role === 'assistant' && !busyHere ? closingAsk(lastMsg.content) : '';
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
       {convoNotes}
@@ -8287,7 +8291,12 @@ export function LogosApp({
         voiceLive={voiceOn}
         {...(LOGOS4.capture ? { onCapture: () => setCaptureOpen(true) } : {})}
         idlePlaceholder={
-          makeChoice(makeId, ownChoices)?.placeholder ?? (focusBrief ? 'Ask about this, or anything…' : studyPlaceholder ?? (messages.length ? 'Say what you actually think.' : 'What are you actually trying to work out?'))
+          makeChoice(makeId, ownChoices)?.placeholder ??
+          (focusBrief
+            ? 'Ask about this, or anything…'
+            : studyPlaceholder ??
+              // Socria's last reply asked something: the box is where the answer goes
+              (waitingAsk ? 'Your answer, in your words…' : messages.length ? 'Say what you actually think.' : 'What are you actually trying to work out?'))
         }
         // a chosen artifact can be made from the conversation so far, with nothing typed
         sendable={!!makeChoice(makeId, ownChoices) && messages.length > 0}
@@ -8964,7 +8973,16 @@ export function LogosApp({
           const k = String(n.role ?? n.type).replace(/_/g, ' ');
           return k.charAt(0).toUpperCase() + k.slice(1);
         };
-        const ideas: BoardIdea[] = map.nodes.map((n) => ({ id: n.id, type: n.type, role: n.role ?? null, kind: kindOf(n), label: n.label }));
+        const labelOf = (id: string) => map.nodes.find((x) => x.id === id)?.label;
+        const ideas: BoardIdea[] = map.nodes.map((n) => ({
+          id: n.id,
+          type: n.type,
+          role: n.role ?? null,
+          kind: kindOf(n),
+          label: n.label,
+          // a step's place is the rail; any other idea says the one thing it does to another
+          rel: shelfOf(n) === 'step' ? null : relationLine(n.id, map.edges, labelOf),
+        }));
         // THE OPEN TURN: the turn being read, drawn as the conversation draws it — you, the prose, Socria's question,
         // then the actions, the first of them the way to what the turn made ("Open the live graph beside this →")
         const t = sheetAt !== null ? turns[sheetAt] : null;
@@ -9024,6 +9042,12 @@ export function LogosApp({
             }}
             open={open}
             composer={l5Dock}
+            onZoomOut={() => upToMap()}
+            narrow={narrow}
+            onPanel={(v) => {
+              setStudyTab(v);
+              setPageFocus(v);
+            }}
           />
         );
       })()
@@ -9038,8 +9062,21 @@ export function LogosApp({
   });
   const viewEl = (v: Viewport) => (v === 'chat' ? l5Thread : v === 'content' ? contentView : v === 'artifacts' ? artifactsView : logicView);
   // one view: the board is the view, and what is beside it is the board's own (never the conversation, the chatbox)
-  const primaryEl = oneView ? boardEl : viewEl(studyTab);
-  const besideEl = oneView ? (boardBeside ? viewEl(boardBeside) : null) : screen.beside && screen.beside !== studyTab ? viewEl(screen.beside) : null;
+  // a phone has no room beside the page: what is opened from it takes the screen, with the way back to the page above it
+  const phoneBeside =
+    oneView && narrow && boardBeside ? (
+      <div className="lp-phone-beside">
+        <button type="button" className="l5-link is-go lp-back" onClick={() => setBoardBeside(null)}>
+          <span className="l5-ar" aria-hidden="true">
+            ←
+          </span>{' '}
+          Back to the page
+        </button>
+        <div className="lp-phone-beside-in">{viewEl(boardBeside)}</div>
+      </div>
+    ) : null;
+  const primaryEl = oneView ? phoneBeside ?? boardEl : viewEl(studyTab);
+  const besideEl = oneView ? (boardBeside && !narrow ? viewEl(boardBeside) : null) : screen.beside && screen.beside !== studyTab ? viewEl(screen.beside) : null;
   /** A Split View choice: a view beside, or Artifacts beside on an artifact named; chosen again, it goes. */
   function pickSplit(c: SplitChoice | null) {
     const sid = activeIdRef.current;
@@ -9416,15 +9453,12 @@ export function LogosApp({
     <L5TopBar
       kind={projectName ? 'Project' : study ? 'Study' : messages.length ? 'Line of thinking' : ''}
       title={projectName || (active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : '')}
-      onHome={goHome}
+      onHome={() => upToMap()}
       // "Sessions /": your lines of thinking, listed on the Universal Map
-      onRail={() => {
-        goHome();
-        setL5List(true);
-      }}
+      onRail={() => upToMap(() => setL5List(true))}
       railOpen={l5Home && l5List}
       switcher={switchEl}
-      split={oneView ? <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} board /> : undefined}
+      split={oneView && !narrow ? <SplitView menu={splitChoices} besideOn={!!besideEl} onPick={pickSplit} board /> : undefined}
       onSearch={phone ? undefined : () => setSearchOpen(Date.now())}
       memory={cloud ? <MindButton onOpen={() => setL5Mind(true)} /> : null}
       presence={
@@ -9488,6 +9522,26 @@ export function LogosApp({
     setL5Mind(false);
     setL5Manage(false);
   }
+  /**
+   * ONE SPACE (lib/logos5/morph.ts): up a level, from the page to this line on the Universal Map — the page's title
+   * travels to the name on its bubble. `then` is anything more the move does (the list opened, for "Sessions /").
+   */
+  function upToMap(then?: () => void) {
+    const id = activeIdRef.current;
+    morph(
+      'out',
+      () => {
+        goHome();
+        then?.();
+      },
+      pageTitleEl(),
+      () => hubNameEl(id)
+    );
+  }
+  /** Down a level: a conversation on the Universal Map opens into its page, its name becoming the page's title. */
+  function downToPage(id: string) {
+    morph('in', () => openFromHome(id), hubNameEl(id), pageTitleEl);
+  }
   /** the contents column, on home */
   function toggleList() {
     setL5List((v) => !v);
@@ -9507,6 +9561,11 @@ export function LogosApp({
         setStudyTab('logic_map');
         showNodes([node]);
       }, 80);
+    // Socria asked something and is waiting: it opens on that question, the answer box ready
+    else {
+      const last = sessionsRef.current.find((x) => x.id === id)?.messages.at(-1);
+      if (last?.role === 'assistant' && closingAsk(last.content)) setTimeout(() => setComposerFocus((f) => ({ n: (f?.n ?? 0) + 1 })), 120);
+    }
   }
   /** Every document this device has read for any line of thinking — for search, read when its box opens. */
   async function readAllDocs(): Promise<IndexDoc[]> {
@@ -9620,7 +9679,7 @@ export function LogosApp({
       activeId={activeId}
       signedIn={!!isSignedIn}
       narrow={narrow}
-      onOpen={(id) => openFromHome(id)}
+      onOpen={(id) => downToPage(id)}
       onOpenChat={(id) => onOpenChat?.(id)}
       onStart={startFromHome}
       onFile={cloud ? fileFromHome : undefined}

@@ -243,6 +243,43 @@ its rules in `lib/logos5/oneView.ts`). The phone keeps the four views.
   off" a line, and the start box a ruled line with its way on the one
   filled control.
 
+### 8.1 After Revision II — sharper, and one space
+
+- **Taken away.** With fewer than two things in it, "Brought and made" is a
+  52px strip, its name on end, pressed to open (its tab opens it too). The
+  Logic Map's head no longer says "Turn iii lit": the lit ideas say it. On
+  Today, the Universal Map's bubbles no longer each say "today". A reply's
+  own elements (charts, tables, worked steps) sit in a square hairline.
+- **What an idea does.** A Logic Map card that conflicts with, rests on or
+  supports another says so in one line under it ("conflicts with *Italy
+  stayed out*") — the relation that says most, never on steps
+  (`relationLine`, `lib/logos5/oneView.ts`). The idea the chatbox asks about
+  is ink, not moss, and says "· asking about" in its label.
+- **Answer it.** When Socria's last reply ended on a question and nothing has
+  been said since, the box reads "Your answer, in your words…". Opened from
+  the Universal Map, such a conversation lands with the box focused. The map
+  already marked those conversations (the gold "?" — Socria is waiting); it
+  now says how many, beside Pick up: "3 questions waiting for your answer →",
+  opening the newest.
+- **The closing question is earned.** The reply rules
+  (`lib/runtime/behavior.ts`) have most replies end on a statement and ask
+  only when the answer changes what comes next — more often when someone is
+  learning. So "Socria asks" appears only when a question is earned; the page
+  reads the same without it.
+- **One space** (`lib/logos5/morph.ts`). The page and the Universal Map are two
+  levels of one place. "Sessions /", the mark, or a pinch outward on the page
+  (Ctrl and the wheel outward) goes up: the page recedes and its title
+  travels to the name on its bubble. Pressing a conversation on the map, or
+  pinching into its bubble until it fills the view, comes down: the bubble's
+  name becomes the page's title. View Transitions draw the move; without
+  them, or with reduced motion, the change is simply made. A pinch inward on
+  the page is left to the browser's own zoom.
+- **A phone.** The page is the view there too: the same three columns as
+  panels side by side, one screen wide — the Logic Map, the conversation,
+  brought and made — swiped between, the header's tabs following the swipe
+  (and bringing their panel when pressed). What is opened from the page takes
+  the screen with "← Back to the page" above it. Split view is a wide screen's.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its
@@ -356,8 +393,9 @@ its own glyph beside it.
   conversation, so their memories appear once they come up in one.
 - This month and All time draw no memory, as the handoff says for this pass.
 - On a phone the desk is not drawn: Artifacts stays one at a time.
-- **One view on a phone** was not drawn in the handoff: a phone keeps the
-  four views and the zoomed-out canvas. A shared room (others thinking
+- **One view on a phone** was not drawn in the handoff; §8.1 draws it as
+  panels. The zoomed-out canvas is no longer reached from a line of thinking
+  (the Universal Map is the level above it). A shared room (others thinking
   together) keeps the conversation as it was.
 - **Revision II, not yet everywhere.** The one view, the header, the
   chatbox, the controls and the Universal Map's chrome are Revision II.

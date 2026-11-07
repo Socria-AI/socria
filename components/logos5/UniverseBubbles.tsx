@@ -271,6 +271,7 @@ export function BubbleMap({
 
   // the wheel: zoom where the pointer is, move where the trackpad goes (as on the Logic Map)
   const wheelRef = useRef<(e: WheelEvent) => void>(() => {});
+  const diveRef = useRef(0);
   wheelRef.current = (e: WheelEvent) => {
     if ((e.target as Element | null)?.closest?.('.l5h-palette, textarea, input')) return;
     e.preventDefault();
@@ -279,6 +280,25 @@ export function BubbleMap({
     const it = readWheel(e);
     const r = box.current!.getBoundingClientRect();
     const c = camRef.current;
+    // ONE SPACE: pinching into a conversation until it fills the view (or the map can come no closer) goes down a level, into it
+    if (it.kind === 'zoom' && it.factor > 1) {
+      const hub = (e.target as Element | null)?.closest?.('.l5b-hub[data-node]');
+      if (hub) {
+        const hr = hub.getBoundingClientRect();
+        const full = hr.width >= Math.min(r.width, r.height) * 0.62;
+        const stuck = zoomAt(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top).k <= c.k + 1e-4;
+        if (full || stuck) {
+          diveRef.current += it.factor - 1;
+          if (diveRef.current > 0.18) {
+            diveRef.current = 0;
+            const id = hub.getAttribute('data-node');
+            if (id) acts.onOpen(id);
+          }
+          return;
+        }
+      }
+    }
+    diveRef.current = 0;
     setCam(keep(it.kind === 'zoom' ? zoomAt(c, c.k * it.factor, e.clientX - r.left, e.clientY - r.top) : { ...c, x: c.x + it.dx, y: c.y + it.dy }));
   };
   useEffect(() => {
@@ -765,7 +785,8 @@ export function BubbleMap({
                       </>
                     )}
                   </span>
-                  <span className="l5b-hub-s">{h.sub}</span>
+                  {/* on Today every one says "today": said once, by the lens, not on each */}
+                  {(L.lens === 'today' ? h.sub.replace(/^today(?: · )?/, '') : h.sub) && <span className="l5b-hub-s">{L.lens === 'today' ? h.sub.replace(/^today(?: · )?/, '') : h.sub}</span>}
                 </span>
                 {tile.open && (
                   <span className="l5b-ask" title="Socria asked something and is waiting for you">

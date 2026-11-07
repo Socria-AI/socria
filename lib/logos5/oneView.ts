@@ -22,9 +22,25 @@ export type Camera = Viewport;
 /** The parts of the board a camera brings forward. */
 export type BoardPart = 'turns' | 'content' | 'artifacts' | 'map';
 
-/** One view is a wide screen's way of showing a line of thinking that has something in it. */
+/**
+ * The one view is how a line of thinking that has something in it is shown — on a wide screen as three
+ * columns, on a phone as the same three side by side, swiped between (Logos 5.5). `narrow` is kept for the
+ * callers that say it; it no longer decides.
+ */
 export function oneViewOn(i: { narrow: boolean; line: boolean; turns: number; busy: boolean }): boolean {
-  return !i.narrow && i.line && (i.turns > 0 || i.busy);
+  return i.line && (i.turns > 0 || i.busy);
+}
+
+/** On a phone the page is three panels side by side: which one each header tab brings into view. */
+export type PagePanel = 0 | 1 | 2;
+export function panelOf(camera: Camera): PagePanel {
+  return camera === 'logic_map' ? 0 : camera === 'chat' ? 1 : 2;
+}
+/** And back: the tab a swipe to a panel chooses — keeping Files or Artifacts when the third panel was already theirs. */
+export function cameraOfPanel(p: PagePanel, now: Camera): Camera {
+  if (p === 0) return 'logic_map';
+  if (p === 1) return 'chat';
+  return now === 'content' || now === 'artifacts' ? now : 'artifacts';
 }
 
 /** What the camera brings forward: on the conversation, everything; on a tab, its own part, and the rest steps back. */
@@ -179,6 +195,37 @@ export function aheadOf(
     }
   });
   return out;
+}
+
+/**
+ * What an idea does to another, in a line under it on the page — the one
+ * relation that says most: a conflict first, then what it rests on, then what
+ * it supports. Steps say nothing (the rail already shows their order). Null
+ * when it does none of these.
+ */
+const REL_SAID: Record<string, string> = { conflicts: 'conflicts with', depends: 'rests on', supports: 'supports', justifies: 'supports', implies: 'implies' };
+const REL_RANK = ['conflicts', 'depends', 'supports', 'justifies', 'implies'];
+export function relationLine(
+  id: string,
+  edges: readonly { from: string; to: string; relation: string }[],
+  labelOf: (id: string) => string | undefined,
+  max = 48
+): { said: string; to: string } | null {
+  let best: { rank: number; to: string; relation: string } | null = null;
+  for (const e of edges) {
+    let other: string | null = null;
+    let relation = e.relation;
+    if (e.from === id) other = e.to;
+    else if (e.to === id && e.relation === 'conflicts') other = e.from; // a conflict runs both ways
+    if (!other || other === id) continue;
+    const rank = REL_RANK.indexOf(relation);
+    if (rank < 0) continue;
+    if (!best || rank < best.rank) best = { rank, to: other, relation };
+  }
+  if (!best) return null;
+  const label = (labelOf(best.to) ?? '').trim();
+  if (!label) return null;
+  return { said: REL_SAID[best.relation], to: label.length > max ? `${label.slice(0, max).replace(/\s+\S*$/, '')}…` : label };
 }
 
 /** What a Logic Map idea is on the page: the question, a given, a step on the way, or an idea of any other kind. */

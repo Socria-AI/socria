@@ -856,8 +856,10 @@ export function UniverseView({
     const next = weekStart(by < 0 ? weekFrom - 3 * DAY : weekFrom + 8 * DAY);
     setWeekAt(next >= weekStart(now) ? null : next);
   };
+  // the questions Socria asked and is still waiting on: the way back in is an answer
+  const asked = tiles.filter((t) => t.open && !hidden.has(t.id)).sort((a, b) => b.at - a.at);
   const pickUp =
-    resume || starredTiles.length ? (
+    resume || starredTiles.length || asked.length ? (
       <div className="l5h-strip" aria-label="Pick up, and starred">
         {resume && (
           <button type="button" className="l5h-pick" onClick={() => open(resume)} title={`Pick up where you left off: ${resume.title}`}>
@@ -865,6 +867,23 @@ export function UniverseView({
             <span className="l5h-pick-k">Pick up where you left off</span>
             <span className="l5h-pick-t">{resume.title}</span>
             <span aria-hidden="true">→</span>
+          </button>
+        )}
+        {asked.length > 0 && (
+          <button
+            type="button"
+            className="l5h-waiting"
+            onClick={() => open(asked[0])}
+            title={`Socria asked: ${asked[0].open}`}
+            aria-label={`${asked.length} ${asked.length === 1 ? 'question' : 'questions'} waiting for your answer. Answer the newest: ${asked[0].open}`}
+          >
+            <span className="l5-badge" aria-hidden="true">
+              {asked.length}
+            </span>
+            <span>{asked.length === 1 ? 'question waiting for your answer' : 'questions waiting for your answer'}</span>
+            <span className="l5-ar" aria-hidden="true">
+              →
+            </span>
           </button>
         )}
         {starredTiles.map((t) => (

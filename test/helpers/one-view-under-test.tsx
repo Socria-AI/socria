@@ -4,3 +4,4 @@
 export * from '@/lib/logos5/oneView';
 export { canvasTurns, closingAsk } from '@/lib/logos5/canvas';
 export { L5Board } from '@/components/logos5/L5Board';
+export { pinchOut, canMorph, MORPH_NAME } from '@/lib/logos5/morph';
