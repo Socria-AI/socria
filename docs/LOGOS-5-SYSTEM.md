@@ -378,6 +378,37 @@ The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space
   tutorial in What Socria does and its feature tip. Things still open beside the space by being pressed (a made
   thing, the Logic Map, a file), and the words "put the Logic Map beside" still work.
 
+### 8.7 The adaptive explanation engine
+
+Not only what to explain, but how to make it understood (`lib/runtime/explain.ts`, test/explain-engine.test.mjs).
+Pure, no model call, invisible: no mode, no badge, no setting. `LOGOS_EXPLAIN=off` takes it out.
+
+- **Twenty strategies, each a behaviour.** Essential Insight, Analogy, Comparative, Worked Example, Faded
+  Guidance, Segmented, Concept Pretraining, Visual-Verbal, Concept Mapping, Causal, Misconception Correction,
+  Error-Based, Elaborative Interrogation, Self-Explanation, Retrieval Practice, Spaced Reinforcement, Interleaved,
+  Teach-Back, Argument Mapping, Decision Tradeoffs. Each carries out its work in three ways:
+  - **an element** the presentation planner already draws: compare, decide, steps, diagram, concepts, claim, paths
+    for the next segments, check for mixed practice;
+  - **a question** within the turn's budget;
+  - **one short line** the reply follows, said as what to do and never named.
+- **Selection** is read in code:
+  - **what they asked**: why, how it works, what it is, which, should I, is it true, solve, relate, practise;
+  - **how much they know**: their words, their mistakes, what they got right, the ledger;
+  - **how complex it is**: terms, parts, length;
+  - **how the last reply landed**: lost after an analogy gets an example or a picture, not another analogy; a slip
+    gets the error located; "I get it now" gets a teach-back.
+- **Combination**: one primary strategy and at most three in all, one question, never two of a kind. An expert gets
+  one strategy; a newcomer on something complex gets three.
+- **Restraint**: a hello, a fact, "just tell me", a hurry, an expert's one-liner, a thing to build. Then nothing is
+  forced and nothing is added to the prompt. Most turns add no tokens; the most any turn adds is a few lines.
+- **Continuity**: a learning ledger in the browser (`lib/logos5/learning.ts`, `socria.learning.v1`) holds topics,
+  when last met and a Leitner box (1, 3, 7, 16, 35 days). It is sent with each turn and noted after a learning turn
+  (`X-Socria-Learn`), moved by how their checks went. A topic met before is recalled before it is retaught; what is
+  due comes back once, in the practice. It is never read on a sensitive or off-the-record turn or in a room of two,
+  and never stored on the server.
+- **Did the reply do it**: `checkExplanation` reads a reply for each strategy, for the evals and the tests.
+  `X-Socria-Explain` carries content-free strategy codes.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

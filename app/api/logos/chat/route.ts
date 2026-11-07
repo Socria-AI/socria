@@ -99,6 +99,13 @@ import {
   pathOf,
   personaOf,
   planPresentation,
+  planExplanation,
+  applyExplanation,
+  renderExplanation,
+  explainTrace,
+  outcomesOf,
+  sanitizeLedger,
+  type ExplainPlan,
   presentationRoom,
   readTurnState,
   renderPresentation,
@@ -975,7 +982,38 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       if (!claim.ok) writeUpRefused = { used: claim.used, limit: claim.limit, ...(claim.unavailable ? { unavailable: true } : {}) };
     }
     const placed = writeUpRefused ? { ...planned, place: undefined, reasons: [...planned.reasons, 'documents-spent'] } : planned;
-    const presentation = inlineOn ? placed : { ...placed, forms: [] };
+    const presented = inlineOn ? placed : { ...placed, forms: [] };
+    // THE ADAPTIVE EXPLANATION ENGINE (lib/runtime/explain.ts): how to make it understood — which of the twenty
+    // strategies fit this turn, read in code from what they asked, what they know, how complex it is and how the last
+    // reply landed; folded into the presentation (its elements) and the turn's context (a few lines, often none).
+    // LOGOS_EXPLAIN=off: the route as it was.
+    let explain: ExplainPlan | null = null;
+    if (persona === 'v5' && process.env.LOGOS_EXPLAIN !== 'off') {
+      try {
+        const newest = kept[kept.length - 1] as { did?: unknown } | undefined;
+        explain = planExplanation({
+          text: String(last.content ?? ''),
+          history: assistInput.history,
+          signals,
+          state: turnState,
+          presentation: presented,
+          questions: assist.questions,
+          guard: assistInput.guard,
+          ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
+          ownJudgment: allocation?.split.judgment === 'human',
+          assist: { retrieval: assist.retrieval, selfExplain: assist.selfExplain, scaffold: assist.scaffold },
+          did: outcomesOf(sanitizeDid(newest?.did)),
+          // the learning ledger kept in their browser — never on a sensitive or off-the-record turn, never in a room of two
+          ledger: turnState.sensitive || signals.offRecord || twoPeople ? [] : sanitizeLedger(body?.learning, Date.now()),
+          length: body?.length === 'concise' || body?.length === 'standard' || body?.length === 'detailed' ? body.length : null,
+          now: Date.now(),
+        });
+      } catch (e) {
+        console.error('[explain] planning failed; this turn runs without it', e instanceof Error ? e.name : 'error');
+        explain = null;
+      }
+    }
+    const presentation = explain && inlineOn ? applyExplanation(presented, explain) : presented;
     const lastText = String(last.content ?? '');
     const turnView = {
       shape: presentation.shape,
@@ -1152,6 +1190,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       fitControlsToForms(mrRun?.block ?? '', presentation) +
       // …and what shape it may take: the inline elements on offer, if any
       renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block) }) +
+      // …and how to make it understood (lib/runtime/explain.ts): nothing for a direct answer, a few lines otherwise
+      renderExplanation(explain, { retrieval: assist.retrieval, selfExplain: assist.selfExplain }) +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
       evidenceBlock +
       accuracy.block;
@@ -1579,6 +1619,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         'X-Content-Type-Options': 'nosniff',
         // how the engine chose to help: content-free (mode, imposed, questions, reason codes)
         'X-Socria-Assist': assistTrace(assist),
+        // how the explanation was shaped: content-free strategy codes (lib/runtime/explain.ts explainTrace)
+        ...(explain ? { 'X-Socria-Explain': explainTrace(explain) } : {}),
+        // a learning turn: the topic, for the ledger kept in their browser (encoded; the words are their own)
+        ...(explain?.learning && explain.topic ? { 'X-Socria-Learn': encodeURIComponent(explain.topic) } : {}),
         // which model answered, and why it was chosen: tier/level/model (lib/model-router.ts)
         'X-Socria-Model': `${route.tier}/${route.level}/${served}`,
         // a write-up they asked for, answered here because the month's documents are spent (above)

@@ -176,6 +176,7 @@ import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5TopBar, L5Working } from '@/components/logos5/L5Views';
+import { noteLearningTurn, readLedger } from '@/lib/logos5/learning';
 import { L5Canvas, MapPreview, type CanvasCard } from '@/components/logos5/L5Canvas';
 import dynamic from 'next/dynamic';
 import type { ArAccess } from '@/lib/ar-access';
@@ -4604,6 +4605,12 @@ export function LogosApp({
             return dg ? { mapDigest: dg } : {};
           })(),
           ...(s0?.messages.length && s0.updatedAt ? { resumedAfterMs: Math.max(0, Date.now() - s0.updatedAt) } : {}),
+          // the learning ledger kept in this browser (lib/logos5/learning.ts): what was learned and when, so an
+          // explanation can bring back what is due or recall what was met before — never anywhere but here
+          ...(() => {
+            const lg = readLedger();
+            return lg.length ? { learning: lg } : {};
+          })(),
           // What Logos knows about this person, for accounts; the server
           // decides what the plan carries of it. The recurrence line is
           // owed until it has been injected once in this session.
@@ -4720,6 +4727,8 @@ export function LogosApp({
       // A write-up they asked to keep, answered in the conversation because the
       // month's document is spent: the words come, and the boundary is said.
       if (res.headers.get('X-Socria-Limit') === 'documents' && !ask('documents-spent')) setError(boundaryNote('documents'));
+      // a learning turn: its topic noted in the ledger, moved by how the checks they answered went
+      noteLearningTurn(res.headers.get('X-Socria-Learn'), turn.did);
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
