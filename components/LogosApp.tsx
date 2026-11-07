@@ -207,6 +207,8 @@ import { L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } fr
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { StudyDesk, drawsInCard, type DeskItem } from './logos5/StudyDesk';
 import { L5Board, type BoardIdea } from './logos5/L5Board';
+import { L5Space, type SpaceIdea, type SpaceThing } from './logos5/L5Space';
+import { answeringOf, firstTurnOf, openIdeaOf } from '@/lib/logos5/ideas';
 import { hubNameEl, morph, pageTitleEl } from '@/lib/logos5/morph';
 import { aheadOf, besideOnBoard, litBy, oneViewOn, relationLine, sheetTurn, shelfOf, toggleBeside } from '@/lib/logos5/oneView';
 import { deskTopicsOf, fileTitle, onMap } from '@/lib/logos5/studyDesk';
@@ -6390,14 +6392,25 @@ export function LogosApp({
   // Revision II: the page's focus is set by the header's tabs and nothing else — what the screen's rules choose
   // (an artifact made, a file read) never dims the conversation
   const [pageFocus, setPageFocus] = useState<Viewport>('chat');
+  // EVERYTHING IN ONE SPACE (Logos 5.5, Revision III): the line of thinking is one space; the page, every turn in order,
+  // is a press away ("Read as a conversation"). The idea open is the newest turn's unless another was pressed; the
+  // chatbox's "Answering" line can be set aside for the turn it names.
+  const [spaceView, setSpaceView] = useState(true);
+  const [spaceOpen, setSpaceOpen] = useState<string | null>(null);
+  const [answerHidden, setAnswerHidden] = useState<string | null>(null);
   useEffect(() => {
     setBoardBeside(null);
     setReading(null);
     setSheetOpen(true);
     setPageFocus('chat');
+    setSpaceOpen(null);
   }, [activeId]);
   // sent: what was being read folds onto the board, and the new turn opens above the chatbox as it arrives
   const lastRole = messages[messages.length - 1]?.role;
+  // sent: the space opens on the new turn as it arrives
+  useEffect(() => {
+    if (lastRole === 'user') setSpaceOpen(null);
+  }, [lastRole, messages.length]);
   useEffect(() => {
     if (lastRole !== 'user') return;
     setReading(null);
@@ -8221,6 +8234,7 @@ export function LogosApp({
   // ONE BOARD (lib/logos5/oneView.ts): a wide screen's way of showing a line of thinking that has something in it.
   // A shared room keeps the conversation as it was. The turn the sheet reads is the newest, unless another was pressed.
   const oneView = oneViewOn({ narrow, line: l5 && !!activeId && !l5Home && !l5Mind && !hydrating && !room.active, turns: messages.length, busy: busyHere });
+  const spaceOn = oneView && spaceView;
   const boardTurns = oneView ? canvasTurns(messages, { pending: busyHere || !!streaming }) : [];
   const sheetAt = oneView && sheetOpen ? sheetTurn(boardTurns.length, reading) : null;
   /** the question Socria's last reply ended on, when nothing has been said since (lib/logos5/canvas.ts closingAsk) */
@@ -9010,6 +9024,99 @@ export function LogosApp({
             )}
           </>
         ) : null;
+        // EVERYTHING IN ONE SPACE (Logos 5.5, Revision III; lib/logos5/ideas.ts, components/logos5/L5Space.tsx): what was
+        // brought, the ideas, what was made and the newest reply on one canvas, joined by what made what; the row under
+        // the header brings one kind forward; the page (below) is a press away
+        if (spaceOn) {
+          const last = turns.length ? turns.length - 1 : null;
+          const auto = openIdeaOf({ nodes: map.nodes, turns, fromMsg: byMsg, at: last });
+          const chosen = spaceOpen && map.nodes.some((n) => n.id === spaceOpen) ? spaceOpen : null;
+          const openId = chosen ?? auto;
+          const openTurn = chosen ? firstTurnOf(chosen, turns, byMsg) : last;
+          const ot = openTurn !== null ? turns[openTurn] : null;
+          const atNewest = openTurn !== null && openTurn === last;
+          const openNode = openId ? map.nodes.find((n) => n.id === openId) ?? null : null;
+          const body = (
+            <>
+              {ot && ot.replyAt !== undefined && messages[ot.replyAt] ? msgEl(messages[ot.replyAt], ot.replyAt) : null}
+              {!ot && openNode ? <p className="ls-note">{openNode.detail || 'Put on the map as the conversation went.'}</p> : null}
+              {atNewest && streaming && (
+                <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />
+              )}
+              {atNewest && synthBusy && <SynthesisPending scope={synthBusy} />}
+              {atNewest && busyHere && !streaming && <L5Working steps={workingSteps} onStop={stopAnswer} />}
+              {atNewest && error && (
+                <p className="l5-error" role="alert">
+                  {error}
+                </p>
+              )}
+            </>
+          );
+          const sIdeas: SpaceIdea[] = map.nodes.map((n) => ({ id: n.id, type: n.type, role: n.role ?? null, label: n.label, kind: kindOf(n), turn: firstTurnOf(n.id, turns, byMsg) }));
+          const sBrought: SpaceThing[] = contentItems.map((c) => ({
+            key: c.id,
+            kicker: c.kind === 'writeup' ? 'Note · written' : c.image ? 'You brought · photo' : 'You brought · file',
+            title: c.title,
+            turn: turnOfEntry(c.id, turns),
+            preview: c.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={c.image} alt="" />
+            ) : undefined,
+            ...(c.meta ? { note: c.meta } : {}),
+            onOpen: () => openContent(c.id),
+          }));
+          const sMade: SpaceThing[] = cards
+            .filter((c) => c.tone !== 'content')
+            .map((c) => ({
+              key: c.key,
+              kicker: c.kicker.replace(/^Artifact · /, 'Made · '),
+              title: c.title ?? '',
+              turn: c.turn,
+              preview: c.preview ?? undefined,
+              ...(c.note ? { note: c.note } : {}),
+              ...(c.onOpen ? { onOpen: c.onOpen } : {}),
+            }));
+          const newestTurn = last !== null ? turns[last] : null;
+          const answering =
+            newestTurn && answerHidden !== newestTurn.key
+              ? answeringOf({ newest: atNewest, asks: !!ot?.asks, pending: !!newestTurn.pending || busyHere, about: !!focusBrief, label: openNode?.label ?? null })
+              : null;
+          return (
+            <L5Space
+              key={activeId ?? 'space'}
+              ideas={sIdeas}
+              edges={map.edges}
+              brought={sBrought}
+              made={sMade}
+              turns={turns}
+              fromMsg={byMsg}
+              openId={openId}
+              openTurn={openTurn}
+              openBody={body}
+              lit={litBy(ot, byMsg)}
+              picked={focus?.kind === 'node' ? focus.id : null}
+              composer={l5Dock}
+              answering={answering}
+              onDismissAnswering={() => newestTurn && setAnswerHidden(newestTurn.key)}
+              onIdea={(id) => {
+                // the newest turn's idea is where the space rests; any other opens with the turn it came from, and is asked about
+                if (id === auto && !chosen) return;
+                if (id === auto || id === chosen) {
+                  setSpaceOpen(null);
+                  clearAbout();
+                  return;
+                }
+                setSpaceOpen(id);
+                setObjSel(null);
+                setFocus({ kind: 'node', id });
+              }}
+              onPage={() => setSpaceView(false)}
+              onZoomOut={() => upToMap()}
+              narrow={narrow}
+              follow={atNewest && (busyHere || !!streaming)}
+            />
+          );
+        }
         return (
           <L5Board
             turns={turns}
@@ -9070,7 +9177,7 @@ export function LogosApp({
           <span className="l5-ar" aria-hidden="true">
             ←
           </span>{' '}
-          Back to the page
+          {spaceOn ? 'Back to the space' : 'Back to the page'}
         </button>
         <div className="lp-phone-beside-in">{viewEl(boardBeside)}</div>
       </div>
@@ -9435,7 +9542,17 @@ export function LogosApp({
   );
   // THE SWITCH (Logos 5): the four views in the header's middle — Chat · Files n · Artifacts n · Logic Map. Zoomed out
   // (the canvas), none is chosen; pressing one brings it close.
-  const switchEl = activeId ? (
+  const switchEl = activeId && !spaceOn ? (
+    <>
+      {oneView && (
+        // the page, read from the space: the way back to it
+        <button type="button" className="l5-link is-go l5-tospace" onClick={() => setSpaceView(true)}>
+          <span className="l5-ar" aria-hidden="true">
+            ←
+          </span>{' '}
+          The space
+        </button>
+      )}
     <L5Switch
       label="Views"
       value={oneView ? pageFocus : zoomed ? '' : studyTab}
@@ -9448,6 +9565,7 @@ export function LogosApp({
         { id: 'logic_map', label: VIEW_LABELS.logic_map, fresh: stageFresh },
       ]}
     />
+    </>
   ) : null;
   const l5Head = (
     <L5TopBar

@@ -1,0 +1,179 @@
+/* components/logos5/space.css — EVERYTHING IN ONE SPACE. (Logos 5.5, Revision III.)
+ *
+ * One canvas on paper grain: columns left to right by how things connect, each
+ * kind its own look — an idea a plain card, a file paper with a folded corner,
+ * a made thing framed with its preview, the open idea ruled in moss. The row
+ * under the header brings one kind forward (the rest steps back to 0.22); the
+ * chatbox is a white box at the foot. On a phone, one column.
+ */
+
+.logos-root .ls {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  min-height: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  color: var(--c-ink);
+}
+
+/* ── the row: not tabs; a way to bring one kind forward ── */
+.logos-root .ls-kinds { flex: none; display: flex; align-items: stretch; gap: 26px; height: 48px; padding: 0 40px; border-bottom: 1px solid var(--c-rule); }
+.logos-root .ls-kd { display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; font: inherit; font-size: 13.5px; font-weight: 500; color: var(--c-ink-60); cursor: pointer; transition: color 0.2s, box-shadow 0.2s; }
+.logos-root .ls-kd:hover { color: var(--c-ink); }
+.logos-root .ls-kd.is-on { color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
+.logos-root .ls-kd:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -2px; }
+.logos-root .ls-c { font-size: 12.5px; color: var(--c-ink-45); font-variant-numeric: tabular-nums; }
+.logos-root .ls-sp { flex: 1; }
+.logos-root .ls-arr { align-self: center; font-size: 12.5px; color: var(--c-ink-45); white-space: nowrap; }
+.logos-root .ls-page { align-self: center; font-size: 13px; white-space: nowrap; }
+
+/* ── the canvas ── */
+.logos-root .ls-canvas { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
+.logos-root .ls-cols { position: relative; display: flex; align-items: flex-start; gap: 64px; width: max-content; min-width: 100%; box-sizing: border-box; padding: 28px 40px 190px; }
+.logos-root .ls-col { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 14px; width: 240px; flex: none; }
+.logos-root .ls-col.is-frame { width: 270px; }
+.logos-root .ls-col.has-open { width: 420px; }
+.logos-root .ls-col.is-made { width: 270px; }
+.logos-root .ls-edges { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+.logos-root .ls-ln path { fill: none; stroke: rgba(var(--c-ink-rgb), 0.3); stroke-width: 1.2; transition: stroke 0.2s; }
+.logos-root .ls-ln.is-back path { stroke: rgba(var(--c-ink-rgb), 0.09); }
+.logos-root .ls-thread { fill: none; stroke: var(--c-gold, #b8a26b); stroke-width: 1.4; stroke-dasharray: 5 5; }
+.logos-root .ls-lw { position: absolute; z-index: 1; transform: translate(-50%, -50%); padding: 0 5px; background: var(--c-paper); font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 13.5px; line-height: 1.2; color: var(--c-ink-60); white-space: nowrap; pointer-events: none; }
+
+.logos-root .ls-it { position: relative; }
+.logos-root .ls-it > :not(.ls-word) { transition: opacity 0.2s var(--c-ease); }
+/* stepped back: the card fades; a turn's words beside it (Words) stay sharp */
+.logos-root .ls-it.is-back > :not(.ls-word) { opacity: 0.22; }
+.logos-root .ls-it.is-back:is(:hover, :focus-within) > :not(.ls-word) { opacity: 0.6; }
+
+/* a card's head: what it is, and the turn of the conversation that made it */
+.logos-root .ls-k { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-tn { flex: none; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--c-ink-45); }
+.logos-root .ls-t { font-size: 14px; line-height: 1.38; overflow-wrap: anywhere; }
+
+/* IDEA */
+.logos-root .ls-idea { display: flex; flex-direction: column; gap: 4px; width: 100%; padding: 10px 12px 11px; box-sizing: border-box; border: 1px solid rgba(var(--c-moss-rgb), 0.16); border-radius: 9px; background: var(--lg-panel-solid, #fff); color: var(--c-ink); font: inherit; text-align: left; cursor: pointer; transition: border-color 0.2s, background-color 0.2s; }
+.logos-root .ls-idea:hover { border-color: rgba(var(--c-moss-rgb), 0.45); }
+.logos-root .ls-idea:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .ls-idea.is-question .ls-t { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 20px; line-height: 1.2; }
+.logos-root .ls-idea.is-lit { border-color: var(--c-moss); background: #eef1e6; }
+.logos-root .ls-idea.is-lit .ls-k { color: var(--c-moss); }
+.logos-root .ls-idea.is-picked { border-color: var(--c-ink); box-shadow: inset 0 0 0 1px var(--c-ink); }
+
+/* FILE: what was brought — paper with a folded corner */
+.logos-root .ls-file { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 10px 12px 11px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 4px 14px 4px 4px; background: #faf8f1; cursor: pointer; }
+.logos-root .ls-file::after { content: ''; position: absolute; top: -1px; right: -1px; width: 14px; height: 14px; border-radius: 0 14px 0 0; background: linear-gradient(225deg, var(--c-paper) 50%, var(--c-rule-2, rgba(53, 70, 32, 0.22)) 50%, #ece8dc 55%); }
+.logos-root .ls-file .ls-k { color: var(--c-gold-ink, #6f5f2c); padding-right: 10px; }
+.logos-root .ls-file .ls-t { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 17px; line-height: 1.2; }
+.logos-root .ls-file:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .ls-file:hover .ls-t { color: var(--c-moss); }
+
+/* MADE: framed, with its preview */
+.logos-root .ls-made { display: flex; flex-direction: column; gap: 7px; padding: 10px 12px 12px; border: 1px solid var(--c-ink-25); border-radius: 9px; background: var(--lg-panel-solid, #fff); cursor: pointer; }
+.logos-root .ls-made .ls-k { color: var(--c-ink-70); }
+.logos-root .ls-made .ls-t { font-weight: 500; }
+.logos-root .ls-made:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .ls-made:hover { border-color: var(--c-ink); }
+.logos-root .ls-prev { position: relative; max-height: 190px; overflow: hidden; }
+.logos-root .ls-prev img { display: block; max-width: 100%; max-height: 170px; object-fit: cover; }
+.logos-root .ls-inert { pointer-events: none; }
+.logos-root .ls-inert > * { margin: 0 !important; }
+.logos-root .ls-note { font-size: 12px; line-height: 1.45; color: var(--c-ink-60); }
+.logos-root .ls-go { font-size: 12.5px; font-weight: 500; color: var(--c-moss); }
+.logos-root .ls-made:hover .ls-go .l5-ar { transform: translateX(3px); }
+
+/* THE OPEN IDEA: where the newest reply is read */
+.logos-root .ls-open { display: flex; flex-direction: column; gap: 11px; padding: 18px 20px 16px; border: 1px solid var(--c-moss); border-radius: 9px; background: var(--lg-panel-solid, #fff); }
+.logos-root .ls-open > .ls-k { font-size: 10.5px; letter-spacing: 0.18em; color: var(--c-moss); }
+.logos-root .ls-you { margin: 0; font-size: 13px; line-height: 1.45; color: var(--c-ink-60); }
+.logos-root .ls-you b { margin-right: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-stmt { margin: 0; font-family: var(--l5-serif, 'Instrument Serif', serif); font-weight: 400; font-size: 27px; line-height: 1.14; letter-spacing: -0.01em; }
+.logos-root .ls-body { padding-top: 11px; border-top: 1px solid var(--c-rule); min-width: 0; }
+/* the reply, drawn as the conversation draws it, set inside the card */
+.logos-root .ls-open .l5-msg { margin: 0; padding: 0; border: 0; background: none; box-shadow: none; max-width: none; }
+.logos-root .ls-open .l5-msg.l5-a > .l5-who { display: none; }
+.logos-root .ls-open .l5-prose.is-reply { max-width: none; font-size: 14.5px; line-height: 1.62; }
+.logos-root .ls-open .l5-prose.is-reply .socria-asks-q { font-size: 22px; }
+.logos-root .ls-open .l5-slice { display: none; }
+.logos-root .ls-open .l5-acts { display: flex; align-items: center; gap: 18px; min-height: 28px; margin: 8px 0 0; padding: 0; opacity: 1; }
+.logos-root .ls-open .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
+.logos-root .ls-open .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-45); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.logos-root .ls-open .l5-act:hover { background: none; color: var(--c-ink); }
+.logos-root .ls-open .l5-act svg { display: none; }
+.logos-root .ls-open .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
+
+/* WORDS: each turn beside what it made */
+.logos-root .ls-word { position: relative; z-index: 3; display: flex; flex-direction: column; gap: 3px; margin: -6px -14px 0 24px; padding: 8px 11px 9px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 12px 12px 12px 3px; background: var(--c-paper); box-sizing: border-box; font-size: 13px; line-height: 1.45; color: var(--c-ink-70); }
+.logos-root .ls-word-n { font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 14px; color: var(--c-ink-45); }
+.logos-root .ls-word-you,
+.logos-root .ls-word-s { margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.logos-root .ls-word b { margin-right: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-word-s { color: var(--c-ink); }
+
+/* ── the chatbox: a box at the foot of the space ── */
+.logos-root .ls-chat { position: absolute; left: 50%; bottom: 18px; z-index: 5; transform: translateX(-50%); width: min(760px, calc(100% - 48px)); display: flex; flex-direction: column; gap: 8px; }
+.logos-root .ls::after { content: ''; position: absolute; left: 0; right: 0; bottom: 0; z-index: 4; height: 150px; background: linear-gradient(to bottom, rgba(var(--c-paper-rgb, 245, 243, 235), 0), var(--c-paper) 46%); pointer-events: none; }
+.logos-root .ls-answering { align-self: flex-start; display: inline-flex; align-items: center; gap: 8px; padding: 4px 6px 4px 10px; border: 1px solid rgba(var(--c-moss-rgb), 0.3); border-radius: 6px; background: #eef1e6; font-size: 12.5px; color: var(--c-moss); max-width: 100%; }
+.logos-root .ls-answering b { font-weight: 600; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 420px; }
+.logos-root .ls-answering-x { width: 20px; height: 20px; padding: 0; border: 0; background: none; color: var(--c-ink-45); font-size: 14px; line-height: 1; cursor: pointer; }
+.logos-root .ls-answering-x:hover { color: var(--c-ink); }
+.logos-root .l5 .ls-chat .l5-dock { max-width: none; margin: 0; padding: 0; background: none; }
+.logos-root .l5 .ls-chat .l5-dock > * + * { margin-top: 8px; }
+.logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .lg-composer-box,
+.logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .lg-composer-box:focus-within {
+  gap: 8px;
+  padding: 10px 12px 8px 16px;
+  border: 1px solid rgba(var(--c-ink-rgb), 0.22);
+  border-radius: 12px;
+  background: var(--lg-panel-solid, #fff);
+}
+.logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .lg-composer-box:focus-within { border-color: var(--c-moss); }
+.logos-root .l5 .ls-chat .lg-composer.is-ruled .l5-crow.l5-compose-line { padding-bottom: 0; border-bottom: 0; align-items: center; }
+.logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .l5-compose-line > textarea {
+  min-height: 26px;
+  padding: 3px 0;
+  font-family: inherit;
+  font-style: normal;
+  font-size: 16px;
+  line-height: 1.45;
+}
+.logos-root .l5 .ls-chat .lg-composer.is-ruled textarea::placeholder { font-family: inherit; font-style: normal; font-size: 16px; color: var(--c-ink-45); }
+
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-idea,
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-made,
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-open { background: rgba(var(--c-ink-rgb), 0.04); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-file { background: rgba(var(--c-ink-rgb), 0.06); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-idea.is-lit,
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-answering { background: rgba(var(--c-moss-rgb), 0.18); }
+
+/* ── a phone: one column ── */
+.logos-root .ls.is-phone .ls-kinds { gap: 18px; height: 44px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
+.logos-root .ls.is-phone .ls-kinds::-webkit-scrollbar { display: none; }
+.logos-root .ls.is-phone .ls-kd { flex: none; gap: 5px; font-size: 13px; white-space: nowrap; }
+.logos-root .ls.is-phone .ls-page { flex: none; font-size: 12.5px; }
+.logos-root .ls-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 9px; padding: 12px 16px 170px; }
+.logos-root .ls-sec { margin-top: 6px; }
+.logos-root .ls-pair { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.logos-root .ls.is-phone .ls-open { padding: 14px 15px 12px; gap: 9px; }
+.logos-root .ls.is-phone .ls-stmt { font-size: 23px; }
+.logos-root .ls.is-phone .ls-open .l5-prose.is-reply { font-size: 14.5px; }
+.logos-root .ls.is-phone .ls-open .l5-prose.is-reply .socria-asks-q { font-size: 20px; }
+.logos-root .ls-all { align-self: flex-start; min-height: 40px; }
+.logos-root .ls-empty { margin: 8px 0; max-width: 34ch; font-size: 13px; line-height: 1.55; color: var(--c-ink-60); }
+.logos-root .ls-trail { margin: 0; padding: 0; list-style: none; }
+.logos-root .ls-trow { display: grid; grid-template-columns: 28px minmax(0, 1fr); padding: 12px 0; border-bottom: 1px solid var(--c-rule); }
+.logos-root .ls-trow .ls-word-you,
+.logos-root .ls-trow .ls-word-s { -webkit-line-clamp: 3; font-size: 13.5px; line-height: 1.45; margin-bottom: 3px; color: var(--c-ink-70); }
+.logos-root .ls-trow .ls-word-s { color: var(--c-ink); }
+.logos-root .ls-trow b { margin-right: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
+.logos-root .ls-chip { min-height: 30px; padding: 3px 9px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 6px; background: var(--lg-panel-solid, #fff); font: inherit; font-size: 12.5px; color: var(--c-ink-70); cursor: pointer; }
+.logos-root .ls.is-phone .ls-chat { left: 0; right: 0; bottom: 0; transform: none; width: auto; padding: 8px 12px 12px; border-top: 1px solid var(--c-rule); background: var(--c-paper); }
+.logos-root .ls.is-phone::after { display: none; }
+
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .ls-it,
+  .logos-root .ls-ln path { transition: none; }
+}

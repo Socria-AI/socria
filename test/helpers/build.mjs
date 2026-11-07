@@ -344,6 +344,8 @@ const MODULES = [
   'test/helpers/study-desk-under-test.tsx',
   // One board, the chatbox is the chat (Logos 5, VIII · One view)
   'test/helpers/one-view-under-test.tsx',
+  // Everything in one space (Logos 5.5, Revision III): files, ideas, made things and the conversation together
+  'test/helpers/space-under-test.tsx',
   // The universal Logic Map's diagram lenses: cycle, tree, parts, concept map, a dated timeline (Logos 5)
   'test/helpers/diagram-layout-under-test.ts',
   // The universal Logic Map: the model, diagram routing, the map pass's instructions, edits, the free plan's rule

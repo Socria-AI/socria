@@ -280,6 +280,51 @@ its rules in `lib/logos5/oneView.ts`). The phone keeps the four views.
   (and bringing their panel when pressed). What is opened from the page takes
   the screen with "← Back to the page" above it. Split view is a wide screen's.
 
+### 8.2 Revision III — everything in one space
+
+Chat, Files, Artifacts and the Logic Map stop being four screens. A line of
+thinking is one space (`components/logos5/L5Space.tsx`, `space.css`; its rules
+in `lib/logos5/ideas.ts`), and the page of §8 is a press away.
+
+- **One canvas, laid out by how things connect.** What frames the question
+  (the question, the givens) and what was brought sit in the first column; each
+  idea follows what it rests on, one column per step along the lines (the
+  longest way, so a chain reads as a row; a loop is cut where it closes); what
+  Socria made sits last. Lines are drawn between them and named where it helps:
+  "so", "but", "because" on the map's own lines that touch the open idea, "read
+  from" from a file to the first idea its turn put on the map, "made" from an
+  idea to what its turn made. Loose relations draw no line.
+- **Each kind has its own look.** An idea is a plain card; a file is paper with
+  a folded corner; something made is framed, with its preview; the open idea is
+  ruled in moss. Every card says the turn of the conversation that made it
+  ("turn ii").
+- **The open idea holds the reply.** It is the idea the newest turn put on the
+  map first (not the question or a given when it put anything else there; the
+  newest of them). It shows what you said, the idea, and Socria's reply as the
+  conversation draws it — "Socria asks" and the actions included. While a reply
+  is arriving, or when a turn put nothing on the map, the reply is read on its
+  own card. Pressing any other idea opens it with the turn it came from and
+  makes it what the chatbox asks about; pressing the newest again goes back.
+- **The row under the header is not tabs.** Everything · Ideas · Brought ·
+  Made · Words, with counts. A choice moves nothing: the chosen kind stays
+  forward and the rest steps back to 0.22, still joined. Words is the
+  conversation itself — each turn's words beside the first thing it made, a
+  dashed gold thread through them in order. "Read as a conversation →" opens
+  the page; "← The space" in the header comes back. The header's tabs show only
+  on the page.
+- **The chatbox is a box at the foot.** White, bordered, with "Answering
+  *the open idea*" above it when Socria's newest reply asked something (and
+  nothing else is being asked about); × sets it aside for that turn.
+- **A phone** has one column: the open idea, what was made from it, what it
+  comes from (the ideas before it, what was brought), what it leads to and what
+  stands against it, then "See all n ideas". The row chooses what the column
+  lists — every idea, what was brought, what was made, or the turns with the
+  ideas each made. The chatbox is fixed at the foot.
+- **Checked by** `test/logos5-space.test.mjs` (the rules, the space drawn on a
+  wide screen and a phone, the wiring) and `.journeys/os-check.mjs` (the space,
+  Made, Words, an older idea opened, the page and back, at 1440 and on an
+  iPhone 13).
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its
