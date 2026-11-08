@@ -176,7 +176,7 @@ import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5TopBar, L5Working } from '@/components/logos5/L5Views';
-import { noteLearningTurn, readLedger, threadNoteFrom } from '@/lib/logos5/learning';
+import { noteLearningTurn, readLedger, replyFailed, threadNoteFrom } from '@/lib/logos5/learning';
 import { LiveGuide } from '@/components/logos5/LiveGuide';
 import { keepAsTurn } from '@/lib/guide/session';
 import type { GuidePlan } from '@/lib/guide/overlay';
@@ -4732,8 +4732,8 @@ export function LogosApp({
       // A write-up they asked to keep, answered in the conversation because the
       // month's document is spent: the words come, and the boundary is said.
       if (res.headers.get('X-Socria-Limit') === 'documents' && !ask('documents-spent')) setError(boundaryNote('documents'));
-      // a learning turn: its topic noted in the ledger, moved by how the checks they answered went
-      noteLearningTurn({ learn: res.headers.get('X-Socria-Learn'), review: res.headers.get('X-Socria-Review'), lost: res.headers.get('X-Socria-Lost') }, turn.did);
+      // a learning turn: noted in the ledger once its reply has landed (below) — never for a turn taken back or failed
+      const learning = { learn: res.headers.get('X-Socria-Learn'), review: res.headers.get('X-Socria-Review'), lost: res.headers.get('X-Socria-Lost') };
       // what the reply will do, as the engine planned it — kept on the reply once it has landed (below)
       const threadHeader = res.headers.get('X-Socria-Thread');
 
@@ -4792,6 +4792,8 @@ export function LogosApp({
       // through the room's record, which is what puts it on both screens.
       if (inShared) roomRef.current.onLocalReply(reply);
       else patchSession(sid, (s) => ({ ...s, messages: landReply(s.messages, sent, reply) }));
+      // the topic noted in the ledger, moved by how the checks they answered went — the reply is on screen now
+      if (!replyFailed(acc)) noteLearningTurn(learning, turn.did);
       // The transcript the map is drawn from is the line ON SCREEN. A reply
       // that lands after the person moved on is in its own session above, and
       // is read back from there when that line is opened (switchSession);

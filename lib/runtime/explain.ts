@@ -205,7 +205,10 @@ export type AskKind = 'why' | 'how' | 'what' | 'compare' | 'decide' | 'claim' | 
 
 // ── reading the turn ──────────────────────────────────────────────────
 
-const lc = (t: string) => t.replace(/```[\s\S]*?```/g, ' ').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
+// clipped before any pattern runs: a very long message is read by its first and last parts, never by every regex over
+// twelve thousand characters (several patterns backtrack on long runs)
+const clip = (t: string) => (t.length > 1600 ? `${t.slice(0, 800)} … ${t.slice(-800)}` : t);
+const lc = (t: string) => clip(t).replace(/```[\s\S]*?```/g, ' ').replace(/[’‘]/g, "'").replace(/\s+/g, ' ').trim().toLowerCase();
 const LEAD = /^(?:(?:so|ok(?:ay)?|hey|hi|hello|please|honestly|um+|uh+|hmm+|well|right|alright|cool|thanks|thank\s+you|great|nice|quick\s+question|question|another\s+question|follow[- ]up|wait|sorry|also|and|but|real\s+quick|really\s+quick|just\s+a\s+quick\s+one|quick\s+one|one\s+more\s+thing|technically|basically|actually|literally|seriously|genuinely|essentially|like)[,:.!]?\s+)+/;
 /** A reaction that opens a message before its question: "ok that makes sense, so why…", "got it. so what's…". */
 const REACTION_LEAD = /^(?:(?:ok(?:ay)?|alright|right|cool|nice|great|thanks|ah+|oh+|ohh+)[,.!]?\s+)?(?:that\s+(?:makes\s+(?:more\s+)?sense|helps|clicks)|(?:i\s+)?(?:get|got)\s+it(?:\s+now)?|makes\s+(?:more\s+)?sense(?:\s+(?:now|so\s+far))?|i\s+see|understood|fair\s+enough|perfect)[,.!]*\s+(?:(?:so|but|and|then)[,]?\s+)?/;
@@ -217,7 +220,7 @@ const WHY = /\bwhy\s+(?:is|are|was|were|does|do|did|would|could|can|can'?t|isn'?
 const HOW_WORKS = /^how\s+(?:does|do|did|is|are|can|could)\s+(?!(?:i|we|you|u)\b)(?:the\s+|a\s+|an\s+)?[a-z][\w-]*(?:\s+[a-z][\w-]*){0,3}\s+[a-z]{3,}|\bhow\s+(?:does|do|did|is|are|can)\s+.{2,80}?\b(?:work|works|happen|happens|form|forms|function|functions|spread|grow|move|run|operate)\b|^how\s+.{2,40}\s+works?\b|\bhow\s+.{2,40}\s+works?\b|\bwhat\s+happens\s+(?:when|if|in|during|to)\b|\bexplain\s+(?:how|the\s+process)\b|\bthe\s+process\s+of\b/;
 const WHAT_IS = /^(?:what(?:'s|s|\s+is|\s+are|\s+was|\s+were)\s+(?:a|an|the)?\s*\w|what\s+(?:a|an|the)\s+[\w-]+(?:\s+[\w-]+){0,4}\s+(?:is|are|means?|does)\b|what\s+(?:[\w-]+\s+){1,4}(?:measures?|means?|stands\s+for|is\s+for|represents?)\b|what\s+does\s+.+\s+mean|what\s+makes\s+(?:a|an|the)\s+(?:good|great|strong|bad|weak|effective|successful)\b|define\b|meaning\s+of\b|explain\s+(?!how|why)\w)/;
 const COMPARE = /\b(?:difference|differences|differ|different)\s+(?:between|from)\b|\bvs\.?\b|\bversus\b|\bcompared?\s+(?:to|with)\b|\bcompare\b|\bsame\s+(?:thing\s+)?as\b|\bmix(?:ing|ed)?\s+(?:\w+\s+){0,4}?up\b|\bconfuse\b.*\band\b|\bhow\s+(?:are|is|do|does)\s+(?:they|these|those|the\s+two|[\w-]+(?:\s+[\w-]+){0,3})\s+(?:different|differ)\b|\b(?:different|differs?)\s+(?:from|than|to)\b|\bwhat'?s\s+the\s+difference\b/;
-const DECIDE = /\b(?:should\s+i|should\s+we|which\s+(?:one\s+)?should|help\s+me\s+(?:decide|choose|pick)|is\s+it\s+worth|better\s+(?:option|choice)|trade-?offs?|worth\s+it|trying\s+to\s+(?:decide|choose|pick)|deciding\s+(?:between|whether)|which\s+(?:one\s+)?(?:to|would\s+you|is\s+better)|can'?t\s+decide)\b|\b(?:next\s+step|best\s+move|better\s+move|first\s+move)\b[^?]*\bor\b[^?]*\?|^[\w-]+(?:\s+[\w-]+){0,3}\s+or\s+[\w-]+(?:\s+[\w-]+){0,3}\s*\?+/;
+const DECIDE = /\b(?:should\s+i|should\s+we|which\s+(?:one\s+)?should|help\s+me\s+(?:decide|choose|pick)|is\s+it\s+worth|better\s+(?:option|choice)|trade-?offs?|worth\s+it|trying\s+to\s+(?:decide|choose|pick)|deciding\s+(?:between|whether)|which\s+(?:one\s+)?(?:to|would\s+you|is\s+better)|can'?t\s+decide)\b|\b(?:next\s+step|best\s+move|better\s+move|first\s+move)\b[^?]{0,120}?\bor\b[^?]{0,120}?\?|^[\w-]+(?:\s+[\w-]+){0,3}\s+or\s+[\w-]+(?:\s+[\w-]+){0,3}\s*\?+/;
 const CLAIM = /^(?:is\s+it\s+(?:true|right|correct)\s+that|is\s+(?:this|that)\s+(?:true|right|correct|a\s+good\s+argument)|does\s+(?:this|my)\s+argument|(?:my|the)\s+(?:argument|thesis|claim)\b)|\b(?:argue|argument\s+(?:for|against)|counter-?argument|debate|is\s+(?:the|this)\s+claim)\b|,\s*right\s*\?\s*$|\b(?:is|are)\s+there\s+(?:any\s+|actually\s+|really\s+)?(?:solid\s+|good\s+|real\s+|strong\s+|much\s+)?(?:evidence|proof|research|science)\b|\bdoes\s+(?:the\s+)?(?:research|science|evidence|data|literature)\s+(?:actually\s+|really\s+)?(?:back|support|show|say)\b|\bis\s+(?:this|that|it)\s+(?:actually\s+|really\s+)?(?:true|legit|a\s+myth)\b|\bmyth\s+or\b|\bdebunk|\bhype\s+or\b/;
 const SOLVE = /\b(?:solve|calculate|compute|work\s+out|find\s+(?:the|x|y)|simplify|differentiate|integrate|derive|factori[sz]e|expand|evaluate|prove|show\s+that)\b|[=]\s*-?\d|\d\s*[x×*+^/-]\s*\d|\bx\s*[+\-=^]/;
 const PROCEDURE = /^(?:how\s+(?:do|can|would|should|could)\s+(?:i|we|you)\b|walk\s+me\s+through|show\s+me\s+how|what\s+are\s+the\s+steps|what'?s\s+the\s+(?:procedure|process|method|formula|way|best\s+way)\s+(?:for|to|of)\b)|\bwhat\s+(?:do\s+i\s+do|should\s+i\s+do|comes|happens|do\s+we\s+do)\s+(?:next|after|now|then)\b|\bthen\s+what\b|\bwhat'?s\s+(?:the\s+)?next\s+step\b|\bwhat\s+comes\s+after\b|\bwhere\s+do\s+i\s+go\s+from\s+here\b/;
@@ -230,9 +233,9 @@ const LEARN_CONTEXT = /\b(?:homework|coursework|revising|revision|studying|study
 /** They say they are new to it — about themselves, or by asking to be treated so ("explain like I'm five"). */
 const NOVICE_SAID = /\b(?:eli5|like\s+(?:i'?m|im|i\s+am)\s+(?:5|five|a\s+(?:kid|child|5\s+year\s+old))|explain\s+(?:it\s+)?like\s+(?:i'?m|i\s+am)\s+(?:5|five|a\s+(?:kid|child))|in\s+(?:really\s+|very\s+)?simple\s+terms|plain\s+english|for\s+dummies|from\s+scratch|i'?m\s+(?:totally\s+|completely\s+|very\s+)?(?:new\s+to|a\s+(?:total\s+|complete\s+)?beginner|a\s+novice|not\s+(?:a\s+)?(?:maths?|math|science|numbers)\s+person)|i\s+am\s+(?:new\s+to|a\s+beginner)|(?:total|complete)\s+beginner|never\s+(?:learned|learnt|studied|done|taken)\b|no\s+idea\s+(?:what|how)|just\s+started\s+(?:learning|studying|taking))\b/;
 /** They say they know the field — about themselves, never a word like "technically" or "formally". */
-const EXPERT_ROLE = String.raw`(?:(?:senior|staff|principal|professional|practising|practicing|working|research|qualified|consultant|clinical|structural|civil|mechanical|electrical|software|data|chartered|registered)\s+)*(?:engineer|developer|programmer|scientist|doctor|physician|surgeon|clinician|nurse|pharmacist|physicist|mathematician|statistician|biostatistician|economist|chemist|biologist|researcher|professor|lecturer|phd|postdoc|accountant|lawyer|attorney|actuary|epidemiologist|[a-z]+ologist|[a-z]+ician|[a-z]+iatrist|specialist|consultant|architect|analyst|teacher\s+of\s+\w+|(?:maths?|physics|chemistry|biology|stats|statistics|history|economics|english)\s+teacher)`;
+const EXPERT_ROLE = String.raw`(?:(?:senior|staff|principal|professional|practising|practicing|working|research|qualified|consultant|clinical|structural|civil|mechanical|electrical|software|data|chartered|registered)\s+)*(?:engineer|developer|programmer|scientist|doctor|physician|surgeon|clinician|nurse|pharmacist|physicist|mathematician|statistician|biostatistician|economist|chemist|biologist|researcher|professor|lecturer|phd|postdoc|accountant|lawyer|attorney|actuary|epidemiologist|cardiologist|neurologist|oncologist|radiologist|immunologist|pathologist|psychologist|psychiatrist|paediatrician|pediatrician|geologist|sociologist|toxicologist|pharmacologist|anaesthetist|anesthesiologist|dietitian|specialist|consultant|architect|analyst|teacher\s+of\s+\w+|(?:maths?|physics|chemistry|biology|stats|statistics|history|economics|english)\s+teacher)`;
 const EXPERT_SAID = new RegExp(
-  String.raw`\b(?:i'?m|i\s+am)\s+(?:a|an)\s+(?:\w+\s+)?` + EXPERT_ROLE + String.raw`\b(?!\s+student)|\bas\s+(?:a|an)\s+(?:\w+\s+)?` + EXPERT_ROLE + String.raw`\b(?!\s+student)|\b(?:[\w-]+\s+){0,3}(?:specialist|consultant|surgeon|engineer|physicist|economist|statistician|nurse|doctor)\s+here\b|\bi\s+(?:teach|lecture\s+in|have\s+a\s+phd\s+in|work\s+as\s+an?\s+\w+|prescribe|practise|practice\s+(?:medicine|law))\b`
+  String.raw`\b(?:i'?m|i\s+am)\s+(?:a|an)\s+(?:\w+\s+)?` + EXPERT_ROLE + String.raw`\b(?!\s+student)|\bas\s+(?:a|an)\s+(?:\w+\s+)?` + EXPERT_ROLE + String.raw`\b(?!\s+student)|\b(?:[\w-]+\s+){0,3}(?:specialist|consultant|surgeon|engineer|physicist|economist|statistician|nurse|doctor)\s+here\b|\bi\s+(?:teach|lecture\s+in|lecture)\s+(?:intro(?:ductory)?\s+|undergrad(?:uate)?\s+|graduate\s+|high\s+school\s+|a\s+)?(?:maths?|math|stats|statistics|physics|chemistry|biology|economics|computer\s+science|cs|history|law|medicine|engineering|philosophy|psychology)\b|\bi\s+(?:have\s+a\s+phd\s+in|prescribe|practise\s+(?:medicine|law)|practice\s+(?:medicine|law))\b`
 );
 
 /**
@@ -240,7 +243,7 @@ const EXPERT_SAID = new RegExp(
  * The bare forms ("huh?", "what?") are read on the message as typed: "so what?" is not being lost.
  */
 const CONFUSED =
-  /\bstill\s+(?:don'?t|dont|do\s+not|confused|lost|not\s+(?:getting|following|sure\s+(?:i\s+get|why|how)))\b|\b(?:i'?m|i\s+am)\s+(?:so\s+|still\s+|a\s+bit\s+|a\s+little\s+|kind\s+of\s+|kinda\s+|really\s+|totally\s+|completely\s+)?(?:confused|lost)\b|\bdoesn'?t\s+make\s+(?:any\s+)?sense\b|\bmakes\s+no\s+sense\b|\bi\s+(?:still\s+)?(?:don'?t|dont|do\s+not)\s+(?:get|understand|see|follow)\b|\bnot\s+following\b|\b(?:you\s+)?lost\s+me\b|\bover\s+my\s+head\b|\bconfus(?:ed|ing)\b|\b(?:explain|say|put|show|describe)\s+(?:it|that|this)?\s*(?:in\s+)?(?:another|a\s+different|some\s+other|an\s+easier|a\s+simpler)\s+way\b|\b(?:explain|say|put)\s+(?:it|that|this)\s+differently\b|\b(?:another|a\s+different)\s+way\s+(?:of\s+explaining|to\s+(?:explain|think\s+about|see|look\s+at))\b|\bcan\s+you\s+(?:simplify|break)\s+(?:it|that|this)(?:\s+down)?\b|\b(?:idk|i\s+(?:don'?t|dont|do\s+not)\s+know)\s+what\s+(?:you\s+mean|that\s+means|you'?re\s+(?:saying|asking))\b|\bwhat\s+do\s+you\s+mean\b|\b(?:didn'?t|did\s+not|doesn'?t|does\s+not)\s+(?:really\s+)?help\b|\bnone\s+of\s+(?:this|that|it)\s+(?:is\s+)?(?:clicking|making\s+sense)\b/;
+  /\bstill\s+(?:don'?t|dont|do\s+not|confused|lost|not\s+(?:getting|following|sure\s+(?:i\s+get|why|how)))\b|\b(?:i'?m|i\s+am)\s+(?:so\s+|still\s+|a\s+bit\s+|a\s+little\s+|kind\s+of\s+|kinda\s+|really\s+|totally\s+|completely\s+)?(?:confused|lost)\b|\bdoesn'?t\s+make\s+(?:any\s+)?sense\b|\bmakes\s+no\s+sense\b|\bi\s+(?:still\s+)?(?:don'?t|dont|do\s+not)\s+(?:get|understand|see|follow)\b|\bnot\s+following\b|\b(?:you\s+)?lost\s+me\b|\bover\s+my\s+head\b|\b(?:i'?m|im|i\s+am|still|so|really)\s+confused\b|\b(?:this|that|it)(?:'s|\s+is)\s+(?:so\s+|really\s+)?confusing\b|\b(?:explain|say|put|show|describe)\s+(?:it|that|this)?\s*(?:in\s+)?(?:another|a\s+different|some\s+other|an\s+easier|a\s+simpler)\s+way\b|\b(?:explain|say|put)\s+(?:it|that|this)\s+differently\b|\b(?:another|a\s+different)\s+way\s+(?:of\s+explaining|to\s+(?:explain|think\s+about|see|look\s+at))\b|\bcan\s+you\s+(?:simplify|break)\s+(?:it|that|this)(?:\s+down)?\b|\b(?:idk|i\s+(?:don'?t|dont|do\s+not)\s+know)\s+what\s+(?:you\s+mean|that\s+means|you'?re\s+(?:saying|asking))\b|\bwhat\s+do\s+you\s+mean\b|\b(?:that|this|it|the\s+\w+)\s+(?:didn'?t|did\s+not|doesn'?t|does\s+not)\s+(?:really\s+)?help\b|\bnone\s+of\s+(?:this|that|it)\s+(?:is\s+)?(?:clicking|making\s+sense)\b/;
 const BARE_LOST = /^(?:huh|what|wait,?\s*what|sorry,?\s*what|eh|um+\s*what|\?+|i'?m\s+lost|lost|confused)\s*[?!.]*$/;
 const GOT_IT = /\b(?:(?:oh,?\s+|ah+,?\s+|ohh+,?\s+)?(?:i\s+(?:get|got)\s+it(?:\s+now)?|that\s+(?:makes\s+(?:more\s+)?sense|clicks|helps|clears\s+it\s+up)|makes\s+(?:more\s+)?sense(?:\s+now)?|i\s+see\s+now|ah+,?\s+i\s+see|now\s+i\s+(?:get|understand|see)|got\s+it|understood|that\s+clicked))\b/;
 const SIMPLER = /\b(?:too\s+(?:long|much|complicated|complex|technical)|simpler|shorter|tl;?dr|in\s+(?:one|a)\s+(?:sentence|line)|keep\s+it\s+short)\b/;
@@ -252,13 +255,15 @@ const FEELING = /\bi\s+(?:just\s+|really\s+|kind\s+of\s+|kinda\s+)?(?:feel|felt)
 /** Laughing at their own riddle: a question answered in the same breath, with a laugh. */
 const JOKE_TOLD = /(?:😂|🤣|😆|😹|\blol\b|\blmao\b|\bha(?:ha)+\b|\bjk\b)/;
 /** A hurry: an exam in minutes, "quick," as the first word — never "quick question:", which only announces one. */
-const HURRY = /\b(?:exam|test|quiz|interview|meeting|presentation|class)\s+(?:is\s+|starts\s+)?in\s+(?:\d+|a\s+few|five|ten|twenty|thirty)\s*(?:min|mins|minutes|hours?|hrs?)\b|\bin\s+a\s+(?:rush|hurry)\b|\bno\s+time\b|^quick[,!:]\s+(?!question)|\basap\b|\b(?:walking\s+into|about\s+to\s+(?:start|sit|take|walk\s+into))\s+(?:my\s+|the\s+|an?\s+)?(?:\w+\s+)?(?:exam|test|quiz|interview|meeting|class)\b|\b(?:rn|right\s+now)\b[^.?!]*\b(?:exam|test|quiz)\b|\b(?:exam|test|quiz)\b[^.?!]*\b(?:rn|right\s+now)\b|\bquick\s*[!?.]*$/;
+const HURRY = /\b(?:exam|test|quiz|interview|meeting|presentation|class)\s+(?:is\s+|starts\s+)?in\s+(?:\d+|a\s+few|five|ten|twenty|thirty)\s*(?:min|mins|minutes|hours?|hrs?)\b|\bin\s+a\s+(?:rush|hurry)\b|\b(?:i\s+have|i'?ve\s+got|i\s+got|there'?s)\s+no\s+time\b|\bno\s+time\s+to\s+(?:explain|read|learn)\b|^quick[,!:]\s+(?!question)|\basap\b|\b(?:walking\s+into|about\s+to\s+(?:start|sit|take|walk\s+into))\s+(?:my\s+|the\s+|an?\s+)?(?:\w+\s+)?(?:exam|test|quiz|interview|meeting|class)\b|\bquick\s*[!?.]*$/;
 /** A handover: they want it done, not learned. */
 const HANDOVER = /\b(?:(?:solve|do|work\s+out|compute|calculate|finish|answer|figure\s+out)\s+(?:it|this|that|these|them)(?:\s+one)?\s+for\s+me|just\s+(?:solve|compute|calculate|work\s+out|find|do)\b|just\s+give\s+me\s+the\s+(?:answer|result|number)|i\s+(?:don'?t|do\s+not)\s+(?:need|want)\s+(?:an\s+)?(?:explanation|to\s+learn|the\s+steps|a\s+walkthrough)|no\s+need\s+to\s+(?:walk\s+me\s+through|explain|show\s+(?:me\s+)?(?:the\s+)?(?:steps|working))|(?:only|just)\s+(?:need|want)\s+the\s+(?:final\s+)?(?:answer|result|number))\b|\b(?:solve|compute|calculate|work\s+out|figure\s+out)\b[^.?!]{0,60}\bfor\s+me\b/;
 /** Working or an answer of their own in the message. */
-const WORKING = /(?:^|[\s(])(?:[a-z]\s*=\s*-?\d|[a-z]\s*\^?\s*\d?\s*[+\-*/]\s*\d+\s*=|-?\d+(?:\.\d+)?\s*[+\-*/x×]\s*-?\d+(?:\.\d+)?\s*=)|\bi\s+got\s+(?:-?\d|[a-z]\s*=|that\b|it\s+as\b)|\bmy\s+(?:answer|working|solution|attempt)\s+(?:is|was)\b|\bi\s+(?:think|reckon)\s+(?:it'?s|the\s+answer\s+is|x\s*=)\s*/;
+const WORKING = /(?:^|[\s(])(?:[a-z]\s*=\s*-?\d|[a-z]\s*\^?\s*\d?\s*[+\-*/]\s*\d+\s*=|-?\d+(?:\.\d+)?\s*[+\-*/x×]\s*-?\d+(?:\.\d+)?\s*=)|\bi\s+got\s+(?:-?\d|[a-z]\s*=|that\b|it\s+as\b)|\bmy\s+(?:answer|working|solution|attempt)\s+(?:is|was)\b|\bmy\s+[a-z]+(?:\s+[a-z]+)?\s+(?:was|is|came\s+out\s+(?:as|at)|=)\s+-?\d|\bso\s+(?:it'?s|its|the\s+answer\s+is|[a-z]\s+is)\s+-?\d|\bi\s+(?:think|reckon)\s+(?:it'?s|the\s+answer\s+is|x\s*=)\s*/;
 const VERIFY_ASK = /\b(?:is|was)\s+(?:this|that|it|my\s+(?:answer|working|reasoning|solution))\s+(?:right|correct|ok|okay)\b|\bright\s*\?|\bisn'?t\s+it\s*\?|\bcorrect\s*\?|\bdid\s+i\s+(?:get|do)\s+(?:it|this|that)\s+right\b|\bam\s+i\s+(?:right|correct|on\s+the\s+right\s+track)\b|\bcheck\s+my\s+(?:working|answer|reasoning|solution)\b/;
 /** A reply that ended by asking them to recall, explain, predict or try — read from its text when it has no note. */
+/** An offer at the end of a reply ("Want me to show you…?") is not a question put to them. */
+const OFFER = /\b(?:want\s+me\s+to|shall\s+i|should\s+i|would\s+you\s+like|do\s+you\s+want|want\s+to\s+(?:see|try|go)|happy\s+to|if\s+you\s+(?:like|want))\b[^?]*\?\s*$/;
 const ASKED_THEM = /(?:\bin\s+your\s+own\s+words\b|\bwhy\s+(?:does|do|is|would|did)\b|\bwhat\s+(?:would|do\s+you\s+think|happens|will\s+happen)\b|\bcan\s+you\s+(?:explain|say|recall|remember|try|tell\s+me)\b|\btry\s+(?:it|this|the\s+next|one)\b|\bnow\s+you\b|\byour\s+turn\b|\bwhich\s+(?:one|method|step|part)\b|\bpredict\b|\bremember\s+(?:what|how|why)\b)[^?]*\?\s*$/;
 const REACTION_WORDS = new Set('thanks thank you ok okay k kk cool great nice awesome perfect sure yes yeah yep yup no nope nah fine lol haha good alright right got it that makes sense i see oh ah ahh ohh wow interesting hmm hm wait huh what sorry still dont don\'t do not get understand follow following lost confused me this that is am i\'m im really so totally completely very bit kind of kinda now makes sense clicks clear clearer helps helped understood love it'.split(' '));
 
@@ -356,7 +361,7 @@ export function askKind(text: string): AskKind {
     // "how would I work out compound interest?": a method asked for, not a mechanism — unless there are numbers to solve
     if (PROCEDURE.test(t) && !/\d/.test(t)) return 'procedure';
     if (HOW_WORKS.test(t)) return 'how';
-    if (SOLVE.test(t) && !/^(?:what\s+(?:is|are|does)|why|how\s+does)\b/.test(t)) return 'solve';
+    if (SOLVE.test(t) && !/^(?:what(?:'s|s)?\s+(?:even\s+|exactly\s+|actually\s+)?(?:is|are|does|do)?\b|why|how\s+does)/.test(t)) return 'solve';
     if (PROCEDURE.test(t)) return 'procedure';
     if (WHAT_IS.test(t)) return 'what';
     return null;
@@ -374,7 +379,7 @@ export function askKind(text: string): AskKind {
 const STOP = new Set(
   (
     'a an the of to in on for and or but is are was were be been being it its this that these those how why what which when where who whom whose does do did doing done can could would should will shall may might must i me my mine we us our you your yours they them their he she him her his hers about into from with without as at by so than then there here really actually exactly just please ' +
-    "explain tell show help understand understanding mean means meant work works working worked happen happens happening difference differences between versus vs compare is it true like simple simply terms eli5 kid five year years old way ways review revise revision exam exams test tests tomorrow today tonight week weekend study studying learn learning quiz practice practise question questions problem problems need needs want wants know knows get gets got still now some more again also don't dont doesn't doesnt can't cant won't isn't isnt i'm im it's thats that's what's whats there's i've ive i'd you're youre let's lets okay ok thanks thank cool great nice yes yeah sure right wrong correct answer answers basically technically literally honestly anyway idea ideas thing things stuff something anything everything bit lot lots kind sort quick quickly next another one two three first second last other same different new beginner novice expert confused confusing lost follow following sense makes make made making clicks clear huh wait sorry hmm well very much many most part parts step steps start begin solve solving solved calculate calculating compute find finding finds simplify evaluate prove show proof example examples mean average good bad better best cause causes caused causing reason reasons effect effects affect affects use uses used using drive drives driven take takes taking give gives giving go goes going come comes keep keeps look looks think thinks feel try trying see seen say said saying ask asking called call does homework assignment class course lecture teacher professor school college university uni unit chapter module topic topics subject concept concepts definition define defined meaning process processes always thought believed heard told pretty sure true false wrong tbh pls plz thx tho rn imo lol haha heyyy hey hiya all not arrows arrow lines line bits bit diagram picture analogy explanation explanations nope none clicking click getting research evidence blog blogs says say back legit claim claims data studies study procedure method methods formula formulas harder easier before after details detail map pieces piece main put pick choose decide deciding open pay start starting trying try tried bet settle remind reminds sorry roughly mock revising term semester mixed mixing keep keeps forgetting drill mix random shuffled bunch few couple across whole entire actual solid strong weak pub night brother sister friend friends talk talking chat chatting seems seem looks idk dunno"
+    "explain tell show help understand understanding mean means meant work works working worked happen happens happening difference differences between versus vs compare is it true like simple simply terms eli5 kid five year years old way ways review revise revision exam exams test tests tomorrow today tonight week weekend study studying learn learning quiz practice practise question questions problem problems need needs want wants know knows get gets got still now some more again also don't dont doesn't doesnt can't cant won't isn't isnt i'm im it's thats that's what's whats there's i've ive i'd you're youre let's lets okay ok thanks thank cool great nice yes yeah sure right wrong correct answer answers basically technically literally honestly anyway idea ideas thing things stuff something anything everything bit lot lots kind sort quick quickly next another one two three first second last other same different new beginner novice expert confused confusing lost follow following sense makes make made making clicks clear huh wait sorry hmm well very much many most part parts step steps start begin solve solving solved calculate calculating compute find finding finds simplify evaluate prove show proof example examples mean average good bad better best cause causes caused causing reason reasons effect effects affect affects use uses used using drive drives driven take takes taking give gives giving go goes going come comes keep keeps look looks think thinks feel try trying see seen say said saying ask asking called call does homework assignment class course lecture teacher professor school college university uni unit chapter module topic topics subject concept concepts definition define defined meaning process processes always thought believed heard told pretty sure true false wrong tbh pls plz thx tho rn imo lol haha heyyy hey hiya all not arrows arrow lines line bits bit diagram picture analogy explanation explanations nope none clicking click getting research evidence blog blogs says say back legit claim claims data studies study procedure method methods formula formulas harder easier before after details detail map pieces piece main put pick choose decide deciding open pay start starting trying try tried bet settle remind reminds sorry roughly mock revising term semester mixed mixing keep keeps forgetting drill mix random shuffled bunch few couple across whole entire actual solid strong weak pub night brother sister friend friends talk talking chat chatting seems seem looks idk dunno while ago earlier remember recall forgot forget"
   ).split(/\s+/)
 );
 
@@ -641,6 +646,8 @@ export function replyAsks(reply: string): boolean {
 /** Strategies that do the same job: never two of one group in a turn. */
 const GROUPS: Strategy[][] = [
   ['worked', 'faded', 'error'],
+  // one worked instance or the first part of many: not both
+  ['worked', 'segmented'],
   ['compare', 'tradeoffs'],
   ['conceptmap', 'argument'],
 ];
@@ -708,9 +715,14 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
   const wrongNow = i.state.understanding.wrong + did.wrong > 0;
   const rightNow = i.state.understanding.right + did.right > 0;
   const working = WORKING.test(t);
-  const verify = VERIFY_ASK.test(t) && (working || /\d/.test(t) || t.split(' ').length >= 8);
+  // their working with a question about it — "where does the 24x come from?", "the answer key says…" — is theirs to have checked
+  const disputed = working && /\b(?:answer\s+key|where\s+(?:does|did)\s+(?:the|that|this)|why\s+(?:is|isn'?t)\s+it|textbook\s+says|marked\s+(?:it\s+|me\s+)?wrong|got\s+it\s+wrong)\b/.test(t);
+  const verify = (VERIFY_ASK.test(t) || disputed) && (working || /\d/.test(t) || t.split(' ').length >= 8);
   // an answer to the question Socria left them: its note says so, or its text ended asking them something
-  const pendingQ = note?.q ?? (prevReply && ASKED_THEM.test(prevReply.replace(new RegExp(`${SHOWN_RE}[^\\]]*\\]`, 'g'), ' ').trim()) ? ('why' as Pending) : undefined);
+  // a note, where the reply has one, is the record: no question in it means none was left. Only older replies, with
+  // no note, are read from their text — and an offer ("Want me to show you…?") is not a question put to them
+  const prevPlain = prevReply.replace(new RegExp(`${SHOWN_RE}[^\\]]*\\]`, 'g'), ' ').trim().slice(-600);
+  const pendingQ = note ? note.q : prevPlain && ASKED_THEM.test(prevPlain) && !OFFER.test(prevPlain) ? ('why' as Pending) : undefined;
   const answering = !!pendingQ && !confused && !reaction && !/\?\s*$/.test(t) && kind !== 'practice' && t.split(' ').length <= 80;
   // anything Socria said that was more than a hello counts: "Entropy measures the number of microstates." is an explanation
   const priorExplanation = !!prevReply && (note ? note.n !== 'direct' : prevReply.split(/\s+/).length >= 5 && !/^(?:hi|hello|hey|good|thanks|you'?re welcome|no problem)\b/i.test(prevReply.trim()));
@@ -726,10 +738,17 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
   // "that makes sense" with something of their own in it — but a new question after it is a new question
   const tagOnly = /^(?:right|correct|yeah|yes|no|true|ok|okay|is\s+that\s+(?:it|right)|thats\s+(?:it|right)|am\s+i\s+right)\s*\?+\s*$/.test(focusOf(raw));
   const newQuestion = /\?\s*$/.test(focusOf(raw)) && !summary && !tagOnly;
-  const statesUnderstanding = summary || (gotIt && !reaction && !!own && t.split(' ').length >= 6 && !newQuestion);
+  // "that makes sense" with an account of their own — a long one stays a teach-back even when it ends asking "right?"
+  // — unless what it asks is a question of its own (a wh-question, or a choice between options)
+  const asksOwn = /\b(?:what|which|how|why|when|where|who|should\s+i|do\s+i)\b|\b\w+\s+or\s+\w+[^,]*\?\s*$/.test(focusOf(raw));
+  const statesUnderstanding = summary || (gotIt && !reaction && !!own && t.split(' ').length >= 6 && (!newQuestion || (t.split(' ').length >= 15 && !asksOwn)));
   // a myth corrected is a TRUE belief: confirmed, never refuted
   const trueSaying = TRUE_SAYINGS.some((re) => re.test(t));
-  const belief = BELIEF.test(t) && !summary;
+  // a belief is theirs and stated — "I read a chapter on the Krebs cycle, how does it work?" or "I thought I had it" is
+  // context, not a claim to weigh; a how/why question after it is still the question
+  const contextOnly = /\bi\s+(?:thought|think)\s+i\s+(?:had|got|understood|knew|get)\b|\bi\s+(?:read|heard)\s+(?:a|an|the|about|some)\s+(?:chapter|book|article|paper|post|bit|lot)\b/.test(t);
+  const askedSomethingElse = ['why', 'how', 'what', 'relate', 'procedure', 'solve', 'compare', 'decide'].includes(kind) && !/,\s*right\s*\?\s*$|\bis\s+(?:that|this|it)\s+(?:true|right|correct)\b/.test(t);
+  const belief = BELIEF.test(t) && !summary && !contextOnly && !askedSomethingElse && !(CONFUSED.test(t) || BARE_LOST.test(t));
   const myth = trueSaying ? undefined : MYTHS.find((m) => m.re.test(t));
   const judgedWrong = !!myth || (belief && i.state.understanding.wrong > 0);
   const studying = LEARN_CONTEXT.test(t);
@@ -806,7 +825,8 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
   if (HANDOVER.test(t)) return (reasons.push('direct:handover'), base('direct', true, ['insight']));
   const hurried = JUST_ANSWER.test(t) || HURRY.test(t) || i.signals.directness === 'answer' || i.signals.answersOnly || i.signals.urgent;
   // their own answer offered for checking ("so my average speed was 50 mph right?") is an attempt, worked or not
-  const attempt = wrongNow || rightNow || (verify && (working || /\d/.test(t))) || answering || statesUnderstanding || trueSaying;
+  // their own answer or working offered for checking is an attempt; a number inside someone else's claim is not
+  const attempt = wrongNow || rightNow || (verify && working) || answering || statesUnderstanding || trueSaying;
   // a plain fact: one sentence answers it, and it is not a mechanism, a comparison, a claim or a method
   const factAsked = /^(?:when|what\s+(?:year|date|time|day)|who|where|how\s+(?:many|much|old|long|far|tall|big))\b|\b(?:in\s+)?what\s+(?:year|century|decade)\b|\bwhen\s+(?:did|was|is|were)\b/.test(strip(focusOf(raw).replace(LEAD, '')));
   const fact = (work === 'information' || factAsked) && complexity === 1 && !['compare', 'why', 'how', 'claim', 'solve', 'procedure', 'decide', 'practice', 'relate'].includes(kind);
@@ -870,8 +890,8 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
       reasons.push(`feedback:answer:${pendingQ}`);
     } else if (statesUnderstanding) {
       reasons.push('feedback:says-it');
-      // they said it in their words: a try on a near case tests whether it carries
-      if (learning && procedure) close(['transfer']);
+      // they said it in their words: a try on a near case tests whether it carries — never for someone who says they are still lost
+      if (learning && procedure && !confused) close(['transfer']);
     } else {
       reasons.push('feedback:verify');
     }
@@ -883,7 +903,10 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
   // ── 3 REFUTE: a belief that does not survive ──
   if (belief || myth) {
     if (judgedWrong) {
-      fill.belief = quoted(focusOf(raw), 12);
+      // the sentence the myth was found in — never a question or someone else's correct rule around it
+      const sentences = lc(raw).split(/(?<=[.!?])\s+|\n+/);
+      const said = myth ? sentences.find((x) => myth.re.test(x)) : sentences.find((x) => BELIEF.test(x));
+      if (said && !/\?\s*$/.test(said)) fill.belief = quoted(said, 12);
       push('misconception', myth ? 'known-myth' : 'refuted');
       // a belief about a quantity: commit to a prediction where something live can show it
       if (myth?.quantity && forms0.some((k) => k === 'sim' || k === 'graph' || k === 'slider')) close(['predict']);
@@ -932,7 +955,7 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
     if (kinds.size >= 2 || review) push('interleave', 'mixed-practice');
     else push('transfer', 'one-to-try');
     if (!strategies.length) strategies.push('insight');
-    return finish('practice', review || strategies.includes('spaced') ? dueHere.slice(0, 2).map((e) => e.topic) : []);
+    return finish('practice', strategies.includes('spaced') ? dueHere.slice(0, 2).map((e) => e.topic) : []);
   }
 
   // ── 6 EXPLAIN: a first explanation, by the kind of question ──
@@ -946,12 +969,13 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
     const fadeLevel = metBefore?.fade ?? 0;
     if (mayWork && !rightNow && !before.has('worked') && fadeLevel === 0) push('worked', 'example');
     else {
-      push('faded', !mayWork ? 'theirs-to-finish' : before.has('worked') ? 'after-example' : `fade:${fadeLevel}`);
+      const nextStep = before.has('worked') && /\bnext\s+step|what\s+(?:do\s+i\s+do|comes)\s+(?:next|after)|\bthen\s+what\b/.test(t);
+      push('faded', !mayWork ? 'theirs-to-finish' : nextStep ? 'next-step' : before.has('worked') ? 'after-example' : `fade:${fadeLevel}`);
       fill.theirs = !mayWork;
     }
   }
   if (kind === 'why') {
-    if (/\b(?:collapse|fall|fell|start|started|begin|began|end|ended|rise|rose|decline|declined|win|won|lose|lost|happen|happened|war|revolution|crash|crisis|recession|depression)\b/.test(t) && !/\b(?:molecule|atom|cell|equation|force|energy|reaction)\b/.test(t)) fill.manyCauses = true;
+    if (/\b(?:war|wars|revolution|empire|dynasty|recession|depression|crisis|crash|famine|uprising|rebellion|election|independence|reformation|renaissance|great\s+leap|cold\s+war|civil\s+rights|industrial\s+revolution|the\s+fall\s+of|collapse\s+of\s+(?:the\s+)?[a-z]+\s+(?:empire|union|republic|kingdom|economy))\b/.test(t)) fill.manyCauses = true;
     push('causal', fill.manyCauses ? 'interacting-causes' : 'why');
   }
   if (kind === 'how') push('causal', 'mechanism');
@@ -963,20 +987,21 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
   if (i.length !== 'detailed' && i.length !== 'concise' && (complexity === 3 || (level === 'novice' && complexity >= 2 && support === 'more'))) push('segmented', complexity === 3 ? 'complex' : 'novice');
   if (!strategies.length || (strategies.length < 2 && !strategies.includes('insight') && level !== 'expert' && kind !== 'solve' && kind !== 'procedure')) strategies.unshift('insight');
 
+  // the most an explanation carries for an expert: one move, and no closing question added after it
+  if (level === 'expert') strategies.splice(1);
   // at most one closing move, on learning turns, never while a question waits
-  if (learning && mayAsk && !unanswered) {
+  if (learning && mayAsk && !unanswered && level !== 'expert') {
     if (i.assist?.retrieval) push('retrieval', 'resumed');
     else if (metBefore && i.now - metBefore.last >= DAY && i.history.length <= 2) push('retrieval', 'met-before');
     else if ((kind === 'solve' || kind === 'procedure') && strategies.includes('worked') && mayWork) push('transfer', 'one-like-it');
     else if (dueHere.length && complexity <= 2 && kind !== 'decide') push('spaced', 'due');
   }
   // one sentence that carries it beyond this case: the reusable rule, applied once more — on learning turns with parts
-  if (learning && level !== 'expert' && i.length !== 'concise' && complexity >= 2 && ['why', 'how', 'what', 'relate', 'solve', 'procedure', 'compare'].includes(kind) && !simpler) {
+  const stops = i.presentation.shape === 'understand' && !i.presentation.depth;
+  if (learning && level !== 'expert' && i.length !== 'concise' && complexity >= 2 && ['why', 'how', 'relate', 'solve', 'procedure'].includes(kind) && !simpler && !stops && !factAsked && !/\bquick\b/.test(t)) {
     fill.transfer = true;
     reasons.push('transfer-hook');
   }
-  // the most an explanation carries: an expert one move, otherwise three
-  if (level === 'expert') strategies.splice(1);
   return finish('explain', question === 'spaced' ? dueHere.slice(0, 2).map((e) => e.topic) : []);
 
   function finish(need: ExplainNeed, dueList: string[] = []): ExplainPlan {
@@ -1105,7 +1130,9 @@ function lineFor(s: Strategy, plan: ExplainPlan, p: Presentation | null): string
         ? `Work one complete example${/\d/.test(plan.topic ?? '') ? ' with their numbers' : ', with their numbers if they gave any'}, each step with its reason.`
         : 'Work one concrete instance through — a real case or real numbers — before any general statement.';
     case 'faded':
-      return theirs || p?.stepsFaded
+      if (plan.reasons.includes('faded:next-step')) return 'Give only the next step, with its reason — not the steps already shown — and leave the one after it to them.';
+      if (p?.stepsFaded) return 'Show the first steps of their own problem with their reasons; the step that finishes it goes in the working\'s "check", never as a line.';
+      return theirs
         ? 'Name the kind of problem and the method in a line; then give only the next single step and let them take it — the rest stays theirs.'
         : 'Show the first steps with their reasons, then leave the last step for them, saying what it needs.';
     case 'segmented':
@@ -1124,6 +1151,10 @@ function lineFor(s: Strategy, plan: ExplainPlan, p: Presentation | null): string
     case 'misconception':
       return `They believe ${plan.fill.belief ? `“${plan.fill.belief}”` : 'something that is not so'}. Say plainly, first, that it is not so; then why it is tempting, the one fact it cannot survive, and the accurate picture in its place.`;
     case 'error':
+      if (plan.reasons.includes('error:check-not-right'))
+        return theirs
+          ? 'Their answer was not right: say so plainly and point to the idea it missed — never the answer itself.'
+          : 'Their answer was not right: say so plainly, give the right one, and the one idea that gets there.';
       return theirs
         ? 'Their working has a slip: point to the first place it goes wrong and why it seemed right — never the corrected answer; the repair is theirs.'
         : 'Their working has a slip: point to the first place it goes wrong, say why it seemed right, and give the rule that fixes it — do not redo the rest for them.';

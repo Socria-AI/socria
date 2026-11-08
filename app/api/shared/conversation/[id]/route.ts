@@ -36,6 +36,7 @@
 // with the row's map, which the client merges with its own, part by part, and
 // sends again (lib/share/sync.ts mergeMaps).
 
+import { sanitizeThreadNote } from '@/lib/runtime/explain';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { createHash } from 'node:crypto';
@@ -146,13 +147,15 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const synthesis = role === 'assistant' ? sanitizeSynthesis(r.synthesis) : undefined;
         // the web pages a reply read, listed under it — addresses and titles, never their text
         const sources = role === 'assistant' ? cleanWebSources(r.sources) : undefined;
+        // what the reply did, as the explanation engine planned it: enum codes and a concept (lib/runtime/explain.ts)
+        const explain = role === 'assistant' ? sanitizeThreadNote(r.explain) : null;
         // said rather than typed (Socria Voice): shown with a microphone
         const via = role === 'user' && r.via === 'voice' ? ('voice' as const) : undefined;
         const extra = { ...(id ? { id } : {}), ...(at ? { at } : {}), ...(replyTo ? { replyTo } : {}), ...(about ? { about } : {}), ...(via ? { via } : {}) };
         // a person's turn is theirs, named; Socria's answer is Socria's
         return role === 'user'
           ? { ...extra, role, content, by }
-          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}), ...(sources ? { sources } : {}) };
+          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}), ...(sources ? { sources } : {}), ...(explain ? { explain } : {}) };
       }).filter((m) => m.content.trim())
     : [];
   const base = Number(body?.base) || 0;

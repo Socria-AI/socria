@@ -998,6 +998,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     const comprehensionAllowed =
       logosPersistPolicy(userTexts) === 'full' &&
       !sharedCtx.shared &&
+      !sharedCtx.unconfirmed &&
       !sharedCtx.guest &&
       !body?.collab &&
       !twoPeople &&

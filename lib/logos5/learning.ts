@@ -17,7 +17,17 @@
 // people present. "Clear memory" clears it (lib/local-data.ts MEMORY_KEYS), and
 // the Memory view lists it with a Forget for each concept.
 
-import { APPROACHES, noteTopic, outcomesOf, replyAsks, sameTopic, sanitizeLedger, sanitizeThreadNote, type Approach, type LedgerEntry, type ThreadNote } from '@/lib/runtime/explain';
+import { APPROACHES, cueCheck, noteTopic, outcomesOf, replyAsks, sameTopic, sanitizeLedger, sanitizeThreadNote, type Approach, type ExplainPlan, type LedgerEntry, type ThreadNote } from '@/lib/runtime/explain';
+
+/**
+ * A reply that is, or ends in, the route's failure notice (lib/upstream-error.ts streamFailureNotice): the
+ * bracketed line that says the reply stopped, or the bracketed line that stands in for one that never began.
+ * Nothing it planned was shown, so nothing is noted from it.
+ */
+export function replyFailed(reply: string): boolean {
+  const t = reply.trim();
+  return /\[The reply stopped here\.[^\]]*\]$/.test(t) || /\(ref [A-Za-z0-9-]+\)\]$/.test(t) || /^\[[^\]]+\]$/.test(t);
+}
 
 export const LEARNING_KEY = 'socria.learning.v1';
 
@@ -108,13 +118,17 @@ export function threadNoteFrom(header: string | null, reply: string): ThreadNote
   const raw = decode(header);
   if (!raw) return null;
   try {
+    if (replyFailed(reply)) return null;
     const note = sanitizeThreadNote(JSON.parse(raw));
     if (!note) return null;
-    if (note.q && !replyAsks(reply)) {
-      const { q: _q, ...rest } = note;
+    // only the moves the reply shows a cue of: a way in it never showed cannot be the one that left them lost
+    const cues = cueCheck(reply, { strategies: note.s } as unknown as ExplainPlan);
+    const shown: ThreadNote = { ...note, s: note.s.filter((s) => cues[s]) };
+    if (shown.q && !replyAsks(reply)) {
+      const { q: _q, ...rest } = shown;
       return rest;
     }
-    return note;
+    return shown;
   } catch {
     return null;
   }

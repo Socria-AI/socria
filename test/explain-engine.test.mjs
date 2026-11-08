@@ -292,7 +292,8 @@ console.log('\n=== integration ===');
   ok('  the ledger read only through the one gate (never sensitive, off the record, two people, shared, a visitor, incognito)', /comprehensionAllowed \? sanitizeLedger\(body\?\.learning/.test(route) && /!turnState\.sensitive &&/.test(route) && /!signals\.offRecord &&/.test(route) && /!twoPeople &&/.test(route));
   ok('  content-free headers: the strategies, and the topic of a learning turn', /'X-Socria-Explain': explainTrace\(explain\)/.test(route) && /'X-Socria-Learn': encodeURIComponent\(explain\.topic\)/.test(route));
   const app = read('components/LogosApp.tsx');
-  ok('the client sends the ledger kept in this browser (never into a conversation others read), and notes a learning turn', /if \(shared\) return \{\};\s*const lg = readLedger\(\);/.test(app) && /noteLearningTurn\(\{ learn: res\.headers\.get\('X-Socria-Learn'\), review: res\.headers\.get\('X-Socria-Review'\), lost: res\.headers\.get\('X-Socria-Lost'\) \}, turn\.did\)/.test(app));
+  ok('the client sends the ledger kept in this browser (never into a conversation others read), and notes a learning turn', /if \(shared\) return \{\};\s*const lg = readLedger\(\);/.test(app) && /const learning = \{ learn: res\.headers\.get\('X-Socria-Learn'\), review: res\.headers\.get\('X-Socria-Review'\), lost: res\.headers\.get\('X-Socria-Lost'\) \};/.test(app) && /landReply\(s\.messages, sent, reply\) \}\)\);\s*\/\/[^\n]*\n\s*if \(!replyFailed\(acc\)\) noteLearningTurn\(learning, turn\.did\);/.test(app));
+  ok('  …only once the reply has landed: not for a turn taken back or failed', (app.match(/noteLearningTurn\(/g) ?? []).length === 1 && app.indexOf('noteLearningTurn(learning') > app.indexOf('const reply: Msg'));
   ok('  …and keeps the engine\'s note on the reply (codes and a concept), the question only if the reply asked it', /threadNoteFrom\(threadHeader, acc\)/.test(app) && /sanitizeThreadNote\(m\.explain\)/.test(read('app/api/conversations/route.ts')));
   ok('"Clear memory" clears the ledger; sign-out says it is cleared', /'socria\.learning\.v1'/.test(read('lib/local-data.ts')) && /lives only in this browser/.test(read('components/account/SignOutPanel.tsx')));
   ok('the Memory view lists it, with a Forget for each concept', /<LearningList \/>/.test(read('components/logos5/MemoryView.tsx')) && /forgetTopic\(e\.topic\)/.test(read('components/logos5/LearningList.tsx')));
@@ -300,6 +301,26 @@ console.log('\n=== integration ===');
   ok('  kept in localStorage only, failures harmless', /localStorage\.setItem\(LEARNING_KEY/.test(lib) && /catch \{/.test(lib) && !/fetch\(/.test(lib));
   ok('invisible: no mode, no badge, nothing new on screen', !/explain-mode|Explanation mode|strategy-badge/i.test(app));
   ok('trace: content-free codes', R.explainTrace(turn('how does photosynthesis work?').plan).split(';').every((p) => /^[a-z0-9+=]+$/.test(p)));
+}
+
+console.log('\n=== the review fixes ===');
+{
+  const worked = [{ role: 'user', content: 'how do I solve 3x + 4 = 19?' }, { role: 'assistant', content: 'Take 4 from both sides, then divide by 3.\n\n```ui\n{"type":"steps","lines":[{"tex":"3x = 15"},{"tex":"x = 5"}]}\n```' }];
+  const r = turn('ok now how do I solve 5x - 2 = 18, whats the next step after moving the 2?', { history: worked, thread: [{ s: ['worked'], n: 'explain', c: 'linear equations' }] });
+  ok('"what is the next step" after a worked example: only the next step, theirs to take after it', (r.plan.reasons.includes('faded:next-step') || r.plan.reasons.includes('faded:theirs-to-finish')) && !has(r, 'worked'), J(r.plan.reasons));
+  const t = turn('a while ago I learned about photosynthesis, I remember some but forgot the rest');
+  ok('"a while ago… remember… forgot" names no topic of its own', !/\b(?:while|ago|remember|forgot)\b/.test(t.plan.topic ?? ''), t.plan.topic);
+  const decide = turn('ok that makes sense. so what should I do next — pay off my credit card first or start putting money in an index fund?', { history: [{ role: 'user', content: "what's an index fund?" }, { role: 'assistant', content: 'An index fund buys every stock in a market index, so you own a small slice of hundreds of companies at once.' }], thread: [{ s: ['insight'], n: 'explain', c: 'index fund' }] });
+  ok('"that makes sense" followed by a choice of their own is the choice, not a teach-back', decide.plan.need !== 'feedback', J(decide.plan.reasons));
+  const cues = R.cueCheck('Plants turn light into sugar. The light splits water first.', { strategies: ['insight', 'analogy'] });
+  ok('the saved note keeps only the moves the reply shows a cue of (no analogy in a reply without one)', cues.insight === true && cues.analogy === false, J(cues));
+  const lib = read('lib/logos5/learning.ts');
+  ok('  …the client filters the note by those cues, and saves none for a failure notice', /cueCheck\(reply, \{ strategies: note\.s \}/.test(lib) && /if \(replyFailed\(reply\)\) return null;/.test(lib));
+  const failed = new Function('reply', lib.match(/export function replyFailed\(reply: string\): boolean \{([\s\S]*?)\n\}/)[1].replace(/: string/g, ''));
+  ok('  a failure notice is recognised; an answer is not', failed('Here is part of it.\n\n[The reply stopped here. Socria could not be reached. (ref ab12)]') && failed('\n\n[Socria could not be reached. (ref 9f3c)]') && !failed('The answer is 4. [See step 2.] Then check it.'));
+  ok('the shared line keeps the engine\'s note on a reply, sanitised', /sanitizeThreadNote\(r\.explain\)/.test(read('app/api/shared/conversation/[id]/route.ts')));
+  ok('nothing is learned about a visitor whose access is not yet confirmed', /!sharedCtx\.shared &&\s*!sharedCtx\.unconfirmed &&/.test(read('app/api/logos/chat/route.ts')));
+  ok('faded steps inside their own reasoning stay short (four lines at most)', /ctx\.faded && spec\.check && spec\.lines\.length <= 4/.test(read('lib/inline-ui.ts')));
 }
 
 console.log(`\nexplain-engine: ${pass} passed, ${fail} failed`);

@@ -1527,7 +1527,7 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
     // the working is the thing a guarded problem asks them to do
     if (ctx.guard) return { ok: false, why: 'guarded' };
     // faded working, only where it was offered so: the step that finishes it is theirs, asked as the check
-    if (ctx.ownReasoning && !(ctx.faded && spec.check && spec.lines.length <= 6)) return { ok: false, why: 'their-reasoning' };
+    if (ctx.ownReasoning && !(ctx.faded && spec.check && spec.lines.length <= 4)) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'graph') {
     // a graph is theirs to explore; under the guard nothing is marked on it that would be the answer:
     // no features, no readings, and the chord and tangent drawn without their slopes
