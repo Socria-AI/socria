@@ -48,6 +48,19 @@
 .logos-root .ls-col.has-open { width: 420px; }
 .logos-root .ls-col.is-made { width: 270px; }
 .logos-root .ls-edges { position: absolute; left: 0; top: 0; z-index: 0; pointer-events: none; overflow: visible; }
+/* ZOOM (lib/logos5/spaceZoom.ts): the cards and their lines scaled as one from the top left; the layer around them is
+   sized to the zoomed space (L5Space sets it), so the canvas scrolls to every edge. The foot's clearance is divided by
+   the zoom, so what the chatbox covers can still be scrolled clear of it at any size. */
+.logos-root .ls-zoom { position: relative; }
+.logos-root .ls.is-zoomed .ls-cols { min-width: 0; transform-origin: 0 0; padding-bottom: calc((var(--ls-foot, 134px) + 56px) / var(--ls-k, 1)); }
+.logos-root .ls-zoom-keys { flex: none; align-self: center; display: inline-flex; align-items: center; gap: 2px; margin-right: -8px; }
+.logos-root .ls-zoom-keys button { min-width: 28px; height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 16px; line-height: 1; color: var(--c-ink-60); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
+.logos-root .ls-zoom-keys button.is-pct { min-width: 48px; font-size: 12.5px; }
+.logos-root .ls-zoom-keys button.is-fit { font-size: 12.5px; font-weight: 500; }
+.logos-root .ls-zoom-keys button:hover:not(:disabled) { background: rgba(var(--c-ink-rgb), 0.06); color: var(--c-ink); }
+.logos-root .ls-zoom-keys button:focus-visible { outline: 2px solid var(--c-moss, currentColor); outline-offset: 1px; }
+.logos-root .ls-zoom-keys button:disabled { cursor: default; opacity: 0.45; }
+.logos-root .ls-zoom-keys button.is-pct:disabled { opacity: 1; color: var(--c-ink-45, var(--c-ink-60)); }
 .logos-root .ls-ln path { fill: none; stroke: rgba(var(--c-ink-rgb), 0.3); stroke-width: 1.2; transition: stroke 0.2s; }
 .logos-root .ls-ln.is-back path { stroke: rgba(var(--c-ink-rgb), 0.09); }
 .logos-root .ls-thread { fill: none; stroke: var(--c-gold, #b8a26b); stroke-width: 1.4; stroke-dasharray: 5 5; }

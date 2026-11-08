@@ -3,3 +3,4 @@
 export * from '@/lib/logos5/ideas';
 export { canvasTurns } from '@/lib/logos5/canvas';
 export { L5Space } from '@/components/logos5/L5Space';
+export * from '@/lib/logos5/spaceZoom';

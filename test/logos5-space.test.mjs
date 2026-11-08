@@ -231,5 +231,23 @@ console.log('\n=== consistency pass: made things seen whole, enlarged, found ===
   ok('the paper is light again: its grain barely there (.055, was .18), and drawn once on the Universal Map', /0 0 0 \.055 0'\/%3E/.test(ctl) && /\.l5h-main \{ background-image: none; \}/.test(read('components/logos5/revision2.css')));
 }
 
+console.log('\n=== zooming the space (lib/logos5/spaceZoom.ts) ===');
+{
+  ok('a third to half as large again; a step of 1.2, through 100% exactly', S.SPACE_ZOOM.min === 0.35 && S.SPACE_ZOOM.max === 1.6 && S.zoomStep(1, -1) === 0.83 && S.zoomStep(0.83, 1) === 1 && S.zoomStep(1.2, -1) === 1 && S.zoomStep(1, 1) === 1.2);
+  ok('  never past either end', S.zoomStep(0.35, -1) === 0.35 && S.zoomStep(1.6, 1) === 1.6 && S.clampZoom(9) === 1.6 && S.clampZoom(0) === 0.35 && S.clampZoom(NaN) === 1);
+  ok('a pinch outward is smaller, inward larger, smoothly', S.zoomByWheel(1, 40) < 1 && S.zoomByWheel(1, -40) > 1 && Math.abs(S.zoomByWheel(1, 4) - 0.96) < 0.011);
+  ok('Fit: the whole space above the chatbox, never larger than 100%', S.fitZoom({ w: 2000, h: 600 }, { w: 1000, h: 900 }, 200) === 0.5 && S.fitZoom({ w: 800, h: 300 }, { w: 1400, h: 900 }, 200) === 1 && S.fitZoom({ w: 1000, h: 1352 }, { w: 1400, h: 900 }, 200) === 0.5);
+  ok('  and to the smallest when even that is not enough', S.fitZoom({ w: 9000, h: 600 }, { w: 1000, h: 900 }, 200) === 0.35);
+  const at = S.anchorScroll({ left: 100, top: 50 }, { x: 400, y: 300 }, 1, 2);
+  ok('the point zoomed about stays where it is', at.left === 600 && at.top === 400 && S.anchorScroll({ left: 0, top: 0 }, { x: 10, y: 10 }, 1, 0.5).left === 0);
+  ok('  the readout', S.zoomLabel(0.83) === '83%' && S.zoomLabel(1) === '100%');
+  ok('the keys sit in the row: −, the readout (back to 100%), +, Fit — on a wide screen only', /class="ls-zoom-keys" role="group" aria-label="Zoom the space"/.test(wide) && /aria-label="Zoom out"/.test(wide) && /aria-label="Zoom in"/.test(wide) && /class="is-pct"[^>]*>100%</.test(wide) && /class="is-fit"[^>]*>Fit</.test(wide) && !/ls-zoom-keys/.test(html(h(S.L5Space, props({ narrow: true })))));
+  const src = read('components/logos5/L5Space.tsx');
+  ok('  the cards and their lines scale as one, the scroll area sized to the zoomed space', /className="ls-zoom" style=\{zoom !== 1 && natural\.w \? \{ width: natural\.w \* zoom, height: natural\.h \* zoom \}/.test(src) && /transform: `scale\(\$\{zoom\}\)`/.test(src));
+  ok('  the lines measured in the space\'s own units, so they stay on their cards at any zoom', /\(r\.left - cr\.left\) \/ z/.test(src) && /h: r\.height \/ z/.test(src));
+  ok('  a pinch zooms about the pointer; pinched on out past the smallest, up to the Universal Map', /zoomByWheel\(k, e\.deltaY\), r \? \{ x: e\.clientX - r\.left, y: e\.clientY - r\.top \}/.test(src) && /e\.deltaY > 0 && k <= SPACE_ZOOM\.min/.test(src) && /pinchOut\(e, acc, Date\.now\(\)\) === 'move'\) zoomOutRef\.current\(\)/.test(src));
+  ok('  what the chatbox covers can be scrolled clear at any zoom', /padding-bottom: calc\(\(var\(--ls-foot, 134px\) \+ 56px\) \/ var\(--ls-k, 1\)\)/.test(read('components/logos5/space.css')));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

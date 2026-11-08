@@ -16,6 +16,7 @@ import { NodeGlyph } from '@/components/NodeGlyph';
 import type { LogosNodeType } from '@/lib/logos';
 import type { CanvasTurn } from '@/lib/logos5/canvas';
 import { pinchOut } from '@/lib/logos5/morph';
+import { anchorScroll, clampZoom, fitZoom, SPACE_ZOOM, zoomByWheel, zoomLabel, zoomStep } from '@/lib/logos5/spaceZoom';
 import { roman } from '@/lib/logos5/oneView';
 import {
   aroundOf,
@@ -183,6 +184,13 @@ export function L5Space({
   const colsRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
+  // ZOOM (lib/logos5/spaceZoom.ts): the cards and their lines drawn smaller or larger as one, by the keys in the row
+  // or a pinch. The scroll area is sized to the zoomed space, so every edge can still be scrolled to.
+  const [zoom, setZoom] = useState(1);
+  const zoomRef = useRef(zoom);
+  zoomRef.current = zoom;
+  const [natural, setNatural] = useState({ w: 0, h: 0 });
+  const pendingScroll = useRef<{ left: number; top: number } | null>(null);
 
   // ARRIVING (Revision IV): when the space opens — a line of thinking opened, or come back to — the cards settle
   // in reading order and then the lines draw. Once: the open idea changing within the line does not replay it.
@@ -204,23 +212,50 @@ export function L5Space({
     return () => el.removeEventListener('click', on);
   });
 
-  // ONE SPACE: a pinch outward goes up a level, to this line on the Universal Map (lib/logos5/morph.ts)
+  // A PINCH zooms the space about the pointer; pinched on out past its smallest, it goes up a level, to this line on
+  // the Universal Map (lib/logos5/morph.ts). A phone's feed is a column of cards and is not zoomed.
   const zoomOutRef = useRef(onZoomOut);
   zoomOutRef.current = onZoomOut;
+  const zoomTo = (next: number, at?: { x: number; y: number }) => {
+    const k = zoomRef.current;
+    const to = clampZoom(next);
+    const sc = scrollRef.current;
+    if (to === k || !sc) return;
+    const point = at ?? { x: sc.clientWidth / 2, y: Math.max(0, sc.clientHeight - footRef.current) / 2 };
+    pendingScroll.current = anchorScroll({ left: sc.scrollLeft, top: sc.scrollTop }, point, k, to);
+    setZoom(to);
+  };
+  const zoomToRef = useRef(zoomTo);
+  zoomToRef.current = zoomTo;
   useEffect(() => {
     const el = rootRef.current;
     if (!el) return;
     const acc = { n: 0, at: 0 };
     const on = (e: WheelEvent) => {
-      if (!zoomOutRef.current) return;
-      const r = pinchOut(e, acc, Date.now());
-      if (!r) return;
+      if (!e.ctrlKey) return;
       e.preventDefault();
-      if (r === 'move') zoomOutRef.current();
+      const k = zoomRef.current;
+      if (narrow || (e.deltaY > 0 && k <= SPACE_ZOOM.min)) {
+        if (zoomOutRef.current && pinchOut(e, acc, Date.now()) === 'move') zoomOutRef.current();
+        return;
+      }
+      acc.n = 0;
+      const sc = scrollRef.current;
+      const r = sc?.getBoundingClientRect();
+      zoomToRef.current(zoomByWheel(k, e.deltaY), r ? { x: e.clientX - r.left, y: e.clientY - r.top } : undefined);
     };
     el.addEventListener('wheel', on, { passive: false });
     return () => el.removeEventListener('wheel', on);
-  }, []);
+  }, [narrow]);
+  // the view kept on the point it was zoomed about, once the space has its new size
+  useLayoutEffect(() => {
+    const sc = scrollRef.current;
+    const want = pendingScroll.current;
+    if (!sc || !want) return;
+    pendingScroll.current = null;
+    sc.scrollLeft = want.left;
+    sc.scrollTop = want.top;
+  }, [zoom, natural]);
 
   const byId = useMemo(() => new Map(ideas.map((n) => [n.id, n])), [ideas]);
   const open = openId ? byId.get(openId) ?? null : null;
@@ -289,11 +324,13 @@ export function L5Space({
     const box = colsRef.current;
     if (!box || narrow) return;
     const cr = box.getBoundingClientRect();
+    // the boxes are measured as drawn (zoomed); the lines are drawn inside the zoomed space, so in its own units
+    const z = zoom || 1;
     const at = (k: string) => {
       const el = box.querySelector<HTMLElement>(`[data-k="${CSS.escape(k)}"]`);
       if (!el) return null;
       const r = el.getBoundingClientRect();
-      return { l: r.left - cr.left, t: r.top - cr.top, r: r.right - cr.left, b: r.bottom - cr.top, h: r.height };
+      return { l: (r.left - cr.left) / z, t: (r.top - cr.top) / z, r: (r.right - cr.left) / z, b: (r.bottom - cr.top) / z, h: r.height / z };
     };
     const lines: Drawn[] = [];
     for (const ln of links) {
@@ -332,7 +369,7 @@ export function L5Space({
       const ws = [...box.querySelectorAll<HTMLElement>('[data-w]')].sort((a, b) => Number(a.dataset.w) - Number(b.dataset.w));
       for (const w of ws) {
         const r = w.getBoundingClientRect();
-        pts.push(`${r.left - cr.left + r.width / 2} ${r.top - cr.top + r.height / 2}`);
+        pts.push(`${(r.left - cr.left + r.width / 2) / z} ${(r.top - cr.top + r.height / 2) / z}`);
       }
       if (pts.length > 1) thread = `M${pts.join(' L ')}`;
     }
@@ -352,6 +389,41 @@ export function L5Space({
     box.querySelectorAll('.ls-col').forEach((c) => ro.observe(c));
     return () => ro.disconnect();
   }, [narrow, ideas.length, brought.length, made.length, openKey]);
+  // the space's size at 100% (a transform does not change it): the zoomed scroll area is this times the zoom
+  useLayoutEffect(() => {
+    const box = colsRef.current;
+    if (!box || narrow) return;
+    const set = () => setNatural((n) => (n.w === box.offsetWidth && n.h === box.offsetHeight ? n : { w: box.offsetWidth, h: box.offsetHeight }));
+    set();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(set);
+    ro.observe(box);
+    return () => ro.disconnect();
+  }, [narrow]);
+  // FIT: the whole space — every card — in the view above the chatbox, from its top left
+  const fitSpace = () => {
+    const box = colsRef.current;
+    const sc = scrollRef.current;
+    if (!box || !sc) return;
+    const z = zoomRef.current;
+    const cr = box.getBoundingClientRect();
+    let right = 0;
+    let bottom = 0;
+    box.querySelectorAll<HTMLElement>('.ls-col').forEach((c) => {
+      const r = c.getBoundingClientRect();
+      right = Math.max(right, r.right - cr.left);
+      bottom = Math.max(bottom, r.bottom - cr.top);
+    });
+    const to = fitZoom({ w: right / z + 40, h: bottom / z + 16 }, { w: sc.clientWidth, h: sc.clientHeight }, footRef.current);
+    pendingScroll.current = { left: 0, top: 0 };
+    if (to === z) {
+      sc.scrollLeft = 0;
+      sc.scrollTop = 0;
+      pendingScroll.current = null;
+      return;
+    }
+    setZoom(to);
+  };
 
   // THE FOOT: the chatbox (and the note above it, when there is one) floats over the canvas's foot. Its height is
   // measured, never assumed, so the canvas always has room to scroll what it covers clear of it
@@ -411,8 +483,9 @@ export function L5Space({
       const right = left + r.width;
       const colEl = el.closest('.ls-col');
       const next = colEl?.nextElementSibling;
-      const gap = colsRef.current ? parseFloat(getComputedStyle(colsRef.current).columnGap) || 64 : 64;
-      const after = next instanceof HTMLElement && next.classList.contains('ls-col') ? gap + next.offsetWidth + 40 : 40;
+      // offsetWidth and the gap are the space's own units; the view is zoomed
+      const gap = (colsRef.current ? parseFloat(getComputedStyle(colsRef.current).columnGap) || 64 : 64) * zoom;
+      const after = next instanceof HTMLElement && next.classList.contains('ls-col') ? gap + next.offsetWidth * zoom + 40 : 40;
       const want = Math.min(Math.max(0, left - 40), Math.max(0, right + after - sc.clientWidth));
       if (Math.abs(sc.scrollLeft - want) > 4) sc.scrollLeft = want;
     }
@@ -453,7 +526,7 @@ export function L5Space({
     const sc = scrollRef.current;
     const col = colsRef.current?.querySelector<HTMLElement>(kind === 'made' ? '.ls-col.is-made' : '.ls-col.is-frame');
     if (!sc || !col) return;
-    const want = Math.max(0, col.offsetLeft - 40);
+    const want = Math.max(0, col.offsetLeft * zoomRef.current - 40);
     if (typeof sc.scrollTo === 'function') sc.scrollTo({ left: want, behavior: 'smooth' });
     else sc.scrollLeft = want;
   }, [kind, narrow]);
@@ -725,6 +798,22 @@ export function L5Space({
         </button>
       ))}
       <span className="ls-sp" />
+      {!narrow && (
+        <span className="ls-zoom-keys" role="group" aria-label="Zoom the space">
+          <button type="button" aria-label="Zoom out" title="Zoom out (or pinch)" onClick={() => zoomTo(zoomStep(zoom, -1))} disabled={zoom <= SPACE_ZOOM.min}>
+            −
+          </button>
+          <button type="button" className="is-pct" aria-label={`Zoom ${zoomLabel(zoom)}: back to 100%`} title="Back to 100%" onClick={() => zoomTo(1)} disabled={zoom === 1}>
+            {zoomLabel(zoom)}
+          </button>
+          <button type="button" aria-label="Zoom in" title="Zoom in (or pinch)" onClick={() => zoomTo(zoomStep(zoom, 1))} disabled={zoom >= SPACE_ZOOM.max}>
+            +
+          </button>
+          <button type="button" className="is-fit" aria-label="Fit the whole space on screen" title="Fit the whole space on screen" onClick={fitSpace}>
+            Fit
+          </button>
+        </span>
+      )}
       <button type="button" className="l5-link is-go ls-page" onClick={onPage}>
         {narrow ? 'As a conversation' : 'Read as a conversation'} <span className="l5-ar">→</span>
       </button>
@@ -812,13 +901,14 @@ export function L5Space({
   return (
     <div
       ref={rootRef}
-      className={`ls is-${kind}${arriving ? ' is-arriving' : ''}${threadOn ? ' has-thread' : ''}${hoverTurn !== null ? ' is-hovering' : ''}`}
+      className={`ls is-${kind}${arriving ? ' is-arriving' : ''}${threadOn ? ' has-thread' : ''}${hoverTurn !== null ? ' is-hovering' : ''}${zoom !== 1 ? ' is-zoomed' : ''}`}
       // the lines start drawing once the last card has settled
-      style={{ ['--ls-base' as string]: `${(ideas.length + brought.length + made.length + (placed ? 0 : 1)) * 70 + 300}ms` }}
+      style={{ ['--ls-base' as string]: `${(ideas.length + brought.length + made.length + (placed ? 0 : 1)) * 70 + 300}ms`, ['--ls-k' as string]: String(zoom) }}
     >
       {kindsEl}
       <div className="ls-canvas l5-dots" ref={scrollRef}>
-        <div className="ls-cols" ref={colsRef}>
+        <div className="ls-zoom" style={zoom !== 1 && natural.w ? { width: natural.w * zoom, height: natural.h * zoom } : undefined}>
+        <div className="ls-cols" ref={colsRef} style={zoom !== 1 ? { transform: `scale(${zoom})` } : undefined}>
           <svg className="ls-edges" width={drawn.w} height={drawn.h} aria-hidden="true">
             {drawn.lines.map((l, i) => (
               <g key={i} className={`ls-ln is-${l.dashed ? 'against' : l.kind}${l.back ? ' is-back' : ''}`} style={{ ['--j' as string]: i }}>
@@ -841,6 +931,7 @@ export function L5Space({
           ))}
           {!placed && <div className="ls-col has-open">{openEl}</div>}
           {made.length > 0 && <div className="ls-col is-made">{made.map((m) => thingEl(m, 'made'))}</div>}
+        </div>
         </div>
       </div>
       {chatEl}

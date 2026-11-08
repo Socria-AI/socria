@@ -614,6 +614,21 @@ were not re-judged: against a noise floor of 0.68 points, one re-generated reply
 ledger's spacing, any production model (the replies came from a stand-in, which obeys instructions more closely than
 some production models do), and cost. The judges are models too, and share some of a model's tastes, length among them.
 
+### 8.12 The space zooms
+
+A line of thinking's canvas could not be seen smaller: a long one ran off the screen and had to be scrolled to read
+its shape. It now zooms (`lib/logos5/spaceZoom.ts`, `components/logos5/L5Space.tsx`):
+
+- **The keys** sit in the row above the canvas, before "Read as a conversation": − and + step by 1.2 (through
+  100% exactly), the readout says the size and puts it back to 100% when pressed, and **Fit** shows every card above
+  the chatbox, never larger than 100%. A third (35%) to half as large again (160%).
+- **A pinch** (or Ctrl and the wheel) zooms smoothly about the pointer. Pinched on out past the smallest, it goes up a
+  level to the Universal Map, as a pinch out did before.
+- **The cards and their lines scale as one.** The lines are measured in the space's own units, so they stay on their
+  cards at any size; the layer around the cards is sized to the zoomed space, so every edge can still be scrolled to,
+  and the room under the chatbox is divided by the zoom, so what it covers can always be scrolled clear.
+- A phone's space is a column of cards, not a canvas, and has no keys.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its
