@@ -74,7 +74,8 @@ export interface SpaceThing {
   onOpen?: () => void;
 }
 
-const KIND_NAMES: Record<SpaceKind, string> = { all: 'Everything', ideas: 'Ideas', brought: 'Brought', made: 'Made', words: 'Words' };
+// the same names the views and the menus use: what you brought is Files, what Socria made is Artifacts
+const KIND_NAMES: Record<SpaceKind, string> = { all: 'Everything', ideas: 'Ideas', brought: 'Files', made: 'Artifacts', words: 'Words' };
 
 function KindGlyph({ k }: { k: SpaceKind }) {
   const p = { fill: 'none', stroke: 'currentColor', strokeWidth: 1.1 } as const;
@@ -181,6 +182,7 @@ export function L5Space({
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
   const openRef = useRef<HTMLDivElement>(null);
+  const chatRef = useRef<HTMLDivElement>(null);
 
   // ARRIVING (Revision IV): when the space opens — a line of thinking opened, or come back to — the cards settle
   // in reading order and then the lines draw. Once: the open idea changing within the line does not replay it.
@@ -351,6 +353,50 @@ export function L5Space({
     return () => ro.disconnect();
   }, [narrow, ideas.length, brought.length, made.length, openKey]);
 
+  // THE FOOT: the chatbox (and the note above it, when there is one) floats over the canvas's foot. Its height is
+  // measured, never assumed, so the canvas always has room to scroll what it covers clear of it
+  const footRef = useRef(0);
+  // Socria's reply — and the question it ends on — kept whole above the chatbox: it is what is read and answered, so it
+  // stays on screen even when that takes the idea above it partly out of view (a wide screen; a phone's feed scrolls on)
+  const keepReplyClear = (smooth = false) => {
+    const sc = scrollRef.current;
+    const el = openRef.current;
+    if (!sc || !el || narrow) return;
+    const sr = sc.getBoundingClientRect();
+    const r = el.getBoundingClientRect();
+    if (r.bottom < sr.top || r.top > sr.bottom - 80) return;
+    const bub = el.querySelector('.ls-bub')?.getBoundingClientRect() ?? r;
+    const over = r.bottom - (sr.bottom - (chatRef.current?.offsetHeight ?? footRef.current) - 20);
+    const room = bub.top - sr.top - 12;
+    // a hair under the box is not worth moving the view for; the reply's last line is
+    if (over <= 12 || room <= 0) return;
+    const top = sc.scrollTop + Math.min(over, room);
+    if (smooth && typeof sc.scrollTo === 'function') sc.scrollTo({ top, behavior: 'smooth' });
+    else sc.scrollTop = top;
+  };
+  const keepRef = useRef(keepReplyClear);
+  keepRef.current = keepReplyClear;
+  // once the cards have settled (they rise into place as the space opens, so their boxes move until then)
+  useEffect(() => {
+    if (!arriving) keepRef.current(true);
+  }, [arriving]);
+  useEffect(() => {
+    const chat = chatRef.current;
+    const root = rootRef.current;
+    if (!chat || !root || typeof ResizeObserver === 'undefined') return;
+    const set = () => {
+      const grew = chat.offsetHeight > footRef.current;
+      footRef.current = chat.offsetHeight;
+      root.style.setProperty('--ls-foot', `${chat.offsetHeight}px`);
+      // a note arriving above the box (or the box growing) would cover the reply's foot: keep it clear
+      if (grew) keepRef.current(true);
+    };
+    set();
+    const ro = new ResizeObserver(set);
+    ro.observe(chat);
+    return () => ro.disconnect();
+  }, [narrow]);
+
   // THE OPEN IDEA IN VIEW: brought into the space's view when it changes; its last words kept in view while it grows
   useLayoutEffect(() => {
     const sc = scrollRef.current;
@@ -359,14 +405,20 @@ export function L5Space({
     const sr = sc.getBoundingClientRect();
     const r = el.getBoundingClientRect();
     if (!narrow) {
-      // the open idea in full, and what comes right after it (what it made) when there is room for both
+      // the open idea in full, and the whole of the column after it (what it made) when there is room for both —
+      // it was allowed a fixed 320px, so a made card 270 wide sat cut by the screen's edge
       const left = r.left - sr.left + sc.scrollLeft;
       const right = left + r.width;
-      const want = Math.min(Math.max(0, left - 40), Math.max(0, right + 320 - sc.clientWidth));
+      const colEl = el.closest('.ls-col');
+      const next = colEl?.nextElementSibling;
+      const gap = colsRef.current ? parseFloat(getComputedStyle(colsRef.current).columnGap) || 64 : 64;
+      const after = next instanceof HTMLElement && next.classList.contains('ls-col') ? gap + next.offsetWidth + 40 : 40;
+      const want = Math.min(Math.max(0, left - 40), Math.max(0, right + after - sc.clientWidth));
       if (Math.abs(sc.scrollLeft - want) > 4) sc.scrollLeft = want;
     }
     const top = r.top - sr.top + sc.scrollTop;
     if (r.top < sr.top || r.top > sr.bottom - 80) sc.scrollTop = Math.max(0, top - 16);
+    else keepRef.current();
   }, [openKey, openTurn, narrow, kind, threadOn]);
   useEffect(() => {
     const sc = scrollRef.current;
@@ -375,7 +427,7 @@ export function L5Space({
     const ro = new ResizeObserver(() => {
       const sr = sc.getBoundingClientRect();
       const r = el.getBoundingClientRect();
-      const over = r.bottom - (sr.bottom - 150);
+      const over = r.bottom - (sr.bottom - Math.max(150, footRef.current + 32));
       if (over > 0) sc.scrollTop += over;
     });
     ro.observe(el);
@@ -384,6 +436,18 @@ export function L5Space({
 
   // THE ROW FINDS WHAT IT BRINGS FORWARD: Made scrolls the canvas to what was made, Brought to what was brought in —
   // they sit at its far edges, and were often off screen
+  useEffect(() => {
+    if (narrow || kind !== 'words') return;
+    // Words: the latest turn's words, which sit under the reply — brought up clear of the chatbox, not left behind it
+    const sc = scrollRef.current;
+    const words = colsRef.current?.querySelectorAll<HTMLElement>('.ls-word');
+    const last = words && words.length ? words[words.length - 1] : null;
+    if (!sc || !last) return;
+    const sr = sc.getBoundingClientRect();
+    const r = last.getBoundingClientRect();
+    const over = r.bottom - (sr.bottom - (chatRef.current?.offsetHeight ?? footRef.current) - 32);
+    if (over > 0 && typeof sc.scrollTo === 'function') sc.scrollTo({ top: sc.scrollTop + over, behavior: 'smooth' });
+  }, [kind, narrow]);
   useEffect(() => {
     if (narrow || (kind !== 'made' && kind !== 'brought')) return;
     const sc = scrollRef.current;
@@ -652,7 +716,8 @@ export function L5Space({
   };
   const kindsEl = (
     <nav className="ls-kinds" aria-label="Bring forward">
-      {(['all', 'ideas', 'brought', 'made', 'words'] as SpaceKind[]).map((k) => (
+      {/* a kind with nothing in it is not offered ("Files 0" brought nothing forward); the one chosen always stays */}
+      {(['all', 'ideas', 'brought', 'made', 'words'] as SpaceKind[]).filter((k) => k === 'all' || k === kind || (k === 'words' ? turns.length > 0 : Number(counts[k]) > 0)).map((k) => (
         <button key={k} type="button" data-kind={k} className={`ls-kd${kind === k ? ' is-on' : ''}`} aria-pressed={kind === k} onClick={() => setKind(k)}>
           {!narrow && <KindGlyph k={k} />}
           {KIND_NAMES[k]}
@@ -666,7 +731,7 @@ export function L5Space({
     </nav>
   );
   const chatEl = (
-    <div className="ls-chat">
+    <div className="ls-chat" ref={chatRef}>
       {composer}
     </div>
   );

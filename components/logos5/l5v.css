@@ -695,13 +695,16 @@
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.09);
 }
 .l5gs-kind {
-  flex: 0 0 auto;
-  min-width: 86px;
+  /* one column wide enough for its longest word ("Line of thinking"), so every result starts at the same place; said
+     in sentence case as written, not title-cased by the sheet */
+  flex: 0 0 116px;
+  overflow: hidden;
   padding-top: 1px;
   font-size: 12.5px;
-  font-weight: 600;
-  text-transform: capitalize;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  font-weight: 500;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
 }
 .l5gs-main {
   display: flex;

@@ -229,7 +229,7 @@ console.log('\n=== the poster draws every node and every edge ===');
     (svg.match(/<path /g) || []).length === map.edges.length, String((svg.match(/<path /g) || []).length));
   ok('the wordmark is there', svg.includes('SOCRIA.APP'));
   ok('the title is there', svg.includes('Should I take it?'));
-  ok('the context is in the eyebrow', svg.includes('THINKING MAP · DECIDING'));
+  ok('the context is in the eyebrow (the Logic Map, called what it is everywhere else)', svg.includes('LOGIC MAP · DECIDING'));
   ok('no undefined', !svg.includes('undefined'));
   ok('no NaN', !/\bNaN\b/.test(svg));
   ok('no CSS variables — a PNG has none', !svg.includes('var('));
@@ -261,7 +261,7 @@ console.log('\n=== an empty map still makes a poster, honestly ===');
   ok('says so', svg.includes('Nothing drawn yet.'));
   ok('still signed', svg.includes('SOCRIA.APP'));
   ok('no undefined', !svg.includes('undefined') && !/\bNaN\b/.test(svg));
-  ok('no context → plain eyebrow', svg.includes('>THINKING MAP<'));
+  ok('no context → plain eyebrow', svg.includes('>LOGIC MAP<'));
 }
 
 console.log('\n=== a conflict dashes, and the scenarios all draw ===');

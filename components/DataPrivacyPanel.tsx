@@ -163,7 +163,7 @@ export function DataPrivacyPanel() {
           <div>
             <dt>What you wrote</dt>
             <dd>
-              Your messages, your Thinking Maps, your drafts. Yours — delete any
+              Your messages, your Logic Maps, your drafts. Yours — delete any
               conversation from the sidebar and it goes, along with its map.
             </dd>
           </div>

@@ -30,7 +30,8 @@ export type { Viewport };
 export const VIEW_ORDER: readonly Viewport[] = ['chat', 'content', 'artifacts', 'logic_map'];
 
 export const VIEW_LABELS: Record<Viewport, string> = {
-  chat: 'Chat',
+  // the conversation is called what it is everywhere ("Read as a conversation", the split's name) — not Chat
+  chat: 'Conversation',
   // Logos 5: the view is called Files — what you brought; its id stays 'content'
   content: 'Files',
   artifacts: 'Artifacts',

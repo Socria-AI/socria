@@ -66,7 +66,9 @@ export const TIPS: readonly Tip[] = [
     kind: 'tip',
     title: 'Your thinking, as a map',
     body: 'Start in the box below. What you think through lands here as nodes: press one to see it, press again to open it, and drag the empty space to look around.',
-    anchor: '.l5h-empty .l5h-go, .l5b-hub',
+    // beside a node, once there is one: over an empty map it explained pressing nodes that were not there yet, and
+    // said again what the empty map's own line says
+    anchor: '.l5b-hub',
     clear: '.l5h-find',
     when: (c) => !!c.guest && c.where === 'home',
   },

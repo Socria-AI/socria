@@ -7422,7 +7422,7 @@ export function LogosApp({
         return { title: 'Conversation' };
       case 'map': {
         const lens = p.config?.lens ? LENSES.find((l) => l.id === p.config!.lens)?.label : null;
-        return { title: 'Thinking Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
+        return { title: 'Logic Map', sub: lens ?? (map.context ? CONTEXT_LABEL[map.context] : undefined) };
       }
       case 'model': {
         const v = p.config?.view && doc ? wsFacts.docs.find((d) => d.id === doc.id)?.views.find((x) => x.id === p.config!.view) : null;
@@ -7722,7 +7722,7 @@ export function LogosApp({
           {!limitNoteOff && atMapBoundary && (
             <div className="lg-one-note" role="note">
               <span className="lg-one-note-text">
-                <b>Your free Thinking Map has reached its limit.</b> Everything here
+                <b>Your free Logic Map has reached its limit.</b> Everything here
                 stays open — Socria One lets it keep growing with your thinking.
               </span>
               <button
@@ -7784,7 +7784,7 @@ export function LogosApp({
     <>
           <header className="lg-panel-head">
             <span className="lg-panel-title">
-              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Thinking Map'}
+              {shapes && shapes !== 'ideas' ? LENSES.find((l) => l.id === shapes)?.label : 'Logic Map'}
               {/* What kind of thinking this turned out to be — read from the
                   conversation, never chosen from a menu. */}
               {map.context && <em className="lg-panel-context">{CONTEXT_LABEL[map.context]}</em>}
@@ -8098,7 +8098,7 @@ export function LogosApp({
     // map's own (its view's actions), Synthesize is the Content and Logic Map views' own, and hiding the bars is gone
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
-    { label: 'Live guidance', hint: 'Point your camera and ask — Socria shows you how, on the picture · early access', onSelect: openGuide },
+    { label: 'Live guidance', hint: 'Socria shows you how, on your camera · early access', onSelect: openGuide },
     // while big-screen mode is on, the way out stays here, where it is looked for; the rest of the experiments are in Account
     ...(cabin ? [{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) }] : []),
     ...(handsWanted ? [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }] : []),
@@ -9108,7 +9108,7 @@ export function LogosApp({
           const body = (
             <>
               {ot && ot.replyAt !== undefined && messages[ot.replyAt] ? msgEl(messages[ot.replyAt], ot.replyAt, undefined, { listen: true }) : null}
-              {!ot && openNode ? <p className="ls-note">{openNode.detail || 'Put on the map as the conversation went.'}</p> : null}
+              {!ot && openNode ? <p className="ls-note">{openNode.detail || 'Drawn from the conversation. Ask about it below.'}</p> : null}
               {atNewest && streaming && (
                 <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />
               )}
@@ -9549,12 +9549,10 @@ export function LogosApp({
     // a guest: how many free messages are left, and the way to sign in, top right
     <div className="l5-guestacct">
       <span className={`l5-guestmeter${guestUsed >= GUEST_TURNS ? ' is-out' : ''}`} title={`Guests get ${GUEST_TURNS} free messages and one map`}>
-        <span className="l5-guestmeter-dots" aria-hidden="true">
-          {Array.from({ length: GUEST_TURNS }, (_, i) => (
-            <i key={i} className={i < guestUsed ? 'is-used' : ''} />
-          ))}
+        {/* said in words (the five dots before them only said it again, and to nobody using a screen reader) */}
+        <span className="l5-guestmeter-l">
+          {Math.max(0, GUEST_TURNS - guestUsed)} free {GUEST_TURNS - guestUsed === 1 ? 'message' : 'messages'} left
         </span>
-        <span className="l5-guestmeter-l">{Math.max(0, GUEST_TURNS - guestUsed)} free left</span>
         {/* a phone's meter, said in words: dots alone said nothing to anyone, a screen reader least of all */}
         <span className="l5-guestmeter-s">{Math.max(0, GUEST_TURNS - guestUsed)} left</span>
       </span>
@@ -10369,7 +10367,8 @@ export function LogosApp({
           )}
           <GuestWall open={guestWall && guest} spent={!guestSave && guest && guestUsed >= GUEST_TURNS} save={guestSave} signUpHref={signUpHref} signInHref={signInHref} onClose={closeGuestWall} />
           {/* floating only where the conversation's dock is not on screen to hold it */}
-          <GuestNudge open={nudgeOpen && !(convoOpen && !homeShown && !mindShown)} signUpHref={signUpHref} />
+          {/* not over a dialog: it sat above Search's dimmed page as if it were part of the results */}
+          <GuestNudge open={nudgeOpen && !(convoOpen && !homeShown && !mindShown) && searchOpen === null && !guideOpen && !oneOpen && !guestWall} signUpHref={signUpHref} />
           {searchOpen !== null && (
             <GlobalSearch
               sessions={sessions}

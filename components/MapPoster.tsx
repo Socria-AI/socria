@@ -274,7 +274,7 @@ export function posterScene(map: ThinkingMap, title: string): PosterScene {
   return {
     w: POSTER_W,
     h: POSTER_H,
-    eyebrow: context ? `Thinking Map · ${context}` : 'Thinking Map',
+    eyebrow: context ? `Logic Map · ${context}` : 'Logic Map',
     title: shown || 'A line of thinking',
     cards,
     edges,

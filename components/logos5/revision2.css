@@ -149,7 +149,9 @@
 /* Send: the surface's one filled control — "Send →"; nothing to send, a hairline ring */
 .logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary { width: auto; min-width: 0; height: 40px; padding: 0 18px; margin-bottom: 2px; }
 .logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary.is-waiting { width: 40px; padding: 0; }
-.logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary:disabled:not(.is-waiting) { background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); }
+/* Send with nothing to send: quiet but legible. A quarter-ink label under a 0.25 opacity (lg-send's own rule) came to
+   about 6% ink — the box's one button looked broken, not waiting */
+.logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary:disabled:not(.is-waiting) { background: transparent; color: var(--c-ink-45); box-shadow: inset 0 0 0 1px var(--c-ink-25); opacity: 1; }
 /* the foot */
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools.l5-compose-foot {
   display: flex;
@@ -270,6 +272,12 @@
 .logos-root .l5 .l5h-main .l5h-find-go { border: 0; background: var(--c-ink); box-shadow: none; color: var(--c-paper); }
 .logos-root .l5 .l5h-main .l5h-find-go:hover:not(:disabled) { border: 0; background: var(--c-moss); transform: translateY(-2px); }
 .logos-root .l5 .l5h-main .l5h-find-go:disabled { opacity: 1; background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); }
+/* The map ends where the box begins. The box is a ruled line with nothing behind it, so on a phone (and wherever the
+   map reached the foot) its words and keys were written straight over the bubbles. The paper now comes up under the
+   foot and the map fades into it; the map can still be dragged through it. */
+.logos-root .l5 .l5h-main .l5h-foot::before { content: ''; position: absolute; left: 0; right: 0; top: -40px; bottom: 0; z-index: -1; pointer-events: none; background: linear-gradient(to top, var(--c-paper) calc(100% - 40px), transparent); }
+/* a touch screen zooms with two fingers: on a phone the + − Fit keys only covered the map */
+@media (pointer: coarse) { .logos-root .l5 .l5h.is-narrow .l5h-zoom { display: none; } }
 /* the Universal Map is paper: the dot grid belongs behind a Logic Map only (Celestial keeps its own sky). The page
    under it already carries the paper's grain — drawn again here it doubled, and the home read as darker paper. */
 html:not([data-theme='dark']):not([data-theme='one']):not([data-theme='night']) .logos-root .l5 .l5h-main { background-image: none; }
@@ -334,3 +342,32 @@ html[data-l5-morph='in']::view-transition-new(root) { animation: l5-morph-arrive
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn i { width: 6px; height: 6px; background: #26485a; }
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn:hover { color: var(--c-ink); border: 0; }
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn.has-note { box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }
+
+/* ── a guest (GuestNudge, GuestWall): said plainly, in the page's own terms ──
+   The note for a guest out of messages was a toast: a badge in a tinted circle, a bold lead, a green pill. Now it is a
+   line on the paper, and its one action is the page's one filled control (ink, moss on hover), the same as Send and
+   the box's →. Inside the conversation it sits in the column above the box as a ruled line, not a card. */
+.logos-root .l5-guestnudge-spark { display: none; }
+.logos-root .l5-guestnudge { gap: 16px; padding: 10px 10px 10px 18px; border-color: var(--c-rule-2); border-radius: 0; background-color: var(--c-paper); background-image: var(--c-grain); color: var(--c-ink-70); }
+.logos-root .l5-guestnudge-t b { font-weight: 500; color: var(--c-ink); }
+.logos-root :is(.l5-guestnudge-go, .l5-guestwall-go) { background: var(--c-ink); color: var(--c-paper); transition: background-color 0.2s, transform 0.2s var(--c-ease); }
+.logos-root :is(.l5-guestnudge-go, .l5-guestwall-go):hover { filter: none; background: var(--c-moss); }
+.logos-root .l5-guestnudge.is-inline { padding: 0 0 10px; border: 0; border-bottom: 1px solid var(--c-rule); background: none; box-shadow: none; }
+.logos-root .l5-guestnudge.is-inline .l5-guestnudge-go { height: 32px; padding: 0 14px; font-size: 13px; }
+/* "← The space" before the views: set off from them by a hairline (it ran straight into the first tab: "The spaceChat") */
+.logos-root .l5 .l5v-top-c .l5-tospace { align-self: center; margin-right: 24px; padding-right: 24px; border-right: 1px solid var(--c-rule-2); white-space: nowrap; }
+/* More, in both headers: a word like Search and List beside it — the same size, weight and ink (on the Universal Map
+   an older rule let it inherit 16px, and in moss it read as an action it is not) */
+.logos-root .l5 :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-link { font-size: 13.5px; font-weight: 500; color: var(--c-ink-70); text-decoration: none; }
+.logos-root .l5 :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-link:is(:hover, [aria-expanded='true']) { color: var(--c-ink); }
+/* the guest's count: words on the paper, not a capsule */
+.logos-root .l5 .l5-guestmeter { height: auto; padding: 0; border: 0; background: none; font-size: 12.5px; }
+.logos-root .l5 .l5-guestmeter.is-out { color: var(--c-tension); }
+/* the inline guest note in the one space floats over the canvas, so it is paper there, not a bare line */
+.logos-root .ls-chat .l5-guestnudge.is-inline { padding: 8px 8px 8px 16px; border: 1px solid var(--c-rule-2); background-color: var(--c-paper); background-image: var(--c-grain); }
+/* the empty Universal Map: one line, and the way to the box said as a word in moss — not a dark banner that pointed at
+   the box below it (the box's own → is the surface's one filled control) */
+.logos-root .l5 .l5h-main .l5h-empty .l5h-go { min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-moss); font-size: 15.5px; font-weight: 500; }
+.logos-root .l5 .l5h-main .l5h-empty .l5h-go:hover:not(:disabled) { background: none; color: var(--c-ink); transform: none; box-shadow: none; }
+/* on a phone the note's action sat indented for a badge that is no longer drawn */
+@media (max-width: 600px) { .logos-root .l5-guestnudge-go { margin-left: 0; } }

@@ -17,9 +17,11 @@
 
 /* paper: the colours as Project Home draws them */
 .logos-root .l5 .l5h {
-  --sc-moss: #354620; --sc-clay: #b4694a; --sc-slate: #5c6b7a; --sc-ochre: #a9822a; --sc-plum: #7d5a86; --sc-ink: #3a3b33;
-  --sc-teal: #2f6f6a; --sc-rose: #a2546a; --sc-sky: #4a6fa5; --sc-sand: #8c7a55; --sc-none: #8b8f82;
-  --lk-study: #a9822a; --lk-deciding: #b4694a; --lk-planning: #8d7a43; --lk-learning: #354620; --lk-writing: #7d5a86; --lk-thinking: #8b8f82; --lk-chat: #b9b3a3;
+  /* each deep enough for the white title it carries to read at 4.5:1 or more (clay, ochre, sand and the neutral were
+     3.2–4.0: a subject's name on its own disc was the hardest thing on the map to read) */
+  --sc-moss: #354620; --sc-clay: #a35c3e; --sc-slate: #5c6b7a; --sc-ochre: #8f6f1f; --sc-plum: #7d5a86; --sc-ink: #3a3b33;
+  --sc-teal: #2f6f6a; --sc-rose: #a2546a; --sc-sky: #4a6fa5; --sc-sand: #7d6c48; --sc-none: #6c7064;
+  --lk-study: #8f6f1f; --lk-deciding: #a35c3e; --lk-planning: #7a6a38; --lk-learning: #354620; --lk-writing: #7d5a86; --lk-thinking: #6c7064; --lk-chat: #b9b3a3;
   --rc-0: #354620; --rc-1: #6f7f4f; --rc-2: #a9ae95; --rc-3: #cdc8b9;
   --l5h-gold: #b8a26b; --l5h-gold-rgb: 184, 162, 107; --l5h-gold-bg: #fbf6e8; --l5h-gold-ink: #6f5f2c; --l5h-gold-on: #fff;
   --l5h-danger: #a3492b; --l5h-made: #5c6b7a;
@@ -270,7 +272,6 @@
   border: 2px dashed color-mix(in srgb, var(--lg-primary) 55%, transparent);
   border-radius: 24px;
   background: color-mix(in srgb, var(--lg-paper) 72%, transparent);
-  backdrop-filter: blur(2px);
   pointer-events: none;
   animation: l5b-fade 0.18s ease-out both;
 }
@@ -2569,7 +2570,9 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   margin-left: -6px;
   border-radius: 4px;
   background: var(--lg-paper);
-  font-size: 11.5px;
+  /* never under 10.5px on screen: the map is drawn at its zoom (--k), and fitted to the window a subject's name came
+     out at six pixels */
+  font-size: max(11.5px, calc(10.5px / var(--k, 1)));
   font-weight: 600;
   letter-spacing: 0.2em;
   line-height: 14px;
@@ -2883,7 +2886,8 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   -webkit-line-clamp: var(--lines, 2);
   overflow: hidden;
   font-family: var(--l5-serif);
-  font-size: var(--f, 18px);
+  /* a title stays readable on screen (12px or more) when the map is zoomed out to fit */
+  font-size: max(var(--f, 18px), calc(12px / var(--k, 1)));
   line-height: 1.08;
   overflow-wrap: anywhere;
 }

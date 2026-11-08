@@ -27,8 +27,10 @@
   --c-tension: var(--lg-tension, #9c5b3c);
 
   --c-ink-70: rgba(var(--c-ink-rgb), 0.7);
-  --c-ink-60: rgba(var(--c-ink-rgb), 0.6);
-  --c-ink-45: rgba(var(--c-ink-rgb), 0.45);
+  /* the secondary inks, readable: 0.66 is the older sheets' --lg-ink-60 too (4.9:1 on paper — AA for small text; 0.6
+     was 4.0:1), and the quietest ink is 3.5:1 (0.45 was 2.7:1, under every timestamp, count and action word) */
+  --c-ink-60: rgba(var(--c-ink-rgb), 0.66);
+  --c-ink-45: rgba(var(--c-ink-rgb), 0.55);
   --c-ink-25: rgba(var(--c-ink-rgb), 0.25);
   --c-line: rgba(var(--c-ink-rgb), 0.3);     /* the ruled line you write on */
   --c-edge: rgba(var(--c-ink-rgb), 0.16);    /* kbd, avatar */
@@ -69,7 +71,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) :is(.logo
   cursor: pointer; transition: background-color 0.2s, transform 0.2s var(--c-ease);
 }
 :is(.logos-root, .lg-tokens) .l5-btn.is-primary:hover:not(:disabled) { background: var(--c-moss); color: var(--c-paper); transform: translateY(-2px); }
-:is(.logos-root, .lg-tokens) .l5-btn.is-primary:disabled { background: transparent; color: var(--c-ink-25); box-shadow: inset 0 0 0 1px var(--c-ink-25); cursor: default; transform: none; }
+:is(.logos-root, .lg-tokens) .l5-btn.is-primary:disabled { background: transparent; color: var(--c-ink-45); box-shadow: inset 0 0 0 1px var(--c-ink-25); cursor: default; transform: none; }
 :is(.logos-root, .lg-tokens) .l5-btn.is-primary.is-sm { height: 32px; padding: 0 14px; }
 
 /* ── words: every other action ───────────────────────────────────── */

@@ -19,7 +19,7 @@ const after = (text, now, narrow = false, o = {}) => V.afterSend(V.routeTurn({ t
 
 console.log('\n=== views: the four, and where a line of thinking opens ===');
 ok('the four views, in Alex’s order', J(V.VIEW_ORDER) === J(['chat', 'content', 'artifacts', 'logic_map']));
-ok('named Chat, Files, Artifacts, Logic Map — 5.5 calls Content "Files" (its id stays content)', J(Object.values(V.VIEW_LABELS)) === J(['Chat', 'Files', 'Artifacts', 'Logic Map']) && 'content' in V.VIEW_LABELS);
+ok('named Conversation, Files, Artifacts, Logic Map — 5.5 calls Content "Files" (its id stays content), and the conversation what it is everywhere', J(Object.values(V.VIEW_LABELS)) === J(['Conversation', 'Files', 'Artifacts', 'Logic Map']) && 'content' in V.VIEW_LABELS);
 ok('a line of thinking opens on Chat, nothing beside it', same(V.OPENING, S('chat')));
 ok('Split View puts the views themselves beside each other — no panels of its own', J(Object.keys(V.SPLIT_NAMES)) === J(['chat', 'content', 'artifacts', 'logic_map']) && V.SPLIT_SECTIONS === undefined);
 ok('…each named as its tab is (the conversation, beside, is "Conversation")', J(Object.values(V.SPLIT_NAMES)) === J(['Conversation', 'Files', 'Artifacts', 'Logic Map']));

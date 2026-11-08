@@ -497,6 +497,39 @@ button in AR Mode); anybody else sees a preview and the waitlist.
   soft flash marks each one leaving the device. An emergency card offers to call only the numbers its own words name.
   The sheet keeps to Logos 5's six type sizes and four corners, and `test/logos5-system.test.mjs` now holds it to them.
 
+### 8.10 The UX audit — desktop, tablet, phone; paper and dark
+
+Every surface was captured at 1440, 1280, 1024 and a phone, in Paper and Dark, and judged as a person would meet it.
+What was broken or inconsistent, and the rule it now keeps (`test/ux-audit-55.test.mjs` holds each one):
+
+- **Nothing is written over anything.** The Universal Map's box had no ground, so on a phone its words and keys sat on
+  the bubbles: the paper now comes up under the foot and the map fades into it (it can still be dragged through it);
+  a touch screen has no + − Fit keys (two fingers zoom). In the one space, Socria's reply ran under the chatbox and the
+  guest note, and Words' card sat behind the box: the canvas measures the box (`--ls-foot`), keeps the reply whole above
+  it once the cards settle, and Words brings the latest turn up. The canvas could never scroll down at all — its dot
+  grid's class, `.l5-dots`, is also the typing dots (inline-flex), which pinned the columns to the screen's height; it is
+  a block now. The open idea is framed with the whole column after it (a fixed 320px left made cards cut by the edge),
+  and the canvas's edges fade into the paper instead of slicing cards. "← The space" is set off from the views by a
+  hairline (it read "The spaceChat"); the floating guest note is never shown over a dialog.
+- **One name for each thing.** What you brought is **Files**, what Socria made is **Artifacts**, the map is the **Logic
+  Map**, the conversation is the **Conversation** — in the space's row (was Brought, Made), the board's column (was
+  "Brought and made"), the header's views (was Chat), the canvas filters, the asking-about line, the limit note, the
+  poster and privacy (were "Thinking Map").
+- **One system.** No blur behind any sheet (the Socria One sheet blurred the page; every other sheet dims it). The
+  secondary inks are readable: `--c-ink-60` is 0.66 (4.9:1 on paper, as the older sheets' `--lg-ink-60`) and
+  `--c-ink-45` is 0.55 (3.5:1; it was 2.7:1 under every timestamp, count and action word). More is a word the size and
+  ink of Search and List beside it. The guest's count is words ("3 free messages left"), not five dots that said it
+  again; the guest note is a line with the page's one filled control (ink, moss on hover), not a toast with a badge and a
+  green pill. Send with nothing to send is quiet but legible (a quarter ink under a quarter opacity read as broken). On
+  a dark ground the space's chatbox is the ground lifted a step, not white.
+- **The map reads at any zoom.** A subject's name stays 10.5px or more on screen and a title 12px or more however far
+  the map is zoomed out (`calc(… / var(--k))`); every subject colour carries a white title at 4.5:1 or more (clay, ochre,
+  sand and the neutral were 3.2–4.0).
+- **Less.** A kind with nothing in it is not offered in the space's row; the list says "Deciding · 2h" but not
+  "Thinking ·" on every row; the empty map says it once (its tip waits for a node, and its way to the box is a word in
+  moss, not a dark banner); search gives one row per finding — a message found only by its conversation's name is not
+  its own row — in sentence case and one column; an idea opened from no particular turn says what can be done.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

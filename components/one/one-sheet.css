@@ -38,9 +38,8 @@
 :is(.logos-root, .lg-tokens) .os-back {
   position: absolute;
   inset: 0;
+  /* the page dimmed, as every other sheet over Logos 5 dims it — not blurred (the workspace has no blur) */
   background: rgba(var(--os-shadow), 0.34);
-  backdrop-filter: blur(4px);
-  -webkit-backdrop-filter: blur(4px);
   animation: osFade 0.18s ease both;
 }
 

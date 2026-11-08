@@ -31,7 +31,18 @@
 
 /* ── the canvas ── */
 .logos-root .ls-canvas { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
-.logos-root .ls-cols { position: relative; display: flex; align-items: flex-start; gap: 64px; width: max-content; min-width: 100%; box-sizing: border-box; padding: 28px 40px 190px; }
+/* a block, whatever else the dot grid's class says: .l5-dots is also the typing dots (inline-flex), which stretched the
+   columns to exactly the canvas's height — so it could never scroll what the chatbox covers into view */
+.logos-root .ls-canvas.l5-dots { display: block; }
+.logos-root .ls-cols { position: relative; display: flex; align-items: flex-start; gap: 64px; width: max-content; min-width: 100%; box-sizing: border-box; padding: 28px 40px calc(var(--ls-foot, 134px) + 56px); }
+/* the space runs on past the screen's sides (and, scrolled, past its top): its edges fade into the paper, so a card the
+   view has not reached reads as more to come, not as a card cut in half */
+.logos-root .ls:not(.is-phone) .ls-canvas {
+  -webkit-mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent), linear-gradient(to bottom, transparent, #000 28px);
+  -webkit-mask-composite: source-in;
+  mask-image: linear-gradient(to right, transparent, #000 32px, #000 calc(100% - 32px), transparent), linear-gradient(to bottom, transparent, #000 28px);
+  mask-composite: intersect;
+}
 .logos-root .ls-col { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 14px; width: 240px; flex: none; }
 .logos-root .ls-col.is-frame { width: 270px; }
 .logos-root .ls-col.has-open { width: 420px; }
@@ -99,7 +110,7 @@
 .logos-root :is(.ls-open, .ls-bub) .l5-slice { display: none; }
 .logos-root :is(.ls-open, .ls-bub) .l5-acts { display: flex; align-items: center; gap: 18px; min-height: 28px; margin: 8px 0 0; padding: 0; opacity: 1; }
 .logos-root :is(.ls-open, .ls-bub) .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
-.logos-root :is(.ls-open, .ls-bub) .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-45); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
+.logos-root :is(.ls-open, .ls-bub) .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-60); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
 .logos-root :is(.ls-open, .ls-bub) .l5-act:hover { background: none; color: var(--c-ink); }
 .logos-root :is(.ls-open, .ls-bub) .l5-act svg { display: none; }
 .logos-root :is(.ls-open, .ls-bub) .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
@@ -145,6 +156,9 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-made,
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-open { background: rgba(var(--c-ink-rgb), 0.04); }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-file { background: rgba(var(--c-ink-rgb), 0.06); }
+/* the chatbox on a dark ground: the ground lifted a step, not white (--lg-panel-solid is not set there, so it fell
+   back to #fff and its pale words all but vanished) */
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .lg-composer-box { background: color-mix(in srgb, var(--c-paper) 92%, #fff); }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-idea.is-lit,
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-answering { background: rgba(var(--c-moss-rgb), 0.18); }
 

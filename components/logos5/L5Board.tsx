@@ -366,21 +366,21 @@ export function L5Board({
       {/* WHAT WAS BROUGHT AND MADE: cells between hairlines, each marking its turn — a strip while there is little in it */}
       {!besideOpen &&
         (slim ? (
-          <section className="lp-col lp-made is-slim" data-part="made" aria-label="Brought and made">
+          <section className="lp-col lp-made is-slim" data-part="made" aria-label="Files and artifacts">
             {cards.length ? (
               <button type="button" className="lp-strip" onClick={() => setMadeOpen(true)} aria-expanded={false} title="Show what was brought and made">
-                <span className="l5-label">Brought and made · {cards.length}</span>
+                <span className="l5-label">Files and artifacts · {cards.length}</span>
               </button>
             ) : (
               <span className="lp-strip is-empty">
-                <span className="l5-label">Brought and made · 0</span>
+                <span className="l5-label">Files and artifacts · 0</span>
               </span>
             )}
           </section>
         ) : (
-          <section className="lp-col lp-made" data-part="made" aria-label="Brought and made">
+          <section className="lp-col lp-made" data-part="made" aria-label="Files and artifacts">
             <header className="lp-head">
-              <span className="l5-label">Brought and made · {cards.length}</span>
+              <span className="l5-label">Files and artifacts · {cards.length}</span>
               {madeOpen && cards.length < 2 && (
                 <button type="button" className="l5-link is-meta" onClick={() => setMadeOpen(false)}>
                   Fold

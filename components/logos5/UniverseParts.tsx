@@ -96,10 +96,10 @@ export function ActIcon({ name }: { name: keyof typeof ACT_ICON }) {
   );
 }
 
-/** "Deciding · 2d" */
+/** "Deciding · 2d" — and only "2d" for plain thinking, the kind most lines are: said on every row, it said nothing */
 export function kindLine(t: Tile): string {
   const when = relTime(t.at);
-  return [t.lookSaid, when === 'now' ? 'just now' : when ? `${when} ago`.replace(/^(\w{3} \d+) ago$/, '$1') : ''].filter(Boolean).join(' · ');
+  return [t.look === 'thinking' ? '' : t.lookSaid, when === 'now' ? 'just now' : when ? `${when} ago`.replace(/^(\w{3} \d+) ago$/, '$1') : ''].filter(Boolean).join(' · ');
 }
 
 /** For a screen reader: what the tile says. */

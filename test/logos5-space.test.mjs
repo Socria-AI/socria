@@ -129,8 +129,8 @@ const props = (over = {}) => ({
   ...over,
 });
 const wide = html(h(S.L5Space, props()));
-ok('the row brings a kind forward: Everything, Ideas, Brought, Made, Words — buttons, not tabs', /class="ls-kinds"/.test(wide) && ['Everything', 'Ideas', 'Brought', 'Made', 'Words'].every((k) => wide.includes(`>${k}`)) && !/role="tab"/.test(wide) && /aria-pressed="true"/.test(wide));
-ok('  with counts: 6 ideas, 1 brought, 1 made, 3 turns', /Ideas<span class="ls-c">6<\/span>/.test(wide) && /Brought<span class="ls-c">1<\/span>/.test(wide) && /Made<span class="ls-c">1<\/span>/.test(wide) && /Words<span class="ls-c">3 turns<\/span>/.test(wide));
+ok('the row brings a kind forward: Everything, Ideas, Files, Artifacts, Words (the names the views use) — buttons, not tabs', /class="ls-kinds"/.test(wide) && ['Everything', 'Ideas', 'Files', 'Artifacts', 'Words'].every((k) => wide.includes(`>${k}`)) && !/role="tab"/.test(wide) && /aria-pressed="true"/.test(wide));
+ok('  with counts: 6 ideas, 1 file, 1 artifact, 3 turns', /Ideas<span class="ls-c">6<\/span>/.test(wide) && /Files<span class="ls-c">1<\/span>/.test(wide) && /Artifacts<span class="ls-c">1<\/span>/.test(wide) && /Words<span class="ls-c">3 turns<\/span>/.test(wide));
 ok('each kind its own card: ideas, a file with its folded corner, something made, the open idea', /class="ls-idea/.test(wide) && /class="ls-file"/.test(wide) && /class="ls-made"/.test(wide) && /class="ls-open"/.test(wide));
 ok('  Revision V: cards say what they are by glyph and colour, not by kind words or turn tags', !/<span class="ls-tn">turn ii<\/span>/.test(wide) && /class="ls-t"><span class="ls-k-g"/.test(wide) && /class="ls-t ls-tt">Payslip, October\.pdf/.test(wide));
 ok('  the open idea is the idea and what was made for it; Socria’s reply is its own bubble under it', /<h2 class="ls-stmt">[\s\S]*?A flatshare at £750<\/h2>/.test(wide) && /class="ls-bub has-tail[^"]*"[^>]*aria-label="Socria’s reply"/.test(wide) && /class="ls-bub-who"[\s\S]*?Socria/.test(wide) && /class="ls-bub[^"]*"[\s\S]*?class="reply"/.test(wide) && !/<b>You<\/b>/.test(wide));

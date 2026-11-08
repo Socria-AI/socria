@@ -64,7 +64,21 @@ export function GlobalSearch({
     };
   }, []);
   const index = useMemo(() => indexWorkspace(sessions, [...docs.values(), ...extra]), [sessions, docs, extra]);
-  const hits = useMemo(() => searchWorkspace(index, q, { limit: 30, now }), [index, q, now]);
+  const found = useMemo(() => searchWorkspace(index, q, { limit: 30, now }), [index, q, now]);
+  // a message found only by its conversation's name says nothing the conversation's own row does not (they came back
+  // one row per message, each reading the same title); and the same words twice in one conversation are one row
+  const hits = useMemo(() => {
+    const seen = new Set<string>();
+    return found.filter((h) => {
+      if (h.entity.kind !== 'message' && h.entity.kind !== 'passage') return true;
+      const words = (h.snippet || '').trim();
+      if (!words || words === (h.entity.title || '').trim()) return false;
+      const key = `${h.entity.session ?? ''}|${words}`;
+      if (seen.has(key)) return false;
+      seen.add(key);
+      return true;
+    });
+  }, [found]);
   useEffect(() => {
     input.current?.focus();
     const was = back.current;
@@ -128,7 +142,7 @@ export function GlobalSearch({
                 onPointerEnter={() => setAt(i)}
                 onClick={() => onPick(h)}
               >
-                <span className={`l5gs-kind is-${h.entity.kind}`}>{h.entity.sub && h.entity.kind === 'artifact' ? h.entity.sub : KIND_LABEL[h.entity.kind]}</span>
+                <span className={`l5gs-kind is-${h.entity.kind}`}>{h.entity.sub && h.entity.kind === 'artifact' ? h.entity.sub.charAt(0).toUpperCase() + h.entity.sub.slice(1) : KIND_LABEL[h.entity.kind]}</span>
                 <span className="l5gs-main">
                   <span className="l5gs-t">{h.entity.kind === 'message' || h.entity.kind === 'passage' ? h.snippet : h.entity.title}</span>
                   {h.entity.session && h.entity.kind !== 'conversation' && <span className="l5gs-s">{titleOf(h.entity.session)}</span>}

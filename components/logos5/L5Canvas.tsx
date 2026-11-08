@@ -37,8 +37,8 @@ export interface CanvasCard {
 const FILTERS: { id: CanvasFilter; label: string }[] = [
   { id: 'all', label: 'Everything' },
   { id: 'ideas', label: 'Ideas' },
-  { id: 'made', label: 'Made' },
-  { id: 'chats', label: 'Chats' },
+  { id: 'made', label: 'Artifacts' },
+  { id: 'chats', label: 'Conversations' },
 ];
 
 const editable = (t: EventTarget | null) => t instanceof HTMLElement && (t.isContentEditable || /^(INPUT|TEXTAREA|SELECT)$/.test(t.tagName));

@@ -1743,23 +1743,8 @@
   font-size: 12.5px;
   white-space: nowrap;
 }
-.logos-root .l5-guestmeter-dots {
-  display: inline-flex;
-  gap: 3px;
-}
 .logos-root .l5-guestmeter-s {
   display: none;
-}
-.logos-root .l5-guestmeter-dots i {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--lg-primary);
-  transition: background-color 0.3s ease, transform 0.3s ease;
-}
-.logos-root .l5-guestmeter-dots i.is-used {
-  background: var(--l5-hair, rgba(53, 70, 32, 0.18));
-  transform: scale(0.8);
 }
 .logos-root .l5-guestmeter.is-out {
   color: #9c5b3c;
@@ -1798,8 +1783,7 @@
   outline-offset: 2px;
 }
 @media (max-width: 600px) {
-  .logos-root .l5-guestmeter-l,
-  .logos-root .l5-guestmeter-dots {
+  .logos-root .l5-guestmeter-l {
     display: none;
   }
   .logos-root .l5-guestmeter-s {

@@ -142,7 +142,7 @@ ok('  an idea says what it does to another, in a line', b.includes('<span class=
 ok('  the one asked about says so in its label', /lp-node-k">Step<span class="lp-node-asking"> · asking about<\/span>/.test(b));
 ok('  the question first; steps on a rail — done, now, ahead; the lit one marked; the asked-about one pressed', /lp-node is-question/.test(b) && /lp-steps/.test(b) && /lp-step is-done/.test(b) && /lp-step is-now/.test(b) && /lp-step is-ahead/.test(b) && /lp-node is-step is-lit is-picked" aria-pressed="true"/.test(b));
 const one = board({ cards: [cards[1]] });
-ok('one thing brought or made: the right column is a strip, its name on end, pressed to open', /class="lp cam-chat has-slim"/.test(one) && /lp-made is-slim/.test(one) && one.includes('Brought and made · 1') && /class="lp-strip"/.test(one) && !one.includes('lp-cell'));
+ok('one thing brought or made: the right column is a strip, its name on end, pressed to open', /class="lp cam-chat has-slim"/.test(one) && /lp-made is-slim/.test(one) && one.includes('Files and artifacts · 1') && /class="lp-strip"/.test(one) && !one.includes('lp-cell'));
 ok('  nothing yet: a quiet strip; on the Files or Artifacts tab it opens whatever it holds', board({ cards: [] }).includes('lp-strip is-empty') && /lp-cell/.test(board({ cards: [cards[1]], camera: 'artifacts' })));
 const phone = board({ narrow: true });
 ok('a phone: the same page, marked for its panels; never a strip', /class="lp cam-chat is-phone"/.test(phone) && !board({ narrow: true, cards: [cards[1]] }).includes('lp-strip'));
@@ -151,7 +151,7 @@ ok('the conversation: its count and the turn being read', b.includes('The conver
 ok('  earlier turns folded to two lines: numeral, "You · …", Socria\'s question', (b.match(/l5-turn is-folded/g) || []).length === 2 && /<span class="l5-turn-n" aria-hidden="true">i\.<\/span>/.test(b) && b.includes('You · i need you to teach me rectangles') && b.includes('Which edge would you take the height from?'));
 ok('  the turn being read is open, with its numeral, and holds the turn as drawn', /l5-turn is-open" data-turn="2"/.test(b) && /iii\.<\/span><div class="l5-turn-body"><div class="OPEN">THE OPEN TURN<\/div>/.test(b));
 ok('  the chatbox at the foot of the conversation', /class="lp-compose"><div class="DOCK">THE CHATBOX<\/div>/.test(b));
-ok('brought and made: cells, each marking its turn; the turn being read\'s goes moss with a dot', b.includes('Brought and made · 2') && /l5-cell lp-cell is-content" data-part="content"/.test(b) && /l5-cell lp-cell is-artifact is-now" data-part="artifacts"/.test(b) && /lp-cell-n is-now"><span class="lp-dot"/.test(b) && b.includes('Turn i<') );
+ok('brought and made: cells, each marking its turn; the turn being read\'s goes moss with a dot', b.includes('Files and artifacts · 2') && /l5-cell lp-cell is-content" data-part="content"/.test(b) && /l5-cell lp-cell is-artifact is-now" data-part="artifacts"/.test(b) && /lp-cell-n is-now"><span class="lp-dot"/.test(b) && b.includes('Turn i<') );
 ok('  a drawing is shown, not used: inert; and it opens beside', /lp-inert" aria-hidden="true"><svg class="GRAPH"/.test(b) && b.includes('Open beside'));
 const first = board({ reading: 0 });
 ok('an earlier turn open: the others fold, and the reading says so', /l5-turn is-open" data-turn="0"/.test(first) && (first.match(/l5-turn is-folded/g) || []).length === 2 && first.includes('Reading turn i of iii'));
