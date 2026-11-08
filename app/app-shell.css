@@ -23,8 +23,8 @@
 
 .app-root *{box-sizing:border-box}
 .app-root{margin:0;background:
-  radial-gradient(760px 340px at 0% 0%,rgba(var(--moss-rgb, 94, 118, 51), .06),transparent 62%),
-  radial-gradient(660px 320px at 100% 100%,rgba(var(--moss-rgb, 94, 118, 51), .05),transparent 62%),var(--app-paper);
+  radial-gradient(760px 340px at 0% 0%,rgba(var(--moss-rgb, 53, 70, 32), .06),transparent 62%),
+  radial-gradient(660px 320px at 100% 100%,rgba(var(--moss-rgb, 53, 70, 32), .05),transparent 62%),var(--app-paper);
   color:var(--ink);font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);line-height:var(--leading-prose);
   -webkit-font-smoothing:antialiased;text-rendering:optimizeLegibility;min-height:100svh}
 .app-root h1, .app-root h2, .app-root h3{font-family:var(--font-serif, Georgia, serif);font-weight:400;margin:0;letter-spacing:-.02em;line-height:1.06}
@@ -51,7 +51,7 @@
 .app-root .field input{width:100%;background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:16px;
   padding:13px 16px;font-size:1rem;outline:none;transition:border-color .2s,box-shadow .2s}
 .app-root .field input::placeholder{color:var(--ink-70)}
-.app-root .field input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .13)}
+.app-root .field input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .13)}
 .app-root .stack{display:flex;flex-direction:column;gap:12px}
 .app-root .row-split{display:flex;align-items:center;gap:14px}
 .app-root .row-split .rule{flex:1}
@@ -207,7 +207,7 @@
   padding:8px 9px;border-radius:7px;font-size:13px;line-height:1.35;color:var(--ink-60);
   transition:background .18s,color .18s}
 .app-root .s-row:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .04);color:var(--ink)}
-.app-root .s-row.on{background:rgba(var(--moss-rgb, 94, 118, 51), .09);color:var(--ink)}
+.app-root .s-row.on{background:rgba(var(--moss-rgb, 53, 70, 32), .09);color:var(--ink)}
 .app-root .s-row .s-glyph, .app-root .s-row .s-gap{width:14px;flex:0 0 auto;margin-top:1px;color:var(--moss-600)}
 /* A line of thinking's mark: a small square with its map in it — one dot per
    node, joined to the first. Chats keep the same width of gap, so every title
@@ -215,14 +215,14 @@
 .app-root .s-row .s-gap{width:22px}
 .app-root .s-row{align-items:flex-start}
 .app-root .s-tile{flex:0 0 auto;display:inline-flex;align-items:center;justify-content:center;margin-top:-2px;
-  border-radius:6px;background:rgba(var(--moss-rgb, 94, 118, 51), .07);box-shadow:inset 0 0 0 1px rgba(var(--moss-rgb, 94, 118, 51), .2);color:var(--moss-600)}
+  border-radius:6px;background:rgba(var(--moss-rgb, 53, 70, 32), .07);box-shadow:inset 0 0 0 1px rgba(var(--moss-rgb, 53, 70, 32), .2);color:var(--moss-600)}
 .app-root .s-tile svg{display:block}
 .app-root .s-tile-edge{stroke:currentColor;stroke-width:.8;opacity:.42;stroke-linecap:round}
 .app-root .s-tile-edge.is-faint{opacity:.2}
 .app-root .s-tile-hub{fill:currentColor}
 .app-root .s-tile-node{fill:currentColor;opacity:.78}
-.app-root .s-row:hover .s-tile{background:rgba(var(--moss-rgb, 94, 118, 51), .11)}
-.app-root .s-row.on .s-tile{background:var(--surface, #fff);box-shadow:inset 0 0 0 1px rgba(var(--moss-rgb, 94, 118, 51), .38);color:var(--moss-700)}
+.app-root .s-row:hover .s-tile{background:rgba(var(--moss-rgb, 53, 70, 32), .11)}
+.app-root .s-row.on .s-tile{background:var(--surface, #fff);box-shadow:inset 0 0 0 1px rgba(var(--moss-rgb, 53, 70, 32), .38);color:var(--moss-700)}
 .app-root .s-glyph{display:inline-flex;align-items:center}
 .app-root .s-glyph svg{display:block}
 .app-root .s-row .t{flex:1;min-width:0;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
@@ -253,7 +253,7 @@
   transition:border-color .2s,transform .2s,background .2s;white-space:nowrap}
 .app-root .mp-btn:hover, .app-root .mp-btn.open{border-color:var(--moss-600);background:var(--surface, #fff);color:var(--ink);transform:translateY(-1px)}
 .app-root .mp-btn .dot{width:7px;height:7px;border-radius:50%;background:var(--moss-600);
-  box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .14);flex:0 0 auto}
+  box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .14);flex:0 0 auto}
 .app-root .mp-btn .nm{font-family:var(--font-serif, Georgia, serif);font-size:14.5px;letter-spacing:-.01em;color:var(--ink)}
 .app-root .mp-btn .sep{color:var(--ink-25)}
 .app-root .mp-btn svg{width:13px;height:13px;color:var(--ink-45);transition:transform .25s var(--ease-out-expo)}
@@ -272,7 +272,7 @@
 .app-root .mp-row{display:flex;flex-direction:column;gap:1px;width:100%;text-align:left;padding:7px 10px;
   border-radius:10px;transition:background .18s}
 .app-root .mp-row:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .04)}
-.app-root .mp-row.on{background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
+.app-root .mp-row.on{background:rgba(var(--moss-rgb, 53, 70, 32), .1)}
 .app-root .mp-row .does{font-family:var(--font-serif, Georgia, serif);font-size:1rem;line-height:1.15;color:var(--ink)}
 .app-root .mp-row.on .does{color:var(--moss-700)}
 .app-root .mp-row .meta{font-size:11.5px;line-height:1.4;color:var(--ink-60)}
@@ -304,8 +304,8 @@
   box-shadow:0 1px 3px rgba(var(--ink-rgb, 31, 31, 31), .28)}
 .app-root .mp-range::-moz-range-thumb{width:13px;height:13px;border-radius:50%;background:var(--paper);
   border:2px solid var(--moss-600);box-shadow:0 1px 3px rgba(var(--ink-rgb, 31, 31, 31), .28)}
-.app-root .mp-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .28)}
-.app-root .mp-range:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .28)}
+.app-root .mp-range:focus-visible::-webkit-slider-thumb{box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .28)}
+.app-root .mp-range:focus-visible::-moz-range-thumb{box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .28)}
 @media(prefers-reduced-motion:no-preference){
   .app-root .mp-range::-webkit-slider-thumb{transition:box-shadow .18s}
 }
@@ -420,15 +420,15 @@
 .app-root .turn-row .turn-acts{opacity:0;transition:opacity .15s;z-index:2}
 .app-root .turn-row:hover .turn-acts,.app-root .turn-row:focus-within .turn-acts{opacity:1}
 .app-root .turn-act{font:inherit;font-size:11.5px;color:rgba(28,26,22,.55);background:none;border:0;border-radius:999px;padding:3px 10px;cursor:pointer}
-.app-root .turn-act:hover,.app-root .turn-act:focus-visible{color:var(--moss-700,#4a5e28);background:rgba(94,118,51,.09);outline:none}
+.app-root .turn-act:hover,.app-root .turn-act:focus-visible{color:var(--moss-700, #354620);background:rgba(var(--moss-rgb, 53, 70, 32),.09);outline:none}
 @media(hover:none){.app-root .turn-row .turn-acts{opacity:.85}.app-root .turn-act{padding:4px 12px}}
 @media(prefers-reduced-motion:reduce){.app-root .turn-row .turn-acts{transition:none}}
 /* what a turn answers, quoted above it */
 .app-root .turn-quote{display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;max-width:85%;margin:0;padding:4px 10px;
   text-align:left;font:inherit;font-family:var(--sans,inherit);font-size:12.5px;line-height:1.45;color:rgba(28,26,22,.6);
-  background:rgba(28,26,22,.035);border:0;border-left:2px solid var(--moss-600,#5e7633);border-radius:4px 8px 8px 4px;cursor:pointer}
+  background:rgba(28,26,22,.035);border:0;border-left:2px solid var(--moss-600, #354620);border-radius:4px 8px 8px 4px;cursor:pointer}
 .app-root .turn-quote b{color:rgba(28,26,22,.92);font-weight:600;margin-right:3px}
-.app-root .turn-quote:hover:not(:disabled){background:rgba(94,118,51,.08)}
+.app-root .turn-quote:hover:not(:disabled){background:rgba(var(--moss-rgb, 53, 70, 32),.08)}
 .app-root .turn-quote:disabled{cursor:default}
 
 /* ---------- hints ----------
@@ -481,9 +481,9 @@
 .app-root .mp-row.gated .meta .nm{color:var(--ink-70)}
 .app-root .mp-row .need{flex:0 0 auto;font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:9.5px;font-weight:600;
   letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700);
-  border:1px solid rgba(var(--moss-rgb, 94, 118, 51), .45);border-radius:999px;padding:3px 9px;white-space:nowrap}
-.app-root .mp-need{margin:10px 14px 4px;padding:11px 13px;background:rgba(var(--moss-rgb, 94, 118, 51), .07);
-  border:1px solid rgba(var(--moss-rgb, 94, 118, 51), .28);font-size:12.5px;line-height:1.5;color:var(--ink-70)}
+  border:1px solid rgba(var(--moss-rgb, 53, 70, 32), .45);border-radius:999px;padding:3px 9px;white-space:nowrap}
+.app-root .mp-need{margin:10px 14px 4px;padding:11px 13px;background:rgba(var(--moss-rgb, 53, 70, 32), .07);
+  border:1px solid rgba(var(--moss-rgb, 53, 70, 32), .28);font-size:12.5px;line-height:1.5;color:var(--ink-70)}
 .app-root .mp-need strong{font-family:var(--font-serif, Georgia, serif);font-weight:400;color:var(--ink)}
 .app-root .mp-need em{font-style:italic;color:var(--moss-700)}
 .app-root .mp-need a{display:block;margin-top:7px;font-family:var(--font-serif, Georgia, serif);font-style:italic;
@@ -720,8 +720,8 @@
 .app-root .s-fold .chev:hover{color:var(--ink);background:rgba(var(--ink-rgb, 31, 31, 31), .06)}
 /* the Project whose home is open in the main pane */
 .app-root .s-fold .s-open.is-home .t{color:var(--ink);font-weight:500}
-.app-root .s-fold:has(.s-open.is-home){background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
-.app-root .s-fold.drop{background:rgba(var(--moss-rgb, 94, 118, 51), .14);outline:1px dashed var(--moss-600)}
+.app-root .s-fold:has(.s-open.is-home){background:rgba(var(--moss-rgb, 53, 70, 32), .1)}
+.app-root .s-fold.drop{background:rgba(var(--moss-rgb, 53, 70, 32), .14);outline:1px dashed var(--moss-600)}
 .app-root .s-kids{margin:0 0 4px 14px;padding-left:6px;border-left:1px solid var(--ink-12)}
 .app-root .s-kids .s-none{margin:6px 6px 8px;font-size:12px}
 .app-root .s-new-proj{margin:2px 0 6px}
@@ -743,7 +743,7 @@
 .app-root .mp-other{border:0;background:none;cursor:pointer;padding:5px 8px;border-radius:7px;
   font-family:var(--font-sans, system-ui, sans-serif);font-size:.82rem;color:var(--ink-60, rgba(31,31,31,.6))}
 .app-root .mp-other:hover{background:rgba(var(--ink-rgb, 31, 31, 31), .04);color:var(--ink)}
-.app-root .mp-other.on{background:rgba(var(--moss-rgb, 94, 118, 51), .1);color:var(--ink)}
+.app-root .mp-other.on{background:rgba(var(--moss-rgb, 53, 70, 32), .1);color:var(--ink)}
 
 /* Shared with you: the code field sits under the list, quietly */
 /* "Join with a code": a quiet row under New, opening the code popup */

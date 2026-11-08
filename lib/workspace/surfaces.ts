@@ -78,7 +78,7 @@ export interface SurfaceContract {
 
 export const SURFACES: Record<SurfaceType, SurfaceContract> = {
   chat: { type: 'chat', title: 'Conversation', represents: 'conversation', emits: [], responds: ['node', 'object', 'param', 'input'], duplicable: false, canBeStale: false, heavy: false },
-  map: { type: 'map', title: 'Thinking Map', represents: 'map', emits: ['node'], responds: ['node'], duplicable: true, canBeStale: true, heavy: true },
+  map: { type: 'map', title: 'Logic Map', represents: 'map', emits: ['node'], responds: ['node'], duplicable: true, canBeStale: true, heavy: true },
   model: { type: 'model', title: 'Model', represents: 'model', emits: ['object', 'input', 'param'], responds: ['object', 'param', 'input'], duplicable: true, canBeStale: true, heavy: true },
   params: { type: 'params', title: 'Parameters', represents: 'model', emits: ['param', 'input'], responds: ['param', 'input'], duplicable: false, canBeStale: false, heavy: false },
   inspector: { type: 'inspector', title: 'Inspector', represents: 'selection', emits: ['object'], responds: ['node', 'object', 'param', 'input'], duplicable: false, canBeStale: false, heavy: false },
@@ -247,11 +247,11 @@ export function suggestViews(facts: WorkspaceFacts, layout: WorkspaceLayout): Vi
   push({ type: 'chat', label: 'Conversation', why: 'talk it through — it knows what you have selected', score: 50 });
 
   if (facts.nodes > 0 || !doc) {
-    push({ type: 'map', label: 'Thinking Map', why: facts.nodes ? `${facts.nodes} idea${facts.nodes === 1 ? '' : 's'} so far, and how they connect` : 'the map builds as you talk', score: doc ? 60 : 90 });
+    push({ type: 'map', label: 'Logic Map', why: facts.nodes ? `${facts.nodes} idea${facts.nodes === 1 ? '' : 's'} so far, and how they connect` : 'the map builds as you talk', score: doc ? 60 : 90 });
     for (const lens of facts.lenses) {
       if (lens === 'graph' || lens === 'plot') continue;
       const name = LENSES.find((l) => l.id === lens)?.label ?? lens;
-      push({ type: 'map', config: { lens }, label: `Thinking Map · ${name}`, why: LENS_WHY[lens] ?? 'another way of reading the map', score: 70 });
+      push({ type: 'map', config: { lens }, label: `Logic Map · ${name}`, why: LENS_WHY[lens] ?? 'another way of reading the map', score: 70 });
     }
   }
 
@@ -883,7 +883,7 @@ export type ViewId = 'map' | 'plot' | 'model' | 'scene' | 'display' | 'params' |
 
 /** What each kind of view is called — in "+ View", and wherever the workspace titles a panel of it. */
 export const VIEW_NAMES: Record<ViewId, string> = {
-  map: 'Thinking Map',
+  map: 'Logic Map',
   plot: 'Math plotting',
   model: 'Modeling',
   scene: 'Studio (CAD)',

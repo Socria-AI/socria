@@ -605,10 +605,10 @@ console.log('\n=== the tiling primitives they use ===');
 
 console.log('\n=== every view, by name ===');
 {
-  ok('the catalogue, in order', VIEW_CATALOGUE.map((v) => v.name).join(' | ') === 'Thinking Map | Math plotting | Modeling | Studio (CAD) | Displays | Parameters | Inspector | Trace | Mind | Conversation', VIEW_CATALOGUE.map((v) => v.name).join(' | '));
+  ok('the catalogue, in order', VIEW_CATALOGUE.map((v) => v.name).join(' | ') === 'Logic Map | Math plotting | Modeling | Studio (CAD) | Displays | Parameters | Inspector | Trace | Mind | Conversation', VIEW_CATALOGUE.map((v) => v.name).join(' | '));
   ok('every kind of surface is in it', Object.keys(SURFACES).every((t) => VIEW_CATALOGUE.some((v) => v.type === t)));
   ok('Math plotting is the map’s plot lens, as a panel', VIEW_CATALOGUE.find((v) => v.id === 'plot').type === 'map' && VIEW_CATALOGUE.find((v) => v.id === 'plot').config?.lens === 'plot');
-  ok('the names', VIEW_NAMES.scene === 'Studio (CAD)' && VIEW_NAMES.model === 'Modeling' && VIEW_NAMES.plot === 'Math plotting' && VIEW_NAMES.map === 'Thinking Map');
+  ok('the names', VIEW_NAMES.scene === 'Studio (CAD)' && VIEW_NAMES.model === 'Modeling' && VIEW_NAMES.plot === 'Math plotting' && VIEW_NAMES.map === 'Logic Map');
   ok('a 3D panel is titled Studio (CAD) wherever the workspace titles it here', SURFACES.scene.title === 'Studio (CAD)' && suggestViews(bare, singleLayout('map')).find((v) => v.type === 'scene').label.startsWith('Studio (CAD)'));
   ok('which kind of view a panel is', viewOf({ type: 'map' }) === 'map' && viewOf({ type: 'map', config: { lens: 'plot' } }) === 'plot' && viewOf({ type: 'map', config: { lens: 'structure' } }) === 'map' && viewOf({ type: 'scene' }) === 'scene');
 

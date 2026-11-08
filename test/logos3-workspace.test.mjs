@@ -145,7 +145,7 @@ console.log('\n=== + View offers what the state supports, and nothing else ===')
   const a = suggestViews(factsFrom(argument), think);
   const at = a.map((v) => v.type);
   ok('an argument is offered no model, parameters or trace', !at.includes('model') && !at.includes('params') && !at.includes('trace'), at.join());
-  ok('  but is offered the map’s ways of reading it', a.some((v) => v.label === 'Thinking Map · Tensions') && a.some((v) => v.label === 'Thinking Map · Evidence'), a.map((v) => v.label).join(' | '));
+  ok('  but is offered the map’s ways of reading it', a.some((v) => v.label === 'Logic Map · Tensions') && a.some((v) => v.label === 'Logic Map · Evidence'), a.map((v) => v.label).join(' | '));
   ok('  each with a reason', a.every((v) => v.why.length > 8));
 
   const saddle = withDoc('saddle');

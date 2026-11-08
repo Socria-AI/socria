@@ -32,7 +32,7 @@
 }
 .rwb-i:hover { transform: scale(1.14); }
 .rwb-i:active { transform: scale(0.94); }
-.rwb-i:focus-visible { outline: 2px solid var(--moss, #5e7633); outline-offset: 1px; }
+.rwb-i:focus-visible { outline: 2px solid var(--moss, #354620); outline-offset: 1px; }
 .rwb-svg { position: relative; z-index: 1; overflow: visible; }
 
 /* a soft gold glow that breathes behind both */
@@ -52,7 +52,7 @@
   animation: rwbTurn 3.6s linear infinite;
 }
 .rwb-give .rwb-lid { transform-box: fill-box; transform-origin: 50% 100%; animation: rwbLid 4.2s ease-in-out infinite; }
-.rwb-ribbon { fill: #5e7633; }
+.rwb-ribbon { fill: var(--moss, #354620); }
 
 /* the challenge: its ring is their progress; a glint runs round it */
 .rwb-glint {

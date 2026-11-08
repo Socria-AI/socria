@@ -14,8 +14,8 @@
 
 .ob-first.obw {
   /* the brand book's palette (docs: Brand Book, 08 Colour): moss is the one green; paper, never pure white */
-  --obw-green: #5e7633; /* moss */
-  --obw-map: #5e7633;
+  --obw-green: var(--moss, #354620); /* moss: the one green */
+  --obw-map: var(--moss-tone, #5e7633); /* the map drawn in the moss tone */
   --obw-card: #f4f1e8; /* paper */
   --obw-card-hi: #e9e5d9; /* paper 2 */
   --obw-tint: #e4eada; /* moss 100 */

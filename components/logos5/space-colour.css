@@ -14,7 +14,7 @@
 
 .logos-root .ls {
   --ls-moss: #5e7633;
-  --ls-moss-ink: #465a26;
+  --ls-moss-ink: var(--c-moss, #354620); /* words in moss are the one green; --ls-moss stays the mid-tone, a tone among tones */
   --ls-slate: #3a6ea5;
   --ls-slate-ink: #2d5582;
   --ls-verm: #d8402f;
@@ -58,7 +58,7 @@
 
 /* IDEA, by what it is */
 .logos-root .ls-idea { gap: 6px; padding: 11px 13px 12px; background: var(--ls-card); }
-.logos-root .ls-idea[data-tone='yours'] { --ls-dot: var(--ls-moss); border-color: rgba(94, 118, 51, 0.28); }
+.logos-root .ls-idea[data-tone='yours'] { --ls-dot: var(--ls-moss); border-color: rgba(var(--moss-rgb, 53, 70, 32), 0.28); }
 .logos-root .ls-idea[data-tone='yours'] .ls-k { color: var(--ls-moss-ink); }
 .logos-root .ls-idea[data-tone='question'] { --ls-dot: var(--ls-mustard-dot); border-color: rgba(232, 182, 44, 0.55); background: var(--ls-tint-mustard); }
 .logos-root .ls-idea[data-tone='question'] .ls-k { color: var(--ls-mustard-ink); }

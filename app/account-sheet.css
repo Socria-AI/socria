@@ -16,7 +16,7 @@
 .acct-sheet .field input{width:100%;background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:16px;
   padding:13px 16px;font-size:1rem;outline:none;transition:border-color .2s,box-shadow .2s}
 .acct-sheet .field input::placeholder{color:var(--ink-70)}
-.acct-sheet .field input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .13)}
+.acct-sheet .field input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .13)}
 .acct-sheet .stack{display:flex;flex-direction:column;gap:12px}
 .acct-sheet .row-split{display:flex;align-items:center;gap:14px}
 .acct-sheet .row-split .rule{flex:1}
@@ -141,7 +141,7 @@
 .acct-sheet .access-form{display:flex;gap:8px}
 .acct-sheet .access-form input{flex:1;min-width:0;background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:999px;
   padding:9px 16px;font:inherit;font-size:.95rem;letter-spacing:.06em;color:var(--ink);outline:none}
-.acct-sheet .access-form input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51),.13)}
+.acct-sheet .access-form input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32),.13)}
 .acct-sheet .access-form button{border:1px solid var(--ink);border-radius:999px;background:none;padding:0 18px;font:inherit;font-size:.9rem;color:var(--ink);cursor:pointer}
 .acct-sheet .access-form button:disabled{opacity:.4;cursor:default}
 .acct-sheet .access-err{margin:0;font-size:.85rem;color:var(--machine)}
@@ -165,12 +165,12 @@
 .acct-sheet .rp-o{display:inline-flex;align-items:center;gap:6px;padding:6px 11px 6px 9px;border:1px solid var(--ink-16);border-radius:999px;
   background:none;cursor:pointer;font:inherit;font-size:.86rem;color:var(--ink)}
 .acct-sheet .rp-o svg{color:var(--moss-700, #3e5a23)}
-.acct-sheet .rp-o:hover{border-color:var(--moss, #5e7633)}
-.acct-sheet .rp-o.on{border-color:var(--moss, #5e7633);background:rgba(var(--moss-rgb, 94, 118, 51), .1)}
+.acct-sheet .rp-o:hover{border-color:var(--moss, #354620)}
+.acct-sheet .rp-o.on{border-color:var(--moss, #354620);background:rgba(var(--moss-rgb, 53, 70, 32), .1)}
 .acct-sheet .rp-note{flex-basis:100%;margin:6px 0 0;font-size:.76rem;color:var(--ink-70)}
 .acct-sheet .rp-name{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
 .acct-sheet .rp-name input{flex:1;min-width:0;max-width:260px;border:0;border-bottom:1px solid var(--ink-25);background:none;padding:6px 2px;font:inherit;font-size:1rem;color:var(--ink);outline:none}
-.acct-sheet .rp-name input:focus{border-bottom-color:var(--moss, #5e7633)}
+.acct-sheet .rp-name input:focus{border-bottom-color:var(--moss, #354620)}
 .acct-sheet .rp-name button{border:1px solid var(--ink-25);background:none;border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit;font-size:.82rem;color:var(--ink)}
 .acct-sheet .rp-name button:disabled{opacity:.4;cursor:default}
 .acct-sheet .rp-bad{font-size:.76rem;color:var(--tension, #9c5b3c)}
@@ -192,16 +192,16 @@
 .acct-sheet .cs-o{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:11px 13px 12px;
   border:1px solid var(--ink-16);border-radius:14px;background:none;font:inherit;color:var(--ink);cursor:pointer;
   transition:border-color .2s,background-color .2s}
-.acct-sheet .cs-o:hover{border-color:var(--moss, #5e7633)}
-.acct-sheet .cs-o:focus-visible{outline:2px solid var(--moss, #5e7633);outline-offset:2px}
-.acct-sheet .cs-o.on{border-color:var(--moss, #5e7633);background:rgba(var(--moss-rgb, 94, 118, 51), .08)}
+.acct-sheet .cs-o:hover{border-color:var(--moss, #354620)}
+.acct-sheet .cs-o:focus-visible{outline:2px solid var(--moss, #354620);outline-offset:2px}
+.acct-sheet .cs-o.on{border-color:var(--moss, #354620);background:rgba(var(--moss-rgb, 53, 70, 32), .08)}
 .acct-sheet .cs-name{display:flex;align-items:center;gap:7px;font-family:var(--font-serif, Georgia, serif);font-size:1rem;line-height:1.15}
 .acct-sheet .cs-o.on .cs-name{color:var(--moss-700, #3e5a23)}
 .acct-sheet .cs-tag{font-family:var(--font-sans, system-ui, sans-serif);font-size:.55rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
   color:var(--ink-70);border:1px solid var(--ink-12);border-radius:999px;padding:1px 6px}
 .acct-sheet .cs-line{font-size:.78rem;line-height:1.4;color:var(--ink-70)}
-.acct-sheet .cs-sample{margin:12px 0 0;padding:12px 14px 11px;border-left:2px solid var(--moss, #5e7633);
-  background:rgba(var(--moss-rgb, 94, 118, 51), .045);border-radius:0 12px 12px 0}
+.acct-sheet .cs-sample{margin:12px 0 0;padding:12px 14px 11px;border-left:2px solid var(--moss, #354620);
+  background:rgba(var(--moss-rgb, 53, 70, 32), .045);border-radius:0 12px 12px 0}
 .acct-sheet .cs-ask,
 .acct-sheet .cs-say{margin:0;display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;align-items:baseline}
 .acct-sheet .cs-ask{font-size:.82rem;line-height:1.45;color:var(--ink-70);padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid var(--ink-12)}
@@ -230,7 +230,7 @@
   border-radius:12px;padding:11px 13px;font:inherit;font-size:.92rem;line-height:1.45;color:var(--ink);outline:none;
   transition:border-color .2s,box-shadow .2s}
 .acct-sheet .persona-words textarea::placeholder{color:var(--ink-45)}
-.acct-sheet .persona-words textarea:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), .13)}
+.acct-sheet .persona-words textarea:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .13)}
 .acct-sheet .persona-row{display:flex;align-items:center;gap:14px;margin-top:9px;flex-wrap:wrap}
 .acct-sheet .persona-save{padding:7px 16px;border-radius:999px;background:var(--moss-700);color:var(--app-paper);font-size:.86rem;font-weight:500;
   transition:opacity .2s,background .2s}
@@ -253,7 +253,7 @@
 .acct-sheet .mr-note{font-size:.78rem;line-height:1.4;color:var(--ink-70);max-width:42ch}
 .acct-sheet .mr-switch{position:relative;flex:0 0 auto;width:40px;height:24px;margin-top:1px;border-radius:999px;
   border:1px solid var(--ink-25);background:var(--ink-12);cursor:pointer;transition:background-color .2s,border-color .2s}
-.acct-sheet .mr-switch:focus-visible{outline:2px solid var(--moss, #5e7633);outline-offset:2px}
+.acct-sheet .mr-switch:focus-visible{outline:2px solid var(--moss, #354620);outline-offset:2px}
 .acct-sheet .mr-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--ink-70);
   transition:transform .2s var(--ease-out-expo),background-color .2s}
 .acct-sheet .mr-switch.on{background:var(--moss-700, #3e5a23);border-color:var(--moss-700, #3e5a23)}
@@ -283,7 +283,7 @@
 .acct-sheet .mr-reset-no:hover{color:var(--ink)}
 .acct-sheet .mr-reset:focus-visible,
 .acct-sheet .mr-reset-yes:focus-visible,
-.acct-sheet .mr-reset-no:focus-visible{outline:2px solid var(--moss, #5e7633);outline-offset:2px}
+.acct-sheet .mr-reset-no:focus-visible{outline:2px solid var(--moss, #354620);outline-offset:2px}
 .acct-sheet .mr-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700, #3e5a23)}
 .acct-sheet .mr-status.is-bad{color:var(--tension, #9c5b3c)}
 @media (max-width:440px){.acct-sheet .mr-item{flex-direction:column;gap:2px}.acct-sheet .mr-when{text-align:left;white-space:normal}}

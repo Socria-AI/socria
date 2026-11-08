@@ -3,7 +3,7 @@
    tokens, so they are paper on Paper, dark on Dark, the sky's on Celestial. */
 
 .logos-root .l5tip {
-  --tip-green: #5e7633; /* moss */
+  --tip-green: var(--c-moss, #354620); /* moss: the one green */
   position: fixed;
   left: 0;
   top: 0;

@@ -103,7 +103,7 @@ export default function RootLayout({
       signUpFallbackRedirectUrl="/chat"
       appearance={{
         variables: {
-          colorPrimary: '#5e7633',
+          colorPrimary: '#354620',
           colorText: '#1F1F1F',
           colorTextSecondary: 'rgba(31,31,31,0.62)',
           colorBackground: '#ffffff',

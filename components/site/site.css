@@ -29,8 +29,8 @@
   --ink-45-journal: var(--ink-45);
   --ink-25-journal: var(--ink-25);
   --ink-12-journal: var(--ink-12);
-  --moss: #5e7633;
-  --moss-700: #465a26;
+  --moss: var(--lg-primary, #354620); /* the one green (globals.css :root) */
+  --moss-700: var(--lg-primary, #354620);
   --sage: #9cb874;
   --forest-2: #1a2410;
   /* tokens/one.css — the one surface that leaves the paper */
@@ -72,7 +72,7 @@
 .site-root *::after { box-sizing: border-box; }
 .site-root p { margin: 0; }
 .site-root a { color: var(--moss-700); text-decoration: none; }
-.site-root a:hover { color: var(--moss); }
+.site-root a:hover { color: var(--ink); }
 .site-root h1,
 .site-root h2,
 .site-root h3 { font-family: var(--serif); font-weight: 400; margin: 0; letter-spacing: -0.015em; line-height: 1; }
@@ -668,7 +668,7 @@
   color: var(--moss-700);
   cursor: pointer;
 }
-.s-replay:hover { color: var(--moss); }
+.s-replay:hover { color: var(--ink); }
 .s-demo {
   border: 1px solid var(--s-hair);
   border-radius: 12px;
@@ -949,7 +949,7 @@
   padding: 0 16px;
   border-bottom: 1px solid rgba(53, 70, 32, 0.08);
 }
-.s-o-row i { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: #354620; box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.14); }
+.s-o-row i { flex: 0 0 auto; width: 7px; height: 7px; border-radius: 50%; background: #354620; box-shadow: 0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), 0.14); }
 .s-o-row-t { flex: 1 1 auto; min-width: 0; font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
 .s-o-row-m { flex: 0 0 auto; font-size: 12px; color: rgba(35, 36, 31, 0.45); white-space: nowrap; }
 .s-o-fade { position: absolute; left: 0; right: 0; bottom: 0; height: 120px; background: linear-gradient(to bottom, rgba(245, 243, 235, 0), #f5f3eb); pointer-events: none; }
@@ -1080,7 +1080,7 @@
 }
 .s-charter .s-foot { margin-top: 96px; }
 .site-root .s-charter .s-foot-links a.is-pdf { color: var(--moss-700); }
-.site-root .s-charter .s-foot-links a.is-pdf:hover { color: var(--moss); }
+.site-root .s-charter .s-foot-links a.is-pdf:hover { color: var(--ink); }
 
 @media print {
   .s-grain,

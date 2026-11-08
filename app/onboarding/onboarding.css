@@ -157,7 +157,7 @@
 .ob-map .ph{position:absolute;left:14px;top:12px;font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:9.5px;font-weight:600;
   letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
 .ob-map .edges{position:absolute;inset:0;width:100%;height:100%;pointer-events:none}
-.ob-map .edges path{fill:none;stroke-width:1.4;stroke:rgba(94,118,51,.7)}
+.ob-map .edges path{fill:none;stroke-width:1.4;stroke:rgba(var(--moss-rgb, 53, 70, 32),.7)}
 .ob-map .edges path.dash{stroke:#E8B62C;stroke-dasharray:5 5}
 .ob-map .nd{position:absolute;max-width:min(54%,236px)}
 @media(prefers-reduced-motion:no-preference){
@@ -234,9 +234,9 @@
   transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
 .ob-card:hover,.ob-card:focus-visible{border-color:var(--moss);background:rgba(255,255,255,.85);transform:translateY(-1px);
   box-shadow:0 10px 26px -18px rgba(32,32,27,.45);outline:none}
-.ob-card.is-on{border-color:var(--moss);background:rgba(94,118,51,.08)}
+.ob-card.is-on{border-color:var(--moss);background:rgba(var(--moss-rgb, 53, 70, 32),.08)}
 .ob-card-ic{grid-row:1/3;display:inline-flex;align-items:center;justify-content:center;width:40px;height:40px;border-radius:11px;
-  background:rgba(94,118,51,.1);color:var(--moss-700)}
+  background:rgba(var(--moss-rgb, 53, 70, 32),.1);color:var(--moss-700)}
 .ob-card-t{font-family:var(--serif);font-size:1.3rem;line-height:1.1}
 .ob-card-d{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.8rem;line-height:1.35;color:var(--ink-60)}
 .ob-later{margin-top:18px;font-family:var(--serif);font-style:italic;font-size:1rem;color:var(--ink-45);background:none;border:none;padding:0;cursor:pointer;
@@ -270,14 +270,14 @@
 .ob-way{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:16px 16px 15px;border:1px solid var(--ink-12);border-radius:14px;
   background:rgba(255,255,255,.62);cursor:pointer;color:var(--ink);transition:border-color .2s,background .2s,transform .2s,box-shadow .2s}
 .ob-way:hover,.ob-way:focus-visible{border-color:var(--moss);background:rgba(255,255,255,.92);transform:translateY(-2px);box-shadow:0 12px 28px -20px rgba(32,32,27,.5);outline:none}
-.ob-way.is-on{border-color:var(--moss);background:rgba(94,118,51,.1);box-shadow:0 0 0 1px var(--moss) inset}
-.ob-way-ic{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;margin-bottom:6px;border-radius:12px;background:rgba(94,118,51,.12);color:var(--moss-700)}
+.ob-way.is-on{border-color:var(--moss);background:rgba(var(--moss-rgb, 53, 70, 32),.1);box-shadow:0 0 0 1px var(--moss) inset}
+.ob-way-ic{display:inline-flex;align-items:center;justify-content:center;width:42px;height:42px;margin-bottom:6px;border-radius:12px;background:rgba(var(--moss-rgb, 53, 70, 32),.12);color:var(--moss-700)}
 .ob-way.is-on .ob-way-ic{background:var(--moss);color:var(--paper)}
 .ob-way-t{font-family:var(--serif);font-size:1.28rem;line-height:1.1}
 .ob-way-d{font-family:var(--font-sans, system-ui, sans-serif),Inter,system-ui,sans-serif;font-size:.8rem;line-height:1.35;color:var(--ink-60)}
 /* the example, as a card under the field — something to take, not small print */
 .ob-eg-card{margin:14px 0 0;display:flex;flex-direction:column;align-items:flex-start;gap:6px;padding:14px 18px;border-left:3px solid var(--moss);
-  background:rgba(94,118,51,.06);border-radius:0 12px 12px 0}
+  background:rgba(var(--moss-rgb, 53, 70, 32),.06);border-radius:0 12px 12px 0}
 .ob-eg-card .ob-eg-k{font-size:10px}
 .ob-eg-card button{font-family:var(--serif);font-size:clamp(1.1rem,1.8vw,1.35rem);line-height:1.35;color:var(--ink);background:none;border:none;padding:0;text-align:left;cursor:pointer}
 .ob-eg-card button:hover{color:var(--moss-700)}

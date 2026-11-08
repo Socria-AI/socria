@@ -101,7 +101,7 @@ export function describeFocus(focus: Focus, map: ThinkingMap | null | undefined,
     return clip({
       kind: 'node',
       label: n.label,
-      of: 'the Thinking Map',
+      of: 'the Logic Map',
       lines: [
         `a ${n.type} on the map${n.status && n.status !== 'open' ? `, marked ${n.status}` : ''}`,
         ...(links.length ? [`connected: ${links.join('; ')}`] : ['not connected to anything yet']),
@@ -228,7 +228,7 @@ It is their writing. Talk about it with them — what it says, where it is uncle
         : b.kind === 'part'
           ? `part of ${b.of}, an object they are working on`
           : b.kind === 'node'
-            ? 'an idea on their Thinking Map'
+            ? 'an idea on their Logic Map'
             : b.kind === 'object'
               ? `a part of the model "${b.of}"`
               : b.kind === 'param'

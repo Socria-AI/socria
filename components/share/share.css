@@ -33,7 +33,7 @@
 
 .sh-add{display:flex;gap:8px;margin-top:18px}
 .sh-add input{flex:1;min-width:0;font:inherit;font-size:14px;padding:9px 12px;border:1px solid var(--ink-16);border-radius:10px;background:#fff;color:var(--ink)}
-.sh-add input:focus{outline:none;border-color:var(--moss);box-shadow:0 0 0 3px rgba(94,118,51,.14)}
+.sh-add input:focus{outline:none;border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32),.14)}
 .sh-add select,.sh-role,.sh-access select{font:inherit;font-size:12.5px;padding:7px 8px;border:1px solid var(--ink-16);border-radius:10px;background:var(--paper);color:var(--ink);cursor:pointer}
 .sh-role.is-fixed{border-color:transparent;background:none;color:var(--ink-45);cursor:default;padding:7px 0}
 @media (max-width: 480px){.sh-add{flex-wrap:wrap}.sh-add input{flex-basis:100%}}

@@ -178,6 +178,9 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 /* ── a phone: one column ── */
 .logos-root .ls.is-phone .ls-kinds { gap: 18px; height: 44px; padding: 0 16px; overflow-x: auto; scrollbar-width: none; }
 .logos-root .ls.is-phone .ls-kinds::-webkit-scrollbar { display: none; }
+/* the row runs on past a phone's edge (the way to the conversation as a page sits at its end): its edges fade into the
+   paper, as the canvas's do, so the last word reads as more to scroll to, not as a word cut in half */
+.logos-root .ls.is-phone .ls-kinds { -webkit-mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 12px, #000 calc(100% - 36px), transparent); }
 .logos-root .ls.is-phone .ls-kd { flex: none; gap: 5px; font-size: 13px; white-space: nowrap; }
 .logos-root .ls.is-phone .ls-page { flex: none; font-size: 12.5px; }
 .logos-root .ls-feed { flex: 1 1 auto; min-height: 0; overflow-y: auto; overscroll-behavior: contain; display: flex; flex-direction: column; gap: 9px; padding: 12px 16px 170px; }
@@ -225,7 +228,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-bub { position: relative; margin-top: 16px; padding: 12px 16px 10px; border: 1px solid rgba(var(--c-moss-rgb), 0.22); border-radius: 18px 18px 18px 6px; background: #fff; box-shadow: 0 1px 2px rgba(35, 36, 31, 0.05), 0 22px 44px -28px rgba(35, 36, 31, 0.5); }
 .logos-root .ls-bub.has-tail::before { content: ''; position: absolute; left: 44px; top: -8px; width: 14px; height: 14px; background: #fff; border-left: 1px solid rgba(var(--c-moss-rgb), 0.22); border-top: 1px solid rgba(var(--c-moss-rgb), 0.22); transform: rotate(45deg); }
 .logos-root .ls-bub:not(.has-tail) { margin-top: 0; }
-.logos-root .ls-bub-who { display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #465a26); }
+.logos-root .ls-bub-who { display: flex; align-items: baseline; gap: 7px; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #354620); }
 /* The name, not the mark: Socria in italic moss Instrument Serif. */
 .logos-root .ls-bub-name { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-style: italic; font-weight: 400; font-size: 19px; line-height: 1; letter-spacing: .005em; color: var(--ls-moss, #5e7633); }
 .logos-root .ls-bub-who .ls-tn { font-family: inherit; font-style: normal; font-size: 12px; font-weight: 500; }
@@ -246,7 +249,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
    pressed, they open as a thread — a column beside the space on a wide screen, a sheet on a phone. A reply
    hovered or focused lights what it made on the canvas. */
 .logos-root .ls-bub.has-earlier { margin-bottom: 14px; box-shadow: 0 6px 0 -3px #fbfaf5, 0 6px 0 -2px rgba(var(--c-moss-rgb), 0.2), 0 12px 0 -7px #f8f6ee, 0 12px 0 -6px rgba(var(--c-moss-rgb), 0.14), 0 1px 2px rgba(35, 36, 31, 0.05), 0 26px 44px -28px rgba(35, 36, 31, 0.5); }
-.logos-root .ls-earlier { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 3px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #465a26); cursor: pointer; transition: background 0.2s; }
+.logos-root .ls-earlier { margin-left: auto; display: inline-flex; align-items: center; gap: 6px; padding: 2px 9px 2px 3px; border: 0; border-radius: 999px; background: none; font: inherit; font-size: 12px; font-weight: 600; color: var(--ls-moss-ink, #354620); cursor: pointer; transition: background 0.2s; }
 .logos-root .ls-earlier:hover, .logos-root .ls-earlier[aria-expanded='true'] { background: rgba(var(--c-moss-rgb), 0.1); }
 .logos-root .ls-earlier:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 .logos-root .ls-earlier-n { display: inline-grid; place-items: center; min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; background: rgba(var(--c-moss-rgb), 0.14); font-size: 11px; font-variant-numeric: tabular-nums; }
@@ -269,7 +272,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-tchips { display: flex; flex-wrap: wrap; gap: 4px 12px; margin-top: 8px; }
 .logos-root .ls-tchip { display: inline-flex; align-items: center; gap: 6px; padding: 0; border: 0; background: none; font: inherit; font-size: 12px; font-weight: 500; cursor: pointer; text-align: left; }
 .logos-root .ls-tchip:hover { text-decoration: underline; text-underline-offset: 3px; }
-.logos-root .ls-tchip.is-lit { color: var(--ls-moss-ink, #465a26); }
+.logos-root .ls-tchip.is-lit { color: var(--ls-moss-ink, #354620); }
 .logos-root .ls-tchip.is-lit::before { content: ''; flex: none; width: 7px; height: 7px; border-radius: 50%; background: var(--ls-moss, #5e7633); }
 .logos-root .ls-tchip.is-made { color: var(--ls-verm-ink, #b03526); }
 .logos-root .ls-tchip.is-made::before { content: ''; flex: none; width: 7px; height: 7px; background: var(--ls-verm, #d8402f); }

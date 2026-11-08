@@ -12,7 +12,7 @@
   --d-ink-45: rgba(32, 32, 27, 0.45);
   --d-ink-25: rgba(32, 32, 27, 0.25);
   --d-line: rgba(53, 70, 32, 0.16);
-  --d-moss: #5e7633;
+  --d-moss: #354620; /* the one green */
   --d-moss-deep: #354620;
   --d-serif: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
   --d-sans: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
@@ -88,7 +88,7 @@
 }
 .docs-root .d-nav-link:hover { color: var(--d-ink); background: rgba(53, 70, 32, 0.05); }
 .docs-root .d-nav-link.is-active {
-  color: var(--d-moss-deep); font-weight: 600; background: rgba(94, 118, 51, 0.1);
+  color: var(--d-moss-deep); font-weight: 600; background: rgba(var(--moss-rgb, 53, 70, 32), 0.1);
 }
 
 .docs-root .d-main {
@@ -124,7 +124,7 @@
 .docs-root .d-article p { margin: 0 0 14px; }
 .docs-root .d-article ul, .docs-root .d-article ol { margin: 0 0 14px; padding-left: 22px; }
 .docs-root .d-article li { margin-bottom: 6px; }
-.docs-root .d-article a { color: var(--d-moss-deep); text-decoration: underline; text-decoration-color: rgba(94,118,51,.4); text-underline-offset: 2px; }
+.docs-root .d-article a { color: var(--d-moss-deep); text-decoration: underline; text-decoration-color: rgba(var(--moss-rgb, 53, 70, 32),.4); text-underline-offset: 2px; }
 .docs-root .d-article a:hover { text-decoration-color: var(--d-moss); }
 .docs-root .d-article strong { font-weight: 650; }
 .docs-root .d-article code {
@@ -576,7 +576,7 @@
   letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss-deep);
 }
 .docs-root .d-show-frame { position: relative; height: 330px; border: 1px solid var(--d-line); border-radius: 10px; overflow: hidden; background: #f4f1e8; }
-.docs-root .d-show-frame.is-scene { background: radial-gradient(120% 90% at 50% 0%, rgba(94,118,51,.07), transparent 70%), #f6f3ec; }
+.docs-root .d-show-frame.is-scene { background: radial-gradient(120% 90% at 50% 0%, rgba(var(--moss-rgb, 53, 70, 32),.07), transparent 70%), #f6f3ec; }
 .docs-root .d-show-frame .lx-plan { display: block; width: 100%; height: 100%; padding: 14px; color: var(--d-ink-45); }
 .docs-root .d-show-frame .lx-wait { display: grid; place-items: center; height: 100%; font-size: 13px; color: var(--d-ink-45); }
 .docs-root .d-show figcaption { font-size: 14px; line-height: 1.55; color: var(--ink-60, rgba(0,0,0,.62)); }

@@ -14,19 +14,22 @@
   --lg5-cue: #f6bf3f;
   --lg5-cue-deep: #d9901a;
   --lg5-edge: rgba(26, 22, 14, 0.55);
-  --lg5-paper: #f5f3eb;
-  --lg5-card: #fffdf7;
-  --lg5-ink: #23241f;
-  --lg5-ink-2: rgba(35, 36, 31, 0.74);
-  --lg5-ink-3: rgba(35, 36, 31, 0.5);
-  --lg5-rule: rgba(35, 36, 31, 0.12);
-  --lg5-moss: #5e7633;
-  --lg5-moss-ink: #465a26;
+  /* The card is "in the paper of Logos 5" — so it is drawn in the theme's tokens, read at the page's root because
+     the card is mounted over the whole page, outside the app: paper on Paper, dark on Dark, as every other sheet
+     (the consistency audit). Only the marks drawn on the camera keep fixed colours: they sit on a picture. */
+  --lg5-paper: var(--paper, #f5f3eb);
+  --lg5-card: var(--surface, #fffdf7);
+  --lg5-ink: var(--ink, #23241f);
+  --lg5-ink-2: rgba(var(--ink-rgb, 35, 36, 31), 0.74);
+  --lg5-ink-3: rgba(var(--ink-rgb, 35, 36, 31), 0.5);
+  --lg5-rule: rgba(var(--ink-rgb, 35, 36, 31), 0.12);
+  --lg5-moss: var(--moss, #354620);
+  --lg5-moss-ink: var(--moss-700, #354620);
   --lg5-verm: #c4432e;
   --lg5-skin: #f8efe2;
   --lg5-acc: #f6d77e;
-  --lg5-line: #2b2a25;
-  --lg5-serif: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  --lg5-line: var(--ink, #2b2a25);
+  --lg5-serif: var(--l5-serif, var(--serif));
   position: fixed;
   inset: 0;
   z-index: 300; /* over the app's own sheets and its search, under the hand pointer */
@@ -34,7 +37,7 @@
   flex-direction: column;
   background: #14130f;
   color: var(--lg5-ink);
-  font-family: var(--l5-sans, Inter, system-ui, sans-serif);
+  font-family: var(--l5-sans, var(--sans));
 }
 .lg5:not(.is-live) {
   align-items: center;
@@ -79,7 +82,7 @@
 .lg5 .sk-soft { fill: none; stroke: var(--lg5-line); stroke-width: 1.4; stroke-linecap: round; opacity: 0.42; }
 .lg5 .sk-cue { fill: none; stroke: var(--lg5-cue-deep); stroke-width: 3; stroke-linecap: round; stroke-linejoin: round; }
 .lg5 .sk-cue.is-faint { opacity: 0.5; }
-.lg5 .sk-shadow { fill: rgba(35, 36, 31, 0.08); }
+.lg5 .sk-shadow { fill: rgba(var(--shadow-rgb, 35, 36, 31), 0.08); }
 .lg5-intro-art .sk-screen { fill: #3a3932; }
 .lg5-intro-art .sk-onscreen { fill: #d8d0bb; }
 .lg5-intro-art .sk-onscreen-lid { fill: #dcbc5e; }
@@ -246,10 +249,10 @@
 .lg5-task { margin: 10px 0 2px; }
 
 .lg5-ctl { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--lg5-ink-2); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
-.lg5-ctl:hover:not(:disabled) { background: rgba(35, 36, 31, 0.06); color: var(--lg5-ink); }
+.lg5-ctl:hover:not(:disabled) { background: rgba(var(--ink-rgb, 35, 36, 31), 0.06); color: var(--lg5-ink); }
 .lg5-ctl:disabled { opacity: 0.3; cursor: default; }
 .lg5-ctl:focus-visible { outline: 2px solid var(--lg5-moss); outline-offset: 1px; }
-.lg5-ctl.is-on { color: var(--lg5-ink); background: rgba(94, 118, 51, 0.12); }
+.lg5-ctl.is-on { color: var(--lg5-ink); background: rgba(var(--moss-rgb, 53, 70, 32), 0.12); }
 
 .lg5-steps { list-style: none; margin: 4px 0 0; padding: 0; }
 .lg5-steps > li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 8px 0; }
@@ -257,7 +260,7 @@
 .lg5-steps.is-all > li { display: grid; }
 .lg5-num { display: inline-flex; align-items: center; justify-content: center; width: 24px; height: 24px; margin-top: 4px; border: 1.5px solid var(--lg5-rule); border-radius: 999px; box-sizing: border-box; font-size: 12.5px; font-weight: 600; color: var(--lg5-ink-3); }
 .is-now > .lg5-num { margin-top: 8px; border-color: var(--lg5-cue-deep); background: var(--lg5-cue-deep); color: #fff; }
-.is-done > .lg5-num { border-color: rgba(94, 118, 51, 0.5); }
+.is-done > .lg5-num { border-color: rgba(var(--moss-rgb, 53, 70, 32), 0.5); }
 .lg5-say { margin: 0; font-family: var(--lg5-serif); font-weight: 400; font-size: 32px; line-height: 1.08; color: var(--lg5-ink); text-wrap: pretty; animation: lg5-rise 0.4s cubic-bezier(0.2, 0.8, 0.2, 1) both; }
 .lg5-say-sm { margin: 3px 0 0; font-size: 15.5px; line-height: 1.4; color: var(--lg5-ink-2); }
 .is-later .lg5-say-sm { color: var(--lg5-ink-3); }
@@ -265,7 +268,7 @@
 .lg5-hint { margin: 10px 0 0; font-size: 13.5px; font-weight: 600; line-height: 1.4; color: #9a5a14; }
 .lg5-hint.is-adjust { color: var(--lg5-moss-ink); }
 .lg5-saw { margin: 12px 0 0; padding: 8px 12px 9px; border-left: 2px solid var(--lg5-cue-deep); border-radius: 0 6px 6px 0; background: rgba(246, 191, 63, 0.12); font-family: var(--lg5-serif); font-style: italic; font-size: 18px; line-height: 1.3; color: var(--lg5-ink); }
-.lg5-saw .l5-label { display: block; margin-bottom: 3px; font-family: var(--l5-sans, Inter, system-ui, sans-serif); font-style: normal; }
+.lg5-saw .l5-label { display: block; margin-bottom: 3px; font-family: var(--l5-sans, var(--sans)); font-style: normal; }
 .lg5-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 12px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--lg5-ink-2); }
 .lg5-unsure { display: flex; align-items: flex-start; gap: 9px; margin: 12px 0 0; font-size: 13.5px; font-style: italic; line-height: 1.45; color: var(--lg5-ink-2); }
 .lg5-unsure > span { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; margin-top: 1px; border: 1.5px solid currentColor; border-radius: 999px; box-sizing: border-box; font-size: 10.5px; font-style: normal; font-weight: 700; }
@@ -277,7 +280,7 @@
 
 /* the movement, drawn in the card when the picture cannot show it */
 .lg5-how { display: flex; align-items: center; gap: 14px; margin: 14px 0 0; }
-.lg5-how-card { flex: none; width: 96px; height: 96px; padding: 4px; box-sizing: border-box; border-radius: 10px; background: var(--lg5-card); box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 12px 24px -14px rgba(35, 36, 31, 0.5); rotate: -2deg; }
+.lg5-how-card { flex: none; width: 96px; height: 96px; padding: 4px; box-sizing: border-box; border-radius: 10px; background: var(--lg5-card); box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.06), 0 12px 24px -14px rgba(var(--shadow-rgb, 35, 36, 31), 0.5); rotate: -2deg; }
 .lg5-how-card .lg5-sk { width: 100%; height: 100%; }
 .lg5-how figcaption { font-family: var(--lg5-serif); font-style: italic; font-size: 18px; line-height: 1.25; color: var(--lg5-ink); }
 
@@ -307,30 +310,30 @@
 .lg5-ask { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; margin-top: 12px; }
 .lg5-ask > .lg5-note { flex-basis: 100%; margin: 0; }
 .lg5-field { position: relative; display: flex; flex: 1 1 220px; align-items: center; }
-.lg5-input { width: 100%; min-height: 48px; padding: 0 56px 0 16px; box-sizing: border-box; border: 1px solid rgba(35, 36, 31, 0.18); border-radius: 10px; background: #fff; font: inherit; font-size: 16px; color: var(--lg5-ink); }
-.lg5-input::placeholder { font-family: var(--lg5-serif); font-style: italic; font-size: 18px; color: rgba(35, 36, 31, 0.42); }
+.lg5-input { width: 100%; min-height: 48px; padding: 0 56px 0 16px; box-sizing: border-box; border: 1px solid rgba(var(--ink-rgb, 35, 36, 31), 0.18); border-radius: 10px; background: var(--lg5-card); font: inherit; font-size: 16px; color: var(--lg5-ink); }
+.lg5-input::placeholder { font-family: var(--lg5-serif); font-style: italic; font-size: 18px; color: rgba(var(--ink-rgb, 35, 36, 31), 0.42); }
 .lg5-input:focus-visible { outline: 2px solid var(--lg5-moss); outline-offset: 1px; }
 .lg5-input.has-mic { padding-right: 100px; }
-.lg5-mic { position: absolute; right: 50px; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 0; border-radius: 999px; background: rgba(35, 36, 31, 0.06); color: var(--lg5-ink); cursor: pointer; touch-action: none; user-select: none; }
+.lg5-mic { position: absolute; right: 50px; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 0; border-radius: 999px; background: rgba(var(--ink-rgb, 35, 36, 31), 0.06); color: var(--lg5-ink); cursor: pointer; touch-action: none; user-select: none; }
 .lg5-mic.is-on { background: var(--lg5-moss); color: #fff; animation: lg5-beat-moss 1.4s ease-out infinite; }
 /* the send button sits in the field, round and ink, as the chatbox's does */
 .lg5-send { position: absolute; right: 5px; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 0; border-radius: 999px; background: var(--lg5-ink); color: var(--lg5-paper); cursor: pointer; transition: background-color 0.2s, transform 0.2s; }
 .lg5-send:hover:not(:disabled) { background: var(--lg5-moss); transform: translateX(2px); }
-.lg5-send:disabled { background: rgba(35, 36, 31, 0.14); color: rgba(35, 36, 31, 0.45); cursor: default; }
+.lg5-send:disabled { background: rgba(var(--ink-rgb, 35, 36, 31), 0.14); color: rgba(var(--ink-rgb, 35, 36, 31), 0.45); cursor: default; }
 .lg5-send.is-busy { background: var(--lg5-moss); color: var(--lg5-paper); animation: lg5-beat-moss 1.4s ease-out infinite; }
 .lg5-send:focus-visible, .lg5-mic:focus-visible { outline: 2px solid var(--lg5-moss); outline-offset: 2px; }
 .lg5-ideas { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 12px; }
 .lg5-idea { min-height: 34px; padding: 0 13px; border: 1px solid var(--lg5-rule); border-radius: 999px; background: var(--lg5-card); color: var(--lg5-ink-2); font: inherit; font-size: 13.5px; cursor: pointer; transition: border-color 0.2s, color 0.2s; }
-.lg5-idea:hover { border-color: rgba(35, 36, 31, 0.3); color: var(--lg5-ink); }
+.lg5-idea:hover { border-color: rgba(var(--ink-rgb, 35, 36, 31), 0.3); color: var(--lg5-ink); }
 .lg5-howto { display: none; list-style: none; gap: 10px; margin: 24px 0 0; padding: 16px 0 0; border-top: 1px solid var(--lg5-rule); }
 .lg5-howto li { display: flex; align-items: center; gap: 10px; font-size: 13.5px; color: var(--lg5-ink-2); }
-.lg5-howto-n { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: rgba(94, 118, 51, 0.12); color: var(--lg5-moss-ink); font-size: 12.5px; font-weight: 600; }
+.lg5-howto-n { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 22px; height: 22px; border-radius: 999px; background: rgba(var(--moss-rgb, 53, 70, 32), 0.12); color: var(--lg5-moss-ink); font-size: 12.5px; font-weight: 600; }
 
 /* a phone held upright: the intro's drawing smaller, and its buttons always in reach */
 @media (max-width: 599px) {
   .lg5-intro { padding: 16px 20px 0; }
   .lg5-intro-art { max-width: 210px; }
-  .lg5-intro .lg5-row { position: sticky; bottom: 0; margin: 0 -20px; padding: 12px 20px max(14px, env(safe-area-inset-bottom)); background: var(--lg5-paper); box-shadow: 0 -10px 18px -14px rgba(35, 36, 31, 0.35); }
+  .lg5-intro .lg5-row { position: sticky; bottom: 0; margin: 0 -20px; padding: 12px 20px max(14px, env(safe-area-inset-bottom)); background: var(--lg5-paper); box-shadow: 0 -10px 18px -14px rgba(var(--shadow-rgb, 35, 36, 31), 0.35); }
 }
 
 /* a phone: the camera is the screen, so the card says less */
@@ -367,7 +370,7 @@
 @keyframes lg5-rock { 0%, 100% { rotate: -4deg; } 50% { rotate: 4deg; } }
 @keyframes lg5-shake { 0%, 100% { translate: -3px 0; } 50% { translate: 3px 0; } }
 @keyframes lg5-beat { 0% { box-shadow: 0 0 0 0 rgba(255, 90, 61, 0.55); } 70%, 100% { box-shadow: 0 0 0 7px rgba(255, 90, 61, 0); } }
-@keyframes lg5-beat-moss { 0% { box-shadow: 0 0 0 0 rgba(94, 118, 51, 0.45); } 70%, 100% { box-shadow: 0 0 0 8px rgba(94, 118, 51, 0); } }
+@keyframes lg5-beat-moss { 0% { box-shadow: 0 0 0 0 rgba(var(--moss-rgb, 53, 70, 32), 0.45); } 70%, 100% { box-shadow: 0 0 0 8px rgba(var(--moss-rgb, 53, 70, 32), 0); } }
 @keyframes lg5-seek { 0% { stroke-dashoffset: 1; opacity: 1; } 60% { stroke-dashoffset: 0; opacity: 1; } 100% { stroke-dashoffset: 0; opacity: 0; } }
 @keyframes lg5-flash { from { opacity: 0.26; } to { opacity: 0; } }
 @keyframes sk-nudge { 0%, 100% { translate: 0 0; } 50% { translate: 3px 0; } }

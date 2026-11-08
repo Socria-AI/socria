@@ -97,7 +97,7 @@
   flex: 1 1 220px; min-width: 0; font: inherit; font-size: 0.86rem; color: var(--ink);
   background: var(--surface, #fff); border: 1px solid var(--app-border); border-radius: 12px; padding: 9px 12px;
 }
-.acct-sheet .rw-link input:focus { outline: none; border-color: var(--moss); box-shadow: 0 0 0 3px rgba(var(--moss-rgb, 94, 118, 51), 0.13); }
+.acct-sheet .rw-link input:focus { outline: none; border-color: var(--moss); box-shadow: 0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), 0.13); }
 .acct-sheet .rw-link button {
   flex: 0 0 auto; font: inherit; font-size: 0.86rem; padding: 0 16px; border-radius: 12px; cursor: pointer;
   background: var(--ink); color: var(--app-paper); border: 1px solid var(--ink); min-width: 78px; min-height: 40px;
