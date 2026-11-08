@@ -1,0 +1,5473 @@
+{
+ "meta": {
+  "what": "Plan-audit golden set for the adaptive explanation engine (lib/runtime/explain.ts).",
+  "how": "Five independent authors (one per slice of turn types) wrote 27 items each in paraphrase groups of three, labelling what the engine SHOULD choose per the decision-ladder design, before the new engine was run on them. A second rater labelled every item blind to the author labels. Agreement on the need: 132/135 (Cohen kappa 0.97); the three disagreements (one group) accept either label.",
+  "labels": "expect.accept = needs accepted; include/exclude = moves that must / must not appear; level, ask, topic where the author was confident. rater = the blind second rater's labels, kept for audit.",
+  "caveat": "Labels encode one reading of the design by model raters, not human teachers. They test that the engine does what the design says, consistently; they are not evidence that any reply helps anyone learn."
+ },
+ "items": [
+  {
+   "id": "g-restraint-social-1",
+   "group": "g-restraint-social",
+   "text": "heyyy socria, how's your day going?",
+   "expect": {
+    "noLines": true,
+    "topic": "null",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A greeting with small talk has nothing to explain, so the reply should add nothing; the 'how' question is social, not a request for a mechanism.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-restraint-social-2",
+   "group": "g-restraint-social",
+   "text": "ok here's one for you: why did the scarecrow win an award? because he was outstanding in his field 😂",
+   "expect": {
+    "noLines": true,
+    "topic": "null",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "They are telling a joke and answer their own 'why' riddle, so this is banter to enjoy, not a why-question to explain.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-restraint-social-3",
+   "group": "g-restraint-social",
+   "text": "haha maybe later, thanks for the help!!",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i find the slope between (1,2) and (3,8)?"
+    },
+    {
+     "role": "assistant",
+     "content": "Slope is rise over run: how much y changes divided by how much x changes. [shown inline — steps: (8 − 2) / (3 − 1) → 6 / 2 → 3] So the slope is 3. Want to try one yourself? Find the slope between (0,1) and (2,7)."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "slope"
+    }
+   ],
+   "expect": {
+    "noLines": true,
+    "topic": "null",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "Socria's last turn asked a question, but a thank-you that turns down the offer is a pleasantry and not an answer, so this is not feedback and needs no teaching.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-restraint-emotional-1",
+   "group": "g-restraint-emotional",
+   "text": "my grandma passed away last night and i can't focus on anything",
+   "expect": {
+    "noLines": true,
+    "topic": "null",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "This is grief with no question in it, so the reply should be human and plain, with no teaching added.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-restraint-emotional-2",
+   "group": "g-restraint-emotional",
+   "text": "feeling really down today, idk why. everything just feels heavy",
+   "expect": {
+    "noLines": true,
+    "topic": "null",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "An emotional message where 'idk why' expresses a feeling rather than asking for causes, so there is nothing to explain.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-restraint-emotional-3",
+   "group": "g-restraint-emotional",
+   "text": "got my chem exam back. 41%. i studied for two weeks straight and i just feel stupid",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "They are sharing disappointment, not showing working or asking anything, so there is no attempt to give feedback on and no question to explain.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-plainfact-1",
+   "group": "g-restraint-plainfact",
+   "text": "what year did the french revolution start",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A bare one-fact question with no sign they are studying it should get the plain fact, with nothing added.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-plainfact-2",
+   "group": "g-restraint-plainfact",
+   "text": "settling a bet with my brother — when did the French Revolution start?",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "They want a fact to settle a bet, not to learn the topic, so restraint applies.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-plainfact-3",
+   "group": "g-restraint-plainfact",
+   "text": "pub quiz tonight, need to double check: french revolution started in what year?",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A quick fact check for a quiz night is a plain fact asked by someone not learning it, so it gets the answer only.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-hurry-1",
+   "group": "g-restraint-hurry",
+   "text": "exam in 10 minutes, what's the formula for the volume of a cone??",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "They are out of time and need just the formula now, so teaching would get in the way.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-hurry-2",
+   "group": "g-restraint-hurry",
+   "text": "no explanation pls, just the formula for the volume of a cone",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "They explicitly ask for no explanation, which is the 'just tell me' form of restraint.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-hurry-3",
+   "group": "g-restraint-hurry",
+   "text": "walking into my test rn — cone volume formula?? quick",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "Being in a hurry before a test means the bare formula is the whole reply.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-handover-1",
+   "group": "g-restraint-handover",
+   "text": "can you just solve this for me? 4x + 9 = 37",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A handover ('just solve this for me') with no Answer Guard asks for the result, not a lesson.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-handover-2",
+   "group": "g-restraint-handover",
+   "text": "I'm a mathematician, just compute the determinant of [[2, 1], [5, 3]] for me, no need to walk me through it",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "An expert handing over a computation and refusing a walkthrough wants only the number.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "level": "expert"
+   }
+  },
+  {
+   "id": "g-restraint-handover-3",
+   "group": "g-restraint-handover",
+   "text": "do this one for me pls, I only need the final answer: 4x + 9 = 37",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "They hand the task over and ask for only the final answer, so restraint applies.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-make-1",
+   "group": "g-restraint-make",
+   "text": "write me a 500 word essay on the causes of WW1",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A request to write an essay is a make request, even though the topic is about causes, so no explanation strategy is added.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-make-2",
+   "group": "g-restraint-make",
+   "text": "can u draft a polite email to my landlord, the heating's been broken for a week",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "Drafting an email is a request to make something, not to understand something.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-make-3",
+   "group": "g-restraint-make",
+   "text": "write a python function that checks if a string is a palindrome",
+   "expect": {
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "Asking for code to be written is a make request, so the reply delivers the code with no teaching added.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-expert-1",
+   "group": "g-restraint-expert",
+   "text": "I'm a cardiologist, what's the LDL target for very-high-risk patients in the current ESC guidelines?",
+   "expect": {
+    "noLines": true,
+    "level": "expert",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A self-declared expert asking a one-sentence question in their own field wants the answer, not an explanation.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "level": "expert"
+   }
+  },
+  {
+   "id": "g-restraint-expert-2",
+   "group": "g-restraint-expert",
+   "text": "as a structural engineer i should know this, but what's the yield strength of A36 steel in MPa?",
+   "expect": {
+    "noLines": true,
+    "level": "expert",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "An engineer asking for a reference value in their own field gets the number with no teaching.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "level": "expert"
+   }
+  },
+  {
+   "id": "g-restraint-expert-3",
+   "group": "g-restraint-expert",
+   "text": "I teach intro stats — does R's prop.test apply Yates' continuity correction by default?",
+   "expect": {
+    "noLines": true,
+    "level": "expert",
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "Someone who teaches statistics is asking a one-line question in that field, so a plain answer is right.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct",
+    "level": "expert"
+   }
+  },
+  {
+   "id": "g-restraint-quickwhy-1",
+   "group": "g-restraint-quickwhy",
+   "text": "quick question: why does ice float?",
+   "expect": {
+    "ask": "why",
+    "topic": "ice",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain",
+     "direct"
+    ]
+   },
+   "why": "'Quick question' is only a preamble: a why-question about a mechanism is not a plain fact, so it needs a first causal explanation.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-quickwhy-2",
+   "group": "g-restraint-quickwhy",
+   "text": "real quick, why does ice float on water instead of sinking",
+   "questions": 0,
+   "expect": {
+    "ask": "why",
+    "topic": "ice",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "elaborate",
+     "selfexplain",
+     "spaced",
+     "teachback",
+     "interleave"
+    ],
+    "accept": [
+     "explain",
+     "direct"
+    ]
+   },
+   "why": "Calling it 'real quick' does not ask for restraint; it is still a why-question that needs causes explained, and with questions:0 no prompting strategy may appear.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-quickwhy-3",
+   "group": "g-restraint-quickwhy",
+   "text": "just a quick one: why does ice float?",
+   "length": "concise",
+   "expect": {
+    "ask": "why",
+    "topic": "ice",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain",
+     "direct"
+    ]
+   },
+   "why": "A concise length setting shortens the explanation but does not turn a why-question into restraint.",
+   "slice": "restraint",
+   "rater": {
+    "need": "direct"
+   }
+  },
+  {
+   "id": "g-restraint-studyfact-1",
+   "group": "g-restraint-studyfact",
+   "text": "we're doing the french revolution in history this term. when exactly did it start?",
+   "expect": {
+    "topic": "revolution",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "The same fact as the plain-fact group, but they say they are learning the topic, so the restraint rung (which needs someone not learning it) does not apply.",
+   "slice": "restraint",
+   "rater": {
+    "need": "explain",
+    "topic": "revolution",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-restraint-studyfact-2",
+   "group": "g-restraint-studyfact",
+   "text": "for my history homework: when did the French Revolution begin?",
+   "expect": {
+    "topic": "revolution",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask a fact for homework, which is study and not a handover or make request, so it gets a first explanation rather than a bare answer.",
+   "slice": "restraint",
+   "rater": {
+    "need": "explain",
+    "topic": "revolution",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-restraint-studyfact-3",
+   "group": "g-restraint-studyfact",
+   "text": "revising for my history mock — what year did the french revolution start? i keep mixing it up with the american one",
+   "expect": {
+    "topic": "revolution",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A learner revising, with no hurry, who says they keep mixing the fact up needs it explained so it sticks; with no ledger entry, retrieval is not allowed.",
+   "slice": "restraint",
+   "rater": {
+    "need": "explain",
+    "topic": "revolution",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-after-analogy-1",
+   "group": "g-confusion-after-analogy",
+   "text": "I still don't get it",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's voltage actually?"
+    },
+    {
+     "role": "assistant",
+     "content": "Think of a water tank on a hill. Voltage is like the water pressure: the higher the tank, the harder it pushes water through the pipe. Current is how much water flows, and resistance is how narrow the pipe is."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "analogy",
+      "insight"
+     ],
+     "n": "explain",
+     "c": "voltage"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "analogy",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They are still confused right after an explanation, so it needs a different way in, and the water analogy the last reply used must not come back.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "analogy",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-after-analogy-2",
+   "group": "g-confusion-after-analogy",
+   "text": "nope, the water thing lost me",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's voltage actually?"
+    },
+    {
+     "role": "assistant",
+     "content": "Think of a water tank on a hill. Voltage is like the water pressure: the higher the tank, the harder it pushes water through the pipe. Current is how much water flows, and resistance is how narrow the pipe is."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "analogy",
+      "insight"
+     ],
+     "n": "explain",
+     "c": "voltage"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "analogy",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They say the analogy lost them, which is confusion after an explanation, so it needs a reframe that does not use an analogy.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "analogy",
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-after-analogy-3",
+   "group": "g-confusion-after-analogy",
+   "text": "hmm still confused tbh",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's voltage actually?"
+    },
+    {
+     "role": "assistant",
+     "content": "Think of a water tank on a hill. Voltage is like the water pressure: the higher the tank, the harder it pushes water through the pipe. Current is how much water flows, and resistance is how narrow the pipe is."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "analogy",
+      "insight"
+     ],
+     "n": "explain",
+     "c": "voltage"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "analogy",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They are still confused after a first explanation that relied on an analogy, so they need a different approach, and not another analogy.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "analogy",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-after-worked-1",
+   "group": "g-confusion-after-worked",
+   "text": "huh?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do I solve 3x - 5 = 10"
+    },
+    {
+     "role": "assistant",
+     "content": "Undo the operations in reverse order: add 5 to both sides, then divide by 3. [shown inline — steps: 3x - 5 = 10 → 3x = 15 → x = 5] So x = 5."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "explain",
+     "c": "linear equations"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "A bare 'huh?' right after a worked example means the explanation didn't land, so the reply should come at it another way and not with another worked example.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-after-worked-2",
+   "group": "g-confusion-after-worked",
+   "text": "i dont see how you got from the first line to the second",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do I solve 3x - 5 = 10"
+    },
+    {
+     "role": "assistant",
+     "content": "Undo the operations in reverse order: add 5 to both sides, then divide by 3. [shown inline — steps: 3x - 5 = 10 → 3x = 15 → x = 5] So x = 5."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "explain",
+     "c": "linear equations"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They can't follow the worked steps they were just shown, which is confusion after an explanation, so the reply needs a new way in rather than the same steps again.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-after-worked-3",
+   "group": "g-confusion-after-worked",
+   "text": "sorry, I don't follow those steps at all",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do I solve 3x - 5 = 10"
+    },
+    {
+     "role": "assistant",
+     "content": "Undo the operations in reverse order: add 5 to both sides, then divide by 3. [shown inline — steps: 3x - 5 = 10 → 3x = 15 → x = 5] So x = 5."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "explain",
+     "c": "linear equations"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They say they don't follow the worked example they were just shown, so the reply needs a different approach that is not another worked example, and there is no attempt to mark as an error.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-after-diagram-1",
+   "group": "g-confusion-after-diagram",
+   "text": "the diagram didn't really help, still confused",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis work"
+    },
+    {
+     "role": "assistant",
+     "content": "Plants capture light energy and store it in sugar. [shown inline — diagram: light → chlorophyll → ATP + NADPH → Calvin cycle → glucose] The light reactions make the energy carriers, and the Calvin cycle spends them to build sugar from CO2."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "causal"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "questions": 0,
+   "expect": {
+    "exclude": [
+     "visual",
+     "error",
+     "misconception",
+     "selfexplain",
+     "elaborate",
+     "retrieval",
+     "teachback"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They are still confused after an explanation built on a diagram, so the reply needs a different way in and no second diagram, and with questions:0 nothing that asks them a question.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "visual",
+     "causal",
+     "error",
+     "misconception",
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-after-diagram-2",
+   "group": "g-confusion-after-diagram",
+   "text": "can you explain it another way? the arrows lost me",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis work"
+    },
+    {
+     "role": "assistant",
+     "content": "Plants capture light energy and store it in sugar. [shown inline — diagram: light → chlorophyll → ATP + NADPH → Calvin cycle → glucose] The light reactions make the energy carriers, and the Calvin cycle spends them to build sugar from CO2."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "causal"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "questions": 0,
+   "expect": {
+    "exclude": [
+     "visual",
+     "error",
+     "misconception",
+     "selfexplain",
+     "elaborate",
+     "retrieval",
+     "teachback"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They ask for another way of explaining it because the diagram lost them, which is a reframe that must avoid the visual approach used last time.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "visual",
+     "causal",
+     "error",
+     "misconception",
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-after-diagram-3",
+   "group": "g-confusion-after-diagram",
+   "text": "what? i dont see how the light part connects to the sugar part",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis work"
+    },
+    {
+     "role": "assistant",
+     "content": "Plants capture light energy and store it in sugar. [shown inline — diagram: light → chlorophyll → ATP + NADPH → Calvin cycle → glucose] The light reactions make the energy carriers, and the Calvin cycle spends them to build sugar from CO2."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "causal"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "questions": 0,
+   "expect": {
+    "exclude": [
+     "visual",
+     "error",
+     "misconception",
+     "selfexplain",
+     "elaborate",
+     "retrieval",
+     "teachback"
+    ],
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "'what?' plus not seeing how the two stages connect is confusion about the diagram they were just shown, so they need a reframe that is not visual.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "visual",
+     "causal",
+     "error",
+     "misconception",
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-after-prose-1",
+   "group": "g-confusion-after-prose",
+   "text": "I don't follow",
+   "history": [
+    {
+     "role": "user",
+     "content": "why does printing money cause inflation?"
+    },
+    {
+     "role": "assistant",
+     "content": "When the money supply grows faster than the goods and services an economy produces, each unit of money buys less, so prices rise."
+    },
+    {
+     "role": "user",
+     "content": "huh?"
+    },
+    {
+     "role": "assistant",
+     "content": "Picture an auction with 10 paintings. If every bidder suddenly has twice as much cash, the same 10 paintings sell for roughly twice the price. The paintings didn't change; the money did."
+    },
+    {
+     "role": "user",
+     "content": "oh ok that makes sense. so why does inflation hurt people with savings?"
+    },
+    {
+     "role": "assistant",
+     "content": "Savings are a fixed amount of money. If prices rise 5% a year and your savings account pays 1%, the real purchasing power of your savings falls by about 4% a year, so the same balance buys less and less over time."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal"
+     ],
+     "n": "explain",
+     "c": "inflation"
+    },
+    {
+     "s": [
+      "analogy"
+     ],
+     "n": "reframe",
+     "c": "inflation"
+    },
+    {
+     "s": [
+      "causal"
+     ],
+     "n": "explain",
+     "c": "savings"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "causal",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They are confused after a plain prose explanation, and the reply before them was a first explain, not a reframe (the earlier reframe was resolved), so this is a reframe and not a diagnose.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "causal",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-after-prose-2",
+   "group": "g-confusion-after-prose",
+   "text": "can u explain that another way",
+   "history": [
+    {
+     "role": "user",
+     "content": "why does printing money cause inflation?"
+    },
+    {
+     "role": "assistant",
+     "content": "When the money supply grows faster than the goods and services an economy produces, each unit of money buys less, so prices rise."
+    },
+    {
+     "role": "user",
+     "content": "huh?"
+    },
+    {
+     "role": "assistant",
+     "content": "Picture an auction with 10 paintings. If every bidder suddenly has twice as much cash, the same 10 paintings sell for roughly twice the price. The paintings didn't change; the money did."
+    },
+    {
+     "role": "user",
+     "content": "oh ok that makes sense. so why does inflation hurt people with savings?"
+    },
+    {
+     "role": "assistant",
+     "content": "Savings are a fixed amount of money. If prices rise 5% a year and your savings account pays 1%, the real purchasing power of your savings falls by about 4% a year, so the same balance buys less and less over time."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal"
+     ],
+     "n": "explain",
+     "c": "inflation"
+    },
+    {
+     "s": [
+      "analogy"
+     ],
+     "n": "reframe",
+     "c": "inflation"
+    },
+    {
+     "s": [
+      "causal"
+     ],
+     "n": "explain",
+     "c": "savings"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "causal",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "Asking for another way to explain the last prose answer is confusion after a first explanation, and the last reply was an explain, so it calls for a reframe rather than a diagnose.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "causal",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-after-prose-3",
+   "group": "g-confusion-after-prose",
+   "text": "i dont see why that means my savings are worth less",
+   "history": [
+    {
+     "role": "user",
+     "content": "why does printing money cause inflation?"
+    },
+    {
+     "role": "assistant",
+     "content": "When the money supply grows faster than the goods and services an economy produces, each unit of money buys less, so prices rise."
+    },
+    {
+     "role": "user",
+     "content": "huh?"
+    },
+    {
+     "role": "assistant",
+     "content": "Picture an auction with 10 paintings. If every bidder suddenly has twice as much cash, the same 10 paintings sell for roughly twice the price. The paintings didn't change; the money did."
+    },
+    {
+     "role": "user",
+     "content": "oh ok that makes sense. so why does inflation hurt people with savings?"
+    },
+    {
+     "role": "assistant",
+     "content": "Savings are a fixed amount of money. If prices rise 5% a year and your savings account pays 1%, the real purchasing power of your savings falls by about 4% a year, so the same balance buys less and less over time."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal"
+     ],
+     "n": "explain",
+     "c": "inflation"
+    },
+    {
+     "s": [
+      "analogy"
+     ],
+     "n": "reframe",
+     "c": "inflation"
+    },
+    {
+     "s": [
+      "causal"
+     ],
+     "n": "explain",
+     "c": "savings"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "causal",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "'i dont see why' about the point just made is confusion, not a stated belief, and the last reply was a first explain, so it needs a reframe that drops the causal prose it already tried.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "causal",
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-second-mole-1",
+   "group": "g-confusion-second-mole",
+   "text": "still lost",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's a mole in chem"
+    },
+    {
+     "role": "assistant",
+     "content": "A mole is just a counting unit, like a dozen. A dozen eggs is 12 eggs; a mole of atoms is 6.02 × 10²³ atoms. Chemists use it because atoms are far too small to count one by one."
+    },
+    {
+     "role": "user",
+     "content": "i dont get it"
+    },
+    {
+     "role": "assistant",
+     "content": "Let's come at it through mass instead. One carbon atom has a mass of 12 atomic mass units, so 12 grams of carbon contains exactly one mole of carbon atoms. [shown inline — steps: 24 g carbon ÷ 12 g/mol = 2 mol of carbon atoms]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "analogy"
+     ],
+     "n": "explain",
+     "c": "mole"
+    },
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "reframe",
+     "c": "mole"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "diagnose"
+    ]
+   },
+   "why": "The last reply was already a reframe and they are still lost, which is a second confusion in a row, so the reply should ask one diagnostic question with two named options.",
+   "slice": "confusion",
+   "rater": {
+    "need": "diagnose",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-second-mole-2",
+   "group": "g-confusion-second-mole",
+   "text": "nope, still not getting it",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's a mole in chem"
+    },
+    {
+     "role": "assistant",
+     "content": "A mole is just a counting unit, like a dozen. A dozen eggs is 12 eggs; a mole of atoms is 6.02 × 10²³ atoms. Chemists use it because atoms are far too small to count one by one."
+    },
+    {
+     "role": "user",
+     "content": "i dont get it"
+    },
+    {
+     "role": "assistant",
+     "content": "Let's come at it through mass instead. One carbon atom has a mass of 12 atomic mass units, so 12 grams of carbon contains exactly one mole of carbon atoms. [shown inline — steps: 24 g carbon ÷ 12 g/mol = 2 mol of carbon atoms]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "analogy"
+     ],
+     "n": "explain",
+     "c": "mole"
+    },
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "reframe",
+     "c": "mole"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "diagnose"
+    ]
+   },
+   "why": "They are confused again right after a reframe (thread[-1].n is reframe), so rather than a third explanation the reply should find where it breaks with a two-option diagnostic question.",
+   "slice": "confusion",
+   "rater": {
+    "need": "diagnose",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-second-mole-3",
+   "group": "g-confusion-second-mole",
+   "text": "sorry im still confused, none of this is clicking",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's a mole in chem"
+    },
+    {
+     "role": "assistant",
+     "content": "A mole is just a counting unit, like a dozen. A dozen eggs is 12 eggs; a mole of atoms is 6.02 × 10²³ atoms. Chemists use it because atoms are far too small to count one by one."
+    },
+    {
+     "role": "user",
+     "content": "i dont get it"
+    },
+    {
+     "role": "assistant",
+     "content": "Let's come at it through mass instead. One carbon atom has a mass of 12 atomic mass units, so 12 grams of carbon contains exactly one mole of carbon atoms. [shown inline — steps: 24 g carbon ÷ 12 g/mol = 2 mol of carbon atoms]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "analogy"
+     ],
+     "n": "explain",
+     "c": "mole"
+    },
+    {
+     "s": [
+      "worked"
+     ],
+     "n": "reframe",
+     "c": "mole"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "diagnose"
+    ]
+   },
+   "why": "This is the second confused turn in a row after a reframe, so the right move is one diagnostic question naming two possible sticking points.",
+   "slice": "confusion",
+   "rater": {
+    "need": "diagnose",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-second-pvalue-1",
+   "group": "g-confusion-second-pvalue",
+   "text": "huh? still dont get it",
+   "length": "concise",
+   "history": [
+    {
+     "role": "user",
+     "content": "what does a p-value actually mean"
+    },
+    {
+     "role": "assistant",
+     "content": "A p-value is the probability of getting results at least as extreme as yours, assuming the null hypothesis is true. A small p-value means your data would be surprising if there were really no effect."
+    },
+    {
+     "role": "user",
+     "content": "what?"
+    },
+    {
+     "role": "assistant",
+     "content": "Picture a coin you believe is fair. You flip it 10 times and get 9 heads. The p-value asks: if the coin really were fair, how often would I see something this lopsided? [shown inline — diagram: 10 fair flips → 9+ heads ≈ 1% of the time → p ≈ 0.01]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "insight"
+     ],
+     "n": "explain",
+     "c": "p-value"
+    },
+    {
+     "s": [
+      "analogy",
+      "visual"
+     ],
+     "n": "reframe",
+     "c": "p-value"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "analogy",
+     "visual",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "diagnose"
+    ]
+   },
+   "why": "The previous reply was already a reframe (analogy plus diagram) and they are still confused, so the reply should ask one diagnostic question with two named options instead of explaining again.",
+   "slice": "confusion",
+   "rater": {
+    "need": "diagnose",
+    "exclude": [
+     "analogy",
+     "visual",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-second-pvalue-2",
+   "group": "g-confusion-second-pvalue",
+   "text": "I'm still not following, sorry",
+   "length": "concise",
+   "history": [
+    {
+     "role": "user",
+     "content": "what does a p-value actually mean"
+    },
+    {
+     "role": "assistant",
+     "content": "A p-value is the probability of getting results at least as extreme as yours, assuming the null hypothesis is true. A small p-value means your data would be surprising if there were really no effect."
+    },
+    {
+     "role": "user",
+     "content": "what?"
+    },
+    {
+     "role": "assistant",
+     "content": "Picture a coin you believe is fair. You flip it 10 times and get 9 heads. The p-value asks: if the coin really were fair, how often would I see something this lopsided? [shown inline — diagram: 10 fair flips → 9+ heads ≈ 1% of the time → p ≈ 0.01]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "insight"
+     ],
+     "n": "explain",
+     "c": "p-value"
+    },
+    {
+     "s": [
+      "analogy",
+      "visual"
+     ],
+     "n": "reframe",
+     "c": "p-value"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "analogy",
+     "visual",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "diagnose"
+    ]
+   },
+   "why": "Two confused turns in a row, the second one after a reframe, call for a two-option diagnostic question rather than a third explanation.",
+   "slice": "confusion",
+   "rater": {
+    "need": "diagnose",
+    "exclude": [
+     "analogy",
+     "visual",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-second-pvalue-3",
+   "group": "g-confusion-second-pvalue",
+   "text": "lost me again",
+   "length": "concise",
+   "history": [
+    {
+     "role": "user",
+     "content": "what does a p-value actually mean"
+    },
+    {
+     "role": "assistant",
+     "content": "A p-value is the probability of getting results at least as extreme as yours, assuming the null hypothesis is true. A small p-value means your data would be surprising if there were really no effect."
+    },
+    {
+     "role": "user",
+     "content": "what?"
+    },
+    {
+     "role": "assistant",
+     "content": "Picture a coin you believe is fair. You flip it 10 times and get 9 heads. The p-value asks: if the coin really were fair, how often would I see something this lopsided? [shown inline — diagram: 10 fair flips → 9+ heads ≈ 1% of the time → p ≈ 0.01]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "insight"
+     ],
+     "n": "explain",
+     "c": "p-value"
+    },
+    {
+     "s": [
+      "analogy",
+      "visual"
+     ],
+     "n": "reframe",
+     "c": "p-value"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "analogy",
+     "visual",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "diagnose"
+    ]
+   },
+   "why": "'lost me again' right after a reframe is a second consecutive confusion, so the reply should diagnose with one question offering two named options.",
+   "slice": "confusion",
+   "rater": {
+    "need": "diagnose",
+    "exclude": [
+     "analogy",
+     "visual",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-guard-fractions-1",
+   "group": "g-confusion-guard-fractions",
+   "text": "i don't get it",
+   "guard": true,
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i add 1/3 + 1/4"
+    },
+    {
+     "role": "assistant",
+     "content": "You can only add fractions when the pieces are the same size, so first find a denominator that both 3 and 4 divide into. [shown inline — steps: 1/3 + 1/4 → ?/12 + ?/12] What goes in place of each question mark?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "fractions"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "Socria asked a try question, but 'i don't get it' is confusion, not an answer, so it is a reframe, and under the Answer Guard it must not become a worked example.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-guard-fractions-2",
+   "group": "g-confusion-guard-fractions",
+   "text": "wait what? im confused",
+   "guard": true,
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i add 1/3 + 1/4"
+    },
+    {
+     "role": "assistant",
+     "content": "You can only add fractions when the pieces are the same size, so first find a denominator that both 3 and 4 divide into. [shown inline — steps: 1/3 + 1/4 → ?/12 + ?/12] What goes in place of each question mark?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "fractions"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "They are confused after the first explanation and give no attempt at the try question, so it needs a reframe that stays guard-safe (no worked example) and marks no error.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-guard-fractions-3",
+   "group": "g-confusion-guard-fractions",
+   "text": "idk what you mean by that",
+   "guard": true,
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i add 1/3 + 1/4"
+    },
+    {
+     "role": "assistant",
+     "content": "You can only add fractions when the pieces are the same size, so first find a denominator that both 3 and 4 divide into. [shown inline — steps: 1/3 + 1/4 → ?/12 + ?/12] What goes in place of each question mark?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "fractions"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ],
+    "topic": "null",
+    "accept": [
+     "reframe"
+    ]
+   },
+   "why": "Saying they don't understand what was meant is confusion and not an answer to the pending question, so the reply should reframe without handing over the answer through a worked example.",
+   "slice": "confusion",
+   "rater": {
+    "need": "reframe",
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-confusion-not-nextstep-1",
+   "group": "g-confusion-not-nextstep",
+   "text": "ok got that. what's the next step?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do you complete the square for x^2 + 6x + 5 = 0?"
+    },
+    {
+     "role": "assistant",
+     "content": "Start by moving the constant to the other side. [shown inline — steps: x² + 6x + 5 = 0 → x² + 6x = -5] Next you'll add something to both sides to turn the left side into a perfect square."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "c": "completing the square"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They follow so far and are asking how the procedure continues, which is a new question for explanation, not confusion and not an attempt.",
+   "slice": "confusion",
+   "rater": {
+    "need": "explain",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-not-nextstep-2",
+   "group": "g-confusion-not-nextstep",
+   "text": "makes sense so far, what do i do next",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do you complete the square for x^2 + 6x + 5 = 0?"
+    },
+    {
+     "role": "assistant",
+     "content": "Start by moving the constant to the other side. [shown inline — steps: x² + 6x + 5 = 0 → x² + 6x = -5] Next you'll add something to both sides to turn the left side into a perfect square."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "c": "completing the square"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "'makes sense so far' rules out confusion. They want the next step of the method, so this is an explain turn and not a reframe.",
+   "slice": "confusion",
+   "rater": {
+    "need": "explain",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-not-nextstep-3",
+   "group": "g-confusion-not-nextstep",
+   "text": "alright, then what? what comes after moving the 5 over",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do you complete the square for x^2 + 6x + 5 = 0?"
+    },
+    {
+     "role": "assistant",
+     "content": "Start by moving the constant to the other side. [shown inline — steps: x² + 6x + 5 = 0 → x² + 6x = -5] Next you'll add something to both sides to turn the left side into a perfect square."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "c": "completing the square"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Here 'then what?' asks for the next step and does not mean 'what?' as confusion, so they need the procedure continued, not a reframe.",
+   "slice": "confusion",
+   "rater": {
+    "need": "explain",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-not-whatnext-1",
+   "group": "g-confusion-not-whatnext",
+   "text": "ok that makes sense. so what should I do next — pay off my credit card first or start putting money in an index fund?",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's an index fund?"
+    },
+    {
+     "role": "assistant",
+     "content": "An index fund buys every stock in a market index, like the S&P 500, so you own a small slice of hundreds of companies at once. Fees are low because nobody is picking stocks, and your return tracks the market as a whole."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "insight"
+     ],
+     "n": "explain",
+     "c": "index fund"
+    }
+   ],
+   "expect": {
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "'what should I do next' here asks them to choose between two named options of their own, which is a decide explanation with trade-offs, not confusion.",
+   "slice": "confusion",
+   "rater": {
+    "need": "explain",
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-not-whatnext-2",
+   "group": "g-confusion-not-whatnext",
+   "text": "got it. so what's my next step, clear the card balance or start investing?",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's an index fund?"
+    },
+    {
+     "role": "assistant",
+     "content": "An index fund buys every stock in a market index, like the S&P 500, so you own a small slice of hundreds of companies at once. Fees are low because nobody is picking stocks, and your return tracks the market as a whole."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "insight"
+     ],
+     "n": "explain",
+     "c": "index fund"
+    }
+   ],
+   "expect": {
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "'got it' shows they understood. 'what's my next step' is a choice between two named options that is theirs, so it gets a trade-offs explanation and not a reframe.",
+   "slice": "confusion",
+   "rater": {
+    "need": "explain",
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-confusion-not-whatnext-3",
+   "group": "g-confusion-not-whatnext",
+   "text": "Cool. What should I do next then: kill my credit card debt or open an index fund?",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's an index fund?"
+    },
+    {
+     "role": "assistant",
+     "content": "An index fund buys every stock in a market index, like the S&P 500, so you own a small slice of hundreds of companies at once. Fees are low because nobody is picking stocks, and your return tracks the market as a whole."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "insight"
+     ],
+     "n": "explain",
+     "c": "index fund"
+    }
+   ],
+   "expect": {
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "This is a personal decision between two named options asked with no sign of confusion, so it is a decide explain that weighs trade-offs.",
+   "slice": "confusion",
+   "rater": {
+    "need": "explain",
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-working-right-1",
+   "group": "g-attempts-working-right",
+   "text": "is this right? 3x - 5 = 16 so 3x = 21 and x = 7",
+   "checked": [
+    {
+     "status": "verified"
+    },
+    {
+     "status": "verified"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They show their own working and ask whether it holds, and the maths engine verified every step, so the reply confirms the attempt instead of re-teaching it.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-working-right-2",
+   "group": "g-attempts-working-right",
+   "text": "3x-5=16 -> 3x=21 -> x=7. did i do it right??",
+   "checked": [
+    {
+     "status": "verified"
+    },
+    {
+     "status": "verified"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "A chain of their own steps plus a request to check them is an attempt, and every step was verified, so the need is feedback that confirms it.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-working-right-3",
+   "group": "g-attempts-working-right",
+   "text": "Solved 3x − 5 = 16: added 5 to both sides to get 3x = 21, then divided by 3, x = 7. Can you check my steps?",
+   "checked": [
+    {
+     "status": "verified"
+    },
+    {
+     "status": "verified"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They describe their working step by step and ask for a check, and all steps were verified, so the reply responds to the attempt (confirm) and does not redo it.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-working-wrong-guard-1",
+   "group": "g-attempts-working-wrong-guard",
+   "text": "is this right? 2x + 3 = 11 so 2x = 14 so x = 7",
+   "guard": true,
+   "checked": [
+    {
+     "status": "refuted"
+    },
+    {
+     "status": "verified"
+    }
+   ],
+   "expect": {
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "worked",
+     "misconception"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "Their working has a refuted first step (2x = 14), so the reply points to that first wrong step, and the Answer Guard means it hints and never gives x.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "worked",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-working-wrong-guard-2",
+   "group": "g-attempts-working-wrong-guard",
+   "text": "i got x=7 for 2x+3=11. moved the 3 over so 2x = 14 then halved it",
+   "guard": true,
+   "checked": [
+    {
+     "status": "refuted"
+    }
+   ],
+   "expect": {
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "worked",
+     "misconception"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They give an answer and how they got it, and the engine refuted the move, so the reply gives feedback on the error under the guard instead of a worked solution.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "worked",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-working-wrong-guard-3",
+   "group": "g-attempts-working-wrong-guard",
+   "text": "Checking my homework: 2x + 3 = 11 → 2x = 11 + 3 = 14 → x = 7. Correct?",
+   "guard": true,
+   "checked": [
+    {
+     "status": "refuted"
+    },
+    {
+     "status": "verified"
+    }
+   ],
+   "expect": {
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "worked",
+     "misconception"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "Their working is shown with a refuted step (adding 3 instead of subtracting it), so the reply points to the first wrong step without solving it, as the guard requires.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "worked",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-check-right-1",
+   "group": "g-attempts-check-right",
+   "text": "15",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do you find the area of a triangle"
+    },
+    {
+     "role": "assistant",
+     "content": "Take half the base times the height: A = ½ × b × h. Picture the triangle as half of a rectangle with the same base and height: cut the rectangle along its diagonal and you get two matching triangles. [shown inline — steps: rectangle 6 × 4 = 24 → half of it = 12] [shown inline — check: A triangle has base 10 and height 3. What is its area? (answer: 15)]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "triangle area"
+    }
+   ],
+   "did": {
+    "right": 1,
+    "wrong": 0
+   },
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They answered the inline check correctly (did.right = 1), so the reply confirms their answer and does not open a new explanation.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-check-right-2",
+   "group": "g-attempts-check-right",
+   "text": "is it 15? half of 30",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do you find the area of a triangle"
+    },
+    {
+     "role": "assistant",
+     "content": "Take half the base times the height: A = ½ × b × h. Picture the triangle as half of a rectangle with the same base and height: cut the rectangle along its diagonal and you get two matching triangles. [shown inline — steps: rectangle 6 × 4 = 24 → half of it = 12] [shown inline — check: A triangle has base 10 and height 3. What is its area? (answer: 15)]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "triangle area"
+    }
+   ],
+   "did": {
+    "right": 1,
+    "wrong": 0
+   },
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "Despite the question mark this answers the check, and did.right = 1, so the need is feedback confirming it, not a new explanation.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-check-right-3",
+   "group": "g-attempts-check-right",
+   "text": "ok so 10 times 3 is 30, half of that, 15 square units",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do you find the area of a triangle"
+    },
+    {
+     "role": "assistant",
+     "content": "Take half the base times the height: A = ½ × b × h. Picture the triangle as half of a rectangle with the same base and height: cut the rectangle along its diagonal and you get two matching triangles. [shown inline — steps: rectangle 6 × 4 = 24 → half of it = 12] [shown inline — check: A triangle has base 10 and height 3. What is its area? (answer: 15)]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "worked",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "triangle area"
+    }
+   ],
+   "did": {
+    "right": 1,
+    "wrong": 0
+   },
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They worked through the check aloud and got it right (did.right = 1), so the reply confirms the attempt.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-recall-wrong-1",
+   "group": "g-attempts-recall-wrong",
+   "text": "glucose?",
+   "history": [
+    {
+     "role": "user",
+     "content": "can we keep going with cellular respiration"
+    },
+    {
+     "role": "assistant",
+     "content": "Sure. Before we build on it, a quick recall from last week. [shown inline — check: What does the Krebs cycle mainly produce for the electron transport chain? (answer: NADH and FADH2)]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "retrieval"
+     ],
+     "n": "practice",
+     "q": "recall",
+     "c": "Krebs cycle"
+    }
+   ],
+   "ledger": [
+    {
+     "topic": "Krebs cycle",
+     "seen": 3,
+     "right": 1,
+     "wrong": 1,
+     "daysAgo": 6,
+     "box": 1
+    }
+   ],
+   "did": {
+    "right": 0,
+    "wrong": 1
+   },
+   "expect": {
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They answered Socria's recall check wrongly (did.wrong = 1), so the reply responds to that wrong attempt first.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-recall-wrong-2",
+   "group": "g-attempts-recall-wrong",
+   "text": "um i think it makes ATP directly, like most of the ATP",
+   "history": [
+    {
+     "role": "user",
+     "content": "can we keep going with cellular respiration"
+    },
+    {
+     "role": "assistant",
+     "content": "Sure. Before we build on it, a quick recall from last week. [shown inline — check: What does the Krebs cycle mainly produce for the electron transport chain? (answer: NADH and FADH2)]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "retrieval"
+     ],
+     "n": "practice",
+     "q": "recall",
+     "c": "Krebs cycle"
+    }
+   ],
+   "ledger": [
+    {
+     "topic": "Krebs cycle",
+     "seen": 3,
+     "right": 1,
+     "wrong": 1,
+     "daysAgo": 6,
+     "box": 1
+    }
+   ],
+   "did": {
+    "right": 0,
+    "wrong": 1
+   },
+   "expect": {
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "This is a wrong answer to the recall check (did.wrong = 1), so it is an attempt to correct, not a free-standing belief to refute.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "include": [
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-recall-wrong-3",
+   "group": "g-attempts-recall-wrong",
+   "text": "oxygen. no wait water? one of those",
+   "history": [
+    {
+     "role": "user",
+     "content": "can we keep going with cellular respiration"
+    },
+    {
+     "role": "assistant",
+     "content": "Sure. Before we build on it, a quick recall from last week. [shown inline — check: What does the Krebs cycle mainly produce for the electron transport chain? (answer: NADH and FADH2)]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "retrieval"
+     ],
+     "n": "practice",
+     "q": "recall",
+     "c": "Krebs cycle"
+    }
+   ],
+   "ledger": [
+    {
+     "topic": "Krebs cycle",
+     "seen": 3,
+     "right": 1,
+     "wrong": 1,
+     "daysAgo": 6,
+     "box": 1
+    }
+   ],
+   "did": {
+    "right": 0,
+    "wrong": 1
+   },
+   "expect": {
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "A hesitant but wrong recall answer to Socria's check (did.wrong = 1) calls for feedback on the error before anything else.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "include": [
+     "error"
+    ],
+    "exclude": [
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-answer-predict-1",
+   "group": "g-attempts-answer-predict",
+   "text": "goes up, everyone suddenly wants one",
+   "history": [
+    {
+     "role": "user",
+     "content": "what actually sets prices? like why is stuff expensive sometimes"
+    },
+    {
+     "role": "assistant",
+     "content": "Mostly the push and pull between how much people want something (demand) and how much of it is available (supply). When lots of buyers chase a limited stock, sellers can charge more; when stock piles up, they cut prices to move it. [shown inline — diagram: more buyers + same stock → price rises] Here's one to try: it starts pouring with rain in a city centre. What do you predict happens to the price street vendors charge for umbrellas, and why?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "q": "predict",
+     "c": "supply and demand"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "Socria's last turn asked a prediction question (thread q = predict) and this short statement answers it, so the reply responds to their answer and does not start a new explanation.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-answer-predict-2",
+   "group": "g-attempts-answer-predict",
+   "text": "they'd charge more bc demand shoots up but they only have the umbrellas they brought",
+   "history": [
+    {
+     "role": "user",
+     "content": "what actually sets prices? like why is stuff expensive sometimes"
+    },
+    {
+     "role": "assistant",
+     "content": "Mostly the push and pull between how much people want something (demand) and how much of it is available (supply). When lots of buyers chase a limited stock, sellers can charge more; when stock piles up, they cut prices to move it. [shown inline — diagram: more buyers + same stock → price rises] Here's one to try: it starts pouring with rain in a city centre. What do you predict happens to the price street vendors charge for umbrellas, and why?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "q": "predict",
+     "c": "supply and demand"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "Their reasoned prediction answers the question Socria asked last turn, so the need is feedback on that answer.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-answer-predict-3",
+   "group": "g-attempts-answer-predict",
+   "text": "price up I guess? same umbrellas, way more ppl needing them",
+   "history": [
+    {
+     "role": "user",
+     "content": "what actually sets prices? like why is stuff expensive sometimes"
+    },
+    {
+     "role": "assistant",
+     "content": "Mostly the push and pull between how much people want something (demand) and how much of it is available (supply). When lots of buyers chase a limited stock, sellers can charge more; when stock piles up, they cut prices to move it. [shown inline — diagram: more buyers + same stock → price rises] Here's one to try: it starts pouring with rain in a city centre. What do you predict happens to the price street vendors charge for umbrellas, and why?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "q": "predict",
+     "c": "supply and demand"
+    }
+   ],
+   "expect": {
+    "exclude": [
+     "error",
+     "misconception",
+     "worked"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "The tentative question mark does not make this a new question: it is an answer to Socria's prediction prompt, so it gets feedback.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-teachback-secant-1",
+   "group": "g-attempts-teachback-secant",
+   "text": "basically the slope gets closer as the gap goes to 0/0",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's a derivative actually? my textbook just says limit of a difference quotient"
+    },
+    {
+     "role": "assistant",
+     "content": "A derivative is the slope of a curve at a single point. You can't get a slope from one point, so pick a second point a distance h away and draw the secant line through both; its slope is (f(x+h) − f(x)) / h. Now slide the second point toward the first. [shown inline — diagram: secant through x and x+h → h shrinks → secant turns into the tangent] The secant slopes settle on one number, and that limit is the derivative. Can you explain back, in your own words, why the secant slope ends up giving the slope of the tangent?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "insight"
+     ],
+     "n": "explain",
+     "q": "teachback",
+     "c": "derivative"
+    }
+   ],
+   "expect": {
+    "level": "intermediate",
+    "exclude": [
+     "error",
+     "misconception",
+     "worked",
+     "pretrain"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "This is an essentially correct teach-back answering Socria's teachback question, so it gets feedback, not a re-explanation, and 'basically' is filler that says nothing about level.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-teachback-secant-2",
+   "group": "g-attempts-teachback-secant",
+   "text": "so as h shrinks the secant kind of turns into the tangent line, and the slope it settles on is the derivative. you cant just plug in h=0 bc that's 0/0",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's a derivative actually? my textbook just says limit of a difference quotient"
+    },
+    {
+     "role": "assistant",
+     "content": "A derivative is the slope of a curve at a single point. You can't get a slope from one point, so pick a second point a distance h away and draw the secant line through both; its slope is (f(x+h) − f(x)) / h. Now slide the second point toward the first. [shown inline — diagram: secant through x and x+h → h shrinks → secant turns into the tangent] The secant slopes settle on one number, and that limit is the derivative. Can you explain back, in your own words, why the secant slope ends up giving the slope of the tangent?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "insight"
+     ],
+     "n": "explain",
+     "q": "teachback",
+     "c": "derivative"
+    }
+   ],
+   "expect": {
+    "level": "intermediate",
+    "exclude": [
+     "error",
+     "misconception",
+     "worked",
+     "pretrain"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They answered the teach-back prompt with a correct account of the secant tending to the tangent, so the reply confirms it and does not explain it again or treat them as a novice.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-teachback-secant-3",
+   "group": "g-attempts-teachback-secant",
+   "text": "my version: two points, line through them, slide one toward the other. the line's slope approaches the tangent's slope, and that limit is the derivative",
+   "history": [
+    {
+     "role": "user",
+     "content": "what's a derivative actually? my textbook just says limit of a difference quotient"
+    },
+    {
+     "role": "assistant",
+     "content": "A derivative is the slope of a curve at a single point. You can't get a slope from one point, so pick a second point a distance h away and draw the secant line through both; its slope is (f(x+h) − f(x)) / h. Now slide the second point toward the first. [shown inline — diagram: secant through x and x+h → h shrinks → secant turns into the tangent] The secant slopes settle on one number, and that limit is the derivative. Can you explain back, in your own words, why the secant slope ends up giving the slope of the tangent?"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "insight"
+     ],
+     "n": "explain",
+     "q": "teachback",
+     "c": "derivative"
+    }
+   ],
+   "expect": {
+    "level": "intermediate",
+    "exclude": [
+     "error",
+     "misconception",
+     "worked",
+     "pretrain"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "A correct own-words teach-back given in reply to Socria's teachback question is an attempt to confirm, not a request to learn.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-myth-falling-1",
+   "group": "g-attempts-myth-falling",
+   "text": "heavier things fall faster than lighter ones right? like a bowling ball would beat a tennis ball if u dropped them from the same height",
+   "expect": {
+    "include": [
+     "misconception"
+    ],
+    "exclude": [
+     "error"
+    ],
+    "accept": [
+     "refute"
+    ]
+   },
+   "why": "They state a wrong belief as a belief ('X, right?'), so the reply gives the verdict first, then why it tempts, then the accurate model.",
+   "slice": "attempts",
+   "rater": {
+    "need": "refute",
+    "include": [
+     "misconception"
+    ],
+    "exclude": [
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-myth-falling-2",
+   "group": "g-attempts-myth-falling",
+   "text": "I always thought a 10 kg weight hits the ground before a 1 kg weight if you drop them at the same time",
+   "expect": {
+    "include": [
+     "misconception"
+    ],
+    "exclude": [
+     "error"
+    ],
+    "accept": [
+     "refute"
+    ]
+   },
+   "why": "'I always thought' introduces a belief that is wrong, so the need is refute with a misconception strategy, not an error, since nothing was attempted.",
+   "slice": "attempts",
+   "rater": {
+    "need": "refute",
+    "include": [
+     "misconception"
+    ],
+    "exclude": [
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-myth-falling-3",
+   "group": "g-attempts-myth-falling",
+   "text": "my physics teacher said heavy objects fall faster because gravity pulls harder on them",
+   "expect": {
+    "include": [
+     "misconception"
+    ],
+    "exclude": [
+     "error"
+    ],
+    "accept": [
+     "refute"
+    ]
+   },
+   "why": "A wrong belief passed on from a teacher is still a stated belief to refute, and the half-true premise (the pull is stronger) is exactly the 'why it tempts' part.",
+   "slice": "attempts",
+   "rater": {
+    "need": "refute",
+    "include": [
+     "misconception"
+    ],
+    "exclude": [
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-true-belief-bats-1",
+   "group": "g-attempts-true-belief-bats",
+   "text": "bats aren't actually blind, right? pretty sure they can see and just use echolocation on top of that",
+   "expect": {
+    "topic": "bat",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "The belief they state is true, so it is not refuted: the reply confirms what holds.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "topic": "bat"
+   }
+  },
+  {
+   "id": "g-attempts-true-belief-bats-2",
+   "group": "g-attempts-true-belief-bats",
+   "text": "I always thought 'blind as a bat' was wrong and bats can actually see. is that true?",
+   "expect": {
+    "topic": "bat",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "'I always thought' opens a belief here too, but the belief is correct, so it gets confirmation (feedback), never a refutation.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "topic": "bat"
+   }
+  },
+  {
+   "id": "g-attempts-true-belief-bats-3",
+   "group": "g-attempts-true-belief-bats",
+   "text": "my bio teacher said bats aren't blind, they can see fine and echolocation is extra",
+   "expect": {
+    "topic": "bat",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "A 'my teacher said' belief that is accurate must not be refuted, so the reply confirms it.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "topic": "bat"
+   }
+  },
+  {
+   "id": "g-attempts-summary-right-1",
+   "group": "g-attempts-summary-right",
+   "text": "so basically the light part makes ATP and NADPH and the calvin cycle uses them to turn CO2 into sugar",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis actually make sugar"
+    },
+    {
+     "role": "assistant",
+     "content": "It happens in two linked stages. In the light reactions, chlorophyll captures light and uses that energy to split water and charge up two carriers, ATP and NADPH (oxygen is the leftover). In the Calvin cycle, the plant spends that ATP and NADPH to fix CO₂ from the air into sugar. [shown inline — diagram: light → ATP + NADPH → Calvin cycle: CO₂ → sugar] Think of the light reactions as the power station and the Calvin cycle as the factory running on that power."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "causal",
+      "analogy"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "expect": {
+    "level": "intermediate",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "A correct 'so basically X' summary of what Socria just said is not a belief to refute, so the reply confirms it, and 'basically' says nothing about level.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception",
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-summary-right-2",
+   "group": "g-attempts-summary-right",
+   "text": "ok so light reactions = charge the batteries, calvin cycle = spend the charge to build glucose from co2. thats it?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis actually make sugar"
+    },
+    {
+     "role": "assistant",
+     "content": "It happens in two linked stages. In the light reactions, chlorophyll captures light and uses that energy to split water and charge up two carriers, ATP and NADPH (oxygen is the leftover). In the Calvin cycle, the plant spends that ATP and NADPH to fix CO₂ from the air into sugar. [shown inline — diagram: light → ATP + NADPH → Calvin cycle: CO₂ → sugar] Think of the light reactions as the power station and the Calvin cycle as the factory running on that power."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "causal",
+      "analogy"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "expect": {
+    "level": "intermediate",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "They restate the explanation correctly and ask whether that is it, which calls for confirmation, not a refutation or a fresh explanation.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception",
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-attempts-summary-right-3",
+   "group": "g-attempts-summary-right",
+   "text": "So basically, light gets turned into chemical energy first, and then that energy is used to build sugar out of carbon dioxide?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis actually make sugar"
+    },
+    {
+     "role": "assistant",
+     "content": "It happens in two linked stages. In the light reactions, chlorophyll captures light and uses that energy to split water and charge up two carriers, ATP and NADPH (oxygen is the leftover). In the Calvin cycle, the plant spends that ATP and NADPH to fix CO₂ from the air into sugar. [shown inline — diagram: light → ATP + NADPH → Calvin cycle: CO₂ → sugar] Think of the light reactions as the power station and the Calvin cycle as the factory running on that power."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "visual",
+      "causal",
+      "analogy"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "expect": {
+    "level": "intermediate",
+    "exclude": [
+     "misconception",
+     "error"
+    ],
+    "accept": [
+     "feedback"
+    ]
+   },
+   "why": "A correct summary phrased as a question is still a check of their own understanding, so it gets feedback confirming it.",
+   "slice": "attempts",
+   "rater": {
+    "need": "feedback",
+    "exclude": [
+     "misconception",
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-novice-what-1",
+   "group": "g-firsts-novice-what",
+   "text": "I'm new to calculus. What is a derivative?",
+   "ledger": [
+    {
+     "topic": "limits",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 6,
+     "box": 2
+    }
+   ],
+   "expect": {
+    "level": "novice",
+    "ask": "what",
+    "topic": "derivative",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They say they are new to calculus and then ask a concept question after that preamble, so this is a first explanation of the what kind for a novice. Derivatives are new to them (the ledger only has limits), so retrieval does not apply.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "novice",
+    "ask": "what",
+    "topic": "derivative",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-novice-what-2",
+   "group": "g-firsts-novice-what",
+   "text": "total beginner here, never touched calc before. whats a derivative actually mean?",
+   "expect": {
+    "level": "novice",
+    "ask": "what",
+    "topic": "derivative",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They call themselves a total beginner and ask what a concept means, with no attempt and no wrong belief, so this is a first what-explanation at novice level.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "novice",
+    "ask": "what",
+    "topic": "derivative",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-novice-what-3",
+   "group": "g-firsts-novice-what",
+   "text": "Okay so I'm a complete beginner at calculus and kind of overwhelmed already. Could you explain what a derivative is?",
+   "expect": {
+    "level": "novice",
+    "ask": "what",
+    "topic": "derivative",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Socria has not explained anything yet, so 'overwhelmed' is not confusion after an explanation. A self-declared beginner is asking for a first concept explanation.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "novice",
+    "ask": "what",
+    "topic": "derivative",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-followup-why-1",
+   "group": "g-firsts-followup-why",
+   "text": "ok that makes sense, so why does the Calvin cycle need ATP?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis work?"
+    },
+    {
+     "role": "assistant",
+     "content": "Photosynthesis runs in two linked stages. In the light reactions, chlorophyll in the thylakoid membranes absorbs light and uses that energy to split water, releasing oxygen and charging up two energy carriers, ATP and NADPH.\n\n[shown inline — diagram: light → split water → O2 + ATP + NADPH → Calvin cycle → sugar]\n\nThose carriers then move into the stroma, where the second stage, the Calvin cycle, uses them to fix carbon dioxide into sugar."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "expect": {
+    "ask": "why",
+    "include": [
+     "causal"
+    ],
+    "topic": "calvin",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "After accepting the last reply they ask a new why-question about a later step. The kind comes from the last question sentence, not the 'ok that makes sense' preamble, so this is a first explanation of causes.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "why",
+    "topic": "Calvin",
+    "include": [
+     "causal"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-followup-why-2",
+   "group": "g-firsts-followup-why",
+   "text": "got it. can you help me understand why the calvin cycle needs ATP?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis work?"
+    },
+    {
+     "role": "assistant",
+     "content": "Photosynthesis runs in two linked stages. In the light reactions, chlorophyll in the thylakoid membranes absorbs light and uses that energy to split water, releasing oxygen and charging up two energy carriers, ATP and NADPH.\n\n[shown inline — diagram: light → split water → O2 + ATP + NADPH → Calvin cycle → sugar]\n\nThose carriers then move into the stroma, where the second stage, the Calvin cycle, uses them to fix carbon dioxide into sugar."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "expect": {
+    "ask": "why",
+    "include": [
+     "causal"
+    ],
+    "topic": "calvin",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "'Can you help me understand why' opens a fresh why-question about a new step, not confusion about the last reply, so it needs a first causal explanation.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "why",
+    "topic": "Calvin",
+    "include": [
+     "causal"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-followup-why-3",
+   "group": "g-firsts-followup-why",
+   "text": "Right, the light part clicks now. But why would the Calvin cycle need ATP and NADPH at all?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how does photosynthesis work?"
+    },
+    {
+     "role": "assistant",
+     "content": "Photosynthesis runs in two linked stages. In the light reactions, chlorophyll in the thylakoid membranes absorbs light and uses that energy to split water, releasing oxygen and charging up two energy carriers, ATP and NADPH.\n\n[shown inline — diagram: light → split water → O2 + ATP + NADPH → Calvin cycle → sugar]\n\nThose carriers then move into the stroma, where the second stage, the Calvin cycle, uses them to fix carbon dioxide into sugar."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "photosynthesis"
+    }
+   ],
+   "expect": {
+    "ask": "why",
+    "include": [
+     "causal"
+    ],
+    "topic": "calvin",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They confirm they understood and then ask a new why-question. Socria asked them nothing last turn, so this is not an answer to give feedback on; it is a first explanation of causes.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "why",
+    "topic": "Calvin",
+    "include": [
+     "causal"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-expert-how-1",
+   "group": "g-firsts-expert-how",
+   "text": "I'm a cardiologist and I prescribe SGLT2 inhibitors constantly for heart failure. How do they actually cut HF hospitalizations at the mechanistic level? I want the current thinking, not the patient-leaflet version.",
+   "expect": {
+    "level": "expert",
+    "ask": "how",
+    "topic": "sglt2",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A self-declared cardiologist asks a several-sentence mechanism question in their own field and asks for depth. That makes it a first how-explanation at expert level, not a one-sentence expert lookup.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "expert",
+    "ask": "how",
+    "topic": "SGLT2",
+    "exclude": [
+     "pretrain",
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-expert-how-2",
+   "group": "g-firsts-expert-how",
+   "text": "Heart failure specialist here. I know the EMPEROR and DAPA-HF data well, but I've never seen a convincing account of the mechanism. How do SGLT2 inhibitors help the failing heart beyond the diuretic effect?",
+   "expect": {
+    "level": "expert",
+    "ask": "how",
+    "topic": "sglt2",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A specialist in this field sets up context and asks how a drug works, so this is a first mechanism explanation pitched at expert level.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "expert",
+    "ask": "how",
+    "topic": "SGLT2",
+    "exclude": [
+     "pretrain",
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-expert-how-3",
+   "group": "g-firsts-expert-how",
+   "text": "As a cardiologist I'm comfortable with the outcomes data on SGLT2 inhibitors, so skip the basics. How do they actually work on the myocardium — metabolic shift, natriuresis, something else? Go deep on the leading hypotheses.",
+   "length": "detailed",
+   "expect": {
+    "level": "expert",
+    "ask": "how",
+    "topic": "sglt2",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "'Skip the basics' plus 'go deep' asks for more depth, not for no explanation. A cardiologist's mechanism question in their own field is therefore a first how-explanation at expert level.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "expert",
+    "ask": "how",
+    "topic": "SGLT2",
+    "exclude": [
+     "pretrain",
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-compare-1",
+   "group": "g-firsts-compare",
+   "text": "Can you help me understand the difference between TCP and UDP? It's for my networking class",
+   "expect": {
+    "ask": "compare",
+    "include": [
+     "compare"
+    ],
+    "topic": "tcp",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "After a polite preamble they ask how two named protocols differ. That is a first compare explanation, and there are no trade-offs because they are not choosing between the two.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "compare",
+    "topic": "TCP",
+    "include": [
+     "compare"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-compare-2",
+   "group": "g-firsts-compare",
+   "text": "tcp vs udp — what's actually different between them?",
+   "length": "concise",
+   "expect": {
+    "ask": "compare",
+    "include": [
+     "compare"
+    ],
+    "topic": "tcp",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A concise length setting shortens the reply but does not mean 'just tell me', so a first explanation comparing two named things is still the need.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "compare",
+    "topic": "TCP",
+    "include": [
+     "compare"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-compare-3",
+   "group": "g-firsts-compare",
+   "text": "I always get TCP and UDP mixed up. How are they different?",
+   "expect": {
+    "ask": "compare",
+    "include": [
+     "compare"
+    ],
+    "topic": "tcp",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Mixing two terms up is not a stated wrong belief, and 'how are they different' is a comparison rather than a mechanism question, so this is a first compare explanation.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "compare",
+    "topic": "TCP",
+    "include": [
+     "compare"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-decide-1",
+   "group": "g-firsts-decide",
+   "text": "I just started my first full-time job and need to pick between a Roth IRA and a traditional IRA. Which one should I go with?",
+   "expect": {
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "topic": "ira",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They have to choose between two named options that are theirs to choose, so the first explanation sets out the trade-offs for their decision instead of just giving a verdict.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "decide",
+    "topic": "IRA",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-decide-2",
+   "group": "g-firsts-decide",
+   "text": "roth or traditional IRA?? trying to decide which one to open this week, I'm 24 and in a pretty low tax bracket",
+   "expect": {
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "topic": "ira",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A short choice between two named accounts that they have to make, plus their own circumstances, calls for a first explanation of the trade-offs.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "decide",
+    "topic": "IRA",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-decide-3",
+   "group": "g-firsts-decide",
+   "text": "Should I put my retirement savings into a Roth IRA or a traditional IRA? I'd like to understand the reasoning, not just get a pick.",
+   "length": "detailed",
+   "expect": {
+    "ask": "decide",
+    "include": [
+     "tradeoffs"
+    ],
+    "topic": "ira",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask which of two named options to choose and want the reasoning, so this is a first decide explanation built on trade-offs.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "decide",
+    "topic": "IRA",
+    "include": [
+     "tradeoffs"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-claim-1",
+   "group": "g-firsts-claim",
+   "text": "I keep reading that being bilingual makes kids better at switching between tasks. is this right?",
+   "expect": {
+    "ask": "claim",
+    "include": [
+     "argument"
+    ],
+    "topic": "bilingual",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "'Is this right?' here comes with no working. They are asking whether a contested research claim holds up, which calls for weighing the evidence, not feedback or a refutation.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "claim",
+    "topic": "bilingual",
+    "include": [
+     "argument"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-claim-2",
+   "group": "g-firsts-claim",
+   "text": "Is there actually solid evidence that bilingual children have better executive function, or is that overhyped?",
+   "expect": {
+    "ask": "claim",
+    "include": [
+     "argument"
+    ],
+    "topic": "bilingual",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask whether a claim is backed by evidence, with no belief of their own that is plainly wrong, so this is a first claim explanation that weighs the argument and the evidence.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "claim",
+    "topic": "bilingual",
+    "include": [
+     "argument"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-claim-3",
+   "group": "g-firsts-claim",
+   "text": "A parenting blog says raising your kid bilingual boosts their focus and self-control. Does the research really back that up?",
+   "expect": {
+    "ask": "claim",
+    "include": [
+     "argument"
+    ],
+    "topic": "bilingual",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They bring a contested claim from a source and ask what the research supports, so the reply should inspect the claim with evidence. Nothing here is a settled wrong belief to refute.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "claim",
+    "topic": "bilingual",
+    "include": [
+     "argument"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-relate-1",
+   "group": "g-firsts-relate",
+   "text": "I've learned about B cells, T cells, antibodies and macrophages separately but I can't see how they connect. Can you give me the big picture of the immune system?",
+   "expect": {
+    "ask": "relate",
+    "include": [
+     "conceptmap"
+    ],
+    "topic": "immune",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Socria has not explained anything yet, so 'can't see how they connect' is not confusion after an explanation. They want a first big-picture explanation showing how the parts fit together.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "relate",
+    "topic": "immune",
+    "include": [
+     "conceptmap"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-relate-2",
+   "group": "g-firsts-relate",
+   "text": "how do all the parts of the immune system fit together? like macrophages, antibodies, t cells, all of it",
+   "expect": {
+    "ask": "relate",
+    "include": [
+     "conceptmap"
+    ],
+    "topic": "immune",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Asking how many parts fit into one system is a relate question, so the first explanation should map the connections.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "relate",
+    "topic": "immune",
+    "include": [
+     "conceptmap"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-relate-3",
+   "group": "g-firsts-relate",
+   "text": "Before I get into the details, could you map out how the main pieces of the immune system relate to each other?",
+   "expect": {
+    "ask": "relate",
+    "include": [
+     "conceptmap"
+    ],
+    "topic": "immune",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask for an overview of how the pieces relate before the details, which is a first relate explanation best given as a concept map.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "relate",
+    "topic": "immune",
+    "include": [
+     "conceptmap"
+    ],
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval",
+     "tradeoffs"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-guard-solve-1",
+   "group": "g-firsts-guard-solve",
+   "text": "how do I solve 3x - 7 = 11?",
+   "guard": true,
+   "expect": {
+    "ask": "solve",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask how to solve a specific equation while the Answer Guard is up. The first explanation names the method and gives only the next step (faded), never a full worked solution.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "solve",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-guard-solve-2",
+   "group": "g-firsts-guard-solve",
+   "text": "Can you show me how to get x in 3x − 7 = 11? we just started equations in class",
+   "guard": true,
+   "expect": {
+    "ask": "solve",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Under the Answer Guard, a request to be shown how to solve an equation they have not tried yet is a first solve explanation, which must be faded rather than worked.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "solve",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "worked",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-guard-solve-3",
+   "group": "g-firsts-guard-solve",
+   "text": "what are the steps to find x in 3x-7=11",
+   "guard": true,
+   "questions": 0,
+   "expect": {
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval",
+     "elaborate",
+     "selfexplain",
+     "spaced",
+     "teachback",
+     "interleave"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Asking for the steps on a specific problem under the Answer Guard calls for a faded first explanation. Because questions:0 allows no question this turn, the question-asking strategies are excluded too.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "ask": "solve",
+    "include": [
+     "faded"
+    ],
+    "exclude": [
+     "worked",
+     "error",
+     "misconception",
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-filler-procedure-1",
+   "group": "g-firsts-filler-procedure",
+   "text": "how do you basically calculate compound interest on savings?",
+   "length": "concise",
+   "expect": {
+    "level": "intermediate",
+    "ask": "procedure",
+    "include": [
+     "worked"
+    ],
+    "topic": "interest",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask for a calculation procedure, with no Answer Guard and no earlier example, so the first explanation uses a worked example. 'Basically' is filler and says nothing about their level.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "intermediate",
+    "ask": "procedure",
+    "topic": "compound interest",
+    "include": [
+     "worked"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-filler-procedure-2",
+   "group": "g-firsts-filler-procedure",
+   "text": "Technically, what's the procedure for working out compound interest over several years?",
+   "expect": {
+    "level": "intermediate",
+    "ask": "procedure",
+    "include": [
+     "worked"
+    ],
+    "topic": "interest",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "This is a first procedure question without the guard, so it gets a worked example. 'Technically' is filler and does not make them an expert.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "intermediate",
+    "ask": "procedure",
+    "topic": "compound interest",
+    "include": [
+     "worked"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-firsts-filler-procedure-3",
+   "group": "g-firsts-filler-procedure",
+   "text": "so basically how would I work out compound interest if the bank compounds monthly?",
+   "expect": {
+    "level": "intermediate",
+    "ask": "procedure",
+    "include": [
+     "worked"
+    ],
+    "topic": "interest",
+    "exclude": [
+     "error",
+     "misconception",
+     "tradeoffs",
+     "retrieval"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Asking how to carry out a calculation, with no guard and no prior example, is a first procedure explanation shown by a worked example. 'Basically' gives no signal about level.",
+   "slice": "firsts",
+   "rater": {
+    "need": "explain",
+    "level": "intermediate",
+    "ask": "procedure",
+    "topic": "compound interest",
+    "include": [
+     "worked"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-quiz-1",
+   "group": "g-practice-quiz",
+   "text": "quiz me on mitosis",
+   "expect": {
+    "topic": "mitosis",
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "A direct request to be quizzed, with no attempt, belief or confusion before it, so the practice rung applies.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "topic": "mitosis",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-quiz-2",
+   "group": "g-practice-quiz",
+   "text": "can you test me on the stages of mitosis? bio test on friday",
+   "expect": {
+    "topic": "mitosis",
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "Asking to be tested before an exam that is days away is a practice request, not hurry, so the practice rung applies.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "topic": "mitosis",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-quiz-3",
+   "group": "g-practice-quiz",
+   "text": "Give me a few questions on mitosis so I can see if I actually know it",
+   "expect": {
+    "topic": "mitosis",
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "They want questions to check their own knowledge, which is a request to be quizzed, so the need is practice.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "topic": "mitosis",
+    "exclude": [
+     "error",
+     "misconception",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-another-1",
+   "group": "g-practice-another",
+   "text": "nice, give me another one",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i solve 3x - 5 = 10"
+    },
+    {
+     "role": "assistant",
+     "content": "Get the x-term on its own first. What could you do to both sides to cancel the −5? [shown inline — steps: 3x − 5 = 10 → 3x = ? → x = ?]"
+    },
+    {
+     "role": "user",
+     "content": "add 5 so 3x = 15, then x = 5"
+    },
+    {
+     "role": "assistant",
+     "content": "Exactly, both steps hold: adding 5 gives 3x = 15, and dividing by 3 gives x = 5. You can confirm it by plugging it back in: 3(5) − 5 = 10."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "linear equations"
+    },
+    {
+     "s": [],
+     "n": "feedback",
+     "c": "linear equations"
+    }
+   ],
+   "guard": true,
+   "expect": {
+    "topic": "equation",
+    "exclude": [
+     "worked",
+     "error"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "After a confirmed solve with no open question, asking for another problem is a practice request, and the guard rules out a worked example.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "exclude": [
+     "worked",
+     "error",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-another-2",
+   "group": "g-practice-another",
+   "text": "can I try a harder one?",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i solve 3x - 5 = 10"
+    },
+    {
+     "role": "assistant",
+     "content": "Get the x-term on its own first. What could you do to both sides to cancel the −5? [shown inline — steps: 3x − 5 = 10 → 3x = ? → x = ?]"
+    },
+    {
+     "role": "user",
+     "content": "add 5 so 3x = 15, then x = 5"
+    },
+    {
+     "role": "assistant",
+     "content": "Exactly, both steps hold: adding 5 gives 3x = 15, and dividing by 3 gives x = 5. You can confirm it by plugging it back in: 3(5) − 5 = 10."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "linear equations"
+    },
+    {
+     "s": [],
+     "n": "feedback",
+     "c": "linear equations"
+    }
+   ],
+   "guard": true,
+   "expect": {
+    "topic": "equation",
+    "exclude": [
+     "worked",
+     "error"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "Asking to try a harder problem after succeeding is a request for more practice, not an answer or a new question to explain.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "exclude": [
+     "worked",
+     "error",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-another-3",
+   "group": "g-practice-another",
+   "text": "ok another problem pls",
+   "history": [
+    {
+     "role": "user",
+     "content": "how do i solve 3x - 5 = 10"
+    },
+    {
+     "role": "assistant",
+     "content": "Get the x-term on its own first. What could you do to both sides to cancel the −5? [shown inline — steps: 3x − 5 = 10 → 3x = ? → x = ?]"
+    },
+    {
+     "role": "user",
+     "content": "add 5 so 3x = 15, then x = 5"
+    },
+    {
+     "role": "assistant",
+     "content": "Exactly, both steps hold: adding 5 gives 3x = 15, and dividing by 3 gives x = 5. You can confirm it by plugging it back in: 3(5) − 5 = 10."
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "faded"
+     ],
+     "n": "explain",
+     "q": "try",
+     "c": "linear equations"
+    },
+    {
+     "s": [],
+     "n": "feedback",
+     "c": "linear equations"
+    }
+   ],
+   "guard": true,
+   "expect": {
+    "topic": "equation",
+    "exclude": [
+     "worked",
+     "error"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "A plain request for another problem on the topic just practised is the practice rung, with no attempt in this message to give feedback on.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "exclude": [
+     "worked",
+     "error",
+     "retrieval"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-exam-review-1",
+   "group": "g-practice-exam-review",
+   "text": "bio final on monday, what should i review?",
+   "ledger": [
+    {
+     "topic": "mitosis",
+     "seen": 3,
+     "right": 1,
+     "wrong": 2,
+     "daysAgo": 6,
+     "box": 0
+    },
+    {
+     "topic": "cellular respiration",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 9,
+     "box": 1
+    },
+    {
+     "topic": "osmosis",
+     "seen": 2,
+     "right": 2,
+     "wrong": 0,
+     "daysAgo": 1.5,
+     "box": 3
+    }
+   ],
+   "expect": {
+    "include": [
+     "spaced"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "Asking what to review before an exam, with ledger entries that are due, is a review request, so the practice rung applies and spaced review fits.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "include": [
+     "spaced"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-exam-review-2",
+   "group": "g-practice-exam-review",
+   "text": "What do I need to go over again before my biology exam?",
+   "ledger": [
+    {
+     "topic": "mitosis",
+     "seen": 3,
+     "right": 1,
+     "wrong": 2,
+     "daysAgo": 6,
+     "box": 0
+    },
+    {
+     "topic": "cellular respiration",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 9,
+     "box": 1
+    },
+    {
+     "topic": "osmosis",
+     "seen": 2,
+     "right": 2,
+     "wrong": 0,
+     "daysAgo": 1.5,
+     "box": 3
+    }
+   ],
+   "expect": {
+    "include": [
+     "spaced"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "Asking what to revisit before an exam is a revision request built on earlier topics that are due, so the need is practice with spaced review.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "include": [
+     "spaced"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-exam-review-3",
+   "group": "g-practice-exam-review",
+   "text": "can we do a revision session for my bio test, whatever I'm weakest on",
+   "ledger": [
+    {
+     "topic": "mitosis",
+     "seen": 3,
+     "right": 1,
+     "wrong": 2,
+     "daysAgo": 6,
+     "box": 0
+    },
+    {
+     "topic": "cellular respiration",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 9,
+     "box": 1
+    },
+    {
+     "topic": "osmosis",
+     "seen": 2,
+     "right": 2,
+     "wrong": 0,
+     "daysAgo": 1.5,
+     "box": 3
+    }
+   ],
+   "expect": {
+    "include": [
+     "spaced"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "An explicit request for a revision session aimed at their weakest topics is practice, and the low-box ledger entries that are due call for spaced review.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "include": [
+     "spaced"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-retrieval-old-1",
+   "group": "g-practice-retrieval-old",
+   "text": "what happens in the krebs cycle again? I've forgotten most of it",
+   "ledger": [
+    {
+     "topic": "krebs cycle",
+     "seen": 2,
+     "right": 1,
+     "wrong": 1,
+     "daysAgo": 12,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "include": [
+     "retrieval"
+    ],
+    "topic": "krebs",
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A first explanation in this conversation of a topic the ledger shows they met 12 days ago, so it is explain with recall before reteaching.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "how",
+    "topic": "krebs",
+    "include": [
+     "retrieval"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-retrieval-old-2",
+   "group": "g-practice-retrieval-old",
+   "text": "We did the Krebs cycle a while back but I can't remember it, how does it work?",
+   "ledger": [
+    {
+     "topic": "krebs cycle",
+     "seen": 2,
+     "right": 1,
+     "wrong": 1,
+     "daysAgo": 12,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "include": [
+     "retrieval"
+    ],
+    "topic": "krebs",
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A how-question on a topic met in an earlier conversation more than a day ago is a first explanation here, and retrieval should come before reteaching.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "how",
+    "topic": "krebs",
+    "include": [
+     "retrieval"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-retrieval-old-3",
+   "group": "g-practice-retrieval-old",
+   "text": "remind me how the krebs cycle works",
+   "ledger": [
+    {
+     "topic": "krebs cycle",
+     "seen": 2,
+     "right": 1,
+     "wrong": 1,
+     "daysAgo": 12,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "include": [
+     "retrieval"
+    ],
+    "topic": "krebs",
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "Asking to be reminded how something works, with no earlier explanation in this conversation, is explain, and the old ledger entry makes recall the right way in.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "how",
+    "topic": "krebs",
+    "include": [
+     "retrieval"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-recent-no-retrieval-1",
+   "group": "g-practice-recent-no-retrieval",
+   "text": "what's standard deviation again? we literally just did this",
+   "ledger": [
+    {
+     "topic": "standard deviation",
+     "seen": 1,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 0.02,
+     "box": 0
+    }
+   ],
+   "expect": {
+    "ask": "what",
+    "topic": "deviation",
+    "exclude": [
+     "retrieval",
+     "spaced",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A concept question on a topic met only about half an hour ago is a plain explanation, and retrieval or spaced review is wrong because the ledger entry is not older than a day.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "what",
+    "topic": "standard deviation",
+    "exclude": [
+     "retrieval",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-recent-no-retrieval-2",
+   "group": "g-practice-recent-no-retrieval",
+   "text": "sorry, remind me what standard deviation measures",
+   "ledger": [
+    {
+     "topic": "standard deviation",
+     "seen": 1,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 0.02,
+     "box": 0
+    }
+   ],
+   "expect": {
+    "ask": "what",
+    "topic": "deviation",
+    "exclude": [
+     "retrieval",
+     "spaced",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "They ask what a concept is with no earlier reply in this conversation to be confused by, so it is explain, without retrieval because the topic was met within the hour.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "what",
+    "topic": "standard deviation",
+    "exclude": [
+     "retrieval",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-recent-no-retrieval-3",
+   "group": "g-practice-recent-no-retrieval",
+   "text": "Can you explain standard deviation one more time? it slipped my mind",
+   "ledger": [
+    {
+     "topic": "standard deviation",
+     "seen": 1,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 0.02,
+     "box": 0
+    }
+   ],
+   "expect": {
+    "ask": "what",
+    "topic": "deviation",
+    "exclude": [
+     "retrieval",
+     "spaced",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A request to explain a concept again, in a new conversation, is explain rather than reframe, and the very recent ledger entry rules out recall-first.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "what",
+    "topic": "standard deviation",
+    "exclude": [
+     "retrieval",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-ledger-junk-1",
+   "group": "g-practice-ledger-junk",
+   "text": "what's the difference between weather and climate?",
+   "ledger": [
+    {
+     "topic": "don't",
+     "seen": 3,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 4,
+     "box": 0
+    },
+    {
+     "topic": "next",
+     "seen": 2,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 6,
+     "box": 0
+    },
+    {
+     "topic": "solve",
+     "seen": 1,
+     "right": 0,
+     "wrong": 1,
+     "daysAgo": 9,
+     "box": 0
+    },
+    {
+     "topic": "thanks",
+     "seen": 2,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 3,
+     "box": 0
+    }
+   ],
+   "expect": {
+    "ask": "compare",
+    "topic": "climate",
+    "exclude": [
+     "retrieval",
+     "spaced",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "A first comparison question on a new topic is explain, and the junk ledger entries are not real topics, so nothing is recalled or put up for review.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "compare",
+    "topic": "climate",
+    "include": [
+     "compare"
+    ],
+    "exclude": [
+     "retrieval",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-ledger-junk-2",
+   "group": "g-practice-ledger-junk",
+   "text": "how is climate different from weather",
+   "ledger": [
+    {
+     "topic": "don't",
+     "seen": 3,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 4,
+     "box": 0
+    },
+    {
+     "topic": "next",
+     "seen": 2,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 6,
+     "box": 0
+    },
+    {
+     "topic": "solve",
+     "seen": 1,
+     "right": 0,
+     "wrong": 1,
+     "daysAgo": 9,
+     "box": 0
+    },
+    {
+     "topic": "thanks",
+     "seen": 2,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 3,
+     "box": 0
+    }
+   ],
+   "expect": {
+    "ask": "compare",
+    "topic": "climate",
+    "exclude": [
+     "retrieval",
+     "spaced",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "It asks how two concepts differ, which is a first explanation of the compare kind, and words like \"don't\" or \"next\" in the ledger must never prompt recall.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "compare",
+    "topic": "climate",
+    "include": [
+     "compare"
+    ],
+    "exclude": [
+     "retrieval",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-ledger-junk-3",
+   "group": "g-practice-ledger-junk",
+   "text": "Can you compare weather and climate for me? geography homework",
+   "ledger": [
+    {
+     "topic": "don't",
+     "seen": 3,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 4,
+     "box": 0
+    },
+    {
+     "topic": "next",
+     "seen": 2,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 6,
+     "box": 0
+    },
+    {
+     "topic": "solve",
+     "seen": 1,
+     "right": 0,
+     "wrong": 1,
+     "daysAgo": 9,
+     "box": 0
+    },
+    {
+     "topic": "thanks",
+     "seen": 2,
+     "right": 0,
+     "wrong": 0,
+     "daysAgo": 3,
+     "box": 0
+    }
+   ],
+   "expect": {
+    "ask": "compare",
+    "topic": "climate",
+    "exclude": [
+     "retrieval",
+     "spaced",
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "explain"
+    ]
+   },
+   "why": "An explicit request to compare two concepts for homework is a first compare explanation, not a handover, and the ledger holds only junk that must not be recalled.",
+   "slice": "practice",
+   "rater": {
+    "need": "explain",
+    "ask": "compare",
+    "topic": "climate",
+    "include": [
+     "compare"
+    ],
+    "exclude": [
+     "retrieval",
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-no-questions-1",
+   "group": "g-practice-no-questions",
+   "text": "give me some practice problems on derivatives",
+   "questions": 0,
+   "ledger": [
+    {
+     "topic": "derivatives",
+     "seen": 5,
+     "right": 3,
+     "wrong": 2,
+     "daysAgo": 4,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "topic": "derivative",
+    "exclude": [
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave",
+     "error"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "A request for practice problems is the practice rung, but questions:0 forbids every question-asking strategy, even though the ledger entry is older than a day.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "topic": "derivative",
+    "exclude": [
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave",
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-no-questions-2",
+   "group": "g-practice-no-questions",
+   "text": "can I drill derivatives for a bit",
+   "questions": 0,
+   "ledger": [
+    {
+     "topic": "derivatives",
+     "seen": 5,
+     "right": 3,
+     "wrong": 2,
+     "daysAgo": 4,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "topic": "derivative",
+    "exclude": [
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave",
+     "error"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "Asking to drill a topic is practice, and with questions:0 the turn may not use retrieval, spaced review or any other strategy that asks a question.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "topic": "derivative",
+    "exclude": [
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave",
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-no-questions-3",
+   "group": "g-practice-no-questions",
+   "text": "I want to practise derivatives before the test",
+   "questions": 0,
+   "ledger": [
+    {
+     "topic": "derivatives",
+     "seen": 5,
+     "right": 3,
+     "wrong": 2,
+     "daysAgo": 4,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "topic": "derivative",
+    "exclude": [
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave",
+     "error"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "A stated wish to practise before a test is the practice rung, and the no-question constraint overrides the due ledger entry for all question-asking strategies.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "topic": "derivative",
+    "exclude": [
+     "elaborate",
+     "selfexplain",
+     "retrieval",
+     "spaced",
+     "teachback",
+     "interleave",
+     "error"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-reaction-1",
+   "group": "g-practice-reaction",
+   "text": "thanks!",
+   "history": [
+    {
+     "role": "user",
+     "content": "why is the sky blue?"
+    },
+    {
+     "role": "assistant",
+     "content": "Sunlight is a mix of colours, and when it hits the gas molecules in air the short blue wavelengths get scattered far more than the long red ones, so blue light reaches your eyes from every direction. [shown inline — diagram: sunlight → air molecules → blue scattered across the sky]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "rayleigh scattering"
+    }
+   ],
+   "expect": {
+    "topic": "null",
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "A bare thank-you after an explanation, with no open question, is small talk with nothing to explain, so the reply needs restraint.",
+   "slice": "practice",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-practice-reaction-2",
+   "group": "g-practice-reaction",
+   "text": "ok cool",
+   "history": [
+    {
+     "role": "user",
+     "content": "why is the sky blue?"
+    },
+    {
+     "role": "assistant",
+     "content": "Sunlight is a mix of colours, and when it hits the gas molecules in air the short blue wavelengths get scattered far more than the long red ones, so blue light reaches your eyes from every direction. [shown inline — diagram: sunlight → air molecules → blue scattered across the sky]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "rayleigh scattering"
+    }
+   ],
+   "expect": {
+    "topic": "null",
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "\"ok cool\" is a pure reaction that answers no question and asks for nothing, so nothing should be added and there is no subject to note.",
+   "slice": "practice",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-practice-reaction-3",
+   "group": "g-practice-reaction",
+   "text": "got it, ty",
+   "history": [
+    {
+     "role": "user",
+     "content": "why is the sky blue?"
+    },
+    {
+     "role": "assistant",
+     "content": "Sunlight is a mix of colours, and when it hits the gas molecules in air the short blue wavelengths get scattered far more than the long red ones, so blue light reaches your eyes from every direction. [shown inline — diagram: sunlight → air molecules → blue scattered across the sky]"
+    }
+   ],
+   "thread": [
+    {
+     "s": [
+      "causal",
+      "visual"
+     ],
+     "n": "explain",
+     "c": "rayleigh scattering"
+    }
+   ],
+   "expect": {
+    "topic": "null",
+    "noLines": true,
+    "accept": [
+     "direct"
+    ]
+   },
+   "why": "An acknowledgement with thanks, after a reply that asked no question, is a pure reaction, so the need is direct with a null topic.",
+   "slice": "practice",
+   "rater": {
+    "need": "direct",
+    "topic": "null"
+   }
+  },
+  {
+   "id": "g-practice-interleave-1",
+   "group": "g-practice-interleave",
+   "text": "mix it up, give me questions from all the stuff we've done, not just one topic",
+   "ledger": [
+    {
+     "topic": "fractions",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 3,
+     "box": 2
+    },
+    {
+     "topic": "percentages",
+     "seen": 3,
+     "right": 1,
+     "wrong": 2,
+     "daysAgo": 5,
+     "box": 0
+    },
+    {
+     "topic": "ratios",
+     "seen": 2,
+     "right": 2,
+     "wrong": 0,
+     "daysAgo": 8,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "include": [
+     "interleave"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "A request for mixed questions across several topics already studied is practice, and the explicit mixing calls for interleaving.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "include": [
+     "interleave"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-interleave-2",
+   "group": "g-practice-interleave",
+   "text": "can you quiz me on a random mix of fractions, percentages and ratios",
+   "ledger": [
+    {
+     "topic": "fractions",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 3,
+     "box": 2
+    },
+    {
+     "topic": "percentages",
+     "seen": 3,
+     "right": 1,
+     "wrong": 2,
+     "daysAgo": 5,
+     "box": 0
+    },
+    {
+     "topic": "ratios",
+     "seen": 2,
+     "right": 2,
+     "wrong": 0,
+     "daysAgo": 8,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "include": [
+     "interleave"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "Asking to be quizzed on a shuffled mix of named topics they met before is practice with interleaving.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "include": [
+     "interleave"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  },
+  {
+   "id": "g-practice-interleave-3",
+   "group": "g-practice-interleave",
+   "text": "Test me on a bit of everything we covered so far, shuffled up",
+   "ledger": [
+    {
+     "topic": "fractions",
+     "seen": 4,
+     "right": 3,
+     "wrong": 1,
+     "daysAgo": 3,
+     "box": 2
+    },
+    {
+     "topic": "percentages",
+     "seen": 3,
+     "right": 1,
+     "wrong": 2,
+     "daysAgo": 5,
+     "box": 0
+    },
+    {
+     "topic": "ratios",
+     "seen": 2,
+     "right": 2,
+     "wrong": 0,
+     "daysAgo": 8,
+     "box": 1
+    }
+   ],
+   "expect": {
+    "include": [
+     "interleave"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ],
+    "accept": [
+     "practice"
+    ]
+   },
+   "why": "A request to be tested on a shuffled mix of earlier topics is the practice rung, and the mixing makes interleaving the fitting strategy.",
+   "slice": "practice",
+   "rater": {
+    "need": "practice",
+    "include": [
+     "interleave"
+    ],
+    "exclude": [
+     "error",
+     "misconception"
+    ]
+   }
+  }
+ ]
+}

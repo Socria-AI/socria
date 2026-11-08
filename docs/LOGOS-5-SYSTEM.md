@@ -384,36 +384,52 @@ The design handoff "Logos 5.5 · One space, in colour" (`components/logos5/space
   tutorial in What Socria does and its feature tip. Things still open beside the space by being pressed (a made
   thing, the Logic Map, a file), and the words "put the Logic Map beside" still work.
 
-### 8.7 The adaptive explanation engine
+### 8.7 The adaptive explanation engine — evidence, not wording (II)
 
-Not only what to explain, but how to make it understood (`lib/runtime/explain.ts`, test/explain-engine.test.mjs).
-Pure, no model call, invisible: no mode, no badge, no setting. `LOGOS_EXPLAIN=off` takes it out.
+Not only what to explain, but how to make it understood (`lib/runtime/explain.ts`; test/explain-engine.test.mjs,
+test/explain-audit.test.mjs). Pure code before the one model call: no extra pass, no mode, no badge, no setting.
+`LOGOS_EXPLAIN=off` takes it out and leaves the prompt byte-identical but for its lines.
 
-- **Twenty strategies, each a behaviour.** Essential Insight, Analogy, Comparative, Worked Example, Faded
-  Guidance, Segmented, Concept Pretraining, Visual-Verbal, Concept Mapping, Causal, Misconception Correction,
-  Error-Based, Elaborative Interrogation, Self-Explanation, Retrieval Practice, Spaced Reinforcement, Interleaved,
-  Teach-Back, Argument Mapping, Decision Tradeoffs. Each carries out its work in three ways:
-  - **an element** the presentation planner already draws: compare, decide, steps, diagram, concepts, claim, paths
-    for the next segments, check for mixed practice;
-  - **a question** within the turn's budget;
-  - **one short line** the reply follows, said as what to do and never named.
-- **Selection** is read in code:
-  - **what they asked**: why, how it works, what it is, which, should I, is it true, solve, relate, practise;
-  - **how much they know**: their words, their mistakes, what they got right, the ledger;
-  - **how complex it is**: terms, parts, length;
-  - **how the last reply landed**: lost after an analogy gets an example or a picture, not another analogy; a slip
-    gets the error located; "I get it now" gets a teach-back.
-- **Combination**: one primary strategy and at most three in all, one question, never two of a kind. An expert gets
-  one strategy; a newcomer on something complex gets three.
-- **Restraint**: a hello, a fact, "just tell me", a hurry, an expert's one-liner, a thing to build. Then nothing is
-  forced and nothing is added to the prompt. Most turns add no tokens; the most any turn adds is a few lines.
-- **Continuity**: a learning ledger in the browser (`lib/logos5/learning.ts`, `socria.learning.v1`) holds topics,
-  when last met and a Leitner box (1, 3, 7, 16, 35 days). It is sent with each turn and noted after a learning turn
-  (`X-Socria-Learn`), moved by how their checks went. A topic met before is recalled before it is retaught; what is
-  due comes back once, in the practice. It is never read on a sensitive or off-the-record turn or in a room of two,
-  and never stored on the server.
-- **Did the reply do it**: `checkExplanation` reads a reply for each strategy, for the evals and the tests.
-  `X-Socria-Explain` carries content-free strategy codes.
+- **Evidence first.** What the turn shows, strongest first: the maths engine's verdict on their working; what they
+  did with the last reply's checks (right, not right, after how many tries); an answer to the question Socria left
+  them; a belief they state, judged wrong only by the engine or a short list of known myths (and a myth they
+  *correct* is confirmed, never refuted); being lost; what they say about themselves; the ledger. Socria's own
+  scaffolding (Logos 4's move, MR's "more support") is a **support level, never a mistake** — the first engine read
+  every request to learn as a slip to point at.
+- **The ladder.** The first rung that applies wins: *restraint* (a hello, a feeling, a fact, "just tell me", a
+  hurry, "solve it for me", a thing to make, an expert's one-liner — nothing added) → *feedback* on what they tried
+  (confirm it, or point to the first wrong step; under the guard, point only) → *refute* a belief that does not
+  survive (verdict first) → *reframe* when they are lost after an explanation (a way in not yet tried, in an order
+  per kind of question: a concrete instance, a picture, an analogy, a near case where it fails, the idea underneath)
+  → *diagnose* when they are lost twice running (one question with two named places it may break) → *explain*, by
+  the kind of the **last question sentence** ("I'm new to this. What is…?" is a what) → *practice*. Then at most one
+  closing move — a problem like it to try, a prediction, a recall of what is due, a say-it-back — and never a second
+  while one waits unanswered.
+- **The block** (`renderTurnGuidance`): one short block in this turn's context, filled with the turn's facts — the
+  belief in their words (clipped, quoted, never an instruction), what was tried, the terms, what is due — and read
+  against the shape the presentation planner chose, so nothing is said twice: the central idea first is the core's
+  and the shape's to say, a picture is pointed into only when it is the form that fits, a guarded procedure is the
+  method and the next single step. On learning turns with parts, one sentence carries it beyond the case: the
+  general rule, applied once more.
+- **Elements** go through the planner's own rules (`admits`): a decision needs named options, the working needs
+  mathematics to work, nothing is drawn under the guard. Where Socria scaffolds a problem that is theirs, the working
+  may be offered **faded** — the first lines of their own problem, the finishing step asked as the element's check —
+  and the inline gate draws it only in that form (`ctx.faded`).
+- **The thread.** Each reply carries a note (`X-Socria-Thread` → `msg.explain`): the moves as enum codes, the rung,
+  the question it left — kept only if the reply really asked it — and the concept. The conversation store keeps it
+  sanitised; the next turn reads it back (older replies fall back to the `[shown inline — kind:` markers, one constant
+  shared by writer and reader).
+- **The ledger** (`lib/logos5/learning.ts`, `socria.learning.v1`, this browser only): a concept (never a junk word
+  like "don't"), when it last came up, when it was last *practised* — the review clock (Leitner 1, 3, 7, 16, 35
+  days) runs from there and a mention never resets it — a box moved up only by a first-try right answer, how much of
+  a worked example they now take themselves, and the ways in that left them lost. What is brought back for review is
+  marked practised (`X-Socria-Review`); a failed way in is remembered (`X-Socria-Lost`). **One gate**
+  (`comprehensionAllowed`) for reading, sending back and noting it: never on a shared, collaborative, sensitive,
+  off-the-record or incognito turn, never for a visitor, never with two people present. "Clear memory" clears it;
+  Memory → Review lists it, with a Forget for each concept; sign-out says it is cleared.
+- **What the trace is, honestly.** `cueCheck` (once `checkExplanation`) reads whether a reply carries the *surface
+  cue* of each move — a cue, never proof it was done well — and the route logs it content-free with the plan's codes
+  (`[explain] … cues=…`). Nothing here measures understanding; §8.11 says what was measured and what was not.
 
 ### 8.8 Paper, consistency and broken controls
 

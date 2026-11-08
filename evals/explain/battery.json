@@ -1,0 +1,1682 @@
+[
+  {
+    "id": "calc-secant-teachback",
+    "domain": "mathematics — calculus",
+    "concept": "the derivative as the limit of secant slopes",
+    "persona": {
+      "level": "novice",
+      "prior": "High-school algebra; can compute the slope between two points; was told \"instantaneous rate of change\" and found it meaningless.",
+      "misconception": null
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "what even is a derivative? my teacher keeps saying \"instantaneous rate of change\" and it means nothing to me"
+      },
+      {
+        "role": "assistant",
+        "content": "Start with something you can already do: the slope between two points on a curve. That's an average rate of change — how much y rises per unit of x between them.\n\nNow keep one point fixed and slide the other one towards it. The slope changes as you slide, but it settles towards one number. That number is the derivative at the fixed point: the rate of change right there, not averaged over a stretch.\n\nTry it with y = x² at x = 3. Work out the slope from x = 3 to x = 4, then from 3 to 3.1, then from 3 to 3.01. What do you notice?"
+      }
+    ],
+    "message": "ok i think i get it now?? the slopes came out 7, then 6.1, then 6.01 so they're heading to 6. so the derivative at 3 is 6 because thats what the slope turns into when the second point basically lands on the first one. but they never actually touch right, bc then its 0/0",
+    "tags": [
+      "what",
+      "teach-back"
+    ],
+    "ideal": {
+      "central_insight": "The derivative is the value the secant slopes approach as the gap h shrinks — a limit — so the two points never have to coincide. For x² at 3 the secant slope is exactly 6 + h, which visibly heads to 6.",
+      "should": [
+        "Confirm briefly and specifically that their account is right, naming the two things they got exactly right: the slopes settle on 6, and h never actually reaches 0 (which is precisely what a limit is)",
+        "Attach the one missing word — \"limit\" — to their own description rather than replacing their description",
+        "Optionally show the algebra that makes their numbers inevitable: ((3+h)² − 9)/h = 6 + h",
+        "Offer at most one forward step (e.g. predict the derivative at x = 5, or spot the 2x pattern) and let them stop there"
+      ],
+      "should_not": [
+        "Re-explain derivatives from the start or repeat the two-point slope set-up",
+        "Bury the confirmation under caveats about epsilon–delta rigour",
+        "Generic praise (\"Great job!\") that does not say what was right",
+        "Ask \"does that make sense?\" or stack several check questions"
+      ],
+      "best_representation": "notation"
+    },
+    "correctness": {
+      "must": [
+        "Secant slope of x² between 3 and 3 + h is 6 + h (7 for h = 1, 6.1 for h = 0.1, 6.01 for h = 0.01)",
+        "The derivative of x² at x = 3 is 6",
+        "The limit is taken without ever setting h = 0; at h = 0 the difference quotient is the undefined 0/0"
+      ],
+      "must_not": [
+        "Saying the derivative is found by plugging h = 0 into the difference quotient",
+        "Saying the two points eventually touch, or that the derivative is the slope between two identical points",
+        "Correcting the user as though they were wrong"
+      ]
+    },
+    "transfer": {
+      "question": "Same idea, new curve: for f(x) = x³ at x = 2, what is the slope of the secant line from x = 2 to x = 2.1, and what number do the secant slopes approach as the second point slides in?",
+      "answer": "Secant slope = ((2+h)³ − 8)/h = 12 + 6h + h². For h = 0.1 that is 12.61 (h = 0.01 gives 12.0601). The slopes approach 12, so f′(2) = 12 — consistent with f′(x) = 3x²."
+    }
+  },
+  {
+    "id": "prob-monty-hall-after-analogy",
+    "domain": "probability",
+    "concept": "conditional probability — the Monty Hall problem (the host's constrained, informed choice)",
+    "persona": {
+      "level": "novice",
+      "prior": "Knows that n equally likely outcomes each have probability 1/n; has heard the answer is \"switch\" and does not believe it.",
+      "misconception": "When two options remain they are 50/50; the host opening a door just removes a goat and carries no information."
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "monty hall problem. why would switching matter?? 2 doors left = 50/50"
+      },
+      {
+        "role": "assistant",
+        "content": "Picture 100 doors instead of 3. You pick one. The host — who knows where the car is — opens 98 of the other doors, all goats, leaving your door and one other closed. Would you still feel it's 50/50? Your first pick had a 1 in 100 chance. The other closed door holds the remaining 99 in 100. With 3 doors it's the same logic: 1/3 for your door, 2/3 for the other one."
+      }
+    ],
+    "message": "no the 100 doors thing just feels like a different game to me. in the real one there are 2 doors left and one has the car. i dont see why the host opening a door changes anything about MY door",
+    "tags": [
+      "why",
+      "still-confused",
+      "confusion-after-analogy",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "They are right that the host's move tells them nothing about their own door — it stays at 1/3. But the host is not random: he must avoid both their door and the car, so in the 2 out of 3 worlds where they first picked a goat he is forced to leave the car behind the other door. The two closed doors are not symmetric, because only one of them was protected from being opened.",
+      "should": [
+        "Agree with the true part of the objection: nothing about their door changes; it stays 1/3",
+        "Drop the 100-door analogy entirely and change representation: enumerate the three equally likely car positions (they pick door 1), what the host must open in each, and what switching gets",
+        "Name the asymmetry: the host never opens your door and never opens the car, so \"two doors left\" does not mean \"two equal doors\"",
+        "Offer a hands-on check as the next step (three playing cards with a friend as host, or a quick simulation), not a lecture",
+        "Keep it to one idea"
+      ],
+      "should_not": [
+        "Repeat, rephrase or enlarge the 100-doors analogy that just failed",
+        "Restate \"1/3 vs 2/3\" more forcefully or appeal to authority",
+        "Use Bayes' theorem notation with a novice",
+        "Imply they are slow for finding it counter-intuitive",
+        "Drop the assumptions the answer depends on (host knows, always opens a goat door, always offers the switch)"
+      ],
+      "best_representation": "compare"
+    },
+    "correctness": {
+      "must": [
+        "Under the standard rules (host knows where the car is, always opens a goat door that is not yours, always offers the switch) staying wins 1/3 and switching wins 2/3",
+        "Each of the three car positions starts equally likely, 1/3 each",
+        "The host's choice is constrained by his knowledge; that constraint is what makes the remaining doors unequal"
+      ],
+      "must_not": [
+        "Saying switching wins 2/3 regardless of how the host behaves",
+        "Saying the chance of your door rises to 1/2 after the reveal",
+        "Saying the answer depends on which goat door is opened"
+      ]
+    },
+    "transfer": {
+      "question": "New version: the host does NOT know where the car is. He opens one of the two other doors at random, and it happens to show a goat. Should you switch now?",
+      "answer": "It no longer matters: staying and switching each win 1/2. Of the 6 equally likely (car position, door opened) combinations, the host reveals the car in 2; of the 4 where a goat appears, the car is behind your door in 2 and behind the other door in 2. (A 2-million-game simulation gives 0.50 / 0.50.) The 2/3 advantage came entirely from the host's knowledge-driven constraint — answering 2/3 here is pattern-matching, not understanding."
+    }
+  },
+  {
+    "id": "phys-seasons-still-confused",
+    "domain": "physics — astronomy",
+    "concept": "cause of the seasons: axial tilt changes sun angle and day length",
+    "persona": {
+      "level": "novice",
+      "prior": "Knows Earth orbits the Sun and is tilted; was taught seasons at school without understanding why tilt matters.",
+      "misconception": "Seasons come from distance to the Sun — and the previous reply reinforced this by saying the tilted hemisphere is \"closer\"."
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "why is it hot in summer and cold in winter"
+      },
+      {
+        "role": "assistant",
+        "content": "It's because of Earth's tilt. Earth's axis is tilted about 23.5°, so for part of the year the Northern Hemisphere is tilted toward the Sun — it's closer to the Sun and gets more heat — and six months later it's tilted away, so it gets less."
+      }
+    ],
+    "message": "wait but how does tilting make us closer? the sun is like 150 million km away, tilting moves us a few thousand km at most. that cant matter?? so is it actually distance or not",
+    "tags": [
+      "why",
+      "still-confused",
+      "misconception",
+      "prior-turn-error"
+    ],
+    "ideal": {
+      "central_insight": "It isn't distance at all — the earlier reply was wrong to say \"closer\". The tilt changes the angle at which sunlight strikes your part of the Earth, and how many hours it shines: steep summer sunlight concentrates a beam on a small patch of ground; low winter sunlight spreads the same beam thin over a larger patch, for fewer hours.",
+      "should": [
+        "Say directly that their reasoning is right and the previous \"closer to the Sun\" statement was a mistake",
+        "Replace it with the angle mechanism: a torch shone straight down versus at a slant — same light, bigger patch, weaker per square metre",
+        "Add day length as the second effect of the same tilt",
+        "Clinch it with facts the distance story cannot explain: Earth is closest to the Sun in early January, during northern winter, and the two hemispheres have opposite seasons at the same distance"
+      ],
+      "should_not": [
+        "Defend or blur the earlier error (\"closer, in a sense\")",
+        "Say distance and tilt both contribute to the seasons as if comparable",
+        "Pile on orbital mechanics (precession, Milankovitch cycles)",
+        "Ignore the user's own correct argument instead of building on it"
+      ],
+      "best_representation": "diagram"
+    },
+    "correctness": {
+      "must": [
+        "Earth's axial tilt is about 23.4° (23.5° acceptable)",
+        "Seasons are caused by the tilt changing the Sun's elevation (energy per unit area) and day length, not by Earth–Sun distance",
+        "Earth is nearest the Sun (perihelion, ≈147 million km) in early January and farthest (aphelion, ≈152 million km) in early July",
+        "Northern and southern hemispheres have opposite seasons"
+      ],
+      "must_not": [
+        "Tilt makes a hemisphere meaningfully closer to the Sun",
+        "Seasons are caused by the elliptical orbit",
+        "Summer happens when Earth is closest to the Sun"
+      ]
+    },
+    "transfer": {
+      "question": "Imagine Earth's axis had zero tilt but its orbit stayed exactly as it is. What would happen to the seasons? And in the real world, what season is it in Sydney in early January — and is Earth near or far from the Sun then?",
+      "answer": "With zero tilt every place would get the same noon Sun angle and 12-hour days all year, so tilt-driven seasons would vanish; only a small (~7%) variation in sunlight from the changing distance would remain, hitting both hemispheres at the same time (strongest in January). Sydney in early January is in summer while Earth is near perihelion — but London, at the same distance, is in winter, which is why distance cannot be the cause."
+    }
+  },
+  {
+    "id": "bio-resistance-adapts",
+    "domain": "biology — evolution",
+    "concept": "natural selection of antibiotic resistance (population change, not individual adaptation)",
+    "persona": {
+      "level": "novice",
+      "prior": "Knows bacteria cause infections and antibiotics kill them; has heard \"antibiotic resistance\" on the news.",
+      "misconception": "Individual bacteria get used to the antibiotic and adapt in response, like a person building tolerance to caffeine."
+    },
+    "history": [],
+    "message": "how do bacteria become resistant to antibiotics? do they like get used to it the way you build up a tolerance to caffeine?",
+    "tags": [
+      "how",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "Individual bacteria don't adapt in response to the drug; the population changes. In a huge population a few cells already carry a variant (from random mutation, or a gene picked up from another bacterium) that lets them survive. The antibiotic kills the rest, the survivors multiply, and the next generation is mostly resistant.",
+      "should": [
+        "Contrast directly with their caffeine model: tolerance is one body changing; resistance is a change in which bacteria are left",
+        "Walk a population through a few rounds — ideally as a small simulation they can run with the drug on and off: many susceptible cells, a rare resistant one, the drug, the survivors multiply",
+        "Mention that resistance genes can also move between bacteria (e.g. on plasmids) — still with no \"learning\"",
+        "Connect to why unnecessary antibiotic use speeds resistance (more selection), without giving personal medical instructions"
+      ],
+      "should_not": [
+        "Need-based language: bacteria \"learn\", \"try to\", \"figure out\", \"decide\"",
+        "Saying the person's body becomes resistant",
+        "Deep molecular mechanisms (beta-lactamases, efflux pumps) for a novice",
+        "Dosing advice"
+      ],
+      "best_representation": "sim"
+    },
+    "correctness": {
+      "must": [
+        "Resistance comes from genetic variation that arises independently of need — random mutation, or horizontal gene transfer (plasmids, transduction, transformation)",
+        "The antibiotic selects: it kills susceptible cells, and resistant ones survive to reproduce",
+        "Resistance is a property of the bacteria, not of the patient",
+        "Fast bacterial generations (minutes to hours in good conditions) let selection act quickly"
+      ],
+      "must_not": [
+        "The antibiotic causes or directs the specific mutations needed for resistance",
+        "Each bacterium gradually gets used to the drug",
+        "People become resistant to antibiotics"
+      ]
+    },
+    "transfer": {
+      "question": "A scientist grows bacteria on a dish with NO antibiotic until there are hundreds of colonies. She presses a velvet pad onto it and stamps the same pattern onto several fresh dishes that DO contain the antibiotic. On every antibiotic dish, the few resistant colonies appear in exactly the same positions. What does that tell you about where resistance comes from?",
+      "answer": "The resistant variants already existed in particular colonies on the original dish, before any contact with the drug — if the drug induced resistance, resistant colonies would appear at random positions on each copy. The antibiotic did not create resistance; it revealed and selected variants that were already there. (This is the Lederbergs' 1952 replica-plating experiment.)"
+    }
+  },
+  {
+    "id": "econ-inflation-level-vs-rate",
+    "domain": "economics",
+    "concept": "inflation is a rate of change of prices (disinflation vs deflation)",
+    "persona": {
+      "level": "novice",
+      "prior": "Follows headlines and pays for groceries; no economics training.",
+      "misconception": "Falling inflation means prices are coming back down."
+    },
+    "history": [],
+    "message": "the news keeps saying inflation is down to 3% now from like 9% so why are groceries still way more expensive than before?? when do prices go back to normal",
+    "tags": [
+      "why",
+      "misconception",
+      "everyday"
+    ],
+    "ideal": {
+      "central_insight": "Inflation is how fast prices are rising, not how high they are. Inflation falling from 9% to 3% means prices are still going up — just more slowly — so they stay at their new, higher level. They would only go back down with deflation, which is rare and usually a sign of trouble.",
+      "should": [
+        "Acknowledge the frustration in a line, then give the rate-versus-level distinction using their groceries",
+        "Use a tiny numerical example (e.g. a $100 basket → $109 → about $112)",
+        "Say what actually restores purchasing power: wages rising faster than prices over time",
+        "Name the two words (disinflation, deflation) once, plainly"
+      ],
+      "should_not": [
+        "Promise or imply prices will return to where they were",
+        "Lecture on central-bank policy or the money supply",
+        "Be dismissive (\"that's just how it works\")",
+        "Turn it political"
+      ],
+      "best_representation": "graph"
+    },
+    "correctness": {
+      "must": [
+        "A 3% inflation rate means the price level is about 3% higher than a year earlier",
+        "Lower inflation (disinflation) still means rising prices; falling prices is deflation",
+        "Major central banks (e.g. the Fed, ECB, Bank of England) target about 2% inflation — gently rising prices, not a return to old prices"
+      ],
+      "must_not": [
+        "\"Inflation dropping means prices are falling\"",
+        "\"Prices will go back to normal once inflation is under control\"",
+        "\"Central banks aim for zero or negative inflation\""
+      ]
+    },
+    "transfer": {
+      "question": "A basket of groceries cost $100 two years ago. Prices rose 8% last year and 3% this year. What does the basket cost now, and what would have to happen for it to cost $100 again?",
+      "answer": "$100 × 1.08 × 1.03 = $111.24. To get back to $100, prices would have to fall by about 10% (100/111.24 ≈ 0.899) — that is deflation, not merely lower inflation. Any positive inflation rate, however small, keeps the basket above $111.24."
+    }
+  },
+  {
+    "id": "cs-recursion-still-confused",
+    "domain": "computer science",
+    "concept": "recursion and the call stack (each call is a separate paused frame)",
+    "persona": {
+      "level": "novice",
+      "prior": "Intro Python: loops, functions, return values.",
+      "misconception": "Calling a function from inside itself restarts it from the top and overwrites n, so there is nowhere for the pending multiplications to live."
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "can someone explain recursion"
+      },
+      {
+        "role": "assistant",
+        "content": "Recursion is when a function calls itself to solve a smaller version of the same problem. Classic example:\n\n```python\ndef factorial(n):\n    if n == 1:\n        return 1\n    return n * factorial(n - 1)\n```\n\nfactorial(4) = 4 * factorial(3) = 4 * 3 * factorial(2) = 4 * 3 * 2 * factorial(1) = 24. The `if n == 1` part is the base case, which stops the recursion."
+      }
+    ],
+    "message": "i still dont get it. if factorial calls factorial, doesnt it just restart from the top? how does it know to come back and do the multiply, and where are all the numbers being kept while it goes down",
+    "tags": [
+      "how",
+      "still-confused",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "A recursive call doesn't restart the function; it starts a separate new copy with its own n, while the current copy pauses mid-line waiting for that answer. The paused copies are kept on a stack. When the base case returns 1, each paused copy resumes, does its multiplication, and hands its result back to the one that called it.",
+      "should": [
+        "Answer their two exact questions: \"does it restart?\" (no — a new call starts; the old one waits mid-line) and \"where are the numbers kept?\" (each call has its own n in its own frame on the call stack)",
+        "Trace factorial(4) as a stack: down (4 waits, 3 waits, 2 waits, base case returns 1), then back up (2×1 = 2, 3×2 = 6, 4×6 = 24)",
+        "Use a different representation from the last turn — a vertical stack or trace, not the same one-line expansion",
+        "End with one tiny thing for them to trace themselves, or nothing"
+      ],
+      "should_not": [
+        "Repeat the same factorial(4) = 4 * factorial(3) = … one-liner",
+        "Swap in a Russian-doll or mirror analogy without mapping it onto the code",
+        "Make tail-call optimisation, memoisation or stack overflow the main content",
+        "Say \"it's just like a loop\""
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "Each call has its own local variables (its own n) in its own stack frame",
+        "The caller pauses at the recursive call and resumes when it returns",
+        "factorial(4) = 24, built on the way back up: 1 → 2 → 6 → 24",
+        "Without a reachable base case the calls never stop (Python raises RecursionError)"
+      ],
+      "must_not": [
+        "\"The function jumps back to the top and n gets overwritten\"",
+        "\"The multiplications happen on the way down\"",
+        "Claiming the shown code handles factorial(0) (with base case n == 1 it recurses forever)"
+      ]
+    },
+    "transfer": {
+      "question": "What does this function return for f(4)? What happens if you call f(-1)?\n\ndef f(n):\n    if n == 0:\n        return 0\n    return n + f(n - 1)",
+      "answer": "f(4) = 4 + 3 + 2 + 1 + 0 = 10, summed on the way back up from f(0). f(-1) calls f(-2), f(-3), … and never reaches n == 0, so the stack of paused calls grows until Python raises RecursionError (maximum recursion depth exceeded)."
+    }
+  },
+  {
+    "id": "design-everything-emphasised",
+    "domain": "design — visual / UI",
+    "concept": "visual hierarchy is relative contrast; emphasis on everything is emphasis on nothing",
+    "persona": {
+      "level": "novice",
+      "prior": "Maintains a small bakery's website with a page builder; no design training.",
+      "misconception": "Making something big, bold and red makes it stand out, so making every important thing big, bold and red makes them all stand out."
+    },
+    "history": [],
+    "message": "made the homepage for our bakery site. i put all the important stuff in big bold red so people notice it — opening hours, the order online button, the new menu, the catering banner, the instagram link. my boss says \"nothing stands out\"?? everything stands out, that was the whole point",
+    "tags": [
+      "why",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "Emphasis is relative: something stands out only because it differs from what's around it. Five things in big bold red are all the same as each other, so none of them stands out and the eye has nowhere to start. Pick the one thing most visitors should do, make only that loud, and let the rest step back.",
+      "should": [
+        "Validate the goal (people should notice key things) and explain in one sentence why it backfired",
+        "Help them rank their five items: likely \"Order online\" as the single primary action; hours and menu secondary; Instagram and catering quieter",
+        "Show how to demote without hiding: smaller size, regular weight, neutral colour, grouping and whitespace",
+        "Mention that red often reads as warning/error, so one accent colour reserved for the main button works better",
+        "Keep advice specific to their page"
+      ],
+      "should_not": [
+        "Dump generic principles (Gestalt laws, F-pattern, 60-30-10) without tying them to the page",
+        "Tell them to hire a designer or switch template",
+        "Imply there is one correct design",
+        "Redesign the whole site"
+      ],
+      "best_representation": "compare"
+    },
+    "correctness": {
+      "must": [
+        "Visual hierarchy comes from differences in size, weight, colour, contrast, spacing and position",
+        "When everything is emphasised, nothing is — emphasis is relative to its surroundings",
+        "One primary call to action per view is a common guideline, not a law"
+      ],
+      "must_not": [
+        "\"Make the important items even bigger\"",
+        "Implying colour alone is enough to signal importance to all users (colour-blind users; WCAG 1.4.1 Use of Color)"
+      ]
+    },
+    "transfer": {
+      "question": "A settings page shows 12 toggles in one long list, all identical in size, font and colour. Users can't find \"Dark mode\", and some accidentally switch on \"Delete account\". Without changing any font size or colour, what two changes would fix both problems?",
+      "answer": "Create difference through structure instead of styling: (1) group related settings under short section labels with whitespace between groups (e.g. Appearance → Dark mode; Notifications; Account), so the eye can jump to the right cluster; (2) move \"Delete account\" out of the toggle list into its own separated area at the end and make it a different kind of control — a button that asks for confirmation — rather than a toggle. Both work by making the target differ from its surroundings (proximity, spacing, position, control type): the same principle as the bakery page."
+    }
+  },
+  {
+    "id": "fin-debt-vs-match",
+    "domain": "everyday — personal finance",
+    "concept": "comparing guaranteed returns: high-interest debt payoff vs employer retirement match",
+    "persona": {
+      "level": "novice",
+      "prior": "First full-time job; knows what interest is; has heard an employer match is \"free money\".",
+      "misconception": "It must be one or the other, and the $5,000 can simply be deposited into the 401(k)."
+    },
+    "history": [],
+    "message": "I have $5k saved. should I use it to pay off my credit card (22% interest, about $5k balance) or put it in my 401k? my job matches 100% up to 4% of my salary and I make $60k",
+    "tags": [
+      "decide",
+      "everyday",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "Treat both as returns: paying off a 22% card is a guaranteed 22% return, and the match is an instant 100% return on the first 4% of salary you contribute. Both beat almost anything else — and it isn't either/or, because 401(k) money goes in through payroll, not from your $5,000. You can usually capture the match by raising your payroll contribution and use the cash on the card.",
+      "should": [
+        "Frame both options as returns (22% guaranteed; 100% match on up to $2,400 a year)",
+        "Point out that 401(k) contributions go through payroll deferral, so the real decision is \"raise my contribution to 4%\" plus \"use the cash on the card\"",
+        "Raise trade-offs they did not mention: keeping a small emergency buffer, the match's vesting schedule, not running the card back up",
+        "Leave the final call with them; keep any disclaimer to a phrase"
+      ],
+      "should_not": [
+        "Recommend specific funds or investments",
+        "Say \"skip the match until the debt is gone\" as a blanket rule",
+        "Moralise about credit-card debt",
+        "Bury the answer under paragraphs of disclaimers"
+      ],
+      "best_representation": "decide"
+    },
+    "correctness": {
+      "must": [
+        "4% of $60,000 = $2,400 a year of contributions; a 100% match adds $2,400 of employer money a year",
+        "Carrying $5,000 at 22% APR costs about $1,100 a year in interest (about $92 in the first month)",
+        "Paying debt early earns a risk-free return equal to its interest rate",
+        "401(k) contributions are made by payroll deferral; employer matches may vest over time"
+      ],
+      "must_not": [
+        "\"Just deposit your $5,000 savings into your 401(k)\" (contributions generally must come through payroll)",
+        "\"Investing will reliably beat 22%\"",
+        "Ignoring the employer match"
+      ]
+    },
+    "transfer": {
+      "question": "Different situation: you have a car loan at 3.5% and a high-yield savings account paying 4.5%, with the interest taxed at your 22% bracket. Should an extra $2,000 go to prepaying the car loan or into savings?",
+      "answer": "After tax, the savings earn 4.5% × (1 − 0.22) ≈ 3.51% — essentially the same as the 3.5% saved by prepaying, so financially it's a wash. The tie-breaker is liquidity: cash in savings stays available for emergencies, money prepaid into a car loan does not. Keeping it in savings is reasonable. Same principle: compare guaranteed after-tax returns, then weigh liquidity and risk."
+    }
+  },
+  {
+    "id": "cook-baking-soda-hurry",
+    "domain": "everyday — cooking science",
+    "concept": "chemical leavening: baking soda vs baking powder",
+    "persona": {
+      "level": "novice",
+      "prior": "Follows recipes; does not know the chemistry.",
+      "misconception": "Implied: baking soda and baking powder are interchangeable one-for-one."
+    },
+    "history": [],
+    "message": "baking muffins RIGHT NOW, recipe says 2 tsp baking powder and i only have baking soda. can i swap it?? quick",
+    "tags": [
+      "just-tell-me",
+      "hurried",
+      "everyday",
+      "how"
+    ],
+    "ideal": {
+      "central_insight": "Yes, but not one-for-one: baking soda is roughly 3–4 times stronger and needs an acid to work. Use about ½ tsp baking soda plus an acid (1 tsp cream of tartar, or about 1 tsp lemon juice or vinegar) and get the muffins in the oven promptly.",
+      "should": [
+        "Put the usable answer in the first line: the amount and the acid",
+        "Give one or two acid options they are likely to have (lemon juice, vinegar, cream of tartar; or swap some milk for buttermilk or yogurt)",
+        "At most one clause of why (soda needs acid; too much tastes soapy)",
+        "Stop there"
+      ],
+      "should_not": [
+        "Explain acid–base chemistry at length",
+        "Ask questions back or quiz them",
+        "Several paragraphs of alternatives",
+        "\"Just use the same amount\""
+      ],
+      "best_representation": "text"
+    },
+    "correctness": {
+      "must": [
+        "Baking soda (sodium bicarbonate) is roughly 3–4× stronger than baking powder",
+        "Baking powder already contains an acid; baking soda needs an acid from the recipe to release CO₂",
+        "1 tsp baking powder ≈ ¼ tsp baking soda + ½ tsp cream of tartar (or ≈ ½ tsp lemon juice or vinegar), so 2 tsp ≈ ½ tsp soda + 1 tsp cream of tartar",
+        "Too much soda without enough acid gives a soapy or metallic taste and a poor rise"
+      ],
+      "must_not": [
+        "A 1:1 swap (2 tsp baking soda)",
+        "\"Baking soda works fine on its own without any acid\""
+      ]
+    },
+    "transfer": {
+      "question": "Next week the opposite happens: a buttermilk pancake recipe calls for 1 tsp baking soda and you only have baking powder. How much would you use, and what might be different about the pancakes?",
+      "answer": "Roughly 3 tsp baking powder (about three times as much). The rise will be fine, but the buttermilk's acid is no longer neutralised by the soda, so the pancakes may taste tangier and brown less (soda raises pH, which promotes browning), and that much powder can add a slightly bitter, chemical note."
+    }
+  },
+  {
+    "id": "health-doms-lactic-acid",
+    "domain": "everyday — health (exercise physiology)",
+    "concept": "delayed-onset muscle soreness (DOMS) vs lactate",
+    "persona": {
+      "level": "novice",
+      "prior": "Back at the gym after a long break; has heard soreness is \"lactic acid\".",
+      "misconception": "Soreness two days later is lactic acid still sitting in the muscles."
+    },
+    "history": [],
+    "message": "did leg day for the first time in ages and 2 days later i can barely walk down stairs lol. is that lactic acid still built up in my muscles? should i stretch it out",
+    "tags": [
+      "why",
+      "misconception",
+      "everyday"
+    ],
+    "ideal": {
+      "central_insight": "It isn't lactic acid — lactate is cleared within an hour or two of exercise. Soreness that peaks a day or two later comes from tiny injuries in the muscle fibres and the repair and inflammation that follow, especially after lowering movements (muscles lengthening under load). That is exactly why going DOWN stairs hurts most.",
+      "should": [
+        "Correct the lactic-acid idea briefly and replace it with microdamage and repair",
+        "Use their own clue: going down stairs = thigh muscles lengthening under load (eccentric work)",
+        "Reassure: it usually fades within a few days, and the next session will make them far less sore (the repeated-bout effect)",
+        "Answer the stretching question honestly: stretching doesn't meaningfully reduce this soreness; gentle movement can ease it for a while",
+        "One line of safety: severe pain, marked swelling or dark, cola-coloured urine needs a doctor"
+      ],
+      "should_not": [
+        "Long biochemistry of lactate metabolism",
+        "Alarmism or diagnosing",
+        "Claiming stretching prevents or cures the soreness",
+        "A lecture on training programmes"
+      ],
+      "best_representation": "causal-chain"
+    },
+    "correctness": {
+      "must": [
+        "Blood lactate returns to resting levels within roughly 30–90 minutes after exercise",
+        "DOMS typically peaks about 24–72 hours after unaccustomed exercise",
+        "DOMS is linked to eccentric (lengthening) contractions and muscle microdamage with subsequent inflammation and repair",
+        "Systematic reviews (e.g. Cochrane 2011) find stretching produces no clinically meaningful reduction in DOMS"
+      ],
+      "must_not": [
+        "\"Lactic acid build-up causes soreness days later\"",
+        "\"Lactic acid crystallises in the muscle\"",
+        "\"Stretching will get rid of it\""
+      ]
+    },
+    "transfer": {
+      "question": "Two people walk for 30 minutes at the same pace on a steep hill: one only uphill (taking a lift back down), the other only downhill (taking a lift up). The uphill walker is far more out of breath. Who is likely to be sorer two days later, and why?",
+      "answer": "The downhill walker. Walking downhill makes the thigh muscles brake while lengthening (eccentric work), which causes more microdamage, even though it is metabolically easier and produces less lactate. Uphill is harder in the moment (more effort, more lactate) but causes less delayed soreness — exactly what a \"lactic acid\" model gets backwards."
+    }
+  },
+  {
+    "id": "math-average-speed-slip",
+    "domain": "everyday — mathematics",
+    "concept": "average speed = total distance ÷ total time (the harmonic mean over equal distances)",
+    "persona": {
+      "level": "novice",
+      "prior": "Comfortable with arithmetic and ordinary averages.",
+      "misconception": "The average of two speeds is always their arithmetic mean."
+    },
+    "history": [],
+    "message": "drove to my moms at 60 mph and back at 40 mph, same road. so my average speed was 50 mph right? my brother says no but wont tell me why lol",
+    "tags": [
+      "solve",
+      "wrong-attempt",
+      "misconception",
+      "everyday"
+    ],
+    "ideal": {
+      "central_insight": "Average speed is total distance divided by total time, and they spent more time driving at 40 than at 60 — so the slow leg counts for more and the average is below 50. It's 48 mph.",
+      "should": [
+        "Pick a convenient distance (e.g. 120 miles each way: 2 h there, 3 h back, 240 miles in 5 h = 48 mph)",
+        "Point to the unequal times as the reason, in one sentence",
+        "Say when their method does work: equal times at each speed (one hour at 60 then one hour at 40 really does average 50)",
+        "Optionally note the distance chosen doesn't change the answer"
+      ],
+      "should_not": [
+        "Just state the harmonic-mean formula",
+        "Make them feel silly — it's a very common intuition",
+        "Use calculus"
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "The average speed is 48 mph",
+        "Over equal distances the times differ (e.g. 2 h at 60 mph and 3 h at 40 mph for 120 miles each way)",
+        "The result is the same for any distance",
+        "The arithmetic mean of speeds is right only when equal time is spent at each speed"
+      ],
+      "must_not": [
+        "50 mph",
+        "\"It depends how far away your mom lives\""
+      ]
+    },
+    "transfer": {
+      "question": "You need to average 60 mph over a 2-mile test track. You drove the first mile at 30 mph. How fast must you drive the second mile?",
+      "answer": "It's impossible. Averaging 60 mph over 2 miles means finishing in 2 minutes total, but the first mile at 30 mph already took 2 minutes, so no finite speed on the second mile can do it. (The \"average the speeds\" intuition says 90 mph.)"
+    }
+  },
+  {
+    "id": "db-normalization-ambiguous",
+    "domain": "computer science (ambiguous: databases, statistics/ML, linear algebra)",
+    "concept": "\"normalization\" — the persona means database normalization, but the message doesn't say",
+    "persona": {
+      "level": "novice",
+      "prior": "Taking an intro databases course (not stated in the message); knows what a table is.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "can someone explain normalization like im 5? my notes just say \"normalize it first\" and i have a quiz thursday",
+    "tags": [
+      "what",
+      "ambiguous"
+    ],
+    "ideal": {
+      "central_insight": "\"Normalization\" means different things in different courses: in databases, organising tables so each fact is stored once; in statistics/ML, rescaling numbers to a common range; in linear algebra, scaling a vector to length 1. With no clue to the course, the best move is one sharp question (or a two-line fork), not a long explanation of possibly the wrong one.",
+      "should": [
+        "Recognise the ambiguity at once and say so in a line",
+        "Ask exactly one sharp question (e.g. \"Is this for a databases class, or stats/machine learning?\"), optionally with a one-line gist of each so they recognise theirs",
+        "Keep the whole reply short — answerable in one word",
+        "If it commits instead, label the assumption and keep it short"
+      ],
+      "should_not": [
+        "Launch into a long explanation of one sense without checking",
+        "Ask several clarifying questions at once",
+        "Explain every sense in full",
+        "Quiz them"
+      ],
+      "best_representation": "text"
+    },
+    "correctness": {
+      "must": [
+        "Database normalization organises data into tables so each fact is stored once, reducing redundancy and update/insert/delete anomalies (normal forms 1NF, 2NF, 3NF)",
+        "Feature normalization rescales values (e.g. min–max to [0, 1], or standardisation to z-scores)",
+        "Vector normalization divides a vector by its length to give unit length"
+      ],
+      "must_not": [
+        "Conflating the senses (e.g. saying database normalization means scaling values to 0–1)"
+      ]
+    },
+    "transfer": {
+      "question": "(Database sense.) A single table stores orders as (order_id, customer_id, customer_email, product). A customer changes their email address. What goes wrong, and how would you normalize the design?",
+      "answer": "The email is repeated in every order row for that customer, so changing it means updating many rows; miss one and the data contradicts itself (an update anomaly). Normalize by storing each fact once: Customers(customer_id, email) and Orders(order_id, customer_id, product), linked by customer_id — the email then lives in exactly one place."
+    }
+  },
+  {
+    "id": "calc-chain-rule-slip",
+    "domain": "mathematics — calculus",
+    "concept": "the chain rule",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Comfortable with the power and product rules; has seen the chain rule stated.",
+      "misconception": "The power rule applies to a bracket raised to a power exactly as to x: bring the exponent down, subtract one, done."
+    },
+    "history": [],
+    "message": "derivative of (3x^2+1)^4 — i got 4(3x^2+1)^3 using the power rule but the answer key says 24x(3x^2+1)^3. where does the 24x come from?? i did bring the 4 down and subtract 1",
+    "tags": [
+      "solve",
+      "wrong-attempt",
+      "misconception",
+      "how"
+    ],
+    "ideal": {
+      "central_insight": "The power rule is the rate for a power of x itself. When the thing raised to the 4th is itself changing with x, you also multiply by how fast that inside changes (6x) — the chain rule. 4 × 6x = 24x.",
+      "should": [
+        "Say at once that their outer step 4(3x²+1)³ is right — the missing piece is one factor, not the method",
+        "Locate the slip: they treated the inside, 3x²+1, as if it were x",
+        "Show d/dx(3x²+1) = 6x and the product 4(3x²+1)³ · 6x = 24x(3x²+1)³",
+        "Give a quick check that makes the extra factor undeniable: (3x)² = 9x² has derivative 18x, while \"power rule only\" gives 2(3x) = 6x",
+        "Name the chain rule and its shape once: outer derivative evaluated at the inside × derivative of the inside"
+      ],
+      "should_not": [
+        "Re-teach the power rule or list every differentiation rule",
+        "State the chain rule formula without connecting it to their specific step",
+        "Make expanding (3x²+1)⁴ the main method",
+        "Treat them as not knowing calculus"
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "d/dx (3x²+1)⁴ = 4(3x²+1)³ · 6x = 24x(3x²+1)³",
+        "Chain rule: (f(g(x)))′ = f′(g(x)) · g′(x)",
+        "The user's 4(3x²+1)³ is correct as the outer factor"
+      ],
+      "must_not": [
+        "Claiming the outer step was wrong",
+        "Putting the 6x in the wrong place, e.g. 4(6x)³ or 4(3x²+1)³ + 6x",
+        "A misapplied product rule offered as the source of 24x"
+      ]
+    },
+    "transfer": {
+      "question": "A spherical balloon is inflated so its radius grows at 2 cm per second. How fast is its volume increasing at the moment the radius is 5 cm? (V = 4/3 πr³)",
+      "answer": "dV/dt = dV/dr · dr/dt = 4πr² · 2. At r = 5: 4π(25)(2) = 200π ≈ 628 cm³/s. (Answering 4πr² = 100π ≈ 314 drops the inner rate dr/dt — the same slip.)"
+    }
+  },
+  {
+    "id": "stats-pvalue-still-confused",
+    "domain": "statistics",
+    "concept": "what a p-value is: P(data | H0), not P(H0 | data); base rates and power",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Ran t-tests in a lab course; knows \"p < 0.05 means significant\"; now analysing a real pilot study.",
+      "misconception": "p = 0.03 means a 3% chance the result is a fluke, so a 97% chance the drug works."
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "what does a p-value actually mean? our pilot study got p = 0.03"
+      },
+      {
+        "role": "assistant",
+        "content": "A p-value is the probability of obtaining test results at least as extreme as the results actually observed, under the assumption that the null hypothesis is correct. A p-value of 0.03 means that if the null hypothesis were true, there would be a 3% probability of observing results at least this extreme. Since 0.03 < 0.05, the result is statistically significant at the 5% level, so you reject the null hypothesis."
+      }
+    ],
+    "message": "ok ive read that like 3 times and i still dont really get it. so basically theres a 3% chance our result is a fluke and 97% chance the drug actually works?",
+    "tags": [
+      "what",
+      "still-confused",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "A p-value is computed by assuming the drug does nothing and asking how surprising data like yours would be: P(data this extreme | no effect). Their sentence flips it into P(no effect | data). Getting from one to the other needs things the p-value doesn't contain — how plausible the drug was beforehand and how much power the study had.",
+      "should": [
+        "Say plainly that the 3%/97% reading is the most common misreading and is not what p = 0.03 means",
+        "Not repeat the definition they have read three times; switch to natural frequencies (imagine 1,000 drugs tested)",
+        "Show with numbers that among \"significant\" results a large share can be duds when few candidates work (10% true, 80% power → about a third of significant results are false positives)",
+        "Say what p = 0.03 does support: data like these would be unusual if the drug did nothing — evidence against \"no effect\", not a probability that it works",
+        "Point to what to look at next for a pilot: effect size, confidence interval, replication"
+      ],
+      "should_not": [
+        "Repeat or lightly rephrase the textbook definition",
+        "Endorse \"97% chance it works\", even partly",
+        "Retreat into jargon (\"fail to reject H0\") without saying what it means",
+        "Turn it into a Bayesian-vs-frequentist philosophy lecture"
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "The p-value is P(results at least this extreme | null hypothesis true)",
+        "It is not the probability that the null is true, nor the probability the result is a fluke, nor 1 minus the probability the drug works",
+        "The probability that a significant result reflects a real effect depends on the prior proportion of true effects and on power, as well as on alpha",
+        "0.05 is a convention, not a law"
+      ],
+      "must_not": [
+        "\"There is a 97% chance the drug works\"",
+        "\"There is a 3% chance the null hypothesis is true\"",
+        "\"A smaller p-value means a bigger effect\""
+      ]
+    },
+    "transfer": {
+      "question": "A lab screens many candidate drugs. Suppose 10% of them truly work, each trial has 80% power, and p < 0.05 counts as \"significant\". Of all the significant results, what fraction are false positives?",
+      "answer": "Per 1,000 drugs: 100 work → 80 significant (true positives); 900 don't → 45 significant by chance (5%). False positives = 45 / (80 + 45) = 36%. So \"p < 0.05\" here means roughly a 1-in-3 chance a significant finding is a dud — nowhere near 5%."
+    }
+  },
+  {
+    "id": "chem-atp-bond-energy",
+    "domain": "chemistry + biology",
+    "concept": "bond breaking costs energy, bond forming releases it (ATP hydrolysis)",
+    "persona": {
+      "level": "intermediate",
+      "prior": "First-year chemistry and biology; knows exothermic/endothermic and ATP as \"the energy currency\".",
+      "misconception": "Breaking ATP's \"high-energy phosphate bond\" releases energy."
+    },
+    "history": [],
+    "message": "in bio we learned ATP stores energy in its high-energy phosphate bonds and breaking that bond releases energy to power the cell. but in chem my teacher said breaking bonds ALWAYS takes energy?? which one is right",
+    "tags": [
+      "why",
+      "compare",
+      "misconception",
+      "multidisciplinary"
+    ],
+    "ideal": {
+      "central_insight": "The chemistry teacher is right: breaking any bond costs energy. ATP hydrolysis releases energy overall because the products (ADP and phosphate, interacting with water) form new bonds and interactions that are much more stable than what was broken. \"High-energy bond\" is biology shorthand for \"this whole reaction is strongly downhill\", not a bond that releases energy when it snaps.",
+      "should": [
+        "Say clearly which statement is literally true (bond breaking always requires energy) and what the biology phrase really means",
+        "Use an energy ledger: energy in to break bonds, energy out when new bonds form, net = the difference",
+        "Give in a sentence why the products are more stable (less repulsion between negative charges, resonance stabilisation of phosphate, better hydration)",
+        "Bridge both classes so they can answer either teacher"
+      ],
+      "should_not": [
+        "Fudge with \"both are right in their own way\" without explaining",
+        "Claim the phosphoanhydride bond is unusually weak or \"spring-loaded\" as the explanation",
+        "Drown it in Gibbs free-energy formalism",
+        "Dismiss the biology teacher"
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "Bond breaking is endothermic; bond formation is exothermic",
+        "ATP + H₂O → ADP + Pᵢ has ΔG°′ ≈ −30.5 kJ/mol; the energy is released by the overall reaction",
+        "The products are stabilised by reduced charge repulsion, resonance of phosphate and hydration"
+      ],
+      "must_not": [
+        "\"Breaking the phosphate bond releases energy\"",
+        "\"Energy is stored inside the bond and let out when it breaks\""
+      ]
+    },
+    "transfer": {
+      "question": "Burning methane: CH₄ + 2 O₂ → CO₂ + 2 H₂O (all gases). Using average bond energies C–H 413, O=O 498, C=O 799, O–H 463 kJ/mol, estimate the enthalpy change and say which part of the reaction releases the energy.",
+      "answer": "Break: 4 C–H + 2 O=O = 4(413) + 2(498) = 2,648 kJ in. Form: 2 C=O + 4 O–H = 2(799) + 4(463) = 3,450 kJ out. ΔH ≈ 2,648 − 3,450 = −802 kJ/mol (exothermic). The energy comes from forming the new C=O and O–H bonds, which release more than breaking the old bonds costs — the same logic as ATP."
+    }
+  },
+  {
+    "id": "bio-vaccine-teachback",
+    "domain": "biology — immunology",
+    "concept": "active immunity and immunological memory (vs passive antibodies)",
+    "persona": {
+      "level": "intermediate",
+      "prior": "High-school biology; knows antibodies and white blood cells exist.",
+      "misconception": "A vaccine puts antibodies into you and those antibodies stay in your blood for life."
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "how do vaccines actually work?"
+      },
+      {
+        "role": "assistant",
+        "content": "A vaccine shows your immune system a harmless version or piece of a pathogen — for example a protein from its surface — without causing the disease. The B cells and T cells that happen to recognise it multiply and respond: B cells make antibodies that stick to that protein, and T cells help coordinate the response and kill infected cells. Afterwards, some of those cells stay on as memory cells. If the real pathogen shows up later, the memory cells recognise it and respond much faster and more strongly, often before you get sick."
+      }
+    ],
+    "message": "ok i think i get it now — so basically the vaccine puts antibodies into your body, and they stay in your blood forever, so when the virus comes theyre already there waiting to fight it. right?",
+    "tags": [
+      "teach-back",
+      "misconception",
+      "how"
+    ],
+    "ideal": {
+      "central_insight": "Close, but the lasting part isn't antibodies. A vaccine doesn't contain antibodies; it trains your own B and T cells, and what persists is a population of memory cells that can make antibodies again, fast, when the real virus shows up. Antibody levels themselves fade over months.",
+      "should": [
+        "Affirm the right part specifically: protection is prepared before the virus arrives, and antibodies are part of the response",
+        "Correct the one error precisely: the vaccine teaches your cells rather than delivering antibodies, and the antibodies don't last forever — memory cells do",
+        "Optionally contrast with the case where you really are given antibodies (passive immunity: antibody treatments, a mother's antibodies to a newborn) — fast but temporary",
+        "At most one short invitation to restate the corrected version"
+      ],
+      "should_not": [
+        "Re-explain the whole immune response from scratch",
+        "A generic \"Exactly!\" that lets the error stand",
+        "Unasked detail (germinal centres, affinity maturation, MHC)",
+        "Several questions in a row"
+      ],
+      "best_representation": "compare"
+    },
+    "correctness": {
+      "must": [
+        "Standard vaccines (active immunisation) stimulate the body to make its own antibodies and memory B and T cells; they do not contain antibodies",
+        "Circulating antibody levels decline over time (IgG half-life is about 3 weeks; long-lived plasma cells sustain some antibody for varying periods)",
+        "Memory cells can persist for years to decades and mount a faster, stronger secondary response",
+        "Passive immunity (receiving antibodies) is immediate but temporary"
+      ],
+      "must_not": [
+        "\"Vaccines inject antibodies\"",
+        "\"Antibodies last forever\"",
+        "Telling the user they are simply right"
+      ]
+    },
+    "transfer": {
+      "question": "A newborn receives antibodies from its mother across the placenta and is protected against some infections for a few months, then loses that protection. A vaccinated child's antibody levels also fall over the following months, yet the child stays protected for years. What explains the difference?",
+      "answer": "The newborn received ready-made antibodies (passive immunity) but no memory cells; once those antibodies are broken down over weeks to months, nothing replaces them. The vaccinated child mounted their own response, so memory B and T cells remain and can rapidly make new antibodies on exposure — the protection lives in the cells, not in the antibodies currently in the blood."
+    }
+  },
+  {
+    "id": "econ-price-rise-hurried",
+    "domain": "economics / small business",
+    "concept": "price elasticity of demand and total revenue",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Runs a coffee cart; comfortable with percentages and margins.",
+      "misconception": "Raising the price 20% raises revenue 20%."
+    },
+    "history": [],
+    "message": "quick q before my 2pm — we run a coffee cart, if we bump our latte from $5 to $6 that's 20% more revenue right? just need a yes/no",
+    "tags": [
+      "just-tell-me",
+      "hurried",
+      "misconception",
+      "decide",
+      "everyday"
+    ],
+    "ideal": {
+      "central_insight": "Revenue is price × number sold. It rises 20% only if they sell exactly as many lattes; if more than about 1 in 6 latte buyers stop (16.7%), revenue actually falls.",
+      "should": [
+        "Answer in the first sentence: \"No — only if you sell the same number of lattes\"",
+        "Give the break-even: they can lose up to about 16.7% of latte sales (keep 5/6) before revenue drops",
+        "One line on testing it (try it for a week or two and count cups)",
+        "Optionally half a sentence that profit is more forgiving than revenue, since fewer cups also means lower costs"
+      ],
+      "should_not": [
+        "A lecture on elasticity formulas or the midpoint method",
+        "Follow-up questions",
+        "A quiz",
+        "Hedging so heavy there's no answer"
+      ],
+      "best_representation": "text"
+    },
+    "correctness": {
+      "must": [
+        "Revenue rises 20% only if quantity sold is unchanged",
+        "Break-even: revenue is unchanged if sales fall to 5/6 of before, a drop of about 16.7%",
+        "If sales fall by more than that, revenue falls (demand is price-elastic over that range)"
+      ],
+      "must_not": [
+        "\"Yes, 20% more revenue\"",
+        "\"Demand doesn't change for small price increases\" as a general rule"
+      ]
+    },
+    "transfer": {
+      "question": "A city raises the bus fare from $2.00 to $2.50, and daily riders fall from 10,000 to 7,000. Did fare revenue go up or down, and is demand elastic or inelastic over this range (midpoint method)?",
+      "answer": "Revenue fell from $20,000 to $17,500 a day (−12.5%). Midpoint elasticity: %ΔQ = −3,000/8,500 ≈ −35.3%; %ΔP = 0.50/2.25 ≈ +22.2%; elasticity ≈ −1.59, so demand is elastic (|e| > 1) — which is exactly why revenue fell."
+    }
+  },
+  {
+    "id": "cs-bigo-nested-slip",
+    "domain": "computer science",
+    "concept": "time complexity: count iterations, not loops",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Knows O(n) and O(n²) from simple loops; met big-O with Socria last week.",
+      "misconception": "Two nested loops always mean O(n²)."
+    },
+    "history": [],
+    "message": "you explained big-O to me last week and I thought I had it but my TA marked this wrong. I said O(n^2) because it's two nested loops:\n\nfor i in range(n):\n    j = 1\n    while j < n:\n        j *= 2\n\nwhy isn't it n^2??",
+    "tags": [
+      "solve",
+      "wrong-attempt",
+      "misconception",
+      "returning-topic"
+    ],
+    "ideal": {
+      "central_insight": "Big-O counts how many times the innermost work runs, not how many loops there are. The inner loop doubles j each time, so it runs about log₂ n times, not n times: n outer iterations × log₂ n inner = O(n log n).",
+      "should": [
+        "Acknowledge the reasonable heuristic (\"nested usually means n²\") and show why it fails here",
+        "Trace the inner loop for a concrete n (n = 16: j = 1, 2, 4, 8 → 4 iterations = log₂ 16)",
+        "State the general method: multiply the iteration counts of nested loops",
+        "Since it's a returning topic, build on what they know instead of re-teaching big-O"
+      ],
+      "should_not": [
+        "Re-explain big-O from the formal definition (constants c, n₀)",
+        "Give \"O(n log n)\" without the counting",
+        "Confuse it with O(log n) alone"
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "The inner loop runs ⌈log₂ n⌉ times for n ≥ 1 (j = 1, 2, 4, … while j < n)",
+        "Total work is Θ(n log n)",
+        "Nested loops multiply their iteration counts"
+      ],
+      "must_not": [
+        "O(n²)",
+        "O(log n)",
+        "\"Big-O counts the number of loops\""
+      ]
+    },
+    "transfer": {
+      "question": "What is the time complexity of this code?\n\nfor i in range(1, n + 1):\n    for j in range(0, n, i):\n        work()",
+      "answer": "The inner loop runs ⌈n/i⌉ times, so the total is about n/1 + n/2 + n/3 + … + n/n ≈ n·ln n, i.e. O(n log n) (for n = 1,000, work() runs 8,053 times). Counting loops would wrongly say O(n²)."
+    }
+  },
+  {
+    "id": "home-heat-pump-decision",
+    "domain": "physics + economics (household energy)",
+    "concept": "heat pumps move heat (coefficient of performance) and cost per unit of delivered heat",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Homeowner; remembers conservation of energy; pays gas and electricity bills.",
+      "misconception": "\"300% efficient\" must violate conservation of energy, so it is a sales trick."
+    },
+    "history": [],
+    "message": "our gas furnace is 20 yrs old and needs replacing. the installer is pushing a heat pump and says it's \"300% efficient\". that's impossible right? you can't get more energy out than you put in. is this a scam or should we actually consider it",
+    "tags": [
+      "decide",
+      "misconception",
+      "everyday",
+      "multidisciplinary"
+    ],
+    "ideal": {
+      "central_insight": "A heat pump doesn't turn electricity into heat; it uses electricity to move heat that is already outside (even in cold air) into the house. So 1 kWh of electricity can deliver about 3 kWh of heat without breaking conservation of energy — the other 2 kWh come from outdoors. Whether it saves money depends on electricity and gas prices and how cold it gets.",
+      "should": [
+        "Validate their physics instinct and resolve it: energy is conserved; the extra heat is moved, not created (a fridge does the same thing the other way)",
+        "Give the comparison they can actually run: cost per kWh of heat = electricity price ÷ COP vs gas price ÷ furnace efficiency",
+        "Name the real trade-offs: climate (COP falls in deep cold; cold-climate models; backup heat), upfront cost and rebates, summer cooling, emissions",
+        "Leave the decision with them and say what to ask the installer (seasonal COP/HSPF for their climate, sizing)"
+      ],
+      "should_not": [
+        "Call it a scam",
+        "Endorse the installer's pitch without the cost comparison",
+        "Say \"it depends\" without the formula",
+        "Go deep into Carnot cycles"
+      ],
+      "best_representation": "decide"
+    },
+    "correctness": {
+      "must": [
+        "COP = heat delivered ÷ electrical energy used; typical seasonal COPs are roughly 2–4",
+        "Energy is conserved: the extra heat is extracted from outdoor air (or the ground)",
+        "COP falls as the outdoor temperature drops",
+        "A fridge or air conditioner is a heat pump moving heat the other way"
+      ],
+      "must_not": [
+        "\"Heat pumps create energy\" or \"beat the laws of thermodynamics\"",
+        "\"Heat pumps don't work below freezing\" (modern cold-climate units run well below −15 °C, at lower COP)",
+        "\"It's definitely cheaper\" without prices"
+      ]
+    },
+    "transfer": {
+      "question": "Electricity costs $0.30/kWh and gas costs $0.10 per kWh of gas energy. A new furnace is 95% efficient; a heat pump averages a seasonal COP of 2.5. Which is cheaper per kWh of heat delivered, and what COP would the heat pump need to break even?",
+      "answer": "Furnace: $0.10 ÷ 0.95 ≈ $0.105 per kWh of heat. Heat pump: $0.30 ÷ 2.5 = $0.12 per kWh of heat — so at these prices the furnace is slightly cheaper to run. Break-even COP = 0.30 ÷ 0.105 ≈ 2.85; a COP of 3 or cheaper electricity would flip it."
+    }
+  },
+  {
+    "id": "hist-ww1-trigger",
+    "domain": "history",
+    "concept": "historical causation: trigger vs underlying conditions vs contingent decisions (counterfactuals)",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Secondary-school history; knows about the assassination and the alliance blocs.",
+      "misconception": "Implied: one event caused the war, so without it there would have been no war."
+    },
+    "history": [],
+    "message": "so did WW1 basically happen because franz ferdinand got shot? like if the assassin had missed would there just have been no war?",
+    "tags": [
+      "why",
+      "misconception",
+      "counterfactual"
+    ],
+    "ideal": {
+      "central_insight": "The assassination was the trigger, not the whole cause. It became a continent-wide war because of conditions already in place (great-power rivalry, alliance commitments, rigid mobilisation plans, Balkan nationalism) and a chain of decisions in July 1914 that could have gone differently. Whether war would have come anyway is a genuine debate among historians — plausible, but not certain.",
+      "should": [
+        "Separate three layers: trigger (Sarajevo), underlying conditions, and the July Crisis decisions",
+        "Lay out the decision chain concisely: German \"blank cheque\" to Austria-Hungary → Austrian ultimatum → war on Serbia → Russian mobilisation → German declarations of war and invasion of Belgium → British entry",
+        "Treat the counterfactual honestly: historians disagree (e.g. Fischer's emphasis on German aims vs Clark's \"sleepwalkers\")",
+        "Keep it tight and offer to go deeper on any link"
+      ],
+      "should_not": [
+        "Recite the \"MAIN\" acronym as a list without showing how causes interact",
+        "Say the alliances automatically dragged everyone in",
+        "Give one cause as the answer, or false certainty either way",
+        "A wall of dates"
+      ],
+      "best_representation": "causal-chain"
+    },
+    "correctness": {
+      "must": [
+        "Archduke Franz Ferdinand was assassinated in Sarajevo on 28 June 1914 by Gavrilo Princip",
+        "Austria-Hungary declared war on Serbia on 28 July 1914",
+        "Germany declared war on Russia (1 August) and France (3 August); Britain declared war on 4 August after Germany invaded Belgium",
+        "Italy, a Triple Alliance member, stayed neutral in 1914 and joined the Allies in 1915"
+      ],
+      "must_not": [
+        "\"The alliance system automatically forced every country into war\"",
+        "\"Britain was treaty-bound to defend France\" (the Entente was not a binding military alliance; Britain's treaty obligation was to Belgian neutrality, 1839)",
+        "Presenting the counterfactual as settled"
+      ]
+    },
+    "transfer": {
+      "question": "Apply the same distinction: was Rosa Parks' arrest on 1 December 1955 the cause of the Montgomery bus boycott?",
+      "answer": "It was the trigger. Underlying conditions: segregated buses and daily humiliation under Jim Crow; existing organisation — the NAACP (Parks was secretary of the Montgomery branch), the Women's Political Council (which had already prepared for a boycott), Black churches. Contingent choices mattered too: earlier arrests (e.g. Claudette Colvin, March 1955) did not spark a boycott, partly because leaders judged Parks' case the one to rally around. Trigger + conditions + decisions, not the arrest alone."
+    }
+  },
+  {
+    "id": "climate-co2-trace-gas",
+    "domain": "physics + chemistry + earth science",
+    "concept": "greenhouse effect: infrared absorption depends on molecular structure, not abundance",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Knows the greenhouse effect exists; high-school science; sceptical but sincere.",
+      "misconception": "A gas's effect on temperature is proportional to how much of the atmosphere it makes up."
+    },
+    "history": [],
+    "message": "honest question, not trolling: CO2 is like 0.04% of the air. how can something that tiny control the temperature of the whole planet? the other 99.96% has to matter way more",
+    "tags": [
+      "why",
+      "misconception",
+      "multidisciplinary"
+    ],
+    "ideal": {
+      "central_insight": "What matters isn't how much of the air a gas is, but whether it absorbs the infrared heat the Earth gives off. Nitrogen and oxygen — about 99% of dry air — are almost completely transparent to that infrared, so they don't take part at all. That leaves trace gases like CO₂ and water vapour doing nearly all the absorbing.",
+      "should": [
+        "Take the question seriously and respectfully",
+        "Explain why N₂ and O₂ don't absorb thermal infrared (symmetric two-atom molecules whose vibrations don't change their charge distribution) while CO₂'s bending and asymmetric stretching do",
+        "Give an everyday intuition for \"small amount, big effect\" (a few drops of ink in a glass of water) and where it stops being exact",
+        "Mention water vapour's large role as a feedback without derailing"
+      ],
+      "should_not": [
+        "Be preachy, political or dismissive",
+        "Drown it in radiative-transfer detail",
+        "Claim CO₂ is the only greenhouse gas",
+        "Answer with consensus or authority instead of mechanism"
+      ],
+      "best_representation": "causal-chain"
+    },
+    "correctness": {
+      "must": [
+        "CO₂ is about 0.04% of the atmosphere (roughly 420–430 ppm)",
+        "N₂ (~78%) and O₂ (~21%) are nearly transparent to thermal infrared",
+        "CO₂ absorbs strongly near 15 µm (bending mode) and 4.3 µm (asymmetric stretch)",
+        "Water vapour is the largest greenhouse contributor but acts mainly as a feedback set by temperature",
+        "Without the greenhouse effect Earth's mean surface temperature would be about −18 °C instead of about +15 °C"
+      ],
+      "must_not": [
+        "\"CO₂ traps heat because it is heavy or dense\"",
+        "\"The ozone hole causes global warming\"",
+        "\"Oxygen and nitrogen absorb most of the heat\""
+      ]
+    },
+    "transfer": {
+      "question": "Argon makes up about 0.93% of the atmosphere — more than 20 times as much as CO₂. Does argon contribute to the greenhouse effect? Why or why not?",
+      "answer": "Essentially not at all. Argon is a single atom: it has no molecular vibrations and no dipole to change, so it cannot absorb thermal infrared. Abundance is irrelevant if a gas doesn't absorb at those wavelengths — reasoning by abundance would wrongly rank argon far above CO₂."
+    }
+  },
+  {
+    "id": "info-entropy-from-context",
+    "domain": "computer science / statistics + physics",
+    "concept": "entropy as uncertainty (Shannon entropy in decision trees) and its link to thermodynamic entropy",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Learning machine learning; knows probabilities; just asked how decision trees choose splits.",
+      "misconception": "Entropy means vague \"disorder\", so the decision-tree use must be an unrelated concept."
+    },
+    "history": [
+      {
+        "role": "user",
+        "content": "how does a decision tree decide which feature to split on?"
+      },
+      {
+        "role": "assistant",
+        "content": "It tries each candidate split and picks the one that makes the resulting groups \"purest\" — each group mostly one class. The usual way to score purity is information gain: the drop in entropy from the parent node to the weighted average of the child nodes. Gini impurity is a common alternative."
+      }
+    ],
+    "message": "ok wait, whats entropy though? my physics friend says its about disorder, which doesnt sound like the same thing at all",
+    "tags": [
+      "what",
+      "ambiguous",
+      "compare",
+      "multidisciplinary"
+    ],
+    "ideal": {
+      "central_insight": "In the decision-tree sense, entropy measures how uncertain you are about a sample's class — roughly, the average number of yes/no questions needed to pin it down. A pure node needs none (entropy 0); a 50/50 node needs one (1 bit). Physics' entropy is the same idea applied to how many microscopic arrangements fit what you know; \"disorder\" is a loose nickname for \"many possibilities\".",
+      "should": [
+        "Commit to the information-theory meaning, because the conversation is about decision trees — no clarifying question needed",
+        "Give H = −Σ p log₂ p with a tiny example (pure node 0; 50/50 node 1 bit)",
+        "Tie straight back to the split: information gain = entropy before − weighted entropy after",
+        "Bridge to the physics friend in a sentence or two: Boltzmann's S = k ln W counts possibilities too, so they are close cousins"
+      ],
+      "should_not": [
+        "Ask \"which entropy do you mean?\" when the context already answers it",
+        "Lecture on thermodynamics or the second law",
+        "Declare the two completely unrelated, or exactly identical without qualification",
+        "Define entropy only as \"disorder\""
+      ],
+      "best_representation": "worked-steps"
+    },
+    "correctness": {
+      "must": [
+        "Shannon entropy H = −Σ pᵢ log₂ pᵢ, measured in bits",
+        "A pure node has H = 0; a 50/50 two-class node has H = 1 bit; k equally likely classes give log₂ k",
+        "Information gain = H(parent) − weighted average H(children)",
+        "Boltzmann entropy S = k_B ln W relates to the number of microstates"
+      ],
+      "must_not": [
+        "Saying (discrete) entropy can be negative",
+        "\"Higher entropy in the children means a better split\"",
+        "Treating \"disorder\" as the definition"
+      ]
+    },
+    "transfer": {
+      "question": "Three decision-tree nodes each hold 8 samples: (a) 4 cats, 4 dogs; (b) 8 cats; (c) 4 cats, 2 dogs, 2 birds. What is the entropy of each, in bits?",
+      "answer": "(a) 1 bit; (b) 0 bits; (c) −(½ log₂ ½ + ¼ log₂ ¼ + ¼ log₂ ¼) = 0.5 + 0.5 + 0.5 = 1.5 bits. Node (c) needs on average 1.5 yes/no questions (\"cat?\", then if not, \"dog?\": ½ × 1 + ½ × 2 = 1.5)."
+    }
+  },
+  {
+    "id": "biz-growth-rate-ambiguous",
+    "domain": "business / mathematics",
+    "concept": "compound annual growth rate vs total growth vs simple average",
+    "persona": {
+      "level": "intermediate",
+      "prior": "Small-business founder; comfortable with spreadsheets and percentages.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "what's the formula for growth rate? our revenue was 120k in 2021 and 210k in 2024 and I need a number for an investor deck",
+    "tags": [
+      "ambiguous",
+      "solve"
+    ],
+    "ideal": {
+      "central_insight": "\"Growth rate\" could mean total growth (75%) or a yearly rate. Over several years, the yearly number investors expect is the compound annual growth rate: (end ÷ start)^(1/years) − 1 = (210/120)^(1/3) − 1 ≈ 20.5% a year over the three years 2021–2024.",
+      "should": [
+        "Commit to CAGR as the most useful reading for an investor deck and say so in one line, rather than asking",
+        "Count periods correctly: 2021 → 2024 is 3 years of growth, not 4",
+        "Give both numbers they might need: 3-year CAGR ≈ 20.5%, total growth 75%",
+        "Warn that 75% ÷ 3 = 25% overstates the yearly rate, and suggest a clear label such as \"20.5% CAGR (2021–2024)\""
+      ],
+      "should_not": [
+        "Ask what they mean by growth rate",
+        "Give 25% a year",
+        "Spread it over 4 years",
+        "Lecture on financial modelling"
+      ],
+      "best_representation": "notation"
+    },
+    "correctness": {
+      "must": [
+        "CAGR = (210/120)^(1/3) − 1 ≈ 0.205 = 20.5%",
+        "Total growth = 210/120 − 1 = 75%",
+        "2021 → 2024 spans 3 compounding periods"
+      ],
+      "must_not": [
+        "25% per year (simple average of the total)",
+        "≈15% per year (using 4 periods)"
+      ]
+    },
+    "transfer": {
+      "question": "A product's sales went from 100 to 150 in year one, then back down to 100 in year two. What's the average of the two yearly growth rates, and what's the compound annual growth rate? Which describes what happened?",
+      "answer": "Yearly rates: +50% then −33.3%; their arithmetic average is +8.3% a year. CAGR = (100/100)^(1/2) − 1 = 0%. CAGR describes reality — sales ended where they started; the arithmetic average misleadingly suggests growth."
+    }
+  },
+  {
+    "id": "eng-depth-cubed-shorthand",
+    "domain": "engineering — structures",
+    "concept": "second moment of area: why depth enters cubed",
+    "persona": {
+      "level": "expert",
+      "prior": "Practising structural engineer; uses I = bh³/12 daily.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "Why does I go as h³ for a rectangular section? I've used bh³/12 for years — want the physical intuition, not the integral.",
+    "tags": [
+      "why",
+      "expert-shorthand"
+    ],
+    "ideal": {
+      "central_insight": "Depth counts three times: more depth is more material (×h); each fibre sits farther from the neutral axis, so with plane sections its strain and stress grow in proportion to that distance (×h); and that larger force acts on a proportionally longer lever arm about the axis (×h). Width only adds more fibres at the same distances, so it counts once.",
+      "should": [
+        "Answer at peer level in a few sentences: the three factors of h",
+        "Optionally one corollary: strength (section modulus bh²/6) loses one factor because the limit is the outer-fibre stress, so it goes as h²",
+        "Optionally one practical number: doubling depth gives 8× stiffness and 4× strength"
+      ],
+      "should_not": [
+        "Define I, the neutral axis or bending from scratch",
+        "Derive the integral they asked not to see",
+        "Add an unrequested worked example",
+        "Patronising check questions"
+      ],
+      "best_representation": "text"
+    },
+    "correctness": {
+      "must": [
+        "I = ∫ y² dA; for a rectangle bh³/12",
+        "Strain (and, elastically, stress) varies linearly with distance from the neutral axis",
+        "Each fibre's moment contribution ∝ y × (stress ∝ y) × dA, hence y²",
+        "Bending stiffness ∝ EI; rectangular section modulus S = bh²/6"
+      ],
+      "must_not": [
+        "\"Stress is uniform over the depth\"",
+        "Swapping the roles of b and h"
+      ]
+    },
+    "transfer": {
+      "question": "A shelf plank is 200 mm wide and 20 mm thick. How much stiffer, and how much stronger in bending, is it set on edge (200 mm deep) rather than flat (20 mm deep)? Any practical catch?",
+      "answer": "Stiffness ratio = (20·200³)/(200·20³) = 100×; strength (section modulus) ratio = (20·200²)/(200·20²) = 10×. Catch: a thin plank on edge is prone to lateral-torsional buckling, so it needs lateral restraint to realise that capacity."
+    }
+  },
+  {
+    "id": "eng-tacoma-flutter",
+    "domain": "engineering + physics + history",
+    "concept": "self-excited aeroelastic flutter vs forced resonance (Tacoma Narrows, 1940)",
+    "persona": {
+      "level": "expert",
+      "prior": "Mechanical engineer fluent in vibration, damping and natural frequencies; learned the Tacoma story from textbooks.",
+      "misconception": "Tacoma Narrows was classic forced resonance: wind forcing matched the deck's natural frequency."
+    },
+    "history": [],
+    "message": "Prepping a lunch-and-learn on resonance. Using Tacoma Narrows (1940) as the headline example — wind forcing at the deck's natural frequency, amplitude builds, collapse. Anything I should tighten?",
+    "tags": [
+      "misconception",
+      "multidisciplinary",
+      "compare"
+    ],
+    "ideal": {
+      "central_insight": "Tacoma isn't a forced-resonance example. The wind was fairly steady — no periodic forcing at a matching frequency. The deck failed by torsional aeroelastic flutter: a self-excited instability in which the twisting motion itself changes the aerodynamic forces so that they feed energy in every cycle (effectively negative damping). The frequency comes from the structure–flow system, not from the wind.",
+      "should": [
+        "Say plainly that the headline example is a well-known textbook error, and give the correct mechanism at peer level",
+        "Contrast forced resonance (external periodic forcing near a natural frequency) with self-excited oscillation (steady energy source, motion-dependent forcing, negative damping)",
+        "Point to Billah & Scanlan (1991, American Journal of Physics) as the reference",
+        "Suggest reframing the talk as \"resonance vs self-excitation\" — the more useful engineering lesson — or a cleaner resonance headline example"
+      ],
+      "should_not": [
+        "Endorse the slide as \"close enough\"",
+        "Over-explain natural frequency or damping to a mechanical engineer",
+        "Present vortex shedding as the accepted cause of the torsional failure"
+      ],
+      "best_representation": "compare"
+    },
+    "correctness": {
+      "must": [
+        "The bridge collapsed on 7 November 1940 in a fairly steady wind of roughly 40 mph (~65 km/h)",
+        "Failure was in a twisting (torsional) mode, attributed to aeroelastic flutter — a self-excited instability",
+        "The vortex-shedding frequency did not match the torsional oscillation frequency, so it was not simple forced resonance",
+        "Reference: Billah & Scanlan, \"Resonance, Tacoma Narrows bridge failure, and undergraduate physics textbooks\", Am. J. Phys. 59 (1991)"
+      ],
+      "must_not": [
+        "\"Periodic gusts matched the bridge's natural frequency\"",
+        "\"Marching troops or traffic caused it\""
+      ]
+    },
+    "transfer": {
+      "question": "A violin bow is drawn across a string at a steady speed, and the string sounds at its own natural frequency. Is this resonance with the bow? Where does the timing come from, and where does the energy come from?",
+      "answer": "Not forced resonance — a bow moving at constant speed has no frequency to match. It's self-excited: friction is higher while the string sticks to the bow than while it slips, so the string's own motion gates when energy goes in each cycle (stick–slip, effectively negative damping). The timing is set by the string's natural frequency; the energy comes from the steady bow motion — the same class of mechanism as flutter."
+    }
+  },
+  {
+    "id": "biz-price-cut-breakeven",
+    "domain": "business — pricing decision",
+    "concept": "break-even volume for a price change given contribution margin",
+    "persona": {
+      "level": "expert",
+      "prior": "Commercial finance lead; fluent in contribution margin, elasticity and P&L.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "CM is 40%. Sales wants a 10% list price cut to drive volume. What lift do we need just to hold total contribution?",
+    "tags": [
+      "solve",
+      "decide",
+      "expert-shorthand"
+    ],
+    "ideal": {
+      "central_insight": "The whole cut comes out of unit contribution: on a $100 price, contribution falls from $40 to $30, so volume must rise by 40/30 − 1 = 33.3% just to stand still — an implied elasticity of about −3.3.",
+      "should": [
+        "Give 33.3% in the first line",
+        "Show the one-line formula: required lift = CM / (CM − cut) − 1",
+        "Flag assumptions briefly: unit variable cost and fixed costs unchanged, no capacity limit, competitors don't match, existing full-price buyers also get the cut",
+        "Optionally one sharp commercial question (is there evidence of elasticity near −3.3?)"
+      ],
+      "should_not": [
+        "Define contribution margin or elasticity",
+        "A long lecture on pricing strategy",
+        "Hedging without the number"
+      ],
+      "best_representation": "notation"
+    },
+    "correctness": {
+      "must": [
+        "Required volume increase = 0.40/(0.40 − 0.10) − 1 = 33.3%",
+        "General form: Δvolume = CM/(CM − Δprice) − 1, with the price change as a fraction of the old price",
+        "Implied break-even elasticity ≈ 33.3% / 10% ≈ −3.3"
+      ],
+      "must_not": [
+        "10%",
+        "25% (= cut ÷ CM: the fall in unit margin, not the required lift)"
+      ]
+    },
+    "transfer": {
+      "question": "At a 25% contribution margin, what volume increase justifies a 5% price cut? And on a 5% price increase, how much volume can you lose before total contribution falls?",
+      "answer": "Cut: 0.25/0.20 − 1 = 25% more volume needed. Increase: unit contribution rises from 25 to 30, so volume can fall to 25/30 ≈ 83.3% of today — a loss of up to about 16.7%. The asymmetry is the lesson: at thin margins, price cuts need big volume gains while price rises can absorb sizeable volume losses."
+    }
+  },
+  {
+    "id": "ml-attention-sqrt-dk",
+    "domain": "machine learning + probability",
+    "concept": "variance of a sum of independent terms (scaled dot-product attention)",
+    "persona": {
+      "level": "expert",
+      "prior": "ML engineer; knows transformers and softmax saturation.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "why √d_k in scaled dot-product attention and not d_k? I get \"softmax saturates\", I want why that specific factor",
+    "tags": [
+      "why",
+      "expert-shorthand",
+      "multidisciplinary"
+    ],
+    "ideal": {
+      "central_insight": "If q and k have roughly independent, zero-mean, unit-variance components, q·k is a sum of d_k terms each of variance 1, so its variance is d_k and its standard deviation √d_k. Dividing by √d_k puts the logits back at unit scale whatever d_k is; dividing by d_k would shrink them like 1/√d_k and flatten softmax toward uniform as d_k grows.",
+      "should": [
+        "Two-line derivation: Var(Σ qᵢkᵢ) = Σ Var(qᵢ)Var(kᵢ) = d_k",
+        "Say what dividing by d_k would do (std 1/√d_k → near-uniform attention at large d_k)",
+        "Note it's a scale argument under initialisation-style assumptions (Vaswani et al. 2017, footnote), not an exact property of trained models",
+        "Optionally: alternatives such as QK-normalisation exist"
+      ],
+      "should_not": [
+        "Explain what attention or softmax is",
+        "A transformer tutorial",
+        "Claim √d_k is exact or fitted from trained statistics"
+      ],
+      "best_representation": "notation"
+    },
+    "correctness": {
+      "must": [
+        "For independent zero-mean unit-variance components, Var(q·k) = d_k and std = √d_k",
+        "Scaling by 1/√d_k gives unit-variance logits under those assumptions",
+        "Scaling by 1/d_k gives std 1/√d_k, pushing softmax toward uniform for large d_k"
+      ],
+      "must_not": [
+        "\"The variance grows as d_k²\"",
+        "\"√d_k was chosen empirically with no rationale\""
+      ]
+    },
+    "transfer": {
+      "question": "A dense layer has fan-in 400 and receives inputs with zero mean and unit variance. What weight standard deviation keeps the pre-activations at unit variance (ignoring the nonlinearity)? What changes for ReLU?",
+      "answer": "Pre-activation = Σ wᵢxᵢ over 400 terms, so Var = 400 · Var(w) · 1; Var(w) = 1/400 → std = 0.05 (LeCun initialisation). For ReLU, which zeroes about half the signal, He initialisation uses Var(w) = 2/fan-in → std ≈ 0.0707. Same principle: the variance of a sum of n independent terms grows like n."
+    }
+  },
+  {
+    "id": "phys-light-slower-in-glass",
+    "domain": "physics — optics / electromagnetism",
+    "concept": "refractive index from superposition of the incident and re-radiated waves",
+    "persona": {
+      "level": "expert",
+      "prior": "PhD electrical engineer, fluent in Maxwell's equations, phasors and driven oscillators; picked up the absorb–re-emit story from popular science.",
+      "misconception": "Light is slower in glass because photons are absorbed and re-emitted by atoms, with a small delay each time."
+    },
+    "history": [],
+    "message": "Giving a talk to undergrads. My one-liner for why light is slower in glass: photons get absorbed and re-emitted by atoms, each re-emission adds a tiny delay. Good enough?",
+    "tags": [
+      "why",
+      "misconception"
+    ],
+    "ideal": {
+      "central_insight": "No — that picture is wrong, not merely simplified. Visible light is below glass's electronic resonances, so nothing is absorbed: the field drives the bound electrons, which oscillate and radiate. The forward wave is the sum of the incident wave and this re-radiated wave, which lags in phase, so the total phase advances more slowly per unit distance — phase velocity c/n.",
+      "should": [
+        "Say directly that absorb–re-emit is a misconception, in their language (phasors, driven oscillators)",
+        "Give two quick reasons it fails: re-emission would go in random directions (glass would scatter light and blur images), and absorption needs resonance (glass is transparent precisely because visible photons don't match its transitions)",
+        "Offer a replacement one-liner suitable for undergrads",
+        "Point to a standard source (Feynman Lectures Vol. I, ch. 31, \"The Origin of the Refractive Index\")"
+      ],
+      "should_not": [
+        "Call absorb–re-emit \"fine as an approximation\"",
+        "Dumb it down for an EE PhD",
+        "Full QED or polariton theory unless asked"
+      ],
+      "best_representation": "diagram"
+    },
+    "correctness": {
+      "must": [
+        "n = c / v_phase",
+        "Below resonance the re-radiated wave lags and n > 1; above resonance (e.g. X-rays) n is slightly less than 1",
+        "Phase velocity above c does not violate relativity: signals and wavefronts travel at ≤ c",
+        "Absorption followed by spontaneous re-emission would randomise direction"
+      ],
+      "must_not": [
+        "\"Photons are absorbed and re-emitted with a delay at each atom\"",
+        "\"Photons travel at c between atoms and wait at each atom\"",
+        "\"Glass is transparent because visible light passes between the atoms without interacting\""
+      ]
+    },
+    "transfer": {
+      "question": "For X-rays, glass has a refractive index slightly below 1 (n = 1 − δ, δ ~ 10⁻⁶–10⁻⁵), so the phase velocity exceeds c. How does the absorb–re-emit picture fare against this, how does the driven-oscillator picture explain it, and is relativity violated?",
+      "answer": "Absorb–re-emit can only add delay, so it can never give v > c — it fails outright. In the driven-oscillator picture, X-ray frequencies are above the electrons' resonances, so the electrons respond with the opposite phase and the re-radiated wave advances rather than retards the total phase, giving n < 1. No violation: phase velocity carries no information, and the signal/front velocity stays ≤ c. (A practical consequence: total external reflection of X-rays at grazing incidence, used in X-ray mirrors and telescopes.)"
+    }
+  },
+  {
+    "id": "design-wcag-contrast-origin",
+    "domain": "design + vision science + mathematics",
+    "concept": "the WCAG contrast ratio: relative luminance and the basis of 4.5:1",
+    "persona": {
+      "level": "expert",
+      "prior": "Senior product designer; uses contrast checkers; good eyesight and a calibrated monitor.",
+      "misconception": "4.5:1 is arbitrary, and \"looks readable to me\" is a fair test."
+    },
+    "history": [],
+    "message": "senior designer here. where does WCAG's 4.5:1 actually come from? feels arbitrary. #777 on white fails and it looks perfectly readable to me on my monitor",
+    "tags": [
+      "why",
+      "misconception",
+      "multidisciplinary"
+    ],
+    "ideal": {
+      "central_insight": "4.5:1 is 3:1 × 1.5: 3:1 is the long-standing minimum for readers with normal vision (ISO 9241-3 / ANSI-HFES-100-1988), and 1.5 is the contrast-sensitivity loss associated with roughly 20/40 acuity, common with ageing. It's sized for a reader with moderately reduced vision, not a designer with good eyes on a good monitor. #777 on white is 4.48:1 — just under.",
+      "should": [
+        "Give the provenance precisely and briefly, peer to peer",
+        "Explain why \"readable to me\" is the wrong test (the threshold targets lower acuity, worse screens, glare)",
+        "Give the number for #777 (4.48:1) and the nearest fix (#767676 ≈ 4.54:1); note that WCAG does not round",
+        "Acknowledge the fair critique: any cutoff is a line on a continuum, and luminance contrast ignores weight/size beyond the large-text rule (WCAG 3 drafts have explored a different method, APCA)"
+      ],
+      "should_not": [
+        "Moralise about why accessibility matters",
+        "Explain what WCAG is",
+        "Claim 4.5 was derived from display gamma or is legally required everywhere"
+      ],
+      "best_representation": "text"
+    },
+    "correctness": {
+      "must": [
+        "WCAG 2 AA: 4.5:1 for normal text, 3:1 for large text (≥18 pt / 24 px, or ≥14 pt / ~18.66 px bold); AAA: 7:1 and 4.5:1",
+        "Contrast ratio = (L₁ + 0.05)/(L₂ + 0.05), using relative luminance from linearised sRGB",
+        "#777777 on #FFFFFF ≈ 4.48:1 (fails AA for normal text); #767676 ≈ 4.54:1 (passes)",
+        "Rationale (Understanding SC 1.4.3): 3:1 baseline × ~1.5 contrast-sensitivity loss at 20/40 = 4.5:1; the same reasoning for 20/80 gives ~7:1"
+      ],
+      "must_not": [
+        "Rounding 4.48 up to a pass",
+        "\"4.5:1 comes from monitor gamma\"",
+        "Computing contrast from raw (non-linearised) RGB values"
+      ]
+    },
+    "transfer": {
+      "question": "(a) Does #767676 text on white pass AA for body text? (b) Would #777 pass if the text were 24 px regular weight? (c) What contrast does AAA body text need, and does #595959 on white meet it?",
+      "answer": "(a) Yes: ≈4.54:1 ≥ 4.5. (b) Yes: 24 px (18 pt) regular counts as large text, so the threshold is 3:1, and 4.48:1 passes. (c) 7:1; #595959 on white is ≈7.0:1 (7.005), so it just meets AAA."
+    }
+  },
+  {
+    "id": "chem-gibbs-log-intuition",
+    "domain": "chemistry — thermodynamics",
+    "concept": "why ΔG = ΔG° + RT ln Q contains a logarithm (concentration entropy, chemical potential)",
+    "persona": {
+      "level": "expert",
+      "prior": "Chemistry PhD teaching general chemistry; can derive the result formally.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "Chem PhD, teaching gen chem this term. Students keep asking why ΔG = ΔG° + RT ln Q has a log in it, and \"it falls out of the math\" isn't landing. I want a physical reason I can say in two minutes.",
+    "tags": [
+      "why",
+      "expert-shorthand"
+    ],
+    "ideal": {
+      "central_insight": "The log is the entropy of concentration. The number of ways to place molecules grows with the room available to each, so a molecule's entropy contains −k ln c; per mole, the free energy (chemical potential) is μ = μ° + RT ln c. Diluting tenfold always gains the same entropy, R ln 10: multiplicative changes in concentration give additive changes in free energy. Q multiplies concentrations, so their logs add up to RT ln Q.",
+      "should": [
+        "A two-minute chain in classroom language: more room per molecule → more arrangements → entropy ∝ ln(volume per molecule) → μ = μ° + RT ln c → summed over the reaction = ΔG° + RT ln Q",
+        "One concrete number for students: each tenfold change in Q shifts ΔG by RT ln 10 ≈ 5.7 kJ/mol at 25 °C",
+        "Connect to equilibrium in one line: ΔG = 0 gives ΔG° = −RT ln K",
+        "Peer tone; brief"
+      ],
+      "should_not": [
+        "A formal derivation via Gibbs–Duhem or partition functions",
+        "Explaining what ΔG or Q is",
+        "Lecturing a PhD on thermodynamics basics"
+      ],
+      "best_representation": "causal-chain"
+    },
+    "correctness": {
+      "must": [
+        "For ideal gases and dilute solutions, μᵢ = μᵢ° + RT ln aᵢ (activity ≈ concentration ÷ standard concentration)",
+        "ΔG = ΔG° + RT ln Q; at equilibrium ΔG = 0 and ΔG° = −RT ln K",
+        "The ln c term is entropic (configurational/positional entropy)",
+        "RT ln 10 ≈ 5.71 kJ/mol at 298 K"
+      ],
+      "must_not": [
+        "\"The log comes from the Arrhenius equation / activation energy\"",
+        "\"ΔG° is the free-energy change under the actual conditions\""
+      ]
+    },
+    "transfer": {
+      "question": "In human red blood cells, [ATP] ≈ 2.25 mM, [ADP] ≈ 0.25 mM and [Pᵢ] ≈ 1.65 mM at 37 °C. Given ΔG°′ = −30.5 kJ/mol for ATP hydrolysis, what is the actual ΔG in the cell, and what does the log term tell you?",
+      "answer": "Q = [ADP][Pᵢ]/[ATP] = (0.25×10⁻³)(1.65×10⁻³)/(2.25×10⁻³) ≈ 1.83×10⁻⁴. RT at 310 K ≈ 2.58 kJ/mol; RT ln Q ≈ 2.58 × (−8.60) ≈ −22.2 kJ/mol. ΔG ≈ −30.5 − 22.2 ≈ −52.7 kJ/mol (Lehninger quotes about −52). The cell holds the ATP/ADP system far from equilibrium, and that concentration term supplies about 42% of the usable free energy."
+    }
+  },
+  {
+    "id": "linalg-svd-vs-eig",
+    "domain": "mathematics — linear algebra",
+    "concept": "relation between the SVD and the eigendecomposition of a symmetric matrix",
+    "persona": {
+      "level": "expert",
+      "prior": "Applied mathematician / ML researcher; uses both decompositions routinely.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "sanity check: symmetric A ⇒ SVD = eigendecomposition? or only PSD",
+    "tags": [
+      "expert-shorthand",
+      "compare"
+    ],
+    "ideal": {
+      "central_insight": "Only PSD. For symmetric A = QΛQᵀ the singular values are |λᵢ|, and an SVD is A = Q|Λ|(QS)ᵀ with S = sign(Λ): each negative eigenvalue flips the sign of that column of V. So U = V = Q exactly when every λᵢ ≥ 0.",
+      "should": [
+        "Answer in the first line: only PSD (symmetric gives σᵢ = |λᵢ|)",
+        "Give the sign-flip construction in one line",
+        "Mention the usual caveats briefly: σ sorted descending; non-uniqueness within repeated values"
+      ],
+      "should_not": [
+        "Explain what an SVD or eigendecomposition is",
+        "An unrequested numerical example",
+        "Paragraphs of preamble"
+      ],
+      "best_representation": "notation"
+    },
+    "correctness": {
+      "must": [
+        "Real symmetric matrices have an orthogonal eigendecomposition A = QΛQᵀ (spectral theorem)",
+        "The singular values of a symmetric matrix are the absolute values of its eigenvalues",
+        "The SVD and eigendecomposition coincide (U = V) iff A is positive semidefinite, up to ordering and basis choice within repeated values"
+      ],
+      "must_not": [
+        "\"Symmetric is enough for SVD = eigendecomposition\"",
+        "\"Singular values equal eigenvalues for any square matrix\""
+      ]
+    },
+    "transfer": {
+      "question": "Give the eigenvalues and singular values of (a) [[0, 1], [1, 0]] and (b) the shear [[1, 1], [0, 1]].",
+      "answer": "(a) Eigenvalues +1 and −1 (eigenvectors (1,1)/√2 and (1,−1)/√2); singular values 1 and 1 — symmetric but indefinite, so U ≠ V. (b) Eigenvalue 1, repeated, with only one eigen-direction (defective); singular values are the square roots of the eigenvalues of AᵀA = [[1,1],[1,2]], i.e. √((3 ± √5)/2) = φ ≈ 1.618 and 1/φ ≈ 0.618 (product = |det| = 1). Eigenvalues describe invariant directions; singular values describe stretching."
+    }
+  },
+  {
+    "id": "econ-opportunity-cost-clapton",
+    "domain": "economics",
+    "concept": "opportunity cost = net value of the best forgone alternative",
+    "persona": {
+      "level": "expert",
+      "prior": "Economics PhD student TA-ing intro micro; fluent with the textbook definition.",
+      "misconception": "The opportunity cost of using a free ticket is the price of the alternative ticket ($40)."
+    },
+    "history": [],
+    "message": "TA-ing intro micro. Writing up the classic: you have a free Clapton ticket (can't resell). Dylan plays the same night, ticket's $40, you'd pay up to $50 to see him. Opp cost of going to Clapton = $40, yes?",
+    "tags": [
+      "solve",
+      "wrong-attempt",
+      "misconception",
+      "expert-shorthand"
+    ],
+    "ideal": {
+      "central_insight": "No — $10. Opportunity cost is the value of the best alternative given up, net of what that alternative would cost. Seeing Dylan would be worth $50 but cost $40, so its net value is $10; choosing Clapton keeps the $40 in your pocket, so only $10 is forgone.",
+      "should": [
+        "Give the correct answer ($10) in the first line — this is going into teaching material",
+        "One line of reasoning: $50 benefit − $40 price = $10 forgone; the $40 isn't lost by choosing Clapton",
+        "Note without condescension that this exact question famously trips up professional economists (Ferraro & Taylor, 2005)",
+        "Optionally suggest an answer-key line explaining why $40 and $50 tempt"
+      ],
+      "should_not": [
+        "Agree with $40",
+        "Explain opportunity cost from scratch to an economics PhD",
+        "Lecture at length"
+      ],
+      "best_representation": "compare"
+    },
+    "correctness": {
+      "must": [
+        "Opportunity cost of seeing Clapton = $10 ($50 willingness to pay − $40 price)",
+        "The $40 is not forgone when you choose Clapton; you keep it",
+        "Ferraro & Taylor (2005) put this question to professional economists and most did not answer $10"
+      ],
+      "must_not": [
+        "$40",
+        "$50",
+        "$0"
+      ]
+    },
+    "transfer": {
+      "question": "You bought a bottle of wine for $20 years ago. Today you could sell it for $75 after fees; an identical bottle would cost $90 to buy. You're deciding whether to open it at dinner tonight. What is the opportunity cost of drinking it?",
+      "answer": "$75 — the best alternative given up is selling it for $75. The $20 purchase price is sunk, and the $90 replacement price matters only if you would otherwise buy another bottle. If drinking it tonight is worth less than $75 to you, sell it."
+    }
+  },
+  {
+    "id": "bio-fisher-investment",
+    "domain": "biology — evolution",
+    "concept": "Fisher's principle: the equilibrium is on equal parental investment, not equal numbers",
+    "persona": {
+      "level": "expert",
+      "prior": "Evolutionary biology grad student; can state Fisher's principle and knows frequency-dependent selection.",
+      "misconception": null
+    },
+    "history": [],
+    "message": "Evo grad student. I can recite Fisher's principle but never had a clean intuition for why the equilibrium is on equal *investment* rather than equal numbers. Quick version?",
+    "tags": [
+      "why",
+      "expert-shorthand"
+    ],
+    "ideal": {
+      "central_insight": "Every offspring has exactly one mother and one father, so the total reproductive payoff through all sons equals that through all daughters. The return per unit spent on a sex is that fixed pool divided by the total investment in that sex — so if one sex receives less total investment, each unit spent on it buys a larger share, and selection shifts investment until total spending on each sex is equal. With equal costs, that means equal numbers.",
+      "should": [
+        "Lead with the one-mother-one-father constraint as the key",
+        "Make the \"return per unit invested\" framing explicit",
+        "One numerical illustration (sons cost twice as much → 1 son : 2 daughters)",
+        "Brief note of assumptions and exceptions (random mating; local mate competition, Hamilton 1967, gives female bias)"
+      ],
+      "should_not": [
+        "Explaining natural selection or frequency dependence basics",
+        "Fisher's biography at length",
+        "Group-selection framing"
+      ],
+      "best_representation": "text"
+    },
+    "correctness": {
+      "must": [
+        "Fisher (1930), The Genetical Theory of Natural Selection",
+        "At equilibrium, total parental expenditure on sons equals that on daughters",
+        "Each offspring has one mother and one father, so total reproductive success through each sex is equal",
+        "Assumes large, randomly mating populations; local mate competition (Hamilton 1967) produces female-biased ratios"
+      ],
+      "must_not": [
+        "\"1:1 because XY sex determination produces it\" as the explanation",
+        "\"Selection favours more females because that maximises population growth\""
+      ]
+    },
+    "transfer": {
+      "question": "In a species where raising a son costs parents twice as much as raising a daughter, what sex ratio at the end of parental care does Fisher's argument predict? Check it by comparing each sex's return per unit of investment.",
+      "answer": "1 son : 2 daughters (sons one-third of offspring), so total investment is equal (1 × 2 = 2 × 1). Check: with half as many sons as daughters, each son's share of the equal reproductive pool is twice each daughter's — exactly matching his double cost — so the return per unit invested is equal and neither sex pays better."
+    }
+  }
+]

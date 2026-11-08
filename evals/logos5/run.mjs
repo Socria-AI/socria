@@ -126,12 +126,17 @@ const repeat = Math.max(1, Math.min(10, Number(args.repeat) || 1));
 
 async function ask(surface, scenario) {
   db.reset();
-  globalThis.__uid = undefined; // signed out: no memory either way, so the scenarios test the reply alone
+  // A signed-in test user: the Logos route answers no signed-out request without a guest pass (route.ts — a 401), so
+  // the old "signed out" here made every Logos scenario a refusal. A fresh user per scenario, with nothing
+  // remembered (the database is reset above), still tests the reply alone.
+  globalThis.__uid = `l5-eval-${surface}-${scenario.id}`;
   const url = surface === 'core4' ? 'http://localhost/api/chat' : 'http://localhost/api/logos/chat';
   // Logos as the new Socria's screen sends it (LogosApp guidance()): the Logos 5 persona, unless --persona classic
   const body = surface === 'core4' ? { model: 'core-4', messages: scenario.messages, conversationId: `l5-${scenario.id}` } : { messages: scenario.messages, surface: 'logos5' };
   const r = await routes[surface].POST(new NextRequest(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) }));
   const text = await r.text();
+  // a refusal is not a reply to grade: stop rather than score a 401 as an answer
+  if (r.status !== 200) throw new Error(`${surface} ${scenario.id}: HTTP ${r.status} — ${text.slice(0, 160)}`);
   await new Promise((done) => setTimeout(done, 200));
   const trace = r.headers.get('x-socria-runtime') ?? '';
   const intent = /intent=([a-z_]+)/.exec(trace)?.[1];

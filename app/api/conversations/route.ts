@@ -6,6 +6,7 @@
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
 import { sanitizeDid, sanitizeInlineState } from '@/lib/inline-ui';
+import { sanitizeThreadNote } from '@/lib/runtime/explain';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources, type ReplyRef } from '@/lib/chat-thread';
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
@@ -78,6 +79,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       const did = m.role === 'user' ? sanitizeDid(m.did) : undefined;
       // the web pages a reply read, listed under it — addresses and titles, never their text
       const sources = m.role === 'assistant' ? cleanWebSources(m.sources) : undefined;
+      // what the reply did, as the explanation engine planned it: enum codes and a concept, nothing else (lib/runtime/explain.ts)
+      const explain = m.role === 'assistant' ? sanitizeThreadNote(m.explain) : null;
       return {
         ...(id ? { id } : {}),
         ...(at ? { at } : {}),
@@ -92,6 +95,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),
         ...(ui ? { ui } : {}),
+        ...(explain ? { explain } : {}),
       };
     });
 }

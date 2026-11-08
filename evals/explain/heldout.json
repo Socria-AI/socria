@@ -1,0 +1,1293 @@
+[
+ {
+  "id": "ho-a-mole-novice-first",
+  "domain": "chemistry — stoichiometry",
+  "concept": "The mole as a counting unit linking particle counts to grams",
+  "persona": {
+   "level": "novice",
+   "prior": "Adult returning to school who knows atoms exist and that the periodic table lists an atomic mass for each element.",
+   "misconception": null
+  },
+  "history": [],
+  "message": "ok total beginner here. what even IS a mole in chemistry?? my textbook just says 6.022 x 10^23 but 6.022 x 10^23 of WHAT and why such a weird number",
+  "tags": [
+   "what",
+   "why",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "A mole is just a count, like a dozen but much bigger: 6.022 x 10^23 particles. The number was chosen so that one mole of a substance has a mass in grams equal (to very good approximation) to its atomic or molecular mass, which lets chemists count atoms by weighing them.",
+   "should": [
+    "Use a counting-unit analogy (dozen, ream of paper) to show a mole is a number of things, not a weight",
+    "Answer 'of what' directly: atoms, molecules, ions or whatever particle you are counting",
+    "Explain why the number is so odd: it is the bridge that makes atomic mass in u equal molar mass in g/mol (carbon about 12 g per mole, water about 18 g per mole)",
+    "Give one concrete example, e.g. 18 g of water is about one mole of water molecules",
+    "Keep the language beginner-friendly and check whether the link to the periodic table makes sense"
+   ],
+   "should_not": [
+    "Open with the formal SI definition and no intuition",
+    "Suggest the mole is a unit of mass or volume",
+    "Go into the 2019 SI redefinition or isotopes in detail for a first explanation"
+   ],
+   "best_representation": "analogy"
+  },
+  "correctness": {
+   "must": [
+    "Avogadro's number is about 6.022 x 10^23 per mole (since 2019 defined as exactly 6.02214076 x 10^23)",
+    "A mole is an amount of substance, i.e. a count of specified particles",
+    "The molar mass in g/mol is numerically (very nearly) equal to the atomic or molecular mass in u, e.g. carbon-12 about 12 g/mol, water about 18 g/mol"
+   ],
+   "must_not": [
+    "A mole is a unit of mass",
+    "One mole of every substance has the same mass",
+    "A mole of a gas always takes up 22.4 L under any conditions"
+   ]
+  },
+  "transfer": {
+   "question": "Roughly how many water molecules are in 36 g of water?",
+   "answer": "Water has a molar mass of about 18 g/mol, so 36 g is about 2 mol. That is 2 x 6.022 x 10^23, about 1.2 x 10^24 molecules."
+  }
+ },
+ {
+  "id": "ho-a-mrna-modified-nucleoside-expert",
+  "domain": "biology — molecular immunology",
+  "concept": "Why mRNA vaccines substitute N1-methylpseudouridine for uridine",
+  "persona": {
+   "level": "expert",
+   "prior": "Condensed-matter physicist who reads papers comfortably but has no biology training past high school.",
+   "misconception": null
+  },
+  "history": [],
+  "message": "physicist here, basically zero bio past high school. why do the covid mRNA vaccines swap uridine for N1-methylpseudouridine? want the actual mechanism, dont dumb it down too much, i can handle jargon if you define it once",
+  "tags": [
+   "why",
+   "expert-shorthand",
+   "multidisciplinary"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Cells have innate immune sensors that recognise unmodified, in vitro transcribed RNA as foreign. When they fire, they cause inflammation and also shut down translation, partly through PKR phosphorylating eIF2alpha. N1-methylpseudouridine still pairs with adenosine like uridine, so the protein encoded doesn't change, but sensor activation drops a lot and much more protein is made.",
+   "should": [
+    "Name the main sensors (endosomal TLR7/8, cytosolic RIG-I and related sensors, PKR) and define each once, briefly",
+    "Explain the two payoffs separately: less innate immune activation and more translation",
+    "Make clear that the base still decodes as U, so the amino-acid sequence is unchanged",
+    "Mention the history briefly (Kariko and Weissman's 2005 finding that modified nucleosides such as pseudouridine suppress TLR activation; N1-methylpseudouridine was later shown, around 2015, to work even better; 2023 Nobel Prize in Physiology or Medicine)",
+    "Be dense and precise, as suits an expert, maybe noting that dsRNA contaminant removal and codon optimisation also matter, or that m1Psi-related ribosomal frameshifting has been reported and is still being studied"
+   ],
+   "should_not": [
+    "Over-simplify with cartoon analogies the person said they don't need",
+    "Claim the modification makes the mRNA permanent or able to enter the nucleus or integrate into DNA",
+    "Attribute the whole effect to RNA stability alone"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "Both the Pfizer-BioNTech (BNT162b2) and Moderna (mRNA-1273) COVID-19 vaccines replace every uridine with N1-methylpseudouridine",
+    "Unmodified in vitro transcribed mRNA activates innate sensors such as TLR7/8, RIG-I and PKR",
+    "N1-methylpseudouridine base-pairs with adenosine and is decoded like uridine, so the encoded protein is unchanged",
+    "Kariko and Weissman shared the 2023 Nobel Prize in Physiology or Medicine for their discoveries on nucleoside base modifications"
+   ],
+   "must_not": [
+    "The modification changes the protein's amino-acid sequence",
+    "Modified mRNA integrates into the host genome",
+    "The modification makes the mRNA persist in the body indefinitely",
+    "Kariko and Weissman's original 2005 paper used N1-methylpseudouridine"
+   ]
+  },
+  "transfer": {
+   "question": "Suppose you put an unmodified, in vitro transcribed mRNA encoding the same spike protein into cells. What would you predict for protein yield and inflammation, and why?",
+   "answer": "Yield would be lower and inflammation higher. Innate sensors (TLRs, RIG-I, PKR) would detect the RNA, PKR-driven eIF2alpha phosphorylation would suppress translation, and the interferon response would further limit expression."
+  }
+ },
+ {
+  "id": "ho-a-circuit-current-still-confused",
+  "domain": "physics — electric circuits",
+  "concept": "Current is not used up; energy is transferred",
+  "persona": {
+   "level": "novice",
+   "prior": "Adult learner in an intro physics course who has just been given the water-in-pipes analogy for circuits.",
+   "misconception": "A bulb uses up current, so less current leaves a bulb than enters it."
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "whats the difference between voltage and current? they seem like the same thing"
+   },
+   {
+    "role": "assistant",
+    "content": "A common way to picture it is water in pipes. Voltage is like water pressure, the push from the pump (the battery). Current is like the flow rate, how much water passes a point each second. A bulb is like a narrow section of pipe or a little water wheel that the flow has to push through. The pump keeps the water circulating around a closed loop."
+   }
+  ],
+  "message": "ok but if the water goes into the bulb and the same amount comes out the other side... then what does the bulb actually USE?? something has to get used up or the battery wouldnt die. i still dont get it",
+  "tags": [
+   "still-confused",
+   "why",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Charge isn't used up: the same current flows all the way round the loop. What the bulb takes is energy. Each bit of charge loses energy (that is what the voltage across the bulb measures), and the bulb gives it out as light and heat. A battery 'dies' when its chemical energy runs out, not when it runs out of charge.",
+   "should": [
+    "Accept that the confusion is reasonable and say exactly what was missing: the difference between charge (which goes round) and energy (which gets transferred)",
+    "Switch to a new representation instead of repeating the water analogy, e.g. a ski lift (battery lifts skiers, they lose height on the slope or bulb, the number of skiers per minute is the same everywhere) or a bike chain delivering energy",
+    "Connect voltage to energy per unit charge",
+    "Explain why the battery runs down: it is converting stored chemical energy",
+    "End with a quick check question, such as what an ammeter would read before and after the bulb"
+   ],
+   "should_not": [
+    "Just restate the water-pipe analogy in more detail",
+    "Say the bulb consumes electrons or current",
+    "Bring in AC, resistivity formulas or drift-velocity calculations"
+   ],
+   "best_representation": "analogy"
+  },
+  "correctness": {
+   "must": [
+    "In a series circuit the current is the same at every point",
+    "Voltage (potential difference) across a component is the energy transferred per unit charge",
+    "A battery converts stored chemical energy into electrical energy; it does not supply a stock of charge that gets used up",
+    "The bulb converts electrical energy to light and thermal energy"
+   ],
+   "must_not": [
+    "Less current comes out of a bulb than goes in",
+    "The bulb uses up electrons",
+    "A battery dies because it runs out of electrons"
+   ]
+  },
+  "transfer": {
+   "question": "Two identical bulbs are in series with a battery. An ammeter between the battery and the first bulb reads 0.3 A. What does an ammeter between the two bulbs read, and one after the second bulb?",
+   "answer": "Both read 0.3 A, because current is the same all round a series loop. Each bulb transfers energy (there is a voltage drop across each), but neither uses up current."
+  }
+ },
+ {
+  "id": "ho-a-molarity-wrong-attempt",
+  "domain": "chemistry — solutions",
+  "concept": "Molarity requires volume in litres",
+  "persona": {
+   "level": "intermediate",
+   "prior": "First-year chemistry student who knows molarity is moles per litre and can look up molar masses.",
+   "misconception": "You can plug millilitres straight into moles = M x V."
+  },
+  "history": [],
+  "message": "need to make 250 mL of 0.5 M NaCl for lab tmrw. i did 0.5 x 250 = 125 mol, then 125 x 58.44 = 7305 g ??? thats like 7 kilos of salt, cant be right lol where did i mess up",
+  "tags": [
+   "wrong-attempt",
+   "solve",
+   "hurried"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Molarity is moles per litre, so the volume has to be in litres: 250 mL = 0.250 L. 0.5 mol/L x 0.250 L = 0.125 mol, and 0.125 mol x 58.44 g/mol is about 7.31 g.",
+   "should": [
+    "Point to the exact step that went wrong (multiplying by 250 instead of 0.250)",
+    "Say that the method (moles first, then grams via molar mass) and the sanity check were both right",
+    "Show the units cancelling (mol/L x L = mol) so the mistake is less likely next time",
+    "Give the corrected amount of about 7.3 g",
+    "Optionally add a practical tip: dissolve the salt and make up to the 250 mL mark in a volumetric flask"
+   ],
+   "should_not": [
+    "Redo the whole calculation without saying where the error was",
+    "Lecture on molarity from scratch",
+    "Treat the student as careless when they caught the absurd result themselves"
+   ],
+   "best_representation": "worked example"
+  },
+  "correctness": {
+   "must": [
+    "Molar mass of NaCl is about 58.44 g/mol",
+    "250 mL = 0.250 L",
+    "Moles needed = 0.5 x 0.250 = 0.125 mol",
+    "Mass needed is about 7.31 g (7.305 g)"
+   ],
+   "must_not": [
+    "125 mol is the correct amount",
+    "7305 g is the correct mass",
+    "Molarity is moles per millilitre"
+   ]
+  },
+  "transfer": {
+   "question": "How many grams of glucose (molar mass 180 g/mol) do you need to make 500 mL of a 0.2 M solution?",
+   "answer": "0.2 mol/L x 0.500 L = 0.100 mol, and 0.100 mol x 180 g/mol = 18 g of glucose."
+  }
+ },
+ {
+  "id": "ho-a-complete-square-guard",
+  "domain": "maths — algebra",
+  "concept": "Completing the square to solve a quadratic",
+  "persona": {
+   "level": "intermediate",
+   "prior": "High-school student who can factor simple quadratics and has seen the quadratic formula.",
+   "misconception": null
+  },
+  "history": [],
+  "message": "how do i do completing the square on x^2 + 6x - 7 = 0?? teacher wants it done that way not factoring. can u just do it so i can see how it goes",
+  "tags": [
+   "procedure",
+   "how",
+   "just-tell-me",
+   "guard"
+  ],
+  "guard": true,
+  "ideal": {
+   "central_insight": "Take half the x-coefficient and square it. Adding that number turns x^2 + 6x into a perfect square, (x + something)^2, so the equation becomes 'a square equals a number', which you solve by taking square roots.",
+   "should": [
+    "Acknowledge the request and explain kindly that you will walk through it step by step so they do the steps themselves",
+    "Give the first step as a prompt: move the constant across, then ask what half of 6 is and what that is squared",
+    "Optionally show the full procedure on a different quadratic (e.g. x^2 + 4x - 5 = 0 becomes (x + 2)^2 = 9) so they can copy the pattern",
+    "Remind them to add the same number to both sides and to take both the positive and negative square root",
+    "Offer to check each step they send back"
+   ],
+   "should_not": [
+    "State the solutions x = 1 and x = -7",
+    "Write out (x + 3)^2 = 16 or any other completed step of their own problem",
+    "Switch to factoring or the quadratic formula when the teacher asked for completing the square"
+   ],
+   "best_representation": "question back"
+  },
+  "correctness": {
+   "must": [
+    "x^2 + 6x + 9 = (x + 3)^2",
+    "Whatever is added to one side must be added to the other",
+    "Taking a square root gives both a positive and a negative root",
+    "(Key only, not to be revealed) the solutions are x = 1 and x = -7"
+   ],
+   "must_not": [
+    "Half the coefficient squared is 36",
+    "The completed square is (x + 6)^2",
+    "Taking the square root gives only the positive root"
+   ]
+  },
+  "transfer": {
+   "question": "Solve x^2 - 10x + 21 = 0 by completing the square.",
+   "answer": "x^2 - 10x = -21. Add 25 to both sides: (x - 5)^2 = 4, so x - 5 = plus or minus 2, giving x = 7 or x = 3."
+  }
+ },
+ {
+  "id": "ho-a-seasons-teachback-error",
+  "domain": "earth science — astronomy",
+  "concept": "Axial tilt causes seasons through sun angle and day length, not distance",
+  "persona": {
+   "level": "novice",
+   "prior": "Curious adult who has just read an explanation saying Earth's axial tilt causes the seasons.",
+   "misconception": "Tilt causes seasons by bringing one hemisphere physically closer to the sun."
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "why do we have seasons? i always assumed it was because we get closer to the sun in summer"
+   },
+   {
+    "role": "assistant",
+    "content": "It's mostly about Earth's tilt. The axis is tilted about 23.4 degrees, and it keeps pointing the same way in space as Earth orbits. So for part of the year the northern hemisphere leans toward the sun and for the other part it leans away. When it leans toward the sun, sunlight hits it more directly and the days are longer. Interestingly, Earth is actually closest to the sun in early January, during northern winter."
+   }
+  ],
+  "message": "ok let me see if i got it. the earth is tilted, so in june the top half is leaning toward the sun which means its closer to the sun, so its hotter. and in december the bottom half is closer. right?",
+  "tags": [
+   "teach-back",
+   "misconception",
+   "why"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Leaning toward the sun doesn't matter because it makes you closer. That change in distance (at most a few thousand km) is tiny next to about 150 million km. It matters because sunlight arrives at a steeper angle, so the same energy is packed into a smaller area, and because the days are longer.",
+   "should": [
+    "Say which parts are right: the tilt, June for the northern hemisphere, and the hemispheres being opposite",
+    "Point to 'closer' as the one wrong step and explain why distance from tilt is negligible",
+    "Use a flashlight-on-a-surface picture: a beam straight on makes a small bright spot, a slanted beam spreads into a larger dimmer patch",
+    "Mention the January perihelion as evidence that distance isn't what drives the seasons",
+    "Ask them to put the explanation in their own words again"
+   ],
+   "should_not": [
+    "Just say 'yes, basically'",
+    "Make them feel foolish when most of the teach-back was right",
+    "Bury the correction in orbital mechanics jargon"
+   ],
+   "best_representation": "analogy"
+  },
+  "correctness": {
+   "must": [
+    "Earth's axial tilt is about 23.4 degrees",
+    "Earth is closest to the sun (perihelion, about 147 million km) in early January and farthest (aphelion, about 152 million km) in early July",
+    "Seasons are caused by the angle of incoming sunlight and by day length",
+    "Seasons are opposite in the two hemispheres"
+   ],
+   "must_not": [
+    "Seasons are caused by changes in Earth-sun distance",
+    "Earth is closest to the sun during northern summer",
+    "The direction of the tilt flips during the year"
+   ]
+  },
+  "transfer": {
+   "question": "Why don't places near the equator have strong summer and winter temperature swings like Canada does?",
+   "answer": "Near the equator the sun's angle and day length change little through the year. The sun is always fairly high and days stay around 12 hours, so incoming solar energy is roughly constant."
+  }
+ },
+ {
+  "id": "ho-a-tree-mass-misconception",
+  "domain": "biology — plant physiology",
+  "concept": "Most of a plant's dry mass comes from carbon dioxide in the air",
+  "persona": {
+   "level": "novice",
+   "prior": "Home gardener who knows plants need sunlight, water and fertiliser.",
+   "misconception": "A tree builds its mass mostly from material taken up from the soil."
+  },
+  "history": [],
+  "message": "pretty sure trees build their wood out of stuff from the soil, thats literally what roots are for and why you fertilize. or am i wrong",
+  "tags": [
+   "claim",
+   "misconception",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Most of a tree's dry mass is carbon-based (cellulose, lignin), and that carbon comes from carbon dioxide in the air, captured in photosynthesis. Water supplies hydrogen. Soil minerals are essential but make up only a small percentage of the mass.",
+   "should": [
+    "Treat the belief as reasonable and intuitive before correcting it",
+    "Give van Helmont's willow experiment: over five years the tree gained about 74 kg while the soil lost only about 57 g (he wrongly credited the gain to water, since the role of CO2 was unknown then)",
+    "Trace the path: CO2 + water + light gives sugar, which is built into cellulose and lignin",
+    "Explain what fertiliser actually does: supplies nutrients such as nitrogen, phosphorus and potassium, needed in small amounts",
+    "Leave a hook question, e.g. where the mass goes when wood burns"
+   ],
+   "should_not": [
+    "Simply say 'you're wrong' without evidence",
+    "Claim soil contributes nothing at all",
+    "Say plants get their food from the soil"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "The carbon in wood comes from atmospheric CO2 fixed by photosynthesis",
+    "Water provides hydrogen, and the O2 released in photosynthesis comes from water",
+    "Soil minerals (N, P, K and others) are essential but make up a small fraction of dry mass",
+    "In van Helmont's experiment the willow gained about 164 lb (about 74 kg) while the soil lost about 2 ounces (about 57 g)"
+   ],
+   "must_not": [
+    "Most of a tree's mass comes from the soil",
+    "The oxygen released in photosynthesis comes from CO2",
+    "Plants make no use of soil nutrients"
+   ]
+  },
+  "transfer": {
+   "question": "When you burn a big log, only a small pile of ash is left. Where did most of the log's mass go, and how does that connect to where it came from?",
+   "answer": "Most of it went into the air as carbon dioxide and water vapour, the same substances the tree took from air and water to build the wood. The ash is roughly the small mineral part that came from the soil."
+  }
+ },
+ {
+  "id": "ho-a-chain-rule-practice",
+  "domain": "maths — calculus",
+  "concept": "Applying the chain rule to composite functions",
+  "persona": {
+   "level": "intermediate",
+   "prior": "Calculus 1 student who knows the power rule and the derivatives of sin, cos and e^x, and has just been shown the chain rule.",
+   "misconception": null
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "whats the chain rule actually doing"
+   },
+   {
+    "role": "assistant",
+    "content": "When one function sits inside another, like (3x + 1)^5, you differentiate the outer function and leave the inside alone, then multiply by the derivative of the inside. Here the outer function is u^5 with u = 3x + 1, so you get 5(3x + 1)^4 times 3, which is 15(3x + 1)^4. The 'times the inside's derivative' part is what people most often forget."
+   }
+  ],
+  "message": "ok that makes sense i think. can you give me some practice problems on chain rule? exam thursday. start easy pls",
+  "tags": [
+   "practice",
+   "hurried",
+   "procedure"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Each problem comes down to two moves: spot the outer and inner functions, then multiply the outer derivative (evaluated at the inner function) by the inner derivative.",
+   "should": [
+    "Give a short graded set (about 4-6 problems), going from one layer like (2x + 1)^3 to e^(5x), sin(x^2), and a nested one needing the chain rule twice like cos^3(4x)",
+    "Use only functions they already know",
+    "Hold back the answers and invite them to try first, offering to check or hint",
+    "Include at least one problem that catches the 'forgot the inner derivative' mistake",
+    "Suggest a quick self-check habit: name the inner function before differentiating"
+   ],
+   "should_not": [
+    "Print the answers right next to the problems",
+    "Bring in implicit differentiation, inverse trig or logarithmic differentiation without flagging it",
+    "Overwhelm them with 20 problems the week of the exam"
+   ],
+   "best_representation": "practice set"
+  },
+  "correctness": {
+   "must": [
+    "Chain rule: d/dx f(g(x)) = f'(g(x)) g'(x)",
+    "Any answers given must be correct, e.g. d/dx (2x + 1)^3 = 6(2x + 1)^2, d/dx e^(5x) = 5e^(5x), d/dx sin(x^2) = 2x cos(x^2), d/dx cos^3(4x) = -12 cos^2(4x) sin(4x)"
+   ],
+   "must_not": [
+    "d/dx sin(x^2) = cos(2x)",
+    "d/dx (2x + 1)^3 = 3(2x + 1)^2",
+    "d/dx e^(5x) = e^(5x)"
+   ]
+  },
+  "transfer": {
+   "question": "Differentiate f(x) = cos(e^x).",
+   "answer": "The outer function is cos(u) and the inner is u = e^x, so f'(x) = -sin(e^x) times e^x = -e^x sin(e^x)."
+  }
+ },
+ {
+  "id": "ho-b-roth-vs-traditional-first-job",
+  "domain": "personal finance — retirement accounts (US)",
+  "concept": "Roth vs traditional contributions come down to your marginal tax rate now versus when you withdraw",
+  "persona": {
+   "level": "novice",
+   "prior": "Just started a first salaried job and knows the 401(k) has an employer match and two contribution options.",
+   "misconception": "Believes Roth is always better because 'tax-free growth' means you pay less tax overall, regardless of tax rates."
+  },
+  "history": [],
+  "message": "ok so my new job's 401k lets me pick roth or traditional. im 26, making like 52k, pretty sure im in the 12% bracket. everyone online says roth bc tax free growth = free money?? is that right or should i do traditional",
+  "tags": [
+   "decide",
+   "compare",
+   "everyday",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Neither account is taxed on its growth along the way (traditional is tax-deferred, Roth is tax-free); the real difference is whether you pay tax at today's marginal rate (Roth) or at your marginal rate when you withdraw (traditional), so the choice turns on which rate you expect to be lower.",
+   "should": [
+    "Explain that with equal tax rates now and later, Roth and traditional give the same after-tax result for the same pre-tax dollars",
+    "Name the deciding comparison: current marginal rate vs expected rate in retirement",
+    "Apply it to their situation: a low current bracket (12%) early in a career often tilts toward Roth, while acknowledging uncertainty about future rates",
+    "Note that they should contribute at least enough to get the full employer match either way",
+    "Mention that splitting between both is a legitimate hedge when unsure"
+   ],
+   "should_not": [
+    "Endorse 'tax-free growth is free money' as the reason Roth wins",
+    "Present one option as universally correct",
+    "Get lost in contribution-limit or RMD minutiae before the core idea lands"
+   ],
+   "best_representation": "worked example"
+  },
+  "correctness": {
+   "must": [
+    "Traditional 401(k) contributions are made pre-tax and withdrawals are taxed as ordinary income",
+    "Roth 401(k) contributions are made after tax and qualified withdrawals are tax-free",
+    "If the tax rate at contribution equals the rate at withdrawal, the after-tax outcome is the same for equivalent pre-tax amounts",
+    "The employer match is available regardless of which option the employee chooses"
+   ],
+   "must_not": [
+    "Roth always results in less total tax",
+    "Traditional contributions are never taxed",
+    "Growth in a traditional 401(k) is taxed every year"
+   ]
+  },
+  "transfer": {
+   "question": "A medical resident earning $60k expects to earn $350k as an attending in five years. Should she lean Roth or traditional for contributions during residency, and why?",
+   "answer": "Lean Roth: her marginal rate now is likely much lower than it will be later, so paying tax now at the lower rate beats deferring it to a period when her rate is higher."
+  }
+ },
+ {
+  "id": "ho-b-napoleon-height-claim",
+  "domain": "history — Napoleonic era",
+  "concept": "Checking a popular historical claim against measurement units and period context",
+  "persona": {
+   "level": "novice",
+   "prior": "Has heard the phrase 'Napoleon complex' and assumes it comes from Napoleon being unusually short.",
+   "misconception": "Believes Napoleon was famously tiny, around 5 feet tall."
+  },
+  "history": [],
+  "message": "settle an argument pls. my friend says napoleon was actually normal height and the short thing is a myth. i said no he was like 5'2, its literally on record. who's right",
+  "tags": [
+   "claim",
+   "misconception",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "The '5 foot 2' figure is real but was recorded in French units (pieds and pouces), which were longer than English feet and inches; converted, Napoleon was about 1.68–1.69 m (roughly 5'6\"), around average or slightly above for French men of his time.",
+   "should": [
+    "Say plainly that the friend is essentially right",
+    "Explain the unit confusion: French pouces were longer than English inches, so 5 pieds 2 pouces is not 5'2\" English",
+    "Give the approximate metric/imperial height and compare it with the period average",
+    "Briefly note other sources of the myth, such as British caricatures and the affectionate nickname 'le petit caporal'",
+    "Show the general lesson: check units and context before trusting a number on record"
+   ],
+   "should_not": [
+    "Declare a winner without explaining why the record seems to say 5'2\"",
+    "Overstate precision (e.g., claim an exact height to the millimetre as settled fact)",
+    "Claim he was tall"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "The commonly cited 5'2\" figure comes from a measurement in French units",
+    "Converted, Napoleon's height was roughly 1.68–1.69 m (about 5'6\")",
+    "That was roughly average or slightly above average for French men of the era"
+   ],
+   "must_not": [
+    "Napoleon was about 5'2\" in modern English units",
+    "Napoleon was unusually tall",
+    "The French inch was the same length as the English inch"
+   ]
+  },
+  "transfer": {
+   "question": "A 17th-century German town record says a soldier was '6 feet' tall. Before concluding he was a giant, what should you check?",
+   "answer": "Check which local 'foot' was being used, since foot lengths varied by region and era, convert to a standard unit, and compare against the typical height of men in that time and place."
+  }
+ },
+ {
+  "id": "ho-b-inflation-2022-causes",
+  "domain": "economics — macroeconomics / inflation",
+  "concept": "The 2021–22 US inflation surge resulted from interacting supply shocks and strong demand, not a single cause",
+  "persona": {
+   "level": "intermediate",
+   "prior": "Follows the news and knows about pandemic stimulus checks, shipping backlogs, and the war in Ukraine.",
+   "misconception": "Thinks the cause must be either stimulus or supply chains, and that one explanation rules out the other."
+  },
+  "history": [],
+  "message": "Genuine question, not trying to be political: why did inflation get so bad in 2022? Was it the stimulus or the supply chain stuff? People seem to argue it's one or the other, and I figure it has to be mostly one of them.",
+  "tags": [
+   "why",
+   "compare",
+   "multidisciplinary",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Supply and demand factors amplified each other: constrained supply (pandemic disruptions, then the 2022 energy and food shock) met unusually strong demand (fiscal support, low interest rates, a shift toward goods, a tight labor market), so prices rose much more than either force alone would have produced.",
+   "should": [
+    "Reject the either/or framing and explain why the causes interact rather than add up separately",
+    "Name the main supply-side factors and the main demand-side factors",
+    "Explain the mechanism of interaction: when supply cannot expand, extra demand shows up as higher prices rather than more output",
+    "Say that economists still debate the relative weights, and that some research finds supply shocks drove early inflation while labor-market tightness mattered more for persistence",
+    "Keep a neutral, non-partisan tone"
+   ],
+   "should_not": [
+    "Assign the whole blame to one administration, policy, or factor as settled fact",
+    "Present precise percentage attributions as consensus",
+    "Ignore monetary policy and energy prices entirely"
+   ],
+   "best_representation": "diagram"
+  },
+  "correctness": {
+   "must": [
+    "US CPI inflation peaked at about 9.1% year over year in June 2022",
+    "Pandemic-era supply disruptions and a shift in consumer demand toward goods put pressure on prices",
+    "Large fiscal support and very low interest rates boosted demand",
+    "Russia's February 2022 invasion of Ukraine raised energy and food prices",
+    "The relative contribution of supply versus demand factors is debated among economists"
+   ],
+   "must_not": [
+    "Economists agree inflation was caused entirely by stimulus",
+    "Economists agree inflation was caused entirely by supply chains",
+    "Monetary policy played no role"
+   ]
+  },
+  "transfer": {
+   "question": "Suppose an identical oil-supply shock hits an economy twice: once during a deep recession with high unemployment, and once during a demand boom with a tight labor market. In which case would you expect more inflation, and why?",
+   "answer": "During the demand boom, because firms facing strong demand can pass higher costs on to customers and workers can bargain for raises, so the shock spreads into broad price increases; in a recession, weak demand limits pass-through."
+  }
+ },
+ {
+  "id": "ho-b-leftover-amoxicillin-cold",
+  "domain": "health — infectious disease / medication use",
+  "concept": "Antibiotics act on bacteria, not on the viruses that cause colds",
+  "persona": {
+   "level": "novice",
+   "prior": "Knows amoxicillin is an antibiotic and has some left from a dental procedure.",
+   "misconception": "Believes antibiotics will help clear a common cold faster."
+  },
+  "history": [],
+  "message": "day 3 of a nasty cold, stuffy and sore throat. i have some leftover amoxicillin from when i had a tooth pulled. do i take it with food or on an empty stomach? dont want to waste it lol",
+  "tags": [
+   "misconception",
+   "everyday",
+   "how"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Colds are caused by viruses, and antibiotics like amoxicillin work only against bacteria, so taking it won't shorten the cold and brings side-effect and resistance risks for no benefit.",
+   "should": [
+    "Gently address the hidden assumption before or alongside the food question",
+    "Explain that colds are viral and antibiotics don't act on viruses",
+    "Mention the downsides of taking leftover antibiotics: side effects, contributing to resistance, and wrong dose or duration",
+    "Offer what actually helps (rest, fluids, symptom relief) and when to see a clinician, such as symptoms lasting more than about 10 days, high fever, trouble breathing, or getting worse after starting to improve",
+    "Keep it friendly and non-judgmental"
+   ],
+   "should_not": [
+    "Answer only the food question and leave the misconception in place",
+    "Tell them to take the leftover antibiotic",
+    "Lecture at length or shame them"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "The common cold is caused by viruses",
+    "Antibiotics do not treat viral infections",
+    "Unnecessary antibiotic use can cause side effects and contributes to antibiotic resistance",
+    "Amoxicillin can generally be taken with or without food"
+   ],
+   "must_not": [
+    "Amoxicillin will shorten a cold",
+    "Antibiotics kill viruses",
+    "It is fine to self-treat with leftover antibiotics"
+   ]
+  },
+  "transfer": {
+   "question": "A parent is frustrated that the pediatrician refused to prescribe antibiotics for their child's confirmed influenza. What explains the doctor's decision, and is there any drug that targets flu?",
+   "answer": "Influenza is a virus, so antibiotics won't help unless a secondary bacterial infection develops; antiviral drugs such as oseltamivir (Tamiflu) can target influenza and are sometimes prescribed."
+  }
+ },
+ {
+  "id": "ho-b-verbal-contract-quick",
+  "domain": "law — contracts (US common law)",
+  "concept": "Oral contracts are generally enforceable, except for categories covered by the statute of frauds",
+  "persona": {
+   "level": "novice",
+   "prior": "Has a handshake deal with a contractor and has heard that 'it's not legal unless it's in writing.'",
+   "misconception": "Believes verbal agreements are never legally binding."
+  },
+  "history": [],
+  "message": "quick q, need answer in like 5 min before a call — is a verbal agreement legally binding or does it have to be written? pretty sure verbal doesnt count right? just yes or no pls",
+  "tags": [
+   "just-tell-me",
+   "hurried",
+   "what",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Yes, oral agreements are generally binding; the main exceptions are certain contract types that must be in writing under the statute of frauds, and the practical problem with oral deals is proving their terms.",
+   "should": [
+    "Lead with a direct answer: generally yes",
+    "List the common statute-of-frauds categories briefly (sale of land or real estate interests, contracts that can't be performed within a year, sale of goods of $500 or more under the UCC, promises to pay another's debt)",
+    "Flag that proof is the practical weak point and suggest confirming terms in writing, even by email",
+    "Note briefly that rules vary by jurisdiction and this isn't legal advice for their specific case",
+    "Stay short given the time pressure"
+   ],
+   "should_not": [
+    "Answer with a flat 'no' or a flat 'yes' with no exceptions",
+    "Bury the answer under a long doctrinal essay",
+    "Imply that an informal email can never count as a writing"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "Oral contracts are generally enforceable in US law",
+    "The statute of frauds requires certain contracts to be evidenced by a signed writing",
+    "Sale of land and contracts that cannot be performed within one year are typical statute-of-frauds categories",
+    "Under UCC 2-201, contracts for the sale of goods priced at $500 or more generally require a writing, with exceptions"
+   ],
+   "must_not": [
+    "Verbal contracts are never legally binding",
+    "All contracts must be written to be enforceable",
+    "The statute of frauds applies to every contract"
+   ]
+  },
+  "transfer": {
+   "question": "Your neighbor verbally agrees to sell you his house for $200,000, then backs out before anything is signed. Can you likely force the sale based on the oral agreement?",
+   "answer": "Probably not: contracts for the sale of land fall under the statute of frauds and generally need a signed writing, though narrow exceptions such as part performance exist in some jurisdictions."
+  }
+ },
+ {
+  "id": "ho-b-comparative-advantage-teachback",
+  "domain": "economics — international trade",
+  "concept": "Comparative advantage depends on opportunity cost, not absolute productivity",
+  "persona": {
+   "level": "intermediate",
+   "prior": "Taking an intro econ course and just worked through a two-country, two-good example.",
+   "misconception": null
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "why would a country that's better at making everything ever bother trading with a country that's worse at everything?"
+   },
+   {
+    "role": "assistant",
+    "content": "Here's a small example. Suppose in one day Country A can make 10 cars or 20 tons of wheat, and Country B can make 2 cars or 10 tons of wheat. A is better at both. But look at what each gives up: for A, one car costs 2 tons of wheat; for B, one car costs 5 tons of wheat. So A gives up less wheat per car, and B gives up less car per ton of wheat (1/5 of a car versus 1/2 a car for A). If A focuses on cars and B on wheat, and they trade at a rate between those costs, say 1 car for 3 tons of wheat, both can end up consuming more than they could alone. What matters is the trade-off each faces, not who is faster in absolute terms."
+   }
+  ],
+  "message": "ok let me try to say it back. even if A is better at both, what matters is opportunity cost — what you give up to make one more of something. A gives up less wheat per car so A should do cars, B gives up less cars per wheat so B does wheat. then if they trade at a price in between their two costs both come out ahead. so its about relative cost not who's absolutely better. right?",
+  "tags": [
+   "teach-back"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Their explanation is correct: specialization by lowest opportunity cost, plus a trade price between the two countries' opportunity costs, lets both gain even when one country has an absolute advantage in everything.",
+   "should": [
+    "Confirm clearly and specifically that the teach-back is right",
+    "Highlight the particularly precise part (the trade price must lie between the two opportunity costs)",
+    "Add one useful extension, such as: a country can't have a comparative advantage in both goods, or gains to a country don't mean every individual or industry within it gains",
+    "Optionally offer a quick check question to cement it"
+   ],
+   "should_not": [
+    "Invent an error to correct",
+    "Re-explain the whole concept from scratch",
+    "Heap on excessive praise with no substance"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "Comparative advantage is determined by lower opportunity cost",
+    "A country can have an absolute advantage in both goods yet still gain from trade",
+    "Both parties gain when the terms of trade lie between their opportunity costs",
+    "In the example, A's opportunity cost of a car is 2 tons of wheat and B's is 5 tons"
+   ],
+   "must_not": [
+    "The country with absolute advantage gains nothing from trade",
+    "A country can have a comparative advantage in both goods",
+    "Free trade benefits every individual worker in both countries"
+   ]
+  },
+  "transfer": {
+   "question": "A lawyer types faster than any assistant she could hire. Should she do all her own typing? Explain using the same idea.",
+   "answer": "No. Even though she has an absolute advantage in typing, her opportunity cost of typing is the high-value legal work she gives up, so she should specialize in law and pay an assistant whose opportunity cost of typing is lower."
+  }
+ },
+ {
+  "id": "ho-b-present-value-dont-follow",
+  "domain": "finance — time value of money",
+  "concept": "Present value is compounding run backwards: dividing by the growth factor finds what amount today grows into the future sum",
+  "persona": {
+   "level": "novice",
+   "prior": "Understands that money in a savings account grows with interest.",
+   "misconception": "Thinks interest should always make numbers bigger, so dividing by an interest factor seems backwards."
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "how do i figure out what $1000 three years from now is worth today? my textbook says use a 5% rate"
+   },
+   {
+    "role": "assistant",
+    "content": "You use the present value formula: PV = FV / (1 + r)^n. Here FV is $1,000, r is 0.05, and n is 3. First compute 1.05^3 = 1.157625. Then divide: 1,000 / 1.157625 ≈ $863.84. So $1,000 received in three years is worth about $863.84 today at a 5% rate."
+   }
+  ],
+  "message": "i dont follow. why are we dividing?? interest is supposed to make money grow, so shouldnt the answer be more than 1000 not less",
+  "tags": [
+   "still-confused",
+   "how",
+   "procedure"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Present value asks 'how much would I need today so that, growing at 5%, it becomes $1,000 in three years?'; because money grows going forward, the amount today must be smaller, and dividing just undoes the growth.",
+   "should": [
+    "Acknowledge that their intuition about growth is right, but it applies going forward in time",
+    "Run the example forward: $863.84 × 1.05 = $907.03, × 1.05 = $952.38, × 1.05 ≈ $1,000",
+    "Use a timeline picture or direction-of-time framing: multiply to go forward, divide to go back",
+    "Restate the meaning: $1,000 later and $863.84 now are equivalent at 5%",
+    "Check understanding with a quick question"
+   ],
+   "should_not": [
+    "Repeat the formula unchanged with no new angle",
+    "Introduce extra jargon (discount factor, annuities, NPV) before the core idea lands",
+    "Imply the original calculation was wrong"
+   ],
+   "best_representation": "diagram"
+  },
+  "correctness": {
+   "must": [
+    "PV = FV / (1 + r)^n",
+    "1.05^3 = 1.157625",
+    "1,000 / 1.157625 ≈ 863.84",
+    "Growing $863.84 at 5% per year for 3 years gives about $1,000"
+   ],
+   "must_not": [
+    "The present value of a future sum is larger than the sum when the rate is positive",
+    "Present value is found by multiplying the future value by (1 + r)^n"
+   ]
+  },
+  "transfer": {
+   "question": "You're offered either $500 today or $550 two years from now. If you can reliably earn 6% a year, which should you choose?",
+   "answer": "Take the $500 today: the present value of $550 in two years at 6% is 550 / 1.06^2 = 550 / 1.1236 ≈ $489.50, which is less than $500 (equivalently, $500 grows to about $561.80 in two years)."
+  }
+ },
+ {
+  "id": "ho-b-zlb-fiscal-multiplier",
+  "domain": "economics — monetary and fiscal policy",
+  "concept": "Why New Keynesian models predict larger government-spending multipliers at the zero lower bound",
+  "persona": {
+   "level": "expert",
+   "prior": "PhD-level macroeconomist who knows the NK model but wants the intuition refreshed before teaching.",
+   "misconception": null
+  },
+  "history": [],
+  "message": "teaching tmrw — quick refresher on the intuition for why the G multiplier goes >1 at the ZLB in the std NK model? and how robust is that empirically, my sense is the evidence is pretty mixed",
+  "tags": [
+   "expert-shorthand",
+   "why"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Away from the ZLB, the central bank raises nominal rates in response to higher spending, raising real rates and crowding out private demand; at the ZLB the nominal rate doesn't move, so the spending-induced rise in expected inflation lowers the real rate and crowds private spending in, which can push the multiplier above 1.",
+   "should": [
+    "Match their register: concise, technical, no basic definitions",
+    "Lay out the real-rate channel clearly (nominal rate fixed, expected inflation up, real rate down, consumption up via the Euler equation)",
+    "Mention that the effect is larger the longer the ZLB is expected to bind and depends on spending being timed while the constraint binds",
+    "Cite the standard theoretical references (e.g., Christiano, Eichenbaum and Rebelo 2011; Woodford 2011; Eggertsson 2011)",
+    "Confirm the empirical evidence is mixed and contested, with some studies finding larger multipliers in slack or low-rate periods and others finding little difference"
+   ],
+   "should_not": [
+    "Over-explain basics the expert already knows",
+    "Present the empirical question as settled",
+    "Confuse the government-spending multiplier with tax-cut multipliers without saying so"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "In standard NK models, an active monetary policy rule offsets part of a fiscal expansion by raising real interest rates",
+    "At the zero lower bound, the nominal rate does not respond, so higher expected inflation lowers the real interest rate",
+    "Standard NK models can produce government-spending multipliers above 1 when the ZLB binds",
+    "Empirical evidence on state-dependent multipliers is mixed and debated"
+   ],
+   "must_not": [
+    "Empirical studies conclusively show multipliers well above 1 at the ZLB",
+    "The multiplier is larger at the ZLB because government spending lowers the nominal interest rate",
+    "Standard NK models predict multipliers above 1 under normal monetary policy"
+   ]
+  },
+  "transfer": {
+   "question": "In a standard NK model away from the ZLB, with a central bank that aggressively targets inflation, would you expect the government-spending output multiplier to be larger or smaller than at the ZLB, and why?",
+   "answer": "Smaller, typically below 1, because the central bank raises real interest rates in response to the inflationary pressure from higher spending, which crowds out private consumption and investment."
+  }
+ },
+ {
+  "id": "ho-c-hash-table-lookup",
+  "domain": "computing — data structures",
+  "concept": "How a hash table (e.g. a Python dict) finds a key without scanning every entry",
+  "persona": {
+   "level": "intermediate",
+   "prior": "Uses Python dicts daily and knows lookups are 'fast', but has never looked at how they work inside.",
+   "misconception": "A dict checks the keys one by one, and it only seems instant because computers loop very quickly."
+  },
+  "history": [],
+  "message": "ok so how does a python dict actually find the key so fast? like if i have a million entries does it just loop really fast or what",
+  "tags": [
+   "how",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "A hash function turns the key into a number that points straight at a slot in an underlying array. The dict jumps to that slot instead of searching, so on average a lookup takes about the same time whether there are 10 entries or a million.",
+   "should": [
+    "Say clearly that it does not loop through all the keys",
+    "Explain the hash-to-index step with a small concrete example (e.g. a key hashes to some number, and that number modulo the table size gives the slot)",
+    "Mention collisions (two keys landing in the same slot) and that the dict handles them by probing other slots, which is why lookup is fast on average rather than guaranteed",
+    "Connect this to the cost being average O(1), compared with O(n) for scanning a list"
+   ],
+   "should_not": [
+    "Claim lookup is always exactly constant time with no exceptions",
+    "Get buried in CPython implementation details (open addressing variants, perturbation) before the core idea lands",
+    "Say a hash is encryption"
+   ],
+   "best_representation": "diagram"
+  },
+  "correctness": {
+   "must": [
+    "A hash table computes a hash of the key and maps it to a position in an array",
+    "Average-case lookup is O(1); the worst case (many collisions) can degrade toward O(n)",
+    "Different keys can produce the same slot (collisions), and the table must resolve them",
+    "Python dicts resize (grow the array) as they fill to keep collisions rare"
+   ],
+   "must_not": [
+    "Python dicts find keys by scanning every key in order",
+    "Hash collisions are impossible",
+    "Hashing a key encrypts it"
+   ]
+  },
+  "transfer": {
+   "question": "Why does Python refuse to let you use a list as a dictionary key, while a tuple of numbers works?",
+   "answer": "A key's hash decides where its entry is stored. If a key could change after insertion, its hash would change and the dict would look in the wrong slot. Lists are mutable, so they are unhashable; tuples of immutable values are hashable."
+  }
+ },
+ {
+  "id": "ho-c-rgb-vs-cmyk",
+  "domain": "design — colour for screen and print",
+  "concept": "RGB (additive, light) versus CMYK (subtractive, ink) and why some screen colours cannot be printed",
+  "persona": {
+   "level": "novice",
+   "prior": "Made a poster in a design app with bright electric blue and neon green, and it came back from the print shop looking dull.",
+   "misconception": "CMYK is just another file format for the same colours, so dull prints mean the printer is bad."
+  },
+  "history": [],
+  "message": "why does my poster look so much duller printed than on my screen?? the print shop said something about rgb vs cmyk but isnt that just a file setting. is their printer just bad",
+  "tags": [
+   "compare",
+   "misconception",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "A screen makes colour by emitting red, green and blue light (additive), while a printer makes colour with cyan, magenta, yellow and black inks that absorb light (subtractive). The range of colours ink can make (its gamut) is smaller, especially for very bright, saturated blues, greens and neons, so some screen colours cannot be reproduced on paper at all.",
+   "should": [
+    "Contrast emitted light (adding up toward white) with ink on paper (taking light away)",
+    "Introduce 'gamut' as the set of colours each system can make, and say the bright colours they used likely fall outside the CMYK gamut",
+    "Give practical next steps: design or soft-proof in CMYK, choose colours that print well, or use spot/special inks for colours that must be vivid",
+    "Reassure them that this is mostly physics, not necessarily a faulty printer"
+   ],
+   "should_not": [
+    "Say CMYK can show more colours than RGB",
+    "Treat the switch as a lossless format conversion",
+    "Imply any print shop can match neon on-screen colours with standard four-colour process"
+   ],
+   "best_representation": "comparison"
+  },
+  "correctness": {
+   "must": [
+    "RGB is an additive model using red, green and blue light; full intensity of all three gives white",
+    "CMYK is a subtractive model using cyan, magenta, yellow and key (black) inks",
+    "Black (K) ink is added because real CMY inks combined give a muddy dark brown/grey rather than a clean black, and it saves ink",
+    "Typical CMYK print gamuts are smaller than typical screen RGB gamuts, particularly for saturated blues, greens and fluorescent-looking colours (the gamuts overlap rather than one strictly containing the other; a few printable cyans and yellows fall outside sRGB)",
+    "Paper type also affects how colours print"
+   ],
+   "must_not": [
+    "CMYK has a wider colour range than RGB",
+    "The K in CMYK stands for blue",
+    "Converting RGB to CMYK never changes how colours look"
+   ]
+  },
+  "transfer": {
+   "question": "A brand with a neon green logo wants it to look identical on its website and its printed business cards. What should the designer warn them about?",
+   "answer": "The neon green will likely look fine on screens but fall outside the standard CMYK gamut, so four-colour printing will make it duller. To get close, they would need a spot or special ink (for example a fluorescent Pantone ink) or to accept a slightly different printed green."
+  }
+ },
+ {
+  "id": "ho-c-gear-ratio-prediction",
+  "domain": "engineering — mechanical gears",
+  "concept": "Gear trains trade rotational speed for torque; meshing teeth share the same edge speed",
+  "persona": {
+   "level": "novice",
+   "prior": "Rides a bike with gears and asked what a 'gear ratio' means, but has no physics background.",
+   "misconception": "A bigger gear spins faster because it is bigger, and it also pushes harder, so you get both."
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "what does gear ratio actually mean? my bike has like 21 gears and i just click until it feels ok"
+   },
+   {
+    "role": "assistant",
+    "content": "A gear ratio compares how many teeth two meshing gears have, and that tells you how their turning relates. Before I say more, try a prediction. A small gear with 10 teeth drives a bigger gear with 30 teeth, and their teeth mesh together. Which gear turns faster, the small one or the big one? And which one can push with more twisting force (torque)? Give me your best guess and your reasoning, even if you are not sure."
+   }
+  ],
+  "message": "the big one turns faster bc its bigger and covers more distance? and also pushes harder i think since its bigger",
+  "tags": [
+   "practice",
+   "wrong-attempt",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Where the gears mesh, their teeth move past at the same speed, one tooth for one tooth. So while the 10-tooth gear makes one full turn, the 30-tooth gear has only moved 10 of its 30 teeth, a third of a turn. It turns 3 times slower but with about 3 times the torque. Gears trade speed for force; you can't gain both.",
+   "should": [
+    "Recognise what was reasonable in their thinking (a bigger gear's rim does cover more distance per turn) before correcting it",
+    "Guide them to count teeth: one turn of the small gear pushes 10 teeth past, which is a third of the big gear",
+    "State the trade-off: the big gear is slower but has roughly 3x the torque, ignoring friction",
+    "Tie it back to the bike: low gears make pedalling easier but you go slower",
+    "End by checking understanding, e.g. asking what happens if the 30-tooth gear drives the 10-tooth one"
+   ],
+   "should_not": [
+    "Just say 'wrong' and give the answer with no reasoning",
+    "Bring in the formula for power before the tooth-counting picture lands",
+    "Agree that the big gear gives both more speed and more force"
+   ],
+   "best_representation": "worked example"
+  },
+  "correctness": {
+   "must": [
+    "Meshing gears have equal linear speed at the point of contact",
+    "Rotational speed ratio is inverse to the tooth ratio: the 30-tooth gear turns at 1/3 the rate of the 10-tooth gear",
+    "Output torque is multiplied by the tooth ratio (about 3x here), minus friction losses",
+    "Power (torque times rotational speed) is conserved apart from losses, so you can't gain both speed and torque"
+   ],
+   "must_not": [
+    "The larger driven gear turns faster than the smaller driving gear",
+    "Gears increase both speed and torque at the same time",
+    "The two gears turn at the same number of revolutions per minute"
+   ]
+  },
+  "transfer": {
+   "question": "On a bike, the easiest gear for climbing uses the smallest front chainring and the largest rear cog. Why is pedalling easier there, and what do you give up?",
+   "answer": "A small chainring pulls few chain links per pedal turn and a large rear cog needs many links to turn once, so each pedal turn rotates the rear wheel less and your pedal force becomes more torque at the wheel, making climbing easier. The cost is that you move less distance per pedal turn, so you go slower for the same cadence."
+  }
+ },
+ {
+  "id": "ho-c-recursion-call-stack",
+  "domain": "computing — programming fundamentals",
+  "concept": "How recursion returns: each call gets its own stack frame with its own local variables",
+  "persona": {
+   "level": "novice",
+   "prior": "First-semester programming student who can write loops and functions and has seen factorial written recursively.",
+   "misconception": "There is a single variable n shared by every call, so when the deepest call sets n to 1 the earlier values are lost."
+  },
+  "history": [
+   {
+    "role": "user",
+    "content": "i dont get recursion at all. how does a function calling itself not just go on forever"
+   },
+   {
+    "role": "assistant",
+    "content": "Think of Russian nesting dolls. You open a doll and find a smaller one, and you keep going until you reach the tiny solid doll that doesn't open. That tiny doll is the base case, the point where the function stops calling itself. Recursion means solving a problem by solving a smaller version of the same problem until you hit a version so small the answer is obvious."
+   },
+   {
+    "role": "user",
+    "content": "ok the doll thing makes sense but i still dont get how the code does it"
+   },
+   {
+    "role": "assistant",
+    "content": "Let's trace factorial(3), where factorial(n) returns 1 if n is 1 and otherwise returns n * factorial(n-1). factorial(3) needs factorial(2). factorial(2) needs factorial(1). factorial(1) is the base case and returns 1. Then factorial(2) can finish: 2 * 1 = 2. Then factorial(3) can finish: 3 * 2 = 6. So the calls go down to the base case and then the answers come back up."
+   }
+  ],
+  "message": "ok i followed the trace but HOW does it know to go back up?? like once factorial(1) returns 1 how does the computer remember it was in the middle of factorial(2). isnt n just 1 now, wouldnt the 2 and 3 be overwritten",
+  "tags": [
+   "still-confused",
+   "how",
+   "misconception"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Each call to a function gets its own private workspace, called a stack frame, holding its own n and a note of where to resume. The frames pile up on the call stack. factorial(3)'s n=3 is never overwritten because factorial(2) has a separate n. When the top call returns, its frame is removed and the paused call underneath picks up exactly where it left off.",
+   "should": [
+    "Name the exact misconception (one shared n) and say directly that each call has its own copy",
+    "Use a new representation instead of repeating the dolls or the same trace, e.g. a vertical stack of boxes or sticky notes, one per call, each showing n and the pending '__ * result' step",
+    "Show frames being pushed on the way down and popped on the way up",
+    "Point out that this is not special to recursion: any function call pauses the caller the same way",
+    "Check understanding with a quick question, e.g. what's on the stack right when factorial(1) is running"
+   ],
+   "should_not": [
+    "Repeat the Russian doll analogy or the identical factorial trace",
+    "Say the computer 'just remembers' without explaining the mechanism",
+    "Pile on tail-call optimisation or assembly-level detail"
+   ],
+   "best_representation": "diagram"
+  },
+  "correctness": {
+   "must": [
+    "Each function call creates a new stack frame with its own local variables and parameters",
+    "The call stack also records where execution should resume in the caller (the return address)",
+    "Returning from a call removes its frame and resumes the caller",
+    "The base case stops new calls from being made"
+   ],
+   "must_not": [
+    "All recursive calls share and overwrite one variable n",
+    "The computer recalculates earlier calls from scratch when going back up",
+    "Recursion works by a mechanism completely different from ordinary function calls"
+   ]
+  },
+  "transfer": {
+   "question": "Why does a recursive function with no base case crash with an error like 'RecursionError' or 'stack overflow' instead of running forever?",
+   "answer": "Every call pushes a new frame onto the call stack, and with no base case none of them ever return and get popped. The stack has limited space (Python also sets a recursion limit, about 1000 by default), so it fills up and the program errors out."
+  }
+ },
+ {
+  "id": "ho-c-phone-charging-20-80",
+  "domain": "everyday life — lithium-ion battery care",
+  "concept": "The trade-offs of limiting charge (20–80%) versus charging to 100% overnight",
+  "persona": {
+   "level": "intermediate",
+   "prior": "Has heard that keeping a phone between 20 and 80 percent makes the battery last longer, and keeps phones 4–5 years.",
+   "misconception": null
+  },
+  "history": [],
+  "message": "should i bother keeping my phone between 20 and 80%? i plug it in overnight every night and i keep my phones like 4-5 yrs. is it worth the hassle or is that a myth",
+  "tags": [
+   "decide",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Lithium-ion batteries wear faster when they spend long periods at high charge, especially when warm, so avoiding hours at 100% does slow capacity loss. For someone who keeps a phone 4–5 years that's a real but modest benefit, and the built-in charge-limit or optimised charging setting gets most of it without any manual effort.",
+   "should": [
+    "Explain the mechanism briefly: time at high state of charge and heat speed up chemical ageing, and charge cycles also add wear",
+    "Weigh the trade-off honestly: less usable charge each day versus more capacity left in later years; say the size of the benefit depends on the phone and usage and isn't precisely agreed",
+    "Point to the low-hassle option: optimised/adaptive charging or an 80% limit setting on many recent iPhones and Android phones",
+    "Tailor the advice: because they keep phones a long time and charge overnight, turning on the built-in feature is a good default; manual 20–80 babysitting is optional",
+    "Mention avoiding heat (e.g. charging under a pillow, in a hot car) as an equally important factor"
+   ],
+   "should_not": [
+    "Claim overnight charging overcharges the battery or is dangerous in normal use",
+    "Recommend fully draining the battery regularly to 'calibrate' it or avoid memory effect",
+    "Present the benefit as dramatic or as a precise guaranteed number"
+   ],
+   "best_representation": "comparison"
+  },
+  "correctness": {
+   "must": [
+    "Lithium-ion batteries degrade with both cycling and calendar ageing",
+    "High state of charge and high temperature speed up degradation",
+    "Phone charging circuits stop or taper charging when full; a phone can't keep forcing current in past full",
+    "Many modern phones offer optimised/adaptive charging and/or an 80% (or similar) charge limit",
+    "How much battery life this saves varies with chemistry, temperature and usage; there isn't one agreed figure"
+   ],
+   "must_not": [
+    "Charging overnight overcharges the battery and is likely to make it explode",
+    "Lithium-ion batteries have a memory effect and must be fully drained regularly",
+    "Keeping between 20 and 80 percent makes no difference whatsoever to wear"
+   ]
+  },
+  "transfer": {
+   "question": "A laptop stays plugged in on a desk all day at 100% and rarely runs on battery. What simple change would help its battery last, and why?",
+   "answer": "Turn on the laptop's battery-health or charge-limit setting so it holds around 80% instead of 100%. Sitting at full charge, often while warm, speeds up calendar ageing, and since it rarely runs on battery you lose almost nothing by capping it."
+  }
+ },
+ {
+  "id": "ho-c-incognito-isp-claim",
+  "domain": "computing — web privacy and networking",
+  "concept": "What private/incognito browsing actually hides, and from whom",
+  "persona": {
+   "level": "novice",
+   "prior": "Uses incognito mode sometimes and saw a short video claiming it makes browsing invisible.",
+   "misconception": "Incognito mode hides your browsing from your internet provider and the network you're on, like school Wi-Fi."
+  },
+  "history": [],
+  "message": "saw a tiktok saying if u use incognito mode ur ISP and ur school wifi cant see what sites u visit?? is that true",
+  "tags": [
+   "claim",
+   "misconception",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Incognito only changes what your own browser saves on your device: no history, cookies or form data are kept once you close the window. Your traffic still goes through the same network in the same way, so the school network and your ISP can still see which sites you connect to, and the sites still see your IP address.",
+   "should": [
+    "Give a clear verdict: the claim is false",
+    "Separate local traces (what incognito clears) from network visibility (what incognito doesn't touch)",
+    "Explain what HTTPS does and doesn't hide: page contents and specific paths are encrypted, but the domain name is usually still visible to the network",
+    "Mention that school-managed devices or accounts may have monitoring software (sometimes including installed certificates that let the school inspect HTTPS traffic) regardless of browser mode",
+    "Briefly say what incognito is actually good for (e.g. shared computers, not staying logged in)"
+   ],
+   "should_not": [
+    "Say incognito encrypts traffic or works like a VPN",
+    "Overstate the other way, claiming any Wi-Fi owner can read everything typed on HTTPS sites",
+    "Coach them on getting around school network rules"
+   ],
+   "best_representation": "comparison"
+  },
+  "correctness": {
+   "must": [
+    "Private/incognito mode stops the browser storing history, cookies and site data from that session on the device",
+    "It does not hide your IP address from websites or your traffic from the network operator or ISP",
+    "With HTTPS, page contents and full URLs are encrypted in transit, but the domain is typically visible through DNS lookups and the TLS server name, unless technologies like encrypted DNS and Encrypted Client Hello are in use",
+    "Managed devices or networks may use monitoring software, filters or installed inspection certificates that work regardless of incognito mode"
+   ],
+   "must_not": [
+    "Incognito mode encrypts your internet traffic",
+    "Incognito mode hides your IP address",
+    "On an HTTPS site, anyone running the Wi-Fi can read your passwords and messages in plain text, even on a personal device with no monitoring software or installed certificates"
+   ]
+  },
+  "transfer": {
+   "question": "You secretly buy a birthday present using an incognito window on the shared family computer. Who can still know about the purchase?",
+   "answer": "Family members won't see the site in the browser history afterward, as long as you didn't stay logged in to accounts (confirmation emails or downloaded receipts could still give it away). The store obviously knows about the purchase and sees your IP address, and your home network or ISP could see that you connected to the store's domain."
+  }
+ },
+ {
+  "id": "ho-c-decimal-to-binary-procedure",
+  "domain": "computing — number systems",
+  "concept": "Converting a decimal number to binary by hand using place values that are powers of 2",
+  "persona": {
+   "level": "novice",
+   "prior": "Intro computer science student who knows binary uses only 0s and 1s but has only ever used an online converter.",
+   "misconception": null
+  },
+  "history": [],
+  "message": "can u teach me how to convert decimal to binary by hand? not just the answer, like i want to actually be able to do it on the exam. e.g. 45",
+  "tags": [
+   "procedure",
+   "how",
+   "practice"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "Each binary digit is a power of 2 (1, 2, 4, 8, 16, 32…), just as decimal digits are powers of 10. To convert, you work out which powers of 2 add up to the number, either by subtracting the largest power that fits or by repeatedly dividing by 2 and reading the remainders from bottom to top. So 45 = 32 + 8 + 4 + 1 = 101101.",
+   "should": [
+    "Start with place values (powers of 2), comparing them to decimal place values so the method makes sense",
+    "Walk through 45 step by step with one method, showing every remainder or subtraction",
+    "Explain why the division-method remainders are read in reverse (the first remainder is the 1s place)",
+    "Show how to check the answer by converting back (32+8+4+1=45)",
+    "Hand them a fresh number to try themselves before showing more"
+   ],
+   "should_not": [
+    "Just state 101101 without the procedure",
+    "Teach both methods at full length at once and overload them",
+    "Skip the check-by-converting-back step"
+   ],
+   "best_representation": "worked example"
+  },
+  "correctness": {
+   "must": [
+    "45 in binary is 101101",
+    "Binary place values from right to left are 1, 2, 4, 8, 16, 32, …",
+    "Repeated division: 45→22 r1, 22→11 r0, 11→5 r1, 5→2 r1, 2→1 r0, 1→0 r1; reading remainders bottom to top gives 101101",
+    "The first remainder from repeated division is the least significant (rightmost) bit"
+   ],
+   "must_not": [
+    "Remainders should be read top to bottom in the order they were produced",
+    "45 in binary is 110101 (or any value other than 101101)",
+    "Binary place values are multiples of 2 (2, 4, 6, 8…)"
+   ]
+  },
+  "transfer": {
+   "question": "Convert 26 to binary by hand and check your answer.",
+   "answer": "26 = 16 + 8 + 2, so it is 11010 (16, 8, 0×4, 2, 0×1). Check: 16 + 8 + 2 = 26."
+  }
+ },
+ {
+  "id": "ho-c-a-vs-an-sound",
+  "domain": "language — English articles",
+  "concept": "'A' versus 'an' depends on the first sound of the next word, not its first letter",
+  "persona": {
+   "level": "intermediate",
+   "prior": "Non-native English speaker who was taught 'use an before a vowel'.",
+   "misconception": "The a/an rule is about written letters, so 'an hour' and 'a university' are random exceptions."
+  },
+  "history": [],
+  "message": "why is it 'an hour' but 'a university'?? both of them break the vowel rule my teacher told me. english is so random lol",
+  "tags": [
+   "why",
+   "misconception",
+   "everyday"
+  ],
+  "guard": false,
+  "ideal": {
+   "central_insight": "The rule is really about sound, not spelling. 'An' goes before a word that starts with a vowel sound and 'a' before a consonant sound. 'Hour' starts with a silent h, so it begins with a vowel sound, and 'university' starts with a 'yoo' sound, which is a consonant sound (/j/). Neither is an exception.",
+   "should": [
+    "Restate the rule in terms of sounds and show that both examples follow it",
+    "Have them say the words out loud: 'our' vs 'you-niversity'",
+    "Give a few more examples showing the pattern (an honest, a one-time, an MBA, a European)",
+    "Briefly explain why the rule exists: 'an' makes it easier to say two vowel sounds in a row, and 'a' developed from 'an' losing its n before consonants",
+    "Mention that a few words vary by accent or style (e.g. 'a historic' vs 'an historic')"
+   ],
+   "should_not": [
+    "Present a list of memorise-only exceptions",
+    "Insist one form of 'a/an historic' is the only correct one",
+    "Make the explanation depend on advanced phonetics jargon without plain examples"
+   ],
+   "best_representation": "prose"
+  },
+  "correctness": {
+   "must": [
+    "'An' is used before words beginning with a vowel sound; 'a' before words beginning with a consonant sound",
+    "'Hour', 'honest' and 'heir' have a silent h and take 'an'",
+    "'University', 'European' and 'one' begin with consonant sounds (/j/ or /w/) and take 'a'",
+    "Abbreviations follow their pronunciation: 'an MBA', 'an FBI agent'",
+    "Usage before some h-words such as 'historic' varies with accent and style"
+   ],
+   "must_not": [
+    "The a/an choice is determined by the first written letter",
+    "'An university' is the standard correct form",
+    "'Hour' takes 'an' because it is an irregular exception with no pattern"
+   ]
+  },
+  "transfer": {
+   "question": "Should you write 'a' or 'an' before 'FBI agent', and before 'European city'?",
+   "answer": "'An FBI agent', because F is said 'eff', which starts with a vowel sound. 'A European city', because 'European' starts with a 'yoo' consonant sound."
+  }
+ }
+]

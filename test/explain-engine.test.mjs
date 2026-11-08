@@ -32,7 +32,7 @@ function turn(text, o = {}) {
   const state = R.readTurnState({ text, history, signals, intent: route.intent, checked: o.checked ?? [], ...(o.resumedAfterMs ? { resumedAfterMs: o.resumedAfterMs } : {}) });
   const a = R.allocate({ state, signals, assist: { lastUserText: text, history, guard: !!o.guard, ...(o.resumedAfterMs ? { resumedAfterMs: o.resumedAfterMs } : {}) } });
   const ownReasoning = a.split.reasoning === 'human' || a.split.reasoning === 'scaffold';
-  const p = R.planPresentation({ text, state, signals, questions: a.assist.questions, ownWriting: a.split.creativity === 'human', ownJudgment: a.split.judgment === 'human', ownReasoning, guard: !!o.guard, history, length: o.length ?? null });
+  const p = R.planPresentation({ text, state, signals, questions: a.assist.questions, ownWriting: a.split.creativity === 'human', ownJudgment: a.split.judgment === 'human', ownReasoning, scaffold: a.split.reasoning === 'scaffold', guard: !!o.guard, history, length: o.length ?? null });
   const questions = o.questions ?? a.assist.questions;
   const plan = R.planExplanation({
     text,
@@ -47,6 +47,7 @@ function turn(text, o = {}) {
     assist: a.assist,
     did: o.did,
     ledger: o.ledger,
+    thread: (o.thread ?? []).map((n) => R.sanitizeThreadNote(n)).filter(Boolean),
     length: o.length ?? null,
     now: NOW,
   });
@@ -58,7 +59,7 @@ const ANALOGY_REPLY = [{ role: 'user', content: 'what is entropy?' }, { role: 'a
 const STEPS_REPLY = [{ role: 'user', content: 'how do I solve 2x + 3 = 11?' }, { role: 'assistant', content: 'Here is the working.\n\n```ui\n{"type":"steps","lines":[{"tex":"2x = 8"},{"tex":"x = 4"}]}\n```' }];
 
 console.log('\n=== the twenty, each where it fits ===');
-ok('the twenty strategies, in their order', J(R.STRATEGIES) === J(['insight', 'analogy', 'compare', 'worked', 'faded', 'segmented', 'pretrain', 'visual', 'conceptmap', 'causal', 'misconception', 'error', 'elaborate', 'selfexplain', 'retrieval', 'spaced', 'interleave', 'teachback', 'argument', 'tradeoffs']));
+ok('the twenty strategies, in their order — and the three moves the ladder added (a try like it, a prediction, a diagnosis)', J(R.STRATEGIES) === J(['insight', 'analogy', 'compare', 'worked', 'faded', 'segmented', 'pretrain', 'visual', 'conceptmap', 'causal', 'misconception', 'error', 'elaborate', 'selfexplain', 'retrieval', 'spaced', 'interleave', 'teachback', 'argument', 'tradeoffs', 'transfer', 'predict', 'diagnose']));
 {
   const r = turn('why is the sky blue?');
   ok('1 Essential Insight: the spine of an explanation ("why is the sky blue?")', has(r, 'insight') && has(r, 'causal'), J(r.plan.strategies));
@@ -141,13 +142,15 @@ ok('the twenty strategies, in their order', J(R.STRATEGIES) === J(['insight', 'a
 }
 {
   const r = turn('oh I get it now, the light reactions make the ATP', { history: LEARNED });
-  ok('18 Teach-Back: "I get it now" — explain it back in a sentence or two', has(r, 'teachback') && r.plan.question === 'teachback', J(r.plan));
+  ok('18 Teach-Back, offered: "I get it now, the light reactions make the ATP" is said back already — confirmed, not quizzed again', r.plan.need === 'feedback' && !r.plan.question && /own words/.test(r.block), J(r.plan));
+  const claimed = turn('ok got it', { history: LEARNED, thread: [{ s: ['analogy'], n: 'reframe', c: 'photosynthesis' }] });
+  ok('  …and "got it" after being lost: understanding claimed, not shown — one chance to say it back', claimed.plan.question === 'teachback', J(claimed.plan));
 }
 {
   const r = turn('my argument is that remote work increases productivity, does it hold up?');
   ok('19 Argument Mapping: a claim to test — reasons, objection, assumption', has(r, 'argument'), J(r.plan));
   const brain = turn('is it true that we only use 10% of our brains?');
-  ok('  …and a claim checked, laid out to inspect', has(brain, 'argument') && brain.applied.forms.includes('claim'), J(brain.applied));
+  ok('  …and a known myth, asked about: refuted, verdict first, the claim still laid out to inspect', brain.plan.need === 'refute' && has(brain, 'misconception') && brain.applied.forms.includes('claim'), J({ plan: brain.plan, forms: brain.applied.forms }));
 }
 {
   const r = turn('should I take the job in London or stay where I am?');
@@ -206,7 +209,7 @@ console.log('\n=== adaptation ===');
   const a = turn("I still don't get it", { history: ANALOGY_REPLY });
   ok('lost after an analogy: a different way in (an example, a picture), not the same again', !has(a, 'analogy') && (has(a, 'worked') || has(a, 'visual')), J(a.plan));
   const b = turn("I still don't get it", { history: [{ role: 'user', content: 'what is entropy?' }, { role: 'assistant', content: 'Entropy measures the number of microstates.' }] });
-  ok('lost after a plain explanation: an analogy', has(b, 'analogy'), J(b.plan));
+  ok('lost after a plain explanation: a different way in (a concrete instance first, or an analogy)', b.plan.need === 'reframe' && (has(b, 'worked') || has(b, 'analogy')), J(b.plan));
   ok('the last reply’s strategies are read from its text', J([...R.usedBefore(ANALOGY_REPLY)]) === J(['analogy']) && R.usedBefore(STEPS_REPLY).has('worked'));
 }
 {
@@ -225,17 +228,17 @@ console.log('\n=== continuity: the learning ledger ===');
   ok('  a slip: back to the first box', L[0].box === 0 && L[0].wrong === 1);
   ok('the intervals expand: 1, 3, 7, 16, 35 days', J(R.INTERVAL_DAYS) === J([1, 3, 7, 16, 35]));
   const due = R.dueTopics([
-    { topic: 'a', seen: 1, right: 0, wrong: 0, last: NOW - 2 * DAY, box: 0 },
-    { topic: 'b', seen: 1, right: 1, wrong: 0, last: NOW - 2 * DAY, box: 1 },
-    { topic: 'c', seen: 1, right: 3, wrong: 0, last: NOW - 40 * DAY, box: 4 },
-    { topic: 'd', seen: 1, right: 0, wrong: 0, last: NOW - 3 * 3600_000, box: 0 },
+    { topic: 'osmosis', seen: 1, right: 0, wrong: 0, last: NOW - 2 * DAY, box: 0 },
+    { topic: 'meiosis', seen: 1, right: 1, wrong: 0, last: NOW - 2 * DAY, box: 1 },
+    { topic: 'entropy', seen: 1, right: 3, wrong: 0, last: NOW - 40 * DAY, box: 4 },
+    { topic: 'enzymes', seen: 1, right: 0, wrong: 0, last: NOW - 3 * 3600_000, box: 0 },
   ], NOW);
-  ok('due: past its box’s interval, never within the day', J(due.map((e) => e.topic)) === J(['c', 'a']), J(due));
-  const big = Array.from({ length: 60 }, (_, i) => ({ topic: `topic ${i}`, seen: 1, right: 0, wrong: 0, last: NOW, box: 9, evil: '<script>' }));
+  ok('due: past its box’s interval since last practised, never within the day', J(due.map((e) => e.topic)) === J(['entropy', 'osmosis']), J(due));
+  const big = Array.from({ length: 60 }, (_, i) => ({ topic: `enzymes kinetics ${'abcdefghijklmnopqrstuvwxyz'[i % 26]}${i}`, seen: 1, right: 0, wrong: 0, last: NOW, box: 9, evil: '<script>' }));
   const s = R.sanitizeLedger([...big, { topic: '', last: NOW }, { topic: 'x', last: 'yesterday' }, null], NOW);
   ok('from a browser: forty at most, boxes clamped, nothing else kept', s.length === 40 && s.every((e) => e.box <= 4 && !('evil' in e)), J(s[0]));
   ok('  and junk is nothing', J(R.sanitizeLedger('nope', NOW)) === '[]' && J(R.sanitizeLedger([{ topic: 'Mitosis!!', last: NOW, seen: 2 }], NOW)) === J([{ topic: 'mitosis', seen: 2, right: 0, wrong: 0, last: NOW, box: 0 }]));
-  ok('what they did with checks, counted', J(R.outcomesOf([{ from: 'Check', said: 'answered 4 to “x?” — right' }, { from: 'Check', said: 'answered 3 to “y?” — not right' }])) === J({ right: 1, wrong: 1 }));
+  ok('what they did with checks, counted (and how many tries)', J(R.outcomesOf([{ from: 'Check', said: 'answered 4 to “x?” — right' }, { from: 'Check', said: 'answered 3 to “y?” — not right' }])) === J({ right: 1, wrong: 1, tries: 1 }));
   ok('the topic, in a few content words', R.topicOf('How does photosynthesis work?') === 'photosynthesis' && R.topicOf('hi') === null && (R.topicOf('what is the difference between mitosis and meiosis?') ?? '').includes('mitosis'));
   const r = turn('how does photosynthesis work?', { ledger: [{ topic: 'photosynthesis', seen: 2, right: 1, wrong: 0, last: NOW - 6 * DAY, box: 1 }] });
   ok('a learning turn is marked for the ledger with its topic', r.plan.learning && r.plan.topic === 'photosynthesis');
@@ -284,12 +287,15 @@ console.log('\n=== integration ===');
   const route = read('app/api/logos/chat/route.ts');
   ok('the route plans the explanation after the presentation and the move', /explain = planExplanation\(\{/.test(route) && route.indexOf('planExplanation({') > route.indexOf('planPresentation({'));
   ok('  folds it into the presentation the gate and the renderer read', /const presentation = explain && inlineOn \? applyExplanation\(presented, explain\) : presented;/.test(route));
-  ok('  its lines in this turn’s context, after the presentation’s — never in the stable prompt', /renderPresentation\(presentation[^\n]*\n[^\n]*\n\s*renderExplanation\(explain/.test(route) && !/const stable =[\s\S]{0,2000}renderExplanation/.test(route));
+  ok('  its lines in this turn’s context, after the presentation’s and read against it — never in the stable prompt', /renderPresentation\(presentation[\s\S]{0,400}renderTurnGuidance\(explain, presentation/.test(route) && !/const stable =[\s\S]{0,2000}renderTurnGuidance/.test(route));
   ok('  LOGOS_EXPLAIN=off: the route as it was; a failure: the turn without it', /process\.env\.LOGOS_EXPLAIN !== 'off'/.test(route) && /\[explain\] planning failed/.test(route));
-  ok('  the ledger never read on a sensitive or off-the-record turn, or in a room of two', /turnState\.sensitive \|\| signals\.offRecord \|\| twoPeople \? \[\] : sanitizeLedger\(body\?\.learning/.test(route));
+  ok('  the ledger read only through the one gate (never sensitive, off the record, two people, shared, a visitor, incognito)', /comprehensionAllowed \? sanitizeLedger\(body\?\.learning/.test(route) && /!turnState\.sensitive &&/.test(route) && /!signals\.offRecord &&/.test(route) && /!twoPeople &&/.test(route));
   ok('  content-free headers: the strategies, and the topic of a learning turn', /'X-Socria-Explain': explainTrace\(explain\)/.test(route) && /'X-Socria-Learn': encodeURIComponent\(explain\.topic\)/.test(route));
   const app = read('components/LogosApp.tsx');
-  ok('the client sends the ledger kept in this browser, and notes a learning turn', /const lg = readLedger\(\);/.test(app) && /noteLearningTurn\(res\.headers\.get\('X-Socria-Learn'\), turn\.did\)/.test(app));
+  ok('the client sends the ledger kept in this browser (never into a conversation others read), and notes a learning turn', /if \(shared\) return \{\};\s*const lg = readLedger\(\);/.test(app) && /noteLearningTurn\(\{ learn: res\.headers\.get\('X-Socria-Learn'\), review: res\.headers\.get\('X-Socria-Review'\), lost: res\.headers\.get\('X-Socria-Lost'\) \}, turn\.did\)/.test(app));
+  ok('  …and keeps the engine\'s note on the reply (codes and a concept), the question only if the reply asked it', /threadNoteFrom\(threadHeader, acc\)/.test(app) && /sanitizeThreadNote\(m\.explain\)/.test(read('app/api/conversations/route.ts')));
+  ok('"Clear memory" clears the ledger; sign-out says it is cleared', /'socria\.learning\.v1'/.test(read('lib/local-data.ts')) && /lives only in this browser/.test(read('components/account/SignOutPanel.tsx')));
+  ok('the Memory view lists it, with a Forget for each concept', /<LearningList \/>/.test(read('components/logos5/MemoryView.tsx')) && /forgetTopic\(e\.topic\)/.test(read('components/logos5/LearningList.tsx')));
   const lib = read('lib/logos5/learning.ts');
   ok('  kept in localStorage only, failures harmless', /localStorage\.setItem\(LEARNING_KEY/.test(lib) && /catch \{/.test(lib) && !/fetch\(/.test(lib));
   ok('invisible: no mode, no badge, nothing new on screen', !/explain-mode|Explanation mode|strategy-badge/i.test(app));

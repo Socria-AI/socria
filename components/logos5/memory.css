@@ -1849,3 +1849,45 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
     transition: none;
   }
 }
+
+/* What you have been learning (components/logos5/LearningList.tsx): the explanation engine's ledger, kept in this
+   browser only — a concept, when it last came up, when it comes back; Forget on each. */
+.logos-root .l5 .l5mm-learn-list {
+  list-style: none;
+  margin: 2px 0 6px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.logos-root .l5 .l5mm-learn-list li {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  flex-wrap: wrap;
+  font-size: 13.5px;
+  color: var(--lg-ink);
+}
+.logos-root .l5 .l5mm-learn-topic {
+  font-weight: 500;
+  text-transform: none;
+}
+.logos-root .l5 .l5mm-learn-when {
+  color: var(--lg-ink-60);
+  font-size: 12.5px;
+  flex: 1 1 auto;
+}
+.logos-root .l5 .l5mm-learn-forget {
+  border: 0;
+  background: none;
+  padding: 2px 0;
+  font: inherit;
+  font-size: 12.5px;
+  color: var(--lg-primary);
+  cursor: pointer;
+  min-height: 24px;
+}
+.logos-root .l5 .l5mm-learn-forget:hover,
+.logos-root .l5 .l5mm-learn-forget:focus-visible {
+  text-decoration: underline;
+}

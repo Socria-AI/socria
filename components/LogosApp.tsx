@@ -176,7 +176,7 @@ import { describeFocus, type Focus } from '@/lib/workspace/focus';
 import { LOGOS4 } from '@/lib/logos4/flags';
 import { MAP_EVERY_TURN } from '@/lib/logos5/flags';
 import { L5Layout, L5TopBar, L5Working } from '@/components/logos5/L5Views';
-import { noteLearningTurn, readLedger } from '@/lib/logos5/learning';
+import { noteLearningTurn, readLedger, threadNoteFrom } from '@/lib/logos5/learning';
 import { LiveGuide } from '@/components/logos5/LiveGuide';
 import { keepAsTurn } from '@/lib/guide/session';
 import type { GuidePlan } from '@/lib/guide/overlay';
@@ -4611,6 +4611,8 @@ export function LogosApp({
           // the learning ledger kept in this browser (lib/logos5/learning.ts): what was learned and when, so an
           // explanation can bring back what is due or recall what was met before — never anywhere but here
           ...(() => {
+            // never into a conversation others read: how this person learns is theirs (the route gates it too)
+            if (shared) return {};
             const lg = readLedger();
             return lg.length ? { learning: lg } : {};
           })(),
@@ -4731,7 +4733,9 @@ export function LogosApp({
       // month's document is spent: the words come, and the boundary is said.
       if (res.headers.get('X-Socria-Limit') === 'documents' && !ask('documents-spent')) setError(boundaryNote('documents'));
       // a learning turn: its topic noted in the ledger, moved by how the checks they answered went
-      noteLearningTurn(res.headers.get('X-Socria-Learn'), turn.did);
+      noteLearningTurn({ learn: res.headers.get('X-Socria-Learn'), review: res.headers.get('X-Socria-Review'), lost: res.headers.get('X-Socria-Lost') }, turn.did);
+      // what the reply will do, as the engine planned it — kept on the reply once it has landed (below)
+      const threadHeader = res.headers.get('X-Socria-Thread');
 
       const reader = res.body?.getReader();
       const decoder = new TextDecoder();
@@ -4775,6 +4779,11 @@ export function LogosApp({
         content: acc,
         ...(group ? { replyTo: replyRefOf(sent, myName) } : {}),
         ...(web ? { sources: web } : {}),
+        // the engine's note on this reply (enum codes and a concept): how the next turn knows what was tried and asked
+        ...(() => {
+          const note = threadNoteFrom(threadHeader, acc);
+          return note ? { explain: note } : {};
+        })(),
       };
       // Into the session that SENT, which may no longer be the active one —
       // and into it as it is NOW. It used to be written as the copy taken when

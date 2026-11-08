@@ -20,7 +20,7 @@ export function SignOutPanel() {
     <Panel
       id="sign-out"
       title="Sign out"
-      lede="Of this device only. Your lines of thinking and what Socria remembers stay in your account, ready when you sign back in."
+      lede="Of this device only. Your lines of thinking and what Socria remembers stay in your account, ready when you sign back in. The record of what you have been learning lives only in this browser, so it is cleared with the rest of this device's Socria data."
     >
       <div className="acct-form-actions">
         <Button

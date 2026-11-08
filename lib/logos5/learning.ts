@@ -1,14 +1,23 @@
 // lib/logos5/learning.ts — THE LEARNING LEDGER, in their browser (Logos 5.5, the explanation engine).
 //
 // What lets an explanation pick up where the last one left off, across
-// conversations: the topics they learned, when, how it went, and a Leitner box
+// conversations: the concepts they learned, when they last came up, when they
+// were last PRACTISED (answered, recalled, reviewed — the review clock runs from
+// there, and a mention never resets it), how their checks went (a right answer
+// moves a concept up a Leitner box only on the first try), how much of a worked
+// example they now take themselves, and the ways in that left them lost
 // (lib/runtime/explain.ts). Kept here, in this browser only — never on the
-// server, never shared — sent with each turn so the reply can bring back what
-// is due or retrieve what was met before, and noted after a learning turn
-// (the server names the topic in X-Socria-Learn; how their checks went is in
-// what they did with the last reply). Forty topics at most.
+// server, never shared — sent with each turn so the reply can bring back what is
+// due or recall what was met before, and noted after a learning turn from the
+// server's content-free headers. Forty concepts at most.
+//
+// The route only reads it, sends the concept back, or notes it through one gate
+// (app/api/logos/chat/route.ts comprehensionAllowed): never on a shared,
+// collaborative, sensitive, off-the-record or incognito turn, never with two
+// people present. "Clear memory" clears it (lib/local-data.ts MEMORY_KEYS), and
+// the Memory view lists it with a Forget for each concept.
 
-import { noteTopic, outcomesOf, sanitizeLedger, type LedgerEntry } from '@/lib/runtime/explain';
+import { APPROACHES, noteTopic, outcomesOf, replyAsks, sameTopic, sanitizeLedger, sanitizeThreadNote, type Approach, type LedgerEntry, type ThreadNote } from '@/lib/runtime/explain';
 
 export const LEARNING_KEY = 'socria.learning.v1';
 
@@ -30,22 +39,95 @@ function writeLedger(ledger: readonly LedgerEntry[]): void {
   }
 }
 
-/** A learning turn answered: its topic noted, moved by how the checks they answered went. */
-export function noteLearningTurn(header: string | null, did: readonly { said: string }[] | undefined, now: number = Date.now()): LedgerEntry[] | null {
+const clean = (raw: string) => raw.toLowerCase().replace(/[^a-z0-9' -]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 48);
+const decode = (header: string | null): string | null => {
   if (!header) return null;
-  let topic = '';
   try {
-    topic = decodeURIComponent(header).toLowerCase().replace(/[^a-z0-9' -]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 48);
+    return decodeURIComponent(header);
   } catch {
     return null;
   }
-  if (!topic) return null;
-  const next = noteTopic(readLedger(now), topic, outcomesOf(did), now);
+};
+
+/** What the server said about a turn, in its content-free headers. */
+export interface LearningHeaders {
+  /** X-Socria-Learn: the concept of a learning turn */
+  learn: string | null;
+  /** X-Socria-Review: the concepts brought back for review this turn (JSON array) */
+  review?: string | null;
+  /** X-Socria-Lost: the way in the last reply took, which left them lost (an approach code) */
+  lost?: string | null;
+}
+
+/**
+ * A learning turn answered: its concept noted, moved by how the checks they answered went (a right answer after
+ * several tries is practice, not a step up a box), a way in that left them lost remembered, and anything brought
+ * back for review marked practised — so it is not asked again tomorrow.
+ */
+export function noteLearningTurn(h: LearningHeaders | string | null, did: readonly { said: string }[] | undefined, now: number = Date.now()): LedgerEntry[] | null {
+  const headers: LearningHeaders = typeof h === 'string' || h === null ? { learn: h } : h;
+  let ledger = readLedger(now);
+  let touched = false;
+  // what was due and was brought back: practised now, whatever else happened this turn
+  const reviewed = decode(headers.review ?? null);
+  if (reviewed) {
+    try {
+      const list = JSON.parse(reviewed);
+      if (Array.isArray(list)) {
+        for (const t of list.slice(0, 2)) {
+          if (typeof t !== 'string') continue;
+          const topic = clean(t);
+          if (topic && ledger.some((e) => sameTopic(e.topic, topic))) {
+            ledger = noteTopic(ledger, topic, { reviewed: true }, now);
+            touched = true;
+          }
+        }
+      }
+    } catch {
+      // a malformed header notes nothing
+    }
+  }
+  const topic = clean(decode(headers.learn) ?? '');
+  if (topic) {
+    const lostRaw = decode(headers.lost ?? null);
+    const failed = lostRaw && (APPROACHES as readonly string[]).includes(lostRaw) ? (lostRaw as Approach) : undefined;
+    const o = outcomesOf(did);
+    ledger = noteTopic(ledger, topic, { right: o.right, wrong: o.wrong, tries: o.tries, ...(failed ? { failed } : {}) }, now);
+    touched = true;
+  }
+  if (!touched) return null;
+  writeLedger(ledger);
+  return ledger;
+}
+
+/**
+ * The note kept on Socria's reply (X-Socria-Thread): enum codes and the concept, sanitised — and the question it
+ * left only if the reply really asked one, so the next turn never waits on a question that was never put.
+ */
+export function threadNoteFrom(header: string | null, reply: string): ThreadNote | null {
+  const raw = decode(header);
+  if (!raw) return null;
+  try {
+    const note = sanitizeThreadNote(JSON.parse(raw));
+    if (!note) return null;
+    if (note.q && !replyAsks(reply)) {
+      const { q: _q, ...rest } = note;
+      return rest;
+    }
+    return note;
+  } catch {
+    return null;
+  }
+}
+
+/** One concept forgotten: what the Memory view's Forget does. */
+export function forgetTopic(topic: string): LedgerEntry[] {
+  const next = readLedger().filter((e) => e.topic !== topic);
   writeLedger(next);
   return next;
 }
 
-/** Forget it all: what Settings' "clear" would call. */
+/** Forget it all: what "Clear memory" and the Memory view's Forget all do. */
 export function clearLedger(): void {
   try {
     if (typeof localStorage !== 'undefined') localStorage.removeItem(LEARNING_KEY);

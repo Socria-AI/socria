@@ -159,6 +159,8 @@ export interface PresentationInput {
   ownJudgment?: boolean;
   /** working it out is theirs, or Socria only scaffolds it (Core 4's split: reasoning) */
   ownReasoning?: boolean;
+  /** …and of those, Socria scaffolds it (split: reasoning = scaffold): the first steps may be shown, the last left theirs */
+  scaffold?: boolean;
   /** the Answer Guard is up */
   guard: boolean;
   /** the conversation before this turn */
@@ -205,6 +207,10 @@ export interface Presentation {
   guard?: boolean;
   /** the depth came from their Detailed length setting, not their words */
   depthFromLength?: boolean;
+  /** there is mathematics in the turn to work (a problem, not a mention): what the working element needs */
+  math?: boolean;
+  /** the working offered is faded: the first lines shown, the step that finishes it theirs, asked as its check */
+  stepsFaded?: boolean;
 }
 
 /**
@@ -557,6 +563,8 @@ export function planPresentation(i: PresentationInput): Presentation {
   // for, it comes before anything inferred: "how do I solve this by completing the square?" wants the lines
   const mathWorking = !NOT_A_PROBLEM.test(t) && (MATH_OBJECT.test(t) || domain === 'math' || FORMULA.test(t) || MATH_MARK.test(t)) && (mathy || WORKING_MATH.test(t));
   if (!i.guard && !i.ownReasoning && WORKING_ASK.test(t) && mathWorking) offer('steps', 'steps:working');
+  // …and when Socria only scaffolds it, the working faded: the first lines shown, the last step theirs (never under the guard)
+  else if (!i.guard && i.ownReasoning && i.scaffold && WORKING_ASK.test(t) && mathWorking) offer('steps', 'steps:faded');
   // a relationship they could discover by changing a number: a graph to change (under the guard too —
   // nothing that would be the answer is marked on it). Which graph follows the idea: rates on a curve
   // (the chord and the tangent that matches it), curves that meet (a tax shifting supply), a point along
@@ -695,6 +703,8 @@ export function planPresentation(i: PresentationInput): Presentation {
     ...(shape === 'understand' && parts ? { parts } : {}),
     ...(lean && forms.includes('decide') ? { lean: true } : {}),
     ...(i.questions <= 0 ? { noQuestion: true } : {}),
+    ...(mathWorking ? { math: true } : {}),
+    ...(forms.includes('steps') && reasons.includes('steps:faded') ? { stepsFaded: true } : {}),
   };
 }
 
@@ -846,6 +856,14 @@ const DIAGRAM_GRAMMAR: Record<DiagramVariant, string> = {
 };
 
 /** The grammar for a form as this turn needs it. */
+/**
+ * THE WORKING, FADED. The reasoning is theirs and Socria scaffolds it: the first lines of their own problem,
+ * each with its reason, and the step that finishes it asked in "check" — computed by the engine when they
+ * answer, never written as a line. Under the guard there is no working at all.
+ */
+const STEPS_FADED =
+  '{"type":"steps","title":"Complete the square","lines":[{"tex":"x^2 - 8x + 10 = 0"},{"tex":"x^2 - 8x = -10","why":"move the constant across"},{"tex":"x^2 - 8x + 16 = 6","why":"half of −8, squared, added to both sides"}],"check":{"prompt":"Now you: the left side is (x − ?)². What goes in the gap?","label":"?","answer":"8/2"}} — the working is theirs, so only the first lines of their own problem, each with its reason; the step that finishes it is theirs, asked in "check" ("answer" is plain arithmetic the engine evaluates), never written as a line. Your prose: the method in a line, and nothing that gives the last step away.';
+
 function grammarFor(k: InlineKind, p: Presentation): string {
   const g = grammarOf(k, p);
   return p.guard && GUARDED[k] ? guarded(g, k) : g;
@@ -859,6 +877,7 @@ function grammarOf(k: InlineKind, p: Presentation): string {
   if (k === 'slider' && r.includes('slider:base-rate')) return SLIDER_BASE_RATE;
   if (k === 'reasoning' && r.includes('reasoning:check-work')) return r.includes('check:slips') ? CHECK_SLIPS : r.includes('check:holds') ? CHECK_HOLDS : CHECK_OPEN;
   if (k === 'decide' && p.lean) return DECIDE_LEAN;
+  if (k === 'steps' && p.stepsFaded) return STEPS_FADED;
   if (k === 'paths' && r.includes('paths:next-layer')) return r.includes('layer:work') ? PATHS_NEXT_WORK : r.includes('layer:more') ? PATHS_NEXT_MORE : PATHS_NEXT_IDEA;
   if (k === 'paths') return r.includes('paths:more') ? PATHS_MORE : r.includes('paths:deeper') ? PATHS_DEEPER : GRAMMAR.paths;
   return GRAMMAR[k];

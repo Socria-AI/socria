@@ -45,6 +45,7 @@ import {
 import { L5Switch } from './L5Chrome';
 import { MemoryNetwork } from './MemoryNetwork';
 import { ChangeCard, Icon, Inspector, Mark, MemoryRow, choicesFor, reachOf, regionVar, type Decision, type PlaceIn, type Step } from './MemoryParts';
+import { LearningList } from './LearningList';
 import './memory.css';
 
 type Load =
@@ -566,6 +567,7 @@ export function MemoryView({
           <a href="/memory">Review them there</a>
         </p>
       </section>
+      <LearningList />
     </main>
   );
 

@@ -1469,6 +1469,8 @@ export interface InlineContext {
   ownJudgment?: boolean;
   /** working it out is theirs (Core 4's split): no reasoning laid out for them */
   ownReasoning?: boolean;
+  /** …but Socria scaffolds it and the working was offered faded: first lines shown, the finishing step theirs as a check */
+  faded?: boolean;
   /** blocks already shown in this reply, and how many of them are things to work with (mutated as the reply streams) */
   shown: { n: number; live?: number };
   /**
@@ -1524,7 +1526,8 @@ export function checkInlineSpec(spec: InlineSpec, ctx: InlineContext): InlineVer
   } else if (spec.type === 'steps') {
     // the working is the thing a guarded problem asks them to do
     if (ctx.guard) return { ok: false, why: 'guarded' };
-    if (ctx.ownReasoning) return { ok: false, why: 'their-reasoning' };
+    // faded working, only where it was offered so: the step that finishes it is theirs, asked as the check
+    if (ctx.ownReasoning && !(ctx.faded && spec.check && spec.lines.length <= 6)) return { ok: false, why: 'their-reasoning' };
   } else if (spec.type === 'graph') {
     // a graph is theirs to explore; under the guard nothing is marked on it that would be the answer:
     // no features, no readings, and the chord and tangent drawn without their slopes
@@ -1700,6 +1703,9 @@ export function contentForCheck(content: string): string {
  * it, an answer they checked. Cheaper than the JSON, and it keeps the model
  * from re-emitting a stale chart because it saw one in the transcript.
  */
+/** How an element is named in the history the model reads — shared with the explanation engine, which reads it back (lib/runtime/explain.ts usedBefore). */
+export const SHOWN_INLINE = '[shown inline — ';
+
 export function contentForHistory(content: string, ui?: Record<string, InlineState>): string {
   if (!content.includes('```')) return content;
   let n = 0;
@@ -1707,7 +1713,7 @@ export function contentForHistory(content: string, ui?: Record<string, InlineSta
     const spec = parseInlineSpec(body);
     const at = n++;
     if (!spec) return '';
-    const was = `[shown inline — ${spec.type}: ${historyText(spec).replace(/\s+/g, ' ').slice(0, 240)}`;
+    const was = `${SHOWN_INLINE}${spec.type}: ${historyText(spec).replace(/\s+/g, ' ').slice(0, 240)}`;
     const now = ui?.[String(at)] ? inlineNow(spec, ui[String(at)]) : null;
     return now ? `${was} — now: ${now.slice(0, 280)}]` : `${was}]`;
   });

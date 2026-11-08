@@ -103,6 +103,9 @@ export const MEMORY_KEYS = [
   'socria.journey.v1',
   'socria.importedProfile.v1',
   'socria.personality.v1',
+  // what they have been learning, kept in this browser by the explanation engine (lib/logos5/learning.ts) — worked
+  // out about them, so "clear memory" clears it too
+  'socria.learning.v1',
 ] as const;
 
 export function clearLocalMemory(): void {

@@ -62,6 +62,12 @@ export interface LogosMsg {
    * answer checked. Shown over their words, and told to Socria with them.
    */
   did?: { from: string; said: string }[];
+  /**
+   * What Socria's reply did, as the explanation engine planned it (lib/runtime/explain.ts ThreadNote): enum
+   * codes for the moves, the rung, the question it left — kept only if the reply really asked it — and the
+   * concept. How the next turn knows what was tried and what waits for an answer. Never their words.
+   */
+  explain?: { s: string[]; n: string; q?: string; c?: string };
 }
 
 /**

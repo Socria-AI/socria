@@ -101,10 +101,13 @@ import {
   planPresentation,
   planExplanation,
   applyExplanation,
-  renderExplanation,
+  renderTurnGuidance,
   explainTrace,
   outcomesOf,
   sanitizeLedger,
+  sanitizeThreadNote,
+  threadNoteOf,
+  cueCheck,
   type ExplainPlan,
   presentationRoom,
   readTurnState,
@@ -966,6 +969,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
             ownWriting: allocation?.split.creativity === 'human',
             ownJudgment: allocation?.split.judgment === 'human',
             ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
+            scaffold: allocation?.split.reasoning === 'scaffold',
             guard: assistInput.guard,
             history: assistInput.history,
             // a Detailed length asks for depth on every thread: a way deeper opened is gone into in full
@@ -987,10 +991,28 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     // strategies fit this turn, read in code from what they asked, what they know, how complex it is and how the last
     // reply landed; folded into the presentation (its elements) and the turn's context (a few lines, often none).
     // LOGOS_EXPLAIN=off: the route as it was.
+    // ONE GATE FOR WHAT IS KEPT ABOUT HOW THEY LEARN (the ledger read here, the topic sent back, the client's
+    // send): only where everything of the turn may be kept, never on a shared or collaborative thread, never
+    // for someone visiting another's conversation, never on a sensitive or off-the-record turn, never with two
+    // people present, never in a conversation marked incognito.
+    const comprehensionAllowed =
+      logosPersistPolicy(userTexts) === 'full' &&
+      !sharedCtx.shared &&
+      !sharedCtx.guest &&
+      !body?.collab &&
+      !twoPeople &&
+      !turnState.sensitive &&
+      !signals.offRecord &&
+      mrPrior?.incognito !== true;
     let explain: ExplainPlan | null = null;
     if (persona === 'v5' && process.env.LOGOS_EXPLAIN !== 'off') {
       try {
         const newest = kept[kept.length - 1] as { did?: unknown } | undefined;
+        // what Socria's earlier replies did, as each was saved (enum codes and a concept): the newest is the last
+        // reply's — and where that one has no note (an older reply), none is used, so the history markers decide
+        const replies = (kept.slice(0, -1) as { role: string; explain?: unknown }[]).filter((m) => m.role === 'assistant');
+        const notes = replies.slice(-4).map((m) => sanitizeThreadNote(m.explain));
+        const thread = notes.length && notes[notes.length - 1] ? notes.filter((n): n is NonNullable<typeof n> => !!n) : [];
         explain = planExplanation({
           text: String(last.content ?? ''),
           history: assistInput.history,
@@ -1001,10 +1023,12 @@ export const POST = withMeter(async function POST(req: NextRequest) {
           guard: assistInput.guard,
           ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
           ownJudgment: allocation?.split.judgment === 'human',
+          // Socria's own scaffolding (Logos 4's move, MR's "more support") is a support level, never a mistake
           assist: { retrieval: assist.retrieval, selfExplain: assist.selfExplain, scaffold: assist.scaffold },
           did: outcomesOf(sanitizeDid(newest?.did)),
-          // the learning ledger kept in their browser — never on a sensitive or off-the-record turn, never in a room of two
-          ledger: turnState.sensitive || signals.offRecord || twoPeople ? [] : sanitizeLedger(body?.learning, Date.now()),
+          // the learning ledger kept in their browser — only through the gate above
+          ledger: comprehensionAllowed ? sanitizeLedger(body?.learning, Date.now()) : [],
+          thread,
           length: body?.length === 'concise' || body?.length === 'standard' || body?.length === 'detailed' ? body.length : null,
           now: Date.now(),
         });
@@ -1190,8 +1214,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       fitControlsToForms(mrRun?.block ?? '', presentation) +
       // …and what shape it may take: the inline elements on offer, if any
       renderPresentation(presentation, { verifyOutLoud: !!mrRun?.block && /VERIFY OUT LOUD/.test(mrRun.block) }) +
-      // …and how to make it understood (lib/runtime/explain.ts): nothing for a direct answer, a few lines otherwise
-      renderExplanation(explain, { retrieval: assist.retrieval, selfExplain: assist.selfExplain }) +
+      // …and how to make it understood (lib/runtime/explain.ts): read against the shape above, so nothing is said
+      // twice — nothing for a direct answer, a few lines filled with this turn's facts otherwise
+      renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } }) +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
       evidenceBlock +
       accuracy.block;
@@ -1329,6 +1354,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       ownWriting: allocation?.split.creativity === 'human',
       ownJudgment: allocation?.split.judgment === 'human',
       ownReasoning: allocation?.split.reasoning === 'human' || allocation?.split.reasoning === 'scaffold',
+      // the working was offered faded (Socria scaffolds, the last step theirs): drawn only with that step asked as its check
+      faded: !!presentation.stepsFaded,
       shown: { n: 0 },
       // they asked for code, JSON or a config: a ```json block is theirs to read and copy, never an element
       code: CODE_ASKED.test(lastText) || turnState.domain === 'engineering',
@@ -1380,7 +1407,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
                     messages: turnMessages(note),
                     temperature: 0.7,
                     max_tokens: maxReply,
-                  })
+                    // the same conversation's cache as the first draft: the stable prompt and history are unchanged
+                    ...(promptCacheKey ? { prompt_cache_key: promptCacheKey } : {}),
+                  } as Parameters<typeof openai.chat.completions.create>[0]) as Promise<{ choices?: { message?: { content?: string | null } }[] }>
                 );
                 again = r.choices?.[0]?.message?.content?.trim() ?? '';
               } catch (e) {
@@ -1531,6 +1560,17 @@ export const POST = withMeter(async function POST(req: NextRequest) {
           // needs the request it was registered from (the same note as Core's,
           // app/api/chat/route.ts). Only a whole answer is read; a failure
           // notice is not something Socria said.
+          // How the explanation went, content-free: the plan's codes, and which of its moves the reply carries a
+          // surface cue of (lib/runtime/explain.ts cueCheck — a cue, never proof it was done well). No topic, no words.
+          if (explain && !explain.direct && reply.trim()) {
+            try {
+              const cues = cueCheck(reply, explain);
+              const carried = Object.entries(cues).filter(([, v]) => v).map(([k]) => k);
+              console.info('[explain] %s cues=%s/%d', explainTrace(explain), carried.join('+') || 'none', explain.strategies.length);
+            } catch {
+              // a trace line is never worth a failed reply
+            }
+          }
           // What the reply asserted, labelled, counted — never its content.
           if (evidence && need && reply.trim()) {
             const factual = need.kinds.some((k) => k !== 'computation');
@@ -1621,8 +1661,14 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         'X-Socria-Assist': assistTrace(assist),
         // how the explanation was shaped: content-free strategy codes (lib/runtime/explain.ts explainTrace)
         ...(explain ? { 'X-Socria-Explain': explainTrace(explain) } : {}),
-        // a learning turn: the topic, for the ledger kept in their browser (encoded; the words are their own)
-        ...(explain?.learning && explain.topic ? { 'X-Socria-Learn': encodeURIComponent(explain.topic) } : {}),
+        // a learning turn: the topic, for the ledger kept in their browser (encoded; the words are their own) — only through the gate
+        ...(comprehensionAllowed && explain?.learning && explain.topic ? { 'X-Socria-Learn': encodeURIComponent(explain.topic) } : {}),
+        // the way in the last reply took that left them lost (an approach code): remembered with the concept, so it is not tried first again
+        ...(comprehensionAllowed && explain?.learning && explain.fill.lostAfter ? { 'X-Socria-Lost': explain.fill.lostAfter } : {}),
+        // what is due and was brought back this turn: the client marks it reviewed, so it is not asked again tomorrow
+        ...(comprehensionAllowed && explain?.due.length ? { 'X-Socria-Review': encodeURIComponent(JSON.stringify(explain.due.slice(0, 2))) } : {}),
+        // the note the client keeps on this reply (enum codes, the concept): how the next turn knows what was tried and asked
+        ...(explain && !explain.direct ? { 'X-Socria-Thread': encodeURIComponent(JSON.stringify(comprehensionAllowed ? threadNoteOf(explain) : { ...threadNoteOf(explain), c: undefined })) } : {}),
         // which model answered, and why it was chosen: tier/level/model (lib/model-router.ts)
         'X-Socria-Model': `${route.tier}/${route.level}/${served}`,
         // a write-up they asked for, answered here because the month's documents are spent (above)
