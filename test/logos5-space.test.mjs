@@ -215,7 +215,16 @@ console.log('\n=== consistency pass: made things seen whole, enlarged, found ===
   ok('in the one space a view or an artifact asked for opens beside it (no more buttons changing a screen nobody sees)', /if \(oneViewRef\.current\) setBoardBeside\(t === 'chat' \? null : besideOnBoard\(t\)\);/.test(app) && (app.match(/if \(oneViewRef\.current\) setBoardBeside\('artifacts'\);/g) ?? []).length === 2 && /oneViewRef\.current = oneView;/.test(app));
   ok('  "put X beside" and "close" in words act on what is beside the space', /is open beside the space now\./.test(app) && /Closed what was open beside the space\./.test(app) && /if \(!boardBesideRef\.current\) return \{ said: 'Nothing is open beside the space\.' \};/.test(app));
   ok('  a message jumped to opens its idea in the space; a search hit opens the line on its idea', /if \(idea\) setSpaceOpen\(idea\);/.test(app) && /if \(oneViewRef\.current && spaceView\) return setSpaceOpen\(node\);/.test(app));
-  ok('  on the Universal Map the menu does not offer to save or move a map that is not on screen', /map\.nodes\.length && activeId && !l5Home && !l5Mind \? \[\{ label: 'Save the map as an image'/.test(app) && /activeId && !l5Home && !l5Mind \? \[\{ label: 'AR Mode'/.test(app));
+  ok('  AR Mode is offered (in Account\u2019s experiments) only where a map is on screen', /activeId && !l5Home && !l5Mind \? \[\{ label: 'AR Mode'/.test(app));
+  {
+    // the More menu, trimmed: no novelties; the experiments live in the account sheet
+    const menu = app.slice(app.indexOf('const l5Menu: L5MenuItem[] = ['), app.indexOf('const experiments:'));
+    const sheet = read('components/account/AccountSheet.tsx');
+    ok('  More no longer offers saving the map as an image, Synthesize, hiding the bars, AR Mode, big-screen mode or turning hands on', !/Save the map as an image|label: 'Synthesize'|Hide the bars|label: 'AR Mode'|'Big-screen mode'|label: 'Use your hands'/.test(menu) && /label: 'Write'/.test(menu) && /label: 'Live guidance'/.test(menu) && /label: 'What Socria does'/.test(menu));
+    ok('  but a way out of a running experiment stays in More', /cabin \? \[\{ label: 'Leave big-screen mode'/.test(menu) && /handsWanted \? \[\{ label: 'Stop using your hands'/.test(menu));
+    ok('  Account has an Experiments section with them, each closing the sheet and starting', /experiments=\{experiments\}/.test(app) && /<span className="lbl">Experiments<\/span>/.test(sheet) && /\['acct-labs', 'Experiments'\]/.test(sheet) && /onClose\(\);\s*x\.onSelect\(\);/.test(sheet));
+    ok('  Quick capture is off unless a deployment turns it on', /capture: on\(env\.capture\)/.test(read('lib/logos4/flags.ts')));
+  }
   ok('  the account sheet opens Memory in the app, not the old page', /onMemory=\{cloud \? \(\) => setL5Mind\(true\) : undefined\}/.test(app) && /onMemory \? \(/.test(read('components/account/AccountSheet.tsx')));
   ok('  the Universal Map’s header says More and the shortcut, as a line’s does', /<L5Menu label="More" items=\{menu\} word button="More" \/>/.test(read('components/logos5/L5Chrome.tsx')) && /className="l5-kbd l5-unibtn-k"/.test(app));
   const ctl = read('components/logos5/l5-controls.css');

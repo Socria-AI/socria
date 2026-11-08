@@ -139,7 +139,7 @@ console.log('\n=== how far into a document ===');
 
 console.log('\n=== the switches ===');
 {
-  ok('every Logos 4 feature is on unless switched off', J(readFlags({})) === J({ pointAsk: true, resume: true, capture: true, voice: true }));
+  ok('every Logos 4 feature is on unless switched off — but Quick capture, off unless switched on', J(readFlags({})) === J({ pointAsk: true, resume: true, capture: false, voice: true }) && readFlags({ capture: 'on' }).capture === true && readFlags({ capture: ' Yes ' }).capture === true);
   ok('"off", "0", "false", "no" switch one off', J(readFlags({ pointAsk: 'off', resume: '0', capture: 'FALSE', voice: ' no ' })) === J({ pointAsk: false, resume: false, capture: false, voice: false }));
   ok('anything else leaves it on', readFlags({ voice: 'yes' }).voice === true);
   const flags = read('lib/logos4/flags.ts');

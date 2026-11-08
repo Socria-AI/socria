@@ -1,7 +1,8 @@
 // lib/logos4/flags.ts — LOGOS 4'S FEATURES, EACH ONE SWITCHABLE.
 //
 // Every Logos 4 feature can be turned off for a deployment without a code
-// change: set NEXT_PUBLIC_LOGOS4_<NAME>=off (or 0, false, no). A feature
+// change: set NEXT_PUBLIC_LOGOS4_<NAME>=off (or 0, false, no). Quick capture is
+// the exception: it is off unless NEXT_PUBLIC_LOGOS4_CAPTURE=on. A feature
 // defaults ON only where it is complete and tested; one that is not is not
 // drawn at all — never a control that looks as if it works.
 //
@@ -13,13 +14,14 @@
 // (components/useVoiceInput.ts).
 
 const off = (v: string | undefined): boolean => /^(off|0|false|no)$/i.test((v ?? '').trim());
+const on = (v: string | undefined): boolean => /^(on|1|true|yes)$/i.test((v ?? '').trim());
 
 export interface Logos4Flags {
   /** select anything — a card, a bar, a cell, a passage, an expression — and ask about it */
   pointAsk: boolean;
   /** come back to the conversation, the selection and the half-typed message as they were */
   resume: boolean;
-  /** a private inbox for a thought, a note or a photo, kept for later */
+  /** a private inbox for a thought, a note or a photo, kept for later — off unless NEXT_PUBLIC_LOGOS4_CAPTURE=on (it duplicated the start box) */
   capture: boolean;
   /** speak into the composer: transcribed, never sent by itself */
   voice: boolean;
@@ -29,7 +31,7 @@ export function readFlags(env: Record<string, string | undefined>): Logos4Flags 
   return {
     pointAsk: !off(env.pointAsk),
     resume: !off(env.resume),
-    capture: !off(env.capture),
+    capture: on(env.capture),
     voice: !off(env.voice),
   };
 }

@@ -8094,24 +8094,27 @@ export function LogosApp({
     ...(activeId && !l5Home ? [{ label: 'New line of thinking', onSelect: () => void newFromHome() }] : []),
     ...(phone && activeId && !l5Home ? [{ label: 'Search everything', hint: 'Conversations, files and artifacts', onSelect: () => setSearchOpen(Date.now()) }] : []),
     { label: 'Write', hint: limits.draftSpace ? 'Your writing and notes — Socria only when you ask' : 'Part of Socria One', onSelect: openWriting },
+    // Quick capture is off unless a deployment turns it on (lib/logos4/flags.ts); saving the map as an image is the
+    // map's own (its view's actions), Synthesize is the Content and Logic Map views' own, and hiding the bars is gone
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
-    // (a line's own map, only while that line is on screen — on the Universal Map it would save one you cannot see)
-    ...(map.nodes.length && activeId && !l5Home && !l5Mind ? [{ label: 'Save the map as an image', onSelect: () => void exportMapPng(map, l5Title) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
+    { label: 'Live guidance', hint: 'Point your camera and ask — Socria shows you how, on the picture · early access', onSelect: openGuide },
+    // while big-screen mode is on, the way out stays here, where it is looked for; the rest of the experiments are in Account
+    ...(cabin ? [{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) }] : []),
+    ...(handsWanted ? [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }] : []),
+    { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
+    ...(!one ? [{ label: 'Socria One', hint: 'Unlimited, with Voice and sharing', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
+  ];
+  // The experiments: novelties that work, kept out of the way in Account (components/account/AccountSheet.tsx)
+  const experiments: { label: string; hint: string; onSelect: () => void }[] = [
+    ...(!handsWanted
+      ? [{ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands }]
+      : [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }]),
+    ...(activeId && !l5Home && !l5Mind ? [{ label: 'AR Mode', hint: 'Move this Logic Map with your hands · early access', onSelect: openAr }] : []),
     // a phone is never a big screen: offered where it can apply, and always where it is on to be left
     ...(!phone || cabin
       ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
       : []),
-    // on a wide screen the line of thinking is one board with nothing floating over it (Logos 5 One view): Synthesize is here
-    ...(activeId && !narrow && !l5Home && canSynthesize(map) ? [{ label: 'Synthesize', hint: 'See where your thinking stands', onSelect: () => void synthesize('workspace') }] : []),
-    ...(activeId && !l5Home && !l5Mind ? [{ label: 'AR Mode', hint: 'Move your Logic Map with your hands · early access', onSelect: openAr }] : []),
-    { label: 'Live guidance', hint: 'Point your camera and ask — Socria shows you how, on the picture · early access', onSelect: openGuide },
-    ...(!handsWanted
-      ? [{ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands }]
-      : [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }]),
-    { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
-    ...(!one ? [{ label: 'Socria One', hint: 'Unlimited, with Voice and sharing', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
-    { label: 'Hide the bars', sep: true, onSelect: () => hideChrome(true) },
   ];
   // The meter, only when it is about to matter: the free allowance closest to
   // its end, said once and quietly — the last two of ten, the last of two —
@@ -10251,6 +10254,7 @@ export function LogosApp({
         // the tutorials say the same, one at a time — rather than a tour that ends before it starts
         onRetakeTour={() => (typeof document !== 'undefined' && document.querySelectorAll('[data-tour]').length >= 2 ? setTourOpen(true) : setGuideOpen(true))}
         onMemory={cloud ? () => setL5Mind(true) : undefined}
+        experiments={experiments}
       />
 
       {/* Sleep Mode (lib/sleep.ts): the week's free tokens are spent — said once, with when Socria wakes */}
