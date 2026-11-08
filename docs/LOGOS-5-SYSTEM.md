@@ -683,6 +683,8 @@ here is a new design; where a surface had no convention, it took the nearest one
   hairline ring, Socria One a word in its blue, open triggers in ink); the list is called Sessions everywhere. What
   floats on the page (composer sheets, the map's menus and cards, tips) is square paper; the old framed keys on the map
   are words and the one pill; tips sit under every dialog's dim. Dark-ground inks for the space's labels and the gold.
+  A message's actions (Copy, Reply, Retry, Edit, Listen) were drawn five ways; they are one rule in the meta word's
+  look, in ink 60 rather than the meta word's 0.55, because they sit under every reply and must pass AA (4.9:1).
 - **The surfaces.** Memory, Study, Write, Projects, the memory graphs, Voice, the big-screen dock, displays and reply
   elements take the ink pill, the bare close, underlined tabs and the label; the light-only colours (white controls, a
   cream dock, four reds) follow the theme. A chart keeps its colours when it is opened in Artifacts (one series palette,

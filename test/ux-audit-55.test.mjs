@@ -62,9 +62,9 @@ console.log('\n=== one system ===');
   ok('  and each dims it with the one token, --lg-dim', undimmed.length === 0, undimmed.join(', '));
 }
 ok('the secondary inks are readable: 0.66 (4.9:1, as the older sheets\' --lg-ink-60) and 0.55 (3.5:1, was 2.7:1)', /--c-ink-60: rgba\(var\(--c-ink-rgb\), 0\.66\);/.test(controls) && /--c-ink-45: rgba\(var\(--c-ink-rgb\), 0\.55\);/.test(controls));
-// one definition (l5.css) in the meta word's look — the readable quiet ink, 0.55 — not one per surface (it was
-// drawn five times, ink 45 on the page and ink 60 in the space)
-ok('  Socria\'s reply actions (Copy, Reply, Retry, Listen) in the readable ink', /\.logos-root \.l5-act \{[^}]*color: var\(--c-ink-45\);[^}]*font-size: 12\.5px;/.test(read('components/logos5/l5.css')) && ![space, read('components/logos5/page.css'), read('components/logos5/l5v.css')].some((s) => /\.l5-act \{/.test(s)));
+// one definition (l5.css) in the meta word's look, not one per surface (it was drawn five times, ink 45 on the
+// page, ink 60 in the space, 0.7 in the thread); on every reply, so in the ink that passes AA at 12.5px (ink 60, 4.9:1)
+ok('  Socria\'s reply actions (Copy, Reply, Retry, Listen) in the readable ink', /\.logos-root \.l5-act \{[^}]*color: var\(--c-ink-60\);[^}]*font-size: 12\.5px;/.test(read('components/logos5/l5.css')) && ![space, read('components/logos5/page.css'), read('components/logos5/l5v.css')].some((s) => /\.l5-act \{/.test(s)));
 ok('More is a word the size, weight and ink of Search and List beside it, in both headers', /:is\(\.l5-head-end, \.l5v-top-r\) > \.l5-menuhost > \.l5-link \{ font-size: 13\.5px; font-weight: 500; color: var\(--c-ink-70\);/.test(r2));
 ok('the guest\'s count is words ("3 free messages left"), not five dots that said it again', !/l5-guestmeter-dots/.test(app) && /free \{GUEST_TURNS - guestUsed === 1 \? 'message' : 'messages'\} left/.test(app) && /\.l5-guestmeter \{ height: auto; padding: 0; border: 0; background: none;/.test(r2));
 ok('the guest note is a line, not a toast: no badge, and its action is the page\'s one filled control (ink, moss on hover)', /\.l5-guestnudge-spark \{ display: none; \}/.test(r2) && /:is\(\.l5-guestnudge-go, \.l5-guestwall-go\) \{ background: var\(--c-ink\); color: var\(--c-paper\);/.test(r2));

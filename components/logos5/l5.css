@@ -819,7 +819,8 @@
 }
 /* A message's own actions (Copy, Reply, Retry, Edit, Listen) are words in the meta word's look
    (.l5-link.is-meta, l5-controls.css), and this is their one definition: the thread, the page (page.css) and
-   the space (space.css) each lay out the row, none redraws the word. */
+   the space (space.css) each lay out the row, none redraws the word. They are used on every reply, so they keep
+   the ink that passes WCAG AA at 12.5px (ink 60, 4.9:1), not the meta word's 0.55 (3.5:1). */
 .logos-root .l5-act {
   display: inline-flex;
   align-items: center;
@@ -829,7 +830,7 @@
   border: 0;
   border-radius: 0;
   background: none;
-  color: var(--c-ink-45);
+  color: var(--c-ink-60);
   font: inherit;
   font-size: 12.5px;
   font-weight: 500;
