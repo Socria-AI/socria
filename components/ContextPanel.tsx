@@ -31,6 +31,7 @@ import {
 } from '@/lib/logos-attachments';
 import { IMAGE_ACCEPT, isImageFile, isPhotoByBytes, isTextFile, prepareImage, readTextFile, saysNothing } from '@/lib/logos-upload';
 import { NodeGlyph } from './NodeGlyph';
+import { CloseGlyph } from './logos5/L5Chrome';
 
 interface SourceInfo {
   kind: SourceKind;
@@ -315,10 +316,7 @@ export function ContextPanel({
           <span className="lg-x-label">{node.label}</span>
         </div>
         <button type="button" onClick={onClose} className="lg-x-close" aria-label="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <CloseGlyph />
         </button>
       </header>
 

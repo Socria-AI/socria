@@ -2,51 +2,74 @@
    The settings sheet a Project's folder opens in the chat rail.
 
    Scoped under .psheet: a CSS file imported from a component in Next.js is
-   global, and .field, .line, .add and .foot are names other surfaces use. */
+   global, and .field, .line, .add and .foot are names other surfaces use.
+
+   The app's one dialog: the page dimmed (--lg-dim), a 16px panel, the name in
+   the serif, the bare × at the top right; fields at 10px with the moss ring;
+   one filled control (Save), every other action a word, danger in tension.
+   The root carries .lg-tokens, so the dialog tokens are there on the chat page. */
 
 .psheet{position:fixed;inset:0;z-index:80;display:flex;align-items:flex-start;justify-content:center;
-  padding:clamp(24px,8vh,90px) 16px 24px;background:rgba(var(--ink-rgb, 31, 31, 31), .28);overflow-y:auto}
-.psheet .psheet-card{width:100%;max-width:520px;background:var(--paper);color:var(--ink);border-radius:16px;
-  box-shadow:0 24px 60px rgba(var(--ink-rgb, 31, 31, 31), .18);border:1px solid var(--ink-12)}
+  padding:clamp(24px,8vh,90px) 16px 24px;background:var(--lg-dim, rgba(var(--shadow-rgb, 32, 32, 27), .32));overflow-y:auto}
+.psheet .psheet-card{width:100%;max-width:520px;background:var(--paper);color:var(--ink);border-radius:var(--lg-r-dialog, 16px);
+  box-shadow:var(--l5-shadow-up, 0 18px 50px -20px rgba(var(--shadow-rgb, 35, 36, 31), .35));border:1px solid var(--ink-12)}
 .psheet .psheet-h{display:flex;align-items:center;justify-content:space-between;padding:14px 18px 0}
-.psheet .lbl{font-family:var(--sans);font-size:10px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700)}
-.psheet .x{font-size:22px;line-height:1;color:var(--ink-45);background:none;border:none;cursor:pointer;padding:2px 4px}
+.psheet .lbl{font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700)}
+/* the one close: a bare × (the shared CloseGlyph), 32 square, ink-60 to ink */
+.psheet .x{display:inline-grid;place-items:center;flex:none;width:32px;height:32px;margin:-6px -6px 0 0;padding:0;
+  border:0;border-radius:0;background:none;color:var(--ink-60);cursor:pointer;transition:color .2s}
 .psheet .x:hover{color:var(--ink)}
+.psheet .x svg{width:16px;height:16px}
+@media (pointer: coarse){.psheet .x{min-width:44px;min-height:44px}}
 .psheet .psheet-body{padding:6px 18px 18px}
 .psheet .field{margin:14px 0 0}
-.psheet .field > label{display:block;font-family:var(--sans);font-size:11px;font-weight:600;letter-spacing:.06em;
-  color:var(--ink-60);margin:0 0 6px}
+.psheet .field > label{display:block;font-family:var(--sans);font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:rgba(var(--ink-rgb, 31, 31, 31), .55);margin:0 0 8px}
 .psheet input,.psheet textarea{width:100%;box-sizing:border-box;font:inherit;font-size:14px;color:var(--ink);
-  background:var(--surface, #fff);border:1px solid var(--ink-16);border-radius:10px;padding:9px 11px}
-.psheet input:focus,.psheet textarea:focus{outline:2px solid var(--moss-200);border-color:var(--moss)}
-.psheet input.name{font-family:var(--serif);font-size:1.6rem;letter-spacing:-.015em;border-color:transparent;
+  background:transparent;border:1px solid var(--ink-16);border-radius:10px;padding:9px 11px}
+.psheet input{min-height:40px}
+.psheet input:focus,.psheet textarea:focus{outline:none;border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .14)}
+/* the name is the sheet's title: the serif, as a field */
+.psheet input.name{font-family:var(--serif);font-size:24px;letter-spacing:-.01em;border-color:transparent;
   background:transparent;padding:4px 6px;margin-left:-6px}
 .psheet input.name:hover{border-color:var(--ink-12)}
+.psheet input.name:focus{border-color:var(--moss)}
 .psheet textarea{min-height:78px;resize:vertical;line-height:1.5}
 .psheet .line{display:flex;align-items:center;gap:10px;padding:8px 2px;border-bottom:1px solid var(--ink-12);font-size:14px}
 .psheet .line .grow{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .psheet .line .meta{font-size:11.5px;color:var(--ink-45);white-space:nowrap}
-.psheet .lnk{font:inherit;font-size:12px;color:var(--ink-45);background:none;border:none;border-bottom:1px solid var(--ink-16);
+.psheet .lnk{font:inherit;font-size:12.5px;color:var(--ink-45);background:none;border:none;border-bottom:1px solid var(--ink-16);
   padding:0 0 1px;cursor:pointer}
 .psheet .lnk:hover{color:var(--ink);border-color:var(--ink)}
-.psheet .add{display:flex;gap:8px;margin:8px 0 0}
+.psheet .add{display:flex;align-items:center;gap:14px;margin:8px 0 0}
 .psheet .add input{flex:1}
-.psheet .pill{display:inline-flex;align-items:center;gap:.4em;font-family:var(--sans);font-size:12.5px;color:var(--ink-70);
-  background:var(--surface, #fff);border:1px solid var(--ink-16);border-radius:999px;padding:7px 13px;cursor:pointer;white-space:nowrap}
-.psheet .pill:hover{border-color:var(--ink);color:var(--ink)}
-.psheet .pill.go{background:var(--moss-700);border-color:var(--moss-700);color:#fff}
-.psheet .pill.danger{color:#a1321f;border-color:rgba(161,50,31,.35)}
-.psheet .pill.danger:hover{border-color:#a1321f}
-.psheet .pill:disabled{opacity:.5;cursor:default}
+/* every action but Save is a word */
+.psheet .pill{display:inline-flex;align-items:center;gap:.4em;min-height:32px;padding:0;box-sizing:border-box;
+  font-family:var(--sans);font-size:13.5px;font-weight:500;line-height:1.2;color:var(--ink-70);
+  background:none;border:0;border-radius:0;cursor:pointer;white-space:nowrap;transition:color .2s}
+.psheet .pill:hover:not(:disabled){color:var(--ink)}
+.psheet .pill:disabled{color:var(--ink-25);cursor:default}
+/* Save: the sheet's one filled control — ink, moss when reached for */
+.psheet .pill.go{height:40px;padding:0 18px;border-radius:999px;background:var(--ink);color:var(--paper);
+  transition:background-color .2s,transform .2s cubic-bezier(.16,1,.3,1)}
+.psheet .pill.go:hover:not(:disabled){background:var(--moss);color:var(--paper);transform:translateY(-2px)}
+.psheet .pill.go:disabled{background:transparent;color:rgba(var(--ink-rgb, 31, 31, 31), .55);box-shadow:inset 0 0 0 1px var(--ink-25);transform:none}
+.psheet .pill.danger{color:var(--tension)}
+.psheet .pill.danger:hover:not(:disabled){color:var(--tension);text-decoration:underline;text-underline-offset:3px}
+/* the confirm's own way on is the destructive one: filled, in tension */
+.psheet .confirm .pill.danger{height:40px;padding:0 18px;border-radius:999px;background:var(--tension);color:var(--paper);text-decoration:none}
+.psheet .confirm .pill.danger:hover:not(:disabled){filter:brightness(.94)}
+.psheet .confirm .pill.danger:disabled{background:transparent;color:rgba(var(--ink-rgb, 31, 31, 31), .55);box-shadow:inset 0 0 0 1px var(--ink-25)}
+@media (prefers-reduced-motion: reduce){.psheet .pill.go{transition:none}.psheet .pill.go:hover:not(:disabled){transform:none}}
 .psheet .pill.upload{margin:8px 0 0}
 .psheet .pill.upload input{display:none}
-.psheet .row-acts{display:flex;gap:8px;margin:8px 0 0}
+.psheet .row-acts{display:flex;align-items:center;gap:18px;margin:8px 0 0}
 .psheet .quiet{margin:16px 0 0;font-size:12.5px;line-height:1.55;color:var(--ink-60)}
 .psheet .quiet a{color:var(--moss-700)}
 .psheet .note{margin:10px 0 0;font-size:12.5px;color:var(--moss-700)}
-.psheet .err{margin:10px 0 0;font-size:12.5px;color:#a1321f}
-.psheet .foot{display:flex;gap:8px;margin:18px 0 0;padding:14px 0 0;border-top:1px solid var(--ink-12)}
-.psheet .confirm{margin:12px 0 0;padding:12px 14px;border:1px solid rgba(161,50,31,.3);border-radius:12px;background:var(--surface, #fff)}
+.psheet .err{margin:10px 0 0;font-size:12.5px;color:var(--tension)}
+.psheet .foot{display:flex;align-items:center;gap:22px;margin:18px 0 0;padding:14px 0 0;border-top:1px solid var(--ink-12)}
+.psheet .confirm{margin:12px 0 0;padding:12px 14px;border:1px solid rgba(var(--tension-rgb, 156, 91, 60), .3);border-radius:var(--lg-r-inner, 10px);background:rgba(var(--tension-rgb, 156, 91, 60), .04)}
 .psheet .confirm p{margin:0;font-size:13px;line-height:1.55;color:var(--ink-70)}
 .psheet .confirm .check{display:flex;gap:8px;align-items:flex-start;margin:10px 0 0;font-size:13px}
-.psheet .confirm .check input{width:auto}
+.psheet .confirm .check input{width:auto;min-height:0}

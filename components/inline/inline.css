@@ -5,24 +5,19 @@
  * hairline and radius as a code block or a table, the conversation's type,
  * words in the ink colours and never in a series colour.
  *
- * SERIES COLOURS are a validated set (the dataviz palette check: lightness
- * band, chroma floor, colour-blind separation between neighbours, the
- * normal-vision floor, contrast) — light on paper and on white; dark on the
- * Dark, One and Celestial grounds. A single series is the theme's primary.
- * More than one is named in a legend, and a pie names every slice with its
- * amount and share, so no colour is ever the only way to tell two apart.
+ * SERIES COLOURS are the one series palette, --ln-c1..6, declared once in
+ * components/display/data.css (InlineUI loads it) so a chart keeps its colours
+ * when "Open in Artifacts" draws it as a data display: a validated set, light
+ * on paper and on white, dark on the Dark, One and Celestial grounds. A single
+ * series is the theme's primary. More than one is named in a legend, and a pie
+ * names every slice with its amount and share, so no colour is ever the only
+ * way to tell two apart.
  *
  * Every rule is under `.logos-root` and one class deeper than the reply's own
  * prose rules (`.l5-prose p`, `.l5-prose table`), which would otherwise win.
  */
 
 .logos-root .ln {
-  --ln-c1: #3b6db4;
-  --ln-c2: #c9772b;
-  --ln-c3: #7a5bb5;
-  --ln-c4: #2f9a83;
-  --ln-c5: #b0476a;
-  --ln-c6: #8a8f2e;
   --ln-hair: var(--l5-hair, var(--lg-line, rgba(53, 70, 32, 0.14)));
   --ln-tint: var(--l5-tint-rgb, 53, 70, 32);
   --ln-ink: var(--lg-ink, #23241f);
@@ -44,12 +39,6 @@
   overflow-wrap: normal;
 }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .ln {
-  --ln-c1: #6496db;
-  --ln-c2: #c97f3c;
-  --ln-c3: #9a83d6;
-  --ln-c4: #33a28a;
-  --ln-c5: #ad4866;
-  --ln-c6: #969b35;
   background: rgba(var(--ln-tint), 0.03);
 }
 /* Celestial's ground is a sky: under a chart, a star is a point that is not
@@ -106,21 +95,21 @@ html[data-theme="night"] .logos-root .ln-options {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--ln-hair);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ln-ink-60);
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-45);
   font: inherit;
-  font-size: 12px;
+  font-size: 12.5px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
-  transition: color 0.15s, border-color 0.15s, background-color 0.15s;
+  transition: color 0.2s;
 }
 .logos-root .ln .ln-open:hover {
-  color: var(--ln-ink);
-  border-color: rgba(var(--ln-tint), 0.3);
-  background: rgba(var(--ln-tint), 0.05);
+  color: var(--c-ink);
 }
 .logos-root .ln :is(.ln-open, .ln-chip, summary, textarea, input[type="range"]):focus-visible,
 .logos-root .ln .ln-svg :is(rect, circle, path):focus-visible {
@@ -208,6 +197,9 @@ html[data-theme="night"] .logos-root .ln-options {
 .logos-root .ln :is(.ln-bar, .ln-dot).s1 { fill: var(--ln-c1); }
 .logos-root .ln :is(.ln-bar, .ln-dot).s2 { fill: var(--ln-c2); }
 .logos-root .ln :is(.ln-bar, .ln-dot).s3 { fill: var(--ln-c3); }
+.logos-root .ln :is(.ln-bar, .ln-dot).s4 { fill: var(--ln-c4); }
+.logos-root .ln :is(.ln-bar, .ln-dot).s5 { fill: var(--ln-c5); }
+.logos-root .ln :is(.ln-bar, .ln-dot).s6 { fill: var(--ln-c6); }
 .logos-root .ln .ln-line {
   fill: none;
   stroke-width: 2;
@@ -218,6 +210,9 @@ html[data-theme="night"] .logos-root .ln-options {
 .logos-root .ln .ln-line.s1 { stroke: var(--ln-c1); }
 .logos-root .ln .ln-line.s2 { stroke: var(--ln-c2); }
 .logos-root .ln .ln-line.s3 { stroke: var(--ln-c3); }
+.logos-root .ln .ln-line.s4 { stroke: var(--ln-c4); }
+.logos-root .ln .ln-line.s5 { stroke: var(--ln-c5); }
+.logos-root .ln .ln-line.s6 { stroke: var(--ln-c6); }
 /* a marker sits on its line with a ring of the ground around it */
 .logos-root .ln .ln-dot {
   stroke: var(--ln-ground);
@@ -284,9 +279,9 @@ html[data-theme="night"] .logos-root .ln-options {
 .logos-root .ln .ln-key.s1, .logos-root .ln .ln-key.k0 { background: var(--ln-c1); }
 .logos-root .ln .ln-key.s2, .logos-root .ln .ln-key.k1 { background: var(--ln-c2); }
 .logos-root .ln .ln-key.s3, .logos-root .ln .ln-key.k2 { background: var(--ln-c3); }
-.logos-root .ln .ln-key.k3 { background: var(--ln-c4); }
-.logos-root .ln .ln-key.k4 { background: var(--ln-c5); }
-.logos-root .ln .ln-key.k5 { background: var(--ln-c6); }
+.logos-root .ln .ln-key.s4, .logos-root .ln .ln-key.k3 { background: var(--ln-c4); }
+.logos-root .ln .ln-key.s5, .logos-root .ln .ln-key.k4 { background: var(--ln-c5); }
+.logos-root .ln .ln-key.s6, .logos-root .ln .ln-key.k5 { background: var(--ln-c6); }
 
 /* pie: a ring, a 2px gap of ground between slices, every slice named beside it */
 .logos-root .ln .ln-pie {
@@ -479,11 +474,11 @@ html[data-theme="night"] .logos-root .ln-options {
 }
 .logos-root .ln .ln-why {
   flex: none;
-  font-size: 11px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ln-ink-60);
+  color: var(--c-ink-45);
 }
 .logos-root .ln .ln-sum {
   flex: 1;
@@ -537,29 +532,33 @@ html[data-theme="night"] .logos-root .ln-options {
 .logos-root .ln .ln-chips {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 6px 20px;
 }
 .logos-root .ln .ln-chip {
-  min-height: 36px;
-  padding: 0 14px;
-  border: 1px solid rgba(var(--ln-tint), 0.22);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--ln-ink);
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink);
   font: inherit;
-  font-size: 14px;
+  font-size: 13.5px;
+  font-weight: 500;
   text-align: left;
   cursor: pointer;
-  transition: background-color 0.15s, border-color 0.15s, color 0.15s;
+  transition: color 0.2s, border-color 0.2s;
 }
 .logos-root .ln .ln-chip:hover:not(:disabled) {
-  border-color: var(--ln-primary);
-  background: rgba(var(--ln-tint), 0.06);
+  color: var(--c-moss);
+  border-bottom-color: var(--c-moss);
 }
 .logos-root .ln .ln-chip.is-on {
-  border-color: var(--ln-primary);
-  background: var(--ln-primary);
-  color: var(--l5-on-primary, var(--lg-paper, #f5f3eb));
+  background: none;
+  color: var(--c-moss);
+  border-bottom: 2px solid var(--c-moss);
 }
 .logos-root .ln-options.is-done .ln-chip:not(.is-on) {
   opacity: 0.5;
@@ -718,7 +717,7 @@ html[data-theme="night"] .logos-root .ln-options {
   margin: 8px 0 0;
 }
 .logos-root .ln .ln-link {
-  min-height: 26px;
+  min-height: 28px;
   padding: 0 9px;
   border: 1px dashed rgba(var(--ln-tint), 0.4);
   border-radius: 999px;
@@ -850,11 +849,11 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 }
 .logos-root .ln .ln-paths-h {
   margin: 0 0 7px;
-  font-size: 11.5px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ln-ink-70);
+  color: var(--c-ink-45);
 }
 .logos-root .ln .ln-paths-list {
   list-style: none;
@@ -962,7 +961,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 26px;
+  min-height: 28px;
   margin-top: 5px;
   padding: 0 9px 0 7px;
   border: 1px solid var(--ln-hair);
@@ -1091,7 +1090,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
     padding: 0 12px 10px 32px;
   }
   .logos-root .ln .ln-chip {
-    min-height: 40px;
+    min-height: 44px;
   }
   .logos-root .ln .ln-cards {
     grid-template-columns: 1fr;
@@ -1328,9 +1327,9 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   margin: 0 0 3px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ln-ink-70);
+  color: var(--c-ink-45);
 }
 .logos-root .ln .ln-q {
   margin: 0 0 9px;
@@ -1561,9 +1560,9 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   margin-right: 8px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ln-ink-60);
+  color: var(--c-ink-45);
 }
 .logos-root .ln .ln-eq.is-second .ln-eq-name { color: var(--ln-c2); }
 .logos-root .ln .ln-eq.is-third .ln-eq-name { color: var(--ln-c3); }
@@ -1700,7 +1699,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   border: 0;
   background: none;
   font: inherit;
-  font-size: 14.5px;
+  font-size: 15px;
   line-height: 1.45;
   color: var(--ln-ink);
   text-align: left;
@@ -1720,7 +1719,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   margin-top: 1px;
   border-radius: 50%;
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
   border: 1.5px solid currentColor;
 }
 .logos-root .ln .ln-mark.is-yes { color: var(--ln-primary); }
@@ -1742,8 +1741,11 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   color: var(--ln-ink-70);
 }
 .logos-root .ln .ln-doubt {
+  display: inline-flex;
+  align-items: center;
+  min-height: 28px;
   margin: 0 0 9px 30px;
-  padding: 3px 10px;
+  padding: 0 10px;
   border: 1px solid var(--ln-hair);
   border-radius: 999px;
   background: none;
@@ -1756,13 +1758,13 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 .logos-root .ln .ln-doubt.is-on {
   border-color: var(--lg-tension, #a14b2a);
   color: var(--lg-tension, #a14b2a);
-  background: rgba(161, 75, 42, 0.07);
+  background: color-mix(in srgb, var(--lg-tension, #a14b2a) 7%, transparent);
 }
-.logos-root .ln .ln-part.is-doubted .ln-part-text { text-decoration: underline wavy rgba(161, 75, 42, 0.55); text-underline-offset: 3px; }
+.logos-root .ln .ln-part.is-doubted .ln-part-text { text-decoration: underline wavy color-mix(in srgb, var(--lg-tension, #a14b2a) 55%, transparent); text-underline-offset: 3px; }
 @media (max-width: 560px) {
   .logos-root .ln .ln-claim-head { grid-template-columns: 1fr; }
   .logos-root .ln .ln-verdict-chip { justify-self: start; margin-top: 6px; }
-  .logos-root .ln .ln-part-row { font-size: 14px; }
+  .logos-root .ln .ln-part-row { font-size: 13.5px; }
 }
 @media (forced-colors: active) {
   .logos-root .ln :is(.ln-chord line, .ln-mv line, .ln-tan line) { stroke: CanvasText; }
@@ -1777,21 +1779,23 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   display: inline-flex;
   align-items: center;
   gap: 6px;
-  min-height: 32px;
-  padding: 4px 12px;
-  border: 1px solid var(--lg-line, rgba(0, 0, 0, 0.14));
-  border-radius: 999px;
-  background: transparent;
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
   font: inherit;
   font-size: 12.5px;
   font-weight: 500;
-  color: var(--lg-ink-60, #5d5d55);
+  color: var(--c-ink-45);
+  white-space: nowrap;
   cursor: pointer;
+  transition: color 0.2s;
 }
-.logos-root .ln-keepable > .ln-keep:hover { color: var(--lg-ink, #1f1f1b); border-color: var(--lg-ink-40, rgba(0, 0, 0, 0.3)); }
-.logos-root .ln-keepable > .ln-keep.is-kept { color: var(--lg-primary, #354620); border-color: currentColor; }
-.logos-root .ln-keepable > .ln-keep:focus-visible { outline: 2px solid var(--lg-primary, #354620); outline-offset: 2px; }
-@media (forced-colors: active) { .logos-root .ln-keepable > .ln-keep { border-color: ButtonText; } }
+.logos-root .ln-keepable > .ln-keep:hover { color: var(--c-ink); }
+.logos-root .ln-keepable > .ln-keep.is-kept { color: var(--c-moss); }
+.logos-root .ln-keepable > .ln-keep:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+@media (pointer: coarse) { .logos-root :is(.ln-keepable > .ln-keep, .ln .ln-open) { min-height: 44px; } }
 
 /* ── how the parts connect (diagram) ──────────────────────────────────
    The picture where there is room; the same parts as a list with
@@ -1866,11 +1870,11 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
   overflow: hidden;
 }
 .logos-root .ln .ln-dg-role {
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--ln-ink-70);
+  color: var(--c-ink-45);
 }
 /* the part each plays, by weight and line as well as its word — never colour alone */
 .logos-root .ln .ln-dg-node.is-underlying {
@@ -2048,7 +2052,7 @@ html[data-theme="night"] .logos-root .ln.ln-paths {
 .logos-root .ln .ln-bal-mark {
   flex: none;
   width: 14px;
-  font-weight: 700;
+  font-weight: 600;
   color: var(--ln-ink-60);
   text-align: center;
 }

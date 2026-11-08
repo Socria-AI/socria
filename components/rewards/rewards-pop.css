@@ -15,6 +15,12 @@
  * cream — a reward, not a sale. The plate carries its own colours, so it is
  * the same plate whichever theme it opens over.
  *
+ * Over the page it is the app's one dialog all the same: the page dimmed
+ * (--lg-dim, never blurred), the dialog radius (its top corners only as a
+ * bottom sheet), the floating shadow (--l5-shadow-up), the title at 32, the
+ * bare × at the top right. The scrim carries .lg-tokens, so those tokens are
+ * there on the chat page too.
+ *
  * Every animation here stops for anybody who has asked their system for less
  * motion; the drawings are complete without it.
  */
@@ -110,8 +116,7 @@
 }
 .rwp-back {
   position: absolute; inset: 0;
-  background: rgba(14, 20, 9, 0.52);
-  backdrop-filter: blur(3px); -webkit-backdrop-filter: blur(3px);
+  background: var(--lg-dim, rgba(var(--shadow-rgb, 32, 32, 27), 0.32));
   animation: rwpFade 0.2s ease both;
 }
 .rwp-sheet {
@@ -122,14 +127,14 @@
     radial-gradient(90% 70% at 50% 0%, rgba(240, 200, 102, 0.16), transparent 62%),
     radial-gradient(120% 90% at 70% 8%, #3d5726 0%, #2a3f1b 36%, #1d2c12 66%, #141f0c 100%);
   color: var(--rwp-cream);
-  border-radius: 14px 14px 0 0;
-  box-shadow: 0 -30px 80px -30px rgba(0, 0, 0, 0.7);
+  border-radius: var(--lg-r-dialog, 16px) var(--lg-r-dialog, 16px) 0 0;
+  box-shadow: var(--l5-shadow-up);
   text-align: center;
   animation: rwpUp 0.3s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .rwp-sheet::before {
   content: ''; position: absolute; inset: 9px; pointer-events: none;
-  border: 1px solid rgba(243, 236, 216, 0.14); border-radius: 8px 8px 0 0;
+  border: 1px solid rgba(243, 236, 216, 0.14); border-radius: 7px 7px 0 0;
 }
 .rwp-sheet::after {
   content: ''; position: absolute; inset: 0; pointer-events: none;
@@ -142,27 +147,29 @@
   .rwp-sheet {
     width: min(440px, 100%);
     padding: 22px 36px 28px;
-    border: 1px solid rgba(243, 236, 216, 0.22); border-radius: 3px;
-    box-shadow: 0 60px 140px -60px rgba(0, 0, 0, 0.85), 0 0 0 1px rgba(240, 200, 102, 0.06);
-    animation: rwpIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+    border: 1px solid rgba(243, 236, 216, 0.22); border-radius: var(--lg-r-dialog, 16px);
+    animation: rwpIn 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
-  .rwp-sheet::before { inset: 10px; border-radius: 0; }
+  /* the inner rule follows the outer corner, 10px in */
+  .rwp-sheet::before { inset: 10px; border-radius: 6px; }
 }
+/* the one close: a bare × (the shared CloseGlyph), 32 square — the plate's own ink, quiet to full */
 .rwp-x {
-  position: absolute; top: 14px; right: 14px; z-index: 2;
-  display: grid; place-items: center; width: 30px; height: 30px; padding: 0;
-  border: 0; border-radius: 50%; background: transparent; color: var(--rwp-cream-50); cursor: pointer;
+  position: absolute; top: 13px; right: 13px; z-index: 2;
+  display: grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  border: 0; border-radius: 0; background: none; color: var(--rwp-cream-70); cursor: pointer; transition: color 0.2s;
 }
-.rwp-x:hover { color: var(--rwp-cream); background: rgba(243, 236, 216, 0.08); }
+.rwp-x:hover { color: var(--rwp-cream); background: none; }
+@media (pointer: coarse) { .rwp-x, .rwp-card-x { min-width: 44px; min-height: 44px; } }
 
 .rwp-visual { display: block; width: 100%; max-width: 320px; height: auto; margin: 6px auto 8px; overflow: visible; }
 .rwp-eyebrow {
-  margin: 0 0 8px; font-size: 9.5px; font-weight: 600;
-  letter-spacing: 0.28em; text-transform: uppercase; color: var(--rwp-gold);
+  margin: 0 0 8px; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--rwp-gold);
 }
 .rwp-title {
   margin: 0 0 10px; font-family: var(--rwp-serif); font-weight: 400;
-  font-size: clamp(26px, 7vw, 32px); line-height: 1.08; letter-spacing: -0.015em; color: var(--rwp-cream);
+  font-size: 32px; line-height: 1.08; letter-spacing: -0.015em; color: var(--rwp-cream);
 }
 .rwp-title em {
   font-style: italic; color: transparent;
@@ -173,27 +180,28 @@
   padding: 0 0.04em;
 }
 .rwp-body { margin: 0 auto 14px; max-width: 34ch; font-size: 14px; line-height: 1.5; color: var(--rwp-cream-70); }
-.rwp-note { margin: 0 auto 12px; max-width: 38ch; font-size: 12.5px; line-height: 1.5; color: var(--rwp-cream-50); }
 .rwp-fine { margin: 10px auto 0; max-width: 40ch; font-size: 11.5px; line-height: 1.5; color: var(--rwp-cream-50); }
 
-/* the link and its copy */
+/* the link and its copy. The field and the way on take the controls standard's
+   shape (10px, 40 tall; a 40px pill at 13.5 / 500, lifting 2px); their gold is the
+   plate's own — ink on this ground would not be read, and moss would vanish into it. */
 .rwp-link { display: flex; gap: 8px; align-items: stretch; margin: 0 0 12px; }
 .rwp-link input {
-  flex: 1 1 auto; min-width: 0; padding: 0 12px; height: 40px;
+  flex: 1 1 auto; min-width: 0; padding: 0 12px; height: 40px; box-sizing: border-box;
   font: inherit; font-size: 13px; color: var(--rwp-cream);
-  background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(243, 236, 216, 0.2); border-radius: 999px;
+  background: rgba(0, 0, 0, 0.22); border: 1px solid rgba(243, 236, 216, 0.2); border-radius: 10px;
   text-overflow: ellipsis;
 }
 .rwp-link input:focus { outline: none; border-color: rgba(240, 200, 102, 0.6); box-shadow: 0 0 0 3px rgba(240, 200, 102, 0.14); }
 .rwp-go {
   flex: 0 0 auto; display: inline-flex; align-items: center; justify-content: center; gap: 6px;
   min-height: 40px; padding: 0 18px; border: 0; border-radius: 999px; cursor: pointer;
-  font: inherit; font-size: 13.5px; font-weight: 600; color: #1d2710;
+  font: inherit; font-size: 13.5px; font-weight: 500; color: #1d2710;
   background: linear-gradient(180deg, #FBE7A6, #E9B94F);
   box-shadow: 0 8px 22px -10px rgba(240, 200, 102, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.55);
-  transition: transform 0.15s, filter 0.15s;
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), filter 0.2s;
 }
-.rwp-go:hover { filter: brightness(1.05); transform: translateY(-1px); }
+.rwp-go:hover { filter: brightness(1.05); transform: translateY(-2px); }
 .rwp-go:active { transform: none; }
 .rwp-go:focus-visible, .rwp-not:focus-visible, .rwp-x:focus-visible { outline: 2px solid var(--rwp-gold); outline-offset: 2px; }
 .rwp-acts { display: flex; align-items: center; justify-content: center; gap: 18px; margin-top: 14px; flex-wrap: wrap; }
@@ -201,10 +209,6 @@
 .rwp-not:hover { color: var(--rwp-cream); }
 
 /* progress, said as a bar and a count */
-.rwp-meter { display: flex; align-items: center; justify-content: center; gap: 12px; margin: 0 0 10px; }
-.rwp-meter-bar { position: relative; width: 120px; height: 6px; border-radius: 999px; background: rgba(243, 236, 216, 0.14); overflow: hidden; }
-.rwp-meter-bar i { position: absolute; inset: 0 auto 0 0; border-radius: inherit; background: linear-gradient(90deg, #E3AE45, #FBE7A6); box-shadow: 0 0 10px rgba(240, 200, 102, 0.7); transition: width 0.6s cubic-bezier(0.16, 1, 0.3, 1); }
-.rwp-meter-n { font-size: 12.5px; color: var(--rwp-cream-70); font-variant-numeric: tabular-nums; }
 
 /* rewards stack: seven, then seven — drawn as the days they are */
 .rwp-stack {
@@ -257,7 +261,7 @@
 .rwp-seal { animation: rwpSeal 3.6s ease-in-out infinite; }
 .rwp-seal-rule { fill: none; stroke: rgba(29, 39, 16, 0.4); stroke-width: 0.8; stroke-dasharray: 1.5 1.5; }
 .rwp-seal-n { font-family: var(--rwp-serif); font-style: italic; font-size: 15px; text-anchor: middle; fill: #1d2710; }
-.rwp-seal-d { font-size: 5.5px; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; text-anchor: middle; fill: #1d2710; }
+.rwp-seal-d { font-size: 5.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; text-anchor: middle; fill: #1d2710; }
 .rwp-seal-ghost { fill: none; stroke: rgba(240, 200, 102, 0.35); stroke-width: 0.8; transform-box: fill-box; transform-origin: center; animation: rwbTurn 14s linear infinite; }
 .rwp-map.is-done .rwp-node.on .rwp-node-card { animation: rwpFlash 1.2s calc(0.6s + var(--i, 0) * 0.1s) ease-out both; }
 
@@ -305,12 +309,12 @@
   animation: rwpCardIn 0.28s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 .rwp-card-x {
-  position: absolute; top: 8px; right: 8px; display: grid; place-items: center;
-  width: 24px; height: 24px; padding: 0; border: 0; border-radius: 50%;
-  background: transparent; color: var(--rwp-cream-50); cursor: pointer;
+  position: absolute; top: 4px; right: 4px; display: grid; place-items: center;
+  width: 32px; height: 32px; padding: 0; border: 0; border-radius: 0;
+  background: none; color: var(--rwp-cream-70); cursor: pointer; transition: color 0.2s;
 }
-.rwp-card-x:hover { color: var(--rwp-cream); background: rgba(243, 236, 216, 0.08); }
-.rwp-card-eyebrow { margin: 0 0 5px; font-size: 9px; font-weight: 600; letter-spacing: 0.26em; text-transform: uppercase; color: var(--rwp-gold); }
+.rwp-card-x:hover { color: var(--rwp-cream); background: none; }
+.rwp-card-eyebrow { margin: 0 0 5px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--rwp-gold); }
 .rwp-card-title {
   margin: 0 22px 9px 0; font-family: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
   font-size: 18px; line-height: 1.18; color: var(--rwp-cream);
@@ -325,8 +329,8 @@
 .rwp-card-not { background: none; border: 0; padding: 4px 2px; font: inherit; font-size: 12px; color: var(--rwp-cream-70); cursor: pointer; }
 .rwp-card-not:hover { color: var(--rwp-cream); }
 .rwp-card-go {
-  display: inline-flex; align-items: center; gap: 5px; min-height: 30px; padding: 0 13px;
-  border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 12.5px; font-weight: 600; color: #1d2710;
+  display: inline-flex; align-items: center; gap: 5px; min-height: 32px; padding: 0 14px;
+  border: 0; border-radius: 999px; cursor: pointer; font: inherit; font-size: 13px; font-weight: 500; color: #1d2710;
   background: linear-gradient(180deg, #FBE7A6, #E9B94F);
   box-shadow: 0 6px 16px -8px rgba(240, 200, 102, 0.8), inset 0 1px 0 rgba(255, 255, 255, 0.5);
 }

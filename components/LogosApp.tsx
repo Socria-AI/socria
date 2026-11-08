@@ -207,7 +207,7 @@ import { effectSaid, linksOf, turnEffect } from '@/lib/logos5/linking';
 import { L5Message, L5Pending, type L5Effect } from './logos5/L5Message';
 import { depthAsked } from '@/lib/reply-layout';
 import { ModelArtifact } from './logos5/ModelTools';
-import { L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } from './logos5/L5Chrome';
+import { CloseGlyph, L5Header, L5LinkBar, L5Menu, L5Switch, MindButton, type L5MenuItem } from './logos5/L5Chrome';
 import { ArtifactsView, StudyBoard, StudyPractice, TopicInspector, type ArtifactItem } from './logos5/Study';
 import { StudyDesk, drawsInCard, type DeskItem } from './logos5/StudyDesk';
 import { L5Board, type BoardIdea } from './logos5/L5Board';
@@ -724,7 +724,7 @@ export function LogosApp({
   // Shown once, the first time someone gets through the gate.
   const [guideOpen, setGuideOpen] = useState(false);
   const [relevant, setRelevant] = useState<Set<string>>(new Set());
-  // the Draft Space and the Writing Space, open (components/write/WriteSpace.tsx)
+  // Write and its notes, open (components/write/WriteSpace.tsx)
   const writeRef = useRef<WriteSpaceHandle>(null);
   /** POINT & ASK on writing: words of the draft, or a card, asked about in the conversation */
   const [writeSel, setWriteSel] = useState<WriteSel | null>(null);
@@ -922,7 +922,7 @@ export function LogosApp({
           body: JSON.stringify({
             type: node.type,
             label: node.label,
-            note: `kept from a Thinking Map (${node.id})`,
+            note: `kept from a Logic Map (${node.id})`,
           }),
         });
         const j = await res.json().catch(() => null);
@@ -991,7 +991,7 @@ export function LogosApp({
       return next;
     });
   }, []);
-  // the document of the Draft Space and the Writing Space; a blank one until something is written
+  // Write's document; a blank one until something is written
   const storedWriteDoc = active?.draft?.doc;
   const writeDoc = useMemo<WriteDoc>(() => storedWriteDoc ?? emptyDoc(0), [storedWriteDoc]);
   const writeDocRef = useRef(writeDoc);
@@ -2972,7 +2972,7 @@ export function LogosApp({
     return () => clearTimeout(t);
   }, [changed, deltaNote]);
 
-  // ── the Draft Space and the Writing Space ──────────────────────────
+  // ── Write, and its notes ────────────────────────────────────────────
   // The document is handed here by the WriteSpace a moment after typing stops
   // (components/write/WriteSpace.tsx) and saved on a timer rather than per
   // handoff: a round trip per pause would be absurd, and losing a sentence
@@ -7518,7 +7518,7 @@ export function LogosApp({
             <span className="lg-annot-k">The model</span>
             <span className="lg-annot-t">{buildNote}</span>
             <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => setBuildNote(null)}>
-              ×
+              <CloseGlyph />
             </button>
           </p>
         )}
@@ -7527,7 +7527,7 @@ export function LogosApp({
             <span className="lg-annot-k">{found.kicker}</span>
             <span className="lg-annot-t">{found.text}</span>
             <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => dismissFound(found.id)}>
-              ×
+              <CloseGlyph />
             </button>
           </p>
         )}
@@ -7566,7 +7566,7 @@ export function LogosApp({
               </>
             )}
             <button type="button" className="lg-annot-x" aria-label="Dismiss" onClick={() => setFirstMapNote(false)}>
-              ×
+              <CloseGlyph />
             </button>
           </p>
         )}
@@ -8146,7 +8146,7 @@ export function LogosApp({
     return (
       <p className={`l5-meter${left === 0 ? ' is-out' : ''}`} role="note">
         {left === 0 ? `You’ve used all ${limit} free ${limit === 1 ? noun.one : noun.many} this month.` : `${left} of ${limit} free ${limit === 1 ? noun.one : noun.many} left this month.`}{' '}
-        <button type="button" className="l5-link" onClick={() => askOne(left === 0 ? boundaryNote(near) : undefined, left === 0)}>
+        <button type="button" className="l5-link is-go" onClick={() => askOne(left === 0 ? boundaryNote(near) : undefined, left === 0)}>
           Unlimited with Socria One
         </button>
       </p>
@@ -8782,13 +8782,13 @@ export function LogosApp({
         <p className="l5v-ingest" role="note">
           <span className="l5v-ingest-k">Added to Files</span>
           {brought.map((c) => (
-            <button key={c.id} type="button" className="l5-link" onClick={() => openContent(c.id)}>
+            <button key={c.id} type="button" className="l5-link is-go" onClick={() => openContent(c.id)}>
               {c.title}
             </button>
           ))}
           <button
             type="button"
-            className="l5-link is-quiet"
+            className="l5-link is-meta"
             onClick={() => {
               openContent(null);
               setStudyTab('content');
@@ -9915,11 +9915,12 @@ export function LogosApp({
                   {/* the shortcut said as it is in a line's header */}
                   {!narrow && <kbd className="l5-kbd l5-unibtn-k">{typeof navigator !== 'undefined' && /mac|iphone|ipad/i.test(navigator.platform || navigator.userAgent || '') ? '⌘K' : 'Ctrl K'}</kbd>}
                 </button>
+                {/* "Sessions", as a line's header calls the same list ("Sessions /") — one name for it */}
                 <button type="button" className={`l5-unibtn is-list${l5List ? ' is-on' : ''}`} onClick={toggleList} aria-pressed={l5List} title="Every conversation, as a list">
                   <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
                     <path d="M8 7h12M8 12h12M8 17h12M4 7h.01M4 12h.01M4 17h.01" />
                   </svg>
-                  <span className="l5-unibtn-l">List</span>
+                  <span className="l5-unibtn-l">Sessions</span>
                 </button>
               </>
             }
@@ -9986,7 +9987,7 @@ export function LogosApp({
       </div>
     </>
   );
-  /** The Draft Space and the Writing Space, for this line of thinking — as an artifact, or as the column beside the map. */
+  /** Write, for this line of thinking — as an artifact, or as the column beside the map. */
   const writeSpaceEl = (where: 'artifact' | 'column') =>
     activeId ? (
       <WriteSpace

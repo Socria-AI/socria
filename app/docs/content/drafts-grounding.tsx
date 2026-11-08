@@ -1,5 +1,5 @@
-// The Draft Space and the Writing Space, and grounding: the one surface built
-// for prose, and how outside material enters the thinking. Checkable against
+// Write and its notes, and grounding: the one surface built for prose, and
+// how outside material enters the thinking. Checkable against
 // lib/write/ (the document, the checks, the assist route's rules, Word in and
 // out), lib/logos-attachments.ts and lib/logos-sources.ts.
 
@@ -8,7 +8,7 @@ import { docPage } from '../registry';
 
 const page = docPage('drafts-grounding')!;
 const sections = [
-  { id: 'draft', heading: 'The Draft Space and the Writing Space' },
+  { id: 'draft', heading: 'Write, and its notes' },
   { id: 'board', heading: 'Putting an argument together' },
   { id: 'writing', heading: 'Writing' },
   { id: 'actions', heading: 'Asking Socria about your writing' },
@@ -23,13 +23,15 @@ const sections = [
 export function DraftsGrounding() {
   return (
     <Article page={page} sections={sections}>
-      <H2 id="draft">The Draft Space and the Writing Space</H2>
+      <H2 id="draft">Write, and its notes</H2>
       <p>
-        One document, two faces. The <strong>Draft Space</strong> is where an
-        argument is put together before it is prose; the{' '}
-        <strong>Writing Space</strong> is the page. On a wide screen they sit
-        side by side. In Logos 5 it is one of a line of thinking&rsquo;s
-        Artifacts, called Writing, and only when you want it: choose{' '}
+        One document: the page, and its <strong>notes</strong>, where an
+        argument is put together before it is prose. The notes open in a
+        panel beside the page (<strong>⋯ → Notes</strong>; a sheet on a
+        phone), and <strong>Turn into an outline</strong> carries them into
+        the writing, adding to it and never rewriting it. In Logos 5 the
+        document is one of a line of thinking&rsquo;s Artifacts, called
+        Writing, and only when you want it: choose{' '}
         <strong>Start writing</strong> (or <strong>+ Write</strong>) in
         Artifacts, or <strong>Write</strong> in the menu, and the page opens
         ready to type into.
@@ -136,8 +138,8 @@ export function DraftsGrounding() {
         As you write, the map softly lights the nodes the paragraph you are in
         touches — computed by plain word overlap, no model call, so it costs
         nothing and cannot editorialize. From any node&rsquo;s menu,{' '}
-        <strong>Add to draft</strong> makes it a card in your Draft Space,
-        linked back to the node it came from.
+        <strong>Add to notes</strong> makes it a card in your notes, linked
+        back to the node it came from.
       </p>
 
       <H2 id="grounding">Grounding nodes in your material</H2>

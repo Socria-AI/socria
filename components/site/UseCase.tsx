@@ -12,6 +12,7 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { LogosNode, type NodeStatus, type NodeType } from '@/components/ds';
+import { INERT } from './chrome';
 import { Ico } from './icons';
 
 export interface DemoCard {
@@ -40,10 +41,6 @@ export interface UseCaseProps {
 }
 
 type Phase = 'final' | 'armed' | 'run';
-
-// Not an inert attribute React 18 knows: the cards are a picture here, not
-// controls to tab through.
-const INERT = { inert: '' } as Record<string, string>;
 
 export function UseCase({ n, kind, wide, mapped, steps, caption }: UseCaseProps) {
   const box = useRef<HTMLDivElement>(null);
@@ -106,8 +103,8 @@ export function UseCase({ n, kind, wide, mapped, steps, caption }: UseCaseProps)
       </div>
       <div className="s-demo" ref={box}>
         <div className="s-demo-tabs" aria-hidden="true">
-          <span className="s-tab is-on">Chat</span>
-          <span className="s-tab is-mid">Content</span>
+          <span className="s-tab is-on">Conversation</span>
+          <span className="s-tab is-mid">Files</span>
           <span className="s-tab is-mid">Artifacts</span>
           <span className="s-tab">
             Logic Map<span className="s-count">{mapped}</span>

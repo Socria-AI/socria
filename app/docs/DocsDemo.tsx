@@ -568,7 +568,7 @@ export function DemoTwoSeats() {
       <section className="lg-panel" style={{ height: '100%' }}>
         <header className="lg-panel-head">
           <span className="lg-panel-title">
-            Thinking Map<em className="lg-panel-context">deciding</em>
+            Logic Map<em className="lg-panel-context">deciding</em>
           </span>
           <span className="lg-panel-state">7 nodes · 2 people</span>
         </header>

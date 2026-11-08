@@ -53,7 +53,7 @@ export default function AccountPage() {
         </Link>
         <div className="flex items-center gap-6 text-[13px] text-ink/60">
           <Link href="/chat" className="hover:text-ink transition-colors">
-            Chat
+            Open Socria
           </Link>
           <Link href="/blog" className="hover:text-ink transition-colors">
             Blog
@@ -64,7 +64,7 @@ export default function AccountPage() {
       <main className="flex-1 px-6 md:px-10 py-10 md:py-16">
         <div className="max-w-5xl mx-auto">
           <div className="mb-10 md:mb-14">
-            <p className="text-[11px] uppercase tracking-[0.22em] text-moss-700 mb-4 font-medium">
+            <p className="text-[10.5px] uppercase tracking-[0.18em] text-moss-700 mb-4 font-semibold">
               Your account
             </p>
             <h1 className="font-serif text-4xl md:text-5xl text-ink leading-tight">
@@ -72,8 +72,8 @@ export default function AccountPage() {
             </h1>
             <p className="mt-4 text-[15px] text-ink/60 max-w-xl leading-relaxed">
               Your profile, the addresses that reach you, how you sign in, and
-              what is guarding it. Your thought sessions live in your account
-              and follow you across every device you sign in on.
+              what is guarding it. Your conversations and Logic Maps live in
+              your account and follow you across every device you sign in on.
             </p>
             <p className="mt-4 text-[14px]">
               <Link

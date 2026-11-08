@@ -18,7 +18,8 @@
 .logos-root .lg-mic svg { width: 18px; height: 18px; }
 .logos-root .lg-mic:hover:not(:disabled) { color: var(--lg-primary); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07); }
 .logos-root .lg-mic:disabled { opacity: 0.35; cursor: default; }
-.logos-root .lg-mic.is-on { color: #fff; background: #a33a2c; }
+/* listening: the one red (the theme's tension colour), words on it in the ground's colour */
+.logos-root .lg-mic.is-on { color: var(--lg-paper); background: var(--lg-tension); }
 .logos-root .lg-mic.is-on svg { width: 14px; height: 14px; }
 /* Held, not clicked: the page must not scroll, select or open a long-press
    menu under a finger that is talking. */
@@ -70,8 +71,8 @@
   font-size: 12.5px;
   cursor: pointer;
 }
-.logos-root .lg-voice-btn.is-done { background: var(--lg-primary); border-color: var(--lg-primary); color: #fff; }
-.logos-root .lg-voice-err { font-style: normal; color: #8a3a2e; }
+.logos-root .lg-voice-btn.is-done { background: var(--lg-primary); border-color: var(--lg-primary); color: var(--lg-paper); }
+.logos-root .lg-voice-err { font-style: normal; color: var(--lg-tension); }
 .logos-root .lg-voice-link {
   border: none;
   background: none;

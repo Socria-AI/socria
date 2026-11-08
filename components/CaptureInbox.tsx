@@ -36,6 +36,7 @@ import {
 import { browserStorage } from '@/lib/logos4/resume';
 import { IMAGE_ACCEPT, prepareImage, isImageFile, isPhotoByBytes, saysNothing } from '@/lib/logos-upload';
 import type { Attachment } from '@/lib/logos-attachments';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './capture-inbox.css';
 
 type Where = 'account' | 'device';
@@ -286,8 +287,8 @@ export function CaptureInbox({
               Quick capture
               {list.length > 0 && <span>{list.length} kept</span>}
             </p>
-            <button type="button" className="qc-x" aria-label="Close the inbox" onClick={onClose}>
-              ×
+            <button type="button" className="qc-x l5-icon l5-close" aria-label="Close the inbox" onClick={onClose}>
+              <CloseGlyph />
             </button>
           </div>
           <h2 id="lg-cap-title" className="qc-title">

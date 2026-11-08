@@ -32,6 +32,7 @@ import { currentOf, type ThoughtObject } from '@/lib/objects';
 import { DIMS, EXPRS, MATERIALS, SHAPE_WORD, UNIT_M, massOf, measure, sceneMass, sizeOf, type LengthUnit, type SceneNode, type SceneState } from '@/lib/objects/scene';
 import { sceneTurn, type SceneTurn } from '@/lib/objects/scene-chat';
 import type { GizmoMode } from './SceneCanvas';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './scene3d.css';
 
 const SceneCanvas = dynamic(() => import('./SceneCanvas').then((m) => m.SceneCanvas), {
@@ -357,8 +358,8 @@ function Inspector({ node: n, scene, readOnly, guarded, edit, onDone }: { node: 
         <span className="s3-kind">
           {SHAPE_WORD[n.shape]} · {n.id}
         </span>
-        <button type="button" className="s3-x" aria-label="Close the inspector" onClick={onDone}>
-          ×
+        <button type="button" className="s3-x l5-icon l5-close" aria-label="Close the inspector" onClick={onDone}>
+          <CloseGlyph />
         </button>
       </header>
       <section>

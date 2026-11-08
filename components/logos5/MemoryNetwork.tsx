@@ -508,9 +508,8 @@ export function MemoryNetwork({
         <button type="button" aria-label="Zoom in" onClick={() => zoomAt(1.25)}>
           <Icon name="plus" />
         </button>
-        <i aria-hidden="true" />
         <button type="button" className="l5mm-fit" onClick={fit}>
-          Fit all
+          Fit
         </button>
       </div>
       {children}

@@ -1,6 +1,12 @@
 'use client';
 
-// The docs chrome: header, grouped sidebar, content column.
+// The docs chrome: the site's masthead and foot (components/site/chrome.tsx),
+// the grouped sidebar, and the content column.
+//
+// The masthead is the one every public page wears, with the section's name
+// beside the lock-up (Socria Docs), Docs marked as where you are, and the
+// sidebar's Contents button before it on a narrow screen, where the sidebar
+// folds away.
 //
 // A client component only because the sidebar highlights the current page,
 // which needs the pathname; the content itself arrives as children from the
@@ -9,37 +15,32 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
+import { DOCS, SiteFoot, SiteMast } from '@/components/site/chrome';
 import { DOC_GROUPS, DOC_PAGES } from './registry';
 
 export function DocsShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const [navOpen, setNavOpen] = useState(false);
-  const activeSlug =
-    pathname === '/docs' ? 'overview' : pathname.replace(/^\/docs\//, '').replace(/\/$/, '');
+  const front = pathname === '/docs';
+  const activeSlug = front ? 'overview' : pathname.replace(/^\/docs\//, '').replace(/\/$/, '');
 
   return (
     <div className="docs-root">
-      <header className="d-top">
-        <button
-          type="button"
-          className="d-nav-toggle"
-          aria-expanded={navOpen}
-          aria-controls="docs-nav"
-          onClick={() => setNavOpen((v) => !v)}
-        >
-          <span aria-hidden="true">☰</span> Contents
-        </button>
-        <Link href="/docs" className="d-word">
-          Socria <em>Docs</em>
-        </Link>
-        <nav className="d-top-links" aria-label="Site">
-          <Link href="/">Socria</Link>
-          <Link href="/explore">Explore</Link>
-          <Link href="/one">Socria One</Link>
-          <Link href="/charter">The Charter</Link>
-          <Link href="/chat" className="d-open">Open Socria</Link>
-        </nav>
-      </header>
+      <SiteMast
+        section={DOCS}
+        current={front ? DOCS.href : { section: DOCS.href }}
+        lead={
+          <button
+            type="button"
+            className="d-nav-toggle"
+            aria-expanded={navOpen}
+            aria-controls="docs-nav"
+            onClick={() => setNavOpen((v) => !v)}
+          >
+            <span aria-hidden="true">☰</span> <span className="d-nav-toggle-t">Contents</span>
+          </button>
+        }
+      />
 
       <div className="d-body">
         <nav id="docs-nav" className={`d-nav${navOpen ? ' is-open' : ''}`} aria-label="Documentation">
@@ -64,21 +65,7 @@ export function DocsShell({ children }: { children: React.ReactNode }) {
         <main className="d-main">{children}</main>
       </div>
 
-      <footer className="d-foot">
-        <span>Socria — Human-First AI</span>
-        <span className="d-foot-links">
-          <Link href="/docs/logos">What Logos is</Link>
-          <Link href="/one">Socria One</Link>
-          {/* A third copy of the site's links — see the note in
-              components/BlogShell.tsx. The docs are where somebody lands when
-              they are already confused, so leaving support out of this one was
-              the worst place to leave it out of. */}
-          <Link href="/support">Support</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-          <Link href="/security">Security</Link>
-        </span>
-      </footer>
+      <SiteFoot />
     </div>
   );
 }

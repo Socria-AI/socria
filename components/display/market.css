@@ -12,7 +12,7 @@
 .dsp .dsp-mk-ctl line { stroke: var(--dsp-tension); stroke-width: 1.4 !important; }
 .dsp .dsp-mk-ctl text { font-size: 11px; fill: var(--dsp-tension); }
 .dsp .dsp-mk-gap { stroke: var(--dsp-tension); stroke-width: 5 !important; opacity: 0.35; }
-.dsp .dsp-mk-practice { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--dsp-line); border-radius: 6px; }
+.dsp .dsp-mk-practice { margin-top: 10px; padding: 8px 10px; border: 1px solid var(--dsp-line); border-radius: var(--lg-r-inner, 10px); }
 .dsp .dsp-mk-practice.is-waiting { border-color: var(--dsp-24); }
 .dsp .dsp-mk-row, .dsp .dsp-mk-pair { display: inline-flex; flex-wrap: wrap; gap: 6px; align-items: center; }
 .dsp .dsp-mk-pair .dsp-num { width: 72px; }

@@ -18,6 +18,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import {
   ROLE_WORD, hostRefusalNote, showCode, type GrantRole, type HostRefusal, type ResourceType, type Role,
 } from '@/lib/share/roles';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './share.css';
 
 interface Member {
@@ -165,13 +166,15 @@ export function ShareDialog({
   const thing = type === 'project' ? 'this Project' : 'this conversation';
 
   return (
-    <div className="sh-scrim" role="dialog" aria-modal="true" aria-label={`Share ${title}`}>
+    <div className="sh-scrim lg-tokens" role="dialog" aria-modal="true" aria-label={`Share ${title}`}>
       <div className="sh-back" onClick={onClose} aria-hidden="true" />
       <div className="sh-sheet">
         <header className="sh-head">
           <span className="sh-kicker">{type === 'project' ? 'Share Project' : 'Share'}</span>
           <h2>“{title || 'Untitled'}”</h2>
-          <button className="sh-x" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Close">
+            <CloseGlyph />
+          </button>
         </header>
 
         {!state && !err && <p className="sh-quiet">Reading who can see {thing}…</p>}
@@ -188,7 +191,7 @@ export function ShareDialog({
                 {state.sharing && (
                   <a className="sh-btn ghost" href={state.sharing.open}>Open “{state.sharing.title || 'Untitled'}”</a>
                 )}
-                {onUpgrade && <button className="sh-btn" onClick={onUpgrade}>Upgrade to Socria One</button>}
+                {onUpgrade && <button className="sh-btn is-one" onClick={onUpgrade}>Upgrade to Socria One</button>}
               </div>
             )}
 
@@ -288,7 +291,7 @@ export function ShareDialog({
                 {linkUrl && (
                   <div className="sh-copyrow">
                     <input readOnly value={linkUrl} aria-label="Share link" onFocus={(e) => e.currentTarget.select()} />
-                    <button className="sh-btn" onClick={() => void copy(linkUrl, 'link')}>{copied === 'link' ? 'Copied' : 'Copy link'}</button>
+                    <button className="sh-btn ghost" onClick={() => void copy(linkUrl, 'link')}>{copied === 'link' ? 'Copied' : 'Copy link'}</button>
                   </div>
                 )}
                 {state.link && (
@@ -335,7 +338,7 @@ export function ShareDialog({
               {owner && (state.members.length > 0 || state.link || state.code) && (
                 <button className="sh-stop" disabled={busy} onClick={() => void act({ action: 'stop' })}>Stop sharing</button>
               )}
-              <button className="sh-btn" onClick={onClose}>Done</button>
+              <button className="sh-btn ghost" onClick={onClose}>Done</button>
             </footer>
           </>
         )}
@@ -400,13 +403,15 @@ export function JoinCodeDialog({ open, onClose }: { open: boolean; onClose: () =
   }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="sh-scrim" role="dialog" aria-modal="true" aria-label="Join with a code">
+    <div className="sh-scrim lg-tokens" role="dialog" aria-modal="true" aria-label="Join with a code">
       <div className="sh-back" onClick={onClose} aria-hidden="true" />
       <div className="sh-sheet sh-joinsheet">
         <header className="sh-head">
           <span className="sh-kicker">Shared with you</span>
           <h2>Join with a code</h2>
-          <button className="sh-x" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Close">
+            <CloseGlyph />
+          </button>
         </header>
         <p className="sh-quiet">The eight-character code someone gave you, for a Project, a conversation or a room.</p>
         <JoinWithCode onDone={onClose} autoFocus />

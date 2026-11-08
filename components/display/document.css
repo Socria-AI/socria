@@ -20,7 +20,7 @@
 .doc-pass { display: flex; flex-direction: column; }
 .doc-page {
   display: flex; align-items: baseline; gap: 8px; margin: 14px 0 4px; padding-bottom: 2px; border-bottom: 1px solid var(--dsp-line);
-  font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dsp-40);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40));
 }
 .doc-page:first-child { margin-top: 2px; }
 .doc-page em { font-style: italic; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 12px; font-family: var(--serif, Georgia, serif); }
@@ -53,7 +53,7 @@
 .doc-t-small { font-size: 12.5px; line-height: 1.45; color: var(--dsp-60); }
 .doc-t-cap { display: block; margin-bottom: 4px; font-size: 12.5px; font-style: italic; color: var(--dsp-60); }
 .doc-t-fig { display: flex; flex-direction: column; gap: 2px; padding: 6px 8px; border: 1px dashed var(--dsp-line); border-radius: 4px; }
-.doc-fig-kind { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); }
+.doc-fig-kind { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); }
 .doc-t-alt { font-size: 13px; color: var(--dsp-ink); }
 .doc-t-int { font-size: 12.5px; font-style: italic; color: var(--dsp-accent); }
 .doc-table-wrap { overflow-x: auto; max-width: 100%; }
@@ -98,7 +98,7 @@
 .doc-how { margin: 0; font-size: 12.5px; color: var(--dsp-60); }
 .doc-check-list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 6px; }
 .doc-check-list li { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; font-size: 13px; line-height: 1.45; }
-.doc-check-mark { font-weight: 700; text-align: center; color: var(--dsp-primary); }
+.doc-check-mark { font-weight: 600; text-align: center; color: var(--dsp-primary); }
 .doc-check-list li.is-warn .doc-check-mark { color: var(--dsp-tension); }
 .doc-check-list li.is-fail .doc-check-mark { color: var(--dsp-tension); }
 .doc-check-at { display: inline-flex; flex-wrap: wrap; gap: 4px; margin-left: 6px; }

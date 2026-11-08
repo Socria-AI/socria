@@ -39,7 +39,7 @@ export const ENV_SPEC: Spec[] = [
   {
     name: 'OPENAI_API_KEY',
     scope: 'server',
-    needed: 'every model call — chat, the Thinking Map, Explore, image reading',
+    needed: 'every model call — chat, the Logic Map, Explore, image reading',
     required: 'always',
     looksLike: /^sk-/,
   },

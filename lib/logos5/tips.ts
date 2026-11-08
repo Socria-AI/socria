@@ -112,7 +112,7 @@ export const TIPS: readonly Tip[] = [
     id: 'f.list',
     kind: 'feature',
     title: 'Every conversation, as a list',
-    body: 'List lays out all your conversations — starred first, then by subject — so any of them is one press away.',
+    body: 'Sessions lays out all your conversations — starred first, then by subject — so any of them is one press away.',
     anchor: '.l5-unibtn.is-list',
     action: 'list',
     when: (c) => c.where === 'home' && c.lines >= 2,

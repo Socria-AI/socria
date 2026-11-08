@@ -6,11 +6,13 @@
 // figure — and this page mounts exactly those exhibits. Restating sixty lines
 // of it under a new name would give two copies to keep in step, and the one
 // nobody edits is the one that rots. `exp-root` carries only what is new here.
+//
+// The masthead and the foot are the site's own (components/site/chrome.tsx).
 
 import type { Metadata } from 'next';
 import Link from 'next/link';
-import { Colophon } from '@/components/Colophon';
-import Image from 'next/image';
+import { Button } from '@/components/ds';
+import { SiteFoot, SiteMast, START } from '@/components/site/chrome';
 import { ExploreShowcase } from './ExploreShowcase';
 import { pageMetadata } from '@/lib/seo';
 
@@ -25,17 +27,7 @@ export const metadata: Metadata = pageMetadata({
 export default function ExplorePage() {
   return (
     <div className="docs-root exp-root">
-      <header className="exp-top">
-        <Link href="/" className="exp-home" aria-label="Socria home">
-          <Image src="/socria-logo.png" alt="" width={26} height={26} />
-          <span>Socria</span>
-        </Link>
-        <nav className="exp-nav">
-          <Link href="/docs/logos-5">Logos 5</Link>
-          <Link href="/docs">Docs</Link>
-          <Link href="/chat">Open Socria</Link>
-        </nav>
-      </header>
+      <SiteMast />
 
       <main className="exp-main">
         <div className="exp-lede">
@@ -61,9 +53,9 @@ export default function ExplorePage() {
             the one you have comes with you.
           </p>
           <div className="exp-end-actions">
-            <Link className="exp-go" href="/chat?model=logos">
-              Open Logos <span aria-hidden="true">→</span>
-            </Link>
+            <Button as="a" href={START} variant="primary" size="md" arrow>
+              Start a conversation
+            </Button>
             <Link className="exp-quiet" href="/docs">
               Read the docs
             </Link>
@@ -71,9 +63,7 @@ export default function ExplorePage() {
         </section>
       </main>
 
-      <footer className="exp-foot">
-        <Colophon />
-      </footer>
+      <SiteFoot />
     </div>
   );
 }

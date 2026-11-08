@@ -22,6 +22,7 @@ import { MAKE_CHOICES, type MakeChoice } from '@/lib/logos5/make';
 import { templateChoice, type ArtifactTemplate } from '@/lib/logos5/templates';
 import { create, EMPTY_SPACE, type ThoughtObject } from '@/lib/objects';
 import { removeTemplateHere, useTemplates } from './useTemplates';
+import { CloseGlyph } from './L5Chrome';
 import './make-gallery.css';
 
 /** React 18 has no typed `inert`: a picture of the figure, not a second copy to tab through. */
@@ -96,7 +97,7 @@ const MakeCard = memo(function MakeCard({ c, on, onPick, template }: { c: MakeCh
       </button>
       {template && (
         <button type="button" className="mkg-remove" aria-label={`Remove the template “${template.name}”`} title="Remove this template" onClick={() => removeTemplateHere(template.id)}>
-          ×
+          <CloseGlyph />
         </button>
       )}
     </li>

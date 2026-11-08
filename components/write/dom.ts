@@ -1,6 +1,6 @@
 // components/write/dom.ts — the page's DOM and the document model, kept in step.
 //
-// The Writing Space is one contentEditable page whose children are the
+// Write is one contentEditable page whose children are the
 // document's blocks, one element each, tagged with the block's id. The model
 // is the truth; the DOM is drawn from it, and read back from it only where the
 // browser itself typed (a character, a deletion inside one block, a spelling

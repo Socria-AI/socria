@@ -37,6 +37,7 @@ import {
 } from '@/lib/rewards/popup-rule';
 import { OPEN_REWARDS_POPUP, pentagon, rewardsSetupPending } from './RewardsBadges';
 import { DONE_SEEN_KEY, readFlag, useRewards, writeFlag, type RewardsView } from './useRewards';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './rewards-pop.css';
 
 /** This browser's memory of the popups (lib/rewards/popup-rule.ts). Swept with everything else on sign-out. */
@@ -202,13 +203,11 @@ function SetupPending({ onClose }: { onClose: () => void }) {
     return () => window.removeEventListener('keydown', onKey);
   }, [onClose]);
   return (
-    <div className="rwp-scrim" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
+    <div className="rwp-scrim lg-tokens" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
       <div className="rwp-back" onClick={onClose} aria-hidden="true" />
       <div className="rwp-sheet is-give">
         <button type="button" className="rwp-x" onClick={onClose} aria-label="Close">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          <CloseGlyph />
         </button>
         <p className="rwp-eyebrow">Socria Rewards · Give 7, Get 7</p>
         <h2 className="rwp-title" id={`${id}-t`}>
@@ -259,13 +258,11 @@ function Popup({
   };
 
   return (
-    <div className="rwp-scrim" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
+    <div className="rwp-scrim lg-tokens" role="dialog" aria-modal="true" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
       <div className="rwp-back" onClick={() => onClose('closed')} aria-hidden="true" />
       <div className={`rwp-sheet is-${kind}`}>
         <button type="button" className="rwp-x" onClick={() => onClose('closed')} aria-label="Close">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" aria-hidden="true">
-            <path d="M18 6 6 18M6 6l12 12" />
-          </svg>
+          <CloseGlyph />
         </button>
         {kind === 'give' ? (
           <Give view={view} limits={limits} id={id} goRef={goRef} onClose={onClose} onAct={onAct} />
@@ -394,9 +391,7 @@ function ChallengeCard({
   return (
     <div className="rwp-card" role="dialog" aria-labelledby={`${id}-t`} aria-describedby={`${id}-b`}>
       <button type="button" className="rwp-card-x" onClick={() => onClose('closed')} aria-label="Close">
-        <svg viewBox="0 0 24 24" width="13" height="13" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
-          <path d="M18 6 6 18M6 6l12 12" />
-        </svg>
+        <CloseGlyph />
       </button>
       <p className="rwp-card-eyebrow">The 5-Node Challenge</p>
       <p id={`${id}-t`} className="rwp-card-title">

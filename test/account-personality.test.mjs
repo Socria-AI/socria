@@ -75,7 +75,8 @@ console.log('\n=== Sign out, always in view ===');
 {
   const sheet = read('components/account/AccountSheet.tsx');
   const foot = sheet.slice(sheet.indexOf('<div className="footbar">'));
-  ok('in the footbar, beside Done', /className="link-act out"[\s\S]*Sign out[\s\S]*Done/.test(foot));
+  // One close (the controls standard): the bare × in the masthead, which never scrolls either — so no "Done" beside Sign out
+  ok('in the footbar; the sheet closes by the × at the top, not a second Done', /className="link-act out"[\s\S]*Sign out/.test(foot) && !/>\s*Done\s*</.test(foot) && /<L5Close label="Close" onClose=\{onClose\} \/>/.test(sheet));
   ok('  for somebody signed in', /\{user && \(\s*<button/.test(foot));
   ok('  clearing this browser’s Socria data first, then home', /clearSocriaLocalData\(\);\s*void signOut\(\{ redirectUrl: '\/' \}\);/.test(foot));
   ok('one Sign out in the sheet, not two', (sheet.match(/>\s*Sign out\s*</g) ?? []).length + (sheet.match(/<span className="t">Sign out<\/span>/g) ?? []).length === 1);

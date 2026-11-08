@@ -33,6 +33,9 @@ import { checkTyped, compileOver, compileOverT, curveFeatures, fitWindow, fitWin
 import { DIAGRAM_ROLE_SAID, diagramColumns, diagramFigure, linksOf, treeRows } from '@/lib/inline-diagram';
 import { TeX } from '@/components/TeX';
 import { copyText } from '@/lib/copy-text';
+// the one series palette (--ln-c1..6) is declared in the data display's sheet, so a chart here and
+// the same chart opened in Artifacts (components/display/DataFigure.tsx) draw their series alike
+import '@/components/display/data.css';
 import './inline.css';
 
 export interface InlineHost {

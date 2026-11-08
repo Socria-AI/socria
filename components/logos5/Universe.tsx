@@ -771,9 +771,9 @@ export function UniverseView({
 
   // ── the list column: every conversation, by subject ──
   const contentsEl = contents ? (
-    <aside className="l5c" aria-label="Contents">
+    <aside className="l5c" aria-label="Sessions">
       <div className="l5c-head">
-        <span className="l5c-k">Contents</span>
+        <span className="l5c-k">Sessions</span>
         <h2>Your Universal Map</h2>
         <p>
           {visible.length} {visible.length === 1 ? 'conversation' : 'conversations'}

@@ -103,7 +103,7 @@
   color: color-mix(in srgb, var(--lg-ink) 66%, transparent);
 }
 .logos-root .l5-prose.is-reply .socria-sub-sep {
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 
 /* the line still being written, inside the list or table it belongs to */
@@ -298,7 +298,7 @@
   background:
     linear-gradient(currentColor, currentColor) center / 11px 1.5px no-repeat,
     linear-gradient(currentColor, currentColor) center / 1.5px 11px no-repeat;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5-prose.is-reply .socria-fold[open] > .socria-fold-sum::after {
   background: linear-gradient(currentColor, currentColor) center / 11px 1.5px no-repeat;
@@ -308,7 +308,7 @@
   color: var(--lg-primary);
 }
 .logos-root .l5-prose.is-reply .socria-fold-sum:focus-visible {
-  outline: 2px solid var(--lg-primary);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 /* open, the first words are the words: no need to show them twice */

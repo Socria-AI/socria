@@ -6,8 +6,7 @@
 // The words are the Charter's and are not edited here. The PDF and this page
 // say the same thing; a change to one is a change to both.
 
-import { Button } from '@/components/ds';
-import { CHARTER_PDF, HOME, ONE, PRIVACY, SiteFoot, SiteMast, SitePage, START, TERMS } from './chrome';
+import { CHARTER, CHARTER_PDF, SiteA, SiteFoot, SiteMast, SitePage, navWithout } from './chrome';
 
 /** The Charter's paragraphs, in order. `No.` stands alone, as it does in the text. */
 export const CHARTER_TEXT: readonly string[] = [
@@ -28,19 +27,13 @@ export const CHARTER_TEXT: readonly string[] = [
 export function Charter() {
   return (
     <SitePage>
-      <SiteMast
-        links={[HOME, ONE, { href: CHARTER_PDF, label: 'Download the PDF', download: true }]}
-        go={
-          <Button as="a" href={START} variant="primary" size="md">
-            Start a conversation
-          </Button>
-        }
-      />
+      <SiteMast links={navWithout(CHARTER.href)} />
       <main>
         <article className="s-sec s-charter" aria-labelledby="s-charter-h">
           <div className="s-label s-charter-run">
             <span>The Socria Charter</span>
             <span>Public · MMXXVI</span>
+            <SiteA l={{ href: CHARTER_PDF, label: 'Download the PDF', download: true }} />
           </div>
           <p className="s-label s-charter-eb">The founding constitution of Socria</p>
           <h1 id="s-charter-h">The Socria Charter</h1>
@@ -58,12 +51,9 @@ export function Charter() {
             <p>The machines work for us.</p>
             <p>Not the other way around.</p>
           </div>
-
-          <SiteFoot
-            links={[PRIVACY, TERMS, { href: CHARTER_PDF, label: 'Download the PDF →', download: true, className: 'is-pdf' }]}
-          />
         </article>
       </main>
+      <SiteFoot middle={<SiteA l={{ href: CHARTER_PDF, label: 'Download the PDF →', download: true, className: 'is-go' }} />} />
     </SitePage>
   );
 }

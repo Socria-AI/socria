@@ -22,6 +22,7 @@ import {
   type RegionId,
 } from '@/lib/logos5/memoryAtlas';
 import { whereFrom } from '@/lib/mind/types';
+import { L5Close } from './L5Chrome';
 
 export type Decision = 'confirm' | 'reject' | 'forget' | 'supersede';
 
@@ -435,9 +436,7 @@ export function Inspector({
         <span className="l5mm-dot" />
         {m.type} · {REGION[m.region].name}
       </span>
-      <button type="button" className="l5mm-x" aria-label="Close" onClick={onClose}>
-        <Icon name="x" />
-      </button>
+      <L5Close className="l5mm-x" label="Close" onClose={onClose} />
     </div>
   );
   return (

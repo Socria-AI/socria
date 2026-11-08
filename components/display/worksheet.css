@@ -18,4 +18,4 @@
 .dsp .dsp-ws-checks li.is-fail { border-left-color: var(--dsp-tension); }
 .dsp .dsp-ws-checks li.is-ok { border-left-color: var(--dsp-primary); }
 .dsp .dsp-ws-checks li.is-unchecked { border-left-style: dashed; }
-.dsp .dsp-ws-mark { font-size: 10px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); margin-right: 6px; }
+.dsp .dsp-ws-mark { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); margin-right: 6px; }

@@ -1,7 +1,7 @@
 'use client';
 // components/mind/MindGraphView.tsx
 //
-// The Mind Graph, drawn and inspectable.
+// What Socria remembers (the memory graph), drawn and inspectable.
 //
 // NOT A SEPARATE REPRESENTATION. The nodes and edges here are the rows from
 // mind_nodes and mind_edges, unchanged. That equivalence is the point of the
@@ -45,6 +45,7 @@ import { query } from '@/lib/workspace/portable';
 import type { MindGraph } from '@/lib/mind/types';
 import { MindAtlas } from './MindAtlas';
 import { MindShare } from '@/components/share/MindShare';
+import { L5Close } from '@/components/logos5/L5Chrome';
 import './mind-graph.css';
 
 interface Provenance {
@@ -625,7 +626,7 @@ function Panel({
           <span className="ty">{node.type}{node.private && ' · private'}</span>
           <h2>{node.label}</h2>
         </div>
-        <button className="x" onClick={onClose} aria-label="Close details">×</button>
+        <L5Close className="x" label="Close details" onClose={onClose} />
       </div>
 
       <div className="pscroll">
@@ -963,7 +964,7 @@ export function MindGraphView() {
 
   if (loading) {
     return (
-      <div className="mem-root">
+      <div className="mem-root lg-tokens">
         {head('What Socria remembers.')}
         <div className="empty" aria-live="polite">
           <p style={{ marginTop: 0 }}>Reading what it has written down…</p>
@@ -975,7 +976,7 @@ export function MindGraphView() {
 
   if (err) {
     return (
-      <div className="mem-root">
+      <div className="mem-root lg-tokens">
         {head('Memory could not be read.')}
         <div className="empty fault"><p role="alert">{err}</p></div>
       </div>
@@ -988,7 +989,7 @@ export function MindGraphView() {
   // able to store one.
   if (storage) {
     return (
-      <div className="mem-root">
+      <div className="mem-root lg-tokens">
         {head('Memory is not running here.')}
         <div className="empty fault">
           <p>
@@ -1014,7 +1015,7 @@ export function MindGraphView() {
 
   if (!nodes.length && !pending.length && !sources.length) {
     return (
-      <div className="mem-root">
+      <div className="mem-root lg-tokens">
         {head('Nothing yet.')}
         <div className="empty">
           <p>
@@ -1047,7 +1048,7 @@ export function MindGraphView() {
   }
 
   return (
-    <div className="mem-root">
+    <div className="mem-root lg-tokens">
       <div className="mem-head">
         <div className="mem-top">
           <div>

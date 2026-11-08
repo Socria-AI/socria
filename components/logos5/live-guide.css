@@ -63,8 +63,8 @@
   max-height: calc(100vh - 32px);
   overflow-y: auto;
   padding: 20px 26px 22px;
-  border-radius: 16px;
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1), 0 40px 80px -36px rgba(0, 0, 0, 0.75);
+  border-radius: var(--lg-r-dialog, 16px);
+  box-shadow: var(--l5-shadow-up);
   animation: lg5-rise 0.42s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
 .lg5-intro-art { display: block; width: 100%; max-width: 300px; height: auto; margin: 0 auto 6px; overflow: visible; }
@@ -248,11 +248,11 @@
 .lg5-tools { display: flex; gap: 2px; margin-right: -6px; }
 .lg5-task { margin: 10px 0 2px; }
 
-.lg5-ctl { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 10px; background: none; color: var(--lg5-ink-2); cursor: pointer; transition: background-color 0.2s, color 0.2s; }
-.lg5-ctl:hover:not(:disabled) { background: rgba(var(--ink-rgb, 35, 36, 31), 0.06); color: var(--lg5-ink); }
+.lg5-ctl { display: inline-flex; align-items: center; justify-content: center; width: 40px; height: 40px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--lg5-ink-2); cursor: pointer; transition: color 0.2s; }
+.lg5-ctl:hover:not(:disabled) { background: none; color: var(--lg5-ink); }
 .lg5-ctl:disabled { opacity: 0.3; cursor: default; }
-.lg5-ctl:focus-visible { outline: 2px solid var(--lg5-moss); outline-offset: 1px; }
-.lg5-ctl.is-on { color: var(--lg5-ink); background: rgba(var(--moss-rgb, 53, 70, 32), 0.12); }
+.lg5-ctl:focus-visible { outline: 2px solid var(--lg5-moss); outline-offset: 2px; }
+.lg5-ctl.is-on { color: var(--lg5-moss); background: none; }
 
 .lg5-steps { list-style: none; margin: 4px 0 0; padding: 0; }
 .lg5-steps > li { display: grid; grid-template-columns: 26px 1fr; gap: 12px; padding: 8px 0; }
@@ -265,22 +265,22 @@
 .lg5-say-sm { margin: 3px 0 0; font-size: 15.5px; line-height: 1.4; color: var(--lg5-ink-2); }
 .is-later .lg5-say-sm { color: var(--lg5-ink-3); }
 .lg5-saw-sm { margin: 3px 0 0; font-family: var(--lg5-serif); font-style: italic; font-size: 15.5px; line-height: 1.35; color: var(--lg5-moss-ink); }
-.lg5-hint { margin: 10px 0 0; font-size: 13.5px; font-weight: 600; line-height: 1.4; color: #9a5a14; }
+.lg5-hint { margin: 10px 0 0; font-size: 13.5px; font-weight: 600; line-height: 1.4; color: var(--c-gold-ink, #9a5a14); }
 .lg5-hint.is-adjust { color: var(--lg5-moss-ink); }
 .lg5-saw { margin: 12px 0 0; padding: 8px 12px 9px; border-left: 2px solid var(--lg5-cue-deep); border-radius: 0 6px 6px 0; background: rgba(246, 191, 63, 0.12); font-family: var(--lg5-serif); font-style: italic; font-size: 18px; line-height: 1.3; color: var(--lg5-ink); }
 .lg5-saw .l5-label { display: block; margin-bottom: 3px; font-family: var(--l5-sans, var(--sans)); font-style: normal; }
 .lg5-confirm { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 8px; margin: 12px 0 0; font-size: 13.5px; line-height: 1.45; color: var(--lg5-ink-2); }
 .lg5-unsure { display: flex; align-items: flex-start; gap: 9px; margin: 12px 0 0; font-size: 13.5px; font-style: italic; line-height: 1.45; color: var(--lg5-ink-2); }
-.lg5-unsure > span { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; margin-top: 1px; border: 1.5px solid currentColor; border-radius: 999px; box-sizing: border-box; font-size: 10.5px; font-style: normal; font-weight: 700; }
-.lg5-caution { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: rgba(246, 191, 63, 0.18); font-size: 13.5px; line-height: 1.45; color: #6f5f2c; }
-.lg5-caution b { font-weight: 600; color: #5a4b1d; }
+.lg5-unsure > span { display: inline-flex; flex: none; align-items: center; justify-content: center; width: 18px; height: 18px; margin-top: 1px; border: 1.5px solid currentColor; border-radius: 999px; box-sizing: border-box; font-size: 10.5px; font-style: normal; font-weight: 600; }
+.lg5-caution { margin: 10px 0 0; padding: 8px 12px; border-radius: 10px; background: rgba(246, 191, 63, 0.18); font-size: 13.5px; line-height: 1.45; color: var(--c-gold-ink, #6f5f2c); }
+.lg5-caution b { font-weight: 600; color: var(--c-gold-ink, #5a4b1d); }
 .lg5-done-note { display: flex; align-items: center; gap: 6px; margin: 8px 0 0; font-family: var(--lg5-serif); font-style: italic; font-size: 15.5px; line-height: 1.3; color: var(--lg5-moss-ink); animation: lg5-fade 0.4s ease-out both; }
 .lg5 .lg5-tick { flex: none; fill: none; stroke: var(--lg5-moss); stroke-width: 2.6; stroke-linecap: round; stroke-linejoin: round; }
 .lg5 .lg5-tick path { stroke-dasharray: 1; stroke-dashoffset: 1; animation: lg5-draw 0.5s ease-out 0.1s forwards; }
 
 /* the movement, drawn in the card when the picture cannot show it */
 .lg5-how { display: flex; align-items: center; gap: 14px; margin: 14px 0 0; }
-.lg5-how-card { flex: none; width: 96px; height: 96px; padding: 4px; box-sizing: border-box; border-radius: 10px; background: var(--lg5-card); box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.06), 0 12px 24px -14px rgba(var(--shadow-rgb, 35, 36, 31), 0.5); rotate: -2deg; }
+.lg5-how-card { flex: none; width: 96px; height: 96px; padding: 4px; box-sizing: border-box; border-radius: 10px; background: var(--lg5-card); box-shadow: var(--l5-shadow); rotate: -2deg; }
 .lg5-how-card .lg5-sk { width: 100%; height: 100%; }
 .lg5-how figcaption { font-family: var(--lg5-serif); font-style: italic; font-size: 18px; line-height: 1.25; color: var(--lg5-ink); }
 
@@ -315,7 +315,7 @@
 .lg5-input:focus-visible { outline: 2px solid var(--lg5-moss); outline-offset: 1px; }
 .lg5-input.has-mic { padding-right: 100px; }
 .lg5-mic { position: absolute; right: 50px; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 0; border-radius: 999px; background: rgba(var(--ink-rgb, 35, 36, 31), 0.06); color: var(--lg5-ink); cursor: pointer; touch-action: none; user-select: none; }
-.lg5-mic.is-on { background: var(--lg5-moss); color: #fff; animation: lg5-beat-moss 1.4s ease-out infinite; }
+.lg5-mic.is-on { background: var(--lg5-moss); color: var(--lg5-paper); animation: lg5-beat-moss 1.4s ease-out infinite; }
 /* the send button sits in the field, round and ink, as the chatbox's does */
 .lg5-send { position: absolute; right: 5px; display: inline-flex; align-items: center; justify-content: center; width: 38px; height: 38px; border: 0; border-radius: 999px; background: var(--lg5-ink); color: var(--lg5-paper); cursor: pointer; transition: background-color 0.2s, transform 0.2s; }
 .lg5-send:hover:not(:disabled) { background: var(--lg5-moss); transform: translateX(2px); }

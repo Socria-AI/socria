@@ -1,155 +1,49 @@
 'use client';
+// components/BlogShell.tsx — the blog's masthead: the site's own
+// (components/site/chrome.tsx SiteMast), with Blog marked as where you are
+// and the way in beside the action.
+//
+// The blog is the one public surface that carries a way in, so it keeps it:
+// "Sign in" as a word in the bar, or — signed in — the account, which on a
+// reading surface links rather than opening a sheet (see AccountControl).
+// The foot is the site's own as well (SiteFoot), which the pages render.
+//
+// A client module because Clerk's loading/loaded halves are client
+// components; on the server the "loading" half is what renders, so the way
+// in is in the page before Clerk has answered.
 
-import { AccountControl } from '@/components/account/AccountControl';
-import { useEffect, useState } from 'react';
 import Link from 'next/link';
-import { usePathname } from 'next/navigation';
-import {
-  SignedIn,
-  SignedOut,
-  ClerkLoading,
-  ClerkLoaded,
-} from '@clerk/nextjs';
+import { ClerkLoaded, ClerkLoading, SignedIn, SignedOut } from '@clerk/nextjs';
+import { AccountControl } from '@/components/account/AccountControl';
+import { BLOG, SiteMast } from '@/components/site/chrome';
 
-export function BlogNav() {
-  const pathname = usePathname();
-  const [scrolled, setScrolled] = useState(false);
-
-  useEffect(() => {
-    const onScroll = () =>
-      setScrolled((window.scrollY || document.documentElement.scrollTop) > 8);
-    onScroll();
-    window.addEventListener('scroll', onScroll, { passive: true });
-    return () => window.removeEventListener('scroll', onScroll);
-  }, []);
-
-  const onBlog = pathname?.startsWith('/blog');
-
+function SignInWord() {
   return (
-    <header className={`nav blognav${scrolled ? ' scrolled' : ''}`}>
-      <div className="nav-inner">
-        <Link className="brand" href="/" aria-label="Socria home">
-          <img src="/socria-logo.png" alt="" />
-          <span className="name">Socria</span>
-        </Link>
-        <div className="nav-right">
-          <nav className="nav-links">
-            <Link href="/#logos">What&rsquo;s new</Link>
-            <Link href="/blog" className={onBlog ? 'cur' : undefined}>
-              Blog
-            </Link>
-          </nav>
-          <ClerkLoading>
-            <Link href="/sign-in" className="nav-signin">
-              Sign in
-            </Link>
-          </ClerkLoading>
-          <ClerkLoaded>
-            <SignedOut>
-              <Link href="/sign-in" className="nav-signin">
-                Sign in
-              </Link>
-            </SignedOut>
-            <SignedIn>
-              {/* Socria's own, not Clerk's. On a reading surface it links
-                  rather than opening a sheet — see AccountControl. */}
-              <AccountControl href="/account" />
-            </SignedIn>
-          </ClerkLoaded>
-          <Link href="/chat" className="btn btn-nav">
-            {/* The tail is hidden on a narrow header, where the full label is
-                what pushes this row past the screen. "Start →" still says it. */}
-            Start<span className="btn-tail"> a thought session</span>{' '}
-            <span className="arrow">→</span>
-          </Link>
-        </div>
-      </div>
-    </header>
+    <Link href="/sign-in" className="s-mast-word">
+      Sign in
+    </Link>
   );
 }
 
-const SOCIALS = [
-  {
-    label: 'Socria on LinkedIn',
-    href: 'https://www.linkedin.com/company/socria',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M4.98 3.5a2.5 2.5 0 11-.02 5 2.5 2.5 0 01.02-5zM3 9h4v12H3zM9 9h3.8v1.7h.05c.53-1 1.83-2.05 3.77-2.05 4.03 0 4.78 2.65 4.78 6.1V21h-4v-5.4c0-1.29-.02-2.95-1.8-2.95-1.8 0-2.08 1.4-2.08 2.85V21H9z" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Socria on Instagram',
-    href: 'https://instagram.com/socriaai',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden="true">
-        <rect x="3" y="3" width="18" height="18" rx="5" />
-        <circle cx="12" cy="12" r="4" />
-        <circle cx="17.4" cy="6.6" r="1.1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-  {
-    label: 'Socria on TikTok',
-    href: 'https://tiktok.com/@socriaai',
-    icon: (
-      <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true">
-        <path d="M16.5 3c.3 2.2 1.6 3.6 3.5 3.9v2.6c-1.3.1-2.5-.3-3.6-1v5.9c0 3.2-2.4 5.6-5.5 5.6A5.4 5.4 0 015.5 14c0-3.1 2.7-5.6 6-5.2v2.7c-.4-.1-.8-.2-1.2-.2-1.5 0-2.6 1.2-2.5 2.7 0 1.4 1.2 2.5 2.6 2.5 1.5 0 2.6-1.2 2.6-2.8V3z" />
-      </svg>
-    ),
-  },
-];
-
-export function BlogFooter() {
+function Account() {
   return (
-    <footer>
-      <div className="foot-top">
-        <div>
-          <div className="foot-brand">
-            <img src="/socria-logo.png" alt="" />
-            <span className="name">Socria</span>
-          </div>
-          <p className="foot-tag">Think for yourself.</p>
-          <div className="foot-socials">
-            {SOCIALS.map((s) => (
-              <a
-                key={s.href}
-                href={s.href}
-                target="_blank"
-                rel="noopener noreferrer"
-                aria-label={s.label}
-              >
-                {s.icon}
-              </a>
-            ))}
-          </div>
-        </div>
-        <div className="foot-links">
-          <Link href="/#logos">What&rsquo;s new: Logos</Link>
-          <Link href="/blog">Blog</Link>
-          <Link href="/docs">Docs</Link>
-          {/* The one page a stuck person looks for. This list is a SECOND copy
-              of the site's links — components/Colophon.tsx is the first, and
-              carries them on every other public surface — so a page added
-              there has to be added here by hand or the blog quietly stops
-              being a way to the rest of the site. Worth collapsing into the
-              Colophon; not while the footer's own layout is load-bearing. */}
-          <Link href="/support">Support</Link>
-          <Link href="/chat">Try Socria</Link>
-          <Link href="/privacy">Privacy</Link>
-          <Link href="/terms">Terms</Link>
-          <Link href="/security">Security</Link>
-          {/* Reachable by URL alone until now. A policy nobody can navigate
-              to is not a published policy. */}
-          <Link href="/subprocessors">Subprocessors</Link>
-          <Link href="/explore">Explore</Link>
-          <Link href="/studio">Studio</Link>
-        </div>
-      </div>
-      <div className="foot-bottom">
-        <span>© {new Date().getFullYear()} Socria</span>
-        <span className="it">Human-first intelligence</span>
-      </div>
-    </footer>
+    <>
+      <ClerkLoading>
+        <SignInWord />
+      </ClerkLoading>
+      <ClerkLoaded>
+        <SignedOut>
+          <SignInWord />
+        </SignedOut>
+        <SignedIn>
+          <AccountControl href="/account" />
+        </SignedIn>
+      </ClerkLoaded>
+    </>
   );
+}
+
+/** The blog's masthead: on the index Blog is the page you are on; on a post, the section it is in. */
+export function BlogMast({ post = false }: { post?: boolean }) {
+  return <SiteMast current={post ? { section: BLOG.href } : BLOG.href} account={<Account />} />;
 }

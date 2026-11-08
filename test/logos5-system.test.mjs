@@ -71,10 +71,12 @@ ok('no backdrop blur anywhere in the workspace', SHEETS.every(([, css]) => !/bac
 ok('no press travel and no lit, lipped primary', SHEETS.every(([, css]) => !/transform: translateY\(1px\)/.test(css) && !/inset 0 1px 0 rgba\(255, 255, 255, 0\.16\)/.test(css)));
 
 console.log('\n=== colour on its job ===');
-ok('something new is a 6px primary dot, not gold', /\.l5-switch-i \.l5-new \{[^}]*background: var\(--lg-primary\);/.test(read('components/logos5/redesign.css')) && !/l5-switch-dot[^}]*--lg-secondary/.test(read('components/logos5/redesign.css')));
+// the dot is the controls standard's .l5-new (--c-moss is --lg-primary), drawn once: redesign.css's copy outweighed it
+ok('something new is a 6px primary dot, not gold', /\.l5-new \{[^}]*width: 6px; height: 6px;[^}]*background: var\(--c-moss\);/.test(controls) && !/\.l5-switch-i \.l5-new \{/.test(read('components/logos5/redesign.css')) && !/l5-switch-dot[^}]*--lg-secondary/.test(read('components/logos5/redesign.css')));
 ok("Socria's question is ink — green is yours", /\.socria-ask \{[^}]*color: var\(--lg-ink\);/.test(read('components/logos5/redesign.css')));
 ok("Memory's regions are one ink, told apart by place and label", /--l5mm-region: rgba\(var\(--lg-ink-rgb, 35, 36, 31\), 0\.62\);/.test(read('components/logos5/memory.css')) && (read('components/logos5/memory.css').match(/--l5mm-(identity|goals|work|learning|people|prefs|recent|questions): var\(--l5mm-region\);/g) ?? []).length === 16);
-ok('counts are plain tabular type, never badges', /\.l5-count \{\s*\/\*[^*]*\*\/\s*font-size: 12\.5px;\s*font-weight: 400;\s*font-variant-numeric: tabular-nums;/.test(read('components/logos5/l5.css')));
+// the count is the controls standard's, defined once (an older copy in l5.css loaded after it and undid its 0.55 ink)
+ok('counts are plain tabular type, never badges', /\.l5-count \{ font-size: 12\.5px; font-weight: 400; font-variant-numeric: tabular-nums; color: var\(--c-ink-45\); \}/.test(controls) && !/\.logos-root \.l5-count \{/.test(read('components/logos5/l5.css')));
 
 console.log('\n=== the header and the switch ===');
 ok('one bar: the mark home, a label and the name in italic, the switch, Search ⌘K, Memory, More, the account', /className=\{`l5v-top/.test(views) && /src="\/socria-mark\.png"/.test(views) && /<span className="l5-label">\{kind\}<\/span>/.test(views) && /<div className="l5v-top-c">\{switcher\}<\/div>/.test(views) && /\{memory\}\s*\{presence\}\s*\{menu\}\s*\{account\}/.test(views));

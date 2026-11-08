@@ -1,9 +1,9 @@
 'use client';
 
-// The Memory page's third part: the Thinking Journey, which is NOT Core 4's
-// memory and is on this page precisely because of that.
+// The Memory page's third part: the Thinking Journey, which is NOT the memory
+// the chats read and is on this page precisely because of that.
 //
-// Core 4 reads the Mind Graph. Core 2 and Core 3.1 read this — a running
+// The chats read the memory graph. The oldest chats read this — a running
 // account of how the person thinks, kept across conversations — and it is
 // still sent with every one of their turns. Two stores, two readers, one
 // sentence a person would use for both ("what Socria remembers"), which is
@@ -73,7 +73,7 @@ export function JourneyRecord() {
   const kept = journey.entries?.length ?? 0;
 
   return (
-    <section className="jr-root" aria-labelledby="jr-h">
+    <section className="jr-root lg-tokens" aria-labelledby="jr-h">
       <span className="jr-kicker">From earlier chats</span>
       <h2 id="jr-h">The Thinking Journey</h2>
       <p className="jr-deck">
@@ -105,7 +105,7 @@ export function JourneyRecord() {
         }}
         onForgetAll={async () => {
           // The account route, which is the one that also clears the thread
-          // memory and everything Core 4 worked out. Nothing about the
+          // memory and everything the earlier chats worked out. Nothing about the
           // conversations themselves is touched.
           try {
             await fetch('/api/account/memory', { method: 'DELETE' });

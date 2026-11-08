@@ -136,7 +136,7 @@ function SystemDiagram() {
   return (
     <figure className="l5i-fig" aria-labelledby="fig-system">
       <div className="l5i-system">
-        {col('The screen (browser)', ['Universal Map — home', 'A line of thinking: Chat · Content · Artifacts · Logic Map', 'Split View · search (⌘K)', 'Writing Space · Memory', 'Push to talk · the composer'], 'client')}
+        {col('The screen (browser)', ['Universal Map — home', 'A line of thinking: Conversation · Files · Artifacts · Logic Map', 'Search (⌘K)', 'Write · Memory', 'Push to talk · the composer'], 'client')}
         <div className="l5i-arrow" aria-hidden="true">
           <span>HTTPS · streamed text</span>
         </div>
@@ -146,7 +146,7 @@ function SystemDiagram() {
         </div>
         <div className="l5i-stack">
           {col('Models', ['Reply: OPENAI_MODEL_LOGOS (Sol)', 'Map: OPENAI_MODEL_LOGOS_MAP (Terra)', 'Memory and titles: a small model'], 'model')}
-          {col('Stores', ['Supabase: conversations, Mind Graph, Projects, mr_ledger, profiles, usage, shares', 'This device: Content layout, Split View width, documents read'], 'store')}
+          {col('Stores', ['Supabase: conversations, Mind Graph, Projects, mr_ledger, profiles, usage, shares', 'This device: the Files layout, documents read'], 'store')}
         </div>
       </div>
       <figcaption id="fig-system">
@@ -283,16 +283,15 @@ function ScreenDiagram() {
           <span>open a line of thinking</span>
         </div>
         <div className="l5i-views">
-          {['Chat', 'Content', 'Artifacts', 'Logic Map'].map((v) => (
+          {['Conversation', 'Files', 'Artifacts', 'Logic Map'].map((v) => (
             <div key={v} className="l5i-view">
               {v}
             </div>
           ))}
-          <div className="l5i-beside">Split View: one panel beside whichever view is open (desktop)</div>
         </div>
       </div>
       <figcaption id="fig-screen">
-        One state machine (lib/logos5/views.ts): a view and, on a wide screen, one thing beside it. The server’s own reading of the turn decides where the screen goes.
+        One state machine (lib/logos5/views.ts): four views of one line of thinking. The server’s own reading of the turn decides where the screen goes.
       </figcaption>
     </figure>
   );

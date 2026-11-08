@@ -27,7 +27,7 @@
 }
 .eng-tick text {
   font-family: var(--sans, system-ui);
-  font-size: 10px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5);
   pointer-events: none;
@@ -40,10 +40,11 @@
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
   pointer-events: none;
 }
-/* A field's colour scale: what the colours mean, at the two ends of the range. */
+/* A field's colour scale: what the colours mean, at the two ends of the range.
+   Never under 10.5px on screen (ModelView.tsx allows 6.4px a character for it). */
 .eng-tick-label {
   font-family: var(--sans, system-ui);
-  font-size: 8.5px;
+  font-size: 10.5px;
   font-variant-numeric: tabular-nums;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.62);
 }
@@ -101,7 +102,7 @@ path.eng-hit {
 }
 .eng-panel-axis {
   font-family: var(--sans, system-ui);
-  font-size: 9.5px;
+  font-size: 10.5px;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.38);
 }
 .eng-panel { cursor: pointer; }
@@ -122,11 +123,6 @@ path.eng-hit {
   font-size: 10.5px;
   letter-spacing: 0.04em;
   fill: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5);
-}
-.eng-read-rule {
-  fill: none;
-  stroke: var(--eng-line, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.14));
-  stroke-width: 0.8;
 }
 .eng-read-cell {
   font-family: var(--sans, system-ui);
@@ -256,7 +252,7 @@ path.eng-hit {
 .eng-read-section { margin: 0 0 18px; }
 .eng-read-section:last-child { margin-bottom: 0; }
 .eng-read-html .eng-read-head {
-  margin: 0 0 7px; font-family: var(--sans, system-ui); font-size: 10px; font-weight: 500; letter-spacing: 0.08em;
+  margin: 0 0 7px; font-family: var(--sans, system-ui); font-size: 10.5px; font-weight: 500; letter-spacing: 0.08em;
   color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.5); padding-bottom: 5px; border-bottom: 1px solid var(--eng-line, rgba(var(--lg-ink-rgb, 35, 36, 31), 0.12)); fill: none;
 }
 .eng-read-facts { margin: 0; display: grid; grid-template-columns: minmax(9em, 15em) 1fr; gap: 5px 18px; }

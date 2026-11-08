@@ -5,9 +5,9 @@
 // Reached from the More menu. It replaces the old walk through what Logos could
 // do (Logos 2 and 3's map, cards, "+ View" and Draft), which described a
 // screen that no longer exists. These are the screen as it is: the Universal
-// Map, a line of thinking and its four views, Split View and the conversation
-// on any side, Make, your own material, Write, Quick capture, search, voice
-// and words, and Memory — each shown working in miniature (the brand book:
+// Map, a line of thinking and its four views (Conversation, Files, Artifacts,
+// Logic Map — lib/logos5/views.ts), Make, your own material, Write, Quick
+// capture, search, voice and words, and Memory — each shown working in miniature (the brand book:
 // show the working surface), told in three steps, with the limit said in the
 // same breath as the capability, and, where it can be, a way to try it now.
 //
@@ -19,6 +19,7 @@
 // that settles, and none at all with reduced motion.
 
 import { useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { L5Close } from './logos5/L5Chrome';
 import './socria-guide.css';
 
 /** Kept from the walk this replaced: set when it is closed. */
@@ -125,8 +126,8 @@ const StartDemo = (
 const ViewsDemo = (
   <div className="sg-d sg-d-views">
     <div className="sg-tabs" aria-hidden="true">
-      <span>Chat</span>
-      <span>Content</span>
+      <span>Conversation</span>
+      <span>Files</span>
       <span>Artifacts</span>
       <span>Logic Map</span>
       <i className="sg-tabline" />
@@ -283,8 +284,8 @@ const SearchDemo = (
     </div>
     <ul className="sg-results" aria-hidden="true">
       {[
-        ['“…rent is most of it — three times the next cost…”', 'Chat'],
-        ['lease-terms.pdf · the clause on renewal', 'Content'],
+        ['“…rent is most of it — three times the next cost…”', 'Conversation'],
+        ['lease-terms.pdf · the clause on renewal', 'Files'],
         ['Monthly costs · a chart', 'Artifacts'],
         ['Rent is fixed', 'Logic Map'],
       ].map(([t, w], i) => (
@@ -384,7 +385,7 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
       steps: [
         <>Type it in the box — or hold the mic and say it.</>,
         <>Enter sends; Shift + Enter starts a new line.</>,
-        <>Reply as you would to a person. Each line of thinking keeps its own map, content and artifacts.</>,
+        <>Reply as you would to a person. Each line of thinking keeps its own Files, Artifacts and Logic Map.</>,
       ],
       demo: StartDemo,
       try: { label: 'Start a new line of thinking', run: 'onNew' },
@@ -397,7 +398,7 @@ export function socriaTutorials(o: { capture: boolean; memory: boolean }): Tutor
           One line of thinking, <em>four</em> ways to see it.
         </>
       ),
-      stand: 'Chat is where it opens. Content holds what you brought, Artifacts what was made, and the Logic Map your own ideas — in the shape your thinking takes.',
+      stand: 'The Conversation is where it opens. Files holds what you brought, Artifacts what was made, and the Logic Map your own ideas — in the shape your thinking takes.',
       steps: [
         <>Switch with the tabs under the title, or the arrow keys once a tab has focus.</>,
         <>Ask for a chart and Artifacts opens; ask for the structure and the Logic Map does — with the conversation beside it.</>,
@@ -603,9 +604,7 @@ export function SocriaGuide({
         <nav className="sg-toc" aria-label="Tutorials">
           <div className="sg-toc-head">
             <p className="sg-lbl">What Socria does</p>
-            <button type="button" className="sg-toc-close" onClick={() => setToc(false)} aria-label="Back to the tutorial">
-              ×
-            </button>
+            <L5Close label="Back to the tutorial" onClose={() => setToc(false)} className="sg-toc-close" />
             <p className="sg-toc-title">{WORDS[list.length] ?? `${list.length} things`}, in the order you’ll meet them.</p>
           </div>
           <ol className="sg-toc-list" style={{ ['--read' as string]: `${((n + 1) / list.length) * 100}%` }}>
@@ -635,9 +634,7 @@ export function SocriaGuide({
               <span className="sg-lbl">{t.name}</span>
               {t.one && !writeIncluded && <span className="sg-one">Socria One</span>}
             </p>
-            <button type="button" className="sg-x" onClick={onClose} aria-label="Close the tutorials">
-              ×
-            </button>
+            <L5Close label="Close the tutorials" onClose={onClose} className="sg-x" />
           </header>
 
           {/* keyed on the tutorial, so it comes in afresh and its demo plays from the top */}

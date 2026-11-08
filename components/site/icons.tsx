@@ -11,12 +11,6 @@ const PATHS = {
       <path d="M20 20l-4.2-4.2" />
     </>
   ),
-  split: (
-    <>
-      <rect x="3.5" y="4.5" width="17" height="15" rx="2" />
-      <path d="M13 4.5v15" />
-    </>
-  ),
   network: (
     <>
       <circle cx="12" cy="12.5" r="3.2" />

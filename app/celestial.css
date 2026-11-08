@@ -197,12 +197,6 @@ html[data-theme='night'] {
 html[data-theme='night'] .logos-root :is(.lg-map, .l5x-canvas) {
   background-image: radial-gradient(circle, rgba(200, 212, 255, 0.045) 1px, transparent 1px);
 }
-html[data-theme='night'] .app-root .logos-offer {
-  border-color: var(--cel-glass-line);
-  background: var(--cel-glass);
-  -webkit-backdrop-filter: var(--cel-blur);
-  backdrop-filter: var(--cel-blur);
-}
 html[data-theme='night'] .logos-root .l5x-convo {
   background: var(--cel-glass);
   -webkit-backdrop-filter: var(--cel-blur);

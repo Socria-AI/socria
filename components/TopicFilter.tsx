@@ -35,6 +35,7 @@ export function TopicFilter({
       <button
         type="button"
         className={`topic${active === 'all' ? ' on' : ''}`}
+        aria-pressed={active === 'all'}
         onClick={() => pick('all')}
       >
         All <span className="ct">{totalCount}</span>
@@ -44,6 +45,7 @@ export function TopicFilter({
           type="button"
           key={t.slug}
           className={`topic${active === t.slug ? ' on' : ''}`}
+          aria-pressed={active === t.slug}
           onClick={() => pick(t.slug)}
         >
           {t.name} <span className="ct">{t.count}</span>

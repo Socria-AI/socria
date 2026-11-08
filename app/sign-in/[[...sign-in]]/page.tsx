@@ -9,7 +9,7 @@ import { pageMetadata } from '@/lib/seo';
 export const metadata: Metadata = pageMetadata({
   path: '/sign-in',
   title: 'Sign in',
-  description: 'Sign in to Socria to keep your thought sessions across every device.',
+  description: 'Sign in to Socria to keep your conversations and Logic Maps across every device.',
 });
 
 export default function SignInPage({

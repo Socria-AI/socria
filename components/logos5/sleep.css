@@ -2,7 +2,13 @@
    paper on Paper, dark on Dark, the night sky on Celestial. Quiet: a moon, a few
    lines, a countdown in the serif. No glow, no gradient, nothing that pulses.
    Logos 5's steps (components/logos5/l5-controls.css): type 32 / 18 / 15.5 /
-   13.5 / 12.5 / 10.5, radii 999 / 16 / 10 / 6, controls 40 tall. */
+   13.5 / 12.5 / 10.5, radii 999 / 16 / 10 / 6, controls 40 tall.
+
+   The screen is the app's one dialog: the page dimmed (--lg-dim), the panel at
+   the dialog radius on --l5-surface (declared on .logos-root for every theme, so
+   no ground needs its own colour here), the floating shadow, the bare × at the
+   top right (L5Close), and its actions from the controls standard — Socria One's
+   button in One's blue, "Keep exploring" a word. */
 
 .sl-scrim {
   position: fixed;
@@ -15,7 +21,7 @@
 .sl-back {
   position: absolute;
   inset: 0;
-  background: rgba(var(--shadow-rgb, 32, 32, 27), 0.32);
+  background: var(--lg-dim);
 }
 @media (prefers-reduced-motion: no-preference) {
   .sl-back {
@@ -41,21 +47,18 @@
   width: min(420px, 100%);
   padding: 30px 28px 24px;
   border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
-  border-radius: 16px;
-  background: var(--l5-surface, #f5f3eb);
+  border-radius: var(--lg-r-dialog);
+  background: var(--l5-surface);
   color: var(--lg-ink, #20201b);
-  box-shadow: 0 30px 70px -40px rgba(var(--shadow-rgb, 32, 32, 27), 0.55);
-  font-family: var(--lg-sans, Inter, system-ui, sans-serif);
+  box-shadow: var(--l5-shadow-up);
+  font-family: var(--lg-sans);
   text-align: center;
 }
-html[data-theme='dark'] .sl-card {
-  background: #1c1c1c;
-}
-html[data-theme='one'] .sl-card {
-  background: #17304a;
-}
-html[data-theme='night'] .sl-card {
-  background: #121c31;
+/* the close: L5Close (the bare ×), whose -6px margin sets it 10px in from the corner */
+.sl-x {
+  position: absolute;
+  top: 16px;
+  right: 16px;
 }
 .sl-moon {
   display: inline-grid;
@@ -93,9 +96,9 @@ html[data-theme='night'] .sl-card {
 .sl-when-k {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.55);
 }
 .sl-when-v {
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
@@ -107,42 +110,17 @@ html[data-theme='night'] .sl-card {
   font-size: 13.5px;
   color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
 }
+/* "Keep exploring" (.l5-btn is-quiet, a word) beside "Stay awake with Socria One" (.l5-btn is-primary is-one) */
 .sl-acts {
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 8px;
+  align-items: center;
+  gap: 8px 22px;
   margin-top: 22px;
 }
-.sl-btn {
-  height: 40px;
-  padding: 0 18px;
-  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lg-ink, #20201b);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.sl-btn:hover {
-  border-color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
-}
-.sl-btn.is-one {
-  border-color: var(--lg-one, #26485a);
-  background: var(--lg-one, #26485a);
-  color: #f0ead8;
-}
-.sl-btn.is-one:hover {
-  filter: brightness(1.08);
-}
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .sl-btn.is-one {
-  color: #0d1a24;
-}
-.sl-btn:focus-visible,
 .sl-bar:focus-visible {
-  outline: 2px solid var(--lg-accent, #264653);
+  outline: 2px solid var(--lg-primary, #354620);
   outline-offset: 2px;
 }
 .sl-one {
@@ -169,12 +147,6 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .sl-btn.i
   font: inherit;
   font-size: 12.5px;
   cursor: pointer;
-}
-html[data-theme='dark'] .sl-bar {
-  background: #1c1c1c;
-}
-html[data-theme='night'] .sl-bar {
-  background: #121c31;
 }
 .sl-bar svg {
   color: var(--lg-primary, #354620);
@@ -210,8 +182,8 @@ html[data-theme='night'] .sl-bar {
   background: rgba(var(--l5-tint-rgb, 53, 70, 32), 0.08);
 }
 .sl-ring:focus-visible {
-  outline: 2px solid var(--lg-accent, #264653);
-  outline-offset: 1px;
+  outline: 2px solid var(--lg-primary, #354620);
+  outline-offset: 2px;
 }
 .sl-ring-track {
   fill: none;
@@ -249,23 +221,17 @@ html[data-theme='night'] .sl-bar {
   padding: 8px 11px;
   border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
   border-radius: 10px;
-  background: var(--l5-surface, #f5f3eb);
-  box-shadow: 0 12px 28px -18px rgba(var(--shadow-rgb, 32, 32, 27), 0.5);
-  font-family: var(--lg-sans, Inter, system-ui, sans-serif);
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow);
+  font-family: var(--lg-sans);
   text-align: left;
-}
-html[data-theme='dark'] .sl-ringtip {
-  background: #1c1c1c;
-}
-html[data-theme='night'] .sl-ringtip {
-  background: #121c31;
 }
 .sl-ringtip-t {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40, rgba(35, 36, 31, 0.4));
+  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.55);
 }
 .sl-ringtip-b {
   font-size: 13.5px;

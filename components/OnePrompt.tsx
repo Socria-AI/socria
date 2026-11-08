@@ -26,7 +26,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { COUNTER_NOUN, COUNTERS, resetsAt, type Counter } from '@/lib/entitlements';
-import { OneClose } from './SocriaOneModal';
+import { L5Close } from './logos5/L5Chrome';
 import type { OnePromptView } from './useOnePrompt';
 import './one/one-sheet.css';
 import './logos5/l5-controls.css';
@@ -93,9 +93,7 @@ export function OnePrompt({
       <div className="os-back" onClick={onDismiss} aria-hidden="true" />
       <div className={`os-sheet is-${view.category}`}>
         <span className="os-grab" aria-hidden="true" />
-        <button type="button" className="os-x l5-icon" onClick={onDismiss} aria-label="Close">
-          <OneClose />
-        </button>
+        <L5Close label="Close" onClose={onDismiss} className="os-x" />
 
         {/* The price sits on the face, beside the name. */}
         <p className="os-brand">

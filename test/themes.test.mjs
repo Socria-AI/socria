@@ -55,7 +55,9 @@ ok('the map’s colours are variables every dark ground turns up', /html:is\(\[d
 ok('the picker offers five, a little sky for night', /\.theme\[data-theme-id="night"\] \.theme-swatch/.test(read('app/account-sheet.css')) && /repeat\(5,/.test(read('app/account-sheet.css')));
 ok('no theme block for paper — paper is every variable’s fallback', !/data-theme="paper"/.test(css));
 const tw = read('tailwind.config.ts');
-ok('Tailwind’s paper, ink, moss and surface read the theme, falling back to paper', /var\(--c-paper, 245 243 235\)/.test(tw) && /var\(--c-ink, 31 31 31\)/.test(tw) && /var\(--c-surface, 255 255 255\)/.test(tw) && /var\(--c-moss-600, 94 118 51\)/.test(tw));
+// the channels are --rgb-*: --c-ink / --c-paper are the controls' full colours inside Logos (l5-controls.css),
+// and the same name for both made every Tailwind ink utility there an invalid colour; moss is the one green
+ok('Tailwind’s paper, ink, moss and surface read the theme, falling back to paper', /var\(--rgb-paper, 245 243 235\)/.test(tw) && /var\(--rgb-ink, 31 31 31\)/.test(tw) && /var\(--rgb-surface, 255 255 255\)/.test(tw) && /var\(--rgb-moss-600, 53 70 32\)/.test(tw) && !/--c-(paper|ink|surface)\b/.test(tw));
 ok('the layout boots the theme and scopes it to the app', /THEME_BOOT/.test(read('app/layout.tsx')) && /<ThemeScope \/>/.test(read('app/layout.tsx')));
 ok('the account sheet offers the themes', /<ThemePicker isOne=\{isOne\}/.test(read('components/account/AccountSheet.tsx')));
 ok('a locked theme cannot be chosen', /if \(locked\) return;/.test(read('components/account/ThemePicker.tsx')));

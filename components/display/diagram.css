@@ -1,6 +1,6 @@
 /* components/display/diagram.css — a diagram in its shape. What a node is in a decision tree is said in
    words in the box; the shape of the border only repeats it. */
-.dsp .dsp-dg-box { padding: 0; border: 1px solid var(--dsp-24); border-radius: 5px; background: var(--dsp-panel); }
+.dsp .dsp-dg-box { padding: 0; border: 1px solid var(--dsp-24); border-radius: var(--lg-r-inner, 10px); background: var(--dsp-panel); }
 .dsp .dsp-dg-box.is-socria { border-style: dashed; }
 .dsp .dsp-dg-box.is-loose { opacity: 0.75; }
 .dsp .dsp-dg-box.is-placed { border-color: var(--dsp-ink); }
@@ -9,7 +9,7 @@
 .dsp .dsp-dg-box.is-outcome { border-left: 3px solid var(--dsp-primary); }
 .dsp .dsp-dg-box.is-sel { box-shadow: 0 0 0 2px var(--dsp-tint-2); border-color: var(--dsp-primary); }
 .dsp .dsp-dg-in { display: flex; flex-direction: column; gap: 0; width: 100%; padding: 5px 8px; border: 0; background: none; text-align: left; cursor: inherit; }
-.dsp .dsp-dg-kind { font-size: 9px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp .dsp-dg-kind { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); }
 .dsp .dsp-dg-label { font-size: 12.5px; line-height: 1.3; }
 .dsp .dsp-dg-val { font-size: 11px; color: var(--dsp-accent); font-variant-numeric: tabular-nums; }
 .dsp .dsp-dg-group { font-size: 10.5px; color: var(--dsp-40); font-style: italic; }

@@ -22,6 +22,7 @@ import {
   type PaperSize,
   type WriteDoc,
 } from '@/lib/write/doc';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 
 // ── find and replace ────────────────────────────────────────────────
 
@@ -98,8 +99,8 @@ export function FindBar({
         <button type="button" className={`w-btn is-quiet${showRep ? ' is-on' : ''}`} aria-pressed={showRep} onClick={() => setShowRep((v) => !v)}>
           Replace
         </button>
-        <button type="button" className="w-x" aria-label="Close find" onClick={onClose}>
-          ×
+        <button type="button" className="w-x l5-icon l5-close" aria-label="Close find" onClick={onClose}>
+          <CloseGlyph />
         </button>
       </div>
       {showRep && (

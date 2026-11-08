@@ -42,6 +42,7 @@ import { ConversationStylePicker } from './ConversationStylePicker';
 import { LogosInstructions } from './LogosInstructions';
 import { MRSettings } from './MRSettings';
 import { OneMark } from '@/components/ds';
+import { L5Close } from '@/components/logos5/L5Chrome';
 
 export function AccountSheet({
   open,
@@ -155,9 +156,8 @@ export function AccountSheet({
           <header className="mast">
             <div className="mast-bar">
               <p className="lbl">Your account</p>
-              <button type="button" className="x" onClick={onClose} aria-label="Close">
-                ×
-              </button>
+              {/* the one close: the bare × at the top right, in the masthead that never scrolls */}
+              <L5Close label="Close" onClose={onClose} />
             </div>
             <div className="mast-who">
               <div className={`mast-av${isOne ? ' is-one' : ''}`}>
@@ -403,9 +403,6 @@ export function AccountSheet({
                   Sign out
                 </button>
               )}
-              <button type="button" className="link-act" onClick={onClose}>
-                Done
-              </button>
             </div>
           </div>
         </div>
@@ -454,9 +451,19 @@ function Membership({ isOne, plan, onClose }: { isOne: boolean; plan: PlanState 
             {isOne ? `${onePlanSentence()}, and how you reason carried between conversations.` : freeTerms()}
           </p>
         </div>
-        <Link className="link-act" href="/one" onClick={onClose}>
-          {isOne ? 'Manage membership' : 'Upgrade to Socria One →'}
-        </Link>
+        {/* the button that buys One is One's blue, as everywhere else (.l5-btn is-one); a member's is a ring on the plate */}
+        {isOne ? (
+          <Link className="link-act" href="/one" onClick={onClose}>
+            Manage membership
+          </Link>
+        ) : (
+          <Link className="l5-btn is-primary is-one" href="/one" onClick={onClose}>
+            Upgrade to Socria One{' '}
+            <span className="l5-ar" aria-hidden="true">
+              →
+            </span>
+          </Link>
+        )}
       </div>
     </div>
   );

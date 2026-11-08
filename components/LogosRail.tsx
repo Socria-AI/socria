@@ -35,7 +35,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Logo } from './Logo';
+import { Logo } from '@/components/ds';
 import { RewardsBadges } from './rewards/RewardsBadges';
 import { FEEDBACK_URL } from '@/lib/feedback';
 import { MapGlyph } from './MapGlyph';
@@ -460,7 +460,7 @@ export function LogosRail({
     // rail on a desktop that has no way to bring it back.
     <aside className="s-bar" data-open={open ? 'yes' : 'no'} aria-label="Your sessions">
       <div className="s-top">
-        <Logo />
+        <Logo size="md" markSrc="/socria-mark.png" href="/" />
         <RewardsBadges enabled={rewards} />
         <button className="s-close" onClick={onToggle} aria-label="Close sidebar">
           <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">

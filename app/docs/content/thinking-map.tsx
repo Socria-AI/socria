@@ -19,7 +19,7 @@ export function ThinkingMapDoc() {
   return (
     <Article page={page} sections={sections}>
       <p>
-        The Thinking Map is a typed graph of your reasoning, extracted fresh
+        The Logic Map is a typed graph of your reasoning, extracted fresh
         from the conversation on every turn. Everything on it is something{' '}
         <em>you</em> said or clearly hold — labeled in your own language, two
         to eight words a node.

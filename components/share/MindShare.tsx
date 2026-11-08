@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from 'react';
 import { ShareDialog } from './ShareDialog';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './share.css';
 
 export function MindShare({ open, onClose }: { open: boolean; onClose: () => void }) {
@@ -27,13 +28,15 @@ export function MindShare({ open, onClose }: { open: boolean; onClose: () => voi
   if (!open) return null;
   if (pick) return <ShareDialog type="project" id={pick.id} title={pick.name} open onClose={() => { setPick(null); onClose(); }} onUpgrade={() => window.location.assign('/one')} />;
   return (
-    <div className="sh-scrim" role="dialog" aria-modal="true" aria-label="Share your thinking">
+    <div className="sh-scrim lg-tokens" role="dialog" aria-modal="true" aria-label="Share your thinking">
       <div className="sh-back" onClick={onClose} aria-hidden="true" />
       <div className="sh-sheet">
         <header className="sh-head">
           <span className="sh-kicker">Share</span>
           <h2>Your memory stays yours.</h2>
-          <button className="sh-x" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="sh-x" onClick={onClose} aria-label="Close">
+            <CloseGlyph />
+          </button>
         </header>
         <p className="sh-privacy" style={{ marginTop: 10, fontSize: 13.5, color: 'var(--ink-70)' }}>
           What Socria remembers about you is never shared. To think with someone, share a Project — everyone in it works on the
@@ -56,7 +59,7 @@ export function MindShare({ open, onClose }: { open: boolean; onClose: () => voi
         ) : (
           <p className="sh-quiet">No Projects yet. Make one in the sidebar, and it can be shared from here or from its home.</p>
         )}
-        <footer className="sh-foot"><button className="sh-btn" onClick={onClose}>Done</button></footer>
+        <footer className="sh-foot"><button className="sh-btn ghost" onClick={onClose}>Done</button></footer>
       </div>
     </div>
   );

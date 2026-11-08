@@ -13,6 +13,7 @@
 // Memory page, and here there is one line about it and a link.
 
 import { useCallback, useEffect, useState } from 'react';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './project-sheet.css';
 
 interface Detail {
@@ -132,11 +133,13 @@ export function ProjectSheet({
   const chats = d?.conversations.length ?? 0;
 
   return (
-    <div className="psheet" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
+    <div className="psheet lg-tokens" role="presentation" onMouseDown={(e) => { if (e.target === e.currentTarget) onClose(); }}>
       <div className="psheet-card" role="dialog" aria-modal="true" aria-label={d ? `Project: ${d.project.name}` : 'Project'}>
         <div className="psheet-h">
           <span className="lbl">Project{d?.project.archived ? ' · archived' : ''}</span>
-          <button type="button" className="x" onClick={onClose} aria-label="Close">×</button>
+          <button type="button" className="x" onClick={onClose} aria-label="Close">
+            <CloseGlyph />
+          </button>
         </div>
 
         {!d ? (

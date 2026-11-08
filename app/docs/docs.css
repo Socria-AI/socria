@@ -13,7 +13,7 @@
   --d-ink-25: rgba(32, 32, 27, 0.25);
   --d-line: rgba(53, 70, 32, 0.16);
   --d-moss: #354620; /* the one green */
-  --d-moss-deep: #354620;
+  --d-caution: #a5623a; /* a warning callout, an archived page's banner */
   --d-serif: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
   --d-sans: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
   --d-mono: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
@@ -28,30 +28,9 @@
   line-height: 1.65;
 }
 
-/* ── header ─────────────────────────────────────────────────────── */
-.docs-root .d-top {
-  position: sticky; top: 0; z-index: 30;
-  display: flex; align-items: center; gap: 18px;
-  padding: 14px clamp(16px, 4vw, 40px);
-  background: rgba(244, 241, 232, 0.92);
-  backdrop-filter: blur(8px);
-  border-bottom: 1px solid var(--d-line);
-}
-.docs-root .d-word {
-  font-family: var(--d-serif); font-size: 1.35rem; letter-spacing: -0.01em;
-  color: var(--d-ink); text-decoration: none;
-}
-.docs-root .d-word em { font-style: italic; color: var(--d-moss); }
-.docs-root .d-top-links { margin-left: auto; display: flex; gap: 18px; align-items: center; }
-.docs-root .d-top-links a {
-  font-size: 13px; color: var(--d-ink-70); text-decoration: none;
-}
-.docs-root .d-top-links a:hover { color: var(--d-moss-deep); }
-.docs-root .d-top-links .d-open {
-  padding: 7px 14px; border: 1px solid var(--d-moss); border-radius: 999px;
-  color: var(--d-moss-deep); font-weight: 500;
-}
-.docs-root .d-top-links .d-open:hover { background: var(--d-moss); color: #fff; }
+/* ── the masthead ───────────────────────────────────────────────── */
+/* The site's own (components/site/site.css .s-mast). The sidebar's Contents
+   button stands before the lock-up only where the sidebar folds away. */
 .docs-root .d-nav-toggle { display: none; }
 
 /* ── body: sidebar + content ────────────────────────────────────── */
@@ -69,15 +48,15 @@
 .docs-root .d-nav {
   padding: 30px 22px 40px 0;
   border-right: 1px solid var(--d-line);
-  position: sticky; top: 61px;
+  position: sticky; top: var(--mast-h);
   align-self: start;
-  max-height: calc(100svh - 61px);
+  max-height: calc(100svh - var(--mast-h));
   overflow-y: auto;
 }
 .docs-root .d-group { margin-bottom: 22px; }
 .docs-root .d-group-name {
   display: block; margin-bottom: 7px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase; color: var(--d-ink-45);
 }
 .docs-root .d-nav-link {
@@ -88,7 +67,7 @@
 }
 .docs-root .d-nav-link:hover { color: var(--d-ink); background: rgba(53, 70, 32, 0.05); }
 .docs-root .d-nav-link.is-active {
-  color: var(--d-moss-deep); font-weight: 600; background: rgba(var(--moss-rgb, 53, 70, 32), 0.1);
+  color: var(--d-moss); font-weight: 600; background: rgba(var(--moss-rgb, 53, 70, 32), 0.1);
 }
 
 .docs-root .d-main {
@@ -99,7 +78,7 @@
 /* ── article typography ─────────────────────────────────────────── */
 .docs-root .d-article { max-width: 720px; }
 .docs-root .d-kicker {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.16em;
+  font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase; color: var(--d-moss);
 }
 .docs-root .d-article h1 {
@@ -116,17 +95,18 @@
   border-top: 1px solid var(--d-line);
   font-family: var(--d-serif); font-weight: 400;
   font-size: 1.45rem; line-height: 1.25;
-  scroll-margin-top: 80px;
+  scroll-margin-top: calc(var(--mast-h) + 16px);
 }
 .docs-root .d-article h3 {
-  margin: 24px 0 8px; font-size: 15px; font-weight: 650; color: var(--d-ink);
+  margin: 24px 0 8px; font-size: 15px; font-weight: 600; color: var(--d-ink);
 }
 .docs-root .d-article p { margin: 0 0 14px; }
 .docs-root .d-article ul, .docs-root .d-article ol { margin: 0 0 14px; padding-left: 22px; }
 .docs-root .d-article li { margin-bottom: 6px; }
-.docs-root .d-article a { color: var(--d-moss-deep); text-decoration: underline; text-decoration-color: rgba(var(--moss-rgb, 53, 70, 32),.4); text-underline-offset: 2px; }
+/* the prose link — legal.css and support.css set theirs the same */
+.docs-root .d-article a { color: var(--d-moss); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: rgba(var(--moss-rgb, 53, 70, 32), 0.4); text-underline-offset: 2px; }
 .docs-root .d-article a:hover { text-decoration-color: var(--d-moss); }
-.docs-root .d-article strong { font-weight: 650; }
+.docs-root .d-article strong { font-weight: 600; }
 .docs-root .d-article code {
   font-family: var(--d-mono); font-size: 0.86em;
   background: rgba(53, 70, 32, 0.07);
@@ -163,13 +143,13 @@
 }
 .docs-root .d-callout .d-callout-tag {
   display: block; margin-bottom: 4px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase; color: var(--d-moss);
 }
 .docs-root .d-callout p { margin: 0; }
 .docs-root .d-callout p + p { margin-top: 8px; }
-.docs-root .d-callout.is-warn { border-left-color: #a5623a; }
-.docs-root .d-callout.is-warn .d-callout-tag { color: #a5623a; }
+.docs-root .d-callout.is-warn { border-left-color: var(--d-caution); }
+.docs-root .d-callout.is-warn .d-callout-tag { color: var(--d-caution); }
 
 /* tables: reference material's native form */
 .docs-root .d-tablewrap { margin: 0 0 16px; overflow-x: auto; }
@@ -178,7 +158,7 @@
 }
 .docs-root .d-article th {
   text-align: left; padding: 8px 12px 8px 0;
-  font-size: 11px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase;
+  font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase;
   color: var(--d-ink-45); border-bottom: 1px solid var(--d-line);
   white-space: nowrap;
 }
@@ -194,7 +174,7 @@
   display: grid; grid-template-columns: 168px minmax(0, 1fr); gap: 4px 18px;
   padding: 9px 0; border-bottom: 1px solid rgba(53, 70, 32, 0.08);
 }
-.docs-root .d-def dt { font-weight: 650; font-size: 13.5px; }
+.docs-root .d-def dt { font-weight: 600; font-size: 13.5px; }
 .docs-root .d-def dt code { font-weight: 500; }
 .docs-root .d-def dd { margin: 0; font-size: 13.5px; color: var(--d-ink-70); }
 @media (max-width: 620px) { .docs-root .d-def { grid-template-columns: 1fr; } }
@@ -225,11 +205,11 @@
   max-width: 46%; text-decoration: none; color: var(--d-ink);
 }
 .docs-root .d-pn .lbl {
-  display: block; font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  display: block; font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase; color: var(--d-ink-45); margin-bottom: 3px;
 }
 .docs-root .d-pn .ttl { font-family: var(--d-serif); font-size: 1.05rem; }
-.docs-root .d-pn a:hover .ttl { color: var(--d-moss-deep); }
+.docs-root .d-pn a:hover .ttl { color: var(--d-moss); }
 .docs-root .d-pn .next { margin-left: auto; text-align: right; }
 
 /* on-this-page strip under the lead */
@@ -238,22 +218,13 @@
   font-size: 12.5px;
 }
 .docs-root .d-toc a { color: var(--d-ink-45); text-decoration: none; }
-.docs-root .d-toc a:hover { color: var(--d-moss-deep); }
+.docs-root .d-toc a:hover { color: var(--d-moss); }
 .docs-root .d-toc a::before { content: '§ '; color: var(--d-ink-25); }
 
-/* ── footer ─────────────────────────────────────────────────────── */
-.docs-root .d-foot {
-  border-top: 1px solid var(--d-line);
-  padding: 20px clamp(16px, 4vw, 40px);
-  display: flex; justify-content: space-between; gap: 14px; flex-wrap: wrap;
-  font-size: 12.5px; color: var(--d-ink-45);
-}
-.docs-root .d-foot-links { display: flex; gap: 16px; }
-.docs-root .d-foot a { color: var(--d-ink-70); text-decoration: none; }
-.docs-root .d-foot a:hover { color: var(--d-moss-deep); }
-
 /* ── small screens ──────────────────────────────────────────────── */
-@media (max-width: 860px) {
+/* The sidebar folds away where the masthead's links do (760px), and its
+   Contents button takes their place before the lock-up. */
+@media (max-width: 760px) {
   .docs-root .d-body { grid-template-columns: 1fr; }
   .docs-root .d-nav {
     display: none;
@@ -269,9 +240,15 @@
     font: inherit; font-size: 12.5px; color: var(--d-ink-70); cursor: pointer;
   }
   .docs-root .d-main { padding-left: 0; }
-  .docs-root .d-top-links a:not(.d-open) { display: none; }
 }
-
+/* On a phone the button is its glyph; the word stays its name. */
+@media (max-width: 560px) {
+  .docs-root .d-nav-toggle { padding: 6px 10px; }
+  .docs-root .d-nav-toggle-t {
+    position: absolute; width: 1px; height: 1px; margin: -1px; padding: 0;
+    overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; border: 0;
+  }
+}
 
 /* ═══ live product demonstrations ════════════════════════════════════
    The wiki embeds the REAL components — ThinkingMap, MathBoard, the dials,
@@ -288,7 +265,7 @@
   --ink-45: var(--d-ink-45);
   --ink-70: var(--d-ink-70);
   --moss: var(--d-moss);
-  --moss-700: var(--d-moss-deep);
+  --moss-700: var(--d-moss);
   --sans: var(--d-sans);
   --serif: var(--d-serif);
 }
@@ -310,7 +287,6 @@
   padding: 10px 14px; border: 1px solid var(--border); border-bottom: none;
   background: #efeadd; border-radius: 10px 10px 0 0;
 }
-.docs-root .ui-dot { width: 9px; height: 9px; border-radius: 50%; background: var(--ink-12); }
 .docs-root .ui-addr {
   margin-left: 10px; font-family: var(--sans); font-size: .72rem;
   letter-spacing: .04em; color: var(--ink-45);
@@ -466,8 +442,6 @@
 }
 .docs-root .ui-cap { padding: 0 0 0 2px; }
 /* in a narrow column the node and its menu stack, so give them the room */
-.docs-root .ui-menudemo { flex-direction: column; gap: 18px; padding: 22px 16px; justify-content: flex-start; overflow: auto; }
-@media (min-width: 900px) { .docs-root .ui-menudemo { flex-direction: row; align-items: flex-start; } }
 .docs-root .ui-ctrldemo { overflow: auto; }
 
 /* the thread inside a demo frame needs the app's own gutters, or a user
@@ -492,11 +466,6 @@
 
 /* the four-move definitions now sit under the full-width demo, in two
    columns so the list does not run the length of the page */
-.docs-root .moves-defs .mv-defs {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 0 clamp(24px,4vw,56px);
-}
-@media (max-width: 760px) { .docs-root .moves-defs .mv-defs { grid-template-columns: 1fr; } }
-
 
 /* wiki-specific corrections to the copied chrome: the docs frame sits in an
    article column, not a magazine spread */
@@ -523,9 +492,8 @@
 @media (max-width: 640px), (hover: none) {
   .docs-root .d-group-name { font-size: 11.5px; letter-spacing: 0.08em; }
   .docs-root .d-callout .d-callout-tag { font-size: 11.5px; letter-spacing: 0.08em; }
-  /* the table of contents and footer links, as targets rather than as type */
-  .docs-root .d-toc a,
-  .docs-root .d-foot-links a { display: inline-block; padding-block: 9px; }
+  /* the table of contents, as targets rather than as type */
+  .docs-root .d-toc a { display: inline-block; padding-block: 9px; }
 }
 
 /* the period qualifier in the plan table — "per month", "per conversation" */
@@ -572,8 +540,8 @@
   background: var(--d-card); border: 1px solid var(--d-line); border-left: 3px solid var(--d-moss); border-radius: 6px;
 }
 .docs-root .d-show-said span {
-  margin-right: 8px; font-family: var(--d-sans, system-ui, sans-serif); font-size: 10.5px; font-weight: 650;
-  letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss-deep);
+  margin-right: 8px; font-family: var(--d-sans, system-ui, sans-serif); font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss);
 }
 .docs-root .d-show-frame { position: relative; height: 330px; border: 1px solid var(--d-line); border-radius: 10px; overflow: hidden; background: #f4f1e8; }
 .docs-root .d-show-frame.is-scene { background: radial-gradient(120% 90% at 50% 0%, rgba(var(--moss-rgb, 53, 70, 32),.07), transparent 70%), #f6f3ec; }
@@ -584,7 +552,7 @@
 /* Logos 3: engineering examples — each a proposal the engine built, with its check */
 .docs-root .d-eng {
   margin: 22px 0 30px; padding: 2px 0 6px;
-  scroll-margin-top: 80px;
+  scroll-margin-top: calc(var(--mast-h) + 16px);
 }
 .docs-root .d-eng + .d-eng { border-top: 1px dashed var(--d-line); padding-top: 18px; }
 .docs-root .d-eng h3 { display: flex; align-items: baseline; gap: 10px; flex-wrap: wrap; }
@@ -600,7 +568,7 @@
   border-radius: 6px;
 }
 .docs-root .d-eng-ask-k {
-  flex: none; font-size: 11px; font-weight: 650; letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss-deep);
+  flex: none; font-size: 11px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--d-moss);
 }
 .docs-root .d-eng-ask-q { font-family: var(--d-serif); font-size: 1.05rem; line-height: 1.45; }
 .docs-root .d-eng-computed { color: var(--d-ink); }
@@ -629,7 +597,7 @@
   background: rgba(250, 248, 241, 0.92); border: 1px solid var(--d-line); border-radius: 999px; padding: 4px 12px;
 }
 .docs-root .d-cad-wake:hover span,
-.docs-root .d-cad-wake:focus-visible span { color: var(--d-moss-deep); border-color: var(--d-moss); }
+.docs-root .d-cad-wake:focus-visible span { color: var(--d-moss); border-color: var(--d-moss); }
 .docs-root .d-cad-cap {
   display: flex; align-items: center; gap: 10px; padding: 7px 12px;
   border-top: 1px solid var(--d-line); background: var(--d-card); font-size: 12.5px; color: var(--d-ink-45);
@@ -639,7 +607,7 @@
   flex: none; font: inherit; font-size: 12px; color: var(--d-ink-70);
   background: transparent; border: 1px solid var(--d-line); border-radius: 6px; padding: 2px 10px; cursor: pointer;
 }
-.docs-root .d-cad-cap button:hover { border-color: var(--d-moss); color: var(--d-moss-deep); }
+.docs-root .d-cad-cap button:hover { border-color: var(--d-moss); color: var(--d-moss); }
 .docs-root .d-eng-x { color: var(--d-ink-45); font-weight: 400; }
 @media (max-width: 640px) {
   .docs-root .d-cad-stage { height: 300px; }
@@ -671,13 +639,13 @@
   margin: 0 0 22px; padding: 14px 18px;
   background: var(--d-card);
   border: 1px solid var(--d-line);
-  border-left: 3px solid #a5623a;
+  border-left: 3px solid var(--d-caution);
   border-radius: 0 10px 10px 0;
 }
 .docs-root .d-archived .d-callout-tag {
   display: block; margin-bottom: 4px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
-  text-transform: uppercase; color: #a5623a;
+  font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
+  text-transform: uppercase; color: var(--d-caution);
 }
 .docs-root .d-archived p { margin: 0; }
 @media (max-width: 640px), (hover: none) {
@@ -701,16 +669,13 @@
 .docs-root .d-diagram .dg-box { fill: var(--d-paper); stroke: var(--d-ink-25); stroke-width: 1; }
 .docs-root .d-diagram .dg-box.is-now { fill: var(--d-paper-2); stroke: var(--d-moss); stroke-width: 1.5; }
 .docs-root .d-diagram .dg-box.is-past { fill: var(--d-card); stroke: var(--d-ink-25); stroke-dasharray: 4 3; }
-.docs-root .d-diagram .dg-band { fill: var(--d-paper-2); stroke: none; }
 .docs-root .d-diagram .dg-t { fill: var(--d-ink); font-family: var(--d-sans); font-size: 13px; }
 .docs-root .d-diagram .dg-t.is-strong { font-weight: 600; }
 .docs-root .d-diagram .dg-t.is-small { fill: var(--d-ink-70); font-size: 11.5px; }
-.docs-root .d-diagram .dg-t.is-accent { fill: var(--d-moss-deep); font-weight: 600; }
+.docs-root .d-diagram .dg-t.is-accent { fill: var(--d-moss); font-weight: 600; }
 .docs-root .d-diagram .dg-t.is-serif { font-family: var(--d-serif); font-size: 17px; }
 .docs-root .d-diagram .dg-line { stroke: var(--d-ink-45); stroke-width: 1.2; fill: none; }
 .docs-root .d-diagram .dg-line.is-accent { stroke: var(--d-moss); stroke-width: 1.6; }
 .docs-root .d-diagram .dg-line.is-soft { stroke: var(--d-ink-25); stroke-dasharray: 3 3; }
-.docs-root .d-diagram .dg-dot { fill: var(--d-moss); }
-.docs-root .d-diagram .dg-dot.is-past { fill: var(--d-ink-45); }
 .docs-root .d-diagram .dg-arrow { fill: var(--d-ink-45); }
 .docs-root .d-diagram .dg-arrow.is-accent { fill: var(--d-moss); }

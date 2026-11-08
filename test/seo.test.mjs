@@ -328,10 +328,12 @@ console.log('\n=== the homepage ===');
   ok('exactly one h1', h1Count(html) === 1, String(h1Count(html)));
   ok('it says the line', /Come out sharper\./.test(h1Of(html)), h1Of(html));
   ok('every "Start a conversation" opens Logos', (html.match(/Start a conversation/g) ?? []).length === 3 && hrefs(html).filter((x) => x === '/logos').length === 4);
-  ok('the masthead reaches One and the Charter', hrefs(html).includes('/one') && hrefs(html).includes('/charter') && hrefs(html).includes('#session'));
-  ok('…and the conversation it scrolls to is there', html.includes('id="session"'));
+  // The masthead is the one every public page wears (components/site/chrome.tsx NAV).
+  ok('the masthead reaches One, the Charter, the blog and the docs', ['/one', '/charter', '/blog', '/docs'].every((x) => hrefs(html).includes(x)));
+  ok('…and the conversation can still be linked to', html.includes('id="session"'));
   ok('the price, from the one place it lives', html.includes('Socria One') && html.includes('· $15 a month'));
   ok('the foot carries Privacy and Terms', hrefs(html).includes('/privacy') && hrefs(html).includes('/terms'));
+  ok('…and Support, outside <main>, so the page has a footer landmark', /<\/main><footer class="s-colophon">/.test(html) && hrefs(html).includes('/support'));
   ok('the product picture is one labelled figure, inert inside', /<figure class="s-shot" aria-label="Logos 5: /.test(html) && /<div class="s-app" aria-hidden="true" inert=""/.test(html));
   ok('the margin cards are a picture, not controls', (html.match(/<div class="s-margin" inert="">/g) ?? []).length === 2);
   // Before anything runs, a demo is its final state: every line in place,
@@ -377,7 +379,8 @@ console.log('\n=== the student page ===');
   ok('it says the month has ended', ended.includes('has <span class="em">ended.</span>'));
   ok('…and promises no month', !ended.includes('@mavs.uta.edu') && !/Create my free account|first month of Socria One/.test(ended));
   ok('…and says what Socria is now, from the plan table', ended.includes('3 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month') && ended.includes('$15/month'));
-  ok('…with a way in and the plan page', ended.includes('href="/chat"') && ended.includes('href="/one"'));
+  // The one call to action every public page makes: "Start a conversation", into Logos.
+  ok('…with a way in and the plan page', ended.includes('href="/logos"') && ended.includes('Start a conversation') && ended.includes('href="/one"'));
   ok('one h1', (ended.match(/<h1[\s>]/g) ?? []).length === 1);
 }
 

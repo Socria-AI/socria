@@ -2,8 +2,8 @@
    Theme tokens only (app/themes.css): Paper, White, Dark, One and Celestial alike. */
 
 /* ── the button beside the box ───────────────────────────────────── */
-/* a key, as Make and the length dial beside it are (buttons.css, the small
-   secondary): card stock, a hairline edge, a ledge; on, pressed in, in the primary */
+/* a key, as Make and the length dial beside it are (l5-controls.css's carried-over
+   --l5b-* key): a hairline edge, no ledge; on, in the primary */
 .logos-root .sv-btn {
   position: relative;
   display: inline-flex;
@@ -58,7 +58,7 @@
   }
 }
 .logos-root .sv-btn.is-hearing svg {
-  color: #c0412f;
+  color: var(--lg-tension);
 }
 /* Experimental, said quietly: a hairline tag in the ink's own grey. It used to
    be a dashed tension-coloured badge, the loudest thing in the composer. */
@@ -69,18 +69,18 @@
   padding: 0 6px;
   border-radius: 999px;
   border: 1px solid color-mix(in srgb, currentColor 35%, transparent);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.04em;
   text-transform: uppercase;
   color: var(--lg-ink-60);
 }
-/* on the free plan the button says whose it is — Socria One's — in Socria One's blue, and opens the paywall */
+/* on the free plan the button says whose it is — Socria One's — in Socria One's blue (the theme's), and opens the paywall */
 .logos-root .sv-exp.is-one {
   border-color: transparent;
-  background: #1d3a4a;
-  color: #f0ead8;
-  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
+  background: var(--lg-one);
+  color: var(--c-paper);
+  font-family: var(--l5-serif);
   font-style: italic;
   font-weight: 400;
   font-size: 11px;
@@ -89,7 +89,7 @@
 }
 .logos-root .sv-exp.is-big {
   height: 18px;
-  font-size: 10px;
+  font-size: 10.5px;
   vertical-align: 3px;
   margin-left: 6px;
 }
@@ -111,12 +111,19 @@
 .logos-root .sv-panel {
   margin: 0 0 8px;
   padding: 8px 8px 8px 12px;
-  border-radius: 14px;
+  border-radius: var(--lg-r-card);
   border: 1px solid var(--lg-line);
-  background: var(--l5-raise, #fff);
+  background: var(--l5-raise);
   box-shadow: var(--l5-shadow);
   font-size: 13px;
   color: var(--lg-ink);
+}
+.logos-root .l5 .sv-panel {
+  border-radius: 0;
+  border-color: var(--c-rule-2);
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .sv-panel.is-floating {
   position: fixed;
@@ -140,7 +147,7 @@
   }
 }
 .logos-root .sv-panel.is-error {
-  border-color: rgba(163, 58, 44, 0.35);
+  border-color: color-mix(in srgb, var(--lg-tension) 35%, transparent);
 }
 .logos-root .sv-row {
   display: flex;
@@ -161,7 +168,7 @@
   animation: svPulse 1.6s ease-in-out infinite;
 }
 .logos-root .sv-dot.is-hearing {
-  background: #c0412f;
+  background: var(--lg-tension);
   animation-duration: 0.9s;
 }
 .logos-root .sv-level {
@@ -214,49 +221,76 @@
   flex: 0 0 auto;
 }
 .logos-root .sv-chip {
-  border: 1px solid var(--lg-line);
-  background: transparent;
-  color: var(--lg-ink-60);
-  border-radius: 999px;
-  padding: 4px 12px;
-  min-height: 30px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 0;
+  background: none;
+  color: var(--c-ink-70);
+  border-radius: 0;
+  padding: 0 4px;
+  min-height: 32px;
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
   white-space: nowrap;
+  transition: color 0.2s;
 }
-.logos-root .sv-chip:hover,
-.logos-root .sv-chip:focus-visible {
-  color: var(--lg-ink);
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4);
+.logos-root .sv-chip:hover:not(:disabled) {
+  color: var(--c-ink);
 }
 .logos-root .sv-chip.is-primary {
-  background: var(--lg-primary);
-  border-color: var(--lg-primary);
-  color: var(--l5-on-primary, #fff);
+  height: 32px;
+  padding: 0 14px;
+  border-radius: 999px;
+  background: var(--c-ink);
+  color: var(--c-paper);
+  line-height: 1;
+  transition: background-color 0.2s, transform 0.2s var(--c-ease);
+}
+.logos-root .sv-chip.is-primary:hover:not(:disabled) {
+  background: var(--c-moss);
+  color: var(--c-paper);
+  transform: translateY(-2px);
 }
 .logos-root .sv-chip:disabled {
-  opacity: 0.45;
+  color: var(--c-ink-25);
   cursor: default;
 }
-.logos-root .sv-icon {
-  width: 30px;
-  height: 30px;
-  border: 0;
-  border-radius: 50%;
+.logos-root .sv-chip.is-primary:disabled {
   background: transparent;
-  color: var(--lg-ink-60);
+  color: var(--c-ink-45);
+  box-shadow: inset 0 0 0 1px var(--c-ink-25);
+}
+.logos-root :is(.sv-chip, .sv-link):focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
+}
+/* a glyph button is the bare glyph (l5-controls .l5-icon): 32px, no ring, no wash */
+.logos-root .sv-icon {
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-60);
   font: inherit;
   font-size: 16px;
   line-height: 1;
   display: inline-grid;
   place-items: center;
   cursor: pointer;
+  transition: color 0.2s;
 }
-.logos-root .sv-icon:hover,
+.logos-root .sv-icon:hover {
+  color: var(--c-ink);
+  background: none;
+}
 .logos-root .sv-icon:focus-visible {
-  color: var(--lg-ink);
-  background: rgba(var(--lg-ink-rgb, 31, 31, 31), 0.06);
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .sv-live {
   display: grid;
@@ -307,11 +341,6 @@
   color: var(--lg-ink-60);
 }
 .logos-root .sv-problem {
-  color: #8a3a2e;
-}
-html[data-theme='dark'] .logos-root .sv-problem,
-html[data-theme='one'] .logos-root .sv-problem,
-html[data-theme='night'] .logos-root .sv-problem {
   color: var(--lg-tension);
 }
 .logos-root .sv-link {
@@ -338,7 +367,7 @@ html[data-theme='night'] .logos-root .sv-problem {
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05);
 }
 .logos-root .sv-confirm.is-destructive {
-  border-left-color: #a33a2c;
+  border-left-color: var(--lg-tension);
 }
 .logos-root .sv-confirm-q {
   margin: 0;
@@ -386,7 +415,7 @@ html[data-theme='night'] .logos-root .sv-problem {
   position: fixed;
   inset: 0;
   z-index: 95;
-  background: rgba(20, 24, 18, 0.32);
+  background: var(--lg-dim);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -398,11 +427,11 @@ html[data-theme='night'] .logos-root .sv-problem {
   width: min(540px, 100%);
   max-height: min(88vh, 760px);
   overflow: hidden;
-  border-radius: 16px;
+  border-radius: var(--lg-r-dialog);
   border: 1px solid var(--lg-line);
-  background: var(--l5-surface, #fffdf8);
+  background: var(--l5-surface);
   color: var(--lg-ink);
-  box-shadow: 0 24px 60px -20px rgba(20, 24, 18, 0.45);
+  box-shadow: var(--l5-shadow-up);
 }
 .logos-root .sv-sheet-head {
   display: flex;
@@ -438,10 +467,11 @@ html[data-theme='night'] .logos-root .sv-problem {
 .logos-root .sv-field legend {
   padding: 0;
   margin-bottom: 6px;
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--lg-ink-60);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-ink-45);
 }
 .logos-root .sv-choice {
   display: grid;
@@ -451,7 +481,7 @@ html[data-theme='night'] .logos-root .sv-problem {
   padding: 10px 12px;
   margin-bottom: 6px;
   border: 1px solid var(--lg-line);
-  border-radius: 12px;
+  border-radius: var(--lg-r-inner);
   font-size: 13.5px;
   line-height: 1.45;
   cursor: pointer;
@@ -473,25 +503,38 @@ html[data-theme='night'] .logos-root .sv-problem {
 .logos-root .sv-seg {
   display: inline-flex;
   flex-wrap: wrap;
-  gap: 4px;
-  padding: 3px;
-  border-radius: 999px;
-  border: 1px solid var(--lg-line);
+  gap: 4px 20px;
+  padding: 0;
+  border-radius: 0;
+  border: 0;
 }
 .logos-root .sv-seg button {
+  display: inline-flex;
+  align-items: center;
   border: 0;
-  border-radius: 999px;
-  padding: 5px 12px;
-  min-height: 30px;
-  background: transparent;
-  color: var(--lg-ink-60);
+  border-radius: 0;
+  padding: 0;
+  min-height: 32px;
+  background: none;
+  color: var(--c-ink-60);
   font: inherit;
-  font-size: 12.5px;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
+  transition: color 0.2s, box-shadow 0.2s;
+}
+.logos-root .sv-seg button:hover {
+  color: var(--c-ink);
 }
 .logos-root .sv-seg button.is-on {
-  background: var(--lg-primary);
-  color: var(--l5-on-primary, #fff);
+  background: none;
+  color: var(--c-ink);
+  box-shadow: inset 0 -2px 0 var(--c-moss);
+}
+.logos-root .sv-seg button:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .sv-promises {
   margin: 14px 0 6px;
@@ -509,10 +552,11 @@ html[data-theme='night'] .logos-root .sv-problem {
 }
 .logos-root .sv-help h3 {
   margin: 10px 0 4px;
-  font-size: 12px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.03em;
-  color: var(--lg-ink-60);
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--c-ink-45);
 }
 .logos-root .sv-help ul {
   margin: 0;
@@ -522,10 +566,16 @@ html[data-theme='night'] .logos-root .sv-problem {
 }
 .logos-root .sv-sheet-foot {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
-  gap: 8px;
+  gap: 8px 18px;
   padding: 12px 20px 16px;
   border-top: 1px solid var(--lg-line);
+}
+/* the sheet's one filled control is the standard 40px pill */
+.logos-root .sv-sheet-foot .sv-chip.is-primary {
+  height: 40px;
+  padding: 0 18px;
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -551,13 +601,13 @@ html[data-theme='night'] .logos-root .sv-problem {
     position: absolute;
     top: 1px;
     right: -2px;
-    height: 13px;
+    height: 14px;
     padding: 0 4px;
-    font-size: 8px;
+    font-size: 10.5px;
   }
   /* on the key's shoulder it needs a ground of its own — Socria One's tag keeps its blue (above), or its cream words vanish */
   .logos-root .sv-btn .sv-exp:not(.is-one) {
-    background: var(--l5-raise, #fff);
+    background: var(--l5-raise);
   }
   .logos-root .sv-exp-long {
     display: none;
@@ -600,7 +650,9 @@ html[data-theme='night'] .logos-root .sv-problem {
   }
   .logos-root .sv-chip {
     min-height: 40px;
-    padding: 6px 14px;
+  }
+  .logos-root .sv-chip.is-primary {
+    height: 40px;
   }
   .logos-root .sv-icon {
     width: 40px;
@@ -660,11 +712,9 @@ html[data-theme='night'] .logos-root .sv-problem {
   gap: 8px;
   flex-wrap: wrap;
 }
-.logos-root .l5h-voice.is-away {
-  color: #a33a2c;
-}
+.logos-root .l5h-voice.is-away,
 .logos-root .l5h-voice.is-err {
-  color: #8a3a2e;
+  color: var(--lg-tension);
 }
 @media (max-width: 560px) {
   /* a phone: the words have the box's whole width, and its tools a line of their own under them,

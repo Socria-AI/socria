@@ -9,8 +9,8 @@
   --l5i-ink-70: rgba(32, 32, 27, 0.72);
   --l5i-ink-45: rgba(32, 32, 27, 0.5);
   --l5i-line: rgba(32, 32, 27, 0.14);
-  --l5i-moss: var(--moss, #5e7633);
-  --l5i-moss-bg: rgba(94, 118, 51, 0.12);
+  --l5i-moss: var(--moss, #354620);
+  --l5i-moss-bg: rgba(53, 70, 32, 0.12);
   --l5i-blue: #26485a;
   --l5i-blue-bg: rgba(38, 72, 90, 0.1);
   --l5i-amber: #8a5a12;
@@ -160,7 +160,7 @@
 /* the workspace */
 .l5i-screens { display: grid; gap: 8px; max-width: 760px; }
 .l5i-home { background: var(--l5i-blue-bg); border-radius: 12px; padding: 14px 16px; }
-.l5i-home b, .l5i-beside { display: block; }
+.l5i-home b { display: block; }
 .l5i-home span { font-size: 14px; color: var(--l5i-ink-70); }
 .l5i-arrow-down { min-height: 44px; }
 .l5i-arrow-down::before { left: 50%; right: auto; top: 4px; bottom: 4px; border-top: 0; border-left: 2px solid var(--l5i-ink-45); }
@@ -168,7 +168,6 @@
 .l5i-arrow-down span { writing-mode: horizontal-tb; transform: none; }
 .l5i-views { display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .l5i-view { background: var(--l5i-card); border: 1px solid var(--l5i-line); border-radius: 10px; padding: 12px; text-align: center; font-weight: 600; }
-.l5i-beside { grid-column: 1 / -1; background: var(--l5i-moss-bg); border-radius: 10px; padding: 10px 12px; font-size: 14px; text-align: center; }
 
 .l5i-foot { max-width: 1040px; margin: 0 auto; padding: 24px 16px 40px; font-size: 13px; color: var(--l5i-ink-70); border-top: 1px solid var(--l5i-line); }
 

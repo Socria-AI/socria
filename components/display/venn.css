@@ -19,12 +19,12 @@
 .dsp-venn-name.is-c { color: var(--dsp-tension); }
 .dsp-venn-name:hover, .dsp-venn-name.is-sel { background: var(--dsp-tint); }
 .dsp-venn-region { position: absolute; transform: translate(-50%, -50%); display: grid; justify-items: center; gap: 3px; pointer-events: none; }
-.dsp-venn-count { font-size: 10px; font-weight: 600; color: var(--dsp-40); font-variant-numeric: tabular-nums; }
-.dsp-venn-none { font-size: 10px; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp-venn-count { font-size: 10.5px; font-weight: 600; color: var(--dsp-40); font-variant-numeric: tabular-nums; }
+.dsp-venn-none { font-size: 10.5px; letter-spacing: 0.18em; font-weight: 600; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); }
 .dsp-venn-members { display: flex; flex-wrap: wrap; justify-content: center; gap: 3px; }
 .dsp-venn-chip {
   pointer-events: auto; padding: 1px 7px; border: 1px solid var(--dsp-line); border-radius: 999px; background: var(--dsp-paper); cursor: grab;
-  font-size: 12px; line-height: 18px; color: var(--dsp-ink); white-space: nowrap; touch-action: none; box-shadow: 0 1px 0 rgba(0, 0, 0, 0.04);
+  font-size: 12px; line-height: 18px; color: var(--dsp-ink); white-space: nowrap; touch-action: none;
 }
 .dsp-venn-chip:hover { border-color: var(--dsp-24); }
 .dsp-venn-chip.is-sel { border-color: var(--dsp-primary); box-shadow: 0 0 0 2px var(--dsp-tint-2); }
@@ -40,7 +40,7 @@
 .dsp-venn-counts { margin: 0; padding: 0; list-style: none; display: grid; gap: 2px; font-size: 12.5px; }
 .dsp-venn-counts li { display: flex; justify-content: space-between; gap: 12px; padding: 2px 0; border-bottom: 1px solid var(--dsp-line); }
 .dsp-venn-in { border: 0; padding: 0; margin: 0; display: flex; flex-wrap: wrap; gap: 10px; }
-.dsp-venn-in legend { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); margin-bottom: 4px; }
+.dsp-venn-in legend { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); margin-bottom: 4px; }
 .dsp-venn-tick { display: inline-flex; align-items: center; gap: 4px; font-size: 12.5px; cursor: pointer; }
 .dsp-venn-tick input { accent-color: var(--dsp-primary); }
 .dsp-venn-tick.is-a { color: var(--dsp-primary); }

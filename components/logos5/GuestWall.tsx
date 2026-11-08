@@ -13,6 +13,7 @@
 
 import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import { GUEST_TURNS } from '@/lib/guest-limits';
+import { L5Close } from './L5Chrome';
 
 export function GuestWall({
   open,
@@ -45,6 +46,8 @@ export function GuestWall({
   return (
     <div className="l5-guestwall" role="presentation" onClick={onClose}>
       <div className="l5-guestwall-card" role="dialog" aria-modal="true" aria-labelledby="l5-guestwall-h" aria-describedby="l5-guestwall-d" onClick={(e) => e.stopPropagation()}>
+        {/* it can be put away (Esc, the page around it, "Not now"): so it has the one close, top right */}
+        <L5Close label="Close" onClose={onClose} className="l5-guestwall-x" />
         {save ? (
           <>
             <p className="l5-guestwall-k">Saved in this browser</p>

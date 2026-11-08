@@ -75,7 +75,7 @@ export const DOC_PAGES: DocPage[] = [
   },
   {
     slug: 'thinking-map',
-    title: 'The Thinking Map',
+    title: 'The Logic Map',
     blurb: 'The Logic Map’s vocabulary: node types, relationships, the four lenses, and the four moves a node opens.',
     group: 'The reasoning environment',
   },

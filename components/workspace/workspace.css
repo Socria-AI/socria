@@ -25,11 +25,6 @@
 }
 .logos-root .ws-suggest .ws-suggest-go { color: var(--lg-primary); }
 .logos-root .ws-suggest button:hover { border-color: var(--lg-line); }
-/* Logos 3's header says less: the mark, and the few doors a person needs. */
-.logos-root .lg-split.is-ws .lg-head { padding: 12px 18px 10px; }
-.logos-root .lg-split.is-ws .lg-head-note { display: none; }
-.logos-root .lg-split.is-ws .lg-back .lg-lbl-long { display: none; }
-.logos-root .lg-split.is-ws .lg-back .lg-lbl-short { display: inline !important; }
 
 /* ── the stage: splits, cells, hairline dividers ─────────────────────── */
 .logos-root .ws-stage { flex: 1; min-height: 0; min-width: 0; display: flex; position: relative; }
@@ -56,23 +51,25 @@
 .logos-root .ws-chip {
   position: absolute; top: 8px; right: 8px; z-index: 8;
   display: flex; align-items: center; gap: 2px; padding: 2px 3px 2px 10px;
-  border-radius: 999px; background: rgba(250,248,242,0.92); border: 1px solid var(--lg-line);
-  box-shadow: 0 6px 18px -12px rgba(var(--ink-rgb, 31, 31, 31), 0.4);
+  border-radius: 999px; background: rgba(var(--l5-surface-rgb), 0.92); border: 1px solid var(--lg-line);
+  box-shadow: var(--l5-shadow);
   opacity: 0; pointer-events: none; transition: opacity 0.15s;
 }
 .logos-root .ws-panel:hover > .ws-chip,
 .logos-root .ws-chip:focus-within,
 .logos-root .ws-panel.is-max > .ws-chip { opacity: 1; pointer-events: auto; }
 .logos-root .ws-chip-t {
-  font-family: var(--lg-sans); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--lg-ink-40); padding-right: 4px; user-select: none;
+  font-family: var(--lg-sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em;
+  text-transform: uppercase; color: var(--c-ink-45); padding-right: 4px; user-select: none;
 }
 .logos-root .ws-chip-t[draggable="true"] { cursor: grab; }
 .logos-root .ws-act {
-  background: none; border: 0; cursor: pointer; color: var(--lg-ink-40);
-  font-size: 13px; line-height: 1; padding: 4px 6px; border-radius: 999px;
+  display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0;
+  background: none; border: 0; border-radius: 0; cursor: pointer; color: var(--c-ink-60);
+  font-size: 13px; line-height: 1; transition: color 0.2s;
 }
-.logos-root .ws-act:hover, .logos-root .ws-act:focus-visible { color: var(--lg-ink); background: rgba(var(--ink-rgb, 31, 31, 31), 0.05); }
+.logos-root .ws-act:hover { color: var(--c-ink); background: none; }
+.logos-root .ws-act svg { width: 16px; height: 16px; }
 .logos-root .ws-body { flex: 1; min-height: 0; min-width: 0; display: flex; flex-direction: column; overflow: hidden; position: relative; }
 .logos-root .ws-body > * { flex: 1; min-height: 0; }
 .logos-root .ws-panel.is-max { flex: 1; }
@@ -90,12 +87,12 @@
 .logos-root .ws-menu {
   position: absolute; z-index: 40; right: 8px; top: calc(100% + 2px);
   width: min(360px, 80vw); max-height: min(560px, 76vh); overflow: auto;
-  background: var(--lg-panel); border: 1px solid var(--lg-line); border-radius: 10px;
-  box-shadow: 0 18px 50px -24px rgba(var(--ink-rgb, 31, 31, 31), 0.45); padding: 6px;
+  background: var(--lg-panel); border: 1px solid var(--lg-line); border-radius: var(--lg-r-inner);
+  box-shadow: var(--l5-shadow-up); padding: 6px;
   font-family: var(--lg-sans);
 }
-.logos-root .ws-menu-none { margin: 8px; font-family: var(--serif); font-style: italic; font-size: 13px; color: var(--lg-ink-60); }
-.logos-root .ws-menu-k { margin: 6px 8px 4px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-ink-40); }
+.logos-root .l5 .ws-menu { border-radius: 0; border-color: var(--c-rule-2); background-color: var(--c-paper); background-image: var(--c-grain); box-shadow: none; }
+.logos-root .ws-menu-k { margin: 6px 8px 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .ws-menu-k.is-sub { margin-top: 10px; }
 .logos-root .ws-menu-row {
   display: flex; flex-direction: column; align-items: flex-start; gap: 1px; width: 100%;
@@ -114,15 +111,16 @@
 .logos-root .ws-cat-row .ws-cat-main { flex: 1 1 auto; min-width: 0; }
 .logos-root .ws-cat-row .ws-menu-l { display: flex; align-items: baseline; gap: 8px; }
 .logos-root .ws-cat-on {
-  font-family: var(--lg-sans); font-style: normal; font-size: 9.5px; font-weight: 600;
-  letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-primary);
+  font-family: var(--lg-sans); font-style: normal; font-size: 10.5px; font-weight: 600;
+  letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-primary);
 }
 .logos-root .ws-menu-w.is-empty { color: var(--lg-ink-40); }
 .logos-root .ws-cat-x {
-  flex: 0 0 auto; width: 28px; height: 28px; margin-right: 2px; border: 1px solid transparent; border-radius: 999px;
-  background: none; cursor: pointer; font-family: var(--lg-sans); font-size: 16px; line-height: 1; color: var(--lg-ink-40);
+  flex: 0 0 auto; display: inline-grid; place-items: center; width: 32px; height: 32px; margin-right: 2px; padding: 0; border: 0; border-radius: 0;
+  background: none; cursor: pointer; font-family: var(--lg-sans); font-size: 16px; line-height: 1; color: var(--c-ink-60); transition: color 0.2s;
 }
-.logos-root .ws-cat-x:hover, .logos-root .ws-cat-x:focus-visible { color: var(--lg-tension); border-color: var(--lg-line); }
+.logos-root .ws-cat-x:hover { color: var(--c-ink); }
+.logos-root .ws-cat-x svg { width: 16px; height: 16px; }
 .logos-root .ws-cat-x:focus-visible, .logos-root .ws-cat-main:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: -2px; }
 
 /* ── empty states ────────────────────────────────────────────────────── */
@@ -135,14 +133,16 @@
 
 /* ── narrow screens: tabs, one surface at a time ─────────────────────── */
 .logos-root .ws-root.is-narrow .ws-tabs { display: flex; gap: 2px; overflow-x: auto; padding: 6px 10px; border-bottom: 1px solid var(--lg-line); scrollbar-width: none; }
-.logos-root .ws-tabs button { background: none; border: 0; padding: 6px 10px; border-radius: 999px; font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60); white-space: nowrap; cursor: pointer; }
-.logos-root .ws-tabs button[aria-selected="true"] { background: rgba(var(--moss-rgb, 53, 70, 32), 0.1); color: var(--lg-primary); }
+.logos-root .ws-root.is-narrow .ws-tabs { gap: 20px; }
+.logos-root .ws-tabs button { display: inline-flex; align-items: center; min-height: 32px; background: none; border: 0; padding: 0; border-radius: 0; font-family: var(--lg-sans); font-size: 13.5px; font-weight: 500; color: var(--c-ink-60); white-space: nowrap; cursor: pointer; transition: color 0.2s, box-shadow 0.2s; }
+.logos-root .ws-tabs button:hover { color: var(--c-ink); }
+.logos-root .ws-tabs button[aria-selected="true"] { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
 
 /* ── the panels' own content ─────────────────────────────────────────── */
 .logos-root .ws-model { display: flex; flex-direction: column; min-height: 0; height: 100%; }
 .logos-root .ws-model > * { flex: 1; min-height: 0; }
 .logos-root .ws-sub { margin: 0 0 6px; font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink-60); }
-.logos-root .ws-h { margin: 14px 0 4px; font-family: var(--lg-sans); font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-ink-40); }
+.logos-root .ws-h { margin: 14px 0 4px; font-family: var(--lg-sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .ws-params, .logos-root .ws-insp, .logos-root .ws-trace { overflow: auto; padding: 4px 16px 18px; font-family: var(--lg-sans); }
 .logos-root .ws-ctl { display: grid; grid-template-columns: minmax(70px, 0.9fr) 1.6fr auto; align-items: center; gap: 10px; padding: 5px 6px; margin: 0 -6px; border-radius: 7px; }
 .logos-root .ws-ctl.is-on { background: rgba(var(--moss-rgb, 53, 70, 32), 0.08); }
@@ -154,7 +154,7 @@
 
 .logos-root .ws-insp-head { padding: 2px 0 8px; border-bottom: 1px solid var(--lg-line); margin-bottom: 8px; }
 .logos-root .ws-insp-head h3 { margin: 2px 0 2px; font-family: var(--serif); font-weight: 400; font-size: 22px; line-height: 1.2; color: var(--lg-ink); }
-.logos-root .ws-kicker { font-size: 9.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-primary); }
+.logos-root .ws-kicker { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-primary); }
 .logos-root .ws-hint { font-family: var(--serif); font-style: italic; font-size: 13.5px; color: var(--lg-ink-60); margin: 4px 0 10px; }
 .logos-root .ws-lines { margin: 0; padding: 0 0 0 16px; font-size: 13.5px; line-height: 1.55; color: var(--lg-ink); }
 .logos-root .ws-sec { border-bottom: 1px solid var(--lg-line); padding: 6px 0; }
@@ -167,14 +167,20 @@
 .logos-root .ws-sec dt { color: var(--lg-ink-60); }
 .logos-root .ws-sec dt button { background: none; border: 0; padding: 0; color: var(--lg-primary); cursor: pointer; font: inherit; text-align: left; }
 .logos-root .ws-sec dd { margin: 0; color: var(--lg-ink); }
-.logos-root .ws-insp-acts { display: flex; gap: 8px; margin-top: 12px; }
+.logos-root .ws-insp-acts { display: flex; align-items: center; gap: 8px 18px; margin-top: 12px; }
 .logos-root .ws-insp-acts button, .logos-root .ws-trace-acts button {
-  font-family: var(--lg-sans); font-size: 12.5px; cursor: pointer; border-radius: 999px; padding: 5px 12px;
-  border: 1px solid rgba(var(--moss-rgb, 53, 70, 32), 0.4); background: none; color: var(--lg-primary);
+  display: inline-flex; align-items: center; justify-content: center; min-height: 32px;
+  font-family: var(--lg-sans); font-size: 13.5px; font-weight: 500; cursor: pointer; border-radius: 0; padding: 0;
+  border: 0; background: none; color: var(--c-ink-70); transition: color 0.2s, background-color 0.2s, transform 0.2s var(--c-ease);
 }
-.logos-root .ws-insp-acts .is-quiet { border-color: transparent; color: var(--lg-ink-60); }
-.logos-root .ws-trace-acts { display: flex; gap: 8px; margin: 2px 0 10px; }
-.logos-root .ws-trace-acts button:disabled { opacity: 0.35; cursor: default; }
+.logos-root .ws-insp-acts button:hover:not(:disabled), .logos-root .ws-trace-acts button:hover:not(:disabled) { color: var(--c-ink); }
+.logos-root .ws-insp-acts button:not(.is-quiet) {
+  height: 32px; padding: 0 14px; border-radius: 999px; background: var(--c-ink); color: var(--c-paper); line-height: 1;
+}
+.logos-root .ws-insp-acts button:not(.is-quiet):hover { background: var(--c-moss); color: var(--c-paper); transform: translateY(-2px); }
+.logos-root .ws-insp-acts .is-quiet { color: var(--c-ink-60); }
+.logos-root .ws-trace-acts { display: flex; align-items: center; gap: 8px 18px; margin: 2px 0 10px; }
+.logos-root .ws-trace-acts button:disabled { color: var(--c-ink-25); cursor: default; }
 .logos-root .ws-trace-list { list-style: none; margin: 0; padding: 0; border-left: 1px solid var(--lg-line); }
 .logos-root .ws-trace-list li button {
   display: flex; align-items: baseline; gap: 8px; width: 100%; text-align: left; background: none; border: 0; cursor: pointer;
@@ -192,129 +198,45 @@
   .logos-root .ws-chip, .logos-root .ws-divider::after, .logos-root .ws-drop span { transition: none; }
 }
 
-/* ── Logos 3: the workspace takes the place of the two fixed columns ──── */
-.logos-root .lg-split.is-ws { grid-template-columns: 280px minmax(0, 1fr); }
-.logos-root .lg-split.is-ws.rail-closed { grid-template-columns: minmax(0, 1fr); }
-.logos-root .lg-split.is-ws.draft-open,
-.logos-root .lg-split.is-ws.draft-open.rail-closed { grid-template-columns: minmax(0, 1fr) minmax(380px, 0.8fr); }
-.logos-root .lg-ws-col { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
-.logos-root .lg-ws-col > .ws-root { flex: 1; min-height: 0; }
-.logos-root .lg-split.is-ws .lg-mswitch { display: none; }
-.logos-root .lg-split.is-ws .lg-ws-col { display: flex !important; }
-@media (max-width: 900px) {
-  .logos-root .lg-split.is-ws, .logos-root .lg-split.is-ws.rail-closed { grid-template-columns: 1fr; }
-}
-/* the conversation and the map, as panels: no column borders of their own */
-.logos-root .ws-body > .lg-convo-panel { display: flex; flex-direction: column; min-height: 0; }
+/* the map, as a panel: no column borders of its own */
 .logos-root .ws-body > .lg-panel-in { border-left: none; border-top: none; background: var(--lg-paper); }
 /* the map needs no head of its own in the workspace: what it is, is plain */
 .logos-root .ws-body > .lg-panel-in > .lg-panel-head { display: none; }
 .logos-root .ws-t-model .ws-body, .logos-root .ws-t-map .ws-body { background: var(--lg-panel); }
-/* the fixed layout hides one column on a phone; in the workspace the tabs decide */
-@media (max-width: 900px) {
-  .logos-root .lg-split.is-ws .ws-body > .lg-panel-in,
-  .logos-root .lg-split.is-ws .ws-body > .lg-convo-panel { display: flex; flex-direction: column; min-height: 0; }
-}
-
-/* ── the dock: the conversation, while it is not a panel ─────────────── */
-.logos-root .ws-dock {
-  flex: 0 0 auto; position: relative; display: flex; flex-direction: column;
-  width: min(780px, calc(100% - 32px)); margin: 0 auto; padding-top: 6px; min-height: 0;
-}
-.logos-root .ws-dock .lg-composer { padding: 6px 0 8px; }
-.logos-root .ws-dock .lg-tools { margin: 0; padding: 0 2px 10px; }
-.logos-root .ws-dock .lg-guard, .logos-root .ws-dock .lg-one-note, .logos-root .ws-dock .lg-drift, .logos-root .ws-dock .lg-allow { margin-left: 0; margin-right: 0; }
-.logos-root .ws-dock:not(.is-open) .lg-thread { display: none; }
-.logos-root .ws-dock.is-open .lg-thread { flex: 0 1 auto; min-height: 0; max-height: 52vh; padding: 10px 4px 8px; border-top: 1px solid var(--lg-line); }
-.logos-root .ws-dock-row { display: flex; align-items: flex-start; gap: 12px; }
-.logos-root .ws-peek-gap { flex: 1; }
-.logos-root .ws-dock-toggle {
-  flex: 0 0 auto; margin-top: 3px; background: none; border: 1px solid transparent; border-radius: 999px; cursor: pointer;
-  padding: 2px 9px; font-family: var(--lg-sans); font-size: 11.5px; color: var(--lg-ink-40); white-space: nowrap;
-}
-.logos-root .ws-dock-toggle:hover, .logos-root .ws-dock-toggle[aria-expanded="true"] { color: var(--lg-ink); border-color: var(--lg-line); }
-/* Socria's latest reply, a few lines of it, where the eye already is */
-.logos-root .ws-peek {
-  display: flex; align-items: baseline; gap: 10px; flex: 1; min-width: 0; text-align: left;
-  background: none; border: 0; cursor: pointer; padding: 4px 2px 2px; color: var(--lg-ink);
-}
-.logos-root .ws-peek-who {
-  flex: 0 0 auto; font-family: var(--lg-sans); font-size: 10px; font-weight: 600; letter-spacing: 0.14em;
-  text-transform: uppercase; color: var(--lg-primary);
-}
-.logos-root .ws-peek-text {
-  font-family: var(--serif); font-size: 15px; line-height: 1.5; color: var(--lg-ink);
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical; overflow: hidden;
-}
-.logos-root .ws-peek:hover .ws-peek-text { color: var(--lg-ink-60); }
-/* a new line of thinking: the first words, and the openings, stay in reach */
-.logos-root .ws-dock.is-new .lg-thread { display: block; flex: 0 1 auto; max-height: 40vh; padding: 0 2px; }
-.logos-root .ws-dock.is-new .lg-intro h1 { display: none; }
-.logos-root .ws-dock.is-new .lg-intro > p { display: none; }
 
 /* ── the contextual inspector card ───────────────────────────────────── */
 .logos-root .ws-card {
   position: absolute; z-index: 12; top: 14px; right: 14px;
   width: min(320px, 42%); display: flex; flex-direction: column; min-height: 0; max-height: min(520px, calc(100% - 28px));
-  background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: 12px;
-  box-shadow: 0 22px 60px -30px rgba(var(--ink-rgb, 31, 31, 31), 0.5);
-  animation: wsCardIn 0.18s ease both;
+  background: var(--lg-paper); border: 1px solid var(--lg-line); border-radius: var(--lg-r-card);
+  box-shadow: var(--l5-shadow-up);
+  animation: wsCardIn 0.2s ease both;
 }
+.logos-root .l5 .ws-card { border-radius: 0; border-color: var(--c-rule-2); background-color: var(--c-paper); background-image: var(--c-grain); box-shadow: none; }
 .logos-root .ws-card > .ws-insp { flex: 1; min-height: 0; }
 .logos-root .ws-card-acts { display: flex; align-items: center; justify-content: flex-end; gap: 4px; padding: 6px 6px 0; }
 .logos-root .ws-card-keep {
-  background: none; border: 0; cursor: pointer; border-radius: 999px; padding: 3px 9px;
-  font-family: var(--lg-sans); font-size: 11.5px; color: var(--lg-ink-40);
+  display: inline-flex; align-items: center; min-height: 24px;
+  background: none; border: 0; cursor: pointer; border-radius: 0; padding: 0 4px;
+  font-family: var(--lg-sans); font-size: 12.5px; font-weight: 500; color: var(--c-ink-45); transition: color 0.2s;
 }
-.logos-root .ws-card-keep:hover { color: var(--lg-primary); background: rgba(var(--moss-rgb, 53, 70, 32), 0.07); }
+.logos-root .ws-card-keep:hover { color: var(--c-ink); background: none; }
 @keyframes wsCardIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
 @media (prefers-reduced-motion: reduce) { .logos-root .ws-card { animation: none; } }
 
 @media (max-width: 900px) {
-  .logos-root .lg-split.is-ws .ws-dock { display: flex !important; width: calc(100% - 24px); }
-  .logos-root .lg-split.is-ws .ws-dock .lg-tools { padding-bottom: calc(10px + env(safe-area-inset-bottom, 0px)); }
   .logos-root .ws-top { padding-right: 10px; }
   .logos-root .ws-card { left: 10px; right: 10px; width: auto; top: auto; bottom: 10px; max-height: 60%; }
 }
 /* Point & Ask on a phone: the inspector is the bottom sheet, and its two
    actions are thumb-sized and share the row. */
 @media (max-width: 640px) {
-  .logos-root .ws-card { left: 0; right: 0; bottom: 0; border-radius: 16px 16px 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
+  .logos-root .ws-card { left: 0; right: 0; bottom: 0; border-radius: var(--lg-r-dialog) var(--lg-r-dialog) 0 0; padding-bottom: env(safe-area-inset-bottom, 0px); }
   .logos-root .ws-card .ws-insp-acts button { flex: 1 1 0; min-height: 44px; }
 }
 /* among several panels, the card clears the corner chip */
 .logos-root .ws-panel.has-chip > .ws-card { top: 44px; max-height: min(560px, calc(100% - 58px)); }
 
-/* ── what a surface says about itself, in Logos 3 ───────────────────────
-   The model's name stays; how it was drawn, what is not available and the
-   corner labels are a click away (Understand) rather than always on. */
-.logos-root .lg-split.is-ws .sfx-l,
-.logos-root .lg-split.is-ws .sfx-note { display: none; }
-.logos-root .lg-split.is-ws .sfx-icon { opacity: 0; transition: opacity 0.15s; }
-.logos-root .lg-split.is-ws .sfx:hover .sfx-icon,
-.logos-root .lg-split.is-ws .sfx-icon:focus-visible,
-.logos-root .lg-split.is-ws .sfx.is-full .sfx-icon { opacity: 1; }
-.logos-root .lg-split.is-ws .und:not(.is-shown) { display: flex; flex-direction: row-reverse; align-items: center; gap: 12px; }
-.logos-root .lg-split.is-ws .und:not(.is-shown) .und-bar { flex: 0 0 auto; }
-.logos-root .lg-split.is-ws .und:not(.is-shown) .und-views { flex: 1; min-width: 0; }
-.logos-root .lg-split.is-ws .und:not(.is-shown) .und-what,
-.logos-root .lg-split.is-ws .und:not(.is-shown) .und-views-label,
-.logos-root .lg-split.is-ws .und:not(.is-shown) .und-missing,
-.logos-root .lg-split.is-ws .und:not(.is-shown) .und-group:has(> .und-of:not([title])) { display: none; }
-/* The map names its lens in its own tabs; the bar above them repeated it,
-   and the legend repeats what every node already says on its face. */
-.logos-root .lg-split.is-ws .ws-t-map .mp-top:not(:has(.mp-x)),
-.logos-root .lg-split.is-ws .ws-t-map .mp-bot { display: none; }
-/* Think together: the icon alone; the name is its tooltip and its label. */
-.logos-root .lg-split.is-ws .lg-collab-start { font-size: 0; gap: 0; padding: 0 8px; border-color: transparent; }
-.logos-root .lg-split.is-ws .lg-collab-start svg { width: 17px; height: 17px; }
-/* the openings, when a line of thinking is new: a row of short starts */
-.logos-root .ws-dock.is-new .lg-openings { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; margin: 0 0 4px; }
-.logos-root .ws-dock.is-new .lg-openings-lead { flex-basis: 100%; text-align: center; margin: 0 0 2px; font-size: 10px; color: var(--lg-ink-40); }
-.logos-root .ws-dock.is-new .lg-opening { padding: 6px 12px; border-radius: 999px; width: auto; }
-.logos-root .ws-dock.is-new .lg-opening small { display: none; }
-.logos-root .ws-dock.is-new .lg-opening strong { font-weight: 500; font-size: 13px; }
-.logos-root .ws-dock.is-new .lg-intro { padding: 0; margin: 0; max-width: none; }
 /* With a Parameters panel open, the model's own sliders would be the same
    controls twice; the panel holds them. */
 .logos-root .ws-root:has(.ws-t-params) .ws-t-model .sfx-ctls { display: none; }
@@ -334,18 +256,10 @@
    conversation on a short screen cannot squeeze the map to nothing either. */
 .logos-root .ws-main:is(.dock-bottom, .dock-top) > .ws-stage,
 .logos-root .ws-root.is-narrow > .ws-stage { min-height: min(26vh, 220px); }
-.logos-root .ws-dockwrap > .ws-dock, .logos-root .ws-root.is-narrow > .ws-dock { flex: 0 1 auto; min-height: 0; }
-.logos-root .ws-dock > * { flex-shrink: 0; }
-.logos-root .ws-dock > .lg-thread, .logos-root .ws-dock > .syn { flex-shrink: 1; min-height: 0; }
 .logos-root .ws-main.dock-top > .ws-dockwrap { border-bottom: 1px solid var(--lg-line); padding-bottom: 4px; }
 .logos-root .ws-main:is(.dock-left, .dock-right) > .ws-dockwrap { width: clamp(300px, 30%, 420px); }
 .logos-root .ws-main.dock-right > .ws-dockwrap { border-left: 1px solid var(--lg-line); }
 .logos-root .ws-main.dock-left > .ws-dockwrap { border-right: 1px solid var(--lg-line); }
-/* beside the stage it is a column: the history fills it, the composer sits at its foot */
-.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock { width: 100%; height: 100%; margin: 0; padding: 18px 16px 0; }
-.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock .lg-thread { display: block; flex: 1 1 auto; max-height: none; overflow-y: auto; padding: 0 2px 8px; border-top: none; }
-.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock .syn { max-height: none; }
-.logos-root .ws-main:is(.dock-left, .dock-right) .ws-dock-toggle { display: none; }
 
 /* the grip: a short bar on the edge that faces the stage */
 .logos-root .ws-dock-grip {
@@ -374,22 +288,23 @@
 .logos-root .ws-confirm { padding: 8px 8px 6px; }
 .logos-root .ws-confirm-q { margin: 0 0 4px; font-family: var(--serif); font-size: 18px; line-height: 1.2; color: var(--lg-ink); }
 .logos-root .ws-confirm-d { margin: 0 0 10px; font-size: 12.5px; line-height: 1.45; color: var(--lg-ink-60); }
-.logos-root .ws-confirm-acts { display: flex; gap: 8px; }
+.logos-root .ws-confirm-acts { display: flex; align-items: center; gap: 8px 18px; }
 .logos-root .ws-confirm-acts button {
-  border: 1px solid var(--lg-line); background: none; border-radius: 999px; padding: 5px 14px; cursor: pointer;
-  font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60);
+  display: inline-flex; align-items: center; min-height: 32px; border: 0; background: none; border-radius: 0; padding: 0; cursor: pointer;
+  font-family: var(--lg-sans); font-size: 13.5px; font-weight: 500; color: var(--c-ink-70); transition: color 0.2s, background-color 0.2s, transform 0.2s var(--c-ease);
 }
-.logos-root .ws-confirm-acts button.is-go { background: var(--lg-primary); border-color: var(--lg-primary); color: var(--lg-paper); }
-.logos-root .ws-confirm-acts button:hover:not(.is-go) { color: var(--lg-ink); border-color: var(--lg-ink-24); }
+.logos-root .ws-confirm-acts button.is-go { height: 32px; padding: 0 14px; border-radius: 999px; background: var(--c-ink); color: var(--c-paper); line-height: 1; }
+.logos-root .ws-confirm-acts button.is-go:hover { background: var(--c-moss); transform: translateY(-2px); }
+.logos-root .ws-confirm-acts button:hover:not(.is-go) { color: var(--c-ink); }
 
 /* Notes on the work, in the conversation: under Socria's latest reply rather
    than as strips across the map. Quiet, like a margin note. */
 .logos-root .lg-annots { display: flex; flex-direction: column; gap: 6px; margin: 2px 0 12px; }
-.logos-root .ws-dock > .lg-annots { margin: 6px 0 4px; }
 .logos-root .lg-annot { display: flex; align-items: baseline; flex-wrap: wrap; gap: 4px 10px; margin: 0; padding: 7px 10px 7px 12px; border-left: 2px solid var(--lg-primary); border-radius: 0 10px 10px 0; background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06); font-size: 13px; line-height: 1.45; color: var(--lg-ink); }
-.logos-root .lg-annot-k { font-family: var(--sans, system-ui); font-size: 10.5px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; color: var(--lg-ink-60); }
+.logos-root .lg-annot-k { font-family: var(--sans, system-ui); font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .lg-annot-t { flex: 1 1 220px; min-width: 0; }
 .logos-root .lg-annot-act { border: 1px solid var(--lg-line); background: transparent; color: var(--lg-ink); font: inherit; font-size: 12px; padding: 2px 10px; border-radius: 999px; cursor: pointer; }
 .logos-root .lg-annot-act:hover { border-color: var(--lg-primary); color: var(--lg-primary); }
-.logos-root .lg-annot-x { margin-left: auto; border: none; background: none; color: var(--lg-ink-40); font-size: 16px; line-height: 1; padding: 0 2px; cursor: pointer; }
-.logos-root .lg-annot-x:hover { color: var(--lg-ink); }
+/* dismissing a note: the bare glyph, 32 x 32, drawn into the row's margin so the row keeps its height */
+.logos-root .lg-annot-x { display: inline-grid; place-items: center; width: 32px; height: 32px; margin: -7px -8px -7px auto; padding: 0; border: none; border-radius: 0; background: none; color: var(--c-ink-60); font-size: 16px; line-height: 1; cursor: pointer; transition: color 0.2s; }
+.logos-root .lg-annot-x:hover { color: var(--c-ink); }

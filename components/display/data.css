@@ -1,6 +1,33 @@
-/* components/display/data.css — charts in the Logos palette: one ink colour, then the accent, quiet axes. */
+/* components/display/data.css — charts in the Logos palette: the one series palette, quiet axes. */
 
-.dsp-data-basis { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 11px; font-weight: 600; letter-spacing: 0.1em; text-transform: uppercase; color: var(--dsp-40); }
+/* THE ONE SERIES PALETTE, declared once, here. A chart in a reply
+   (components/inline/inline.css, which InlineUI loads with this sheet) and the
+   same chart opened in Artifacts (DataFigure) read these, so a chart keeps its
+   colours when it is opened. A lone series is the theme's primary; with more
+   than one, series n is --ln-cn, and a pie's slice n is --ln-cn — following the
+   series (its column, a slice's row), never its rank. The tension colour is the
+   conflict colour and never a series. A validated set (the dataviz palette
+   check: lightness band, chroma floor, colour-blind separation between
+   neighbours, the normal-vision floor, contrast): light on paper and on white,
+   dark on the Dark, One and Celestial grounds. */
+:is(.logos-root, .lg-tokens) {
+  --ln-c1: #3b6db4;
+  --ln-c2: #c9772b;
+  --ln-c3: #7a5bb5;
+  --ln-c4: #2f9a83;
+  --ln-c5: #b0476a;
+  --ln-c6: #8a8f2e;
+}
+html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.logos-root, .lg-tokens) {
+  --ln-c1: #6496db;
+  --ln-c2: #c97f3c;
+  --ln-c3: #9a83d6;
+  --ln-c4: #33a28a;
+  --ln-c5: #ad4866;
+  --ln-c6: #969b35;
+}
+
+.dsp-data-basis { display: flex; align-items: center; gap: 8px; margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); }
 .dsp-data-basis.is-example { color: var(--dsp-tension); padding: 4px 8px; border: 1px dashed color-mix(in srgb, var(--dsp-tension) 55%, transparent); border-radius: 4px; }
 .dsp-data-basis.is-given { color: var(--dsp-primary); }
 .dsp-data-basis .dsp-tool { text-transform: none; letter-spacing: 0; font-weight: 400; }
@@ -10,43 +37,70 @@
 .dsp-data-series input { accent-color: var(--dsp-primary); }
 
 .dsp-data-bar { cursor: pointer; transition: opacity 0.15s; }
-.dsp-data-bar:hover, .dsp-data-bar:focus { opacity: 0.8; outline: none; }
+.dsp-data-bar:hover { opacity: 0.8; }
+.dsp-data-bar:focus { outline: none; }
+/* keyboard focus is the standard ring, not the hover's fade */
+.dsp-data-bar:focus-visible { outline: 2px solid var(--dsp-primary); outline-offset: 2px; }
 .dsp-data-bar.is-sel { stroke: var(--dsp-ink); stroke-width: 1.5; }
-.is-s0.dsp-data-bar, .is-s0 .dsp-data-line { fill: var(--dsp-primary); stroke: var(--dsp-primary); }
-.is-s1.dsp-data-bar, .is-s1 .dsp-data-line { fill: var(--dsp-accent); stroke: var(--dsp-accent); }
-.is-s2.dsp-data-bar, .is-s2 .dsp-data-line { fill: var(--dsp-tension); stroke: var(--dsp-tension); }
-.is-s3.dsp-data-bar, .is-s3 .dsp-data-line { fill: var(--dsp-60); stroke: var(--dsp-60); }
+/* a lone series is the primary; several are the series palette, by series */
+.dsp {
+  --dsp-s0: var(--dsp-primary);
+  --dsp-s1: var(--ln-c1, #3b6db4);
+  --dsp-s2: var(--ln-c2, #c9772b);
+  --dsp-s3: var(--ln-c3, #7a5bb5);
+  --dsp-s4: var(--ln-c4, #2f9a83);
+  --dsp-s5: var(--ln-c5, #b0476a);
+  --dsp-s6: var(--ln-c6, #8a8f2e);
+}
+.is-s0.dsp-data-bar, .is-s0 .dsp-data-line { fill: var(--dsp-s0); stroke: var(--dsp-s0); }
+.is-s1.dsp-data-bar, .is-s1 .dsp-data-line { fill: var(--dsp-s1); stroke: var(--dsp-s1); }
+.is-s2.dsp-data-bar, .is-s2 .dsp-data-line { fill: var(--dsp-s2); stroke: var(--dsp-s2); }
+.is-s3.dsp-data-bar, .is-s3 .dsp-data-line { fill: var(--dsp-s3); stroke: var(--dsp-s3); }
+.is-s4.dsp-data-bar, .is-s4 .dsp-data-line { fill: var(--dsp-s4); stroke: var(--dsp-s4); }
+.is-s5.dsp-data-bar, .is-s5 .dsp-data-line { fill: var(--dsp-s5); stroke: var(--dsp-s5); }
+.is-s6.dsp-data-bar, .is-s6 .dsp-data-line { fill: var(--dsp-s6); stroke: var(--dsp-s6); }
 .dsp-data-bar.is-neg { fill-opacity: 0.75; }
 .dsp-data-line { fill: none !important; stroke-width: 2; stroke-linejoin: round; stroke-linecap: round; }
 .dsp-data-area { fill-opacity: 0.12; stroke: none; }
-.is-s0 .dsp-data-area, .is-s0 .dsp-data-pt { fill: var(--dsp-primary); }
-.is-s1 .dsp-data-area, .is-s1 .dsp-data-pt { fill: var(--dsp-accent); }
-.is-s2 .dsp-data-area, .is-s2 .dsp-data-pt { fill: var(--dsp-tension); }
-.is-s3 .dsp-data-area, .is-s3 .dsp-data-pt { fill: var(--dsp-60); }
+.is-s0 .dsp-data-area, .is-s0 .dsp-data-pt { fill: var(--dsp-s0); }
+.is-s1 .dsp-data-area, .is-s1 .dsp-data-pt { fill: var(--dsp-s1); }
+.is-s2 .dsp-data-area, .is-s2 .dsp-data-pt { fill: var(--dsp-s2); }
+.is-s3 .dsp-data-area, .is-s3 .dsp-data-pt { fill: var(--dsp-s3); }
+.is-s4 .dsp-data-area, .is-s4 .dsp-data-pt { fill: var(--dsp-s4); }
+.is-s5 .dsp-data-area, .is-s5 .dsp-data-pt { fill: var(--dsp-s5); }
+.is-s6 .dsp-data-area, .is-s6 .dsp-data-pt { fill: var(--dsp-s6); }
 .dsp-data-pt { stroke: var(--dsp-paper); stroke-width: 1.5; cursor: pointer; }
 .dsp-data-pt.is-sel { stroke: var(--dsp-ink); stroke-width: 2; }
 .dsp-data-pt:focus { outline: none; stroke: var(--dsp-ink); }
+.dsp-data-pt:focus-visible { outline: 2px solid var(--dsp-primary); outline-offset: 2px; }
 
 .dsp-data-pie { display: flex; flex-wrap: wrap; align-items: center; justify-content: center; gap: 16px; }
 .dsp-data-pie svg { width: min(100%, 260px); height: auto; }
 .dsp-data-slice { cursor: pointer; }
 .dsp-data-slice path, .dsp-data-slice circle { stroke: var(--dsp-paper); stroke-width: 1.5; }
-.dsp-data-slice.is-s0 path, .dsp-data-slice.is-s0 circle { fill: var(--dsp-primary); }
-.dsp-data-slice.is-s1 path, .dsp-data-slice.is-s1 circle { fill: var(--dsp-accent); }
-.dsp-data-slice.is-s2 path, .dsp-data-slice.is-s2 circle { fill: var(--dsp-tension); }
-.dsp-data-slice.is-s3 path, .dsp-data-slice.is-s3 circle { fill: var(--dsp-60); }
+.dsp-data-slice.is-s0 path, .dsp-data-slice.is-s0 circle { fill: var(--dsp-s0); }
+.dsp-data-slice.is-s1 path, .dsp-data-slice.is-s1 circle { fill: var(--dsp-s1); }
+.dsp-data-slice.is-s2 path, .dsp-data-slice.is-s2 circle { fill: var(--dsp-s2); }
+.dsp-data-slice.is-s3 path, .dsp-data-slice.is-s3 circle { fill: var(--dsp-s3); }
+.dsp-data-slice.is-s4 path, .dsp-data-slice.is-s4 circle { fill: var(--dsp-s4); }
+.dsp-data-slice.is-s5 path, .dsp-data-slice.is-s5 circle { fill: var(--dsp-s5); }
+.dsp-data-slice.is-s6 path, .dsp-data-slice.is-s6 circle { fill: var(--dsp-s6); }
 .dsp-data-slice.is-sel path, .dsp-data-slice.is-sel circle { stroke: var(--dsp-ink); stroke-width: 2; }
 .dsp-data-slice:focus { outline: none; }
+.dsp-data-slice:focus-visible { outline: 2px solid var(--dsp-primary); outline-offset: 2px; }
 .dsp-data-slice:focus-visible path, .dsp-data-slice:focus-visible circle { stroke: var(--dsp-ink); stroke-width: 2.5; }
 .dsp-data-slice text { font-size: 11px; fill: #fff; pointer-events: none; }
 .dsp-data-key { margin: 0; padding: 0; list-style: none; display: grid; gap: 4px; font-size: 12.5px; }
 .dsp-data-key.is-row { display: flex; flex-wrap: wrap; gap: 4px 14px; margin-bottom: 4px; }
 .dsp-data-key em { font-style: normal; color: var(--dsp-60); font-variant-numeric: tabular-nums; margin-left: 4px; }
 .dsp-data-sw { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 6px; vertical-align: -1px; }
-.dsp-data-sw.is-s0 { background: var(--dsp-primary); }
-.dsp-data-sw.is-s1 { background: var(--dsp-accent); }
-.dsp-data-sw.is-s2 { background: var(--dsp-tension); }
-.dsp-data-sw.is-s3 { background: var(--dsp-60); }
+.dsp-data-sw.is-s0 { background: var(--dsp-s0); }
+.dsp-data-sw.is-s1 { background: var(--dsp-s1); }
+.dsp-data-sw.is-s2 { background: var(--dsp-s2); }
+.dsp-data-sw.is-s3 { background: var(--dsp-s3); }
+.dsp-data-sw.is-s4 { background: var(--dsp-s4); }
+.dsp-data-sw.is-s5 { background: var(--dsp-s5); }
+.dsp-data-sw.is-s6 { background: var(--dsp-s6); }
 
 .dsp-data-heat-wrap { overflow-x: auto; }
 .dsp-data-heat { border-collapse: separate; border-spacing: 2px; font-size: 12px; font-variant-numeric: tabular-nums; }

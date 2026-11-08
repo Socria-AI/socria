@@ -18,7 +18,7 @@ html[data-theme="white"] {
   --paper: #FFFFFF; --paper-2: #F3F3F1; --border: #E6E6E2;
   --app-paper: #FFFFFF; --app-border: #E6E6E2;
   --surface: #FFFFFF;
-  --c-paper: 255 255 255; --c-paper-2: 243 243 241; --c-surface: 255 255 255; --c-border: 230 230 226;
+  --rgb-paper: 255 255 255; --rgb-paper-2: 243 243 241; --rgb-surface: 255 255 255; --rgb-border: 230 230 226;
 }
 html[data-theme="white"] :is(.logos-root, .lg-tokens) { --lg-paper: #FFFFFF; --lg-panel: #FAFAF8; }
 html[data-theme="white"] .app-root { --app-paper: #FFFFFF; --app-border: #E6E6E2; }
@@ -35,18 +35,22 @@ html[data-theme="dark"] {
   --accent: #D9D9D9; --accent-700: #EDEDED;
   --app-paper: #121212; --app-border: #2C2C2C;
   --surface: #1C1C1C;
-  --c-paper: 18 18 18; --c-paper-2: 26 26 26; --c-ink: 232 232 232; --c-surface: 28 28 28; --c-border: 44 44 44;
-  --c-moss-50: 28 28 28; --c-moss-100: 36 36 36; --c-moss-200: 51 51 51; --c-moss-600: 217 217 217; --c-moss-700: 237 237 237; --c-moss-800: 245 245 245;
+  --rgb-paper: 18 18 18; --rgb-paper-2: 26 26 26; --rgb-ink: 232 232 232; --rgb-surface: 28 28 28; --rgb-border: 44 44 44;
+  --rgb-moss-50: 28 28 28; --rgb-moss-100: 36 36 36; --rgb-moss-200: 51 51 51; --rgb-moss-600: 217 217 217; --rgb-moss-700: 237 237 237; --rgb-moss-800: 245 245 245;
 }
 html[data-theme="dark"] :is(.logos-root, .lg-tokens) {
   --lg-paper: #121212; --lg-panel: #171717;
   /* the light a model's figure sits in (components/surfaces/surfaces.css): a breath, not a lamp */
   --sfx-glow: rgba(232, 232, 232, 0.045);
   --lg-primary: #F2F2F2; --lg-accent: #8FB3C4; --lg-secondary: #C9B47E; --lg-tension: #D18A68;
-  --lg-ink: #E8E8E8; --lg-ink-60: rgba(232, 232, 232, 0.6); --lg-ink-40: rgba(232, 232, 232, 0.4); --lg-ink-24: rgba(232, 232, 232, 0.24);
+  --lg-ink: #E8E8E8; --lg-ink-60: rgba(232, 232, 232, 0.6); --lg-ink-40: rgba(232, 232, 232, 0.55); --lg-ink-24: rgba(232, 232, 232, 0.24);
   --lg-line: rgba(232, 232, 232, 0.12);
   --lg-one: #8FB3C4; --lg-one-soft: rgba(143, 179, 196, 0.12); --lg-one-line: rgba(143, 179, 196, 0.35);
   --node-idea-bg: rgba(232, 232, 232, 0.07);
+  /* the surfaces a floating thing is drawn on, for sheets mounted outside .l5 too (globals.css) */
+  --lg-panel-solid: #1C1C1C; --l5-surface: #1C1C1C; --l5-surface-rgb: 28, 28, 28; --l5-raise: #242424; --l5-hair: rgba(232, 232, 232, 0.12);
+  --l5-shadow: 0 1px 2px rgba(0, 0, 0, 0.4), 0 8px 28px -14px rgba(0, 0, 0, 0.6);
+  --l5-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.4), 0 18px 50px -20px rgba(0, 0, 0, 0.7);
 }
 html[data-theme="dark"] .app-root { --app-paper: #121212; --app-border: #2C2C2C; }
 
@@ -61,17 +65,20 @@ html[data-theme="one"] {
   --accent: #B8CDD9; --accent-700: #C8DAE4;
   --app-paper: #13293A; --app-border: #2A4A5E;
   --surface: #1B3749;
-  --c-paper: 19 41 58; --c-paper-2: 24 50 69; --c-ink: 240 234 216; --c-surface: 27 55 73; --c-border: 42 74 94;
-  --c-moss-50: 29 58 77; --c-moss-100: 36 68 88; --c-moss-200: 52 88 110; --c-moss-600: 184 205 217; --c-moss-700: 200 218 228; --c-moss-800: 220 232 239;
+  --rgb-paper: 19 41 58; --rgb-paper-2: 24 50 69; --rgb-ink: 240 234 216; --rgb-surface: 27 55 73; --rgb-border: 42 74 94;
+  --rgb-moss-50: 29 58 77; --rgb-moss-100: 36 68 88; --rgb-moss-200: 52 88 110; --rgb-moss-600: 184 205 217; --rgb-moss-700: 200 218 228; --rgb-moss-800: 220 232 239;
 }
 html[data-theme="one"] :is(.logos-root, .lg-tokens) {
   --lg-paper: #13293A; --lg-panel: #16303F;
   --sfx-glow: rgba(240, 234, 216, 0.045);
   --lg-primary: #B8CDD9; --lg-accent: #E5D3A1; --lg-secondary: #E5D3A1; --lg-tension: #E39A7A;
-  --lg-ink: #F0EAD8; --lg-ink-60: rgba(240, 234, 216, 0.62); --lg-ink-40: rgba(240, 234, 216, 0.42); --lg-ink-24: rgba(240, 234, 216, 0.26);
+  --lg-ink: #F0EAD8; --lg-ink-60: rgba(240, 234, 216, 0.62); --lg-ink-40: rgba(240, 234, 216, 0.55); --lg-ink-24: rgba(240, 234, 216, 0.26);
   --lg-line: rgba(240, 234, 216, 0.13);
   --lg-one: #E5D3A1; --lg-one-soft: rgba(229, 211, 161, 0.12); --lg-one-line: rgba(229, 211, 161, 0.35);
   --node-idea-bg: rgba(184, 205, 217, 0.12);
+  --lg-panel-solid: #1B3749; --l5-surface: #1B3749; --l5-surface-rgb: 27, 55, 73; --l5-raise: #22415A; --l5-hair: rgba(240, 234, 216, 0.13);
+  --l5-shadow: 0 1px 2px rgba(3, 12, 18, 0.3), 0 8px 28px -14px rgba(3, 12, 18, 0.5);
+  --l5-shadow-up: 0 1px 2px rgba(3, 12, 18, 0.3), 0 18px 50px -20px rgba(3, 12, 18, 0.6);
 }
 html[data-theme="one"] .app-root { --app-paper: #13293A; --app-border: #2A4A5E; }
 
@@ -91,19 +98,27 @@ html[data-theme="night"] {
   --accent: #C4A456; --accent-700: #E2C27A;
   --app-paper: #0B1222; --app-border: #24314B;
   --surface: #131D33;
-  --c-paper: 11 18 34; --c-paper-2: 16 26 46; --c-ink: 233 230 242; --c-surface: 19 29 51; --c-border: 36 49 75;
-  --c-moss-50: 22 29 48; --c-moss-100: 28 36 55; --c-moss-200: 46 47 56; --c-moss-600: 168 134 55; --c-moss-700: 196 164 86; --c-moss-800: 226 194 122;
+  --rgb-paper: 11 18 34; --rgb-paper-2: 16 26 46; --rgb-ink: 233 230 242; --rgb-surface: 19 29 51; --rgb-border: 36 49 75;
+  --rgb-moss-50: 22 29 48; --rgb-moss-100: 28 36 55; --rgb-moss-200: 46 47 56; --rgb-moss-600: 168 134 55; --rgb-moss-700: 196 164 86; --rgb-moss-800: 226 194 122;
 }
 html[data-theme="night"] :is(.logos-root, .lg-tokens) {
   --lg-paper: #0B1222; --lg-panel: #0F182B;
   --sfx-glow: rgba(200, 212, 255, 0.05);
   --lg-primary: #E7CF92; --lg-accent: #9DB4E3; --lg-secondary: #C3B1E1; --lg-tension: #E8998A;
-  --lg-ink: #E9E6F2; --lg-ink-60: rgba(233, 230, 242, 0.62); --lg-ink-40: rgba(233, 230, 242, 0.42); --lg-ink-24: rgba(233, 230, 242, 0.26);
+  --lg-ink: #E9E6F2; --lg-ink-60: rgba(233, 230, 242, 0.62); --lg-ink-40: rgba(233, 230, 242, 0.55); --lg-ink-24: rgba(233, 230, 242, 0.26);
   --lg-line: rgba(200, 212, 255, 0.13);
   --lg-one: #9DB4E3; --lg-one-soft: rgba(157, 180, 227, 0.12); --lg-one-line: rgba(157, 180, 227, 0.35);
   --node-idea-bg: rgba(231, 207, 146, 0.1);
+  --lg-panel-solid: #131D33; --l5-surface: #131D33; --l5-surface-rgb: 19, 29, 51; --l5-raise: #1A2642; --l5-hair: rgba(200, 212, 255, 0.12);
+  --l5-shadow: 0 1px 2px rgba(0, 0, 0, 0.3), 0 8px 28px -14px rgba(0, 0, 0, 0.45);
+  --l5-shadow-up: 0 1px 2px rgba(0, 0, 0, 0.3), 0 18px 50px -20px rgba(0, 0, 0, 0.6);
 }
 html[data-theme="night"] .app-root { --app-paper: #0B1222; --app-border: #24314B; }
+
+/* tension, the one red, outside the Logos tokens too (the account pages and sheets read --tension) */
+html[data-theme="dark"] { --tension: #D18A68; --tension-rgb: 209, 138, 104; }
+html[data-theme="one"] { --tension: #E39A7A; --tension-rgb: 227, 154, 122; }
+html[data-theme="night"] { --tension: #E8998A; --tension-rgb: 232, 153, 138; }
 
 /* ── what every dark ground needs besides variables ────────────────── */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) body { background-color: var(--paper); color: var(--ink); }
@@ -122,13 +137,10 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
 /* a card lifted on hover, or focused, casts a shadow — on a dark ground in the ground's dark, not a glow of the ink */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node:hover { box-shadow: 0 2px 4px rgba(var(--shadow-rgb), 0.3), 0 14px 28px -16px rgba(var(--shadow-rgb), 0.75); }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-node.is-focused { box-shadow: 0 3px 6px rgba(var(--shadow-rgb), 0.3), 0 18px 36px -18px rgba(var(--shadow-rgb), 0.8); }
-html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-root .lg-zoom { background: var(--surface); border-color: var(--lg-line); }
 /* the rail and the sheets laid a white veil over paper; on a dark ground, none */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root .s-bar { background: rgba(255, 255, 255, 0.02); }
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .acct-sheet .footbar { background: rgba(255, 255, 255, 0.03); }
-html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .acct-sheet .scrim { background: rgba(0, 0, 0, 0.55); }
 /* the offer to see it drawn, under a chat: paper's pale card was a grey slab on a dark ground */
-html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .app-root .logos-offer { border-color: var(--ink-12); background: rgba(255, 255, 255, 0.035); }
 /* The mark is a dark drawing on a transparent ground; on a dark one it is drawn light. */
 html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) :is(.app-root, .logos-root, .acct-sheet) img[src*="socria-mark"] { filter: invert(1) brightness(0.92); }
 /* A decision is the one filled card. On a dark ground it is filled with a wash
@@ -152,8 +164,6 @@ html:is([data-theme="dark"], [data-theme="one"], [data-theme="night"]) .logos-ro
   --l5-card-ink: var(--lg-ink);
   --l5-on-primary: var(--lg-paper);
   --l5-no-ink: var(--lg-tension);
-  --l5s-gold-ink: var(--lg-secondary);
-  --l5s-review-ink: var(--lg-secondary);
 }
 html[data-theme="dark"] .logos-root .l5 {
   --l5-surface: #1C1C1C; --l5-surface-rgb: 28, 28, 28; --l5-paper-hi: #1C1C1C; --l5-raise: #242424;

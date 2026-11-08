@@ -112,7 +112,11 @@ for (const [name, f] of [
   const css = read(f);
   ok(`${name}: no gradient, no gold`, !/gradient\(/.test(css) && !/#b8a26b|--lg-secondary|gold/i.test(css.replace(/no gold/g, '')));
   ok(`  Instrument Serif for what is said, the Logos sans for what is operated`, /--serif, 'Instrument Serif'/.test(css) && /var\(--lg-sans\)/.test(css));
-  ok(`  moss and ink from the tokens, so the dark grounds hold`, /var\(--lg-primary/.test(css) && /var\(--lg-ink/.test(css) && /html\[data-theme='night'\]/.test(css));
+  // Each sheet's raised surface is the theme's own (--l5-raise, declared on .logos-root for every ground), so it
+  // needs no block per theme and holds no white of its own.
+  const raise = f === 'components/socria-guide.css' ? '--sg-raise: var(--l5-raise, #fff);' : '--qc-raise: var(--l5-raise, #fff);';
+  const grounds = css.includes(raise) && !/#fff\b/i.test(css.replace(raise, '')) && !/html\[data-theme=/.test(css);
+  ok(`  moss and ink from the tokens, so the dark grounds hold`, /var\(--lg-primary/.test(css) && /var\(--lg-ink/.test(css) && grounds);
   ok(`  the book's curve, and no motion when less is asked for`, /cubic-bezier\(0\.16, 1, 0\.3, 1\)/.test(css) && /prefers-reduced-motion: reduce/.test(css));
 }
 ok('reduced motion leaves each demo on its last frame', /\.sg-pane:not\(\.is-last\) \{\s*display: none;/.test(read('components/socria-guide.css')));

@@ -237,7 +237,8 @@ console.log('\n=== the composer is always usable while chat is ===');
   ok('the thread scrolls itself, never its ancestors', !/scrollIntoView\(/.test(app) && /t\.scrollTop = t\.scrollHeight/.test(app));
   ok('  and a streaming reply only follows someone already at the end', /atEndRef\.current = t\.scrollHeight - t\.scrollTop - t\.clientHeight < 48/.test(app));
   const ws = read('components/workspace/workspace.css');
-  ok('the dock may shrink; the composer may not', /\.ws-dock > \* \{ flex-shrink: 0; \}/.test(ws) && /\.ws-dock > \.lg-thread, \.logos-root \.ws-dock > \.syn \{ flex-shrink: 1; min-height: 0; \}/.test(ws));
+  // (the workspace's dock, .ws-dock, is no longer rendered anywhere, so its two shrink rules went with it)
+  ok('the old dock\'s rules are gone with the dock', !/\.ws-dock > /.test(ws));
   ok('the stage keeps a floor when the conversation unfolds', /\.ws-stage \{ min-height: min\(26vh, 220px\); \}/.test(ws) && /is-narrow > \.ws-stage/.test(ws));
 }
 

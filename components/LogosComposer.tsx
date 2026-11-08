@@ -8,7 +8,7 @@
 // work from the same material.
 
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
-import { L5Close, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
+import { CloseGlyph, L5Close, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
 import { MathKeypad } from './MathKeypad';
 import { DocPreview } from './DocPreview';
 import type { MathTopic } from '@/lib/math-context';
@@ -790,7 +790,7 @@ export function LogosComposer({
             </span>
             {onCancelReply && (
               <button type="button" className="lg-reply-cancel" aria-label={`Stop replying to ${replyTo.who}`} title="Stop replying (Esc)" onClick={onCancelReply}>
-                ×
+                <CloseGlyph />
               </button>
             )}
           </div>

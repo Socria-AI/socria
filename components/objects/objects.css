@@ -23,9 +23,9 @@
 .logos-root .obj-name { font-family: var(--serif); font-style: italic; font-size: 22px; line-height: 1; color: var(--lg-ink); }
 .logos-root .obj.is-trail .obj-name, .logos-root .obj.is-card .obj-name { font-size: 15px; }
 .logos-root .obj-name sub { font-size: 0.6em; font-style: normal; margin-left: 1px; }
-.logos-root .obj-shape { font-size: 10px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--lg-ink-40); }
+.logos-root .obj-shape { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .obj-origin { font-size: 11px; color: var(--lg-ink-40); font-style: italic; font-family: var(--serif); }
-.logos-root .obj-now { font-size: 9px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--lg-accent); }
+.logos-root .obj-now { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-accent); }
 .logos-root .obj-views { margin-left: auto; display: inline-flex; gap: 2px; }
 .logos-root .obj-views button {
   background: none; border: 0; border-bottom: 1px solid transparent; padding: 1px 4px; cursor: pointer;
@@ -46,7 +46,7 @@
 .logos-root .obj-grid.is-small .obj-cell.is-rhs { border-left: 1px solid var(--lg-ink-24); padding-left: 6px; }
 .logos-root .obj-corner { width: 1px; }
 .logos-root .obj-colh, .logos-root .obj-rowh {
-  background: none; border: 0; cursor: pointer; padding: 2px 4px; font-family: var(--lg-sans); font-size: 10px; color: var(--lg-ink-24);
+  background: none; border: 0; cursor: pointer; padding: 2px 4px; font-family: var(--lg-sans); font-size: 10.5px; color: var(--lg-ink-24);
   border-radius: 3px;
 }
 .logos-root .obj-rowh { font-size: 12px; font-style: italic; font-family: var(--serif); color: var(--lg-ink-40); padding-right: 10px; }
@@ -79,7 +79,7 @@
 .logos-root .obj-rowop { font-family: var(--font-stix, serif); font-size: 13px; color: var(--lg-accent); padding-left: 14px; white-space: nowrap; min-width: 52px; }
 .logos-root .obj-frac { display: inline-flex; flex-direction: column; align-items: center; vertical-align: middle; font-size: 0.72em; line-height: 1.05; }
 .logos-root .obj-frac-n { border-bottom: 1px solid currentColor; padding: 0 2px; }
-.logos-root .obj-more { font-size: 10px; color: var(--lg-ink-40); }
+.logos-root .obj-more { font-size: 10.5px; color: var(--lg-ink-40); }
 
 .logos-root .obj-eqs { list-style: none; margin: 4px 0; padding: 0; display: grid; gap: 4px; }
 .logos-root .obj-eqs button { background: none; border: 0; cursor: pointer; display: flex; gap: 10px; align-items: baseline; font: inherit; padding: 3px 6px; border-radius: 3px; }
@@ -93,8 +93,8 @@
 .logos-root .obj-step-note { flex-basis: 100%; color: var(--lg-accent); font-family: var(--serif); font-size: 15px; line-height: 1.35; }
 .logos-root .obj-step.is-off .obj-step-note { color: var(--lg-tension); }
 
-/* "In the chat:" — things to do to it, each a small key in the product's button
-   language (components/logos5/buttons.css): it puts the words in the chat box */
+/* "In the chat:" — things to do to it, each a small key (the carried-over
+   --l5b-* key, l5-controls.css): it puts the words in the chat box */
 .logos-root .obj-ops { display: flex; gap: 6px 8px; align-items: center; margin-top: 12px; }
 .logos-root .obj-ops-tpl { display: inline-flex; flex-wrap: wrap; gap: 6px; }
 .logos-root .obj-ops-tpl button {
@@ -102,10 +102,9 @@
   border: 1px solid var(--l5b-edge, rgba(35, 36, 31, 0.15)); border-radius: 8px;
   background: var(--l5b-face, #fffdf8); box-shadow: var(--l5b-ledge, 0 1px 0 rgba(35, 36, 31, 0.07));
   font-family: var(--font-stix, serif); font-size: 13.5px; color: var(--lg-ink);
-  transition: border-color 0.15s, background-color 0.15s, transform 0.12s;
+  transition: border-color 0.15s, background-color 0.15s;
 }
 .logos-root .obj-ops-tpl button:hover { border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05); }
-.logos-root .obj-ops-tpl button:active { transform: translateY(1px); box-shadow: none; }
 .logos-root .obj-ops-tpl button:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
 .logos-root .obj-ops input {
   flex: 1; min-width: 0; border: 0; border-bottom: 1px solid var(--lg-ink-24); background: transparent; padding: 5px 2px;
@@ -114,14 +113,10 @@
 .logos-root .obj-ops input:focus { border-bottom-color: var(--lg-primary); }
 .logos-root .obj-ops { flex-wrap: wrap; }
 .logos-root .obj-ops-hint { font-size: 12px; color: var(--lg-ink-40); font-family: var(--font-stix, serif); }
-.logos-root .obj-ops-go {
-  background: var(--lg-primary); color: var(--lg-paper); border: 0; border-radius: 999px; padding: 4px 12px; cursor: pointer; font-size: 12px;
-}
-.logos-root .obj-ops-go:disabled { opacity: 0.35; cursor: default; }
 .logos-root .obj-refused { margin: 6px 0 0; font-size: 12.5px; color: var(--lg-tension); line-height: 1.4; }
 .logos-root .obj-suggest { margin: 8px 0 0; font-size: 12.5px; display: grid; gap: 4px; }
 .logos-root .obj-suggest > span { display: flex; gap: 8px; align-items: baseline; font-family: var(--font-stix, serif); }
-.logos-root .obj-suggest-k { font-family: var(--lg-sans); font-size: 10px; letter-spacing: 0.12em; text-transform: uppercase; color: var(--lg-accent); }
+.logos-root .obj-suggest-k { font-family: var(--lg-sans); font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-accent); }
 .logos-root .obj-suggest button { background: none; border: 0; padding: 0; cursor: pointer; color: var(--lg-accent); font: inherit; font-family: var(--lg-sans); font-size: 12px; text-decoration: underline; text-underline-offset: 3px; }
 /* the steps it has been through: back and forward keys either side of where it is */
 .logos-root .obj-hist {
@@ -136,7 +131,6 @@
   font-size: 16px; line-height: 1; color: var(--lg-ink);
 }
 .logos-root .obj-hist button:hover:not(:disabled) { border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); }
-.logos-root .obj-hist button:active:not(:disabled) { transform: translateY(1px); box-shadow: none; }
 .logos-root .obj-hist button:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
 .logos-root .obj-hist button:disabled { opacity: 0.35; cursor: default; box-shadow: none; }
 
@@ -165,12 +159,11 @@
 .logos-root .obj-trail .obj-plan path, .logos-root .obj-card .obj-plan path { cursor: default; }
 .logos-root .obj-scene-empty { margin: 10px 0; font-size: 12.5px; color: var(--lg-ink-60); }
 .logos-root .obj-scene-foot { display: flex; align-items: center; justify-content: space-between; gap: 8px; font-size: 11.5px; color: var(--lg-ink-60); }
-.logos-root .obj-scene-foot button { font: inherit; font-size: 12px; color: var(--lg-paper); background: var(--lg-primary); border: 0; border-radius: 6px; padding: 3px 10px; cursor: pointer; }
+.logos-root .obj-scene-foot button { display: inline-flex; align-items: center; justify-content: center; height: 32px; padding: 0 14px; font: inherit; font-size: 13.5px; font-weight: 500; line-height: 1; color: var(--c-paper); background: var(--c-ink); border: 0; border-radius: 999px; cursor: pointer; transition: background-color 0.2s, transform 0.2s var(--c-ease); }
+.logos-root .obj-scene-foot button:hover:not(:disabled) { background: var(--c-moss); transform: translateY(-2px); }
 .logos-root .obj-scene-step { margin: 2px 0 0; font-size: 11px; color: var(--lg-ink-60); text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 150px; }
 
 /* the step between two states in the Work lens's trail */
-.logos-root .lg-conn.lg-tone-suggested .lg-edge { stroke-dasharray: 4 3; }
-.logos-root .lg-conn.lg-tone-undone { opacity: 0.35; }
 .logos-root .lg-map-wrap[data-lens="work"] .lg-conn-transforms_to { color: var(--lg-accent); }
 .logos-root .lg-map-wrap[data-lens="work"] .lg-conn-transforms_to .lg-edge { stroke-dasharray: none; stroke-width: 1.2; opacity: 0.8; }
 .logos-root .lg-map-wrap[data-lens="work"] .lg-conn-label { font-family: var(--font-stix, serif); font-size: 13px; fill: var(--lg-accent); paint-order: stroke; stroke: var(--lg-paper, #f6f3ec); stroke-width: 4px; }
@@ -183,8 +176,8 @@
 
 /* ── a matrix, as what it is: rank, subspaces, factorizations ───────── */
 .obj-an { display: grid; gap: 6px; padding: 4px 2px 2px; font-size: 12.5px; line-height: 1.45; }
-.obj-an-rank { margin: 0; color: var(--lg-ink-80, rgba(35, 36, 31, 0.86)); }
-.obj-an-rank strong { font-weight: 650; }
+.obj-an-rank { margin: 0; color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.86); }
+.obj-an-rank strong { font-weight: 600; }
 .obj-an-sub { list-style: none; margin: 0; padding: 0; display: grid; gap: 3px; }
 .obj-an-sub li { display: grid; grid-template-columns: minmax(96px, auto) 44px 1fr; gap: 8px; align-items: baseline; }
 .obj-an-k { color: var(--lg-ink-60, rgba(35, 36, 31, 0.6)); font-size: 11.5px; letter-spacing: 0.01em; }

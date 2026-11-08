@@ -1,6 +1,6 @@
 'use client';
 
-// components/write/Board.tsx — the Draft Space.
+// components/write/Board.tsx — the notes: Write's board, where ideas are arranged before they are prose.
 //
 // Where an argument is put together before it is written. Ideas are dumped as
 // they come — one line, one card — then sorted into piles, each of which will

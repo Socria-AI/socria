@@ -48,6 +48,7 @@ import {
   type ViewSuggestion,
   type WorkspaceFacts,
 } from '@/lib/workspace/surfaces';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './workspace.css';
 
 type Zone = 'left' | 'right' | 'top' | 'bottom' | 'center';
@@ -90,7 +91,7 @@ export interface WorkspaceProps {
   overlay?: ReactNode;
   /**
    * "+ View" at the end of the top row. Logos 5 sets it false: one more panel
-   * docks beside its views with Split View instead (components/logos5/L5Views.tsx).
+   * docks beside its views instead (components/logos5/L5Views.tsx).
    */
   addViews?: boolean;
 }
@@ -192,7 +193,7 @@ function ViewMenu({
                 title={`Remove ${e.name}`}
                 onClick={() => remove(e)}
               >
-                ×
+                <CloseGlyph />
               </button>
             )}
           </div>
@@ -381,7 +382,7 @@ export function Workspace(props: WorkspaceProps) {
             </button>
             {several && !isMax && (
               <button type="button" className="ws-act" aria-label={`Close ${title}`} title="Close" onClick={() => onLayout(closePanel(layoutRef.current, p.id))}>
-                ×
+                <CloseGlyph />
               </button>
             )}
           </div>

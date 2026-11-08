@@ -92,7 +92,7 @@ export function DemoSplit() {
         <section className="lg-panel">
           <header className="lg-panel-head">
             <span className="lg-panel-title">
-              Thinking Map<em className="lg-panel-context">deciding</em>
+              Logic Map<em className="lg-panel-context">deciding</em>
             </span>
             <span className="lg-panel-state">{demo.nodes.length} nodes</span>
           </header>

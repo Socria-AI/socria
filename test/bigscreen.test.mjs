@@ -149,14 +149,15 @@ ok('  everywhere else the map fits as it always has', /fitMax = FIT_MAX,/.test(t
 console.log('\n=== sized for a finger, by the brand book ===');
 const css = read('components/logos5/cabin.css');
 ok('the app moves right by the dock’s width; the dock is 112px', /\.logos-root\.is-cabin \{\s*left: 112px;/.test(css) && /\.cab-dock \{[\s\S]*?width: 112px;/.test(css));
-ok('places 92px wide, 84px tall at least; the one you are in in moss', /\.cab-place \{[\s\S]*?width: 92px;\s*min-height: 84px;/.test(css) && /\.cab-place\.is-on \{[\s\S]*?color: #354620;/.test(css));
+ok('places 92px wide, 84px tall at least; the one you are in in moss (the theme\u2019s, a token)', /\.cab-place \{[\s\S]*?width: 92px;\s*min-height: 84px;/.test(css) && /\.cab-place\.is-on \{[\s\S]*?color: var\(--c-moss\);/.test(css));
+ok('the dock and the note draw in theme tokens: no cream or ink left over on a dark app', !/#(eeebe0|23241f|fffdf8|f5f3eb|354620)/i.test(css));
 ok(
   'the bar 80px, its controls 56px; tabs 62px; the box’s buttons 56px',
-  /\.l5v-top \{\s*height: 80px;/.test(css) && /\.l5v-home,[\s\S]*?height: 56px;/.test(css) && /\.l5v-tab \{\s*min-height: 62px;/.test(css) && /\.lg-send,[\s\S]*?width: 56px;\s*height: 56px;/.test(css)
+  /\.l5v-top \{\s*height: 80px;/.test(css) && /\.l5v-home,[\s\S]*?height: 56px;/.test(css) && /\.l5v-top \.l5-switch-i \{\s*min-height: 62px;/.test(css) && /\.lg-send,[\s\S]*?width: 56px;\s*height: 56px;/.test(css)
 );
 ok(
   'no gradient, a focus you can see, still for reduced motion',
-  !/gradient/.test(css) && /\.cab-place:focus-visible[\s\S]*?outline: 3px solid #354620/.test(css) && /prefers-reduced-motion: reduce/.test(css)
+  !/gradient/.test(css) && /\.cab-place:focus-visible[\s\S]*?outline: 2px solid var\(--c-moss\)/.test(css) && /prefers-reduced-motion: reduce/.test(css)
 );
 
 console.log(`\nbigscreen: ${pass} passed, ${fail} failed`);

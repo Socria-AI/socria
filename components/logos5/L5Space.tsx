@@ -18,6 +18,7 @@ import type { CanvasTurn } from '@/lib/logos5/canvas';
 import { pinchOut } from '@/lib/logos5/morph';
 import { anchorScroll, clampZoom, fitZoom, SPACE_ZOOM, zoomByWheel, zoomLabel, zoomStep } from '@/lib/logos5/spaceZoom';
 import { roman } from '@/lib/logos5/oneView';
+import { CloseGlyph } from './L5Chrome';
 import {
   aroundOf,
   broughtKey,
@@ -693,8 +694,8 @@ export function L5Space({
               Work with it beside the space <span className="l5-ar">→</span>
             </button>
           )}
-          <button type="button" className="l5-icon ls-lb-x" aria-label="Close" onClick={() => setEnlarged(null)}>
-            ×
+          <button type="button" className="l5-icon l5-close ls-lb-x" aria-label="Close" onClick={() => setEnlarged(null)}>
+            <CloseGlyph />
           </button>
         </div>
         <div className="ls-lb-body">{big.preview}</div>

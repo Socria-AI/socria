@@ -19,6 +19,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { filterThreads, readAnchor, whenSaid, type CommentItem, type Thread, type ThreadFilter } from '@/lib/share/comments';
 import { hueOf } from '@/lib/share/hue';
 import type { CommentsState } from './useComments';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './comments.css';
 
 const initial = (s: string) => (s.trim()[0] ?? '?').toUpperCase();
@@ -284,7 +285,7 @@ export function CommentsPanel({
           <button role="tab" aria-selected={effective === 'resolved'} onClick={() => setFilter('resolved')}>Resolved{resolved ? ` ${resolved}` : ''}</button>
           <button role="tab" aria-selected={effective === 'all'} onClick={() => setFilter('all')}>All</button>
         </span>
-        {onClose && <button className="cm-x" onClick={onClose} aria-label="Close comments">×</button>}
+        {onClose && <button type="button" className="cm-x l5-icon l5-close" onClick={onClose} aria-label="Close comments"><CloseGlyph /></button>}
       </header>
 
       {focusAnchor != null && (

@@ -1,6 +1,6 @@
 // Logos 5 — the one Socria. Checkable against docs/LOGOS-5.md (the screen),
 // docs/LOGOS-5-RUNTIME.md (what happens on a turn, at the level this page
-// says it), lib/logos5/views.ts (the four views and Split View),
+// says it), lib/logos5/views.ts (the four views, and what opens beside them),
 // lib/inline-ui.ts (the six interactive elements), lib/runtime/replay.ts
 // (the allocator, run over the whole conversation), lib/guest-pass.ts (what a
 // guest gets) and lib/entitlements.ts (every count on this page).
@@ -73,11 +73,11 @@ export function Logos5() {
       <H2 id="views">A line of thinking, in four views</H2>
       <LineOfThinking />
       <Defs>
-        <Def term="Chat">
+        <Def term="Conversation">
           Where a line of thinking opens, and where talk stays. Every reply can be stopped, retried, copied
           and replied to; what you sent can be edited.
         </Def>
-        <Def term="Content">
+        <Def term="Files">
           The documents, notes and pictures you brought, as cards you can arrange and stack. A document
           opens as Socria read it, with the topics it was sorted into.
         </Def>
@@ -86,19 +86,19 @@ export function Logos5() {
           pictures, plots, designs in 3D, charts, plans, comparisons, practice.
         </Def>
         <Def term="Logic Map">
-          The <Link href="/docs/thinking-map">Thinking Map</Link> of the conversation — your claims,
+          The <Link href="/docs/thinking-map">map</Link> of the conversation — your claims,
           assumptions, tensions and evidence. It is drawn when you ask for structure, while you are looking
           at it, and now and then as a conversation grows; open it on a map that is behind and it catches
           up.
         </Def>
       </Defs>
       <p>
-        The view moves only when what you asked for lives somewhere else. A question stays in Chat. A file
-        is read into Content in the background, and the turn says so — the screen does not move. Something
-        you asked to be made opens Artifacts; structure you asked for opens the Logic Map. On a wide screen
-        the conversation stays beside either, so the reply is read next to what it made.{' '}
-        <strong>Split View</strong> docks one more panel beside whichever view is open — a plot, a model, a
-        design, a display, the map, its trace, or your memory. A phone shows one thing at a time.
+        The view moves only when what you asked for lives somewhere else. A question stays in the
+        Conversation. A file is read into Files in the background, and the turn says so — the screen does
+        not move. Something you asked to be made opens Artifacts; structure you asked for opens the Logic
+        Map. On a wide screen the conversation stays beside either, so the reply is read next to what it
+        made. Anything you open — something made, the map, a file — sits beside the view you are in, and
+        the panel beside it can be resized or moved to another edge. A phone shows one thing at a time.
       </p>
 
       <H2 id="replies">Replies that turn interactive</H2>

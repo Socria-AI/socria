@@ -10,6 +10,7 @@
 import type { Metadata } from 'next';
 import Link from 'next/link';
 import './app-shell.css';
+import { Logo } from '@/components/ds';
 import { NotFoundPath } from '@/components/NotFoundPath';
 
 export const metadata: Metadata = {
@@ -22,8 +23,10 @@ const ROUTES: [string, string, string][] = [
   ['Logos', '/logos', 'Start a conversation'],
   ['Socria One', '/one', 'Membership'],
   ['The Charter', '/charter', 'What Socria is for'],
+  ['Explore', '/explore', 'What people bring to it'],
   ['Blog', '/blog', 'Essays and dispatches'],
   ['Docs', '/docs', 'How the product works'],
+  ['Support', '/support', 'Answers, and a person'],
 ];
 
 export default function NotFound() {
@@ -32,8 +35,7 @@ export default function NotFound() {
       <div className="plate-wrap gone">
         <div className="plate wide">
           <Link className="brand" href="/" aria-label="Socria home">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/socria-mark.png" alt="" width={34} height={34} />
+            <Logo size="md" showWordmark={false} markSrc="/socria-mark.png" />
           </Link>
           <div>
             <p className="eyebrow">404 · not a page</p>

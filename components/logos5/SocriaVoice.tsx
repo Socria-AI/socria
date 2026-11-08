@@ -23,6 +23,7 @@ import type { Ear, EarState } from './useSocriaVoice';
 import { useEar } from './useSocriaVoice';
 import { VOICE_HELP, type Pace, type VoiceEngine, type VoiceSettings, type WhileAnswering } from '@/lib/voice/speech';
 import { otherEngine } from '@/lib/voice/recognizer';
+import { L5Close } from './L5Chrome';
 import './voice.css';
 
 const ENGINE_NAME: Record<VoiceEngine, string> = {
@@ -235,9 +236,7 @@ export function VoicePanelView({
               <circle cx="10" cy="17" r="2" />
             </svg>
           </button>
-          <button type="button" className="sv-icon" onClick={onOff} aria-label="Turn Voice off" title="Turn Voice off — or say “stop listening”">
-            ×
-          </button>
+          <L5Close className="sv-icon" label="Turn Voice off" title="Turn Voice off — or say “stop listening”" onClose={onOff} />
         </span>
       </div>
 
@@ -384,9 +383,7 @@ export function VoiceSheet({
           <h2>
             {title} {kind !== 'help' && <span className="sv-exp is-big">Experimental</span>}
           </h2>
-          <button type="button" className="sv-icon" onClick={onClose} aria-label="Close">
-            ×
-          </button>
+          <L5Close className="sv-icon" label="Close" onClose={onClose} />
         </header>
 
         <div className="sv-sheet-body">

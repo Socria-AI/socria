@@ -180,8 +180,8 @@ export function CarriedIntoLogos5() {
 export function LineOfThinking() {
   const id = 'dg-views';
   const tabs: [string, string[]][] = [
-    ['Chat', ['Talk and questions.', 'A reply turns', 'interactive only', 'where it helps.']],
-    ['Content', ['The files you drop,', 'read and kept.', 'Replies cite their', 'passages.']],
+    ['Conversation', ['Talk and questions.', 'A reply turns', 'interactive only', 'where it helps.']],
+    ['Files', ['The files you drop,', 'read and kept.', 'Replies cite their', 'passages.']],
     ['Artifacts', ['What is made: your', 'writing, charts,', 'models, 3D.', 'Opens when you ask.']],
     ['Logic Map', ['The structure of', 'the thinking —', 'drawn when you ask', 'for structure.']],
   ];
@@ -190,12 +190,12 @@ export function LineOfThinking() {
       id={id}
       viewBox="0 0 760 290"
       title="The Universal Map and a line of thinking"
-      desc="Home is the Universal Map, every conversation on one map. Opening one gives a line of thinking with four views: Chat for talk, Content for your files, Artifacts for what is made, and the Logic Map for structure. Split View docks one more panel beside whichever view is open."
+      desc="Home is the Universal Map, every conversation on one map. Opening one gives a line of thinking with four views: the Conversation for talk, Files for what you bring, Artifacts for what is made, and the Logic Map for structure. Whatever you open sits in a panel beside the view you are in."
       caption={
         <>
-          Home is the Universal Map. A line of thinking opens on Chat; the view changes only when what you
-          asked for lives somewhere else — a file goes to Content, something made to Artifacts, structure to
-          the Logic Map — and on a wide screen the conversation stays beside it.
+          Home is the Universal Map. A line of thinking opens on the Conversation; the view changes only when
+          what you asked for lives somewhere else — a file goes to Files, something made to Artifacts,
+          structure to the Logic Map — and on a wide screen the conversation stays beside it.
         </>
       }
     >
@@ -216,8 +216,8 @@ export function LineOfThinking() {
         );
       })}
       <rect x={252} y={196} width={478} height={56} rx={8} className="dg-box is-past" />
-      <text x={491} y={219} textAnchor="middle" className="dg-t is-strong">Split View</text>
-      <text x={491} y={237} textAnchor="middle" className="dg-t is-small">one more panel beside whichever view is open — on a wide screen</text>
+      <text x={491} y={219} textAnchor="middle" className="dg-t is-strong">Beside it</text>
+      <text x={491} y={237} textAnchor="middle" className="dg-t is-small">what you open sits beside the view you are in — on a wide screen</text>
     </Figure>
   );
 }

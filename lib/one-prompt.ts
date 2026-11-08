@@ -343,8 +343,8 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     intent: 'high',
     title: 'Write beside your thinking',
     body:
-      'Draft Space lets you write with the map still in view, so the reasoning ' +
-      'stays next to the words. Socria One opens it.',
+      'Write keeps the map in view while you write, so the reasoning stays ' +
+      'next to the words. Socria One opens it.',
   },
   'connections-locked': {
     category: 'entitlement',

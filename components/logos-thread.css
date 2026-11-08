@@ -87,8 +87,7 @@
 .logos-root .lg-msg-quote:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
 
 /* gone to by a quote: a brief ring, so the eye lands */
-.logos-root .lg-msg.is-flash .lg-msg-body,
-.logos-root .lg-synth-wrap.is-flash { animation: lgFlash 1.4s ease; }
+.logos-root .lg-msg.is-flash .lg-msg-body { animation: lgFlash 1.4s ease; }
 @keyframes lgFlash {
   0%, 35% { box-shadow: 0 0 0 3px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.28); }
   100% { box-shadow: 0 0 0 0 rgba(var(--lg-primary-rgb, 53, 70, 32), 0); }
@@ -105,7 +104,6 @@
    A small bar that appears under the message on hover or keyboard focus,
    over the gap below it — so it never adds height to the conversation. On a
    touch screen there is no hover: it sits in the flow, always there. */
-.logos-root .lg-synth-wrap { position: relative; }
 .logos-root .lg-msg-acts {
   position: absolute; top: calc(100% + 2px); left: 0; z-index: 3;
   display: inline-flex; gap: 2px; padding: 2px;
@@ -115,24 +113,21 @@
 }
 .logos-root .lg-msg.is-mine .lg-msg-acts { left: auto; right: 0; }
 .logos-root .lg-msg:hover .lg-msg-acts,
-.logos-root .lg-msg:focus-within .lg-msg-acts,
-.logos-root .lg-synth-wrap:hover > .lg-msg-acts,
-.logos-root .lg-synth-wrap:focus-within > .lg-msg-acts { opacity: 1; pointer-events: auto; }
-.logos-root .lg-synth-wrap > .lg-msg-acts { top: auto; bottom: -26px; }
+.logos-root .lg-msg:focus-within .lg-msg-acts { opacity: 1; pointer-events: auto; }
 .logos-root .lg-msg-act {
   display: inline-flex; align-items: center; gap: 5px;
   padding: 3px 9px; border: 0; border-radius: 999px; background: none;
   font: inherit; font-size: 11.5px; color: var(--lg-ink-60); cursor: pointer; white-space: nowrap;
 }
 .logos-root .lg-msg-act:hover,
-.logos-root .lg-msg-act:focus-visible { color: var(--lg-primary); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08); outline: none; }
+.logos-root .lg-msg-act:focus-visible { color: var(--lg-primary); background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08); }
+.logos-root .lg-msg-act:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
 .logos-root .lg-sr {
   position: absolute; width: 1px; height: 1px; overflow: hidden;
   clip: rect(0 0 0 0); clip-path: inset(50%); white-space: nowrap;
 }
 @media (hover: none) {
-  .logos-root .lg-msg-acts,
-  .logos-root .lg-synth-wrap > .lg-msg-acts {
+  .logos-root .lg-msg-acts {
     position: static; margin-top: 4px; opacity: 0.85; pointer-events: auto;
     background: none; border: 0; box-shadow: none; padding: 0;
   }
@@ -151,12 +146,13 @@
 .logos-root .lg-reply-text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 1px; }
 .logos-root .lg-reply-k { color: var(--lg-primary); font-weight: 600; font-size: 11.5px; }
 .logos-root .lg-reply-x { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+/* letting go of the reply: the bare glyph, 32 x 32 (l5-controls .l5-icon) */
 .logos-root .lg-reply-cancel {
-  flex: 0 0 auto; width: 28px; height: 28px; border: 0; border-radius: 50%;
-  background: none; color: var(--lg-ink-40); font-size: 18px; line-height: 1; cursor: pointer;
+  flex: 0 0 auto; display: inline-grid; place-items: center; width: 32px; height: 32px; padding: 0; border: 0; border-radius: 0;
+  background: none; color: var(--c-ink-60); font-size: 18px; line-height: 1; cursor: pointer; transition: color 0.2s;
 }
-.logos-root .lg-reply-cancel:hover,
-.logos-root .lg-reply-cancel:focus-visible { color: var(--lg-ink); background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06); outline: none; }
+.logos-root .lg-reply-cancel:hover { color: var(--lg-ink); background: none; }
+.logos-root .lg-reply-cancel:focus-visible { color: var(--lg-ink); outline: 2px solid var(--lg-primary); outline-offset: 2px; }
 /* ── Point & Ask (Logos 4): what a message is, or was, about ─────────── */
 .logos-root .lg-about-chip .lg-about-of { color: var(--lg-ink-40); }
 .logos-root .lg-about-chip .lg-tex { font-size: 0.95em; }
@@ -194,8 +190,7 @@
 .logos-root .lg-mention-offer:hover { color: var(--lg-ink); }
 
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .lg-msg.is-flash .lg-msg-body,
-  .logos-root .lg-synth-wrap.is-flash { animation: none; outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+  .logos-root .lg-msg.is-flash .lg-msg-body { animation: none; outline: 2px solid var(--lg-primary); outline-offset: 2px; }
   .logos-root .lg-msg-acts { transition: none; }
 }
 
@@ -211,9 +206,9 @@
 .logos-root .lg-did-k {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: color-mix(in srgb, var(--lg-ink) 70%, transparent);
+  color: var(--c-ink-45);
 }
 .logos-root .lg-did-chip {
   display: inline-flex;

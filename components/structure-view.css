@@ -32,15 +32,15 @@
 .lg-sv-row.is-error{border-left:3px solid var(--lg-tension)}
 .lg-sv-row.is-verified{border-left:3px solid var(--lg-primary)}
 
-.lg-sv-kind{display:inline-flex;align-items:center;gap:6px;font-size:10px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--lg-ink-60)}
+.lg-sv-kind{display:inline-flex;align-items:center;gap:6px;font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--c-ink-45, var(--lg-ink-60))}
 .lg-sv-kind .lg-node-glyph{width:12px;height:12px}
 .lg-sv-kind em{font-style:normal;font-weight:500;letter-spacing:.02em;text-transform:none;color:var(--lg-ink-40)}
 .lg-sv-kind em::before{content:'·';margin-right:6px}
-.lg-sv-label{font-size:14.5px;line-height:1.4;overflow-wrap:anywhere}
+.lg-sv-label{font-size:15px;line-height:1.4;overflow-wrap:anywhere}
 .lg-sv-note{font-size:12.5px;line-height:1.5;color:var(--lg-ink-60)}
 .lg-sv-meta{display:flex;flex-wrap:wrap;gap:4px 12px;font-size:11px;color:var(--lg-ink-40)}
 .lg-sv-meta:empty{display:none}
-.lg-sv-status{font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:9.5px;padding:2px 7px;border-radius:999px;
+.lg-sv-status{font-weight:600;letter-spacing:.04em;text-transform:uppercase;font-size:10.5px;padding:2px 7px;border-radius:999px;
   background:rgba(var(--lg-ink-rgb, 35, 36, 31), .06);color:var(--lg-ink-60)}
 .lg-sv-status.s-supported,.lg-sv-status.s-settled,.lg-sv-status.s-checked{background:rgba(var(--lg-primary-rgb, 53, 70, 32), .1);color:var(--lg-primary)}
 .lg-sv-status.s-open{background:rgba(209, 138, 104, .14);color:var(--lg-tension)}

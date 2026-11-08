@@ -10,39 +10,7 @@
   --exp-max: 940px;
 }
 
-/* ── chrome ───────────────────────────────────────────────────────────── */
-.exp-top {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 20px;
-  padding: 18px clamp(18px, 5vw, 48px);
-  border-bottom: 1px solid var(--d-line);
-}
-.exp-home {
-  display: inline-flex;
-  align-items: center;
-  gap: 9px;
-  text-decoration: none;
-  color: var(--d-ink);
-  font-family: var(--d-serif);
-  font-size: 1.4rem;
-  letter-spacing: -0.01em;
-}
-.exp-nav {
-  display: flex;
-  align-items: center;
-  gap: clamp(14px, 3vw, 28px);
-  font-size: 0.86rem;
-  color: var(--d-ink-45);
-}
-.exp-nav a {
-  color: inherit;
-  text-decoration: none;
-  transition: color 0.2s;
-}
-.exp-nav a:hover { color: var(--d-ink); }
-.exp-nav a:last-child { color: var(--d-moss-deep); font-weight: 500; }
+/* The masthead and the foot are the site's own (components/site/site.css). */
 
 .exp-main {
   flex: 1;
@@ -55,11 +23,11 @@
 /* ── lede ─────────────────────────────────────────────────────────────── */
 .exp-eyebrow {
   margin: 0 0 14px;
-  font-size: 0.68rem;
+  font-size: var(--type-label, 0.7rem);
   font-weight: 600;
-  letter-spacing: 0.24em;
+  letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase;
-  color: var(--d-moss-deep);
+  color: var(--d-moss);
 }
 .exp-h1 {
   margin: 0;
@@ -78,31 +46,36 @@
 }
 
 /* ── the filter ───────────────────────────────────────────────────────── */
+/* A filter is a word on a hairline, as the controls standard draws one
+   (.l5-chip): moss on hover, and moss with a 2px rule when chosen. The
+   support page's topics and the blog's are drawn the same. */
 .exp-filter {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px;
+  gap: 8px 22px;
   margin: clamp(30px, 5vh, 52px) 0 0;
   padding-bottom: clamp(20px, 3vh, 30px);
   border-bottom: 1px solid var(--d-line);
 }
 .exp-chip {
-  padding: 7px 15px;
-  border: 1px solid var(--d-line);
-  border-radius: 999px;
-  background: transparent;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-bottom: 1px solid rgba(53, 70, 32, 0.22);
+  border-radius: 0;
+  background: none;
   font-family: var(--d-sans);
-  font-size: 0.85rem;
-  color: var(--d-ink-70);
+  font-size: 13.5px;
+  font-weight: 500;
+  color: var(--d-ink);
   cursor: pointer;
-  transition: background 0.2s, color 0.2s, border-color 0.2s;
+  transition: color 0.2s, border-color 0.2s;
 }
-.exp-chip:hover { background: rgba(53, 70, 32, 0.06); color: var(--d-ink); }
-.exp-chip.is-on {
-  background: var(--d-moss-deep);
-  border-color: var(--d-moss-deep);
-  color: var(--d-paper);
-}
+.exp-chip:hover { color: var(--d-moss); border-bottom-color: var(--d-moss); }
+.exp-chip.is-on { color: var(--d-moss); border-bottom: 2px solid var(--d-moss); }
 
 /* ── a case ───────────────────────────────────────────────────────────── */
 .exp-cases {
@@ -111,17 +84,17 @@
   gap: clamp(56px, 9vh, 104px);
   padding: clamp(40px, 6vh, 68px) 0 0;
 }
-.exp-case { scroll-margin-top: 24px; }
+.exp-case { scroll-margin-top: calc(var(--mast-h) + 24px); }
 .exp-case-head { max-width: 60ch; }
 .exp-kind {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  font-size: 0.68rem;
+  font-size: var(--type-label, 0.7rem);
   font-weight: 600;
-  letter-spacing: 0.18em;
+  letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase;
-  color: var(--d-moss-deep);
+  color: var(--d-moss);
 }
 .exp-kind-sep { opacity: 0.5; }
 .exp-case-title {
@@ -153,13 +126,13 @@
   margin-top: 16px;
   font-size: 0.92rem;
   font-weight: 500;
-  color: var(--d-moss-deep);
+  color: var(--d-moss);
   text-decoration: none;
   border-bottom: 1px solid rgba(53, 70, 32, 0.3);
   padding-bottom: 2px;
   transition: border-color 0.2s;
 }
-.exp-case-go:hover { border-color: var(--d-moss-deep); }
+.exp-case-go:hover { border-color: var(--d-moss); }
 
 /* ── the end ──────────────────────────────────────────────────────────── */
 .exp-end {
@@ -190,21 +163,6 @@
   gap: 12px 22px;
   margin-top: 26px;
 }
-.exp-go {
-  display: inline-flex;
-  align-items: center;
-  gap: 0.55em;
-  min-height: 46px;
-  padding: 0 26px;
-  border-radius: 999px;
-  background: var(--d-moss-deep);
-  color: var(--d-paper);
-  font-size: 0.95rem;
-  font-weight: 500;
-  text-decoration: none;
-  transition: background 0.2s, transform 0.2s;
-}
-.exp-go:hover { background: var(--d-moss); transform: translateY(-1px); }
 .exp-quiet {
   font-family: var(--d-serif);
   font-style: italic;
@@ -213,16 +171,6 @@
   text-decoration: none;
 }
 .exp-quiet:hover { color: var(--d-ink); }
-
-.exp-foot {
-  padding: 26px;
-  border-top: 1px solid var(--d-line);
-  text-align: center;
-  font-family: var(--d-serif);
-  font-style: italic;
-  font-size: 0.85rem;
-  color: var(--d-ink-45);
-}
 
 /* The docs rule gives every frame a big top margin, which is right inside a
    flowing article and wrong here where the lens tabs sit directly above. */
@@ -255,8 +203,6 @@
     min-height: 460px;
     border-top: 1px solid var(--d-line);
   }
-  .exp-nav { gap: 14px; font-size: 0.8rem; }
-  .exp-go { width: 100%; justify-content: center; }
 }
 
 /* The exhibit thread is a fixed height and the assistant's reply is the half

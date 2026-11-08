@@ -30,11 +30,11 @@ export function describeWriting(doc: WriteDoc | null | undefined, sel: WriteSel 
     if (!c || !c.text.trim()) return null;
     const pile = c.group ? doc.groups.find((g) => g.id === c.group) : null;
     const lines = [
-      `a card in their Draft Space — ${CARD_KIND_LABEL[c.kind].toLowerCase()}${pile ? `, in the pile “${one(pile.title || 'untitled', 60)}”` : ', not yet in a pile'}`,
+      `a card in their notes — ${CARD_KIND_LABEL[c.kind].toLowerCase()}${pile ? `, in the pile “${one(pile.title || 'untitled', 60)}”` : ', not yet in a pile'}`,
       `it reads, in their words: “${one(c.text, 180)}”`,
       ...(c.links ?? []).slice(0, 4).map((l) => `linked to ${l.k === 'doc' ? 'a passage of their documents' : l.k === 'node' ? 'an idea on their Logic Map' : 'another card'}: ${one(l.label, 120)}`),
     ];
-    return { kind: 'writing', label: one(c.text, 80), of: of ? `the Draft Space of ${of}` : 'their Draft Space', lines };
+    return { kind: 'writing', label: one(c.text, 80), of: of ? `the notes for ${of}` : 'their notes', lines };
   }
   const i = doc.blocks.findIndex((b) => b.id === sel.block);
   const cell = i < 0 ? findCell(doc, sel.block) : null;
@@ -66,7 +66,7 @@ export function describeWriting(doc: WriteDoc | null | undefined, sel: WriteSel 
     `their words, verbatim: “${one(words, 190)}”`,
     ...(!whole ? [`in the paragraph: “${one(b.text, 190)}”`] : []),
     ...(b.cites ?? []).slice(0, 3).map((c) => `it cites a passage they linked: ${one(c.label, 140)}`),
-    ...grew.map((c) => `it grew from their Draft Space card: “${one(c!.text, 140)}”${(c!.links ?? []).some((l) => l.k === 'node') ? `, linked to the map idea ${one((c!.links ?? []).find((l) => l.k === 'node')!.label, 80)}` : ''}`),
+    ...grew.map((c) => `it grew from a card in their notes: “${one(c!.text, 140)}”${(c!.links ?? []).some((l) => l.k === 'node') ? `, linked to the map idea ${one((c!.links ?? []).find((l) => l.k === 'node')!.label, 80)}` : ''}`),
   ];
   return { kind: 'writing', label: one(words, 80), of: of ? `the draft ${of}` : 'their draft', lines };
 }

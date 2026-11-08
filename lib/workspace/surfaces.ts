@@ -485,7 +485,7 @@ export function suggestLayout(
 // ── a view asked for by name ──────────────────────────────────────
 
 /**
- * "Show this as a structure": the Thinking Map, in that lens, takes over the
+ * "Show this as a structure": the Logic Map, in that lens, takes over the
  * workspace. A single surface simply becomes the map in that lens. In an
  * arrangement of several panels the map panel (added if there is none) is
  * pointed at the lens and given the whole workspace — maximized, so the

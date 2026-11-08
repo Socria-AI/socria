@@ -23,6 +23,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { RESET_WORDS, WEEK_MS, allowanceLine, formatTokens, leftLine, localReset, wakesIn, type SleepState } from '@/lib/sleep';
+import { L5Close } from './L5Chrome';
 import './sleep.css';
 
 /** Something the server said is resting, with its state. */
@@ -157,6 +158,7 @@ export function SleepScreen({
     <div className="sl-scrim" role="dialog" aria-modal="true" aria-labelledby="sl-t" aria-describedby="sl-b">
       <div className="sl-back" onClick={onClose} aria-hidden="true" />
       <div className="sl-card">
+        <L5Close label="Close" onClose={onClose} className="sl-x" />
         <div className="sl-moon">
           <Moon size={30} />
         </div>
@@ -173,12 +175,13 @@ export function SleepScreen({
             <ResetWithLocal local={local} />
           </span>
         </p>
+        {/* the controls standard: the one filled control is the button that buys One, in One's blue; staying is a word */}
         <div className="sl-acts">
-          <button ref={closeRef} type="button" className="sl-btn" onClick={onClose}>
+          <button ref={closeRef} type="button" className="l5-btn is-quiet" onClick={onClose}>
             Keep exploring
           </button>
           {onUpgrade && (
-            <button type="button" className="sl-btn is-one" onClick={onUpgrade}>
+            <button type="button" className="l5-btn is-primary is-one" onClick={onUpgrade}>
               Stay awake with Socria One
             </button>
           )}

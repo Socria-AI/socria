@@ -12,20 +12,19 @@
  */
 
 /* ── the challenge chip, in the Logos header ─────────────────────────── */
+/* a word among the header's words (Search, Memory, More): 13.5 in ink 70, ink when pointed at or open — no pill;
+   done, it says so in moss */
 .logos-root .rwc { position: relative; display: inline-flex; flex: 0 0 auto; }
 .logos-root .rwc-chip {
   display: inline-flex; align-items: center; gap: 7px;
-  height: 28px; padding: 0 10px; border-radius: 999px;
-  border: 1px solid var(--lg-line); background: transparent;
-  color: var(--lg-ink-60); font: inherit; font-size: 12px; cursor: pointer;
-  transition: color 0.18s, border-color 0.18s, background 0.18s;
+  min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none;
+  color: var(--c-ink-70); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;
+  transition: color 0.2s;
 }
 .logos-root .rwc-chip:hover,
-.logos-root .rwc-chip[aria-expanded='true'] {
-  color: var(--lg-primary); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.05);
-}
-.logos-root .rwc-chip.is-done { color: var(--lg-primary); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35); }
+.logos-root .rwc-chip[aria-expanded='true'] { color: var(--c-ink); }
+.logos-root .rwc-chip.is-done { color: var(--c-moss); }
+@media (pointer: coarse) { .logos-root .rwc-chip { min-height: 44px; } }
 .logos-root .rwc-chip-t { font-variant-numeric: tabular-nums; white-space: nowrap; }
 .logos-root .rwc-dots { display: inline-flex; gap: 3px; }
 .logos-root .rwc-dots i {
@@ -35,19 +34,22 @@
 }
 .logos-root .rwc-dots i.on { background: var(--lg-primary); border-color: var(--lg-primary); }
 
+/* it floats under the header, so it is drawn as whatever floats there is (Revision II): paper, a hairline, square,
+   no shadow */
 .logos-root .rwc-card {
   position: absolute; top: calc(100% + 8px); left: 0; z-index: 70;
   white-space: normal; text-align: left; /* the header it hangs from is nowrap */
   display: flex; flex-direction: column; gap: 8px;
   width: min(300px, calc(100vw - 32px)); padding: 14px 16px;
-  background: var(--lg-paper); color: var(--lg-ink);
-  border: 1px solid var(--lg-line); border-radius: 12px;
-  box-shadow: 0 14px 34px -18px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  background-color: var(--c-paper, var(--lg-paper)); background-image: var(--c-grain, none); color: var(--lg-ink);
+  border: 1px solid var(--c-rule-2, var(--lg-line)); border-radius: 0;
+  box-shadow: none;
   animation: rwcIn 0.22s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
 @keyframes rwcIn { from { opacity: 0; transform: translateY(-4px); } to { opacity: 1; transform: none; } }
+/* the one label, lit */
 .logos-root .rwc-k {
-  font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-primary);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-moss, var(--lg-primary));
 }
 .logos-root .rwc-h { font-family: var(--font-stix, Georgia, serif); font-size: 16px; line-height: 1.3; }
 .logos-root .rwc-h-done { font-size: 18px; }
@@ -55,18 +57,23 @@
 .logos-root .rwc-progress .rwc-dots i { width: 8px; height: 8px; }
 .logos-root .rwc-note { font-size: 12.5px; line-height: 1.45; color: var(--lg-ink-60); }
 .logos-root .rwc-acts { display: flex; align-items: center; justify-content: flex-end; gap: 12px; margin-top: 2px; }
+/* words (the way to the account goes somewhere: moss; "Not now" is the meta word), and the card's one filled
+   control (.l5-btn.is-primary.is-sm: ink, moss on hover) */
 .logos-root .rwc-link,
 .logos-root .rwc-quiet {
-  background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; cursor: pointer;
+  background: none; border: 0; padding: 0; font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; transition: color 0.2s;
 }
-.logos-root .rwc-link { color: var(--lg-primary); text-decoration: underline; text-underline-offset: 3px; margin-right: auto; }
-.logos-root .rwc-quiet { color: var(--lg-ink-40); }
+.logos-root .rwc-link { color: var(--c-moss, var(--lg-primary)); margin-right: auto; }
+.logos-root .rwc-link:hover { color: var(--c-ink, var(--lg-ink)); }
+.logos-root .rwc-quiet { color: var(--c-ink-45); }
 .logos-root .rwc-quiet:hover { color: var(--lg-ink); }
 .logos-root .rwc-go {
-  background: var(--lg-primary); color: var(--lg-paper); border: 0; border-radius: 999px;
-  padding: 7px 14px; font: inherit; font-size: 12.5px; cursor: pointer;
+  display: inline-flex; align-items: center; height: 32px;
+  background: var(--c-ink); color: var(--c-paper); border: 0; border-radius: 999px;
+  padding: 0 14px; font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s var(--c-ease);
 }
-.logos-root .rwc-go:hover { filter: brightness(1.08); }
+.logos-root .rwc-go:hover { background: var(--c-moss); transform: translateY(-2px); }
 .logos-root .rwc-mark {
   display: grid; place-items: center; width: 30px; height: 30px; border-radius: 50%;
   color: var(--lg-paper); background: var(--lg-primary);
@@ -74,7 +81,7 @@
 }
 @keyframes rwcMark { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
 .logos-root .rwc-chip:focus-visible,
-.logos-root .rwc-card button:focus-visible { outline: 2px solid var(--lg-primary); outline-offset: 2px; }
+.logos-root .rwc-card button:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 
 /* ── the account section ─────────────────────────────────────────────── */
 .acct-sheet .rw { display: flex; flex-direction: column; gap: 14px; }
@@ -119,5 +126,6 @@
 
 @media (prefers-reduced-motion: reduce) {
   .logos-root .rwc-card, .logos-root .rwc-mark { animation: none; }
+  .logos-root .rwc-go:hover { transform: none; }
   .acct-sheet .rw-bar i, .logos-root .rwc-dots i { transition: none; }
 }

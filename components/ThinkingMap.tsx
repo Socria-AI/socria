@@ -2482,9 +2482,8 @@ export function ThinkingMap({
             aria-label="Show all of the map"
             title="Show all of it (0)"
           >
-            <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-              <path d="M2.5 6V2.5H6M10 2.5h3.5V6M13.5 10v3.5H10M6 13.5H2.5V10" />
-            </svg>
+            {/* the one zoom control (− 100% + Fit): Fit is a word, as on the Universal Map and in the space */}
+            Fit
           </button>
         </div>
       )}

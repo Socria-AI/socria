@@ -2,7 +2,9 @@
  * board, a topic's quotes, practice and its check. The same paper, olive and
  * serif as the conversation (l5.css); scoped under .logos-root .l5. Phones
  * first where it matters: the board is a list, the topic a sheet, the
- * practice table a stack of cards.
+ * practice table a stack of cards. Its cards are the desk's (StudyDesk's
+ * .l5-holder): paper, a hairline, square, no shadow, so the board, a topic
+ * and practice read as one feature with the desk they sit in.
  */
 
 .logos-root .l5 {
@@ -17,8 +19,9 @@
   --l5s-gold: var(--lg-secondary, #b8a26b);
   /* why a topic is the place to start — a gold note — and a review topic's label */
   --l5s-gold-rgb: 184, 162, 107;
-  --l5s-gold-ink: #5b4d27;
-  --l5s-review-ink: #7a6a3e;
+  /* one gold ink for the product (l5-controls --c-gold-ink); dark grounds restate both (themes.css) */
+  --l5s-gold-ink: var(--c-gold-ink);
+  --l5s-review-ink: var(--c-gold-ink);
   /* a drop zone with files held over it */
   --l5s-drop-over: #fbfaf3;
 }
@@ -45,77 +48,88 @@
 .logos-root .l5 .l5s-chip.is-src span[aria-hidden] {
   color: var(--lg-primary);
 }
-/* the study's buttons, in the product's one language (components/logos5/buttons.css):
-   .l5s-x a glyph, .l5s-btn a key of card stock, .l5s-go the one way on */
+/* the study's buttons, in the controls standard (l5-controls.css): .l5s-x the
+   bare close glyph (L5Close), .l5s-btn and .l5s-act words, .l5s-go and
+   .l5s-act.is-primary the one filled control — the ink pill */
 .logos-root .l5 .l5s-x {
   width: 32px;
   height: 32px;
+  padding: 0;
   border: 0;
-  border-radius: var(--l5b-r-sm);
-  background: transparent;
-  color: var(--l5b-ink-2);
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-60);
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
-  transition: background-color 0.15s, color 0.15s;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5s-x:hover {
-  background: var(--l5b-wash);
-  color: var(--l5b-ink);
+  background: none;
+  color: var(--c-ink);
 }
 
-.logos-root .l5 .l5s-btn {
-  min-height: 40px;
-  padding: 0 16px;
-  border: 1px solid var(--l5b-edge);
-  border-radius: var(--l5b-r);
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
-  color: var(--l5b-ink);
+.logos-root .l5 :is(.l5s-btn, .l5s-act) {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--c-ink-70);
   font: inherit;
   font-size: 13.5px;
   font-weight: 500;
+  white-space: nowrap;
   cursor: pointer;
-  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: color 0.2s;
 }
-.logos-root .l5 .l5s-btn:active:not(:disabled) {
-  transform: none;
-  box-shadow: none;
+.logos-root .l5 :is(.l5s-btn, .l5s-act):hover:not(:disabled) {
+  color: var(--c-ink);
 }
-.logos-root .l5 .l5s-btn:disabled,
-.logos-root .l5 .l5s-go:disabled,
-.logos-root .l5 .l5s-act:disabled {
-  opacity: 0.45;
+.logos-root .l5 :is(.l5s-btn, .l5s-act):disabled {
+  color: var(--c-ink-25);
   cursor: default;
 }
-.logos-root .l5 .l5s-go {
+.logos-root .l5 :is(.l5s-go, .l5s-act.is-primary) {
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  min-height: 44px;
-  padding: 0 20px;
-  border: 1px solid var(--l5b-fill);
-  border-radius: var(--l5b-r);
-  background: var(--l5b-fill);
+  height: 40px;
+  min-height: 0;
+  padding: 0 18px;
+  box-sizing: border-box;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-ink);
   box-shadow: none;
-  color: var(--l5b-on-fill);
+  color: var(--c-paper);
   font: inherit;
-  font-size: 15.5px;
-  font-weight: 600;
+  font-size: 13.5px;
+  font-weight: 500;
+  line-height: 1;
+  white-space: nowrap;
   cursor: pointer;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: background-color 0.2s, transform 0.2s var(--c-ease);
 }
-.logos-root .l5 .l5s-go:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
-  background: color-mix(in srgb, var(--l5b-fill) 88%, #000);
+.logos-root .l5 :is(.l5s-go, .l5s-act.is-primary):hover:not(:disabled) {
+  background: var(--c-moss);
+  color: var(--c-paper);
   transform: translateY(-2px);
 }
-.logos-root .l5 .l5s-go:active:not(:disabled) {
+.logos-root .l5 :is(.l5s-go, .l5s-act.is-primary):disabled {
+  background: transparent;
+  color: var(--c-ink-45);
+  box-shadow: inset 0 0 0 1px var(--c-ink-25);
+  cursor: default;
   transform: none;
-  box-shadow: none;
 }
-.logos-root .l5 :is(.l5s-x, .l5s-btn, .l5s-go):focus-visible {
-  outline: 2px solid var(--l5b-focus);
+.logos-root .l5 :is(.l5s-x, .l5s-btn, .l5s-go, .l5s-act, .l5s-link, .l5s-hintbtn, .l5s-card, .l5s-opt):focus-visible {
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 .logos-root .l5 .l5s-link {
@@ -140,85 +154,16 @@
   line-height: 1.45;
   color: var(--lg-ink-40);
 }
-.logos-root .l5 .l5s-spin {
-  display: inline-block;
-  width: 14px;
-  height: 14px;
-  border: 2px solid var(--l5-hair);
-  border-top-color: var(--lg-primary);
-  border-radius: 50%;
-  animation: l5s-spin 0.9s linear infinite;
-}
-@keyframes l5s-spin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
-/* ── the header's steps ───────────────────────────────────────────── */
-.logos-root .l5 .l5s-steps {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  flex: 0 1 auto;
-  min-width: 0;
-}
-.logos-root .l5 .l5s-step {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  min-height: 32px;
-  padding: 0 12px;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lg-ink-60);
-  font: inherit;
-  font-size: 13.5px;
-  white-space: nowrap;
-  cursor: pointer;
-}
-.logos-root .l5 .l5s-step.is-on {
-  background: var(--lg-primary);
-  color: var(--l5-on-primary);
-}
-.logos-root .l5 .l5s-step-n {
-  font-size: 12.5px;
-  font-variant-numeric: tabular-nums;
-  opacity: 0.8;
-}
-.logos-root .l5 .l5s-step-tag {
-  padding: 1px 7px;
-  border: 1px dashed currentColor;
-  border-radius: 999px;
-  font-size: 10.5px;
-  opacity: 0.75;
-}
-.logos-root .l5 .l5s-step.is-quiet:not(.is-on) {
-  color: var(--lg-ink-40);
-}
-.logos-root .l5 .l5-head.has-steps .l5-title {
-  flex: 0 1 auto;
-  max-width: 28%;
-  font-family: var(--lg-sans);
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-  color: var(--lg-ink-60);
-}
+/* the header's middle (L5Chrome's L5Header `center`) */
 .logos-root .l5 .l5-head-mid {
   flex: 1 1 auto;
   display: flex;
   justify-content: center;
   min-width: 0;
 }
-/* the bar's keys (Search, List, the way back): buttons.css's small secondary —
-   card stock with a hairline edge and a ledge, not a thin-outline pill */
+/* the bar's keys (Search, List, the way back): the carried-over --l5b-* key
+   (l5-controls.css), a hairline edge, not a thin-outline pill. The shell's own
+   header controls, kept here; their look is the shell's to change */
 .logos-root .l5 .l5-unibtn {
   display: inline-flex;
   align-items: center;
@@ -278,23 +223,6 @@
   color: var(--l5b-fill);
 }
 
-/* ── the study's own screen ───────────────────────────────────────── */
-.logos-root .l5 .l5s-main {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: hidden;
-}
-
-.logos-root .l5 .l5s-main > .l5-dock {
-  flex: 0 0 auto;
-}
-
-/* ── the intake ───────────────────────────────────────────────────── */
-
-
 /* ── the board ────────────────────────────────────────────────────── */
 /* the board and a topic scroll each on their own; "where to start" stays in view under the board */
 
@@ -318,16 +246,16 @@
   align-self: center;
   margin: 0 16px 10px;
   padding: 8px 14px;
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .l5 .l5s-board {
   position: relative;
   flex: 1 1 auto;
   padding: 22px 22px 18px;
-  background-image: radial-gradient(rgba(var(--l5-tint-rgb), 0.08) 1px, transparent 1px);
-  background-size: 22px 22px;
 }
 .logos-root .l5 .l5s-links {
   position: absolute;
@@ -395,19 +323,20 @@
   gap: 8px;
   width: 100%;
   padding: 14px 16px 12px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   color: var(--lg-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
-  transition: opacity 0.18s, transform 0.18s, border-color 0.18s, box-shadow 0.18s;
+  transition: opacity 0.2s, border-color 0.2s, box-shadow 0.2s;
 }
 .logos-root .l5 .l5s-card.is-on {
-  border-color: var(--lg-primary);
-  box-shadow: 0 0 0 3px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14), var(--l5-shadow);
+  border-color: var(--c-moss);
+  box-shadow: inset 0 0 0 1px var(--c-moss);
 }
 .logos-root .l5 .l5s-card.is-dim {
   opacity: 0.38;
@@ -421,9 +350,9 @@
 .logos-root .l5 .l5s-kind {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5s-card.is-foundation .l5s-kind {
   color: var(--lg-primary);
@@ -445,8 +374,8 @@
 }
 .logos-root .l5 .l5s-card.is-start {
   margin-top: 0;
-  border-color: var(--lg-primary);
-  box-shadow: 0 0 0 1px var(--lg-primary), 0 18px 38px -22px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
+  border-color: var(--c-moss);
+  box-shadow: inset 0 0 0 1px var(--c-moss);
 }
 .logos-root .l5 .l5s-card-title {
   font-family: var(--l5-serif);
@@ -494,10 +423,11 @@
   z-index: 5;
   margin: 0 22px 14px;
   padding: 16px 18px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   max-width: 1100px;
   align-self: center;
   width: calc(100% - 44px);
@@ -506,13 +436,15 @@
   position: absolute;
   top: 8px;
   right: 8px;
+  margin: 0;
 }
 .logos-root .l5 .l5s-start-k {
   margin: 0;
-  font-size: 12.5px;
-  letter-spacing: 0.1em;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5s-start-k b {
   color: var(--lg-primary);
@@ -538,13 +470,14 @@
   align-items: flex-start;
   gap: 12px;
   padding: 12px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--lg-paper);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background: none;
   color: var(--lg-ink);
   font: inherit;
   text-align: left;
   cursor: pointer;
+  transition: border-color 0.2s;
 }
 .logos-root .l5 .l5s-opt b {
   display: block;
@@ -599,9 +532,9 @@
   margin: 0;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5s-insp-t {
   margin: 4px 0 6px;
@@ -634,10 +567,10 @@
 .logos-root .l5 .l5s-quote {
   margin: 0;
   padding: 12px 14px;
-  border: 1px solid var(--l5-hair);
+  border: 1px solid var(--c-rule-2);
   border-left: 3px solid var(--l5s-gold);
-  border-radius: 10px;
-  background: var(--l5-surface);
+  border-radius: 0;
+  background: none;
 }
 .logos-root .l5 .l5s-quote blockquote {
   margin: 0 0 8px;
@@ -649,27 +582,13 @@
 .logos-root .l5 .l5s-quote.is-sm blockquote {
   font-size: 15.5px;
 }
+/* a topic's ways on: Practise is the one filled control, the rest are words */
 .logos-root .l5 .l5s-acts {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 8px;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 20px;
   margin-top: 8px;
-}
-.logos-root .l5 .l5s-act {
-  min-height: 44px;
-  padding: 0 12px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 10px;
-  background: var(--l5-surface);
-  color: var(--lg-ink);
-  font: inherit;
-  font-size: 13.5px;
-  cursor: pointer;
-}
-.logos-root .l5 .l5s-act.is-primary {
-  background: var(--lg-primary);
-  border-color: var(--lg-primary);
-  color: var(--l5-on-primary);
 }
 
 /* ── practice ─────────────────────────────────────────────────────── */
@@ -711,10 +630,11 @@
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5s-jwrap {
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   overflow: visible;
 }
 .logos-root .l5 .l5s-jtable {
@@ -727,9 +647,9 @@
   border-bottom: 1px solid var(--l5-hair);
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.1em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   text-align: left;
 }
 .logos-root .l5 .l5s-jtable th.is-num,
@@ -774,8 +694,9 @@
   font-size: 15.5px;
 }
 .logos-root .l5 .l5s-in:focus {
-  outline: 2px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.35);
-  outline-offset: 0;
+  outline: none;
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 3px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
   background: var(--l5-raise);
 }
 .logos-root .l5 .l5s-in.is-num {
@@ -800,7 +721,7 @@
   height: 22px;
   border-radius: 50%;
   font-size: 13.5px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .logos-root .l5 .l5s-mark.is-ok {
   background: var(--l5s-ok-soft);
@@ -816,15 +737,21 @@
   margin-top: 6px;
 }
 .logos-root .l5 .l5s-hintbtn {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: transparent;
-  color: var(--lg-ink-60);
+  min-height: 24px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-45);
   font: inherit;
   font-size: 12.5px;
+  font-weight: 500;
   cursor: pointer;
+  transition: color 0.2s;
+}
+.logos-root .l5 .l5s-hintbtn:hover,
+.logos-root .l5 .l5s-hintbtn[aria-expanded='true'] {
+  color: var(--c-ink);
 }
 .logos-root .l5 .l5s-hint {
   position: absolute;
@@ -836,10 +763,11 @@
   gap: 6px;
   width: min(320px, 78vw);
   padding: 12px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-surface);
-  box-shadow: 0 12px 34px -12px rgba(var(--shadow-rgb, 35, 36, 31), 0.32);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   font-size: 13.5px;
   line-height: 1.45;
   font-weight: 400;
@@ -863,7 +791,7 @@
   box-shadow: none;
   flex-direction: row;
   padding: 4px 10px;
-  border-radius: 999px;
+  border-radius: 0;
   font-size: 13.5px;
 }
 .logos-root .l5 .l5s-cloze {
@@ -875,9 +803,10 @@
 }
 .logos-root .l5 .l5s-cloze li {
   padding: 12px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-surface);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
 }
 .logos-root .l5 .l5s-cloze li.is-no {
   background: var(--l5s-no-wash);
@@ -925,10 +854,11 @@
 }
 .logos-root .l5 .l5s-side-card {
   padding: 16px 18px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .l5 .l5s-side-card.is-quiet {
   box-shadow: none;
@@ -995,8 +925,8 @@
   padding: 12px 14px;
   border: 1px solid rgba(var(--l5-no-rgb), 0.25);
   border-left: 3px solid var(--l5s-no);
-  border-radius: 16px;
-  background: var(--l5-surface);
+  border-radius: 0;
+  background: none;
 }
 .logos-root .l5 .l5s-gap-l {
   margin: 0;
@@ -1017,7 +947,7 @@
 .logos-root .l5 .l5s-allright {
   margin: 0;
   padding: 12px 14px;
-  border-radius: 16px;
+  border-radius: 0;
   background: var(--l5s-ok-soft);
   color: var(--l5s-ok);
   font-size: 13.5px;
@@ -1041,9 +971,9 @@
     max-width: none;
     max-height: 78svh;
     border-left: 0;
-    border-top: 1px solid var(--l5-hair);
+    border-top: 1px solid var(--c-rule-2);
     border-radius: 16px 16px 0 0;
-    box-shadow: 0 -18px 50px -20px rgba(var(--shadow-rgb, 35, 36, 31), 0.35);
+    box-shadow: none;
     padding-bottom: calc(22px + env(safe-area-inset-bottom, 0px));
   }
   .logos-root .l5 .l5s-practice {
@@ -1054,15 +984,8 @@
     flex: 0 0 auto;
     width: 100%;
   }
-  .logos-root .l5 .l5-head.has-steps .l5-title {
-    display: none;
-  }
 }
 @media (max-width: 640px) {
-  
-  
-  
-  
   .logos-root .l5 .l5s-board {
     padding: 14px 16px;
   }
@@ -1102,29 +1025,11 @@
   .logos-root .l5 .l5s-start-opts {
     grid-template-columns: 1fr;
   }
-  /* the steps: the one you are on is named, the others are their numbers */
-  .logos-root .l5 .l5s-step {
-    padding: 0 8px;
-    min-height: 36px;
-    min-width: 36px;
-    justify-content: center;
-  }
-  .logos-root .l5 .l5s-step-tag,
-  .logos-root .l5 .l5s-step:not(.is-on) .l5s-step-l {
-    display: none;
-  }
-  .logos-root .l5 .l5s-step-l {
-    font-size: 13.5px;
-  }
   .logos-root .l5 .l5-unibtn .l5-unibtn-l {
     display: none;
   }
   /* the mark alone: the word is in the mark's label */
   .logos-root .l5 .l5-brand-w {
-    display: none;
-  }
-  /* with the steps on the bar, the Universal Map is in the menu */
-  .logos-root .l5 .l5-head.has-steps .l5-unibtn {
     display: none;
   }
   .logos-root .l5 .l5s-practice {
@@ -1186,37 +1091,27 @@
   .logos-root .l5 .l5s-jtable td.is-num {
     width: auto;
   }
-  .logos-root .l5 .l5s-acts {
-    grid-template-columns: 1fr;
-  }
 }
 @media (hover: hover) {
-  .logos-root .l5 .l5s-card:hover {
-    transform: translateY(-1px);
-    border-color: rgba(var(--l5-tint-rgb), 0.32);
+  .logos-root .l5 .l5s-card:not(.is-on):not(.is-start):hover {
+    border-color: rgba(var(--c-ink-rgb), 0.26);
   }
   .logos-root .l5 .l5s-card.is-dim:hover {
     opacity: 0.7;
   }
-  .logos-root .l5 .l5s-opt:hover,
-  .logos-root .l5 .l5s-act:not(.is-primary):hover {
-    border-color: rgba(var(--l5-tint-rgb), 0.35);
-  }
-  .logos-root .l5 .l5s-btn:hover:not(:disabled) {
-    border-color: var(--l5b-edge-hi);
-    background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
+  .logos-root .l5 .l5s-opt:hover {
+    border-color: rgba(var(--c-ink-rgb), 0.26);
   }
 }
 @media (prefers-reduced-motion: reduce) {
-  .logos-root .l5 .l5s-card,
-  .logos-root .l5 .l5s-spin {
+  .logos-root .l5 .l5s-card {
     transition: none;
     animation: none;
   }
-  .logos-root .l5 :is(.l5s-btn, .l5s-go, .l5-unibtn) {
+  .logos-root .l5 :is(.l5s-btn, .l5s-go, .l5s-act, .l5-unibtn) {
     transition: none;
   }
-  .logos-root .l5 :is(.l5s-btn, .l5s-go, .l5-unibtn):is(:hover, :active) {
+  .logos-root .l5 :is(.l5s-btn, .l5s-go, .l5s-act, .l5-unibtn):is(:hover, :active) {
     transform: none !important;
   }
 }

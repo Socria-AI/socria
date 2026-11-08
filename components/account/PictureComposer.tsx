@@ -111,7 +111,7 @@ export function PictureComposer({ isOne = false }: { isOne?: boolean }) {
   const group = GROUPS.find((g) => g.id === tab) ?? GROUPS[0];
 
   return (
-    <div className="pfp-root">
+    <div className="pfp-root lg-tokens">
       <div className="pfp-head">
         <div>
           <Label tone="moss">Your account · your picture</Label>

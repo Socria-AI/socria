@@ -1,7 +1,8 @@
 'use client';
 
-// The Memory page's second half: what Core 4 recorded about the person's
-// THINKING, as opposed to what Socria knows about them (the Mind Graph above).
+// The Memory page's second half: what the earlier chats recorded about the
+// person's THINKING, as opposed to what Socria knows about them (the memory
+// graph above).
 //
 // Three things, each with the person in charge of it:
 //
@@ -11,12 +12,12 @@
 //                          marked Socria's; anything else is unattributed and
 //                          never said back to them as theirs.
 //   the Cognitive State    per conversation: what they SAID they want, kept
-//                          apart from what Core 4 inferred (with how sure,
+//                          apart from what the chat inferred (with how sure,
 //                          and why). Inferred fields can be set or reset.
 //   capability evidence    counted events, per concept. Deletable.
 //
 // Everything goes through /api/core4. Nothing is hidden here that the model
-// can see: if Core 4 uses it, it is on this page.
+// can see: if a chat uses it, it is on this page.
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import './core4-record.css';
@@ -82,7 +83,7 @@ export function Core4Record() {
     };
   }, [data]);
 
-  if (err && !data) return <section className="c4-root"><p className="c4-err" role="alert">{err}</p></section>;
+  if (err && !data) return <section className="c4-root lg-tokens"><p className="c4-err" role="alert">{err}</p></section>;
   if (!data) return null;
   const empty = !data.entries.length && !data.states.length && !data.capability.length;
 
@@ -94,7 +95,7 @@ export function Core4Record() {
   );
 
   return (
-    <section className="c4-root" aria-labelledby="c4-h">
+    <section className="c4-root lg-tokens" aria-labelledby="c4-h">
       <div className="c4-head">
         <span className="c4-kicker">From earlier chats</span>
         <h2 id="c4-h">How Socria read your thinking</h2>

@@ -629,6 +629,75 @@ its shape. It now zooms (`lib/logos5/spaceZoom.ts`, `components/logos5/L5Space.t
   and the room under the chatbox is divided by the zoom, so what it covers can always be scrolled clear.
 - A phone's space is a column of cards, not a canvas, and has no keys.
 
+### 8.13 One Socria — the standard, measured and held
+
+Every page and surface was captured (desktop, phone; paper and dark), every stylesheet parsed (92 sheets, 47,000
+declarations) and every component read, and five areas were audited against what most of the product already did:
+the public site, the Logos 5 shell, the feature surfaces, the dialogs and account pages, and a census of the shared
+primitives. The standard is that majority, plus the two documented systems (`l5-controls.css`, Revision II). Nothing
+here is a new design; where a surface had no convention, it took the nearest one the system already had.
+
+**The standard.**
+
+- **Colour.** One UI green, `#354620`, always through a token (it was 850 uses against the older `#5e7633`, which
+  survives only as a categorical tone, `--moss-tone`). Every colour on an app route is a theme token. The surfaces a
+  floating thing is drawn on (`--l5-surface`, `--l5-raise`, `--l5-hair`, `--l5-shadow`, `--l5-shadow-up`,
+  `--lg-panel-solid`) are now declared with the Logos tokens for every theme, so a sheet mounted outside `.l5` stops
+  hard-coding its own per-theme colours. One red, tension: `--lg-tension` inside Logos, `--tension` at the root
+  (themed; the account pages read it). One Prussian blue, `--lg-one`, for Socria One only.
+- **Controls.** One filled control per surface, the ink pill (40px; 32 small; 46 full-width in a sheet), moss under the
+  pointer; everything else a word. Close is a bare × at the top right. A chosen tab, lens or option is underlined,
+  never a filled pill or a tray. A label is 10.5px / 600 / 0.18em, uppercase, ink at 0.55. Nothing travels when
+  pressed.
+- **Focus.** One ring: 2px moss, 2px off. A zero-weight floor (`:where(body) :focus-visible`) catches anything that
+  drew none, and fields show a moss border with a 3px ring.
+- **Surfaces.** On the Logos 5 page, whatever floats is paper, a hairline, square, no shadow (Revision II). A dialog
+  over the app dims the page (`--lg-dim`, never a blur or a tinted veil) under a 16px panel (`--lg-r-dialog`) with a
+  serif title. Cards are 16px, a card inside a card 10px.
+- **Type.** Weights 400 / 500 / 600; nothing under 10.5px in the interface; the families through variables (next/font
+  registers hashed names, so a literal "Instrument Serif" never matched and Live guidance had been set in Georgia).
+  The quietest Logos ink (`--lg-ink-40`, used for about 190 timestamps, counts and hints) is now 0.55, the controls'
+  floor of 3.5:1; at 0.4 it was 2.4:1.
+- **Names.** Conversation, Files, Artifacts, Logic Map. No Split View, Chat or Content view, Thinking Map, Draft Space
+  or thought sessions in what a person reads.
+
+**What changed with it.**
+
+- Tailwind's colour channels were called `--c-ink` and `--c-paper`, the same names as the controls' full colours, so
+  any Tailwind ink utility inside Logos computed an invalid colour; they are `--rgb-*` now, and Tailwind's moss is the
+  one green.
+- The global sheet lost 1,800 lines of rules nothing rendered (the retired landing, the Core 3 modal, insight cards,
+  the old gate, the intro timeline, the old 404) and the comments that introduced them; `test/ux-consistency.test.mjs`
+  pins that they stay gone. The Connections, style and journey dialogs, the Data & Privacy page and the account kit
+  now follow the dialog, control and field rules, and the Data & Privacy page follows the theme.
+- The Logic Map's zoom lost its tray: − 100% + Fit as bare keys, the same keys as the Universal Map's, the space's and
+  Memory's. Its lens tabs underline the chosen one. Its cards take the moss focus ring (they had the accent blue).
+- **The public site** wears one masthead and one foot (`components/site/chrome.tsx`) on every page: /, /one, /charter,
+  the blog, the docs, the policies, /explore and /support (which had none). One nav list, one action ("Start a
+  conversation", to Logos), one collapse width (760px), one 64px bar (`--mast-h`); the docs' Contents and the policies'
+  tabs are slots in it. The five footers are one (Privacy, Terms and Support in every one). The blog's fake subscribe
+  box, which said "Subscribed ✓" and sent nothing, is two real doors to the newsletter setting. The landing and the docs
+  describe the product as it is (four views, Concise/Balanced/Detailed), and the Charter is in sentence case.
+- **The shell.** `l5-controls.css` loads before the older sheets, so their copies of its classes won; the copies are
+  gone, not reordered. The Universal Map's and Memory's header now draws as the page's does (the account a word in a
+  hairline ring, Socria One a word in its blue, open triggers in ink); the list is called Sessions everywhere. What
+  floats on the page (composer sheets, the map's menus and cards, tips) is square paper; the old framed keys on the map
+  are words and the one pill; tips sit under every dialog's dim. Dark-ground inks for the space's labels and the gold.
+- **The surfaces.** Memory, Study, Write, Projects, the memory graphs, Voice, the big-screen dock, displays and reply
+  elements take the ink pill, the bare close, underlined tabs and the label; the light-only colours (white controls, a
+  cream dock, four reds) follow the theme. A chart keeps its colours when it is opened in Artifacts (one series palette,
+  `--ln-c1..6`, in `data.css`), and the tension colour is no longer a series. A full-screen display sits under Live
+  guidance, and Write's header under the dialogs.
+- **The dialogs.** Account, One, the guide, Sleep, Share, Projects, the picture sheet, the tour and the rewards pop-ups
+  dim the page without a blur (the Account sheet had a Prussian veil), sit in a 16px panel with a serif title, close
+  with the one ×, and buy One only in One's blue. Share, Projects and the picture sheet no longer draw white on a dark
+  ground. The Account sheet lost its "Done", which only repeated the ×.
+
+**Not done here, and why.** Breakpoints (33 distinct widths) and transition timings were measured but not snapped:
+moving a breakpoint changes a layout at a width nobody looked at, and a 0.18s to 0.2s change is invisible. Phone
+layouts of dialogs are kept as they are (no majority). The legal pages' copy still says "Thinking Map" and "Draft
+Space" in places and needs legal review before it changes.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its
@@ -793,6 +862,13 @@ its own glyph beside it.
 
 ## 11. How it is held
 
+- `test/ux-consistency.test.mjs` holds the one standard (§8.13) across every
+  stylesheet: one green (no UI accent in `#5e7633`), the font families as
+  variables, the surface and dialog tokens declared for every theme, one red,
+  Tailwind's channels under their own names, the readable quiet ink, one focus
+  ring and its floor, the ink pill, the bare close and the untrayed zoom, dialogs
+  dimmed and never blurred, weights 400/500/600, the current names, and the
+  retired rules gone.
 - `test/logos5-system.test.mjs` reads the sources: the old sheets gone and
   never imported; the three states; the one icon, menu, close and label; every
   reading size one of the six steps and every corner one of the four radii in

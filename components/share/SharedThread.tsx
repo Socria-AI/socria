@@ -372,12 +372,12 @@ export function SharedThread({
 
   if (err) {
     return (
-      <div className="st-root">
+      <div className="st-root lg-tokens">
         <div className="st-wrap"><p className="sh-err" role="alert">{err}</p><button className="sh-btn ghost" onClick={onClose}>Back</button></div>
       </div>
     );
   }
-  if (!convo || !role) return <div className="st-root" aria-busy="true"><div className="st-wrap"><p className="sh-quiet">Opening…</p></div></div>;
+  if (!convo || !role) return <div className="st-root lg-tokens" aria-busy="true"><div className="st-wrap"><p className="sh-quiet">Opening…</p></div></div>;
 
   const others = people.filter((p) => !p.you);
   const typingNow = others.filter((p) => p.cursor?.on === 'typing');
@@ -389,7 +389,7 @@ export function SharedThread({
   const threadsAt = (a: string) => comments.threads.filter((t) => t.root.anchor === a);
 
   return (
-    <div className="st-root">
+    <div className="st-root lg-tokens">
       <header className="st-head">
         <button className="st-back" onClick={onClose} aria-label="Back to your conversations">←</button>
         <div className="st-title">

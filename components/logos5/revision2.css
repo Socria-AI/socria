@@ -18,7 +18,13 @@
 .logos-root .l5 .l5v-primary-in { background: transparent; }
 
 /* ── the header ─────────────────────────────────────────────────────── */
-.logos-root .l5 .l5v-top {
+/* Two components draw a header — a line's (L5TopBar, .l5v-top) and the Universal Map's and Memory's (L5Header,
+   .l5-head) — and both draw it alike: 56 tall, paper with its grain, a rule below, 24px in from the edges; the mark
+   and the wordmark in 21px serif; the line's name in 19px serif italic; at the end, words (Search with its key,
+   Sessions, Memory, More), Socria One the word in its own blue (tips.css), and the account a word with its initial
+   in a hairline ring. An open trigger (Sessions, More, a pressed Sessions list) holds its hover ink: nothing in the
+   bar goes moss or grows an underline but the chosen view. */
+.logos-root .l5 :is(.l5v-top, .l5-head) {
   box-sizing: border-box;
   border-bottom: 1px solid var(--c-rule);
   background-color: var(--c-paper);
@@ -36,63 +42,67 @@
   min-height: 56px;
   padding: 0 24px;
 }
+.logos-root .l5 .l5-head { column-gap: 24px; padding: 0 24px; }
 /* a phone keeps its two rows — the name, then the tabs across the width, underlined (l5v.css) */
 .logos-root .l5 .l5v-top.is-narrow { padding: 0 16px; }
 .logos-root .l5 .l5v-top.is-narrow .l5-switch { width: 100%; height: 44px; gap: 0; justify-content: space-between; }
 .logos-root .l5 .l5v-top.is-narrow .l5-switch-i { flex: 1 1 0; height: 44px; justify-content: center; }
 .logos-root .l5 .l5v-top-l { display: flex; align-items: center; gap: 14px; min-width: 0; }
 .logos-root .l5 .l5v-top-c { display: flex; align-items: stretch; justify-content: center; min-width: 0; }
-.logos-root .l5 .l5v-top-r { display: flex; align-items: center; justify-content: flex-end; gap: 22px; min-width: 0; }
-.logos-root .l5 .l5v-top .l5v-rule { width: 1px; height: 20px; background: var(--c-rule-2); }
+.logos-root .l5 :is(.l5v-top-r, .l5-head-end) { display: flex; align-items: center; justify-content: flex-end; gap: 22px; min-width: 0; }
+.logos-root .l5 :is(.l5v-top .l5v-rule, .l5-head-rule) { width: 1px; height: 20px; background: var(--c-rule-2); }
 /* the breadcrumb: "Sessions" (a word that opens the list) / the line's name in serif italic */
 .logos-root .l5 .l5v-crumb { flex: none; display: inline-flex; align-items: center; gap: 8px; padding: 0; border: 0; background: none; color: var(--c-ink-70); font: inherit; font-size: 13.5px; font-weight: 500; cursor: pointer; transition: color 0.2s; }
-.logos-root .l5 .l5v-crumb:hover { color: var(--c-ink); }
-.logos-root .l5 .l5v-crumb[aria-expanded='true'] { color: var(--c-moss); }
+.logos-root .l5 .l5v-crumb:is(:hover, [aria-expanded='true']) { color: var(--c-ink); }
 .logos-root .l5 .l5v-crumb:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 .logos-root .l5 .l5v-slash { flex: none; color: var(--c-ink-25); font-size: 15px; }
 .logos-root .l5 .l5v-where { display: flex; align-items: baseline; gap: 10px; min-width: 0; margin: 0; }
 .logos-root .l5 .l5v-where .l5-label { display: none; }
+.logos-root .l5 .l5-where .l5-title,
 .logos-root .l5 .l5v-title { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 19px; font-weight: 400; line-height: 1.2; color: var(--c-ink); }
-.logos-root .l5 .l5v-home img { width: 22px; height: 22px; }
+.logos-root .l5 :is(.l5v-home, .l5-brand) img { width: 22px; height: 22px; }
 /* the wordmark in Instrument Serif (Revision IV): the name is said, not operated */
+.logos-root .l5 .l5-brand-w,
 .logos-root .l5 .l5v-home-w { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 21px; font-weight: 400; line-height: 1; letter-spacing: 0; }
 /* the tabs fill the bar: the chosen one underlined at its foot */
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch { height: 56px; gap: 28px; }
 .logos-root .l5 .l5v-top:not(.is-narrow) .l5v-top-c .l5-switch-i { height: 56px; }
-/* the words at the end */
-.logos-root .l5 .l5v-top-r :is(.l5-btn, .l5-link) { min-height: 32px; }
-.logos-root .l5 .l5v-search { gap: 8px; color: var(--c-ink-70); }
-.logos-root .l5 .l5v-search svg { display: none; }
-.logos-root .l5 .l5v-kbd,
-.logos-root .l5 .l5v-search kbd { height: 20px; display: inline-flex; align-items: center; padding: 0 6px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 4px; background: none; box-shadow: none; font: inherit; font-size: 11px; font-weight: 500; color: var(--c-ink-45); }
-/* "Split view": a word with a 6px dot, ink 25 off and moss on */
-.logos-root .l5 .l5v-splitb { gap: 8px; color: var(--c-ink-70); box-shadow: none; }
-.logos-root .l5 .l5v-splitb svg { display: none; }
-.logos-root .l5 .l5v-splitb::before { content: ''; width: 6px; height: 6px; border-radius: 50%; background: var(--c-ink-25); transition: background-color 0.2s; }
-.logos-root .l5 .l5v-splitb.is-on { color: var(--c-ink); box-shadow: none; }
-.logos-root .l5 .l5v-splitb.is-on::before { background: var(--c-moss); }
-/* every word at the end is UI type: 13.5, no underline */
-.logos-root .l5 .l5v-top-r :is(.l5-link, .l5-btn:not(.is-primary), .l5-signin) { font-size: 13.5px; font-weight: 500; text-decoration: none; }
+/* the words at the end: Search (and its key, .l5-kbd), Sessions on the map, the way back from Memory — one word each,
+   13.5 in ink 70, ink when pointed at or open */
+.logos-root .l5 :is(.l5v-search, .l5-head-end .l5-unibtn) { gap: 8px; color: var(--c-ink-70); }
+.logos-root .l5 .l5v-search svg,
+.logos-root .l5 .l5-head-end .l5-unibtn svg { display: none; }
+.logos-root .l5 .l5-head-end .l5-unibtn { height: auto; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; font-size: 13.5px; font-weight: 500; transition: color 0.2s; }
+.logos-root .l5 .l5-head-end .l5-unibtn:is(:hover, .is-on, [aria-pressed='true']) { border: 0; background: none; box-shadow: none; color: var(--c-ink); }
+@media (pointer: coarse) { .logos-root .l5 .l5-head-end .l5-unibtn { min-height: 44px; } }
+/* a phone's bar has room for the glyphs only (study.css puts the words away there): the glyph comes back, and a
+   word with no glyph ("← Universal Map", in Memory) keeps its word — both were left blank */
+@media (max-width: 640px) {
+  .logos-root .l5 .l5-head-end .l5-unibtn svg { display: block; }
+  .logos-root .l5 .l5-head-end .l5-unibtn:not(:has(svg)) .l5-unibtn-l { display: inline; }
+}
+/* More, in both headers: a word like Search and Sessions beside it — the same size, weight and ink (on the Universal
+   Map an older rule let it inherit 16px, and in moss it read as an action it is not) */
+.logos-root .l5 :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-link { font-size: 13.5px; font-weight: 500; color: var(--c-ink-70); text-decoration: none; }
+.logos-root .l5 :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-link:is(:hover, [aria-expanded='true']) { color: var(--c-ink); }
 .logos-root .l5 .l5-mindbtn { width: auto; height: auto; min-height: 32px; border-radius: 0; background: none; color: var(--c-ink-70); }
 .logos-root .l5 .l5-mindbtn:hover { background: none; color: var(--c-ink); }
-/* the account: the name as a word, the initial in a hairline ring, no fill */
-.logos-root .l5 .l5v-top-r .l5-avatar { width: 28px; height: 28px; min-width: 28px; box-sizing: border-box; display: grid; place-items: center; padding: 0; border: 1px solid var(--c-edge); border-radius: 50%; background: none; box-shadow: none; color: var(--c-ink); font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
-.logos-root .l5 .l5v-top-r .who-btn { gap: 8px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); font-size: 13.5px; font-weight: 500; }
-.logos-root .l5 .l5v-top-r .who-btn:hover { background: none; color: var(--c-ink); }
-.logos-root .l5 .l5v-top-r .who-btn :is(.avatar, .av-sm) { width: 28px; height: 28px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 50%; background: none; box-shadow: none; color: var(--c-ink); font-size: 11.5px; font-weight: 600; }
+/* Socria One and the account sit as far apart as the words before them */
+.logos-root .l5 :is(.l5v-top-r, .l5-head-end) > .l5-acct { gap: inherit; }
+/* the account: the name as a word, the initial in a hairline ring — no pill, no fill, no lift */
+.logos-root .l5 :is(.l5v-top-r, .l5-head-end) .who-btn { gap: 8px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); font-size: 13.5px; font-weight: 500; transition: color 0.2s; }
+.logos-root .l5 :is(.l5v-top-r, .l5-head-end) .who-btn:hover { background: none; color: var(--c-ink); transform: none; }
+.logos-root .l5 :is(.l5v-top-r, .l5-head-end) .who-btn :is(.avatar, .av-sm) { width: 28px; height: 28px; box-sizing: border-box; border: 1px solid var(--c-edge); border-radius: 50%; background: none; box-shadow: none; color: var(--c-ink); font-family: var(--lg-sans); font-style: normal; font-size: 11.5px; font-weight: 600; letter-spacing: 0.04em; }
+.logos-root .l5 :is(.l5v-top-r, .l5-head-end) .who-btn:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 /* a guest: what is left, said in words; Sign in and Save are words — the one filled control is Send */
 .logos-root .l5 .l5-guestacct { gap: 22px; margin: 0; }
-.logos-root .l5 .l5-guestmeter { height: auto; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-60); font-size: 12.5px; font-variant-numeric: tabular-nums; }
-.logos-root .l5 .l5-guestmeter-dots i { background: var(--c-moss); }
-.logos-root .l5 .l5-guestmeter-dots i.is-used { background: var(--c-ink-25); transform: none; }
+.logos-root .l5 .l5-guestmeter { height: auto; padding: 0; border: 0; background: none; border-radius: 0; color: var(--c-ink-60); font-size: 12.5px; font-variant-numeric: tabular-nums; }
+.logos-root .l5 .l5-guestmeter.is-out { color: var(--c-tension); }
 .logos-root .l5 .l5-signin,
 .logos-root .l5 button.l5-guestsave { height: auto; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; filter: none; color: var(--c-moss); font: inherit; font-size: 13.5px; font-weight: 500; text-decoration: none; cursor: pointer; transition: color 0.2s; }
 .logos-root .l5 .l5-signin:hover,
 .logos-root .l5 button.l5-guestsave:hover { background: none; color: var(--c-ink); filter: none; box-shadow: none; }
 .logos-root .l5 .l5-signin:active { transform: none; }
-
-/* words are words wherever they are: l5.css's older underlined link may load after l5-controls.css */
-.logos-root .l5 .l5-link { text-decoration: none; }
 
 /* ── the chatbox: a ruled line ──────────────────────────────────────── */
 .logos-root .l5 .lg-composer.is-ruled { margin: 0; }
@@ -172,7 +182,7 @@
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools-mid .mp-btn { height: 28px; padding: 0 6px; border: 0; border-radius: 0; background: none; font-size: 12.5px; color: var(--c-ink-60); }
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools-mid .mp-btn:hover { background: none; color: var(--c-ink); }
 .logos-root .l5 .lg-composer.is-ruled .l5-guide-acts { display: inline-flex; align-items: center; gap: 18px; }
-.logos-root .l5 .lg-composer.is-ruled .l5-guide-acts .l5-link { min-height: 28px; font-size: 13px; }
+.logos-root .l5 .lg-composer.is-ruled .l5-guide-acts .l5-link { min-height: 28px; }
 .logos-root .l5 .lg-composer.is-ruled .l5-guide-acts .l5-guide-reveal { color: var(--c-ink-45); }
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools-end :is(.lg-mic, .sv-btn) { width: 28px; height: 28px; min-width: 28px; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-60); }
 .logos-root .l5 .lg-composer.is-ruled .l5-ctools-end :is(.lg-mic, .sv-btn):hover:not(:disabled) { background: none; color: var(--c-ink); }
@@ -203,13 +213,16 @@
 .logos-root .l5 .lp-compose .l5-dock > * + * { margin-top: 10px; }
 
 /* ── whatever floats: paper, a hairline, square, no shadow ──────────── */
-.logos-root .l5 :is(.l5v-menu, .l5x-sheet, .l5-ask, .l5x-pop, .l5-tip, .tip-card, .lg-pop, .l5v-beside) {
+/* Each floating thing is drawn so in its own sheet — the composer's Make and Length sheets (app-shell.css .mp-sheet),
+   the Universal Map's View menu, hidden tray, card, palette, find list and the bar over several chosen
+   (universe.css), the tips and the One note (tips.css, which mount outside .l5) — and these two here. */
+.logos-root .l5 :is(.l5-ask, .l5v-beside) {
   border-radius: 0;
   box-shadow: none;
   backdrop-filter: none;
   -webkit-backdrop-filter: none;
 }
-.logos-root .l5 :is(.l5v-menu, .l5x-sheet, .l5-ask, .l5x-pop) {
+.logos-root .l5 .l5-ask {
   border: 1px solid var(--c-rule-2);
   background-color: var(--c-paper);
   background-image: var(--c-grain);
@@ -221,21 +234,18 @@
 
 @media (max-width: 760px) {
   .logos-root .l5 .l5v-top { gap: 12px; padding: 0 14px; }
-  .logos-root .l5 .l5v-top-r { gap: 14px; }
+  .logos-root .l5 .l5-head { column-gap: 12px; padding: 0 14px; }
+  .logos-root .l5 :is(.l5v-top-r, .l5-head-end) { gap: 14px; }
   .logos-root .l5 .lg-composer.is-ruled .l5-compose-line > textarea,
   .logos-root .l5 .lg-composer.is-ruled textarea::placeholder { font-size: 20px; }
   .logos-root .l5 .lg-composer.is-ruled .lg-send.l5-btn.is-primary { height: 36px; padding: 0 14px; }
 }
 
 /* ── home: the Universal Map (Screens 3 and 5) ──────────────────────────
-   Paper, no tray, no keys: Search and List are words; the lenses are tabs with the chosen one underlined; the
+   Paper, no tray, no keys: Search and Sessions are words; the lenses are tabs with the chosen one underlined; the
    map's tools are words; "Pick up where you left off" is a line, not a box; the start box is a ruled line, its
    way on the one filled control. */
-.logos-root .l5 .l5-head-end .l5-unibtn { height: auto; min-height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); font-size: 13.5px; font-weight: 500; }
-.logos-root .l5 .l5-head-end .l5-unibtn svg { display: none; }
-.logos-root .l5 .l5-head-end .l5-unibtn:hover { background: none; color: var(--c-ink); }
-.logos-root .l5 .l5-head-end .l5-unibtn:is(.is-on, [aria-pressed='true']) { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
-.logos-root .l5 .l5-head-end { gap: 22px; }
+/* (the header's words — Search, Sessions — are drawn with a line's, under "the header" above) */
 
 .logos-root .l5 .l5h-main .l5h-lens { gap: 20px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; }
 .logos-root .l5 .l5h-main .l5h-lens-pill { display: none; }
@@ -251,15 +261,13 @@
 .logos-root .l5 .l5h-main .l5h-tool.is-on { background: none; color: var(--c-ink); box-shadow: inset 0 -2px 0 var(--c-moss); }
 .logos-root .l5 .l5h-main .l5h-tool:is(.is-select, .l5h-viewbtn) svg { display: none; }
 
-.logos-root .l5 .l5h-main .l5h-pick { padding: 0 0 0 16px; border: 0; border-left: 1px solid var(--c-rule-2); border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); }
-.logos-root .l5 .l5h-main .l5h-pick:hover { background: none; color: var(--c-ink); transform: none; }
+/* "Pick up where you left off" and each starred conversation: a word after a hairline, the name in moss serif */
+.logos-root .l5 .l5h-main :is(.l5h-pick, .l5h-starchip) { min-height: 32px; padding: 0 0 0 16px; border: 0; border-left: 1px solid var(--c-rule-2); border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-70); }
+.logos-root .l5 .l5h-main :is(.l5h-pick, .l5h-starchip):hover { background: none; color: var(--c-ink); transform: none; }
 .logos-root .l5 .l5h-main .l5h-pick > span[aria-hidden]:first-child:not(:last-child) { display: none; }
-.logos-root .l5 .l5h-main .l5h-pick-t { color: var(--c-moss); }
+.logos-root .l5 .l5h-main :is(.l5h-pick-t, .l5h-starchip span) { color: var(--c-moss); }
 
-.logos-root .l5 .l5h-main .l5h-zoom { border: 0; border-radius: 0; background: none; box-shadow: none; }
-.logos-root .l5 .l5h-main .l5h-zoom button { border: 0; border-radius: 0; background: none; box-shadow: none; color: var(--c-ink-60); font-variant-numeric: tabular-nums; }
-.logos-root .l5 .l5h-main .l5h-zoom button:hover { background: none; color: var(--c-ink); }
-
+/* (the zoom keys are the one zoom control: universe.css .l5h-zoom) */
 .logos-root .l5 .l5h-main .l5h-find,
 .logos-root .l5 .l5h-main .l5h-find:focus-within { min-height: 48px; padding: 0 0 8px; border: 0; border-bottom: 1px solid var(--c-line); border-radius: 0; background: none; box-shadow: none; }
 .logos-root .l5 .l5h-main .l5h-find:focus-within { border-bottom-color: var(--c-moss); }
@@ -337,11 +345,8 @@ html[data-l5-morph='in']::view-transition-new(root) { animation: l5-morph-arrive
   ::view-transition-new(*) { animation: none !important; }
 }
 
-/* Socria One in the header (Revision IV): the word in Socria One's slate, serif italic, after its dot — no pill */
-.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn { height: auto; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; gap: 7px; color: #26485a; font-size: 18px; transition: color 0.2s; }
-.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn i { width: 6px; height: 6px; background: #26485a; }
-.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn:hover { color: var(--c-ink); border: 0; }
-.logos-root .l5 .l5v-top:not(.is-narrow) .l5-onebtn.has-note { box-shadow: none; text-decoration: underline; text-underline-offset: 4px; }
+/* Socria One in the header (Revision IV) is the word in its own blue, after its dot — no pill: tips.css, in both
+   headers and on a phone */
 
 /* ── a guest (GuestNudge, GuestWall): said plainly, in the page's own terms ──
    The note for a guest out of messages was a toast: a badge in a tinted circle, a bold lead, a green pill. Now it is a
@@ -353,16 +358,9 @@ html[data-l5-morph='in']::view-transition-new(root) { animation: l5-morph-arrive
 .logos-root :is(.l5-guestnudge-go, .l5-guestwall-go) { background: var(--c-ink); color: var(--c-paper); transition: background-color 0.2s, transform 0.2s var(--c-ease); }
 .logos-root :is(.l5-guestnudge-go, .l5-guestwall-go):hover { filter: none; background: var(--c-moss); }
 .logos-root .l5-guestnudge.is-inline { padding: 0 0 10px; border: 0; border-bottom: 1px solid var(--c-rule); background: none; box-shadow: none; }
-.logos-root .l5-guestnudge.is-inline .l5-guestnudge-go { height: 32px; padding: 0 14px; font-size: 13px; }
+.logos-root .l5-guestnudge.is-inline .l5-guestnudge-go { height: 32px; padding: 0 14px; font-size: 13.5px; }
 /* "← The space" before the views: set off from them by a hairline (it ran straight into the first tab: "The spaceChat") */
 .logos-root .l5 .l5v-top-c .l5-tospace { align-self: center; margin-right: 24px; padding-right: 24px; border-right: 1px solid var(--c-rule-2); white-space: nowrap; }
-/* More, in both headers: a word like Search and List beside it — the same size, weight and ink (on the Universal Map
-   an older rule let it inherit 16px, and in moss it read as an action it is not) */
-.logos-root .l5 :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-link { font-size: 13.5px; font-weight: 500; color: var(--c-ink-70); text-decoration: none; }
-.logos-root .l5 :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-link:is(:hover, [aria-expanded='true']) { color: var(--c-ink); }
-/* the guest's count: words on the paper, not a capsule */
-.logos-root .l5 .l5-guestmeter { height: auto; padding: 0; border: 0; background: none; font-size: 12.5px; }
-.logos-root .l5 .l5-guestmeter.is-out { color: var(--c-tension); }
 /* the inline guest note in the one space floats over the canvas, so it is paper there, not a bare line */
 .logos-root .ls-chat .l5-guestnudge.is-inline { padding: 8px 8px 8px 16px; border: 1px solid var(--c-rule-2); background-color: var(--c-paper); background-image: var(--c-grain); }
 /* the empty Universal Map: one line, and the way to the box said as a word in moss — not a dark banner that pointed at

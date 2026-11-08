@@ -193,7 +193,7 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
   {
     path: '/docs',
     name: 'Docs',
-    summary: 'How Socria works: the models, the Thinking Map, documents, Socria One and your data.',
+    summary: 'How Socria works: the models, the Logic Map, documents, Socria One and your data.',
     priority: 0.7,
     changeFrequency: 'weekly',
   },

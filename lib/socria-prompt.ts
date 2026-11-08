@@ -1614,7 +1614,7 @@ export const SOCRIA_MODELS: Record<SocriaModel, ModelConfig> = {
     label: 'Socria Logos',
     short: 'Logos',
     description:
-      'Maps your reasoning as you talk. Opens the split-screen Thinking Map.',
+      'Maps your reasoning as you talk, on the Logic Map.',
     defaultOpenAIModel: 'gpt-5.6-sol',
     supportsDepth: false,
     requiresAuth: true,

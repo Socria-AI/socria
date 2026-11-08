@@ -12,6 +12,11 @@
  *
  * On a phone it is a sheet from the bottom, under the thumb; from 640px it
  * centres. Motion is a short rise, and none at all for reduced motion.
+ *
+ * The app's one dialog: the page dimmed (--lg-dim), the panel at the dialog
+ * radius (--lg-r-dialog; its top corners only, as a bottom sheet) with the
+ * floating shadow (--l5-shadow-up), the title in the serif at 32, the bare ×
+ * (L5Close) at the top right.
  */
 
 :is(.logos-root, .lg-tokens) .os-scrim {
@@ -25,7 +30,6 @@
   --os-one: var(--lg-one, #26485a);
   --os-one-soft: var(--lg-one-soft, rgba(38, 72, 90, 0.08));
   --os-one-line: var(--lg-one-line, rgba(38, 72, 90, 0.28));
-  --os-shadow: var(--shadow-rgb, 28, 30, 24);
   --os-serif: var(--l5-serif, var(--font-serif, 'Instrument Serif', Georgia, serif));
   position: fixed;
   inset: 0;
@@ -39,7 +43,7 @@
   position: absolute;
   inset: 0;
   /* the page dimmed, as every other sheet over Logos 5 dims it — not blurred (the workspace has no blur) */
-  background: rgba(var(--os-shadow), 0.34);
+  background: var(--lg-dim);
   animation: osFade 0.18s ease both;
 }
 
@@ -53,8 +57,8 @@
   padding: 12px 20px calc(20px + env(safe-area-inset-bottom, 0px));
   background: var(--os-paper);
   color: var(--os-ink);
-  border-radius: 20px 20px 0 0;
-  box-shadow: 0 -10px 40px -12px rgba(var(--os-shadow), 0.3);
+  border-radius: var(--lg-r-dialog) var(--lg-r-dialog) 0 0;
+  box-shadow: var(--l5-shadow-up);
   font-family: var(--lg-sans, inherit);
   animation: osUp 0.26s cubic-bezier(0.16, 1, 0.3, 1) both;
 }
@@ -75,10 +79,7 @@
     width: min(420px, 100%);
     padding: 26px 28px 22px;
     border: 1px solid var(--os-line);
-    border-radius: 20px;
-    box-shadow:
-      0 1px 2px rgba(var(--os-shadow), 0.06),
-      0 30px 80px -28px rgba(var(--os-shadow), 0.42);
+    border-radius: var(--lg-r-dialog);
     animation: osIn 0.24s cubic-bezier(0.16, 1, 0.3, 1) both;
   }
   :is(.logos-root, .lg-tokens) .os-sheet.is-wide {
@@ -89,11 +90,12 @@
   }
 }
 
-/* close — placed here; its look is .l5-icon (components/logos5/l5-controls.css) */
+/* close — L5Close, placed here; its look is .l5-icon .l5-close (components/logos5/l5-controls.css),
+   whose -6px margin sets it 10px in from the corner */
 :is(.logos-root, .lg-tokens) .os-x {
   position: absolute;
-  top: 10px;
-  right: 10px;
+  top: 16px;
+  right: 16px;
 }
 
 /* the name, with its monogram and its price — the only place the blue speaks first */
@@ -145,9 +147,9 @@
 :is(.logos-root, .lg-tokens) .os-title {
   margin: 0;
   font-family: var(--os-serif);
-  font-size: clamp(25px, 3.4vw, 29px);
+  font-size: 32px;
   font-weight: 400;
-  line-height: 1.12;
+  line-height: 1.1;
   letter-spacing: -0.01em;
   color: var(--os-ink);
   text-wrap: balance;
@@ -258,12 +260,13 @@
 :is(.logos-root, .lg-tokens) .os-err {
   margin: 14px 0 0;
   padding: 9px 12px;
-  border: 1px solid rgba(156, 91, 60, 0.28);
+  /* the one red, from the theme: a light red on the dark grounds */
+  border: 1px solid color-mix(in srgb, var(--c-tension) 28%, transparent);
   border-radius: 10px;
-  background: rgba(156, 91, 60, 0.07);
+  background: color-mix(in srgb, var(--c-tension) 7%, transparent);
   font-size: 13px;
   line-height: 1.5;
-  color: var(--lg-tension, #9c5b3c);
+  color: var(--c-tension);
 }
 
 /* the way on, and the way to stay — .l5-btn is-primary is-one, and .l5-btn is-quiet */
@@ -274,7 +277,7 @@
   margin-top: 20px;
 }
 :is(.logos-root, .lg-tokens) .os-foot a:focus-visible {
-  outline: 2px solid var(--os-one);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 
@@ -335,9 +338,9 @@
   max-width: 400px;
   padding: 28px 24px 24px;
   border: 1px solid var(--lg-one-line, rgba(38, 72, 90, 0.28));
-  border-radius: 18px;
+  border-radius: var(--lg-r-card);
   background: var(--lg-paper);
-  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 28, 30, 24), 0.05), 0 18px 48px -26px rgba(var(--shadow-rgb, 28, 30, 24), 0.3);
+  box-shadow: var(--l5-shadow);
   text-align: left;
 }
 .logos-root .os-locked .os-brand {
@@ -349,7 +352,7 @@
 .logos-root .os-locked h2 {
   margin: 0;
   font-family: var(--l5-serif, var(--font-serif, 'Instrument Serif', Georgia, serif));
-  font-size: 23px;
+  font-size: 24px;
   font-weight: 400;
   line-height: 1.16;
   letter-spacing: -0.01em;

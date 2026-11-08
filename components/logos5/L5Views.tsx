@@ -1,9 +1,9 @@
 'use client';
 // components/logos5/L5Views.tsx — THE LOGOS 5 SHELL (Alex Tran, Logos 5 Comments v2).
 //
-// A line of thinking is four views — Chat, Content, Artifacts, Logic Map —
-// switched in a tab row; something opened (a made thing, the Logic Map, a file)
-// can sit beside the view. The header keeps only what is global: the way back
+// A line of thinking is four views — Conversation, Files, Artifacts, Logic Map —
+// switched in the header (L5Switch, L5Chrome.tsx); something opened (a made
+// thing, the Logic Map, a file) can sit beside the view. The header keeps only what is global: the way back
 // to the Universal Map, search, and the account. (Split View, the menu that
 // put a view beside, is gone: things open beside by being pressed.)
 //
@@ -92,7 +92,7 @@ export function L5TopBar({
         {onSearch && (
           <button type="button" className="l5-link l5v-search" onClick={onSearch} aria-label="Search everything" aria-keyshortcuts="Meta+K Control+K" title="Search everything">
             <span>Search</span>
-            {!narrow && <kbd className="l5v-kbd l5-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
+            {!narrow && <kbd className="l5-kbd">{isMac() ? '⌘K' : 'Ctrl K'}</kbd>}
           </button>
         )}
         {memory}
@@ -101,63 +101,6 @@ export function L5TopBar({
         {account}
       </div>
     </header>
-  );
-}
-
-// ── the four views ───────────────────────────────────────────────────
-
-export function L5Tabs({
-  value,
-  onChange,
-  counts,
-  fresh,
-  actions,
-}: {
-  value: Viewport;
-  onChange: (v: Viewport) => void;
-  counts: Partial<Record<Viewport, number>>;
-  /** something new arrived in a view that is not open */
-  fresh?: Partial<Record<Viewport, boolean>>;
-  /** the open view's own actions — Synthesize, Add files — at the row's end */
-  actions?: ReactNode;
-}) {
-  const refs = useRef<Record<string, HTMLButtonElement | null>>({});
-  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
-    const i = VIEW_ORDER.indexOf(value);
-    const to = e.key === 'ArrowRight' ? VIEW_ORDER[(i + 1) % 4] : e.key === 'ArrowLeft' ? VIEW_ORDER[(i + 3) % 4] : e.key === 'Home' ? VIEW_ORDER[0] : e.key === 'End' ? VIEW_ORDER[3] : null;
-    if (!to) return;
-    e.preventDefault();
-    onChange(to);
-    requestAnimationFrame(() => refs.current[to]?.focus());
-  };
-  return (
-    <div className="l5v-tabrow">
-      <div className="l5v-tabs" role="tablist" aria-label="Views" onKeyDown={onKey}>
-        {VIEW_ORDER.map((v) => {
-          const n = counts[v];
-          const on = v === value;
-          return (
-            <button
-              key={v}
-              ref={(el) => void (refs.current[v] = el)}
-              type="button"
-              role="tab"
-              id={`l5v-tab-${v}`}
-              aria-selected={on}
-              aria-controls="l5v-primary"
-              tabIndex={on ? 0 : -1}
-              className={`l5v-tab${on ? ' is-on' : ''}${fresh?.[v] && !on ? ' is-fresh' : ''}`}
-              onClick={() => onChange(v)}
-            >
-              {VIEW_LABELS[v]}
-              {typeof n === 'number' && n > 0 && <span className="l5v-count">{n}</span>}
-              {fresh?.[v] && !on && <span className="l5v-dot" aria-label="new" />}
-            </button>
-          );
-        })}
-      </div>
-      {actions && <div className="l5v-tab-acts">{actions}</div>}
-    </div>
   );
 }
 
@@ -256,7 +199,8 @@ export function L5Layout({
       className={`l5v-body is-${view}${board ? ' is-board' : ''}${besideOn ? ` has-beside side-${side}` : ''}${narrow ? ' is-narrow' : ''}${omniTop && omni && !narrow ? ' omni-top' : ''}${aim ? ' is-docking' : ''}`}
       style={besideOn ? ({ ['--beside' as string]: `${Math.round(share * 1000) / 10}%` }) : undefined}
     >
-      <main id="l5v-primary" className="l5v-primary" role="tabpanel" aria-labelledby={`l5v-tab-${view}`}>
+      {/* labelled by the view's tab in the header's switch (L5Switch: id l5-switch-<view>) */}
+      <main id="l5v-primary" className="l5v-primary" role="tabpanel" aria-labelledby={`l5-switch-${view}`}>
         <div className="l5v-primary-in">{primary}</div>
         {actions && <div className="l5v-acts">{actions}</div>}
         {omni && <div className="l5v-omni">{omni}</div>}

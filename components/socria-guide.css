@@ -12,7 +12,12 @@
  * are the product's own surfaces, so they keep the product's radii); no
  * gradients, no glow, no gold. The demos play once, the way ideas form — fast
  * out, a long settle — and with reduced motion they are simply their last
- * frame. Every colour is a Logos token, so the dark grounds hold. */
+ * frame. Every colour is a Logos token, so the dark grounds hold.
+ *
+ * It is the app's one dialog: the page dimmed (--lg-dim), the panel at the
+ * dialog radius with the floating shadow, the headline in the serif at 32, the
+ * bare × (L5Close) at the top right, and the forward action the standard ink
+ * pill. On a phone it is the whole screen. */
 
 .sg-veil {
   position: fixed;
@@ -21,8 +26,8 @@
   display: grid;
   place-items: center;
   padding: 24px;
-  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.32);
-  animation: sg-fade 0.35s ease both;
+  background: var(--lg-dim);
+  animation: sg-fade 0.18s ease both;
 }
 
 .sg {
@@ -33,7 +38,8 @@
   --sg-moss-rgb: var(--lg-primary-rgb, 53, 70, 32);
   --sg-line: var(--lg-line, rgba(53, 70, 32, 0.14));
   --sg-paper: var(--lg-paper, #f5f3eb);
-  --sg-raise: #fff;
+  /* the raised surface of the miniatures, from the theme (--l5-raise is declared on .logos-root for every ground) */
+  --sg-raise: var(--l5-raise, #fff);
   --sg-rust: var(--lg-tension, #9c5b3c);
   --sg-ease: cubic-bezier(0.16, 1, 0.3, 1);
   position: relative;
@@ -43,22 +49,13 @@
   height: min(700px, 100%);
   overflow: hidden;
   border: 1px solid var(--sg-line);
-  border-radius: 20px;
+  border-radius: var(--lg-r-dialog);
   background: var(--sg-paper);
-  box-shadow: 0 40px 100px -50px rgba(var(--sg-ink-rgb), 0.6);
+  box-shadow: var(--l5-shadow-up);
   color: var(--sg-ink);
   font-family: var(--lg-sans);
   outline: none;
-  animation: sg-in 0.6s var(--sg-ease) both;
-}
-html[data-theme='dark'] .sg {
-  --sg-raise: #242424;
-}
-html[data-theme='one'] .sg {
-  --sg-raise: #22415a;
-}
-html[data-theme='night'] .sg {
-  --sg-raise: #1a2642;
+  animation: sg-in 0.26s var(--sg-ease) both;
 }
 
 .sg-sr {
@@ -73,11 +70,11 @@ html[data-theme='night'] .sg {
 
 .sg-lbl {
   margin: 0;
-  font-size: 0.66rem;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(var(--sg-ink-rgb), 0.5);
+  color: rgba(var(--sg-ink-rgb), 0.55);
 }
 
 /* ── the contents ──────────────────────────────────────────────────── */
@@ -96,14 +93,15 @@ html[data-theme='night'] .sg {
   padding-bottom: 12px;
   border-bottom: 1px solid var(--sg-ink);
 }
-.sg-toc-close {
+/* the contents' own close (L5Close) is for a phone, where the contents cover the tutorial */
+.sg .sg-toc .sg-toc-close {
   display: none;
 }
 .sg-toc-title {
   margin: 16px 0 0;
   text-wrap: balance;
   font-family: var(--sg-serif);
-  font-size: 1.7rem;
+  font-size: 24px;
   line-height: 1.08;
   letter-spacing: -0.015em;
   color: var(--sg-ink);
@@ -218,33 +216,11 @@ html[data-theme='night'] .sg {
   padding: 2px 8px;
   border: 1px solid var(--lg-one-line, rgba(38, 72, 90, 0.3));
   border-radius: 999px;
-  font-size: 0.58rem;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
   color: var(--lg-one, #26485a);
-}
-.sg-x {
-  display: grid;
-  place-items: center;
-  flex: none;
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  border: 1px solid var(--sg-line);
-  border-radius: 50%;
-  background: none;
-  font-size: 1.1rem;
-  line-height: 1;
-  color: rgba(var(--sg-ink-rgb), 0.7);
-  cursor: pointer;
-  transition:
-    border-color 0.2s,
-    color 0.2s;
-}
-.sg-x:hover {
-  border-color: var(--sg-ink);
-  color: var(--sg-ink);
 }
 .sg-body {
   flex: 1 1 auto;
@@ -258,9 +234,9 @@ html[data-theme='night'] .sg {
   text-wrap: balance;
   margin: 0;
   font-family: var(--sg-serif);
-  font-size: clamp(1.75rem, 2.7vw, 2.45rem);
+  font-size: 32px;
   font-weight: 400;
-  line-height: 1.04;
+  line-height: 1.06;
   letter-spacing: -0.02em;
   color: var(--sg-ink);
 }
@@ -376,7 +352,7 @@ html[data-theme='night'] .sg {
   transition: width 0.6s var(--sg-ease);
 }
 .sg-count {
-  font-size: 0.66rem;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
@@ -399,36 +375,34 @@ html[data-theme='night'] .sg {
 .sg-back:hover {
   color: var(--sg-ink);
 }
-/* the forward action: the book's primary pill — ink, moss when reached for, lifted 2px */
+/* the forward action: the one filled control — ink, moss when reached for, lifted 2px (40 tall, as every primary) */
 .sg-next {
   display: inline-flex;
   align-items: center;
   gap: 0.45em;
-  height: 44px;
-  padding: 0 24px;
+  height: 40px;
+  padding: 0 18px;
   border: 0;
   border-radius: 999px;
   background: var(--sg-ink);
   color: var(--sg-paper);
   font: inherit;
-  font-size: 0.96rem;
+  font-size: 13.5px;
   font-weight: 500;
   cursor: pointer;
   transition:
-    background-color 0.25s var(--sg-ease),
-    transform 0.25s var(--sg-ease);
+    background-color 0.2s,
+    transform 0.2s var(--sg-ease);
 }
 .sg-next:hover {
   background: var(--sg-moss);
   transform: translateY(-2px);
 }
-.sg-x:focus-visible,
 .sg-toc-b:focus-visible,
 .sg-try:focus-visible,
 .sg-back:focus-visible,
 .sg-next:focus-visible,
-.sg-tocbtn:focus-visible,
-.sg-toc-close:focus-visible {
+.sg-tocbtn:focus-visible {
   outline: 2px solid var(--sg-moss);
   outline-offset: 2px;
 }
@@ -459,9 +433,6 @@ html[data-theme='night'] .sg {
   margin-top: 7px;
   border-radius: 3px;
   background: rgba(var(--sg-ink-rgb), 0.1);
-}
-.sg-line.w50 {
-  width: 50%;
 }
 .sg-line.w60 {
   width: 60%;
@@ -678,80 +649,6 @@ html[data-theme='night'] .sg {
 }
 .sg-node.is-t {
   border-color: var(--sg-rust);
-}
-
-/* IV — Split View, and the conversation on any side */
-.sg-screen {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  top: 16px;
-  bottom: 42px;
-  overflow: hidden;
-  border: 1px solid rgba(var(--sg-ink-rgb), 0.16);
-  border-radius: 12px;
-  background: var(--sg-raise);
-}
-.sg-screen-bar {
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  height: 16px;
-  padding: 0 8px;
-  border-bottom: 1px solid var(--sg-line);
-}
-.sg-screen-bar i {
-  width: 5px;
-  height: 5px;
-  border-radius: 50%;
-  background: rgba(var(--sg-ink-rgb), 0.18);
-}
-.sg-screen-body {
-  position: absolute;
-  left: 0;
-  right: 0;
-  top: 16px;
-  bottom: 0;
-}
-.sg-bars.is-wide {
-  position: absolute;
-  left: 9%;
-  bottom: 14%;
-  height: 58%;
-  gap: 14px;
-}
-.sg-convo {
-  position: absolute;
-  left: 62%;
-  top: 0;
-  width: 38%;
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  gap: 5px;
-  padding: 8px;
-  background: var(--sg-paper);
-  box-shadow: 0 0 0 1px var(--sg-line);
-  animation: sg-convo 6s var(--sg-ease) 0.5s 2 both;
-}
-.sg-convo-h {
-  font-size: 9px;
-  font-weight: 600;
-  color: rgba(var(--sg-ink-rgb), 0.62);
-}
-.sg-convo-h b {
-  margin-right: 3px;
-  color: var(--sg-moss);
-}
-.sg-convo .sg-line {
-  margin-top: 2px;
-}
-.sg-convo-box {
-  height: 14px;
-  margin-top: auto;
-  border: 1px solid var(--sg-line);
-  border-radius: 999px;
-  background: var(--sg-raise);
 }
 
 /* V — Make */
@@ -1218,31 +1115,23 @@ html[data-theme='night'] .sg {
     background: var(--sg-paper);
     animation: sg-up 0.5s var(--sg-ease) both;
   }
-  .sg-toc-close {
+  .sg .sg-toc .sg-toc-close {
     position: absolute;
     right: 0;
-    top: -6px;
-    display: grid;
-    place-items: center;
-    width: 40px;
-    height: 40px;
-    padding: 0;
-    border: 1px solid var(--sg-line);
-    border-radius: 50%;
-    background: none;
-    font-size: 1.1rem;
-    color: rgba(var(--sg-ink-rgb), 0.7);
+    top: 0;
+    display: inline-grid;
   }
+  /* where you are, as a word that opens the contents */
   .sg-tocbtn {
     display: inline-flex;
     align-items: center;
-    height: 32px;
-    padding: 0 12px;
-    border: 1px solid var(--sg-line);
-    border-radius: 999px;
+    min-height: 32px;
+    padding: 0;
+    border: 0;
+    border-radius: 0;
     background: none;
     font: inherit;
-    font-size: 0.62rem;
+    font-size: 10.5px;
     font-weight: 600;
     letter-spacing: 0.14em;
     text-transform: uppercase;
@@ -1254,15 +1143,8 @@ html[data-theme='night'] .sg {
   .sg-spreadhead .sg-num {
     display: none;
   }
-  .sg-x {
-    width: 40px;
-    height: 40px;
-  }
   .sg-body {
     padding: 14px 18px 10px;
-  }
-  .sg-title {
-    font-size: 1.8rem;
   }
   .sg-work {
     grid-template-columns: minmax(0, 1fr);
@@ -1382,36 +1264,6 @@ html[data-theme='night'] .sg {
   to {
     opacity: 1;
     transform: none;
-  }
-}
-@keyframes sg-convo {
-  0%,
-  18% {
-    left: 62%;
-    top: 0;
-    width: 38%;
-    height: 100%;
-  }
-  28%,
-  46% {
-    left: 0;
-    top: 0;
-    width: 38%;
-    height: 100%;
-  }
-  56%,
-  74% {
-    left: 0;
-    top: 56%;
-    width: 100%;
-    height: 44%;
-  }
-  84%,
-  100% {
-    left: 62%;
-    top: 0;
-    width: 38%;
-    height: 100%;
   }
 }
 

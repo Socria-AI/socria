@@ -12,18 +12,19 @@
 /* ---------- the first-run tour ----------
    One SVG carries the scrim, the hole, the ink ring and the leader. The hole
    shows paper, so the ring is moss rather than sage — sage on paper fails at
-   every size. The scrim is the brand's forest, not Prussian: Prussian means the
-   membership boundary and nothing else. */
+   every size. The scrim is the theme's own shadow (the brand's forest on paper),
+   never Prussian: Prussian means the membership boundary and nothing else. It is
+   deeper than a dialog's dim because it is a spotlight: the hole has to read. */
 .tour-svg{position:fixed;inset:0;z-index:90}
-.tour-scrim{fill:rgba(26,36,16,.56)}
+.tour-scrim{fill:rgba(var(--shadow-rgb, 26, 36, 16),.56)}
 .tour-ring{fill:none;stroke:var(--moss);stroke-width:1.8;stroke-linecap:round;
   stroke-dasharray:1400;stroke-dashoffset:1400;animation:tr-draw 1.15s var(--ease-out-expo) .12s forwards}
 .tour-leader{fill:none;stroke:var(--moss);stroke-width:1.3;stroke-linecap:round;opacity:.8;
   stroke-dasharray:520;stroke-dashoffset:520;animation:tr-draw .85s var(--ease-out-expo) .55s forwards}
 .tour-dot{fill:var(--moss);animation:tr-dot .5s var(--ease-out-expo) 1.15s both}
-/* the note: paper, a hairline, and room to actually read */
-.tour-note{position:fixed;z-index:92;background:var(--paper);border:1px solid var(--ink-16);border-radius:15px;
-  padding:19px 22px 15px;box-shadow:0 44px 90px -44px rgba(26,36,16,.7);
+/* the note: paper, a hairline, the dialog radius and the floating shadow, and room to actually read */
+.tour-note{position:fixed;z-index:92;background:var(--paper);border:1px solid var(--ink-16);border-radius:var(--lg-r-dialog, 16px);
+  padding:19px 22px 15px;box-shadow:var(--l5-shadow-up, 0 18px 50px -20px rgba(var(--shadow-rgb, 26, 36, 16), .35));
   animation:tn-in .62s var(--ease-out-expo) both}
 .tour-note.tour-above{animation:tn-in-up .62s var(--ease-out-expo) both}
 /* the step as a numeral, the way a spread is numbered */
@@ -35,7 +36,7 @@
    is not a document section. This selector still said h3, so the title fell
    through to the body rule below and rendered at 14.5px: the note had no
    headline at all, just two paragraphs. */
-.tour-note .tn-t{margin:0;font-family:var(--font-serif, Georgia, serif);font-size:1.48rem;line-height:1.08;
+.tour-note .tn-t{margin:0;font-family:var(--font-serif, Georgia, serif);font-weight:400;font-size:24px;line-height:1.08;
   letter-spacing:-.018em;color:var(--ink)}
 .tour-note p{margin:11px 0 0;font-size:14.5px;line-height:1.62;color:var(--ink-70);max-width:38ch}
 .tour-note .tn-t{margin-top:0}
@@ -44,12 +45,13 @@
 .tn-ticks{display:flex;gap:5px;margin-right:auto}
 .tn-ticks i{width:18px;height:2px;background:var(--ink-12);display:block;transition:background .45s var(--ease-standard)}
 .tn-ticks i.on{background:var(--moss)}
-.tn-skip{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:10px;font-weight:600;letter-spacing:.2em;
+.tn-skip{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:10.5px;font-weight:600;letter-spacing:.18em;
   text-transform:uppercase;color:var(--ink-45);background:none;border:none;cursor:pointer;transition:color .2s}
 .tn-skip:hover{color:var(--ink)}
-.tn-next{display:inline-flex;align-items:center;gap:.5em;height:38px;padding:0 19px;border-radius:999px;
+/* the way on: the one filled control, 40 tall — ink, moss when reached for */
+.tn-next{display:inline-flex;align-items:center;gap:.5em;height:40px;padding:0 18px;border-radius:999px;
   background:var(--ink);color:var(--paper);border:none;cursor:pointer;
-  font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:13px;font-weight:500;transition:background .2s,transform .2s}
+  font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:13.5px;font-weight:500;transition:background .2s,transform .2s}
 .tn-next:hover{background:var(--moss);transform:translateY(-2px)}
 .tn-next .ar{transition:transform .2s}
 .tn-next:hover .ar{transform:translateX(3px)}
@@ -63,6 +65,8 @@
   .tour-ring,.tour-leader{stroke-dashoffset:0;animation:none}
   .tour-dot{opacity:1;animation:none}
   .tour-note,.tour-note.tour-above{animation:none}
+  .tn-next,.tn-next .ar{transition:none}
+  .tn-next:hover,.tn-next:hover .ar{transform:none}
 }
 
 

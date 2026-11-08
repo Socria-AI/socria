@@ -42,7 +42,7 @@ import {
   type MemoryIn,
   type RegionId,
 } from '@/lib/logos5/memoryAtlas';
-import { L5Switch } from './L5Chrome';
+import { L5Close, L5Switch } from './L5Chrome';
 import { MemoryNetwork } from './MemoryNetwork';
 import { ChangeCard, Icon, Inspector, Mark, MemoryRow, choicesFor, reachOf, regionVar, type Decision, type PlaceIn, type Step } from './MemoryParts';
 import { LearningList } from './LearningList';
@@ -575,9 +575,7 @@ export function MemoryView({
     <aside className="l5mm-side" aria-label="The change, in the network">
       <div className="l5mm-insp-top">
         <span className="l5mm-k">In the network</span>
-        <button type="button" className="l5mm-x" aria-label="Close" onClick={() => setChangeSel(null)}>
-          <Icon name="x" />
-        </button>
+        <L5Close className="l5mm-x" label="Close" onClose={() => setChangeSel(null)} />
       </div>
       <h3>{focus.kind === 'possible-conflict' || focus.kind === 'conflict' ? 'Two claims that disagree' : focus.to.label}</h3>
       <p>When a memory changes, what rests on it may need another look — so you can see how far a change reaches.</p>

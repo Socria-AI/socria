@@ -165,10 +165,10 @@ export function ContentView({
 
   if (opened && reader) {
     return (
-      <section className="l5c" aria-label="Content">
+      <section className="l5c" aria-label="Files">
         <div className="l5c-readhead">
           <button type="button" className="l5-link" onClick={onBack}>
-            ← All content
+            ← All files
           </button>
           <span className="l5c-readt">{byId.get(opened)?.title ?? 'Document'}</span>
         </div>
@@ -178,7 +178,7 @@ export function ContentView({
   }
 
   return (
-    <section className="l5c" aria-label="Content">
+    <section className="l5c" aria-label="Files">
       {items.length ? (
         <>
           <p className="l5c-help" id="l5c-help">

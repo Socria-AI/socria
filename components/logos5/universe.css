@@ -69,7 +69,7 @@
   border: 1px solid color-mix(in srgb, var(--lg-ink) 13%, transparent);
   border-radius: 16px;
   background: var(--l5-surface);
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.04), 0 16px 40px -24px rgba(var(--shadow-rgb, 35, 36, 31), 0.32);
   transition: box-shadow 0.25s ease, border-color 0.25s ease;
 }
@@ -90,7 +90,7 @@
 }
 .logos-root .l5 .l5h-find input::placeholder {
   font-size: 16px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-find input::-webkit-search-cancel-button {
   -webkit-appearance: none;
@@ -131,7 +131,7 @@
   flex: none;
   display: inline-flex;
 }
-/* add files: a glyph (buttons.css .l5-icon-btn) — a square that takes a wash when pointed at */
+/* add files: a glyph (.l5-icon) — bare, it darkens when pointed at */
 .logos-root .l5 .l5h-find-att {
   flex: none;
   display: inline-grid;
@@ -145,17 +145,13 @@
   color: var(--l5b-ink-2);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s, color 0.15s, transform 0.12s;
+  transition: color 0.15s;
 }
 .logos-root .l5 .l5h-find-att:hover {
-  background: var(--l5b-wash);
   color: var(--l5b-ink);
 }
-.logos-root .l5 .l5h-find-att:active {
-  transform: translateY(1px);
-}
 .logos-root .l5 .l5h-find-att:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 .logos-root .l5 .l5h-find-go:disabled {
@@ -189,14 +185,14 @@
   flex: none;
   display: grid;
   place-items: center;
-  width: 30px;
+  width: 32px;
   height: 34px;
   border-radius: 5px;
   background: #a65a3f;
   color: #fff;
-  font-size: 8.5px;
-  font-weight: 700;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
 }
 .logos-root .l5 .l5h-ftype.is-doc {
   background: #2f4a5e;
@@ -223,7 +219,7 @@
 }
 .logos-root .l5 .l5h-file-s {
   font-size: 11.5px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-file.is-reading .l5h-file-s {
   animation: l5h-drawing 1.4s ease-in-out infinite;
@@ -242,7 +238,7 @@
   border: 0;
   border-radius: 50%;
   background: transparent;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   font-size: 15px;
   line-height: 1;
   cursor: pointer;
@@ -306,10 +302,12 @@
   animation: l5b-rise 0.24s cubic-bezier(0.2, 0.8, 0.2, 1) both;
   overflow: auto;
   padding: 6px;
-  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.14);
-  border-radius: 16px;
-  background: var(--l5-surface);
-  box-shadow: 0 22px 54px -26px rgba(var(--shadow-rgb, 35, 36, 31), 0.5);
+  /* it floats over the map: paper, a hairline, square, no shadow (Revision II) */
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-o {
   display: grid;
@@ -336,9 +334,10 @@
   align-items: center;
   gap: 6px;
   font-size: 10.5px;
-  letter-spacing: 0.09em;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-o-t {
   font-family: var(--l5-serif);
@@ -355,42 +354,6 @@
 
 /* ── the bar over the map ─────────────────────────────────────────── */
 
-/* a choice of one (buttons.css .l5-seg): a tray, the chosen one raised in it, as the lenses are */
-.logos-root .l5 .l5h-seg {
-  display: inline-flex;
-  flex: none;
-  gap: 2px;
-  padding: 3px;
-  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.09);
-  border-radius: var(--l5b-r);
-  background: var(--l5h-lens-tray);
-}
-.logos-root .l5 .l5h-seg button {
-  min-height: 30px;
-  padding: 0 12px;
-  border: 1px solid transparent;
-  border-radius: var(--l5b-r-sm);
-  background: transparent;
-  color: var(--l5b-ink-2);
-  font: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  cursor: pointer;
-  transition: background-color 0.15s, color 0.15s, box-shadow 0.15s;
-}
-.logos-root .l5 .l5h-seg button:hover {
-  color: var(--l5b-ink);
-}
-.logos-root .l5 .l5h-seg button.is-on {
-  border-color: var(--l5b-edge);
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
-  color: var(--l5b-ink);
-}
-.logos-root .l5 .l5h-seg button:focus-visible {
-  outline: 2px solid var(--l5b-focus);
-  outline-offset: 2px;
-}
 .logos-root .l5 .l5h-strip {
   flex: 1 1 auto;
   min-width: 0;
@@ -402,9 +365,8 @@
 .logos-root .l5 .l5h-strip::-webkit-scrollbar {
   display: none;
 }
-/* where to pick up, and what is starred: keys (buttons.css, the small
-   secondary) — the conversation's name in the serif, the glyph and the arrow
-   in the primary, the arrow stepping on when pointed at */
+/* where to pick up, and what is starred: words after a hairline (revision2.css draws them on the map), the
+   conversation's name in the serif, the arrow stepping on when pointed at */
 .logos-root .l5 .l5h-pick,
 .logos-root .l5 .l5h-starchip {
   flex: none;
@@ -420,26 +382,16 @@
   box-shadow: var(--l5b-ledge);
   color: var(--l5b-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background-color 0.15s, box-shadow 0.15s, transform 0.12s;
-}
-.logos-root .l5 .l5h-pick:hover,
-.logos-root .l5 .l5h-starchip:hover {
-  border-color: var(--l5b-edge-hi);
-  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
-}
-.logos-root .l5 .l5h-pick:active,
-.logos-root .l5 .l5h-starchip:active {
-  transform: translateY(1px);
-  box-shadow: none;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5h-pick:focus-visible,
 .logos-root .l5 .l5h-starchip:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 .logos-root .l5 .l5h-pick {
@@ -485,12 +437,12 @@
   box-shadow: var(--l5b-ledge);
   color: var(--l5b-ink);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5h-tool svg {
   flex: none;
@@ -509,12 +461,8 @@
 .logos-root .l5 .l5h-tool:hover:not(:disabled) svg {
   color: var(--l5b-ink);
 }
-.logos-root .l5 .l5h-tool:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: none;
-}
 .logos-root .l5 .l5h-tool:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 .logos-root .l5 .l5h-tool:disabled {
@@ -548,6 +496,12 @@
   touch-action: none;
   user-select: none;
   -webkit-user-select: none;
+}
+/* it takes the keyboard (tabIndex 0), so it shows when it has it: the focus ring, drawn inside its edge — outside, the
+   map's own frame would clip it */
+.logos-root .l5 .l5h-map:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: -2px;
 }
 .logos-root .l5 .l5h-map.is-nodes,
 .logos-root .l5 .l5h-map.is-cluster,
@@ -589,6 +543,10 @@
   font-size: 26px;
   outline: none;
 }
+.logos-root .l5 .l5n-frename input:focus {
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14);
+}
 
 .logos-root .l5 .l5h-palette {
   position: absolute;
@@ -598,10 +556,12 @@
   display: flex;
   gap: 6px;
   padding: 7px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  /* it floats over the map: paper, a hairline, square, no shadow (Revision II) */
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-palette button {
   width: 22px;
@@ -662,6 +622,10 @@
   resize: none;
   outline: none;
 }
+.logos-root .l5 .l5h-note textarea:focus {
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14);
+}
 
 .logos-root .l5 .l5h-lasso {
   position: absolute;
@@ -671,20 +635,23 @@
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.06);
   pointer-events: none;
 }
-/* the camera's controls: one framed tray, as the canvas's (globals.css .lg-zoom)
-   — card stock with a ledge, 32px keys that take a wash when pointed at */
+/* THE ZOOM KEYS — one control wherever something zooms (the Universal Map here, the space's .ls-zoom-keys, the
+   canvas's .lcv-zoom, the Logic Map's .lg-zoom): − (the readout, where there is one) + Fit, left to right. Bare glyph
+   keys like .l5-icon — 32px, no frame, no wash, no corners, ink 60 that darkens to ink; Fit is a 12.5px word; nothing
+   travels when pressed; a thumb's 44px on a touch screen. No tray behind them. */
 .logos-root .l5 .l5h-zoom {
   position: absolute;
   right: 16px;
   bottom: 16px;
   z-index: 12;
   display: flex;
-  gap: 2px;
-  padding: 2px;
-  border: 1px solid var(--l5b-edge);
-  border-radius: var(--l5b-r);
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
+  align-items: center;
+  gap: 0;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-zoom button {
   position: relative;
@@ -692,51 +659,41 @@
   height: 32px;
   padding: 0;
   border: 0;
-  border-radius: var(--l5b-r-sm);
-  background: transparent;
-  color: var(--l5b-ink-2);
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--c-ink-60);
   font: inherit;
   font-size: 16px;
   line-height: 1;
+  font-variant-numeric: tabular-nums;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s, color 0.15s, transform 0.12s;
+  transition: color 0.2s;
 }
-.logos-root .l5 .l5h-zoom button:hover {
-  background: var(--l5b-wash);
-  color: var(--l5b-ink);
+.logos-root .l5 .l5h-zoom button:hover:not(:disabled) {
+  color: var(--c-ink);
 }
-.logos-root .l5 .l5h-zoom button:active {
-  transform: translateY(1px);
+.logos-root .l5 .l5h-zoom button:disabled {
+  color: var(--c-ink-25);
+  cursor: default;
 }
 .logos-root .l5 .l5h-zoom button:focus-visible {
-  outline: 2px solid var(--l5b-focus);
-  outline-offset: 1px;
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-zoom button.is-fit {
-  font-size: 12px;
+  padding: 0 6px;
+  font-size: 12.5px;
   font-weight: 500;
 }
-
-/* said once, and said now */
-.logos-root .l5 .l5h-hint {
-  position: absolute;
-  left: 16px;
-  bottom: 18px;
-  z-index: 12;
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  max-width: calc(100% - 200px);
-  margin: 0;
-  padding: 6px 6px 6px 14px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: color-mix(in srgb, var(--l5-surface) 92%, transparent);
-  box-shadow: var(--l5-shadow);
-  font-size: 12.5px;
-  color: var(--lg-ink-60);
+@media (pointer: coarse) {
+  .logos-root .l5 .l5h-zoom button {
+    min-width: 44px;
+    height: 44px;
+  }
 }
+/* said once, and said now */
 .logos-root .l5 .l5h-said {
   position: absolute;
   left: 50%;
@@ -815,44 +772,20 @@
 }
 
 /* ── buttons ──────────────────────────────────────────────────────────
-   The map's own, in the product's one language (components/logos5/buttons.css):
-   .l5h-go the one way on (filled, lit from above, a darker lip), .l5h-btn a
-   key of card stock (a hairline edge, a one-pixel ledge), .l5h-x a glyph. */
+   The map's own, in Revision II's terms (l5-controls.css): every action is a word — .l5h-btn is the .l5-link word,
+   .is-quiet the meta word, .is-danger the word in the one red; the one filled control on a panel is
+   .l5-btn.is-primary.is-sm (Save a view, New Project from these, Make it); .l5h-x is the bare × glyph. Nothing
+   travels when pressed. .l5h-go stays only as the empty map's way to the box: a word in moss (revision2.css). */
 .logos-root .l5 .l5h-go {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 7px;
-  min-height: 40px;
-  padding: 0 18px;
-  border: 1px solid color-mix(in srgb, var(--l5b-fill) 78%, #000);
-  border-radius: var(--l5b-r);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 86%, #fff) 0%, var(--l5b-fill) 100%);
-  box-shadow:
-    inset 0 1px 0 rgba(255, 255, 255, 0.16),
-    0 1px 0 color-mix(in srgb, var(--l5b-fill) 62%, #000),
-    0 8px 18px -12px rgba(var(--l5b-fill-rgb), 0.9);
-  color: var(--l5b-on-fill);
   font: inherit;
-  font-size: 14px;
-  font-weight: 600;
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
-}
-.logos-root .l5 .l5h-go:hover:not(:disabled) {
-  border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
-  background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
-  transform: translateY(-1px);
-}
-.logos-root .l5 .l5h-go:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
-}
-.logos-root .l5 .l5h-go:disabled {
-  opacity: 0.45;
-  cursor: default;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5h-btn {
   display: inline-flex;
@@ -860,91 +793,73 @@
   justify-content: center;
   gap: 6px;
   min-height: 32px;
-  padding: 0 11px;
-  border: 1px solid var(--l5b-edge);
-  border-radius: var(--l5b-r-sm);
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
-  color: var(--l5b-ink);
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
+  color: var(--c-ink-70);
   font: inherit;
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   white-space: nowrap;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: color 0.2s;
 }
-.logos-root .l5 .l5h-btn:hover:not(:disabled) {
-  border-color: var(--l5b-edge-hi);
-  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
-}
-.logos-root .l5 .l5h-btn:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: none;
+.logos-root .l5 .l5h-btn:hover:not(:disabled),
+.logos-root .l5 .l5h-btn:is(.is-on, [aria-expanded='true']) {
+  color: var(--c-ink);
 }
 .logos-root .l5 .l5h-btn:disabled {
-  opacity: 0.45;
+  color: var(--c-ink-25);
   cursor: default;
 }
-.logos-root .l5 .l5h-btn.is-on {
-  border-color: rgba(var(--l5b-fill-rgb), 0.38);
-  background: rgba(var(--l5b-fill-rgb), 0.09);
-  box-shadow: inset 0 1px 2px rgba(var(--l5b-fill-rgb), 0.12);
-  color: var(--l5b-fill);
-}
 .logos-root .l5 .l5h-btn.is-quiet {
-  border-color: transparent;
-  background: transparent;
-  box-shadow: none;
-  color: var(--l5b-ink-2);
+  min-height: 24px;
+  font-size: 12.5px;
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-btn.is-quiet:hover:not(:disabled) {
-  border-color: transparent;
-  background: var(--l5b-wash);
-  color: var(--l5b-ink);
+  color: var(--c-ink);
 }
 .logos-root .l5 .l5h-btn.is-danger {
-  border-color: color-mix(in srgb, var(--l5h-danger) 40%, transparent);
-  color: var(--l5h-danger);
+  color: var(--c-tension);
 }
-.logos-root .l5 .l5h-btn.is-danger:hover:not(:disabled) {
-  border-color: var(--l5h-danger);
-  background: color-mix(in srgb, var(--l5h-danger) 8%, var(--l5b-face));
-}
+/* the close, or the take-away: the bare × of whatever it sits by */
 .logos-root .l5 .l5h-x {
   flex: none;
   display: inline-grid;
   place-items: center;
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--l5b-ink-2);
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-60);
+  font: inherit;
   font-size: 20px;
   line-height: 1;
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: background-color 0.15s, color 0.15s, transform 0.12s;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5h-x:hover {
-  background: var(--l5b-wash);
-  color: var(--l5b-ink);
-}
-.logos-root .l5 .l5h-x:active {
-  transform: translateY(1px);
+  color: var(--c-ink);
 }
 .logos-root .l5 :is(.l5h-go, .l5h-btn, .l5h-x):focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
-/* in the bar over several chosen, the way on is the small size, beside the small keys */
-.logos-root .l5 .l5h-bar-sel .l5h-go {
-  min-height: 32px;
-  padding: 0 13px;
-  border-radius: var(--l5b-r-sm);
-  font-size: 13px;
+@media (pointer: coarse) {
+  .logos-root .l5 .l5h-btn {
+    min-height: 44px;
+  }
+  .logos-root .l5 .l5h-x {
+    width: 44px;
+    height: 44px;
+  }
 }
 @media (prefers-reduced-motion: reduce) {
   .logos-root .l5 :is(.l5h-go, .l5h-btn, .l5h-x, .l5h-tool, .l5h-pick, .l5h-starchip, .l5h-wt-step, .l5h-find-go, .l5h-find-att, .l5h-zoom button, .l5h-pick > span[aria-hidden]) {
@@ -959,12 +874,20 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--lg-primary);
+  color: var(--c-moss);
   font: inherit;
   font-size: 13.5px;
+  font-weight: 500;
+  text-decoration: none;
+  cursor: pointer;
+  transition: color 0.2s;
+}
+.logos-root .l5 .l5h-link:hover {
+  color: var(--c-ink);
+}
+.logos-root .l5 .l5h-banner .l5h-link {
   text-decoration: underline;
   text-underline-offset: 3px;
-  cursor: pointer;
 }
 .logos-root .l5 .l5h-name {
   display: flex;
@@ -984,7 +907,8 @@
   outline: none;
 }
 .logos-root .l5 .l5h-name input:focus {
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.38);
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14);
 }
 
 /* renaming or deleting from the card, under its buttons */
@@ -1016,10 +940,12 @@
   flex-direction: column;
   gap: 10px;
   padding: 14px 16px 14px;
-  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.16);
-  border-radius: 18px;
-  background: var(--l5-surface);
-  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.05), 0 26px 60px -26px rgba(var(--shadow-rgb, 35, 36, 31), 0.5);
+  /* it floats over the map: paper, a hairline, square, no shadow (Revision II) */
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-pv[style*='left'] {
   right: auto;
@@ -1097,7 +1023,7 @@
 }
 .logos-root .l5 .l5h-pv-menu {
   margin-top: -2px;
-  box-shadow: 0 10px 28px -18px rgba(var(--shadow-rgb, 35, 36, 31), 0.45);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-pv-menu[hidden] {
   display: none;
@@ -1121,9 +1047,10 @@
   display: flex;
   flex-direction: column;
   padding: 6px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 12px;
-  background: var(--lg-paper);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
 }
 .logos-root .l5 .l5h-pv-move.is-up {
   position: absolute;
@@ -1131,8 +1058,7 @@
   left: 0;
   z-index: 3;
   min-width: 220px;
-  background: var(--l5-surface);
-  box-shadow: 0 18px 44px -20px rgba(var(--shadow-rgb, 35, 36, 31), 0.45);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-mi {
   padding: 8px 10px;
@@ -1170,10 +1096,12 @@
   max-height: calc(100% - 72px);
   overflow: auto;
   padding: 4px 16px 14px;
-  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.16);
-  border-radius: 18px;
-  background: var(--l5-surface);
-  box-shadow: 0 26px 60px -26px rgba(var(--shadow-rgb, 35, 36, 31), 0.5);
+  /* they float over the map: paper, a hairline, square, no shadow (Revision II) */
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
 }
 .logos-root .l5 .l5h-tray {
   padding-top: 12px;
@@ -1192,22 +1120,14 @@
   margin: 0 0 8px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-vm h4 .l5h-link {
   font-size: 12px;
   letter-spacing: 0;
   text-transform: none;
-}
-.logos-root .l5 .l5h-vm .l5h-seg button {
-  min-height: 28px;
-  padding: 0 10px;
-  font-size: 12.5px;
-}
-.logos-root .l5 .l5h-seg.is-wrap {
-  flex-wrap: wrap;
 }
 .logos-root .l5 .l5h-vm-row {
   display: flex;
@@ -1236,7 +1156,7 @@
 .logos-root .l5 .l5h-vm-check em {
   font-size: 12px;
   font-style: normal;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-vm-view {
   display: flex;
@@ -1250,13 +1170,14 @@
 .logos-root .l5 .l5h-vm-acts {
   display: flex;
   flex-wrap: wrap;
-  gap: 6px;
+  align-items: center;
+  gap: 4px 18px;
 }
 .logos-root .l5 .l5h-sure {
   display: flex;
   flex-wrap: wrap;
   align-items: center;
-  gap: 6px;
+  gap: 4px 14px;
   font-size: 13px;
   color: var(--lg-ink-60);
 }
@@ -1295,14 +1216,16 @@
   z-index: 20;
   display: flex;
   align-items: center;
-  gap: 8px;
   max-width: calc(100% - 24px);
-  padding: 6px 6px 6px 16px;
-  border: 1px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.18);
-  /* a softened rectangle round its keys, as the menus are — not a pill */
-  border-radius: 14px;
-  background: var(--l5-surface);
-  box-shadow: 0 22px 54px -24px rgba(var(--shadow-rgb, 35, 36, 31), 0.55);
+  padding: 6px 10px 6px 16px;
+  /* it floats over the map: paper, a hairline, square, no shadow (Revision II); its actions are words, its way on
+     the one filled control */
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
+  gap: 16px;
   white-space: nowrap;
   transform: translateX(-50%);
 }
@@ -1322,15 +1245,11 @@
   min-width: 0;
   overflow: hidden;
   white-space: nowrap;
-  font-size: 11px;
-  letter-spacing: 0.06em;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
-}
-.logos-root .l5 .l5h-k-t {
-  min-width: 0;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5h-glyph {
   flex: none;
@@ -1357,20 +1276,6 @@
 }
 .logos-root .l5 .l5h-chip.is-topic {
   background: rgba(var(--l5h-gold-rgb), 0.17);
-}
-.logos-root .l5 .l5h-badges {
-  flex: none;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  margin-left: auto;
-  letter-spacing: 0;
-}
-.logos-root .l5 .l5h-badges.is-corner {
-  position: absolute;
-  top: 12px;
-  right: 12px;
-  z-index: 2;
 }
 .logos-root .l5 .l5h-made {
   display: inline-flex;
@@ -1402,10 +1307,6 @@
   border-radius: 50%;
   background: var(--l5h-gold);
   box-shadow: 0 0 0 3px rgba(var(--l5h-gold-rgb), 0.24);
-}
-.logos-root .l5 .l5h-lasthere {
-  font-weight: 600;
-  color: var(--l5h-gold-ink);
 }
 
 /* ── nothing yet, and the atlas ───────────────────────────────────── */
@@ -1478,14 +1379,10 @@
     border-radius: 22px;
     padding-bottom: calc(14px + env(safe-area-inset-bottom, 0px));
   }
-  .logos-root .l5 .l5h-hint {
-    display: none;
-  }
   .logos-root .l5 .l5h-bar-sel {
     flex-wrap: wrap;
     justify-content: center;
     width: calc(100% - 24px);
-    border-radius: 22px;
     bottom: 12px;
     white-space: normal;
   }
@@ -1504,9 +1401,6 @@
   .logos-root .l5 .l5h-tool.is-select,
   .logos-root .l5 .l5h-tool.is-redo {
     display: none;
-  }
-  .logos-root .l5 .l5h-seg button {
-    padding: 0 11px;
   }
   .logos-root .l5 .l5h-long {
     display: none;
@@ -1602,7 +1496,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   cursor: grabbing;
 }
 .logos-root .l5 .l5t-scroll:focus-visible {
-  box-shadow: inset 0 0 0 2px rgba(var(--l5h-gold-rgb), 0.5);
+  box-shadow: inset 0 0 0 2px var(--c-moss);
 }
 .logos-root .l5 .l5t-track {
   position: relative;
@@ -1624,7 +1518,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   font-weight: 600;
   letter-spacing: 0.16em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5t-wk.is-month {
   border-left-style: solid;
@@ -1688,7 +1582,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 .logos-root .l5 .l5t-gap-mark {
   font-size: 18px;
   letter-spacing: 0.2em;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5t-gap-t {
   font-family: var(--l5-serif);
@@ -1697,10 +1591,11 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5t-gap-s {
-  font-size: 10px;
+  font-size: 10.5px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 /* the threads */
 .logos-root .l5 .l5t-lines {
@@ -1731,7 +1626,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   position: absolute;
   transform: translateY(-50%);
   white-space: nowrap;
-  font-size: 10px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.15em;
   text-transform: uppercase;
@@ -1767,7 +1662,10 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 .logos-root .l5 .l5t-back:focus-visible {
   border-style: solid;
   border-color: var(--c);
-  outline: none;
+}
+.logos-root .l5 .l5t-back:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5t-back.is-dim {
   opacity: 0.3;
@@ -1893,11 +1791,11 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   gap: 5px;
   max-width: 100%;
   white-space: nowrap;
-  font-size: 9.5px;
-  font-weight: 500;
+  font-size: 10.5px;
+  font-weight: 600;
   letter-spacing: 0.11em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   text-shadow: 0 0 3px var(--lg-paper), 0 0 8px var(--lg-paper);
 }
 /* over the line, in screen units */
@@ -1929,7 +1827,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   font-weight: 400;
 }
 .logos-root .l5 .l5t-name.is-floor {
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5t-name.is-floor::before {
   content: none;
@@ -1950,7 +1848,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   transform: translateX(-50%);
   white-space: nowrap;
   font-size: 11px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5t-day.is-week,
 .logos-root .l5 .l5t-day.is-month {
@@ -1958,7 +1856,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5t-day.is-today {
-  font-weight: 700;
+  font-weight: 600;
   color: var(--l5h-gold-ink);
 }
 .logos-root .l5 .l5t-more,
@@ -1983,7 +1881,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 .logos-root .l5 .l5t-more small,
 .logos-root .l5 .l5t-today small {
   font-size: 11.5px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5t-more.is-l {
   left: 14px;
@@ -2011,7 +1909,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   width: 150px;
   font-size: 11.5px;
   line-height: 1.3;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5t-scrub-bar {
   position: relative;
@@ -2031,11 +1929,11 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   bottom: 0;
   padding: 3px 0 0 5px;
   border-left: 1px solid color-mix(in srgb, var(--lg-ink) 10%, transparent);
-  font-size: 9.5px;
+  font-size: 10.5px;
   font-weight: 600;
   letter-spacing: 0.12em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   pointer-events: none;
 }
 .logos-root .l5 .l5t-scrub-gap {
@@ -2076,48 +1974,39 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 }
 
 /* what is said at the foot sits over the history, not on it */
-.logos-root .l5 .l5h-main.is-time .l5h-hint {
-  bottom: 104px;
-}
 .logos-root .l5 .l5h-main.is-time .l5h-said {
   bottom: 120px;
 }
 /* the week, as a map: its name over it, and a way back to other weeks */
 
-/* the week before, the week after: small framed keys for one glyph (buttons.css .l5-icon-btn.is-framed) */
+/* the week before, the week after: a glyph each, bare (.l5-icon) — no frame, no wash; it darkens */
 .logos-root .l5 .l5h-wt-step {
-  width: 30px;
-  height: 30px;
+  width: 32px;
+  height: 32px;
   display: inline-grid;
   place-items: center;
   padding: 0;
-  border: 1px solid var(--l5b-edge);
-  border-radius: 8px;
-  background: var(--l5b-face);
-  box-shadow: var(--l5b-ledge);
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   font: inherit;
   font-size: 15px;
   line-height: 1;
-  color: var(--l5b-ink-2);
+  color: var(--c-ink-60);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background-color 0.15s, color 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5h-wt-step:hover:not(:disabled) {
-  border-color: var(--l5b-edge-hi);
-  background: color-mix(in srgb, var(--l5b-face) 94%, rgb(var(--l5b-fill-rgb)));
-  color: var(--l5b-ink);
-}
-.logos-root .l5 .l5h-wt-step:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: none;
+  color: var(--c-ink);
 }
 .logos-root .l5 .l5h-wt-step:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 .logos-root .l5 .l5h-wt-step:disabled {
-  opacity: 0.4;
+  color: var(--c-ink-25);
   cursor: default;
 }
 
@@ -2182,27 +2071,6 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
 }
 .logos-root .l5 .l5h-title {
   min-width: 0;
-}
-.logos-root .l5 .l5h-kicker {
-  margin: 0 0 6px;
-  font-size: 11px;
-  font-weight: 500;
-  letter-spacing: 0.22em;
-  text-transform: uppercase;
-  color: var(--lg-ink-60);
-}
-.logos-root .l5 .l5h-h {
-  margin: 0;
-  font-family: var(--l5-serif);
-  font-weight: 400;
-  font-size: 46px;
-  line-height: 1.02;
-  letter-spacing: -0.01em;
-  color: var(--lg-ink);
-}
-.logos-root .l5 .l5h-h em {
-  font-style: italic;
-  color: var(--lg-primary);
 }
 .logos-root .l5 .l5h-sub {
   display: flex;
@@ -2287,7 +2155,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   border-radius: var(--l5b-r-sm);
   background: transparent;
   font-family: var(--lg-sans);
-  font-size: 13px;
+  font-size: 13.5px;
   font-weight: 500;
   line-height: 1;
   letter-spacing: 0;
@@ -2308,7 +2176,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   box-shadow: var(--l5b-ledge);
 }
 .logos-root .l5 .l5h-lens button:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 /* the map's tools, under the lenses: the keys above (.l5h-tool), in a row */
@@ -2356,28 +2224,6 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   align-items: center;
   gap: 9px;
 }
-.logos-root .l5 .l5h-lg-hub {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--sc-moss);
-}
-.logos-root .l5 .l5h-lg-dot {
-  width: 9px;
-  height: 9px;
-  border-radius: 50%;
-  background: var(--sc-moss);
-}
-.logos-root .l5 .l5h-lg-link {
-  width: 34px;
-  border-top: 1.5px dashed var(--l5b-link);
-}
-.logos-root .l5 .l5h-lg-line {
-  width: 30px;
-  height: 2.4px;
-  border-radius: 2px;
-  background: var(--sc-moss);
-}
 .logos-root .l5 .l5h-omni {
   flex: 0 1 620px;
   min-width: 0;
@@ -2402,34 +2248,23 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   color: var(--l5b-on-fill);
   cursor: pointer;
   -webkit-tap-highlight-color: transparent;
-  transition: border-color 0.15s, background 0.15s, box-shadow 0.15s, transform 0.12s;
+  transition: background-color 0.2s, transform 0.2s var(--c-ease);
 }
 .logos-root .l5 .l5h-find-go:hover:not(:disabled) {
   border-color: color-mix(in srgb, var(--l5b-fill) 70%, #000);
   background: linear-gradient(180deg, color-mix(in srgb, var(--l5b-fill) 78%, #fff) 0%, color-mix(in srgb, var(--l5b-fill) 94%, #fff) 100%);
   transform: translateY(-1px);
 }
-.logos-root .l5 .l5h-find-go:active:not(:disabled) {
-  transform: translateY(1px);
-  box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.22);
-}
 .logos-root .l5 .l5h-find-go:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 /* said once, and said now: over the foot, not on it */
-.logos-root .l5 .l5h-hint {
-  bottom: calc(var(--l5h-foot, 92px) + 8px);
-  left: 40px;
-}
 .logos-root .l5 .l5h-said {
   bottom: calc(var(--l5h-foot, 92px) + 18px);
 }
 .logos-root .l5 .l5h-bar-sel {
   bottom: calc(var(--l5h-foot, 92px) + 10px);
-}
-.logos-root .l5 .l5h-main.is-time .l5h-hint {
-  bottom: calc(var(--l5h-foot, 92px) + 104px);
 }
 .logos-root .l5 .l5h-main.is-time .l5h-said {
   bottom: calc(var(--l5h-foot, 92px) + 120px);
@@ -2734,7 +2569,8 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   padding: 1px 7px;
   border: 1px solid color-mix(in srgb, var(--c) 42%, transparent);
   border-radius: 999px;
-  font-size: 9.5px;
+  font-size: 10.5px;
+  font-weight: 600;
   letter-spacing: 0.14em;
   line-height: 13px;
   color: color-mix(in srgb, var(--c) 82%, var(--lg-ink));
@@ -2778,7 +2614,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   cursor: pointer;
 }
 .logos-root .l5 .l5b-make .l5b-name-t {
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   cursor: pointer;
   transition: color 0.2s;
 }
@@ -2819,16 +2655,12 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   color: var(--lg-ink);
   outline: none;
 }
+.logos-root .l5 .l5b-make input:focus {
+  border-color: var(--c-moss);
+}
 .logos-root .l5 .l5b-make-s {
   font-size: 11px;
-  color: var(--lg-ink-40);
-}
-.logos-root .l5 .l5h-lg-proj {
-  width: 18px;
-  height: 18px;
-  border: 1.5px solid color-mix(in srgb, var(--sc-clay) 70%, transparent);
-  border-radius: 50%;
-  background: color-mix(in srgb, var(--sc-clay) 8%, transparent);
+  color: var(--c-ink-45);
 }
 
 /* a real study session: a disc in its subject's colour, its name inside */
@@ -2923,7 +2755,7 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   background: var(--l5h-gold);
   color: var(--l5h-gold-on);
   font-size: 11px;
-  font-weight: 700;
+  font-weight: 600;
 }
 .logos-root .l5 .l5b-made {
   position: absolute;
@@ -2943,9 +2775,12 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   transform: scale(1.035);
   filter: saturate(1.08) brightness(1.04);
 }
-.logos-root .l5 .l5b-hub:focus-visible .l5b-disc,
 .logos-root .l5 .l5b-hub.is-sel .l5b-disc {
   box-shadow: 0 0 0 3px var(--lg-paper), 0 0 0 5.5px rgba(var(--l5h-gold-rgb), 0.95), 0 14px 30px -20px color-mix(in srgb, var(--c) 80%, #000);
+}
+/* the keyboard's ring is the one focus colour, not the gold of what is chosen */
+.logos-root .l5 .l5b-hub:focus-visible .l5b-disc {
+  box-shadow: 0 0 0 3px var(--lg-paper), 0 0 0 5px var(--c-moss), 0 14px 30px -20px color-mix(in srgb, var(--c) 80%, #000);
 }
 .logos-root .l5 .l5b-hub.is-here .l5b-disc {
   box-shadow: 0 0 0 3px var(--lg-paper), 0 0 0 5px color-mix(in srgb, var(--c) 60%, transparent);
@@ -3075,10 +2910,12 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   position: absolute;
   z-index: 6;
   padding: 16px 20px 16px;
-  border: 1px solid color-mix(in srgb, var(--lg-ink) 8%, transparent);
-  border-radius: 14px;
-  background: var(--l5-surface);
-  box-shadow: 0 1px 2px rgba(var(--shadow-rgb, 35, 36, 31), 0.04), 0 18px 40px -20px rgba(var(--shadow-rgb, 35, 36, 31), 0.32);
+  /* it floats over the map: paper, a hairline, square, no shadow (Revision II) */
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   cursor: default;
 }
 .logos-root .l5 .l5b-card-t {
@@ -3112,24 +2949,29 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
     opacity: 0;
   }
 }
+/* change its words, take it away: a glyph each, bare (.l5-icon) — they darken; taking away darkens to the one red */
 .logos-root .l5 .l5b-card-btn {
   display: inline-grid;
   place-items: center;
-  width: 28px;
-  height: 28px;
+  width: 32px;
+  height: 32px;
   padding: 0;
   border: 0;
-  border-radius: 8px;
-  background: transparent;
-  color: var(--lg-ink-40);
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-60);
   cursor: pointer;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5b-card-btn:hover {
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
-  color: var(--lg-ink);
+  color: var(--c-ink);
 }
 .logos-root .l5 .l5b-card-btn.is-danger:hover {
-  color: var(--l5h-danger);
+  color: var(--c-tension);
+}
+.logos-root .l5 .l5b-card-btn:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5b-card-edit {
   display: flex;
@@ -3148,6 +2990,10 @@ html[data-theme="night"] .logos-root .l5 .l5h-note:hover {
   font-size: 14px;
   color: var(--lg-ink);
   outline: none;
+}
+.logos-root .l5 .l5b-card-edit input:focus {
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14);
 }
 
 /* ── coming in: each lens, and each week, arrives drawn ─────────────
@@ -3472,14 +3318,6 @@ html[data-theme="night"] .logos-root .l5 .l5b-card-s {
 html[data-theme="night"] .logos-root .l5 .l5b-card-s em {
   color: #f0d79b;
 }
-html[data-theme="night"] .logos-root .l5 .l5h-h,
-html[data-theme="night"] .logos-root .l5 .l5h-kicker {
-  text-shadow: 0 0 24px rgba(3, 5, 13, 0.95), 0 0 2px rgba(3, 5, 13, 0.9);
-}
-html[data-theme="night"] .logos-root .l5 .l5h-h em {
-  color: #f0d79b;
-  text-shadow: 0 0 22px rgba(240, 216, 158, 0.35), 0 0 24px rgba(3, 5, 13, 0.95);
-}
 /* the line through time: each session a star on the plane of the galaxy */
 html[data-theme="night"] .logos-root .l5 .l5t-star {
   background: radial-gradient(circle, #fff 0%, color-mix(in srgb, var(--c) 70%, #fff) 30%, var(--c) 66%);
@@ -3577,14 +3415,6 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
 .logos-root .l5 .l5h.is-narrow .l5h-title {
   width: 100%;
 }
-.logos-root .l5 .l5h.is-narrow .l5h-kicker {
-  margin-bottom: 3px;
-  font-size: 9.5px;
-}
-.logos-root .l5 .l5h.is-narrow .l5h-h {
-  font-size: 30px;
-  padding-right: 108px;
-}
 .logos-root .l5 .l5h.is-narrow .l5h-sub {
   max-width: none;
   margin-top: 8px;
@@ -3603,7 +3433,7 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
 }
 .logos-root .l5 .l5h.is-narrow .l5h-weektitle .l5h-sub-k {
   display: inline;
-  font-size: 9.5px;
+  font-size: 10.5px;
   letter-spacing: 0.12em;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -3726,7 +3556,10 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   border-style: solid;
   border-color: var(--lg-primary);
   color: var(--lg-ink);
-  outline: none;
+}
+.logos-root .l5 .l5h-todaynode:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5h-todaynode-dot {
   flex: 0 0 auto;
@@ -3795,7 +3628,7 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   box-shadow: 0 0 0 1px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16);
 }
 .logos-root .l5 .l5b-mem:focus-visible {
-  outline: 2px solid rgba(var(--l5h-gold-rgb), 0.95);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 .logos-root .l5 .l5b-mem.is-dim {
@@ -3927,6 +3760,10 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   text-decoration: underline;
   text-underline-offset: 3px;
 }
+.logos-root .l5 .l5b-card-lnk:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
+}
 .logos-root .l5 .l5b-card-lnk.is-danger {
   color: var(--l5h-danger);
 }
@@ -4000,7 +3837,8 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
   outline: none;
 }
 .logos-root .l5 .l5h-pv-mem-fix input:focus {
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.38);
+  border-color: var(--c-moss);
+  box-shadow: 0 0 0 3px rgba(var(--c-moss-rgb), 0.14);
 }
 .logos-root .l5 .l5h-pv-mem-more {
   align-self: flex-start;

@@ -11,7 +11,6 @@
   --lg-ink-45: rgba(32, 32, 27, 0.45);
   --lg-line: rgba(53, 70, 32, 0.16);
   --lg-moss: #354620; /* the one green */
-  --lg-moss-deep: #354620;
   --lg-serif: var(--font-serif, Georgia, serif), 'Instrument Serif', Georgia, serif;
   --lg-sans: var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif), Inter, system-ui, sans-serif;
 
@@ -25,26 +24,13 @@
   line-height: 1.68;
 }
 
-.legal-root .lg-top {
-  border-bottom: 1px solid var(--lg-line);
-  padding: 16px clamp(18px, 5vw, 44px);
-  display: flex; align-items: center; gap: 22px; flex-wrap: wrap;
-}
-.legal-root .lg-word {
-  font-family: var(--lg-serif); font-size: 1.35rem;
-  color: var(--lg-ink); text-decoration: none;
-}
-.legal-root .lg-tabs { display: flex; gap: 18px; margin-left: auto; }
-.legal-root .lg-tabs a {
-  font-size: 13px; color: var(--lg-ink-45); text-decoration: none;
-}
-.legal-root .lg-tabs a:hover { color: var(--lg-moss-deep); }
-.legal-root .lg-tabs a.is-on { color: var(--lg-moss-deep); font-weight: 600; }
+/* The masthead, the row of policies under it and the foot are the site's own
+   (components/site/site.css). */
 
 .legal-root main { flex: 1; width: 100%; max-width: 760px; margin: 0 auto; padding: clamp(34px, 6vh, 62px) clamp(18px, 5vw, 44px) 80px; }
 
 .legal-root .lg-kicker {
-  font-size: 11px; font-weight: 700; letter-spacing: 0.18em;
+  font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase; color: var(--lg-moss);
 }
 .legal-root h1 {
@@ -64,14 +50,16 @@
   margin: 42px 0 12px; padding-top: 20px;
   border-top: 1px solid var(--lg-line);
   font-family: var(--lg-serif); font-weight: 400; font-size: 1.5rem;
-  line-height: 1.2; scroll-margin-top: 20px;
+  line-height: 1.2; scroll-margin-top: calc(var(--mast-h) + 20px);
 }
-.legal-root h3 { margin: 26px 0 8px; font-size: 15px; font-weight: 650; }
+.legal-root h3 { margin: 26px 0 8px; font-size: 15px; font-weight: 600; }
 .legal-root p { margin: 0 0 14px; }
 .legal-root ul { margin: 0 0 14px; padding-left: 22px; }
 .legal-root li { margin-bottom: 7px; }
-.legal-root strong { font-weight: 650; }
-.legal-root a { color: var(--lg-moss-deep); text-underline-offset: 2px; }
+.legal-root strong { font-weight: 600; }
+/* the prose link, as the docs set theirs */
+.legal-root main a { color: var(--lg-moss); text-decoration: underline; text-decoration-thickness: 1px; text-decoration-color: rgba(var(--moss-rgb, 53, 70, 32), 0.4); text-underline-offset: 2px; }
+.legal-root main a:hover { text-decoration-color: var(--lg-moss); }
 .legal-root code {
   font-family: ui-monospace, 'SF Mono', Menlo, monospace; font-size: 0.86em;
   background: rgba(53, 70, 32, 0.07); border: 1px solid rgba(53, 70, 32, 0.1);
@@ -87,7 +75,7 @@
 .legal-root .lg-note p + p { margin-top: 9px; }
 .legal-root .lg-note .t {
   display: block; margin-bottom: 5px;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.14em;
+  font-size: var(--type-label, 0.7rem); font-weight: 600; letter-spacing: var(--tracking-label, 0.28em);
   text-transform: uppercase; color: var(--lg-moss);
 }
 
@@ -95,20 +83,11 @@
 .legal-root table { width: 100%; border-collapse: collapse; font-size: 13.5px; line-height: 1.5; }
 .legal-root th {
   text-align: left; padding: 8px 14px 8px 0; white-space: nowrap;
-  font-size: 10.5px; font-weight: 700; letter-spacing: 0.11em;
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.11em;
   text-transform: uppercase; color: var(--lg-ink-45);
   border-bottom: 1px solid var(--lg-line);
 }
 .legal-root td { padding: 10px 14px 10px 0; border-bottom: 1px solid rgba(53,70,32,0.08); vertical-align: top; }
-
-.legal-root .lg-foot {
-  border-top: 1px solid var(--lg-line);
-  padding: 20px clamp(18px, 5vw, 44px);
-  display: flex; gap: 18px; flex-wrap: wrap;
-  font-size: 12.5px; color: var(--lg-ink-45);
-}
-.legal-root .lg-foot a { color: var(--lg-ink-70); text-decoration: none; }
-.legal-root .lg-foot a:hover { color: var(--lg-moss-deep); }
 
 /* On a phone.
    These labels are set at 10.5px because they are tracked uppercase captions

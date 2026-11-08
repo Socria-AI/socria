@@ -34,6 +34,7 @@ import {
 // is drawn inside one in Logos too, where nothing else brings them in.
 import './mind-graph.css';
 import './mind-atlas.css';
+import { L5Close } from '@/components/logos5/L5Chrome';
 
 const KIND_WORD: Record<AtlasNode['kind'], string> = {
   memory: 'Memory',
@@ -201,7 +202,7 @@ export function MindAtlas({
               <>
                 <div className="ma-side-head">
                   <span className={`ma-kind k-${selected.kind}`}>{KIND_WORD[selected.kind]}{selected.kind !== 'chat' && selected.kind !== 'project' && selected.type ? ` · ${selected.type}` : ''}</span>
-                  <button className="ma-x" aria-label="Close" onClick={() => setSel(null)}>×</button>
+                  <L5Close className="ma-x" label="Close" onClose={() => setSel(null)} />
                 </div>
                 <h3 className="ma-title">{selected.label}</h3>
                 {selected.sub && selected.kind !== 'chat' && <p className="ma-sub">{selected.sub}</p>}

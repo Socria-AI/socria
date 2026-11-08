@@ -1,6 +1,6 @@
 'use client';
 
-// components/write/Editor.tsx — the Writing Space's page.
+// components/write/Editor.tsx — Write's page.
 //
 // One contentEditable page, one element per block, drawn from the document
 // model (lib/write/doc.ts) and never the other way round except where the

@@ -2,33 +2,25 @@
    Socria One button and its note on return (OneNudge in LogosApp). Drawn in Logos 5's own
    tokens, so they are paper on Paper, dark on Dark, the sky's on Celestial. */
 
+/* A tip floats over the page, so it is drawn as whatever floats there is (Revision II): paper with its grain, a
+   hairline, square corners, no shadow — in each theme's own paper (--c-paper, --c-grain: declared on .logos-root for
+   every theme, so a tip, which mounts outside .l5, has them too). It sits above the docks and headers (60) and below
+   every dialog's dimmed page (80 and up): a tip never shows over a sheet. */
 .logos-root .l5tip {
-  --tip-green: var(--c-moss, #354620); /* moss: the one green */
   position: fixed;
   left: 0;
   top: 0;
-  z-index: 88;
+  z-index: 70;
   width: min(300px, calc(100vw - 24px));
   padding: 13px 15px 12px;
-  border: 1px solid var(--lg-line);
-  border-radius: 16px;
-  background: var(--l5-surface, #fffdf8);
-  box-shadow: 0 18px 44px -22px rgba(var(--shadow-rgb, 32, 32, 27), 0.45), 0 2px 6px -2px rgba(var(--shadow-rgb, 32, 32, 27), 0.12);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   color: var(--lg-ink);
   font-family: var(--lg-sans);
   visibility: hidden;
-}
-html[data-theme='dark'] .logos-root .l5tip,
-html[data-theme='one'] .logos-root .l5tip {
-  --tip-green: #9cb874; /* sage */
-  background: #1c1c1c;
-}
-html[data-theme='one'] .logos-root .l5tip {
-  background: #17304a;
-}
-html[data-theme='night'] .logos-root .l5tip {
-  --tip-green: #9cb874;
-  background: #121c31;
 }
 .logos-root .l5tip.is-placed {
   visibility: visible;
@@ -70,21 +62,22 @@ html[data-theme='night'] .logos-root .l5tip {
   border-left: none;
   border-top: none;
 }
+/* its label is the one label (.l5-label), after a moss dot */
 .logos-root .l5tip-k {
   display: inline-flex;
   align-items: center;
   gap: 7px;
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.16em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-60);
+  color: var(--c-ink-45);
 }
 .logos-root .l5tip-k i {
   width: 6px;
   height: 6px;
   border-radius: 50%;
-  background: var(--tip-green);
+  background: var(--c-moss);
 }
 .logos-root .l5tip-t {
   margin: 6px 0 3px;
@@ -101,43 +94,64 @@ html[data-theme='night'] .logos-root .l5tip {
 }
 .logos-root .l5tip-row {
   display: flex;
-  gap: 8px;
+  align-items: center;
+  gap: 18px;
   justify-content: flex-end;
   margin-top: 11px;
 }
-.logos-root .l5tip-go,
-.logos-root .l5tip-ok {
-  height: 30px;
-  padding: 0 13px;
-  border-radius: 999px;
-  font: inherit;
-  font-size: 12.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
+/* "Show me" is the card's one filled control (.l5-btn.is-primary.is-sm): ink, moss on hover; "Got it" is a word */
 .logos-root .l5tip-go {
-  border: 1px solid var(--lg-primary);
-  background: var(--lg-primary);
-  color: var(--lg-paper);
-}
-.logos-root .l5tip-ok {
-  border: 1px solid var(--lg-line);
-  background: transparent;
-  color: var(--lg-ink);
+  display: inline-flex;
+  align-items: center;
+  height: 32px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 999px;
+  background: var(--c-ink);
+  color: var(--c-paper);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: background-color 0.2s, transform 0.2s var(--c-ease);
 }
 .logos-root .l5tip-go:hover {
-  filter: brightness(1.08);
+  background: var(--c-moss);
+  transform: translateY(-2px);
+}
+.logos-root .l5tip-ok {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--c-ink-70);
+  font: inherit;
+  font-size: 13.5px;
+  font-weight: 500;
+  white-space: nowrap;
+  cursor: pointer;
+  transition: color 0.2s;
 }
 .logos-root .l5tip-ok:hover {
-  border-color: var(--lg-ink-40);
+  color: var(--c-ink);
 }
 .logos-root .l5tip-go:focus-visible,
 .logos-root .l5tip-ok:focus-visible {
-  outline: 2px solid var(--lg-accent);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .l5tip-go:hover {
+    transform: none;
+  }
+}
 
-/* ── Socria One, in the header, for a free account ─────────────────── */
+/* ── Socria One, in the header, for a free account ─────────────────
+   The word in its own blue (--lg-one, themed: slate on Paper, a light blue on the dark grounds), serif italic, after
+   its dot — no pill, in both headers and on a phone (where it says "One"). */
 .logos-root .l5-acct {
   position: relative;
   display: inline-flex;
@@ -148,11 +162,12 @@ html[data-theme='night'] .logos-root .l5tip {
   display: inline-flex;
   align-items: center;
   gap: 7px;
-  height: 32px;
-  padding: 0 12px 0 10px;
-  border: 1px solid var(--lg-one-line);
-  border-radius: 999px;
-  background: var(--lg-one-soft);
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  box-shadow: none;
   color: var(--lg-one);
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
   font-style: italic;
@@ -160,47 +175,49 @@ html[data-theme='night'] .logos-root .l5tip {
   line-height: 1;
   cursor: pointer;
   white-space: nowrap;
-  transition: background-color 0.15s, border-color 0.15s;
+  transition: color 0.2s;
 }
 .logos-root .l5-onebtn i {
-  width: 7px;
-  height: 7px;
+  width: 6px;
+  height: 6px;
   border-radius: 50%;
   background: var(--lg-one);
 }
 .logos-root .l5-onebtn:hover {
-  border-color: var(--lg-one);
+  color: var(--c-ink);
 }
 .logos-root .l5-onebtn:focus-visible {
-  outline: 2px solid var(--lg-one);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
+/* a note waiting under it: the word underlined */
 .logos-root .l5-onebtn.has-note {
-  border-color: var(--lg-one);
-  box-shadow: 0 0 0 3px var(--lg-one-soft);
+  text-decoration: underline;
+  text-underline-offset: 4px;
+}
+@media (pointer: coarse) {
+  .logos-root .l5-onebtn {
+    min-height: 44px;
+  }
 }
 
-/* …and the small note under it, when somebody comes back */
+/* …and the small note under it, when somebody comes back — drawn as a tip is: paper, a hairline, square, no shadow,
+   below every dialog's dimmed page */
 .logos-root .l5-onenote {
   position: absolute;
   right: 0;
   top: calc(100% + 10px);
-  z-index: 89;
+  z-index: 71;
   width: min(300px, calc(100vw - 24px));
   padding: 13px 15px 12px;
-  border: 1px solid var(--lg-one-line);
-  border-radius: 16px;
-  background: var(--l5-surface, #fffdf8);
-  box-shadow: 0 18px 44px -22px rgba(var(--shadow-rgb, 32, 32, 27), 0.45);
+  border: 1px solid var(--c-rule-2);
+  border-radius: 0;
+  background-color: var(--c-paper);
+  background-image: var(--c-grain);
+  box-shadow: none;
   color: var(--lg-ink);
   font-family: var(--lg-sans);
   text-align: left;
-}
-html[data-theme='dark'] .logos-root .l5-onenote {
-  background: #1c1c1c;
-}
-html[data-theme='night'] .logos-root .l5-onenote {
-  background: #121c31;
 }
 .logos-root .l5-onenote::before {
   content: '';
@@ -236,20 +253,15 @@ html[data-theme='night'] .logos-root .l5-onenote {
   line-height: 1.5;
   color: var(--lg-ink-60);
 }
+/* the button that buys Socria One is One's blue, its words the ground's (light on slate, dark on a dark ground's
+   light blue) */
 .logos-root .l5-onenote .l5tip-go {
-  border-color: var(--lg-one);
   background: var(--lg-one);
-  color: #fff;
-}
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5-onenote .l5tip-go {
-  color: #0d1a24;
+  color: var(--lg-paper);
 }
 
 @media (max-width: 640px) {
-  /* a phone's header has room for the monogram only */
-  .logos-root .l5-onebtn {
-    padding: 0 10px;
-  }
+  /* a phone's header has room for "One" only */
   .logos-root .l5-onebtn-l {
     position: absolute;
     width: 1px;

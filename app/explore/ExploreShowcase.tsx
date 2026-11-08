@@ -127,7 +127,7 @@ function Exhibit({ scenario }: { scenario: Scenario }) {
           <section className="lg-panel">
             <header className="lg-panel-head">
               <span className="lg-panel-title">
-                Thinking Map
+                Logic Map
                 {scenario.contextLabel && (
                   <em className="lg-panel-context">{scenario.contextLabel}</em>
                 )}

@@ -1,6 +1,6 @@
 'use client';
 
-// components/write/socria.tsx — the one place the Writing Space asks Socria.
+// components/write/socria.tsx — the one place Write asks Socria.
 //
 // Three tabs, each a plain job:
 //

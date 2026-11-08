@@ -2,7 +2,7 @@
 // month has ended, and here is what Socria is now.
 
 import Link from 'next/link';
-import { Button, Label } from '@/components/ds';
+import { Button, Label, Logo } from '@/components/ds';
 import { freePlanSentence } from '@/lib/entitlements';
 import { priceWithPeriod } from '@/lib/socria-one';
 
@@ -12,9 +12,7 @@ export function StudentsBody() {
       <div className="plate-wrap">
         <div className="plate wide">
           <Link href="/" className="auth-mark" aria-label="Socria home">
-            {/* eslint-disable-next-line @next/next/no-img-element */}
-            <img src="/socria-logo.png" alt="" width={34} height={34} />
-            <span>Socria</span>
+            <Logo size="md" markSrc="/socria-mark.png" />
           </Link>
 
           <div>
@@ -28,8 +26,10 @@ export function StudentsBody() {
             account needed, and a free account has {freePlanSentence()}. Socria One is {priceWithPeriod()}.
           </p>
           <div className="stack" style={{ gap: '12px' }}>
-            <Button as="a" href="/chat" variant="primary" size="lg" arrow>
-              Start thinking
+            {/* Where every public "Start a conversation" goes (components/site/chrome.tsx START),
+                written out so this plate does not load the public site's stylesheet. */}
+            <Button as="a" href="/logos" variant="primary" size="lg" arrow>
+              Start a conversation
             </Button>
             <p className="auth-cross">
               <Link href="/one">See Socria One</Link>

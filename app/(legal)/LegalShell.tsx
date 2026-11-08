@@ -1,39 +1,19 @@
 'use client';
 
-// The chrome the three policy pages share.
+// The chrome the policy pages share: the site's masthead with the policies in
+// a row under it, the page you are reading marked, and the site's foot
+// (components/site/chrome.tsx). A client component only for the pathname.
 
-import Link from 'next/link';
 import { usePathname } from 'next/navigation';
-
-const TABS = [
-  { href: '/privacy', label: 'Privacy' },
-  { href: '/terms', label: 'Terms' },
-  { href: '/security', label: 'Security' },
-  { href: '/subprocessors', label: 'Sub-processors' },
-];
+import { POLICIES, SiteFoot, SiteMast } from '@/components/site/chrome';
 
 export function LegalShell({ children }: { children: React.ReactNode }) {
   const path = usePathname();
   return (
     <div className="legal-root">
-      <header className="lg-top">
-        <Link href="/" className="lg-word">Socria</Link>
-        <nav className="lg-tabs" aria-label="Policies">
-          {TABS.map((t) => (
-            <Link key={t.href} href={t.href} className={path === t.href ? 'is-on' : undefined}
-              aria-current={path === t.href ? 'page' : undefined}>
-              {t.label}
-            </Link>
-          ))}
-        </nav>
-      </header>
+      <SiteMast sub={{ label: 'Policies', links: POLICIES, current: path }} />
       <main>{children}</main>
-      <footer className="lg-foot">
-        <span>Socria — Human-First AI</span>
-        <Link href="/docs">Docs</Link>
-        <Link href="/support">Support</Link>
-        <Link href="/chat">Open Socria</Link>
-      </footer>
+      <SiteFoot />
     </div>
   );
 }

@@ -14,6 +14,7 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { indexWorkspace, searchWorkspace, type EntityKind, type Hit, type IndexDoc } from '@/lib/runtime/representation';
 import type { LogosSession } from '@/lib/logos-sessions';
+import { L5Close } from './L5Chrome';
 
 const KIND_LABEL: Record<EntityKind, string> = {
   conversation: 'Line of thinking',
@@ -23,7 +24,7 @@ const KIND_LABEL: Record<EntityKind, string> = {
   artifact: 'Artifact',
   writing: 'Writing',
   card: 'Card',
-  node: 'Map',
+  node: 'Logic Map',
 };
 
 export function GlobalSearch({
@@ -115,7 +116,7 @@ export function GlobalSearch({
             ref={input}
             value={q}
             onChange={(e) => setQ(e.target.value)}
-            placeholder="Search conversations, content, artifacts, maps…"
+            placeholder="Search conversations, files, artifacts, Logic Maps…"
             aria-label="Search everything"
             role="combobox"
             aria-expanded={hits.length > 0}
@@ -124,12 +125,14 @@ export function GlobalSearch({
             autoComplete="off"
             spellCheck={false}
           />
-          <kbd className="l5v-kbd">Esc</kbd>
+          <kbd className="l5-kbd l5gs-esc">Esc</kbd>
+          {/* a touch screen has no Esc key: the one close, top right */}
+          <L5Close label="Close search" onClose={onClose} className="l5gs-x" />
         </div>
         {q.trim() && !hits.length ? (
           <p className="l5gs-empty">Nothing matches “{q.trim()}”.</p>
         ) : !q.trim() ? (
-          <p className="l5gs-empty">Type to search every line of thinking, what was said in it, your documents, what was made and every map.</p>
+          <p className="l5gs-empty">Type to search every line of thinking, what was said in it, your files, what was made and every Logic Map.</p>
         ) : (
           <ul className="l5gs-list" id="l5gs-list" role="listbox" aria-label="Results">
             {hits.map((h, i) => (

@@ -21,6 +21,7 @@
 import { useEffect, useState } from 'react';
 import type { UserUnderstanding } from '@/lib/socria-prompt';
 import type { Plan } from '@/lib/socria-one';
+import { CloseGlyph } from './logos5/L5Chrome';
 import {
   dormantCount,
   groupByKind,
@@ -125,10 +126,7 @@ export function JourneyDebugModal({
     <div className="core3-modal-backdrop" onClick={onClose} role="dialog" aria-modal="true" aria-labelledby="jrn-title">
       <div className="core3-modal-card jrn-card" onClick={(e) => e.stopPropagation()}>
         <button type="button" onClick={onClose} className="core3-modal-close" aria-label="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <CloseGlyph />
         </button>
 
         <div className="jrn-body">

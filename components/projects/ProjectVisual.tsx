@@ -11,6 +11,7 @@ import type { Atlas, AtlasNode } from '@/lib/mind/atlas';
 import { relLabel } from '@/lib/mind/atlas';
 import { VISUAL_NAME, type VisualKind } from '@/lib/project-home';
 import { evidenceLayout, madeThings, roadmapLayout, timelineLayout, webLayout } from '@/lib/project-visual';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 
 interface ChatLite {
   id: string;
@@ -104,7 +105,7 @@ export function ProjectVisual({
           <aside className="ph-vside" aria-label={selected.label}>
             <div className="ph-vside-head">
               <span className="k">{selected.kind === 'idea' ? `On a map · ${selected.type}` : selected.kind === 'memory' ? `Remembered · ${selected.type}` : selected.type}</span>
-              <button className="x" aria-label="Close" onClick={() => setSel(null)}>×</button>
+              <button type="button" className="x" aria-label="Close" onClick={() => setSel(null)}><CloseGlyph /></button>
             </div>
             <h4>{selected.label}</h4>
             {selected.sub && selected.kind !== 'chat' && <p className="sub">{selected.sub}</p>}

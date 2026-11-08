@@ -1,6 +1,6 @@
 /* /mind-ar — the Mind Graph, floating over the camera. Scoped to .mar-root. */
 .mar-root{position:fixed;inset:0;overflow:hidden;background:radial-gradient(1200px 700px at 30% 20%,#2c3a1b,#12170b 70%);color:#f4f1e8;
-  font-family:Inter,system-ui,sans-serif;touch-action:none;user-select:none;-webkit-user-select:none}
+  font-family:var(--sans);touch-action:none;user-select:none;-webkit-user-select:none}
 .mar-root .mar-video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:0;transition:opacity .4s}
 .mar-root.has-camera .mar-video{opacity:1}
 .mar-root .mar-video.is-mirrored{transform:scaleX(-1)}
@@ -13,7 +13,7 @@
   padding:max(12px,env(safe-area-inset-top)) 16px 12px;background:linear-gradient(rgba(10,14,6,.6),transparent)}
 .mar-root .mar-back{color:#f4f1e8;text-decoration:none;font-size:13px;opacity:.85;white-space:nowrap}
 .mar-root .mar-title{display:flex;flex-direction:column;min-width:0;flex:1}
-.mar-root .mar-title strong{font-family:"Source Serif 4",Georgia,serif;font-weight:500;font-size:17px}
+.mar-root .mar-title strong{font-family:var(--serif);font-weight:500;font-size:17px}
 .mar-root .mar-title span{font-size:12px;opacity:.75;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .mar-root .mar-badge{font-size:10px;font-weight:600;letter-spacing:.16em;text-transform:uppercase;color:#e8b62c;
   border:1px solid rgba(232,182,44,.5);border-radius:999px;padding:3px 9px;white-space:nowrap}
@@ -42,12 +42,12 @@
 .mar-root .mar-card{position:absolute;z-index:4;left:16px;bottom:calc(76px + env(safe-area-inset-bottom));width:min(360px,calc(100% - 92px));
   max-height:50vh;overflow:auto;background:rgba(244,241,232,.96);color:#20201b;border-radius:16px;padding:16px 18px;
   box-shadow:0 20px 50px -20px rgba(0,0,0,.6)}
-.mar-root .mar-card h2{font-family:"Source Serif 4",Georgia,serif;font-weight:500;font-size:20px;line-height:1.25;margin:4px 0 8px}
+.mar-root .mar-card h2{font-family:var(--serif);font-weight:500;font-size:20px;line-height:1.25;margin:4px 0 8px}
 .mar-root .mar-card p{font-size:14px;line-height:1.5;margin:0 0 10px;color:rgba(32,32,27,.75)}
 .mar-root .mar-type{font-size:10.5px;font-weight:700;letter-spacing:.16em;text-transform:uppercase;filter:brightness(.7)}
 .mar-root .mar-card ul{list-style:none;margin:0;padding:0;border-top:1px solid rgba(32,32,27,.1)}
 .mar-root .mar-card li button{display:block;width:100%;text-align:left;background:none;border:0;border-bottom:1px solid rgba(32,32,27,.08);
   padding:8px 0;font-size:13.5px;color:#20201b;cursor:pointer}
-.mar-root .mar-card li em{font-style:normal;color:#5e7633;margin-right:6px}
+.mar-root .mar-card li em{font-style:normal;color:#9cb874;margin-right:6px}
 .mar-root .mar-x{position:absolute;right:10px;top:8px;background:none;border:0;font-size:22px;color:rgba(32,32,27,.5);cursor:pointer}
 @media (max-width:620px){.mar-root .mar-card{width:calc(100% - 84px)}}

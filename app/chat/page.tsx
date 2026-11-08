@@ -46,7 +46,7 @@ import { JoinCodeDialog, ShareDialog } from '@/components/share/ShareDialog';
 import { SharedThread } from '@/components/share/SharedThread';
 import { RewardsPopups } from '@/components/rewards/RewardsPopups';
 import { useConversationStyle } from '@/components/useConversationStyle';
-import { Logo } from '@/components/Logo';
+import { Logo } from '@/components/ds';
 import { usePlan } from '@/components/usePlan';
 import { takeCarried } from '@/lib/onboarding-script';
 import { isSource } from '@/lib/checkout-attribution';
@@ -448,7 +448,7 @@ export default function ChatPage() {
           <button type="button" className="chat-aside-back" onClick={backToLogos}>
             <span aria-hidden="true">←</span> Logos
           </button>
-          <Logo size="sm" />
+          <Logo size="sm" markSrc="/socria-mark.png" href="/" />
         </header>
         {error && (
           <p className="chat-aside-error" role="alert">

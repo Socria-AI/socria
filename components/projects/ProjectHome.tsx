@@ -260,7 +260,7 @@ export function ProjectHome({
 
   if (err) {
     return (
-      <div className="ph-root">
+      <div className="ph-root lg-tokens">
         <div className="ph-wrap">
           <p className="ph-fault" role="alert">{err}</p>
         </div>
@@ -269,7 +269,7 @@ export function ProjectHome({
   }
   if (!data) {
     return (
-      <div className="ph-root" aria-busy="true">
+      <div className="ph-root lg-tokens" aria-busy="true">
         <div className="ph-wrap">
           <div className="ph-skel">
             <i className="a" /><i className="b" /><i className="c" /><i className="d" />
@@ -301,7 +301,7 @@ export function ProjectHome({
   };
 
   return (
-    <div className="ph-root">
+    <div className="ph-root lg-tokens">
       <div className="ph-wrap">
         {/* ── the header ── */}
         <header className="ph-head">

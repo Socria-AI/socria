@@ -4,7 +4,7 @@
 // The Artifacts view of a study: your files on the left, each holding its
 // topics (on your map, or not yet; where to start; what is new); what was made
 // from them in the middle, as cards, for the topic chosen or for all of them;
-// the conversation docks on the right with Split View. Choosing a topic on
+// the conversation docks on the right, beside the desk. Choosing a topic on
 // the left decides the middle, and "Show all" takes it back; the files fold
 // away for room and come back from the middle's head. The card the
 // conversation last pointed at is lit and brought into view. What is heavy

@@ -1,6 +1,6 @@
 'use client';
 
-// components/write/Toolbar.tsx — the Writing Space's one row: the formatting
+// components/write/Toolbar.tsx — Write's one row: the formatting
 // tools on the left, the document's own actions (Socria, Export, ⋯) on the right.
 //
 // The tools are in the order a word processor has them — undo, the

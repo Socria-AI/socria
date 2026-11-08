@@ -82,7 +82,7 @@ export const TOPICS: FaqTopic[] = [
         q: 'What do I get without paying?',
         a: [
           `A free account has ${freePlanSentence()}, by the calendar month (UTC). A conversation is counted when it is <em>started</em>, so going back to one you have already begun never costs another. A Logic Map is counted once for its conversation however often it is redrawn, and an artifact or a document once however often it comes back.`,
-          'Every lens, every depth and Draft Space are the same on both plans. Socria Voice and sharing your own conversations are part of Socria One; joining a conversation somebody shares with you is free.',
+          'Every lens, every depth and Write are the same on both plans. Socria Voice and sharing your own conversations are part of Socria One; joining a conversation somebody shares with you is free.',
           'Reach a limit and nothing is taken away: everything you started stays open, every map keeps what it has, and the month’s allowance comes back on the first.',
         ],
       },

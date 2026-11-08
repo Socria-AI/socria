@@ -53,7 +53,7 @@
 .logos-root .lp-head-k { padding: 0; border: 0; background: none; font: inherit; color: inherit; cursor: pointer; text-align: left; }
 .logos-root .lp-head-k:hover .l5-label { color: var(--c-moss); }
 .logos-root .lp-head-k:disabled { cursor: default; }
-.logos-root .lp-head-k:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 3px; }
+.logos-root .lp-head-k:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
 .logos-root .lp-meta { font-size: 12.5px; color: var(--c-ink-60); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .logos-root .lp-empty { margin: 0; max-width: 34ch; font-size: 12.5px; line-height: 1.55; color: var(--c-ink-60); }
 
@@ -79,7 +79,7 @@
 }
 .logos-root .lp-node:hover { border-color: rgba(var(--c-moss-rgb), 0.45); }
 .logos-root .lp-node:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
-.logos-root .lp-node-k { font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .lp-node-k { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .lp-node-t { font-size: 13.5px; line-height: 1.38; overflow-wrap: anywhere; }
 .logos-root .lp-node.is-question .lp-node-t { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 17px; line-height: 1.25; }
 /* lit: from the turn being read */
@@ -135,10 +135,6 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 /* the actions: words, Copy and Retry as meta, the way to what the turn made first */
 .logos-root .lp .l5-turn.is-open .l5-acts { display: flex; align-items: center; gap: 20px; min-height: 32px; margin: 10px 0 0; padding: 0; opacity: 1; }
 .logos-root .lp .l5-turn.is-open .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
-.logos-root .lp .l5-turn.is-open .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-45); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; transition: color 0.2s; }
-.logos-root .lp .l5-turn.is-open .l5-act:hover { background: none; color: var(--c-ink); }
-.logos-root .lp .l5-turn.is-open .l5-act svg { display: none; }
-.logos-root .lp .l5-turn.is-open .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
 .logos-root .lp .l5-turn.is-open .l5-acts > .l5-link.is-go { margin-right: auto; }
 
 /* ── BROUGHT AND MADE ───────────────────────────────────────────────── */
@@ -169,7 +165,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .lp-strip { display: flex; align-items: flex-start; justify-content: center; width: 100%; height: 100%; padding: 0; border: 0; background: none; cursor: pointer; }
 .logos-root .lp-strip .l5-label { writing-mode: vertical-rl; transform: rotate(180deg); white-space: nowrap; transition: color 0.2s; }
 .logos-root .lp-strip:hover .l5-label { color: var(--c-moss); }
-.logos-root .lp-strip:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -4px; }
+.logos-root .lp-strip:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -2px; }
 .logos-root .lp-strip.is-empty { cursor: default; }
 .logos-root .lp-strip.is-empty .l5-label { color: var(--c-ink-25); }
 

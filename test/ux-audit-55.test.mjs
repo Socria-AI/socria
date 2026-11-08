@@ -52,9 +52,19 @@ ok('the Logic Map is never "the Thinking Map" to the person: the asking-about so
 ok('the canvas filters say Artifacts and Conversations', /\{ id: 'made', label: 'Artifacts' \},\n  \{ id: 'chats', label: 'Conversations' \}/.test(read('components/logos5/L5Canvas.tsx')));
 
 console.log('\n=== one system ===');
-ok('no blur behind the Socria One sheet (every sheet over Logos 5 dims the page; none blurs it)', !/backdrop-filter:\s*blur/.test(read('components/one/one-sheet.css')));
+{
+  // A dialog over the app dims the page with the one token and blurs nothing (the One sheets, Account, the guide,
+  // Sleep, Share, a Project, Rewards); the tour's spotlight and the picture page's bar blur nothing either.
+  const sheets = ['components/one/one-sheet.css', 'app/account-sheet.css', 'components/socria-guide.css', 'components/logos5/sleep.css', 'components/share/share.css', 'components/projects/project-sheet.css', 'components/rewards/rewards-pop.css'];
+  const blurred = [...sheets, 'app/tour.css', 'app/account/picture/picture.css'].filter((f) => /backdrop-filter:\s*blur/.test(read(f)));
+  ok('no blur behind any sheet (every sheet over the app dims the page; none blurs it)', blurred.length === 0, blurred.join(', '));
+  const undimmed = sheets.filter((f) => !/background: ?var\(--lg-dim/.test(read(f)));
+  ok('  and each dims it with the one token, --lg-dim', undimmed.length === 0, undimmed.join(', '));
+}
 ok('the secondary inks are readable: 0.66 (4.9:1, as the older sheets\' --lg-ink-60) and 0.55 (3.5:1, was 2.7:1)', /--c-ink-60: rgba\(var\(--c-ink-rgb\), 0\.66\);/.test(controls) && /--c-ink-45: rgba\(var\(--c-ink-rgb\), 0\.55\);/.test(controls));
-ok('  Socria\'s reply actions (Copy, Reply, Retry, Listen) in the readable ink', /\.l5-act \{[^}]*color: var\(--c-ink-60\);/.test(space));
+// one definition (l5.css) in the meta word's look — the readable quiet ink, 0.55 — not one per surface (it was
+// drawn five times, ink 45 on the page and ink 60 in the space)
+ok('  Socria\'s reply actions (Copy, Reply, Retry, Listen) in the readable ink', /\.logos-root \.l5-act \{[^}]*color: var\(--c-ink-45\);[^}]*font-size: 12\.5px;/.test(read('components/logos5/l5.css')) && ![space, read('components/logos5/page.css'), read('components/logos5/l5v.css')].some((s) => /\.l5-act \{/.test(s)));
 ok('More is a word the size, weight and ink of Search and List beside it, in both headers', /:is\(\.l5-head-end, \.l5v-top-r\) > \.l5-menuhost > \.l5-link \{ font-size: 13\.5px; font-weight: 500; color: var\(--c-ink-70\);/.test(r2));
 ok('the guest\'s count is words ("3 free messages left"), not five dots that said it again', !/l5-guestmeter-dots/.test(app) && /free \{GUEST_TURNS - guestUsed === 1 \? 'message' : 'messages'\} left/.test(app) && /\.l5-guestmeter \{ height: auto; padding: 0; border: 0; background: none;/.test(r2));
 ok('the guest note is a line, not a toast: no badge, and its action is the page\'s one filled control (ink, moss on hover)', /\.l5-guestnudge-spark \{ display: none; \}/.test(r2) && /:is\(\.l5-guestnudge-go, \.l5-guestwall-go\) \{ background: var\(--c-ink\); color: var\(--c-paper\);/.test(r2));

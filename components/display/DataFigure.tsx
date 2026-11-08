@@ -34,7 +34,10 @@ import { PlotFrame, type Tick } from './PlotFrame';
 import './data.css';
 
 type D = Display<DataState>;
-const SERIES = ['is-s0', 'is-s1', 'is-s2', 'is-s3'];
+/** The one series palette (data.css, shared with a reply's charts): a lone series is the primary
+ *  (is-s0); several are is-s1…is-s6 by the series' own index — its column, or a pie slice's row —
+ *  so a chart keeps its colours when it is opened here, and a series keeps its colour when sorted. */
+const seriesClass = (i: number, many: boolean): string => (many ? `is-s${(i % 6) + 1}` : 'is-s0');
 const BASIS: Record<DataState['basis'], { said: string; cls: string }> = {
   given: { said: 'Your numbers', cls: 'is-given' },
   source: { said: 'From your file', cls: 'is-source' },
@@ -161,7 +164,7 @@ function Chart({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
             L.bars.map((r) => (
               <rect
                 key={`${r.row}:${r.series}`}
-                className={`dsp-data-bar ${SERIES[r.series % 4]}${isSel(r.row, r.col) ? ' is-sel' : ''}${r.value < 0 ? ' is-neg' : ''}`}
+                className={`dsp-data-bar ${seriesClass(r.series, L.series.length > 1)}${isSel(r.row, r.col) ? ' is-sel' : ''}${r.value < 0 ? ' is-neg' : ''}`}
                 x={pl.px(r.x0)}
                 width={Math.max(1, pl.px(r.x1) - pl.px(r.x0))}
                 y={pl.py(r.y1)}
@@ -199,7 +202,7 @@ function Chart({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
               }
               const base = pl.py(zero ?? 0);
               return (
-                <g key={sr.col} className={`dsp-data-series-g ${SERIES[si % 4]}`}>
+                <g key={sr.col} className={`dsp-data-series-g ${seriesClass(si, L.series.length > 1)}`}>
                   {s.view !== 'scatter' &&
                     runs.map((run, k) =>
                       run.length ? (
@@ -244,7 +247,7 @@ function Chart({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
     return (
       <div className="dsp-data-pie">
         <svg viewBox="0 0 260 260" role="img" aria-label={`Pie chart: ${L.slices.map((x) => `${x.label} ${Math.round(x.share * 100)}%`).join(', ')}`}>
-          {L.slices.map((sl, i) => {
+          {L.slices.map((sl) => {
             const [x0, y0] = pt(sl.a0);
             const [x1, y1] = pt(sl.a1);
             const big = sl.a1 - sl.a0 > 0.5 ? 1 : 0;
@@ -253,7 +256,7 @@ function Chart({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
             return (
               <g
                 key={sl.row}
-                className={`dsp-data-slice ${SERIES[i % 4]}${isSel(sl.row, L.col) ? ' is-sel' : ''}`}
+                className={`dsp-data-slice ${seriesClass(sl.row, true)}${isSel(sl.row, L.col) ? ' is-sel' : ''}`}
                 onClick={() => pick(sl.row, L.col)}
                 tabIndex={0}
                 role="button"
@@ -273,9 +276,9 @@ function Chart({ s, d, sel, select }: { s: DataState; d: D; sel: string | null; 
           })}
         </svg>
         <ul className="dsp-data-key">
-          {L.slices.map((sl, i) => (
+          {L.slices.map((sl) => (
             <li key={sl.row}>
-              <span className={`dsp-data-sw ${SERIES[i % 4]}`} />
+              <span className={`dsp-data-sw ${seriesClass(sl.row, true)}`} />
               {sl.label} <em>{fmtNum(sl.value)}</em>
             </li>
           ))}
@@ -347,7 +350,7 @@ function Legend({ names }: { names: string[] }) {
     <ul className="dsp-data-key is-row">
       {names.map((n, i) => (
         <li key={n}>
-          <span className={`dsp-data-sw ${SERIES[i % 4]}`} />
+          <span className={`dsp-data-sw ${seriesClass(i, true)}`} />
           {n}
         </li>
       ))}

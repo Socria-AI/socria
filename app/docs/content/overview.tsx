@@ -44,10 +44,10 @@ export function Overview() {
         Socria is one model, <Link href="/docs/logos-5">Logos 5</Link>, at{' '}
         <code>socria.app/chat</code>. You arrive on the Universal Map — every
         conversation you have had, on one map — and a conversation opens on
-        Chat, with three more views beside it for when there is something to
-        show: Content for your files, Artifacts for what is made, and the
-        Logic Map, the <Link href="/docs/thinking-map">Thinking Map</Link> of
-        the conversation, which looks like this:
+        the Conversation view, with three more beside it for when there is
+        something to show: Files for what you bring, Artifacts for what is
+        made, and the <Link href="/docs/thinking-map">Logic Map</Link> of the
+        conversation, which looks like this:
       </p>
       <DemoSplit />
       <p>

@@ -885,9 +885,10 @@ function Seg<T extends string>({ label, value, options, said, onPick }: { label:
   return (
     <div className="l5h-vm-row">
       <span className="l5h-vm-l">{label}</span>
-      <div className="l5h-seg" role="radiogroup" aria-label={label}>
+      {/* a choice of one inside a panel: the controls standard's segment, the chosen one underlined (l5-controls.css) */}
+      <div className="l5-seg" role="radiogroup" aria-label={label}>
         {options.map((o) => (
-          <button key={o} type="button" role="radio" aria-checked={value === o} className={value === o ? 'is-on' : ''} onClick={() => onPick(o)}>
+          <button key={o} type="button" role="radio" aria-checked={value === o} className={`l5-seg-b${value === o ? ' is-on' : ''}`} onClick={() => onPick(o)}>
             {said[o]}
           </button>
         ))}
@@ -1021,7 +1022,7 @@ export function ViewMenu({
           }}
         >
           <input value={name} maxLength={40} placeholder="Name this view to keep it" aria-label="Name this view" onChange={(e) => setName(e.target.value)} style={{ fontSize: 16 }} />
-          <button type="submit" className="l5h-btn" disabled={!name.trim()}>
+          <button type="submit" className="l5-btn is-primary is-sm" disabled={!name.trim()}>
             Save
           </button>
         </form>
@@ -1069,8 +1070,9 @@ export function HiddenTray({ tiles, onShow, onShowAll, onClose }: { tiles: Tile[
     <div className="l5h-tray" role="dialog" aria-label="Hidden from the map">
       <div className="l5h-pv-head">
         <span className="l5h-tile-k">Hidden from the map · {tiles.length}</span>
-        <button type="button" className="l5h-x" aria-label="Close" onClick={onClose}>
-          ×
+        {/* the one close, as the card beside a conversation has it */}
+        <button type="button" className="l5-icon is-sm l5h-pv-x" aria-label="Close" onClick={onClose}>
+          <ActIcon name="close" />
         </button>
       </div>
       <p className="l5h-tray-p">Still here, and still found by search — only not drawn.</p>
@@ -1130,7 +1132,7 @@ export function ActionBar({
           }}
         >
           <input autoFocus value={naming} maxLength={80} placeholder="Name the Project" aria-label="Name the new Project" onChange={(e) => setNaming(e.target.value)} style={{ fontSize: 16 }} />
-          <button type="submit" className="l5h-go" disabled={!naming.trim()}>
+          <button type="submit" className="l5-btn is-primary is-sm" disabled={!naming.trim()}>
             Make it
           </button>
           <button type="button" className="l5h-btn" onClick={() => setNaming(null)}>
@@ -1140,7 +1142,7 @@ export function ActionBar({
       ) : (
         <>
           {onNewProject && (
-            <button type="button" className="l5h-go" onClick={() => setNaming('')}>
+            <button type="button" className="l5-btn is-primary is-sm" onClick={() => setNaming('')}>
               New Project from these
             </button>
           )}
@@ -1174,8 +1176,8 @@ export function ActionBar({
               Back in order
             </button>
           )}
-          <button type="button" className="l5h-x" aria-label="Choose none" onClick={onClear}>
-            ×
+          <button type="button" className="l5-icon is-sm" aria-label="Choose none" title="Choose none" onClick={onClear}>
+            <ActIcon name="close" />
           </button>
         </>
       )}

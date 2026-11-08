@@ -246,7 +246,7 @@ Rules: one outline line per paragraph you were given, in order (headings get rol
   return `${head}
 ${RULES}
 
-Their Draft Space — cards they wrote, sorted into piles that will become paragraphs:
+Their notes — cards they wrote, sorted into piles that will become paragraphs:
 """
 ${(i.cards ?? []).map((c) => `[${c.id}] (${c.kind}, pile: ${c.pile}) ${c.text}${c.links.length ? ` — linked to ${c.links.join('; ')}` : ''}`).join('\n')}
 """

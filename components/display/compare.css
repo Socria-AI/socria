@@ -4,7 +4,7 @@
 .dsp-cmp { width: 100%; border-collapse: separate; border-spacing: 0; font-size: 13px; }
 .dsp-cmp th, .dsp-cmp td { padding: 6px 8px; border-bottom: 1px solid var(--dsp-line); vertical-align: middle; }
 .dsp-cmp thead th { border-bottom: 1px solid var(--dsp-24); }
-.dsp-cmp-corner, .dsp-cmp-wcol { font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); text-align: left; }
+.dsp-cmp-corner, .dsp-cmp-wcol { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); text-align: left; }
 .dsp-cmp-wcol { width: 150px; }
 .dsp-cmp-opt { position: relative; text-align: center; font-family: var(--serif, Georgia, serif); font-size: 15px; font-weight: 400; min-width: 96px; }
 .dsp-cmp-opt .dsp-edit { text-align: center; font-family: inherit; font-size: inherit; border-bottom-color: transparent; width: 100%; }
@@ -31,9 +31,9 @@
 .dsp-cmp-more { padding: 0 3px; border: 0; background: none; cursor: pointer; color: var(--dsp-24); font-size: 13px; }
 .dsp-cmp-more:hover, .dsp-cmp-more[aria-pressed='true'] { color: var(--dsp-primary); }
 .dsp-cmp-note { display: block; font-size: 10.5px; color: var(--dsp-60); line-height: 1.3; }
-.dsp-cmp-range { display: block; font-size: 10px; color: var(--dsp-40); font-variant-numeric: tabular-nums; }
+.dsp-cmp-range { display: block; font-size: 10.5px; color: var(--dsp-40); font-variant-numeric: tabular-nums; }
 .dsp-cmp tfoot td, .dsp-cmp tfoot th { border-bottom: 0; border-top: 1px solid var(--dsp-24); padding-top: 8px; }
-.dsp-cmp-totlabel { text-align: left; font-size: 10px; font-weight: 600; letter-spacing: 0.12em; text-transform: uppercase; color: var(--dsp-40); }
+.dsp-cmp-totlabel { text-align: left; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45, var(--dsp-40)); }
 .dsp-cmp-totlabel span { text-transform: none; letter-spacing: 0; font-weight: 400; }
 .dsp-cmp-total { text-align: center; }
 .dsp-cmp-total strong { display: block; font-family: var(--serif, Georgia, serif); font-size: 22px; font-weight: 400; font-variant-numeric: tabular-nums; }

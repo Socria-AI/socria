@@ -6,65 +6,37 @@
  * would put paper between the scrim and the app, which defeats the entire
  * point of a scrim — you are meant to see the thing you are still in.
  *
- * The class names here (.sec, .field, .act, .plan, .person) are words this
- * product uses elsewhere, so the scope is doing real work.
+ * The class names here (.sec, .act, .plan, .sub) are words this product uses
+ * elsewhere, so the scope is doing real work.
+ *
+ * It is the app's one dialog: the page dimmed (--lg-dim — never blurred, never
+ * tinted), a 16px panel with the floating shadow (--l5-shadow-up), the name in
+ * the serif at 32, the bare × at the top right (L5Close), one short rise in.
+ * The sheet mounts inside .logos-root, so those tokens are always there.
  */
-.acct-sheet .rule{border:none;border-top:1px solid var(--ink-12);margin:0}
-.acct-sheet .field{display:flex;flex-direction:column;gap:7px}
-.acct-sheet .field label{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:.66rem;font-weight:600;letter-spacing:var(--tracking-label);
-  text-transform:uppercase;color:var(--ink-70)}
-.acct-sheet .field input{width:100%;background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:16px;
-  padding:13px 16px;font-size:1rem;outline:none;transition:border-color .2s,box-shadow .2s}
-.acct-sheet .field input::placeholder{color:var(--ink-70)}
-.acct-sheet .field input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .13)}
-.acct-sheet .stack{display:flex;flex-direction:column;gap:12px}
-.acct-sheet .row-split{display:flex;align-items:center;gap:14px}
-.acct-sheet .row-split .rule{flex:1}
-.acct-sheet .row-split span{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.95rem;color:var(--ink-70)}
-.acct-sheet .provider{display:flex;align-items:center;justify-content:center;gap:.7em;width:100%;height:52px;
-  border:1px solid var(--ink);border-radius:999px;font-size:.98rem;font-weight:500;
-  transition:background .2s,color .2s,transform .2s}
-.acct-sheet .provider:hover{transform:translateY(-2px);background:var(--ink);color:var(--app-paper)}
-.acct-sheet .provider svg{width:17px;height:17px;flex:0 0 auto}
-.acct-sheet .provider:hover svg circle, .acct-sheet .provider:hover svg path{stroke:currentColor}
 .acct-sheet .vow{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.98rem;color:var(--ink-70);line-height:1.4;max-width:38ch}
 .acct-sheet .avatar{width:26px;height:26px;border-radius:50%;background:var(--moss-600);color:var(--paper);
   display:grid;place-items:center;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.92rem;flex:0 0 auto}
-.acct-sheet .avatar.lg{width:52px;height:52px;font-size:1.5rem}
-.acct-sheet .scrim{position:fixed;inset:0;z-index:60;background:rgba(15,36,48,.55);backdrop-filter:blur(3px);
+.acct-sheet .scrim{position:fixed;inset:0;z-index:60;background:var(--lg-dim, rgba(var(--shadow-rgb, 32, 32, 27), .32));
   display:grid;place-items:center;padding:clamp(16px,4vh,48px) clamp(16px,4vw,40px);overflow:auto}
-.acct-sheet .scrim[hidden]{display:none}
-.acct-sheet .sheet{width:min(560px,100%);background:var(--app-paper);border:1px solid var(--app-border);border-radius:18px;
-  box-shadow:0 40px 90px -50px rgba(var(--ink-rgb, 31, 31, 31), .55);overflow:hidden;max-height:100%;
+.acct-sheet .sheet{width:min(560px,100%);background:var(--app-paper);border:1px solid var(--app-border);border-radius:var(--lg-r-dialog, 16px);
+  box-shadow:var(--l5-shadow-up);overflow:hidden;max-height:100%;
   display:flex;flex-direction:column}
-.acct-sheet .scrim:not([hidden]) .sheet{animation:sheet-in .5s var(--ease-out-expo)}
-.acct-sheet .sheet .head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;
-  padding:16px clamp(20px,3vw,30px) 13px;border-bottom:1px solid var(--ink-12)}
 /* The register's own element resets (`.app-root h1,h2,h3{font-family:serif;
    font-weight:400}`) did not come across when this sheet was re-scoped, so
-   the heading fell back to the browser's bold sans and the head's micro-label
-   to plain body text. Both are stated here rather than inherited. */
+   the heading fell back to the browser's bold sans. It is stated here rather
+   than inherited. */
 .acct-sheet h2{font-family:var(--serif);font-weight:400;letter-spacing:-.02em;line-height:1.06;margin:0}
-.acct-sheet .sheet .head h2{font-size:1.45rem;margin-top:5px}
-.acct-sheet .sheet .x{width:34px;height:34px;border-radius:50%;border:1px solid var(--app-border);display:grid;place-items:center;
-  font-size:1.05rem;color:var(--ink-70);flex:0 0 auto;transition:border-color .2s,color .2s}
-.acct-sheet .sheet .x:hover{border-color:var(--ink);color:var(--ink)}
 .acct-sheet .sheet .scroll{overflow:auto;padding:0 clamp(20px,3vw,30px)}
 .acct-sheet .sec{padding:20px 0;border-bottom:1px solid var(--ink-12)}
 .acct-sheet .sec:last-child{border-bottom:none}
-.acct-sheet .head .lbl,
-.acct-sheet .sec > .lbl{display:block;font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:.66rem;font-weight:600;
-  letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-70);margin-bottom:14px}
-.acct-sheet .person{display:flex;align-items:center;gap:14px}
-.acct-sheet .person .nm{font-family:var(--font-serif, Georgia, serif);font-size:1.3rem;line-height:1.1}
-.acct-sheet .person .em2{font-size:.9rem;color:var(--ink-70)}
-.acct-sheet .person .since{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.88rem;color:var(--ink-70);margin-top:2px}
+.acct-sheet .sec > .lbl{display:block;font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:10.5px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:rgba(var(--ink-rgb, 31, 31, 31), .55);margin-bottom:14px}
 .acct-sheet .plan{display:flex;align-items:center;justify-content:space-between;gap:18px;flex-wrap:wrap}
 .acct-sheet .plan .tier{display:flex;align-items:center;gap:12px}
 .acct-sheet .plan .tier .t{font-family:var(--font-serif, Georgia, serif);font-size:1.3rem}
 .acct-sheet .plan .tier .t .em{font-style:italic;color:var(--prussian)}
 .acct-sheet .plan .note{font-size:.9rem;color:var(--ink-70);max-width:30ch;margin-top:4px}
-.acct-sheet .opt-note{margin-top:12px;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.94rem;color:var(--ink-70)}
 .acct-sheet .acts{display:flex;flex-direction:column;gap:0}
 .acct-sheet .act{display:flex;align-items:baseline;justify-content:space-between;gap:16px;padding:13px 0;
   border-bottom:1px solid var(--ink-12);text-align:left;width:100%;transition:padding-left .25s var(--ease-out-expo)}
@@ -73,45 +45,17 @@
 .acct-sheet .act .t{font-size:1rem}
 .acct-sheet .act .d{font-size:.85rem;color:var(--ink-70);text-align:right;max-width:24ch}
 .acct-sheet .act:hover .t{color:var(--moss-700)}
-.acct-sheet .act.danger:hover .t{color:var(--machine)}
 .acct-sheet .sheet .footbar{display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap;
   padding:11px clamp(20px,3vw,30px) 12px;border-top:1px solid var(--ink-12);background:rgba(244,241,232,.6)}
 .acct-sheet .sheet .footbar .vow{flex:1;min-width:0;max-width:40ch;font-size:.86rem;line-height:1.35}
-.acct-sheet .sheet .footbar .prev{display:block;margin-top:3px;font-size:.82rem;color:var(--ink-45)}
-.acct-sheet .sheet .footbar .prev button{font:inherit;font-style:italic;color:var(--moss-700);
-  border-bottom:1px solid var(--moss);padding-bottom:1px}
-.acct-sheet .act.src{cursor:default}
-.acct-sheet .act.src .t{display:inline-flex;align-items:center;gap:.5em}
-.acct-sheet .act.src.is-locked:hover{padding-left:0}
-.acct-sheet .act.src.is-locked .t{color:var(--ink-70)}
-.acct-sheet .act.src.is-locked svg{color:var(--prussian);opacity:1}
-.acct-sheet .act.src.is-locked .d{color:var(--prussian);font-style:italic;font-family:var(--font-serif, Georgia, serif)}
-.acct-sheet .link-act{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:.95rem;color:var(--moss-700)}
-.acct-sheet .link-act .d2{font-size:.82rem;color:var(--ink-70)}
-.acct-sheet .sheet .field input{border-radius:16px}
-.acct-sheet .sheet .footbar .prev{display:block;margin-top:5px;color:var(--ink-70)}
-.acct-sheet .sheet .footbar .prev button{font-family:var(--font-serif, Georgia, serif);font-style:italic;color:var(--moss-700);border-bottom:1px solid var(--moss-700);padding-bottom:1px}
-.acct-sheet .sheet .footbar .prev button:hover{color:var(--moss)}
-.acct-sheet .s-vow{margin:8px 0 0;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:10.5px;
-  color:var(--ink-45);line-height:1.4}
-.acct-sheet .gate{margin:22px 0 4px;padding:20px 22px;border:1px solid var(--ink-12);background:var(--surface, #fff);
-  box-shadow:0 30px 70px -50px rgba(var(--lg-ink-rgb, 35, 36, 31), .4)}
-.acct-sheet .gate .l{margin:0;font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:9.5px;font-weight:600;
-  letter-spacing:.24em;text-transform:uppercase;color:var(--ink-45)}
-.acct-sheet .gate .h{margin:9px 0 0;font-family:var(--font-serif, Georgia, serif);font-size:clamp(1.3rem,2.2vw,1.7rem);
-  line-height:1.15;color:var(--ink)}
-.acct-sheet .gate .b{margin:11px 0 0;font-size:14px;line-height:1.6;color:var(--ink-70);max-width:46ch}
-.acct-sheet .gate .b em{font-style:italic;color:var(--moss-700)}
-.acct-sheet .gate .acts{margin-top:17px;display:flex;align-items:center;gap:20px;flex-wrap:wrap}
-.acct-sheet .gate .acts .q{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:13.5px;color:var(--ink-45);
-  border-bottom:1px solid var(--ink-25);padding-bottom:1px;transition:color .2s,border-color .2s}
-.acct-sheet .gate .acts .q:hover{color:var(--ink);border-color:var(--ink)}
-.acct-sheet .gate .f{margin:15px 0 0;padding-top:13px;border-top:1px solid var(--ink-12);
-  font-size:12.5px;line-height:1.5;color:var(--ink-45)}
-.acct-sheet .gate .f em{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:13.5px;color:var(--ink-70)}
+/* a word that goes somewhere: moss, ink when reached for */
+.acct-sheet .link-act{display:flex;flex-direction:column;align-items:flex-end;gap:2px;font-size:13.5px;font-weight:500;color:var(--moss-700);transition:color .2s}
+.acct-sheet .link-act:hover{color:var(--ink)}
 .acct-sheet .sheet .pfp-link{display:inline-block;margin-top:7px;font-size:12.5px;color:var(--moss-700);
   text-decoration:none;border-bottom:1px solid var(--ink-16);padding-bottom:1px}
 .acct-sheet .sheet .pfp-link:hover{border-color:var(--moss-700)}
+/* the controls standard's focus: a 2px moss ring, 2px out */
+.acct-sheet :is(.act, .link-act, .pfp-link, .theme, .rp-o, .persona-save, .persona-clear, .access-form button, .rp-name button):focus-visible{outline:2px solid var(--moss);outline-offset:2px}
 
 /* ── theme: four swatches, the One two marked and offered rather than hidden ── */
 .acct-sheet .themes{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:10px}
@@ -129,31 +73,29 @@
 .acct-sheet .theme-line.is-short{top:25px;width:38%}
 .acct-sheet .theme-dot{position:absolute;right:10px;bottom:10px;width:12px;height:12px;border-radius:50%}
 .acct-sheet .theme-name{display:flex;align-items:center;gap:6px;font-size:.84rem;color:var(--ink);line-height:1.2}
-.acct-sheet .theme-one{font-size:.58rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+.acct-sheet .theme-one{font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
   padding:1px 6px;border-radius:999px;background:var(--one-pblue);color:var(--one-cream)}
 .acct-sheet .theme-note{grid-column:1/-1;margin:2px 0 0;font-size:.84rem;color:var(--ink-70)}
 @media (max-width:520px){.acct-sheet .themes{grid-template-columns:repeat(3,minmax(0,1fr))}}
 
-/* ── access code ─────────────────────────────────────────────────────── */
+/* ── access code: a field and its one filled control ─────────────────── */
 .acct-sheet .access{display:flex;flex-direction:column;gap:10px}
 .acct-sheet .access-open{display:flex;align-items:baseline;justify-content:space-between;gap:12px;margin:0;font-size:.92rem;color:var(--ink)}
 .acct-sheet .access-open b{font-weight:600}
 .acct-sheet .access-form{display:flex;gap:8px}
-.acct-sheet .access-form input{flex:1;min-width:0;background:var(--surface, #fff);border:1px solid var(--app-border);border-radius:999px;
-  padding:9px 16px;font:inherit;font-size:.95rem;letter-spacing:.06em;color:var(--ink);outline:none}
-.acct-sheet .access-form input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32),.13)}
-.acct-sheet .access-form button{border:1px solid var(--ink);border-radius:999px;background:none;padding:0 18px;font:inherit;font-size:.9rem;color:var(--ink);cursor:pointer}
-.acct-sheet .access-form button:disabled{opacity:.4;cursor:default}
-.acct-sheet .access-err{margin:0;font-size:.85rem;color:var(--machine)}
+.acct-sheet .access-form input{flex:1;min-width:0;height:40px;box-sizing:border-box;background:transparent;border:1px solid var(--ink-16);border-radius:10px;
+  padding:0 12px;font:inherit;font-size:.95rem;letter-spacing:.06em;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
+.acct-sheet .access-form input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32),.14)}
+.acct-sheet .access-err{margin:0;font-size:.85rem;color:var(--tension)}
 
 /* Testing — never on production. Quieter than the account itself, and
    labelled where it is, so nobody mistakes a test control for a setting. */
-.acct-sheet .sec.tt{border-top:1px dashed var(--line, rgba(31,31,31,.18))}
+.acct-sheet .sec.tt{border-top:1px dashed var(--ink-16)}
 .acct-sheet .tt-where{margin:-4px 0 10px;font-family:var(--font-sans, system-ui, sans-serif);font-size:.72rem;letter-spacing:.02em;color:var(--ink-70)}
-.acct-sheet .tt-sub{margin:14px 0 2px;font-family:var(--font-sans, system-ui, sans-serif);font-size:.62rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-70)}
+.acct-sheet .tt-sub{margin:14px 0 2px;font-family:var(--font-sans, system-ui, sans-serif);font-size:10.5px;font-weight:600;letter-spacing:.14em;text-transform:uppercase;color:var(--ink-70)}
 .acct-sheet .tt .act{width:100%;background:none;border-left:0;border-right:0;border-top:0;text-align:left;cursor:pointer;font:inherit;color:inherit}
 .acct-sheet .tt .act:disabled{opacity:.5;cursor:default}
-.acct-sheet .tt-done{font-size:.8rem;color:var(--moss-700, #3e5a23)}
+.acct-sheet .tt-done{font-size:.8rem;color:var(--moss-700)}
 .acct-sheet .tt-reached{margin:8px 0 0;font-size:.74rem;line-height:1.5;color:var(--ink-70);word-break:break-word}
 .acct-sheet .tt-reached span{font-weight:600}
 .acct-sheet .tt-note{margin:12px 0 0;font-size:.74rem;line-height:1.45;color:var(--ink-70)}
@@ -164,16 +106,26 @@
 .acct-sheet .rp{display:flex;flex-wrap:wrap;gap:6px}
 .acct-sheet .rp-o{display:inline-flex;align-items:center;gap:6px;padding:6px 11px 6px 9px;border:1px solid var(--ink-16);border-radius:999px;
   background:none;cursor:pointer;font:inherit;font-size:.86rem;color:var(--ink)}
-.acct-sheet .rp-o svg{color:var(--moss-700, #3e5a23)}
-.acct-sheet .rp-o:hover{border-color:var(--moss, #354620)}
-.acct-sheet .rp-o.on{border-color:var(--moss, #354620);background:rgba(var(--moss-rgb, 53, 70, 32), .1)}
+.acct-sheet .rp-o svg{color:var(--moss-700)}
+.acct-sheet .rp-o:hover{border-color:var(--moss)}
+.acct-sheet .rp-o.on{border-color:var(--moss);background:rgba(var(--moss-rgb, 53, 70, 32), .1)}
 .acct-sheet .rp-note{flex-basis:100%;margin:6px 0 0;font-size:.76rem;color:var(--ink-70)}
 .acct-sheet .rp-name{display:flex;gap:8px;align-items:center;flex-wrap:wrap}
-.acct-sheet .rp-name input{flex:1;min-width:0;max-width:260px;border:0;border-bottom:1px solid var(--ink-25);background:none;padding:6px 2px;font:inherit;font-size:1rem;color:var(--ink);outline:none}
-.acct-sheet .rp-name input:focus{border-bottom-color:var(--moss, #354620)}
-.acct-sheet .rp-name button{border:1px solid var(--ink-25);background:none;border-radius:999px;padding:4px 12px;cursor:pointer;font:inherit;font-size:.82rem;color:var(--ink)}
-.acct-sheet .rp-name button:disabled{opacity:.4;cursor:default}
-.acct-sheet .rp-bad{font-size:.76rem;color:var(--tension, #9c5b3c)}
+.acct-sheet .rp-name input{flex:1;min-width:0;max-width:260px;height:40px;box-sizing:border-box;border:1px solid var(--ink-16);border-radius:10px;background:transparent;
+  padding:0 12px;font:inherit;font-size:1rem;color:var(--ink);outline:none;transition:border-color .2s,box-shadow .2s}
+.acct-sheet .rp-name input:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32),.14)}
+.acct-sheet .rp-bad{font-size:.76rem;color:var(--tension)}
+
+/* Each part's Save (and the access code's Apply) is its one filled control:
+   ink, moss when reached for; waiting for words, it is a ring, not a fade. */
+.acct-sheet :is(.access-form button, .rp-name button, .persona-save){display:inline-flex;align-items:center;justify-content:center;flex:none;
+  height:40px;padding:0 18px;box-sizing:border-box;border:0;border-radius:999px;background:var(--ink);color:var(--paper);
+  font:inherit;font-size:13.5px;font-weight:500;line-height:1;white-space:nowrap;cursor:pointer;
+  transition:background-color .2s,transform .2s var(--ease-out-expo)}
+.acct-sheet .persona-row .persona-save{height:32px;padding:0 14px}
+.acct-sheet :is(.access-form button, .rp-name button, .persona-save):hover:not(:disabled){background:var(--moss);transform:translateY(-2px)}
+.acct-sheet :is(.access-form button, .rp-name button, .persona-save):disabled{background:transparent;color:rgba(var(--ink-rgb, 31, 31, 31), .55);
+  box-shadow:inset 0 0 0 1px var(--ink-25);cursor:default;transform:none}
 
 /* ── Personalization: one section, three parts ──────────────────────────
    How Socria talks with you (the account's, every device), then what it calls
@@ -190,52 +142,48 @@
 /* Conversation style: four characters, then the same message in each product's voice. */
 .acct-sheet .cs-grid{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
 .acct-sheet .cs-o{display:flex;flex-direction:column;align-items:flex-start;gap:4px;text-align:left;padding:11px 13px 12px;
-  border:1px solid var(--ink-16);border-radius:14px;background:none;font:inherit;color:var(--ink);cursor:pointer;
+  border:1px solid var(--ink-16);border-radius:var(--lg-r-inner, 10px);background:none;font:inherit;color:var(--ink);cursor:pointer;
   transition:border-color .2s,background-color .2s}
-.acct-sheet .cs-o:hover{border-color:var(--moss, #354620)}
-.acct-sheet .cs-o:focus-visible{outline:2px solid var(--moss, #354620);outline-offset:2px}
-.acct-sheet .cs-o.on{border-color:var(--moss, #354620);background:rgba(var(--moss-rgb, 53, 70, 32), .08)}
+.acct-sheet .cs-o:hover{border-color:var(--moss)}
+.acct-sheet .cs-o:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
+.acct-sheet .cs-o.on{border-color:var(--moss);background:rgba(var(--moss-rgb, 53, 70, 32), .08)}
 .acct-sheet .cs-name{display:flex;align-items:center;gap:7px;font-family:var(--font-serif, Georgia, serif);font-size:1rem;line-height:1.15}
-.acct-sheet .cs-o.on .cs-name{color:var(--moss-700, #3e5a23)}
-.acct-sheet .cs-tag{font-family:var(--font-sans, system-ui, sans-serif);font-size:.55rem;font-weight:600;letter-spacing:.14em;text-transform:uppercase;
+.acct-sheet .cs-o.on .cs-name{color:var(--moss-700)}
+.acct-sheet .cs-tag{font-family:var(--font-sans, system-ui, sans-serif);font-size:10.5px;font-weight:600;letter-spacing:.12em;text-transform:uppercase;
   color:var(--ink-70);border:1px solid var(--ink-12);border-radius:999px;padding:1px 6px}
 .acct-sheet .cs-line{font-size:.78rem;line-height:1.4;color:var(--ink-70)}
-.acct-sheet .cs-sample{margin:12px 0 0;padding:12px 14px 11px;border-left:2px solid var(--moss, #354620);
-  background:rgba(var(--moss-rgb, 53, 70, 32), .045);border-radius:0 12px 12px 0}
+.acct-sheet .cs-sample{margin:12px 0 0;padding:12px 14px 11px;border-left:2px solid var(--moss);
+  background:rgba(var(--moss-rgb, 53, 70, 32), .045);border-radius:0 10px 10px 0}
 .acct-sheet .cs-ask,
 .acct-sheet .cs-say{margin:0;display:grid;grid-template-columns:52px minmax(0,1fr);gap:10px;align-items:baseline}
 .acct-sheet .cs-ask{font-size:.82rem;line-height:1.45;color:var(--ink-70);padding-bottom:9px;margin-bottom:9px;border-bottom:1px solid var(--ink-12)}
 .acct-sheet .cs-say + .cs-say{margin-top:8px}
-.acct-sheet .cs-who{font-family:var(--font-sans, system-ui, sans-serif);font-size:.56rem;font-weight:600;letter-spacing:.14em;
+.acct-sheet .cs-who{font-family:var(--font-sans, system-ui, sans-serif);font-size:10.5px;font-weight:600;letter-spacing:.12em;
   text-transform:uppercase;color:var(--ink-70)}
 .acct-sheet .cs-q{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.93rem;line-height:1.45;color:var(--ink)}
 .acct-sheet .cs-cap{margin-top:10px;font-size:.72rem;color:var(--ink-70)}
 .acct-sheet .cs-note{margin:12px 0 0;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.88rem;line-height:1.45;
   color:var(--ink-70);max-width:52ch}
-.acct-sheet .cs-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700, #3e5a23)}
-.acct-sheet .cs-status.is-bad{color:var(--tension, #9c5b3c)}
+.acct-sheet .cs-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700)}
+.acct-sheet .cs-status.is-bad{color:var(--tension)}
 @media (max-width:440px){.acct-sheet .cs-grid{grid-template-columns:1fr}}
 @media (prefers-reduced-motion:reduce){.acct-sheet .cs-o{transition:none}}
 
-/* Sign out beside Done, in the footbar that never scrolls away. */
+/* Sign out in the footbar that never scrolls away; the × at the top closes. */
 .acct-sheet .sheet .footbar .foot-acts{display:flex;align-items:center;gap:18px}
 .acct-sheet .link-act.out{color:var(--ink-70)}
-.acct-sheet .link-act.out:hover{color:var(--machine, #8a3b2b)}
+.acct-sheet .link-act.out:hover{color:var(--tension)}
 
 /* Your own words, in Logos: the standing instructions. */
 .acct-sheet .persona-words{display:flex;flex-direction:column;gap:7px;margin-top:4px}
-.acct-sheet .persona-words-h{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:.66rem;font-weight:600;
-  letter-spacing:var(--tracking-label);text-transform:uppercase;color:var(--ink-70)}
-.acct-sheet .persona-words textarea{width:100%;resize:vertical;min-height:84px;background:var(--surface, #fff);border:1px solid var(--app-border);
-  border-radius:12px;padding:11px 13px;font:inherit;font-size:.92rem;line-height:1.45;color:var(--ink);outline:none;
+.acct-sheet .persona-words-h{font-family:var(--font-sans, system-ui, -apple-system, 'Segoe UI', sans-serif);font-size:10.5px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:rgba(var(--ink-rgb, 31, 31, 31), .55)}
+.acct-sheet .persona-words textarea{width:100%;resize:vertical;min-height:84px;background:transparent;border:1px solid var(--ink-16);
+  border-radius:10px;padding:11px 13px;font:inherit;font-size:.92rem;line-height:1.45;color:var(--ink);outline:none;
   transition:border-color .2s,box-shadow .2s}
 .acct-sheet .persona-words textarea::placeholder{color:var(--ink-45)}
-.acct-sheet .persona-words textarea:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .13)}
+.acct-sheet .persona-words textarea:focus{border-color:var(--moss);box-shadow:0 0 0 3px rgba(var(--moss-rgb, 53, 70, 32), .14)}
 .acct-sheet .persona-row{display:flex;align-items:center;gap:14px;margin-top:9px;flex-wrap:wrap}
-.acct-sheet .persona-save{padding:7px 16px;border-radius:999px;background:var(--moss-700);color:var(--app-paper);font-size:.86rem;font-weight:500;
-  transition:opacity .2s,background .2s}
-.acct-sheet .persona-save:disabled{opacity:.4;cursor:default}
-.acct-sheet .persona-save:not(:disabled):hover{background:var(--moss)}
 .acct-sheet .persona-clear{font-size:.86rem;color:var(--ink-70)}
 .acct-sheet .persona-clear:hover{color:var(--ink)}
 .acct-sheet .persona-note{font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.86rem;color:var(--moss-700)}
@@ -253,21 +201,21 @@
 .acct-sheet .mr-note{font-size:.78rem;line-height:1.4;color:var(--ink-70);max-width:42ch}
 .acct-sheet .mr-switch{position:relative;flex:0 0 auto;width:40px;height:24px;margin-top:1px;border-radius:999px;
   border:1px solid var(--ink-25);background:var(--ink-12);cursor:pointer;transition:background-color .2s,border-color .2s}
-.acct-sheet .mr-switch:focus-visible{outline:2px solid var(--moss, #354620);outline-offset:2px}
+.acct-sheet .mr-switch:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
 .acct-sheet .mr-knob{position:absolute;top:2px;left:2px;width:18px;height:18px;border-radius:50%;background:var(--ink-70);
   transition:transform .2s var(--ease-out-expo),background-color .2s}
-.acct-sheet .mr-switch.on{background:var(--moss-700, #3e5a23);border-color:var(--moss-700, #3e5a23)}
+.acct-sheet .mr-switch.on{background:var(--moss-700);border-color:var(--moss-700)}
 .acct-sheet .mr-switch.on .mr-knob{transform:translateX(16px);background:var(--app-paper)}
 .acct-sheet .mr-switch[aria-disabled="true"]{opacity:.5;cursor:default}
 .acct-sheet .mr-locked{display:block;margin:8px 0 0}
-.acct-sheet .mr-list-h{margin:14px 0 6px;font-family:var(--font-sans, system-ui, sans-serif);font-size:.62rem;font-weight:600;
+.acct-sheet .mr-list-h{margin:14px 0 6px;font-family:var(--font-sans, system-ui, sans-serif);font-size:10.5px;font-weight:600;
   letter-spacing:.14em;text-transform:uppercase;color:var(--ink-70)}
 .acct-sheet .mr-list{list-style:none;margin:0;padding:0}
 .acct-sheet .mr-item{display:flex;align-items:baseline;justify-content:space-between;gap:14px;padding:6px 0;border-bottom:1px dashed var(--ink-12)}
 .acct-sheet .mr-item:last-child{border-bottom:none}
 .acct-sheet .mr-what{font-size:.86rem;line-height:1.4;color:var(--ink)}
 .acct-sheet .mr-when{flex:0 0 auto;font-size:.74rem;color:var(--ink-70);text-align:right;white-space:nowrap}
-.acct-sheet .mr-still{color:var(--moss-700, #3e5a23)}
+.acct-sheet .mr-still{color:var(--moss-700)}
 .acct-sheet .mr-empty{margin:0;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:.86rem;color:var(--ink-70)}
 .acct-sheet .mr-note.mr-unlisted{display:block;margin:8px 0 0}
 .acct-sheet .mr-reset-row{margin-top:12px}
@@ -277,15 +225,15 @@
 .acct-sheet .mr-confirm{display:flex;align-items:center;gap:12px;flex-wrap:wrap}
 .acct-sheet .mr-confirm-q{flex-basis:100%;font-size:.84rem;line-height:1.45;color:var(--ink)}
 .acct-sheet .mr-confirm-d{flex-basis:100%;margin-top:-6px;font-size:.78rem;line-height:1.45;color:var(--ink-70);max-width:56ch}
-.acct-sheet .mr-reset-yes{padding:5px 14px;border-radius:999px;border:1px solid var(--machine, #8a3b2b);color:var(--machine, #8a3b2b);font-size:.84rem}
-.acct-sheet .mr-reset-yes:hover{background:var(--machine, #8a3b2b);color:var(--app-paper)}
+.acct-sheet .mr-reset-yes{padding:5px 14px;border-radius:999px;border:1px solid var(--tension);color:var(--tension);font-size:.84rem}
+.acct-sheet .mr-reset-yes:hover{background:var(--tension);color:var(--app-paper)}
 .acct-sheet .mr-reset-no{font-size:.84rem;color:var(--ink-70)}
 .acct-sheet .mr-reset-no:hover{color:var(--ink)}
 .acct-sheet .mr-reset:focus-visible,
 .acct-sheet .mr-reset-yes:focus-visible,
-.acct-sheet .mr-reset-no:focus-visible{outline:2px solid var(--moss, #354620);outline-offset:2px}
-.acct-sheet .mr-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700, #3e5a23)}
-.acct-sheet .mr-status.is-bad{color:var(--tension, #9c5b3c)}
+.acct-sheet .mr-reset-no:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
+.acct-sheet .mr-status{min-height:1.25em;margin:6px 0 0;font-size:.78rem;line-height:1.4;color:var(--moss-700)}
+.acct-sheet .mr-status.is-bad{color:var(--tension)}
 @media (max-width:440px){.acct-sheet .mr-item{flex-direction:column;gap:2px}.acct-sheet .mr-when{text-align:left;white-space:normal}}
 @media (prefers-reduced-motion:reduce){.acct-sheet .mr-switch,.acct-sheet .mr-knob{transition:none}}
 
@@ -300,72 +248,67 @@
 .acct-sheet{--pblue:var(--one-pblue, #26485a);--pale:#b8cdd9}
 .acct-sheet .sheet{width:min(580px,100%)}
 
-/* the masthead */
+/* the masthead; its close is L5Close (l5-controls.css), the bare × */
 .acct-sheet .mast{flex:none;padding:14px clamp(20px,3vw,30px) 0}
 .acct-sheet .mast-bar{display:flex;align-items:center;justify-content:space-between;gap:12px;padding-bottom:12px;border-bottom:1px solid var(--ink)}
-.acct-sheet .mast-bar .lbl{margin:0;font-family:var(--font-sans, system-ui, sans-serif);font-size:.66rem;font-weight:600;
-  letter-spacing:.18em;text-transform:uppercase;color:var(--ink-45)}
-.acct-sheet .mast .x{width:30px;height:30px}
+.acct-sheet .mast-bar .lbl{margin:0;font-family:var(--font-sans, system-ui, sans-serif);font-size:10.5px;font-weight:600;
+  letter-spacing:.18em;text-transform:uppercase;color:rgba(var(--ink-rgb, 31, 31, 31), .55)}
 .acct-sheet .mast-who{display:flex;align-items:center;gap:18px;padding:20px 0 18px}
 .acct-sheet .mast-av{position:relative;flex:none;border-radius:50%;padding:3px;border:1px solid var(--ink-12)}
 .acct-sheet .mast-av > *{display:block;border-radius:50%}
-/* a member's picture wears the One seal's two rings: the inner one the seal, the outer fainter, the invitation */
-.acct-sheet .mast-av.is-one{border-color:var(--pblue)}
-.acct-sheet .mast-av.is-one::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid rgba(38,72,90,.3)}
+/* a member's picture wears the One seal's two rings: the inner one the seal, the outer fainter, the invitation — in One's themed blue */
+.acct-sheet .mast-av.is-one{border-color:var(--lg-one, var(--pblue))}
+.acct-sheet .mast-av.is-one::after{content:"";position:absolute;inset:-6px;border-radius:50%;border:1px solid var(--lg-one-line, rgba(38,72,90,.3))}
 .acct-sheet .avatar.xl{width:64px;height:64px;font-size:1.9rem;display:grid;place-items:center}
 .acct-sheet .mast-id{min-width:0}
-.acct-sheet .mast .nm{font-family:var(--font-serif, Georgia, serif);font-weight:400;font-size:2.1rem;line-height:1;letter-spacing:-.025em;margin:0;
+/* the sheet's title: the person's name, in the serif at 32 */
+.acct-sheet .mast .nm{font-family:var(--font-serif, Georgia, serif);font-weight:400;font-size:32px;line-height:1;letter-spacing:-.02em;margin:0;
   overflow:hidden;text-overflow:ellipsis;white-space:nowrap;color:var(--ink)}
 .acct-sheet .mast .em2{margin-top:6px;font-size:.9rem;color:var(--ink-70);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .acct-sheet .mast-meta{display:flex;flex-wrap:wrap;align-items:center;margin:9px 0 0;font-family:var(--font-sans, system-ui, sans-serif);
-  font-size:.64rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700)}
+  font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--moss-700)}
 .acct-sheet .mast-meta > span + span::before{content:"·";margin:0 .7em;color:var(--ink-45)}
 .acct-sheet .mast-meta > span:last-child:not(:first-child){color:var(--ink-45)}
-.acct-sheet .mast-one{display:inline-flex;align-items:center;gap:.7em;color:var(--pblue)}
+.acct-sheet .mast-one{display:inline-flex;align-items:center;gap:.7em;color:var(--lg-one, var(--pblue))}
 .acct-sheet .mast .pfp-link{margin-top:10px;font-family:var(--font-serif, Georgia, serif);font-style:italic;font-size:1rem;
   color:var(--moss-700);border-bottom:1px solid var(--moss);transition:color .2s}
-.acct-sheet .mast .pfp-link:hover{color:var(--moss)}
+.acct-sheet .mast .pfp-link:hover{color:var(--ink)}
 
-/* the contents line: where you are in moss; the rule under it fills as you read */
+/* the contents line: where you are underlined in moss; the rule under it fills as you read */
 .acct-sheet .jump{position:relative;display:flex;gap:20px;overflow-x:auto;scrollbar-width:none;
   margin:0 calc(-1 * clamp(20px,3vw,30px));padding:0 clamp(20px,3vw,30px);border-top:1px solid var(--ink-12)}
 .acct-sheet .jump::-webkit-scrollbar{display:none}
 .acct-sheet .jump::after{content:"";position:absolute;left:0;right:0;bottom:0;height:1px;background:var(--moss);
   transform:scaleX(var(--read, 0));transform-origin:left;transition:transform .2s linear}
 .acct-sheet .jump-b{flex:none;position:relative;padding:13px 0 12px;background:none;border:0;cursor:pointer;
-  font-family:var(--font-sans, system-ui, sans-serif);font-size:.62rem;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
-  color:var(--ink-45);transition:color .2s}
+  font-family:var(--font-sans, system-ui, sans-serif);font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;
+  color:var(--ink-60);transition:color .2s}
 .acct-sheet .jump-b:hover{color:var(--ink)}
-.acct-sheet .jump-b.is-here{color:var(--moss-700)}
+.acct-sheet .jump-b.is-here{color:var(--ink)}
 .acct-sheet .jump-b.is-here::after{content:"";position:absolute;left:0;right:0;bottom:0;height:2px;background:var(--moss)}
 .acct-sheet .jump-b:focus-visible{outline:2px solid var(--moss);outline-offset:-2px}
 
 /* each section opens like a spread: a numeral in moss italic, the name as a micro-label */
 .acct-sheet .sheet .scroll{counter-reset:sec;border-top:1px solid var(--ink-12)}
 .acct-sheet .sec{counter-increment:sec;padding:24px 0 26px;scroll-margin-top:0}
-.acct-sheet .sec > .lbl{display:flex;align-items:baseline;gap:14px;margin-bottom:16px;letter-spacing:.18em;color:var(--ink-45)}
+.acct-sheet .sec > .lbl{display:flex;align-items:baseline;gap:14px;margin-bottom:16px}
 .acct-sheet .sec > .lbl::before{content:counter(sec, upper-roman);font-family:var(--font-serif, Georgia, serif);font-style:italic;
   font-size:1.15rem;font-weight:400;letter-spacing:0;text-transform:none;color:var(--moss-700)}
 
-/* fields sit on the paper behind a hairline; in the app only the composer is white */
-.acct-sheet .sheet .field input,
-.acct-sheet .access-form input,
-.acct-sheet .persona-words textarea{background:transparent;border-color:var(--ink-16)}
-
-/* the membership: the one surface with a colour of its own */
-.acct-sheet .plan{padding:20px 22px;border:1px solid var(--moss-200, #cad5b6);border-radius:18px;background:var(--app-paper)}
+/* the membership: the one surface with a colour of its own, a card inside the sheet */
+.acct-sheet .plan{padding:20px 22px;border:1px solid var(--moss-200, #cad5b6);border-radius:var(--lg-r-inner, 10px);background:var(--app-paper)}
 .acct-sheet .plan .tier .t{font-size:1.6rem;line-height:1.1;letter-spacing:-.015em}
 .acct-sheet .plan .note{max-width:38ch;margin-top:6px}
-.acct-sheet .plan .link-act{flex-direction:row;align-items:center;gap:.45em;height:44px;padding:0 22px;border-radius:999px;
-  background:var(--ink);color:var(--app-paper);font-size:.92rem;font-weight:500;white-space:nowrap;
-  transition:background-color .25s var(--ease-out-expo),transform .25s var(--ease-out-expo)}
-.acct-sheet .plan .link-act:hover{background:var(--moss);transform:translateY(-2px)}
+/* Free: "Upgrade to Socria One" is the button that buys One — .l5-btn is-primary is-one, One's blue.
+   A member: "Manage membership", a cream ring on the Prussian plate. */
+.acct-sheet .plan .link-act{flex-direction:row;align-items:center;gap:.45em;height:40px;padding:0 18px;border:1px solid rgba(240,234,216,.45);border-radius:999px;
+  background:none;color:var(--one-cream, #f0ead8);font-size:13.5px;font-weight:500;white-space:nowrap;
+  transition:background-color .2s,border-color .2s,color .2s,transform .2s var(--ease-out-expo)}
+.acct-sheet .plan .link-act:hover{background:var(--one-cream, #f0ead8);border-color:var(--one-cream, #f0ead8);color:var(--pblue);transform:translateY(-2px)}
 .acct-sheet .plan.is-one{border-color:transparent;background:var(--pblue);color:var(--one-cream, #f0ead8)}
 .acct-sheet .plan.is-one .tier .t{color:var(--one-cream, #f0ead8)}
 .acct-sheet .plan.is-one .tier .t .em{color:var(--pale)}
 .acct-sheet .plan.is-one .note{color:rgba(240,234,216,.72)}
-.acct-sheet .plan.is-one .link-act{background:none;border:1px solid rgba(240,234,216,.45);color:var(--one-cream, #f0ead8)}
-.acct-sheet .plan.is-one .link-act:hover{background:var(--one-cream, #f0ead8);border-color:var(--one-cream, #f0ead8);color:var(--pblue)}
 
 /* rows that go somewhere: the name, what it does under it, and the forward arrow, which slides 3px */
 .acct-sheet .sheet .act{position:relative;flex-direction:column;align-items:flex-start;gap:3px;padding:14px 28px 14px 0;text-align:left}
@@ -374,26 +317,24 @@
 .acct-sheet .act::after{content:"→";position:absolute;right:2px;top:50%;margin-top:-.6em;font-size:1rem;line-height:1.2;color:var(--ink-45);
   transition:transform .25s var(--ease-out-expo),color .2s}
 .acct-sheet .act:hover::after{transform:translateX(3px);color:var(--moss-700)}
-.acct-sheet .act[target="_blank"]::after,
-.acct-sheet .act.src::after{content:none}
-.acct-sheet .act.danger:hover::after{color:var(--machine)}
+.acct-sheet .act[target="_blank"]::after{content:none}
 
-/* in: the masthead, then each section, the way ideas form — fast out of the gate, a long settle */
-@keyframes acct-up{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:none}}
-.acct-sheet .mast-who,
-.acct-sheet .scroll > .sec{animation:acct-up 1s var(--ease-out-expo) both}
-.acct-sheet .scroll > .sec:nth-child(1){animation-delay:.12s}
-.acct-sheet .scroll > .sec:nth-child(2){animation-delay:.24s}
-.acct-sheet .scroll > .sec:nth-child(3){animation-delay:.36s}
-.acct-sheet .scroll > .sec:nth-child(n+4){animation-delay:.48s}
+/* in: the page dims, the sheet rises once — short, like every other sheet */
+@keyframes acct-fade{from{opacity:0}to{opacity:1}}
+@keyframes acct-up{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+.acct-sheet .scrim{animation:acct-fade .18s ease both}
+.acct-sheet .sheet{animation:acct-up .26s var(--ease-out-expo) both}
 
 @media (max-width: 520px){
   .acct-sheet .mast-who{gap:14px;padding:16px 0 14px}
-  .acct-sheet .mast .nm{font-size:1.65rem}
+  .acct-sheet .mast .nm{font-size:24px}
   .acct-sheet .avatar.xl{width:52px;height:52px;font-size:1.55rem}
   .acct-sheet .plan{padding:18px}
 }
 @media (prefers-reduced-motion: reduce){
-  .acct-sheet .mast-who,.acct-sheet .scroll > .sec{animation:none}
-  .acct-sheet .act::after,.acct-sheet .jump::after,.acct-sheet .plan .link-act{transition:none}
+  .acct-sheet .scrim,.acct-sheet .sheet{animation:none}
+  .acct-sheet .act::after,.acct-sheet .jump::after,.acct-sheet .plan .link-act,
+  .acct-sheet :is(.access-form button, .rp-name button, .persona-save){transition:none}
+  .acct-sheet .plan .link-act:hover,
+  .acct-sheet :is(.access-form button, .rp-name button, .persona-save):hover:not(:disabled){transform:none}
 }

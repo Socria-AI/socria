@@ -956,10 +956,10 @@ export function ModelView({
                 const hiT = scaleEnd(img.hi, img.hi - img.lo);
                 const cy = Math.max(10, pad / 2);
                 const xHi = a.W - pad;
-                const barR = xHi - hiT.length * 5.2 - 5;
+                const barR = xHi - hiT.length * 6.4 - 5;
                 const barL = barR - bw;
                 const xLo = barL - 4;
-                const xName = xLo - loT.length * 5.2 - 9;
+                const xName = xLo - loT.length * 6.4 - 9;
                 const stops = (img.diverging ? DIVERGING : VIRIDIS).map((c, i, all) => <stop key={i} offset={`${(100 * i) / (all.length - 1)}%`} stopColor={c} />);
                 put(0, (
                   <g key={`cb${pi}`} className="eng-colorbar" style={{ pointerEvents: 'none' }}>

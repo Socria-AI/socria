@@ -2,10 +2,9 @@
 // components/logos5/ModelTools.tsx — A MODEL'S OWN TOOLS, INSIDE ITS ARTIFACT.
 //
 // A model's parameters, its inspector and its history used to be panels of
-// their own, docked beside whatever view was open (Split View's "Parameters",
-// "Inspector", "Trace"). They are the model's: here they open beside the model,
-// inside its card in Artifacts, one at a time — so Split View holds only the
-// views themselves (lib/logos5/views.ts splitMenu).
+// their own, docked beside whatever view was open ("Parameters", "Inspector",
+// "Trace"). They are the model's: here they open beside the model, inside its
+// card in Artifacts, one at a time.
 
 import type { ReactNode } from 'react';
 import { L5Close } from './L5Chrome';

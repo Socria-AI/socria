@@ -27,7 +27,7 @@
 .logos-root .ls-c { font-size: 12.5px; color: var(--c-ink-45); font-variant-numeric: tabular-nums; }
 .logos-root .ls-sp { flex: 1; }
 .logos-root .ls-arr { align-self: center; font-size: 12.5px; color: var(--c-ink-45); white-space: nowrap; }
-.logos-root .ls-page { align-self: center; font-size: 13px; white-space: nowrap; }
+.logos-root .ls-page { align-self: center; font-size: 13.5px; white-space: nowrap; }
 
 /* ── the canvas ── */
 .logos-root .ls-canvas { position: relative; flex: 1 1 auto; min-height: 0; overflow: auto; overscroll-behavior: contain; scrollbar-width: thin; }
@@ -53,14 +53,18 @@
    the zoom, so what the chatbox covers can still be scrolled clear of it at any size. */
 .logos-root .ls-zoom { position: relative; }
 .logos-root .ls.is-zoomed .ls-cols { min-width: 0; transform-origin: 0 0; padding-bottom: calc((var(--ls-foot, 134px) + 56px) / var(--ls-k, 1)); }
-.logos-root .ls-zoom-keys { flex: none; align-self: center; display: inline-flex; align-items: center; gap: 2px; margin-right: -8px; }
-.logos-root .ls-zoom-keys button { min-width: 28px; height: 28px; padding: 0 6px; border: 0; border-radius: 6px; background: none; font: inherit; font-size: 16px; line-height: 1; color: var(--c-ink-60); font-variant-numeric: tabular-nums; cursor: pointer; transition: background-color 0.15s, color 0.15s; }
-.logos-root .ls-zoom-keys button.is-pct { min-width: 48px; font-size: 12.5px; }
-.logos-root .ls-zoom-keys button.is-fit { font-size: 12.5px; font-weight: 500; }
-.logos-root .ls-zoom-keys button:hover:not(:disabled) { background: rgba(var(--c-ink-rgb), 0.06); color: var(--c-ink); }
-.logos-root .ls-zoom-keys button:focus-visible { outline: 2px solid var(--c-moss, currentColor); outline-offset: 1px; }
-.logos-root .ls-zoom-keys button:disabled { cursor: default; opacity: 0.45; }
-.logos-root .ls-zoom-keys button.is-pct:disabled { opacity: 1; color: var(--c-ink-45, var(--c-ink-60)); }
+/* the one zoom control (universe.css .l5h-zoom has the rule): − 100% + Fit, bare 32px glyph keys that darken, the
+   readout tabular, Fit a 12.5px word, a thumb's 44px on a touch screen */
+.logos-root .ls-zoom-keys { flex: none; align-self: center; display: inline-flex; align-items: center; gap: 0; margin-right: -8px; }
+.logos-root .ls-zoom-keys button { min-width: 32px; height: 32px; padding: 0; border: 0; border-radius: 0; background: none; box-shadow: none; font: inherit; font-size: 16px; line-height: 1; color: var(--c-ink-60); font-variant-numeric: tabular-nums; cursor: pointer; transition: color 0.2s; }
+.logos-root .ls-zoom-keys button.is-pct { min-width: 44px; font-size: 12.5px; }
+.logos-root .ls-zoom-keys button.is-fit { padding: 0 6px; font-size: 12.5px; font-weight: 500; }
+.logos-root .ls-zoom-keys button:hover:not(:disabled) { color: var(--c-ink); }
+.logos-root .ls-zoom-keys button:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+.logos-root .ls-zoom-keys button:disabled { color: var(--c-ink-25); cursor: default; }
+/* at 100% the readout has nothing to put back: it reads as the readout, not as a key that is off */
+.logos-root .ls-zoom-keys button.is-pct:disabled { color: var(--c-ink-60); }
+@media (pointer: coarse) { .logos-root .ls-zoom-keys button { min-width: 44px; height: 44px; } }
 .logos-root .ls-ln path { fill: none; stroke: rgba(var(--c-ink-rgb), 0.3); stroke-width: 1.2; transition: stroke 0.2s; }
 .logos-root .ls-ln.is-back path { stroke: rgba(var(--c-ink-rgb), 0.09); }
 .logos-root .ls-thread { fill: none; stroke: var(--c-gold, #b8a26b); stroke-width: 1.4; stroke-dasharray: 5 5; }
@@ -73,7 +77,7 @@
 .logos-root .ls-it.is-back:is(:hover, :focus-within) > :not(.ls-word) { opacity: 0.6; }
 
 /* a card's head: what it is, and the turn of the conversation that made it */
-.logos-root .ls-k { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-k { display: flex; justify-content: space-between; align-items: baseline; gap: 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .ls-tn { flex: none; font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 13px; font-weight: 400; letter-spacing: 0; text-transform: none; color: var(--c-ink-45); }
 .logos-root .ls-t { font-size: 14px; line-height: 1.38; overflow-wrap: anywhere; }
 
@@ -88,7 +92,7 @@
 
 /* FILE: what was brought — paper with a folded corner */
 .logos-root .ls-file { position: relative; display: flex; flex-direction: column; gap: 5px; padding: 10px 12px 11px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 4px 14px 4px 4px; background: #faf8f1; cursor: pointer; }
-.logos-root .ls-file::after { content: ''; position: absolute; top: -1px; right: -1px; width: 14px; height: 14px; border-radius: 0 14px 0 0; background: linear-gradient(225deg, var(--c-paper) 50%, var(--c-rule-2, rgba(53, 70, 32, 0.22)) 50%, #ece8dc 55%); }
+.logos-root .ls-file::after { content: ''; position: absolute; top: -1px; right: -1px; width: 14px; height: 14px; border-radius: 0 14px 0 0; background: linear-gradient(225deg, var(--c-paper) 50%, var(--c-rule-2, rgba(53, 70, 32, 0.22)) 50%, var(--ls-fold, var(--c-rule)) 55%); }
 .logos-root .ls-file .ls-k { color: var(--c-gold-ink, #6f5f2c); padding-right: 10px; }
 .logos-root .ls-file .ls-t { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 17px; line-height: 1.2; }
 .logos-root .ls-file:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
@@ -112,7 +116,7 @@
 .logos-root .ls-open { display: flex; flex-direction: column; gap: 11px; padding: 18px 20px 16px; border: 1px solid var(--c-moss); border-radius: 9px; background: var(--lg-panel-solid, #fff); }
 .logos-root .ls-open > .ls-k { font-size: 10.5px; letter-spacing: 0.18em; color: var(--c-moss); }
 .logos-root .ls-you { margin: 0; font-size: 13px; line-height: 1.45; color: var(--c-ink-60); }
-.logos-root .ls-you b { margin-right: 6px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-you b { margin-right: 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .ls-stmt { margin: 0; font-family: var(--l5-serif, 'Instrument Serif', serif); font-weight: 400; font-size: 27px; line-height: 1.14; letter-spacing: -0.01em; }
 .logos-root .ls-body { padding-top: 11px; border-top: 1px solid var(--c-rule); min-width: 0; }
 /* the reply, drawn as the conversation draws it, set inside the card */
@@ -123,17 +127,13 @@
 .logos-root :is(.ls-open, .ls-bub) .l5-slice { display: none; }
 .logos-root :is(.ls-open, .ls-bub) .l5-acts { display: flex; align-items: center; gap: 18px; min-height: 28px; margin: 8px 0 0; padding: 0; opacity: 1; }
 .logos-root :is(.ls-open, .ls-bub) .l5-msg.l5-a .l5-fx { margin-left: 0; padding-left: 0; }
-.logos-root :is(.ls-open, .ls-bub) .l5-act { display: inline-flex; align-items: center; min-height: 24px; padding: 0; border: 0; border-radius: 0; background: none; color: var(--c-ink-60); font: inherit; font-size: 12.5px; font-weight: 500; cursor: pointer; }
-.logos-root :is(.ls-open, .ls-bub) .l5-act:hover { background: none; color: var(--c-ink); }
-.logos-root :is(.ls-open, .ls-bub) .l5-act svg { display: none; }
-.logos-root :is(.ls-open, .ls-bub) .l5-act .l5-act-l { position: static; width: auto; height: auto; clip: auto; overflow: visible; white-space: nowrap; }
 
 /* WORDS: each turn beside what it made */
 .logos-root .ls-word { position: relative; z-index: 3; display: flex; flex-direction: column; gap: 3px; margin: -6px -14px 0 24px; padding: 8px 11px 9px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 12px 12px 12px 3px; background: var(--c-paper); box-sizing: border-box; font-size: 13px; line-height: 1.45; color: var(--c-ink-70); }
 .logos-root .ls-word-n { font-family: var(--l5-serif, 'Instrument Serif', serif); font-style: italic; font-size: 14px; color: var(--c-ink-45); }
 .logos-root .ls-word-you,
 .logos-root .ls-word-s { margin: 0; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
-.logos-root .ls-word b { margin-right: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-word b { margin-right: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .ls-word-s { color: var(--c-ink); }
 
 /* ── the chatbox: a box at the foot of the space ── */
@@ -165,13 +165,8 @@
 }
 .logos-root .l5 .ls-chat .lg-composer.is-ruled textarea::placeholder { font-family: inherit; font-style: normal; font-size: 16px; color: var(--c-ink-45); }
 
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-idea,
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-made,
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-open { background: rgba(var(--c-ink-rgb), 0.04); }
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-file { background: rgba(var(--c-ink-rgb), 0.06); }
-/* the chatbox on a dark ground: the ground lifted a step, not white (--lg-panel-solid is not set there, so it fell
-   back to #fff and its pale words all but vanished) */
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .ls-chat .l5-dock .lg-composer.is-ruled .lg-composer-box { background: color-mix(in srgb, var(--c-paper) 92%, #fff); }
+/* (on a dark ground the cards take space-colour.css's tints — a file keeps its slate — and the chatbox the theme's
+   own raised surface, --lg-panel-solid, which every theme now declares; the overrides that stood in for it are gone) */
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-idea.is-lit,
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-answering { background: rgba(var(--c-moss-rgb), 0.18); }
 
@@ -197,7 +192,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-trow .ls-word-you,
 .logos-root .ls-trow .ls-word-s { -webkit-line-clamp: 3; font-size: 13.5px; line-height: 1.45; margin-bottom: 3px; color: var(--c-ink-70); }
 .logos-root .ls-trow .ls-word-s { color: var(--c-ink); }
-.logos-root .ls-trow b { margin-right: 4px; font-size: 10px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .ls-trow b { margin-right: 4px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45); }
 .logos-root .ls-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-top: 6px; }
 .logos-root .ls-chip { min-height: 30px; padding: 3px 9px; border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); border-radius: 6px; background: var(--lg-panel-solid, #fff); font: inherit; font-size: 12.5px; color: var(--c-ink-70); cursor: pointer; }
 .logos-root .ls.is-phone .ls-chat { left: 0; right: 0; bottom: 0; transform: none; width: auto; padding: 8px 12px 12px; border-top: 1px solid var(--c-rule); background: var(--c-paper); }
@@ -300,13 +295,14 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 .logos-root .ls-prev.is-fit > .ls-inert { width: 440px; max-height: 382px; overflow: hidden; zoom: 0.55; -webkit-mask-image: linear-gradient(#000 78%, transparent); mask-image: linear-gradient(#000 78%, transparent); }
 .logos-root .ls-enl { position: absolute; right: 6px; bottom: 6px; z-index: 1; display: inline-flex; align-items: center; gap: 5px; padding: 3px 8px; border-radius: 999px; background: color-mix(in oklab, var(--c-paper) 92%, transparent); box-shadow: 0 0 0 1px var(--c-rule-2); font-size: 11.5px; font-weight: 500; color: var(--c-ink-70); opacity: 0; transform: translateY(2px); transition: opacity 0.18s, transform 0.18s; pointer-events: none; }
 .logos-root :is(.ls-made, .ls-file).has-prev:is(:hover, :focus-visible) .ls-enl { opacity: 1; transform: none; }
-.logos-root .ls-lb { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 32px; background: rgba(var(--c-ink-rgb), 0.28); animation: ls-lb-in 0.2s ease-out; }
+/* a dialog over the space: the page dimmed with the one token (an ink dim whitened a dark ground), a 16px panel on
+   paper, its title in the serif, the bare × top right */
+.logos-root .ls-lb { position: absolute; inset: 0; z-index: 30; display: grid; place-items: center; padding: 32px; background: var(--lg-dim); animation: ls-lb-in 0.2s ease-out; }
 @keyframes ls-lb-in { from { opacity: 0; } }
-.logos-root .ls-lb-card { width: min(880px, 100%); max-height: calc(100% - 24px); display: flex; flex-direction: column; border: 1px solid var(--c-rule-2); border-radius: 14px; background-color: var(--c-paper); background-image: var(--c-grain); box-shadow: 0 30px 70px -30px rgba(35, 36, 31, 0.6); animation: ls-lb-card 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
+.logos-root .ls-lb-card { width: min(880px, 100%); max-height: calc(100% - 24px); display: flex; flex-direction: column; border: 1px solid var(--c-rule-2); border-radius: var(--lg-r-dialog, 16px); background-color: var(--c-paper); background-image: var(--c-grain); box-shadow: var(--l5-shadow-up); animation: ls-lb-card 0.24s cubic-bezier(0.16, 1, 0.3, 1); }
 @keyframes ls-lb-card { from { transform: translateY(10px) scale(0.98); opacity: 0; } }
 .logos-root .ls-lb-head { flex: none; display: flex; align-items: center; gap: 14px; padding: 14px 16px 12px 20px; border-bottom: 1px solid var(--c-rule); }
-.logos-root .ls-lb-head .ls-tt { font-size: 16px; }
-.logos-root .ls-lb-x { font-size: 20px; line-height: 1; }
+.logos-root .ls-lb-head .ls-tt { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 24px; font-weight: 400; line-height: 1.15; }
 .logos-root .ls-lb-body { flex: 1 1 auto; min-height: 0; overflow: auto; padding: 20px 22px 24px; }
 .logos-root .ls-lb-body img { display: block; max-width: 100%; margin: 0 auto; }
 .logos-root .ls.is-phone .ls-lb { padding: 12px; align-items: end; }
@@ -315,7 +311,7 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 
 /* one focus ring for every control, wherever it is: moss, 2px, outside the control */
 .logos-root :is(.ls-chip, .ls-tchip, .ls-hero, .ls-earlier, .ls-kd, .ls-tb, .l5mm-btn, .l5h-btn, .l5h-link, .l5-unibtn):focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
-.logos-root .l5-unibtn-k { margin-left: 6px; height: 18px; font-size: 10.5px; }
+/* (the Universal Map's ⌘K is the one key, .l5-kbd — 20px, 11px — as a line's header draws it) */
 /* the canvas's last column keeps a margin to the edge when scrolled to (a scroller drops its own end padding) */
 .logos-root .ls-cols::after { content: ''; flex: none; width: 1px; height: 1px; }
 /* the row's words never wrap, however narrow the space is beside an open panel */

@@ -41,7 +41,7 @@
 }
 .mkg-card:hover {
   border-color: rgba(var(--l5-tint-rgb, 53, 70, 32), 0.32);
-  box-shadow: 0 10px 28px -18px rgba(var(--shadow-rgb, 20, 20, 16), 0.45);
+  box-shadow: var(--l5-shadow);
 }
 .mkg-card.is-on {
   border-color: var(--mkg-primary);
@@ -190,11 +190,11 @@
 .mkg-sec {
   grid-column: 1 / -1;
   margin: 6px 2px -2px;
-  font-size: 12.5px;
+  font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--mkg-60);
+  color: var(--c-ink-45, var(--mkg-60));
 }
 .mkg-sec span {
   margin-left: 6px;
@@ -202,23 +202,34 @@
   letter-spacing: 0;
   text-transform: none;
 }
+/* removing it: the bare glyph, 32 x 32, at the card's top right (l5-controls .l5-icon) */
 .mkg-remove {
   position: absolute;
-  top: 6px;
-  right: 6px;
+  top: 2px;
+  right: 2px;
   z-index: 2;
-  width: 30px;
-  height: 30px;
-  border: 1px solid var(--mkg-hair);
-  border-radius: 999px;
-  background: var(--mkg-card);
-  color: var(--mkg-60);
+  display: inline-grid;
+  place-items: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: 0;
+  border-radius: 0;
+  background: none;
+  color: var(--c-ink-60, var(--mkg-60));
   font-size: 15.5px;
   line-height: 1;
   cursor: pointer;
+  transition: color 0.2s;
 }
-.mkg-remove:hover,
-.mkg-remove:focus-visible {
+.mkg-remove:hover {
   color: var(--mkg-ink);
-  border-color: var(--mkg-40);
+}
+.mkg-remove:focus-visible {
+  outline: 2px solid var(--mkg-primary);
+  outline-offset: 2px;
+}
+.mkg-remove svg {
+  width: 16px;
+  height: 16px;
 }

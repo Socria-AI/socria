@@ -1,6 +1,6 @@
 'use client';
 
-// components/write/parts.tsx — what the Writing Space shows beside the page
+// components/write/parts.tsx — what Write shows beside the page
 // and on its words (the Socria panel itself is socria.tsx).
 //
 // The card under an underlined word, an edit proposed on its own words (each
@@ -13,6 +13,7 @@ import { useMemo, useState } from 'react';
 import type { SourceDoc } from '@/lib/docs/types';
 import type { ThinkingMap } from '@/lib/logos';
 import { docText, findText, wordCount, type Card, type Version, type WriteDoc } from '@/lib/write/doc';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import type { Issue } from '@/lib/write/checks';
 import type { AssistResult, Role } from '@/lib/write/assist';
 
@@ -337,8 +338,8 @@ export function LinkPicker({
     <div className="w-picker" role="dialog" aria-label={title} onKeyDown={(e) => e.key === 'Escape' && onClose()}>
       <div className="w-row">
         <p className="w-eyebrow">{title}</p>
-        <button type="button" className="w-x" aria-label="Close" onClick={onClose}>
-          ×
+        <button type="button" className="w-x l5-icon l5-close" aria-label="Close" onClick={onClose}>
+          <CloseGlyph />
         </button>
       </div>
       {items.length > 0 && <input className="w-input" autoFocus value={q} placeholder="Search" aria-label="Search" onChange={(e) => setQ(e.target.value)} />}

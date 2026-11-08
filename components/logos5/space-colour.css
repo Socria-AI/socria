@@ -28,6 +28,8 @@
   --ls-card: #fffefa;
   --ls-tint-slate: color-mix(in oklab, var(--ls-slate) 8%, var(--ls-card));
   --ls-tint-mustard: color-mix(in oklab, var(--ls-mustard) 14%, var(--ls-card));
+  /* the underside of a file card's folded corner */
+  --ls-fold: #dde5ee;
   --ls-rest: 0 1px 2px rgba(35, 36, 31, 0.04);
   --ls-lift: 0 1px 2px rgba(35, 36, 31, 0.05), 0 14px 28px -16px rgba(35, 36, 31, 0.4);
 }
@@ -71,7 +73,7 @@
 
 /* FILE: brought, in slate */
 .logos-root .ls-file { gap: 7px; padding: 11px 13px 12px; border-color: rgba(58, 110, 165, 0.3); background: var(--ls-tint-slate); }
-.logos-root .ls-file::after { background: linear-gradient(225deg, var(--c-paper) 50%, rgba(58, 110, 165, 0.3) 50%, #dde5ee 56%); }
+.logos-root .ls-file::after { background: linear-gradient(225deg, var(--c-paper) 50%, rgba(58, 110, 165, 0.3) 50%, var(--ls-fold) 56%); }
 .logos-root .ls-file .ls-k { color: var(--ls-slate-ink); }
 .logos-root .ls-file .ls-k > span:first-child::before { content: ''; flex: none; width: 7px; height: 7px; margin-right: 7px; border-radius: 50%; background: var(--ls-slate); }
 .logos-root .ls-file .ls-prev { border: 1px solid rgba(58, 110, 165, 0.18); background: var(--ls-card); }
@@ -129,11 +131,19 @@
 .logos-root .ls.is-arriving .ls-ln.is-against path,
 .logos-root .ls.is-arriving .ls-lw { animation: ls-fade 0.6s var(--c-ease) both; animation-delay: calc(var(--ls-base, 900ms) + var(--j, 0) * 120ms); }
 
-/* ── dark themes: tints from the theme's own ink ── */
+/* ── dark themes: tints from the theme's own ink ──
+   and the words in each colour turned up to be read on a dark card (the paper inks came out at 1.9–3.0:1): slate,
+   vermilion and mustard as the Universal Map draws them on a dark ground, the rust as the theme's own tension —
+   every one 4.8:1 or more on Dark, One and Night, tinted card or plain */
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls {
   --ls-card: rgba(var(--c-ink-rgb), 0.04);
   --ls-tint-slate: rgba(58, 110, 165, 0.16);
   --ls-tint-mustard: rgba(232, 182, 44, 0.14);
+  --ls-slate-ink: #a7bcd6;
+  --ls-verm-ink: #f2917f;
+  --ls-mustard-ink: #e7cf92;
+  --ls-rust-ink: var(--lg-tension);
+  --ls-fold: rgba(58, 110, 165, 0.32);
 }
 html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .ls-word { background: rgba(184, 162, 107, 0.14); }
 

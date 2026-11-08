@@ -63,9 +63,6 @@
 
 /* the confirmation */
 .app-root .ev-ticket{display:flex;flex-direction:column;gap:18px}
-.app-root .ev-qr{display:grid;place-items:center;padding:14px;background:#fff;border:1px solid var(--app-border);border-radius:18px;width:min(240px,100%);margin:0 auto}
-.app-root .ev-qr svg{width:100%;height:auto;display:block}
-.app-root .ev-code{font-family:ui-monospace, SFMono-Regular, Menlo, monospace;font-size:1.7rem;letter-spacing:.24em;text-align:center}
 .app-root .ev-badge{display:inline-flex;align-items:center;gap:6px;width:fit-content;padding:4px 10px;border-radius:999px;font-size:.78rem;font-weight:600;background:var(--moss-100);color:var(--moss-800)}
 .app-root .ev-badge.attended{background:var(--ink);color:var(--app-paper)}
 .app-root .ev-actions{display:flex;flex-wrap:wrap;gap:10px}

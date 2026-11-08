@@ -11,6 +11,7 @@ import type { LogosNodeType } from '@/lib/logos';
 import { MODE_META, type ExploreResult, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
 import { MathText } from './TeX';
+import { CloseGlyph } from './logos5/L5Chrome';
 
 export type FocusMsg = { role: 'user' | 'assistant'; content: string };
 
@@ -160,10 +161,7 @@ export function ExplorePanel({
           <span className="lg-x-label">{node?.label}</span>
         </div>
         <button type="button" onClick={onClose} className="lg-x-close" aria-label="Close">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round">
-            <line x1="18" y1="6" x2="6" y2="18" />
-            <line x1="6" y1="6" x2="18" y2="18" />
-          </svg>
+          <CloseGlyph />
         </button>
       </header>
 

@@ -181,7 +181,9 @@ ok('  pressing the question while answering it puts the cursor in the chatbox', 
 ok('Memory’s gold count is what its Review holds: changes proposed, read again when Memory closes', /fetch\('\/api\/mind\/changes\?scope=logos'/.test(app4) && /c\?\.review === 'proposed'/.test(app4) && /\}, \[cloud, l5Mind\]\);/.test(app4) && /<MindButton onOpen=\{\(\) => setL5Mind\(true\)\} waiting=\{memWaiting\} \/>/.test(app4));
 ok('Listen reads the open reply aloud with the browser’s own voice', /msgEl\(messages\[ot\.replyAt\], ot\.replyAt, undefined, \{ listen: true \}\)/.test(app4) && /function ListenButton/.test(read('components/logos5/L5Message.tsx')) && /SpeechSynthesisUtterance/.test(read('components/logos5/L5Message.tsx')));
 const r2 = read('components/logos5/revision2.css');
-ok('the wordmark top left in Instrument Serif; Socria One the word in its slate, no pill', /\.l5v-home-w \{ font-family: var\(--l5-serif/.test(r2) && /\.l5-onebtn \{ height: auto; padding: 0; border: 0;[^}]*color: #26485a/.test(r2));
+// Socria One is the word in its own blue, themed (--lg-one: slate on Paper, light on the dark grounds — the raw slate
+// was unreadable there), drawn once (tips.css) for both headers
+ok('the wordmark top left in Instrument Serif; Socria One the word in its slate, no pill', /\.l5v-home-w \{ font-family: var\(--l5-serif/.test(r2) && /\.l5-onebtn \{[^}]*padding: 0;\s*border: 0;[^}]*background: none;[^}]*color: var\(--lg-one\);/.test(read('components/logos5/tips.css')) && !/#26485a/.test(r2));
 
 console.log('\n=== Revision VI: every one of Socria’s replies ===');
 ok('the thread counts Socria’s replies, one still arriving included, a question with no reply not', S.threadReplies(cTurns) === 3 && S.threadReplies([...cTurns, { asked: 'and?', said: '', pending: true }]) === 4 && S.threadReplies([...cTurns, { asked: 'and?', said: '' }]) === 3);

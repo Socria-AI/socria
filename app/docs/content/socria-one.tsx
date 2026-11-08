@@ -41,10 +41,10 @@ export function SocriaOne() {
       <p>
         What it deliberately does <em>not</em> open is anything Socria can do
         inside a single line of thinking. Every{' '}
-        <Link href="/docs/depth-personality">reply length</Link>, Thinking Maps
-        with unbounded branching and every lens, Research, Draft Space and
-        grounding in your own material are on the free tier too, at full
-        strength. That was a change, and the reasoning is in the table below:
+        <Link href="/docs/depth-personality">reply length</Link>, Logic Maps
+        with unbounded branching and every lens, Research, Write and its
+        notes, and grounding in your own material are on the free tier too, at
+        full strength. That was a change, and the reasoning is in the table below:
         a free tier that clips every dimension at once does not read as a trial,
         it reads as a thin product, and nobody subscribes to more of something
         they have only watched be mediocre.
@@ -78,7 +78,7 @@ export function SocriaOne() {
         for its conversation, however often it is redrawn; a node when a map
         gains it; an artifact once, however often it is saved; a document
         once, the first time its reading reaches a conversation or a write-up
-        is filed in Content. A turn in somebody else&rsquo;s shared
+        is filed in Files. A turn in somebody else&rsquo;s shared
         conversation is never one of yours. Its exact shape:
       </p>
       <DemoLimitsTable />

@@ -10,10 +10,11 @@ import type { Config } from 'tailwindcss';
 // Never a grey, never a tinted green. The steps are named here so that
 // `text-ink-45` is available and `text-ink/38` looks like the mistake it is.
 //
-// Measured, and the reason moss has two entries: ink on paper 14.5:1 · moss
-// on paper 4.5:1, which is 16px and up ONLY · moss-700 on paper 6.8:1, which
-// is the one to use for small text · sage on paper fails at every size, so it
-// is emphasis on forest and nowhere else.
+// Measured: ink on paper 14.5:1 · moss on paper 9.2:1 — there is one green,
+// #354620, so moss and moss-700 are the same colour and either reads at any
+// size (the older #5e7633 survives only as a categorical tone, --moss-tone) ·
+// sage on paper fails at every size, so it is emphasis on forest and nowhere
+// else.
 //
 // These mirror the custom properties in app/globals.css rather than replacing
 // them: the ported stylesheets read var(--moss-700), the React written here
@@ -31,32 +32,32 @@ const config: Config = {
         // theme reaches every utility; the fallback IS the paper value, so with
         // no theme set nothing differs by a single pixel.
         paper: {
-          DEFAULT: 'rgb(var(--c-paper, 245 243 235) / <alpha-value>)', // the chat
-          2: 'rgb(var(--c-paper-2, 236 232 218) / <alpha-value>)',
+          DEFAULT: 'rgb(var(--rgb-paper, 245 243 235) / <alpha-value>)', // the chat
+          2: 'rgb(var(--rgb-paper-2, 236 232 218) / <alpha-value>)',
           journal: '#F4F1E8', // the page
         },
 
         // ── ink, in four steps and no others ──────────────────────
         ink: {
-          DEFAULT: 'rgb(var(--c-ink, 31 31 31) / <alpha-value>)',
-          70: 'rgb(var(--c-ink, 31 31 31) / 0.7)',
-          45: 'rgb(var(--c-ink, 31 31 31) / 0.45)',
-          25: 'rgb(var(--c-ink, 31 31 31) / 0.25)',
-          12: 'rgb(var(--c-ink, 31 31 31) / 0.12)', // hairlines only, never text
+          DEFAULT: 'rgb(var(--rgb-ink, 31 31 31) / <alpha-value>)',
+          70: 'rgb(var(--rgb-ink, 31 31 31) / 0.7)',
+          45: 'rgb(var(--rgb-ink, 31 31 31) / 0.45)',
+          25: 'rgb(var(--rgb-ink, 31 31 31) / 0.25)',
+          12: 'rgb(var(--rgb-ink, 31 31 31) / 0.12)', // hairlines only, never text
         },
         // A raised surface: the composer, a card, a chip. White on paper.
-        surface: 'rgb(var(--c-surface, 255 255 255) / <alpha-value>)',
+        surface: 'rgb(var(--rgb-surface, 255 255 255) / <alpha-value>)',
 
         // ── the person ────────────────────────────────────────────
         // Your thinking, your call. 600 above 16px; 700 for anything smaller.
         moss: {
-          DEFAULT: 'rgb(var(--c-moss-600, 94 118 51) / <alpha-value>)',
-          50: 'rgb(var(--c-moss-50, 244 246 238) / <alpha-value>)',
-          100: 'rgb(var(--c-moss-100, 228 234 218) / <alpha-value>)',
-          200: 'rgb(var(--c-moss-200, 202 213 182) / <alpha-value>)',
-          600: 'rgb(var(--c-moss-600, 94 118 51) / <alpha-value>)',
-          700: 'rgb(var(--c-moss-700, 71 90 40) / <alpha-value>)',
-          800: 'rgb(var(--c-moss-800, 56 72 31) / <alpha-value>)',
+          DEFAULT: 'rgb(var(--rgb-moss-600, 53 70 32) / <alpha-value>)',
+          50: 'rgb(var(--rgb-moss-50, 244 246 238) / <alpha-value>)',
+          100: 'rgb(var(--rgb-moss-100, 228 234 218) / <alpha-value>)',
+          200: 'rgb(var(--rgb-moss-200, 202 213 182) / <alpha-value>)',
+          600: 'rgb(var(--rgb-moss-600, 53 70 32) / <alpha-value>)',
+          700: 'rgb(var(--rgb-moss-700, 53 70 32) / <alpha-value>)',
+          800: 'rgb(var(--rgb-moss-800, 43 58 26) / <alpha-value>)',
         },
         // Emphasis on forest only — it fails on paper at every size.
         sage: {
@@ -96,7 +97,7 @@ const config: Config = {
           pale: '#b8cdd9', // emphasis on One
         },
 
-        border: 'rgb(var(--c-border, 231 226 211) / <alpha-value>)',
+        border: 'rgb(var(--rgb-border, 231 226 211) / <alpha-value>)',
       },
       fontFamily: {
         // Anything *said*. 400 only — emphasis is italic, moss, one step

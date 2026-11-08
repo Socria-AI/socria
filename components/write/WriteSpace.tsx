@@ -8,7 +8,7 @@
 // spacing, lists — Toolbar.tsx), and on the right the document's three
 // actions: Socria, Export, and ⋯ (find, the outline, notes, versions, page
 // setup, opening a file). Everything else opens in one panel beside the page
-// (a sheet on a phone), one at a time. The notes — the old Draft Space, where
+// (a sheet on a phone), one at a time. The notes — Write's board, where
 // ideas are dumped and arranged before they are prose — are one of those
 // panels; "Turn into an outline" carries them into the writing, adding to it
 // and never rewriting it. All of it is one document (lib/write/doc.ts), saved
@@ -117,6 +117,7 @@ import { AltEditor, FindBar, LinkBubble, LinkEditor, OutlinePanel, PagePanel } f
 import { mediaClient } from './media-client';
 import { ago, IssueCard, LinkPicker, ProposalCard, VersionsPanel, type Pick, type Proposal } from './parts';
 import { SocriaPanel, type Asked, type ImproveOp, type SocriaTab, type Target, type ThinkOp } from './socria';
+import { CloseGlyph } from '@/components/logos5/L5Chrome';
 import './write.css';
 
 export type SaveState = 'saved' | 'saving' | 'local' | 'offline';
@@ -251,7 +252,7 @@ export const WriteSpace = forwardRef<
     cloud?: boolean;
     /** the line of thinking's name, for Socria's readings */
     topic?: string;
-    /** words kept in memory (the Mind Graph), when the person asks; says what happened */
+    /** words kept in Memory, when the person asks; says what happened */
     onKeep?: (text: string, kind: CardKind) => Promise<string>;
   }
 >(function WriteSpace(props, ref) {
@@ -1375,8 +1376,8 @@ export const WriteSpace = forwardRef<
             )}
             {panelTitle}
           </h2>
-          <button type="button" className="w-x" aria-label={`Close ${panelTitle}`} onMouseDown={(e) => e.preventDefault()} onClick={closePanel}>
-            ×
+          <button type="button" className="w-x l5-icon l5-close" aria-label={`Close ${panelTitle}`} onMouseDown={(e) => e.preventDefault()} onClick={closePanel}>
+            <CloseGlyph />
           </button>
         </div>
       )}
@@ -1578,8 +1579,8 @@ export const WriteSpace = forwardRef<
         </button>
       </Menu>
       {props.onClose && (
-        <button type="button" className="w-x is-close" aria-label="Close the writing" onClick={() => (flush(), props.onClose?.())}>
-          ×
+        <button type="button" className="w-x is-close l5-icon l5-close" aria-label="Close the writing" onClick={() => (flush(), props.onClose?.())}>
+          <CloseGlyph />
         </button>
       )}
     </>

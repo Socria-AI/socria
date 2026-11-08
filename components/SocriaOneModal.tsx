@@ -17,6 +17,7 @@
 import { useEffect, useId, useRef } from 'react';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import { comparisonRows, LIMIT_HEADLINE } from '@/lib/entitlements';
+import { L5Close } from './logos5/L5Chrome';
 import './one/one-sheet.css';
 import './logos5/l5-controls.css';
 
@@ -25,14 +26,6 @@ export function OneCheck() {
   return (
     <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
       <path d="M3.2 8.4l3 3 6.6-6.8" />
-    </svg>
-  );
-}
-
-export function OneClose() {
-  return (
-    <svg viewBox="0 0 16 16" fill="none" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" aria-hidden="true">
-      <path d="M4 4l8 8M12 4l-8 8" />
     </svg>
   );
 }
@@ -80,9 +73,7 @@ export function SocriaOneModal({
       <div className="os-back" onClick={onClose} aria-hidden="true" />
       <div className="os-sheet is-wide">
         <span className="os-grab" aria-hidden="true" />
-        <button type="button" className="os-x l5-icon" onClick={onClose} aria-label="Close">
-          <OneClose />
-        </button>
+        <L5Close label="Close" onClose={onClose} className="os-x" />
 
         <p className="os-brand">
           <span className="os-mono" aria-hidden="true">

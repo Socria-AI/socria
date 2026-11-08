@@ -1,10 +1,11 @@
 /* components/logos5/redesign.css — Logos 5, the map is the screen.
  *
- * The redesign (docs/LOGOS-5.md §2): a header of the mark, where you are and
- * a switch of three views; the view is the screen; the conversation a panel
- * folded away beside it, or (folded) a composer floating on the canvas; on a
- * phone the conversation is a sheet. Also the card's "Asking about", the
- * Mind Graph, home's contents column, and the conversation's own restyle.
+ * The redesign (docs/LOGOS-5.md §2): the Universal Map's and Memory's header
+ * (L5Header), the card's "Asking about", the artifacts and model tools, home's
+ * contents column, and the conversation's own restyle. Its first layout — the
+ * view as the screen, the conversation a panel or a floating box (.l5x) — is
+ * gone with the components that drew it; the four views are the header's
+ * switch (l5-controls.css), and both headers draw alike (revision2.css).
  * Loaded after l5.css and study.css, and scoped under .logos-root .l5.
  */
 
@@ -125,90 +126,19 @@
 }
 
 /* ── the switch (Logos 5) ─────────────────────────────────────────
-   A hairline tray, 36 tall; items 28 tall at UI 13.5 in ink 70; the one chosen
-   is the wash with primary text (l5-controls.css). Counts are plain tabular
-   type, never badges; something new in a view you are not on is a 6px primary
-   dot. These carry .l5 so they hold against the older rules below. */
-/* Revision II: the switch is a row of underlined tabs at full bar height — no tray, no wash; the chosen one is
-   ink with a 2px moss line at its foot (l5-controls.css .l5-tab). Counts are plain tabular type; something new in
-   a view you are not on is a 6px moss dot. */
-.logos-root .l5 .l5-switch {
-  display: inline-flex;
-  align-items: stretch;
-  gap: 28px;
-  height: 100%;
-  min-height: 32px;
-  padding: 0;
-  box-sizing: border-box;
-  border: 0;
-  border-radius: 0;
-  background: none;
-}
-.logos-root .l5 .l5-switch-i {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  height: auto;
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  border-radius: 0;
-  background: none;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  white-space: nowrap;
-  cursor: pointer;
-  transition: box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), color 0.2s;
-}
-.logos-root .l5 .l5-switch-i:hover {
-  color: var(--lg-ink);
-}
-.logos-root .l5 .l5-switch-i:is([aria-selected='true'], .is-on) {
-  background: none;
-  color: var(--lg-ink);
-  box-shadow: inset 0 -2px 0 var(--lg-primary);
-}
-.logos-root .l5 .l5-switch-i .l5-count {
-  min-width: 0;
-  height: auto;
-  padding: 0;
-  border-radius: 0;
-  background: none;
-  font-size: 12.5px;
-  font-weight: 400;
-  font-variant-numeric: tabular-nums;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
-}
-.logos-root .l5 .l5-switch-i:is([aria-selected='true'], .is-on) .l5-count {
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
-}
-.logos-root .l5 .l5-switch-i .l5-new {
-  position: absolute;
-  top: 50%;
-  right: -9px;
-  width: 6px;
-  height: 6px;
-  margin-top: -9px;
-  border-radius: 50%;
-  background: var(--lg-primary);
-}
-.logos-root .l5 .l5-switch-i:focus-visible {
-  outline: 2px solid var(--lg-primary);
-  outline-offset: 2px;
-}
+   Revision II: the switch is a row of underlined tabs at full bar height — no tray, no wash; the chosen one is ink
+   with a 2px moss line at its foot; counts are plain tabular type; something new in a view you are not on is a 6px
+   moss dot. All of that is the controls standard's .l5-switch / .l5-switch-i / .l5-count / .l5-new
+   (l5-controls.css), drawn there and nowhere else: the copy that stood here outweighed it and drew the tabs at 0.6
+   ink. What is left is the full-width switch (Memory on a phone), its tabs sharing the width. */
 .logos-root .l5 .l5-switch.is-wide {
   display: flex;
   width: 100%;
-}
-.logos-root .l5 .l5-switch.is-wide {
   gap: 0;
 }
 .logos-root .l5 .l5-switch.is-wide .l5-switch-i {
   flex: 1 1 0;
+  justify-content: center;
   padding: 0 6px;
 }
 .logos-root .l5 .l5x-tabs {
@@ -218,14 +148,6 @@
 }
 
 /* ── the line of thinking: the view is the screen ─────────────────── */
-.logos-root .l5 .l5x {
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  position: relative;
-  overflow: hidden;
-}
 .logos-root .l5 .l5x-canvas {
   --omni: 0px;
   position: relative;
@@ -238,9 +160,6 @@
   background-image: radial-gradient(circle, rgba(var(--l5-tint-rgb), 0.09) 1px, transparent 1px);
   background-size: 26px 26px;
 }
-.logos-root .l5 .l5x:not(.has-convo):not(.is-narrow) .l5x-canvas {
-  --omni: 150px;
-}
 /* the map places its card menus out of the composer's way (components/ThinkingMap.tsx) */
 .logos-root .l5 .l5x-canvas {
   --lg-menu-reserve: var(--omni);
@@ -249,29 +168,8 @@
 .logos-root .l5 .l5x-canvas .lg-legend {
   bottom: calc(var(--omni) + 16px);
 }
-.logos-root .l5 .l5x:has(.l5x-peek) .lg-legend,
 .logos-root .l5 .lg-map-wrap:has(.lg-acts.is-ask) .lg-legend {
   display: none;
-}
-.logos-root .l5 .l5x-view {
-  position: relative;
-  flex: 1 1 auto;
-  min-width: 0;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  overflow: auto;
-}
-.logos-root .l5 .l5x-canvas.is-logic .l5x-view,
-.logos-root .l5 .l5x-canvas.is-components .l5x-view {
-  overflow: hidden;
-}
-.logos-root .l5 .l5x-view > .ws-root {
-  flex: 1 1 auto;
-  min-height: 0;
-}
-.logos-root .l5 .l5x-canvas.is-artifacts .l5x-view {
-  padding-bottom: var(--omni);
 }
 /* the board under a floating composer: its foot keeps clear of it */
 .logos-root .l5 .l5x-canvas .l5s-boardcol {
@@ -333,302 +231,11 @@
   padding-bottom: var(--omni);
 }
 
-/* the conversation, unfolded */
-.logos-root .l5 .l5x-convo {
-  flex: 0 0 460px;
-  max-width: 46%;
-  min-width: 340px;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-  border-right: 1px solid var(--l5-hair);
-  background: var(--l5-paper-hi);
-  box-shadow: 24px 0 60px -40px rgba(var(--shadow-rgb, 35, 36, 31), 0.25);
-  z-index: 5;
-}
-.logos-root .l5 .l5x-convo-head {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  padding: 10px 10px 10px 20px;
-  border-bottom: 1px solid var(--l5-hair);
-}
-.logos-root .l5 .l5x-convo-t {
-  font-family: var(--l5-serif);
-  font-size: 18px;
-}
-.logos-root .l5 .l5x-convo-fold {
-  margin-left: 6px;
-  padding: 0;
-  border: 0;
-  background: none;
-  font-family: var(--lg-sans);
-  font-size: 12.5px;
-  color: var(--lg-ink-40);
-  cursor: pointer;
-}
-.logos-root .l5 .l5x-convo .l5-col {
-  flex: 1 1 auto;
-}
-.logos-root .l5 .l5x-convo .l5-thread-in {
-  max-width: none;
-  padding: 18px 20px 20px;
-}
-.logos-root .l5 .l5x-convo .l5-dock {
-  max-width: none;
-  padding: 0 18px 18px;
-}
-
-/* the conversation, folded: a composer floating on the canvas, and what arrives over it */
-.logos-root .l5 .l5x-omni {
-  position: absolute;
-  left: 50%;
-  bottom: 22px;
-  z-index: 6;
-  width: min(680px, calc(100% - 48px));
-  transform: translateX(-50%);
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-  pointer-events: none;
-}
-.logos-root .l5 .l5x-omni > * {
-  pointer-events: auto;
-}
-.logos-root .l5 .l5x-omni .l5-dock {
-  max-width: none;
-  padding: 0;
-}
-.logos-root .l5 .l5x-omni .lg-composer-box,
-.logos-root .l5 .l5x-convo .lg-composer-box {
-  border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
-  border-radius: 16px;
-  background: rgba(var(--l5-surface-rgb), 0.94);
-  box-shadow: var(--l5-shadow-up);
-}
-/* ── THE CONVERSATION BOX, MOVED (components/logos5/L5Line.tsx) ───────
-   Its head — or, folded, the grip over the composer — is its handle. Docked,
-   it is where it has always been; floating, it is where it was left, over
-   the views; with the views hidden, it is the conversation alone. */
-.logos-root .l5 .l5x-convo-head {
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-}
-.logos-root .l5 .l5x-convo-head:active {
-  cursor: grabbing;
-}
-.logos-root .l5 .l5x-convo-head:focus-visible,
-.logos-root .l5 .l5x-omni-bar:focus-visible {
-  outline: 2px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45);
-  outline-offset: -2px;
-}
-.logos-root .l5 .l5x-convo-acts,
-.logos-root .l5 .l5x-box-tools {
-  display: inline-flex;
-  align-items: center;
-  gap: 2px;
-}
-.logos-root .l5 .l5x-box-tool {
-  display: grid;
-  place-items: center;
-  width: 30px;
-  height: 30px;
-  padding: 0;
-  border: 0;
-  border-radius: 50%;
-  background: none;
-  color: var(--lg-ink-40);
-  cursor: pointer;
-  transition: color 0.15s, background 0.15s;
-}
-.logos-root .l5 .l5x-box-tool svg {
-  width: 16px;
-  height: 16px;
-  fill: none;
-  stroke: currentColor;
-  stroke-width: 1.7;
-  stroke-linecap: round;
-  stroke-linejoin: round;
-}
-.logos-root .l5 .l5x-box-tool:hover {
-  color: var(--lg-ink);
-  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06);
-}
-.logos-root .l5 .l5x-box-tool[aria-pressed='true'] {
-  color: var(--lg-primary);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
-}
-
-/* folded: a grip over the composer, shown when it is wanted */
-.logos-root .l5 .l5x-omni-bar {
-  position: absolute;
-  left: 50%;
-  bottom: calc(100% + 8px);
-  display: flex;
-  align-items: center;
-  gap: 4px;
-  padding: 2px 4px 2px 12px;
-  border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
-  border-radius: 999px;
-  background: rgba(var(--l5-surface-rgb), 0.94);
-  box-shadow: var(--l5-shadow-up);
-  cursor: grab;
-  user-select: none;
-  touch-action: none;
-  opacity: 0;
-  transform: translate(-50%, 4px);
-  transition: opacity 0.18s, transform 0.18s;
-}
-.logos-root .l5 .l5x-omni-bar:active {
-  cursor: grabbing;
-}
-.logos-root .l5 .l5x-omni:hover .l5x-omni-bar,
-.logos-root .l5 .l5x-omni:focus-within .l5x-omni-bar {
-  opacity: 1;
-  transform: translate(-50%, 0);
-}
-.logos-root .l5 .l5x-grip {
-  display: grid;
-  grid-template-columns: repeat(3, 3px);
-  gap: 3px;
-  margin-right: 4px;
-}
-.logos-root .l5 .l5x-grip i {
-  width: 3px;
-  height: 3px;
-  border-radius: 50%;
-  background: var(--lg-ink-40);
-}
-
-/* floating: out of the flow, over the views, where it was left */
-.logos-root .l5 .l5x.is-floating .l5x-canvas {
-  --omni: 0px;
-}
-.logos-root .l5 .l5x.is-floating .l5x-convo {
-  position: absolute;
-  z-index: 7;
-  flex: none;
-  width: min(440px, calc(100% - 32px));
-  height: min(680px, calc(100% - 32px));
-  min-width: 0;
-  max-width: none;
-  border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  overflow: hidden;
-  box-shadow:
-    0 2px 6px rgba(var(--shadow-rgb, 35, 36, 31), 0.06),
-    0 34px 80px -30px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
-}
-.logos-root .l5 .l5x.is-floating .l5x-omni {
-  bottom: auto;
-  transform: none;
-  z-index: 7;
-}
-/* there, the grip is part of it, always shown, so the box can always be taken hold of */
-.logos-root .l5 .l5x.is-floating .l5x-omni-bar {
-  position: static;
-  align-self: center;
-  opacity: 1;
-  transform: none;
-}
-/* placed before it is shown, never flashed in a corner first */
-.logos-root .l5 .l5x.is-floating.is-placing :is(.l5x-convo, .l5x-omni) {
-  visibility: hidden;
-}
-
-/* the views hidden: the conversation alone, centred, and given room */
-.logos-root .l5 .l5x.is-focus .l5x-convo {
-  width: min(780px, calc(100% - 48px));
-  height: calc(100% - 48px);
-}
-.logos-root .l5 .l5x.is-focus .l5x-view {
-  visibility: hidden;
-}
-.logos-root .l5 .l5x.is-focus .l5x-canvas {
-  background-image: none;
-}
-.logos-root .l5:has(.l5x.is-focus) .l5-head-mid {
-  visibility: hidden;
-}
-@media (prefers-reduced-motion: reduce) {
-  .logos-root .l5 .l5x-omni-bar {
-    transition: none;
-  }
-}
 .logos-root .l5 .lg-composer textarea::placeholder {
   font-family: var(--l5-serif);
   font-style: italic;
   font-size: 18px;
-  color: var(--lg-ink-40);
-}
-.logos-root .l5 .l5x-peek {
-  display: flex;
-  flex-direction: column;
-  max-height: 42vh;
-  padding: 12px 16px 12px;
-  border: 1px solid rgba(var(--l5-tint-rgb), 0.16);
-  border-radius: 16px;
-  background: rgba(var(--l5-surface-rgb), 0.97);
-  box-shadow: var(--l5-shadow-up);
-}
-.logos-root .l5 .l5x-peek-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  margin-bottom: 4px;
-}
-.logos-root .l5 .l5x-peek-acts {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-.logos-root .l5 .l5x-peek-body {
-  min-height: 0;
-  overflow-y: auto;
-  font-size: 15.5px;
-  line-height: 1.6;
-}
-.logos-root .l5 .l5x-thinking {
-  margin: 0;
-  font-family: var(--l5-serif);
-  font-style: italic;
-  color: var(--lg-ink-40);
-}
-.logos-root .l5 .l5x-peek-fx {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  margin-top: 8px;
-}
-.logos-root .l5 .l5x-fx {
-  min-height: 28px;
-  padding: 0 10px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 999px;
-  background: var(--lg-paper);
-  color: var(--lg-primary);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
-}
-.logos-root .l5 .l5x-who {
-  font-family: var(--l5-serif);
-  font-style: italic;
-  font-size: 13.5px;
-  color: var(--lg-primary);
-}
-.logos-root .l5 .l5x-link {
-  padding: 0;
-  border: 0;
-  background: none;
-  color: var(--lg-primary);
-  font: inherit;
-  font-size: 12.5px;
-  cursor: pointer;
+  color: var(--c-ink-45);
 }
 
 /* ── the conversation, restyled ──────────────────────────────────── */
@@ -648,11 +255,6 @@
   font-size: 13.5px;
   color: var(--lg-primary);
 }
-.logos-root .l5 .l5x-convo .l5-prose,
-.logos-root .l5 .l5x-sheet .l5-prose {
-  font-size: 15.5px;
-  line-height: 1.62;
-}
 .logos-root .l5 .socria-ask {
   font-family: var(--l5-serif);
   font-style: italic;
@@ -666,7 +268,7 @@
   padding: 0 2px;
   border: 0;
   background: none;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   font-size: 12.5px;
 }
 .logos-root .l5 .l5-fx-chip:hover,
@@ -737,7 +339,7 @@
   padding: 0;
   border: 0;
   background: none;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
   font: inherit;
   cursor: pointer;
 }
@@ -845,11 +447,11 @@
   color: var(--lg-ink-60);
 }
 .logos-root .l5 .l5s-eyebrow {
-  font-size: 12.5px;
-  font-weight: 500;
-  letter-spacing: 0.14em;
+  font-size: 10.5px;
+  font-weight: 600;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5s-cdrop {
   width: min(560px, 100%);
@@ -879,7 +481,7 @@
 }
 .logos-root .l5 .l5s-cdrop-s {
   font-size: 12.5px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5s-csaid {
   width: min(560px, 100%);
@@ -1112,7 +714,7 @@
   font-weight: 600;
   letter-spacing: 0.18em;
   text-transform: uppercase;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5c-find {
   display: flex;
@@ -1120,7 +722,7 @@
   gap: 9px;
   padding: 0 0 8px;
   border-bottom: 1px solid var(--l5-hair);
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5c-find input {
   flex: 1 1 auto;
@@ -1169,33 +771,41 @@
   border-radius: 50%;
   background: var(--lg-primary);
 }
+/* the class is shared with Content's cards (l5v.css sets them 600): Instrument Serif has one weight, so the serif is
+   400 here — at 600 it came out faux bold */
 .logos-root .l5 .l5c-t {
   font-family: var(--l5-serif);
   font-size: 18px;
+  font-weight: 400;
   line-height: 1.2;
 }
 .logos-root .l5 .l5c-s {
   font-size: 12.5px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5c-none {
   margin: 0;
   font-size: 13.5px;
-  color: var(--lg-ink-40);
+  color: var(--c-ink-45);
 }
 .logos-root .l5 .l5c-join {
   align-self: flex-start;
   padding: 0;
   border: 0;
   background: none;
-  color: var(--lg-primary);
+  color: var(--c-moss);
   font: inherit;
   font-size: 13.5px;
+  font-weight: 500;
   cursor: pointer;
+  transition: color 0.2s;
 }
 .logos-root .l5 .l5c-join:hover {
-  text-decoration: underline;
-  text-underline-offset: 3px;
+  color: var(--c-ink);
+}
+.logos-root .l5 :is(.l5c-item, .l5c-join, .l5c-mind):focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 .logos-root .l5 .l5c-mind {
   align-self: flex-start;
@@ -1220,81 +830,7 @@
   .logos-root .l5 .l5-head-mid {
     display: none;
   }
-  .logos-root .l5 .l5x.is-narrow {
-    flex-direction: column;
-  }
-  .logos-root .l5 .l5x.is-narrow .l5x-canvas {
-    /* the folded sheet's measured height (components/LogosApp.tsx) */
-    padding-bottom: var(--sheet, 150px);
-  }
-  .logos-root .l5 .l5x-sheet {
-    position: absolute;
-    left: 0;
-    right: 0;
-    bottom: 0;
-    z-index: 8;
-    display: flex;
-    flex-direction: column;
-    gap: 6px;
-    max-height: 82%;
-    padding: 4px 16px calc(12px + env(safe-area-inset-bottom, 0px));
-    border-top: 1px solid var(--l5-hair);
-    border-radius: 16px 16px 0 0;
-    background: var(--l5-paper-hi);
-    box-shadow: 0 -20px 60px -30px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
-  }
   /* open: two thirds of the screen, from the foot — the map still in sight above it */
-  .logos-root .l5 .l5x-sheet.is-open {
-    height: 68%;
-    max-height: none;
-  }
-  .logos-root .l5 .l5x-sheet-grip {
-    align-self: center;
-    width: 64px;
-    min-height: 22px;
-    padding: 8px 12px;
-    border: 0;
-    background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.2);
-    background-clip: content-box;
-    border-radius: 999px;
-    cursor: pointer;
-  }
-  .logos-root .l5 .l5x-sheet-row {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 8px;
-    min-height: 32px;
-  }
-  .logos-root .l5 .l5x-sheet-row .l5x-link {
-    min-height: 44px;
-  }
-  .logos-root .l5 .l5x-sheet-last {
-    display: -webkit-box;
-    margin: 0;
-    overflow: hidden;
-    -webkit-line-clamp: 1;
-    -webkit-box-orient: vertical;
-    font-size: 15.5px;
-    line-height: 1.5;
-  }
-  .logos-root .l5 .l5x-sheet .l5-col {
-    flex: 1 1 auto;
-    min-height: 0;
-  }
-  .logos-root .l5 .l5x-sheet .l5-thread-in {
-    max-width: none;
-    padding: 4px 0 12px;
-  }
-  .logos-root .l5 .l5x-sheet .l5-dock {
-    max-width: none;
-    padding: 0;
-  }
-  .logos-root .l5 .l5x-sheet .lg-composer-box {
-    background: var(--lg-paper);
-    box-shadow: none;
-    border-color: rgba(var(--l5-tint-rgb), 0.16);
-  }
   .logos-root .l5 .l5x-canvas .l5s-start {
     bottom: 160px;
   }

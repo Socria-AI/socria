@@ -15,12 +15,10 @@
 import { Button, LogosNode, SpreadHead } from '@/components/ds';
 import { freePlanSentence, onePlanSentence } from '@/lib/entitlements';
 import { priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
-import { CHARTER, DOCS, ONE, PRIVACY, SiteFoot, SiteMast, SitePage, START, TERMS } from './chrome';
+import { INERT, ONE, SiteFoot, SiteMast, SitePage, START } from './chrome';
 import { Ico } from './icons';
 import { MapEdges, type MapEdge } from './MapEdges';
 import { UseCase, type UseCaseProps } from './UseCase';
-
-const INERT = { inert: '' } as Record<string, string>;
 
 const EDGES: MapEdge[] = [
   { from: 'c1', to: 'a' },
@@ -103,15 +101,11 @@ function Shot() {
           <div className="s-app-c">
             <span className="s-find">
               <Ico name="search" />
-              <span className="s-find-t">Search conversations, content, artifacts…</span>
+              <span className="s-find-t">Search conversations, files, artifacts…</span>
               <kbd>⌘K</kbd>
             </span>
           </div>
           <div className="s-app-r">
-            <span className="s-chip is-on">
-              <Ico name="split" stroke={1.7} />
-              <span>Split View</span>
-            </span>
             <span className="s-ib">
               <Ico name="network" />
             </span>
@@ -124,12 +118,12 @@ function Shot() {
         <div className="s-app-tabs">
           <div className="s-tabrow">
             <span className="s-tab">
-              Chat<span className="s-count">4</span>
+              Conversation<span className="s-count">4</span>
             </span>
-            <span className="s-tab">
-              Content<span className="s-count">1</span>
+            <span className="s-tab is-mid">
+              Files<span className="s-count">1</span>
             </span>
-            <span className="s-tab">Artifacts</span>
+            <span className="s-tab is-mid">Artifacts</span>
             <span className="s-tab is-on">
               Logic Map<span className="s-count">6</span>
             </span>
@@ -162,7 +156,7 @@ function Shot() {
           </div>
           <div className="s-beside">
             <div className="s-beside-head">
-              <span>Chat</span>
+              <span>Conversation</span>
               <span className="s-ib">
                 <Ico name="close" />
               </span>
@@ -221,7 +215,7 @@ function Shot() {
                 </div>
                 <div className="s-omni-row">
                   <span className="s-omni-depth">
-                    Thoughtful <Ico name="down" size={10} stroke={2} />
+                    Balanced <Ico name="down" size={10} stroke={2} />
                   </span>
                   <span className="s-send">
                     <Ico name="send" size={16} stroke={1.9} />
@@ -271,14 +265,7 @@ function Exchange({
 export function Landing() {
   return (
     <SitePage>
-      <SiteMast
-        links={[{ href: '#session', label: 'A conversation' }, ONE, CHARTER]}
-        go={
-          <Button as="a" href={START} variant="primary" size="md">
-            Start a conversation
-          </Button>
-        }
-      />
+      <SiteMast />
 
       <main>
         <section className="s-sec s-cover" aria-labelledby="s-cover-h">
@@ -399,25 +386,14 @@ export function Landing() {
         </section>
 
         <section className="s-sec s-close-sec" aria-label="The close">
-          <div className="s-wrap s-close-in">
+          <div className="s-wrap">
             <p className="s-close">
               The next one will need <em>less help.</em>
             </p>
-            <SiteFoot
-              middle={<span>Logos 5 · MMXXVI</span>}
-              links={[
-                CHARTER,
-                ONE,
-                DOCS,
-                PRIVACY,
-                TERMS,
-                { href: 'https://www.linkedin.com/company/socria', label: 'LinkedIn' },
-                { href: 'https://www.instagram.com/socriaai', label: '@socriaai' },
-              ]}
-            />
           </div>
         </section>
       </main>
+      <SiteFoot middle="Logos 5 · MMXXVI" />
     </SitePage>
   );
 }

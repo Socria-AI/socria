@@ -997,12 +997,13 @@ export function BubbleMap({
 
       {drag?.kind === 'lasso' && <div className="l5h-lasso" style={{ left: Math.min(drag.x0, drag.x1), top: Math.min(drag.y0, drag.y1), width: Math.abs(drag.x1 - drag.x0), height: Math.abs(drag.y1 - drag.y0) }} aria-hidden="true" />}
 
+      {/* the one zoom control's order (universe.css .l5h-zoom): − then + then Fit — no readout here */}
       <div className="l5h-zoom" data-control style={{ bottom: bottom + 14 }}>
-        <button type="button" aria-label="Zoom in" onClick={() => ((touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k * 1.25, size.w / 2, size.h / 2))))}>
-          +
-        </button>
         <button type="button" aria-label="Zoom out" onClick={() => ((touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k / 1.25, size.w / 2, size.h / 2))))}>
           −
+        </button>
+        <button type="button" aria-label="Zoom in" onClick={() => ((touched.current = true), setCam(keep(zoomAt(camRef.current, camRef.current.k * 1.25, size.w / 2, size.h / 2))))}>
+          +
         </button>
         <button type="button" className="is-fit" aria-label="Fit the map to the screen" onClick={() => ((touched.current = false), fitNow())}>
           Fit

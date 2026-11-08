@@ -2,7 +2,7 @@
    number and a blank. Grades are said in words. */
 .dsp .dsp-ex-source { margin: 0 0 8px; font-size: 12px; color: var(--dsp-60); }
 .dsp .dsp-ex-unverified { color: var(--dsp-tension); }
-.dsp .dsp-ex-box { padding: 4px 6px; border: 1px solid var(--dsp-24); border-radius: 5px; background: var(--dsp-panel); font-size: 12px; }
+.dsp .dsp-ex-box { padding: 4px 6px; border: 1px solid var(--dsp-24); border-radius: var(--lg-r-inner, 10px); background: var(--dsp-panel); font-size: 12px; }
 .dsp .dsp-ex-box.is-secret { border-style: dashed; }
 .dsp .dsp-ex-box.is-right { border-color: var(--dsp-primary); }
 .dsp .dsp-ex-box.is-wrong { border-color: var(--dsp-tension); }

@@ -18,7 +18,7 @@
 
 import { useMemo, useState } from 'react';
 import Link from 'next/link';
-import { Colophon } from '@/components/Colophon';
+import { SiteFoot, SiteMast } from '@/components/site/chrome';
 import {
   SUPPORT_EMAIL,
   TOPICS,
@@ -84,6 +84,8 @@ export function SupportPage() {
 
   return (
     <div className="sp-root">
+      <SiteMast />
+
       <section className="qhead">
         <div className="qwrap">
           <span className="lbl moss">Support</span>
@@ -241,11 +243,7 @@ export function SupportPage() {
         </div>
       </section>
 
-      <div className="sp-body" style={{ paddingTop: 0 }}>
-        <div className="qwrap">
-          <Colophon />
-        </div>
-      </div>
+      <SiteFoot />
     </div>
   );
 }

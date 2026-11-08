@@ -57,7 +57,7 @@
   color: var(--ink-70, rgba(31, 31, 31, 0.7));
   cursor: pointer;
 }
-.eng-tab:hover { border-color: var(--moss-600, #5e7633); }
+.eng-tab:hover { border-color: var(--moss-600, #354620); }
 .eng-tab.is-on {
   background: var(--moss-700, #475a28);
   border-color: var(--moss-700, #475a28);
@@ -104,7 +104,7 @@
   color: var(--ink-70, rgba(31, 31, 31, 0.7));
   cursor: pointer;
 }
-.eng-ops button:hover { border-color: var(--moss-600, #5e7633); }
+.eng-ops button:hover { border-color: var(--moss-600, #354620); }
 .eng-ops span {
   margin-left: 6px;
   font-family: var(--serif);

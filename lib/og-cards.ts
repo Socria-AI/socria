@@ -74,7 +74,7 @@ const FIXED: Record<string, OgCard> = {
   docs: {
     kicker: 'Socria Docs',
     title: 'How the whole thing works.',
-    line: 'The models, the Thinking Map, documents, Socria One and your data.',
+    line: 'The models, the Logic Map, documents, Socria One and your data.',
   },
   blog: {
     kicker: 'The Socria Blog',

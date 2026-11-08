@@ -34,7 +34,7 @@ export function UseCases() {
         is exactly the kind of thinking that benefits from being seen: the
         reasons, the assumptions holding them together, and the tensions
         between them. Ask for the structure — &ldquo;what does this rest
-        on?&rdquo; — and the <Link href="/docs/thinking-map">Thinking Map</Link>{' '}
+        on?&rdquo; — and the <Link href="/docs/thinking-map">Logic Map</Link>{' '}
         draws it beside the conversation — when two of your own reasons pull
         against each other, the map shows the conflict as a drawn edge rather
         than letting it hide in prose. Weighing options? Ask for a comparison
@@ -73,7 +73,7 @@ export function UseCases() {
 
       <H2 id="math">Working through math</H2>
       <p>
-        <strong>Ask in Chat; open the Logic Map for the working.</strong>{' '}
+        <strong>Ask in the conversation; open the Logic Map for the working.</strong>{' '}
         A derivative, integral, limit or root you ask for is computed by the
         engine rather than recalled, and your own steps are checked against
         it. On the map, givens, unknowns, equation steps, mistakes and results

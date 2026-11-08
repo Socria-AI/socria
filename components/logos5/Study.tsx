@@ -35,6 +35,7 @@ import {
   type StudyTopic,
 } from '@/lib/logos5/study';
 import { MakeGallery } from './MakeGallery';
+import { L5Close } from './L5Chrome';
 import './study.css';
 
 /** a layout effect in the browser; on the server (which renders first) an ordinary one, so nothing warns */
@@ -277,9 +278,7 @@ export function StartPanel({
 }) {
   return (
     <section className="l5s-start" aria-label="Where to start">
-      <button type="button" className="l5s-x l5s-start-x" aria-label="Close" onClick={onClose}>
-        ×
-      </button>
+      <L5Close className="l5s-x l5s-start-x" label="Close" onClose={onClose} />
       <p className="l5s-start-k">
         <b>Socria</b> · {sortedSaid(study)}
         {study.plain ? ' by their own headings' : ''}
@@ -355,9 +354,7 @@ export function TopicInspector({
         <p className="l5s-insp-k">
           Topic · {n} {n === 1 ? 'source' : 'sources'}
         </p>
-        <button type="button" className="l5s-x" aria-label="Close" onClick={onClose}>
-          ×
-        </button>
+        <L5Close className="l5s-x" label="Close" onClose={onClose} />
       </div>
       <h3 className="l5s-insp-t">{topic.title}</h3>
       {topic.summary && <p className="l5s-insp-sum">{topic.summary}</p>}

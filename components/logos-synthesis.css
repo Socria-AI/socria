@@ -19,7 +19,7 @@
 
 .logos-root .syn-eyebrow {
   display: flex; flex-wrap: wrap; align-items: baseline; gap: 7px; margin: 0 0 10px;
-  font-size: 10px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-primary);
+  font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-primary);
 }
 .logos-root .syn-eyebrow > span:not(:first-child) { color: var(--lg-ink-40); font-weight: 500; }
 .logos-root .syn-src { margin-left: auto; letter-spacing: 0.12em; font-weight: 500; }
@@ -34,7 +34,7 @@
 }
 
 .logos-root .syn-k {
-  margin: 0 0 7px; font-size: 9.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-ink-40);
+  margin: 0 0 7px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-45);
 }
 .logos-root .syn-k em { font-family: var(--serif); font-style: italic; font-weight: 400; letter-spacing: 0; text-transform: none; font-size: 12.5px; color: var(--lg-ink-40); }
 .logos-root .syn-sec { padding: 12px 0 2px; }
@@ -65,7 +65,7 @@
 .logos-root .syn-socria .syn-list li::before, .logos-root .syn-possible .syn-list li::before { background: var(--syn-blue); }
 .logos-root .syn-critique .syn-list li { display: grid; grid-template-columns: 118px 1fr; gap: 10px; padding-left: 0; }
 .logos-root .syn-critique .syn-list li::before { display: none; }
-.logos-root .syn-level { font-size: 10px; font-weight: 600; letter-spacing: 0.08em; text-transform: uppercase; padding-top: 3px; color: var(--lg-ink-40); }
+.logos-root .syn-level { font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; padding-top: 3px; color: var(--c-ink-45); }
 .logos-root .syn-critique li.is-problem .syn-level { color: var(--lg-tension); }
 .logos-root .syn-critique li.is-suggestion .syn-level { color: var(--syn-blue); }
 .logos-root .syn-p-label { display: block; font-family: var(--serif); font-size: 17px; line-height: 1.25; }
@@ -110,23 +110,17 @@
 .logos-root .ws-dock .syn-title { font-size: 28px; }
 
 /* the Synthesize door, beside the composer */
-.logos-root .lg-synth {
-  display: inline-flex; align-items: center; gap: 6px; margin-right: auto;
-  border: 1px solid var(--lg-line); background: none; border-radius: 999px; padding: 5px 12px 5px 10px; cursor: pointer;
-  font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60);
-}
-.logos-root .lg-synth:hover:not(:disabled) { color: var(--lg-primary); border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.45); }
-.logos-root .lg-synth:disabled { opacity: 0.45; cursor: default; }
-.logos-root .lg-synth svg { flex: 0 0 auto; }
 
 /* several objects picked on the map */
 .logos-root .lg-picked-bar {
   position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 9;
   display: flex; align-items: center; gap: 12px; padding: 6px 8px 6px 14px; border-radius: 999px;
-  background: var(--surface, #fff); border: 1px solid var(--lg-line); box-shadow: 0 10px 30px -18px rgba(var(--shadow-rgb, 32, 32, 27), 0.5);
+  background: var(--surface, #fff); border: 1px solid var(--lg-line); box-shadow: var(--l5-shadow-up);
   font-family: var(--lg-sans); font-size: 12.5px; color: var(--lg-ink-60);
 }
 .logos-root .lg-picked-bar button { border: 0; background: none; cursor: pointer; font: inherit; color: var(--lg-ink-60); padding: 4px 8px; border-radius: 999px; }
-.logos-root .lg-picked-bar button.is-go { background: var(--lg-primary); color: var(--lg-paper); }
+/* the bar's one filled control: ink, moss when reached for (l5-controls .l5-btn.is-primary) */
+.logos-root .lg-picked-bar button.is-go { background: var(--c-ink); color: var(--c-paper); font-weight: 500; transition: background-color 0.2s; }
+.logos-root .lg-picked-bar button.is-go:hover:not(:disabled) { background: var(--c-moss); }
 .logos-root .lg-node.is-picked { box-shadow: 0 0 0 2px var(--lg-accent); }
 .logos-root .lg-node.is-socria { border-style: dashed; }

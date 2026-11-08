@@ -110,42 +110,13 @@
   line-height: 1.25;
   color: var(--lg-ink);
 }
-:is(.l5v-home, .l5v-btn, .l5v-icon):focus-visible {
-  outline: 2px solid var(--l5b-focus);
+:is(.l5v-home, .l5v-btn):focus-visible {
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
-}
-/* a glyph beside the title: the one icon button */
-.l5v-icon {
-  display: inline-grid;
-  place-items: center;
-  width: 32px;
-  height: 32px;
-  flex: 0 0 auto;
-  border: 0;
-  border-radius: 999px;
-  background: transparent;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
-  cursor: pointer;
-  -webkit-tap-highlight-color: transparent;
-}
-.l5v-icon:hover {
-  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06);
-  color: var(--lg-ink);
 }
 /* Search: a quiet key with its ⌘K */
 .logos-root .l5v-search {
   gap: 8px;
-}
-.l5v-kbd {
-  display: inline-flex;
-  align-items: center;
-  height: 20px;
-  padding: 0 6px;
-  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.16);
-  border-radius: 6px;
-  font: 600 10.5px/1 var(--l5-ui);
-  letter-spacing: 0.04em;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
 }
 /* the switch sits in the bar's middle at its own 36px tray (l5-controls.css) */
 .l5v-top .l5-switch {
@@ -250,149 +221,10 @@
 .l5v-btn:is(.is-on, [aria-expanded='true']) svg {
   color: var(--l5b-fill);
 }
-.l5v-link {
-  border: 0;
-  padding: 0;
-  background: none;
-  color: var(--lg-primary);
-  font: inherit;
-  font-weight: 500;
-  cursor: pointer;
-}
-.l5v-link:hover {
-  text-decoration: underline;
-}
 
 /* ── Split View ─────────────────────────────────────────────────────── */
 .l5v-split {
   position: relative;
-}
-.l5v-menu {
-  position: absolute;
-  right: 0;
-  top: calc(100% + 6px);
-  z-index: 40;
-  width: 300px;
-  max-height: min(70vh, 560px);
-  overflow: auto;
-  padding: 8px;
-  border: 1px solid var(--l5-hair);
-  border-radius: 10px;
-  background: var(--l5-raise);
-  box-shadow: var(--l5-shadow);
-}
-.l5v-menu-h {
-  margin: 4px 8px 6px;
-  font-size: 12.5px;
-  font-weight: 600;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
-}
-.l5v-menu-s {
-  margin: 10px 8px 4px;
-  font-size: 12.5px;
-  font-weight: 600;
-  letter-spacing: 0.02em;
-  text-transform: uppercase;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
-}
-.l5v-mi {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 1px;
-  width: 100%;
-  padding: 7px 8px;
-  border: 0;
-  border-radius: 10px;
-  background: none;
-  color: var(--lg-ink);
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-}
-.l5v-mi:hover,
-.l5v-mi:focus-visible {
-  background: rgba(var(--l5-tint-rgb), 0.08);
-}
-.l5v-mi.is-on {
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.09);
-}
-.l5v-mi-t {
-  font-size: 13.5px;
-  font-weight: 500;
-}
-.l5v-mi-s {
-  font-size: 12.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
-}
-.l5v-mi.is-close {
-  margin-top: 6px;
-  border-top: 1px solid var(--l5-hair);
-  border-radius: 0 0 10px 10px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.75);
-  font-size: 13.5px;
-}
-
-/* ── the four views ─────────────────────────────────────────────────── */
-.l5v-tabrow {
-  flex: 0 0 auto;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  padding: 0 14px;
-  height: 44px;
-  border-bottom: 1px solid var(--l5-hair);
-  background: var(--lg-paper);
-}
-.l5v-tabs {
-  display: flex;
-  gap: 2px;
-  height: 100%;
-}
-.l5v-tab {
-  position: relative;
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  height: 100%;
-  padding: 0 12px;
-  border: 0;
-  border-bottom: 2px solid transparent;
-  background: none;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
-  font: inherit;
-  font-size: 13.5px;
-  font-weight: 500;
-  cursor: pointer;
-}
-.l5v-tab:hover {
-  color: var(--lg-ink);
-}
-.l5v-tab.is-on {
-  color: var(--lg-ink);
-  border-bottom-color: var(--lg-primary);
-}
-.l5v-count {
-  min-width: 18px;
-  padding: 0 5px;
-  border-radius: 10px;
-  background: rgba(var(--l5-tint-rgb), 0.1);
-  font-size: 12.5px;
-  line-height: 18px;
-  text-align: center;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
-}
-.l5v-dot {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: var(--lg-primary);
-}
-.l5v-tab-acts {
-  display: flex;
-  align-items: center;
-  gap: 8px;
 }
 
 /* ── the body: a view, and what is beside it ────────────────────────── */
@@ -434,10 +266,13 @@
   background: transparent;
   border-left: 1px solid var(--l5-hair);
 }
-.l5v-divider:hover,
-.l5v-divider:focus-visible {
+.l5v-divider:hover {
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.12);
-  outline: none;
+}
+/* it takes the arrow keys: with the keys it shows the focus ring (inside it — it is a 6px strip), not a hover tint */
+.logos-root .l5 .l5v-divider:focus-visible {
+  outline: 2px solid var(--c-moss);
+  outline-offset: -2px;
 }
 .l5v-beside {
   flex: 0 0 var(--beside);
@@ -478,12 +313,6 @@
 .l5v-beside-body > .l5v-logic {
   flex: 1 1 auto;
   min-height: 0;
-}
-.l5v-menu-none {
-  margin: 4px 8px 8px;
-  font-size: 13.5px;
-  line-height: 1.45;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
 }
 
 /* Chat: one centred column */
@@ -585,7 +414,7 @@
   display: grid;
   gap: 4px;
   font-size: 13.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5v-steps li {
   display: flex;
@@ -593,10 +422,10 @@
   gap: 8px;
 }
 .l5v-steps li.is-done {
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5v-steps li.is-next {
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5v-spin {
   width: 12px;
@@ -630,6 +459,8 @@
 }
 
 /* ── search ─────────────────────────────────────────────────────────── */
+/* A dialog over the app (the dialog rule): the page dimmed with the one token, never blurred; a 16px panel on the
+   surface; the bare × top right — a touch screen has no Esc key. Its field takes the moss line when it has the keys. */
 .l5gs-scrim {
   position: fixed;
   inset: 0;
@@ -638,7 +469,7 @@
   justify-content: center;
   align-items: flex-start;
   padding: 12vh 16px 16px;
-  background: rgba(var(--shadow-rgb, 20, 22, 18), 0.32);
+  background: var(--lg-dim, rgba(var(--shadow-rgb, 20, 22, 18), 0.32));
 }
 .l5gs {
   width: min(640px, 100%);
@@ -646,10 +477,10 @@
   display: flex;
   flex-direction: column;
   border: 1px solid var(--l5-hair);
-  border-radius: 16px;
-  background: var(--l5-raise);
+  border-radius: var(--lg-r-dialog, 16px);
+  background: var(--l5-surface);
   color: var(--lg-ink);
-  box-shadow: 0 20px 60px -20px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  box-shadow: var(--l5-shadow-up);
   font-family: var(--l5-ui, var(--lg-sans));
   overflow: hidden;
 }
@@ -657,9 +488,13 @@
   display: flex;
   align-items: center;
   gap: 10px;
-  padding: 12px 14px;
+  padding: 10px 10px 10px 14px;
   border-bottom: 1px solid var(--l5-hair);
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
+  transition: border-color 0.2s;
+}
+.l5gs-in:focus-within {
+  border-bottom-color: var(--c-moss);
 }
 .l5gs-in input {
   flex: 1;
@@ -671,11 +506,19 @@
   font-size: 15.5px;
   outline: none;
 }
+.l5gs-in .l5gs-x {
+  margin: 0;
+}
+@media (pointer: coarse) {
+  .l5gs-in .l5gs-esc {
+    display: none;
+  }
+}
 .l5gs-empty {
   margin: 0;
   padding: 18px 16px;
   font-size: 13.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5gs-list {
   list-style: none;
@@ -704,7 +547,7 @@
   font-weight: 500;
   white-space: nowrap;
   text-overflow: ellipsis;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.6);
+  color: var(--c-ink-60);
 }
 .l5gs-main {
   display: flex;
@@ -719,7 +562,7 @@
 }
 .l5gs-s {
   font-size: 12.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -732,7 +575,7 @@
 .l5c-help {
   margin: 0 0 10px;
   font-size: 12.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5c-canvas {
   position: relative;
@@ -777,7 +620,7 @@
 .l5c-meta {
   font-size: 12.5px;
   font-weight: 500;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5c-t {
   font-size: 15.5px;
@@ -789,7 +632,7 @@
 }
 .l5c-snip {
   font-size: 12.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
   display: -webkit-box;
   -webkit-line-clamp: 2;
   -webkit-box-orient: vertical;
@@ -804,7 +647,7 @@
   border: 0;
   border-radius: 6px;
   background: none;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
   font-size: 15.5px;
   cursor: pointer;
 }
@@ -872,7 +715,7 @@
 .l5c-out {
   border: 0;
   background: none;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
   font: inherit;
   font-size: 12.5px;
   cursor: pointer;
@@ -887,7 +730,7 @@
   padding: 22px 16px;
   border: 1.5px dashed rgba(var(--lg-ink-rgb, 35, 36, 31), 0.18);
   border-radius: 16px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
   text-align: center;
   cursor: pointer;
 }
@@ -907,7 +750,7 @@
 }
 .l5c-drop-s {
   font-size: 12.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5c-topics {
   margin-top: 28px;
@@ -918,7 +761,7 @@
   font-weight: 600;
   letter-spacing: 0.02em;
   text-transform: uppercase;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5c-readhead {
   display: flex;
@@ -946,7 +789,7 @@
   max-width: 440px;
   padding: 32px 20px;
   text-align: center;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
 .l5v-empty h2 {
   margin: 0 0 6px;
@@ -1004,8 +847,7 @@
 }
 /* every card already names its kind: no colour key at the map's foot */
 .l5v-logic .lg-legend,
-.l5v-logic .mp-bot,
-.l5v-panel .mp-bot {
+.l5v-logic .mp-bot {
   display: none;
 }
 /* the composer's words, and what it says when empty, in the shell's one type */
@@ -1013,18 +855,6 @@
   font-family: inherit;
   font-style: normal;
   font-size: inherit;
-}
-
-/* ── a panel docked beside ──────────────────────────────────────────── */
-.l5v-panel {
-  flex: 1 1 auto;
-  min-height: 0;
-  display: flex;
-  flex-direction: column;
-}
-.l5v-panel > * {
-  flex: 1 1 auto;
-  min-height: 0;
 }
 
 /* the one way on (buttons.css .is-primary): filled in the primary ink, lit from above, a darker lip */
@@ -1052,15 +882,12 @@
   cursor: default;
 }
 @media (prefers-reduced-motion: reduce) {
-  :is(.l5v-home, .l5v-btn, .l5v-icon) {
+  :is(.l5v-home, .l5v-btn) {
     transition: none;
   }
-  :is(.l5v-home, .l5v-btn, .l5v-icon):is(:hover, :active) {
+  :is(.l5v-home, .l5v-btn):is(:hover, :active) {
     transform: none !important;
   }
-}
-.l5v-link.is-quiet {
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
 }
 
 /* ── Rule B: what a turn brought, said under it ─────────────────────── */
@@ -1081,9 +908,11 @@
 }
 .l5v-ingest-k {
   font-weight: 600;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
+  color: var(--c-ink-70);
 }
-.l5v-ingest .l5v-link {
+/* each file brought is a word that goes to it (.l5-link.is-go); a long name ends in "…" */
+.logos-root .l5v-ingest .l5-link.is-go {
+  display: block;
   max-width: 260px;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -1150,16 +979,6 @@
     padding: 0;
     justify-content: center;
   }
-  .l5v-tabrow {
-    padding: 0 6px;
-    overflow-x: auto;
-  }
-  .l5v-tab {
-    padding: 0 10px;
-  }
-  .l5v-tab-acts {
-    display: none;
-  }
   .l5v-omni {
     left: 0;
     right: 0;
@@ -1210,7 +1029,7 @@
   transform: none;
 }
 .logos-root .l5-clip:focus-visible {
-  outline: 2px solid var(--l5b-focus);
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 @media (prefers-reduced-motion: reduce) {
@@ -1238,11 +1057,6 @@
   .lg-send-spin {
     animation: none;
   }
-}
-
-/* a message's own actions (Copy, Reply, Retry): quiet, and still readable (WCAG AA) */
-.logos-root .l5 .l5-act {
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
 }
 
 /* ── where the conversation sits: the panel beside, on any edge ─────────
@@ -1373,8 +1187,8 @@
   background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.1);
 }
 .l5v-side:focus-visible {
-  outline: 2px solid var(--lg-primary);
-  outline-offset: 1px;
+  outline: 2px solid var(--c-moss);
+  outline-offset: 2px;
 }
 
 /* dragged: the four edges marked, and the one it would dock on drawn where it would be */
@@ -1474,45 +1288,6 @@
   }
 }
 
-/* Split View's choice of side: four little screens, the conversation's edge marked */
-.l5v-menu-sides {
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 4px;
-  padding: 2px 2px 4px;
-}
-.l5v-menu-side {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 4px;
-  padding: 8px 4px 7px;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  background: none;
-  font: inherit;
-  font-size: 12.5px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.72);
-  cursor: pointer;
-  transition:
-    color 0.2s,
-    background-color 0.2s,
-    border-color 0.2s;
-}
-.l5v-menu-side:hover {
-  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.04);
-  color: var(--lg-ink);
-}
-.l5v-menu-side.is-on {
-  border-color: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.4);
-  background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.07);
-  color: var(--lg-primary);
-}
-.l5v-menu-side:focus-visible {
-  outline: 2px solid var(--lg-primary);
-  outline-offset: 1px;
-}
-
 /* the conversation put at the top: the composer floats at the top of a view, and its menus open downward */
 .l5v-body.omni-top .l5v-omni {
   top: 12px;
@@ -1541,8 +1316,7 @@
     animation: none;
   }
   .l5v-side,
-  .l5v-menu-side,
-  .l5v-dock-zone {
+.l5v-dock-zone {
     transition: none;
   }
 }
@@ -1560,12 +1334,6 @@
     height: 44px;
     padding: 0;
     justify-content: center;
-    border-radius: var(--l5b-r);
-  }
-  /* More, beside it on the other side: the same key */
-  .logos-root .l5v-top-r > .l5-menuhost > .l5-icon {
-    width: 44px;
-    height: 44px;
     border-radius: var(--l5b-r);
   }
   .l5v-title {
@@ -1780,28 +1548,9 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   font-size: 15.5px;
   line-height: 1.65;
 }
+/* a message's actions are words (.l5-act, l5.css): unpadded, so the row sits flush with the words above it */
 .logos-root .l5 .l5-acts {
-  gap: 0;
-  margin: 6px 0 0 -12px;
-}
-.logos-root .l5 .l5-u .l5-acts {
-  margin: 6px -12px 0 0;
-}
-.logos-root .l5 .l5-act {
-  height: 32px;
-  min-height: 32px;
-  padding: 0 12px;
-  border-radius: 999px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.7);
-  font-size: 13.5px;
-  font-weight: 500;
-}
-.logos-root .l5 .l5-act:hover {
-  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06);
-  color: var(--lg-ink);
-}
-.logos-root .l5 .l5-act svg {
-  display: none;
+  margin: 6px 0 0;
 }
 /* "Asked about": a label on its own line, then what was asked about — no box, no border */
 .logos-root .l5 .l5-about {
@@ -2024,7 +1773,14 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
   font-family: var(--l5-serif);
   font-style: italic;
   font-size: 18px;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.45);
+  color: var(--c-ink-45);
+}
+/* the field draws no ring of its own: the line above it turns moss while it has the keys */
+.logos-root .l5 .l5-ask-in {
+  transition: border-color 0.2s;
+}
+.logos-root .l5 .l5-ask-in:focus-within {
+  border-top-color: var(--c-moss);
 }
 .logos-root .l5 .l5-ask-go {
   width: 32px;

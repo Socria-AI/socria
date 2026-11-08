@@ -276,7 +276,7 @@
 .sfx-sec-k {
   font-size: 10.5px;
   font-weight: 600;
-  letter-spacing: 0.14em;
+  letter-spacing: 0.18em;
   text-transform: uppercase;
   color: var(--sfx-faint);
 }
@@ -389,6 +389,8 @@
 .sfx-ctl input[type='range']:focus-visible::-webkit-slider-thumb { transform: scale(1.15); }
 .sfx-ctl input[type='range']:focus-visible { outline: none; }
 .sfx-ctl input[type='range']:focus-visible::-webkit-slider-thumb { box-shadow: 0 0 0 4px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.18); }
+/* Firefox draws its own thumb: the same ring on it, or keyboard focus showed nothing there */
+.sfx-ctl input[type='range']:focus-visible::-moz-range-thumb { box-shadow: 0 0 0 4px rgba(var(--lg-primary-rgb, 53, 70, 32), 0.18); }
 .sfx-ctl input[type='range']:disabled { cursor: default; opacity: 0.55; }
 /* what moving it does: said when the control is being used, not before */
 .sfx-ctl-help {

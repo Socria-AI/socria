@@ -121,7 +121,7 @@ console.log('=== the marks: the rail, beside the Socria mark ===');
   const rail = read('components/LogosRail.tsx');
   const app = read('components/LogosApp.tsx');
   // The Core rail's marks were archived with it.
-  ok('Logos rail: the marks right after the Socria mark', /<div className="s-top">\s*<Logo \/>\s*<RewardsBadges enabled=\{rewards\} \/>/.test(rail));
+  ok('Logos rail: the marks right after the Socria mark', /<div className="s-top">\s*<Logo size="md" markSrc="\/socria-mark\.png" href="\/" \/>\s*<RewardsBadges enabled=\{rewards\} \/>/.test(rail));
   ok('…for a signed-in person only', /rewards = false,/.test(rail) && /<LogosRail\s+sessions=\{sessions\}\s+rewards=\{cloud\}/.test(app));
   const badges = read('components/rewards/RewardsBadges.tsx');
   ok('the gift while there is a link to give', /const showGive = !!view\.link;/.test(badges));

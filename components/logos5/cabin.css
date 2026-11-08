@@ -4,7 +4,9 @@
  * second tone with a hairline, places 92px with a word under each drawing,
  * the one you are in held in moss; and across the app every control at least
  * 56px, the words a size up, the composer voice-first. The app moves right by
- * the dock's width; nothing else about it changes. */
+ * the dock's width; nothing else about it changes. Every colour is a theme
+ * token (the dock sits inside .logos-root), so on Dark, One and Night the dock
+ * is that ground's second tone, not cream beside a dark app. */
 
 .cab-dock {
   position: fixed;
@@ -17,9 +19,9 @@
   flex-direction: column;
   align-items: center;
   padding: calc(18px + env(safe-area-inset-top, 0px)) 0 18px;
-  background: #eeebe0;
-  border-right: 1px solid rgba(35, 36, 31, 0.1);
-  color: #23241f;
+  background: color-mix(in srgb, var(--paper-2) 72%, var(--c-paper));
+  border-right: 1px solid rgba(var(--c-ink-rgb), 0.1);
+  color: var(--c-ink);
   font-family: var(--lg-sans, var(--sans, system-ui, sans-serif));
 }
 .cab-brand {
@@ -34,7 +36,7 @@
   opacity: 0.9;
 }
 .cab-brand span {
-  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-family: var(--l5-serif);
   font-size: 19px;
 }
 .cab-places {
@@ -57,14 +59,14 @@
   border: 0;
   border-radius: 22px;
   background: none;
-  color: rgba(35, 36, 31, 0.66);
+  color: var(--c-ink-60);
   font: inherit;
   font-size: 14px;
   font-weight: 500;
   cursor: pointer;
   transition:
-    background-color 0.25s cubic-bezier(0.16, 1, 0.3, 1),
-    color 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+    background-color 0.2s var(--c-ease),
+    color 0.2s var(--c-ease);
 }
 .cab-place svg {
   width: 30px;
@@ -76,8 +78,8 @@
   stroke-linejoin: round;
 }
 .cab-place.is-on {
-  background: rgba(53, 70, 32, 0.11);
-  color: #354620;
+  background: rgba(var(--c-moss-rgb), 0.11);
+  color: var(--c-moss);
   font-weight: 600;
 }
 .cab-place:disabled {
@@ -87,13 +89,13 @@
 .cab-place:focus-visible,
 .cab-leave:focus-visible,
 .cab-note button:focus-visible {
-  outline: 3px solid #354620;
+  outline: 2px solid var(--c-moss);
   outline-offset: 2px;
 }
 @media (hover: hover) {
   .cab-place:not(:disabled):not(.is-on):hover {
-    background: rgba(35, 36, 31, 0.05);
-    color: #23241f;
+    background: rgba(var(--c-ink-rgb), 0.05);
+    color: var(--c-ink);
   }
 }
 .cab-rule {
@@ -101,7 +103,7 @@
   width: 40px;
   height: 1px;
   margin: 6px auto;
-  background: rgba(35, 36, 31, 0.14);
+  background: rgba(var(--c-ink-rgb), 0.14);
 }
 .cab-leave {
   margin-top: auto;
@@ -109,13 +111,13 @@
   padding: 6px 8px;
   border: 0;
   background: none;
-  font-family: var(--serif, 'Instrument Serif', Georgia, serif);
+  font-family: var(--l5-serif);
   font-size: 16px;
   font-style: italic;
   line-height: 1.15;
-  color: #354620;
+  color: var(--c-moss);
   text-decoration: underline;
-  text-decoration-color: rgba(53, 70, 32, 0.4);
+  text-decoration-color: rgba(var(--c-moss-rgb), 0.4);
   text-underline-offset: 4px;
   cursor: pointer;
 }
@@ -131,12 +133,12 @@
   align-items: center;
   gap: 16px;
   padding: 14px 14px 14px 20px;
-  border: 1px solid rgba(53, 70, 32, 0.18);
-  border-radius: 20px;
-  background: #fffdf8;
-  box-shadow: 0 24px 48px -28px rgba(35, 36, 31, 0.45);
-  color: #23241f;
-  font-family: var(--lg-sans, system-ui, sans-serif);
+  border: 1px solid var(--c-rule-2);
+  border-radius: var(--lg-r-card);
+  background: var(--l5-surface);
+  box-shadow: var(--l5-shadow-up);
+  color: var(--c-ink);
+  font-family: var(--lg-sans);
   font-size: 16px;
   line-height: 1.4;
   animation: cab-rise 0.5s cubic-bezier(0.16, 1, 0.3, 1) both;
@@ -144,17 +146,22 @@
 .cab-note p {
   margin: 0;
 }
+/* the note's one filled control: the ink pill, at a finger's size */
 .cab-note button {
   flex: none;
   min-height: 52px;
   padding: 0 22px;
   border: 0;
-  border-radius: 26px;
-  background: #23241f;
-  color: #f5f3eb;
+  border-radius: 999px;
+  background: var(--c-ink);
+  color: var(--c-paper);
   font: inherit;
-  font-weight: 600;
+  font-weight: 500;
   cursor: pointer;
+  transition: background-color 0.2s;
+}
+.cab-note button:hover {
+  background: var(--c-moss);
 }
 @keyframes cab-rise {
   from {
@@ -185,7 +192,7 @@
   min-height: 58px;
   font-size: 17px;
 }
-/* the line of thinking's own bar: the way back, the title, search, Split View, ⋯ */
+/* the line of thinking's own bar: the way back, the title, the views, search, ⋯ */
 .logos-root.is-cabin .l5v-top {
   height: 80px;
   padding: 0 20px;
@@ -196,12 +203,9 @@
   height: 56px;
   min-width: 56px;
   padding: 0 18px;
-  /* the keys' softened corner at a finger's size (components/logos5/buttons.css), not a pill */
+  /* the keys' softened corner at a finger's size, not a pill */
   border-radius: 14px;
   font-size: 17px;
-}
-.logos-root.is-cabin :is(.l5-head-end, .l5v-top-r) > .l5-menuhost > .l5-icon {
-  border-radius: 14px;
 }
 .logos-root.is-cabin .l5v-search {
   width: min(520px, 34vw);
@@ -210,8 +214,8 @@
   border-radius: 28px;
   font-size: 17px;
 }
-/* the four views' tabs */
-.logos-root.is-cabin .l5v-tab {
+/* the four views' tabs (the header's switch), at a finger's size */
+.logos-root.is-cabin .l5v-top .l5-switch-i {
   min-height: 62px;
   padding-left: 22px;
   padding-right: 22px;

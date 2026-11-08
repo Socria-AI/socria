@@ -11,7 +11,7 @@
 
 import { LogosNode, OneMark } from '@/components/ds';
 import { ONE_HEADLINE, ONE_STANDFIRST, priceLabel, SOCRIA_ONE } from '@/lib/socria-one';
-import { CHARTER, DOCS, HOME, PRIVACY, SiteA, SiteMast, SitePage, START, TERMS } from './chrome';
+import { INERT, ONE, SiteFoot, SiteMast, SitePage, START, navWithout } from './chrome';
 import { MapEdges, type MapEdge } from './MapEdges';
 import { OneJoin } from './OneJoin';
 
@@ -28,9 +28,6 @@ export const ONE_CONVERSATIONS: readonly { title: string; meta: string }[] = [
   { title: 'Should we raise now?', meta: 'Tue · 5 cards' },
   { title: 'Organic chemistry, mechanisms', meta: 'Mon · 2 cards' },
 ];
-
-/** nothing in a picture is a control (React 18 has no `inert` prop) */
-const INERT = { inert: '' } as Record<string, string>;
 
 const EDGES: readonly MapEdge[] = [{ from: 'c', to: 'c2', on: true }];
 
@@ -54,7 +51,7 @@ export function One() {
   const price = priceLabel();
   return (
     <SitePage tone="one">
-      <SiteMast links={[HOME, CHARTER, DOCS]} go={<OneJoin place="mast" />} />
+      <SiteMast links={navWithout(ONE.href)} go={<OneJoin place="mast" />} />
 
       <main className="s-sec s-o" aria-labelledby="s-o-h">
         <div className="s-o-in">
@@ -87,7 +84,7 @@ export function One() {
               <div className="s-o-pic" aria-hidden="true" {...INERT}>
                 <div className="s-o-bar">
                   <span className="s-o-bar-t">Conversations</span>
-                  <span className="s-o-chip">
+                  <span className="s-chip">
                     <Plus />
                     New
                   </span>
@@ -113,7 +110,7 @@ export function One() {
               <div className="s-o-pic" aria-hidden="true" {...INERT}>
                 <div className="s-o-bar">
                   <span className="s-o-bar-t">The press and the Reformation</span>
-                  <span className="s-o-chip is-on">
+                  <span className="s-chip is-on">
                     <ShareIcon />
                     Share
                   </span>
@@ -142,19 +139,9 @@ export function One() {
               </div>
             </section>
           </div>
-
-          <footer className="s-o-foot">
-            <span className="s-o-sign">
-              Socria · <em>Think For Yourself.</em>
-            </span>
-            <span>Renews monthly · Cancel any time</span>
-            <div className="s-o-links">
-              <SiteA l={TERMS} />
-              <SiteA l={PRIVACY} />
-            </div>
-          </footer>
         </div>
       </main>
+      <SiteFoot middle="Renews monthly · Cancel any time" />
     </SitePage>
   );
 }
