@@ -86,7 +86,8 @@ console.log('\n=== scenario B — "quiz me": productive challenge kept ===');
   const r = run([U('I have a test on derivatives tomorrow.'), A('Good luck — what would help most?'), U('quiz me on derivatives, one question at a time')]);
   ok('a quiz is kept a quiz', r.decision.action === 'preserve_challenge' && r.decision.controls.strategy === 'preserve_challenge', r.decision.action);
   ok('  one question allowed — the question IS the help', r.assist.questions === 1, r.assist.questions);
-  ok('  and the answer is not given away', r.decision.controls.noRevealAnswers === true && /Keep it a quiz/.test(r.block));
+  ok('  and the answer is not given away', r.decision.controls.noRevealAnswers === true && /do not give the answers away/.test(r.block) && /"Quiz me" is one question at a time/.test(r.block));
+  ok('  …and a practice set asked for is a short graded set, held back, not one question and a wait', /practice problems asked for are a short graded set \(three to five, easiest first\), answers held back/.test(r.block));
   // their next answers are short, and Socria keeps asking: not friction in a quiz
   const later = run([
     U('quiz me on derivatives, one question at a time'),

@@ -546,6 +546,74 @@ What was broken or inconsistent, and the rule it now keeps (`test/ux-audit-55.te
   moss, not a dark banner); search gives one row per finding — a message found only by its conversation's name is not
   its own row — in sentence case and one column; an idea opened from no particular turn says what can be done.
 
+### 8.11 The explanation engine, measured — and what it did not show
+
+**What was measured.** How expert judges rated single replies. Not learning. Nobody learned anything in this
+evaluation, and nothing here says the engine helps people understand more. `evals/explain/human-study.md` is the study
+that would.
+
+**How.** 57 scenarios: the 33 of the dev battery (`evals/explain/battery.json`) and 24 held out, written for this and
+never used to tune the engine (`evals/explain/heldout.json`). Each was sent four ways, and the exact request captured:
+
+- **A**: the engine as it is (`evals/explain/capture.mjs`).
+- **A0**: the engine before this work (6e3c765).
+- **B**: the engine off (`LOGOS_EXPLAIN=off`), byte-identical but for the engine's lines and elements.
+- **C**: one strong tutoring prompt and no runtime (`evals/explain/arm-c.mjs`, `strong-prompt.md`).
+
+A stand-in model wrote one reply per request, obeying it. A simulated learner, who saw only the reply, answered a new
+transfer question from the answer key. Three blinded judges per scenario then scored and ranked the four replies
+against the key; each judge saw them under labels in its own fixed random order. Judges agreed on the order of a pair of
+replies 85% of the time (874 of 1,026 pairs; chance is 50%). The scores are in `evals/explain/results-2026-11-08.json`.
+
+**Results** (mean over three judges; 1–5, transfer 0–2; words exclude ```ui blocks):
+
+| arm | correct | load | adaptation | misconception | independence | natural | transfer | overall | mean rank | median words |
+|---|---|---|---|---|---|---|---|---|---|---|
+| A, engine | 4.86 | 4.47 | 4.32 | 4.54 | 3.99 | 4.18 | 1.94 | 4.06 | 2.80 | 141 |
+| A0, old engine | 4.82 | 4.46 | 4.27 | 4.59 | 4.12 | 4.22 | 1.96 | 4.09 | 2.74 | 150 |
+| B, engine off | 4.95 | 4.70 | 4.37 | 4.65 | 3.99 | 4.39 | 1.91 | 4.15 | 2.58 | 153 |
+| C, strong prompt | 4.92 | 3.95 | 4.57 | 4.96 | 4.20 | 4.47 | 1.94 | 4.48 | 1.88 | 237 |
+
+Arm A's overall score minus each other arm's, with 95% intervals from a bootstrap over scenarios:
+
+| | all 57 | held-out 24 | dev 33 |
+|---|---|---|---|
+| A − A0 | −0.03 (−0.25 to +0.19) | −0.18 (−0.56 to +0.21) | +0.08 (−0.16 to +0.33) |
+| A − B | −0.09 (−0.30 to +0.13) | −0.01 (−0.33 to +0.31) | −0.14 (−0.42 to +0.14) |
+| A − C | −0.42 (−0.64 to −0.19) | −0.65 (−0.99 to −0.26) | −0.24 (−0.52 to +0.05) |
+
+**What it shows, honestly.**
+
+- **The engine made no difference this evaluation could see.** A against B and A against A0 are within noise. The
+  noise is large. On the 19 scenarios where the engine added nothing, so A's and B's requests were byte-identical, the
+  two replies still differed by 0.68 overall points on average, B ahead by 0.33: that is one generation against
+  another. Where the engine did change the request, A − B was +0.04. With one reply per arm, a difference smaller than
+  about 0.3 points cannot be told from chance. The engine may help a little, or not at all; this cannot say which.
+- **The strong prompt wins, mostly by length.** C's replies were 1.7 times as long, and the judges, told not to reward
+  length, did anyway: the longest reply was ranked first 43% of the time (chance 25%). With the scenario held fixed,
+  each doubling of length was worth about 0.42 points. Adjusting for length, C's lead falls from +0.42 to +0.11. Its
+  "load" score is the lowest of the four. Socria keeps replies short on purpose, so arm C is not a product that could
+  ship as it is; but its adaptation and misconception scores are the highest, and that is worth learning from.
+- **Transfer is at its ceiling** (1.91–1.96 of 2 for every arm). The simulated learner answered almost every transfer
+  question, so this measure did not separate the arms. A real learner, a day later, is a different test.
+
+**What it found that could be fixed** (from the judges' notes on arm A's lowest-ranked replies; each now has a test):
+
+- Wrong working with a "lol" in it was read as joking. The reply was told to "play along, don't turn it into help", and
+  the engine stood down. "Where did I mess up?" under working was not read as asking for a check either, so a fresh
+  worked example replaced the pointer to the slip. Both now read as their working to check (`lib/cognition/assist.ts`
+  `offersWork`, `lib/runtime/explain.ts` `disputed`). "I did 5 push-ups" is not working.
+- "Give me some practice problems, start easy" was handled as "quiz me": one question, then wait. The judges and the key
+  wanted a short graded set. A practice set asked for is now three to five, easiest first, answers held back
+  (`lib/mr/execute.ts`); "quiz me" is still one question at a time.
+
+Re-captured after these fixes, exactly those two requests changed and the other 55 are byte-identical. Their replies
+were not re-judged: against a noise floor of 0.68 points, one re-generated reply would show nothing.
+
+**Not measured.** Learning, retention, transfer by a real person, behaviour over a whole conversation, the learning
+ledger's spacing, any production model (the replies came from a stand-in, which obeys instructions more closely than
+some production models do), and cost. The judges are models too, and share some of a model's tastes, length among them.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its
@@ -651,6 +719,11 @@ its own glyph beside it.
 
 ## 10. Not finished
 
+- **The explanation engine is not shown to help.** Blinded judges could not tell
+  its replies from the engine-off replies (§8.11); one strong prompt with no
+  runtime was rated higher, mostly for being longer. Whether it helps anyone
+  learn needs real learners (`evals/explain/human-study.md`), and that has not
+  been run.
 - **Readings seen once** are not on the map: they live in the pending ledger,
   which the Logos memory feed deliberately does not send. "Waiting" on the map
   is a memory held tentatively. Showing the ledger needs a server change.

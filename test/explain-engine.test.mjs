@@ -323,5 +323,16 @@ console.log('\n=== the review fixes ===');
   ok('faded steps inside their own reasoning stay short (four lines at most)', /ctx\.faded && spec\.check && spec\.lines\.length <= 4/.test(read('lib/inline-ui.ts')));
 }
 
+console.log('\n=== found by the blinded evaluation (§8.11) ===');
+{
+  const lol = turn('need to make 250 mL of 0.5 M NaCl for lab tmrw. i did 0.5 x 250 = 125 mol, then 125 x 58.44 = 7305 g ??? thats like 7 kilos of salt, cant be right lol where did i mess up');
+  ok('their wrong working with a "lol" is still their working to have checked: feedback, never a joke played along with', lol.plan.need === 'feedback' && !lol.plan.reasons.some((x) => /talk:playful/.test(x)), J(lol.plan.reasons));
+  ok('  …and the turn is read as work, not play', lol.state.exchange.kind === 'task' && lol.state.work === 'verification', `${lol.state.exchange.kind} ${lol.state.work}`);
+  const plain = turn('i did 0.5 x 250 = 125 mol, then 125 x 58.44 = 7305 g. where did i mess up?');
+  ok('"where did I mess up" under their working: the slip is pointed to, not a fresh worked example', plain.plan.need === 'feedback' && !has(plain, 'worked'), J(plain.plan.reasons));
+  const pushups = turn('i did 5 pushups today, how many should i do?');
+  ok('  "I did 5 push-ups" is not working to check', pushups.state.work !== 'verification', pushups.state.work);
+}
+
 console.log(`\nexplain-engine: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

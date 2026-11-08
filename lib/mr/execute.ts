@@ -209,7 +209,11 @@ export function renderControls(c: TypedControls, ctx: { withheld: boolean; hardN
       );
       break;
     case 'preserve_challenge':
-      lines.push('THEY ASKED TO BE QUIZZED. Keep it a quiz: one question at a time, then wait. Do not give the answer away unless they ask for it.');
+      // a practice set asked for is a set, held back — not one question and a wait (evals/explain, §8.11): "quiz me"
+      // is asked one at a time; "give me some practice problems" is a short graded set to work through
+      lines.push(
+        'THEY ASKED TO BE QUIZZED OR TO PRACTISE. Keep the challenge theirs: do not give the answers away unless they ask. "Quiz me" is one question at a time, then wait; practice problems asked for are a short graded set (three to five, easiest first), answers held back, with an offer to check them.'
+      );
       break;
     case 'edit_as_asked':
       lines.push('THEIR WRITING, THEIR LEVEL OF HELP. Make only the edits they asked for — no rewrite, no lesson, nothing new in their voice.');

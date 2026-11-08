@@ -234,7 +234,7 @@ export function asksForTheAnswer(text: string): boolean {
 }
 
 export function offersWork(text: string): boolean {
-  return /\b(?:is\s+(?:this|that|my\s+\w+)\s+(?:right|correct)\b|did\s+i\s+(?:get|do)\s+(?:it|this|that)\s+right\b|check\s+(?:my|this|it)\b|here'?s\s+my\s+(?:answer|working|work|solution|attempt)\b|i\s+got\s+(?:[-−+]?\s*[\d.(]|[a-z]\s*[=≈<>]|\$|an?\s+(?:answer|result|value|total)\s+of\b|the\s+(?:same\s+)?(?:answer|result|value|total)\b|that\s+(?:it|the|x|y)\b)|my\s+answer\s+is\b)/i.test(clean(text));
+  return /\b(?:is\s+(?:this|that|my\s+\w+)\s+(?:right|correct)\b|did\s+i\s+(?:get|do)\s+(?:it|this|that)\s+right\b|check\s+(?:my|this|it)\b|here'?s\s+my\s+(?:answer|working|work|solution|attempt)\b|i\s+got\s+(?:[-−+]?\s*[\d.(]|[a-z]\s*[=≈<>]|\$|an?\s+(?:answer|result|value|total)\s+of\b|the\s+(?:same\s+)?(?:answer|result|value|total)\b|that\s+(?:it|the|x|y)\b)|my\s+answer\s+is\b|where\s+did\s+i\s+(?:mess|screw|slip|go)\s*(?:up|wrong)\b|what\s+did\s+i\s+do\s+wrong\b|where'?s\s+my\s+(?:mistake|error|slip)\b|i\s+did\s+[-−+]?\s*[\d.]+\s*[x×*/+\-−]\s*[\d.]+)/i.test(clean(text));
 }
 
 /** Mid-flow: another idea, another item, a continuation that wants room rather than a question. */

@@ -716,7 +716,7 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
   const rightNow = i.state.understanding.right + did.right > 0;
   const working = WORKING.test(t);
   // their working with a question about it — "where does the 24x come from?", "the answer key says…" — is theirs to have checked
-  const disputed = working && /\b(?:answer\s+key|where\s+(?:does|did)\s+(?:the|that|this)|why\s+(?:is|isn'?t)\s+it|textbook\s+says|marked\s+(?:it\s+|me\s+)?wrong|got\s+it\s+wrong)\b/.test(t);
+  const disputed = working && /\b(?:answer\s+key|where\s+(?:does|did)\s+(?:the|that|this)|why\s+(?:is|isn'?t)\s+it|textbook\s+says|marked\s+(?:it\s+|me\s+)?wrong|got\s+it\s+wrong|where\s+did\s+i\s+(?:mess|screw|slip|go)\s*(?:up|wrong)|what\s+did\s+i\s+do\s+wrong|where'?s\s+my\s+(?:mistake|error|slip)|(?:can'?t|cant|couldn'?t)\s+be\s+right|doesn'?t\s+(?:look|seem)\s+right)\b/.test(t);
   const verify = (VERIFY_ASK.test(t) || disputed) && (working || /\d/.test(t) || t.split(' ').length >= 8);
   // an answer to the question Socria left them: its note says so, or its text ended asking them something
   // a note, where the reply has one, is the record: no question in it means none was left. Only older replies, with
