@@ -46,6 +46,8 @@ import {
   AFTER_AUTH,
   chooseFactor,
   chooseSecondFactor,
+  codeFactor,
+  secondFactorEmailId,
   cleanCode,
   cleanEmail,
   resendIn,
@@ -113,7 +115,11 @@ export function AuthForm({
   /** which first factor sign-in settled on; null until we have asked */
   const [factor, setFactor] = useState<ChosenFactor | null>(null);
   /** which second factor Clerk offered, once the first one has passed */
-  const [second, setSecond] = useState<'totp' | 'backup_code' | 'phone_code' | null>(null);
+  const [second, setSecond] = useState<'totp' | 'backup_code' | 'phone_code' | 'email_code' | null>(null);
+  /** the ways in Clerk offered for this address: kept so "Email me a code instead" can switch to the code */
+  const [factors, setFactors] = useState<unknown[]>([]);
+  /** a line said beside the step, not an error: why a code was sent when a password was typed */
+  const [note, setNote] = useState<string | null>(null);
   /** when the current code was sent, for the resend hold */
   const [sentAt, setSentAt] = useState(0);
   const [hold, setHold] = useState(0);
@@ -217,7 +223,9 @@ export function AuthForm({
     try {
       if (kind === 'sign-in') {
         const res = await signIn!.create({ identifier: addr });
-        const chosen = chooseFactor(res.supportedFirstFactors as never);
+        const offered = (res.supportedFirstFactors ?? []) as unknown[];
+        setFactors(offered);
+        const chosen = chooseFactor(offered as never);
         setFactor(chosen);
         if (!chosen) {
           // No password and no mailable address: an account made with Google,
@@ -231,6 +239,16 @@ export function AuthForm({
           );
           setBusy(false);
           return;
+        }
+        // A PASSWORD TYPED WITH THE ADDRESS: tried at once. An account with no password yet is mailed a code
+        // instead, and told why — once in, a password can be set under Account, so the next sign-in needs no email.
+        if (password && chosen.strategy === 'password') {
+          const done = await signIn!.attemptFirstFactor({ strategy: 'password', password });
+          await afterPassword(done);
+          return;
+        }
+        if (password && chosen.strategy === 'email_code') {
+          setNote('This account has no password yet, so we emailed you a code. Once you are in, you can set a password under Account — then signing in needs no email.');
         }
         const next = signInStep(res.status, chosen);
         if (next === 'code') {
@@ -246,7 +264,17 @@ export function AuthForm({
         }
         setStep(next);
       } else {
-        const res = await signUp!.create({ emailAddress: addr });
+        // the password chosen with the address, where the instance takes one; where it does not, the address alone
+        const res = await (async () => {
+          if (!password) return signUp!.create({ emailAddress: addr });
+          try {
+            return await signUp!.create({ emailAddress: addr, password });
+          } catch (e) {
+            const why = clerkMessage(e, '');
+            if (/password/i.test(why) && /not|unknown|invalid param|allowed/i.test(why)) return signUp!.create({ emailAddress: addr });
+            throw e;
+          }
+        })();
         const next = signUpStep(res.status, res.missingFields, res.unverifiedFields);
         if (next === 'code') {
           await signUp!.prepareEmailAddressVerification({ strategy: 'email_code' });
@@ -269,6 +297,66 @@ export function AuthForm({
     }
   }
 
+  /** What a password attempt left: in, a second factor (an authenticator, or a mailed code to trust this device), or not. */
+  async function afterPassword(res: { status: unknown; createdSessionId?: string | null; supportedSecondFactors?: unknown }) {
+    if (res.status === 'complete') {
+      land(res.createdSessionId, false);
+      return;
+    }
+    const next = signInStep(res.status, { strategy: 'password' });
+    if (next === 'second-factor') {
+      const offered = res.supportedSecondFactors as never;
+      const how = chooseSecondFactor(offered);
+      setSecond(how);
+      if (how === 'phone_code') {
+        await signIn!.prepareSecondFactor({ strategy: 'phone_code' });
+        setSentAt(Date.now());
+      }
+      if (how === 'email_code') {
+        const id = secondFactorEmailId(offered);
+        await signIn!.prepareSecondFactor({ strategy: 'email_code', ...(id ? { emailAddressId: id } : {}) } as never);
+        setSentAt(Date.now());
+      }
+      setCode('');
+    }
+    setStep(next);
+    setBusy(false);
+  }
+
+  /** "Email me a code instead": the person's own choice, on the email or password step. */
+  async function codeInstead() {
+    if (!ready || busy || kind !== 'sign-in') return;
+    const addr = cleanEmail(email);
+    if (!addr) {
+      setErr('That does not look like an email address.');
+      return;
+    }
+    setBusy(true);
+    setErr(null);
+    try {
+      let offered = factors;
+      if (!offered.length) {
+        const res = await signIn!.create({ identifier: addr });
+        offered = (res.supportedFirstFactors ?? []) as unknown[];
+        setFactors(offered);
+      }
+      const cf = codeFactor(offered as never);
+      if (!cf) {
+        setErr('This account cannot be sent a code. Sign in with your password.');
+        setBusy(false);
+        return;
+      }
+      await signIn!.prepareFirstFactor({ strategy: 'email_code', emailAddressId: cf.emailAddressId! });
+      setFactor(cf);
+      setSentAt(Date.now());
+      setCode('');
+      setStep('code');
+      setBusy(false);
+    } catch (e) {
+      fail(e, 'Could not send a code.');
+    }
+  }
+
   // ── the password step ─────────────────────────────────────────────
   async function submitPassword(e?: React.FormEvent) {
     e?.preventDefault();
@@ -282,23 +370,8 @@ export function AuthForm({
     try {
       if (kind === 'sign-in') {
         const res = await signIn!.attemptFirstFactor({ strategy: 'password', password });
-        if (res.status === 'complete') {
-          land(res.createdSessionId, false);
-          return;
-        }
-        const next = signInStep(res.status, factor);
-        if (next === 'second-factor') {
-          const how = chooseSecondFactor(
-            (res as { supportedSecondFactors?: unknown }).supportedSecondFactors as never
-          );
-          setSecond(how);
-          if (how === 'phone_code') {
-            await signIn!.prepareSecondFactor({ strategy: 'phone_code' });
-            setSentAt(Date.now());
-          }
-          setCode('');
-        }
-        setStep(next);
+        await afterPassword(res as never);
+        return;
       } else {
         const res = await signUp!.update({ password });
         const next = signUpStep(res.status, res.missingFields, res.unverifiedFields);
@@ -436,6 +509,8 @@ export function AuthForm({
     setCode('');
     setPassword('');
     setErr(null);
+    setNote(null);
+    setFactors([]);
     setSentAt(0);
     setSecond(null);
   }
@@ -460,6 +535,24 @@ export function AuthForm({
                 onChange={(ev) => setEmail(ev.target.value)}
               />
             </div>
+            <div className="field">
+              <label htmlFor="auth-pass">{kind === 'sign-in' ? 'Your password' : 'Choose a password'}</label>
+              <input
+                id="auth-pass"
+                type="password"
+                autoComplete={kind === 'sign-in' ? 'current-password' : 'new-password'}
+                value={password}
+                onChange={(ev) => setPassword(ev.target.value)}
+              />
+            </div>
+            {kind === 'sign-in' && (
+              <p className="opt-note">
+                No password yet?{' '}
+                <button type="button" onClick={() => void codeInstead()} disabled={!ready || busy}>
+                  Email me a sign-in code instead
+                </button>
+              </p>
+            )}
             {kind === 'sign-up' && (
               <label className="auth-check">
                 <input
@@ -500,6 +593,14 @@ export function AuthForm({
           </Button>
           <p className="opt-note">
             {email} — <button type="button" onClick={back}>use a different address</button>
+            {kind === 'sign-in' && (
+              <>
+                {' · '}
+                <button type="button" onClick={() => void codeInstead()} disabled={!ready || busy}>
+                  Email me a code instead
+                </button>
+              </>
+            )}
           </p>
         </form>
       )}
@@ -507,6 +608,7 @@ export function AuthForm({
       {step === 'code' && (
         <form className="stack" onSubmit={submitCode}>
           <div className="field">
+            {note && <p className="opt-note">{note}</p>}
             <label htmlFor="auth-code">The code we emailed you</label>
             <input
               ref={box}
@@ -523,7 +625,7 @@ export function AuthForm({
             {busy ? 'One moment…' : 'Continue'}
           </Button>
           <p className="opt-note">
-            Sent to {email}.{' '}
+            Sent to {email}. Not there? Check your junk or spam folder.{' '}
             {hold > 0 ? (
               <span>Another can be sent in {hold}s.</span>
             ) : (
@@ -546,7 +648,9 @@ export function AuthForm({
                 ? 'One of your backup codes'
                 : second === 'phone_code'
                   ? 'The code we texted you'
-                  : 'Your authenticator code'}
+                  : second === 'email_code'
+                    ? 'The code we emailed you'
+                    : 'Your authenticator code'}
             </label>
             <input
               ref={box}
@@ -567,7 +671,9 @@ export function AuthForm({
               ? 'From the app you set up when you turned on two-factor.'
               : second === 'backup_code'
                 ? 'The one-time codes you saved when you turned on two-factor.'
-                : `Sent to the number on your account.`}{' '}
+                : second === 'email_code'
+                  ? `Sent to ${email}, to confirm it is you on this device. Not there? Check your junk or spam folder.`
+                  : `Sent to the number on your account.`}{' '}
             <button type="button" onClick={back}>
               Start again
             </button>
