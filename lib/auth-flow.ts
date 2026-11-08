@@ -119,23 +119,34 @@ export interface ChosenFactor {
  */
 export function chooseSecondFactor(
   factors: readonly FirstFactor[] | null | undefined
-): 'totp' | 'backup_code' | 'phone_code' | null {
+): 'totp' | 'backup_code' | 'phone_code' | 'email_code' | null {
   const list = Array.isArray(factors) ? factors : [];
   for (const want of ['totp', 'phone_code', 'backup_code'] as const) {
     if (list.some((f) => f?.strategy === want)) return want;
   }
+  // a new device after a right password: Clerk may ask for a mailed code to trust it ("client trust"). It was
+  // unmodelled, so a right password ended on "That code was not accepted" with no code ever sent.
+  if (list.some((f) => f?.strategy === 'email_code')) return 'email_code';
   return null;
+}
+
+/** The address a mailed second-factor code goes to, when that is the second factor. */
+export function secondFactorEmailId(factors: readonly FirstFactor[] | null | undefined): string | null {
+  const list = Array.isArray(factors) ? factors : [];
+  const f = list.find((x) => x?.strategy === 'email_code' && typeof x.emailAddressId === 'string');
+  return f ? (f.emailAddressId as string) : null;
 }
 
 /**
  * Which first factor to use.
  *
- * A mailed code is preferred over a password wherever the instance offers
- * both, and that is a product decision rather than a technical one: the
- * design's form asks for an email address and nothing else, most people do
- * not have a password for a product they used twice, and "check your email"
- * has no failure mode that ends in a reset flow. Password is the fallback for
- * instances — or accounts — where a code is not on offer.
+ * A PASSWORD FIRST, wherever the account has one (November 2026). The mailed
+ * code was preferred, as the form that asks for nothing but an address — until
+ * the codes stopped arriving for a whole class of people: Outlook and Hotmail
+ * file or drop them while Gmail delivers, and someone who cannot receive the
+ * code cannot get in at all. A password depends on no inbox. The mailed code
+ * stays as the way in for an account with no password yet, and as the choice
+ * the person can make ("Email me a code instead", codeFactor below).
  *
  * Returns null when neither is available. The caller must then say so rather
  * than showing an empty form: an OAuth-only account reaching a password box
@@ -143,14 +154,15 @@ export function chooseSecondFactor(
  */
 export function chooseFactor(factors: readonly FirstFactor[] | null | undefined): ChosenFactor | null {
   const list = Array.isArray(factors) ? factors : [];
-  const code = list.find(
-    (f) => f?.strategy === 'email_code' && typeof f.emailAddressId === 'string'
-  );
-  if (code) {
-    return { strategy: 'email_code', emailAddressId: code.emailAddressId as string };
-  }
   if (list.some((f) => f?.strategy === 'password')) return { strategy: 'password' };
-  return null;
+  return codeFactor(list);
+}
+
+/** The mailed code, when the account can be mailed one: the fallback, and the person's own choice. */
+export function codeFactor(factors: readonly FirstFactor[] | null | undefined): ChosenFactor | null {
+  const list = Array.isArray(factors) ? factors : [];
+  const code = list.find((f) => f?.strategy === 'email_code' && typeof f.emailAddressId === 'string');
+  return code ? { strategy: 'email_code', emailAddressId: code.emailAddressId as string } : null;
 }
 
 /**
@@ -169,7 +181,8 @@ export function signInStep(
   if (status === 'needs_first_factor') {
     return factor?.strategy === 'password' ? 'password' : 'code';
   }
-  if (status === 'needs_second_factor') return 'second-factor';
+  // a new device after a right password: Clerk's client trust asks for a second factor, under either name
+  if (status === 'needs_second_factor' || status === 'needs_client_trust') return 'second-factor';
   if (status === 'needs_new_password') return 'new-password';
   // needs_identifier, or something added after this was written. Back to the
   // top, which always has a next thing to press.

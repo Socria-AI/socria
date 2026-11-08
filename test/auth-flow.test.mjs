@@ -13,6 +13,8 @@
 import {
   AFTER_AUTH,
   chooseSecondFactor,
+  codeFactor,
+  secondFactorEmailId,
   RESEND_AFTER_SECONDS,
   chooseFactor,
   cleanCode,
@@ -65,12 +67,12 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
   const code = { strategy: 'email_code', emailAddressId: 'idn_1' };
   const pw = { strategy: 'password' };
 
-  // A mailed code is preferred wherever both are offered: the design's form
-  // asks for an email and nothing else, and "check your email" has no failure
-  // mode that ends in a reset flow.
+  // A password is preferred wherever the account has one (November 2026): mailed codes stopped arriving in
+  // Outlook and Hotmail inboxes, and a person without the code cannot get in. The code is the fallback.
   const both = chooseFactor([pw, code]);
-  ok('a code beats a password', both?.strategy === 'email_code');
-  ok('and carries the address to mail', both?.emailAddressId === 'idn_1');
+  ok('a password beats a code (codes go missing in some inboxes; a password needs none)', both?.strategy === 'password');
+  ok('  …the code stays on offer as the fallback', codeFactor([pw, code])?.strategy === 'email_code' && codeFactor([pw, code])?.emailAddressId === 'idn_1' && codeFactor([pw]) === null);
+  ok('a code chosen carries the address to mail', chooseFactor([code])?.emailAddressId === 'idn_1');
   ok('password when that is all there is', chooseFactor([pw])?.strategy === 'password');
   ok('and it needs no address', chooseFactor([pw])?.emailAddressId === undefined);
 
@@ -84,6 +86,7 @@ const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
      chooseFactor([{ strategy: 'email_code' }]) === null);
   ok('…but it falls through to the password beside it',
      chooseFactor([{ strategy: 'email_code' }, pw])?.strategy === 'password');
+  ok('a code when there is no password', chooseFactor([code])?.strategy === 'email_code');
 }
 
 {
@@ -175,6 +178,8 @@ ok('one default landing, shared by both doors and the callback', AFTER_AUTH === 
   ok('totp wins', chooseSecondFactor([backup, phone, totp]) === 'totp');
   ok('then phone', chooseSecondFactor([backup, phone]) === 'phone_code');
   ok('backup codes last', chooseSecondFactor([backup]) === 'backup_code');
+  ok('a mailed code to trust a new device, when that is all there is', chooseSecondFactor([{ strategy: 'email_code', emailAddressId: 'e1' }]) === 'email_code' && secondFactorEmailId([{ strategy: 'email_code', emailAddressId: 'e1' }]) === 'e1');
+  ok('client trust is a second factor', signInStep('needs_client_trust', { strategy: 'password' }) === 'second-factor');
   ok('nothing usable is null', chooseSecondFactor([{ strategy: 'weird' }]) === null);
   ok('absent is null', chooseSecondFactor(undefined) === null && chooseSecondFactor([]) === null);
 }
@@ -200,6 +205,13 @@ console.log('\n=== Google is not offered, and nobody is stranded by that ===');
     !/Use the button above/.test(form));
   ok('  but tells a Google-only account what to actually do',
     /hellosocria@gmail\.com/.test(form) && /email sign-in/.test(form), '');
+
+  // PASSWORD FIRST (November 2026): mailed codes went missing in Outlook and Hotmail inboxes.
+  ok('the form asks for a password with the address, and tries it at once', /id="auth-pass"/.test(form) && /attemptFirstFactor\(\{ strategy: 'password', password \}\)/.test(form));
+  ok('  a mailed code is still one press away, as the person\'s own choice', /Email me a sign-in code instead/.test(form) && /async function codeInstead\(\)/.test(form) && /codeFactor\(offered/.test(form));
+  ok('  an account with no password yet is mailed a code and told how to set one', /has no password yet, so we emailed you a code/.test(form));
+  ok('  a new device asked to confirm by mailed code is handled, not a dead end', /how === 'email_code'/.test(form) && /prepareSecondFactor\(\{ strategy: 'email_code'/.test(form));
+  ok('  and every mailed code says where else to look', (form.match(/Check your junk or spam folder/g) ?? []).length >= 2);
 
   // The account page is the same redirect one screen further along.
   const panel = read('components/account/ConnectionsPanel.tsx');
