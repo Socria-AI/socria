@@ -9,7 +9,7 @@
 // the text in front of it, and `$0$` was being judged as money in the first
 // place. The regression cases below are the actual sentence that broke.
 
-import { splitMath, hasMath, looksMath } from './.tmp/tex-split.mjs';
+import { splitMath, hasMath, looksMath, unescapeDollars } from './.tmp/tex-split.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -106,6 +106,29 @@ console.log('\n=== hasMath agrees with splitMath, always ===');
   // A global regex keeps lastIndex between calls; calling twice must agree.
   const t = 'a $0$ here';
   ok('hasMath is not stateful', hasMath(t) === hasMath(t) && hasMath(t) === true);
+}
+
+console.log('\n=== an escaped dollar is a dollar sign, not a delimiter ===');
+{
+  // The reply that shipped broken (November 9, 2026): "MR = \6$".
+  ok('a price inside a span stays in the span', round('$MR = \\$6$') === '«MR = \\$6»', round('$MR = \\$6$'));
+  ok('two prices inside one span', round('$TR = \\$6 \\times 12 = \\$72$ per hour') === '«TR = \\$6 \\times 12 = \\$72» per hour',
+     round('$TR = \\$6 \\times 12 = \\$72$ per hour'));
+  ok('a line of them', round('- $MR = \\$6$\n- $TR = \\$6 \\times 12 = \\$72$ per hour') ===
+     '- «MR = \\$6»\n- «TR = \\$6 \\times 12 = \\$72» per hour');
+  ok('no stray backslash or dollar in the prose', !/[\\$]/.test(proseOf('$MR = \\$6$ and $TR = \\$72$ per hour')),
+     proseOf('$MR = \\$6$ and $TR = \\$72$ per hour'));
+  ok('hasMath sees it', hasMath('$MR = \\$6$'));
+
+  // In prose, \$ is a price and reads as one.
+  ok('an escaped price in prose reads plainly', round('it costs \\$5 and \\$10') === 'it costs $5 and $10', round('it costs \\$5 and \\$10'));
+  ok('an escaped dollar cannot open a span', round('pay \\$5 so that $x = 2$') === 'pay $5 so that «x = 2»', round('pay \\$5 so that $x = 2$'));
+  ok('prose with only escaped dollars has no maths', !hasMath('from \\$5 to \\$10'));
+  ok('unescapeDollars', unescapeDollars('a \\$5 b') === 'a $5 b' && unescapeDollars('plain') === 'plain');
+
+  // Unchanged: unescaped money, and maths with no dollars at all.
+  ok('money still money', round('it cost $5 and $10') === 'it cost $5 and $10', round('it cost $5 and $10'));
+  ok('maths still maths', round('so $x^2 = 4$') === 'so «x^2 = 4»');
 }
 
 console.log('\n=== degenerate input terminates ===');

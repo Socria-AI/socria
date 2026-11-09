@@ -11,7 +11,7 @@
 
 import katex from 'katex';
 import { createContext, useContext, type KeyboardEvent, type MouseEvent } from 'react';
-import { splitMath, hasMath } from '@/lib/tex-split';
+import { splitMath, hasMath, unescapeDollars } from '@/lib/tex-split';
 
 /**
  * POINT & ASK (Logos 4): where a picker is provided — Socria's replies, in the
@@ -82,11 +82,11 @@ export function TeX({ tex, display = false }: { tex: string; display?: boolean }
 // that can mangle a sentence without anyone noticing, and there it can be
 // tested. Re-exported here because every caller already imports from './TeX'.
 
-export { splitMath, hasMath, looksMath, type Seg } from '@/lib/tex-split';
+export { splitMath, hasMath, looksMath, unescapeDollars, type Seg } from '@/lib/tex-split';
 
 /** Render a string that mixes prose and LaTeX. */
 export function MathText({ children, className }: { children: string; className?: string }) {
-  if (!hasMath(children)) return <>{children}</>;
+  if (!hasMath(children)) return <>{unescapeDollars(children)}</>;
   const segs = splitMath(children);
   return (
     <span className={className}>

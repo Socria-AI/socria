@@ -21,6 +21,12 @@
 //      literal dollar signs, while "$5 and $10" — the case the judgement
 //      exists for — was judged to be mathematics. It was backwards in both
 //      directions.
+//
+//   3. An escaped dollar inside a span — `$MR = \$6$`, the way a price is
+//      written in mathematics — closed the span at the backslash. KaTeX was
+//      handed "MR = \" and the reader saw "MR = \6$" (November 9, 2026). A
+//      `\$` is a dollar sign, never a delimiter: it neither opens nor closes
+//      a span, and in prose it is shown as a plain "$".
 
 export interface Seg {
   kind: 'text' | 'inline' | 'block';
@@ -35,12 +41,19 @@ const PATTERNS: { re: RegExp; kind: 'inline' | 'block' }[] = [
   { re: /\\\(([\s\S]+?)\\\)/, kind: 'inline' },
   // single-$ inline: require a non-space start and a non-space end so a lone
   // "$" in prose cannot open a span that runs to the end of the paragraph.
-  { re: /\$(?!\s)([^$\n]*?[^\s$])\$/, kind: 'inline' },
+  // An escaped \$ is a dollar sign: it cannot open a span, and inside one it
+  // is part of the body ("$MR = \$6$"), never its end.
+  { re: /(?<!\\)\$(?!\s)((?:\\\$|[^$\n])*?(?:\\\$|[^\s$\\]))\$/, kind: 'inline' },
 ];
 
 /** The single-$ pattern, as a global, for hasMath. Kept beside PATTERNS so
  *  the two can never drift into disagreeing about what a span is. */
-const INLINE_G = /\$(?!\s)([^$\n]*?[^\s$])\$/g;
+const INLINE_G = /(?<!\\)\$(?!\s)((?:\\\$|[^$\n])*?(?:\\\$|[^\s$\\]))\$/g;
+
+/** Prose shows an escaped dollar as the dollar it stands for: "\$6" reads "$6". */
+export function unescapeDollars(text: string): string {
+  return text.includes('\\$') ? text.replace(/\\\$/g, '$') : text;
+}
 
 /**
  * Is the body of a single-$ span mathematics, or is it two currency amounts
@@ -93,18 +106,18 @@ export function splitMath(input: string): Seg[] {
       }
     }
     if (!best) {
-      segs.push({ kind: 'text', body: rest });
+      segs.push({ kind: 'text', body: unescapeDollars(rest) });
       break;
     }
 
     // Whatever came before the span, once.
-    if (best.index > 0) segs.push({ kind: 'text', body: rest.slice(0, best.index) });
+    if (best.index > 0) segs.push({ kind: 'text', body: unescapeDollars(rest.slice(0, best.index)) });
 
     if (best.kind === 'inline' && !looksMath(best.body)) {
       // Not mathematics after all. Keep the span verbatim, delimiters and
       // all — and ONLY the span. Slicing from 0 here is what duplicated the
       // sentence in front of it.
-      segs.push({ kind: 'text', body: rest.slice(best.index, best.index + best.len) });
+      segs.push({ kind: 'text', body: unescapeDollars(rest.slice(best.index, best.index + best.len)) });
     } else {
       segs.push({ kind: best.kind, body: best.body });
     }
