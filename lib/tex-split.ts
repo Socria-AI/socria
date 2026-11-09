@@ -33,6 +33,12 @@ export interface Seg {
   body: string;
 }
 
+/** A segment with where it sits in the input — for a caller that must leave the mathematics untouched (lib/rich-text.ts). */
+export interface SpanSeg extends Seg {
+  start: number;
+  end: number;
+}
+
 // Ordered so the longer delimiters ($$, \[, \() are tried before the shorter
 // ones and never mis-split a $$ as two $.
 const PATTERNS: { re: RegExp; kind: 'inline' | 'block' }[] = [
@@ -76,6 +82,10 @@ export function looksMath(body: string): boolean {
   // whole reason the judgement exists, and it has to be checked first because
   // such a body also contains the letters the last test looks for.
   if (/^[-+]?[\d,.]+\s+[a-z]/i.test(t)) return false;
+  // "$50k-$80k", "$5M to $10M", "$3bn–$4bn": an amount with its scale, running
+  // into a dash or a word. The scale is a letter, so without this the range
+  // was drawn as KaTeX "50k−80k" with both dollar signs gone.
+  if (/^[-+]?[\d,.]*\d(?:k|K|m|M|mn|b|B|bn|tn|T)(?:\s*[-–—]|\s+[a-z]+)$/.test(t)) return false;
 
   // A bare number, signed or not, between two delimiters. Money never is.
   if (/^[-+]?\d[\d,.]*$/.test(t)) return true;
@@ -93,9 +103,28 @@ export function looksMath(body: string): boolean {
  * forever, and this runs on every streamed token.
  */
 export function splitMath(input: string): Seg[] {
-  const segs: Seg[] = [];
-  let rest = input;
+  return scanMath(input).map(({ kind, body }) => ({ kind, body: kind === 'text' ? unescapeDollars(body) : body }));
+}
+
+/**
+ * The same cut as splitMath, with each segment's place in the input, and the
+ * text left exactly as written (no unescaping) — so a caller can keep the
+ * mathematics out of whatever it does to the prose around it.
+ */
+export function scanMath(input: string): SpanSeg[] {
+  const segs: SpanSeg[] = [];
+  const src = typeof input === 'string' ? input : '';
+  let rest = src;
+  let at = 0;
   let guard = 0;
+  const text = (start: number, end: number) => {
+    if (end <= start) return;
+    const last = segs[segs.length - 1];
+    if (last && last.kind === 'text' && last.end === start) {
+      last.body += src.slice(start, end);
+      last.end = end;
+    } else segs.push({ kind: 'text', body: src.slice(start, end), start, end });
+  };
 
   while (rest && guard++ < 400) {
     let best: { index: number; len: number; body: string; kind: 'inline' | 'block' } | null = null;
@@ -106,25 +135,27 @@ export function splitMath(input: string): Seg[] {
       }
     }
     if (!best) {
-      segs.push({ kind: 'text', body: unescapeDollars(rest) });
-      break;
+      text(at, src.length);
+      return segs;
     }
 
     // Whatever came before the span, once.
-    if (best.index > 0) segs.push({ kind: 'text', body: unescapeDollars(rest.slice(0, best.index)) });
+    text(at, at + best.index);
 
     if (best.kind === 'inline' && !looksMath(best.body)) {
       // Not mathematics after all. Keep the span verbatim, delimiters and
       // all — and ONLY the span. Slicing from 0 here is what duplicated the
       // sentence in front of it.
-      segs.push({ kind: 'text', body: unescapeDollars(rest.slice(best.index, best.index + best.len)) });
+      text(at + best.index, at + best.index + best.len);
     } else {
-      segs.push({ kind: best.kind, body: best.body });
+      segs.push({ kind: best.kind, body: best.body, start: at + best.index, end: at + best.index + best.len });
     }
 
-    rest = rest.slice(best.index + best.len);
+    at += best.index + best.len;
+    rest = src.slice(at);
   }
-
+  // the guard ran out: the rest is text, never lost
+  text(at, src.length);
   return segs;
 }
 

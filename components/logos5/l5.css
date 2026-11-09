@@ -570,6 +570,15 @@
   font-family: ui-monospace, 'SF Mono', Menlo, Consolas, monospace;
   font-size: 0.86em;
 }
+.logos-root .l5-prose .socria-link {
+  color: inherit;
+  text-decoration: underline;
+  text-decoration-color: rgba(var(--l5-tint-rgb), 0.45);
+  text-underline-offset: 2px;
+}
+.logos-root .l5-prose .socria-link:hover {
+  text-decoration-color: currentColor;
+}
 .logos-root .l5-prose .socria-codeblock {
   margin: 0 0 1em;
   border: 1px solid var(--l5-hair);

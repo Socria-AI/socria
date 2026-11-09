@@ -34,6 +34,7 @@ import { MathText } from '@/components/TeX';
 import { SourceCards } from '@/components/SourceCards';
 import { InlineBlock, type InlineHost } from '@/components/inline/InlineUI';
 import { contentAsText } from '@/lib/inline-ui';
+import { plainText } from '@/lib/logos5/canvas';
 
 /**
  * How a surface draws a citation key — [A3.12], [A3.12, A4.2] — when its
@@ -100,6 +101,14 @@ export function Inline({
       {splitInline(text, { code }).map((seg, i) => {
         const key = `${keyBase}-${i}`;
         if (seg.kind === 'code') return <code key={key} className="socria-code">{seg.text}</code>;
+        // a link the reply wrote ([words](https://…)): http(s) and mailto only, read in lib/rich-text.ts
+        if (seg.kind === 'link' && seg.href) {
+          return (
+            <a key={key} className="socria-link" href={seg.href} target="_blank" rel="noopener noreferrer">
+              {seg.text}
+            </a>
+          );
+        }
         const body = <Body text={seg.text} math={math} cite={cite} />;
         if (seg.kind === 'text') return <span key={key}>{body}</span>;
         if (seg.kind === 'strong') {
@@ -240,7 +249,7 @@ function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block;
         <List
           key={k}
           className={block.kind === 'ul' && block.compact ? 'socria-list is-short' : undefined}
-          start={block.kind === 'ol' && block.start ? block.start : undefined}
+          start={block.kind === 'ol' && block.start !== undefined ? block.start : undefined}
         >
           {block.items.map((it, i) => (
             <li key={i}>
@@ -280,7 +289,7 @@ function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block;
         <List
           key={k}
           className={`socria-terms${block.ordered ? ' is-ordered' : ''}`}
-          style={block.ordered && block.start ? { counterReset: `rx-term ${block.start - 1}` } : undefined}
+          style={block.ordered && block.start !== undefined ? { counterReset: `rx-term ${block.start - 1}` } : undefined}
         >
           {block.items.map((it, i) => row(it, i, i === last ? tailSub : undefined))}
           {next && row(next, 't')}
@@ -301,7 +310,8 @@ function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block;
               <div key={gi} className="socria-group">
                 {g.header && (
                   <div className="socria-group-head">
-                    {stripMarks(g.header).replace(/:$/, '')}
+                    {/* a label's marks and mathematics drawn, never printed ("- $x>0$:" showed its dollars) */}
+                    <Body text={stripMarks(g.header).replace(/:$/, '')} math={math} cite={cite} />
                   </div>
                 )}
                 {(g.items.length > 0 || more !== null) && (
@@ -359,7 +369,8 @@ function BlockNode({ block, math, k, cite, rich, inline, tail }: { block: Block;
  */
 function Table({ block, math, k, cite, rich, pending, writing }: { block: Extract<Block, { kind: 'table' }>; math?: boolean; k: string; cite?: CiteRender; rich?: boolean; pending?: string[]; writing?: boolean }) {
   const cmp = !!block.compare;
-  const labels = block.header.map((c) => stripMarks(c));
+  // the stacked phone row's label is an attribute — plain text, its mathematics as type
+  const labels = block.header.map((c) => plainText(stripMarks(c)));
   const row = (r: string[], ri: number | 't') => (
     <tr key={ri} className={ri === 't' ? 'is-tail' : undefined}>
       {r.map((c, ci) =>

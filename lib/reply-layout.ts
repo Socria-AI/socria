@@ -65,6 +65,7 @@
 //
 // Pure: no React, no DOM. components/RichText.tsx draws what this returns.
 
+import { plainText } from '@/lib/logos5/canvas';
 import { bulletBlock, isTableRule, listLine, parseBlocks, stripMarks, type Block } from './rich-text';
 import type { InlineSpec } from './inline-ui';
 
@@ -523,7 +524,8 @@ export function previewOf(b: Block | undefined): string {
     default:
       text = '';
   }
-  const words = stripMarks(text).replace(/\$+/g, '').replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
+  // the mathematics as type ("½bh", "x²"), never its TeX with the dollars taken off ("\frac{1}{2}bh")
+  const words = plainText(text).replace(/\s+/g, ' ').trim().split(' ').filter(Boolean);
   if (!words.length) return '';
   return words.length > PREVIEW_WORDS ? `${words.slice(0, PREVIEW_WORDS).join(' ')}…` : words.join(' ');
 }
@@ -854,7 +856,10 @@ function settleTail(tail: string): { settle: string; tail: string } {
  * (so it may be that list's next item, or that table's next row).
  */
 export function streamingSplit(text: string, editorial = false): { settled: string; tail: string; joins: boolean } {
-  const cut = text.lastIndexOf('\n\n');
+  let cut = text.lastIndexOf('\n\n');
+  // a displayed formula still open: the paragraph it began in is still being written, blank lines and all
+  const opened = openDisplayAt(text);
+  if (opened >= 0 && cut > opened) cut = text.lastIndexOf('\n\n', opened);
   // inside an unclosed fence — as the parser reads fences, one-line blocks and all
   const read = text.includes('```') ? parseBlocks(text, { rich: true }) : [];
   const end = read[read.length - 1];
@@ -877,7 +882,61 @@ export function streamingSplit(text: string, editorial = false): { settled: stri
       joins = true;
     }
   }
-  return { settled, tail, joins };
+  return { settled, tail: tidyTail(tail), joins };
+}
+
+/**
+ * Where a displayed formula ($$ or \[) opens and has not yet closed, or -1.
+ * Fenced code is not mathematics.
+ */
+export function openDisplayAt(text: string): number {
+  if (!text.includes('$$') && !text.includes('\\[')) return -1;
+  const bare = text.replace(/```[\s\S]*?(?:```|$)/g, (m) => ' '.repeat(m.length)).replace(/`[^`\n]*`/g, (m) => ' '.repeat(m.length));
+  let open = -1;
+  for (const m of bare.matchAll(/\$\$|\\\[|\\\]/g)) {
+    const at = m.index ?? 0;
+    if (m[0] === '$$') open = open >= 0 ? -1 : at;
+    else if (m[0] === '\\[') open = open >= 0 ? open : at;
+    else if (open >= 0 && bare.startsWith('\\[', open)) open = -1;
+  }
+  return open;
+}
+
+/**
+ * The line still being written, without the half of a construct that cannot
+ * be drawn yet. While a reply streams, "So the area is $\frac{1}{2" showed its
+ * raw TeX until the closing dollar arrived and then jumped into a formula; an
+ * unpaired "**" printed its asterisks. An unfinished formula is held back
+ * until it is whole, and an unpaired mark is left out until its pair comes —
+ * the words themselves are never held back. Money ("costs $5") is not a formula.
+ */
+export function tidyTail(tail: string): string {
+  if (!tail) return tail;
+  let t = tail;
+  const display = openDisplayAt(t);
+  if (display >= 0) t = t.slice(0, display).trimEnd();
+  const inl = t.lastIndexOf('\\(');
+  if (inl >= 0 && t.indexOf('\\)', inl) < 0) t = t.slice(0, inl).trimEnd();
+  // single dollars, outside code, escaped ones and $$ set aside
+  const bare = t.replace(/`[^`\n]*`/g, (m) => ' '.repeat(m.length));
+  const singles = [...bare.matchAll(/(?<![\\$])\$(?!\$)/g)].map((m) => m.index ?? 0);
+  if (singles.length % 2 === 1) {
+    const at = singles[singles.length - 1];
+    const after = t.slice(at + 1);
+    // a formula on its way: TeX's marks right after the dollar ("$\frac", "$p^*", "$x_1", "$f(x) =")
+    if (/^\S/.test(after) && /[\\^_{}=]/.test(after)) t = t.slice(0, at).trimEnd();
+  }
+  // an unpaired bold mark, and an unpaired backtick, are left out until their pair arrives
+  if ((t.match(/\*\*/g) ?? []).length % 2 === 1) {
+    const k = t.lastIndexOf('**');
+    t = t.slice(0, k) + t.slice(k + 2);
+  }
+  const ticks = t.replace(/```/g, '').match(/`/g) ?? [];
+  if (ticks.length % 2 === 1) {
+    const k = t.lastIndexOf('`');
+    if (t.slice(k - 2, k + 1) !== '```') t = t.slice(0, k) + t.slice(k + 1);
+  }
+  return t;
 }
 
 /**

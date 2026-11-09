@@ -284,7 +284,7 @@ export function WriteUpReader({ text }: { text: string }) {
   return (
     <article className="l5c-plain l5c-writeup" aria-label="Written by Socria">
       <div className="l5c-text l5c-rich">
-        <RichText text={text} rich />
+        <RichText text={text} rich math />
       </div>
     </article>
   );

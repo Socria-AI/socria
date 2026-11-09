@@ -18,11 +18,14 @@
 // plain-node harness in test/. Everything below returns plain data.
 
 import { INLINE_KINDS, parseInlineSpec, type InlineSpec } from './inline-ui';
+import { hasMath, scanMath } from './tex-split';
 
 /** One run of inline text, and what it is. */
 export interface Inline {
-  kind: 'text' | 'em' | 'strong' | 'strong-em' | 'code';
+  kind: 'text' | 'em' | 'strong' | 'strong-em' | 'code' | 'link';
   text: string;
+  /** link: where it goes — http(s) or mailto only, never anything a click could run */
+  href?: string;
 }
 
 export interface TableBlock {
@@ -125,7 +128,12 @@ export type Block =
 export interface ReadOptions {
   rich?: boolean;
 }
-const FENCE_RE = /^\s*```\s*([\w+#.-]{0,20})\s*$/;
+const FENCE_RE = /^\s*(`{3,}|~{3,})\s*([\w+#.-]{0,20})\s*$/;
+/** A fence that closes a block opened by `open`: the same character, at least as many of it, nothing after. */
+const closesFence = (line: string, open: string) => {
+  const m = /^\s*(`{3,}|~{3,})\s*$/.exec(line);
+  return !!m && m[1][0] === open[0] && m[1].length >= open.length;
+};
 /**
  * The ways a model actually writes an inline block that the strict shape
  * above does not read, each seen in a streamed reply:
@@ -174,7 +182,9 @@ function mayBeSpec(said: string): boolean {
   // still being spelled, with nothing written after it yet
   return all.length === rest.length && (!word || ARRIVING_KINDS.some((k) => k.startsWith(word)));
 }
-const HEADING_RE = /^(#{1,3})\s+(\S.*)$/;
+const HEADING_RE = /^\s{0,3}(#{1,6})\s+(\S.*)$/;
+/** `---`, `***`, `___` on a line of their own: a divider, drawn as the pause it is, never as a paragraph of dashes. */
+const RULE_RE = /^\s{0,3}([-*_])(?:\s*\1){2,}\s*$/;
 const QUOTE_RE = /^\s*>\s?(.*)$/;
 
 // ── inline ───────────────────────────────────────────────────────────
@@ -200,8 +210,10 @@ const QUOTE_RE = /^\s*>\s?(.*)$/;
  * `*` at the start of a line is a bullet, not an opening mark.
  */
 const INLINE_SOURCE =
-  /\*\*\*([^*\n]+)\*\*\*|\*\*((?:[^*\n]|\n(?!\s*\n)|\*(?!\*))+?)\*\*|\*([^*\n]+)\*/
+  /\*\*\*([^*\n]+)\*\*\*|\*\*((?:[^*\n]|\n(?!\s*\n)|\*(?!\*))+?)\*\*|\*(?=[^\s*])([^*\n]*?[^\s*])\*/
     .source;
+// Emphasis needs a word right inside each of its asterisks: "5 * 4 = 20 and 3 * 2 = 6" is
+// arithmetic, and it was set in italics between the two multiplication signs.
 
 /**
  * A FRESH one per call, never a shared module-level constant.
@@ -227,20 +239,75 @@ function inlineRe(): RegExp {
  */
 export function splitInline(input: string, opts: { code?: boolean } = {}): Inline[] {
   const text = typeof input === 'string' ? input : '';
-  // Inline code first, when asked: what is inside backticks is never read for marks.
+  // Inline code first, when asked: what is inside backticks is never read for marks — or for mathematics.
   if (opts.code && text.includes('`')) {
     const parts: Inline[] = [];
     const re = /`([^`\n]+)`/g;
     let at = 0;
     let m: RegExpExecArray | null;
     while ((m = re.exec(text)) !== null) {
-      if (m.index > at) parts.push(...splitInline(text.slice(at, m.index)));
+      if (m.index > at) parts.push(...linksThenMarks(text.slice(at, m.index), true));
       parts.push({ kind: 'code', text: m[1] });
       at = m.index + m[0].length;
     }
-    if (at < text.length) parts.push(...splitInline(text.slice(at)));
+    if (at < text.length) parts.push(...linksThenMarks(text.slice(at), true));
     return parts;
   }
+  return linksThenMarks(text, !!opts.code);
+}
+
+/** `[words](https://…)` — read in Logos 5's rich reading; any other scheme stays the text it is. */
+const LINK_RE = /\[([^\]\n]{1,200})\]\((https?:\/\/[^\s)<>"]{1,2000}|mailto:[^\s)<>"]{1,320})\)/g;
+
+function linksThenMarks(text: string, links: boolean): Inline[] {
+  if (!links || !text.includes('](')) return protectedMarks(text);
+  const out: Inline[] = [];
+  let at = 0;
+  for (const m of text.matchAll(LINK_RE)) {
+    const i = m.index ?? 0;
+    // a bracket inside mathematics is the mathematics' own
+    if (i > at) out.push(...protectedMarks(text.slice(at, i)));
+    out.push({ kind: 'link', text: stripMarks(m[1]) || m[2], href: m[2] });
+    at = i + m[0].length;
+  }
+  if (at < text.length) out.push(...protectedMarks(text.slice(at)));
+  return out;
+}
+
+// Stand-ins while the marks are read: the mathematics (by number) and an escaped asterisk.
+const HOLD_OPEN = '\uE000';
+const HOLD_CLOSE = '\uE001';
+const HOLD_STAR = '\uE002';
+const HOLD_RE = /\uE000(\d+)\uE001/g;
+
+/**
+ * The marks of a run of prose, with its MATHEMATICS left whole.
+ *
+ * Marks used to be read first and the mathematics found afterwards, in each
+ * piece the marks left — so the asterisks of `$p^*$ and $q^*$` were taken for
+ * emphasis, the italic swallowed both formulas, and neither piece held a whole
+ * `$…$` any more: the reader saw raw dollars around an italic "= 5$ and $q^".
+ * Now every span the mathematics reader (lib/tex-split.ts) would draw is held
+ * aside under a stand-in, the marks are read around it, and it is put back
+ * exactly as written, inside whatever mark it sat in. `\*` is an asterisk.
+ */
+function protectedMarks(text: string): Inline[] {
+  const held: string[] = [];
+  let t = text;
+  if (t.includes('$') || t.includes('\\')) {
+    if (hasMath(t) || /\\\(|\\\[|\$\$/.test(t)) {
+      t = scanMath(t)
+        .map((g) => (g.kind === 'text' ? g.body : `${HOLD_OPEN}${held.push(text.slice(g.start, g.end)) - 1}${HOLD_CLOSE}`))
+        .join('');
+    }
+    t = t.replace(/\\\*/g, HOLD_STAR);
+  }
+  if (!held.length && !t.includes(HOLD_STAR)) return marksOf(t);
+  const back = (s: string) => s.replace(HOLD_RE, (_, n) => held[Number(n)] ?? '').replace(/\uE002/g, '*');
+  return marksOf(t).map((seg) => ({ ...seg, text: back(seg.text) }));
+}
+
+function marksOf(text: string): Inline[] {
   const out: Inline[] = [];
   const push = (kind: Inline['kind'], body: string) => {
     if (!body) return;
@@ -260,7 +327,7 @@ export function splitInline(input: string, opts: { code?: boolean } = {}): Inlin
       push('strong-em', m[1]);
     } else if (m[2] !== undefined) {
       // Bold, which may carry emphasis inside it.
-      for (const inner of splitInline(m[2])) {
+      for (const inner of marksOf(m[2])) {
         push(inner.kind === 'em' ? 'strong-em' : 'strong', inner.text);
       }
     } else {
@@ -282,8 +349,9 @@ export function stripMarks(s: string): string {
 
 // ── blocks ───────────────────────────────────────────────────────────
 
-const BULLET_RE = /^\s*([-•]|\*)\s+(.*)$/;
-const ORDERED_RE = /^\s*\d+[.)]\s+(.*)$/;
+const BULLET_RE = /^\s*([-•+]|\*)\s+(.*)$/;
+// three digits at most: "2024. That was the year." is a sentence, not item 2,024 of a list
+const ORDERED_RE = /^\s*\d{1,3}[.)]\s+(.*)$/;
 const TABLE_SEP_RE = /^\s*\|?[\s:|-]*-{2,}[\s:|-]*\|?\s*$/;
 /** How far a line is indented, a tab counted as two spaces. */
 const indentOf = (l: string): number => (l.match(/^[ \t]*/)?.[0] ?? '').replace(/\t/g, '  ').length;
@@ -313,13 +381,39 @@ export function listLine(line: string): { ordered: boolean; text: string; indent
 /** A table's `|---|---|` rule. */
 export const isTableRule = (line: string): boolean => TABLE_SEP_RE.test(line) && line.includes('-');
 
+/**
+ * A table row's cells. A pipe divides cells only outside `code` and outside
+ * mathematics — `$|x|$` is an absolute value, `\(\|v\|\)` a norm — and `\|`
+ * in prose is a pipe that is part of the cell. Splitting on every pipe shifted
+ * the columns and broke the formula in two.
+ */
 export function splitTableRow(line: string): string[] {
-  return line
-    .trim()
-    .replace(/^\|/, '')
-    .replace(/\|$/, '')
-    .split('|')
-    .map((c) => c.trim());
+  const t = line.trim().replace(/^\|/, '').replace(/(?<!\\)\|$/, '');
+  // where a pipe does NOT divide: inside code, inside mathematics
+  const keep: [number, number][] = [];
+  for (const m of t.matchAll(/`[^`\n]+`/g)) keep.push([m.index ?? 0, (m.index ?? 0) + m[0].length]);
+  if (t.includes('$') || t.includes('\\(')) {
+    for (const g of scanMath(t)) if (g.kind !== 'text' && !keep.some(([a, b]) => g.start < b && g.end > a)) keep.push([g.start, g.end]);
+  }
+  const inside = (k: number) => keep.some(([a, b]) => k >= a && k < b);
+  const cells: string[] = [];
+  let cur = '';
+  for (let k = 0; k < t.length; k++) {
+    const c = t[k];
+    if (c === '\\' && t[k + 1] === '|' && !inside(k)) {
+      cur += '|';
+      k++;
+      continue;
+    }
+    if (c === '|' && !inside(k)) {
+      cells.push(cur.trim());
+      cur = '';
+      continue;
+    }
+    cur += c;
+  }
+  cells.push(cur.trim());
+  return cells;
 }
 
 /**
@@ -403,6 +497,9 @@ function richListAt(lines: string[], from: number): { block: Block; next: number
   let inSub = false;
   while (i < lines.length && lines[i].trim() !== '') {
     const l = lines[i];
+    // a fenced block under an item ends the list there and is drawn as the code it is — joined onto
+    // the item it was flattened to one line, its newlines gone and its backticks printed
+    if (FENCE_RE.test(l)) break;
     const marked = BULLET_RE.test(l) || ORDERED_RE.test(l);
     const depth = indentOf(l);
     if (marked && depth >= base + 2 && items.length) {
@@ -481,9 +578,90 @@ function sourcesAt(lines: string[], i: number): { block: SourcesBlock; next: num
   return { block: { kind: 'sources', query, items }, next: at };
 }
 
+/** Stand-in for a line break inside displayed mathematics while the lines are read (restored after). */
+const MATH_NL = '\uE010';
+
+/**
+ * Displayed mathematics that runs over several lines, held together as one line.
+ *
+ * Blocks are read line by line, so a `$$ … $$` whose aligned rows begin "- c &= d"
+ * became a bullet, and one with a blank line inside became two paragraphs — the
+ * formula in pieces, every piece raw. Lines from an opening `$$` or `\[` to its
+ * close are joined here (code fences and inline code untouched) and given back
+ * their breaks once the blocks are read. Only a span that closes is joined: a
+ * stray `$$` in prose must not swallow the rest of the reply.
+ */
+export function joinDisplayMath(text: string): string {
+  if (!text.includes('$$') && !text.includes('\\[')) return text;
+  const lines = text.split('\n');
+  const out: string[] = [];
+  let fence: string | null = null;
+  let held: string[] | null = null;
+  let closer = '';
+  for (const line of lines) {
+    if (held) {
+      held.push(line);
+      if (opensOrCloses(line, closer) % 2 === 1) {
+        out.push(held.join(MATH_NL));
+        held = null;
+      }
+      continue;
+    }
+    const f = /^\s*(`{3,}|~{3,})/.exec(line);
+    if (fence) {
+      if (f && f[1][0] === fence[0]) fence = null;
+      out.push(line);
+      continue;
+    }
+    if (f) {
+      fence = f[1];
+      out.push(line);
+      continue;
+    }
+    // an odd number of $$ (or a \[ without its \]) leaves a display open at the end of the line
+    const bare = line.replace(/`[^`]*`/g, '');
+    const dd = opensOrCloses(bare, '$$');
+    const sq = (bare.match(/\\\[/g) || []).length - (bare.match(/\\\]/g) || []).length;
+    if (dd % 2 === 1) {
+      held = [line];
+      closer = '$$';
+    } else if (sq > 0) {
+      held = [line];
+      closer = '\\]';
+    } else out.push(line);
+  }
+  // never closed: the lines as they were (a reply still streaming its formula is the tail's business)
+  if (held) out.push(...held);
+  return out.join('\n');
+}
+
+/** How many unescaped `closer` marks a line has. */
+function opensOrCloses(line: string, closer: string): number {
+  let n = 0;
+  for (let k = line.indexOf(closer); k >= 0; k = line.indexOf(closer, k + closer.length)) if (line[k - 1] !== '\\' || closer !== '$$') n++;
+  return n;
+}
+
+/** Put back the line breaks joinDisplayMath held, in every string a block carries. */
+function unjoin<T>(v: T): T {
+  if (typeof v === 'string') return (v.includes(MATH_NL) ? v.split(MATH_NL).join('\n') : v) as unknown as T;
+  if (Array.isArray(v)) return v.map(unjoin) as unknown as T;
+  if (v && typeof v === 'object') {
+    const o: Record<string, unknown> = {};
+    for (const [k, x] of Object.entries(v as Record<string, unknown>)) o[k] = k === 'spec' ? x : unjoin(x);
+    return o as T;
+  }
+  return v;
+}
+
 export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
-  const text = typeof input === 'string' ? input : '';
-  const lines = text.replace(/\r/g, '').split('\n');
+  const joined = joinDisplayMath((typeof input === 'string' ? input : '').replace(/\r/g, ''));
+  const blocks = parseLines(joined, opts);
+  return joined.includes(MATH_NL) ? unjoin(blocks) : blocks;
+}
+
+function parseLines(text: string, opts: ReadOptions): Block[] {
+  const lines = text.split('\n');
   const blocks: Block[] = [];
   const rich = !!opts.rich;
   /** inline blocks met so far — the next one's position */
@@ -510,7 +688,10 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
       const inlineOpen = lines[i].match(UI_OPEN_INLINE_RE);
       const fence = inlineOpen ? null : lines[i].match(FENCE_RE);
       if (fence || inlineOpen) {
-        const lang = inlineOpen ? 'ui' : (fence![1] || '').toLowerCase();
+        const lang = inlineOpen ? 'ui' : (fence![2] || '').toLowerCase();
+        const marker = fence?.[1] ?? '```';
+        // a fence indented under a list item: its lines carry the same indent, which is not the code's
+        const lead = fence ? indentOf(lines[i]) : 0;
         const isUi = lang === 'ui';
         const body: string[] = inlineOpen ? [inlineOpen[1]] : [];
         i++;
@@ -518,7 +699,7 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
         while (i < lines.length) {
           // a code block closes only on a fence line of its own, as it always has; a line in it that
           // merely starts with backticks is code. An inline block is JSON, so it can be read more freely.
-          const close = isUi ? lines[i].match(CLOSE_RE) : FENCE_RE.test(lines[i]) ? ['', ''] : null;
+          const close = isUi ? lines[i].match(CLOSE_RE) : closesFence(lines[i], marker) ? ['', ''] : null;
           if (close) {
             const rest = close[1].trim();
             open = false;
@@ -545,12 +726,18 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
           blocks.push({ kind: 'ui', spec: open ? null : parseInlineSpec(body.join('\n')), open, n: uiSeen++, ...(kind ? { pending: kind } : {}) });
           continue;
         }
-        blocks.push({ kind: 'code', lang: fence?.[1] || null, text: body.join('\n'), open });
+        const code = lead ? body.map((l) => l.replace(new RegExp(`^[ \\t]{0,${lead}}`), '')) : body;
+        blocks.push({ kind: 'code', lang: fence?.[2] || null, text: code.join('\n'), open });
         continue;
       }
       const h = lines[i].match(HEADING_RE);
       if (h) {
-        blocks.push({ kind: 'h', level: h[1].length as 1 | 2 | 3, text: h[2].replace(/\s+#+\s*$/, '').trim() });
+        // four to six #s are headings too (the stream gate already treats them so); drawn at the third level
+        blocks.push({ kind: 'h', level: Math.min(3, h[1].length) as 1 | 2 | 3, text: h[2].replace(/\s+#+\s*$/, '').trim() });
+        i++;
+        continue;
+      }
+      if (RULE_RE.test(lines[i]) && !(i > 0 && lines[i - 1].trim() !== '' && /^\s*-+\s*$/.test(lines[i]) && lines[i - 1].includes('|'))) {
         i++;
         continue;
       }
@@ -572,10 +759,13 @@ export function parseBlocks(input: string, opts: ReadOptions = {}): Block[] {
     }
 
     if (startsTable(lines, i)) {
+      const piped = /^\s*\|/.test(lines[i]);
       const header = splitTableRow(lines[i]);
       i += 2;
       const rows: string[][] = [];
-      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '') {
+      // a row is a row: piped like the header, or (for a table written without outer pipes) as many
+      // cells as it has. "So $|x|$ matters" under a table is the next sentence, not a broken row.
+      while (i < lines.length && lines[i].includes('|') && lines[i].trim() !== '' && (piped ? /^\s*\|/.test(lines[i]) : splitTableRow(lines[i]).length >= header.length)) {
         rows.push(splitTableRow(lines[i]));
         i++;
       }

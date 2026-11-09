@@ -11,6 +11,7 @@ import type { LogosNodeType } from '@/lib/logos';
 import { MODE_META, type ExploreResult, type NodeMode } from '@/lib/logos-explore';
 import { NodeGlyph } from './NodeGlyph';
 import { MathText } from './TeX';
+import { RichText, StreamingRichText } from './RichText';
 import { CloseGlyph } from './logos5/L5Chrome';
 
 export type FocusMsg = { role: 'user' | 'assistant'; content: string };
@@ -468,12 +469,13 @@ export function ExplorePanel({
             <span className="lg-x-thread-label">Thinking about this</span>
             {thread.map((m, i) => (
               <div key={i} className={`lg-x-turn lg-x-turn-${m.role}`}>
-                <MathText>{m.content}</MathText>
+                {/* a reply here is a reply like any other: its lists, tables, code and mathematics drawn, not printed */}
+                {m.role === 'assistant' ? <RichText text={m.content} math rich /> : <MathText>{m.content}</MathText>}
               </div>
             ))}
             {streaming && (
               <div className="lg-x-turn lg-x-turn-assistant">
-                <MathText>{streaming}</MathText>
+                <StreamingRichText text={streaming} math rich />
               </div>
             )}
             {busy && !streaming && (

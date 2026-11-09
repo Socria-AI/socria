@@ -2721,7 +2721,17 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   color: var(--lg-ink);
   padding-left: 12px;
   border-left: 2px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.16);
+  /* drawn as blocks (RichText), so the source's line breaks are not spacing */
+  white-space: normal;
 }
+.logos-root .lg-x-turn-assistant > :first-child { margin-top: 0; }
+.logos-root .lg-x-turn-assistant > :last-child { margin-bottom: 0; }
+.logos-root .lg-x-turn-assistant p,
+.logos-root .lg-x-turn-assistant ul,
+.logos-root .lg-x-turn-assistant ol { margin: 0 0 0.6em; }
+.logos-root .lg-x-turn-assistant ul,
+.logos-root .lg-x-turn-assistant ol { padding-left: 1.2em; }
+.logos-root .lg-x-turn-assistant pre { white-space: pre; overflow-x: auto; }
 @media (prefers-reduced-motion: reduce) { .logos-root .lg-x-turn { animation: none; } }
 
 .logos-root .lg-x-ask {

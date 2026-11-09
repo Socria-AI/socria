@@ -9,6 +9,7 @@
 // draws it.
 
 import { parseBlocks } from '@/lib/rich-text';
+import { scanMath, unescapeDollars } from '@/lib/tex-split';
 import type { InlineSpec } from '@/lib/inline-ui';
 
 export interface CanvasMsg {
@@ -87,6 +88,10 @@ export function readTex(tex: string): string {
     if (s === before) break;
   }
   return s
+    // an escaped character is that character: \$6 is six dollars, \% a percent sign
+    .replace(/\\([$%&#_])/g, '$1')
+    // p^* is "p star", written as type
+    .replace(/\^\{?\*\}?/g, '*')
     .replace(/\\(?:left|right|big|Big|bigg|Bigg)\b\s*/g, '')
     .replace(/\\([A-Za-z]+)/g, (m, name: string) => TEX_SYMBOL[name] ?? (/^(sin|cos|tan|log|ln|exp|lim|max|min)$/.test(name) ? name : ''))
     .replace(/\^\{([0-9n-]{1,3})\}|\^([0-9n])/g, (m, a?: string, b?: string) => {
@@ -102,19 +107,25 @@ export function readTex(tex: string): string {
 /** Text as it reads: no fenced blocks, no marks, TeX as type, one line. */
 export function plainText(content: unknown): string {
   const s = typeof content === 'string' ? content : '';
-  return s
+  // the shape of the lines first — fences, headings, bullets, quotations — on the whole text
+  const lines = s
     .replace(/```[\s\S]*?(```|$)/g, ' ')
-    .replace(/\$\$([\s\S]*?)\$\$/g, (_m, t: string) => ` ${readTex(t)} `)
-    .replace(/\\\[([\s\S]*?)\\\]/g, (_m, t: string) => ` ${readTex(t)} `)
-    .replace(/\\\(([\s\S]*?)\\\)/g, (_m, t: string) => readTex(t))
-    // $…$ is maths, unless it is two sums of money: "$5 and $10"
-    .replace(/\$([^$\n]{1,120})\$/g, (m, t: string) => (/^\d[\d,.]*\s/.test(t) && !/[\\^=]/.test(t) ? m : readTex(t)))
-    .replace(/\\[A-Za-z]+(?:\{[^{}]*\})*/g, (m) => readTex(m))
-    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
     .replace(/^\s*[-*+]\s+/gm, '')
-    .replace(/^\s*>\s?/gm, '')
-    .replace(/[*_`~]/g, '')
+    .replace(/^\s*>\s?/gm, '');
+  // then the mathematics as type and the prose without its marks — never the other way round:
+  // the marks taken out of a formula left $p^*$ as "p^" and $x_1$ as "x1" (lib/tex-split.ts finds the spans)
+  return scanMath(lines)
+    .map((g) =>
+      g.kind === 'text'
+        ? unescapeDollars(g.body)
+            .replace(/\\[A-Za-z]+(?:\{[^{}]*\})*/g, (m) => readTex(m))
+            .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/g, '$1$2')
+            .replace(/[*`~]/g, '')
+        : ` ${readTex(g.body)} `
+    )
+    .join('')
     .replace(/\s+/g, ' ')
     .trim();
 }

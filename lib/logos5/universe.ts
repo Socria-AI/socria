@@ -167,7 +167,12 @@ export function plain(text: string): string {
     .replace(/\$\$[\s\S]*?\$\$/g, ' ')
     .replace(/\[[A-Z]\d+(?:\.\d+)?\]/g, '')
     .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
-    .replace(/[*_`#>|~]+/g, '')
+    // the marks, and only the marks: "growth > 3%" keeps its sign, a table row loses its pipes
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '')
+    .replace(/^\s*\|(.*)\|\s*$/gm, (_m, row: string) => row.replace(/\|/g, ' '))
+    .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/gm, '$1$2')
+    .replace(/[*`]+|~~/g, '')
     .replace(/\s+/g, ' ')
     .trim();
 }
