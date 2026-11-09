@@ -9142,6 +9142,13 @@ export function LogosApp({
             <>
               {ot && ot.replyAt !== undefined && messages[ot.replyAt] ? msgEl(messages[ot.replyAt], ot.replyAt, undefined, { listen: true }) : null}
               {!ot && openNode ? <p className="ls-note">{openNode.detail || 'Drawn from the conversation. Ask about it below.'}</p> : null}
+              {/* an empty line of thinking: the same space, waiting for its first words (and saying why a first message did not go) */}
+              {!turns.length && !openNode ? <p className="ls-note">What are you working through? Say it below, in your own words. The ideas, what you bring and what Socria makes gather here.</p> : null}
+              {!turns.length && error && (
+                <p className="l5-error" role="alert">
+                  {error}
+                </p>
+              )}
               {atNewest && streaming && (
                 <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />
               )}
@@ -9579,6 +9586,12 @@ export function LogosApp({
   /** where the tab row was: on a full view, the way back to the chat and that view's own actions; on the chat, nothing */
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   /** the account chip opens the profile's own menu: the account, and Memory (Alex Tran: the mind graph lives in the profile) */
+  const homeShown = l5 && l5Home && !l5Mind && !hydrating && !room.active;
+  /**
+   * The welcome-back word is said on the Universal Map, and only there: never over a conversation, and never beside
+   * the resting or trial-ended screen, which already say the one thing worth saying (one pitch at a time).
+   */
+  const welcomeOn = !!onePrompt?.open && onePrompt.reason === 'welcome-back' && homeShown && !sleepOpen && !trialEndedOpen;
   const accountEl = guest ? (
     // a guest: how many free messages are left, and the way to sign in, top right
     <div className="l5-guestacct">
@@ -9609,7 +9622,7 @@ export function LogosApp({
         <OneButton
           onOpen={() => askOne()}
           note={
-            onePrompt?.open && onePrompt.reason === 'welcome-back'
+            welcomeOn && onePrompt
               ? {
                   first: (readName() ?? user?.firstName ?? '').trim().split(/\s+/)[0] || null,
                   title: onePrompt.title,
@@ -9690,7 +9703,8 @@ export function LogosApp({
   // is no start screen and no "where do you want to start?" — the composer is
   // where it begins.
   const emptyHere = messages.length === 0 && !busy && !streaming && !groupView && !togetherReadOnly;
-  const homeShown = l5 && l5Home && !l5Mind && !hydrating && !room.active;
+  /** the conversations are still being read: neither home nor a line of thinking is drawn yet */
+  const openingNow = l5 && hydrating && !room.active;
   // WHAT CHANGED, once, to somebody who used the Socria before the map — told
   // on the map, because the map is what changed (lib/first-run.ts
   // wantsWhatsNew). Every conversation they had counts as having been here,
@@ -10120,7 +10134,7 @@ export function LogosApp({
         />
       )}
       <WelcomeBack
-        ready={!!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun.synced && !introWanted && !whatsNewShown && !busy && !oneOpen && !acctOpen && !guideOpen}
+        ready={!!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun.synced && !introWanted && !whatsNewShown && !busy && !oneOpen && !acctOpen && !guideOpen && !trialEnded && !sleep?.asleep}
         ask={ask}
       />
       {whatsNewShown && (
@@ -10360,9 +10374,14 @@ export function LogosApp({
         >
           {railEl}
           <div className="l5-main">
-            {!chromeHidden && !mindShown && !homeShown && l5Head}
+            {!chromeHidden && !mindShown && !homeShown && !openingNow && l5Head}
             <div className={`l5-body${zoomed && !oneView && !mindShown && !homeShown ? ' is-zoomed' : ''}`}>
-              {mindShown ? (
+              {openingNow ? (
+                // still reading the conversations: a quiet page, never a half-built one (the old canvas flashed here)
+                <div className="l5-opening" role="status" aria-busy="true">
+                  <span className="l5-opening-t">Opening Socria…</span>
+                </div>
+              ) : mindShown ? (
                 l5MindView
               ) : homeShown ? (
                 l5HomeView

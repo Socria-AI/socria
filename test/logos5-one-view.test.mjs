@@ -34,7 +34,7 @@ const html = (el) => quiet(() => renderToStaticMarkup(el));
 console.log('\n=== oneView: when the board is the view ===');
 ok('a wide screen, a line of thinking with something in it', O.oneViewOn({ narrow: false, line: true, turns: 2, busy: false }));
 ok('  the first message on its way counts', O.oneViewOn({ narrow: false, line: true, turns: 0, busy: true }));
-ok('  on a phone too (as panels side by side); not on an empty line, not off a line', O.oneViewOn({ narrow: true, line: true, turns: 3, busy: false }) && !O.oneViewOn({ narrow: false, line: true, turns: 0, busy: false }) && !O.oneViewOn({ narrow: true, line: false, turns: 3, busy: false }));
+ok('  on a phone too (as panels side by side), and on an empty line (the old canvas never opens); not off a line', O.oneViewOn({ narrow: true, line: true, turns: 3, busy: false }) && O.oneViewOn({ narrow: false, line: true, turns: 0, busy: false }) && !O.oneViewOn({ narrow: true, line: false, turns: 3, busy: false }));
 ok('  a phone: each tab brings its panel — Logic Map left, the conversation, then brought and made', O.panelOf('logic_map') === 0 && O.panelOf('chat') === 1 && O.panelOf('content') === 2 && O.panelOf('artifacts') === 2);
 ok('  and a swipe to a panel chooses its tab, keeping Files or Artifacts on the third', O.cameraOfPanel(0, 'chat') === 'logic_map' && O.cameraOfPanel(1, 'logic_map') === 'chat' && O.cameraOfPanel(2, 'chat') === 'artifacts' && O.cameraOfPanel(2, 'content') === 'content');
 
@@ -165,6 +165,8 @@ ok('no ideas yet: the column says where they will land', board({ map: null }).in
 
 console.log('\n=== wired into LogosApp ===');
 const app = read('components/LogosApp.tsx');
+ok('while the conversations are read, a quiet page: no header, no half-built line, home or canvas', /const openingNow = l5 && hydrating && !room\.active;/.test(app) && /!homeShown && !openingNow && l5Head/.test(app) && /\{openingNow \? \(\s*\/\/[^\n]*\n\s*<div className="l5-opening"/.test(app));
+ok('an empty line of thinking says what goes there, and why a first message did not go', /!turns\.length && !openNode \? <p className="ls-note">What are you working through\?/.test(app) && /!turns\.length && error && \(/.test(app));
 ok('the page is the view, on a wide screen and a phone; the zoomed-out canvas is not reached from it', /const oneView = oneViewOn\(\{ narrow,/.test(app) && /const primaryEl = oneView \? phoneBeside \?\? boardEl : viewEl\(studyTab\);/.test(app) && /const canvasEl = zoomed && !oneView/.test(app));
 ok('  the turn read is the one pressed, else the newest; a send opens the newest and gives focus back to the conversation', /const sheetAt = oneView && sheetOpen \? sheetTurn\(boardTurns\.length, reading\) : null;/.test(app) && /if \(lastRole !== 'user'\) return;\s*setReading\(null\);\s*setSheetOpen\(true\);\s*setPageFocus\('chat'\);/.test(app));
 ok('  the open turn is drawn as the conversation draws it (one message renderer), the way to what it made first in its actions', /const msgEl = \(m: Msg, i: number, go\?: ReactNode, opts\?: \{ listen\?: boolean \}\) =>/.test(app) && /\{messages\.map\(\(m, i\) => msgEl\(m, i\)\)\}/.test(app) && /msgEl\(messages\[t\.askedAt\], t\.askedAt\)/.test(app) && /msgEl\(messages\[t\.replyAt\], t\.replyAt, go\)/.test(app) && /Open the \{madeNoun\} beside this/.test(app));

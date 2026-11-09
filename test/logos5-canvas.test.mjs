@@ -136,7 +136,7 @@ console.log('\n=== the wiring ===');
   ok('while zoomed, the conversation underneath is neither seen nor reachable', /\.l5-body\.is-zoomed > :not\(\.lcv\)\s*\{[^}]*visibility: hidden[^}]*pointer-events: none/.test(css));
   ok('cards on the theme’s raised surface (white on Paper), not the chat card’s beige', /--lcv-card: var\(--l5-raise/.test(css) && !/--lcv-card: var\(--l5-card/.test(css));
   ok('  your question in a filled neutral bubble (the chat’s shape), not a tan one', /\.lcv-ask \{[^}]*background: rgba\(var\(--lcv-ink-rgb\), 0\.075\)/.test(css));
-  ok('the canvas sits under the header, so ‹ Universal Map stays on screen while zoomed', /\.l5-body\.is-zoomed \{\s*position: relative;/.test(css) && /\{!chromeHidden && !mindShown && !homeShown && l5Head\}/.test(app));
+  ok('the canvas sits under the header, so ‹ Universal Map stays on screen while zoomed', /\.l5-body\.is-zoomed \{\s*position: relative;/.test(css) && /\{!chromeHidden && !mindShown && !homeShown && !openingNow && l5Head\}/.test(app));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -23,12 +23,12 @@ export type Camera = Viewport;
 export type BoardPart = 'turns' | 'content' | 'artifacts' | 'map';
 
 /**
- * The one view is how a line of thinking that has something in it is shown — on a wide screen as three
- * columns, on a phone as the same three side by side, swiped between (Logos 5.5). `narrow` is kept for the
- * callers that say it; it no longer decides.
+ * The one view is how every line of thinking is shown (Logos 5.5) — an empty one included, so the page a
+ * conversation begins on is the page it carries on in, and the zoomed-out canvas of Logos 5 is never what
+ * opens. `narrow`, `turns` and `busy` are kept for the callers that say them; they no longer decide.
  */
 export function oneViewOn(i: { narrow: boolean; line: boolean; turns: number; busy: boolean }): boolean {
-  return i.line && (i.turns > 0 || i.busy);
+  return i.line;
 }
 
 /** On a phone the page is three panels side by side: which one each header tab brings into view. */
