@@ -96,12 +96,12 @@ console.log('\n=== the comparison and the sentences are written from the table a
   const rows = comparisonRows();
   const row = (id) => rows.find((r) => r.id === id) ?? {};
   ok('the comparison has the seven rows the trial and Socria One differ on', rows.map((r) => r.id).join() === 'ai,after,voice,share,experiments,themes,files', rows.map((r) => r.id).join());
-  ok('  the trial: seven days, 4,000 tokens a day; Socria One: unlimited, under fair use', row('ai').free === '7 days · 4,000 tokens a day' && row('ai').one === 'Unlimited (fair use)', JSON.stringify(row('ai')));
+  ok('  the trial: seven days, 10,000 tokens a day; Socria One: unlimited, under fair use', row('ai').free === '7 days · 10,000 tokens a day' && row('ai').one === 'Unlimited (fair use)', JSON.stringify(row('ai')));
   ok('  after the trial, everything made stays open — nothing is taken away', row('after').free === 'Everything you made stays open' && row('after').one === 'Keep going', JSON.stringify(row('after')));
   ok('  Voice, sharing, the experiments and the two themes: Socria One’s', ['voice', 'share', 'experiments', 'themes'].every((id) => row(id).free === 'Not included' && row(id).one === 'Included'), JSON.stringify(rows.slice(2, 6)));
   ok('  the largest file, from the table', row('files').free === '4 MB' && row('files').one === '30 MB', JSON.stringify(row('files')));
   ok('  no row sells a count the trial does not have', !rows.some((r) => /a month/.test(r.free)), JSON.stringify(rows.map((r) => r.free)));
-  ok('the trial in one sentence', freePlanSentence() === 'a 7-day trial: 4,000 tokens a day, up to 28,000 in all', freePlanSentence());
+  ok('the trial in one sentence', freePlanSentence() === 'a 7-day trial: 10,000 tokens a day, up to 70,000 in all', freePlanSentence());
   ok('Socria One in one sentence', onePlanSentence() === 'Unlimited conversations, Logic Maps and artifacts after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes', onePlanSentence());
   ok('  selling only what the trial does not have: no depth, lens, Draft Space or map size', !/depth|lens|Draft|nodes/i.test(onePlanSentence()), onePlanSentence());
   ok('an allowance, as it is said: uncounted is unlimited, on both plans', allowanceLabel('maps') === 'Unlimited Logic Maps' && allowanceLabel('documents') === 'Unlimited documents' && allowanceLabel('nodes', 'one') === 'Unlimited Logic Map nodes', `${allowanceLabel('maps')} | ${allowanceLabel('documents')} | ${allowanceLabel('nodes', 'one')}`);

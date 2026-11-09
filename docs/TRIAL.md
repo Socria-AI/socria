@@ -9,8 +9,8 @@ every new AI request needs Socria One ($15 a month). Nothing made is ever taken 
 |---|---|
 | Begins | With the account's first model call that does real work for it (a reply, a Logic Map pass, an artifact, a reading). Never at sign-up, never for upkeep (a title, the memory kept about the person). |
 | Lasts | 7 × 24 hours from that moment, to the millisecond. |
-| A day | 00:00 to 24:00 UTC, by the server's clock. 4,000 tokens, input and output together. |
-| In all | 28,000 tokens. A day's limit is the smaller of 4,000 and what the trial has left, so a trial that touches eight UTC days (one begun mid-day) still ends at 28,000. |
+| A day | 00:00 to 24:00 UTC, by the server's clock. 10,000 tokens, input and output together. |
+| In all | 70,000 tokens. A day’s limit is the smaller of 10,000 and what the trial has left, so a trial that touches eight UTC days (one begun mid-day) still ends at 70,000. |
 | A day spent | 429, resting until 00:00 UTC. The screen says when, in UTC and the person's own time. |
 | The end | 402 with `trialEnded`. New AI requests need Socria One. |
 | After | Every conversation, Logic Map, artifact and document stays open; everything done by hand (moving, writing, renaming, organising, exporting, deleting) works. Only requests that would ask a model are refused. |

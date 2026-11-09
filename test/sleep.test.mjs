@@ -108,6 +108,10 @@ process.env.RATE_LIMIT_DISABLED = '1';
 process.env.USAGE_STORE_MEMO_MS = '0';
 // a short wait for the person's other calls, so the busy case below is quick
 process.env.SOCRIA_TOKEN_WAIT_MS = '400';
+// The mechanics below are written at a 4,000-token day within 28,000 (the trial as it launched); the
+// limits move per deployment, so they run there. The defaults themselves are test/trial.test.mjs's.
+process.env.SOCRIA_TRIAL_DAILY_TOKENS = '4000';
+process.env.SOCRIA_TRIAL_TOTAL_TOKENS = '28000';
 
 const { db } = await import(pathToFileURL(join(here, 'helpers', 'fake-supabase.mjs')).href);
 const load = (n) => import(pathToFileURL(join(OUT, `${n}.mjs`)).href);
@@ -451,7 +455,7 @@ console.log('\n=== resets, and subscriptions changing ===');
   process.env.SOCRIA_TRIAL_DAILY_TOKENS = '8000';
   const higher = await call('chat', '/api/logos/chat', ROUTES[0].body('gus'), { as: 'gus' });
   ok('a higher daily limit, set in the environment, wakes it with no redeploy', higher.status === 200 && tokensOf('gus') === 4_700, { status: higher.status, tokens: tokensOf('gus') });
-  delete process.env.SOCRIA_TRIAL_DAILY_TOKENS;
+  process.env.SOCRIA_TRIAL_DAILY_TOKENS = '4000';
   process.env.SOCRIA_SLEEP = 'off';
   setTokens('gus', 999_999);
   ok('SOCRIA_SLEEP=off switches counting off: answered, and nothing held or counted', (await call('chat', '/api/logos/chat', ROUTES[0].body('gus'), { as: 'gus' })).status === 200 && tokensOf('gus') === 999_999 && holdsOf('gus') === 0);
@@ -619,8 +623,8 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
 
   // the trial's day (period 'day'), as the server sends it
   const start = now - 2 * HOUR;
-  const spent = Tr.trialState({ startedAt: start, now, byDay: { [Tr.dayKey(now)]: 4_400 } });
-  const going = Tr.trialState({ startedAt: start, now, byDay: { [Tr.dayKey(now)]: 1_400 } });
+  const spent = Tr.trialState({ startedAt: start, now, byDay: { [Tr.dayKey(now)]: 4_400 }, limits: Tr.trialLimits(process.env) });
+  const going = Tr.trialState({ startedAt: start, now, byDay: { [Tr.dayKey(now)]: 1_400 }, limits: Tr.trialLimits(process.env) });
   ok('the trial’s day, as the server reads it: period day, 4,000, resetting at the next 00:00 UTC', spent.status === 'active' && spent.today.period === 'day' && spent.today.asleep && spent.today.limit === 4_000 && spent.today.resetAt === Tr.nextMidnight(now) && !going.today.asleep && going.today.left === 2_600, spent.today);
   const dhtml = renderToStaticMarkup(h(UI.SleepScreen, { sleep: spent.today, trial: spent, open: true, onClose() {}, onUpgrade() {}, onWake() {}, timeZone: 'America/Chicago' }));
   ok('the day spent: "Socria is resting", today’s 4,000 trial tokens, and what still works', /Socria is resting/.test(dhtml) && /You’ve used today’s 4,000 trial tokens/.test(dhtml) && /Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting/.test(dhtml), text(dhtml));

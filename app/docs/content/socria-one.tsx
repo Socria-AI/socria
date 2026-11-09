@@ -20,7 +20,7 @@ import { DAY_RESET_WORDS, TRIAL } from '@/lib/trial';
 import { docPage } from '../registry';
 
 const page = docPage('socria-one')!;
-/** The trial's numbers as the page says them: "4,000", "28,000". */
+/** The trial's numbers as the page says them: "10,000", "70,000". */
 const tokens = (n: number) => n.toLocaleString('en-GB');
 const sections = [
   { id: 'plans', heading: 'The trial and the plan' },
