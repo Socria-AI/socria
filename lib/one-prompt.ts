@@ -22,7 +22,7 @@
 // Enforcement lives on the server and is unaffected by any of this. A prompt
 // is UX. If this file were deleted, every limit would still hold.
 
-import { allowanceLabel, boundaryNote, FEATURE_NOTE, LIMIT_HEADLINE, PLANS, TIERED_COUNTERS, type Counter, freePlanSentence } from './entitlements';
+import { boundaryNote, FEATURE_NOTE, LIMIT_HEADLINE, PLANS, TIERED_COUNTERS, type Counter, freePlanSentence } from './entitlements';
 import type { Plan } from './socria-one';
 import type { ThinkingContext } from './logos';
 
@@ -138,11 +138,14 @@ export interface TriggerSpec {
  * What the welcome-back prompt says, in rotation.
  *
  * FOUR THINGS THAT ARE ALL TRUE, rather than one thing said four times. Each
- * one is a different reason the count matters — what is carried between
- * conversations, what the free tier actually is, what happens to the work
- * already done — and none of them is a countdown, a discount, or a claim that
- * the free tier is worse at thinking. It is not: it is the same Socria, counted
- * by the day and the month.
+ * one is a different reason Socria One matters — what is carried between
+ * conversations, what the trial actually is, what happens to the work already
+ * done — and none of them is a countdown, a discount, or a claim that the trial
+ * is worse at thinking. It is not: it is the whole of Socria for seven days
+ * (lib/trial.ts), held by tokens rather than by a count. Since November 9,
+ * 2026 there is no free plan to describe, so none of these names one; and none
+ * sells what the trial already has — only what continues after it and what is
+ * Socria One's alone.
  *
  * The person picking these up in sequence should feel like they are being told
  * something, not measured. If a line here ever reads as pressure, it is the
@@ -151,35 +154,35 @@ export interface TriggerSpec {
 export const WELCOME_BACK: readonly { title: string; body: string; nudge: string }[] = [
   {
     title: 'Pick it back up',
-    nudge: 'Socria One holds as many conversations as you have, and carries what it learns into the next.',
+    nudge: 'Socria One keeps Socria answering after the trial, and carries what it learns into the next.',
     body:
-      `The free plan holds ${allowanceLabel('chats')} and ${allowanceLabel('maps')}. ` +
-      'Socria One holds as many as you have, and carries what it learns ' +
-      'about how you reason from each one into the next.',
+      'Every conversation you have started is here to pick back up. ' +
+      'Socria One keeps Socria answering after the trial, and carries what it ' +
+      'learns about how you reason from each one into the next.',
   },
   {
     title: 'What stays between conversations',
-    nudge: 'Room and continuity: as much as you need, with what you have settled carried forward.',
+    nudge: 'Room and continuity: no daily limit, with what you have settled carried forward.',
     body:
-      `The free plan gives you ${freePlanSentence()}. What Socria One adds is ` +
-      'room and continuity: as much as you need, with your positions, what you ' +
+      `Socria starts with ${freePlanSentence()}. What Socria One adds is ` +
+      'room and continuity: no daily limit, with your positions, what you ' +
       'have settled and how you tend to think carried forward instead of restarting.',
   },
   {
     title: 'Where this goes next',
-    nudge: 'Long work is where Socria earns its place. Socria One is the version without a count on it.',
+    nudge: 'Long work is where Socria earns its place. Socria One keeps going after the trial, without a daily limit.',
     body:
       'Long work is where this product earns its place — a decision that runs ' +
       'for weeks, a question you keep returning to. Socria One is the version ' +
-      'without a count on it.',
+      'that keeps going after the seven days, without a daily limit.',
   },
   {
     title: 'Everything you have made stays yours',
-    nudge: 'Nothing here expires on the free plan. Socria One adds unlimited conversations, Voice and sharing.',
+    nudge: 'Everything you make stays open after the trial. Socria One adds no daily limit, Voice, sharing and the experiments.',
     body:
-      'Nothing here expires and nothing is taken back: every conversation and ' +
-      'every map you have made stays open on the free plan. Socria One is ' +
-      'unlimited, with Socria Voice and sharing.',
+      'Nothing you make is taken back: every conversation, map and artifact ' +
+      'stays open after the trial, to open, move and edit. Socria One keeps ' +
+      'Socria answering, with Socria Voice, sharing and the experiments.',
   },
 ];
 
@@ -401,14 +404,15 @@ export const TRIGGERS: Record<TriggerReason, TriggerSpec> = {
     category: 'proactive',
     intent: 'medium',
     title: 'Go further with Socria One',
-    // What it used to promise — lifted limits, maps that keep growing — is
-    // what the free tier already does. What is actually still on the other
-    // side of the price is the count and the continuity, so that is what it
-    // says now. Selling somebody a feature they are using is how a product
-    // teaches people to ignore it.
+    // What it used to promise — lifted limits, maps that keep growing, then as
+    // many lines of thinking as you have — is what the trial already does. What
+    // is actually still on the other side of the price is Socria answering
+    // after the seven days and the continuity, so that is what it says now.
+    // Selling somebody a feature they are using is how a product teaches
+    // people to ignore it.
     body:
-      'You have been coming back to think here. Socria One keeps as many lines ' +
-      'of thinking as you have, and carries what it learns about how you reason ' +
+      'You have been coming back to think here. Socria One keeps Socria answering ' +
+      'after the trial, and carries what it learns about how you reason ' +
       'from each one into the next.',
   },
 
@@ -452,9 +456,10 @@ export function copyFor(reason: TriggerReason, shown = 0): PromptCopy {
     // "Continue with Socria One", which read as a step in what they were doing
     // rather than a purchase, and an upgrade should never be mistaken for one).
     primary: spec.category === 'entitlement' ? 'Upgrade to Socria One' : 'Become a member',
-    // The way out says what actually happens next: the free plan, kept — in the
-    // same words as the plan sheet's, and as a sentence now that it is a button.
-    secondary: spec.category === 'entitlement' ? 'Not now — keep the free plan' : 'Maybe later',
+    // The way out, in the same words as the plan sheet's (SocriaOneModal). It
+    // said "Not now — keep the free plan" until the seven-day trial replaced the
+    // free tier (November 9, 2026): there is no free plan left to keep.
+    secondary: spec.category === 'entitlement' ? 'Not now' : 'Maybe later',
   };
 }
 

@@ -64,14 +64,15 @@ export function Overview() {
         each one led to the next.
       </p>
       <p>
-        Logos 5 is free to start — signed out, a guest gets one line of
-        thinking and its map with no account — and it is the centerpiece of{' '}
+        Logos 5 can be tried before signing up — signed out, a guest gets a
+        short preview, one line of thinking and its map — and it is the
+        centerpiece of{' '}
         <Link href="/docs/socria-one">Socria One</Link>, the{' '}
-        {priceWithPeriod()} plan. Its free tier is not a trial but Logos 5
-        itself, counted by the month — {freePlanSentence()}: what Socria One
-        sells is having none of that counted, Socria Voice, sharing, and what
-        is carried between conversations, never a better version of any one
-        of them.
+        {priceWithPeriod()} plan. Every account begins with {freePlanSentence()} —
+        the whole of Logos 5, not a cut-down version. After seven days new AI
+        requests need Socria One, and everything made in the trial stays open.
+        What Socria One adds is no daily limit, Socria Voice, sharing, the
+        experiments and two themes, never a better version of any one of them.
       </p>
 
       <H2 id="principles">What never changes</H2>
@@ -103,12 +104,12 @@ export function Overview() {
           tell Socria it read you wrong. Neither is ever gated.
         </li>
         <li>
-          <strong>Nothing held hostage.</strong> Reaching a free limit — the
-          day&rsquo;s messages, or the month&rsquo;s lines of thinking — pauses
-          only what is new; it never hides, deletes, or locks what you
-          have already thought. Your existing maps stay visible and
-          interactive, the conversations you have begun stay open, and the
-          day&rsquo;s allowance comes back tomorrow.
+          <strong>Nothing held hostage.</strong> Reaching the end of a trial
+          day, or of the trial itself, pauses only new AI requests; it never
+          hides, deletes, or locks what you have already thought. Your
+          existing maps stay visible and interactive, the conversations you
+          have begun stay open and editable by hand, and a trial day&rsquo;s
+          tokens come back at 00:00 UTC.
         </li>
       </ul>
 

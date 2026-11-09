@@ -1,7 +1,8 @@
 // components/site/One.tsx — Socria One, from `Socria One` in the design
 // project (the 2026 page): paper, not the deep blue; the price in the
-// headline; two cards for the two things One adds — conversations with no
-// count, and sharing a map — and a foot that says how it renews.
+// headline; two cards for two things One adds — no daily limit once the
+// seven-day trial is over, and sharing a map — and a foot that says how it
+// renews.
 //
 // THE NUMBERS ARE READ, NOT WRITTEN. The price comes from lib/socria-one, so
 // this page, the paywall and the checkout cannot disagree about what One
@@ -73,7 +74,7 @@ export function One() {
               <div className="s-o-go">
                 <OneJoin place="cover" />
                 <a className="s-o-free" href={START}>
-                  Socria is free to start
+                  Start a seven-day trial
                 </a>
               </div>
             </div>
@@ -101,8 +102,8 @@ export function One() {
                 <div className="s-o-fade" />
               </div>
               <div className="s-o-cap">
-                <h2 id="s-o-c1">Unlimited conversations</h2>
-                <p>No daily or monthly count. Begin as many as you have.</p>
+                <h2 id="s-o-c1">No daily limit</h2>
+                <p>Seven days to try it; then as many conversations as you have, with nothing counted.</p>
               </div>
             </section>
 

@@ -152,8 +152,10 @@ console.log('\n=== the copy: what each says, and what none may say ===');
   ok('welcome opens with the volume', /as many lines of thinking as you have/.test(all['welcome-one'].text));
   ok('welcome promises the continuity', /carries what it learns about how you reason/.test(all['welcome-one'].text));
   // removed: "...on both surfaces" (/into Core and into Logos/) — Core was archived; Logos 5 is the one surface
-  ok('welcome says what is not counted', /nothing is counted by the month any more/.test(all['welcome-one'].text));
-  ok('welcome says what is unlimited, from the plan table', all['welcome-one'].text.includes('Unlimited conversations, Logic Maps, artifacts and documents, with Socria Voice and chat sharing'));
+  // Since November 9, 2026 there is no free tier, only a seven-day trial counted by the day
+  // (lib/trial.ts): what One lifts is the daily limit, and what it adds is its own features.
+  ok('welcome says there is no daily limit', /begin as many lines of thinking as you have, with no daily limit\./.test(all['welcome-one'].text) && !/counted by the month/.test(all['welcome-one'].text));
+  ok('welcome says what is unlimited, from the plan table', all['welcome-one'].text.includes('Unlimited conversations, Logic Maps and artifacts after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes'));
   ok('welcome reassures', /Nothing you have already made changes/.test(all['welcome-one'].text));
   // No email names Core: the Core models and the Core chat were archived (docs/ARCHIVE.md).
   for (const k of LIFECYCLE_KINDS) {

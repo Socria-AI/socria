@@ -66,8 +66,8 @@ console.log('\n=== what they start is a conversation of its own, and it counts =
 ok('the welcome starts a line of thinking of its own — never appended to one already open', /firstRun\.reach\('socria\.intro'\);[\s\S]{0,260}startFromHome\(text\);/.test(app));
 ok('  and so does the sentence carried from /onboarding', /seeded\.current = true;[\s\S]{0,140}startFromHome\(initialInput\);/.test(app));
 ok('it is counted like any other: no flag, no gift', !/firstThought|This one was on us|X-Socria-First-Thought/.test(app + intro));
-ok('a free plan is told so under the field, with what is left', /It counts as one of your \$\{limit\} free conversations this month — \$\{left\} left\./.test(app) && /startNote=\{welcomeNote\}/.test(app));
-ok('  never to Socria One, a guest, or before the plan is known', /if \(!isSignedIn \|\| one \|\| !planKnown\) return null;/.test(app));
+ok('the trial is said under the field: it begins with this question, or which day it is', /'Your seven-day trial begins with this question\.'/.test(app) && /\$\{dayOfLine\(trial\)\} of your trial — \$\{todayLine\(trial\.today\)\}/.test(app) && /startNote=\{welcomeNote\}/.test(app));
+ok('  never to Socria One, a guest, or before the plan is known', /if \(!isSignedIn \|\| one \|\| !planKnown \|\| !trial\) return null;/.test(app));
 ok('the account’s first name starts the name field', /defaultName=\{user\?\.firstName \?\? null\}/.test(app));
 ok('a new account sees it once — even one that brought a guest’s line of thinking along', /wantsWelcome\(firstRun\.state, \{/.test(app) && /accountAgeMs: user\?\.createdAt/.test(app) && /synced: firstRun\.synced/.test(app));
 

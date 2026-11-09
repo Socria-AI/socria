@@ -13,7 +13,7 @@ import { auth } from '@clerk/nextjs/server';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { COUNTERS, limitsFor, type Counter } from '@/lib/entitlements';
 import { readAllUsage } from '@/lib/usage';
-import { sleepFor } from '@/lib/sleep-server';
+import { trialStateFor } from '@/lib/sleep-server';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -34,11 +34,12 @@ export async function GET(req: NextRequest) {
     counters[c] = { used: used[c] ?? 0, limit: limits.counters[c] };
   }
 
-  // the week's tokens (lib/sleep.ts): a free account's tokens this week, the limit, and when Socria wakes
-  // (Monday 00:00 UTC) — the same on every device, since it is the account's, not the browser's. Null for
-  // Socria One and for a guest, who are not counted here; left out when the store cannot be read, so the
-  // app keeps what it last knew rather than showing a number nobody counted.
-  const sleep = await sleepFor(userId ?? null, plan);
+  // the seven-day trial (lib/trial.ts): where it stands — not begun, running (which day, how many left,
+  // when it ends) or over — and today's tokens, as Sleep Mode's state (`sleep`, period 'day'), so the
+  // screen counts down to 00:00 UTC. Null for Socria One and for a guest, who are not counted; left out
+  // when the store cannot be read, so the app keeps what it last knew rather than a number nobody counted.
+  const trial = await trialStateFor(userId ?? null, plan);
 
-  return NextResponse.json({ plan, counters, limits, ...(sleep === undefined ? {} : { sleep }) });
+  // an ended trial is not resting until 00:00 UTC — it is over, and the app says so instead (no `sleep`)
+  return NextResponse.json({ plan, counters, limits, ...(trial === undefined ? {} : { trial, sleep: trial && trial.status !== 'ended' ? trial.today : null }) });
 }

@@ -98,6 +98,7 @@ export default function PrivacyPage() {
             <tr><td>Your account and plan</td><td>Email, sign-in, subscription status</td></tr>
             <tr><td>Student access</td><td>A verified university email address, to check that it is at a school we have approved &mdash; and for nothing else</td></tr>
             <tr><td>Keeping the service up</td><td>Rate limiting and abuse prevention</td></tr>
+            <tr><td>One trial a person</td><td>A one-way keyed hash of your verified email address, kept when your trial begins</td></tr>
             <tr><td>Understanding usage</td><td>Aggregate, privacy-preserving page analytics</td></tr>
             <tr><td>Knowing what brings people in</td><td>Outside the EU, the EEA, the UK, Switzerland and Canada: a note in your browser of how you first arrived &mdash; the kind of page, the kind of site that sent you (a search engine, say) and any campaign tag in our own link. It is reported once, when you create an account, never with who you are, and then deleted. In those countries nothing is kept.</td></tr>
           </tbody>
@@ -296,8 +297,16 @@ export default function PrivacyPage() {
         account removes all of it immediately. Neither is a soft delete &mdash;
         we do not keep a copy in a bin.
       </p>
-      <p>Three things survive that, and you should hear it from us:</p>
+      <p>Four things survive that, and you should hear it from us:</p>
       <ul>
+        <li>
+          <strong>That an address has had a trial.</strong> When your seven-day
+          trial begins we keep a one-way keyed hash of your verified email
+          address — never the address — so that a new account with the same
+          address does not begin a second trial. It cannot be turned back into
+          your address, it is linked to nothing else, and it is kept after your
+          account is deleted for that one purpose.
+        </li>
         <li>
           <strong>Payment records.</strong> Stripe keeps invoice and transaction
           records to meet its own tax and legal obligations after a subscription

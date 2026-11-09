@@ -15,7 +15,7 @@ import '../app-shell.css';
 export const metadata: Metadata = pageMetadata({
   path: '/students',
   title: 'The UTA student month has ended',
-  description: `The UTA student month has ended. Socria is free to start, and Socria One is ${priceWithPeriod()}.`,
+  description: `The UTA student month has ended. Every account starts with a seven-day trial, then Socria One is ${priceWithPeriod()}.`,
   og: 'students',
   noindex: true,
 });

@@ -238,6 +238,10 @@ class Query {
 const UNMETERED = {
   reserve_logos_tokens: (a) => ({ data: { granted: Math.max(1, a?.p_want ?? 1), used: 0, held: Math.max(1, a?.p_want ?? 1) }, error: null }),
   settle_logos_tokens: () => ({ data: 0, error: null }),
+  // The seven-day trial's start (lib/trial-server.ts beginTrial), for a suite that supplies none: begun at
+  // once, as the real function answers the call that writes it. Every other use of consume_logos_usage
+  // answers nothing, as it always did here, so no older suite starts meeting a count it never met.
+  consume_logos_usage: (a) => (a?.p_scope === 'trial' && a?.p_counter === 'start' ? { data: a.p_by, error: null } : { data: null, error: null }),
 };
 
 const client = {

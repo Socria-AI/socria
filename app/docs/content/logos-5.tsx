@@ -236,7 +236,7 @@ export function Logos5() {
         itself.
       </p>
       <p>
-        The free plan carries {FREE.memoryEntries} things about you between conversations;{' '}
+        The trial carries {FREE.memoryEntries} things about you between conversations;{' '}
         <Link href="/docs/socria-one">Socria One</Link> carries {ONE.memoryEntries}. It is one store either
         way — the plan sets how much of it travels.
       </p>
@@ -254,9 +254,9 @@ export function Logos5() {
       <H2 id="plans">Plans and access</H2>
       <p>
         Signed out, Logos 5 is open to you as a guest: one line of thinking and its map, with no account.
-        Starting a second asks you to sign up, which is free, and the one you have comes with you. The free
-        plan holds {freePlanSentence()}; going back to a conversation you have begun costs nothing, and
-        reaching any count leaves everything you started open.{' '}
+        Starting a second asks you to sign up, and the one you have comes with you. A new account has{' '}
+        {freePlanSentence()}, beginning with its first question; a day&rsquo;s tokens reset at 00:00 UTC, and
+        when the seven days are over everything you made stays open — only new AI requests need Socria One.{' '}
         <Link href="/docs/socria-one">Socria One</Link> is {onePlanSentence().replace(/^U/, 'u')}. A line of
         thinking or a Project can be shared by invitation, by link or by code — sharing your own is part of
         Socria One, and joining what somebody shares with you is free.

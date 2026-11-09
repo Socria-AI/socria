@@ -394,7 +394,7 @@ function paragraphs(kind: LifecycleKind, ctx: CopyContext): { subject: string; b
         subject: 'Socria One is open',
         body: [
           'Socria One is open.',
-          `${onePlanSentence()}: begin as many lines of thinking as you have, and nothing is counted by the month any more. And Socria now carries what it learns about how you reason from each one into the next, so a conversation begins where the last one ended rather than from nothing.`,
+          `${onePlanSentence()}: begin as many lines of thinking as you have, with no daily limit. And Socria now carries what it learns about how you reason from each one into the next, so a conversation begins where the last one ended rather than from nothing.`,
           'Nothing you have already made changes. It is all still yours, and still where you left it.',
         ],
       };

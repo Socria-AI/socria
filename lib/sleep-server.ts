@@ -1,4 +1,11 @@
-// lib/sleep-server.ts — SLEEP MODE, ENFORCED AND COUNTED ON THE SERVER.
+// lib/sleep-server.ts — THE TRIAL'S TOKENS, ENFORCED AND COUNTED ON THE SERVER.
+//
+// SINCE NOVEMBER 9, 2026 an account that is not on Socria One is held to the seven-day trial
+// (lib/trial.ts, lib/trial-server.ts): a day's tokens (4,000) within the trial's (28,000), and nothing
+// once its seven days are over. The machinery below is Sleep Mode's, unchanged in how it holds and
+// settles; what changed is the period (the trial's UTC day, `tday:…`, instead of the week) and the
+// gate, which now also refuses an ended trial (402, with the cookie that keeps the guest preview from
+// standing in for it). The week's words and arithmetic stay in lib/sleep.ts, unused by the gate.
 //
 // A free account's week of tokens (lib/sleep.ts), kept in the database and
 // held to on every AI request:
@@ -49,11 +56,24 @@ import { NextResponse, type NextRequest } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { supabaseAdmin } from './supabase';
 import { resolvePlanForRequest } from './socria-one-server';
-import { SLEEP_COUNTER, sleepRefusal, sleepState, TOKENS_BUSY, TOKENS_UNAVAILABLE, weekKey, weeklyLimit, type SleepState } from './sleep';
+import { SLEEP_COUNTER, sleepRefusal, TOKENS_BUSY, TOKENS_UNAVAILABLE, type SleepState } from './sleep';
+import { TRIAL_DAY_NOTE, TRIAL_ENDED_COOKIE, TRIAL_UNAVAILABLE, dayKey, dayStart, nextMidnight, trialEndedRefusal, type TrialState } from './trial';
+import { beginTrial, countEnded, countLimitHit, trialFor } from './trial-server';
 
 export { TOKENS_BUSY, TOKENS_UNAVAILABLE };
-import { holdTokens, isTokenRefusal, WAIT_MS, type Reserved, type TokenStore } from './token-allowance';
-import { currentMeter, enterMeter } from './token-meter';
+import { holdTokens, isTokenRefusal, TokenRefusal, WAIT_MS, type Reserved, type TokenStore } from './token-allowance';
+
+/** A trial day's state as a refused hold reports it. */
+const dayState = (used: number, limit: number, at: number): SleepState => ({
+  asleep: used >= limit,
+  used,
+  limit,
+  left: Math.max(0, limit - used),
+  weekStart: dayStart(at),
+  resetAt: nextMidnight(at),
+  period: 'day',
+});
+import { currentMeter, enterMeter, type Meter } from './token-meter';
 import { onMetering } from './openai-usage';
 
 const off = () => ['off', '0', 'false', 'no'].includes((process.env.SOCRIA_SLEEP ?? '').trim().toLowerCase());
@@ -148,81 +168,116 @@ export const supabaseTokenStore: TokenStore = {
   read: readWeek,
 };
 
-// ── the week, for the routes and the screen ─────────────────────────
+// ── the trial, for the routes and the screen ────────────────────────
 
-/** Whether this account's AI requests are counted: signed in, on the free plan, Sleep Mode on. */
+/** Whether this account's AI requests are counted: signed in, not on Socria One, the switch not off. */
 const counted = (userId: string | null, plan: string): userId is string => !!userId && plan !== 'one' && !off();
 
 /**
- * The week's state for this account, as the app shows it. Null when it is not
- * counted (signed out, Socria One, switched off); undefined when the store
- * cannot be read — the app then keeps what it last knew.
+ * The trial's state for this account, as the app shows it. Null when it is not counted (signed out,
+ * Socria One, switched off); undefined when the store cannot be read — the app then keeps what it last knew.
  */
-export async function sleepFor(userId: string | null, plan: string, now = Date.now()): Promise<SleepState | null | undefined> {
+export async function trialStateFor(userId: string | null, plan: string, now = Date.now()): Promise<TrialState | null | undefined> {
   if (!counted(userId, plan)) return null;
   try {
-    return sleepState(await readWeek(userId, weekKey(now)), weeklyLimit(process.env), now);
+    return await trialFor(userId, now, { checkClaim: true });
   } catch (e) {
-    console.error('[sleep] the week could not be read:', e instanceof Error ? e.message : 'error');
+    console.error('[trial] the trial could not be read:', e instanceof Error ? e.message : 'error');
     return undefined;
   }
 }
 
+/** Today's tokens, as Sleep Mode's state (period 'day') — the usage panel's `sleep`. */
+export async function sleepFor(userId: string | null, plan: string, now = Date.now()): Promise<SleepState | null | undefined> {
+  const t = await trialStateFor(userId, plan, now);
+  return t ? t.today : t;
+}
+
+const noteFor = (s: SleepState) => (s.period === 'day' ? TRIAL_DAY_NOTE : undefined);
 function sleepResponse(s: SleepState): NextResponse {
   const wait = Math.max(1, Math.ceil((s.resetAt - Date.now()) / 1000));
-  return NextResponse.json(sleepRefusal(s), { status: 429, headers: { 'Retry-After': String(wait) } });
+  return NextResponse.json(sleepRefusal(s, noteFor(s)), { status: 429, headers: { 'Retry-After': String(wait) } });
 }
-const unavailableResponse = () => NextResponse.json({ error: TOKENS_UNAVAILABLE, unavailable: true }, { status: 503, headers: { 'Retry-After': '60' } });
+const unavailableResponse = () => NextResponse.json({ error: TRIAL_UNAVAILABLE, unavailable: true }, { status: 503, headers: { 'Retry-After': '60' } });
 const busyResponse = () => NextResponse.json({ error: TOKENS_BUSY, busy: true }, { status: 429, headers: { 'Retry-After': '5' } });
 
 /**
- * Before a model is called. `refuse`: the answer to send — the week is spent
- * (429, Sleep Mode) or cannot be checked (503). `meter`: a free account,
- * awake — the caller meters the request with meterFor(userId) in its own
- * context (AsyncLocalStorage carries a store set in the route itself, not one
+ * The trial over: 402 with what to do, and a cookie on this browser so its guest preview cannot stand in
+ * for the trial (the guest routes read it). Exported for the routes that answer it themselves.
+ */
+export function trialEndedResponse(t: TrialState): NextResponse {
+  const res = NextResponse.json(trialEndedRefusal(t), { status: 402 });
+  res.cookies.set(TRIAL_ENDED_COOKIE, '1', { httpOnly: true, sameSite: 'lax', secure: process.env.NODE_ENV === 'production', path: '/', maxAge: 400 * 86_400 });
+  return res;
+}
+
+/** What a gate hands the route: the meter to enter, or nothing to meter. */
+export type GateMeter = Meter;
+
+/**
+ * Before a model is called. `refuse`: the answer to send — the trial is over (402), today's tokens are
+ * spent (429, resting until 00:00 UTC), or the trial cannot be read (503, fail closed). `meter`: an
+ * account on its trial (or about to begin it), with today left — the caller meters the request with
+ * meterFor(meter) in its own context (AsyncLocalStorage carries a store set in the route itself, not one
  * set inside an awaited helper):
  *
  *   const sleep = await sleepGate(req, userId, plan);
  *   if (sleep.refuse) return sleep.refuse;
  *   if (sleep.meter) meterFor(sleep.meter);
  */
-export async function sleepGate(req: NextRequest, userId: string | null, plan?: string): Promise<{ refuse: NextResponse | null; meter: string | null; state: SleepState | null }> {
+export async function sleepGate(
+  req: NextRequest,
+  userId: string | null,
+  plan?: string
+): Promise<{ refuse: NextResponse | null; meter: GateMeter | null; state: SleepState | null; trial?: TrialState }> {
   if (!userId || off()) return { refuse: null, meter: null, state: null };
   const p = plan ?? (await resolvePlanForRequest(req, userId));
   if (!counted(userId, p)) return { refuse: null, meter: null, state: null };
   const now = Date.now();
-  let s: SleepState;
+  let t: TrialState;
   try {
-    s = sleepState(await readWeek(userId, weekKey(now)), weeklyLimit(process.env), now);
+    t = await trialFor(userId, now, { checkClaim: true });
   } catch (e) {
-    console.error('[sleep] the week could not be read; this free request is paused:', e instanceof Error ? e.message : 'error');
+    console.error('[trial] the trial could not be read; this request is paused:', e instanceof Error ? e.message : 'error');
     return { refuse: unavailableResponse(), meter: null, state: null };
   }
-  if (s.asleep) return { refuse: sleepResponse(s), meter: null, state: s };
-  return { refuse: null, meter: userId, state: s };
+  if (t.status === 'ended') {
+    void countEnded(userId, now);
+    return { refuse: trialEndedResponse(t), meter: null, state: null, trial: t };
+  }
+  if (t.today.asleep) {
+    void countLimitHit(userId, now);
+    return { refuse: sleepResponse(t.today), meter: null, state: t.today, trial: t };
+  }
+  return { refuse: null, meter: { userId, limit: t.today.limit, scope: dayKey(now), ...(t.status === 'eligible' ? { begin: true } : {}) }, state: t.today, trial: t };
 }
 
 /** Meter the rest of this request — called by the route itself, after sleepGate said so. */
-export function meterFor(userId: string): void {
-  enterMeter({ userId, limit: weeklyLimit(process.env) });
+export function meterFor(meter: GateMeter): void {
+  enterMeter({ ...meter });
 }
 
 /**
- * For the routes that only do our own upkeep (a conversation's title, the
- * memory kept about the person): never counted, but resting while the
- * account is — no model is asked for a free account whose week is spent or
- * cannot be checked. True when the route should stand down.
+ * For the routes that only do our own upkeep (a conversation's title, the memory kept about the
+ * person): never counted, and never begins a trial — but resting while the account is: no model is
+ * asked for an account whose trial is over, whose day is spent, or whose trial cannot be read. True
+ * when the route should stand down.
  */
 export async function restingNow(req: NextRequest, userId: string | null): Promise<boolean> {
   if (!userId || off()) return false;
-  const gate = await sleepGate(req, userId);
-  return !!gate.refuse;
+  const p = await resolvePlanForRequest(req, userId);
+  if (!counted(userId, p)) return false;
+  try {
+    const t = await trialFor(userId, Date.now());
+    return t.status === 'ended' || t.today.asleep;
+  } catch {
+    return true;
+  }
 }
 
 /**
- * A model call refused mid-request (lib/token-allowance.ts TokenRefusal) as
- * the answer a route sends: Sleep Mode (429 with the week's state), busy (429),
- * or the week unreadable (503). Null for any other error.
+ * A model call refused mid-request (lib/token-allowance.ts TokenRefusal) as the answer a route sends:
+ * resting (429 with the day's state), busy (429), or unreadable (503). Null for any other error.
  */
 export function sleepAnswer(e: unknown): NextResponse | null {
   if (!isTokenRefusal(e)) return null;
@@ -251,9 +306,20 @@ onMetering({
   async begin(call) {
     const m = currentMeter();
     if (!m || off()) return null;
+    // the request's first real model call begins the trial (once; a second call in the request finds it begun)
+    if (m.begin) {
+      try {
+        await beginTrial(m.userId);
+      } catch (e) {
+        throw new TokenRefusal({ kind: 'unavailable', detail: e instanceof Error ? e.message.slice(0, 160) : undefined });
+      }
+      m.begin = false;
+    }
+    const scope = m.scope;
     const hold = await holdTokens(supabaseTokenStore, {
       user: m.userId,
       limit: m.limit,
+      ...(scope ? { scope, stateOf: (used: number, limit: number, at: number) => dayState(used, limit, at) } : {}),
       input: call.input,
       output: call.output,
       cappable: call.cappable,

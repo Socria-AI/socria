@@ -14,7 +14,7 @@ import { MathBoard } from '@/components/MathBoard';
 import { MathPlot } from '@/components/MathPlot';
 import { MathViz } from '@/components/MathViz';
 import { sanitizeViz, type VizScene } from '@/lib/logos-viz';
-import { COUNTER_SCOPE, FEATURE_NAME, FEATURES, PLANS, TIERED_COUNTERS, megabytes, type Counter } from '@/lib/entitlements';
+import { COUNTER_SCOPE, FEATURE_NAME, FEATURES, PLANS, TIERED_COUNTERS, comparisonRows, megabytes, type Counter } from '@/lib/entitlements';
 import { SOCRIA_ONE } from '@/lib/socria-one';
 import type { ThinkingMap } from '@/lib/logos';
 import { ThinkingMap as ThinkingMapView } from '@/components/ThinkingMap';
@@ -239,7 +239,7 @@ export function DemoLimitsTable() {
         <thead>
           <tr>
             <th>What</th>
-            <th>Free</th>
+            <th>Seven-day trial</th>
             <th>
               Socria One · {SOCRIA_ONE.currency}
               {SOCRIA_ONE.price}/{SOCRIA_ONE.period}
@@ -247,12 +247,22 @@ export function DemoLimitsTable() {
           </tr>
         </thead>
         <tbody>
-          {/* The first rows are the ones Socria One is sold on — what the
-              free plan counts by the month — and then the two features only
-              One includes. The rest are the same on both sides, and that is
-              the table telling the truth rather than the table being lazy:
-              what Socria can do inside a conversation is the whole product
-              on either plan. */}
+          {/* The first rows are the ones Socria One is sold on — the trial's
+              tokens and what follows it (lib/entitlements.ts comparisonRows,
+              from lib/trial.ts) — and then the features only One includes.
+              Most of the rest are the same on both sides, and that is the table
+              telling the truth rather than the table being lazy: what Socria
+              can do inside a conversation is the whole product in the trial
+              and on Socria One. */}
+          {comparisonRows()
+            .filter((r) => r.id === 'ai' || r.id === 'after')
+            .map((r) => (
+              <tr key={r.id}>
+                <td>{r.label}</td>
+                <td>{r.free}</td>
+                <td>{r.one}</td>
+              </tr>
+            ))}
           {counters.filter(tiered).map((c) => row(c))}
           {FEATURES.map((f) => (
             <tr key={f}>
@@ -261,6 +271,15 @@ export function DemoLimitsTable() {
               <td>{one.features[f] ? 'Included' : 'Not included'}</td>
             </tr>
           ))}
+          {comparisonRows()
+            .filter((r) => r.id === 'themes')
+            .map((r) => (
+              <tr key={r.id}>
+                <td>{r.label}</td>
+                <td>{r.free}</td>
+                <td>{r.one}</td>
+              </tr>
+            ))}
           {counters.filter((c) => !tiered(c)).map((c) => row(c))}
           <tr>
             <td>Lenses onto the map</td>

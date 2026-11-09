@@ -8,6 +8,16 @@
 // will disagree with itself the first time it changes, and these numbers are
 // meant to change as we learn what they should be.
 //
+// THE SEVEN-DAY TRIAL AND SOCRIA ONE (November 9, 2026). The `free` plan below is now the trial's: a
+// hard trial, not a free tier (lib/trial.ts). Its limit is tokens — 4,000 a UTC day, 28,000 across
+// seven days — held on the server by lib/sleep-server.ts; the monthly counts that used to be the free
+// tier are lifted to the same fair-use ceilings as Socria One, so the trial is the whole of Socria
+// apart from the features below. After seven days every new AI request needs Socria One; nothing made
+// is taken away. Socria One alone has Socria Voice, sharing a chat, the experiments (Use your hands,
+// AR Mode, big-screen mode) and the Celestial and Socria One themes (lib/theme.ts).
+//
+// What follows is the October 31 note, kept for the history of the counters.
+//
 // THE FREE TIER AND SOCRIA ONE (October 31, 2026).
 //
 // Logos 5 is the one product, and Socria One is the one subscription:
@@ -49,6 +59,7 @@
 // everything else — there are no separate Core limits.
 
 import type { Plan } from './socria-one';
+import { TRIAL } from './trial';
 
 /**
  * A counter's name. The string is also its storage key, so renaming one
@@ -109,7 +120,7 @@ export const UNIT_COUNTERS = ['chats', 'maps', 'artifacts', 'documents'] as cons
 export type UnitCounter = (typeof UNIT_COUNTERS)[number];
 
 /** Features one plan has and the other does not — not counted, simply open or not. */
-export const FEATURES = ['voice', 'share'] as const;
+export const FEATURES = ['voice', 'share', 'experiments'] as const;
 export type Feature = (typeof FEATURES)[number];
 
 export interface Limits {
@@ -154,7 +165,7 @@ export interface Limits {
    * the moment they are read (app/api/files/upload, app/api/files/read).
    */
   readonly uploadBytes: number;
-  /** Socria Voice (and Hold to talk), and opening a share on something you own */
+  /** Socria Voice (and Hold to talk), opening a share on something you own, and the experiments (Use your hands, AR Mode, big-screen mode) */
   readonly features: Readonly<Record<Feature, boolean>>;
 }
 
@@ -174,13 +185,14 @@ export const megabytes = (bytes: number) => `${Math.round(bytes / (1024 * 1024))
  */
 export const PLANS: Record<Plan, Limits> = {
   free: {
+    // the trial's: tokens are its limit (lib/trial.ts), so the counts are Socria One's fair-use ceilings
     counters: {
-      chats: 3,
+      chats: 400,
       messages: null,
-      maps: 2,
-      nodes: 10,
-      artifacts: 2,
-      documents: 1,
+      maps: null,
+      nodes: null,
+      artifacts: null,
+      documents: null,
       explore: null,
       research: 120,
       challenge: null,
@@ -197,7 +209,7 @@ export const PLANS: Record<Plan, Limits> = {
     // one store (lib/person-memory.ts), so nothing is lost by being on this plan
     memoryEntries: 12,
     uploadBytes: DIRECT_UPLOAD_BYTES,
-    features: { voice: false, share: false },
+    features: { voice: false, share: false, experiments: false },
   },
   one: {
     counters: {
@@ -224,7 +236,7 @@ export const PLANS: Record<Plan, Limits> = {
     memoryTurns: null,
     memoryEntries: 160,
     uploadBytes: 30 * 1024 * 1024,
-    features: { voice: true, share: true },
+    features: { voice: true, share: true, experiments: true },
   },
 };
 
@@ -235,7 +247,7 @@ export const PLANS: Record<Plan, Limits> = {
  * ceiling would be selling somebody something they already have. The suite
  * asserts this list is the truth rather than a comment.
  */
-export const TIERED_COUNTERS: readonly Counter[] = ['chats', 'maps', 'nodes', 'artifacts', 'documents'];
+export const TIERED_COUNTERS: readonly Counter[] = [];
 
 export function limitsFor(plan: Plan): Limits {
   return PLANS[plan];
@@ -325,16 +337,16 @@ export function allowanceLabel(counter: Counter, plan: Plan = 'free'): string {
 }
 
 /** The headline at any free limit — the same sentence wherever one is met. */
-export const LIMIT_HEADLINE = 'You’ve reached your free limit.';
-export const LIMIT_OFFER = 'Unlock unlimited access with Socria One.';
+export const LIMIT_HEADLINE = 'Your trial has reached its end.';
+export const LIMIT_OFFER = 'Keep going with Socria One.';
 
 const REACHED: Record<Counter, string> = {
-  chats: `That’s ${plural(free('chats'), 'free conversation', 'free conversations')} this month. Every one you’ve started stays open.`,
+  chats: `That’s ${plural(free('chats'), 'new conversation', 'new conversations')} this month, as many as fair use covers. Every one you’ve started stays open.`,
   messages: 'That’s as many messages as fair use covers today.',
-  maps: `That’s ${plural(free('maps'), 'free Logic Map', 'free Logic Maps')} this month. This conversation keeps going; the maps you have stay yours.`,
-  nodes: `That’s ${plural(free('nodes'), 'free Logic Map node', 'free Logic Map nodes')} this month. Your maps keep every idea they have; new ones wait for next month.`,
-  artifacts: `That’s ${plural(free('artifacts'), 'free artifact', 'free artifacts')} this month. Everything already made stays in Artifacts.`,
-  documents: `That’s ${plural(free('documents'), 'free document', 'free documents')} this month. Your writing so far is kept.`,
+  maps: 'That’s as many Logic Maps as fair use covers this month. This conversation keeps going; the maps you have stay yours.',
+  nodes: 'That’s as many Logic Map nodes as fair use covers this month. Your maps keep every idea they have; new ones wait for next month.',
+  artifacts: 'That’s as many artifacts as fair use covers this month. Everything already made stays in Artifacts.',
+  documents: 'That’s as many documents as fair use covers this month. Your writing so far is kept.',
   explore: 'Explore has run as far as it goes on this map.',
   research: 'Research has run as far as it goes in this conversation.',
   challenge: 'Challenge has run as far as it goes in this conversation.',
@@ -363,25 +375,27 @@ export function boundaryNote(counter: Counter, plan: Plan = 'free'): string {
 export const FEATURE_NOTE: Record<Feature, string> = {
   voice: 'Socria Voice is part of Socria One.',
   share: 'Sharing a conversation is part of Socria One.',
+  experiments: 'The experiments — Use your hands, AR Mode and big-screen mode — are part of Socria One.',
 };
 
-/** The rows of the Free / Socria One comparison, in the order they are shown. */
-export function comparisonRows(): { id: Counter | Feature; label: string; free: string; one: string }[] {
-  const cell = (plan: Plan, c: Counter) => {
-    const n = PLANS[plan].counters[c];
-    if (n === null || (plan === 'one' && TIERED_COUNTERS.includes(c))) return 'Unlimited';
-    return COUNTER_SCOPE[c] === 'day' ? `${n} a day` : `${n} a month`;
-  };
+/** The rows of the Trial / Socria One comparison, in the order they are shown. */
+export function comparisonRows(): { id: string; label: string; free: string; one: string }[] {
   const yes = (plan: Plan, f: Feature) => (PLANS[plan].features[f] ? 'Included' : 'Not included');
+  const t = trialNumbers();
   return [
-    { id: 'chats', label: 'Conversations', free: cell('free', 'chats'), one: cell('one', 'chats') },
-    { id: 'maps', label: 'Logic Maps', free: cell('free', 'maps'), one: cell('one', 'maps') },
-    { id: 'nodes', label: 'Logic Map nodes', free: cell('free', 'nodes'), one: cell('one', 'nodes') },
-    { id: 'artifacts', label: 'Artifacts', free: cell('free', 'artifacts'), one: cell('one', 'artifacts') },
-    { id: 'documents', label: 'Documents', free: cell('free', 'documents'), one: cell('one', 'documents') },
+    { id: 'ai', label: 'Conversations, Logic Maps and artifacts', free: `${t.days} days · ${t.daily} tokens a day`, one: 'Unlimited (fair use)' },
+    { id: 'after', label: 'After the trial', free: 'Everything you made stays open', one: 'Keep going' },
     { id: 'voice', label: 'Socria Voice', free: yes('free', 'voice'), one: yes('one', 'voice') },
     { id: 'share', label: 'Sharing a chat', free: yes('free', 'share'), one: yes('one', 'share') },
+    { id: 'experiments', label: 'Experiments (hands, AR Mode, big screen)', free: yes('free', 'experiments'), one: yes('one', 'experiments') },
+    { id: 'themes', label: 'Celestial and Socria One themes', free: 'Not included', one: 'Included' },
+    { id: 'files', label: 'Largest file', free: megabytes(PLANS.free.uploadBytes), one: megabytes(PLANS.one.uploadBytes) },
   ];
+}
+
+/** The trial's numbers as the copy says them ("7", "4,000", "28,000"). */
+function trialNumbers(): { days: number; daily: string; total: string } {
+  return { days: TRIAL.days, daily: TRIAL.daily.toLocaleString('en-GB'), total: TRIAL.total.toLocaleString('en-GB') };
 }
 
 /**
@@ -389,29 +403,24 @@ export function comparisonRows(): { id: Counter | Feature; label: string; free: 
  * docs, the FAQ and the pages, so no copy ever states a number of its own.
  */
 export function freePlanSentence(): string {
-  const parts = TIERED_COUNTERS.map((c) => allowanceLabel(c, 'free').replace(/ a month$/, ''));
-  const last = parts.pop();
-  return `${parts.join(', ')} and ${last} a month`;
+  const t = trialNumbers();
+  return `a ${t.days}-day trial: ${t.daily} tokens a day, up to ${t.total} in all`;
 }
 
 /** What each premium-only feature is called in a sentence. */
 export const FEATURE_NAME: Record<Feature, string> = {
   voice: 'Socria Voice',
   share: 'chat sharing',
+  experiments: 'the experiments',
 };
 
 /**
- * Socria One in one sentence, from the same table: what is unlimited on it
- * that the free plan counts, then the features only it includes —
- * "Unlimited conversations, Logic Maps, artifacts and documents, with Socria
- * Voice and chat sharing". Nodes are part of "Logic Maps" here; the
- * comparison table names them on their own row.
+ * Socria One in one sentence, from the same table: no limit after the trial, then the features only
+ * it includes — "Unlimited conversations, Logic Maps and artifacts after the trial, with Socria Voice,
+ * chat sharing, the experiments and the Celestial and Socria One themes".
  */
 export function onePlanSentence(): string {
-  const open = TIERED_COUNTERS.filter((c) => c !== 'nodes' && limitOf('free', c) !== null && allowanceLabel(c, 'one').startsWith('Unlimited')).map(
-    (c) => COUNTER_NOUN[c]?.many ?? c
-  );
-  const only = FEATURES.filter((f) => PLANS.one.features[f] && !PLANS.free.features[f]).map((f) => FEATURE_NAME[f]);
+  const only = [...FEATURES.filter((f) => PLANS.one.features[f] && !PLANS.free.features[f]).map((f) => FEATURE_NAME[f]), 'the Celestial and Socria One themes'];
   const list = (xs: string[]) => (xs.length < 2 ? xs.join('') : `${xs.slice(0, -1).join(', ')} and ${xs[xs.length - 1]}`);
-  return `Unlimited ${list(open)}${only.length ? `, with ${list(only)}` : ''}`;
+  return `Unlimited conversations, Logic Maps and artifacts after the trial, with ${list(only)}`;
 }

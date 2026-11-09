@@ -28,7 +28,7 @@ import {
   WELCOME_GAP_MS,
   welcomeVariant,
 } from './.tmp/one-prompt.mjs';
-import { COUNTERS, TIERED_COUNTERS, PLANS, boundaryNote } from './.tmp/entitlements.mjs';
+import { COUNTERS, TIERED_COUNTERS, PLANS, boundaryNote, freePlanSentence } from './.tmp/entitlements.mjs';
 
 let pass = 0,
   fail = 0;
@@ -41,9 +41,12 @@ const NOW = 1_800_000_000_000;
  *
  * A trigger whose counter is a fair-use ceiling BOTH plans share has nothing
  * to offer — Socria One stops in the same place — so decide() refuses it with
- * 'shared-ceiling' and the surface says what happened inline instead. Only
- * `chats` is a boundary the product sells past, so the rules about how an
- * entitlement prompt behaves are exercised against these.
+ * 'shared-ceiling' and the surface says what happened inline instead. Since the
+ * seven-day trial replaced the free tier (November 9, 2026) every counter is
+ * shared — TIERED_COUNTERS is empty, the trial is held by tokens — so what can
+ * still open a sheet is a feature only Socria One has (Voice, sharing) and the
+ * retired triggers kept for attribution. The rules about how an entitlement
+ * prompt behaves are exercised against these.
  */
 const sellable = (r) => {
   const c = TRIGGERS[r].counter;
@@ -53,6 +56,12 @@ const SELLABLE = TRIGGER_REASONS.filter(sellable);
 const SHARED = TRIGGER_REASONS.filter(
   (r) => TRIGGERS[r].category === 'entitlement' && !sellable(r)
 );
+/**
+ * Kept for attribution and raised by nothing (see the notes in lib/one-prompt.ts): maps do not fill,
+ * every depth, lens and Draft is open on both plans, and Core's own limits were folded into Logos'.
+ * Their copy describes a plan table that clipped again, so it is left out of what a trial is shown.
+ */
+const RETIRED = ['map-full', 'depth-locked', 'lenses-locked', 'draft-locked', 'connections-locked', 'core-chats-spent', 'core-messages-spent'];
 
 /** A free user who has cleared every proactive bar. Tests vary one thing. */
 const engaged = {
@@ -116,14 +125,27 @@ for (const r of TRIGGER_REASONS) {
   ok(`${r}: silent for a member`, d.show === false && d.why === 'has-one', JSON.stringify(d));
 }
 
-console.log('\n=== free user hits the Logos chat limit ===');
+console.log('\n=== a trial account at the ceiling on conversations: said in place, never a sheet ===');
 {
+  // The month's conversations were the free tier's boundary (October 31, 2026). On the trial they are
+  // Socria One's own fair-use ceiling (lib/entitlements.ts), so there is nothing on the other side of it
+  // to sell: the surface says what happened, in place, from boundaryNote().
   const d = show({ reason: 'chats-spent' });
-  ok('chats-spent shows', d.show === true);
-  ok('chats-spent is urgent', d.show && d.intent === 'urgent');
-  ok('chats-spent is an entitlement prompt', d.show && d.category === 'entitlement');
-  ok('body says what ran out', d.show && /month/i.test(d.copy.body), d.show && d.copy.body);
-  ok('body says what One changes', d.show && /Socria One/.test(d.copy.body));
+  ok('chats-spent opens no sheet: Socria One stops in the same place', d.show === false && d.why === 'shared-ceiling', JSON.stringify(d));
+  const c = copyFor('chats-spent');
+  ok('  what is said in place still says what ran out, in the table’s number', /month/i.test(c.body) && c.body.includes(String(PLANS.free.counters.chats)), c.body);
+  ok('  that the ceiling is shared', /same place/.test(c.body), c.body);
+  ok('  and never offers Socria One', !/Unlock unlimited access with Socria One|Socria One (gives|opens|lets|lifts|keeps)/.test(c.body), c.body);
+}
+
+console.log('\n=== a trial account presses Socria Voice ===');
+{
+  // What a sheet still opens for: a feature only Socria One has, pressed.
+  const d = show({ reason: 'voice-locked' });
+  ok('voice-locked shows', d.show === true);
+  ok('voice-locked is high intent', d.show && d.intent === 'high');
+  ok('voice-locked is an entitlement prompt', d.show && d.category === 'entitlement');
+  ok('body says what it is part of, and what it does', d.show && /Socria Voice is part of Socria One/.test(d.copy.body) && /out loud/.test(d.copy.body), d.show && d.copy.body);
   ok(
     'copy is contextual, not generic',
     d.show && !/^upgrade/i.test(d.copy.title),
@@ -153,7 +175,8 @@ console.log('\n=== a ceiling Socria One also has never opens a sheet ===');
     });
     ok(`${r}: refused however engaged they are`, d.show === false && d.why === 'shared-ceiling');
   }
-  ok('the month is not one of them', !SHARED.includes('chats-spent'));
+  ok('the month is one of them now: Socria One’s own fair-use ceiling', SHARED.includes('chats-spent'));
+  ok('  and so is every counter: no count opens a sheet on the trial', COUNTERS.every((c) => SHARED.includes(reasonForCounter(c))), COUNTERS.filter((c) => !SHARED.includes(reasonForCounter(c))).join());
 }
 
 console.log('\n=== entitlement prompts are not rationed by the proactive guards ===');
@@ -264,7 +287,7 @@ console.log('\n=== max one proactive prompt per session ===');
   const d = show({ reason: 'returning-thinker', state: after });
   ok('second one in a session is suppressed', d.show === false && d.why === 'session-cap');
   // …but an entitlement prompt still gets through, because they asked for it.
-  const e = show({ reason: 'chats-spent', state: after });
+  const e = show({ reason: 'voice-locked', state: after });
   ok('an entitlement prompt is unaffected', e.show === true);
 }
 
@@ -316,7 +339,7 @@ console.log('\n=== sensitive moments are left alone ===');
   const d = show({ reason: 'returning-thinker', context: 'reflecting' });
   ok('no proactive prompt while reflecting', d.show === false && d.why === 'sensitive-context');
   // But a boundary they walked into is still explained — silence would be worse.
-  const e = show({ reason: 'chats-spent', context: 'reflecting' });
+  const e = show({ reason: 'voice-locked', context: 'reflecting' });
   ok('an entitlement prompt still explains itself', e.show === true);
   // Ordinary work is unaffected.
   ok('planning is not sensitive', show({ reason: 'returning-thinker', context: 'planning' }).show === true);
@@ -411,7 +434,7 @@ console.log('\n=== the daily floor: two tabs are not two prompts ===');
   ok('an hour after a proactive prompt elsewhere → daily-floor', decide({ ...other, reason: 'returning-thinker' }).why === 'daily-floor');
   ok('a day later it may ask again', decide({ ...base, state: { ...EMPTY_PROMPT_STATE, lastProactiveAt: NOW - DAY_MS - 1 }, reason: 'returning-thinker' }).show === true);
   // Entitlement prompts are answers, not asks: the floor does not touch them.
-  ok('the floor does not silence an entitlement prompt', decide({ ...other, reason: 'chats-spent' }).show === true);
+  ok('the floor does not silence an entitlement prompt', decide({ ...other, reason: 'voice-locked' }).show === true);
   ok('nor the Socria One button', decide({ ...other, reason: 'asked' }).show === true);
   ok('the empty state has no floor', EMPTY_PROMPT_STATE.lastProactiveAt === 0);
 }
@@ -476,8 +499,8 @@ console.log('\n=== welcome-back: the one prompt a timer is allowed to raise ==='
   ok('  and the decision carries the one they have not seen',
     back({ state: { ...EMPTY_PROMPT_STATE, welcomes: 1 } }).copy.title === WELCOME_BACK[1].title);
 
-  // None of them may sell the free tier short or manufacture urgency: it is
-  // the same Socria, twice a month, and saying otherwise is a lie that also
+  // None of them may sell the trial short or manufacture urgency: it is the
+  // whole of Socria for seven days, and saying otherwise is a lie that also
   // happens to be bad for the product.
   for (const v of WELCOME_BACK) {
     ok(`"${v.title}" makes no time-limited claim`,
@@ -489,20 +512,39 @@ console.log('\n=== welcome-back: the one prompt a timer is allowed to raise ==='
       !/basic|limited version|upgrade to unlock/i.test(v.body), v.body);
   }
 
-  // The free plan as the plan table holds it, in the words the copy uses —
-  // and only what is sold: the counters the Core chat had are internal now.
-  const WORD = ['no', 'one', 'two', 'three', 'four', 'five', 'six', 'seven', 'eight', 'nine', 'ten', 'eleven', 'twelve'];
-  const fc = PLANS.free.counters;
-  // (October 31, 2026: the free plan is its monthly allowances, said from the table; there is no day's count to mention.)
-  void WORD;
-  ok('the free plan is said in the table’s own numbers',
-    WELCOME_BACK.some((v) => v.body.includes(`${fc.chats} conversations`) && v.body.includes(`${fc.maps} Logic Maps`)),
+  // The trial as the table and lib/trial.ts hold it, in the words the copy uses
+  // (freePlanSentence) — never a number written here, and never the old free
+  // plan's monthly counts (November 9, 2026: there is no free plan to describe).
+  ok('the trial is said in the table’s own words',
+    WELCOME_BACK.some((v) => v.body.includes(freePlanSentence())),
     WELCOME_BACK.map((v) => v.body).join(' | '));
-  ok('  and never a daily count, or the archived chat’s counts',
+  ok('  and never the old free plan or its monthly counts',
+    WELCOME_BACK.every((v) => !/free plan|free tier|a month\b/i.test(`${v.body} ${v.nudge}`)), WELCOME_BACK.map((v) => `${v.body} ${v.nudge}`).join(' | '));
+  ok('  nor a daily count of messages, or the archived chat’s counts',
     WELCOME_BACK.every((v) => !/a day at a time|messages a day|new chats/.test(v.body)), WELCOME_BACK.map((v) => v.body).join(' | '));
+  ok('  every variant has its short line for the Socria One button', WELCOME_BACK.every((v) => typeof v.nudge === 'string' && v.nudge.length > 20 && !/!/.test(v.nudge)));
 
   // An urgent boundary still wins if both fire in the same breath.
   ok('a spent counter outranks it', bestTrigger(['welcome-back', 'chats-spent']) === 'chats-spent');
+}
+
+console.log('\n=== what a trial account is shown never sells what the trial already has ===');
+{
+  // The trial is the whole of Socria for seven days: every depth, every lens, Draft Space, maps that grow,
+  // conversations, Logic Maps, artifacts and documents without a monthly count. A prompt that offered any
+  // of those would be selling somebody what they are using — and there is no free plan left to name.
+  // What Socria One is sold on is what continues after the trial and what is Socria One's alone.
+  const shownToTrial = TRIGGER_REASONS.filter((r) => !RETIRED.includes(r) && show({ reason: r }).show);
+  ok('what can reach a trial account: Voice, sharing, the shaped map, the returning nudge, the button and the welcome',
+    shownToTrial.join() === 'voice-locked,share-locked,map-shaped,returning-thinker,asked,welcome-back', shownToTrial.join());
+  const said = [
+    ...shownToTrial.map((r) => ({ r, ...copyFor(r) })),
+    ...WELCOME_BACK.map((v, i) => ({ r: `welcome-back ${i}`, ...copyFor('welcome-back', i), nudge: v.nudge })),
+  ].map((c) => ({ r: c.r, text: [c.title, c.body, c.primary, c.secondary, c.nudge ?? ''].join(' ') }));
+  const naming = said.filter((c) => /free plan|free tier/i.test(c.text));
+  ok('none names a free plan or a free tier — there is only the trial', naming.length === 0, naming.map((c) => `${c.r}: ${c.text}`).join(' | '));
+  const selling = said.filter((c) => /every depth|all four registers|every lens|Draft Space|keep growing|monthly (limit|count)|without a count|as many( [a-z]+)* as you have/i.test(c.text));
+  ok('none sells what the trial already has', selling.length === 0, selling.map((c) => `${c.r}: ${c.text}`).join(' | '));
 }
 
 console.log('\n=== nothing a person reads names Core ===');

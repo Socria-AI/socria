@@ -30,7 +30,7 @@ import { enforceRateLimit } from '@/lib/rate-limit';
 import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
-import { boundaryNote } from '@/lib/entitlements';
+import { boundaryNote, FEATURE_NOTE, hasFeature } from '@/lib/entitlements';
 import { spend } from '@/lib/usage';
 import { arTester, arViewer } from '@/lib/ar-server';
 import { mayUse } from '@/lib/route-guard';
@@ -54,6 +54,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   if (!userId && !mayUse(req, userId)) return NextResponse.json({ error: 'Sign in to use Live Guidance.' }, { status: 401 });
   // early access, decided on the server like AR Mode — before anything is read or spent
   if (!arTester(await arViewer())) return NextResponse.json({ error: 'Live Guidance is in early access with AR Mode.', earlyAccess: true }, { status: 403 });
+  // …and, like AR Mode, one of the experiments, which are Socria One's
+  if (!hasFeature(await resolvePlanForRequest(req, userId), 'experiments')) return NextResponse.json({ error: FEATURE_NOTE.experiments, upgrade: 'experiments' }, { status: 402 });
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
 

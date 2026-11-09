@@ -8,9 +8,9 @@ import { pageMetadata } from '@/lib/seo';
 
 export const metadata: Metadata = pageMetadata({
   path: '/one',
-  title: 'Socria One — unlimited Socria, with Voice and sharing',
+  title: 'Socria One — Socria without a daily limit, with Voice, sharing and the experiments',
   absolute: true,
-  description: `Socria One: ${onePlanSentence().replace(/^U/, 'u')}, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Socria is free to start.`,
+  description: `Socria One: ${onePlanSentence().replace(/^U/, 'u')}, longer documents, and personalisation that learns how you reason. ${priceWithPeriod()}. Every account starts with a seven-day trial.`,
 });
 
 export default function OnePage() {

@@ -246,3 +246,10 @@
 .sl-keep {
   white-space: nowrap;
 }
+
+/* ── the seven-day trial (lib/trial.ts): its day under the reset, its countdown in the ring's tip, its end ── */
+.sl-trial { margin: 10px 0 0; font-size: 12.5px; color: var(--c-ink-60, rgba(35, 36, 31, 0.66)); }
+.sl-ringtip-trial { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); }
+.tr-card .tr-k { display: block; margin-bottom: 6px; }
+.tr-keep { margin: 14px 0 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--c-ink-70, rgba(35, 36, 31, 0.7)); }
+.tr-bar .sl-bar-n { color: var(--lg-one, #26485a); }

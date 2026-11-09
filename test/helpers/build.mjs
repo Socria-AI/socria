@@ -346,6 +346,8 @@ const MODULES = [
   'test/helpers/one-view-under-test.tsx',
   // Everything in one space (Logos 5.5, Revision III): files, ideas, made things and the conversation together
   'test/helpers/space-under-test.tsx',
+  // The seven-day trial (Logos 5.5): its rules, the dashboard's counts, the holds it runs on, the plan table
+  'test/helpers/trial-under-test.ts',
   // Socria Live AR Guidance: overlay schema, safety, tracking, session, prompt (lib/guide)
   'test/helpers/live-guide-under-test.ts',
   // The universal Logic Map's diagram lenses: cycle, tree, parts, concept map, a dated timeline (Logos 5)

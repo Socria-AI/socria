@@ -31,8 +31,12 @@ import { AsyncLocalStorage } from 'node:async_hooks';
 export interface Meter {
   /** the account the request is counted to */
   userId: string;
-  /** the week's limit, read once when the request was checked */
+  /** the period's limit, read once when the request was checked (the trial's day: lib/trial.ts) */
   limit: number;
+  /** the period's key in the store (`tday:…` for the trial's day); the week when absent */
+  scope?: string;
+  /** the trial has not begun: the request's first model call begins it (lib/trial-server.ts beginTrial) */
+  begin?: boolean;
 }
 
 interface Box {

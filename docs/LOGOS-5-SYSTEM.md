@@ -719,6 +719,18 @@ moving a breakpoint changes a layout at a width nobody looked at, and a 0.18s to
 layouts of dialogs are kept as they are (no majority). The legal pages' copy still says "Thinking Map" and "Draft
 Space" in places and needs legal review before it changes.
 
+### 8.14 A seven-day hard trial, not a free tier
+
+Every account not on Socria One has seven days (7 × 24 hours from its first real request): 4,000 tokens a
+UTC day, 28,000 in all, held and settled on the server by Sleep Mode's machinery with the trial's day as its
+period (`lib/trial.ts`, `lib/trial-server.ts`, `lib/sleep-server.ts`). A day spent rests until 00:00 UTC; the
+trial over, every new AI request needs Socria One, and everything made stays open and editable by hand. Socria
+One alone has no daily limit, Voice, sharing, the experiments and the Celestial and One themes. A keyed hash of
+the verified address keeps it to one trial a person; existing free accounts got a fresh trial at their next
+request. The screens: the ring by the box is today's tokens (its tip says the day of seven and when the trial
+ends), a calm card when the day or the trial is over, the numbers a press away in Account. `docs/TRIAL.md` has
+the whole of it, `/dev/trial` the numbers, and `test/trial.test.mjs` holds it.
+
 ## 9. The Logic Map draws almost anything
 
 The Logic Map was a picture of the person's reasoning and nothing else: its

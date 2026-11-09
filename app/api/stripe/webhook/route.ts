@@ -37,6 +37,7 @@ import { tenureBucket } from '@/lib/analytics';
 import { clerkClient } from '@clerk/nextjs/server';
 import { supabaseAdmin } from '@/lib/supabase';
 import { forgetPlanMemo } from '@/lib/socria-one-server';
+import { countUpgrade } from '@/lib/trial-server';
 import { entitledBy } from '@/lib/entitlement-rule';
 import { rewardsAfterBilling } from '@/lib/rewards/rewards-server';
 import { emailBaseUrl, emailSecret, sendEmail, withTimeout } from '@/lib/email';
@@ -232,6 +233,9 @@ async function applySubscription(sub: Stripe.Subscription): Promise<void> {
   // running reward time into the bank (and records a conversion once); paid access ending lets
   // banked time start. Bounded, because Stripe is waiting for a 200. Stripe itself is not touched.
   await withTimeout(rewardsAfterBilling(userId, entitledBy(sub.status, periodEndOf(sub))).then(() => 'done' as const), 4000, 'timeout' as const);
+  // The trial's analytics (lib/trial-server.ts): Socria One begun is counted once per person, with where
+  // they were — in their trial, after it, or never having had one. Bounded and never in the way.
+  if (entitledBy(sub.status, periodEndOf(sub))) await withTimeout(countUpgrade(userId).then(() => 'done' as const), 3000, 'timeout' as const);
 }
 
 export async function POST(req: NextRequest) {

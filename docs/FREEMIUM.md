@@ -1,5 +1,7 @@
 # Freemium — the Free plan and Socria One (October 2026)
 
+> **Superseded on November 9, 2026 by the seven-day trial ([TRIAL.md](TRIAL.md)).** There is no free plan any more; the monthly counts below are lifted to Socria One's fair-use ceilings, and the trial's tokens are the limit. Kept as the record of how the counters work.
+
 Logos 5 relaunches with a strict free plan and one paid plan. This page is the
 record of what changed, how each limit is counted and enforced, the one manual
 step production needs, and the decisions and known boundaries.

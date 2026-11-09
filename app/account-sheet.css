@@ -338,3 +338,11 @@
   .acct-sheet .plan .link-act:hover,
   .acct-sheet :is(.access-form button, .rp-name button, .persona-save):hover:not(:disabled){transform:none}
 }
+/* the trial's numbers, a press away (lib/trial.ts): never the first thing said */
+.acct-sheet .plan .trial-more{margin-top:8px;font-size:12.5px;color:var(--ink-70)}
+.acct-sheet .plan .trial-more summary{cursor:pointer;color:var(--ink-70);font-weight:500}
+.acct-sheet .plan .trial-more summary:hover{color:var(--ink)}
+.acct-sheet .plan .trial-more summary:focus-visible{outline:2px solid var(--moss);outline-offset:2px}
+.acct-sheet .plan .trial-more dl{display:grid;grid-template-columns:auto 1fr;gap:4px 12px;margin:8px 0 0;max-width:38ch}
+.acct-sheet .plan .trial-more dt{font-size:10.5px;font-weight:600;letter-spacing:.18em;text-transform:uppercase;color:var(--ink-45);padding-top:2px}
+.acct-sheet .plan .trial-more dd{margin:0}

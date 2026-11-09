@@ -22,6 +22,7 @@
 import type { Metadata, MetadataRoute } from 'next';
 import { DOC_PAGES } from '@/app/docs/registry';
 import { freePlanSentence, onePlanSentence } from './entitlements';
+import { GUEST_TURNS } from './guest-limits';
 import { priceWithPeriod } from './socria-one';
 import { studentOfferOpen } from './socria-edu';
 
@@ -179,7 +180,7 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
   {
     path: '/one',
     name: 'Socria One',
-    summary: `${onePlanSentence()} — ${priceWithPeriod()}. Socria is free to start.`,
+    summary: `${onePlanSentence()} — ${priceWithPeriod()}. Every account starts with a seven-day trial.`,
     priority: 0.8,
     changeFrequency: 'monthly',
   },
@@ -296,7 +297,7 @@ export function llmsTxt(opts: { now: number }): string {
     ''
   );
   lines.push(
-    `Socria is Logos 5: a conversation that asks as well as answers, with a live map of your reasoning beside it, models it can compute and documents it reads with every citation checked. Without an account you get one line of thinking and its map; a free account has ${freePlanSentence()}, and the one you have comes with you. Socria One (${priceWithPeriod()}) is ${onePlanSentence().replace(/^U/, 'u')}.`,
+    `Socria is Logos 5: a conversation that asks as well as answers, with a live map of your reasoning beside it, models it can compute and documents it reads with every citation checked. Without an account you get a short preview: one line of thinking and its map, up to ${GUEST_TURNS} messages. An account starts with ${freePlanSentence()}, and the line you began comes with you. After the seven days, new AI requests need Socria One, and everything made in the trial stays open. Socria One (${priceWithPeriod()}) is ${onePlanSentence().replace(/^U/, 'u')}.`,
     ''
   );
   const link = (name: string, path: string, summary: string) => `- [${name}](${absoluteUrl(path)}): ${summary}`;

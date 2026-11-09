@@ -86,20 +86,20 @@ export function SocriaOneModal({
         </p>
 
         <h2 className="os-title" id={`${id}-t`}>
-          {limited ? LIMIT_HEADLINE : 'Unlimited Socria'}
+          {limited ? LIMIT_HEADLINE : 'Socria, without a daily limit'}
         </h2>
         <p className="os-sub" id={`${id}-s`}>
-          {reason ?? 'Conversations, Logic Maps, artifacts and documents without a monthly count — with Socria Voice and sharing, which only Socria One includes.'}
+          {reason ?? 'Keep thinking after your seven-day trial — conversations, Logic Maps and artifacts with no daily limit — with Socria Voice, sharing, the experiments and the Celestial and One themes, which only Socria One includes.'}
         </p>
 
         {/* what each plan holds, from the one table (lib/entitlements.ts) — never a number written here */}
         <div className="os-cmp-wrap">
           <table className="os-cmp">
-            <caption className="os-sr">Free compared with Socria One</caption>
+            <caption className="os-sr">The trial compared with Socria One</caption>
             <thead>
               <tr>
                 <td />
-                <th scope="col">Free</th>
+                <th scope="col">Trial</th>
                 <th scope="col" className="is-one">
                   Socria One
                 </th>
@@ -149,7 +149,7 @@ export function SocriaOneModal({
             )}
           </button>
           <button type="button" className="l5-btn is-quiet" onClick={onClose}>
-            Not now — keep the free plan
+            Not now
           </button>
         </div>
 

@@ -50,7 +50,7 @@ export function priceWithPeriod(): string {
 /** What the /one page says, word for word: its headline (the price follows it) and
  *  the line beside it. The share card says the same, so the two cannot drift. */
 export const ONE_HEADLINE = 'More of Socria.';
-export const ONE_STANDFIRST = 'The free tier, without the counts. Same models, same map.';
+export const ONE_STANDFIRST = 'Seven days to try it. Then Socria, without a daily limit — same models, same map.';
 
 // Imported for the map cap's default; entitlements imports only the TYPE
 // above, so this edge is one-directional at runtime.
@@ -88,6 +88,10 @@ export function isOne(plan: Plan): boolean {
 // Written as capabilities of a thinking environment, not as quantities of
 // AI. Nobody is buying tokens here.
 //
+// SINCE NOVEMBER 9, 2026 there is no free tier, only a seven-day trial (lib/trial.ts): the lines below
+// sell what continues after it and what is One's alone — no daily limit, Socria Voice, sharing, the
+// experiments and the two themes.
+//
 // WHAT IS ON THE OTHER SIDE OF THE PRICE. Free and Socria One think the same
 // way — every depth, every lens, the same map and the same questions asked
 // back. What the free plan counts by the month (lib/entitlements.ts: its
@@ -108,23 +112,15 @@ export type OneFeature =
   | 'conversations'
   | 'history'
   | 'together'
-  | 'voice';
+  | 'voice'
+  | 'experiments'
+  | 'themes';
 
 export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = [
   {
     id: 'conversations',
-    title: 'Unlimited conversations',
-    blurb: 'as many lines of thinking as the month holds — nothing counted, nothing waiting for next month.',
-  },
-  {
-    id: 'map',
-    title: 'Unlimited Logic Maps',
-    blurb: 'every conversation mapped, with as many nodes as the thinking needs.',
-  },
-  {
-    id: 'draft',
-    title: 'Unlimited artifacts and documents',
-    blurb: 'make what the work needs, and bring in or write up as many documents as you have.',
+    title: 'No daily limit',
+    blurb: 'keep thinking after your seven-day trial — conversations, Logic Maps and artifacts, as many as the work needs.',
   },
   {
     id: 'voice',
@@ -137,9 +133,19 @@ export const ONE_FEATURES: { id: OneFeature; title: string; blurb: string }[] = 
     blurb: 'every chat and whole Projects, each with its map — sharing is part of Socria One.',
   },
   {
+    id: 'experiments',
+    title: 'The experiments',
+    blurb: 'Use your hands, AR Mode and big-screen mode — the newest ways to move through your thinking.',
+  },
+  {
+    id: 'themes',
+    title: 'Celestial and Socria One themes',
+    blurb: 'your map as a star chart, or in the One blue.',
+  },
+  {
     id: 'history',
-    title: 'It remembers how you reason',
-    blurb: 'the durable things about your thinking, carried into each new one.',
+    title: 'It remembers more of how you reason',
+    blurb: 'the durable things about your thinking, carried into each new one — and files up to 30 MB.',
   },
 ];
 

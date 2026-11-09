@@ -402,11 +402,12 @@ export function Logos2() {
         <Link href="/docs/logos-3">Logos 3.5</Link>, which is everything here
         with a second seat, thinking depth and the everyday displays.
       </p>
-      <Callout tag="Free, then Socria One">
+      <Callout tag="A trial, then Socria One">
         Logos 2 is archived: every conversation had with it opens in Logos 5
-        now, on the same plan as everything else — the free plan holds{' '}
-        {freePlanSentence()}, and{' '}
-        <Link href="/docs/socria-one">Socria One</Link> counts none of them.
+        now, on the same plan as everything else — a new account has{' '}
+        {freePlanSentence()}, and after it{' '}
+        <Link href="/docs/socria-one">Socria One</Link> has no daily limit.
+        Everything made before stays open either way.
       </Callout>
       <p>
         The conversation, the lenses and the moves on each card are the ones

@@ -68,7 +68,7 @@ export type Refusal = { kind: 'sleep'; state: SleepState } | { kind: 'busy' } | 
 export class TokenRefusal extends Error {
   readonly tokenRefusal = true;
   constructor(readonly refusal: Refusal) {
-    super(refusal.kind === 'sleep' ? 'the week’s tokens are spent' : refusal.kind === 'busy' ? 'the week’s tokens are held by calls still running' : 'the week’s tokens cannot be checked');
+    super(refusal.kind === 'sleep' ? 'the period’s tokens are spent' : refusal.kind === 'busy' ? 'the period’s tokens are held by calls still running' : 'the period’s tokens cannot be checked');
     this.name = 'TokenRefusal';
   }
 }
@@ -108,6 +108,13 @@ export interface HoldOptions {
   id?: () => string;
   /** told when a settle could not be written, after its retry */
   onLost?: (tokens: number, why: unknown) => void;
+  /**
+   * The period the call is counted in — its key in the store. The week holding the call when absent;
+   * the seven-day trial passes its day (lib/trial.ts dayKey).
+   */
+  scope?: string;
+  /** The state a refused call reports, given what the period has settled. Sleep Mode's week when absent. */
+  stateOf?: (used: number, limit: number, at: number) => SleepState;
 }
 
 /** The margin on an estimated input: the estimate is bytes ÷ 4, and a tokenizer can read some text closer. */
@@ -142,8 +149,8 @@ export async function holdTokens(store: TokenStore, o: HoldOptions): Promise<Hol
   const ttl = o.ttl ?? HOLD_TTL_MS;
   const hold = (o.id ?? newId)();
   const want = wantFor(o.input, o.output);
-  // the week the call began in is the week it settles into, even if it ends after Monday 00:00
-  const week = weekKey(now());
+  // the period the call began in is the one it settles into, even if it ends after the reset
+  const week = o.scope ?? weekKey(now());
   const deadline = now() + waitMs;
   for (;;) {
     let r: Reserved;
@@ -160,7 +167,7 @@ export async function holdTokens(store: TokenStore, o: HoldOptions): Promise<Hol
     }
     // nothing free: the week is spent — or every token left is held by calls of theirs still running
     const othersHold = r.holds && r.held > 0 && r.used < o.limit;
-    if (!othersHold) throw new TokenRefusal({ kind: 'sleep', state: { ...sleepState(r.used, o.limit, now()), asleep: true, left: 0 } });
+    if (!othersHold) throw new TokenRefusal({ kind: 'sleep', state: { ...(o.stateOf ? o.stateOf(r.used, o.limit, now()) : sleepState(r.used, o.limit, now())), asleep: true, left: 0 } });
     if (now() >= deadline) throw new TokenRefusal({ kind: 'busy' });
     await wait(pollMs);
   }

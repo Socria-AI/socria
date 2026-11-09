@@ -89,6 +89,11 @@ export interface SleepState {
   weekStart: number;
   /** when Socria wakes (ms, the next Monday 00:00 UTC) */
   resetAt: number;
+  /**
+   * The period counted. 'day' is the seven-day trial's day (lib/trial.ts): weekStart is then the
+   * day's 00:00 UTC and resetAt the next. Absent is the week.
+   */
+  period?: 'week' | 'day';
 }
 
 export function sleepState(used: number, limit: number, now: number): SleepState {
@@ -160,8 +165,8 @@ export const TOKENS_UNAVAILABLE =
 export const TOKENS_BUSY = 'Socria is still finishing your other request. Try again in a moment.';
 
 /** The body of a refused AI request: the state, so any screen can count down to the reset. */
-export function sleepRefusal(s: SleepState): { error: string; sleep: true; used: number; limit: number; left: number; weekStart: number; resetAt: number } {
-  return { error: SLEEP_NOTE, sleep: true, used: s.used, limit: s.limit, left: 0, weekStart: s.weekStart, resetAt: s.resetAt };
+export function sleepRefusal(s: SleepState, note: string = SLEEP_NOTE): { error: string; sleep: true; used: number; limit: number; left: number; weekStart: number; resetAt: number; period: 'week' | 'day' } {
+  return { error: note, sleep: true, used: s.used, limit: s.limit, left: 0, weekStart: s.weekStart, resetAt: s.resetAt, period: s.period ?? 'week' };
 }
 
 // ── what a call is counted at ────────────────────────────────────────

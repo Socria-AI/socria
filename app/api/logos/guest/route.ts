@@ -12,6 +12,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { auth } from '@clerk/nextjs/server';
 import { enforceRateLimit } from '@/lib/rate-limit';
+import { TRIAL_ENDED_COOKIE, guestAfterTrial } from '@/lib/trial';
 import { GUEST_COOKIE, GUEST_COOKIE_PATH, GUEST_LIMIT, GUEST_TTL_MS, claimGuest } from '@/lib/guest-pass';
 
 export const runtime = 'nodejs';
@@ -27,6 +28,8 @@ export async function POST(req: NextRequest) {
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
   if (userId) return NextResponse.json({ ok: true, guest: false });
+  // the guest preview is not a second trial: a browser whose account's trial is over gets none (lib/trial.ts)
+  if (req.cookies.get(TRIAL_ENDED_COOKIE)?.value) return NextResponse.json({ ok: false, ...guestAfterTrial() }, { status: 402 });
 
   const body = await req.json().catch(() => null);
   const claim = claimGuest(req.cookies.get(GUEST_COOKIE)?.value, body?.sessionId, Date.now());

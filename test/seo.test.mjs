@@ -158,10 +158,14 @@ console.log('\n=== llms.txt ===');
   ok('every docs page, the overview at /docs', DOC_PAGES.every((d) => t.includes(`(${SEO.absoluteUrl(SEO.docPath(d.slug))})`)));
   ok('the price, from the one place it lives', t.includes('$15/month'));
   // removed: "says what needs an account" (Logos needed one, Core worked without) — Core was archived, Logos 5 is the one surface
-  ok('says what a guest gets, and what an account adds', /Without an account you get one line of thinking and its map; a free account has 3 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month/.test(t));
-  ok('…and what Socria One is, from the plan table', t.includes('Socria One ($15/month) is unlimited conversations, Logic Maps, artifacts and documents, with Socria Voice and chat sharing.'));
+  // There is no free tier (lib/trial.ts): a guest gets a short preview, an account a seven-day trial, then Socria One.
+  ok('says what a guest gets, and what an account adds', t.includes('Without an account you get a short preview: one line of thinking and its map, up to 5 messages. An account starts with a 7-day trial: 4,000 tokens a day, up to 28,000 in all, and the line you began comes with you.'));
+  ok('…and what follows the trial: Socria One, with nothing made taken away', t.includes('After the seven days, new AI requests need Socria One, and everything made in the trial stays open.'));
+  ok('…and what Socria One is, from the plan table', t.includes('Socria One ($15/month) is unlimited conversations, Logic Maps and artifacts after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes.'));
+  ok('…and the One page’s summary says the trial comes first', t.includes('— $15/month. Every account starts with a seven-day trial.'));
   // the summary and the public pages are this file's words; the docs list is the docs registry's
   const own = t.slice(0, t.indexOf('## Docs')) + t.slice(t.indexOf('## More'));
+  ok('promises no free tier and no monthly allowance in its own words', !/free (account|tier|plan)|free to start|a month\b|by the month/i.test(own), own.match(/.{0,60}(free (account|tier|plan)|free to start|a month\b|by the month).{0,60}/i)?.[0]);
   ok('names no Core in its own words', !/\bCore\b/.test(own), own.match(/.{0,60}\bCore\b.{0,60}/)?.[0]);
   ok('the retired student page is not listed', !t.includes('/students'));
   ok('…nor after the old close', !SEO.llmsTxt({ now: AFTER }).includes('/students'));
@@ -191,7 +195,11 @@ console.log('\n=== preview cards ===');
   ok('the invitation, in words — and no days of Socria One', inv.kicker === 'A friend invited you' && !/Socria One/.test(`${inv.title} ${inv.line}`), JSON.stringify(inv));
   ok('…not while referrals are off', ogCardFor(['invited'], ctx({ referral: { enabled: false, signupDays: 7 } })).kicker === 'Socria');
   const oneCard = ogCardFor(['one'], ctx());
-  ok('the One card says what the /one page says', oneCard.title === 'More of Socria.' && oneCard.line === 'The free tier, without the counts. Same models, same map — $15/month.' && /ONE_HEADLINE/.test(readFileSync(join(root, 'components/site/One.tsx'), 'utf8')), JSON.stringify(oneCard));
+  ok('the One card says what the /one page says', oneCard.title === 'More of Socria.' && oneCard.line === 'Seven days to try it. Then Socria, without a daily limit — same models, same map — $15/month.' && /ONE_HEADLINE/.test(readFileSync(join(root, 'components/site/One.tsx'), 'utf8')) && /ONE_STANDFIRST/.test(readFileSync(join(root, 'components/site/One.tsx'), 'utf8')), JSON.stringify(oneCard));
+  // There is no free tier to offer: an account is created for its seven-day trial, and no card says otherwise.
+  const signUp = ogCardFor(['sign-up'], ctx());
+  ok('the sign-up card offers the trial, not a free account', /seven days/i.test(signUp.line) && !/free/i.test(`${signUp.title} ${signUp.line}`), JSON.stringify(signUp));
+  ok('…as does the invitation', /seven days/i.test(inv.line) && !/free/i.test(`${inv.title} ${inv.line}`), JSON.stringify(inv));
   ok('…and never the retired daily count', !/daily count/i.test(`${oneCard.title} ${oneCard.line}`) && !/daily count|without the ceiling/i.test(readFileSync(join(root, 'app/one/page.tsx'), 'utf8')));
   ok('fit keeps short text', fit('Short title', 20) === 'Short title');
   const f = fit('A rather long title that will not fit on the card at all', 30);
@@ -216,7 +224,7 @@ console.log('\n=== structured data ===');
   ok('website, published by the organization', site['@type'] === 'WebSite' && site.publisher['@id'] === org['@id']);
   const app = LD.softwareApplicationLd();
   const one = app.offers.find((o) => o.name === 'Socria One');
-  ok('the free plan at 0', app.offers.some((o) => o.name === 'Free' && o.price === '0'));
+  ok('the seven-day trial at 0, and no free plan', app.offers.some((o) => o.name === 'Seven-day trial' && o.price === '0') && !app.offers.some((o) => /free/i.test(o.name)));
   ok('Socria One at its real price, monthly', one.price === '15' && one.priceCurrency === 'USD' && one.priceSpecification.unitCode === 'MON');
   ok('no ratings or reviews, anywhere', !/aggregateRating|"review"/i.test(JSON.stringify([org, site, app])));
   const bc = LD.breadcrumbLd([{ name: 'Socria', path: '/' }, { name: 'Docs', path: '/docs' }, { name: 'Models', path: '/docs/models' }]);
@@ -332,6 +340,9 @@ console.log('\n=== the homepage ===');
   ok('the masthead reaches One, the Charter, the blog and the docs', ['/one', '/charter', '/blog', '/docs'].every((x) => hrefs(html).includes(x)));
   ok('…and the conversation can still be linked to', html.includes('id="session"'));
   ok('the price, from the one place it lives', html.includes('Socria One') && html.includes('· $15 a month'));
+  // There is no free plan beside it: the first plan is the seven-day trial, from the trial's numbers.
+  ok('the plans: a seven-day trial, then Socria One', html.includes('<h3>Seven-day trial</h3>') && html.includes('Every account starts with a 7-day trial: 4,000 tokens a day, up to 28,000 in all.') && html.includes('Seven days free, then Socria One.'));
+  ok('…and no free tier promised anywhere on the page', !/<h3>Free<\/h3>|free account|free to start|free tier/i.test(html), html.match(/.{0,40}(free account|free to start|free tier).{0,40}/i)?.[0]);
   ok('the foot carries Privacy and Terms', hrefs(html).includes('/privacy') && hrefs(html).includes('/terms'));
   ok('…and Support, outside <main>, so the page has a footer landmark', /<\/main><footer class="s-colophon">/.test(html) && hrefs(html).includes('/support'));
   ok('the product picture is one labelled figure, inert inside', /<figure class="s-shot" aria-label="Logos 5: /.test(html) && /<div class="s-app" aria-hidden="true" inert=""/.test(html));
@@ -347,8 +358,8 @@ console.log('\n=== Socria One ===');
   const html = renderToStaticMarkup(h(UI.One, {}));
   ok('exactly one h1', h1Count(html) === 1, String(h1Count(html)));
   ok('the headline carries the price, from lib/socria-one', h1Of(html) === 'More of Socria. $15 a month.', h1Of(html));
-  ok('the line beside it', html.includes('The free tier, without the counts. Same models, same map.'));
-  ok('two cards, each named by its heading', (html.match(/<section class="s-o-card" aria-labelledby="s-o-c[12]">/g) ?? []).length === 2 && html.includes('Unlimited conversations') && html.includes('Share every map'));
+  ok('the line beside it', html.includes('<p class="s-o-stand">Seven days to try it. Then Socria, without a daily limit — same models, same map.</p>'));
+  ok('two cards, each named by its heading', (html.match(/<section class="s-o-card" aria-labelledby="s-o-c[12]">/g) ?? []).length === 2 && html.includes('<h2 id="s-o-c1">No daily limit</h2>') && html.includes('<h2 id="s-o-c2">Share every map</h2>'));
   ok('the pictures are pictures: hidden and inert, no controls inside', (html.match(/<div class="s-o-pic" aria-hidden="true" inert="">/g) ?? []).length === 2);
   const pics = html.split('class="s-o-pic"').slice(1).map((x) => x.split('class="s-o-cap"')[0]);
   // the map's cards are the design system's LogosNode, a button by nature: inert is what takes them out of the tab order
@@ -356,11 +367,11 @@ console.log('\n=== Socria One ===');
   ok('the map draws its two ideas and the line between them', html.includes('data-pn="c"') && html.includes('data-pn="c2"') && /<svg class="s-edges" aria-hidden="true"><path class="is-on"/.test(html));
   ok('the masthead and the headline can subscribe', (html.match(/<button type="button" class="s-pill is-(deep|blue)"/g) ?? []).length === 2);
   ok('no dead anchor to a join band that is gone', !html.includes('href="#join"'));
-  ok('the free tier opens Logos', /<a class="s-o-free" href="\/logos">Socria is free to start<\/a>/.test(html));
+  ok('the trial opens Logos', /<a class="s-o-free" href="\/logos">Start a seven-day trial<\/a>/.test(html));
   ok('it says how it renews', html.includes('Renews monthly · Cancel any time'));
   ok('the masthead reaches Socria, the Charter and the docs', ['/', '/charter', '/docs'].every((x) => hrefs(html).includes(x)));
   ok('the foot carries Terms and Privacy', hrefs(html).includes('/terms') && hrefs(html).includes('/privacy'));
-  ok('no retired promise on the page', !/without the ceiling|free month|access code/i.test(html));
+  ok('no retired promise on the page', !/without the ceiling|free month|access code|free tier|free to start|without the counts/i.test(html));
 }
 
 console.log('\n=== the Charter ===');
@@ -378,7 +389,8 @@ console.log('\n=== the student page ===');
   const ended = renderToStaticMarkup(h(UI.StudentsBody, {}));
   ok('it says the month has ended', ended.includes('has <span class="em">ended.</span>'));
   ok('…and promises no month', !ended.includes('@mavs.uta.edu') && !/Create my free account|first month of Socria One/.test(ended));
-  ok('…and says what Socria is now, from the plan table', ended.includes('3 conversations, 2 Logic Maps, 10 Logic Map nodes, 2 artifacts and 1 document a month') && ended.includes('$15/month'));
+  ok('…and says what Socria is now, from the plan table', ended.includes('a new account has a 7-day trial: 4,000 tokens a day, up to 28,000 in all') && ended.includes('After that, Socria One is $15/month.'));
+  ok('…and offers no free tier in its place', !/free to start|free account|free tier/i.test(ended), ended.match(/.{0,40}free.{0,40}/g)?.join(' | '));
   // The one call to action every public page makes: "Start a conversation", into Logos.
   ok('…with a way in and the plan page', ended.includes('href="/logos"') && ended.includes('Start a conversation') && ended.includes('href="/one"'));
   ok('one h1', (ended.match(/<h1[\s>]/g) ?? []).length === 1);

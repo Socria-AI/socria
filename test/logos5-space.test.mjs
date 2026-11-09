@@ -217,7 +217,7 @@ console.log('\n=== consistency pass: made things seen whole, enlarged, found ===
   ok('in the one space a view or an artifact asked for opens beside it (no more buttons changing a screen nobody sees)', /if \(oneViewRef\.current\) setBoardBeside\(t === 'chat' \? null : besideOnBoard\(t\)\);/.test(app) && (app.match(/if \(oneViewRef\.current\) setBoardBeside\('artifacts'\);/g) ?? []).length === 2 && /oneViewRef\.current = oneView;/.test(app));
   ok('  "put X beside" and "close" in words act on what is beside the space', /is open beside the space now\./.test(app) && /Closed what was open beside the space\./.test(app) && /if \(!boardBesideRef\.current\) return \{ said: 'Nothing is open beside the space\.' \};/.test(app));
   ok('  a message jumped to opens its idea in the space; a search hit opens the line on its idea', /if \(idea\) setSpaceOpen\(idea\);/.test(app) && /if \(oneViewRef\.current && spaceView\) return setSpaceOpen\(node\);/.test(app));
-  ok('  AR Mode is offered (in Account\u2019s experiments) only where a map is on screen', /activeId && !l5Home && !l5Mind \? \[\{ label: 'AR Mode'/.test(app));
+  ok('  AR Mode is offered (in Account\u2019s experiments) only where a map is on screen', /activeId && !l5Home && !l5Mind \? \[oneOnly\(\{ label: 'AR Mode'/.test(app));
   {
     // the More menu, trimmed: no novelties; the experiments live in the account sheet
     const menu = app.slice(app.indexOf('const l5Menu: L5MenuItem[] = ['), app.indexOf('const experiments:'));

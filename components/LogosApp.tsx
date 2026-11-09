@@ -187,11 +187,14 @@ import { HANDCAM_EVENT, readHandCommand, type ArCommand, type HandCommand } from
 import { handPointer, stopHands } from '@/lib/hand-bus';
 import { L5Tips } from '@/components/logos5/L5Tips';
 import { OneButton, WelcomeBack } from '@/components/logos5/OneHeader';
-import { SleepBar, SleepRing, SleepScreen, useSleepWatch } from '@/components/logos5/SleepMode';
+import { SleepBar, SleepRing, SleepScreen, TrialEndedBar, TrialEndedScreen, useSleepWatch, useTrialEndedWatch } from '@/components/logos5/SleepMode';
 import type { SleepState } from '@/lib/sleep';
+import { dayOfLine, todayLine, type TrialState } from '@/lib/trial';
 
 /** What the Socria One sheet says when it is opened from Sleep Mode. */
-const SLEEP_ONE = 'Socria One has no weekly token allowance, so Socria stays awake — its own fair-use limits are the only ones.';
+const SLEEP_ONE = 'Socria One has no daily token allowance, so Socria stays awake — its own fair-use limits are the only ones.';
+/** What the Socria One sheet says when it is opened from the end of the trial. */
+const TRIAL_ONE = 'Your seven-day trial has ended. Socria One picks up where you left off, with no daily limit — and everything you made is already here.';
 import { NEW_FOR_MS, type TipAction } from '@/lib/logos5/tips';
 import { canvasElements, canvasTurns, closingAsk, ELEMENT_NOUN, excerpt as canvasExcerpt, turnOfEntry, type CanvasTurn } from '@/lib/logos5/canvas';
 import { InlineBlock } from '@/components/inline/InlineUI';
@@ -565,6 +568,21 @@ export function LogosApp({
     if (!already) setSleepOpen(true);
   });
   const asleepNow = () => !!sleepRef.current?.asleep && Date.now() < sleepRef.current.resetAt;
+  // THE SEVEN-DAY TRIAL (lib/trial.ts): where it stands, as the server keeps it (null: Socria One or a
+  // guest) — and, once it is over, the card said once and the line over the box. Over, nothing that would
+  // ask Socria is sent; the words stay in the box. Everything made stays open, and everything by hand works.
+  const [trial, setTrial] = useState<TrialState | null>(null);
+  const [trialEnded, setTrialEnded] = useState<{ note?: string } | null>(null);
+  const [trialEndedOpen, setTrialEndedOpen] = useState(false);
+  const trialEndedRef = useRef(trialEnded);
+  trialEndedRef.current = trialEnded;
+  useTrialEndedWatch((b) => {
+    const already = !!trialEndedRef.current;
+    setTrialEnded({ note: typeof b.error === 'string' ? b.error : undefined });
+    if (!already) setTrialEndedOpen(true);
+  });
+  // a guest has no trial to go on with (their browser's refusal says to sign in), so only an account is held here
+  const trialOverNow = () => !!trialEndedRef.current && !!isSignedIn;
   // Checkout is a redirect, so the button needs to show it's gone somewhere.
   const [oneBusy, setOneBusy] = useState(false);
   const [oneError, setOneError] = useState<string | null>(null);
@@ -1703,8 +1721,15 @@ export function LogosApp({
         if (!res.ok) return;
         const json = await res.json();
         if (json?.counters) setUsage(json.counters);
-        // the week's tokens, the same on every device (null: Socria One, or not counted; absent: unreadable)
+        // today's trial tokens, the same on every device (null: Socria One, or not counted; absent: unreadable)
         if (json && 'sleep' in json) setSleep(json.sleep && typeof json.sleep.resetAt === 'number' ? json.sleep : null);
+        // the trial itself: which day, how many left, or over (null: Socria One, or a guest)
+        if (json && 'trial' in json) {
+          const t = json.trial && typeof json.trial.status === 'string' ? (json.trial as TrialState) : null;
+          setTrial(t);
+          if (t?.status === 'ended') setTrialEnded((cur) => cur ?? {});
+          else setTrialEnded(null);
+        }
       } catch {
         /* the panel simply does not update; nothing depends on it */
       }
@@ -3300,6 +3325,10 @@ export function LogosApp({
     const content = text.trim();
     const node = explore.node;
     if (!content || focusBusy || !node) return;
+    if (trialOverNow()) {
+      setTrialEndedOpen(true);
+      return;
+    }
     if (asleepNow()) {
       setSleepOpen(true);
       return;
@@ -4190,6 +4219,11 @@ export function LogosApp({
     };
     const said0 = text.trim();
     if ((!said0 && !atts.length) || !activeIdRef.current) return;
+    // the trial over: nothing is sent, the words stay in the box, and the card says what comes next
+    if (trialOverNow()) {
+      setTrialEndedOpen(true);
+      return;
+    }
     // resting: nothing is sent, the words stay in the box, and the screen says when Socria wakes
     if (asleepNow()) {
       setSleepOpen(true);
@@ -7175,14 +7209,12 @@ export function LogosApp({
       synced: firstRun.synced,
       accountAgeMs: user?.createdAt ? Date.now() - new Date(user.createdAt).getTime() : null,
     });
-  /** under the welcome's field, on a free plan: what starting costs — it is one of the month's conversations */
+  /** under the welcome's field, on the trial (lib/trial.ts): what starting means — its seven days begin with it, or which day it is */
   const welcomeNote = (() => {
-    if (!isSignedIn || one || !planKnown) return null;
-    const u = usage.chats;
-    const limit = u?.limit ?? null;
-    if (limit === null || limit <= 0) return null;
-    const left = Math.max(0, limit - (u?.used ?? 0));
-    return left > 0 ? `It counts as one of your ${limit} free conversations this month — ${left} left.` : null;
+    if (!isSignedIn || one || !planKnown || !trial) return null;
+    if (trial.status === 'eligible') return 'Your seven-day trial begins with this question.';
+    if (trial.status === 'active') return `${dayOfLine(trial)} of your trial — ${todayLine(trial.today)}.`;
+    return null;
   })();
 
   // ── ONE WRITE PATH FOR EVERY SURFACE ─────────────────────────────
@@ -8109,49 +8141,36 @@ export function LogosApp({
     // map's own (its view's actions), Synthesize is the Content and Logic Map views' own, and hiding the bars is gone
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
-    { label: 'Live guidance', hint: 'Socria shows you how, on your camera · early access', onSelect: openGuide },
+    { label: 'Live guidance', hint: one ? 'Socria shows you how, on your camera · early access' : 'Socria shows you how, on your camera · Socria One', onSelect: one ? openGuide : () => askOne(FEATURE_NOTE.experiments) },
     // while big-screen mode is on, the way out stays here, where it is looked for; the rest of the experiments are in Account
     ...(cabin ? [{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) }] : []),
     ...(handsWanted ? [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }] : []),
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
-    ...(!one ? [{ label: 'Socria One', hint: 'Unlimited, with Voice and sharing', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
+    ...(!one ? [{ label: 'Socria One', hint: 'No daily limit, with Voice, sharing and the experiments', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
   ];
-  // The experiments: novelties that work, kept out of the way in Account (components/account/AccountSheet.tsx)
+  // The experiments: novelties that work, kept out of the way in Account (components/account/AccountSheet.tsx).
+  // They are Socria One's (lib/entitlements.ts): on the trial each is named, marked Socria One, and opens
+  // the sheet instead of starting — except the ways out (stopping the hands, leaving big-screen mode), which
+  // always work.
+  const oneOnly = (x: { label: string; hint: string; onSelect: () => void }) =>
+    one ? x : { label: x.label, hint: `${x.hint.replace(/ · early access$/, '')} · Socria One`, onSelect: () => askOne(FEATURE_NOTE.experiments) };
   const experiments: { label: string; hint: string; onSelect: () => void }[] = [
     ...(!handsWanted
-      ? [{ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands }]
+      ? [oneOnly({ label: 'Use your hands', hint: 'Point, pinch to click and drag, both hands to zoom — all of Logos 5 · early access', onSelect: startYourHands })]
       : [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }]),
-    ...(activeId && !l5Home && !l5Mind ? [{ label: 'AR Mode', hint: 'Move this Logic Map with your hands · early access', onSelect: openAr }] : []),
+    ...(activeId && !l5Home && !l5Mind ? [oneOnly({ label: 'AR Mode', hint: 'Move this Logic Map with your hands · early access', onSelect: openAr })] : []),
     // a phone is never a big screen: offered where it can apply, and always where it is on to be left
     ...(!phone || cabin
-      ? [{ label: cabin ? 'Leave big-screen mode' : 'Big-screen mode', hint: cabin ? 'Back to the usual layout' : 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(!cabin) }]
+      ? [cabin ? { label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) } : oneOnly({ label: 'Big-screen mode', hint: 'For a car’s screen while parked, or any large touchscreen', onSelect: () => setCabinMode(true) })]
       : []),
   ];
   // The meter, only when it is about to matter: the free allowance closest to
   // its end, said once and quietly — the last two of ten, the last of two —
   // with the way past it beside it. A conversation not yet begun is asked
   // about conversations first; one under way, about its map and what it makes.
-  const l5Meter = (() => {
-    if (one || !isSignedIn) return null;
-    const order: Counter[] = messages.length === 0 ? ['chats', 'maps', 'nodes', 'artifacts', 'documents'] : ['nodes', 'maps', 'artifacts', 'documents', 'chats'];
-    const near = order.find((c) => {
-      const u = usage[c];
-      return !!u && u.limit !== null && (u.used >= u.limit || nearLimit('free', c, u.used));
-    });
-    if (!near) return null;
-    const u = usage[near]!;
-    const limit = u.limit ?? 0;
-    const left = Math.max(0, limit - u.used);
-    const noun = COUNTER_NOUN[near] ?? { one: near, many: near };
-    return (
-      <p className={`l5-meter${left === 0 ? ' is-out' : ''}`} role="note">
-        {left === 0 ? `You’ve used all ${limit} free ${limit === 1 ? noun.one : noun.many} this month.` : `${left} of ${limit} free ${limit === 1 ? noun.one : noun.many} left this month.`}{' '}
-        <button type="button" className="l5-link is-go" onClick={() => askOne(left === 0 ? boundaryNote(near) : undefined, left === 0)}>
-          Unlimited with Socria One
-        </button>
-      </p>
-    );
-  })();
+  // The monthly meter belonged to the free tier; the trial's tokens have their ring by the box (SleepRing), and
+  // the counts left are fair-use ceilings shared with Socria One, which are never sold past.
+  const l5Meter = null;
   // ── the study's screens (components/logos5/Study.tsx) ──
   const studyTopicObj = study && studyTopic ? study.state.topics.find((t) => t.id === studyTopic) ?? null : null;
   const artKey = artSel[activeId ?? ''] ?? null;
@@ -8289,7 +8308,7 @@ export function LogosApp({
           </span>
           Socria One
         </p>
-        <h2>You’ve used this month’s free Logic Maps.</h2>
+        <h2>Logic Maps have reached this month’s fair-use ceiling.</h2>
         <p>{boundaryNote('maps')}</p>
         <button type="button" className="l5-btn is-primary is-one is-wide" onClick={() => askOne(boundaryNote('maps'), true)}>
           See Socria One <span className="l5-ar" aria-hidden="true">→</span>
@@ -8325,9 +8344,11 @@ export function LogosApp({
       {nudgeOpen && <GuestNudge inline open signUpHref={signUpHref} />}
       {/* Socria Voice, while it listens: what it hears and does, over the box it speaks into */}
       {voicePanel(false)}
+      {/* the trial over: one line over the box — they can still draft; sending opens the card */}
+      <TrialEndedBar on={!!trialEnded && plan !== 'one' && !!isSignedIn} onOpen={() => setTrialEndedOpen(true)} />
       {/* resting: one line over the box — they can still draft; sending waits for the reset */}
       <SleepBar
-        sleep={sleep}
+        sleep={trialEnded ? null : sleep}
         onOpen={() => setSleepOpen(true)}
         onWake={() => {
           setSleep(null);
@@ -8373,7 +8394,8 @@ export function LogosApp({
         // the week's tokens, a small ring beside the tools: what is left and when it resets (free accounts; filled = resting)
         meter={
           <SleepRing
-            sleep={sleep}
+            sleep={trialEnded ? null : sleep}
+            trial={trial}
             onOpen={() => setSleepOpen(true)}
             onWake={() => {
               setSleep(null);
@@ -10258,6 +10280,7 @@ export function LogosApp({
           one account surface in the product rather than two that drift. */}
       <LiveGuide open={liveOpen} onClose={() => setLiveOpen(false)} access={arAccess ? (arAccess.tester ? 'tester' : 'preview') : 'unknown'} onKeep={keepGuide} sessionId={activeId} />
       <AccountSheet
+        trial={plan === 'one' ? null : trial}
         open={acctOpen}
         onClose={() => setAcctOpen(false)}
         isOne={one}
@@ -10269,8 +10292,19 @@ export function LogosApp({
       />
 
       {/* Sleep Mode (lib/sleep.ts): the week's free tokens are spent — said once, with when Socria wakes */}
+      {/* the trial over (lib/trial.ts): said once, with one way on; everything made stays open */}
+      <TrialEndedScreen
+        open={trialEndedOpen && !!trialEnded && plan !== 'one' && !!isSignedIn && !oneOpen}
+        note={trialEnded?.note}
+        onClose={() => setTrialEndedOpen(false)}
+        onUpgrade={() => {
+          setTrialEndedOpen(false);
+          askOne(TRIAL_ONE, true);
+        }}
+      />
       <SleepScreen
-        sleep={sleep}
+        sleep={trialEnded ? null : sleep}
+        trial={trial}
         open={sleepOpen && !oneOpen}
         onClose={() => setSleepOpen(false)}
         onUpgrade={plan === 'one' ? undefined : () => askOne(SLEEP_ONE)}

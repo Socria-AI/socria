@@ -23,7 +23,8 @@
 // The person gets a sentence they can act on plus six characters to quote; the
 // log keeps everything else.
 
-import { SLEEP_NOTE, TOKENS_BUSY, TOKENS_UNAVAILABLE } from './sleep';
+import { SLEEP_NOTE, TOKENS_BUSY } from './sleep';
+import { TRIAL_DAY_NOTE, TRIAL_UNAVAILABLE } from './trial';
 
 export type UpstreamCode =
   | 'upstream_auth'
@@ -265,10 +266,12 @@ export function streamFailureNotice(where: string, err: unknown, sentSomething: 
 
 /** The sentence for a call the week's tokens refused — read from the error's shape, so nothing here reaches the database. */
 function refusalNotice(err: unknown): string | null {
-  const r = err as { tokenRefusal?: unknown; refusal?: { kind?: unknown } } | null;
+  const r = err as { tokenRefusal?: unknown; refusal?: { kind?: unknown; state?: { period?: unknown } } } | null;
   if (!r || typeof r !== 'object' || r.tokenRefusal !== true) return null;
   const kind = r.refusal?.kind;
-  return kind === 'sleep' ? SLEEP_NOTE : kind === 'busy' ? TOKENS_BUSY : TOKENS_UNAVAILABLE;
+  // the seven-day trial's day (lib/trial.ts) is said as the day; the week's words only for the week
+  const day = r.refusal?.state?.period === 'day';
+  return kind === 'sleep' ? (day ? TRIAL_DAY_NOTE : SLEEP_NOTE) : kind === 'busy' ? TOKENS_BUSY : TRIAL_UNAVAILABLE;
 }
 
 /**

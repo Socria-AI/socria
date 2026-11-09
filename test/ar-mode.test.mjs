@@ -345,7 +345,7 @@ console.log('\n=== the way in ===');
 {
   const app = read('components/LogosApp.tsx');
   ok('the Logic Map’s own actions have AR Mode, marked early', /\{studyTab === 'logic_map' && \([\s\S]{0,300}className="l5-btn is-sm l5v-ar" onClick=\{openAr\}[\s\S]{0,200}AR Mode <span className="l5v-ar-k">Early<\/span>/.test(app));
-  ok('  and the ⋯ menu, on any line of thinking', /\.\.\.\(activeId && !l5Home && !l5Mind \? \[\{ label: 'AR Mode', hint: [^}]*onSelect: openAr \}\] : \[\]\)/.test(app));
+  ok('  and the ⋯ menu, on any line of thinking — Socria One’s, like every experiment', /\.\.\.\(activeId && !l5Home && !l5Mind \? \[oneOnly\(\{ label: 'AR Mode', hint: [^}]*onSelect: openAr \}\)\] : \[\]\)/.test(app));
   ok('who may use it is asked when it is opened — never on load', (app.match(/fetch\('\/api\/ar\/access'/g) ?? []).length === 1 && /function askArAccess\(\)/.test(app) && /function openAr\(\) \{\s*setArOpen\(true\);\s*if \(arKnownRef\.current\) return;\s*void askArAccess\(\);/.test(app));
   ok('  a failed ask is not kept, and signing in or out asks again', /arKnownRef\.current = known;/.test(app) && /arKnownRef\.current = false;\s*setArAccess\(null\);\s*\}, \[isSignedIn\]\)/.test(app));
   ok('it is the map of the line of thinking that is open, and leaves when another opens', /<ARMode\s+map=\{map\}\s+layoutKey=\{activeId\}/.test(app) && /useEffect\(\(\) => setArOpen\(false\), \[activeId\]\)/.test(app));

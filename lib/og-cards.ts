@@ -103,7 +103,7 @@ const FIXED: Record<string, OgCard> = {
   'sign-up': {
     kicker: 'Socria',
     title: `${TAGLINE}.`,
-    line: 'Create your free account — and keep your thinking across every device.',
+    line: 'Create your account — seven days to try Socria, and your thinking on every device.',
   },
   'sign-in': DEFAULT_CARD,
 };
@@ -133,14 +133,15 @@ export function ogCardFor(key: readonly string[], ctx: OgContext): OgCard {
     // The student month and the referral's free days of Socria One were
     // both retired (31 October 2026): neither card promises them now. A
     // student link reads as the home page; an invitation is still said, as
-    // an invitation to a free account and nothing more.
+    // an invitation to an account and its seven-day trial, and nothing more.
+    // (There is no free tier since 9 November 2026: lib/trial.ts.)
     if (k[0] === 'students') return DEFAULT_CARD;
     if (k[0] === 'invited') {
       if (!ctx.referral?.enabled) return FIXED['sign-up'];
       return {
         kicker: 'A friend invited you',
         title: 'Think it through with Socria.',
-        line: 'Create your free account — no card needed.',
+        line: 'Create your account and try Socria for seven days — no card needed.',
       };
     }
     return FIXED[k[0]] ?? DEFAULT_CARD;

@@ -22,7 +22,8 @@ import {
   highlight,
 } from './.tmp/support-faq.mjs';
 import { WITHHELD_OAUTH } from './.tmp/auth-flow.mjs';
-import { PLANS } from './.tmp/entitlements.mjs';
+import { PLANS, onePlanSentence } from './.tmp/entitlements.mjs';
+import { TRIAL } from './.tmp/trial-under-test.mjs';
 
 let pass = 0, fail = 0;
 const ok = (n, c, x = '') => (c ? pass++ : (fail++, console.log('FAIL', n, x)));
@@ -88,11 +89,22 @@ console.log('\n=== it recommends what the product actually ships ===');
   // stopped being true.
   const f = PLANS.free.counters;
   // removed: the Core half of this check ("4 new chats and 20 messages a day") — the Core chat was archived and its counters are internal now
-  // THE FREE PLAN, IN THE TABLE'S OWN NUMBERS (lib/entitlements.ts): every
-  // monthly allowance, and none of the retired daily message count.
-  ok('the free tier is stated rather than left to be discovered',
-    PROSE.includes(`${f.chats} conversations, ${f.maps} logic maps, ${f.nodes} logic map nodes, ${f.artifacts} artifacts and ${f.documents} document a month`),
-    PROSE.match(/.{0,60}a month.{0,20}/g)?.join(' || ') ?? 'no monthly allowance is stated');
+  // THE TRIAL, IN ITS OWN NUMBERS (lib/trial.ts). There is no free tier since
+  // November 9, 2026: every account has seven days, so many tokens a UTC day
+  // and so many in all, and then every new AI request needs Socria One. Read
+  // from the trial rather than typed here, so a change to it fails this line
+  // until the answer catches up.
+  const n = (x) => x.toLocaleString('en-GB');
+  ok('the trial is stated rather than left to be discovered',
+    PROSE.includes(`every account starts with a ${TRIAL.days}-day trial: ${n(TRIAL.daily)} tokens a day, up to ${n(TRIAL.total)} in all`)
+      && /the seven days begin with your first request to socria, not when you sign up/.test(PROSE),
+    PROSE.match(/.{0,60}trial.{0,60}/g)?.join(' || ') ?? 'no trial is stated');
+  ok('  and what follows it: new requests need Socria One, and nothing made is taken away',
+    /when the seven days are over, new questions, logic maps and artifacts need socria one\. nothing is taken away/.test(PROSE),
+    PROSE.match(/.{0,60}seven days are over.{0,80}/g)?.join(' || ') ?? '');
+  ok('  and no monthly allowance or free tier is still promised',
+    !/(conversations|logic maps|nodes|artifacts|documents?) a month|calendar month|comes back on the first|free (tier|plan|account|limit)|sign up free|free to start/.test(PROSE),
+    PROSE.match(/.{0,50}((conversations|logic maps|nodes|artifacts|documents?) a month|calendar month|comes back on the first|free (tier|plan|account|limit)|sign up free|free to start).{0,50}/g)?.join(' || ') ?? '');
   ok('  and the retired daily message count is not promised',
     f.messages === null && !/messages a day/.test(PROSE), PROSE.match(/.{0,60}messages a day.{0,20}/g)?.join(' || ') ?? '');
   ok('  and Voice and sharing are said to be Socria One',
@@ -103,11 +115,15 @@ console.log('\n=== it recommends what the product actually ships ===');
   ok('  and no limit that has gone is still promised',
     !/four branches|core 4 conversations a calendar month|handful of sessions|core 3\.1 is open either way/i.test(PROSE),
     PROSE.match(/.{0,40}(four branches|conversations a calendar month|handful of sessions|open either way).{0,40}/g)?.join(' || ') ?? '');
-  // SOCRIA ONE, IN THE SAME TABLE'S NUMBERS: no daily message count, and the
-  // memory carried between conversations against the free plan's.
+  // SOCRIA ONE, IN THE SAME TABLE'S NUMBERS: what goes on after the trial —
+  // no daily limit and no end date — and what is One's alone; and the memory
+  // carried between conversations against the trial's.
   const one = TOPICS.find((t) => t.id === 'one').qs[0];
-  ok('One counts nothing the free plan counts, and the answer says so',
-    /unlimited conversations, logic maps, artifacts and documents, with socria voice and chat sharing/.test(plainText(one)) && /nothing is counted by the month/.test(plainText(one)), plainText(one));
+  ok('One goes on after the trial with no daily limit, and the answer says so',
+    plainText(one).includes(onePlanSentence().toLowerCase())
+      && /unlimited conversations, logic maps and artifacts after the trial, with socria voice, chat sharing, the experiments and the celestial and socria one themes/.test(plainText(one))
+      && /there is no daily limit and no end date/.test(plainText(one))
+      && !/nothing is counted by the month/.test(plainText(one)), plainText(one));
   ok('  and it never sells the retired daily count',
     !/no daily count/.test(plainText(one)), plainText(one));
   ok('  and the price is the price', plainText(one).includes('$15 a month'), plainText(one));
@@ -116,11 +132,21 @@ console.log('\n=== it recommends what the product actually ships ===');
     PROSE.match(/.{0,40}(free month|access code|socria rewards).{0,40}/g)?.join(' || ') ?? '');
   ok('  and its memory is the table’s',
     plainText(one).includes(`${PLANS.one.memoryEntries} things, against ${PLANS.free.memoryEntries}`), plainText(one));
-  // SIGNED OUT: one line of thinking and its map; another needs a free account,
-  // and the one they have comes with them (docs/ARCHIVE.md, lib/guest-pass.ts).
+  // SIGNED OUT: a short preview — one line of thinking and its map, a few
+  // messages; going further needs an account, which starts on its seven-day
+  // trial, and the line they began comes with them (lib/guest-pass.ts,
+  // lib/guest-limits.ts).
   const signedOut = plainText(TOPICS.find((t) => t.id === 'start').qs.find((q) => /account to use it/.test(q.q)));
-  ok('signed out is one line of thinking and its map', /one line of thinking and its map/.test(signedOut), signedOut);
-  ok('  and another starts with a free account that brings it along', /sign up free/.test(signedOut) && /comes with you/.test(signedOut), signedOut);
+  ok('signed out is one line of thinking and its map', /one line of thinking and its map, up to 5 messages/.test(signedOut), signedOut);
+  ok('  and going further starts an account on its seven-day trial, which brings it along', /sign up\. a new account starts with a seven-day trial/.test(signedOut) && /comes with you/.test(signedOut) && !/sign up free/.test(signedOut), signedOut);
+  // AT THE TRIAL'S EDGE: the words the product says (lib/trial.ts TRIAL_DAY_NOTE,
+  // TRIAL_ENDED_NOTE) are a question here, answered in the trial's numbers.
+  const edge = TOPICS.find((t) => t.id === 'logos').qs.find((q) => /trial/.test(q.q));
+  const edgeText = edge ? plainText(edge) : '';
+  ok('the trial’s day and its end are each a question with an answer',
+    !!edge && /used today’s trial tokens/.test(edgeText) && /my trial has ended/.test(edgeText)
+      && edgeText.includes(`each day of the trial holds ${n(TRIAL.daily)} tokens, and the whole trial ${n(TRIAL.total)}`) && edgeText.includes(`socria rests until 00:00 utc`) && edgeText.includes(`after ${TRIAL.days} days, or sooner if all ${n(TRIAL.total)} tokens are used`)
+      && /need socria one, which has no daily limit/.test(edgeText) && /opened, moved and edited by hand/.test(edgeText), edgeText);
   // THE STATUS CARD lists what exists. It is markup in the page, not data, so
   // it is read from the page itself.
   const page = readFileSync('app/support/SupportPage.tsx', 'utf8');

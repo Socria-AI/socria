@@ -284,7 +284,7 @@ export function Landing() {
                   <Button as="a" href={START} variant="primary" size="xl" arrow>
                     Start a conversation
                   </Button>
-                  <span className="s-go-note">Free to start.</span>
+                  <span className="s-go-note">Seven days free, then Socria One.</span>
                 </div>
               </div>
             </div>
@@ -357,8 +357,11 @@ export function Landing() {
             <SpreadHead num="III." name="Plans" />
             <div className="s-plans">
               <div className="s-plan">
-                <h3>Free</h3>
-                <p>A free account, with {freePlanSentence()}. Bring a document and watch the map fill in.</p>
+                <h3>Seven-day trial</h3>
+                <p>
+                  Every account starts with {freePlanSentence()}. Bring a document and watch the map fill in; what
+                  you make stays yours when the seven days are over.
+                </p>
                 <div className="s-plan-go">
                   <Button as="a" href={START} variant="primary" size="md" arrow>
                     Start a conversation

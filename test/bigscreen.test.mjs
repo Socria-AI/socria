@@ -141,7 +141,7 @@ ok(
     /onMemory=\{cloud \? \(\) => setL5Mind\(true\) : undefined\}/.test(app) &&
     /onLeave=\{\(\) => setCabinMode\(false\)\}/.test(app)
 );
-ok('the ⋯ menu turns it on and off', /label: cabin \? 'Leave big-screen mode' : 'Big-screen mode'/.test(app));
+ok('the ⋯ menu turns it on (Socria One’s, like every experiment) and always off', /cabin \? \{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: \(\) => setCabinMode\(false\) \} : oneOnly\(\{ label: 'Big-screen mode'/.test(app));
 ok('the map’s cards fitted larger there, and only there', /\{\.\.\.\(cabin && !narrow \? \{ fitMax: CABIN_FIT_MAX, fitMinK: CABIN_MIN_K \} : \{\}\)\}/.test(app));
 const tm = read('components/ThinkingMap.tsx');
 ok('  everywhere else the map fits as it always has', /fitMax = FIT_MAX,/.test(tm) && /minK: fitMinK \?\? \(graph \? 0\.45 : 0\.6\)/.test(tm) && (tm.match(/maxK: fitMax/g) ?? []).length === 2);

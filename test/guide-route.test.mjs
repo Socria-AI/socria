@@ -52,6 +52,9 @@ console.error = (...a) => errored.push(a.map(String).join(' '));
 process.env.OPENAI_API_KEY = 'test';
 process.env.RATE_LIMIT_DISABLED = '1';
 process.env.SOCRIA_AR_TESTERS = 'tester@example.com';
+// Live Guidance is one of the experiments, which are Socria One's (lib/entitlements.ts, November 9, 2026):
+// the suite's two accounts hold Socria One through the operator's list
+process.env.SOCRIA_ONE_USER_IDS = 'user_guide_tester,user_guide_other';
 delete process.env.SOCRIA_DASHBOARD_ADMINS;
 
 const TESTER = 'user_guide_tester';
@@ -125,6 +128,12 @@ console.log('\n=== who may look ===');
   ok('signed in but not a tester: early access, nothing asked or spent', r.status === 403 && r.json?.earlyAccess === true && r.calls.length === 0 && bumps.length === 0, J(r));
 }
 {
+  // a tester on the trial: the experiments are Socria One's, so nothing is asked or spent
+  globalThis.__users.user_guide_trial = { emails: ['tester@example.com'] };
+  const r = await ask({ mode: 'plan', image: FRAME, question: 'jar' }, [JAR], 'user_guide_trial');
+  ok('a tester without Socria One: told it is part of Socria One, nothing asked or spent', r.status === 402 && r.json?.upgrade === 'experiments' && r.calls.length === 0, J(r));
+}
+{
   // an address on the list that was never confirmed proves nothing
   globalThis.__users.user_guide_unverified = { emails: ['tester@example.com'], unverified: ['tester@example.com'] };
   const r = await ask({ mode: 'plan', image: FRAME, question: 'jar' }, [JAR], 'user_guide_unverified');
@@ -144,7 +153,7 @@ console.log('\n=== who may look ===');
   ok('a visitor with the access code but no account: early access still says no', shut.status === 403 && shut.calls.length === 0, J(shut));
   process.env.SOCRIA_AR_TESTERS = '*';
   const open = await ask({ mode: 'plan', image: FRAME, question: 'How do I open this jar?' }, [JAR], null, cookie);
-  ok('  …and through only where AR Mode is open to everyone, off production', open.status === 200 && open.json?.plan?.steps?.length === 3, J(open));
+  ok('  …and even where AR Mode is open to everyone, a visitor has no Socria One: the experiments are One’s', open.status === 402 && open.json?.upgrade === 'experiments' && open.calls.length === 0, J(open));
   const forged = await ask({ mode: 'plan', image: FRAME, question: 'jar' }, [JAR], null, `${access.ACCESS_COOKIE}=core.9999999999999.forged`);
   ok('  …a forged grant is no grant', forged.status === 401 && forged.calls.length === 0, J(forged));
   process.env.SOCRIA_AR_TESTERS = 'tester@example.com';

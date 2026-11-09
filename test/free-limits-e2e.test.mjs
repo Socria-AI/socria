@@ -1,40 +1,56 @@
-// The free plan, end to end, through the real routes (October 31, 2026).
+// The trial's counts, end to end, through the real routes (November 9, 2026).
 //
-//                         Free          Socria One
-//   Conversations         3 a month     unlimited (fair use)
-//   Logic Maps            2 a month     unlimited
-//   Logic Map nodes       10 a month    unlimited
-//   Artifacts             2 a month     unlimited
-//   Documents             1 a month     unlimited
-//   Socria Voice          —             included
-//   Sharing a chat        —             included
+// There is no free tier any more. An account that is not on Socria One has a seven-day trial
+// (lib/trial.ts): 4,000 tokens a UTC day, 28,000 in all, held on the server by lib/sleep-server.ts and
+// proved in test/trial.test.mjs. Beside the tokens, the trial's counts are Socria One's own fair-use
+// ceilings (lib/entitlements.ts) — the monthly allowances that were the free tier (October 31, 2026:
+// three conversations, two Logic Maps, ten nodes, two artifacts, one document a month) are lifted:
+//
+//                         Trial                    Socria One
+//   Conversations         400 a month (fair use)   400 a month (fair use)
+//   Logic Maps            not counted              not counted
+//   Logic Map nodes       not counted              not counted
+//   Artifacts             not counted              not counted
+//   Documents             not counted              not counted
+//   Research              120 a conversation       120 a conversation
+//   Images read           60 a conversation        60 a conversation
+//   Socria Voice          —                        included
+//   Sharing a chat        —                        included
 //
 // The routes are the real ones, bundled from app/api, against the in-memory
 // database with the usage functions supplied (scripts/dev/usage-functions.mjs —
 // the same semantics as supabase/freemium.sql), a Clerk that knows these
 // people, and a scripted model that records every call. What is proved is what
-// a person meets: each boundary arrives where the table says, with its own
-// sentence and the word the page raises Socria One for; a refused turn or map
-// never reaches the model; nothing is charged twice; nothing already made is
-// taken away; and none of the old ways to Socria One without paying for it —
-// a complimentary grant, a comped account, a redeemed code, promotional time —
-// opens anything any more. Socria One is not counted.
+// a person meets: the old monthly numbers no longer stop a trial account; the
+// fair-use ceilings still do, on both plans, at the number in the table, before
+// the model is asked and without offering Socria One (it stops in the same
+// place); a conversation is charged once however often it is sent; nothing
+// already made is taken away; what is still counted is paused, never let
+// through, when its count cannot be read; Voice and sharing are Socria One's;
+// and none of the old ways to Socria One without paying for it — a
+// complimentary grant, a comped account, a redeemed code, promotional time —
+// opens anything any more.
 //
-//   liam   free — conversations
-//   fiona  free — a Core conversation is one of the month's conversations
-//   mira   free — Logic Maps and their nodes
-//   ada    free — artifacts, by the save
-//   dora   free — documents
-//   vic    free — Voice and sharing
-//   carl   free, with a complimentary grant and a comp row from before
-//   nina   free — a new conversation's map is the server's to count, whatever the page sends
-//   otto   free — a map saved before these limits keeps growing; a new one is refused
-//   hana   free — a map begun by hand is one of the month's maps
-//   pete   free — with the usage table missing, the free plan is paused, never lifted
+//   liam   trial — conversations: past the old three, and the fair-use ceiling of 400
+//   oscar  Socria One (the operator's allowlist) — the same ceiling of 400
+//   fiona  trial — a Core conversation is one of the month's conversations
+//   mira   trial — Logic Maps and their nodes, not counted
+//   dina   trial — a drawing, drawn whole whatever the month's nodes were
+//   eve    trial — a drawing with room; an unasked subject is not drawn
+//   nina   trial — a new conversation's map, whatever the page sends
+//   pia    trial — map passes that name no conversation
+//   otto   trial — a map saved before; a new one beside it
+//   hana   trial — maps begun by hand
+//   pete   trial — with the usage table missing, what is counted is paused, never lifted
+//   rita   trial — the per-conversation ceilings: Research and images
+//   ada    trial — artifacts, by the save
+//   dora   trial — documents
+//   vic    trial — Voice and sharing
+//   carl   trial, with a complimentary grant and a comp row from before
 //   olga   Socria One (the operator's allowlist)
 //   paula  Socria One (a paid Stripe subscription)
 //   owen   Socria One (the operator's permanent grant, by a verified address)
-//   uma    free — the same address, never verified
+//   uma    trial — the same address, never verified
 
 import { build } from 'esbuild';
 import { mkdirSync, rmSync } from 'node:fs';
@@ -64,6 +80,8 @@ const ROUTES = {
   room: 'app/api/logos/room/route.ts',
   transcribe: 'app/api/transcribe/route.ts',
   read: 'app/api/files/read/route.ts',
+  explore: 'app/api/logos/explore/route.ts',
+  readImage: 'app/api/logos/read/route.ts',
 };
 
 rmSync(OUT, { recursive: true, force: true });
@@ -105,16 +123,18 @@ console.error = quiet;
 process.env.OPENAI_API_KEY = 'test';
 process.env.RATE_LIMIT_DISABLED = '1';
 process.env.SHARE_SECRET = 'test-share-secret';
-process.env.SOCRIA_ONE_USER_IDS = 'olga';
+process.env.SOCRIA_ONE_USER_IDS = 'olga,oscar';
 // owen and uma: the operator's permanent grant is the SHA-256 of a verified address (lib/socria-one-grant.ts);
 // a deployment may add hashes in SOCRIA_ONE_GRANT_HASHES, which is how a test lists one without a real address
 process.env.SOCRIA_ONE_GRANT_HASHES = (await import('node:crypto')).createHash('sha256').update('owen@example.com').digest('hex');
 // ask whether the usage table exists on every request: the suite takes it away and puts it back
 process.env.USAGE_STORE_MEMO_MS = '0';
-// The usage functions supplied below include the week of tokens' (Sleep Mode, test/sleep.test.mjs holds
-// it): this suite is about the monthly allowances, and its scripted model reports no usage, so every
-// call is counted at an estimate — a week no person here should reach while the months are proved.
-process.env.SOCRIA_FREE_WEEKLY_TOKENS = '2000000000';
+// The trial's tokens (4,000 a UTC day, 28,000 in all — lib/trial.ts, held by lib/sleep-server.ts) are
+// test/trial.test.mjs's to prove. This suite is about the counts beside them, and its scripted model
+// reports no usage, so every call is counted at an estimate: the day and the trial are moved out of
+// reach here (the environment's own switches), so no person meets them while the counts are proved.
+process.env.SOCRIA_TRIAL_DAILY_TOKENS = '2000000000';
+process.env.SOCRIA_TRIAL_TOTAL_TOKENS = '2000000000';
 
 const load = (n) => import(pathToFileURL(join(OUT, `${n}.mjs`)).href);
 const R = Object.fromEntries(await Promise.all(Object.keys(ROUTES).map(async (k) => [k, await load(k)])));
@@ -161,7 +181,7 @@ const settle = async () => {
 const passes = () => (globalThis.__logosCalls ?? []).filter((p) => !p.stream).length;
 
 globalThis.__users = Object.fromEntries(
-  ['liam', 'fiona', 'mira', 'ada', 'dora', 'vic', 'nina', 'otto', 'hana', 'pete', 'olga', 'paula'].map((u) => [u, { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] }])
+  ['liam', 'oscar', 'fiona', 'mira', 'ada', 'dora', 'vic', 'nina', 'pia', 'otto', 'hana', 'pete', 'rita', 'olga', 'paula'].map((u) => [u, { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] }])
 );
 // carl: a complimentary grant on the account, and a comp row, from before
 globalThis.__users.carl = { firstName: 'Carl', emails: ['carl@example.com'], privateMetadata: { socriaOne: 'comp' } };
@@ -181,40 +201,63 @@ const turns = (n) => {
 const logos = (sessionId, userTurns = 1, extra = {}) => call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId, messages: turns(userTurns), ...extra });
 const core = (conversationId, userTurns = 1) => call(R.chat.POST, 'POST', '/api/chat', { model: 'core-4', conversationId, messages: turns(userTurns) });
 
-console.log('\n=== conversations: three a month ===');
+/** What a note at a fair-use ceiling must never do: offer Socria One, which stops in the same place. */
+const SELLS_ONE = /Unlock unlimited access with Socria One|Upgrade to Socria One|Socria One (gives|opens|lets|lifts|keeps|reads|grounds)/;
+const chatCount = (uid, sessionId, counter) => db.rows('logos_usage').find((x) => x.user_id === uid && x.scope === `chat:${sessionId}` && x.counter === counter)?.n ?? 0;
+const marks = (uid, prefix) => db.rows('logos_usage').filter((x) => x.user_id === uid && x.scope.startsWith(prefix)).length;
+
+console.log('\n=== conversations: the old three a month no longer stop a trial ===');
 as('liam');
 globalThis.__logosReply = 'Noted.';
-for (let k = 1; k <= 3; k++) {
-  const r = await logos(`s${k}`);
-  if (r.status !== 200) ok(`conversation ${k} of 3 is answered`, false, r.text);
-}
-ok('three conversations begun, three counted', count('liam', 'chats') === 3, String(count('liam', 'chats')));
-let before = streams();
-const eleventh = await logos('s4');
-ok('the fourth is refused, with the word the page raises Socria One for', eleventh.status === 402 && eleventh.json?.upgrade === 'chats', eleventh.text);
-ok('  and the boundary’s own sentence: three this month, every one still open, Socria One', /3 free conversations this month/.test(eleventh.json?.error ?? '') && /stays open/.test(eleventh.json?.error ?? '') && /Unlock unlimited access with Socria One/.test(eleventh.json?.error ?? ''), eleventh.json?.error);
-ok('  at the count it was refused at, and before the model is asked', eleventh.json?.used === 3 && eleventh.json?.limit === 3 && streams() === before);
+const opened = [];
+for (let k = 1; k <= 4; k++) opened.push(await logos(`s${k}`));
+ok('four conversations begun — past the old three — and every one answered', opened.every((r) => r.status === 200), opened.map((r) => `${r.status} ${r.text.slice(0, 120)}`).join(' | '));
+ok('  the fourth with no boundary said and nothing raised for Socria One', !opened[3].json?.upgrade && !opened[3].headers.get('X-Socria-Limit'));
+ok('  each counted once, toward the month’s fair-use ceiling', count('liam', 'chats') === 4, String(count('liam', 'chats')));
 const back = await logos('s3', 4);
-ok('going back to a conversation already begun costs nothing', back.status === 200 && count('liam', 'chats') === 3, back.text);
+ok('going back to a conversation already begun costs nothing', back.status === 200 && count('liam', 'chats') === 4, back.text);
 let long = true;
 for (let k = 2; k <= 16; k++) long = long && (await logos('s1', k)).status === 200;
 ok('no daily count of messages: fifteen more turns in one conversation, all answered', long);
-ok('  and none of them is counted as a message the plan limits', count('liam', 'chats') === 3);
-ok('a first turn sent again is not a second conversation', (await logos('s2', 1)).status === 200 && count('liam', 'chats') === 3);
+ok('  and none of them is counted as a conversation', count('liam', 'chats') === 4);
+ok('a first turn sent again is not a second conversation', (await logos('s2', 1)).status === 200 && count('liam', 'chats') === 4);
 const gift = await logos('s12', 1, { firstThought: true });
-ok('onboarding’s "first thought" is no longer a gift: past the three, it is refused like any other', gift.status === 402 && gift.json?.upgrade === 'chats' && !gift.headers.get('X-Socria-First-Thought'), gift.text);
+ok('onboarding’s "first thought" is no longer a gift: answered, and counted like any other conversation', gift.status === 200 && count('liam', 'chats') === 5 && !gift.headers.get('X-Socria-First-Thought'), gift.text);
+
+console.log('\n=== Socria One’s fair-use ceiling on conversations holds on both plans ===');
+// 400 new conversations a month: far past any person's month, a guard against a script — and the trial's
+// as well as Socria One's (lib/entitlements.ts), so the note at it offers nothing to buy.
+db.rows('logos_usage').find((x) => x.user_id === 'liam' && x.scope === month && x.counter === 'chats').n = 399;
+const fourHundredth = await logos('s-400');
+ok('the 400th conversation of a month is answered', fourHundredth.status === 200 && count('liam', 'chats') === 400, fourHundredth.text.slice(0, 200));
+let before = streams();
+const over = await logos('s-401');
+const overNote = over.json?.error ?? '';
+ok('the 401st is refused at the ceiling, at the count in the table, before the model is asked', over.status === 402 && over.json?.used === 400 && over.json?.limit === 400 && streams() === before, over.text);
+ok('  saying the ceiling is shared and every conversation stays open — never offering Socria One', /same place/.test(overNote) && /stays open/.test(overNote) && !SELLS_ONE.test(overNote), overNote);
+ok('  and at the ceiling every conversation already begun goes on', (await logos('s1', 17)).status === 200 && count('liam', 'chats') === 400);
+as('oscar');
+db.rows('logos_usage').push({ id: `oscar|${month}|chats`, user_id: 'oscar', scope: month, counter: 'chats', n: 400, updated_at: Date.now() });
+before = streams();
+const oneOver = await logos('o-401');
+ok('Socria One meets the same ceiling at the same number, before the model is asked', oneOver.status === 402 && oneOver.json?.used === 400 && oneOver.json?.limit === 400 && streams() === before, oneOver.text);
+ok('  and is never sold what it already has', !SELLS_ONE.test(oneOver.json?.error ?? ''), oneOver.json?.error);
+ok('  its conversations already begun go on', (await logos('o-old', 3)).status === 200);
 
 console.log('\n=== Core and Logos share the month ===');
 as('fiona');
 for (let k = 1; k <= 2; k++) await logos(`f${k}`);
 const c1 = await core('core-1');
-ok('a Core conversation is answered — and is one of the month’s three', c1.status === 200 && count('fiona', 'chats') === 3, `${c1.status} ${count('fiona', 'chats')}`);
+ok('a Core conversation is answered — and is one of the month’s conversations', c1.status === 200 && count('fiona', 'chats') === 3, `${c1.status} ${count('fiona', 'chats')}`);
 const c2 = await core('core-2');
-ok('the next, in Core, is refused at the same boundary', c2.status === 402 && c2.json?.upgrade === 'chats', c2.text);
+ok('the next, in Core — a fourth, past the old three — is answered too', c2.status === 200 && count('fiona', 'chats') === 4, `${c2.status} ${count('fiona', 'chats')} ${c2.text.slice(0, 200)}`);
 ok('  no Core counters are written any more', !db.rows('logos_usage').some((x) => x.user_id === 'fiona' && /^core-/.test(x.counter)));
-ok('a Core conversation going on costs nothing', (await core('core-1', 3)).status === 200 && count('fiona', 'chats') === 3);
+ok('a Core conversation going on costs nothing', (await core('core-1', 3)).status === 200 && count('fiona', 'chats') === 4);
+db.rows('logos_usage').find((x) => x.user_id === 'fiona' && x.scope === month && x.counter === 'chats').n = 400;
+const coreOver = await core('core-3');
+ok('Core meets the same fair-use ceiling — one count of conversations, wherever they begin', coreOver.status === 402 && coreOver.json?.limit === 400 && /same place/.test(coreOver.json?.error ?? '') && !SELLS_ONE.test(coreOver.json?.error ?? ''), coreOver.text.slice(0, 300));
 
-console.log('\n=== Logic Maps: two a month, ten nodes a month ===');
+console.log('\n=== Logic Maps and their nodes: not counted on the trial ===');
 await settle();
 as('mira');
 const N = (ids) => ids.map((id) => ({ id, type: 'claim', label: `Idea ${id}`, status: 'open' }));
@@ -226,31 +269,29 @@ const map = (sessionId, current, script, messages = [{ role: 'user', content: 'I
 const EMPTY = { nodes: [], edges: [] };
 const m1 = await map('m1', EMPTY, extraction(['a', 'b', 'c']));
 ok('a first Logic Map is drawn: three nodes kept', m1.status === 200 && m1.json?.map?.nodes?.length === 3, m1.text.slice(0, 300));
-ok('  one of the month’s two maps, three of its ten nodes', count('mira', 'maps') === 1 && count('mira', 'nodes') === 3, `${count('mira', 'maps')} ${count('mira', 'nodes')}`);
+ok('  and nothing is counted: no map, no node, no marker', count('mira', 'maps') === 0 && count('mira', 'nodes') === 0 && marks('mira', 'mapmark:') === 0, `${count('mira', 'maps')} ${count('mira', 'nodes')} ${marks('mira', 'mapmark:')}`);
 const m2 = await map('m2', EMPTY, extraction(['d', 'e', 'f', 'g']));
-ok('a second map: four more nodes', m2.status === 200 && m2.json?.map?.nodes?.length === 4 && count('mira', 'maps') === 2 && count('mira', 'nodes') === 7);
+ok('a second map: four more nodes', m2.status === 200 && m2.json?.map?.nodes?.length === 4);
 before = passes();
 const m3 = await map('m3', EMPTY, extraction(['x']));
-ok('a third conversation’s map is refused before any model is asked', m3.status === 402 && m3.json?.upgrade === 'maps' && passes() === before, m3.text.slice(0, 300));
-ok('  saying so in the boundary’s words, with the map it was sent kept', /2 free Logic Maps this month/.test(m3.json?.error ?? '') && JSON.stringify(m3.json?.map?.nodes) === '[]');
+ok('a third conversation’s map — past the old two — is drawn', m3.status === 200 && !m3.json?.upgrade && JSON.stringify(m3.json?.map?.nodes?.map((n) => n.id)) === '["x"]' && passes() === before + 1, m3.text.slice(0, 300));
 const grow = await map('m1', m1.json.map, extraction(['a', 'b', 'c', 'h', 'i', 'j', 'k', 'l'], [{ from: 'a', to: 'h', relation: 'relates' }, { from: 'c', to: 'l', relation: 'relates' }]));
 const kept = (grow.json?.map?.nodes ?? []).map((n) => n.id);
-ok('a map already drawn keeps growing — until the month’s ten nodes: three of five new kept', grow.status === 200 && kept.length === 6 && ['h', 'i', 'j'].every((id) => kept.includes(id)) && !kept.includes('k') && !kept.includes('l'), JSON.stringify(kept));
-ok('  a connection to a node not kept goes with it; one to a kept node stays', (grow.json?.map?.edges ?? []).some((e) => e.to === 'h') && !(grow.json?.map?.edges ?? []).some((e) => e.to === 'l'), JSON.stringify(grow.json?.map?.edges));
-ok('  the page is told which allowance stopped the map, and in what words', grow.json?.limit?.counter === 'nodes' && grow.json?.limit?.used === 10 && /10 free Logic Map nodes this month/.test(grow.json?.limit?.note ?? ''), JSON.stringify(grow.json?.limit));
-ok('  and the count is exactly ten', count('mira', 'nodes') === 10);
-const still = await map('m1', grow.json.map, extraction(['a', 'b', 'c', 'h', 'i', 'j', 'z']));
-ok('past the ten, the map keeps every node it has and gains none', still.status === 200 && still.json?.map?.nodes?.length === 6 && !still.json.map.nodes.some((n) => n.id === 'z') && count('mira', 'nodes') === 10, JSON.stringify(still.json?.map?.nodes?.map((n) => n.id)));
+ok('a map already drawn keeps growing past the old ten nodes a month: all five new kept (the 9th to the 13th)', grow.status === 200 && kept.length === 8 && ['h', 'i', 'j', 'k', 'l'].every((id) => kept.includes(id)), JSON.stringify(kept));
+ok('  every connection kept with them', (grow.json?.map?.edges ?? []).some((e) => e.to === 'h') && (grow.json?.map?.edges ?? []).some((e) => e.to === 'l'), JSON.stringify(grow.json?.map?.edges));
+ok('  and no allowance is said to have stopped it', !grow.json?.limit, JSON.stringify(grow.json?.limit));
+const still = await map('m1', grow.json.map, extraction(['a', 'b', 'c', 'h', 'i', 'j', 'k', 'l', 'z']));
+ok('and on: a fourteenth node is kept, every node it had stays', still.status === 200 && still.json?.map?.nodes?.length === 9 && still.json.map.nodes.some((n) => n.id === 'z') && count('mira', 'nodes') === 0, JSON.stringify(still.json?.map?.nodes?.map((n) => n.id)));
 const hand = await call(R.allowance.POST, 'POST', '/api/logos/allowance', { counter: 'nodes' });
-ok('a node added by hand is refused too, once the month’s nodes are spent', hand.status === 402 && hand.json?.upgrade === 'nodes', hand.text);
+ok('a node added by hand is allowed, and not counted', hand.status === 200 && hand.json?.limit === null, hand.text);
 as('olga');
 const oneMap = await map('o1', EMPTY, extraction(Array.from({ length: 14 }, (_, k) => `n${k}`)));
 ok('Socria One: a map of fourteen nodes, kept whole, nothing counted', oneMap.status === 200 && oneMap.json?.map?.nodes?.length === 14 && count('olga', 'nodes') === 0 && count('olga', 'maps') === 0);
 
-console.log('\n=== a drawing on the free plan: kept whole or not at all, never an empty map charged ===');
-// THE LOGIC MAP DRAWS (Logos 5, lib/quota-map.ts keepAddedNodes): a drawing the month's nodes cannot hold is
-// left off whole, the person's own new ideas kept first — and the meter plans that BEFORE a first map is
-// claimed, so a pass that would leave a conversation's map empty takes none of the month's maps.
+console.log('\n=== a drawing on the trial is drawn whole, whatever the month’s nodes were ===');
+// THE LOGIC MAP DRAWS (Logos 5, lib/quota-map.ts keepAddedNodes): a drawing is kept whole or not at all where
+// nodes are counted. On the trial they are not, so a drawing is never held back by a count of nodes — even
+// for an account that drew nine of the old ten before the trial.
 for (const u of ['dina', 'eve']) globalThis.__users[u] = { firstName: u[0].toUpperCase() + u.slice(1), emails: [`${u}@example.com`] };
 as('dina');
 db.rows('logos_usage').push({ id: `dina|${month}|nodes`, user_id: 'dina', scope: month, counter: 'nodes', n: 9, updated_at: Date.now() });
@@ -263,96 +304,110 @@ const WATERMAP = {
 };
 const drawItAsk = [{ role: 'user', content: 'Draw the water cycle.' }];
 const dLeft = await map('dLeft', EMPTY, WATERMAP, drawItAsk);
-ok('one node left and a drawing of four: none of it is drawn — never half', dLeft.status === 200 && (dLeft.json?.map?.nodes ?? []).length === 0, dLeft.text.slice(0, 300));
-ok('  no map is claimed for a map left empty, and no node is taken', count('dina', 'maps') === 0 && count('dina', 'nodes') === 9, `${count('dina', 'maps')} ${count('dina', 'nodes')}`);
-ok('  the page is told why, in the drawing\'s own words', dLeft.json?.limit?.counter === 'nodes' && dLeft.json.limit.note === 'This drawing needs 4 Logic Map nodes and only 1 Logic Map node is left this month, so it was not drawn — never half of it.', JSON.stringify(dLeft.json?.limit));
-ok('  and the drawing\'s title goes with it', !('title' in (dLeft.json?.map ?? {})), JSON.stringify(dLeft.json?.map));
+ok('nine of the old ten used and a drawing of four: all of it is drawn, with its title', dLeft.status === 200 && (dLeft.json?.map?.nodes ?? []).length === 4 && dLeft.json.map.title === 'The water cycle', dLeft.text.slice(0, 300));
+ok('  no allowance is said to have stopped it, and nothing is counted', !dLeft.json?.limit && count('dina', 'maps') === 0 && count('dina', 'nodes') === 9, `${JSON.stringify(dLeft.json?.limit)} ${count('dina', 'maps')} ${count('dina', 'nodes')}`);
 const theirsDrawn = { ...WATERMAP, nodes: [{ id: 'q', type: 'question', label: 'Why does it rain so much here?', status: 'open' }, ...WATERMAP.nodes] };
 const dMine = await map('dMine', EMPTY, theirsDrawn, [{ role: 'user', content: 'Why does it rain so much here? Draw the water cycle.' }]);
-ok('their own question and a drawing, one node left: their question is kept, the drawing left off whole', dMine.status === 200 && JSON.stringify((dMine.json?.map?.nodes ?? []).map((x) => x.id)) === '["q"]', dMine.text.slice(0, 300));
-ok('  this map holds their idea, so it is one of the month\'s maps; one node taken', count('dina', 'maps') === 1 && count('dina', 'nodes') === 10, `${count('dina', 'maps')} ${count('dina', 'nodes')}`);
-ok('  said plainly: none left for the drawing, their idea kept', dMine.json?.limit?.note === 'This drawing needs 4 Logic Map nodes and none are left this month, so it was not drawn — never half of it. Your own new ideas were kept.', JSON.stringify(dMine.json?.limit));
+ok('their own question and a drawing: both kept, whole', dMine.status === 200 && JSON.stringify((dMine.json?.map?.nodes ?? []).map((x) => x.id)) === '["q","ev","co","pr","cl"]' && !dMine.json?.limit, dMine.text.slice(0, 300));
 as('eve');
 const eFits = await map('eFits', EMPTY, WATERMAP, drawItAsk);
-ok('with room, the whole drawing is drawn and counted: one map, four nodes', eFits.status === 200 && (eFits.json?.map?.nodes ?? []).length === 4 && eFits.json.map.title === 'The water cycle' && !eFits.json.limit && count('eve', 'maps') === 1 && count('eve', 'nodes') === 4, eFits.text.slice(0, 300));
-// UNASKED, A SUBJECT IS DRAWN FOR SOCRIA ONE AND A GUEST — a free account's week is not spent on it
+ok('with room, the whole drawing is drawn, and nothing counted', eFits.status === 200 && (eFits.json?.map?.nodes ?? []).length === 4 && eFits.json.map.title === 'The water cycle' && !eFits.json.limit && count('eve', 'maps') === 0 && count('eve', 'nodes') === 0, eFits.text.slice(0, 300));
+// UNASKED, A SUBJECT IS DRAWN FOR SOCRIA ONE AND A GUEST — a trial account's tokens are not spent on it
 const mapToldOf = () => JSON.stringify((globalThis.__logosCalls ?? []).filter((p) => !p.stream).at(-1)?.messages ?? []);
 let passesBefore = passes();
 await map('e2', eFits.json.map, { ...WATERMAP }, [{ role: 'user', content: 'explain the water cycle' }]);
-ok('a free account asking about a subject with a shape: the map pass runs, and is not told to draw it', passes() === passesBefore + 1 && !mapToldOf().includes("THIS TURN'S SUBJECT"), `${passes() - passesBefore} ${mapToldOf().slice(-300)}`);
+ok('a trial account asking about a subject with a shape: the map pass runs, and is not told to draw it', passes() === passesBefore + 1 && !mapToldOf().includes("THIS TURN'S SUBJECT"), `${passes() - passesBefore} ${mapToldOf().slice(-300)}`);
 as('olga');
 passesBefore = passes();
 await map('o2', EMPTY, { ...WATERMAP }, [{ role: 'user', content: 'explain the water cycle' }]);
 ok('Socria One asking the same: the map pass is told the subject has a shape to draw', passes() === passesBefore + 1 && mapToldOf().includes("THIS TURN'S SUBJECT"), `${passes() - passesBefore} ${mapToldOf().slice(-300)}`);
 
-console.log('\n=== a new conversation\'s map is the server\'s to count, whatever the page sends ===');
-// The bug as reported: on the free plan, a third and fourth map were drawn after
-// two. The page can send a map with a new conversation's id — the previous
-// conversation's, in the moment after switching — and the route used to take
-// "it already has nodes" as "this conversation already has its map".
+console.log('\n=== a new conversation\'s map: drawn, whatever the page sends, and never counted ===');
+// The bug once reported on the free plan: the page can send a map with a new conversation's id — the
+// previous conversation's, in the moment after switching. With maps not counted on the trial, what the
+// page sends can neither spend a map nor stop one: every pass is drawn, and nothing is written.
 as('nina');
 const n1 = await map('n1', EMPTY, extraction(['a', 'b']));
 const n2 = await map('n2', EMPTY, extraction(['c']));
-ok('two maps drawn and counted', n1.status === 200 && n2.status === 200 && count('nina', 'maps') === 2, `${n1.status} ${n2.status} ${count('nina', 'maps')}`);
 before = passes();
-const stale = await map('n3', n2.json.map, extraction(['c', 'd']));
-ok('a third conversation sent with the previous conversation\'s map is still refused — before any model is asked', stale.status === 402 && stale.json?.upgrade === 'maps' && passes() === before, stale.text.slice(0, 300));
-ok('  and nothing more is counted', count('nina', 'maps') === 2 && count('nina', 'nodes') === 3);
+const stale = await map('n3', n2.json?.map ?? EMPTY, extraction(['c', 'd']));
+ok('three maps — the third sent with the previous conversation\'s map — all drawn, the model asked for it', n1.status === 200 && n2.status === 200 && stale.status === 200 && passes() === before + 1 && (stale.json?.map?.nodes ?? []).length === 2, `${n1.status} ${n2.status} ${stale.text.slice(0, 200)}`);
 const anon = await call(R.map.POST, 'POST', '/api/logos/map', { messages: [{ role: 'user', content: 'A thought.' }], map: EMPTY });
-ok('a free map pass that names no conversation is refused like any other once the maps are used', anon.status === 402 && anon.json?.upgrade === 'maps', anon.text.slice(0, 200));
-// A pass that names no conversation has no conversation to "already have" a map: each one that
-// leaves a map is a new one, so leaving the id out never rides on a map counted elsewhere.
+ok('  a map pass that names no conversation is drawn like any other', anon.status === 200 && !anon.json?.upgrade, anon.text.slice(0, 200));
+ok('  and nothing is counted or marked', count('nina', 'maps') === 0 && count('nina', 'nodes') === 0 && marks('nina', 'mapmark:') === 0);
 as('pia');
 const p1 = await map(undefined, EMPTY, extraction(['a']));
 const p2 = await map(undefined, p1.json?.map ?? EMPTY, extraction(['a', 'b']));
-ok('  without a conversation, every pass that leaves a map is counted as a new map', p1.status === 200 && p2.status === 200 && count('pia', 'maps') === 2, `${p1.status} ${p2.status} ${count('pia', 'maps')}`);
-before = passes();
 const p3 = await map(undefined, p2.json?.map ?? EMPTY, extraction(['a', 'b', 'c']));
-ok('  and the third is refused before any model is asked', p3.status === 402 && p3.json?.upgrade === 'maps' && passes() === before, p3.text.slice(0, 200));
+ok('without a conversation, a third pass — past the old two maps — is drawn too, and none is counted', [p1, p2, p3].every((r) => r.status === 200) && (p3.json?.map?.nodes ?? []).length === 3 && count('pia', 'maps') === 0, `${p1.status} ${p2.status} ${p3.status} ${count('pia', 'maps')}`);
 as('olga');
-const oneStale = await map('o9', n2.json.map, extraction(['c', 'd']));
+const oneStale = await map('o9', n2.json?.map ?? EMPTY, extraction(['c', 'd']));
 ok('Socria One is not counted, whatever it sends', oneStale.status === 200 && count('olga', 'maps') === 0);
 
-console.log('\n=== a map saved before the limits keeps growing; a new one is refused ===');
+console.log('\n=== a map saved before keeps growing; a new one beside it is drawn ===');
 as('otto');
-db.rows('conversations').push({ id: 'old-1', user_id: 'otto', title: 'Before the limits', messages: [], map: { nodes: N(['p', 'q']), edges: [] }, updated_at: Date.now() });
-db.rows('logos_usage').push({ user_id: 'otto', scope: month, counter: 'maps', n: 2, updated_at: Date.now() });
+db.rows('conversations').push({ id: 'old-1', user_id: 'otto', title: 'Before the trial', messages: [], map: { nodes: N(['p', 'q']), edges: [] }, updated_at: Date.now() });
+// the old free plan's two maps, used this month before the trial began
+db.rows('logos_usage').push({ id: `otto|${month}|maps`, user_id: 'otto', scope: month, counter: 'maps', n: 2, updated_at: Date.now() });
 const grows = await map('old-1', { nodes: N(['p', 'q']), edges: [] }, extraction(['p', 'q', 'r']));
-ok('a conversation saved with a map is known to have one: it grows, and no map is charged', grows.status === 200 && (grows.json?.map?.nodes ?? []).length === 3 && count('otto', 'maps') === 2 && count('otto', 'nodes') === 1, grows.text.slice(0, 300));
+ok('a conversation saved with a map grows: everything it had, and the new node', grows.status === 200 && JSON.stringify((grows.json?.map?.nodes ?? []).map((n) => n.id)) === '["p","q","r"]' && count('otto', 'maps') === 2 && count('otto', 'nodes') === 0, grows.text.slice(0, 300));
 before = passes();
 const fresh = await map('new-1', EMPTY, extraction(['x']));
-ok('a new conversation, with the month\'s maps spent, is refused before any model is asked', fresh.status === 402 && fresh.json?.upgrade === 'maps' && passes() === before, fresh.text.slice(0, 200));
+ok('a new conversation, with the old month\'s two maps used, is drawn — the old count refuses nothing', fresh.status === 200 && !fresh.json?.upgrade && (fresh.json?.map?.nodes ?? []).length === 1 && passes() === before + 1, fresh.text.slice(0, 200));
 
-console.log('\n=== a map begun by hand is one of the month\'s maps ===');
+console.log('\n=== maps begun by hand ===');
 as('hana');
 const byHand = (sessionId, newMap = true) => call(R.allowance.POST, 'POST', '/api/logos/allowance', { counter: 'nodes', n: 1, sessionId, newMap });
-const h1 = await byHand('h1');
-ok('the first card of a conversation, added by hand, claims a map and a node', h1.status === 200 && count('hana', 'maps') === 1 && count('hana', 'nodes') === 1, h1.text);
-const h1b = await byHand('h1');
-ok('  another card in the same conversation claims only a node', h1b.status === 200 && count('hana', 'maps') === 1 && count('hana', 'nodes') === 2, h1b.text);
-await byHand('h2');
-const h3 = await byHand('h3');
-ok('a third conversation begun by hand is refused at the month\'s two maps', h3.status === 402 && h3.json?.upgrade === 'maps' && count('hana', 'maps') === 2 && count('hana', 'nodes') === 3, h3.text);
+const hs = [await byHand('h1'), await byHand('h1'), await byHand('h2'), await byHand('h3')];
+ok('cards added by hand in three conversations — past the old two maps — are all allowed', hs.every((r) => r.status === 200), hs.map((r) => r.text).join(' | '));
+ok('  and none of it is counted', count('hana', 'maps') === 0 && count('hana', 'nodes') === 0 && marks('hana', 'mapmark:') === 0);
 
-console.log('\n=== with the usage table missing, the free plan is paused — never lifted ===');
+console.log('\n=== with the usage table missing, what is counted is paused — never lifted ===');
 db.absent.add('logos_usage');
 as('pete');
 before = streams();
 const paused = await logos('p1');
-ok('a free conversation is paused, not let through uncounted: 503, said plainly', paused.status === 503 && paused.json?.unavailable === true && /can’t be checked right now/.test(paused.json?.error ?? ''), paused.text.slice(0, 300));
+ok('a trial conversation is paused, not let through uncounted: 503, said plainly', paused.status === 503 && paused.json?.unavailable === true && /can’t be checked right now/.test(paused.json?.error ?? ''), paused.text.slice(0, 300));
 ok('  offering nothing — it is a fault, not a limit — and before the model is asked', !paused.json?.upgrade && streams() === before);
 before = passes();
 const pausedMap = await map('p1', EMPTY, extraction(['a']));
-ok('a free map is paused the same way, before any model is asked', pausedMap.status === 503 && pausedMap.json?.unavailable === true && passes() === before, pausedMap.text.slice(0, 200));
+ok('a trial map pass is paused the same way (the trial cannot be read), before any model is asked', pausedMap.status === 503 && pausedMap.json?.unavailable === true && passes() === before, pausedMap.text.slice(0, 200));
+// a card added by hand asks no model and is counted on neither plan: there is nothing to pause
 const pausedHand = await call(R.allowance.POST, 'POST', '/api/logos/allowance', { counter: 'nodes', n: 1, sessionId: 'p2', newMap: true });
-ok('  and a card added by hand', pausedHand.status === 503 && pausedHand.json?.unavailable === true, pausedHand.text);
+ok('  a card added by hand — no model, nothing counted — still goes on', pausedHand.status === 200 && pausedHand.json?.limit === null, pausedHand.text);
 as('olga');
 const onePaused = await logos('o-missing');
 ok('Socria One is never paused by it', onePaused.status === 200, onePaused.text.slice(0, 200));
 db.absent.delete('logos_usage');
 await settle();
 
-console.log('\n=== artifacts: two a month, held at the save ===');
+console.log('\n=== the per-conversation ceilings refuse on both plans: Research 120, images 60 ===');
+// Fair use held in common (lib/entitlements.ts): a guard against a runaway loop, met at the number in the
+// table, before any model is asked — and never sold past, since Socria One stops in the same place.
+const PNG = 'data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAYAAAAfFcSJAAAADUlEQVR42mNkYPhfDwAChwGA60e6kgAAAABJRU5ErkJggg==';
+const seed = (uid, sessionId, counter, n) => db.rows('logos_usage').push({ id: `${uid}|chat:${sessionId}|${counter}`, user_id: uid, scope: `chat:${sessionId}`, counter, n, updated_at: Date.now() });
+const research = (sessionId) => call(R.explore.POST, 'POST', '/api/logos/explore', { label: 'Rent control', type: 'claim', mode: 'research', sessionId, messages: [{ role: 'user', content: 'Does rent control work?' }] });
+const readImage = (sessionId) => call(R.readImage.POST, 'POST', '/api/logos/read', { image: PNG, sessionId });
+for (const [who, plan] of [['rita', 'the trial'], ['oscar', 'Socria One']]) {
+  as(who);
+  seed(who, 'rr', 'research', 120);
+  let calls = (globalThis.__logosCalls ?? []).length;
+  const r = await research('rr');
+  ok(`${plan}: the 121st Research in a conversation is refused at the table’s 120, before any model is asked`, r.status === 402 && r.json?.upgrade === 'research' && r.json?.used === 120 && r.json?.limit === 120 && (globalThis.__logosCalls ?? []).length === calls, r.text.slice(0, 300));
+  ok(`  ${plan}: said as fair use, never offering Socria One`, /same place/.test(r.json?.error ?? '') && !SELLS_ONE.test(r.json?.error ?? ''), r.json?.error);
+  seed(who, 'ri', 'images', 60);
+  calls = (globalThis.__logosCalls ?? []).length;
+  const i = await readImage('ri');
+  ok(`${plan}: the 61st image read in a conversation is refused at the table’s 60, before any model is asked`, i.status === 402 && i.json?.upgrade === 'images' && i.json?.used === 60 && i.json?.limit === 60 && (globalThis.__logosCalls ?? []).length === calls, i.text.slice(0, 300));
+  ok(`  ${plan}: said as fair use, never offering Socria One`, /same place/.test(i.json?.error ?? '') && !SELLS_ONE.test(i.json?.error ?? ''), i.json?.error);
+  seed(who, 'ri59', 'images', 59);
+  const i60 = await readImage('ri59');
+  ok(`  ${plan}: the 60th is not refused, and is counted`, i60.status !== 402 && chatCount(who, 'ri59', 'images') === 60, `${i60.status} ${chatCount(who, 'ri59', 'images')} ${i60.text.slice(0, 200)}`);
+  ok(`  ${plan}: a ceiling in one conversation is not met in the next`, (await readImage('ri-next')).status !== 402 && chatCount(who, 'ri-next', 'images') === 1);
+}
+await settle();
+
+console.log('\n=== artifacts: not counted on the trial, held at the save ===');
 as('ada');
 // real workspace objects, made the way an element opened in Artifacts is (lib/inline-ui.ts artifactFromSpec)
 const chart = (title) => I.artifactFromSpec({ type: 'chart', kind: 'bar', title, x: ['Rent', 'Food', 'Transport'], series: [{ values: [1200, 400, 150] }], basis: 'given' });
@@ -365,46 +420,45 @@ const save = (id, sp, extra = {}) =>
 const two = space(['One', 'Two']);
 const three = I.makeDisplay(two, chart('Three').kind, chart('Three').state, 'socria').space;
 const s1 = await save('conv-a', two);
-ok('two artifacts saved: both kept, two counted', s1.status === 200 && !s1.json?.refused && count('ada', 'artifacts') === 2, s1.text);
+ok('two artifacts saved: both kept, nothing counted', s1.status === 200 && !s1.json?.refused && count('ada', 'artifacts') === 0, s1.text);
 const third = objIds(three).find((x) => !objIds(two).includes(x));
 const s2 = await save('conv-a', three, { base: db.rows('conversations').find((r) => r.id === 'conv-a')?.updated_at ?? null });
 const stored = db.rows('conversations').find((r) => r.id === 'conv-a');
 const storedObjs = JSON.stringify(stored?.map ?? stored?.memory ?? {});
-ok('a third is not kept — and the save says which, and why', s2.status === 200 && JSON.stringify(s2.json?.refused?.artifacts?.objects) === JSON.stringify([third]) && /2 free artifacts this month/.test(s2.json?.refused?.note ?? ''), s2.text);
-ok('  the two already made are untouched, and the third is not in what was stored', objIds(two).every((x) => storedObjs.includes(`"${x}"`)) && !storedObjs.includes(`"${third}"`), storedObjs.slice(0, 300));
-const s3 = await save('conv-a', two, { base: db.rows('conversations').find((r) => r.id === 'conv-a')?.updated_at ?? null });
-ok('saving the same two again costs nothing', s3.status === 200 && !s3.json?.refused && count('ada', 'artifacts') === 2);
+ok('a third — past the old two — is kept, and nothing is refused', s2.status === 200 && !s2.json?.refused && !!third, s2.text);
+ok('  all three are in what was stored', objIds(three).every((x) => storedObjs.includes(`"${x}"`)), storedObjs.slice(0, 300));
+ok('  and none is counted or marked', count('ada', 'artifacts') === 0 && marks('ada', 'artmark:') === 0);
 as('paula');
 const ps = await save('conv-p', space(['A', 'B', 'C', 'D']));
 ok('Socria One (a paid subscription): four artifacts, all kept, nothing counted', ps.status === 200 && !ps.json?.refused && count('paula', 'artifacts') === 0, ps.text);
 
-console.log('\n=== documents: one a month ===');
+console.log('\n=== documents: not counted on the trial ===');
 as('dora');
 const { doc } = await T.readDocument('report.md', Buffer.from('# Q3 report\n\nRevenue rose 12% on the quarter.\n\nCosts held flat.'));
 const { doc: other } = await T.readDocument('notes.txt', Buffer.from('Second document.\n\nThe launch moved to March.'));
 const attach = (d) => ({ kind: 'doc', name: d.name, doc: d.id, text: T.renderDocAsNote(d, 24000).text, pages: d.pageCount, format: d.format, origin: 'source' });
 const withDoc = (sessionId, d, n = 1) => call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId, messages: [{ role: 'user', content: 'What does this say?', attachments: [attach(d)] }, ...turns(n).slice(1)], docs: [d] });
 const d1 = await withDoc('d1', doc);
-ok('a first document brought into a conversation: read, and counted once', d1.status === 200 && count('dora', 'documents') === 1, d1.text.slice(0, 200));
-ok('  carried on later turns, it costs nothing more', (await withDoc('d1', doc, 3)).status === 200 && count('dora', 'documents') === 1);
+ok('a first document brought into a conversation: read, and not counted', d1.status === 200 && count('dora', 'documents') === 0, d1.text.slice(0, 200));
+ok('  carried on later turns, it is read again', (await withDoc('d1', doc, 3)).status === 200 && count('dora', 'documents') === 0);
 before = streams();
 const d2 = await withDoc('d2', other);
-ok('a second document this month is refused, before the model is asked', d2.status === 402 && d2.json?.upgrade === 'documents' && streams() === before, d2.text.slice(0, 300));
-ok('  in the boundary’s words', /1 free document this month/.test(d2.json?.error ?? ''), d2.json?.error);
+ok('a second document this month — past the old one — is read, and the model asked', d2.status === 200 && streams() === before + 1 && !d2.json?.upgrade, d2.text.slice(0, 300));
 const form = new FormData();
 form.append('file', new Blob(['Third document'], { type: 'text/plain' }), 'third.txt');
 const read = await call(R.read.POST, 'POST', '/api/files/read', undefined, { form });
-ok('reading another file is refused before any reading is done', read.status === 402 && read.json?.upgrade === 'documents', read.text.slice(0, 200));
+ok('reading another file is done, and handed back', read.status === 200 && (read.json?.notes ?? []).some((n) => n.name === 'third.txt' && /Third document/.test(n.text)), read.text.slice(0, 200));
 globalThis.__logosReply = '# A short history\n\nIt began with a question.';
 const wu = await call(R.logos.POST, 'POST', '/api/logos/chat', { surface: 'logos5', sessionId: 'd3', messages: [{ role: 'user', content: 'Make me a study guide on the causes of World War One' }] });
 const wuPrompt = (globalThis.__logosCalls ?? []).filter((p) => p.stream).pop();
-ok('a write-up asked for with the month’s document spent: answered here, and the page told why', wu.status === 200 && wu.headers.get('X-Socria-Limit') === 'documents' && !systemOf(wuPrompt ?? { messages: [] }).includes('A WRITE-UP, READ IN CONTENT'), `${wu.status} ${wu.headers.get('X-Socria-Limit')}`);
+ok('a write-up asked for is filed in Content, with no limit said', wu.status === 200 && !wu.headers.get('X-Socria-Limit') && systemOf(wuPrompt ?? { messages: [] }).includes('A WRITE-UP, READ IN CONTENT'), `${wu.status} ${wu.headers.get('X-Socria-Limit')}`);
+ok('  and no document is counted or marked', count('dora', 'documents') === 0 && marks('dora', 'docmark:') === 0);
 globalThis.__logosReply = 'Noted.';
 
 console.log('\n=== Socria Voice and sharing are Socria One ===');
 as('vic');
 const voice = await call(R.transcribe.POST, 'POST', '/api/transcribe', undefined, { form: new FormData() });
-ok('Voice on the free plan: refused, with the word the page raises Socria One for', voice.status === 402 && voice.json?.upgrade === 'voice' && /Socria Voice is part of Socria One/.test(voice.json?.error ?? ''), voice.text);
+ok('Voice on the trial: refused, with the word the page raises Socria One for', voice.status === 402 && voice.json?.upgrade === 'voice' && /Socria Voice is part of Socria One/.test(voice.json?.error ?? ''), voice.text);
 as(null);
 ok('  and signed out', (await call(R.transcribe.POST, 'POST', '/api/transcribe', undefined, { form: new FormData() })).status !== 200);
 as('olga');
@@ -413,17 +467,17 @@ ok('Socria One passes the gate (and is told no recording arrived)', oneVoice.sta
 as('vic');
 await call(R.conversations.PUT, 'PUT', '/api/conversations', { conversation: { id: 'c-vic', title: 'Mine', messages: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], updatedAt: Date.now() } });
 const vshare = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'c-vic', action: 'link', role: 'viewer' });
-ok('sharing a conversation on the free plan: refused', vshare.status === 402 && vshare.json?.upgrade === 'share' && vshare.json?.refusal === 'plan', vshare.text);
+ok('sharing a conversation on the trial: refused', vshare.status === 402 && vshare.json?.upgrade === 'share' && vshare.json?.refusal === 'plan', vshare.text);
 ok('  saying sharing is Socria One, and that joining stays open', /Sharing a conversation is part of Socria One/.test(vshare.json?.refusalNote ?? '') && /join what others share/.test(vshare.json?.refusalNote ?? ''), vshare.json?.refusalNote);
 const vroom = await call(R.room.POST, 'POST', '/api/logos/room', {});
-ok('opening a room on the free plan: refused', vroom.status === 402 && vroom.json?.upgrade === 'share', vroom.text);
+ok('opening a room on the trial: refused', vroom.status === 402 && vroom.json?.upgrade === 'share', vroom.text);
 as('olga');
 await call(R.conversations.PUT, 'PUT', '/api/conversations', { conversation: { id: 'c-olga', title: 'Ours', messages: [{ role: 'user', content: 'a' }, { role: 'assistant', content: 'b' }], updatedAt: Date.now() } });
 const link = await call(R.share.POST, 'POST', '/api/share', { type: 'conversation', id: 'c-olga', action: 'link', role: 'editor' });
 ok('Socria One shares by link', link.status === 200 && !!link.json?.link?.token, link.text.slice(0, 200));
 as('vic');
 const joined = await call(R.accept.POST, 'POST', '/api/share/accept', { token: link.json?.link?.token });
-ok('a free account joins what Socria One shared — joining is free', joined.status === 200, joined.text.slice(0, 200));
+ok('a trial account joins what Socria One shared — joining stays open', joined.status === 200, joined.text.slice(0, 200));
 
 console.log('\n=== no free way to Socria One ===');
 as('carl');
@@ -451,11 +505,15 @@ console.log('\n=== the panel reads the same counts the routes refuse at ===');
 as('mira');
 const panel = await call(R.usage.GET, 'GET', '/api/logos/usage');
 const c = panel.json?.counters ?? {};
-ok('maps 2 of 2, nodes 10 of 10', c.maps?.used === 2 && c.maps?.limit === 2 && c.nodes?.used === 10 && c.nodes?.limit === 10, JSON.stringify(c));
-ok('  and the free plan has no daily message limit', c.messages?.limit === null);
+ok('the old monthly allowances are not counted on the trial: maps, nodes, artifacts and documents have no limit', ['maps', 'nodes', 'artifacts', 'documents'].every((k) => c[k] && c[k].limit === null), JSON.stringify(c));
+ok('  conversations carry Socria One’s fair-use ceiling, 400 a month', c.chats?.limit === 400, JSON.stringify(c.chats));
+ok('  the per-conversation ceilings are the table’s: Research 120, images 60, files 60', c.research?.limit === 120 && c.images?.limit === 60 && c.files?.limit === 60, JSON.stringify(c));
+ok('  and the trial has no daily message limit', c.messages?.limit === null);
 as('olga');
 const onePanel = await call(R.usage.GET, 'GET', '/api/logos/usage');
-ok('Socria One: every tiered allowance unlimited', ['maps', 'nodes', 'artifacts', 'documents'].every((k) => onePanel.json?.counters?.[k]?.limit === null), JSON.stringify(onePanel.json?.counters));
+const oc = onePanel.json?.counters ?? {};
+ok('Socria One: every old allowance unlimited', ['maps', 'nodes', 'artifacts', 'documents'].every((k) => oc[k] && oc[k].limit === null), JSON.stringify(oc));
+ok('  and limit for limit the same panel as the trial’s — the counts are held in common', Object.keys(c).length > 0 && Object.keys(c).every((k) => oc[k]?.limit === c[k].limit), JSON.stringify(oc));
 
 console.log(`\nfree-limits-e2e: ${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

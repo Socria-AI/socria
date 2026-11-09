@@ -123,6 +123,7 @@ import {
 import { runResearch } from '@/lib/core4/web-server';
 import { contentAsText, contentForCheck, contentForHistory, didLine, gateInlineBlock, sanitizeDid, sanitizeInlineState, type InlineContext } from '@/lib/inline-ui';
 import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
+import { TRIAL_ENDED_COOKIE, guestAfterTrial } from '@/lib/trial';
 import { GUEST_TURNS, GUEST_TURNS_LIMIT, guestTurnsUsed } from '@/lib/guest-limits';
 // METACOGNITIVE REGULATION (docs/MR.md): on unless LOGOS_MR=off (or shadow).
 import { afterReply, emptyReplyFallback, regulateTurn, replyGate, type MRRegulation } from '@/lib/mr';
@@ -187,6 +188,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     if (limited) return limited;
 
     const body = await req.json().catch(() => null);
+    // the guest preview is not a second trial (lib/trial.ts)
+    if (guest && req.cookies.get(TRIAL_ENDED_COOKIE)?.value) return NextResponse.json(guestAfterTrial(), { status: 402 });
     if (guest && !guestMay(req.cookies.get(GUEST_COOKIE)?.value, body?.sessionId, Date.now())) {
       return NextResponse.json({ error: GUEST_LIMIT, guestLimit: true, requiresKey: true }, { status: 401 });
     }

@@ -20,6 +20,7 @@ import OpenAI from 'openai';
 import { tracked } from '@/lib/openai-usage';
 import { auth } from '@clerk/nextjs/server';
 import { GUEST_COOKIE, GUEST_LIMIT, guestMay } from '@/lib/guest-pass';
+import { TRIAL_ENDED_COOKIE, guestAfterTrial } from '@/lib/trial';
 import {
   mapInstructions,
   mapAsItStands,
@@ -151,6 +152,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
   if (guest && !req.cookies.get(GUEST_COOKIE)?.value) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
   }
+  // the guest preview is not a second trial (lib/trial.ts)
+  if (guest && req.cookies.get(TRIAL_ENDED_COOKIE)?.value) return NextResponse.json(guestAfterTrial(), { status: 402 });
 
   const limited = await enforceRateLimit(req, userId, 'aux');
   if (limited) return limited;
