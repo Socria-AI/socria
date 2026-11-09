@@ -245,10 +245,46 @@ console.log('\n=== zooming the space (lib/logos5/spaceZoom.ts) ===');
   ok('  the readout', S.zoomLabel(0.83) === '83%' && S.zoomLabel(1) === '100%');
   ok('the keys sit in the row: −, the readout (back to 100%), +, Fit — on a wide screen only', /class="ls-zoom-keys" role="group" aria-label="Zoom the space"/.test(wide) && /aria-label="Zoom out"/.test(wide) && /aria-label="Zoom in"/.test(wide) && /class="is-pct"[^>]*>100%</.test(wide) && /class="is-fit"[^>]*>Fit</.test(wide) && !/ls-zoom-keys/.test(html(h(S.L5Space, props({ narrow: true })))));
   const src = read('components/logos5/L5Space.tsx');
-  ok('  the cards and their lines scale as one, the scroll area sized to the zoomed space', /className="ls-zoom" style=\{zoom !== 1 && natural\.w \? \{ width: natural\.w \* zoom, height: natural\.h \* zoom \}/.test(src) && /transform: `scale\(\$\{zoom\}\)`/.test(src));
+  ok('  the cards and their lines scale as one, the scroll area sized to the zoomed space', /className="ls-zoom" style=\{zoomBox\}/.test(src) && /return \{ width: w \* zoom, height: Math\.max\(natural\.h \* zoom, hh\) \}/.test(src) && /transform: `scale\(\$\{zoom\}\)`/.test(src));
   ok('  the lines measured in the space\'s own units, so they stay on their cards at any zoom', /\(r\.left - cr\.left\) \/ z/.test(src) && /h: r\.height \/ z/.test(src));
   ok('  a pinch zooms about the pointer; pinched on out past the smallest, up to the Universal Map', /zoomByWheel\(k, e\.deltaY\), r \? \{ x: e\.clientX - r\.left, y: e\.clientY - r\.top \}/.test(src) && /e\.deltaY > 0 && k <= SPACE_ZOOM\.min/.test(src) && /pinchOut\(e, acc, Date\.now\(\)\) === 'move'\) zoomOutRef\.current\(\)/.test(src));
   ok('  what the chatbox covers can be scrolled clear at any zoom', /padding-bottom: calc\(\(var\(--ls-foot, 134px\) \+ 56px\) \/ var\(--ls-k, 1\)\)/.test(read('components/logos5/space.css')));
+}
+
+console.log('\n=== moving about the space, as on the Universal Map (lib/logos5/spaceMove.ts) ===');
+{
+  const M = S;
+  ok('a stored arrangement is read with care: finite offsets only, nothing at 0,0, never thrown into the distance', J(M.readMoved('{"n:a":{"x":40.4,"y":-12},"n:b":{"x":0,"y":0},"n:c":{"x":"9","y":1},"n:d":{"x":1e9,"y":2}}')) === J({ 'n:a': { x: 40, y: -12 }, 'n:d': { x: 20000, y: 2 } }) && J(M.readMoved('not json')) === '{}' && J(M.readMoved('[1,2]')) === '{}' && J(M.readMoved(null)) === '{}');
+  ok('  stored per conversation; nothing stored once every card is back', M.movedStoreKey('abc') === 'socria.l5.space-moved.v1:abc' && M.writeMoved({}) === null && M.writeMoved({ 'n:a': { x: 0, y: 0 } }) === null && M.writeMoved({ 'n:a': { x: 3, y: 4 } }) === '{"n:a":{"x":3,"y":4}}');
+  const m1 = M.moveBy({}, ['n:a', 'm:x'], 30, -10);
+  ok('cards moved together; moved back to where they were laid out, they leave the arrangement', J(m1) === J({ 'n:a': { x: 30, y: -10 }, 'm:x': { x: 30, y: -10 } }) && J(M.moveBy(m1, ['n:a'], -30, 10)) === J({ 'm:x': { x: 30, y: -10 } }) && M.moveBy(m1, [], 5, 5) === m1);
+  ok('  a card is drawn where it was put, plus the drag carrying it', J(M.shiftOf(m1, 'n:a', { keys: ['n:a'], dx: 5, dy: 5 })) === J({ x: 35, y: -5 }) && J(M.shiftOf(m1, 'n:z', null)) === J({ x: 0, y: 0 }));
+  ok('a drag never takes a card past the space\'s top or left edge (nothing can scroll there)', J(M.clampDrag(-500, -500, [{ l: 100, t: 60 }, { l: 300, t: 20 }])) === J({ dx: -92, dy: -12 }) && J(M.clampDrag(40, 50, [{ l: 100, t: 60 }])) === J({ dx: 40, dy: 50 }));
+  const cards = [
+    { key: 'a', l: 0, t: 0, r: 100, b: 50 },
+    { key: 'b', l: 200, t: 0, r: 300, b: 50 },
+    { key: 'c', l: 0, t: 200, r: 100, b: 250 },
+  ];
+  ok('Shift-drag: the rectangle chooses the cards it touches; a click is not a rectangle', J(M.cardsIn({ x0: 50, y0: 20, x1: 220, y1: 30 }, cards)) === J(['a', 'b']) && J(M.cardsIn({ x0: 5, y0: 5, x1: 6, y1: 6 }, cards)) === '[]');
+  ok('arrows go to the nearest card that way, straight ahead before off to the side', M.nextCard('right', 'a', cards) === 'b' && M.nextCard('down', 'a', cards) === 'c' && M.nextCard('left', 'a', cards) === null);
+  const plain = { shiftKey: false, altKey: false };
+  ok('  on a card an arrow goes to a card; Shift and an arrow move the view; Alt and an arrow move the card', J(M.arrowIntent('ArrowRight', plain, true)) === J({ kind: 'card', way: 'right' }) && J(M.arrowIntent('ArrowUp', { shiftKey: true, altKey: false }, true)) === J({ kind: 'pan', dx: 0, dy: -60 }) && J(M.arrowIntent('ArrowLeft', { shiftKey: false, altKey: true }, true)) === J({ kind: 'nudge', dx: -16, dy: 0 }) && J(M.arrowIntent('ArrowDown', { shiftKey: true, altKey: true }, true)) === J({ kind: 'nudge', dx: 0, dy: 64 }));
+  ok('  with no card focused, arrows move the view; other keys are not arrows', J(M.arrowIntent('ArrowDown', plain, false)) === J({ kind: 'pan', dx: 0, dy: 60 }) && M.arrowIntent('a', plain, true) === null);
+  const src = read('components/logos5/L5Space.tsx');
+  const css = read('components/logos5/space.css');
+  const wide = html(h(S.L5Space, props()));
+  ok('the canvas takes the Universal Map\'s gestures: press, drag, let go, a pinch, the keys', /onPointerDown=\{onCanvasDown\}/.test(src) && /onPointerMove=\{onCanvasMove\}/.test(src) && /onPointerCancel=\{\(e\) => onCanvasUp\(e, true\)\}/.test(src) && /onKeyDown=\{onCanvasKey\}/.test(src) && /class="ls-canvas l5-dots" tabindex="0" role="region" aria-label="The space\. Drag the empty space to move around it, drag a card to move it/.test(wide));
+  ok('  the empty space dragged moves the view; a finger that did not wait moves it too', /sc\.scrollLeft = g\.left - dx;/.test(src) && /if \(g\.kind === 'card' && !g\.held\) g\.kind = 'pan';/.test(src) && /SPACE_MOVE\.holdMs/.test(src));
+  ok('  a card dragged is put there and kept for the conversation; a chosen card carries the others', /keepMoved\(moveBy\(moved, c\.keys, c\.dx, c\.dy\)\)/.test(src) && /localStorage\.setItem\(movedStoreKey\(spaceId\), v\)/.test(src) && /g\.keys = chosen\.has\(g\.key\) \? \[\.\.\.chosen\] : \[g\.key\]/.test(src));
+  ok('  a card let go after a drag is not also opened', /swallowNext\(\);/.test(src) && /el\.addEventListener\('click', on, true\)/.test(src));
+  ok('  the lines follow a moved card: it is drawn shifted (translate, so the arrival still plays) and they are measured from it', /st\.translate = `\$\{o\.x\}px \$\{o\.y\}px`/.test(src) && /querySelector<HTMLElement>\(`\[data-k="\$\{CSS\.escape\(k\)\}"\]`\)/.test(src));
+  ok('  Socria\'s reply stays words a mouse can select; a finger on it moves the space', /if \(inReply && type !== 'touch'\) return null;/.test(src) && /\.ls:not\(\.is-phone\) \.ls-canvas \{ cursor: grab; touch-action: none; \}/.test(css) && /\.ls:not\(\.is-phone\) \.ls-bub \{ cursor: auto; \}/.test(css));
+  ok('  + and − zoom, 0 fits, Escape lets go of what was chosen', /e\.key === '0'\) \(e\.preventDefault\(\), fitSpace\(\)\)/.test(src) && /e\.key === 'Escape' && chosen\.size/.test(src));
+  ok('"Put back" appears once a card has been moved, and puts every card back', !/ls-putback/.test(wide) && /Put back/.test(src) && /keepMoved\(\{\}\);/.test(src));
+  ok('a phone\'s column is not moved about', /if \(narrow\) return st;/.test(src) && /const placed_ = \(k: string\) => \(narrow \? ''/.test(src));
+  ok('LogosApp keeps the arrangement under the conversation', /spaceId=\{activeId\}/.test(read('components/LogosApp.tsx')));
+  ok('room to move: the space sits in room of its own on every side, the view starts on the space, and keeps its place', /\.ls-slack \{ position: relative; box-sizing: content-box; width: max-content; padding: 38vh 45vw; \}/.test(css) && /className="ls-slack" ref=\{slackRef\}/.test(src) && /sc\.scrollLeft = now\.x;/.test(src) && /sc\.scrollLeft \+= now\.x - was\.x;/.test(src));
+  ok('  zooming, Fit, the row and the open idea all count the room: the view never rests in it by itself', J(S.anchorScroll({ left: 700, top: 400 }, { x: 100, y: 100 }, 1, 2, { x: 600, y: 300 })) === J({ left: 900, top: 600 }) && /pendingScroll\.current = \{ left: room\.x, top: room\.y \}/.test(src) && /slackOf\(\)\.x \+ col\.offsetLeft \* zoomRef\.current - 40/.test(src) && /Math\.max\(edge, left - 40\)/.test(src));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

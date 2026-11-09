@@ -9191,6 +9191,7 @@ export function LogosApp({
               onZoomOut={() => upToMap()}
               narrow={narrow}
               follow={atNewest && (busyHere || !!streaming)}
+              spaceId={activeId}
             />
           );
         }

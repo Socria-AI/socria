@@ -11,12 +11,14 @@
 //
 // Its rules are lib/logos5/ideas.ts; this file draws them.
 
-import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type ReactNode } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import type { LogosNodeType } from '@/lib/logos';
 import type { CanvasTurn } from '@/lib/logos5/canvas';
 import { pinchOut } from '@/lib/logos5/morph';
 import { anchorScroll, clampZoom, fitZoom, SPACE_ZOOM, zoomByWheel, zoomLabel, zoomStep } from '@/lib/logos5/spaceZoom';
+import { arrowIntent, cardsIn, clampDrag, moveBy, movedStoreKey, nextCard, readMoved, shiftOf, spread, SPACE_MOVE, writeMoved, type Moved } from '@/lib/logos5/spaceMove';
+import { isDrag } from '@/lib/canvas';
 import { roman } from '@/lib/logos5/oneView';
 import { CloseGlyph } from './L5Chrome';
 import {
@@ -141,6 +143,7 @@ export function L5Space({
   onZoomOut,
   narrow = false,
   follow = false,
+  spaceId = null,
 }: {
   ideas: SpaceIdea[];
   edges: IdeaEdgeLite[];
@@ -171,6 +174,8 @@ export function L5Space({
   narrow?: boolean;
   /** the open reply is still arriving: its last words stay in view */
   follow?: boolean;
+  /** the conversation, so where its cards were put is kept for it (on this device) */
+  spaceId?: string | null;
 }) {
   const [kind, setKind] = useState<SpaceKind>('all');
   // THE THREAD (Revision VI): every one of Socria's replies, opened from the bubble; a reply hovered lights what it made
@@ -183,6 +188,15 @@ export function L5Space({
   const rootRef = useRef<HTMLDivElement>(null);
   const scrollRef = useRef<HTMLDivElement>(null);
   const colsRef = useRef<HTMLDivElement>(null);
+  // ROOM TO MOVE (lib/logos5/spaceMove.ts): the space sits in room of its own on every side (space.css .ls-slack), so it
+  // can be dragged about like the Universal Map even when it fits the screen; the view starts on the space itself
+  const slackRef = useRef<HTMLDivElement>(null);
+  const slackOf = () => {
+    const el = slackRef.current;
+    if (!el) return { x: 0, y: 0 };
+    const cs = getComputedStyle(el);
+    return { x: parseFloat(cs.paddingLeft) || 0, y: parseFloat(cs.paddingTop) || 0 };
+  };
   const openRef = useRef<HTMLDivElement>(null);
   const chatRef = useRef<HTMLDivElement>(null);
   // ZOOM (lib/logos5/spaceZoom.ts): the cards and their lines drawn smaller or larger as one, by the keys in the row
@@ -192,6 +206,35 @@ export function L5Space({
   zoomRef.current = zoom;
   const [natural, setNatural] = useState({ w: 0, h: 0 });
   const pendingScroll = useRef<{ left: number; top: number } | null>(null);
+  // MOVING ABOUT (lib/logos5/spaceMove.ts), as on the Universal Map: the empty space dragged moves the view, a card
+  // dragged is put somewhere else (and kept there for this conversation), Shift-drag chooses several to move together
+  const [moved, setMoved] = useState<Moved>({});
+  const [carry, setCarry] = useState<{ keys: string[]; dx: number; dy: number } | null>(null);
+  const carryRef = useRef(carry);
+  carryRef.current = carry;
+  const [chosen, setChosen] = useState<ReadonlySet<string>>(() => new Set());
+  const [lasso, setLasso] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null);
+  const lassoRef = useRef(lasso);
+  lassoRef.current = lasso;
+  useEffect(() => {
+    if (!spaceId) return;
+    try {
+      setMoved(readMoved(localStorage.getItem(movedStoreKey(spaceId))));
+    } catch {
+      /* no storage here: the arrangement lasts as long as the visit */
+    }
+  }, [spaceId]);
+  const keepMoved = (next: Moved) => {
+    setMoved(next);
+    if (!spaceId) return;
+    try {
+      const v = writeMoved(next);
+      if (v) localStorage.setItem(movedStoreKey(spaceId), v);
+      else localStorage.removeItem(movedStoreKey(spaceId));
+    } catch {
+      /* kept for the visit */
+    }
+  };
 
   // ARRIVING (Revision IV): when the space opens — a line of thinking opened, or come back to — the cards settle
   // in reading order and then the lines draw. Once: the open idea changing within the line does not replay it.
@@ -223,7 +266,7 @@ export function L5Space({
     const sc = scrollRef.current;
     if (to === k || !sc) return;
     const point = at ?? { x: sc.clientWidth / 2, y: Math.max(0, sc.clientHeight - footRef.current) / 2 };
-    pendingScroll.current = anchorScroll({ left: sc.scrollLeft, top: sc.scrollTop }, point, k, to);
+    pendingScroll.current = anchorScroll({ left: sc.scrollLeft, top: sc.scrollTop }, point, k, to, slackOf());
     setZoom(to);
   };
   const zoomToRef = useRef(zoomTo);
@@ -247,6 +290,30 @@ export function L5Space({
     };
     el.addEventListener('wheel', on, { passive: false });
     return () => el.removeEventListener('wheel', on);
+  }, [narrow]);
+  // the view starts on the space, not on the room around it; when the window changes size, so does the room, and the view
+  // keeps its place
+  const slackAt = useRef<{ x: number; y: number } | null>(null);
+  useLayoutEffect(() => {
+    const sc = scrollRef.current;
+    if (!sc || narrow) return;
+    const place = () => {
+      const now = slackOf();
+      const was = slackAt.current;
+      slackAt.current = now;
+      if (!was) {
+        sc.scrollLeft = now.x;
+        sc.scrollTop = now.y;
+      } else if (was.x !== now.x || was.y !== now.y) {
+        sc.scrollLeft += now.x - was.x;
+        sc.scrollTop += now.y - was.y;
+      }
+    };
+    place();
+    if (typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(place);
+    ro.observe(sc);
+    return () => ro.disconnect();
   }, [narrow]);
   // the view kept on the point it was zoomed about, once the space has its new size
   useLayoutEffect(() => {
@@ -320,7 +387,7 @@ export function L5Space({
   const cardKindOf = (k: string): 'idea' | 'brought' | 'made' | 'open' => (k === openKey ? 'open' : k.startsWith('c:') ? 'brought' : k.startsWith('m:') ? 'made' : 'idea');
 
   // THE LINES: measured once the cards are laid out, and again whenever the space changes size
-  const [drawn, setDrawn] = useState<{ lines: Drawn[]; thread: string; w: number; h: number }>({ lines: [], thread: '', w: 0, h: 0 });
+  const [drawn, setDrawn] = useState<{ lines: Drawn[]; thread: string; w: number; h: number; ew: number; eh: number }>({ lines: [], thread: '', w: 0, h: 0, ew: 0, eh: 0 });
   const measure = () => {
     const box = colsRef.current;
     if (!box || narrow) return;
@@ -374,7 +441,17 @@ export function L5Space({
       }
       if (pts.length > 1) thread = `M${pts.join(' L ')}`;
     }
-    const next = { lines, thread, w: box.scrollWidth, h: box.scrollHeight };
+    // a card put past the space's edge still has room to be scrolled to: the space runs on to its far side
+    let ew = 0;
+    let eh = 0;
+    if (carry || Object.keys(moved).length) {
+      box.querySelectorAll<HTMLElement>('[data-k]').forEach((el) => {
+        const r = el.getBoundingClientRect();
+        ew = Math.max(ew, (r.right - cr.left) / z);
+        eh = Math.max(eh, (r.bottom - cr.top) / z);
+      });
+    }
+    const next = { lines, thread, w: box.scrollWidth, h: box.scrollHeight, ew: Math.ceil(ew), eh: Math.ceil(eh) };
     setDrawn((cur) => (JSON.stringify(cur) === JSON.stringify(next) ? cur : next));
   };
   const measureRef = useRef(measure);
@@ -416,10 +493,11 @@ export function L5Space({
       bottom = Math.max(bottom, r.bottom - cr.top);
     });
     const to = fitZoom({ w: right / z + 40, h: bottom / z + 16 }, { w: sc.clientWidth, h: sc.clientHeight }, footRef.current);
-    pendingScroll.current = { left: 0, top: 0 };
+    const room = slackOf();
+    pendingScroll.current = { left: room.x, top: room.y };
     if (to === z) {
-      sc.scrollLeft = 0;
-      sc.scrollTop = 0;
+      sc.scrollLeft = room.x;
+      sc.scrollTop = room.y;
       pendingScroll.current = null;
       return;
     }
@@ -487,11 +565,13 @@ export function L5Space({
       // offsetWidth and the gap are the space's own units; the view is zoomed
       const gap = (colsRef.current ? parseFloat(getComputedStyle(colsRef.current).columnGap) || 64 : 64) * zoom;
       const after = next instanceof HTMLElement && next.classList.contains('ls-col') ? gap + next.offsetWidth * zoom + 40 : 40;
-      const want = Math.min(Math.max(0, left - 40), Math.max(0, right + after - sc.clientWidth));
+      // never back past the space's own edge into the room around it
+      const edge = slackOf().x;
+      const want = Math.min(Math.max(edge, left - 40), Math.max(edge, right + after - sc.clientWidth));
       if (Math.abs(sc.scrollLeft - want) > 4) sc.scrollLeft = want;
     }
     const top = r.top - sr.top + sc.scrollTop;
-    if (r.top < sr.top || r.top > sr.bottom - 80) sc.scrollTop = Math.max(0, top - 16);
+    if (r.top < sr.top || r.top > sr.bottom - 80) sc.scrollTop = Math.max(slackOf().y, top - 16);
     else keepRef.current();
   }, [openKey, openTurn, narrow, kind, threadOn]);
   useEffect(() => {
@@ -527,10 +607,232 @@ export function L5Space({
     const sc = scrollRef.current;
     const col = colsRef.current?.querySelector<HTMLElement>(kind === 'made' ? '.ls-col.is-made' : '.ls-col.is-frame');
     if (!sc || !col) return;
-    const want = Math.max(0, col.offsetLeft * zoomRef.current - 40);
+    const want = Math.max(0, slackOf().x + col.offsetLeft * zoomRef.current - 40);
     if (typeof sc.scrollTo === 'function') sc.scrollTo({ left: want, behavior: 'smooth' });
     else sc.scrollLeft = want;
   }, [kind, narrow]);
+
+  // ── MOVING ABOUT: pressing, dragging, letting go (the Universal Map's gestures, on this canvas) ──
+  type Gesture = {
+    id: number;
+    type: string;
+    kind: 'pan' | 'card' | 'lasso';
+    key: string | null;
+    sx: number;
+    sy: number;
+    left: number;
+    top: number;
+    moved: boolean;
+    held: boolean;
+    add: boolean;
+    timer: ReturnType<typeof setTimeout> | null;
+    keys: string[];
+    boxes: { l: number; t: number }[];
+  };
+  const gesture = useRef<Gesture | null>(null);
+  const pointers = useRef(new Map<number, { x: number; y: number }>());
+  const pinch = useRef<{ d0: number; k0: number } | null>(null);
+  // a card let go after a drag is not also pressed
+  const swallow = useRef(false);
+  const swallowNext = () => {
+    swallow.current = true;
+    setTimeout(() => (swallow.current = false), 0);
+  };
+  useEffect(() => {
+    const el = rootRef.current;
+    if (!el) return;
+    const on = (e: MouseEvent) => {
+      if (!swallow.current) return;
+      swallow.current = false;
+      e.preventDefault();
+      e.stopPropagation();
+    };
+    el.addEventListener('click', on, true);
+    return () => el.removeEventListener('click', on, true);
+  }, [narrow]);
+  /** every card as drawn now, in the space's own units, from its top left */
+  const cardBoxes = () => {
+    const box = colsRef.current;
+    if (!box) return [];
+    const cr = box.getBoundingClientRect();
+    const z = zoomRef.current || 1;
+    return [...box.querySelectorAll<HTMLElement>('[data-k]')].map((el) => {
+      const r = el.getBoundingClientRect();
+      return { key: el.dataset.k!, l: (r.left - cr.left) / z, t: (r.top - cr.top) / z, r: (r.right - cr.left) / z, b: (r.bottom - cr.top) / z };
+    });
+  };
+  const targetOf = (el: Element, type: string): { kind: 'card'; key: string } | { kind: 'canvas' } | null => {
+    if (el.closest('input, textarea, select, a[href], [contenteditable="true"], .ls-zoom-keys')) return null;
+    // Socria's reply is words to read and copy: a mouse selects them, a finger moves the space
+    const inReply = !!el.closest('.ls-bub');
+    if (inReply && type !== 'touch') return null;
+    const card = el.closest<HTMLElement>('[data-k]');
+    if (card && !inReply && colsRef.current?.contains(card)) return { kind: 'card', key: card.dataset.k! };
+    return { kind: 'canvas' };
+  };
+  const endGesture = () => {
+    const g = gesture.current;
+    if (g?.timer) clearTimeout(g.timer);
+    gesture.current = null;
+    rootRef.current?.classList.remove('is-holding', 'is-panning');
+  };
+  const onCanvasDown = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (e.pointerType === 'mouse' && e.button !== 0) return;
+    const sc = scrollRef.current;
+    const t = targetOf(e.target as Element, e.pointerType);
+    if (!sc || !t) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    if (pointers.current.size >= 2) {
+      // two fingers: a pinch, whatever the first was doing
+      const [a, b] = [...pointers.current.values()];
+      endGesture();
+      setCarry(null);
+      setLasso(null);
+      pinch.current = { d0: Math.max(1, spread(a, b)), k0: zoomRef.current };
+      return;
+    }
+    const touch = e.pointerType === 'touch';
+    const kind: Gesture['kind'] = t.kind === 'card' ? 'card' : !touch && e.shiftKey ? 'lasso' : 'pan';
+    if (kind !== 'card' && !touch) {
+      // the empty space pressed: no words selected while it moves, and the keys work from here
+      e.preventDefault();
+      sc.focus({ preventScroll: true });
+    }
+    const g: Gesture = { id: e.pointerId, type: e.pointerType, kind, key: t.kind === 'card' ? t.key : null, sx: e.clientX, sy: e.clientY, left: sc.scrollLeft, top: sc.scrollTop, moved: false, held: !touch, add: e.shiftKey, timer: null, keys: [], boxes: [] };
+    if (touch && kind === 'card')
+      // held still for a moment, the card is picked up; moved first, the space moves
+      g.timer = setTimeout(() => {
+        if (gesture.current === g && !g.moved) {
+          g.held = true;
+          rootRef.current?.classList.add('is-holding');
+        }
+      }, SPACE_MOVE.holdMs);
+    gesture.current = g;
+  };
+  const onCanvasMove = (e: ReactPointerEvent<HTMLDivElement>) => {
+    if (!pointers.current.has(e.pointerId)) return;
+    pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+    const sc = scrollRef.current;
+    if (!sc) return;
+    if (pinch.current) {
+      const pts = [...pointers.current.values()];
+      if (pts.length < 2) return;
+      const r = sc.getBoundingClientRect();
+      zoomToRef.current(pinch.current.k0 * (spread(pts[0], pts[1]) / pinch.current.d0), { x: (pts[0].x + pts[1].x) / 2 - r.left, y: (pts[0].y + pts[1].y) / 2 - r.top });
+      return;
+    }
+    const g = gesture.current;
+    if (!g || g.id !== e.pointerId) return;
+    const dx = e.clientX - g.sx;
+    const dy = e.clientY - g.sy;
+    if (!g.moved) {
+      if (!isDrag(dx, dy, g.type)) return;
+      g.moved = true;
+      if (g.timer) clearTimeout(g.timer);
+      // a finger that did not wait to pick the card up moves the space
+      if (g.kind === 'card' && !g.held) g.kind = 'pan';
+      try {
+        e.currentTarget.setPointerCapture(e.pointerId);
+      } catch {
+        /* not every pointer can be captured */
+      }
+      if (g.kind === 'pan') rootRef.current?.classList.add('is-panning');
+      if (g.kind === 'card' && g.key) {
+        // a chosen card carries the others chosen with it
+        g.keys = chosen.has(g.key) ? [...chosen] : [g.key];
+        g.boxes = cardBoxes().filter((c) => g.keys.includes(c.key));
+        if (!chosen.has(g.key) && chosen.size) setChosen(new Set());
+      }
+    }
+    if (g.kind === 'pan') {
+      sc.scrollLeft = g.left - dx;
+      sc.scrollTop = g.top - dy;
+      return;
+    }
+    const z = zoomRef.current || 1;
+    if (g.kind === 'card') {
+      const c = clampDrag(dx / z, dy / z, g.boxes);
+      setCarry({ keys: g.keys, dx: c.dx, dy: c.dy });
+      return;
+    }
+    const cr = colsRef.current?.getBoundingClientRect();
+    if (cr) setLasso({ x0: (g.sx - cr.left) / z, y0: (g.sy - cr.top) / z, x1: (e.clientX - cr.left) / z, y1: (e.clientY - cr.top) / z });
+  };
+  const onCanvasUp = (e: ReactPointerEvent<HTMLDivElement>, cancelled = false) => {
+    pointers.current.delete(e.pointerId);
+    if (pinch.current) {
+      if (pointers.current.size < 2) pinch.current = null;
+      endGesture();
+      return;
+    }
+    const g = gesture.current;
+    if (!g || g.id !== e.pointerId) return;
+    endGesture();
+    const c = carryRef.current;
+    const l = lassoRef.current;
+    setCarry(null);
+    setLasso(null);
+    if (cancelled) return;
+    if (!g.moved) {
+      if (g.kind === 'card' && g.key && g.add && g.type !== 'touch') {
+        // Shift and a press: the card joins (or leaves) the cards chosen, and is not opened
+        const key = g.key;
+        setChosen((cur) => {
+          const next = new Set(cur);
+          if (next.has(key)) next.delete(key);
+          else next.add(key);
+          return next;
+        });
+        swallowNext();
+      } else if (g.kind !== 'card' && chosen.size) setChosen(new Set());
+      return;
+    }
+    swallowNext();
+    if (g.kind === 'card' && c && (c.dx || c.dy)) keepMoved(moveBy(moved, c.keys, c.dx, c.dy));
+    else if (g.kind === 'lasso' && l) setChosen(new Set(cardsIn(l, cardBoxes())));
+  };
+  /** a card brought to the keyboard: focused, and scrolled into view */
+  const focusCard = (key: string) => {
+    const el = colsRef.current?.querySelector<HTMLElement>(`[data-k="${CSS.escape(key)}"]`);
+    if (!el) return;
+    let f = el.querySelector<HTMLElement>('.ls-idea, .ls-file[tabindex], .ls-made[tabindex], .ls-hero[tabindex]');
+    if (!f) {
+      el.tabIndex = -1;
+      f = el;
+    }
+    f.focus({ preventScroll: true });
+    el.scrollIntoView?.({ block: 'nearest', inline: 'nearest', behavior: 'smooth' });
+  };
+  const onCanvasKey = (e: ReactKeyboardEvent<HTMLDivElement>) => {
+    const el = e.target as HTMLElement;
+    if (el.closest('input, textarea, select, [contenteditable="true"]')) return;
+    const sc = scrollRef.current;
+    if (!sc) return;
+    const cardEl = el.closest<HTMLElement>('[data-k]');
+    const onCard = cardEl && colsRef.current?.contains(cardEl) ? cardEl.dataset.k! : null;
+    const it = arrowIntent(e.key, e, !!onCard);
+    if (it) {
+      e.preventDefault();
+      if (it.kind === 'pan') {
+        if (typeof sc.scrollBy === 'function') sc.scrollBy({ left: it.dx, top: it.dy, behavior: 'smooth' });
+        else (sc.scrollLeft += it.dx), (sc.scrollTop += it.dy);
+      } else if (it.kind === 'nudge' && onCard) {
+        const keys = chosen.has(onCard) ? [...chosen] : [onCard];
+        const c = clampDrag(it.dx, it.dy, cardBoxes().filter((b) => keys.includes(b.key)));
+        keepMoved(moveBy(moved, keys, c.dx, c.dy));
+      } else if (it.kind === 'card' && onCard) {
+        const next = nextCard(it.way, onCard, cardBoxes());
+        if (next) focusCard(next);
+      }
+      return;
+    }
+    if (e.metaKey || e.ctrlKey) return;
+    if (e.key === '+' || e.key === '=') (e.preventDefault(), zoomTo(zoomStep(zoomRef.current, 1)));
+    else if (e.key === '-' || e.key === '_') (e.preventDefault(), zoomTo(zoomStep(zoomRef.current, -1)));
+    else if (e.key === '0') (e.preventDefault(), fitSpace());
+    else if (e.key === 'Escape' && chosen.size) (e.stopPropagation(), setChosen(new Set()));
+  };
+  const anyMoved = Object.keys(moved).length > 0;
 
   // READING ORDER (Revision IV): the frame column, then each column top to bottom, then what was made — the order
   // the cards settle in when the space opens
@@ -542,8 +844,17 @@ export function L5Space({
     keys.push(...made.map((m) => madeKey(m.key)));
     return new Map(keys.map((k, i) => [k, i]));
   }, [layout, brought, made, placed]);
-  const order = (k: string) => ({ ['--i' as string]: orderOf.get(k) ?? 0 });
-  const back = (k: string) => (forwardIn(kind, cardKindOf(k)) ? '' : ' is-back') + (glow.has(k) ? ' is-glow' : '');
+  // a card put somewhere else is drawn shifted (the translate property, so the arrival's transform still plays), and its
+  // lines follow it: they are measured from the cards as drawn
+  const order = (k: string) => {
+    const st: Record<string, string | number> = { ['--i' as string]: orderOf.get(k) ?? 0 };
+    if (narrow) return st;
+    const o = shiftOf(moved, k, carry);
+    if (o.x || o.y) st.translate = `${o.x}px ${o.y}px`;
+    return st;
+  };
+  const placed_ = (k: string) => (narrow ? '' : `${moved[k] ? ' is-moved' : ''}${carry?.keys.includes(k) ? ' is-lifted' : ''}${chosen.has(k) ? ' is-chosen' : ''}`);
+  const back = (k: string) => (forwardIn(kind, cardKindOf(k)) ? '' : ' is-back') + (glow.has(k) ? ' is-glow' : '') + placed_(k);
   const turnWords = (t: number) => {
     const turn = turns[t];
     if (!turn) return null;
@@ -810,10 +1121,23 @@ export function L5Space({
           <button type="button" aria-label="Zoom in" title="Zoom in (or pinch)" onClick={() => zoomTo(zoomStep(zoom, 1))} disabled={zoom >= SPACE_ZOOM.max}>
             +
           </button>
-          <button type="button" className="is-fit" aria-label="Fit the whole space on screen" title="Fit the whole space on screen" onClick={fitSpace}>
+          <button type="button" className="is-fit" aria-label="Fit the whole space on screen" title="Fit the whole space on screen (0)" onClick={fitSpace}>
             Fit
           </button>
         </span>
+      )}
+      {!narrow && anyMoved && (
+        <button
+          type="button"
+          className="l5-link ls-putback"
+          title="Every card back where the space laid it out"
+          onClick={() => {
+            keepMoved({});
+            setChosen(new Set());
+          }}
+        >
+          Put back
+        </button>
       )}
       <button type="button" className="l5-link is-go ls-page" onClick={onPage}>
         {narrow ? 'As a conversation' : 'Read as a conversation'} <span className="l5-ar">→</span>
@@ -898,6 +1222,15 @@ export function L5Space({
   }
 
   // ── A WIDE SCREEN: the space, left to right ──
+  // the scroll area: the space's size times the zoom; a card put past its far edge widens it (and the room under the
+  // chatbox stays below the lowest card)
+  const zoomBox = (() => {
+    const w = Math.max(natural.w, drawn.ew ? drawn.ew + 40 : 0);
+    const hh = drawn.eh ? drawn.eh * zoom + footRef.current + 56 : 0;
+    if (zoom === 1 && w <= natural.w && hh <= natural.h) return undefined;
+    if (!natural.w) return undefined;
+    return { width: w * zoom, height: Math.max(natural.h * zoom, hh) };
+  })();
   const col = (ids: string[]) => ids.map((id) => (open && id === open.id ? openEl : byId.get(id) ? ideaEl(byId.get(id)!) : null));
   return (
     <div
@@ -907,8 +1240,20 @@ export function L5Space({
       style={{ ['--ls-base' as string]: `${(ideas.length + brought.length + made.length + (placed ? 0 : 1)) * 70 + 300}ms`, ['--ls-k' as string]: String(zoom) }}
     >
       {kindsEl}
-      <div className="ls-canvas l5-dots" ref={scrollRef}>
-        <div className="ls-zoom" style={zoom !== 1 && natural.w ? { width: natural.w * zoom, height: natural.h * zoom } : undefined}>
+      <div
+        className="ls-canvas l5-dots"
+        ref={scrollRef}
+        tabIndex={0}
+        role="region"
+        aria-label="The space. Drag the empty space to move around it, drag a card to move it, Shift-drag to choose several; arrows go from card to card, Shift and the arrows move the view, Alt and the arrows move a card, + and − zoom, 0 fits."
+        onPointerDown={onCanvasDown}
+        onPointerMove={onCanvasMove}
+        onPointerUp={(e) => onCanvasUp(e)}
+        onPointerCancel={(e) => onCanvasUp(e, true)}
+        onKeyDown={onCanvasKey}
+      >
+        <div className="ls-slack" ref={slackRef}>
+        <div className="ls-zoom" style={zoomBox}>
         <div className="ls-cols" ref={colsRef} style={zoom !== 1 ? { transform: `scale(${zoom})` } : undefined}>
           <svg className="ls-edges" width={drawn.w} height={drawn.h} aria-hidden="true">
             {drawn.lines.map((l, i) => (
@@ -919,6 +1264,13 @@ export function L5Space({
             ))}
             {drawn.thread && <path className="ls-thread" d={drawn.thread} />}
           </svg>
+          {lasso && (
+            <div
+              className="ls-lasso"
+              aria-hidden="true"
+              style={{ left: Math.min(lasso.x0, lasso.x1), top: Math.min(lasso.y0, lasso.y1), width: Math.abs(lasso.x1 - lasso.x0), height: Math.abs(lasso.y1 - lasso.y0) }}
+            />
+          )}
           {(layout.frame.length > 0 || brought.length > 0) && (
             <div className="ls-col is-frame">
               {col(layout.frame)}
@@ -932,6 +1284,7 @@ export function L5Space({
           ))}
           {!placed && <div className="ls-col has-open">{openEl}</div>}
           {made.length > 0 && <div className="ls-col is-made">{made.map((m) => thingEl(m, 'made'))}</div>}
+        </div>
         </div>
         </div>
       </div>

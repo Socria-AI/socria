@@ -629,6 +629,25 @@ its shape. It now zooms (`lib/logos5/spaceZoom.ts`, `components/logos5/L5Space.t
   and the room under the chatbox is divided by the zoom, so what it covers can always be scrolled clear.
 - A phone's space is a column of cards, not a canvas, and has no keys.
 
+**It moves as the Universal Map does** (`lib/logos5/spaceMove.ts`). The same hands work on both:
+
+- **Drag the empty space** to move around it (a finger too, and two fingers pinch). The wheel and a trackpad scroll it
+  as before. The space sits in room of its own on every side (`.ls-slack`), so it moves even when it fits the screen;
+  at the far end of that room it still fills over half the view. The view opens on the space, and zooming, Fit, the
+  row and the open idea all count the room, so the view never comes to rest in it by itself.
+- **Drag a card** to put it somewhere else; it draws above what it lands on, and its lines follow it, since they are
+  measured from the cards as drawn. A
+  finger holds a card a moment to pick it up (moved sooner, the space moves). A card let go is not also opened, and a
+  press without a drag opens it as before. No card goes past the space's top or left edge, where nothing could scroll
+  to it; past its far edges the space grows to keep it reachable.
+- **Shift-drag** draws a rectangle that chooses the cards it touches; Shift and a press adds one or takes it away. What
+  is chosen wears the Universal Map's gold ring, and a chosen card carries the others when dragged. Escape lets go.
+- **Keys** (with the space or a card focused): an arrow goes to the nearest card that way, Shift and an arrow move the
+  view, Alt and an arrow move the card (Shift as well, four times as far), + and − zoom, 0 fits.
+- Where cards were put is kept for that conversation on this device, until **Put back** (in the row, once a card has
+  moved) returns every card to where the space laid it out.
+- Socria's reply is still words: a mouse selects them rather than moving anything. A phone's column does not move.
+
 ### 8.13 One Socria — the standard, measured and held
 
 Every page and surface was captured (desktop, phone; paper and dark), every stylesheet parsed (92 sheets, 47,000

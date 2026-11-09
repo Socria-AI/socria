@@ -317,3 +317,27 @@ html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-ro
 /* the row's words never wrap, however narrow the space is beside an open panel */
 .logos-root .ls-kd, .logos-root .ls-page { white-space: nowrap; }
 .logos-root .ls-kinds { overflow-x: auto; scrollbar-width: none; }
+
+/* ── MOVING ABOUT (lib/logos5/spaceMove.ts), as on the Universal Map ──
+   the empty space is held and dragged to move around it; a card is dragged to put it somewhere else (a finger holds it
+   a moment first); Shift-drag draws a rectangle that chooses several, which then move together. A finger moves and
+   pinches the space itself, so the canvas takes its touches; Socria's reply is still words a mouse can select. */
+.logos-root .ls:not(.is-phone) .ls-canvas { cursor: grab; touch-action: none; }
+.logos-root .ls:not(.is-phone) .ls-canvas:focus-visible { outline: 2px solid var(--c-moss); outline-offset: -2px; }
+.logos-root .ls:not(.is-phone) .ls-bub { cursor: auto; }
+.logos-root .ls.is-panning .ls-canvas,
+.logos-root .ls.is-panning .ls-canvas * { cursor: grabbing; }
+.logos-root .ls:not(.is-phone) .ls-it.is-lifted { z-index: 4; opacity: 0.92; filter: drop-shadow(0 12px 18px rgba(var(--shadow-rgb, 35, 36, 31), 0.22)); }
+/* a card put somewhere else draws above the columns it now sits over (each column is a layer of its own) */
+.logos-root .ls:not(.is-phone) .ls-col:has(> .ls-it.is-moved) { z-index: 2; }
+.logos-root .ls:not(.is-phone) .ls-col:has(> .ls-it.is-lifted) { z-index: 3; }
+.logos-root .ls:not(.is-phone) .ls-it.is-lifted,
+.logos-root .ls:not(.is-phone) .ls-it.is-lifted * { cursor: grabbing; }
+.logos-root .ls.is-holding .ls-canvas { cursor: grabbing; }
+/* what is chosen wears the Universal Map's gold ring; the keyboard's ring stays the one moss focus colour */
+.logos-root .ls-it.is-chosen > :is(.ls-idea, .ls-file, .ls-made, .ls-open) { box-shadow: 0 0 0 3px var(--c-paper), 0 0 0 5px var(--ls-gold, #b8a26b); }
+.logos-root .ls-lasso { position: absolute; z-index: 5; border: 1px dashed var(--ls-gold, #b8a26b); background: rgba(184, 162, 107, 0.08); pointer-events: none; }
+.logos-root .ls-putback { flex: none; align-self: center; font-size: 12.5px; }
+/* room to move: the space sits in room of its own on every side, so it can be dragged about even when it fits the
+   screen, as the Universal Map can; at the far end of the room the space still fills over half the view */
+.logos-root .ls-slack { position: relative; box-sizing: content-box; width: max-content; padding: 38vh 45vw; }

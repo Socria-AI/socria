@@ -39,11 +39,21 @@ export function fitZoom(content: { w: number; h: number }, view: { w: number; h:
 
 /**
  * Where the view goes when the zoom changes from `from` to `to`, so the point under `at` (a point in the view, from its
- * top left — the pointer for a pinch, the middle for the keys) stays where it is.
+ * top left — the pointer for a pinch, the middle for the keys) stays where it is. `slack` is the room around the space
+ * (lib/logos5/spaceMove.ts), which does not scale.
  */
-export function anchorScroll(scroll: { left: number; top: number }, at: { x: number; y: number }, from: number, to: number): { left: number; top: number } {
+export function anchorScroll(
+  scroll: { left: number; top: number },
+  at: { x: number; y: number },
+  from: number,
+  to: number,
+  slack: { x: number; y: number } = { x: 0, y: 0 }
+): { left: number; top: number } {
   const r = to / from;
-  return { left: Math.max(0, (scroll.left + at.x) * r - at.x), top: Math.max(0, (scroll.top + at.y) * r - at.y) };
+  return {
+    left: Math.max(0, (scroll.left + at.x - slack.x) * r + slack.x - at.x),
+    top: Math.max(0, (scroll.top + at.y - slack.y) * r + slack.y - at.y),
+  };
 }
 
 /** The readout: "80%". */
