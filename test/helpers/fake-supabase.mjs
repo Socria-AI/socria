@@ -29,6 +29,8 @@ const PK = {
   event_sheet_sync: ['event_id'],
   captures: ['id'],
   mr_ledger: ['user_id', 'id'],
+  // supabase/schema.sql: primary key (user_id, scope, counter) — the key every usage write meets
+  logos_usage: ['user_id', 'scope', 'counter'],
 };
 
 // Unique indexes beyond the primary key (supabase/schema.sql), as Postgres
@@ -95,7 +97,13 @@ class Query {
     this._limit = null;
     this._single = false;
   }
-  select(cols = '*', opts = {}) { if (this.op === 'select') { this.cols = cols; this.opts = opts; } return this; }
+  // After a write, .select() asks for the written rows back (Prefer: return=representation), as PostgREST
+  // answers it: the rows inserted or changed — and, for ON CONFLICT DO NOTHING, only the ones inserted.
+  select(cols = '*', opts = {}) {
+    if (this.op === 'select') { this.cols = cols; this.opts = opts; }
+    else this._returning = cols;
+    return this;
+  }
   insert(rows) { this.op = 'insert'; this.payload = Array.isArray(rows) ? rows : [rows]; return this; }
   upsert(rows, opts = {}) { this.op = 'upsert'; this.payload = Array.isArray(rows) ? rows : [rows]; this.upsertOpts = opts; return this; }
   update(patch, opts = {}) { this.op = 'update'; this.payload = patch; this.opts = opts; return this; }
@@ -175,11 +183,19 @@ class Query {
       return { data, error: null, count };
     }
 
+    // the written rows, in the columns asked for — or nothing, when no .select() followed the write
+    const written = (rows) => {
+      if (this._returning === undefined) return null;
+      const cols = this._returning === '*' ? [] : String(this._returning).split(',').map((c) => c.trim()).filter(Boolean);
+      return rows.map((r) => (cols.length ? Object.fromEntries(cols.map((c) => [c, r[c] ?? null])) : { ...r }));
+    };
+
     if (this.op === 'insert' || this.op === 'upsert') {
       for (const row of this.payload) {
         const err = checkCols(t, Object.keys(row), true);
         if (err) return { data: null, error: err, count: null };
       }
+      const out = [];
       for (const row of this.payload) {
         const k = keyOf(t, row);
         const i = all.findIndex((r) => keyOf(t, r) === k);
@@ -190,29 +206,33 @@ class Query {
           // ON CONFLICT DO NOTHING
           if (this.upsertOpts?.ignoreDuplicates) continue;
           all[i] = { ...all[i], ...row };
+          out.push(all[i]);
         } else {
           if (collides(t, row, all)) return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint' }, count: null };
           if (t === 'mind_projects' && all.some((r) => r.user_id === row.user_id && String(r.name).toLowerCase() === String(row.name).toLowerCase())) {
             return { data: null, error: { code: '23505', message: 'duplicate key value violates unique constraint "mind_projects_user_name_idx"' }, count: null };
           }
           all.push({ ...row });
+          out.push(all[all.length - 1]);
         }
         db.log.push([this.op, t, k]);
       }
-      return { data: null, error: null, count: this.payload.length };
+      return { data: written(out), error: null, count: this.payload.length };
     }
 
     if (this.op === 'update') {
       const err = filterErr ?? checkCols(t, Object.keys(this.payload), true);
       if (err) return { data: null, error: err, count: null };
       let n = 0;
+      const out = [];
       for (let i = 0; i < all.length; i++) {
         if (!match(all[i])) continue;
         all[i] = { ...all[i], ...this.payload };
+        out.push(all[i]);
         n++;
       }
       db.log.push(['update', t, n]);
-      return { data: null, error: null, count: n };
+      return { data: written(out), error: null, count: n };
     }
 
     if (this.op === 'delete') {

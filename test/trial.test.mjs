@@ -87,7 +87,7 @@ console.log('\n=== one trial a person ===');
   const h = (e) => createHmac('sha256', key).update(T.normaliseEmail(e), 'utf8').digest('hex');
   ok('  so their keyed hashes match, and a different person’s does not', h('Pat.Smith@gmail.com') === h('patsmith+2@gmail.com') && h('pat@gmail.com') !== h('pat@outlook.com'));
   const server = read('lib/trial-server.ts');
-  ok('  only a keyed hash is kept — never the address — keyed by the hash so deleting the account leaves it', /createHmac\('sha256', key\)\.update\(norm, 'utf8'\)/.test(server) && /p_user: CLAIM_PREFIX \+ h/.test(server) && !/emailAddress,/.test(server.replace(/e\.emailAddress, key/, '')));
+  ok('  only a keyed hash is kept — never the address — keyed by the hash so deleting the account leaves it', /createHmac\('sha256', key\)\.update\(norm, 'utf8'\)/.test(server) && /bumpSafely\(CLAIM_PREFIX \+ h, CLAIM_SCOPE, CLAIM_COUNTER, at\)/.test(server) && /readCount\(\{ user: CLAIM_PREFIX \+ h, scope: CLAIM_SCOPE, counter: CLAIM_COUNTER \}\)/.test(server) && !/emailAddress,/.test(server.replace(/e\.emailAddress, key/, '')));
   ok('  only VERIFIED addresses count', /e\?\.verification\?\.status === 'verified'/.test(server));
   ok('  account deletion leaves the claims (they are keyed by the hash, not the account)', !/trialclaim/.test(read('app/api/account/delete/route.ts')));
 }
@@ -135,7 +135,10 @@ console.log('\n=== activation: once, atomically ===');
   ok('  not even a week later: a trial is never restarted', later === -1);
   const sleep = read('lib/sleep-server.ts');
   ok('  begun on the request’s first real model call, never at the gate or for upkeep', /if \(m\.begin\) \{\s*try \{\s*await beginTrial\(m\.userId\)/.test(sleep) && /\.\.\.\(t\.status === 'eligible' \? \{ begin: true \} : \{\}\)/.test(sleep) && !/beginTrial/.test(sleep.slice(sleep.indexOf('export async function restingNow'), sleep.indexOf('export function sleepAnswer'))));
-  ok('  the start that began it counts the activation and keeps the address, once', /if \(typeof data === 'number' && data === m\) \{\s*\/\/ this call began it: keep the address, and count the activation\s*void keepClaims\(userId, now\);\s*void countEvent\('activated', now\);/.test(read('lib/trial-server.ts')));
+  ok('  the start that began it counts the activation and keeps the address, once', /first = await createOnce\(row, m, now\);/.test(read('lib/trial-server.ts')) && /\/\/ this call began it: keep the address, and count the activation\s*void keepClaims\(userId, now\);\s*void countEvent\('activated', now\);\s*return m \* 60_000;/.test(read('lib/trial-server.ts')));
+  ok('  written without any SQL function (INSERT … ON CONFLICT DO NOTHING), the function only as a fallback', /\.upsert\(\{ user_id: r\.user, scope: r\.scope, counter: r\.counter, n, updated_at: at \}, \{ onConflict: 'user_id,scope,counter', ignoreDuplicates: true \}\)/.test(read('lib/usage-rows.ts')) && /\.eq\('n', cur\)/.test(read('lib/usage-rows.ts')));
+  ok('  a failed check for an earlier trial never refuses a first one', /a guard\s*(?:\/\/|\*)?\s*against a second trial is never a reason to refuse somebody their first/.test(read('lib/trial-server.ts')) && !/throw fault\('claim read'/.test(read('lib/trial-server.ts')));
+  ok('  the "can’t be checked" sentence says to try again only once (the app adds that its message is back in the box)', !/try again/i.test(T.TRIAL_UNAVAILABLE) && /paused for a moment/.test(T.TRIAL_UNAVAILABLE));
 }
 
 console.log('\n=== concurrency and bypass ===');

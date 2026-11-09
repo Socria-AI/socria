@@ -44,7 +44,12 @@
 // nothing past the limit is ever held — but a hold is then part of the week's
 // total until it is settled, so a call made while another is running may be
 // told Socria is resting a moment early, and a call that dies keeps its hold.
-// Without either, free accounts' AI requests are paused and the log says why.
+// Without either (or when they answer an error), the hold is kept on the table
+// alone (lib/usage-rows.ts: compare-and-set on the row, as strict, no function
+// needed) and the log says once why. Only a store that cannot be read or
+// written at all pauses the trial's requests (November 9, 2026: production
+// answered every trial's first message with "Your trial can't be checked right
+// now" because the functions were not there to answer).
 //
 // Switches, read per request (no redeploy): SOCRIA_FREE_WEEKLY_TOKENS sets the
 // limit; SOCRIA_SLEEP=off switches Sleep Mode off for everyone (an operator's
@@ -55,6 +60,7 @@
 import { NextResponse, type NextRequest } from 'next/server';
 import { waitUntil } from '@vercel/functions';
 import { supabaseAdmin } from './supabase';
+import { addTo, readCount } from './usage-rows';
 import { resolvePlanForRequest } from './socria-one-server';
 import { SLEEP_COUNTER, sleepRefusal, TOKENS_BUSY, TOKENS_UNAVAILABLE, type SleepState } from './sleep';
 import { TRIAL_DAY_NOTE, TRIAL_ENDED_COOKIE, TRIAL_UNAVAILABLE, dayKey, dayStart, nextMidnight, trialEndedRefusal, type TrialState } from './trial';
@@ -124,6 +130,36 @@ async function reserveByCounter(a: { user: string; week: string; want: number; m
   return { granted: 0, used: await readWeek(a.user, a.week), held: 0, holds: false };
 }
 
+/**
+ * The table alone (lib/usage-rows.ts), for a database where neither function answers: the same hold,
+ * as strict — the count is raised only where it is still what was read, so nothing past the limit is
+ * ever held — and, like the older path, a hold is part of the period's total until it is settled.
+ */
+async function reserveByRows(a: { user: string; week: string; want: number; min: number; limit: number; at: number }): Promise<Reserved> {
+  const row = { user: a.user, scope: a.week, counter: SLEEP_COUNTER };
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const used = (await readCount(row)) ?? 0;
+    const free = a.limit - used;
+    if (free < Math.max(1, a.min)) return { granted: 0, used, held: 0, holds: false };
+    const take = Math.min(a.want, free);
+    const n = await addTo(row, take, a.at, { limit: a.limit });
+    // -1: another request took the room first — read again and try once more
+    if (n === -1) continue;
+    return { granted: take, used: n - take, held: take, holds: false };
+  }
+  return { granted: 0, used: (await readCount(row)) ?? 0, held: 0, holds: false };
+}
+
+/** The older paths, in order: consume_logos_usage, then the table alone. Throws only when the store cannot answer at all. */
+async function reserveWithoutHolds(a: { user: string; week: string; want: number; min: number; limit: number; at: number }): Promise<Reserved> {
+  try {
+    return await reserveByCounter(a);
+  } catch (e) {
+    warnOnce('rows', `[sleep] consume_logos_usage could not hold the tokens (${e instanceof Error ? e.message : 'error'}) — holding them on the table alone (lib/usage-rows.ts) until supabase/freemium.sql is run`);
+    return reserveByRows(a);
+  }
+}
+
 export const supabaseTokenStore: TokenStore = {
   async reserve(a) {
     const { data, error } = await supabaseAdmin().rpc('reserve_logos_tokens', {
@@ -144,9 +180,9 @@ export const supabaseTokenStore: TokenStore = {
       // an answer that is not the function's: the hold cannot be trusted, so nothing is held
       throw fault('reserve', { message: 'unexpected answer' });
     }
-    if (!missingFunction(error)) throw fault('reserve', error);
-    warnOnce('reserve', '[sleep] reserve_logos_tokens is not installed — the week’s tokens are held through consume_logos_usage until supabase/weekly-tokens.sql is run (docs/SLEEP-MODE.md)');
-    return reserveByCounter(a);
+    if (missingFunction(error)) warnOnce('reserve', '[sleep] reserve_logos_tokens is not installed — the tokens are held through consume_logos_usage (or the table alone) until supabase/weekly-tokens.sql is run (docs/SLEEP-MODE.md)');
+    else warnOnce('reserve-error', `[sleep] reserve_logos_tokens answered an error (${String(error.message ?? error.code ?? 'error').slice(0, 160)}) — holding through the older paths instead`);
+    return reserveWithoutHolds(a);
   },
   async settle(a) {
     const db = supabaseAdmin();
@@ -162,8 +198,10 @@ export const supabaseTokenStore: TokenStore = {
       delta < 0
         ? await db.rpc('refund_logos_usage', { p_user: a.user, p_scope: a.week, p_counter: SLEEP_COUNTER, p_by: -delta, p_at: a.at })
         : await db.rpc('bump_logos_usage', { p_user: a.user, p_scope: a.week, p_counter: SLEEP_COUNTER, p_by: delta, p_at: a.at });
-    if (error) throw fault('settle', error);
-    return typeof data === 'number' ? data : 0;
+    if (!error) return typeof data === 'number' ? data : 0;
+    // without the functions: the same change on the table alone (never below zero)
+    warnOnce('settle-rows', `[sleep] ${delta < 0 ? 'refund' : 'bump'}_logos_usage could not settle (${String(error.message ?? error.code ?? 'error').slice(0, 160)}) — settling on the table alone (lib/usage-rows.ts)`);
+    return addTo({ user: a.user, scope: a.week, counter: SLEEP_COUNTER }, delta, a.at);
   },
   read: readWeek,
 };

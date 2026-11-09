@@ -76,6 +76,8 @@ const ENTRIES = {
   sleep: 'lib/sleep.ts',
   trial: 'lib/trial.ts',
   gate: 'lib/sleep-server.ts',
+  rows: 'lib/usage-rows.ts',
+  trialServer: 'lib/trial-server.ts',
   pass: 'lib/guest-pass.ts',
   objects: 'lib/objects/index.ts',
   screen: 'components/logos5/SleepMode.tsx',
@@ -537,6 +539,52 @@ console.log('\n=== the older counter, before supabase/weekly-tokens.sql is run =
   ok('the day is still held and settled — through consume_logos_usage, refunded to what it cost', a.status === 200 && tokensOf('mo') === 700 && holdsOf('mo') === 0 && weekRows().length === 0, { status: a.status, tokens: tokensOf('mo') });
   setTokens('mo', 4_000);
   ok('  and as strict at the limit', restsForTheDay(await call('chat', '/api/logos/chat', ROUTES[0].body('mo'), { as: 'mo' }), 4_000));
+}
+
+console.log('\n=== no usage functions at all (production, November 9, 2026: no trial could begin) ===');
+{
+  fresh();
+  const gone = (name) => () => ({ data: null, error: { code: 'PGRST202', message: `Could not find the function public.${name} in the schema cache` } });
+  for (const name of ['reserve_logos_tokens', 'settle_logos_tokens', 'consume_logos_usage', 'bump_logos_usage', 'refund_logos_usage']) db.rpcs[name] = gone(name);
+  globalThis.__users = { ...(globalThis.__users ?? {}), nf: { emails: ['nf.person@example.com'] } };
+  const secretWas = process.env.SOCRIA_TRIAL_SECRET;
+  process.env.SOCRIA_TRIAL_SECRET = 'a-test-secret-for-the-address-hashes';
+  const metric = (event) => db.rows('logos_usage').filter((r) => r.user_id === 'metrics:trial' && r.counter === event).reduce((a, r) => a + r.n, 0);
+  const claims = () => db.rows('logos_usage').filter((r) => String(r.user_id).startsWith('trialclaim:') && r.scope === 'claim' && r.n > 0).length;
+  const a = await call('chat', '/api/logos/chat', ROUTES[0].body('nf'), { as: 'nf' });
+  ok('the first message is answered: the trial begins on the table alone, and its tokens are held and settled there', a.status === 200 && startOf('nf') !== null && tokensOf('nf') === EACH && holdsOf('nf') === 0, { status: a.status, start: startOf('nf'), tokens: tokensOf('nf'), body: a.text.slice(0, 200) });
+  await new Promise((r) => setTimeout(r, 60));
+  ok('  the activation is counted and the address kept, with no bump_logos_usage to do it', metric('activated') === 1 && claims() === 1, { activated: metric('activated'), claims: claims() });
+  const start = startOf('nf');
+  const b = await call('chat', '/api/logos/chat', ROUTES[0].body('nf'), { as: 'nf' });
+  ok('  the next message the same: the start unmoved, the day adding up', b.status === 200 && startOf('nf') === start && tokensOf('nf') === 2 * EACH && metric('activated') === 1, { status: b.status, tokens: tokensOf('nf') });
+  const u = await usageOf('nf');
+  ok('  and the app is shown the running trial and the day', u.trial?.status === 'active' && u.sleep?.used === 2 * EACH && u.sleep?.limit === 4_000, u);
+  setTokens('nf', 4_000);
+  ok('  as strict at the day’s limit', restsForTheDay(await call('chat', '/api/logos/chat', ROUTES[0].body('nf'), { as: 'nf' }), 4_000));
+  ok('  a limit reached is counted once, on the table alone', metric('limit_hits') === 1);
+
+  // the primitives, raced: twenty requests at once for the last of a limit, two first messages at once
+  const row = { user: 'race', scope: 'tday:race', counter: 'tokens' };
+  const got = await Promise.all(Array.from({ length: 20 }, () => R.rows.addTo(row, 100, Date.now(), { limit: 1_000 })));
+  const n = db.rows('logos_usage').find((r) => r.user_id === 'race')?.n;
+  ok('twenty requests at once for 1,000 tokens, 100 each: exactly ten are given them, the rest told no — never more than the limit', n === 1_000 && got.filter((x) => x > 0).length === 10 && got.filter((x) => x === -1).length === 10, { n, got });
+  ok('  a refund never goes below zero', (await R.rows.addTo(row, -5_000, Date.now())) === 0);
+  const t0 = Date.now();
+  const [s1, s2] = await Promise.all([R.trialServer.beginTrial('twin', t0), R.trialServer.beginTrial('twin', t0 + 1_000)]);
+  await new Promise((r) => setTimeout(r, 60));
+  const starts = db.rows('logos_usage').filter((r) => r.user_id === 'twin' && r.scope === 'trial' && r.counter === 'start');
+  ok('two first messages at once begin ONE trial: one start row, both told the same start, one activation', starts.length === 1 && s1 === s2 && s1 === Math.floor(t0 / 60_000) * 60_000 && metric('activated') === 2, { starts, s1, s2, activated: metric('activated') });
+  // a start row left empty by an attempt that died between creating and filling it is filled, not refused
+  db.rows('logos_usage').push({ user_id: 'stub', scope: 'trial', counter: 'start', n: 0, updated_at: t0 });
+  ok('  a start row left empty is filled, once', (await R.trialServer.beginTrial('stub', t0)) === Math.floor(t0 / 60_000) * 60_000 && startOf('stub') === Math.floor(t0 / 60_000));
+  // only a store that cannot be read or written at all still pauses the request
+  db.absent.add('logos_usage');
+  const down = await call('chat', '/api/logos/chat', ROUTES[0].body('nz'), { as: 'nz' });
+  ok('with no table to keep it on, the request is still paused (503) and no model is asked', down.status === 503 && down.json?.unavailable === true && down.calls.filter((c) => c.stream).length === 0, down.status);
+  db.absent.delete('logos_usage');
+  if (secretWas === undefined) delete process.env.SOCRIA_TRIAL_SECRET;
+  else process.env.SOCRIA_TRIAL_SECRET = secretWas;
 }
 
 console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');

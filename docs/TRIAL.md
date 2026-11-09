@@ -43,7 +43,16 @@ the suite `test/trial.test.mjs` fails if a model-calling route skips it):
 Why it cannot be bypassed: the balance is the server's, keyed by the account and the UTC day — never a
 cookie, header, body field or browser. Holds are taken under the row's lock (`reserve_logos_tokens`, or
 `consume_logos_usage` until `supabase/weekly-tokens.sql` is applied), so refreshes, tabs, devices and
-requests at once draw on one balance and can never be granted the same last tokens. A failed call costs
+requests at once draw on one balance and can never be granted the same last tokens.
+
+Without those functions (a database where `supabase/freemium.sql` was never run, or where they answer an
+error), every trial write is made on the table alone (`lib/usage-rows.ts`), as strictly: the start with
+INSERT … ON CONFLICT DO NOTHING (one first message begins the trial, however many arrive at once), and
+every count changed only where it is still the value read (compare-and-set: of twenty requests racing for
+the last 1,000 tokens, exactly the ones that fit are given them). The functions are used wherever they
+answer. Only a store that cannot be read or written at all pauses requests (503). Until November 9, 2026
+the start was written only through `consume_logos_usage`, and production — which did not have it —
+answered every trial's first message with "Your trial can't be checked right now". A failed call costs
 nothing; a call that used less than it held gives the rest back; a stream stopped early is settled at an
 estimate of what it read and wrote; a settle is counted once; a hold whose call never returns stops
 counting after ten minutes. The day may end past its limit by at most the one call that was running.
@@ -95,7 +104,10 @@ service's own rows (`metrics:trial`, `mday:MM-DD`); events are counted once per 
 
 ## Deployment
 
-- No migration is required: everything is in `logos_usage` with the existing functions.
+- No migration is required: everything is in `logos_usage`, and nothing needs its functions (they are used
+  where they exist; `/api/health/upstream` says whether they do).
+- Recommended: run `supabase/freemium.sql` once, so holds and counts are taken under the row's lock by the
+  functions rather than by compare-and-set (both are strict; the functions are one round trip).
 - Recommended: apply `supabase/weekly-tokens.sql` (not applied yet, by decision) so holds are kept apart from
   the day's total.
 - Set `SOCRIA_TRIAL_SECRET` (a long random string) so the eligibility hash does not depend on the Clerk key.

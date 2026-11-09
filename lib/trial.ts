@@ -222,7 +222,9 @@ export function endsAtWords(at: number, opts: { locale?: string; timeZone?: stri
 export const TRIAL_DAY_NOTE = `You’ve used today’s trial tokens. Socria rests until ${DAY_RESET_WORDS}, and everything you’ve made is still here.`;
 
 /** What a request is told when the trial cannot be read: paused, plainly, and nothing lost (sent with 503). */
-export const TRIAL_UNAVAILABLE = 'Your trial can’t be checked right now, so new requests to Socria are paused. Everything you already have stays open — try again in a minute.';
+// One instruction, said once: the app adds "Your message is back in the box — try sending it again" to a
+// failed send, so this sentence does not say to try again as well (it said so twice, November 9, 2026).
+export const TRIAL_UNAVAILABLE = 'Your trial can’t be checked right now, so new requests to Socria are paused for a moment. Everything you already have stays open.';
 
 /** What a request refused after the trial says. */
 export const TRIAL_ENDED_NOTE = 'Your seven-day trial has ended. New questions, Logic Maps and artifacts need Socria One. Everything you’ve made is still here to open, move and edit.';
