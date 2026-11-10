@@ -19,7 +19,7 @@ import { auth } from '@clerk/nextjs/server';
 import { tracked } from '@/lib/openai-usage';
 import { chooseAuxModel, firstAccepted, tierOf } from '@/lib/model-router';
 import { LOGOS_MODEL } from '@/lib/logos';
-import { meterFor, sleepGate } from '@/lib/sleep-server';
+import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { enforceRateLimit } from '@/lib/rate-limit';
@@ -110,6 +110,9 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       intent,
     });
   } catch (e) {
+    // the week's last tokens taken by another request first: said as Sleep Mode, never as a failure
+    const resting = sleepAnswer(e);
+    if (resting) return resting;
     console.error('ux reason failed:', e instanceof Error ? e.message : e);
     return NextResponse.json({ error: 'SocriaUX could not answer just now. Your work is saved; try again in a moment.' }, { status: 502 });
   }

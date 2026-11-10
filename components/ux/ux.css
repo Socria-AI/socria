@@ -21,8 +21,10 @@
   --ux-line: rgba(53, 70, 32, 0.14);
   --ux-line-2: rgba(53, 70, 32, 0.22);
   --ux-moss: #354620;
-  --ux-moss-tone: #5e7633;
-  --ux-moss-700: #465a26;
+  /* one green (test/ux-consistency): #354620 is every accent */
+  --ux-moss-tone: #354620;
+  --ux-moss-hover: #2a381a;
+  --ux-moss-700: #354620;
   --ux-moss-wash: rgba(53, 70, 32, 0.07);
   --ux-moss-wash-2: rgba(53, 70, 32, 0.12);
   --ux-rust: #9c5b3c;
@@ -68,8 +70,8 @@
   white-space: nowrap;
 }
 .uxr-btn:hover:not(:disabled) {
-  background: var(--ux-moss-tone);
-  border-color: var(--ux-moss-tone);
+  background: var(--ux-moss-hover);
+  border-color: var(--ux-moss-hover);
 }
 .uxr-btn:disabled {
   opacity: 0.45;
@@ -207,7 +209,7 @@ textarea.uxr-input {
 .uxr-select:focus {
   border-color: var(--ux-moss-tone);
   outline: none;
-  box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.14);
+  box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.14);
 }
 .uxr-input::placeholder {
   color: var(--ux-ink-45);
@@ -721,7 +723,7 @@ textarea.uxr-input {
   cursor: default;
 }
 .uxc-el:hover .uxc-hit {
-  outline: calc(1px / var(--k, 1)) solid rgba(94, 118, 51, 0.6);
+  outline: calc(1px / var(--k, 1)) solid rgba(53, 70, 32, 0.6);
 }
 .uxc-sel {
   position: absolute;
@@ -784,7 +786,7 @@ textarea.uxr-input {
 .uxc-mark.sev-medium { background: var(--ux-medium); }
 .uxc-mark.sev-low { background: var(--ux-low); }
 .uxc-mark.is-on {
-  box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
+  box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.35), 0 1px 3px rgba(0, 0, 0, 0.25);
 }
 .uxc-pin {
   position: absolute;
@@ -813,7 +815,7 @@ textarea.uxr-input {
   background: #b8b5aa;
 }
 .uxc-pin.is-open {
-  box-shadow: 0 0 0 4px rgba(94, 118, 51, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
+  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.3), 0 2px 6px rgba(0, 0, 0, 0.22);
 }
 .uxc-pop {
   position: absolute;
@@ -880,7 +882,7 @@ textarea.uxr-input {
   color: var(--ux-ink);
   resize: none;
   outline: none;
-  box-shadow: 0 0 0 4px rgba(94, 118, 51, 0.15);
+  box-shadow: 0 0 0 4px rgba(53, 70, 32, 0.15);
 }
 .uxc-empty {
   position: absolute;
@@ -1771,7 +1773,7 @@ textarea.uxr-input {
   color: #f5f3eb;
   cursor: pointer;
 }
-.uxp-send:hover:not(:disabled) { background: var(--ux-moss-tone); }
+.uxp-send:hover:not(:disabled) { background: var(--ux-moss-hover); }
 .uxp-send:disabled { opacity: 0.35; cursor: default; }
 .uxp-send:focus-visible { outline: 2px solid var(--ux-moss-tone); outline-offset: 2px; }
 .uxp-note {
@@ -1826,7 +1828,7 @@ textarea.uxr-input {
 }
 .uxp-finding.is-on {
   border-color: var(--ux-moss-tone);
-  box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.12);
+  box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.12);
 }
 .uxp-finding p { margin: 6px 0; color: var(--ux-ink-70); }
 .uxp-finding-title {
@@ -2111,7 +2113,7 @@ textarea.uxr-input {
   background: var(--ux-white);
   cursor: pointer;
 }
-.uxs-start.is-on { border-color: var(--ux-moss-tone); box-shadow: 0 0 0 3px rgba(94, 118, 51, 0.1); }
+.uxs-start.is-on { border-color: var(--ux-moss-tone); box-shadow: 0 0 0 3px rgba(53, 70, 32, 0.1); }
 .uxs-start input {
   position: absolute;
   left: 12px;
