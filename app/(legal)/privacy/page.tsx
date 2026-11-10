@@ -342,6 +342,12 @@ export default function PrivacyPage() {
         is never sent to us to keep.
       </p>
       <p>
+        When you ask Socria to read a document for you (Analysis, beside the
+        file), what Socria read from it is sent to the model once to make that
+        reading, and the reading is kept in your browser alone — never in our
+        database. Asked again, it is made again.
+      </p>
+      <p>
         Our own application logs record route names, error codes and counts.
         They do not contain your messages, and they never contain an access
         token.

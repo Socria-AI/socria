@@ -10,7 +10,9 @@ Opening a file in Socria shows the file as itself: a PDF's own pages, a Word doc
 | **The preview** | The original drawn in the browser | Nowhere: it is drawn from the original each time it is opened | The person |
 | **The reading** | The text, tables, figures and checks Socria takes from the file (lib/docs) | This device (IndexedDB `socria-docs`), and the conversation as an attachment's text | Socria: replies, citations, the Logic Map |
 
-Socria never reads the preview, and the preview never draws the reading. The preview has a second tab, **What Socria read**, which shows the reading under a line that says plainly what it is.
+Socria never reads the preview, and the preview never draws the reading. The preview has a tab called **What Socria read**, which shows the reading under a line that says plainly what it is.
+
+It also has an **Analysis** tab: Socria's own reading of the document, made when the person asks, with every point linked to the passage it rests on. A citation, an analysis point, or a passage pressed in the reading opens the original at that passage, marked, with a strip that offers **Ask about this**. See docs/DOCUMENT-INTELLIGENCE.md.
 
 ## How a file travels
 

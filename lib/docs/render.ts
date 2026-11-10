@@ -19,6 +19,7 @@
 // PURE.
 
 import { selectPassages } from './ground';
+import type { DocShape } from './intent';
 import type { DocBlock, DocTable, SourceDoc } from './types';
 
 /** A document in a conversation, with its letter. */
@@ -51,7 +52,8 @@ Keep four things apart, and say which is which:
   · your reading or interpretation of it (say so),
   · anything the documents do not say — never present it as theirs. If the document does not answer the question, say that plainly instead of filling the gap.
 Passages marked "read from the page image" were read by a vision model from a picture of the page; treat their numbers with care, and say so when they matter. Text marked [illegible] could not be read: never guess what it says.
-When only part of a long document is shown, you are told which part. Do not assume what the rest says.`;
+When only part of a long document is shown, you are told which part. Do not assume what the rest says.
+Answer the question asked, first and briefly: most questions about a document want a sentence or two and a key, not a summary of the document. Put the essential finding before the detail. Shorten wording, never meaning: keep the conditions, numbers and qualifiers that change what a claim says. A follow-up such as "why?" or "and the second one?" is about the passages just discussed unless the person says otherwise.`;
 
 const LABEL: Partial<Record<DocBlock['kind'], string>> = {
   title: 'title',
@@ -112,7 +114,7 @@ function checksLine(doc: SourceDoc): string {
  * passages the person has selected in the document view: always shown, and
  * named as what they are pointing at.
  */
-export function renderDoc(ref: DocRef, opts: { query?: string; budget: number; focus?: readonly string[] }): string {
+export function renderDoc(ref: DocRef, opts: { query?: string; budget: number; focus?: readonly string[]; recent?: readonly string[]; shape?: DocShape }): string {
   const { letter, doc } = ref;
   const visible = doc.blocks.filter((b) => b.kind !== 'header' && b.kind !== 'footer');
   const lines = new Map<string, string>(visible.map((b) => [b.id, blockLine(letter, b, doc)]));
@@ -122,7 +124,11 @@ export function renderDoc(ref: DocRef, opts: { query?: string; budget: number; f
   if (doc.unread) meta.push(`Pages ${doc.unread.from}–${doc.unread.to} were not read.`);
   const focus = (opts.focus ?? []).filter((id) => lines.has(id)).slice(0, 6);
   if (focus.length) meta.push(`The person has selected ${focus.map((id) => `[${citeKey(letter, id)}]`).join(', ')} in this document — “this” in their message most likely means ${focus.length === 1 ? 'that passage' : 'those passages'}.`);
+  const recent = (opts.recent ?? []).filter((id) => lines.has(id) && !focus.includes(id)).slice(0, 8);
+  // a document that fits is shown whole, whatever is asked: nothing it says can be missed
   if (total <= opts.budget) return [head, ...meta, ...visible.map((b) => lines.get(b.id)!), '</document>'].join('\n');
+  // one that does not is shown in the parts this kind of question needs, in the room it needs
+  const room = Math.max(2400, Math.round(opts.budget * (opts.shape?.budget ?? 1)));
 
   // too long for the turn: the outline, the opening, and what bears on the question
   const chosen = new Set<string>();
@@ -131,23 +137,76 @@ export function renderDoc(ref: DocRef, opts: { query?: string; budget: number; f
   const take = (b: DocBlock) => {
     if (chosen.has(b.id)) return true;
     const n = lines.get(b.id)!.length + 1;
-    if (used + n > opts.budget) return false;
+    if (used + n > room) return false;
     chosen.add(b.id);
     used += n;
     return true;
   };
+  const shape = opts.shape;
   for (const id of focus) take(visible.find((b) => b.id === id)!);
+  // what the last reply cited: a follow-up is about it
+  for (const id of recent) take(visible.find((b) => b.id === id)!);
   for (const b of outline.slice(0, 120)) take(b);
-  let opening = 0;
+  // the section each passage sits in, by its nearest heading above
+  const sectionOf = new Map<string, string>();
+  let heading = '';
   for (const b of visible) {
-    if (opening > Math.min(2500, opts.budget * 0.15)) break;
+    if (b.kind === 'heading' || b.kind === 'title') heading = b.text;
+    sectionOf.set(b.id, heading);
+  }
+  let opening = 0;
+  const openingRoom = shape?.kind === 'locate' ? Math.min(900, room * 0.06) : Math.min(2500, room * 0.15);
+  for (const b of visible) {
+    if (opening > openingRoom) break;
     if (take(b)) opening += lines.get(b.id)!.length;
   }
-  for (const { block } of selectPassages(doc, opts.query ?? '', 400)) {
-    if (used > opts.budget) break;
-    take(block);
+  // an overview's skeleton: the first passage under every heading
+  if (shape?.spread) {
+    let after = false;
+    for (const b of visible) {
+      if (b.kind === 'heading' || b.kind === 'title') after = true;
+      else if (after) {
+        after = false;
+        if (used > room * 0.7) break;
+        take(b);
+      }
+    }
   }
-  const out: string[] = [head, ...meta, `Only part of this document is shown here — its outline, its opening, and the passages that bear most on the latest message (${chosen.size} of ${visible.length} passages). Where passages were left out, it says so. Do not assume what they say; ask the person to point you to a section if you need it.`];
+  // the sections this kind of question leans on: their first passages, matched or not
+  if (shape?.sections) {
+    const per = new Map<string, number>();
+    for (const b of visible) {
+      const sec = sectionOf.get(b.id) ?? '';
+      if (!sec || !shape.sections.test(sec) || b.kind === 'heading' || b.kind === 'title') continue;
+      const n = per.get(sec) ?? 0;
+      if (n >= 3) continue;
+      if (used > room * 0.8) break;
+      if (take(b)) per.set(sec, n + 1);
+    }
+  }
+  // the kinds this question needs whatever its words match: a question about the numbers sees the tables
+  if (shape?.always.length) {
+    let n = 0;
+    for (const b of visible) {
+      if (n >= 8 || used > room * 0.7) break;
+      if (shape.always.includes(b.kind) && take(b)) n += 1;
+    }
+  }
+  const favour = new Set(shape?.favour ?? []);
+  const scored = selectPassages(doc, opts.query ?? '', 400).map((p) => {
+    let score = p.score;
+    if (favour.has(p.block.kind)) score *= 1.4;
+    if (shape?.sections && shape.sections.test(sectionOf.get(p.block.id) ?? '')) score *= 1.3;
+    return { block: p.block, score };
+  });
+  scored.sort((a, b) => b.score - a.score);
+  let matched = 0;
+  for (const { block } of scored) {
+    if (used > room || matched >= (shape?.passages ?? 400)) break;
+    if (take(block)) matched += 1;
+  }
+  const said = shape?.kind === 'locate' ? 'its outline and the passages that match the latest message' : 'its outline, its opening, and the passages that bear most on the latest message';
+  const out: string[] = [head, ...meta, `Only part of this document is shown here — ${said}${recent.length ? ', and the passages the last reply cited' : ''} (${chosen.size} of ${visible.length} passages). Where passages were left out, it says so. Do not assume what they say; ask the person to point you to a section if you need it.`];
   let gap: string[] = [];
   const flushGap = () => {
     if (!gap.length) return;
@@ -169,15 +228,30 @@ export function renderDoc(ref: DocRef, opts: { query?: string; budget: number; f
  * Every document of a conversation, within one budget shared between them by
  * how much each bears on the question (and at least a fair share each).
  */
-export function renderDocs(refs: DocRef[], opts: { query?: string; budget: number; focus?: Readonly<Record<string, readonly string[]>> }): string {
+export function renderDocs(
+  refs: DocRef[],
+  opts: { query?: string; budget: number; focus?: Readonly<Record<string, readonly string[]>>; recent?: Readonly<Record<string, readonly string[]>>; shape?: DocShape }
+): string {
   if (!refs.length) return '';
+  // a comparison is between documents: each gets the same share, whatever the question matches
   const weights = refs.map((r) => {
+    if (opts.shape?.balanced) return 1;
     const top = selectPassages(r.doc, opts.query ?? '', 5).reduce((n, p) => n + p.score, 0);
-    return 1 + top;
+    const near = (opts.focus?.[r.doc.id]?.length ?? 0) + (opts.recent?.[r.doc.id]?.length ?? 0);
+    return 1 + top + near;
   });
   const sum = weights.reduce((a, b) => a + b, 0);
+  const budget = opts.budget;
   return refs
-    .map((r, i) => renderDoc(r, { query: opts.query, budget: Math.max(3000, Math.floor((opts.budget * weights[i]) / sum)), ...(opts.focus?.[r.doc.id] ? { focus: opts.focus[r.doc.id] } : {}) }))
+    .map((r, i) =>
+      renderDoc(r, {
+        query: opts.query,
+        budget: Math.max(3000, Math.floor((budget * weights[i]) / sum)),
+        ...(opts.focus?.[r.doc.id] ? { focus: opts.focus[r.doc.id] } : {}),
+        ...(opts.recent?.[r.doc.id] ? { recent: opts.recent[r.doc.id] } : {}),
+        ...(opts.shape ? { shape: opts.shape } : {}),
+      })
+    )
     .join('\n\n');
 }
 

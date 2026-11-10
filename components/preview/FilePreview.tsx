@@ -14,6 +14,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { CloseGlyph } from '@/components/logos5/L5Chrome';
+import { docNow, loadDocs, onDoc } from '@/lib/docs/client';
+import { analysable } from '@/lib/docs/brief';
+import type { BriefDiagram } from '@/lib/docs/brief-map';
+import type { SourceDoc } from '@/lib/docs/types';
+import { blockAt, markOf, pickable, unitOf, validBox, type Mark } from '@/lib/preview/locate';
+import { AnalysisPane } from './AnalysisPane';
 import { countLabel, kindLabel, previewKindOf, sizeLabel, storedTypeFor } from '@/lib/preview/kinds';
 import { findOriginal, whyNot, type Found } from '@/lib/preview/originals';
 import type { PreviewTarget } from './types';
@@ -28,10 +34,36 @@ import './preview.css';
 
 const ZOOMS = [0.5, 0.67, 0.8, 0.9, 1, 1.1, 1.25, 1.5, 1.75, 2, 2.5, 3, 4];
 
-export function FilePreview({ target, account, headers, onClose, onOpenReading }: { target: PreviewTarget; account: boolean; headers: () => Record<string, string>; onClose: () => void; onOpenReading?: (docId: string) => void }) {
+type Tab = 'preview' | 'analysis' | 'reading';
+
+export function FilePreview({
+  target,
+  account,
+  headers,
+  onClose,
+  onOpenReading,
+  onAsk,
+  onAskText,
+  onMap,
+}: {
+  target: PreviewTarget;
+  account: boolean;
+  headers: () => Record<string, string>;
+  onClose: () => void;
+  onOpenReading?: (docId: string) => void;
+  onAsk?: (docId: string, blockId: string) => void;
+  onAskText?: (text: string) => void;
+  onMap?: (d: BriefDiagram) => void;
+}) {
   const kind = previewKindOf(target.name, target.mime, target.format);
   const hasReading = !!(target.doc || target.reading || target.text);
-  const [tab, setTab] = useState<'preview' | 'reading'>('preview');
+  const [tab, setTab] = useState<Tab>(target.tab ?? 'preview');
+  // THE READING (lib/docs): what Socria read from the file — for the analysis, for marking a passage in
+  // the original, and for "What Socria read". Held here once, so every tab reads the same one.
+  const [doc, setDoc] = useState<SourceDoc | null>(() => (target.doc ? docNow(target.doc) : null));
+  const [mark, setMark] = useState<Mark | null>(null);
+  const [marked, setMarked] = useState<boolean | null>(null);
+  const seq = useRef(0);
   const [found, setFound] = useState<Found | null>(null);
   const [zoom, setZoom] = useState(1);
   const [pages, setPages] = useState(target.pages ?? 0);
@@ -58,6 +90,52 @@ export function FilePreview({ target, account, headers, onClose, onOpenReading }
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [target.file, target.doc, account]);
+
+  useEffect(() => {
+    if (!target.doc) return;
+    let live = true;
+    void loadDocs([target.doc]).then((d) => live && d[0] && setDoc(d[0]));
+    const off = onDoc((d) => d.id === target.doc && setDoc(d));
+    return () => {
+      live = false;
+      off();
+    };
+  }, [target.doc]);
+
+  /** a passage chosen — from a citation, the analysis, the reading or a press on the page — marked and shown */
+  const markPassage = useCallback(
+    (block: string, show: Tab | null = 'preview') => {
+      if (!doc) return;
+      seq.current += 1;
+      const m = markOf(doc, block, seq.current);
+      if (!m) return;
+      setMark(m);
+      setMarked(m.box ? true : null);
+      if (show) setTab(show);
+    },
+    [doc]
+  );
+  // opened at a passage (a citation pressed), or moved to another while open
+  useEffect(() => {
+    if (doc && target.passage) markPassage(target.passage, target.tab ?? 'preview');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [doc, target.passage, target.n]);
+  const canAnalyse = !!doc && analysable(doc);
+  const canPick = !!doc && doc.blocks.some((b) => validBox(b.box));
+  const hit = useCallback((page: number, fx: number, fy: number) => (doc && pickable(doc, page) ? blockAt(doc, page, fx, fy)?.box ?? null : null), [doc]);
+  const pick = useCallback(
+    (page: number, fx: number, fy: number) => {
+      const b = doc ? blockAt(doc, page, fx, fy) : null;
+      if (b) markPassage(b.id, null);
+    },
+    [doc, markPassage]
+  );
+  const ask = () => {
+    if (!mark || !onAsk) return;
+    onAsk(mark.doc, mark.block);
+    // on a phone the conversation is under the preview: it comes back, the passage named in the composer
+    if (typeof window !== 'undefined' && window.matchMedia('(max-width: 860px)').matches) onClose();
+  };
 
   // the keyboard, and focus in and back out
   useEffect(() => {
@@ -137,18 +215,33 @@ export function FilePreview({ target, account, headers, onClose, onOpenReading }
   const paged = kind === 'pdf' || kind === 'slides' || kind === 'docx';
   const zoomable = tab === 'preview' && !!(blob || copySrc) && !error && kind !== 'none' && kind !== 'html';
 
+  const onMarked = useCallback((found: boolean) => setMarked(found), []);
+  const markFor = tab === 'preview' ? mark : null;
+
   let body: React.ReactNode;
-  if (tab === 'reading') body = <ReadingPane docId={target.doc} text={target.text} reading={target.reading} {...(onOpenReading && target.doc ? { onOpenReading: () => onOpenReading(target.doc!) } : {})} />;
+  if (tab === 'analysis' && doc) body = <AnalysisPane doc={doc} headers={headers} onGo={(b) => markPassage(b)} {...(onAskText ? { onAskText: (t: string) => { onAskText(t); if (window.matchMedia('(max-width: 860px)').matches) onClose(); } } : {})} {...(onMap ? { onMap: (d: BriefDiagram) => { onMap(d); onClose(); } } : {})} />;
+  else if (tab === 'reading')
+    body = (
+      <ReadingPane
+        docId={target.doc}
+        text={target.text}
+        reading={target.reading}
+        given={doc}
+        focus={mark?.block ?? null}
+        {...(doc ? { onPick: (b: string) => markPassage(b, null) } : {})}
+        {...(onOpenReading && target.doc ? { onOpenReading: () => onOpenReading(target.doc!) } : {})}
+      />
+    );
   else if (error) body = <Fallback say={error} canRead={hasReading} onRead={() => setTab('reading')} onDownload={blob ? download : undefined} />;
   else if (!found) body = <p className="fp-wait">Opening {target.name}…</p>;
   else if (!blob && copySrc) body = <ImageView blob={null} src={copySrc} name={target.name} zoom={zoom} onZoom={setZoom} onSize={(w, h) => setDims({ w, h })} onError={onError} />;
   else if (!blob) body = <Fallback say={whyNot((found as Exclude<Found, { blob: Blob }>).why)} canRead={hasReading} onRead={() => setTab('reading')} />;
-  else if (kind === 'pdf') body = <PdfView blob={blob} zoom={zoom} goto={goto} onPages={onPages} onPage={onPage} onError={onError} />;
-  else if (kind === 'docx') body = <DocxView blob={blob} zoom={zoom} goto={goto} onPages={onPages} onPage={onPage} onError={onError} />;
-  else if (kind === 'slides') body = <SlidesView blob={blob} zoom={zoom} goto={goto} onPages={onPages} onPage={onPage} onError={onError} />;
-  else if (kind === 'sheet' || kind === 'delimited') body = <SheetView blob={blob} name={target.name} delimited={kind === 'delimited'} zoom={zoom} onPages={onPages} onError={onError} />;
+  else if (kind === 'pdf') body = <PdfView blob={blob} zoom={zoom} goto={goto} onPages={onPages} onPage={onPage} onError={onError} mark={markFor} {...(canPick ? { hit, onPick: pick } : {})} />;
+  else if (kind === 'docx') body = <DocxView blob={blob} zoom={zoom} goto={goto} onPages={onPages} onPage={onPage} onError={onError} mark={markFor} onMarked={onMarked} />;
+  else if (kind === 'slides') body = <SlidesView blob={blob} zoom={zoom} goto={goto} onPages={onPages} onPage={onPage} onError={onError} mark={markFor} {...(canPick ? { hit, onPick: pick } : {})} />;
+  else if (kind === 'sheet' || kind === 'delimited') body = <SheetView blob={blob} name={target.name} delimited={kind === 'delimited'} zoom={zoom} onPages={onPages} onError={onError} mark={markFor} onMarked={onMarked} />;
   else if (kind === 'image') body = <ImageView blob={blob} name={target.name} zoom={zoom} onZoom={setZoom} onSize={(w, h) => setDims({ w, h })} onError={onError} />;
-  else if (kind === 'markdown' || kind === 'html' || kind === 'text') body = <TextView blob={blob} kind={kind} name={target.name} zoom={zoom} onError={onError} />;
+  else if (kind === 'markdown' || kind === 'html' || kind === 'text') body = <TextView blob={blob} kind={kind} name={target.name} zoom={zoom} onError={onError} mark={markFor} onMarked={onMarked} />;
   else body = <Fallback say={`There is no visual preview for ${kindLabel(target.name, kind).replace(/ files?$/i, '')} files yet. You can download the original, and Socria has read it.`} canRead={hasReading} onRead={() => setTab('reading')} onDownload={download} />;
 
   return (
@@ -185,6 +278,11 @@ export function FilePreview({ target, account, headers, onClose, onOpenReading }
             <button type="button" role="tab" aria-selected={tab === 'preview'} onClick={() => setTab('preview')}>
               Preview
             </button>
+            {canAnalyse && (
+              <button type="button" role="tab" aria-selected={tab === 'analysis'} onClick={() => setTab('analysis')}>
+                Analysis
+              </button>
+            )}
             <button type="button" role="tab" aria-selected={tab === 'reading'} onClick={() => setTab('reading')}>
               What Socria read
             </button>
@@ -217,6 +315,40 @@ export function FilePreview({ target, account, headers, onClose, onOpenReading }
           </div>
         )}
       </div>
+
+      {mark && doc && tab !== 'analysis' && (
+        <div className="fp-strip" role="region" aria-label="The passage chosen">
+          <div>
+            <span className="fp-strip-where">
+              {unitOf(doc.format)} {mark.page}
+              {mark.kind === 'table' ? ' · a table' : mark.kind === 'figure' ? ' · a figure' : mark.kind === 'equation' ? ' · an equation' : ''}
+            </span>
+            <p className="fp-strip-words">{mark.kind === 'table' ? mark.text.split('\n')[0] : mark.text}</p>
+          </div>
+          <div className="fp-strip-acts">
+            {onAsk && (
+              <button type="button" className="l5-link is-go" onClick={ask}>
+                Ask about this <span className="l5-ar">→</span>
+              </button>
+            )}
+            {tab === 'preview' ? (
+              <button type="button" className="l5-link is-meta" onClick={() => setTab('reading')}>
+                See it as read
+              </button>
+            ) : (
+              blob && (
+                <button type="button" className="l5-link is-meta" onClick={() => markPassage(mark.block)}>
+                  Show it in the file
+                </button>
+              )
+            )}
+            <button type="button" className="l5-link is-meta" onClick={() => setMark(null)} aria-label="Let go of this passage">
+              Done
+            </button>
+          </div>
+          {tab === 'preview' && marked === false && <p className="fp-strip-note">Its words could not be found on the page drawn here — they are above, as Socria read them.</p>}
+        </div>
+      )}
 
       <div className="fp-body">{body}</div>
     </div>

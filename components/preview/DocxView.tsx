@@ -9,8 +9,29 @@
 // when they go somewhere ordinary (http, https, mailto) and open in a new tab.
 
 import { useEffect, useRef, useState } from 'react';
+import { firstHolding, needleOf, type Mark } from '@/lib/preview/locate';
 
-export function DocxView({ blob, zoom, goto, onPages, onPage, onError }: { blob: Blob; zoom: number; goto?: { n: number; seq: number }; onPages: (n: number) => void; onPage?: (n: number) => void; onError: (msg: string) => void }) {
+export function DocxView({
+  blob,
+  zoom,
+  goto,
+  onPages,
+  onPage,
+  onError,
+  mark,
+  onMarked,
+}: {
+  blob: Blob;
+  zoom: number;
+  goto?: { n: number; seq: number };
+  onPages: (n: number) => void;
+  onPage?: (n: number) => void;
+  onError: (msg: string) => void;
+  /** a passage to find in the laid-out pages, by its words (the preview's pages are not the reading's) */
+  mark?: Mark | null;
+  /** whether it was found */
+  onMarked?: (found: boolean) => void;
+}) {
   const host = useRef<HTMLDivElement>(null);
   const page = useRef<HTMLDivElement | null>(null);
   const [docWidth, setDocWidth] = useState(816);
@@ -31,6 +52,7 @@ export function DocxView({ blob, zoom, goto, onPages, onPage, onError }: { blob:
       .fp-docx-root .docx-wrapper { background: transparent !important; padding: 0 !important; display: flex; flex-direction: column; align-items: center; gap: 18px; }
       .fp-docx-root .docx-wrapper > section.docx { margin: 0 !important; box-shadow: 0 1px 2px rgba(0,0,0,.08), 0 6px 22px -10px rgba(0,0,0,.25) !important; }
       .fp-docx-root a[href] { color: #1f5fbf; }
+      .fp-docx-root .fp-hit { background: rgba(53, 70, 32, 0.12); box-shadow: -6px 0 0 rgba(53, 70, 32, 0.12), inset 3px 0 0 #354620; border-radius: 4px; transition: background 0.4s ease; }
     `;
     const styles = document.createElement('div');
     const body = document.createElement('div');
@@ -105,6 +127,24 @@ export function DocxView({ blob, zoom, goto, onPages, onPage, onError }: { blob:
     const sections = page.current?.querySelectorAll<HTMLElement>('section.docx');
     sections?.[goto.n - 1]?.scrollIntoView({ block: 'start' });
   }, [goto]);
+
+  // a passage asked for: found by its words, marked, brought into view
+  useEffect(() => {
+    if (!ready || !mark?.seq || !page.current) return;
+    page.current.querySelectorAll('.fp-hit').forEach((n) => n.classList.remove('fp-hit'));
+    const cells = mark.kind === 'table' ? mark.text.split(/\s*\|\s*|\n/).filter((c) => c.trim().length > 1) : [];
+    const needle = needleOf(cells[0] && mark.kind === 'table' ? cells.slice(0, 3).join(' ') : mark.text);
+    const els = [...page.current.querySelectorAll<HTMLElement>(mark.kind === 'table' ? 'table' : 'p, li, td, th, h1, h2, h3, h4, h5, h6')];
+    let i = firstHolding(els.map((e) => e.textContent ?? ''), needle);
+    if (i < 0 && mark.kind === 'table' && cells[0]) i = firstHolding(els.map((e) => e.textContent ?? ''), needleOf(cells[0], 40));
+    const el = i >= 0 ? els[i] : null;
+    if (el) {
+      el.classList.add('fp-hit');
+      el.scrollIntoView({ block: 'center', behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    }
+    onMarked?.(!!el);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [ready, mark?.seq]);
   useEffect(() => {
     const el = scroller.current;
     if (!el || !ready || !onPage) return;

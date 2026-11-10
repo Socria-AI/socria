@@ -8,11 +8,37 @@
 // size in pixels and scaled to fit, so text sits where the file puts it. A chart or
 // SmartArt is shown as what it is, labelled — never guessed at.
 
-import { useEffect, useRef, useState, type CSSProperties } from 'react';
+import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import type { Box } from '@/lib/docs/types';
+import { markRect, type Mark } from '@/lib/preview/locate';
 import { openPackage, type Package } from '@/lib/preview/ooxml';
 import { px, readDeck, type Deck, type Para, type Shape, type Slide, type TextBody } from '@/lib/preview/slides';
 
-export function SlidesView({ blob, zoom, goto, onPages, onPage, onError }: { blob: Blob; zoom: number; goto: { n: number; seq: number }; onPages: (n: number) => void; onPage: (n: number) => void; onError: (msg: string) => void }) {
+export function SlidesView({
+  blob,
+  zoom,
+  goto,
+  onPages,
+  onPage,
+  onError,
+  mark,
+  hit,
+  onPick,
+}: {
+  blob: Blob;
+  zoom: number;
+  goto: { n: number; seq: number };
+  onPages: (n: number) => void;
+  onPage: (n: number) => void;
+  onError: (msg: string) => void;
+  /** a passage to show: its slide, and its box marked where the reading has one */
+  mark?: Mark | null;
+  /** the box of the passage under a point of the slide, for the faint box that follows the pointer */
+  hit?: (page: number, fx: number, fy: number) => Box | null;
+  /** a press on the slide: the passage there, to ask about */
+  onPick?: (page: number, fx: number, fy: number) => void;
+}) {
+  const [hover, setHover] = useState<Box | null>(null);
   const [deck, setDeck] = useState<Deck | null>(null);
   const [pkg, setPkg] = useState<Package | null>(null);
   const [cur, setCur] = useState(0);
@@ -44,6 +70,12 @@ export function SlidesView({ blob, zoom, goto, onPages, onPage, onError }: { blo
   useEffect(() => {
     if (goto.seq && deck) setCur(Math.max(0, Math.min(deck.slides.length - 1, goto.n - 1)));
   }, [goto, deck]);
+  // a passage asked for: its slide
+  useEffect(() => {
+    if (mark?.seq && deck) setCur(Math.max(0, Math.min(deck.slides.length - 1, mark.page - 1)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mark?.seq, deck]);
+  useEffect(() => setHover(null), [cur]);
   useEffect(() => onPage(cur + 1), [cur, onPage]);
 
   useEffect(() => {
@@ -94,8 +126,30 @@ export function SlidesView({ blob, zoom, goto, onPages, onPage, onError }: { blo
         ))}
       </div>
       <div className="fp-slides-stage" ref={stage}>
-        <div className="fp-slide-main" onClick={() => document.fullscreenElement && setCur((c) => Math.min(deck.slides.length - 1, c + 1))}>
-          <SlideCanvas deck={deck} slide={slide} scale={document.fullscreenElement ? Math.min(window.innerWidth / px(deck.width), window.innerHeight / px(deck.height)) : scale} media={media} />
+        <div
+          className="fp-slide-main"
+          {...(onPick ? { 'data-pick': '' } : {})}
+          onClick={(e) => {
+            if (document.fullscreenElement) return setCur((c) => Math.min(deck.slides.length - 1, c + 1));
+            const p = pointOn(e);
+            if (p && onPick) onPick(slide.n, p.fx, p.fy);
+          }}
+          onMouseMove={hit ? (e) => { const p = pointOn(e); const b = p ? hit(slide.n, p.fx, p.fy) : null; setHover((h0) => (b ? (h0 && h0.join() === b.join() ? h0 : b) : null)); } : undefined}
+          onMouseLeave={hit ? () => setHover(null) : undefined}
+        >
+          {(() => {
+            const sc = document.fullscreenElement ? Math.min(window.innerWidth / px(deck.width), window.innerHeight / px(deck.height)) : scale;
+            const w = px(deck.width) * sc;
+            const h = px(deck.height) * sc;
+            const marked = !document.fullscreenElement && mark && mark.page === slide.n && mark.box ? markRect(mark.box, w, h, 6) : null;
+            const hovered = !document.fullscreenElement && hover && !(marked && mark?.box?.join() === hover.join()) ? markRect(hover, w, h, 6) : null;
+            return (
+              <SlideCanvas deck={deck} slide={slide} scale={sc} media={media}>
+                {hovered && <span className="fp-hover" style={hovered} aria-hidden="true" />}
+                {marked && <span key={mark!.seq} className="fp-mark" style={marked} aria-hidden="true" />}
+              </SlideCanvas>
+            );
+          })()}
         </div>
         <div className="fp-slides-under">
           <span className="fp-slides-where">
@@ -172,7 +226,17 @@ const CLIP: Record<string, string> = {
   star5: 'polygon(50% 0, 61% 35%, 98% 35%, 68% 57%, 79% 91%, 50% 70%, 21% 91%, 32% 57%, 2% 35%, 39% 35%)',
 };
 
-export function SlideCanvas({ deck, slide, scale, media, thumb }: { deck: Deck; slide: Slide; scale: number; media: Map<string, string>; thumb?: boolean }) {
+/** Where a pointer is on the slide drawn inside the element it moved over, as fractions of the slide. */
+function pointOn(e: React.MouseEvent<HTMLElement>): { fx: number; fy: number } | null {
+  const el = e.currentTarget.querySelector<HTMLElement>('.fp-slide');
+  if (!el) return null;
+  const r = el.getBoundingClientRect();
+  const fx = (e.clientX - r.left) / r.width;
+  const fy = (e.clientY - r.top) / r.height;
+  return fx >= 0 && fx <= 1 && fy >= 0 && fy <= 1 ? { fx, fy } : null;
+}
+
+export function SlideCanvas({ deck, slide, scale, media, thumb, children }: { deck: Deck; slide: Slide; scale: number; media: Map<string, string>; thumb?: boolean; children?: ReactNode }) {
   const W = px(deck.width);
   const H = px(deck.height);
   const bgImage = slide.bg?.image ? media.get(slide.bg.image) : undefined;
@@ -183,6 +247,7 @@ export function SlideCanvas({ deck, slide, scale, media, thumb }: { deck: Deck; 
           <ShapeView key={i} s={s} media={media} />
         ))}
       </div>
+      {children}
     </div>
   );
 }

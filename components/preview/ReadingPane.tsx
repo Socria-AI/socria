@@ -7,16 +7,44 @@
 // them — under a line that says exactly that, so the two are never mistaken for
 // each other.
 
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { docNow, loadDocs, onDoc } from '@/lib/docs/client';
 import type { DocBlock, SourceDoc } from '@/lib/docs/types';
 import { MathText } from '@/components/TeX';
 
-export function ReadingPane({ docId, text, reading, onOpenReading }: { docId?: string; text?: string; reading?: string; onOpenReading?: () => void }) {
-  const [doc, setDoc] = useState<SourceDoc | null>(() => (docId ? docNow(docId) : null));
+export function ReadingPane({
+  docId,
+  text,
+  reading,
+  onOpenReading,
+  given,
+  focus,
+  onPick,
+}: {
+  docId?: string;
+  text?: string;
+  reading?: string;
+  onOpenReading?: () => void;
+  /** the reading, when the preview already holds it */
+  given?: SourceDoc | null;
+  /** a passage to bring into view, marked */
+  focus?: string | null;
+  /** a passage pressed: chosen, to ask about or to see in the file */
+  onPick?: (block: string) => void;
+}) {
+  const [doc, setDoc] = useState<SourceDoc | null>(() => given ?? (docId ? docNow(docId) : null));
   const [looked, setLooked] = useState(!docId || !!doc);
+  const holder = useRef<HTMLDivElement>(null);
   useEffect(() => {
-    if (!docId) return;
+    if (given) setDoc(given);
+  }, [given]);
+  useEffect(() => {
+    if (!focus || !doc) return;
+    const el = holder.current?.querySelector<HTMLElement>(`[data-block="${CSS.escape(focus)}"]`);
+    el?.scrollIntoView({ block: 'center' });
+  }, [focus, doc]);
+  useEffect(() => {
+    if (!docId || given) return;
     let live = true;
     void loadDocs([docId]).then((d) => {
       if (!live) return;
@@ -31,7 +59,7 @@ export function ReadingPane({ docId, text, reading, onOpenReading }: { docId?: s
   }, [docId]);
 
   return (
-    <div className="fp-reading">
+    <div className="fp-reading" ref={holder}>
       <p className="fp-reading-said">
         This is what Socria read from the file — the text, tables and captions it reasons with and cites. It is not how the file looks; that is the Preview.
       </p>
@@ -41,7 +69,7 @@ export function ReadingPane({ docId, text, reading, onOpenReading }: { docId?: s
         </button>
       )}
       {doc ? (
-        <DocReading doc={doc} />
+        <DocReading doc={doc} focus={focus ?? null} {...(onPick ? { onPick } : {})} />
       ) : reading ? (
         <p className="fp-reading-p">{reading}</p>
       ) : text ? (
@@ -53,7 +81,7 @@ export function ReadingPane({ docId, text, reading, onOpenReading }: { docId?: s
   );
 }
 
-function DocReading({ doc }: { doc: SourceDoc }) {
+function DocReading({ doc, focus, onPick }: { doc: SourceDoc; focus: string | null; onPick?: (block: string) => void }) {
   const pages = [...new Set(doc.blocks.map((b) => b.page))].sort((a, b) => a - b);
   const unit = doc.format === 'pptx' || doc.format === 'odp' ? 'Slide' : doc.format === 'xlsx' || doc.format === 'ods' ? 'Sheet' : 'Page';
   return (
@@ -67,7 +95,20 @@ function DocReading({ doc }: { doc: SourceDoc }) {
               {unit} {p}
               {pg?.ocr === 'done' ? ' · read from its picture' : pg?.ocr === 'needed' ? ' · a picture not yet read' : ''}
             </h4>
-            {blocks.length ? blocks.map((b) => <Block key={b.id} b={b} doc={doc} />) : <p className="fp-wait">Nothing on this {unit.toLowerCase()} could be read as text.</p>}
+            {blocks.length ? (
+              blocks.map((b) => (
+                <div
+                  key={b.id}
+                  data-block={b.id}
+                  className={`fp-reading-b${focus === b.id ? ' is-on' : ''}${onPick ? ' is-pick' : ''}`}
+                  {...(onPick ? { role: 'button', tabIndex: 0, onClick: () => onPick(b.id), onKeyDown: (e: React.KeyboardEvent) => (e.key === 'Enter' || e.key === ' ') && (e.preventDefault(), onPick(b.id)) } : {})}
+                >
+                  <Block b={b} doc={doc} />
+                </div>
+              ))
+            ) : (
+              <p className="fp-wait">Nothing on this {unit.toLowerCase()} could be read as text.</p>
+            )}
           </section>
         );
       })}

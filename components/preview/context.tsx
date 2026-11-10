@@ -12,6 +12,7 @@ import { createContext, useCallback, useContext, useMemo, useRef, useState, type
 import type { PreviewTarget } from './types';
 import { keepOriginal } from '@/lib/preview/originals';
 import type { Attachment } from '@/lib/logos-attachments';
+import type { BriefDiagram } from '@/lib/docs/brief-map';
 
 export type { PreviewTarget } from './types';
 
@@ -35,6 +36,9 @@ export function FilePreviewHost({
   account,
   headers,
   onOpenReading,
+  onAsk,
+  onAskText,
+  onMap,
   hostRef,
 }: {
   children: ReactNode;
@@ -43,11 +47,17 @@ export function FilePreviewHost({
   headers: () => Record<string, string>;
   /** open a document's reading (with its citation keys) beside the map */
   onOpenReading?: (docId: string) => void;
+  /** ask about a passage: it becomes what the next message is about */
+  onAsk?: (docId: string, blockId: string) => void;
+  /** a question put in the composer, to send or change */
+  onAskText?: (text: string) => void;
+  /** a drawing of Socria's reading, filed in Artifacts */
+  onMap?: (d: BriefDiagram) => void;
   /** for the component that renders the host, which cannot read its own context */
   hostRef?: MutableRefObject<Host | null>;
 }) {
   const [target, setTarget] = useState<PreviewTarget | null>(null);
-  const open = useCallback((t: PreviewTarget) => setTarget(t), []);
+  const open = useCallback((t: PreviewTarget) => setTarget((prev) => ({ ...t, n: (prev?.n ?? 0) + 1 })), []);
   const headersRef = useRef(headers);
   headersRef.current = headers;
   const keep = useCallback(
@@ -59,7 +69,19 @@ export function FilePreviewHost({
   return (
     <Ctx.Provider value={host}>
       {children}
-      {target && <FilePreview key={`${target.file ?? ''}:${target.doc ?? ''}:${target.name}`} target={target} account={account} headers={headers} onClose={() => setTarget(null)} {...(onOpenReading ? { onOpenReading } : {})} />}
+      {target && (
+        <FilePreview
+          key={`${target.file ?? ''}:${target.doc ?? ''}:${target.name}`}
+          target={target}
+          account={account}
+          headers={headers}
+          onClose={() => setTarget(null)}
+          {...(onOpenReading ? { onOpenReading } : {})}
+          {...(onAsk ? { onAsk } : {})}
+          {...(onAskText ? { onAskText } : {})}
+          {...(onMap ? { onMap } : {})}
+        />
+      )}
     </Ctx.Provider>
   );
 }

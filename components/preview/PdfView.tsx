@@ -9,6 +9,8 @@
 // original — the reading Socria reasons with is elsewhere.
 
 import { useEffect, useRef, useState } from 'react';
+import type { Box } from '@/lib/docs/types';
+import { markRect, type Mark } from '@/lib/preview/locate';
 
 interface PdfPage {
   getViewport(o: { scale: number }): { width: number; height: number };
@@ -21,7 +23,31 @@ interface PdfDoc {
   loadingTask?: { destroy(): Promise<void> };
 }
 
-export function PdfView({ blob, zoom, goto, onPages, onPage, onError }: { blob: Blob; zoom: number; goto: { n: number; seq: number }; onPages: (n: number) => void; onPage: (n: number) => void; onError: (msg: string) => void }) {
+export function PdfView({
+  blob,
+  zoom,
+  goto,
+  onPages,
+  onPage,
+  onError,
+  mark,
+  hit,
+  onPick,
+}: {
+  blob: Blob;
+  zoom: number;
+  goto: { n: number; seq: number };
+  onPages: (n: number) => void;
+  onPage: (n: number) => void;
+  onError: (msg: string) => void;
+  /** a passage to show, marked where the reading boxed it */
+  mark?: Mark | null;
+  /** the box of the passage under a point of a page, for the faint box that follows the pointer */
+  hit?: (page: number, fx: number, fy: number) => Box | null;
+  /** a press on a page: the passage there, to ask about */
+  onPick?: (page: number, fx: number, fy: number) => void;
+}) {
+  const [hover, setHover] = useState<{ page: number; box: Box } | null>(null);
   const box = useRef<HTMLDivElement>(null);
   const [doc, setDoc] = useState<PdfDoc | null>(null);
   const [sizes, setSizes] = useState<{ w: number; h: number }[]>([]);
@@ -113,15 +139,44 @@ export function PdfView({ blob, zoom, goto, onPages, onPage, onError }: { blob: 
     box.current?.querySelector(`[data-pdf-page="${goto.n}"]`)?.scrollIntoView({ block: 'start' });
   }, [goto]);
 
+  // a passage asked for: its page, scrolled so the passage sits a little below the top
+  useEffect(() => {
+    if (!mark?.seq || !sizes.length) return;
+    const el = box.current;
+    const pageEl = el?.querySelector<HTMLElement>(`[data-pdf-page="${mark.page}"]`);
+    if (!el || !pageEl) return;
+    const y = pageEl.offsetTop + (mark.box ? mark.box[1] * pageEl.offsetHeight : 0) - Math.min(120, el.clientHeight * 0.18);
+    el.scrollTo({ top: Math.max(0, y), behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches ? 'auto' : 'smooth' });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mark?.seq, sizes.length]);
+
+  /** where on its page a pointer is, as fractions of the page */
+  const at = (e: React.MouseEvent<HTMLDivElement>, n: number) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return { page: n, fx: (e.clientX - r.left) / r.width, fy: (e.clientY - r.top) / r.height };
+  };
+
   const fit = Math.max(200, width - 32);
   return (
-    <div ref={box} className="fp-pdf" tabIndex={0} aria-label="Pages">
+    <div ref={box} className="fp-pdf" tabIndex={0} aria-label="Pages" {...(onPick ? { 'data-pick': '' } : {})}>
       {sizes.map((s, k) => {
         const w = Math.round(fit * zoom);
         const h = Math.round((w * s.h) / s.w);
+        const marked = mark && mark.page === k + 1 && mark.box ? markRect(mark.box, w, h) : null;
+        const hovered = hover && hover.page === k + 1 && !(mark?.box && mark.page === hover.page && mark.box.join() === hover.box.join()) ? markRect(hover.box, w, h) : null;
         return (
-          <div key={k} className="fp-pdf-page" data-pdf-page={k + 1} style={{ width: w, height: h }}>
+          <div
+            key={k}
+            className="fp-pdf-page"
+            data-pdf-page={k + 1}
+            style={{ width: w, height: h }}
+            onClick={onPick ? (e) => { const p = at(e, k + 1); onPick(p.page, p.fx, p.fy); } : undefined}
+            onMouseMove={hit ? (e) => { const p = at(e, k + 1); const b = hit(p.page, p.fx, p.fy); setHover((h0) => (b ? (h0 && h0.page === p.page && h0.box.join() === b.join() ? h0 : { page: p.page, box: b }) : null)); } : undefined}
+            onMouseLeave={hit ? () => setHover(null) : undefined}
+          >
             {doc && near.has(k + 1) ? <PageCanvas doc={doc} n={k + 1} width={w} /> : null}
+            {hovered && <span className="fp-hover" style={hovered} aria-hidden="true" />}
+            {marked && <span key={mark!.seq} className="fp-mark" style={marked} aria-hidden="true" />}
             <span className="fp-pdf-n" aria-hidden="true">
               {k + 1}
             </span>

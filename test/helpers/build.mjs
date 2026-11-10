@@ -312,6 +312,8 @@ const MODULES = [
   'lib/rewards/popup-rule.ts',
   // documents in Logos: the readers, grounding, the document view and its context, in one bundle
   'test/helpers/docs-under-test.tsx',
+  // document intelligence: question kinds, what is shown for each, the grounded reading, passages in the original
+  'test/helpers/docint-under-test.ts',
   // the developer dashboard: gate, counters, aggregation and the page body, in one bundle
   'test/helpers/dashboard-under-test.tsx',
   // Logos 4, Point & Ask: focus descriptions, the message's "about", the picker, in one bundle

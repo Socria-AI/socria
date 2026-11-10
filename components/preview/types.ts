@@ -21,6 +21,12 @@ export interface PreviewTarget {
   reading?: string;
   /** a note read as text, for files attached before readings had ids */
   text?: string;
+  /** open at this passage of the reading (a block id, "p3.12"), marked in the original */
+  passage?: string;
+  /** open on this tab */
+  tab?: 'preview' | 'analysis' | 'reading';
+  /** which opening this is: a second citation into a file already open moves it again */
+  n?: number;
 }
 
 /** An attachment as something to open. */

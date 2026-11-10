@@ -4,14 +4,33 @@
 // Markdown as it renders (its source a press away), a web page drawn in a sealed
 // frame, a notebook as its cells. The file is text, so its text IS the preview.
 
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { RichText } from '@/components/RichText';
 import type { PreviewKind } from '@/lib/preview/kinds';
+import { firstHolding, needleOf, type Mark } from '@/lib/preview/locate';
 
 /** The most text drawn; a longer file says how much more there is. */
 const MAX_CHARS = 1_500_000;
 
-export function TextView({ blob, kind, name, zoom, onError }: { blob: Blob; kind: PreviewKind; name: string; zoom: number; onError: (msg: string) => void }) {
+export function TextView({
+  blob,
+  kind,
+  name,
+  zoom,
+  onError,
+  mark,
+  onMarked,
+}: {
+  blob: Blob;
+  kind: PreviewKind;
+  name: string;
+  zoom: number;
+  onError: (msg: string) => void;
+  /** a passage to find by its words and mark */
+  mark?: Mark | null;
+  onMarked?: (found: boolean) => void;
+}) {
+  const holder = useRef<HTMLDivElement>(null);
   const [text, setText] = useState<string | null>(null);
   const [cut, setCut] = useState(0);
   const [source, setSource] = useState(false);
@@ -33,10 +52,31 @@ export function TextView({ blob, kind, name, zoom, onError }: { blob: Blob; kind
   }, [blob]);
 
   const notebook = useMemo(() => (text !== null && /\.ipynb$/i.test(name) ? readNotebook(text) : null), [text, name]);
+
+  // a passage asked for: the first paragraph, item, cell or line that holds its words
+  useEffect(() => {
+    if (text === null || !mark?.seq) return;
+    const t = window.setTimeout(() => {
+      const root = holder.current;
+      if (!root) return;
+      root.querySelectorAll('.fp-hit').forEach((n) => n.classList.remove('fp-hit'));
+      const els = [...root.querySelectorAll<HTMLElement>('p, li, h1, h2, h3, h4, h5, h6, td, th, blockquote, .fp-line, pre')];
+      const i = firstHolding(els.map((e) => e.textContent ?? ''), needleOf(mark.text));
+      const el = i >= 0 ? els[i] : null;
+      if (el) {
+        el.classList.add('fp-hit');
+        el.scrollIntoView({ block: 'center' });
+      }
+      onMarked?.(!!el);
+    }, 80);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [text, mark?.seq]);
+
   if (text === null) return <p className="fp-wait">Opening the file…</p>;
   const rendered = kind === 'markdown' || kind === 'html' || !!notebook;
   return (
-    <div className="fp-text" style={{ fontSize: `${Math.round(14 * zoom * 10) / 10}px` }}>
+    <div ref={holder} className="fp-text" style={{ fontSize: `${Math.round(14 * zoom * 10) / 10}px` }}>
       <div className="fp-text-bar">
         {rendered && (
           <button type="button" className="l5-link is-meta" aria-pressed={source} onClick={() => setSource((s) => !s)}>

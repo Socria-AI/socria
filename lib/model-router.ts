@@ -104,6 +104,8 @@ export interface TurnFacts {
   pushback?: boolean;
   /** documents shown with this turn */
   docs?: number;
+  /** the question about them is a lookup (lib/docs/intent.ts): found and cited, not reasoned over — no deep model for that */
+  docLight?: boolean;
   /** something is being built: a simulation, a model, a display */
   construct?: string | null;
   /** Logos 5's length setting */
@@ -138,7 +140,7 @@ export function levelOf(f: TurnFacts): LevelDecision {
   const deep: string[] = [];
   if (f.mathCheck) deep.push('maths');
   if (f.pushback || f.exchange === 'disagreement') deep.push('pushback');
-  if ((f.docs ?? 0) > 0) deep.push('documents');
+  if ((f.docs ?? 0) > 0 && !f.docLight) deep.push('documents');
   if (f.construct === 'simulation' || f.construct === 'model') deep.push('building');
   if (DEEP_WORDS.test(text)) deep.push('asked for depth');
   if ((text.match(/\?/g) ?? []).length >= 3) deep.push('many questions');

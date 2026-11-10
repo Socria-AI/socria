@@ -11,12 +11,57 @@
 
 import { useEffect, useMemo, useRef, useState, type CSSProperties } from 'react';
 import { colName, delimitedSheet, readWorkbook, type Cell, type Sheet, type Workbook } from '@/lib/preview/sheet';
+import { fold, type Mark } from '@/lib/preview/locate';
 
 const CHUNK = 300;
 
-export function SheetView({ blob, name, delimited, zoom, onPages, onError }: { blob: Blob; name: string; delimited: boolean; zoom: number; onPages: (n: number) => void; onError: (msg: string) => void }) {
+export function SheetView({
+  blob,
+  name,
+  delimited,
+  zoom,
+  onPages,
+  onError,
+  mark,
+  onMarked,
+}: {
+  blob: Blob;
+  name: string;
+  delimited: boolean;
+  zoom: number;
+  onPages: (n: number) => void;
+  onError: (msg: string) => void;
+  /** a passage to show: its sheet, and the cell its words begin in */
+  mark?: Mark | null;
+  onMarked?: (found: boolean) => void;
+}) {
   const [wb, setWb] = useState<Workbook | null>(null);
   const [at, setAt] = useState(0);
+  const holder = useRef<HTMLDivElement>(null);
+  // a passage asked for: its sheet (the reading's page is the sheet's place in the workbook)…
+  useEffect(() => {
+    if (!wb || !mark?.seq) return;
+    if (mark.page >= 1 && mark.page <= wb.sheets.length) setAt(mark.page - 1);
+  }, [wb, mark?.seq, mark?.page]);
+  // …then the first cell its words begin in, once the sheet is drawn
+  useEffect(() => {
+    if (!wb || !mark?.seq) return;
+    const t = window.setTimeout(() => {
+      const root = holder.current;
+      if (!root) return;
+      root.querySelectorAll('.fp-hit-cell').forEach((n) => n.classList.remove('fp-hit-cell'));
+      const first = mark.text.split(/\s*\|\s*|\n/).map((c) => fold(c)).find((c) => c.length >= 2) ?? '';
+      const cells = [...root.querySelectorAll<HTMLElement>('td')];
+      const el = first ? cells.find((c) => fold(c.textContent ?? '') === first) ?? cells.find((c) => first.length >= 6 && fold(c.textContent ?? '').includes(first)) : undefined;
+      if (el) {
+        el.classList.add('fp-hit-cell');
+        el.scrollIntoView({ block: 'center', inline: 'center' });
+      }
+      onMarked?.(!!el);
+    }, 120);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [wb, mark?.seq, at]);
   useEffect(() => {
     let live = true;
     (async () => {
@@ -41,7 +86,7 @@ export function SheetView({ blob, name, delimited, zoom, onPages, onError }: { b
   if (!wb) return <p className="fp-wait">Opening the spreadsheet…</p>;
   const sheet = wb.sheets[at];
   return (
-    <div className="fp-sheet">
+    <div className="fp-sheet" ref={holder}>
       {sheet.kind === 'chart' ? (
         <p className="fp-note fp-sheet-chart">“{sheet.name}” is a chart sheet. Charts are not drawn in the preview — download the workbook to see it.</p>
       ) : (

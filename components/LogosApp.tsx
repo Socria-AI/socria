@@ -155,6 +155,7 @@ import { DocsContext, type DocsApi } from '@/components/display/docs-context';
 import { AUTO_PAGES, docNow, loadDocs, onDoc, pagesToRead, putDoc, putOriginal, readFileAsDoc, readPages as readDocPages } from '@/lib/docs/client';
 import { FilePreviewHost, type Host as FilePreviewHostApi } from '@/components/preview/context';
 import { targetOf } from '@/components/preview/types';
+import type { BriefDiagram } from '@/lib/docs/brief-map';
 import { docLetters, docsForRequest } from '@/lib/docs/conversation';
 import { renderDocAsNote, type DocRef } from '@/lib/docs/render';
 import { BLOCK_ID } from '@/lib/docs/sanitize';
@@ -3541,13 +3542,57 @@ export function LogosApp({
     if (id) setDisplayToOpen(id);
   }
 
-  /** Open the passage a citation names, selected — so what is asked next is about it. */
+  /**
+   * Open the passage a citation names. Where the file's original is kept (this device or the account),
+   * it opens as itself beside the conversation, at the passage, marked (components/preview); a document
+   * attached before originals were kept opens as it was read, the passage selected — so what is asked
+   * next is about it.
+   */
   function openCite(docId: string, blockId: string) {
+    const sess = sessionsRef.current.find((x) => x.id === activeIdRef.current);
+    const att = sess ? attachmentOfContent(sess.messages, `doc:${docId}`) : null;
+    if (att?.file && filePreviewRef.current) {
+      filePreviewRef.current.open({ ...targetOf(att), passage: blockId });
+      return;
+    }
     if (!workspaceOn) return;
     const id = documentDisplay(docId);
     if (!id) return;
     onObject({ type: 'select', obj: id, part: blockId });
     setDisplayToOpen(id);
+  }
+
+  /** "Ask about this" on a passage of a file opened beside the conversation: it becomes what the next message is about. */
+  function askAboutPassage(docId: string, blockId: string) {
+    if (!workspaceOn) return;
+    const id = documentDisplay(docId);
+    if (!id) return;
+    onObject({ type: 'select', obj: id, part: blockId });
+    setMobileView('chat');
+    focusComposer();
+  }
+
+  /** A question from a document's analysis, put in the composer to send or change — never sent for them. */
+  function askFromAnalysis(text: string) {
+    setInput(text);
+    setMobileView('chat');
+    focusComposer();
+  }
+
+  /** A drawing of a document's analysis (lib/docs/brief-map.ts), filed in Artifacts — once; pressed again, it opens. */
+  function mapFromAnalysis(state: BriefDiagram) {
+    if (!workspaceOn) return;
+    if (togetherRef.current?.active && togetherRef.current.role !== 'owner' && togetherRef.current.role !== 'editor') {
+      setError('You can look at this line of thinking, but not change it.');
+      return;
+    }
+    const space = spaceOf(mapRef.current);
+    const had = space.objs.find((o) => o.kind === 'diagram' && (currentOf(o) as { title?: string } | null)?.title === state.title);
+    if (had) return showObject(had.id);
+    const made = makeDisplay(space, 'diagram', state, 'socria');
+    if (!made.ok) return setError(made.says);
+    if (!commitObjects(made.space, objOf(made.space, made.obj.id))) return;
+    showObject(made.obj.id);
   }
 
   /** The passage selected in a document view, as the next turn's "this". */
@@ -10103,7 +10148,7 @@ export function LogosApp({
       className={`logos-root${cabin && !narrow ? ' is-cabin' : ''}`}
     >
       {/* a file opened as itself beside the conversation, and its original kept as it is attached (components/preview) */}
-      <FilePreviewHost account={!!isSignedIn} headers={keyHeaders} onOpenReading={openDoc} hostRef={filePreviewRef}>
+      <FilePreviewHost account={!!isSignedIn} headers={keyHeaders} onOpenReading={openDoc} onAsk={askAboutPassage} onAskText={askFromAnalysis} onMap={mapFromAnalysis} hostRef={filePreviewRef}>
       {/* BIG-SCREEN MODE: the dock down the left — the Universal Map, the four views, Write, Memory */}
       {cabin && !narrow && (
         <CabinDock
