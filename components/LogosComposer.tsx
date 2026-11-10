@@ -7,6 +7,7 @@
 // paste an image and it's read once, up front, so the reply and the map both
 // work from the same material.
 
+import { activityLine, useActivities } from '@/lib/activity';
 import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { CloseGlyph, L5Close, L5Menu, type L5MenuItem } from './logos5/L5Chrome';
 import { MathKeypad } from './MathKeypad';
@@ -780,8 +781,46 @@ export function LogosComposer({
     return () => document.removeEventListener('paste', onDocPaste);
   }, []);
 
+  // WHAT IS TAKING TIME (lib/activity.ts), one line above the box: a file being read here, or anything slow
+  // elsewhere — scanned pages, an analysis, files being sorted, a reply that has not started
+  const elsewhere = activityLine(useActivities());
+  const here = readying
+    ? drafts.some((d) => d.status === 'reading' && d.kind === 'doc')
+      ? (() => {
+          const docs = drafts.filter((d) => d.status === 'reading' && d.kind === 'doc');
+          return docs.length === 1 ? `Reading ${docs[0].name}…` : `Reading ${docs.length} documents…`;
+        })()
+      : drafts.some((d) => d.phase === 'converting')
+        ? 'Converting the HEIC photo…'
+        : drafts.some((d) => d.phase === 'opening')
+          ? 'Opening the photo…'
+          : 'Reading the photo…'
+    : null;
+  const activity = here ? { says: here, more: elsewhere ? elsewhere.more + 1 : 0 } : elsewhere;
+
   return (
     <div className={`lg-composer${layout === 'stacked' ? ' is-ruled' : ''}`} data-tour="composer" ref={rootRef}>
+      {activity && (
+        <div className="lg-activity" role="status" aria-live="polite">
+          <span className="lg-activity-spin" aria-hidden="true" />
+          <span className="lg-activity-says">{activity.says}</span>
+          {activity.of ? (
+            <span className="lg-activity-n">
+              {activity.done} of {activity.of}
+            </span>
+          ) : null}
+          {activity.more > 0 && <span className="lg-activity-more">and {activity.more} more</span>}
+          {activity.of ? (
+            <span className="lg-activity-bar" aria-hidden="true">
+              <i style={{ width: `${Math.round(((activity.done ?? 0) / activity.of) * 100)}%` }} />
+            </span>
+          ) : (
+            <span className="lg-activity-bar is-open" aria-hidden="true">
+              <i />
+            </span>
+          )}
+        </div>
+      )}
       <div
         className={`lg-composer-box${dragging ? ' is-dropping' : ''}`}
         onDragEnter={(e) => {
@@ -1194,19 +1233,7 @@ export function LogosComposer({
         </p>
       )}
 
-      {(notice || readying) && (
-        <p className="lg-composer-note">
-          {readying
-            ? drafts.some((d) => d.status === 'reading' && d.kind === 'doc')
-              ? 'Reading the document…'
-              : drafts.some((d) => d.phase === 'converting')
-                ? 'Converting the HEIC photo…'
-                : drafts.some((d) => d.phase === 'opening')
-                  ? 'Opening the photo…'
-                  : 'Reading the photo…'
-            : notice}
-        </p>
-      )}
+      {notice && !readying && <p className="lg-composer-note">{notice}</p>}
     </div>
   );
 }

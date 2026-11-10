@@ -27,3 +27,4 @@ export { termsDiagram, argumentDiagram } from '@/lib/docs/brief-map';
 export { markOf, blockAt, pickable, markRect, fold, needleOf, firstHolding, validBox, unitOf } from '@/lib/preview/locate';
 export { makeDisplay, EMPTY_SPACE } from '@/lib/objects';
 export { currentOf } from '@/lib/objects/core';
+export { setActivity, endActivity, withActivity, activityLine } from '@/lib/activity';

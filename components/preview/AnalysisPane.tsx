@@ -18,6 +18,7 @@ import { useEffect, useMemo, useState, type ReactNode } from 'react';
 import { qualityOf, restoreBrief, structureOf, type BriefCite, type BriefItem, type DocBrief } from '@/lib/docs/brief';
 import { argumentDiagram, termsDiagram, type BriefDiagram } from '@/lib/docs/brief-map';
 import { getBrief, putBrief } from '@/lib/docs/brief-store';
+import { endActivity, setActivity } from '@/lib/activity';
 import type { SourceDoc } from '@/lib/docs/types';
 import { fold, unitOf } from '@/lib/preview/locate';
 
@@ -75,6 +76,8 @@ export function AnalysisPane({
   const make = async () => {
     setStatus({ kind: 'loading' });
     setNote('');
+    // said above the chatbox too, so it is seen from the conversation while the preview is aside
+    setActivity(`brief:${doc.id}`, `Analysing ${doc.name}…`);
     try {
       const r = await fetch('/api/docs/brief', { method: 'POST', headers: { 'content-type': 'application/json', ...headers() }, body: JSON.stringify({ doc }) });
       const j = (await r.json().catch(() => null)) as { brief?: unknown; note?: string; error?: string } | null;
@@ -96,6 +99,8 @@ export function AnalysisPane({
       void putBrief(b);
     } catch {
       setStatus({ kind: 'error', says: 'Socria could not be reached. Check the connection and try again.', retry: true });
+    } finally {
+      endActivity(`brief:${doc.id}`);
     }
   };
 

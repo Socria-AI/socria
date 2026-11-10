@@ -153,6 +153,7 @@ import { ScenePanel } from '@/components/scene3d/ScenePanel';
 import { DisplayPanel } from '@/components/display/DisplayPanel';
 import { DocsContext, type DocsApi } from '@/components/display/docs-context';
 import { AUTO_PAGES, docNow, loadDocs, onDoc, pagesToRead, putDoc, putOriginal, readFileAsDoc, readPages as readDocPages } from '@/lib/docs/client';
+import { endActivity, setActivity } from '@/lib/activity';
 import { FilePreviewHost, type Host as FilePreviewHostApi } from '@/components/preview/context';
 import { targetOf } from '@/components/preview/types';
 import type { BriefDiagram } from '@/lib/docs/brief-map';
@@ -842,6 +843,8 @@ export function LogosApp({
   const docsRef = useRef(docs);
   docsRef.current = docs;
   const [docReading, setDocReading] = useState<Record<string, { done: number; of: number }>>({});
+  const docReadingRef = useRef(docReading);
+  docReadingRef.current = docReading;
   const letters = useMemo(() => docLetters(messages), [messages]);
   const docRefs = useMemo<DocRef[]>(() => [...letters].flatMap(([id, letter]) => (docs.get(id) ? [{ letter, doc: docs.get(id)! }] : [])), [letters, docs]);
   const docIdsKey = [...letters.keys()].join(',');
@@ -6511,6 +6514,35 @@ export function LogosApp({
   /** the topic open on the board */
   const [studyTopic, setStudyTopic] = useState<string | null>(null);
   const [organizing, setOrganizing] = useState(false);
+
+  // WHAT IS TAKING TIME, said above the chatbox (lib/activity.ts): scanned pages being read from their
+  // pictures, files being sorted, and a reply that has not begun after a few seconds
+  useEffect(() => {
+    const live = new Set<string>();
+    for (const [id, r] of Object.entries(docReading)) {
+      const name = docsRef.current.get(id)?.name ?? docNow(id)?.name ?? 'the document';
+      setActivity(`pages:${id}`, `Reading the scanned pages of ${name}`, { done: r.done, of: r.of });
+      live.add(`pages:${id}`);
+    }
+    return () => {
+      for (const k of live) if (!(k.slice(6) in docReadingRef.current)) endActivity(k);
+    };
+  }, [docReading]);
+  useEffect(() => {
+    if (!organizing) return;
+    setActivity('organize', 'Sorting your files into topics…');
+    return () => endActivity('organize');
+  }, [organizing]);
+  const slowReply = busyHere && !streaming;
+  const docsHere = docs.size > 0;
+  useEffect(() => {
+    if (!slowReply) return;
+    const t = window.setTimeout(() => setActivity('reply', docsHere ? 'Going through your documents for the answer…' : 'Working on the answer…'), 3000);
+    return () => {
+      window.clearTimeout(t);
+      endActivity('reply');
+    };
+  }, [slowReply, docsHere]);
   const [makingFor, setMakingFor] = useState<string | null>(null);
   const [studyNote, setStudyNote] = useState<string | null>(null);
   /** the topic opened by "Recommend for me", whose reason is shown with it */

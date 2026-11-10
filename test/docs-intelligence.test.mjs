@@ -337,6 +337,35 @@ console.log('\n=== the reading, drawn: terms and argument as diagrams in Artifac
   ok('fewer than three terms, or no claim: nothing is drawn', T.termsDiagram(few) === null && T.argumentDiagram(few) === null);
 }
 
+console.log('\n=== what is taking time, said above the chatbox ===');
+{
+  const { readFileSync } = await import('node:fs');
+  const read = (f) => readFileSync(join(root, f), 'utf8');
+  // what activityLine is handed is what the composer shows
+  ok('nothing taking time: no line', T.activityLine([]) === null);
+  const one = T.activityLine([{ key: 'r', says: 'Reading report.pdf', at: 1 }]);
+  ok('one thing: its words, nothing more', one.says === 'Reading report.pdf' && one.more === 0 && one.of === undefined);
+  const two = T.activityLine([{ key: 'p', says: 'Reading the scanned pages of scan.pdf', done: 2, of: 8, at: 1 }, { key: 'b', says: 'Analysing study.pdf…', at: 2 }]);
+  ok('several: the newest, and how many more', two.says === 'Analysing study.pdf…' && two.more === 1);
+  const counted = T.activityLine([{ key: 'p', says: 'Reading the scanned pages of scan.pdf', done: 3, of: 8, at: 1 }]);
+  ok('a counted thing says how far along it is', counted.done === 3 && counted.of === 8);
+  let ran = false;
+  const got = await T.withActivity('t', 'Doing a slow thing', async () => { ran = true; return 42; });
+  ok('withActivity runs the work and gives back its answer', ran && got === 42);
+  let threw = false;
+  try { await T.withActivity('t2', 'Failing', async () => { throw new Error('x'); }); } catch { threw = true; }
+  ok('  and still ends the line when the work fails', threw);
+  const comp = read('components/LogosComposer.tsx');
+  ok('the composer shows the line above the box, as a status a screen reader announces', /\{activity && \(\s*<div className="lg-activity" role="status" aria-live="polite">/.test(comp) && comp.indexOf('className="lg-activity"') < comp.indexOf('className={`lg-composer-box'));
+  ok('  a document being read is named in it', /`Reading \$\{docs\[0\]\.name\}…`/.test(comp));
+  ok('  the old note under the box is gone', !/'Reading the document…'/.test(comp));
+  const app = read('components/LogosApp.tsx');
+  ok('scanned pages being read, files being sorted and a slow reply each say so', /setActivity\(`pages:\$\{id\}`/.test(app) && /setActivity\('organize'/.test(app) && /setActivity\('reply'/.test(app) && /3000\)/.test(app));
+  ok('an analysis says so while it is made, and ends whatever happens', /setActivity\(`brief:\$\{doc\.id\}`/.test(read('components/preview/AnalysisPane.tsx')) && /finally \{\s*endActivity\(`brief:\$\{doc\.id\}`\);/.test(read('components/preview/AnalysisPane.tsx')));
+  const css = read('app/globals.css');
+  ok('the line keeps still for those who ask for less motion', /prefers-reduced-motion: reduce\) \{\s*\.logos-root \.lg-activity, \.logos-root \.lg-activity-spin/.test(css));
+}
+
 console.log('\n=== the route: /api/docs/brief ===');
 {
   const OUT = join(here, '.tmp', 'e2e-docint');

@@ -1862,6 +1862,46 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   letter-spacing: 0.02em;
   pointer-events: none;
 }
+/* WHAT IS TAKING TIME (lib/activity.ts): one quiet line above the chatbox — a turning mark, what is
+   happening, how far along when it can be counted, and a hairline that fills (or travels, when it cannot) */
+.logos-root .lg-activity {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  margin: 0 0 8px;
+  padding: 7px 12px 9px;
+  overflow: hidden;
+  border: 1px solid rgba(var(--lg-ink-rgb, 35, 36, 31), 0.1);
+  border-radius: 10px;
+  background: var(--l5-surface, var(--lg-paper, #fffdf8));
+  box-shadow: 0 6px 18px -14px rgba(var(--shadow-rgb, 35, 36, 31), 0.4);
+  font-size: 12.5px;
+  color: var(--lg-ink-70, rgba(35, 36, 31, 0.72));
+  animation: lgActIn 0.22s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)) both;
+}
+@keyframes lgActIn { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+.logos-root .lg-activity-spin {
+  flex: none;
+  width: 11px;
+  height: 11px;
+  border: 1.5px solid rgba(var(--lg-primary-rgb, 53, 70, 32), 0.22);
+  border-top-color: var(--lg-primary, #354620);
+  border-radius: 999px;
+  animation: lgActSpin 0.8s linear infinite;
+}
+@keyframes lgActSpin { to { transform: rotate(360deg); } }
+.logos-root .lg-activity-says { flex: 0 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color: var(--lg-ink, #23241f); }
+.logos-root .lg-activity-n, .logos-root .lg-activity-more { flex: none; font-variant-numeric: tabular-nums; color: var(--lg-ink-40, rgba(35, 36, 31, 0.5)); }
+.logos-root .lg-activity-bar { position: absolute; left: 0; right: 0; bottom: 0; height: 2px; background: rgba(var(--lg-primary-rgb, 53, 70, 32), 0.08); }
+.logos-root .lg-activity-bar i { display: block; height: 100%; background: var(--lg-primary, #354620); transition: width 0.4s ease; }
+.logos-root .lg-activity-bar.is-open i { width: 30%; animation: lgActTravel 1.4s ease-in-out infinite; }
+@keyframes lgActTravel { from { transform: translateX(-100%); } to { transform: translateX(340%); } }
+@media (prefers-reduced-motion: reduce) {
+  .logos-root .lg-activity, .logos-root .lg-activity-spin, .logos-root .lg-activity-bar.is-open i { animation: none; }
+  .logos-root .lg-activity-bar.is-open i { width: 100%; opacity: 0.35; }
+}
 .logos-root .lg-composer-note {
   margin: 7px 4px 0;
   font-size: 11.5px;
