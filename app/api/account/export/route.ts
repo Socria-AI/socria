@@ -16,6 +16,7 @@ import { supabaseAdmin } from '@/lib/supabase';
 import { enforceRateLimit } from '@/lib/rate-limit';
 import { exportRegistrationsForEmails } from '@/lib/events/privacy';
 import { listMedia } from '@/lib/write/media-store';
+import { listOriginals } from '@/lib/file-originals-store';
 import { MR_RETENTION_MS } from '@/lib/mr/store';
 
 export const runtime = 'nodejs';
@@ -299,6 +300,15 @@ export async function GET(req: NextRequest) {
     writingPicturesErr = e;
     out.writingPictures = [];
   }
+  // The originals of the files they attached, kept so each opens as itself. An attachment's
+  // `file` is the id each is listed by here, with a link that works for an hour.
+  let attachedFilesErr: unknown = null;
+  try {
+    out.attachedFiles = await listOriginals(userId);
+  } catch (e) {
+    attachedFilesErr = e;
+    out.attachedFiles = [];
+  }
 
   out.core4Note =
     'core4State and reasoningLedger separate what you said from what Socria inferred: an ' +
@@ -350,6 +360,7 @@ export async function GET(req: NextRequest) {
     ['yourRoomEvents', roomWordsErr],
     ['eventRegistrations', eventRegistrationsErr],
     ['writingPictures', writingPicturesErr],
+    ['attachedFiles', attachedFilesErr],
   ]
     .filter(([, e]) => !!e)
     .map(([name]) => name as string);

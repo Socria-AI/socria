@@ -10,6 +10,8 @@ import { deleteConversation } from '@/lib/core4/store';
 import { forgetConversation as forgetMrConversation } from '@/lib/mr/store';
 import { cleanId } from '@/lib/mind/logos-turn';
 import { releaseDraftMedia } from '@/lib/write/media-store';
+import { originalIdsIn } from '@/lib/file-originals';
+import { releaseOriginals } from '@/lib/file-originals-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -29,6 +31,9 @@ export async function DELETE(
     // sidecar instead, and its pictures stay until the account goes)
     const before = await supabaseAdmin().from('conversations').select('draft').eq('id', params.id).eq('user_id', userId).maybeSingle();
     const draft = before.error ? null : (before.data as { draft?: unknown } | null)?.draft ?? null;
+    // the originals its attachments point at, read before the row goes too
+    const held = await supabaseAdmin().from('conversations').select('messages').eq('id', params.id).eq('user_id', userId).maybeSingle();
+    const originals = held.error ? [] : originalIdsIn((held.data as { messages?: unknown } | null)?.messages);
 
     const { error } = await supabaseAdmin()
       .from('conversations')
@@ -64,6 +69,8 @@ export async function DELETE(
     // Before reporting an MR failure, not after: the row is already gone, so a
     // retry reads no draft and could never release them.
     await releaseDraftMedia(userId, draft);
+    // …and the originals of the files attached in it, unless another conversation still holds one
+    await releaseOriginals(userId, originals);
     if (!mrGone) {
       console.error('DELETE conversation: mr cascade failed');
       return NextResponse.json({ error: 'The conversation was deleted, but Socria could not remove everything it kept about it. Please try again.' }, { status: 500 });

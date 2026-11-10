@@ -8,6 +8,8 @@
 // is UniverseBubbles.tsx, the line through time UniverseTime.tsx, and the
 // whole is Universe.tsx.
 
+import { useFilePreview } from '@/components/preview/context';
+import { canPreview, targetOf } from '@/components/preview/types';
 import { isEditable, pasteIsFiles, pastedFiles } from '@/lib/paste';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { relTime } from '@/lib/logos-sessions';
@@ -578,6 +580,8 @@ export function FindOrStart({
   const recording = mic.state === 'recording' || mic.state === 'asking' || mic.state === 'transcribing';
   const [at, setAt] = useState(0);
   const [files, setFiles] = useState<BoxFile[]>([]);
+  // each file kept as its original and opened as itself (components/preview), its reading made beside it
+  const filePreview = useFilePreview();
   const [over, setOver] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -596,7 +600,8 @@ export function FindOrStart({
       const id = `f${++seq.current}`;
       setFiles((fs) => [...fs, { id, name: file.name, status: 'reading' }]);
       try {
-        const att = await readDocument(file);
+        const [read, kept] = await Promise.all([readDocument(file), filePreview?.keep(file) ?? Promise.resolve(null)]);
+        const att = kept ? { ...read, ...kept } : read;
         setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'ready', att } : f)));
       } catch (e: unknown) {
         setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'error', error: (e as Error)?.message || 'could not be read' } : f)));
@@ -707,8 +712,14 @@ export function FindOrStart({
                 {fileType(f.name)}
               </span>
               <span className="l5h-file-t">
-                <span className="l5h-file-n">{f.name}</span>
-                <span className="l5h-file-s">{f.status === 'reading' ? 'reading…' : f.status === 'error' ? f.error : f.att?.kind === 'doc' ? `${f.att.pages ?? 1} ${(f.att.pages ?? 1) === 1 ? 'page' : 'pages'}` : 'read'}</span>
+                {filePreview && f.att && canPreview(f.att) ? (
+                  <button type="button" className="l5h-file-n l5h-file-open" onClick={() => filePreview.open(targetOf(f.att!))} title={`Open ${f.name}`}>
+                    {f.name}
+                  </button>
+                ) : (
+                  <span className="l5h-file-n">{f.name}</span>
+                )}
+                <span className="l5h-file-s">{f.status === 'reading' ? 'reading…' : f.status === 'error' ? f.error : f.att?.kind === 'doc' ? `${f.att.pages ?? 1} ${(() => { const [one, many] = /^(pptx|odp)$/.test(f.att.format ?? '') ? ['slide', 'slides'] : /^(xlsx|ods)$/.test(f.att.format ?? '') ? ['sheet', 'sheets'] : ['page', 'pages']; return (f.att.pages ?? 1) === 1 ? one : many; })()}` : 'read'}</span>
               </span>
               <button type="button" className="l5h-file-x" aria-label={`Remove ${f.name}`} onClick={() => setFiles((fs) => fs.filter((x) => x.id !== f.id))}>
                 ×

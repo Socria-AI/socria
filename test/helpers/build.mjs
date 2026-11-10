@@ -382,6 +382,8 @@ const MODULES = [
   'test/helpers/ar-under-test.tsx',
   // the welcome's tips and features, and Socria One's button and its note on return
   'test/helpers/tips-under-test.tsx',
+  // native file preview: workbooks, decks and delimited text drawn from the original file
+  'test/helpers/preview-under-test.ts',
 ];
 
 export async function buildAll() {

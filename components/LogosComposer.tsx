@@ -35,6 +35,8 @@ import { TeX } from './TeX';
 import { useVoiceInput } from './useVoiceInput';
 import { MAX_RECORD_SECONDS, SLIDE_CANCEL_PX, clock, insertSpoken } from '@/lib/logos4/voice';
 import { PhotoViewer } from './PhotoViewer';
+import { useFilePreview } from './preview/context';
+import { canPreview, targetOf } from './preview/types';
 import './logos-thread.css';
 import './photos.css';
 import './logos4.css';
@@ -67,8 +69,10 @@ export function AttachmentList({
   onOpenDoc?: (docId: string) => void;
 }) {
   const [openNote, setOpenNote] = useState<string | null>(null);
-  /** the document being looked at under its chip */
+  /** the document being looked at under its chip (only where there is no preview host) */
   const [preview, setPreview] = useState<string | null>(null);
+  /** a file opened as itself beside the conversation (components/preview) */
+  const host = useFilePreview();
   /** the photo opened large (components/PhotoViewer.tsx) */
   const [viewing, setViewing] = useState<string | null>(null);
   if (!items.length) return null;
@@ -85,7 +89,7 @@ export function AttachmentList({
         <div className={`lg-pics${pictures.length > 1 ? ' is-many' : ''}`}>
           {pictures.map(({ a, id }) => (
             <figure key={id} className={`lg-pic${a.preview ? '' : ' is-small'}`}>
-              <button type="button" className="lg-pic-open" onClick={() => setViewing(id)} aria-label={`${a.name || 'Photo'} — open it large`}>
+              <button type="button" className="lg-pic-open" onClick={() => (host ? host.open(targetOf(a)) : setViewing(id))} aria-label={`${a.name || 'Photo'} — open it`}>
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img src={a.preview || a.thumb} alt={a.name || 'Attached photo'} loading="lazy" decoding="async" />
               </button>
@@ -103,8 +107,10 @@ export function AttachmentList({
         if (a.kind === 'doc') {
           const unit = UNIT[a.format ?? ''] ?? ['page', 'pages'];
           const canOpen = !!onOpenDoc && !!a.doc && a.status !== 'reading';
-          const canPreview = !!a.doc && a.status !== 'reading' && a.status !== 'error';
-          const previewing = canPreview && preview === id;
+          // with a host, the file opens as itself beside the conversation; without one, its reading opens under the chip as before
+          const opensAsFile = !!host && canPreview(a) && a.status !== 'reading';
+          const canPeek = !host && !!a.doc && a.status !== 'reading' && a.status !== 'error';
+          const previewing = canPeek && preview === id;
           return (
             <div key={id} className="lg-att lg-att-doc">
               <span className="lg-att-glyph" aria-hidden="true">
@@ -114,7 +120,11 @@ export function AttachmentList({
                 </svg>
               </span>
               <span className="lg-att-meta">
-                {canOpen ? (
+                {opensAsFile ? (
+                  <button type="button" className="lg-att-name lg-att-open" onClick={() => host!.open(targetOf(a))} title={`Open ${a.name || 'the document'}`}>
+                    {a.name || 'Document'}
+                  </button>
+                ) : canOpen ? (
                   <button type="button" className="lg-att-name lg-att-open" onClick={() => onOpenDoc!(a.doc!)} title="Open the reading beside the map">
                     {a.name || 'Document'}
                   </button>
@@ -135,11 +145,15 @@ export function AttachmentList({
                   {!onOrigin && a.origin && a.origin !== 'source' && <span className="lg-att-origin-tag">{ORIGIN_LABEL[a.origin]}</span>}
                 </span>
               </span>
-              {canPreview && (
+              {opensAsFile ? (
+                <button type="button" className="lg-att-pv" onClick={() => host!.open(targetOf(a))} aria-label={`Open ${a.name || 'the document'}`}>
+                  Open
+                </button>
+              ) : canPeek ? (
                 <button type="button" className="lg-att-pv" aria-expanded={previewing} onClick={() => setPreview(previewing ? null : id)}>
                   {previewing ? 'Hide' : 'Preview'}
                 </button>
-              )}
+              ) : null}
               {onRemove && a.id && (
                 <button type="button" className="lg-att-x" onClick={() => onRemove(a.id!)} aria-label={`Remove ${a.name || 'attachment'}`}>
                   ×
@@ -163,7 +177,7 @@ export function AttachmentList({
             {a.kind === 'image' ? (
               <>
                 {a.thumb ? (
-                  <button type="button" className="lg-att-look" onClick={() => setViewing(id)} aria-label={`See ${a.name || 'the photo'} large`}>
+                  <button type="button" className="lg-att-look" onClick={() => (host && canPreview(a) ? host.open(targetOf(a)) : setViewing(id))} aria-label={`Open ${a.name || 'the photo'}`}>
                     {/* eslint-disable-next-line @next/next/no-img-element */}
                     <img className="lg-att-thumb" src={a.thumb} alt="" />
                   </button>
@@ -202,7 +216,11 @@ export function AttachmentList({
                     {!onOrigin && a.origin && a.origin !== 'mine' && (
                       <span className="lg-att-origin-tag">{ORIGIN_LABEL[a.origin]}</span>
                     )}
-                    {a.text ? (
+                    {a.file && host ? (
+                      <button type="button" className="lg-att-peek" onClick={() => host.open(targetOf(a))}>
+                        open
+                      </button>
+                    ) : a.text ? (
                       <button
                         type="button"
                         className="lg-att-peek"
@@ -506,6 +524,8 @@ export function LogosComposer({
    */
   group?: boolean;
 }) {
+  // where files are kept as their originals and opened as themselves (components/preview); null without a host
+  const filePreview = useFilePreview();
   const taRef = useRef<HTMLTextAreaElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const [keypad, setKeypad] = useState(false);
@@ -660,6 +680,8 @@ export function LogosComposer({
     // the chip is there at once, saying what is happening: opening it, converting a HEIC, reading it
     addDraft({ id, kind: 'image', name: file.name || 'Photo', status: 'reading', phase: 'opening' });
     const patch = (d: Partial<Draft>) => setDrafts((prev) => prev.map((x) => (x.id === id ? { ...x, ...d } : x)));
+    // the original photo kept as it was taken, so it opens at full size (components/preview); its reading is separate
+    void filePreview?.keep(file).then((kept) => kept && patch(kept));
     try {
       const prepared = await prepareImage(file, undefined, undefined, { onConvert: () => patch({ phase: 'converting' }) });
       patch({ name: prepared.name, thumb: prepared.thumb, ...(prepared.preview ? { preview: prepared.preview } : {}), phase: undefined });
@@ -687,8 +709,9 @@ export function LogosComposer({
     const id = nextId();
     addDraft({ id, kind: 'doc', name: file.name, status: 'reading' });
     try {
-      const att = await readDocument!(file);
-      setDrafts((prev) => prev.map((d) => (d.id === id ? { ...att, id, status: 'ready' } : d)));
+      // the reading Socria reasons with, and the original the preview draws — side by side, never one for the other
+      const [att, kept] = await Promise.all([readDocument!(file), filePreview?.keep(file) ?? Promise.resolve(null)]);
+      setDrafts((prev) => prev.map((d) => (d.id === id ? { ...att, ...(kept ?? {}), id, status: 'ready' } : d)));
     } catch (e: any) {
       setDrafts((prev) => prev.map((d) => (d.id === id ? { ...d, status: 'error', error: e?.message || 'could not be read' } : d)));
     }

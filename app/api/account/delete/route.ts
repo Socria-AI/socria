@@ -20,6 +20,7 @@ import { purgeSharing } from '@/lib/share/server';
 import { purgeRegistrationsForEmails } from '@/lib/events/privacy';
 import { purgeUploads } from '@/lib/upload-store';
 import { purgeMedia } from '@/lib/write/media-store';
+import { purgeOriginals } from '@/lib/file-originals-store';
 import { purgeReferrer } from '@/lib/rewards/supabase-rewards-store';
 import { purgeUserFromRooms } from '@/lib/logos-rooms-server';
 
@@ -299,6 +300,8 @@ export async function DELETE(req: NextRequest) {
   await purgeUploads(userId);
   // The pictures in their writing: one folder of private storage, removed whole.
   await purgeMedia(userId);
+  // The originals of the files they attached (opened as themselves in a preview): one folder, removed whole.
+  await purgeOriginals(userId);
 
   // The identity last.
   try {

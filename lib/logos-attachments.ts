@@ -61,6 +61,31 @@ export interface Attachment {
   format?: string;
   /** doc: what the reading's checks found that is not fine, in a line — shown on the chip */
   checks?: string;
+  /**
+   * The ORIGINAL file, kept so it opens as itself (lib/file-originals.ts): 32 hex characters
+   * of its SHA-256. On the device that attached it, and with the account when signed in.
+   * The preview draws this; the reading above is what Socria reasons with.
+   */
+  file?: string;
+  /** the original's size in bytes */
+  size?: number;
+  /** the original's type, as the browser named it */
+  mime?: string;
+  /** when it was attached (ms) */
+  at?: number;
+}
+
+/** An original's id (lib/file-originals.ts FILE_ID), here too because this module runs in the browser. */
+const FILE_REF = /^[a-f0-9]{32}$/;
+
+/** The original's fields, from anything: only what is well formed survives. */
+function originalOf(a: Record<string, unknown>): Pick<Attachment, 'file' | 'size' | 'mime' | 'at'> {
+  return {
+    ...(typeof a.file === 'string' && FILE_REF.test(a.file) ? { file: a.file } : {}),
+    ...(typeof a.size === 'number' && Number.isInteger(a.size) && a.size > 0 && a.size < 2 ** 40 ? { size: a.size } : {}),
+    ...(typeof a.mime === 'string' && /^[a-z]+\/[a-z0-9.+-]{1,80}$/i.test(a.mime) ? { mime: a.mime } : {}),
+    ...(typeof a.at === 'number' && Number.isFinite(a.at) && a.at > 0 ? { at: Math.floor(a.at) } : {}),
+  };
 }
 
 const DOC_ID = /^[0-9a-f]{16}$/;
@@ -73,7 +98,8 @@ export const MAX_READING_CHARS = 1_600;
 export const MAX_THUMB_CHARS = 62_000;
 // A 960px JPEG, stepped down until it fits: ~150KB of image at most.
 export const MAX_PREVIEW_CHARS = 200_000;
-export const MAX_NAME = 80;
+// a file's own name, kept whole: long names are common and cutting one loses which file it was
+export const MAX_NAME = 200;
 
 /** Paste anything longer than this and it becomes a note instead of filling the box. */
 export const NOTE_THRESHOLD = 900;
@@ -135,6 +161,7 @@ export function sanitizeAttachments(raw: unknown, maxNoteChars: number = MAX_NOT
           ? { truncated: true }
           : {}),
         ...(a.opening === true ? { opening: true } : {}),
+        ...originalOf(a),
       });
     } else if (a.kind === 'doc') {
       // a document's reading is never trusted from the client either: its id
@@ -153,6 +180,7 @@ export function sanitizeAttachments(raw: unknown, maxNoteChars: number = MAX_NOT
         ...(typeof a.format === 'string' && DOC_FORMAT.test(a.format) ? { format: a.format } : {}),
         ...(clip(a.checks, 300).trim() ? { checks: clip(a.checks, 300).trim() } : {}),
         ...(a.truncated === true || (typeof a.text === 'string' && a.text.length > maxNoteChars) ? { truncated: true } : {}),
+        ...originalOf(a),
       });
     } else if (a.kind === 'image') {
       const thumb = clip(a.thumb, MAX_THUMB_CHARS);
@@ -169,6 +197,7 @@ export function sanitizeAttachments(raw: unknown, maxNoteChars: number = MAX_NOT
         /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(a.preview)
           ? { preview: a.preview }
           : {}),
+        ...originalOf(a),
       });
     }
     if (out.length >= MAX_ATTACHMENTS) break;

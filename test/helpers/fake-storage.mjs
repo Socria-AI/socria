@@ -53,6 +53,21 @@ function bucketApi(name) {
       const gone = paths.filter((p) => files()?.delete(p));
       return { data: gone.map((p) => ({ name: p })), error: null };
     },
+    // a one-time upload link (the bucket's own rules still apply when the file arrives: see uploadSigned)
+    async createSignedUploadUrl(path, opts = {}) {
+      s.calls.push(['signUpload', name, path]);
+      const b = s.buckets.get(name);
+      if (!b) return { data: null, error: { message: 'Bucket not found', statusCode: '404' } };
+      if (b.files.has(path) && !opts.upsert) return { data: null, error: { message: 'The resource already exists', statusCode: '409' } };
+      const token = `tok_${Math.random().toString(36).slice(2)}`;
+      (s.uploads ??= new Map()).set(token, { bucket: name, path });
+      return { data: { signedUrl: `https://storage.test/object/upload/sign/${name}/${path}?token=${token}`, token, path }, error: null };
+    },
+    async createSignedUrl(path, expiresIn) {
+      s.calls.push(['signOne', name, path, expiresIn]);
+      if (!files()?.has(path)) return { data: null, error: { message: 'Object not found', statusCode: '404' } };
+      return { data: { signedUrl: `https://storage.test/object/sign/${name}/${path}?expires=${expiresIn}` }, error: null };
+    },
     async createSignedUrls(paths, expiresIn) {
       s.calls.push(['sign', name, paths.length, expiresIn]);
       return { data: paths.map((p) => ({ path: p, error: null, signedUrl: `https://storage.test/object/sign/${name}/${p}?expires=${expiresIn}` })), error: null };
@@ -77,4 +92,12 @@ export function supabaseAdmin() {
       from: bucketApi,
     },
   };
+}
+
+/** What the browser's PUT to a signed upload link does: the file lands, under the bucket's rules. */
+export async function uploadSigned(token, bytes, type = 'application/octet-stream') {
+  const u = state().uploads?.get(token);
+  if (!u) return { error: { message: 'invalid token' } };
+  state().uploads.delete(token);
+  return bucketApi(u.bucket).upload(u.path, bytes, { contentType: type });
 }

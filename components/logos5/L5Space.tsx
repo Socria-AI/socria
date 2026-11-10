@@ -76,6 +76,8 @@ export interface SpaceThing {
   preview?: ReactNode;
   note?: string;
   onOpen?: () => void;
+  /** opens straight away (a file opened as itself, components/preview), never enlarged here first */
+  direct?: boolean;
 }
 
 // the same names the views and the menus use: what you brought is Files, what Socria made is Artifacts
@@ -912,7 +914,7 @@ export function L5Space({
   const thingEl = (c: SpaceThing, what: 'brought' | 'made') => {
     const k = what === 'brought' ? broughtKey(c.key) : madeKey(c.key);
     // something to look at is enlarged first; with nothing to show, the card opens beside the space as before
-    const act = c.preview ? () => setEnlarged(k) : c.onOpen;
+    const act = c.direct && c.onOpen ? c.onOpen : c.preview ? () => setEnlarged(k) : c.onOpen;
     return (
       <div key={k} className={`ls-it${back(k)}`} data-k={k} style={order(k)}>
         <div
@@ -921,7 +923,7 @@ export function L5Space({
           tabIndex={act ? 0 : undefined}
           onClick={act}
           onKeyDown={press(act)}
-          aria-label={`${c.kicker}${c.title ? `: ${c.title}` : ''}${c.preview ? '. Enlarge it' : c.onOpen ? '. Open it' : ''}`}
+          aria-label={`${c.kicker}${c.title ? `: ${c.title}` : ''}${c.direct && c.onOpen ? '. Open it' : c.preview ? '. Enlarge it' : c.onOpen ? '. Open it' : ''}`}
         >
           <span className="ls-t ls-tt">{c.title || c.kicker}</span>
           {c.preview ? (

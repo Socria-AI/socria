@@ -140,6 +140,18 @@ class Query {
     this._cols = [...(this._cols ?? []), col];
     return this;
   }
+  // jsonb containment (@>), as PostgREST's cs: an array contains another when every element of the other is
+  // contained in some element of it; an object, when every key's value is contained in its own.
+  contains(c, v) {
+    const within = (a, b) => {
+      if (Array.isArray(b)) return Array.isArray(a) && b.every((x) => a.some((y) => within(y, x)));
+      if (b && typeof b === 'object') return !!a && typeof a === 'object' && !Array.isArray(a) && Object.entries(b).every(([k, x]) => within(a[k], x));
+      return a === b;
+    };
+    this.filters.push((r) => within(r[c], v));
+    this._cols = [...(this._cols ?? []), c];
+    return this;
+  }
   // Each call adds a key, as PostgREST's does: .order('a').order('b') sorts by a, then b.
   order(c, { ascending = true } = {}) { this._orders.push({ c, ascending }); return this; }
   limit(n) { this._limit = n; return this; }

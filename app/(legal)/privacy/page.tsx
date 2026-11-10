@@ -25,7 +25,7 @@ export default function PrivacyPage() {
         deleted.
       </p>
       <p className="lg-dates">
-        Effective August 2026 · Last updated October 2026 · Data controller:
+        Effective August 2026 · Last updated November 2026 · Data controller:
         Socria — <a href="mailto:hellosocria@gmail.com">hellosocria@gmail.com</a>
       </p>
 
@@ -36,7 +36,10 @@ export default function PrivacyPage() {
         Your messages, and Socria&rsquo;s replies. If you use Logos, that also
         means the <strong>Thinking Map</strong> built from those messages —
         your claims, assumptions, tensions and evidence — along with anything
-        you write in Draft Space and any material you attach or paste.
+        you write in Draft Space and any material you attach or paste. When
+        you are signed in, that includes the <strong>original</strong> of each
+        file you attach, kept so it opens as itself; see{' '}
+        <a href="#keep">How long we keep it</a>.
       </p>
 
       <h3>What Socria works out about your thinking</h3>
@@ -242,7 +245,7 @@ export default function PrivacyPage() {
           <a href="/account/data">Data &amp; Privacy</a> downloads everything we
           hold about you as a JSON file: conversations, maps, drafts, memory,
           profile and subscription status, with a link to each picture in your
-          writing. Connected accounts are listed as connected; their access
+          writing and to the original of each file you attached. Connected accounts are listed as connected; their access
           tokens are never included.
         </li>
         <li>
@@ -327,6 +330,16 @@ export default function PrivacyPage() {
         to being read. It is deleted from there the moment it has been read,
         whether or not it could be; one that is never read, because the page
         closed mid-upload, is deleted within a day.
+      </p>
+      <p>
+        When you are signed in, the original of each file you attach is kept in
+        private storage under your account, so that it opens as itself — its
+        pages, slides or grid — on any of your devices. Only you can open it:
+        someone a conversation is shared with sees what Socria read from the
+        file, never the original. It is deleted when the conversation that holds
+        it is deleted (unless another of your conversations holds the same file),
+        and with your account. Signed out, the original stays in your browser and
+        is never sent to us to keep.
       </p>
       <p>
         Our own application logs record route names, error codes and counts.

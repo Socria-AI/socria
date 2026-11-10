@@ -154,6 +154,8 @@ console.log('\n=== every storage bucket ===');
   const KNOWN = {
     UPLOAD_BUCKET: { purge: /await purgeUploads\(userId\)/ },
     MEDIA_BUCKET: { purge: /await purgeMedia\(userId\)/, exported: /out\.writingPictures = await listMedia\(userId\)/ },
+    // the originals of attached files (lib/file-originals-store.ts): kept, so listed in the export and removed with the account
+    FILES_BUCKET: { purge: /await purgeOriginals\(userId\)/, exported: /out\.attachedFiles = await listOriginals\(userId\)/ },
     // The relaunch's waitlist (lib/waitlist.ts) holds addresses typed by visitors with no
     // account, keyed by the address, not a user: there is no account to empty it with. It is
     // read only by the team, behind the dashboard's gate; a removal is by hand, on request.

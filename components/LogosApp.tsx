@@ -153,6 +153,8 @@ import { ScenePanel } from '@/components/scene3d/ScenePanel';
 import { DisplayPanel } from '@/components/display/DisplayPanel';
 import { DocsContext, type DocsApi } from '@/components/display/docs-context';
 import { AUTO_PAGES, docNow, loadDocs, onDoc, pagesToRead, putDoc, putOriginal, readFileAsDoc, readPages as readDocPages } from '@/lib/docs/client';
+import { FilePreviewHost, type Host as FilePreviewHostApi } from '@/components/preview/context';
+import { targetOf } from '@/components/preview/types';
 import { docLetters, docsForRequest } from '@/lib/docs/conversation';
 import { renderDocAsNote, type DocRef } from '@/lib/docs/render';
 import { BLOCK_ID } from '@/lib/docs/sanitize';
@@ -1737,6 +1739,8 @@ export function LogosApp({
     []
   );
 
+  /** the preview host, for opening a file from Content (components/preview) — a ref, so it is declared with the other hooks */
+  const filePreviewRef = useRef<FilePreviewHostApi | null>(null);
   const keyHeaders = useCallback(
     (): Record<string, string> => ({
       // What the client believes it holds. The routes check for themselves.
@@ -8459,6 +8463,12 @@ export function LogosApp({
   function openContent(id: string | null) {
     const sid = activeIdRef.current;
     if (!sid) return;
+    // a file whose original is kept opens as itself beside the conversation; an older one, as its reading here
+    const att = id ? attachmentOfContent(messages, id) : null;
+    if (att && filePreviewRef.current && (att.file || (att.kind === 'image' && (att.preview || att.thumb)))) {
+      filePreviewRef.current.open(targetOf(att));
+      return;
+    }
     setContentSel((m) => ({ ...m, [sid]: id }));
     if (id) setStudyTab('content');
     // on the board, a file opened is read large beside it
@@ -9173,6 +9183,11 @@ export function LogosApp({
             ) : undefined,
             ...(c.meta ? { note: c.meta } : {}),
             onOpen: () => openContent(c.id),
+            // a file whose original is kept opens as itself beside the conversation, not enlarged here
+            ...((() => {
+              const a = attachmentOfContent(messages, c.id);
+              return a && (a.file || (a.kind === 'image' && (a.preview || a.thumb))) ? { direct: true } : {};
+            })()),
           }));
           const sMade: SpaceThing[] = cards
             .filter((c) => c.tone !== 'content')
@@ -10087,6 +10102,8 @@ export function LogosApp({
     <div
       className={`logos-root${cabin && !narrow ? ' is-cabin' : ''}`}
     >
+      {/* a file opened as itself beside the conversation, and its original kept as it is attached (components/preview) */}
+      <FilePreviewHost account={!!isSignedIn} headers={keyHeaders} onOpenReading={openDoc} hostRef={filePreviewRef}>
       {/* BIG-SCREEN MODE: the dock down the left — the Universal Map, the four views, Write, Memory */}
       {cabin && !narrow && (
         <CabinDock
@@ -10467,6 +10484,7 @@ export function LogosApp({
             />
           )}
         </div>
+      </FilePreviewHost>
     </div>
     </DocsContext.Provider>
   );
@@ -10541,4 +10559,17 @@ function sourcesIn(h: Headers): number {
   } catch {
     return 0;
   }
+}
+
+/** The attachment a Content entry was made from ("doc:<id>", "img:<message>:<n>", "note:<message>:<n>"), when it came from one. */
+function attachmentOfContent(messages: readonly { id?: string; attachments?: Attachment[] }[], id: string): Attachment | null {
+  if (id.startsWith('doc:')) {
+    const doc = id.slice(4);
+    for (const m of messages) for (const a of m.attachments ?? []) if (a.kind === 'doc' && a.doc === doc) return a;
+    return null;
+  }
+  const m = /^(img|note):(.+):(\d+)$/.exec(id);
+  if (!m) return null;
+  const at = messages.findIndex((x, i) => (x.id && /^[\w-]{1,80}$/.test(x.id) ? x.id : `i${i}`) === m[2]);
+  return at >= 0 ? messages[at].attachments?.[Number(m[3])] ?? null : null;
 }
