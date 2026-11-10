@@ -181,6 +181,17 @@
   background: color-mix(in srgb, var(--lg-paper) 60%, var(--l5-surface));
   animation: l5b-rise 0.3s cubic-bezier(0.2, 0.8, 0.2, 1) both;
 }
+/* a picture in the box: itself, small and square, never a coloured box with its name */
+.logos-root .l5 .l5h-fthumb {
+  flex: none;
+  width: 34px;
+  height: 34px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.06);
+  box-shadow: inset 0 0 0 1px rgba(var(--lg-ink-rgb, 35, 36, 31), 0.08);
+}
+.logos-root .l5 .l5h-file.is-reading .l5h-fthumb { opacity: 0.6; }
 .logos-root .l5 .l5h-ftype {
   flex: none;
   display: grid;

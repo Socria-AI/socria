@@ -11,6 +11,8 @@
 import { useFilePreview } from '@/components/preview/context';
 import { canPreview, targetOf } from '@/components/preview/types';
 import { isEditable, pasteIsFiles, pastedFiles } from '@/lib/paste';
+import { IMAGE_ACCEPT, isImageFile, isPhotoByBytes, prepareImage, saysNothing } from '@/lib/logos-upload';
+import { kindOfFile } from '@/lib/file-kinds';
 import { useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import { relTime } from '@/lib/logos-sessions';
 import type { Attachment } from '@/lib/logos-attachments';
@@ -489,6 +491,8 @@ export interface Found {
 interface BoxFile {
   id: string;
   name: string;
+  /** a picture: its small copy, shown as itself in the chip */
+  thumb?: string;
   status: 'reading' | 'ready' | 'error';
   att?: Attachment;
   error?: string;
@@ -514,7 +518,7 @@ export function fileType(name: string): string {
  * dims) and the first answer is a press of Enter away; or, if nothing is
  * right, its round ↑ begins a new line of thinking with those words as its
  * first question. Files dropped on it (or on the map), or added with its
- * clip, are read here first; sent, Socria sorts them into topics. Its list
+ * clip, are read here first; sent, Socria reads them and answers (studying with documents, it sorts them into topics). Its list
  * opens upward, over the map.
  */
 export function FindOrStart({
@@ -526,6 +530,7 @@ export function FindOrStart({
   onStart,
   inputRef,
   readDocument,
+  readImage,
   onStartFiles,
   picker,
   placeholder,
@@ -543,7 +548,9 @@ export function FindOrStart({
   inputRef: React.RefObject<HTMLInputElement>;
   /** files can be put in it: each read here before it is sent */
   readDocument?: (file: File) => Promise<Attachment>;
-  /** begun with files: Socria sorts them, with what was said about them */
+  /** a picture (a screenshot, a photo) is read the way the conversation reads one: shrunk, shown, described */
+  readImage?: (dataUrl: string) => Promise<string>;
+  /** begun with files: asked about in a new conversation — or, to study them, sorted into topics */
   onStartFiles?: (text: string, atts: Attachment[], goal: Intent) => void;
   /** the model and how far it goes, in the box */
   picker?: ReactNode;
@@ -590,6 +597,8 @@ export function FindOrStart({
   const ready = files.filter((f) => f.status === 'ready' && f.att);
   const reading = files.some((f) => f.status === 'reading');
   const canFiles = !!readDocument && !!onStartFiles;
+  /** studying with documents (an exam, an assignment): they are sorted into topics; anything else is asked about */
+  const sorts = ready.length > 0 && ready.every((f) => f.att?.kind === 'doc') && ['exam', 'assignment'].includes(intentOf(q, ready.length));
 
   async function take(list: FileList | File[]) {
     if (!readDocument) return;
@@ -598,6 +607,24 @@ export function FindOrStart({
     if (list.length > all.length) setNotice(`Up to ${BOX_MAX} files at a time.`);
     for (const file of all) {
       const id = `f${++seq.current}`;
+      // A PICTURE — a screenshot, a photo, a pasted image — is read as one, exactly as the conversation's
+      // box reads it (components/LogosComposer.tsx addImage): its small copy shown in the chip as itself,
+      // the original kept, what is in it read. A document reader is no reader for a screenshot.
+      const picture = !!readImage && (isImageFile(file) || (saysNothing(file) && kindOfFile(file.name, file.type) === 'unsupported' && (await isPhotoByBytes(file))));
+      if (picture) {
+        setFiles((fs) => [...fs, { id, name: file.name || 'Screenshot', status: 'reading' }]);
+        const kept = filePreview?.keep(file).catch(() => null) ?? Promise.resolve(null);
+        try {
+          const prepared = await prepareImage(file);
+          setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, name: prepared.name, thumb: prepared.thumb } : f)));
+          const [reading, k] = await Promise.all([readImage!(prepared.full), kept]);
+          const att: Attachment = { kind: 'image', name: prepared.name, thumb: prepared.thumb, ...(prepared.preview ? { preview: prepared.preview } : {}), reading, ...(k ?? {}) };
+          setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'ready', att } : f)));
+        } catch (e: unknown) {
+          setFiles((fs) => fs.map((f) => (f.id === id ? { ...f, status: 'error', error: (e as Error)?.message || 'could not be read' } : f)));
+        }
+        continue;
+      }
       setFiles((fs) => [...fs, { id, name: file.name, status: 'reading' }]);
       try {
         const [read, kept] = await Promise.all([readDocument(file), filePreview?.keep(file) ?? Promise.resolve(null)]);
@@ -708,9 +735,15 @@ export function FindOrStart({
         <ul className="l5h-files" aria-label="Files to sort">
           {files.map((f) => (
             <li key={f.id} className={`l5h-file is-${f.status}`} title={f.status === 'error' ? f.error : f.name}>
-              <span className={`l5h-ftype is-${fileType(f.name).toLowerCase()}`} aria-hidden="true">
-                {fileType(f.name)}
-              </span>
+              {f.thumb ? (
+                // a picture is shown as itself, not as a box with its name
+                // eslint-disable-next-line @next/next/no-img-element
+                <img className="l5h-fthumb" src={f.thumb} alt="" aria-hidden="true" />
+              ) : (
+                <span className={`l5h-ftype is-${fileType(f.name).toLowerCase()}`} aria-hidden="true">
+                  {fileType(f.name)}
+                </span>
+              )}
               <span className="l5h-file-t">
                 {filePreview && f.att && canPreview(f.att) ? (
                   <button type="button" className="l5h-file-n l5h-file-open" onClick={() => filePreview.open(targetOf(f.att!))} title={`Open ${f.name}`}>
@@ -719,7 +752,7 @@ export function FindOrStart({
                 ) : (
                   <span className="l5h-file-n">{f.name}</span>
                 )}
-                <span className="l5h-file-s">{f.status === 'reading' ? 'reading…' : f.status === 'error' ? f.error : f.att?.kind === 'doc' ? `${f.att.pages ?? 1} ${(() => { const [one, many] = /^(pptx|odp)$/.test(f.att.format ?? '') ? ['slide', 'slides'] : /^(xlsx|ods)$/.test(f.att.format ?? '') ? ['sheet', 'sheets'] : ['page', 'pages']; return (f.att.pages ?? 1) === 1 ? one : many; })()}` : 'read'}</span>
+                <span className="l5h-file-s">{f.status === 'reading' ? 'reading…' : f.status === 'error' ? f.error : f.att?.kind === 'image' ? 'picture · read' : f.att?.kind === 'doc' ? `${f.att.pages ?? 1} ${(() => { const [one, many] = /^(pptx|odp)$/.test(f.att.format ?? '') ? ['slide', 'slides'] : /^(xlsx|ods)$/.test(f.att.format ?? '') ? ['sheet', 'sheets'] : ['page', 'pages']; return (f.att.pages ?? 1) === 1 ? one : many; })()}` : 'read'}</span>
               </span>
               <button type="button" className="l5h-file-x" aria-label={`Remove ${f.name}`} onClick={() => setFiles((fs) => fs.filter((x) => x.id !== f.id))}>
                 ×
@@ -810,8 +843,8 @@ export function FindOrStart({
           type="button"
           className="l5h-find-go"
           disabled={reading}
-          aria-label={ready.length ? `Sort ${ready.length === 1 ? 'this file' : `these ${ready.length} files`} into topics` : q ? `Start a new line of thinking: ${q}` : 'Start a new line of thinking'}
-          title={ready.length ? 'Sort them into topics' : q ? 'Start something new with this' : 'Type what you are working on, or add your notes'}
+          aria-label={ready.length ? (sorts ? `Sort ${ready.length === 1 ? 'this file' : `these ${ready.length} files`} into topics` : `Ask Socria about ${ready.length === 1 ? 'this file' : `these ${ready.length} files`}`) : q ? `Start a new line of thinking: ${q}` : 'Start a new line of thinking'}
+          title={ready.length ? (sorts ? 'Sort them into topics' : 'Ask about them') : q ? 'Start something new with this' : 'Type what you are working on, or add your notes'}
           onMouseDown={(e) => e.preventDefault()}
           onClick={begin}
         >
@@ -825,7 +858,7 @@ export function FindOrStart({
           ref={fileRef}
           type="file"
           multiple
-          accept={STUDY_ACCEPT}
+          accept={readImage ? `${STUDY_ACCEPT},${IMAGE_ACCEPT},.heic,.heif` : STUDY_ACCEPT}
           hidden
           onChange={(e) => {
             if (e.target.files?.length) void take(e.target.files);

@@ -9951,10 +9951,14 @@ export function LogosApp({
     if (!said && !files?.atts.length) return;
     if (!newFromHome()) return;
     setHomeStart(null);
-    if (files?.atts.length && activeIdRef.current) {
-      sortNextRef.current = { id: activeIdRef.current, atts: files.atts, said, goal: files.goal };
+    // FILES FROM THE MAP'S BOX. Studying (an exam, an assignment) with documents: sorted into topics, as
+    // Study does. Anything else — a screenshot, a question about a file, files with nothing said — is a
+    // turn of the conversation, so Socria reads them and answers, exactly as from the conversation's box.
+    const studying = files?.atts.length && (files.goal === 'exam' || files.goal === 'assignment') && files.atts.every((a) => a.kind === 'doc');
+    if (studying && activeIdRef.current) {
+      sortNextRef.current = { id: activeIdRef.current, atts: files!.atts, said, goal: files!.goal };
       setSortPending(true);
-    } else void send(said, [], null, undefined, via);
+    } else void send(said, files?.atts ?? [], null, undefined, via);
   }
   /** filed from the map: a line of thinking as the rail files it, a Core chat by its host */
   function fileFromHome(id: string, kind: 'logos' | 'core', projectId: string | null) {
@@ -10014,6 +10018,7 @@ export function LogosApp({
       onJoinCode={onJoinWithCode}
       drawing={drawing}
       readDocument={readDocument}
+      readImage={readImage}
       picker={<ConcisePicker value={replyLength} onChange={pickLength} />}
       // talking instead of typing, here too: the words into the box (held mic), or Socria Voice
       voice={LOGOS4.voice && hasAccess && !togetherReadOnly}

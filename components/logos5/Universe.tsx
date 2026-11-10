@@ -109,6 +109,7 @@ export function UniverseView({
   atlas,
   drawing = null,
   readDocument,
+  readImage,
   picker,
   voice = false,
   voiceButton,
@@ -160,6 +161,8 @@ export function UniverseView({
   drawing?: { done: number; total: number } | null;
   /** files can be put in the box: each read in the browser before it is sent */
   readDocument?: (file: File) => Promise<Attachment>;
+  /** a picture read as a picture: shrunk, shown, described */
+  readImage?: (dataUrl: string) => Promise<string>;
   /** the model and how far it goes, in the box */
   picker?: ReactNode;
   /** the hold-to-talk mic in the box: words spoken land in it to edit, never sent by themselves */
@@ -748,6 +751,7 @@ export function UniverseView({
       resume={resume}
       inputRef={findRef}
       readDocument={readDocument}
+      readImage={readImage}
       picker={picker}
       voice={voice}
       voiceButton={voiceButton}
