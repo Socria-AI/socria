@@ -34,6 +34,9 @@ export interface CanvasTurn {
   said: string;
   /** the question the reply ends on, when it ends on one — what a folded turn shows (Logos 5.5, the page) */
   asks?: string;
+  /** the same two with their mathematics kept, for where a formula can be typeset (the thread of replies) */
+  saidTex?: string;
+  asksTex?: string;
   /** Socria is still writing this turn's reply */
   pending?: boolean;
   /** a synthesis — where the thinking stands — rather than a reply */
@@ -130,6 +133,75 @@ export function plainText(content: unknown): string {
     .trim();
 }
 
+/**
+ * A text as it reads, but its MATHEMATICS KEPT AS MATHEMATICS: the prose without its marks, as plainText
+ * makes it, and every formula left whole as \(…\) for components/TeX MathText to typeset. Where a line of
+ * text can show a formula (the thread of Socria's replies), "\frac{1}{2}" is ½, never "12".
+ */
+export function richText(content: unknown): string {
+  const s = typeof content === 'string' ? content : '';
+  const lines = s
+    .replace(/```[\s\S]*?(```|$)/g, ' ')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*>\s?/gm, '');
+  return scanMath(lines)
+    .map((g) =>
+      g.kind === 'text'
+        ? g.body
+            .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+            .replace(/(^|[\s(])_([^_\n]+)_(?=[\s.,;:!?)]|$)/g, '$1$2')
+            .replace(/[*`~]/g, '')
+        : ` \\(${g.body.replace(/\s+/g, ' ').trim()}\\) `
+    )
+    .join('')
+    .replace(/\s+/g, ' ')
+    .replace(/ ([.,;:!?])/g, '$1')
+    .trim();
+}
+
+/**
+ * The first words of a text with its mathematics kept (richText), cut by how much it READS — a formula
+ * counts as its spoken length — at a word, and never inside a formula.
+ */
+export function richExcerpt(content: unknown, max = 200): string {
+  const t = richText(content);
+  const parts = scanMath(t);
+  let out = '';
+  let read = 0;
+  for (const g of parts) {
+    if (g.kind !== 'text') {
+      const n = readTex(g.body).length;
+      if (read + n > max && read > max * 0.5) return `${out.trimEnd()}…`;
+      out += t.slice(g.start, g.end);
+      read += n;
+      continue;
+    }
+    if (read + g.body.length <= max) {
+      out += g.body;
+      read += g.body.length;
+      continue;
+    }
+    const room = max - read;
+    const cut = g.body.slice(0, room);
+    const sentence = (out + cut).match(/^[\s\S]*[.!?](?=\s)/)?.[0];
+    if (sentence && sentence.length > max * 0.55 && !/\\\([^)]*$/.test(sentence)) return sentence;
+    const sp = cut.lastIndexOf(' ');
+    return `${out}${(sp > room * 0.4 ? cut.slice(0, sp) : cut).trimEnd()}…`;
+  }
+  return out;
+}
+
+/** The question a reply ends on, its mathematics kept (richText) — closingAsk, typeset. */
+export function closingAskRich(content: unknown, max = 220): string {
+  if (!closingAsk(content)) return '';
+  const t = richText(content).trim();
+  const m = /((?:[^.!?…\n\\]|\\\([^)]*\\\)|\\[^(])*\?)["'’”)\]]*\s*$/.exec(t);
+  const q = (m?.[1] ?? '').trim().replace(/^[—–-]\s*/, '');
+  if (!q) return '';
+  return q.length > max ? closingAsk(content) : q;
+}
+
 /** The first words of a text, cut at a word, never mid-sentence without saying so. */
 export function excerpt(content: unknown, max = 180): string {
   const t = plainText(content);
@@ -176,12 +248,16 @@ export function canvasTurns(messages: readonly CanvasMsg[], opts: { pending?: bo
     if (m.role !== 'assistant') return;
     const said = excerpt(m.content, 200);
     const asks = closingAsk(m.content);
+    const saidTex = richExcerpt(m.content, 200);
+    const asksTex = asks ? closingAskRich(m.content) : '';
+    const tex = { ...(saidTex !== said ? { saidTex } : {}), ...(asksTex && asksTex !== asks ? { asksTex } : {}) };
     if (open && open.replyAt === undefined) {
       open.replyId = m.id;
       open.replyAt = at;
       open.said = said;
       if (asks) open.asks = asks;
-    } else start({ asked: '', said, replyId: m.id, replyAt: at, ...(asks ? { asks } : {}) });
+      Object.assign(open, tex);
+    } else start({ asked: '', said, replyId: m.id, replyAt: at, ...(asks ? { asks } : {}), ...tex });
     open = null;
   });
   // the turn still being answered

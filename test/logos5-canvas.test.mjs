@@ -139,5 +139,26 @@ console.log('\n=== the wiring ===');
   ok('the canvas sits under the header, so ‹ Universal Map stays on screen while zoomed', /\.l5-body\.is-zoomed \{\s*position: relative;/.test(css) && /\{!chromeHidden && !mindShown && !homeShown && !openingNow && l5Head\}/.test(app));
 }
 
+
+console.log('\n=== the thread of replies keeps its mathematics ===');
+{
+  const a = 'Try it with a number: dividing by $\\frac{1}{2}$ is the same as multiplying by $2$. $6 \\div \\frac{1}{2} = 12$. That is why dividing by $\\frac{1}{x}$ is the same as multiplying by $x$.';
+  const r = C.richExcerpt(a);
+  ok('a fraction stays a fraction, as TeX to typeset — never "12"', r.includes('\\(\\frac{1}{2}\\)') && r.includes('\\(\\frac{1}{x}\\)') && !/dividing by 12/.test(r), r);
+  ok('  the prose loses its marks as before', !C.richText('**bold** and `code`').includes('*') && !C.richText('**bold** and `code`').includes('`'));
+  const b = 'Rewrite it as a fraction first.\n\nWhat do you get for the derivative of the bottom, $\\frac{1}{x}$?';
+  ok('the question it ends on keeps its formula', C.closingAskRich(b) === 'What do you get for the derivative of the bottom, \\(\\frac{1}{x}\\)?', C.closingAskRich(b));
+  ok('  and a reply that asks nothing has no question', C.closingAskRich('It is $x$.') === '');
+  const long = 'x '.repeat(10) + '$' + 'a+'.repeat(60) + 'b$ and more words after it.';
+  const cut = C.richExcerpt(long, 60);
+  ok('a long formula is never cut in half', (cut.match(/\\\(/g) ?? []).length === (cut.match(/\\\)/g) ?? []).length, cut);
+  const turns = C.canvasTurns([{ role: 'user', content: 'why?' }, { role: 'assistant', id: 'r', content: b }]);
+  ok('a turn carries both: plain words for where only words fit, the formula for the thread', turns[0].asks.includes('1/x') && turns[0].asksTex.includes('\\frac{1}{x}'));
+  const plainTurn = C.canvasTurns([{ role: 'user', content: 'hi' }, { role: 'assistant', id: 'r', content: 'Hello there.' }]);
+  ok('  and a reply with no mathematics carries nothing more', !('saidTex' in plainTurn[0]) && !('asksTex' in plainTurn[0]));
+  const space = readFileSync(join(dirname(fileURLToPath(import.meta.url)), '..', 'components/logos5/L5Space.tsx'), 'utf8');
+  ok('the thread typesets what it shows', /threadWords\(\{ said: turn\.saidTex \?\? turn\.said, asks: turn\.asksTex \?\? turn\.asks \}\)/.test(space) && /<p className="ls-tsay"><MathText>\{said\}<\/MathText><\/p>/.test(space) && /<p className="ls-task"><MathText>\{asks\}<\/MathText><\/p>/.test(space));
+}
+
 console.log(`\n${pass} passed, ${fail} failed`);
 process.exit(fail ? 1 : 0);

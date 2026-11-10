@@ -11,6 +11,7 @@
 //
 // Its rules are lib/logos5/ideas.ts; this file draws them.
 
+import { MathText } from '@/components/TeX';
 import { useEffect, useLayoutEffect, useMemo, useRef, useState, type KeyboardEvent as ReactKeyboardEvent, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { NodeGlyph } from '@/components/NodeGlyph';
 import type { LogosNodeType } from '@/lib/logos';
@@ -1029,7 +1030,8 @@ export function L5Space({
         {rows.map((r) => {
           const turn = turns[r.index];
           if (!turn) return null;
-          const { said, asks } = threadWords(turn);
+          // the thread typesets mathematics: the words with their formulas kept (lib/logos5/canvas.ts richExcerpt)
+          const { said, asks } = threadWords({ said: turn.saidTex ?? turn.said, asks: turn.asksTex ?? turn.asks });
           const madeHere = made.filter((m) => m.turn === r.index);
           const first = r.made[0]?.id ?? null;
           return (
@@ -1052,8 +1054,8 @@ export function L5Space({
                     <span className="ls-bub-name">Socria</span>
                     <span className="ls-tn">{turn.pending ? 'thinking…' : r.index === turns.length - 1 ? 'just now' : roman(r.index + 1)}</span>
                   </span>
-                  {turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay">{said}</p>}
-                  {asks && !turn.pending && <p className="ls-task">{asks}</p>}
+                  {turn.pending ? <p className="ls-tsay">Replying…</p> : said && <p className="ls-tsay"><MathText>{said}</MathText></p>}
+                  {asks && !turn.pending && <p className="ls-task"><MathText>{asks}</MathText></p>}
                   {(r.made.length > 0 || madeHere.length > 0) && (
                     <span className="ls-tchips">
                       {r.made.map((m) => (
