@@ -56,6 +56,11 @@ const FIXED: Record<string, OgCard> = {
     title: 'Watch your reasoning take shape.',
     line: 'A live map of what you’re claiming, assuming and still asking — beside the conversation.',
   },
+  ux: {
+    kicker: 'SocriaUX',
+    title: 'Why is it designed that way?',
+    line: 'A design workspace with a reasoning system beside it — for designers who want to get better, not just faster.',
+  },
   explore: {
     kicker: 'Explore Socria',
     title: 'What a thinking environment is for.',

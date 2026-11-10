@@ -238,6 +238,13 @@ export async function GET(req: NextRequest) {
   const capturesErr = missingTable(capturesRaw) ? null : capturesRaw;
   out.captures = captures ?? [];
 
+  // SocriaUX (/ux): every design project, whole — the artboards, annotations,
+  // the reasoning map, research notes and the thread with SocriaUX.
+  const { data: uxProjects, error: uxProjectsRaw } = await db
+    .from('ux_projects').select('id, name, doc, created_at, updated_at').eq('user_id', userId).order('updated_at', { ascending: false });
+  const uxProjectsErr = missingTable(uxProjectsRaw) ? null : uxProjectsRaw;
+  out.designProjects = uxProjects ?? [];
+
   // Metacognitive Regulation's intervention ledger: which condition each turn
   // ran under, what MR decided, how it went and what its integrity checks
   // caught — as codes, counts and turn indices. Their MR settings are on the
@@ -354,6 +361,7 @@ export async function GET(req: NextRequest) {
     ['howYouArrived', invitedYouErr],
     ['friendsYouInvited', youInvitedErr],
     ['captures', capturesErr],
+    ['designProjects', uxProjectsErr],
     ['mrLedger', mrLedgerErr],
     ['roomSeats', roomSeatsErr],
     ['rooms', roomsErr],

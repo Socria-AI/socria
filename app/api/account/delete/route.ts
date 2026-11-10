@@ -78,6 +78,9 @@ const OWNED_TABLES = [
   // Socria adjusted its help for them (lib/mr/store.ts MR_TABLES). Their MR
   // settings live on user_profiles, above.
   'mr_ledger',
+  // SocriaUX (/ux): their design projects — artboards, annotations, the
+  // reasoning map, research notes — one jsonb document per project.
+  'ux_projects',
 ] as const;
 
 /**
@@ -88,6 +91,7 @@ const OWNED_TABLES = [
  * missing table is forgiven; any other error still stops the deletion.
  */
 const LATE_TABLES = new Set<string>([
+  'ux_projects',
   'lifecycle_emails',
   'mind_nodes',
   'mind_edges',
