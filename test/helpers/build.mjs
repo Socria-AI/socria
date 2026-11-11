@@ -21,6 +21,7 @@ export const OUT = join(here, '..', '.tmp');
 const MODULES = [
   'lib/logos-math.ts',
   'lib/transfer/explore.ts',
+  'lib/transfer/cap-reports.ts',
   'lib/logos-viz.ts',
   'lib/logos-layout.ts',
   'lib/numeric/linalg.ts',

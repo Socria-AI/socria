@@ -12,12 +12,11 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { carry } from '@/lib/onboarding-script';
-import { askMessage, askStarters, type Filters, type TransferRow } from '@/lib/transfer/explore';
 
 const CLOSED_KEY = 'socria.transfer.ask.closed';
 const DELAY_MS = 2200;
 
-export function AskSocria({ open, setOpen, filters, rows }: { open: boolean; setOpen: (v: boolean) => void; filters: Filters; rows: readonly TransferRow[] }) {
+export function AskSocria({ open, setOpen, message, starters }: { open: boolean; setOpen: (v: boolean) => void; message: (question: string) => string; starters: readonly string[] }) {
   const [text, setText] = useState('');
   const [going, setGoing] = useState(false);
   const box = useRef<HTMLTextAreaElement>(null);
@@ -56,7 +55,7 @@ export function AskSocria({ open, setOpen, filters, rows }: { open: boolean; set
     if (going) return;
     setGoing(true);
     carry(typeof window !== 'undefined' ? window.sessionStorage : null, {
-      text: askMessage(question, filters, rows),
+      text: message(question),
       intent: 'transfer-ut-austin-fall-2026',
       surface: 'logos',
       model: 'logos-3',
@@ -81,7 +80,7 @@ export function AskSocria({ open, setOpen, filters, rows }: { open: boolean; set
       </header>
       <p className="xf-ask-lede">Ask about these results or your own application. Socria takes what you&rsquo;re looking at with it, and helps you think it through rather than guessing your odds.</p>
       <ul className="xf-ask-starters">
-        {askStarters(filters).map((s) => (
+        {starters.map((s) => (
           <li key={s}>
             <button type="button" onClick={() => send(s)} disabled={going}>
               {s}

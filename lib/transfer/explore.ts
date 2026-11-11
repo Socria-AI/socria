@@ -13,17 +13,33 @@
 // as `gpaRaw` / `hoursRaw` and left off anything that plots or averages them.
 // One response with impossible numbers (a GPA of 6, 12,345 hours) was left
 // out. Long answers were cut off at the page edge in the source (`cut`).
+// CAP responses marked "Denied" were removed: completing CAP guarantees the
+// College of Liberal Arts, so a CAP "denial" is a major that was not given,
+// not a refusal from UT (2 responses, Nursing and Civil Engineering).
+//
+// THREE DATA SETS, KEPT APART. The page shows one at a time (`set`):
+//   2026    — the Fall 2026 forum above;
+//   2023    — an unofficial Fall 2023 spreadsheet's CAP rows: 26 CAP students
+//             who were admitted, with college, major, choice, GPA and hours.
+//             Admits only, so it gives no rate;
+//   reddit  — CAP students' own stories (lib/transfer/cap-reports.ts), shown
+//             as stories, never counted into a rate.
 //
 // Pure: no React, no clock.
 
 import DATA from './ut-austin-fall-2026.json';
+import DATA_2023 from './ut-austin-fall-2023-cap.json';
 
 export type Decision = 'first' | 'second' | 'denied' | 'unknown';
 
+export type SetKey = '2026' | '2023' | 'reddit';
+
 export interface TransferRow {
   id: number;
-  /** the decision date, YYYY-MM-DD */
-  date: string;
+  /** which data set it came from; the Fall 2026 forum when absent */
+  source?: '2026' | '2023';
+  /** the decision date, YYYY-MM-DD, when the source gave one */
+  date: string | null;
   college: string;
   major: string;
   /** the major as typed, when it was matched to another name */
@@ -45,12 +61,38 @@ export interface TransferRow {
   cut?: boolean;
 }
 
-export const ROWS: readonly TransferRow[] = DATA as TransferRow[];
+/** Completing CAP guarantees Liberal Arts: a CAP "denied" was a major not given, not UT. */
+export const capDenied = (r: TransferRow) => r.cap && r.decision === 'denied';
+
+const RAW_2026 = DATA as TransferRow[];
+
+/** The Fall 2026 forum, without CAP "denials". */
+export const ROWS: readonly TransferRow[] = RAW_2026.filter((r) => !capDenied(r));
+
+/** The Fall 2023 spreadsheet's CAP admits. */
+export const ROWS_2023: readonly TransferRow[] = (DATA_2023 as TransferRow[]).map((r) => ({ ...r, source: '2023' as const }));
 
 export const SOURCE = {
   title: 'Fall 2026 UT Austin External Transfer Forum Responses',
   left_out: 1,
+  cap_denied_removed: RAW_2026.filter(capDenied).length,
 } as const;
+
+export const SOURCE_2023 = {
+  title: 'Unofficial UT Austin External Transfers Fall 2023 (Responses)',
+  url: 'https://docs.google.com/spreadsheets/d/1pedDbdIwBVItusHrD4ix-GgJB_TdtjKax72AjjamBz8/edit?usp=sharing',
+} as const;
+
+export const SETS: readonly { key: SetKey; label: string; line: string }[] = [
+  { key: '2026', label: 'Fall 2026 forum', line: 'Everyone who filled in the Fall 2026 transfer form: admitted and denied, CAP and external.' },
+  { key: '2023', label: 'Fall 2023 sheet', line: 'CAP students who were admitted, from an unofficial Fall 2023 spreadsheet. Admits only, so no rate.' },
+  { key: 'reddit', label: 'Reddit CAP stories', line: 'CAP students telling how they got in, in their own posts. Stories, not statistics.' },
+];
+
+/** The rows a set holds; the Reddit stories are not rows. */
+export function rowsFor(set: SetKey): readonly TransferRow[] {
+  return set === '2023' ? ROWS_2023 : set === '2026' ? ROWS : [];
+}
 
 // ── words ────────────────────────────────────────────────────────────
 
@@ -100,6 +142,7 @@ export const HOURS_BANDS: readonly Band[] = [
 ];
 
 export interface Filters {
+  set: SetKey;
   applicant: Applicant;
   college: string | null;
   major: string | null;
@@ -108,7 +151,7 @@ export interface Filters {
   hours: string | null;
 }
 
-export const NO_FILTERS: Filters = { applicant: 'all', college: null, major: null, residency: null, gpa: null, hours: null };
+export const NO_FILTERS: Filters = { set: '2026', applicant: 'all', college: null, major: null, residency: null, gpa: null, hours: null };
 
 const inBand = (v: number | null, band: Band | undefined) =>
   !band || (v != null && (band.min == null || v >= band.min) && (band.max == null || v < band.max));
@@ -134,11 +177,12 @@ export function activeCount(f: Filters): number {
 
 // ── the address ──────────────────────────────────────────────────────
 
-const Q = { applicant: 'who', college: 'college', major: 'major', residency: 'residency', gpa: 'gpa', hours: 'hours' } as const;
+const Q = { set: 'set', applicant: 'who', college: 'college', major: 'major', residency: 'residency', gpa: 'gpa', hours: 'hours' } as const;
 
 /** The filters as a query string ("" when there are none), so a view can be shared. */
 export function toQuery(f: Filters): string {
   const p = new URLSearchParams();
+  if (f.set !== '2026') p.set(Q.set, f.set);
   if (f.applicant !== 'all') p.set(Q.applicant, f.applicant);
   for (const k of ['college', 'major', 'residency', 'gpa', 'hours'] as const) {
     const v = f[k];
@@ -149,14 +193,18 @@ export function toQuery(f: Filters): string {
 }
 
 /** The filters from a query string. Anything that names nothing in the data is dropped. */
-export function fromQuery(search: string, rows: readonly TransferRow[] = ROWS): Filters {
+export function fromQuery(search: string): Filters {
   const p = new URLSearchParams(search);
+  const sv = p.get(Q.set);
+  const set: SetKey = sv === '2023' || sv === 'reddit' ? sv : '2026';
+  const rows = rowsFor(set);
   const known = (k: 'college' | 'major' | 'residency', v: string | null) => (v && rows.some((r) => r[k] === v) ? v : null);
   const who = p.get(Q.applicant);
   const gpa = p.get(Q.gpa);
   const hours = p.get(Q.hours);
   return {
-    applicant: who === 'cap' || who === 'external' ? who : 'all',
+    set,
+    applicant: set === '2026' && (who === 'cap' || who === 'external') ? who : 'all',
     college: known('college', p.get(Q.college)),
     major: known('major', p.get(Q.major)),
     residency: known('residency', p.get(Q.residency)),
@@ -238,8 +286,8 @@ export interface Day extends Outcome {
 
 /** Decisions per day, from the first to the last, days with none included. */
 export function byDay(rows: readonly TransferRow[]): Day[] {
-  if (!rows.length) return [];
-  const dates = rows.map((r) => r.date).sort();
+  const dates = rows.map((r) => r.date).filter((d): d is string => !!d).sort();
+  if (!dates.length) return [];
   const out: Day[] = [];
   const end = Date.parse(`${dates[dates.length - 1]}T00:00:00Z`);
   for (let t = Date.parse(`${dates[0]}T00:00:00Z`); t <= end; t += 86_400_000) {
@@ -315,6 +363,14 @@ export function whoPhrase(f: Filters): string {
 
 /** The headline: how many people like this, and how it went for them. */
 export function headline(f: Filters, o: Outcome): { lead: string; result: string } {
+  if (f.set === '2023') {
+    const who = whoPhrase(f).replace(/^applicants/, '');
+    if (!o.n) return { lead: `No admitted CAP students${who} in the Fall 2023 sheet.`, result: 'Try widening a filter.' };
+    return {
+      lead: `${o.n === 1 ? 'One admitted CAP student' : `${o.n} admitted CAP students`}${who} reported their results.`,
+      result: `${plural(o.first, 'got their first-choice major', 'got their first-choice major')}${o.second ? `, ${o.second} another major` : ''}. Admits only, so this says who got in, not how likely it was.`,
+    };
+  }
   if (!o.n) return { lead: `No ${whoPhrase(f)} reported a decision.`, result: 'Try widening a filter.' };
   const lead = `${o.n === 1 ? 'One' : o.n} ${o.n === 1 ? whoPhrase(f).replace(/applicants/, 'applicant') : whoPhrase(f)} reported ${o.n === 1 ? 'a decision' : 'their decisions'}.`;
   if (o.known < 5) {
@@ -371,15 +427,22 @@ export function askMessage(question: string, f: Filters, rows: readonly Transfer
   const q = question.replace(/\s+/g, ' ').trim().slice(0, 600);
   const o = outcome(rows);
   const m = medians(rows);
-  const lines = [q || 'Help me make sense of this for my own application.', '', `What I'm looking at: self-reported UT Austin Fall 2026 transfer decisions (${ROWS.length} applicants who filled in a shared form; not official, not a fair sample).`];
+  const about =
+    f.set === '2023'
+      ? `an unofficial Fall 2023 spreadsheet of ${ROWS_2023.length} CAP students admitted to UT Austin (self-reported; admits only, so no acceptance rate can be drawn from it)`
+      : `self-reported UT Austin Fall 2026 transfer decisions (${ROWS.length} applicants who filled in a shared form; not official, not a fair sample; CAP responses marked denied were left out, since completing CAP guarantees Liberal Arts)`;
+  const lines = [q || 'Help me make sense of this for my own application.', '', `What I'm looking at: ${about}.`];
   if (activeCount(f)) lines.push(`Filtered to ${whoPhrase(f)}.`);
   if (o.known) {
     lines.push(
-      `${o.n} reported: ${o.first} admitted to their first-choice major, ${o.second} to another major, ${o.denied} denied` +
-        `${o.known >= 5 ? ` (${pct(o.first + o.second, o)}% admitted)` : ''}.`
+      f.set === '2023'
+        ? `${o.n} admitted: ${o.first} to their first-choice major, ${o.second} to another major.`
+        : `${o.n} reported: ${o.first} admitted to their first-choice major, ${o.second} to another major, ${o.denied} denied` +
+            `${o.known >= 5 ? ` (${pct(o.first + o.second, o)}% admitted)` : ''}.`
     );
     const g = (v: number | null) => (v == null ? '—' : v.toFixed(2));
-    if (m.gpa.admitted != null || m.gpa.denied != null) lines.push(`Median GPA: admitted ${g(m.gpa.admitted)}, denied ${g(m.gpa.denied)}. Median credit hours: admitted ${m.hours.admitted ?? '—'}, denied ${m.hours.denied ?? '—'}.`);
+    if (f.set === '2023') lines.push(`Median GPA ${g(m.gpa.admitted)}, median credit hours ${m.hours.admitted ?? '—'}.`);
+    else if (m.gpa.admitted != null || m.gpa.denied != null) lines.push(`Median GPA: admitted ${g(m.gpa.admitted)}, denied ${g(m.gpa.denied)}. Median credit hours: admitted ${m.hours.admitted ?? '—'}, denied ${m.hours.denied ?? '—'}.`);
     const t = themeShares(rows).themes.filter((x) => x.admitted + x.denied > 0).slice(0, 3);
     if (t.length) lines.push(`Most often named as their biggest extracurricular: ${t.map((x) => `${x.name.toLowerCase()} (admitted ${x.admittedPct}%, denied ${x.deniedPct}%)`).join('; ')}.`);
   } else {
@@ -398,3 +461,21 @@ export function askStarters(f: Filters): string[] {
     f.applicant === 'cap' ? 'What should I do if I get a second-choice major?' : 'How much do GPA and credit hours seem to matter here?',
   ];
 }
+
+/** Asking from the Reddit stories: what they were reading, said plainly to be anecdotes. */
+export function askStoriesMessage(question: string, reports: readonly { destination: string; outcome: string; gpa: number | null; school: string | null }[]): string {
+  const q = question.replace(/\s+/g, ' ').trim().slice(0, 600);
+  const lines = [
+    q || 'Help me make sense of these CAP stories for my own application.',
+    '',
+    `What I'm looking at: ${reports.length} Reddit posts by or about CAP students who moved to UT Austin (first-person or secondhand, unverified, not a representative sample; completing CAP guarantees the College of Liberal Arts, not McCombs or every major).`,
+    ...reports.slice(0, 12).map((r) => `- ${r.school ? `${r.school} CAP` : 'CAP'}: ${r.outcome}${r.gpa != null ? `, GPA ${r.gpa}` : ''}`),
+  ];
+  return lines.join('\n').slice(0, 2000);
+}
+
+export const STORY_STARTERS = [
+  'What do the CAP-to-McCombs stories have in common?',
+  'How should I plan my CAP year if I want McCombs?',
+  'What should my backup be if I don’t get my major?',
+];

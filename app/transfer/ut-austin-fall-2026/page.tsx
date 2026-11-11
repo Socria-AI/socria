@@ -14,7 +14,7 @@ import '../transfer.css';
 export const metadata: Metadata = pageMetadata({
   path: '/transfer/ut-austin-fall-2026',
   title: 'UT Austin Fall 2026 transfer decisions',
-  description: `${ROWS.length} UT Austin transfer applicants' self-reported decisions, GPAs, credit hours and extracurriculars for Fall 2026. Filter by college, major, CAP and more.`,
+  description: `${ROWS.length} UT Austin transfer applicants' self-reported decisions, GPAs, credit hours and extracurriculars for Fall 2026. Plus a Fall 2023 sheet of CAP admits and CAP students' own stories.`,
   og: 'transfer',
 });
 

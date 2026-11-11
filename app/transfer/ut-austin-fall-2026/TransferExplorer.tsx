@@ -14,7 +14,15 @@ import {
   HOURS_BANDS,
   NO_FILTERS,
   ROWS,
+  ROWS_2023,
+  SETS,
   SOURCE,
+  SOURCE_2023,
+  STORY_STARTERS,
+  askMessage,
+  askStarters,
+  askStoriesMessage,
+  rowsFor,
   activeCount,
   byDay,
   byGroup,
@@ -39,6 +47,8 @@ import {
   type TransferRow,
 } from '@/lib/transfer/explore';
 import { AskSocria } from './AskSocria';
+import { Stories } from './Stories';
+import { CAP_REPORTS } from '@/lib/transfer/cap-reports';
 
 const fill = (d: Decision) => `var(--xf-${d})`;
 const gpaText = (v: number | null) => (v == null ? '—' : v.toFixed(2));
@@ -66,10 +76,10 @@ function jitter(id: number) {
 
 // ── pieces ───────────────────────────────────────────────────────────
 
-function Key({ unknown }: { unknown?: boolean }) {
+function Key({ unknown, admitsOnly }: { unknown?: boolean; admitsOnly?: boolean }) {
   return (
     <ul className="xf-key" aria-label="Key">
-      {DECISIONS.map((d) => (
+      {DECISIONS.filter((d) => !admitsOnly || d !== 'denied').map((d) => (
         <li key={d}>
           <span className="xf-dot" style={{ background: fill(d) }} aria-hidden />
           {DECISION_LABEL[d]}
@@ -108,12 +118,15 @@ function Section({ id, title, note, children, wide }: { id?: string; title: stri
 
 // ── GPA × hours ──────────────────────────────────────────────────────
 
-const ALL_GPA = ROWS.map((r) => r.gpa).filter((v): v is number => v != null);
-const ALL_HOURS = ROWS.map((r) => r.hours).filter((v): v is number => v != null);
-const X0 = Math.max(2, Math.floor(Math.min(...ALL_GPA) * 4) / 4);
+/** The scatter's axes for a set: from its lowest GPA (never below 2.0) to 4.0, and hours up to 110 at most. */
+function axesFor(base: readonly TransferRow[]) {
+  const gpas = base.map((r) => r.gpa).filter((v): v is number => v != null);
+  const hours = base.map((r) => r.hours).filter((v): v is number => v != null);
+  const X0 = Math.max(2, Math.floor(Math.min(4, ...gpas) * 4) / 4 - (Math.min(4, ...gpas) >= 3.5 ? 0.25 : 0));
 // A few people reported far more hours than anyone else; past 110 they are drawn on the top edge and said so.
-const Y1 = Math.min(110, Math.ceil(Math.max(...ALL_HOURS) / 10) * 10);
-const ABOVE = ALL_HOURS.filter((v) => v > Y1).sort((a, b) => a - b);
+  const Y1 = Math.min(110, Math.ceil(Math.max(30, ...hours) / 10) * 10);
+  return { X0, Y1, ABOVE: hours.filter((v) => v > Y1).sort((a, b) => a - b) };
+}
 
 /** Round tick steps for an axis that runs to `max`. */
 function niceTicks(max: number, want = 3): number[] {
@@ -123,7 +136,8 @@ function niceTicks(max: number, want = 3): number[] {
   return out;
 }
 
-function Scatter({ shown }: { shown: ReadonlySet<number> }) {
+function Scatter({ shown, base }: { shown: ReadonlySet<number>; base: readonly TransferRow[] }) {
+  const { X0, Y1, ABOVE } = useMemo(() => axesFor(base), [base]);
   const [ref, w] = useWidth<HTMLDivElement>(640);
   const h = Math.round(Math.min(420, Math.max(280, w * 0.62)));
   const m = { l: 40, r: 16, t: 28, b: 38 };
@@ -131,12 +145,12 @@ function Scatter({ shown }: { shown: ReadonlySet<number> }) {
   const y = (v: number) => h - m.b - (v / Y1) * (h - m.t - m.b);
   const pts = useMemo(
     () =>
-      ROWS.filter((r) => r.gpa != null && r.hours != null).map((r) => {
+      base.filter((r) => r.gpa != null && r.hours != null).map((r) => {
         const [jx, jy] = jitter(r.id);
         return { r, cx: x(Math.min(4, r.gpa! + jx * 0.018)), cy: y(Math.min(Y1, r.hours! + jy * 1.6)) };
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [w, h],
+    [w, h, base, X0, Y1],
   );
   const [hover, setHover] = useState<{ r: TransferRow; cx: number; cy: number } | null>(null);
   const [pinned, setPinned] = useState(false);
@@ -249,7 +263,7 @@ function Scatter({ shown }: { shown: ReadonlySet<number> }) {
 
 // ── outcomes by college or major ─────────────────────────────────────
 
-function Groups({ groups, onPick, picked }: { groups: Group[]; onPick: (name: string) => void; picked: string | null }) {
+function Groups({ groups, onPick, picked, firstOnly }: { groups: Group[]; onPick: (name: string) => void; picked: string | null; firstOnly?: boolean }) {
   const [all, setAll] = useState(false);
   const top = all ? groups : groups.slice(0, 10);
   if (!groups.length) return <p className="xf-empty">Nothing matches these filters.</p>;
@@ -262,8 +276,8 @@ function Groups({ groups, onPick, picked }: { groups: Group[]; onPick: (name: st
               <span className="xf-group-name">{g.name}</span>
               <span className="xf-group-n">{g.n}</span>
               <OutcomeBar o={g} />
-              <span className="xf-group-pct" title="Admitted, either major">
-                {g.known ? `${pct(g.first + g.second, g)}%` : '—'}
+              <span className="xf-group-pct" title={firstOnly ? 'Got their first-choice major' : 'Admitted, either major'}>
+                {g.known ? `${pct(firstOnly ? g.first : g.first + g.second, g)}%` : '—'}
               </span>
             </button>
           </li>
@@ -280,9 +294,9 @@ function Groups({ groups, onPick, picked }: { groups: Group[]; onPick: (name: st
 
 // ── when decisions came ──────────────────────────────────────────────
 
-function Timeline({ rows }: { rows: readonly TransferRow[] }) {
+function Timeline({ rows, base }: { rows: readonly TransferRow[]; base: readonly TransferRow[] }) {
   const [ref, w] = useWidth<HTMLDivElement>(640);
-  const days = useMemo(() => byDay(ROWS), []);
+  const days = useMemo(() => byDay(base), [base]);
   const shownDays = useMemo(() => {
     const m = new Map(byDay(rows).map((d) => [d.date, d]));
     return days.map((d) => m.get(d.date) ?? { ...d, n: 0, first: 0, second: 0, denied: 0, unknown: 0, known: 0 });
@@ -482,7 +496,7 @@ function Responses({ rows }: { rows: readonly TransferRow[] }) {
                     {r.cap ? <span className="xf-tag">CAP</span> : 'External'}
                     {r.residency && r.residency !== 'In-state' ? <span className="xf-res"> · {r.residency}</span> : null}
                   </td>
-                  <td className="is-wide-only xf-date">{dayLabel(r.date, true)}</td>
+                  <td className="is-wide-only xf-date">{r.date ? dayLabel(r.date, true) : r.source === '2023' ? 'Fall 2023' : '—'}</td>
                 </tr>,
                 isOpen ? (
                   <tr key={`${r.id}-d`} className="xf-detail">
@@ -490,7 +504,13 @@ function Responses({ rows }: { rows: readonly TransferRow[] }) {
                       <div className="xf-detail-in">
                         <div className="xf-detail-said">
                           <p className="xf-label">Most significant extracurricular, in their words</p>
-                          <p className="xf-quote">{r.extra ? `“${r.extra}${r.cut ? '…' : ''}”` : <span className="xf-muted">Nothing given.</span>}</p>
+                          <p className="xf-quote">
+                            {r.extra ? (
+                              `“${r.extra}${r.cut ? '…' : ''}”`
+                            ) : (
+                              <span className="xf-muted">{r.source === '2023' ? 'The Fall 2023 sheet did not ask.' : 'Nothing given.'}</span>
+                            )}
+                          </p>
                           {themes.length ? (
                             <p className="xf-chips">
                               {themes.map((t) => (
@@ -514,10 +534,14 @@ function Responses({ rows }: { rows: readonly TransferRow[] }) {
                             <dt>Residency</dt>
                             <dd>{r.residency ?? 'Not said'}</dd>
                           </div>
-                          <div>
-                            <dt>Decision date</dt>
-                            <dd>{dayLabel(r.date)} 2026</dd>
-                          </div>
+                          {r.date ? (
+                            <div>
+                              <dt>Decision date</dt>
+                              <dd>
+                                {dayLabel(r.date)} {r.date.slice(0, 4)}
+                              </dd>
+                            </div>
+                          ) : null}
                           {r.majorRaw || r.note ? (
                             <div>
                               <dt>Major as written</dt>
@@ -585,19 +609,23 @@ export function TransferExplorer() {
   }, [f]);
 
   const set = (patch: Partial<Filters>) => setF((cur) => ({ ...cur, ...patch }));
-  const rows = useMemo(() => filterRows(ROWS, f), [f]);
+  const base = rowsFor(f.set);
+  const stories = f.set === 'reddit';
+  const admitsOnly = f.set === '2023';
+  const rows = useMemo(() => filterRows(rowsFor(f.set), f), [f]);
   const shown = useMemo(() => new Set(rows.map((r) => r.id)), [rows]);
   const o = outcome(rows);
   const med = medians(rows);
   const head = headline(f, o);
-  const colleges = useMemo(() => options(ROWS, 'college'), []);
-  const majors = useMemo(() => options(f.college ? ROWS.filter((r) => r.college === f.college) : ROWS, 'major'), [f.college]);
-  const residencies = useMemo(() => options(ROWS, 'residency'), []);
+  const colleges = useMemo(() => options(base, 'college'), [base]);
+  const majors = useMemo(() => options(f.college ? base.filter((r) => r.college === f.college) : base, 'major'), [base, f.college]);
+  const residencies = useMemo(() => options(base, 'residency'), [base]);
   const groupKey = f.college ? 'major' : 'college';
-  const groups = useMemo(() => byGroup(filterRows(ROWS, { ...f, [groupKey]: null, ...(groupKey === 'college' ? { major: null } : {}) }), groupKey), [f, groupKey]);
+  const groups = useMemo(() => byGroup(filterRows(base, { ...f, [groupKey]: null, ...(groupKey === 'college' ? { major: null } : {}) }), groupKey), [base, f, groupKey]);
   const all = outcome(ROWS);
   const n = activeCount(f);
-  const dates = ROWS.map((r) => r.date).sort();
+  const dates = ROWS.map((r) => r.date).filter((d): d is string => !!d).sort();
+  const counts: Record<string, number> = { '2026': ROWS.length, '2023': ROWS_2023.length, reddit: CAP_REPORTS.length };
 
   return (
     <div className="xf">
@@ -614,13 +642,13 @@ export function TransferExplorer() {
         </header>
 
         <section className="xf-hero">
-          <p className="xf-eyebrow">UT Austin · Fall 2026 transfer decisions</p>
+          <p className="xf-eyebrow">UT Austin · transfer decisions</p>
           <h1>
             Who got in, <em>and with what.</em>
           </h1>
           <p className="xf-lede">
-            {all.n} transfer applicants shared their decision, GPA, credit hours and the one thing they think mattered most. Filter it down to
-            people like you.
+            What transfer students reported themselves: {ROWS.length} applicants from the Fall 2026 forum, {ROWS_2023.length} CAP admits from a Fall 2023
+            sheet, and {CAP_REPORTS.length} CAP students&rsquo; own stories. Pick a source, then filter it down to people like you.
           </p>
           <p className="xf-credits">
             Made by <strong>Pradeep Muraliram</strong> (founder), with <strong>Madison Carby</strong> (Socria creative &amp; brand),{' '}
@@ -634,7 +662,29 @@ export function TransferExplorer() {
           </button>
         </section>
 
+        <nav className="xf-sets" aria-label="Data set">
+          {SETS.map((st) => (
+            <button
+              key={st.key}
+              type="button"
+              className={`xf-set${f.set === st.key ? ' is-on' : ''}`}
+              aria-pressed={f.set === st.key}
+              onClick={() => setF({ ...NO_FILTERS, set: st.key })}
+            >
+              <span className="xf-set-name">
+                {st.label} <em>{counts[st.key]}</em>
+              </span>
+              <span className="xf-set-line">{st.line}</span>
+            </button>
+          ))}
+        </nav>
+
+        {stories ? (
+          <Stories />
+        ) : (
+          <>
         <div className="xf-filters" role="group" aria-label="Filters">
+          {f.set === '2026' ? (
           <div className="xf-seg" role="radiogroup" aria-label="Applied as">
             {(
               [
@@ -648,6 +698,7 @@ export function TransferExplorer() {
               </button>
             ))}
           </div>
+          ) : null}
           <Select label="College" value={f.college ?? ''} onChange={(v) => set({ college: v || null, major: null })}>
             <option value="">Any college</option>
             {colleges.map((c) => (
@@ -680,16 +731,18 @@ export function TransferExplorer() {
               </option>
             ))}
           </Select>
-          <Select label="Residency" value={f.residency ?? ''} onChange={(v) => set({ residency: v || null })}>
-            <option value="">Anywhere</option>
-            {residencies.map((c) => (
-              <option key={c.value} value={c.value}>
-                {c.value} ({c.n})
-              </option>
-            ))}
-          </Select>
+          {residencies.length ? (
+            <Select label="Residency" value={f.residency ?? ''} onChange={(v) => set({ residency: v || null })}>
+              <option value="">Anywhere</option>
+              {residencies.map((c) => (
+                <option key={c.value} value={c.value}>
+                  {c.value} ({c.n})
+                </option>
+              ))}
+            </Select>
+          ) : null}
           {n ? (
-            <button type="button" className="xf-clear" onClick={() => setF(NO_FILTERS)}>
+            <button type="button" className="xf-clear" onClick={() => setF({ ...NO_FILTERS, set: f.set })}>
               Clear {n === 1 ? 'filter' : `${n} filters`}
             </button>
           ) : null}
@@ -703,8 +756,8 @@ export function TransferExplorer() {
           {o.known ? (
             <div className="xf-split">
               <OutcomeBar o={o} tall />
-              <dl className="xf-stats">
-                {DECISIONS.map((d) => (
+              <dl className={`xf-stats${admitsOnly ? ' is-two' : ''}`}>
+                {DECISIONS.filter((d) => !admitsOnly || d !== 'denied').map((d) => (
                   <div key={d}>
                     <dt>
                       <span className="xf-dot" style={{ background: fill(d) }} aria-hidden />
@@ -724,9 +777,11 @@ export function TransferExplorer() {
                     <span>
                       admitted <strong>{gpaText(med.gpa.admitted)}</strong>
                     </span>
-                    <span>
-                      denied <strong>{gpaText(med.gpa.denied)}</strong>
-                    </span>
+                    {admitsOnly ? null : (
+                      <span>
+                        denied <strong>{gpaText(med.gpa.denied)}</strong>
+                      </span>
+                    )}
                   </dd>
                 </div>
                 <div>
@@ -735,9 +790,11 @@ export function TransferExplorer() {
                     <span>
                       admitted <strong>{med.hours.admitted ?? '—'}</strong>
                     </span>
-                    <span>
-                      denied <strong>{med.hours.denied ?? '—'}</strong>
-                    </span>
+                    {admitsOnly ? null : (
+                      <span>
+                        denied <strong>{med.hours.denied ?? '—'}</strong>
+                      </span>
+                    )}
                   </dd>
                 </div>
               </dl>
@@ -747,11 +804,12 @@ export function TransferExplorer() {
 
         <div className="xf-grid">
           <Section title="GPA and credit hours" note="Each dot is one person. Your filters are in colour." wide>
-            <Key unknown={rows.length < ROWS.length} />
-            <Scatter shown={shown} />
+            <Key unknown={rows.length < base.length} admitsOnly={admitsOnly} />
+            <Scatter shown={shown} base={base} />
           </Section>
 
           <Section
+            wide={admitsOnly}
             title={f.college ? `Majors in ${f.college}` : 'By college'}
             note={
               f.college ? (
@@ -762,7 +820,7 @@ export function TransferExplorer() {
                   </button>
                 </>
               ) : (
-                'Share admitted on the right. Press a college to see its majors.'
+                admitsOnly ? 'Share who got their first-choice major on the right. Press a college to see its majors.' : 'Share admitted on the right. Press a college to see its majors.'
               )
             }
           >
@@ -770,21 +828,28 @@ export function TransferExplorer() {
               groups={groups}
               picked={f.college ? f.major : f.college}
               onPick={(name) => (f.college ? set({ major: f.major === name ? null : name }) : set({ college: name, major: null }))}
+              firstOnly={admitsOnly}
             />
           </Section>
 
+          {admitsOnly ? null : (
           <Section title="What they said mattered most" note="How often admitted and denied applicants named each kind of thing, sorted by keyword. What people chose to mention, not what decided anything.">
             <Themes rows={rows} />
           </Section>
+          )}
 
+          {admitsOnly ? null : (
           <Section title="When decisions came" note={`Decision dates people gave, ${dayLabel(dates[0])} to ${dayLabel(dates[dates.length - 1])}. Outlines are days with no one matching your filters.`} wide>
-            <Timeline rows={rows} />
+            <Timeline rows={rows} base={base} />
           </Section>
+          )}
 
           <Section id="responses" title="Every response" note="Press a row to read what they said and the details as they wrote them." wide>
             <Responses rows={rows} />
           </Section>
         </div>
+          </>
+        )}
 
         <footer className="xf-about" id="about">
           <h2>About this data</h2>
@@ -793,7 +858,14 @@ export function TransferExplorer() {
               These are answers to a form that UT Austin transfer applicants filled in themselves, the <em>Fall 2026 UT Austin External Transfer Forum
               Responses</em>: {all.n + SOURCE.left_out} responses with decision dates from {dayLabel(dates[0])} to {dayLabel(dates[dates.length - 1])} 2026. Nobody checked
               them, and the people who answer a form like this are not a fair sample of everyone who applied, so read the shares as what this group
-              reported, not as anyone&rsquo;s odds.
+              reported, not as anyone&rsquo;s odds. {SOURCE.cap_denied_removed} CAP responses marked denied were left out: completing CAP guarantees the
+              College of Liberal Arts, so for a CAP student &ldquo;denied&rdquo; means the major they asked for, not UT.
+            </p>
+            <p>
+              The Fall 2023 sheet is the <a href={SOURCE_2023.url} target="_blank" rel="noopener noreferrer nofollow">{SOURCE_2023.title}</a>, which says
+              itself that it is neither complete nor representative. Only its {ROWS_2023.length} CAP students who were admitted are here, so it shows who got in
+              and with what, never a rate. The Reddit stories are people&rsquo;s own posts, or a parent&rsquo;s or friend&rsquo;s, each linked and marked for how
+              much it says; posts with no outcome yet, and CAP major denials, are left out.
             </p>
             <p>
               To make it searchable, majors were matched to UT&rsquo;s own names, and the wording people used is kept on each response. A GPA above 4.0
@@ -810,7 +882,12 @@ export function TransferExplorer() {
           </p>
         </footer>
       </div>
-      <AskSocria open={ask} setOpen={setAsk} filters={f} rows={rows} />
+      <AskSocria
+        open={ask}
+        setOpen={setAsk}
+        message={(q) => (stories ? askStoriesMessage(q, CAP_REPORTS) : askMessage(q, f, rows))}
+        starters={stories ? STORY_STARTERS : askStarters(f)}
+      />
     </div>
   );
 }

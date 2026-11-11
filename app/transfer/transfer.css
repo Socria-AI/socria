@@ -292,3 +292,48 @@
   .xf-ask-lede{display:none}
   .xf-ask-starters li:nth-child(n+2){display:none}
 }
+
+/* the data sets: three sources, one at a time */
+.xf-sets{display:grid; grid-template-columns:repeat(3, minmax(0, 1fr)); gap:10px}
+.xf .xf-set{display:flex; flex-direction:column; gap:4px; text-align:left; padding:14px 16px; border-radius:16px; background:var(--xf-surface);
+  border:1px solid var(--xf-hair-2); transition:border-color .15s, background .15s, box-shadow .15s}
+.xf .xf-set:hover{border-color:var(--xf-hair)}
+.xf .xf-set.is-on{border-color:var(--xf-accent); background:var(--xf-accent-soft); box-shadow:inset 0 0 0 1px var(--xf-accent)}
+.xf-set-name{font-family:var(--xf-serif); font-size:1.22rem; line-height:1.15}
+.xf-set-name em{font-style:normal; font-family:var(--xf-sans); font-size:.78rem; font-weight:600; color:var(--xf-ink-3); margin-left:4px; font-variant-numeric:tabular-nums}
+.xf-set-line{font-size:.8rem; line-height:1.4; color:var(--xf-ink-2)}
+.xf-stats.is-two{grid-template-columns:repeat(2, minmax(0, 1fr))}
+
+/* the Reddit stories */
+.xf-stories{display:flex; flex-direction:column; gap:20px}
+.xf-chips-row{display:flex; flex-wrap:wrap; gap:8px}
+.xf .xf-pick{height:36px; padding:0 14px; border-radius:999px; font-size:.86rem; color:var(--xf-ink-2); background:var(--xf-surface); border:1px solid var(--xf-hair)}
+.xf .xf-pick em{font-style:normal; color:var(--xf-ink-3); margin-left:3px; font-variant-numeric:tabular-nums}
+.xf .xf-pick.is-on{background:var(--xf-ink); color:var(--xf-bg); border-color:var(--xf-ink)}
+.xf .xf-pick.is-on em{color:inherit; opacity:.7}
+.xf-rules{padding:18px 20px; border-radius:16px; background:var(--xf-sunk); border:1px solid var(--xf-hair-2); display:flex; flex-direction:column; gap:10px}
+.xf-rules h2{font-family:var(--xf-serif); font-weight:400; font-size:1.3rem}
+.xf .xf-rules ul{display:grid; grid-template-columns:repeat(2, minmax(0, 1fr)); gap:8px 24px; list-style:disc; padding-left:18px}
+.xf-rules li{font-size:.88rem; line-height:1.45; color:var(--xf-ink-2)}
+.xf-rules-src{font-size:.78rem; color:var(--xf-ink-3)}
+.xf-rules-src a{color:var(--xf-accent); text-underline-offset:3px}
+.xf-story-list{display:grid; grid-template-columns:repeat(auto-fill, minmax(300px, 1fr)); gap:14px}
+.xf-story{display:flex; flex-direction:column; gap:10px; padding:18px; border-radius:16px; background:var(--xf-surface); border:1px solid var(--xf-hair-2); box-shadow:var(--xf-shadow)}
+.xf-story-head{display:flex; align-items:center; justify-content:space-between; gap:10px}
+.xf-story-route{font-size:.7rem; font-weight:600; letter-spacing:.12em; text-transform:uppercase; color:var(--xf-ink-3)}
+.xf-conf{flex:0 0 auto; padding:2px 8px; border-radius:999px; font-size:.7rem; font-weight:600; border:1px solid var(--xf-hair); color:var(--xf-ink-2)}
+.xf-conf.is-detailed{background:var(--xf-accent-soft); color:var(--xf-accent); border-color:transparent}
+.xf-story h3{font-family:var(--xf-serif); font-weight:400; font-size:1.25rem; line-height:1.2; margin:0}
+.xf-story-facts{display:flex; gap:22px; margin:0}
+.xf-story-facts dt{font-size:.62rem; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--xf-ink-3)}
+.xf-story-facts dd{margin:0; font-weight:600; font-variant-numeric:tabular-nums}
+.xf .xf-story-did{list-style:disc; padding-left:18px; display:flex; flex-direction:column; gap:3px; font-size:.86rem; line-height:1.4; color:var(--xf-ink-2)}
+.xf-story-take{font-family:var(--xf-serif); font-style:italic; font-size:1rem; line-height:1.35; padding-top:8px; border-top:1px solid var(--xf-hair-2); margin-top:auto}
+.xf-story-src{font-size:.8rem; color:var(--xf-accent); text-underline-offset:3px; align-self:flex-start}
+.xf-story-note{font-size:.84rem; color:var(--xf-ink-3); max-width:70ch}
+@media (max-width:760px){
+  .xf-sets{grid-template-columns:minmax(0, 1fr)}
+  .xf .xf-set{padding:12px 14px}
+  .xf-rules ul{grid-template-columns:minmax(0, 1fr)}
+  .xf-story-list{grid-template-columns:minmax(0, 1fr)}
+}

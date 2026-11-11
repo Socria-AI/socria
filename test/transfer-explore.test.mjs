@@ -24,15 +24,16 @@ const ok = (name, cond, detail = '') => {
 const R = X.ROWS;
 
 console.log('\n=== the rows ===');
-ok('284 responses (285 in the sheet, one left out)', R.length === 284 && X.SOURCE.left_out === 1, String(R.length));
+ok('282 responses (285 in the sheet: one impossible, two CAP "denials" left out)', R.length === 282 && X.SOURCE.left_out === 1 && X.SOURCE.cap_denied_removed === 2, String(R.length));
+ok('no CAP student is shown as denied (CAP guarantees Liberal Arts)', !R.some((r) => r.cap && r.decision === 'denied'));
 ok('ids are unique', new Set(R.map((r) => r.id)).size === R.length);
 ok('the impossible response is not among them (GPA 6, 12,345 hours)', !R.some((r) => r.id === 111) && !R.some((r) => r.gpaRaw === '6'));
 ok('every decision is one of four', R.every((r) => ['first', 'second', 'denied', 'unknown'].includes(r.decision)));
 ok('only one decision was not said', R.filter((r) => r.decision === 'unknown').length === 1);
 const o = X.outcome(R);
 ok('outcomes add up', o.first + o.second + o.denied + o.unknown === o.n && o.known === o.n - 1, JSON.stringify(o));
-ok('148 first-choice, 28 another major, 107 denied', o.first === 148 && o.second === 28 && o.denied === 107, JSON.stringify(o));
-ok('74 applied through CAP', R.filter((r) => r.cap).length === 74, String(R.filter((r) => r.cap).length));
+ok('148 first-choice, 28 another major, 105 denied', o.first === 148 && o.second === 28 && o.denied === 105, JSON.stringify(o));
+ok('72 applied through CAP', R.filter((r) => r.cap).length === 72, String(R.filter((r) => r.cap).length));
 ok('every date is a real day in May–July 2026', R.every((r) => /^2026-0[5-7]-\d\d$/.test(r.date) && !Number.isNaN(Date.parse(r.date))));
 ok('every GPA is on the 4.0 scale, or null with what they wrote kept', R.every((r) => (r.gpa != null ? r.gpa > 0 && r.gpa <= 4 : !r.gpaRaw || r.gpaRaw.length > 0)));
 ok('a weighted GPA is kept as written and left off the scale', R.some((r) => r.gpa == null && r.gpaRaw === '4.4W'));
@@ -54,7 +55,7 @@ ok('every college is one of UT’s', R.every((r) => ['Liberal Arts', 'Cockrell E
 
 console.log('\n=== filters ===');
 const cap = X.filterRows(R, { ...X.NO_FILTERS, applicant: 'cap' });
-ok('CAP only', cap.length === 74 && cap.every((r) => r.cap));
+ok('CAP only', cap.length === 72 && cap.every((r) => r.cap));
 ok('external only', X.filterRows(R, { ...X.NO_FILTERS, applicant: 'external' }).length === 210);
 const la = X.filterRows(R, { ...X.NO_FILTERS, college: 'Liberal Arts' });
 ok('a college', la.length > 100 && la.every((r) => r.college === 'Liberal Arts'));
@@ -76,7 +77,7 @@ const junk = X.fromQuery('?who=admin&college=Hogwarts&major=<script>&gpa=9&hours
 ok('anything that names nothing in the data is dropped', JSON.stringify(junk) === JSON.stringify(X.NO_FILTERS), JSON.stringify(junk));
 
 console.log('\n=== what the page says ===');
-ok('percentages are of known decisions', X.pct(o.first, o) === Math.round((148 / 283) * 100));
+ok('percentages are of known decisions', X.pct(o.first, o) === Math.round((148 / 281) * 100));
 ok('median of an even list', X.median([1, 2, 3, 4]) === 2.5 && X.median([3]) === 3 && X.median([]) === null);
 const med = X.medians(R);
 ok('admitted applicants reported a higher median GPA than those denied', med.gpa.admitted > med.gpa.denied, JSON.stringify(med));
@@ -87,7 +88,7 @@ ok('one entry per day from the first decision to the last', days[0].date === '20
 ok('days add up to every row', days.reduce((n, d) => n + d.n, 0) === R.length);
 ok('day label', X.dayLabel('2026-05-15') === '15 May' && X.dayLabel('2026-07-02', true) === '2 Jul');
 const h1 = X.headline(X.NO_FILTERS, o);
-ok('the headline for everyone', /^284 applicants reported their decisions\.$/.test(h1.lead) && /^62% were admitted: 52% to their first-choice major, 10% to another major\.$/.test(h1.result), `${h1.lead} ${h1.result}`);
+ok('the headline for everyone', /^282 applicants reported their decisions\.$/.test(h1.lead) && /^63% were admitted: 53% to their first-choice major, 10% to another major\.$/.test(h1.result), `${h1.lead} ${h1.result}`);
 const capLa = { ...X.NO_FILTERS, applicant: 'cap', college: 'Liberal Arts', gpa: '3.9' };
 const h2 = X.headline(capLa, X.outcome(X.filterRows(R, capLa)));
 ok('the headline names who the filters describe', /CAP applicants to Liberal Arts with a GPA of 3\.90 or above/.test(h2.lead), h2.lead);
@@ -143,13 +144,51 @@ console.log('\n=== reason through it with Socria ===');
   const ask = readFileSync(join(root, 'app/transfer/ut-austin-fall-2026/AskSocria.tsx'), 'utf8');
   ok('the chatbox can be closed, and stays closed for the visit', /aria-label="Close"/.test(ask) && /sessionStorage\.setItem\(CLOSED_KEY/.test(ask) && /Escape/.test(ask));
   ok('it hands the question to Logos 5.5 and sends it on landing', /carry\(/.test(ask) && /model: 'logos-3'/.test(ask) && /send: true/.test(ask) && /assign\('\/chat'\)/.test(ask));
-  ok('the page has a button that opens it', /Reason through it with Socria/.test(ui) && /<AskSocria /.test(ui));
+  ok('the page has a button that opens it', /Reason through it with Socria/.test(ui) && /<AskSocria/.test(ui));
 }
 
 console.log('\n=== who made it ===');
 for (const n of ['Pradeep Muraliram', 'Madison Carby', 'Yara Al-Laham', 'Alex Tran']) ok(`${n} is credited at the top`, ui.includes(n) && ui.indexOf(n) < ui.indexOf('className="xf-filters"'));
 
 ok('Pradeep Muraliram is credited as founder', ui.includes('Pradeep Muraliram</strong> (founder)'));
+
+console.log('\n=== three data sets ===');
+{
+  const D = X.ROWS_2023;
+  ok('the Fall 2023 sheet: 26 CAP admits, none denied', D.length === 26 && D.every((r) => r.cap && (r.decision === 'first' || r.decision === 'second') && r.source === '2023'));
+  const g = D.map((r) => r.gpa).sort((a, b) => a - b);
+  ok('its median GPA is 3.90 and 16 of 26 are 3.90 or above', X.median(g) === 3.9 && g.filter((v) => v >= 3.9).length === 16);
+  ok('22 in Liberal Arts, 4 outside it', D.filter((r) => r.college === 'Liberal Arts').length === 22);
+  ok('three got another major', D.filter((r) => r.decision === 'second').length === 3);
+  ok('Psychology B.S. reads as Psychology, the wording kept', D.some((r) => r.major === 'Psychology' && r.majorRaw === 'Psychology B.S.'));
+  ok('the sets are kept apart', X.rowsFor('2026') === X.ROWS && X.rowsFor('2023') === X.ROWS_2023 && X.rowsFor('reddit').length === 0);
+  ok('ids never collide across sets', new Set([...X.ROWS, ...X.ROWS_2023].map((r) => r.id)).size === X.ROWS.length + X.ROWS_2023.length);
+  const f23 = { ...X.NO_FILTERS, set: '2023', college: 'Liberal Arts', major: 'Economics' };
+  ok('the set travels in the address, and its filters with it', JSON.stringify(X.fromQuery(X.toQuery(f23))) === JSON.stringify(f23), X.toQuery(f23));
+  ok('a 2026-only filter does not survive a switch to 2023', X.fromQuery('?set=2023&who=cap&residency=In-state').applicant === 'all' && X.fromQuery('?set=2023&residency=In-state').residency === null);
+  ok('an unknown set is the 2026 forum', X.fromQuery('?set=1999').set === '2026');
+  const h = X.headline(f23, X.outcome(X.filterRows(D, f23)));
+  ok('the 2023 headline says admits only, never a rate', /admitted CAP students to Economics/.test(h.lead) && /Admits only/.test(h.result) && !/%/.test(h.result), `${h.lead} ${h.result}`);
+  const m23 = X.askMessage('What GPA do I need?', { ...X.NO_FILTERS, set: '2023' }, D);
+  ok('asking from 2023 says it is admits only', /admits only, so no acceptance rate/.test(m23) && !/denied/.test(m23.split('\n').slice(3).join(' ')), m23);
+  ok('asking from 2026 says CAP denials were left out', /CAP responses marked denied were left out/.test(X.askMessage('hi', X.NO_FILTERS, R)));
+}
+{
+  const { CAP_REPORTS, CAP_RULES } = await import('./.tmp/cap-reports.mjs');
+  ok('the Reddit stories: 15, each linked to Reddit', CAP_REPORTS.length === 15 && CAP_REPORTS.every((r) => /^https:\/\/www\.reddit\.com\/r\//.test(r.url)));
+  ok('none of them is a denial', CAP_REPORTS.every((r) => !/denied|rejected/i.test(r.outcome)));
+  ok('every story says how far it can be trusted', CAP_REPORTS.every((r) => ['detailed', 'sparse', 'secondhand', 'likely'].includes(r.confidence)));
+  ok('ids are unique', new Set(CAP_REPORTS.map((r) => r.id)).size === CAP_REPORTS.length);
+  ok('seven reached McCombs directly, one more by way of Economics', CAP_REPORTS.filter((r) => r.destination === 'McCombs').length === 7 && CAP_REPORTS.some((r) => r.id === 'MC-07' && /Economics/.test(r.outcome)));
+  ok('the official rules say the guarantee is Liberal Arts, not McCombs', /Liberal Arts/.test(CAP_RULES.guarantee) && /not McCombs/.test(CAP_RULES.guarantee));
+  const sm = X.askStoriesMessage('', CAP_REPORTS);
+  ok('asking from the stories says they are unverified anecdotes', /unverified, not a representative sample/.test(sm) && sm.length <= 2000);
+  const nothingPersonal = readFileSync(join(root, 'lib/transfer/cap-reports.ts'), 'utf8');
+  ok('no applicant’s own plan or profile is published', !/CAPSO|Spring 2027|Socria, a human-first/i.test(nothingPersonal));
+  const stories = readFileSync(join(root, 'app/transfer/ut-austin-fall-2026/Stories.tsx'), 'utf8');
+  ok('the stories view links out safely', /rel="noopener noreferrer nofollow"/.test(stories));
+  ok('the page offers all three sets', /SETS\.map/.test(ui) && X.SETS.map((s) => s.key).join() === '2026,2023,reddit');
+}
 
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);
