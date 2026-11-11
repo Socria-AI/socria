@@ -103,6 +103,8 @@ const OPEN = [
   '/subprocessors',
   // events: an RSVP, the ticket a guest was emailed, the door
   '/events',
+  // public datasets students share with each other (the transfer results)
+  '/transfer',
   // a friend's referral link, which leads to sign-up
   '/r',
   // link-preview cards — the campaign's own among them

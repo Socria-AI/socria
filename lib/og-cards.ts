@@ -71,6 +71,11 @@ const FIXED: Record<string, OgCard> = {
     title: 'The Socria Charter.',
     line: 'The machines work for us. Not the other way around.',
   },
+  transfer: {
+    kicker: 'UT Austin · Fall 2026 transfers',
+    title: 'Who got in, and with what.',
+    line: 'Transfer decisions, GPAs, credit hours and extracurriculars, as applicants reported them.',
+  },
   docs: {
     kicker: 'Socria Docs',
     title: 'How the whole thing works.',

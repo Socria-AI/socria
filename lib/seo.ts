@@ -226,6 +226,13 @@ export const PUBLIC_PAGES: readonly PublicPage[] = [
     priority: 0.4,
     changeFrequency: 'monthly',
   },
+  {
+    path: '/transfer/ut-austin-fall-2026',
+    name: 'UT Austin Fall 2026 transfer decisions',
+    summary: 'Self-reported UT Austin transfer decisions for Fall 2026, with GPA, credit hours, CAP and extracurriculars, to filter and compare.',
+    priority: 0.5,
+    changeFrequency: 'monthly',
+  },
   { path: '/privacy', name: 'Privacy', summary: 'What Socria collects, why, and how to get it back or deleted.', priority: 0.3, changeFrequency: 'monthly' },
   { path: '/terms', name: 'Terms', summary: 'The agreement for using Socria.', priority: 0.2, changeFrequency: 'yearly' },
   { path: '/security', name: 'Security', summary: 'How Socria protects accounts and data.', priority: 0.2, changeFrequency: 'yearly' },

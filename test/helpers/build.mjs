@@ -20,6 +20,7 @@ export const OUT = join(here, '..', '.tmp');
 /** Every module a suite may import. Add one here when a suite needs it. */
 const MODULES = [
   'lib/logos-math.ts',
+  'lib/transfer/explore.ts',
   'lib/logos-viz.ts',
   'lib/logos-layout.ts',
   'lib/numeric/linalg.ts',
