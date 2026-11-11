@@ -1040,6 +1040,26 @@ create table if not exists captures (
 
 create index if not exists captures_user_idx on captures (user_id, created_at desc);
 
+-- ── SocriaUX (/ux): design projects ───────────────────────────────────
+--
+-- One row per project: the whole document (artboards, annotations, the
+-- reasoning map, research notes, the thread) as jsonb, normalised by
+-- lib/ux/model.ts normalizeProject before it is written. The browser keeps
+-- its own copy first (lib/ux/storage.ts); this is the copy that follows a
+-- signed-in designer between devices. Reached only through /api/ux/projects
+-- with the service role, every query filtered by user_id.
+create table if not exists ux_projects (
+  user_id text not null,
+  id text not null,
+  name text not null default '',
+  doc jsonb not null,
+  created_at bigint not null,
+  updated_at bigint not null,
+  primary key (user_id, id)
+);
+
+create index if not exists ux_projects_user_updated_idx on ux_projects (user_id, updated_at desc);
+
 -- ── Socria events: RSVP and attendance ─────────────────────────────────
 --
 -- events: one row per event, edited by Socria admins. A date is shown on the

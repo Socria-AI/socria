@@ -86,7 +86,7 @@ export function takeoverOn(env: Env = takeoverEnv()): boolean {
 export type PathClass = 'home' | 'app' | 'open' | 'site';
 
 /** Logos 5, and what opens into it. */
-const APP = ['/chat', '/logos', '/logos2', '/logos2-test', '/memory', '/model', '/mind-ar', '/onboarding', '/s', '/logos-5-internal'];
+const APP = ['/chat', '/logos', '/logos2', '/logos2-test', '/memory', '/model', '/mind-ar', '/onboarding', '/s', '/logos-5-internal', '/ux'];
 
 /** What keeps working whatever the campaign. */
 const OPEN = [
@@ -138,6 +138,8 @@ const THINKING_API = [
   '/api/logos/guest',
   '/api/logos/sources',
   '/api/logos/room',
+  // SocriaUX's design reasoning (/ux)
+  '/api/ux/reason',
   '/api/chat',
   '/api/mr',
   '/api/transcribe',

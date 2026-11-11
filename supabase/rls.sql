@@ -170,3 +170,9 @@ revoke all on event_sheet_sync    from anon, authenticated;
 alter table mr_ledger enable row level security;
 alter table mr_ledger force row level security;
 revoke all on mr_ledger from anon, authenticated;
+
+-- SocriaUX design projects (schema.sql ux_projects): one designer's projects,
+-- reached only through /api/ux/projects with the service role.
+alter table ux_projects enable row level security;
+alter table ux_projects force row level security;
+revoke all on ux_projects from anon, authenticated;

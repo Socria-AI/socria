@@ -387,6 +387,8 @@ const MODULES = [
   'test/helpers/tips-under-test.tsx',
   // native file preview: workbooks, decks and delimited text drawn from the original file
   'test/helpers/preview-under-test.ts',
+  // SocriaUX (/ux): the project, the checks, the model's brief and reply, the code, the store
+  'test/helpers/ux-under-test.ts',
 ];
 
 export async function buildAll() {

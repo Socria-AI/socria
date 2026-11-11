@@ -44,6 +44,7 @@ const pages = [
   ['/', 'next', 'go:/chat'],
   // Logos 5, and what opens into it: the campaign at the same address until the code is in
   ['/chat', 'show', 'next'],
+  ['/ux', 'show', 'next'],
   ['/logos', 'show', 'next'],
   ['/logos2', 'show', 'next'],
   ['/memory', 'show', 'next'],
@@ -112,6 +113,7 @@ const thinking = [
   'logos/guest',
   'logos/sources',
   'logos/room',
+  'ux/reason',
   'chat',
   'mr',
   'transcribe',
