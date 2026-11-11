@@ -149,5 +149,7 @@ console.log('\n=== reason through it with Socria ===');
 console.log('\n=== who made it ===');
 for (const n of ['Pradeep Muraliram', 'Madison Carby', 'Yara Al-Laham', 'Alex Tran']) ok(`${n} is credited at the top`, ui.includes(n) && ui.indexOf(n) < ui.indexOf('className="xf-filters"'));
 
+ok('Pradeep Muraliram is credited as founder', ui.includes('Pradeep Muraliram</strong> (founder)'));
+
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

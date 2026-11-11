@@ -623,7 +623,7 @@ export function TransferExplorer() {
             people like you.
           </p>
           <p className="xf-credits">
-            Made by <strong>Pradeep Muraliram</strong>, with <strong>Madison Carby</strong> (Socria creative &amp; brand),{' '}
+            Made by <strong>Pradeep Muraliram</strong> (founder), with <strong>Madison Carby</strong> (Socria creative &amp; brand),{' '}
             <strong>Yara Al-Laham</strong> (growth &amp; analytics) and <strong>Alex Tran</strong> (product manager).
           </p>
           <button type="button" className="xf-ask-btn" onClick={() => setAsk(true)}>
