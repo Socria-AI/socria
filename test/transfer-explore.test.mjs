@@ -126,5 +126,25 @@ ok('every decision colour is also said in words (a key)', /<Key /.test(ui) && /D
 const css = readFileSync(join(root, 'app/transfer/transfer.css'), 'utf8');
 ok('a dark version of every decision colour', (css.match(/--xf-first:/g) ?? []).length === 3 && (css.match(/--xf-denied:/g) ?? []).length === 3);
 
+console.log('\n=== reason through it with Socria ===');
+{
+  const capLa = { ...X.NO_FILTERS, applicant: 'cap', college: 'Liberal Arts' };
+  const msg = X.askMessage('  Should I   still apply?  ', capLa, X.filterRows(R, capLa));
+  ok('the question comes first (it names the conversation), tidied', msg.startsWith('Should I still apply?\n\nWhat I'), msg.slice(0, 60));
+  ok('it says the data is self-reported and unofficial', /self-reported/.test(msg) && /not official/.test(msg));
+  ok('it carries who the filters describe and how it went', /Filtered to CAP applicants to Liberal Arts\./.test(msg) && /37 reported: 10 admitted to their first-choice major, 27 to another major, 0 denied \(100% admitted\)/.test(msg), msg);
+  ok('medians and the commonest themes go with it', /Median GPA: admitted 3\.90/.test(msg) && /Most often named/.test(msg));
+  ok('never longer than the handover keeps (2,000)', X.askMessage('x'.repeat(5000), X.NO_FILTERS, R).length <= 2000);
+  ok('an empty question still asks something', X.askMessage('   ', X.NO_FILTERS, R).startsWith('Help me make sense of this'));
+  ok('nobody matching says so', /Nobody matching/.test(X.askMessage('hi', capLa, [])));
+  ok('no filters, no "Filtered to"', !/Filtered to/.test(X.askMessage('hi', X.NO_FILTERS, R)));
+  const st = X.askStarters(capLa);
+  ok('three starters, worded for CAP and the college', st.length === 3 && /as a CAP student applying to Liberal Arts/.test(st[0]) && /second-choice/.test(st[2]), st.join(' | '));
+  const ask = readFileSync(join(root, 'app/transfer/ut-austin-fall-2026/AskSocria.tsx'), 'utf8');
+  ok('the chatbox can be closed, and stays closed for the visit', /aria-label="Close"/.test(ask) && /sessionStorage\.setItem\(CLOSED_KEY/.test(ask) && /Escape/.test(ask));
+  ok('it hands the question to Logos 5.5 and sends it on landing', /carry\(/.test(ask) && /model: 'logos-3'/.test(ask) && /send: true/.test(ask) && /assign\('\/chat'\)/.test(ask));
+  ok('the page has a button that opens it', /Reason through it with Socria/.test(ui) && /<AskSocria /.test(ui));
+}
+
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

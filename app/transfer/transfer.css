@@ -247,4 +247,44 @@
 }
 @media (prefers-reduced-motion: reduce){
   .xf *{transition:none !important}
+  .xf-ask{animation:none}
+}
+
+/* Reason through it with Socria: the button in the opening, and the chatbox at the bottom */
+.xf .xf-ask-btn{align-self:flex-start; display:inline-flex; align-items:center; gap:9px; height:44px; padding:0 18px 0 15px; margin-top:6px; border-radius:999px;
+  background:var(--xf-ink); color:var(--xf-bg); font-size:.92rem; font-weight:500; box-shadow:0 8px 20px -12px rgba(0,0,0,.5); transition:transform .15s, box-shadow .15s}
+.xf .xf-ask-btn:hover{transform:translateY(-1px); box-shadow:0 12px 24px -12px rgba(0,0,0,.55)}
+.xf-ask-btn svg{width:16px; height:16px; fill:none; stroke:currentColor; stroke-width:1.5; stroke-linejoin:round}
+.xf-cta .xf-inline{font:inherit; font-style:italic}
+
+.xf-ask{position:fixed; z-index:20; right:max(20px, env(safe-area-inset-right, 0px)); bottom:max(20px, env(safe-area-inset-bottom, 0px)); width:min(380px, calc(100vw - 32px));
+  display:flex; flex-direction:column; gap:12px; padding:18px 18px 14px; border-radius:16px; background:var(--xf-surface); color:var(--xf-ink);
+  border:1px solid var(--xf-hair); box-shadow:0 1px 0 rgba(0,0,0,.04), 0 24px 60px -20px rgba(0,0,0,.42); animation:xf-rise .32s cubic-bezier(.2,.8,.2,1)}
+@keyframes xf-rise{from{opacity:0; transform:translateY(16px)}to{opacity:1; transform:none}}
+.xf-ask-head{display:flex; align-items:flex-start; justify-content:space-between; gap:12px}
+.xf-ask-kicker{font-size:.64rem; font-weight:600; letter-spacing:.14em; text-transform:uppercase; color:var(--xf-accent)}
+.xf-ask h2{font-family:var(--xf-serif); font-weight:400; font-size:1.42rem; line-height:1.1; margin-top:3px}
+.xf-ask-close{flex:0 0 auto; width:32px; height:32px; margin:-6px -6px 0 0; border-radius:999px; display:grid; place-items:center; color:var(--xf-ink-3)}
+.xf-ask-close:hover{background:var(--xf-sunk); color:var(--xf-ink)}
+.xf-ask-close svg{width:14px; height:14px; fill:none; stroke:currentColor; stroke-width:1.6; stroke-linecap:round}
+.xf-ask-lede{font-size:.84rem; line-height:1.45; color:var(--xf-ink-2)}
+.xf-ask-starters{display:flex; flex-direction:column; gap:6px}
+.xf-ask-starters button{width:100%; text-align:left; padding:8px 12px; border-radius:10px; font-size:.84rem; line-height:1.3; color:var(--xf-ink);
+  background:var(--xf-bg); border:1px solid var(--xf-hair-2); transition:border-color .12s, background .12s}
+.xf-ask-starters button:hover{border-color:var(--xf-accent); background:var(--xf-accent-soft)}
+.xf-ask-form{display:flex; align-items:flex-end; gap:8px; padding:8px 8px 8px 13px; border-radius:16px; background:var(--xf-bg); border:1px solid var(--xf-hair)}
+.xf-ask-form:focus-within{border-color:var(--xf-accent); box-shadow:0 0 0 3px var(--xf-accent-soft)}
+.xf-ask-form textarea{flex:1; min-width:0; resize:none; border:0; background:none; outline:none; font:inherit; font-size:.92rem; line-height:1.4; color:var(--xf-ink); padding:4px 0; max-height:120px}
+.xf-ask-form textarea::placeholder{color:var(--xf-ink-3)}
+.xf .xf-ask-send{flex:0 0 auto; width:34px; height:34px; border-radius:999px; display:grid; place-items:center; background:var(--xf-ink); color:var(--xf-bg); transition:opacity .12s}
+.xf .xf-ask-send:disabled{opacity:.3; cursor:default}
+.xf-ask-send svg{width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round}
+.xf-ask-spin{width:14px; height:14px; border-radius:999px; border:2px solid currentColor; border-right-color:transparent; animation:xf-spin .7s linear infinite}
+@keyframes xf-spin{to{transform:rotate(360deg)}}
+.xf-ask-foot{font-size:.74rem; color:var(--xf-ink-3); text-align:center}
+@media (max-width:640px){
+  .xf-ask{left:12px; right:12px; bottom:max(12px, env(safe-area-inset-bottom, 0px)); width:auto; padding:16px 14px 12px}
+  .xf-ask{gap:10px}
+  .xf-ask-lede{display:none}
+  .xf-ask-starters li:nth-child(n+2){display:none}
 }

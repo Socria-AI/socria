@@ -356,3 +356,45 @@ export function search(rows: readonly TransferRow[], q: string): TransferRow[] {
     return words.every((w) => hay.includes(w));
   });
 }
+
+// ── asking Socria ────────────────────────────────────────────────────
+
+/**
+ * The question someone asks from the page, with what they were looking at,
+ * as the first message of a Socria conversation: the question first (it
+ * names the conversation), then what they were looking at. Socria does not see the
+ * rows, so the figures go with the question: who the filters describe, how
+ * it went for them, the medians, and what they most often named. Short, and
+ * said to be self-reported, so the reply reasons from it rather than over it.
+ */
+export function askMessage(question: string, f: Filters, rows: readonly TransferRow[]): string {
+  const q = question.replace(/\s+/g, ' ').trim().slice(0, 600);
+  const o = outcome(rows);
+  const m = medians(rows);
+  const lines = [q || 'Help me make sense of this for my own application.', '', `What I'm looking at: self-reported UT Austin Fall 2026 transfer decisions (${ROWS.length} applicants who filled in a shared form; not official, not a fair sample).`];
+  if (activeCount(f)) lines.push(`Filtered to ${whoPhrase(f)}.`);
+  if (o.known) {
+    lines.push(
+      `${o.n} reported: ${o.first} admitted to their first-choice major, ${o.second} to another major, ${o.denied} denied` +
+        `${o.known >= 5 ? ` (${pct(o.first + o.second, o)}% admitted)` : ''}.`
+    );
+    const g = (v: number | null) => (v == null ? '—' : v.toFixed(2));
+    if (m.gpa.admitted != null || m.gpa.denied != null) lines.push(`Median GPA: admitted ${g(m.gpa.admitted)}, denied ${g(m.gpa.denied)}. Median credit hours: admitted ${m.hours.admitted ?? '—'}, denied ${m.hours.denied ?? '—'}.`);
+    const t = themeShares(rows).themes.filter((x) => x.admitted + x.denied > 0).slice(0, 3);
+    if (t.length) lines.push(`Most often named as their biggest extracurricular: ${t.map((x) => `${x.name.toLowerCase()} (admitted ${x.admittedPct}%, denied ${x.deniedPct}%)`).join('; ')}.`);
+  } else {
+    lines.push('Nobody matching these filters reported a decision.');
+  }
+  return lines.join('\n').slice(0, 2000);
+}
+
+/** A few ways in, worded for whoever the filters describe. */
+export function askStarters(f: Filters): string[] {
+  const who = f.applicant === 'cap' ? 'as a CAP student' : f.applicant === 'external' ? 'as an external transfer' : 'for me';
+  const where = f.major ?? f.college;
+  return [
+    `What do these numbers actually mean ${who}${where ? ` applying to ${where}` : ''}?`,
+    'How should I write about my strongest extracurricular?',
+    f.applicant === 'cap' ? 'What should I do if I get a second-choice major?' : 'How much do GPA and credit hours seem to matter here?',
+  ];
+}

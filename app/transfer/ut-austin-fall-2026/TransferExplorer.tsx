@@ -38,6 +38,7 @@ import {
   type SortKey,
   type TransferRow,
 } from '@/lib/transfer/explore';
+import { AskSocria } from './AskSocria';
 
 const fill = (d: Decision) => `var(--xf-${d})`;
 const gpaText = (v: number | null) => (v == null ? '—' : v.toFixed(2));
@@ -570,6 +571,7 @@ function Select({ label, value, onChange, children, disabled }: { label: string;
 
 export function TransferExplorer() {
   const [f, setF] = useState<Filters>(NO_FILTERS);
+  const [ask, setAsk] = useState(false);
   const ready = useRef(false);
 
   useEffect(() => {
@@ -620,6 +622,12 @@ export function TransferExplorer() {
             {all.n} transfer applicants shared their decision, GPA, credit hours and the one thing they think mattered most. Filter it down to
             people like you.
           </p>
+          <button type="button" className="xf-ask-btn" onClick={() => setAsk(true)}>
+            <svg viewBox="0 0 16 16" aria-hidden>
+              <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
+            </svg>
+            Reason through it with Socria
+          </button>
         </section>
 
         <div className="xf-filters" role="group" aria-label="Filters">
@@ -791,10 +799,14 @@ export function TransferExplorer() {
             <p>Socria is not part of UT Austin, and nothing here is advice from the university.</p>
           </div>
           <p className="xf-cta">
-            Working on your own application? <Link href="/logos">Think it through with Socria</Link>
+            Working on your own application?{' '}
+            <button type="button" className="xf-inline" onClick={() => setAsk(true)}>
+              Think it through with Socria
+            </button>
           </p>
         </footer>
       </div>
+      <AskSocria open={ask} setOpen={setAsk} filters={f} rows={rows} />
     </div>
   );
 }
