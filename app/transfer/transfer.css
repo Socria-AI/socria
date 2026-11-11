@@ -250,6 +250,10 @@
   .xf-ask{animation:none}
 }
 
+/* who made it: under the opening, quiet but there to find */
+.xf-credits{font-size:.8rem; line-height:1.5; color:var(--xf-ink-3); max-width:62ch; padding-top:2px}
+.xf-credits strong{font-weight:500; color:var(--xf-ink-2)}
+
 /* Reason through it with Socria: the button in the opening, and the chatbox at the bottom */
 .xf .xf-ask-btn{align-self:flex-start; display:inline-flex; align-items:center; gap:9px; height:44px; padding:0 18px 0 15px; margin-top:6px; border-radius:999px;
   background:var(--xf-ink); color:var(--xf-bg); font-size:.92rem; font-weight:500; box-shadow:0 8px 20px -12px rgba(0,0,0,.5); transition:transform .15s, box-shadow .15s}

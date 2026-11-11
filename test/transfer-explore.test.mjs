@@ -146,5 +146,8 @@ console.log('\n=== reason through it with Socria ===');
   ok('the page has a button that opens it', /Reason through it with Socria/.test(ui) && /<AskSocria /.test(ui));
 }
 
+console.log('\n=== who made it ===');
+for (const n of ['Pradeep Muraliram', 'Madison Carby', 'Yara Al-Laham', 'Alex Tran']) ok(`${n} is credited at the top`, ui.includes(n) && ui.indexOf(n) < ui.indexOf('className="xf-filters"'));
+
 console.log(failed ? `\n${failed} failed` : '\nall passed');
 process.exit(failed ? 1 : 0);

@@ -622,6 +622,10 @@ export function TransferExplorer() {
             {all.n} transfer applicants shared their decision, GPA, credit hours and the one thing they think mattered most. Filter it down to
             people like you.
           </p>
+          <p className="xf-credits">
+            Made by <strong>Pradeep Muraliram</strong>, with <strong>Madison Carby</strong> (Socria creative &amp; brand),{' '}
+            <strong>Yara Al-Laham</strong> (growth &amp; analytics) and <strong>Alex Tran</strong> (product manager).
+          </p>
           <button type="button" className="xf-ask-btn" onClick={() => setAsk(true)}>
             <svg viewBox="0 0 16 16" aria-hidden>
               <path d="M2.5 3.5h11v7h-6l-3 2.5v-2.5h-2z" />
