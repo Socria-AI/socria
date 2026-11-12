@@ -159,7 +159,7 @@ console.log('\n=== llms.txt ===');
   ok('the price, from the one place it lives', t.includes('$15/month'));
   // removed: "says what needs an account" (Logos needed one, Core worked without) — Core was archived, Logos 5 is the one surface
   // There is no free tier (lib/trial.ts): a guest gets a short preview, an account a seven-day trial, then Socria One.
-  ok('says what a guest gets, and what an account adds', t.includes('Without an account you get a short preview: one line of thinking and its map, up to 5 messages. An account starts with a 7-day trial: 10,000 tokens a day, up to 70,000 in all, and the line you began comes with you.'));
+  ok('says what a guest gets, and what an account adds', t.includes('Without an account you get a short preview: one line of thinking and its map, up to 5 messages. An account starts with a 7-day trial: 20,000 tokens a day, up to 140,000 in all, and the line you began comes with you.'));
   ok('…and what follows the trial: Socria One, with nothing made taken away', t.includes('After the seven days, new AI requests need Socria One, and everything made in the trial stays open.'));
   ok('…and what Socria One is, from the plan table', t.includes('Socria One ($15/month) is unlimited conversations, Logic Maps and artifacts after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes.'));
   ok('…and the One page’s summary says the trial comes first', t.includes('— $15/month. Every account starts with a seven-day trial.'));
@@ -341,7 +341,7 @@ console.log('\n=== the homepage ===');
   ok('…and the conversation can still be linked to', html.includes('id="session"'));
   ok('the price, from the one place it lives', html.includes('Socria One') && html.includes('· $15 a month'));
   // There is no free plan beside it: the first plan is the seven-day trial, from the trial's numbers.
-  ok('the plans: a seven-day trial, then Socria One', html.includes('<h3>Seven-day trial</h3>') && html.includes('Every account starts with a 7-day trial: 10,000 tokens a day, up to 70,000 in all.') && html.includes('Seven days free, then Socria One.'));
+  ok('the plans: a seven-day trial, then Socria One', html.includes('<h3>Seven-day trial</h3>') && html.includes('Every account starts with a 7-day trial: 20,000 tokens a day, up to 140,000 in all.') && html.includes('Seven days free, then Socria One.'));
   ok('…and no free tier promised anywhere on the page', !/<h3>Free<\/h3>|free account|free to start|free tier/i.test(html), html.match(/.{0,40}(free account|free to start|free tier).{0,40}/i)?.[0]);
   ok('the foot carries Privacy and Terms', hrefs(html).includes('/privacy') && hrefs(html).includes('/terms'));
   ok('…and Support, outside <main>, so the page has a footer landmark', /<\/main><footer class="s-colophon">/.test(html) && hrefs(html).includes('/support'));
@@ -389,7 +389,7 @@ console.log('\n=== the student page ===');
   const ended = renderToStaticMarkup(h(UI.StudentsBody, {}));
   ok('it says the month has ended', ended.includes('has <span class="em">ended.</span>'));
   ok('…and promises no month', !ended.includes('@mavs.uta.edu') && !/Create my free account|first month of Socria One/.test(ended));
-  ok('…and says what Socria is now, from the plan table', ended.includes('a new account has a 7-day trial: 10,000 tokens a day, up to 70,000 in all') && ended.includes('After that, Socria One is $15/month.'));
+  ok('…and says what Socria is now, from the plan table', ended.includes('a new account has a 7-day trial: 20,000 tokens a day, up to 140,000 in all') && ended.includes('After that, Socria One is $15/month.'));
   ok('…and offers no free tier in its place', !/free to start|free account|free tier/i.test(ended), ended.match(/.{0,40}free.{0,40}/g)?.join(' | '));
   // The one call to action every public page makes: "Start a conversation", into Logos.
   ok('…with a way in and the plan page', ended.includes('href="/logos"') && ended.includes('Start a conversation') && ended.includes('href="/one"'));

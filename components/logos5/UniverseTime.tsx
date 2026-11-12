@@ -17,7 +17,7 @@ import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, typ
 import { timeLayout, TIME_NARROW, TIME_WIDE, type TimeBead } from '@/lib/logos5/timeline';
 import type { Homes } from '@/lib/logos5/spatial';
 import type { Match, Tile } from '@/lib/logos5/universe';
-import { colorVar, kindLine, shortDate, tileSaid } from './UniverseParts';
+import { StartDisc, colorVar, kindLine, shortDate, tileSaid } from './UniverseParts';
 import { nodeLabel } from '@/lib/logos5/title';
 
 const css = (vars: Record<string, string | number>): CSSProperties => vars as unknown as CSSProperties;
@@ -30,6 +30,8 @@ export interface TimeActs {
   onPreview: (id: string | null, at: DOMRect | null) => void;
   onOpen: (id: string) => void;
   onSelect: (ids: string[]) => void;
+  /** the big + after now: a new line of thinking */
+  onStart?: () => void;
 }
 
 export function TimeView({
@@ -71,7 +73,8 @@ export function TimeView({
   bottom?: number;
   acts: TimeActs;
 }) {
-  const L = useMemo(() => timeLayout({ tiles, homes, now, from, narrow }), [tiles, homes, now, from, narrow]);
+  const startable = !!acts.onStart;
+  const L = useMemo(() => timeLayout({ tiles, homes, now, from, narrow, start: startable }), [tiles, homes, now, from, narrow, startable]);
   const S = narrow ? TIME_NARROW : TIME_WIDE;
   const scroller = useRef<HTMLDivElement>(null);
   const actsRef = useRef(acts);
@@ -308,6 +311,7 @@ export function TimeView({
           <div className="l5t-now" style={{ left: L.nowX }}>
             <span>Now</span>
           </div>
+          {L.plus && acts.onStart && <StartDisc x={L.plus.x} y={L.plus.y} r={L.plus.r} onStart={acts.onStart} delay={420} className="is-time" />}
           {L.gaps.map((g) => (
             <div key={`gap:${g.from}`} className="l5t-gap" style={{ left: g.x, width: g.w }}>
               <span className="l5t-gap-mark" aria-hidden="true">···</span>

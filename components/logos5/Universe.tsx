@@ -41,7 +41,8 @@ import { BubbleMap, type BubbleActs, type MapMemoryLayer } from './UniverseBubbl
 import { TimeView } from './UniverseTime';
 import type { Attachment } from '@/lib/logos-attachments';
 import type { Intent } from '@/lib/logos5/study';
-import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, ViewMenu, kindLine, shortDate, type Found, type Taught } from './UniverseParts';
+import { ActionBar, FindOrStart, Glyph, HiddenTray, PreviewCard, StarMark, StartDisc, ViewMenu, kindLine, shortDate, type Found, type Taught } from './UniverseParts';
+import { START_R } from '@/lib/logos5/bubbles';
 import './universe.css';
 
 const newId = (p: string) => `${p}_${Date.now().toString(36)}${Math.random().toString(36).slice(2, 7)}`;
@@ -360,6 +361,8 @@ export function UniverseView({
     return () => ro?.disconnect();
   }, [narrow, hasTop, lens]);
 
+  /** the big + is drawn in the map (each lens its own place for it), unless an opening is being carried in the box */
+  const startable = !!onNew && !startWith;
   // N, anywhere on the map that is not a field, starts something new — the +'s key
   useEffect(() => {
     if (!onNew || startWith) return;
@@ -552,6 +555,7 @@ export function UniverseView({
     },
     onPreview: (id, at) => setPreview(id ? { id, at } : null),
     onOpen: openId,
+    onStart: startable ? onNew : undefined,
     onRefile: refile,
     onFold: (key, folded) => commit((a) => A.setFrame(a, key, { collapsed: folded }), [], true),
     onNewProject:
@@ -1017,10 +1021,12 @@ export function UniverseView({
           onPreview: mapActs.onPreview,
           onOpen: openId,
           onSelect: (ids) => setSel(ids),
+          onStart: startable ? onNew : undefined,
         }}
       />
     ) : (
       <div className="l5h-empty">
+        {startable && onNew && <EmptyStart onStart={onNew} narrow={narrow} />}
         <p>Nothing begun this month yet — the rest is all still here, in order.</p>
         <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, 'all'))}>
           All time →
@@ -1030,6 +1036,7 @@ export function UniverseView({
   else if (lens === 'today' && !todayTiles.length)
     body = (
       <div className="l5h-empty is-today">
+        {startable && onNew && <EmptyStart onStart={onNew} narrow={narrow} bare />}
         <button type="button" className="l5h-todaynode" onClick={() => (onNew ? onNew() : findRef.current?.focus())}>
           <span className="l5h-todaynode-dot" aria-hidden="true" />
           {TODAY_EMPTY}
@@ -1039,6 +1046,7 @@ export function UniverseView({
   else if (lens === 'week' && !scoped.length)
     body = (
       <div className="l5h-empty">
+        {startable && onNew && weekAt === null && <EmptyStart onStart={onNew} narrow={narrow} />}
         <p>{weekAt === null ? 'Nothing yet this week.' : 'Nothing was begun that week.'}</p>
         <button type="button" className="l5h-btn" onClick={() => prefer((a) => A.setMode(a, 'all'))}>
           All time →
@@ -1171,23 +1179,8 @@ export function UniverseView({
                 </li>
               </ul>
             )}
-            {onNew && !startWith ? (
-              <div className="l5h-newwrap">
-                <button type="button" className="l5h-new" onClick={onNew} aria-label="Start a new line of thinking" title="Start a new line of thinking (N)">
-                  <span className="l5h-new-o" aria-hidden="true">
-                    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
-                      <path d="M12 5v14M5 12h14" />
-                    </svg>
-                  </span>
-                  <span className="l5h-new-l">
-                    <span className="l5h-new-t">Start something new</span>
-                    {!narrow && <span className="l5h-new-k">N</span>}
-                  </span>
-                </button>
-              </div>
-            ) : (
-              <div className="l5h-omni">{findEl}</div>
-            )}
+            {/* the + is in the map itself now (StartDisc); the box comes back only to carry an opening */}
+            {!startable && <div className="l5h-omni">{findEl}</div>}
           </div>
           {viewOpen && (
             <ViewMenu
@@ -1334,5 +1327,15 @@ function LensSwitch({ lens, narrow, onPick }: { lens: A.HomeMode; narrow: boolea
         </button>
       ))}
     </div>
+  );
+}
+
+/** The big + where a lens has nothing to draw yet: the same disc, standing in the middle over the words. */
+function EmptyStart({ onStart, narrow, bare = false }: { onStart: () => void; narrow: boolean; bare?: boolean }) {
+  const r = narrow ? START_R.narrow : START_R.wide;
+  return (
+    <span className={`l5h-emptyplus${bare ? ' is-bare' : ''}`} style={{ width: 2 * r, height: 2 * r }}>
+      <StartDisc x={r} y={r} r={r} onStart={onStart} bare={bare} />
+    </span>
   );
 }

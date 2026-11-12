@@ -1,7 +1,7 @@
 // lib/sleep-server.ts — THE TRIAL'S TOKENS, ENFORCED AND COUNTED ON THE SERVER.
 //
 // SINCE NOVEMBER 9, 2026 an account that is not on Socria One is held to the seven-day trial
-// (lib/trial.ts, lib/trial-server.ts): a day's tokens (10,000) within the trial's (70,000), and nothing
+// (lib/trial.ts, lib/trial-server.ts): a day's tokens (20,000) within the trial's (140,000), and nothing
 // once its seven days are over. The machinery below is Sleep Mode's, unchanged in how it holds and
 // settles; what changed is the period (the trial's UTC day, `tday:…`, instead of the week) and the
 // gate, which now also refuses an ended trial (402, with the cookie that keeps the guest preview from

@@ -75,6 +75,8 @@ export interface BubbleIn {
   all?: readonly Tile[];
   /** room kept for a new Project, at the end of the folded row */
   canMake?: boolean;
+  /** draw the big + that starts something new, in the map's free room (the Universal Map sets it when it can) */
+  start?: boolean;
   /**
    * Today, exactly (Alex Tran, Logos 5 Comments v2): `tiles` are only what was
    * begun today, and nothing else is drawn — no Projects or subjects folded
@@ -234,6 +236,8 @@ export interface BubbleLayout {
   card: BubbleCard | null;
   /** where a new Project is made, at the end of the folded row; null when there is no room asked for */
   make: Box | null;
+  /** the big + that starts something new, and its words under it; null when not asked for */
+  start: BubbleStart | null;
   /** what Socria remembers, each beside what it came from (empty with Memory off) */
   memories: BubbleMemory[];
   /** every conversation drawn: where, how big, which subject */
@@ -243,6 +247,98 @@ export interface BubbleLayout {
   focus: Box;
   /** Today: which day it is about */
   today?: { when: TodayPlan['when']; day: number };
+}
+
+/** The big + and the words under it, in the map's own coordinates. */
+export interface BubbleStart {
+  x: number;
+  y: number;
+  r: number;
+  /** "Start something new", centred under the disc */
+  label: Box;
+}
+
+/** The +'s disc: as big as a well-filled conversation's, so it reads as a place on the map, not a button on it. */
+export const START_R = { wide: 54, narrow: 52 } as const;
+/** Clear room kept round it: from every subject's ring and name, the card, a remembered chip and every line. */
+export const START_PAD = { wide: 28, narrow: 20 } as const;
+/** Its words: one serif line under the disc. */
+export const START_WORDS = 'Start something new';
+// a phone draws the map smaller to fit it, so the + and its words keep nearly their wide size in the map's own units
+const START_LABEL = { wide: { w: 168, h: 20, gap: 8 }, narrow: { w: 168, h: 20, gap: 8 } } as const;
+/** Below first, then round both sides, then above: where the eye goes after the map. */
+const START_ANGLES = [90, 70, 110, 50, 130, 30, 150, 10, 170, -10, 190, -30, 210, -50, 230, -70, 250, 270];
+
+/** The point of a box nearest p, and how far it is. */
+function boxDist(b: Box, p: Pt): number {
+  const dx = Math.max(b.x - p.x, 0, p.x - (b.x + b.w));
+  const dy = Math.max(b.y - p.y, 0, p.y - (b.y + b.h));
+  return Math.hypot(dx, dy);
+}
+const boxesMeet = (a: Box, b: Box, pad: number) => a.x < b.x + b.w + pad && b.x < a.x + a.w + pad && a.y < b.y + b.h + pad && b.y < a.y + a.h + pad;
+
+/**
+ * Where the + goes. On a wide screen, the free spot nearest the middle of what is drawn — below it first, then
+ * round the sides — so it sits in the map among the subjects, as big as one of them, and never on a ring, a
+ * name, the card, a remembered chip or a line; its words go under it and are kept clear too. On a phone, where
+ * the map is as wide as the screen and read from the top down, it leads the column: centred, over the first
+ * subject, so it is the first thing seen. With nothing drawn, the middle.
+ */
+export function startSpot(o: {
+  circles: readonly { x: number; y: number; r: number }[];
+  boxes: readonly Box[];
+  curves: readonly { p0: Pt; c: Pt; p1: Pt }[];
+  around: Box;
+  narrow?: boolean;
+}): BubbleStart {
+  const k = o.narrow ? 'narrow' : 'wide';
+  const R = START_R[k];
+  const pad = START_PAD[k];
+  const L = START_LABEL[k];
+  // each line, as points along it
+  const pts: Pt[] = [];
+  for (const c of o.curves)
+    for (let i = 0; i <= 24; i++) {
+      const t = i / 24;
+      const u = 1 - t;
+      pts.push({ x: u * u * c.p0.x + 2 * u * t * c.c.x + t * t * c.p1.x, y: u * u * c.p0.y + 2 * u * t * c.c.y + t * t * c.p1.y });
+    }
+  const labelAt = (p: Pt): Box => ({ x: round(p.x - L.w / 2), y: round(p.y + R + L.gap), w: L.w, h: L.h });
+  const clear = (p: Pt) => {
+    const words = labelAt(p);
+    for (const c of o.circles) {
+      if (Math.hypot(c.x - p.x, c.y - p.y) < c.r + R + pad) return false;
+      if (boxDist(words, c) < c.r + pad / 2) return false;
+    }
+    for (const b of o.boxes) {
+      if (boxDist(b, p) < R + pad) return false;
+      if (boxesMeet(words, b, pad / 2)) return false;
+    }
+    for (const q of pts) {
+      if (Math.hypot(q.x - p.x, q.y - p.y) < R + pad * 0.6) return false;
+      if (boxDist(words, q) < pad / 3) return false;
+    }
+    return true;
+  };
+  const mid = { x: o.around.x + o.around.w / 2, y: o.around.y + o.around.h / 2 };
+  if (o.narrow && o.around.h > 0) {
+    // over the first subject, its words clear of that subject's name; higher still if anything is in the way
+    for (let y = round(o.around.y - pad - L.gap - L.h - R), n = 0; n < 40; y -= 8, n++) {
+      const p = { x: round(mid.x), y };
+      if (clear(p)) return { x: p.x, y: p.y, r: R, label: labelAt(p) };
+    }
+  }
+  const reach = Math.max(o.around.w, o.around.h) + 2 * (R + pad) + L.h + 40;
+  for (let rho = 0; rho <= reach; rho += 8) {
+    for (const deg of rho ? START_ANGLES : [90]) {
+      const a = (deg * Math.PI) / 180;
+      const p = { x: round(mid.x + rho * Math.cos(a)), y: round(mid.y + rho * Math.sin(a)) };
+      if (clear(p)) return { x: p.x, y: p.y, r: R, label: labelAt(p) };
+    }
+  }
+  // nowhere inside the reach: under everything, in the middle
+  const p = { x: round(mid.x), y: round(o.around.y + o.around.h + pad + R) };
+  return { x: p.x, y: p.y, r: R, label: labelAt(p) };
 }
 
 // ── measures ─────────────────────────────────────────────────────────
@@ -953,7 +1049,27 @@ export function bubbleLayout(input: BubbleIn): BubbleLayout {
   const memories = remembered ? placeMemories(remembered.hang, { hubs, dots, clusters, placed, links, spokes, joins, card, make, area: bounds, narrow }) : [];
   const inside = (b: Box) => b.x >= bounds.x && b.y >= bounds.y && b.x + b.w <= bounds.x + bounds.w && b.y + b.h <= bounds.y + bounds.h;
   if (memories.some((m) => !inside(m.box))) bounds = boxAround([bounds, ...memories.map((m) => m.box)]);
-  return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, make, memories, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
+  // the big + last, in the free room nearest the middle of the subjects drawn open, clear of everything above
+  let start: BubbleStart | null = null;
+  if (input.start) {
+    const opened = clusters.filter((c) => !c.folded);
+    start = startSpot({
+      circles: [...opened.map((c) => ({ x: c.x, y: c.y, r: c.r })), ...hubs.map((h) => ({ x: h.x, y: h.y, r: h.r + (h.halo ? HALO : 0) }))],
+      boxes: [
+        ...opened.map((c) => c.label),
+        ...clusters.filter((c) => c.folded).map((c) => foldedBox(c)),
+        ...dots.map((d) => d.label),
+        ...(card ? [card] : []),
+        ...(make ? [make] : []),
+        ...memories.map((m) => m.box),
+      ],
+      curves: links,
+      around: opened.length ? boxAround(opened.map((c) => ({ x: c.x - c.r, y: c.y - c.r, w: 2 * c.r, h: 2 * c.r }))) : bounds,
+      narrow,
+    });
+    bounds = boxAround([...(clusters.length || card || make || memories.length ? [bounds] : []), { x: start.x - start.r, y: start.y - start.r, w: 2 * start.r, h: 2 * start.r }, start.label]);
+  }
+  return { lens: input.lens, hubs, dots, clusters, joins, spokes, links, card, make, start, memories, byId: placed, bounds, focus: bounds, ...(today ? { today } : {}) };
 }
 
 /** A folded one's room: its name and the dots under it — or, empty, the words that say so. */

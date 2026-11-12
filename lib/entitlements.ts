@@ -9,7 +9,7 @@
 // meant to change as we learn what they should be.
 //
 // THE SEVEN-DAY TRIAL AND SOCRIA ONE (November 9, 2026). The `free` plan below is now the trial's: a
-// hard trial, not a free tier (lib/trial.ts). Its limit is tokens — 10,000 a UTC day, 70,000 across
+// hard trial, not a free tier (lib/trial.ts). Its limit is tokens — 20,000 a UTC day, 140,000 across
 // seven days — held on the server by lib/sleep-server.ts; the monthly counts that used to be the free
 // tier are lifted to the same fair-use ceilings as Socria One, so the trial is the whole of Socria
 // apart from the features below. After seven days every new AI request needs Socria One; nothing made
@@ -393,7 +393,7 @@ export function comparisonRows(): { id: string; label: string; free: string; one
   ];
 }
 
-/** The trial's numbers as the copy says them ("7", "10,000", "70,000"). */
+/** The trial's numbers as the copy says them ("7", "20,000", "140,000"). */
 function trialNumbers(): { days: number; daily: string; total: string } {
   return { days: TRIAL.days, daily: TRIAL.daily.toLocaleString('en-GB'), total: TRIAL.total.toLocaleString('en-GB') };
 }

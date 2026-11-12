@@ -36,8 +36,8 @@ const at = (s) => Date.parse(s);
 
 console.log('\n=== the numbers ===');
 {
-  ok('7 days, 10,000 tokens a UTC day, 70,000 in all', T.TRIAL.days === 7 && T.TRIAL.daily === 10000 && T.TRIAL.total === 70000 && T.TRIAL_MS === 7 * DAY);
-  ok('  the environment may move them, written as whole numbers; nothing else does', J(T.trialLimits({ SOCRIA_TRIAL_DAILY_TOKENS: '5000', SOCRIA_TRIAL_TOTAL_TOKENS: '30000' })) === J({ daily: 5000, total: 30000 }) && J(T.trialLimits({ SOCRIA_TRIAL_DAILY_TOKENS: 'lots' })) === J({ daily: 10000, total: 70000 }));
+  ok('7 days, 20,000 tokens a UTC day, 140,000 in all', T.TRIAL.days === 7 && T.TRIAL.daily === 20000 && T.TRIAL.total === 140000 && T.TRIAL_MS === 7 * DAY);
+  ok('  the environment may move them, written as whole numbers; nothing else does', J(T.trialLimits({ SOCRIA_TRIAL_DAILY_TOKENS: '5000', SOCRIA_TRIAL_TOTAL_TOKENS: '30000' })) === J({ daily: 5000, total: 30000 }) && J(T.trialLimits({ SOCRIA_TRIAL_DAILY_TOKENS: 'lots' })) === J({ daily: 20000, total: 140000 }));
   ok('  a total below a day is raised to a day', T.trialLimits({ SOCRIA_TRIAL_DAILY_TOKENS: '9000', SOCRIA_TRIAL_TOTAL_TOKENS: '100' }).total === 9000);
 }
 
@@ -53,28 +53,28 @@ console.log('\n=== the state ===');
 {
   const now = at('2026-11-09T10:00:00Z');
   const e = T.trialState({ startedAt: null, now });
-  ok('not begun: eligible, with a full day ahead of it', e.status === 'eligible' && e.today.limit === 10000 && e.today.left === 10000 && e.daysLeft === 7 && e.today.period === 'day');
+  ok('not begun: eligible, with a full day ahead of it', e.status === 'eligible' && e.today.limit === 20000 && e.today.left === 20000 && e.daysLeft === 7 && e.today.period === 'day');
   const c = T.trialState({ startedAt: null, now, claimed: true });
   ok('  an address that has had a trial: ended, never begun, nothing to spend', c.status === 'ended' && c.reason === 'claimed' && c.today.limit === 0 && c.startedAt === null);
   const start = at('2026-11-09T09:00:00Z');
   const a = T.trialState({ startedAt: start, now, byDay: { 'tday:2026-11-09': 1500 } });
-  ok('running: day 1 of 7, today’s tokens counted, reset at 00:00 UTC', a.status === 'active' && a.day === 1 && a.today.used === 1500 && a.today.left === 8500 && a.today.resetAt === at('2026-11-10T00:00:00Z') && a.endsAt === start + 7 * DAY);
-  const spentToday = T.trialState({ startedAt: start, now, byDay: { 'tday:2026-11-09': 10000 } });
+  ok('running: day 1 of 7, today’s tokens counted, reset at 00:00 UTC', a.status === 'active' && a.day === 1 && a.today.used === 1500 && a.today.left === 18500 && a.today.resetAt === at('2026-11-10T00:00:00Z') && a.endsAt === start + 7 * DAY);
+  const spentToday = T.trialState({ startedAt: start, now, byDay: { 'tday:2026-11-09': 20000 } });
   ok('  today spent: still running, resting until 00:00 UTC', spentToday.status === 'active' && spentToday.today.asleep && spentToday.today.left === 0);
   const tomorrow = T.trialState({ startedAt: start, now: at('2026-11-10T00:00:01Z'), byDay: { 'tday:2026-11-09': 4000 } });
-  ok('  the next UTC day starts again at 10,000', tomorrow.status === 'active' && !tomorrow.today.asleep && tomorrow.today.limit === 10000 && tomorrow.today.used === 0 && tomorrow.day === 1);
+  ok('  the next UTC day starts again at 20,000', tomorrow.status === 'active' && !tomorrow.today.asleep && tomorrow.today.limit === 20000 && tomorrow.today.used === 0 && tomorrow.day === 1);
   const day3 = T.trialState({ startedAt: start, now: at('2026-11-11T12:00:00Z') });
   ok('  day 3, five days left counting today', day3.day === 3 && day3.daysLeft === 5);
   // eight UTC days touched: the last day's limit is what the trial has left
   const byDay = {};
-  for (const k of T.trialDayKeys(start).slice(0, 7)) byDay[k] = 10000;
+  for (const k of T.trialDayKeys(start).slice(0, 7)) byDay[k] = 20000;
   const last = T.trialState({ startedAt: start, now: at('2026-11-16T08:00:00Z'), byDay });
-  ok('the trial’s 70,000 caps the eighth UTC day: spent, it has ended', last.status === 'ended' && last.reason === 'spent' && last.total.used === 70000);
+  ok('the trial’s 140,000 caps the eighth UTC day: spent, it has ended', last.status === 'ended' && last.reason === 'spent' && last.total.used === 140000);
   const partial = { ...byDay };
   delete partial[T.trialDayKeys(start)[6]];
   partial[T.trialDayKeys(start)[6]] = 1000;
   const last2 = T.trialState({ startedAt: start, now: at('2026-11-16T08:00:00Z'), byDay: partial });
-  ok('  with 9,000 left after seven days, the eighth day may spend 9,000, not 10,000', last2.status === 'active' && last2.today.limit === 9000 && last2.total.used === 61000);
+  ok('  with 19,000 left after seven days, the eighth day may spend 19,000, not 20,000', last2.status === 'active' && last2.today.limit === 19000 && last2.total.used === 121000);
   const over = T.trialState({ startedAt: start, now: start + 7 * DAY });
   ok('the end: 168 hours after it began, to the millisecond', over.status === 'ended' && over.reason === 'expired' && T.trialState({ startedAt: start, now: start + 7 * DAY - 1 }).status === 'active');
   ok('  a day’s tokens outside the trial’s days never count to it', T.trialState({ startedAt: start, now, byDay: { 'tday:2026-11-01': 99999 } }).status === 'active');
@@ -225,9 +225,9 @@ console.log('\n=== the plan table ===');
 {
   ok('voice, sharing and the experiments are Socria One’s', T.FEATURES.join() === 'voice,share,experiments' && !T.hasFeature('free', 'voice') && !T.hasFeature('free', 'share') && !T.hasFeature('free', 'experiments') && T.hasFeature('one', 'experiments'));
   ok('  the trial’s counts are lifted: tokens are its limit', T.PLANS.free.counters.maps === null && T.PLANS.free.counters.artifacts === null && T.PLANS.free.counters.chats === T.PLANS.one.counters.chats && T.TIERED_COUNTERS.length === 0);
-  ok('  the copy is written from the numbers', T.freePlanSentence() === 'a 7-day trial: 10,000 tokens a day, up to 70,000 in all' && /after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes$/.test(T.onePlanSentence()));
+  ok('  the copy is written from the numbers', T.freePlanSentence() === 'a 7-day trial: 20,000 tokens a day, up to 140,000 in all' && /after the trial, with Socria Voice, chat sharing, the experiments and the Celestial and Socria One themes$/.test(T.onePlanSentence()));
   const rows = T.comparisonRows();
-  ok('  the comparison: trial against Socria One, themes and experiments named', rows.some((r) => r.id === 'experiments' && r.free === 'Not included' && r.one === 'Included') && rows.some((r) => r.id === 'themes') && rows[0].free === '7 days · 10,000 tokens a day');
+  ok('  the comparison: trial against Socria One, themes and experiments named', rows.some((r) => r.id === 'experiments' && r.free === 'Not included' && r.one === 'Included') && rows.some((r) => r.id === 'themes') && rows[0].free === '7 days · 20,000 tokens a day');
   ok('  the benefits sell what continues and what is One’s alone', T.ONE_FEATURES.map((f) => f.id).join() === 'conversations,voice,together,experiments,themes,history' && /Seven days to try it/.test(T.ONE_STANDFIRST));
   const theme = read('lib/theme.ts');
   ok('  Celestial and the Socria One theme are One’s', /night: \{ id: 'night', label: 'Celestial'[^}]*one: true/.test(theme) && /one: \{ id: 'one', label: 'Socria One'[^}]*one: true/.test(theme));

@@ -40,7 +40,7 @@ import { bubbleLayout, foldedBox, type BubbleCluster, type BubbleLens, type Bubb
 import { mapProvenance, type MapMemory } from '@/lib/logos5/memoryAtlas';
 import { PROJECT_COLOR_KEYS, type Homes } from '@/lib/logos5/spatial';
 import type { Arrangement } from '@/lib/logos5/arrange';
-import { MadeMark, StarMark, colorVar, shortDate, tileSaid } from './UniverseParts';
+import { MadeMark, StarMark, StartDisc, colorVar, shortDate, tileSaid } from './UniverseParts';
 import { nodeLabel } from '@/lib/logos5/title';
 
 export interface BubbleActs {
@@ -56,6 +56,8 @@ export interface BubbleActs {
   onOpenFar: (key: string, open: boolean) => void;
   /** a new Project, named — with these conversations filed in it, when some were dropped on it */
   onNewProject?: (name: string, ids: string[]) => void;
+  /** the big + in the map: a new line of thinking */
+  onStart?: () => void;
   onRename?: (key: string, name: string) => void;
   onColor?: (key: string, color: string) => void;
   /** a subject read from the conversations, made a Project with them in it */
@@ -204,8 +206,8 @@ export function BubbleMap({
   // what the layout needs of a memory: its words and where it came from (the rest is how it is drawn)
   const memIn = useMemo(() => memory?.list.map((m) => ({ id: m.id, text: m.text, from: m.from })), [memory?.list]);
   const L = useMemo(
-    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject && lens === 'week', strictToday: lens === 'today', ...(memIn?.length ? { memories: memIn } : {}) }),
-    [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject, memIn]
+    () => bubbleLayout({ lens, tiles, all, homes, ideas, links: arr.links, now, narrow, folded: lens === 'week' ? folded : undefined, opened, resumeId, cardFor, size: arr.display.size, ideaLinks: arr.display.ideas, canMake: !!acts.onNewProject && lens === 'week', start: !!acts.onStart, strictToday: lens === 'today', ...(memIn?.length ? { memories: memIn } : {}) }),
+    [lens, tiles, all, homes, ideas, arr.links, now, narrow, folded, opened, resumeId, cardFor, arr.display.size, arr.display.ideas, acts.onNewProject, !!acts.onStart, memIn]
   );
   const memOf = useMemo(() => new Map((memory?.list ?? []).map((m) => [m.id, m])), [memory?.list]);
   const titleOf = (id: string) => tileById.get(id)?.title ?? null;
@@ -732,6 +734,8 @@ export function BubbleMap({
             )}
           </div>
         )}
+
+        {L.start && acts.onStart && <StartDisc x={L.start.x} y={L.start.y} r={L.start.r} onStart={acts.onStart} delay={ARRIVE.circle + L.clusters.length * ARRIVE.circleStep + 200} className="is-map" />}
 
         {L.hubs.map((h) => {
           const tile = tileById.get(h.id);

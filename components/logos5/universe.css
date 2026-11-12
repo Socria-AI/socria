@@ -3558,6 +3558,8 @@ html[data-theme="night"] .logos-root .l5 .l5t-line {
 .logos-root .l5 .l5h-empty.is-today {
   display: grid;
   place-items: center;
+  /* the + and the invitation under it, together in the middle (not a row of the height each) */
+  align-content: center;
   height: 100%;
 }
 .logos-root .l5 .l5h-todaynode {
@@ -3886,36 +3888,41 @@ html[data-theme="night"] .logos-root .l5 .l5b-mem-m {
   margin-top: 12px;
 }
 
-/* THE + (Universe.tsx onNew): where the box that found or started used to stand, one large, unmissable way to begin —
-   an ink disc with the plus, a slow ring of moss around it, and the words beside it. It opens a new line of thinking,
-   which waits with ideas to explore and its chatbox ready. */
-.logos-root .l5 .l5h-newwrap { flex: none; margin: 0 auto; display: flex; justify-content: center; }
-.logos-root .l5 .l5h-new {
-  position: relative; display: inline-flex; align-items: center; gap: 16px; padding: 10px 26px 10px 10px;
-  border: 1px solid var(--c-rule-2); border-radius: 999px; background-color: var(--c-paper); background-image: var(--c-grain);
-  color: var(--c-ink); font: inherit; cursor: pointer;
-  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 18px 40px -22px rgba(35, 36, 31, 0.55);
-  transition: transform 0.3s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), box-shadow 0.3s, border-color 0.2s;
+/* THE + (UniverseParts.tsx StartDisc): drawn in the map itself, not standing under it — in Today and This week a
+   disc as big as a conversation's, in the free room the layout found among the subjects (lib/logos5/bubbles.ts
+   startSpot); on the timeline the next thing after Now (lib/logos5/timeline.ts plus); in a lens with nothing yet,
+   in the middle over its words. An ink disc with the plus, a slow ring of moss round it, and its words under it.
+   It opens a new line of thinking, which waits with ideas to explore and its chatbox ready. */
+.logos-root .l5 .l5plus {
+  position: absolute; z-index: 4; display: block; padding: 0; border: 0; border-radius: 999px;
+  background: none; color: var(--c-ink); font: inherit; cursor: pointer;
 }
-.logos-root .l5 .l5h-new:hover { transform: translateY(-3px); border-color: var(--c-moss); box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 24px 48px -22px rgba(35, 36, 31, 0.6); }
-.logos-root .l5 .l5h-new:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 4px; }
-.logos-root .l5 .l5h-new-o {
-  position: relative; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 999px;
+.logos-root .l5 .l5plus-o {
+  position: absolute; inset: 0; display: grid; place-items: center; border-radius: 999px;
   background: var(--c-ink); color: var(--c-paper);
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.08), 0 18px 36px -20px rgba(35, 36, 31, 0.7);
   transition: transform 0.45s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), background-color 0.2s;
 }
-.logos-root .l5 .l5h-new-o::after { content: ''; position: absolute; inset: -7px; border-radius: 999px; border: 1.5px solid color-mix(in oklab, var(--c-moss) 55%, transparent); }
-.logos-root .l5 .l5h-new:hover .l5h-new-o { transform: rotate(90deg); background: var(--c-moss); }
-.logos-root .l5 .l5h-new-l { display: inline-flex; align-items: center; gap: 12px; }
-.logos-root .l5 .l5h-new-t { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 32px; line-height: 1; letter-spacing: -0.01em; }
-.logos-root .l5 .l5h-new-k { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border: 1px solid var(--c-rule-2); border-radius: 6px; font-size: 12.5px; color: var(--c-ink-60); }
+.logos-root .l5 .l5plus-o svg { transition: transform 0.45s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)); }
+.logos-root .l5 .l5plus-o::after { content: ''; position: absolute; inset: -8px; border-radius: 999px; border: 1.5px solid color-mix(in oklab, var(--c-moss) 55%, transparent); }
+.logos-root .l5 .l5plus:hover .l5plus-o { transform: scale(1.05); background: var(--c-moss); }
+.logos-root .l5 .l5plus:hover .l5plus-o svg { transform: rotate(90deg); }
+.logos-root .l5 .l5plus:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 12px; }
+.logos-root .l5 .l5plus-t {
+  position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 18px; line-height: 1.1; letter-spacing: -0.005em;
+  color: var(--c-ink); white-space: nowrap; pointer-events: none;
+}
+/* on a phone the timeline and an empty lens are drawn at full size; the map is drawn smaller, so its + keeps 18px */
+.logos-root .l5 .l5h.is-narrow .l5plus:not(.is-map) .l5plus-t { font-size: 15.5px; top: calc(100% + 6px); }
 @media (prefers-reduced-motion: no-preference) {
-  .logos-root .l5 .l5h-new-o::after { animation: l5hNewRing 3.2s ease-in-out infinite; }
+  .logos-root .l5 .l5plus-o::after { animation: l5hNewRing 3.2s ease-in-out infinite; }
+  .logos-root .l5 .l5plus.is-map,
+  .logos-root .l5 .l5plus.is-time { animation: l5b-pop 0.72s cubic-bezier(0.22, 0.9, 0.3, 1) var(--d, 0ms) both; }
 }
 @keyframes l5hNewRing { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.25; } }
-/* a phone: the disc and the words, centred above the edge */
-.logos-root .l5 .l5h.is-narrow .l5h-new { gap: 12px; padding: 8px 22px 8px 8px; }
-.logos-root .l5 .l5h.is-narrow .l5h-new-o { width: 56px; height: 56px; }
-.logos-root .l5 .l5h.is-narrow .l5h-new-t { font-size: 18px; }
-/* Celestial and the other dark grounds: the disc is the light one */
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .l5h-new { box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.8); }
+/* a lens with nothing in it yet: the disc stands in the middle, its words under it, over what the lens says */
+.logos-root .l5 .l5h-emptyplus { position: relative; display: block; margin: 0 auto 52px; }
+.logos-root .l5 .l5h-emptyplus.is-bare { margin-bottom: 22px; }
+/* Celestial and the other dark grounds: the disc is the light one, its shadow the night's */
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .l5plus-o { box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.8); }

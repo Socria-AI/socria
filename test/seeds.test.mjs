@@ -94,7 +94,7 @@ ok('two groups face each other across the centre', two.length === 2 && two[0].na
 
 console.log('\n=== wired where it belongs ===');
 const uni = read('components/logos5/Universe.tsx');
-ok('the + stands where the box stood, and the box comes back only to carry an opening', /onNew && !startWith \? \(/.test(uni) && /className="l5h-new"/.test(uni) && /<div className="l5h-omni">\{findEl\}<\/div>/.test(uni));
+ok('the + is drawn in the map itself, in every lens — no pill under it — and the box comes back only to carry an opening', /const startable = !!onNew && !startWith;/.test(uni) && (uni.match(/onStart: startable \? onNew : undefined/g) ?? []).length === 2 && /\{!startable && <div className="l5h-omni">\{findEl\}<\/div>\}/.test(uni) && !/className="l5h-new"/.test(uni) && /<StartDisc /.test(read('components/logos5/UniverseBubbles.tsx')) && /<StartDisc /.test(read('components/logos5/UniverseTime.tsx')) && (uni.match(/<EmptyStart /g) ?? []).length === 3);
 ok('N starts something new, never while typing', /e\.key !== 'n' && e\.key !== 'N'/.test(uni) && /closest\('input, textarea, select/.test(uni));
 const app = read('components/LogosApp.tsx');
 ok('the + opens a new line of thinking', /onNew=\{\(\) => void newFromHome\(\)\}/.test(app));

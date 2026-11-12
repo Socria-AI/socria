@@ -1968,12 +1968,24 @@ Asked for: "instead of there being a chatbox, in the universal map lets add a gi
 to see and beautiful … to create a new chat … in a empty chat i want to add bubbles/mindmaps, but make them
 beautiful, and less chatbot like. more or so ideas to explore".
 
-- **The +.** The box at the Universal Map's foot is now one large control: an ink disc with a plus and "Start
-  something new" in the serif (`components/logos5/Universe.tsx`, `.l5h-new` in `universe.css`). N does the same
-  when nobody is typing. It opens a new, empty line of thinking (`newFromHome`). The box comes back only when an
-  opening is carried to the map (a Project's start, an opening chosen elsewhere), so nothing that used it is lost.
-  What moved: search stays in the header (Ctrl K); voice and files are in the line of thinking's own chatbox;
-  files are no longer dropped on the map itself.
+- **The +.** Not a bar at the foot of the map: a big plus drawn in the map itself, in every lens, so it sits where
+  the conversations are (asked for: "in the today or this week or the timeline there should be a big plus. not a
+  fat chatbox"). One component, `StartDisc` (`components/logos5/UniverseParts.tsx`): an ink disc with the plus, a
+  slow ring of moss round it, "Start something new" under it; light on Celestial. It opens a new, empty line of
+  thinking (`newFromHome`), as N does when nobody is typing.
+  - *Today and This week:* a disc as big as a well-filled conversation's, placed by the pure layout
+    (`lib/logos5/bubbles.ts` `startSpot`, `BubbleIn.start`, `BubbleLayout.start`). On a wide screen it takes the
+    free spot nearest the middle of the subjects (below first, then round the sides), clear of every ring, disc,
+    name, card, remembered chip and line, its words clear too, and the map is fitted with it. On a phone, where the
+    map is as wide as the screen and read from the top, it leads the column, centred over the first subject.
+  - *This month and All time:* the next thing on the line after Now (`lib/logos5/timeline.ts` `plus`), level
+    with the first lane and past the words of everything begun today; the line is made long enough to hold it.
+  - *A lens with nothing yet:* the same disc in the middle, over what the lens says (over Alex's "No sessions
+    recorded today…" on an empty Today, which stays).
+  - The box comes back only when an opening is carried to the map (a Project's start, an opening chosen
+    elsewhere); the map's foot is otherwise empty, and the map has its room. Tests: `test/logos5-bubbles.test.mjs`
+    (nothing under the + or its words, in seven arrangements, wide and phone), `test/logos5-timeline.test.mjs`,
+    `test/seeds.test.mjs` (wiring).
 - **Ideas to explore.** An empty line of thinking opens on a small mind map instead of one waiting card
   (`components/logos5/IdeaSeeds.tsx`, `lib/logos5/seeds.ts`): "A new line of thinking" in the middle, and around
   it up to three groups and eight bubbles — *Left open* (an open question, a tension, an untested assumption from

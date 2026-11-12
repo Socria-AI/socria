@@ -57,6 +57,36 @@ export function Glyph({ look, size = 14 }: { look: Look; size?: number }) {
 
 const STAR = 'M12 3.8l2.5 5.2 5.6.7-4.1 3.9 1 5.6L12 16.5l-5 2.7 1-5.6L3.9 9.7l5.6-.7z';
 
+/**
+ * The big + that starts something new, drawn in the map itself: an ink disc as big as a conversation's, at a
+ * place the layout chose (lib/logos5/bubbles.ts startSpot, lib/logos5/timeline.ts plus), its words under it.
+ * Not a box: there is nothing to type into here; it opens a new line of thinking, whose chatbox is the box.
+ */
+export function StartDisc({ x, y, r, onStart, delay = 0, className = '', bare = false }: { x: number; y: number; r: number; onStart: () => void; delay?: number; className?: string; bare?: boolean }) {
+  return (
+    <button
+      type="button"
+      className={`l5plus${className ? ` ${className}` : ''}`}
+      style={{ left: x - r, top: y - r, width: 2 * r, height: 2 * r, ['--d' as string]: `${delay}ms` }}
+      onClick={onStart}
+      aria-label="Start something new"
+      title="Start something new (N)"
+      data-control
+    >
+      <span className="l5plus-o" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width={Math.round(r * 0.66)} height={Math.round(r * 0.66)} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+          <path d="M12 4.5v15M4.5 12h15" />
+        </svg>
+      </span>
+      {!bare && (
+        <span className="l5plus-t" aria-hidden="true">
+          Start something new
+        </span>
+      )}
+    </button>
+  );
+}
+
 /** What was made in a conversation — charts, plans, practice — counted. */
 export function MadeMark({ n }: { n: number }) {
   return (

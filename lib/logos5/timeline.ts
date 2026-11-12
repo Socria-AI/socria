@@ -126,6 +126,8 @@ export interface TimeLayout {
   weekX: number;
   start: number;
   end: number;
+  /** the big +, when asked for: the next thing on the line */
+  plus: TimeStart | null;
 }
 
 export interface TimeIn {
@@ -136,7 +138,18 @@ export interface TimeIn {
   /** where the line begins — the first of the month for This month; otherwise the first conversation */
   from?: number | null;
   narrow?: boolean;
+  /** draw the big + that starts something new, just after now (the Universal Map sets it when it can) */
+  start?: boolean;
 }
+
+/** The big + on the line, just after now, level with the first lane, and its words under it. */
+export interface TimeStart {
+  x: number;
+  y: number;
+  r: number;
+  label: { x: number; y: number; w: number; h: number };
+}
+export const TIME_START = { wide: { r: 34, w: 168, h: 20, gap: 8, clear: 18 }, narrow: { r: 28, w: 148, h: 18, gap: 6, clear: 14 } } as const;
 
 /** The next local day's start (a day is not always 24 hours). */
 function nextDay(at: number): number {
@@ -200,7 +213,7 @@ export function timeLayout(input: TimeIn): TimeLayout {
     x += S.day;
     d = nd;
   }
-  const width = x + S.pad;
+  let width = x + S.pad;
   const xOf = (at: number): number => {
     const t = Math.max(start, Math.min(at, end - 1));
     let lo = 0;
@@ -368,6 +381,18 @@ export function timeLayout(input: TimeIn): TimeLayout {
   }
 
   const lowest = floorY ?? (lanes ? S.top + (lanes - 1) * S.lane : S.top);
+  // the big +: after now and after the words of everything begun today, so nothing it says sits on theirs; the
+  // line made long enough to hold it
+  let plus: TimeStart | null = null;
+  if (input.start) {
+    const P = input.narrow ? TIME_START.narrow : TIME_START.wide;
+    const nowX = xOf(now);
+    const reach = beads.reduce((m, b) => Math.max(m, b.x + (b.label === 'none' ? b.r : S.label / 2)), nowX);
+    const half = Math.max(P.r, P.w / 2);
+    const px = Math.round(reach + P.clear + half);
+    plus = { x: px, y: S.top, r: P.r, label: { x: Math.round(px - P.w / 2), y: S.top + P.r + P.gap, w: P.w, h: P.h } };
+    width = Math.max(width, px + half + Math.round(S.pad / 3));
+  }
   return {
     beads,
     byId: new Map(beads.map((b) => [b.id, b])),
@@ -382,6 +407,7 @@ export function timeLayout(input: TimeIn): TimeLayout {
     weekX: xOf(Math.max(start, weekStart(now))),
     start,
     end,
+    plus,
   };
 }
 

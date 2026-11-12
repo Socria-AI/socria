@@ -75,7 +75,7 @@ const CONVS = [
 const layoutOf = (convs = CONVS, o = {}) => {
   const tiles = T.tilesOf(convs);
   const homes = T.homesOf(tiles, projects, T.emptyArrangement());
-  return T.timeLayout({ tiles, homes, now: o.now ?? NOW, from: o.from ?? null, narrow: !!o.narrow });
+  return T.timeLayout({ tiles, homes, now: o.now ?? NOW, from: o.from ?? null, narrow: !!o.narrow, start: !!o.start });
 };
 
 console.log('\n=== in order, each where it began ===');
@@ -146,6 +146,21 @@ console.log('\n=== words, never on top of each other ===');
   ok('what was worked on last is named first', pair.byId.get('today').label === 'below' && pair.byId.get('older').label !== 'below', J(pair.beads.map((b) => [b.id, b.label])));
   const P = layoutOf(undefined, { narrow: true });
   ok('a phone draws it narrower', P.width < layoutOf().width && P.beads.length === CONVS.length);
+}
+
+console.log('\n=== the big + : the next thing after now ===');
+{
+  const reachOf = (L, S) => Math.max(L.nowX, ...L.beads.map((b) => b.x + (b.label === 'none' ? b.r : S.label / 2)));
+  const L = layoutOf(undefined, { start: true });
+  const P = L.plus;
+  ok('asked for: after now, after the words of everything begun today, level with the first lane', !!P && P.x - Math.max(P.r, P.label.w / 2) >= reachOf(L, T.TIME_WIDE) && P.y === T.TIME_WIDE.top, J(P));
+  ok('  its words under it, centred; the line long enough to hold both', P.label.x + P.label.w / 2 === P.x && P.label.y > P.y + P.r && L.width >= P.x + Math.max(P.r, P.label.w / 2));
+  const plain = layoutOf();
+  ok('  not asked for: none, and the line just as it was', plain.plus === null && J(plain.beads) === J(L.beads) && J(plain.days) === J(L.days) && plain.width <= L.width);
+  const N = layoutOf(undefined, { start: true, narrow: true });
+  ok('  on a phone: a size smaller, by the same rule', N.plus.r === T.TIME_START.narrow.r && N.plus.x - Math.max(N.plus.r, N.plus.label.w / 2) >= reachOf(N, T.TIME_NARROW) && N.plus.y === T.TIME_NARROW.top);
+  const E = T.timeLayout({ tiles: [], homes: T.homesOf([], [], T.emptyArrangement()), now: NOW, start: true });
+  ok('  nothing yet: the + still stands just after now', !!E.plus && E.plus.x > E.nowX && E.width >= E.plus.x + E.plus.label.w / 2);
 }
 
 console.log(`\nlogos5-timeline: ${pass} passed, ${fail} failed`);

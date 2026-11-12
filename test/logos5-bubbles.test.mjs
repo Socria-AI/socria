@@ -86,7 +86,7 @@ const layoutOf = (o = {}) => {
   const tiles = B.tilesOf(o.convs ?? CONVS);
   const homes = B.homesOf(tiles, projects, B.emptyArrangement());
   const scoped = o.week ? tiles.filter((t) => t.at >= NOW - 2.6 * DAY) : tiles;
-  return B.bubbleLayout({ lens: o.week ? 'week' : 'today', tiles: scoped, all: tiles, homes, ideas: o.ideas ?? B.sharedIdeas(scoped), links: o.links ?? [LINK], now: NOW, narrow: !!o.narrow, folded: o.folded, opened: o.opened, resumeId: o.resume ?? 'exam', size: o.size, ideaLinks: o.ideaLinks, cardFor: o.cardFor, canMake: o.canMake });
+  return B.bubbleLayout({ lens: o.week ? 'week' : 'today', tiles: scoped, all: tiles, homes, ideas: o.ideas ?? B.sharedIdeas(scoped), links: o.links ?? [LINK], now: NOW, narrow: !!o.narrow, folded: o.folded, opened: o.opened, resumeId: o.resume ?? 'exam', size: o.size, ideaLinks: o.ideaLinks, cardFor: o.cardFor, canMake: o.canMake, start: o.start });
 };
 const overlap = (a, b, air = 0) => a.x < b.x + b.w + air && b.x < a.x + a.w + air && a.y < b.y + b.h + air && b.y < a.y + a.h + air;
 const dist = (a, b) => Math.hypot(a.x - b.x, a.y - b.y);
@@ -207,6 +207,57 @@ console.log('\n=== This week, a phone, the sizes, the words ===');
   ok('circles packed round the first, none on another', P[0].x === 0 && P[0].y === 0 && P.every((a, i) => P.every((b, j) => j <= i || dist(a, b) >= [200, 120, 160, 90][i] + [200, 120, 160, 90][j] + 40 - 0.6)));
   ok('the same conversations draw the same map', J(layoutOf()) === J(layoutOf()) && J(layoutOf({ narrow: true })) === J(layoutOf({ narrow: true })));
   ok('the person’s choice of card is the card shown', layoutOf({ links: [LINK, { id: 'l2', a: 'exam', b: 'adj', label: 'same chapter' }], cardFor: 'own:l2' }).card?.link === 'own:l2');
+}
+
+console.log('\n=== the big + : in the map, on nothing ===');
+{
+  const curvePts = (l) => Array.from({ length: 21 }, (_, i) => { const t = i / 20, u = 1 - t; return { x: u * u * l.p0.x + 2 * u * t * l.c.x + t * t * l.p1.x, y: u * u * l.p0.y + 2 * u * t * l.c.y + t * t * l.p1.y }; });
+  const wrongs = (L) => {
+    const s = L.start;
+    const bad = [];
+    for (const c of L.clusters.filter((c) => !c.folded)) if (dist(c, s) < c.r + s.r) bad.push(`ring ${c.key}`);
+    for (const h of L.hubs) if (dist(h, s) < room(h) + s.r) bad.push(`disc ${h.id}`);
+    const boxes = [...L.clusters.filter((c) => !c.folded).map((c) => c.label), ...L.clusters.filter((c) => c.folded).map((c) => B.foldedBox(c)), ...L.dots.map((d) => d.label), ...(L.card ? [L.card] : []), ...(L.make ? [L.make] : []), ...L.memories.map((m) => m.box)];
+    for (const b of boxes) {
+      if (nearBox(s, s.r, b)) bad.push('a name or card under the +');
+      if (overlap(s.label, b)) bad.push('its words on a name or card');
+    }
+    for (const c of L.clusters.filter((c) => !c.folded)) if (nearBox(c, c.r, s.label)) bad.push(`its words in ${c.key}`);
+    for (const l of L.links) if (curvePts(l).some((p) => dist(p, s) < s.r)) bad.push(`line ${l.key}`);
+    const b = L.bounds;
+    if (s.x - s.r < b.x - 0.5 || s.y - s.r < b.y - 0.5 || s.x + s.r > b.x + b.w + 0.5 || s.label.y + s.label.h > b.y + b.h + 0.5) bad.push('outside what the map is fitted to');
+    return bad;
+  };
+  const cases = [['today', {}], ['this week', { week: true }], ['a phone', { narrow: true }], ['this week on a phone', { week: true, narrow: true }], ['with room for a new Project', { week: true, canMake: true }], ['no lines', { links: [], ideaLinks: false }], ['the card the person chose', { links: [LINK, { id: 'l2', a: 'exam', b: 'adj', label: 'same chapter' }], cardFor: 'own:l2' }]];
+  const bad = [];
+  for (const [name, o] of cases) {
+    const L = layoutOf({ ...o, start: true });
+    if (!L.start) bad.push(`${name}: none`);
+    else if (wrongs(L).length) bad.push(`${name}: ${wrongs(L).join(', ')}`);
+  }
+  ok('asked for, the + is drawn in the map: on no ring, disc, name, card or line, its words clear, fitted with the rest', bad.length === 0, bad.join(' | '));
+  const plain = layoutOf();
+  const L = layoutOf({ start: true });
+  ok('  not asked for, there is none — and asked for, nothing else moves', plain.start === null && J(plain.hubs) === J(L.hubs) && J(plain.clusters) === J(L.clusters) && J(plain.card) === J(L.card));
+  const rings = L.clusters.filter((c) => !c.folded);
+  const box = { x: Math.min(...rings.map((c) => c.x - c.r)), y: Math.min(...rings.map((c) => c.y - c.r)), x1: Math.max(...rings.map((c) => c.x + c.r)), y1: Math.max(...rings.map((c) => c.y + c.r)) };
+  const reach = 3 * L.start.r + B.START_PAD.wide;
+  ok('  as big as a well-filled conversation, among the subjects rather than off at an edge', L.start.r === B.START_R.wide && L.start.x > box.x - reach && L.start.x < box.x1 + reach && L.start.y > box.y - reach && L.start.y < box.y1 + reach, J(L.start));
+  const N = layoutOf({ narrow: true, start: true });
+  const nRings = N.clusters.filter((c) => !c.folded);
+  const nTop = Math.min(...nRings.map((c) => Math.min(c.y - c.r, c.label.y)));
+  const nMid = (Math.min(...nRings.map((c) => c.x - c.r)) + Math.max(...nRings.map((c) => c.x + c.r))) / 2;
+  ok('  on a phone, a size smaller, and first in the column: centred over the first subject, so it is seen on arrival', N.start.r === B.START_R.narrow && Math.abs(N.start.x - nMid) <= 0.5 && N.start.label.y + N.start.label.h < nTop && N.bounds.y >= N.start.y - N.start.r - 0.5, J(N.start));
+  ok('  …and no wider than the subjects, so a phone fitted to them shows it whole', N.start.label.x >= Math.min(...nRings.map((c) => c.x - c.r)) - 0.5 && N.start.label.x + N.start.label.w <= Math.max(...nRings.map((c) => c.x + c.r)) + 0.5);
+  ok('  the same map puts it in the same place', J(layoutOf({ start: true }).start) === J(layoutOf({ start: true }).start));
+  const one = B.startSpot({ circles: [{ x: 0, y: 0, r: 100 }], boxes: [], curves: [], around: { x: -100, y: -100, w: 200, h: 200 } });
+  const gap = 100 + one.r + B.START_PAD.wide;
+  ok('startSpot: round one subject, it goes just below it first', one.x === 0 && one.y >= gap && one.y < gap + 9, J(one));
+  const below = B.startSpot({ circles: [{ x: 0, y: 0, r: 100 }], boxes: [{ x: -200, y: 120, w: 400, h: 200 }], curves: [], around: { x: -100, y: -100, w: 200, h: 200 } });
+  ok('  something under it: round to a side instead, still beside it', dist(below, { x: 0, y: 0 }) < gap + 40 && Math.abs(below.x) > 50, J(below));
+  ok('  its words go under the disc, centred', one.label.x + one.label.w / 2 === one.x && one.label.y > one.y + one.r);
+  const empty = B.bubbleLayout({ lens: 'today', tiles: [], all: [], homes: B.homesOf([], projects, B.emptyArrangement()), ideas: [], links: [], now: NOW, strictToday: true, start: true });
+  ok('  with nothing drawn, the + alone, in the middle of what the map is fitted to', !!empty.start && empty.bounds.w >= 2 * empty.start.r && empty.start.x - empty.start.r >= empty.bounds.x - 0.5);
 }
 
 console.log(`\nlogos5-bubbles: ${pass} passed, ${fail} failed`);

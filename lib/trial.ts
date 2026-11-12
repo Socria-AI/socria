@@ -38,9 +38,9 @@ export const TRIAL = {
   /** how long it lasts */
   days: 7,
   /** tokens a UTC day */
-  daily: 10_000,
+  daily: 20_000,
   /** tokens across the whole trial */
-  total: 70_000,
+  total: 140_000,
 } as const;
 
 /** The trial's length in milliseconds: seven days of 24 hours. */
@@ -201,7 +201,7 @@ export function daysLeftLine(s: TrialState): string {
   return s.daysLeft <= 1 ? 'Last day of your trial' : `${s.daysLeft} days left in your trial`;
 }
 
-/** "8,600 of 10,000 left today" — or, spent, "Today’s 10,000 are used". */
+/** "18,600 of 20,000 left today" — or, spent, "Today’s 20,000 trial tokens are used". */
 export function todayLine(day: SleepState): string {
   return day.asleep ? `Today’s ${formatTokens(day.limit)} trial tokens are used` : `${formatTokens(day.left)} of ${formatTokens(day.limit)} left today`;
 }
