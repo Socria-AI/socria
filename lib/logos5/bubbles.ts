@@ -258,14 +258,14 @@ export interface BubbleStart {
   label: Box;
 }
 
-/** The +'s disc: as big as a well-filled conversation's, so it reads as a place on the map, not a button on it. */
-export const START_R = { wide: 54, narrow: 52 } as const;
+/** The +'s disc: bigger than most conversations, so it is the first thing found on the map — and still a place on it. */
+export const START_R = { wide: 76, narrow: 64 } as const;
 /** Clear room kept round it: from every subject's ring and name, the card, a remembered chip and every line. */
-export const START_PAD = { wide: 28, narrow: 20 } as const;
+export const START_PAD = { wide: 34, narrow: 24 } as const;
 /** Its words: one serif line under the disc. */
 export const START_WORDS = 'Start something new';
 // a phone draws the map smaller to fit it, so the + and its words keep nearly their wide size in the map's own units
-const START_LABEL = { wide: { w: 168, h: 20, gap: 8 }, narrow: { w: 168, h: 20, gap: 8 } } as const;
+const START_LABEL = { wide: { w: 290, h: 38, gap: 16 }, narrow: { w: 290, h: 38, gap: 16 } } as const;
 /** Below first, then round both sides, then above: where the eye goes after the map. */
 const START_ANGLES = [90, 70, 110, 50, 130, 30, 150, 10, 170, -10, 190, -30, 210, -50, 230, -70, 250, 270];
 

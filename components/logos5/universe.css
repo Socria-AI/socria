@@ -3897,32 +3897,41 @@ html[data-theme="night"] .logos-root .l5 .l5b-mem-m {
   position: absolute; z-index: 4; display: block; padding: 0; border: 0; border-radius: 999px;
   background: none; color: var(--c-ink); font: inherit; cursor: pointer;
 }
+/* the disc: ink, a paper gap, a gold ring, a gold glow round it and a lift under it — the one thing on the map in gold */
 .logos-root .l5 .l5plus-o {
   position: absolute; inset: 0; display: grid; place-items: center; border-radius: 999px;
-  background: var(--c-ink); color: var(--c-paper);
-  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.08), 0 18px 36px -20px rgba(35, 36, 31, 0.7);
-  transition: transform 0.45s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), background-color 0.2s;
+  background: radial-gradient(circle at 34% 28%, color-mix(in srgb, var(--c-ink) 74%, var(--c-paper)) 0%, var(--c-ink) 58%);
+  color: var(--c-paper);
+  box-shadow:
+    0 0 0 5px var(--c-paper),
+    0 0 0 9px var(--l5h-gold),
+    0 0 46px 14px rgba(var(--l5h-gold-rgb), 0.42),
+    0 26px 48px -18px rgba(35, 36, 31, 0.7);
+  transition: transform 0.45s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), background 0.2s;
 }
 .logos-root .l5 .l5plus-o svg { transition: transform 0.45s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)); }
-.logos-root .l5 .l5plus-o::after { content: ''; position: absolute; inset: -8px; border-radius: 999px; border: 1.5px solid color-mix(in oklab, var(--c-moss) 55%, transparent); }
-.logos-root .l5 .l5plus:hover .l5plus-o { transform: scale(1.05); background: var(--c-moss); }
+/* a ring of gold that keeps going out from it, so the eye finds it */
+.logos-root .l5 .l5plus-ping { position: absolute; inset: -9px; border-radius: 999px; border: 2px solid rgba(var(--l5h-gold-rgb), 0.85); opacity: 0; pointer-events: none; }
+.logos-root .l5 .l5plus:hover .l5plus-o { transform: scale(1.07); background: var(--c-moss); }
 .logos-root .l5 .l5plus:hover .l5plus-o svg { transform: rotate(90deg); }
-.logos-root .l5 .l5plus:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 12px; }
+.logos-root .l5 .l5plus:focus-visible { outline: 3px solid var(--l5h-gold); outline-offset: 16px; }
 .logos-root .l5 .l5plus-t {
-  position: absolute; top: calc(100% + 8px); left: 50%; transform: translateX(-50%);
-  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 18px; line-height: 1.1; letter-spacing: -0.005em;
+  position: absolute; top: calc(100% + 16px); left: 50%; transform: translateX(-50%);
+  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 32px; line-height: 1.05; letter-spacing: -0.01em;
   color: var(--c-ink); white-space: nowrap; pointer-events: none;
 }
-/* on a phone the timeline and an empty lens are drawn at full size; the map is drawn smaller, so its + keeps 18px */
-.logos-root .l5 .l5h.is-narrow .l5plus:not(.is-map) .l5plus-t { font-size: 15.5px; top: calc(100% + 6px); }
+/* on a phone the timeline and an empty lens are drawn at full size; the map is drawn smaller, so its + keeps 32px */
+.logos-root .l5 .l5h.is-narrow .l5plus:not(.is-map) .l5plus-t { font-size: 18px; top: calc(100% + 12px); }
 @media (prefers-reduced-motion: no-preference) {
-  .logos-root .l5 .l5plus-o::after { animation: l5hNewRing 3.2s ease-in-out infinite; }
+  .logos-root .l5 .l5plus-ping { animation: l5plusPing 2.6s cubic-bezier(0.2, 0.6, 0.35, 1) infinite; }
   .logos-root .l5 .l5plus.is-map,
   .logos-root .l5 .l5plus.is-time { animation: l5b-pop 0.72s cubic-bezier(0.22, 0.9, 0.3, 1) var(--d, 0ms) both; }
 }
-@keyframes l5hNewRing { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.25; } }
+@keyframes l5plusPing { 0% { transform: scale(1); opacity: 0.9; } 70%, 100% { transform: scale(1.5); opacity: 0; } }
 /* a lens with nothing in it yet: the disc stands in the middle, its words under it, over what the lens says */
-.logos-root .l5 .l5h-emptyplus { position: relative; display: block; margin: 0 auto 52px; }
-.logos-root .l5 .l5h-emptyplus.is-bare { margin-bottom: 22px; }
+.logos-root .l5 .l5h-emptyplus { position: relative; display: block; margin: 0 auto 78px; }
+.logos-root .l5 .l5h-emptyplus.is-bare { margin-bottom: 30px; }
 /* Celestial and the other dark grounds: the disc is the light one, its shadow the night's */
-html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .l5plus-o { box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.8); }
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .l5plus-o {
+  box-shadow: 0 0 0 5px var(--c-paper), 0 0 0 9px var(--l5h-gold), 0 0 52px 16px rgba(var(--l5h-gold-rgb), 0.38), 0 22px 44px -20px rgba(0, 0, 0, 0.85);
+}

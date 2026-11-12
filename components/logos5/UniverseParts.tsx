@@ -73,8 +73,9 @@ export function StartDisc({ x, y, r, onStart, delay = 0, className = '', bare = 
       title="Start something new (N)"
       data-control
     >
+      <span className="l5plus-ping" aria-hidden="true" />
       <span className="l5plus-o" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width={Math.round(r * 0.66)} height={Math.round(r * 0.66)} fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round">
+        <svg viewBox="0 0 24 24" width={Math.round(r * 0.78)} height={Math.round(r * 0.78)} fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round">
           <path d="M12 4.5v15M4.5 12h15" />
         </svg>
       </span>

@@ -149,7 +149,7 @@ export interface TimeStart {
   r: number;
   label: { x: number; y: number; w: number; h: number };
 }
-export const TIME_START = { wide: { r: 34, w: 168, h: 20, gap: 8, clear: 18 }, narrow: { r: 28, w: 148, h: 18, gap: 6, clear: 14 } } as const;
+export const TIME_START = { wide: { r: 48, w: 290, h: 38, gap: 14, clear: 24 }, narrow: { r: 40, w: 176, h: 24, gap: 10, clear: 16 } } as const;
 
 /** The next local day's start (a day is not always 24 hours). */
 function nextDay(at: number): number {
