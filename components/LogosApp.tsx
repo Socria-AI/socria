@@ -68,6 +68,12 @@ import { hueOf } from '@/lib/share/hue';
 import { LOGOS3_TOUR, LOGOS_TOUR, LOGOS_TOUR_KEY, shouldRunTour } from '@/lib/tour';
 import { AccountControl } from '@/components/account/AccountControl';
 import { AccountSheet } from '@/components/account/AccountSheet';
+import { CourseChip, CourseSheet } from '@/components/logos5/CourseSheet';
+import { dropProfile, listProfiles, onProfiles, putProfile, readLinks, setLink } from '@/lib/teaching/store';
+import { digestMaterial } from '@/lib/teaching/materials';
+import { addMaterial, allowMaterial, correct as correctCourseObs, matchProfile, newProfile, profileLabel, removeMaterial, restore as restoreCourseObs } from '@/lib/teaching/profile';
+import { courseFor, learnerOf, packOf } from '@/lib/teaching/use';
+import { NEEDS_PERMISSION, type CourseProfile, type Evidence as CourseEvidence, type MaterialKind } from '@/lib/teaching/types';
 import { useConversationStyle } from '@/components/useConversationStyle';
 import { ChallengeChip } from '@/components/rewards/ChallengeChip';
 import { PLAN_CHANGED, SESSION_SAVED } from '@/components/rewards/useRewards';
@@ -851,6 +857,26 @@ export function LogosApp({
   const docReadingRef = useRef(docReading);
   docReadingRef.current = docReading;
   const letters = useMemo(() => docLetters(messages), [messages]);
+  // COURSE PROFILES (lib/teaching): kept in this browser beside the files they were read from; which conversation
+  // is in which course, when the person chose, beside them. The sheet is closed (false), open on no course in
+  // particular (null), or open on one.
+  const [courses, setCourses] = useState<CourseProfile[]>([]);
+  const coursesRef = useRef(courses);
+  coursesRef.current = courses;
+  const [courseLinks, setCourseLinks] = useState<Record<string, string>>({});
+  const [courseOpen, setCourseOpen] = useState<string | null | false>(false);
+  const [courseReading, setCourseReading] = useState<string[]>([]);
+  const [courseNotice, setCourseNotice] = useState<string | null>(null);
+  useEffect(() => {
+    let live = true;
+    void listProfiles().then((all) => live && setCourses(all));
+    setCourseLinks(readLinks());
+    const off = onProfiles((all) => setCourses([...all]));
+    return () => {
+      live = false;
+      off();
+    };
+  }, []);
   const docRefs = useMemo<DocRef[]>(() => [...letters].flatMap(([id, letter]) => (docs.get(id) ? [{ letter, doc: docs.get(id)! }] : [])), [letters, docs]);
   const docIdsKey = [...letters.keys()].join(',');
   // a document changed anywhere on this device — a page read, a correction — is the one shown and sent
@@ -4724,6 +4750,15 @@ export function LogosApp({
             const lg = readLedger();
             return lg.length ? { learning: lg } : {};
           })(),
+          // the course this conversation is in, if any (lib/teaching/use.ts): what the course profile says about how
+          // the course teaches and asks — never its materials — and never into a conversation others read
+          ...(() => {
+            if (shared || !coursesRef.current.length) return {};
+            const studied = studyIn(mapRef.current.objects)?.state.files.map((f) => f.doc) ?? [];
+            const asked = [...next].reverse().find((m) => m.role === 'user');
+            const hit = courseFor(coursesRef.current, { linked: readLinks()[sid] ?? null, docs: [...docLetters(next).keys(), ...studied], text: typeof asked?.content === 'string' ? asked.content : '' });
+            return hit ? { course: packOf(hit.profile, hit.why) } : {};
+          })(),
           // What Logos knows about this person, for accounts; the server
           // decides what the plan carries of it. The recurrence line is
           // owed until it has been injected once in this session.
@@ -8229,6 +8264,106 @@ export function LogosApp({
     setFocus((f) => (f?.kind === 'node' ? null : f));
   }
   const l5Title = study ? study.state.course || study.state.title : active?.title && active.title !== UNTITLED ? active.title : messages.length ? 'A line of thinking' : 'Logos';
+  // (worked out each render, not memoised: this is past the component's early return, where no hook may be)
+  const courseHere = (() => {
+    if (!activeId || !courses.length) return null;
+    const asked = [...messages].reverse().find((m) => m.role === 'user');
+    return courseFor(courses, { linked: courseLinks[activeId] ?? null, docs: [...letters.keys(), ...(study?.state.files.map((f) => f.doc) ?? [])], text: typeof asked?.content === 'string' ? asked.content : '' });
+  })();
+  // ── the course profile's actions (components/logos5/CourseSheet.tsx) ──
+  const keepCourse = async (next: CourseProfile, was: string) => {
+    const saved = await putProfile(next, was);
+    if (saved) setCourseOpen(saved.id);
+    return saved;
+  };
+  const courseById = async (id: string) => (await listProfiles()).find((x) => x.id === id) ?? null;
+  async function addCourseFiles(files: File[], opts: { to: string | null; allowed: boolean }) {
+    setCourseNotice(null);
+    // files added together are one course's unless one names another: a file that names no course joins the batch's
+    let batch: string | null = opts.to;
+    for (const file of files.slice(0, 8)) {
+      setCourseReading((r) => [...r, file.name]);
+      try {
+        // read as any file is read here (scanned pages included), and the original kept for the preview
+        const [att, kept] = await Promise.all([readDocument(file), filePreviewRef.current?.keep(file).catch(() => null) ?? Promise.resolve(null)]);
+        const doc = att.doc ? docNow(att.doc) ?? (await loadDocs([att.doc]))[0] ?? null : null;
+        if (!doc) throw new Error('it was too large to read here');
+        const now = Date.now();
+        const digest = digestMaterial(doc, { now, allowed: opts.allowed });
+        if (kept?.file) digest.material.file = kept.file;
+        const all = await listProfiles();
+        const named = digest.material.course ? matchProfile(all, digest.material) : null;
+        const into = (opts.to && all.find((x) => x.id === opts.to)) || named || (!digest.material.course && batch ? all.find((x) => x.id === batch) : null) || null;
+        const base = into ?? newProfile({ course: digest.material.course ?? 'My course', title: digest.material.title, instructor: digest.material.instructor, term: digest.material.term }, now);
+        const saved = await keepCourse(addMaterial(base, digest, now), base.id);
+        if (saved && !batch) batch = saved.id;
+        if (NEEDS_PERMISSION.has(digest.material.kind) && !digest.material.allowed) setCourseNotice(`“${file.name}” looks like a past exam or quiz: it is kept, but not used until you say you are allowed to use it.`);
+      } catch (e) {
+        setCourseNotice(`“${file.name}” could not be read${e instanceof Error && e.message ? `: ${e.message}` : ''}.`);
+      } finally {
+        setCourseReading((r) => {
+          const i = r.indexOf(file.name);
+          return i < 0 ? r : [...r.slice(0, i), ...r.slice(i + 1)];
+        });
+      }
+    }
+  }
+  async function setCourseKind(id: string, doc: string, kind: MaterialKind) {
+    const prof = await courseById(id);
+    const old = prof?.digests.find((x) => x.material.doc === doc);
+    if (!prof || !old) return;
+    const [d] = await loadDocs([doc]);
+    if (!d) return setCourseNotice(`“${old.material.name}” is no longer kept in this browser: add it again to change what it is.`);
+    const now = Date.now();
+    const digest = digestMaterial(d, { now, kind, allowed: old.material.allowed });
+    digest.material.addedAt = old.material.addedAt;
+    if (old.material.file) digest.material.file = old.material.file;
+    await keepCourse(addMaterial(prof, digest, now), prof.id);
+  }
+  async function allowCourse(id: string, doc: string, allowed: boolean) {
+    const prof = await courseById(id);
+    if (prof) await keepCourse(allowMaterial(prof, doc, allowed, Date.now()), prof.id);
+  }
+  async function removeCourseMaterial(id: string, doc: string) {
+    const prof = await courseById(id);
+    if (prof) await keepCourse(removeMaterial(prof, doc, Date.now()), prof.id);
+  }
+  async function correctCourse(id: string, obs: string, verdict: 'wrong' | 'right', note?: string) {
+    const prof = await courseById(id);
+    if (prof) await keepCourse(correctCourseObs(prof, obs, verdict, Date.now(), note), prof.id);
+  }
+  async function restoreCourse(id: string, obs: string) {
+    const prof = await courseById(id);
+    if (prof) await keepCourse(restoreCourseObs(prof, obs, Date.now()), prof.id);
+  }
+  function linkCourse(to: string | 'off' | null) {
+    if (!activeId) return;
+    setLink(activeId, to);
+    setCourseLinks(readLinks());
+  }
+  /** Practice in the course's style: a quiz request in the chatbox (MR's quiz contract then holds), never sent by itself. */
+  function practiseCourse(prof: CourseProfile) {
+    const l = learnerOf(packOf(prof, 'linked'), readLedger(), Date.now());
+    const first = l.weak[0] ?? l.due[0] ?? prof.concepts.find((c) => c.inAssessment >= 2)?.term ?? prof.concepts[0]?.term;
+    const words = `Quiz me in the style of ${prof.course}${first ? `, starting with ${first}` : ''} — one question at a time.`;
+    if (activeId && !l5Home) {
+      setLink(activeId, prof.id);
+      setCourseLinks(readLinks());
+    } else void newFromHome();
+    setCourseOpen(false);
+    window.setTimeout(() => {
+      setInput(words);
+      focusComposer();
+    }, 60);
+  }
+  function openCourseEvidence(e: CourseEvidence, name: string, file?: string) {
+    filePreviewRef.current?.open({ name, doc: e.doc, ...(file ? { file } : {}), passage: e.block, tab: file ? 'preview' : 'reading', n: Date.now() });
+  }
+  async function deleteCourse(id: string) {
+    await dropProfile(id);
+    setCourseLinks(readLinks());
+    setCourseOpen(null);
+  }
   /** the list is open when it was asked for and the rail is out (a tap beside it on a phone puts the rail away) */
   const listOpen = l5Manage && railOpen && !chromeHidden;
   // The Universal Map is the bar's first control and Synthesize is the Content and Logic Map
@@ -8250,6 +8385,7 @@ export function LogosApp({
     // while big-screen mode is on, the way out stays here, where it is looked for; the rest of the experiments are in Account
     ...(cabin ? [{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) }] : []),
     ...(handsWanted ? [{ label: 'Stop using your hands', hint: 'Turns the camera off', onSelect: stopYourHands }] : []),
+    { label: 'Your courses', hint: 'How each course teaches and tests, read from your materials', onSelect: () => setCourseOpen(courseHere?.profile.id ?? null) },
     { label: 'What Socria does', hint: 'Short tutorials, one at a time', sep: true, onSelect: () => setGuideOpen(true) },
     ...(!one ? [{ label: 'Socria One', hint: 'No daily limit, with Voice, sharing and the experiments', onSelect: () => askOne() }] : oneManageable ? [{ label: 'Manage Socria One', onSelect: manageOne }] : []),
   ];
@@ -8524,10 +8660,11 @@ export function LogosApp({
           <>
             <MakePicker value={makeId} onChange={pickMake} open={makeOpen} onOpenChange={setMakeOpen} bare />
             <ConcisePicker value={replyLength} onChange={pickLength} />
+            {courseHere && <CourseChip label={profileLabel(courseHere.profile)} onOpen={() => setCourseOpen(courseHere.profile.id)} />}
           </>
         }
-        // Logos 5: Make lives under "+", beside Attach, Search my files and ∑
-        plusItems={[{ label: 'Make', hint: 'A chart, a table, a timeline — drawn in Artifacts', onSelect: () => setMakeOpen(true) }]}
+        // Logos 5: Make lives under "+", beside Attach, Search my files and ∑ — and the course profile
+        plusItems={[{ label: 'Make', hint: 'A chart, a table, a timeline — drawn in Artifacts', onSelect: () => setMakeOpen(true) }, { label: 'Course profile', hint: 'How your course teaches and tests — from your syllabus, slides and past exams', onSelect: () => setCourseOpen(courseHere?.profile.id ?? null) }]}
         onSearchFiles={() => setSearchOpen(Date.now())}
         // the Answer Guard, on the chatbox's first line beside "Asking about" (Logos 5, One view)
         guide={guarded && l5 ? { onHint: () => void send('Can I have another hint?'), onReveal: reveal, busy } : null}
@@ -10470,6 +10607,31 @@ export function LogosApp({
       {/* The account, over the map — the same sheet /chat opens, so there is
           one account surface in the product rather than two that drift. */}
       <LiveGuide open={liveOpen} onClose={() => setLiveOpen(false)} access={arAccess ? (arAccess.tester ? 'tester' : 'preview') : 'unknown'} onKeep={keepGuide} sessionId={activeId} />
+      {/* How the course teaches and tests (lib/teaching), inside Logos 5: from the chatbox's chip, "+" and More */}
+      {courseOpen !== false && (
+        <CourseSheet
+          profiles={courses}
+          focus={courseOpen}
+          active={courseHere ? { id: courseHere.profile.id, why: courseHere.why } : null}
+          linked={activeId ? courseLinks[activeId] ?? null : null}
+          reading={courseReading}
+          notice={courseNotice}
+          narrow={narrow}
+          inConversation={!!activeId && !l5Home}
+          onClose={() => setCourseOpen(false)}
+          onFocus={(id) => setCourseOpen(id)}
+          onAdd={(files, opts) => void addCourseFiles(files, opts)}
+          onKind={(id, doc, kind) => void setCourseKind(id, doc, kind)}
+          onAllow={(id, doc, ok) => void allowCourse(id, doc, ok)}
+          onRemove={(id, doc) => void removeCourseMaterial(id, doc)}
+          onCorrect={(id, obs, verdict, note) => void correctCourse(id, obs, verdict, note)}
+          onRestore={(id, obs) => void restoreCourse(id, obs)}
+          onLink={linkCourse}
+          onPractice={practiseCourse}
+          onEvidence={openCourseEvidence}
+          onDelete={(id) => void deleteCourse(id)}
+        />
+      )}
       <AccountSheet
         trial={plan === 'one' ? null : trial}
         open={acctOpen}

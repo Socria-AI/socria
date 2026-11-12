@@ -18,6 +18,8 @@
 // begins `socria.`; a key added tomorrow is covered without anybody
 // remembering to come back here.
 
+import { clearCourses } from '@/lib/teaching/store';
+
 /** The prefix every key this product writes shares. */
 export const SOCRIA_PREFIX = 'socria.';
 
@@ -87,6 +89,13 @@ export function clearSocriaLocalData(): number {
   } catch {
     /* same */
   }
+  // Course profiles are kept in IndexedDB, which no prefix sweep reaches: what Socria read from someone's course
+  // materials, passages included (lib/teaching/store.ts). The next person on this device must not find them.
+  try {
+    clearCourses();
+  } catch {
+    /* nothing to do */
+  }
   return n;
 }
 
@@ -110,6 +119,8 @@ export const MEMORY_KEYS = [
 
 export function clearLocalMemory(): void {
   if (typeof window === 'undefined') return;
+  // course profiles: what Socria read from a student's course materials, and which conversation was in which course
+  clearCourses();
   for (const k of MEMORY_KEYS) {
     try {
       window.localStorage.removeItem(k);

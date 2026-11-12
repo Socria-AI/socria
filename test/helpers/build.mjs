@@ -23,6 +23,7 @@ const MODULES = [
   'lib/transfer/explore.ts',
   'lib/gifts.ts',
   'lib/logos5/seeds.ts',
+  'lib/teaching/teaching.ts',
   'lib/transfer/cap-reports.ts',
   'lib/logos-viz.ts',
   'lib/logos-layout.ts',

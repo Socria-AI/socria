@@ -235,7 +235,9 @@ pre.fp-code.is-wrap { white-space: pre-wrap; }
 .fp-pdf[data-pick] .fp-pdf-page, .fp-slide-main[data-pick] .fp-slide { cursor: pointer; }
 .fp-slide { position: relative; }
 .fp-hit-cell { outline: 2px solid var(--c-moss, #354620); outline-offset: -2px; background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.1) !important; }
-.fp-text .fp-hit { background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.12); box-shadow: -10px 0 0 rgba(var(--c-moss-rgb, 53, 70, 32), 0.12), inset 3px 0 0 var(--c-moss, #354620); border-radius: 6px; }
+/* the passage asked for: tinted, with its rule in the margin the tint makes, clear of the first letters */
+.fp-text .fp-hit { position: relative; background: rgba(var(--c-moss-rgb, 53, 70, 32), 0.12); box-shadow: -10px 0 0 rgba(var(--c-moss-rgb, 53, 70, 32), 0.12); border-radius: 6px; }
+.fp-text .fp-hit::before { content: ''; position: absolute; left: -10px; top: 0; bottom: 0; width: 3px; border-radius: 999px; background: var(--c-moss, #354620); }
 
 /* the passage strip: which passage is marked, and what can be done with it */
 .fp-strip {

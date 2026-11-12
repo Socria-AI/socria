@@ -1,0 +1,102 @@
+/* components/logos5/course.css — the course profile (CourseSheet.tsx): a sheet like any float in Logos 5 — paper, a
+   hairline, square corners, no shadow — on the right of a wide screen, the whole screen on a phone. Type is the
+   system's own sizes; confidence and basis are words with a mark, never colour alone. */
+
+.logos-root .cs-wrap { position: fixed; inset: 0; z-index: 85; display: flex; justify-content: flex-end; }
+.logos-root .cs-scrim { position: absolute; inset: 0; background: color-mix(in oklab, var(--c-ink) 18%, transparent); }
+.logos-root .cs {
+  position: relative; display: flex; flex-direction: column; width: min(560px, 100vw); height: 100%; padding: 0;
+  border-width: 0 0 0 1px; color: var(--c-ink); font-family: var(--lg-sans, inherit);
+}
+.logos-root .cs-wrap.is-narrow .cs { width: 100vw; border-left: 0; }
+.logos-root .cs-head { padding: 16px 24px 14px; border-bottom: 1px solid var(--c-rule); }
+.logos-root .cs-wrap.is-narrow .cs-head { padding: 12px 16px; }
+.logos-root .cs-bar { display: flex; align-items: center; justify-content: space-between; }
+.logos-root .cs-x { font-size: 18px; line-height: 1; }
+.logos-root .cs-courses { display: flex; flex-wrap: wrap; gap: 0 18px; margin-top: 8px; }
+.logos-root .cs-title { margin: 10px 0 4px; font-family: var(--l5-serif, 'Instrument Serif', serif); font-weight: 400; font-size: 32px; line-height: 1.08; }
+.logos-root .cs-wrap.is-narrow .cs-title { font-size: 18px; }
+.logos-root .cs-who { color: var(--c-ink-60); }
+.logos-root .cs-meta { font-size: 12.5px; color: var(--c-ink-60); }
+.logos-root .cs-scroll { flex: 1; overflow-y: auto; padding: 14px 24px 28px; }
+.logos-root .cs-wrap.is-narrow .cs-scroll { padding: 12px 16px 28px; }
+.logos-root .cs-fine { margin: 6px 0; font-size: 12.5px; line-height: 1.45; color: var(--c-ink-60); }
+.logos-root .cs-empty p { margin: 0 0 12px; font-size: 15.5px; line-height: 1.5; }
+.logos-root .cs-sr { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+
+/* whether this conversation is using it */
+.logos-root .cs-here { margin: 0 0 14px; padding: 10px 0; border-bottom: 1px solid var(--c-rule); font-size: 13.5px; line-height: 1.5; color: var(--c-ink-70, var(--c-ink-60)); }
+.logos-root .cs-here .l5-link { margin-right: 10px; font-size: 13.5px; }
+.logos-root .cs-here.is-on i { display: inline-block; width: 7px; height: 7px; margin-right: 6px; border-radius: 999px; background: var(--c-moss); vertical-align: 1px; }
+.logos-root .cs-notice { margin: 0 0 12px; font-size: 13.5px; color: var(--c-ink); }
+.logos-root .cs-wait { margin: 0 0 14px; padding: 10px 12px; border: 1px solid var(--c-rule-2); font-size: 13.5px; }
+.logos-root .cs-wait p { margin: 0 0 6px; }
+.logos-root .cs-wait .l5-link { display: block; margin-top: 4px; font-size: 13.5px; text-align: left; }
+
+/* what it changes */
+.logos-root .cs-effects { display: grid; gap: 12px; margin: 0 0 18px; padding: 14px 0 16px; border-top: 2px solid var(--c-moss); border-bottom: 1px solid var(--c-rule); }
+.logos-root .cs-h { margin: 0 0 4px; font-family: var(--l5-serif, 'Instrument Serif', serif); font-weight: 400; font-size: 18px; }
+.logos-root .cs-effects ul { margin: 0; padding-left: 18px; font-size: 13.5px; line-height: 1.5; }
+.logos-root .cs-effects li { margin: 2px 0; }
+.logos-root .cs-go { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; }
+
+/* tabs and the rows under them */
+.logos-root .cs-tabs { display: flex; flex-wrap: wrap; gap: 0 18px; margin-bottom: 4px; border-bottom: 1px solid var(--c-rule); }
+.logos-root .cs-n { margin-left: 5px; font-size: 10.5px; color: var(--c-ink-45); }
+.logos-root .cs-obs { padding: 14px 0; border-bottom: 1px solid var(--c-rule); }
+.logos-root .cs-obs.is-wrong .cs-said { color: var(--c-ink-45); text-decoration: line-through; text-decoration-color: var(--c-ink-25, var(--c-ink-45)); }
+.logos-root .cs-said { margin: 0 0 6px; font-size: 15.5px; line-height: 1.4; }
+.logos-root .cs-tags { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 12px; margin: 0; }
+.logos-root .cs-conf, .logos-root .cs-basis { display: inline-flex; align-items: center; gap: 5px; font-size: 12.5px; font-weight: 500; }
+.logos-root .cs-conf::before { content: ''; width: 18px; height: 6px; border: 1px solid currentColor; background: linear-gradient(90deg, currentColor var(--fill, 33%), transparent 0); }
+.logos-root .cs-conf.is-low { --fill: 33%; color: var(--c-ink-60); }
+.logos-root .cs-conf.is-moderate { --fill: 66%; color: var(--c-ink); }
+.logos-root .cs-conf.is-high { --fill: 100%; color: var(--c-moss); }
+.logos-root .cs-basis { color: var(--c-ink-60); }
+.logos-root .cs-basis::before { content: ''; width: 7px; height: 7px; border-radius: 999px; border: 1px solid currentColor; }
+.logos-root .cs-basis.is-observed::before { background: currentColor; }
+.logos-root .cs-basis.is-inferred::before { background: linear-gradient(90deg, currentColor 50%, transparent 0); }
+.logos-root .cs-caveat { margin: 6px 0 0; font-size: 12.5px; font-style: italic; line-height: 1.45; color: var(--c-ink-60); }
+.logos-root .cs-yours { margin: 6px 0 0; font-size: 12.5px; color: var(--c-ink); }
+.logos-root .cs-acts { display: flex; flex-wrap: wrap; gap: 4px 16px; margin-top: 8px; }
+.logos-root .cs-acts .l5-link, .logos-root .cs-yours .l5-link { font-size: 12.5px; }
+.logos-root .cs-note { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 8px; }
+.logos-root .cs-note input { flex: 1 1 220px; min-height: 32px; padding: 0 8px; border: 1px solid var(--c-rule-2); border-radius: 0; background: var(--c-paper); color: var(--c-ink); font: inherit; font-size: 13.5px; }
+.logos-root .cs-ev { margin: 8px 0 0; padding: 0; list-style: none; }
+.logos-root .cs-ev li + li { margin-top: 6px; }
+.logos-root .cs-ev-b { display: flex; flex-direction: column; gap: 2px; width: 100%; padding: 8px 10px; border: 0; border-left: 2px solid var(--c-rule-2); background: none; color: var(--c-ink); font: inherit; text-align: left; cursor: pointer; }
+.logos-root .cs-ev-b:hover, .logos-root .cs-ev-b:focus-visible { border-left-color: var(--c-moss); background: var(--c-hover-row); }
+.logos-root .cs-ev-b q { font-family: var(--l5-serif, 'Instrument Serif', serif); font-size: 15.5px; line-height: 1.35; }
+
+.logos-root .cs-concepts { margin: 8px 0 0; padding: 0; list-style: none; }
+.logos-root .cs-concepts li { position: relative; display: flex; align-items: baseline; justify-content: space-between; gap: 12px; padding: 9px 0; border-bottom: 1px solid var(--c-rule); }
+.logos-root .cs-bar-w { position: absolute; left: 0; bottom: -1px; width: var(--w); height: 2px; background: var(--c-moss); }
+.logos-root .cs-term { font-size: 15.5px; }
+
+.logos-root .cs-materials { margin: 8px 0 0; padding: 0; list-style: none; }
+.logos-root .cs-mat { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; cursor: default; }
+.logos-root .cs-mat-main { display: flex; flex-direction: column; flex: 1 1 220px; min-width: 0; }
+.logos-root .cs-mat-name { overflow: hidden; font-size: 13.5px; font-weight: 500; text-overflow: ellipsis; white-space: nowrap; }
+.logos-root .cs-kind select { min-height: 30px; padding: 0 6px; border: 1px solid var(--c-rule-2); border-radius: 0; background: var(--c-paper); color: var(--c-ink); font: inherit; font-size: 12.5px; }
+.logos-root .cs-allow { display: flex; align-items: flex-start; gap: 8px; font-size: 12.5px; line-height: 1.4; color: var(--c-ink-60); }
+.logos-root .cs-allow.is-row { align-items: center; }
+.logos-root .cs-allow input { margin: 2px 0 0; accent-color: var(--c-moss); }
+.logos-root .cs-changes { margin: 8px 0 0; padding: 0; list-style: none; font-size: 13.5px; line-height: 1.45; }
+.logos-root .cs-changes li { padding: 7px 0; border-bottom: 1px solid var(--c-rule); }
+.logos-root .cs-add { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
+.logos-root .cs-foot { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--c-rule); }
+.logos-root .cs-del { align-self: flex-start; color: var(--c-tension); }
+
+/* the chatbox's chip */
+.logos-root .cs-chip { gap: 6px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }
+.logos-root .cs-chip i { width: 6px; height: 6px; flex: none; border-radius: 999px; background: var(--c-moss); }
+
+@media (prefers-reduced-motion: no-preference) {
+  .logos-root .cs { animation: csIn 0.32s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .logos-root .cs-wrap.is-narrow .cs { animation-name: csUp; }
+}
+@keyframes csIn { from { transform: translateX(24px); opacity: 0; } }
+@keyframes csUp { from { transform: translateY(24px); opacity: 0; } }
+@media (forced-colors: active) {
+  .logos-root .cs-conf::before, .logos-root .cs-basis::before { forced-color-adjust: none; border-color: CanvasText; }
+}

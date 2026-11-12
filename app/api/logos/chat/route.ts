@@ -137,7 +137,9 @@ import { deliberate } from '@/lib/mr/deliberate';
 import { resolveCondition } from '@/lib/mr/experiment';
 import { standingFacts } from '@/lib/mr/adaptation';
 import { checkPrivacy } from '@/lib/mr/integrity';
-import { recordPieces } from '@/lib/mr/ifr';
+import { QUIZ, recordPieces } from '@/lib/mr/ifr';
+import { courseLean, courseTrace, copiedWording, predictsExam, renderCourseGuidance, sanitizeCoursePack, type CoursePack } from '@/lib/teaching/use';
+import { shinglesOf } from '@/lib/teaching/materials';
 import { carriedInOf, modelDeliberationsIn, persistAllowed, resetTurnOf, revocationsOf, rowsForTurn } from '@/lib/mr/ledger';
 import { loadForTurn, readIncognito, readSettings, writeRows, writeSettings } from '@/lib/mr/store';
 import type { LedgerRow, MRSettings } from '@/lib/mr/types';
@@ -1037,6 +1039,10 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       !turnState.sensitive &&
       !signals.offRecord &&
       mrPrior?.incognito !== true;
+    // THE COURSE THIS TURN IS IN (lib/teaching/use.ts): what the client's course profile says about how the course
+    // teaches and assesses, sent from the profiles kept in its browser — read behind the same gate as the learning
+    // ledger, because how someone studies a course is theirs. LOGOS_COURSES=off: the route as it was.
+    const coursePack: CoursePack | null = comprehensionAllowed && persona === 'v5' && process.env.LOGOS_COURSES !== 'off' ? sanitizeCoursePack(body?.course) : null;
     let explain: ExplainPlan | null = null;
     if (persona === 'v5' && process.env.LOGOS_EXPLAIN !== 'off') {
       try {
@@ -1063,6 +1069,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
           ledger: comprehensionAllowed ? sanitizeLedger(body?.learning, Date.now()) : [],
           thread,
           length: body?.length === 'concise' || body?.length === 'standard' || body?.length === 'detailed' ? body.length : null,
+          // how the course teaches leans which way in comes first (an example, a picture, a comparison)
+          course: coursePack ? courseLean(coursePack, String(last.content ?? '')) : null,
           now: Date.now(),
         });
       } catch (e) {
@@ -1072,6 +1080,27 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     }
     const presentation = explain && inlineOn ? applyExplanation(presented, explain) : presented;
     const lastText = String(last.content ?? '');
+    // the course's guidance for this turn: its terms on a learning turn, and on a practice turn the reasoning its
+    // questions demand, aimed at what this student has got wrong or not practised (never the course's wording,
+    // never a claim about what an exam will ask)
+    const coursePractice = !!coursePack && (explain?.ask === 'practice' || QUIZ.test(lastText));
+    const courseBlock = coursePack
+      ? renderCourseGuidance(coursePack, {
+          text: lastText,
+          topic: explain?.topic ?? null,
+          practice: coursePractice,
+          learning: coursePractice || (!!explain && (explain.learning || !explain.direct)),
+          ledger: sanitizeLedger(body?.learning, Date.now()),
+          now: Date.now(),
+        })
+      : '';
+    // a sentence claiming to know what an exam will ask never ships while a course is in play (counted, never logged)
+    const courseDropped = { predicted: 0 };
+    const courseDrop = (x: string): boolean => {
+      if (!coursePack || !predictsExam(x)) return false;
+      courseDropped.predicted += 1;
+      return true;
+    };
     const turnView = {
       shape: presentation.shape,
       forms: presentation.forms,
@@ -1250,6 +1279,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
       // …and how to make it understood (lib/runtime/explain.ts): read against the shape above, so nothing is said
       // twice — nothing for a direct answer, a few lines filled with this turn's facts otherwise
       renderTurnGuidance(explain, presentation, { said: { retrieval: assist.retrieval, selfExplain: assist.selfExplain } }) +
+      // …and the course it is in, when one is (lib/teaching/use.ts)
+      courseBlock +
       // What may be asserted on what (epistemic.ts) — then, last, what was computed.
       evidenceBlock +
       // …and how to answer this question about the documents (a lookup, an overview, a critique…)
@@ -1494,6 +1525,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
               const held = new SentenceGate(() => {}, {
                 passQuestions: signals.requestsQuestions && !mrRun?.gate.hardNoQuestions,
                 keepOpener: accuracy.theyCaughtIt,
+                ...(coursePack ? { drop: courseDrop } : {}),
                 // MR's filters give back the pieces the gate reads: none for a chunk they take out, a list
                 // number apart from its item (lib/mr/index.ts filterAll)
                 ...(g ? { rewriteAll: (x: string) => g.filterAll(rewrite ? rewrite(x) : x), keep: g.exempt, see: g.see } : { rewrite }),
@@ -1540,7 +1572,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
               // would read as exposition and release the questions it holds), and a list number they
               // held comes back apart from its item (lib/mr/index.ts filterAll)
               ...(mrGate ? { rewriteAll: (x: string) => mrGate.filterAll(rewrite ? rewrite(x) : x) } : { rewrite }),
-              drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }),
+              drop: (x) => fabricatedToolClaim(x, { searched, computed: accuracy.context.computed }) || courseDrop(x),
               // a question MR kept under their "stop asking" (somebody else's words) goes out in order, not to the tail cap
               ...(mrGate ? { keep: mrGate.exempt, see: mrGate.see } : {}),
               neverEmpty: true,
@@ -1630,6 +1662,15 @@ export const POST = withMeter(async function POST(req: NextRequest) {
                 searched: searched ? 1 : 0,
               })
             );
+          }
+          // the course: how much of the reply's wording a past question of the course also has, and what the gate
+          // dropped — counts only, never the words
+          if (coursePack) {
+            try {
+              console.info(`[course] ${courseTrace(coursePack, { guidance: !!courseBlock, practice: coursePractice })};copied=${copiedWording(contentAsText(reply), coursePack.avoid, shinglesOf)};predicted=${courseDropped.predicted}`);
+            } catch {
+              /* a measure, never the reply */
+            }
           }
           // MR: what the reply did against what was enforced, then the ledger —
           // content-free rows, after the stream, never awaited before it closes.
@@ -1725,6 +1766,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         ...(writeUpRefused && !writeUpRefused.unavailable ? { 'X-Socria-Limit': 'documents', 'X-Socria-Limit-Used': String(writeUpRefused.used), 'X-Socria-Limit-Of': String(writeUpRefused.limit) } : {}),
         // Metacognitive Regulation's decision this turn: content-free codes (lib/mr/index.ts traceOf)
         ...(mrRun ? { 'X-Socria-MR': mrRun.trace } : {}),
+        // the course this turn was in, why, and what it shaped: content-free (lib/teaching/use.ts courseTrace)
+        ...(coursePack ? { 'X-Socria-Course': courseTrace(coursePack, { guidance: !!courseBlock, practice: coursePractice }) } : {}),
         // the runtime's reading of the turn: content-free, for the client and the evals
         ...(runtime
           ? {

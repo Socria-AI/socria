@@ -301,6 +301,8 @@ console.log('\n=== a passage in the original: marking it, picking it, finding it
   const texts = ['Contents', 'Falls dropped from 4.1 to 3.4 per 1,000\nbed-days after staffing rose.', 'Falls dropped again.'];
   ok('  the first element that holds it', T.firstHolding(texts, T.needleOf('Falls dropped from 4.1 to 3.4 per 1,000 bed-days after staffing rose.')) === 1);
   ok('  a passage split across two elements is found by its first words', T.firstHolding(['Falls dropped from 4.1 to', '3.4 per 1,000 bed-days.'], T.needleOf('Falls dropped from 4.1 to 3.4 per 1,000 bed-days.')) === 0);
+  ok('  a numbered or lettered item is found without its number, which the list draws', T.needleOf('4. Suppose the market for apartments has demand Qd = 1000 - 2P') === 'suppose the market for apartments has demand qd = 1000 - 2p' && T.needleOf('(b) Draw the supply and demand graph') === 'draw the supply and demand graph' && T.firstHolding(['Name: ____', 'Suppose the market for apartments has demand Qd = 1000 - 2P and supply Qs = 3P - 250.'], T.needleOf('4. Suppose the market for apartments has demand Qd = 1000 - 2P and supply Qs = 3P - 250.')) === 1);
+  ok('  …and words that only look like a marker are kept', T.needleOf('e.g. a fall in the price of coffee') === 'e.g. a fall in the price of coffee' && T.needleOf('U.S. output fell in the second quarter') === 'u.s. output fell in the second quarter');
   ok('  and nothing when nothing holds it', T.firstHolding(texts, T.needleOf('An entirely different sentence that is not there.')) === -1);
   ok('a deck’s pages are slides; a workbook’s, sheets', T.unitOf('pptx') === 'Slide' && T.unitOf('xlsx') === 'Sheet' && T.unitOf('pdf') === 'Page');
 }

@@ -89,7 +89,7 @@ Socria's analysis is a fourth thing, in its own tab, and says what it is.
   - **PDF and slides:** the passage's box from the reading is marked on the page.
   - **Word:** the preview lays the document out afresh, so its pages are not the reading's; the passage is found by its words and marked.
   - **Sheet:** found by its first cell.
-  - **Text and Markdown:** found by its words.
+  - **Text and Markdown:** found by its words. A numbered or lettered item ("4.", "(b)") is looked for without its number, which the rendered list draws rather than writes.
 
   When a passage cannot be found on the drawn page, the strip says so and its words are above it.
 - **Picking a passage by pressing the page.** On a PDF or a deck, a faint box follows the pointer over the passages the reading boxed, and a press picks one.

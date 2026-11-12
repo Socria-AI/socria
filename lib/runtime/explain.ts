@@ -120,6 +120,21 @@ export interface ThreadNote {
   c?: string;
 }
 
+/**
+ * How the course a turn is in teaches, as the explanation planner takes it (lib/teaching/use.ts courseLean): a lean
+ * on the order of ways in, never a rule, and nothing of the course's materials but its terms.
+ */
+export interface CourseLean {
+  /** how the course opens a topic, where that is seen with some confidence */
+  opens?: 'example' | 'definition' | 'question';
+  /** the course explains and asks with graphs or diagrams */
+  draws?: boolean;
+  /** its questions turn on telling related ideas apart */
+  contrasts?: boolean;
+  /** the course's terms for what this turn is about */
+  terms?: string[];
+}
+
 export interface ExplainInput {
   /** their newest message */
   text: string;
@@ -145,6 +160,8 @@ export interface ExplainInput {
   thread?: readonly ThreadNote[] | null;
   /** their chosen reply length */
   length?: 'concise' | 'standard' | 'detailed' | null;
+  /** the course this turn is in, when one applies (lib/teaching): it leans which way in comes first */
+  course?: CourseLean | null;
   now: number;
 }
 
@@ -674,6 +691,22 @@ const ROTATION: Record<'concept' | 'procedure' | 'claim' | 'choice', Approach[]>
   claim: ['example', 'contrast', 'stepback'],
   choice: ['example', 'contrast', 'stepback'],
 };
+/**
+ * The order of ways in, leaned by the course: a picture first for a course that reasons with graphs, a comparison
+ * ahead of an analogy for one whose questions turn on telling ideas apart. The same array when nothing changes.
+ */
+export function leanRotation(order: Approach[], course: CourseLean | null | undefined, family: string): Approach[] {
+  if (!course) return order;
+  let out = order;
+  if (course.draws && family === 'concept' && out.includes('picture')) out = ['picture', ...out.filter((a) => a !== 'picture')];
+  if (course.contrasts && out.includes('contrast')) {
+    const rest = out.filter((a) => a !== 'contrast');
+    const at = Math.max(0, rest.indexOf('analogy'));
+    out = rest.includes('analogy') ? [...rest.slice(0, at), 'contrast', ...rest.slice(at)] : out;
+  }
+  return out.join() === order.join() ? order : out;
+}
+
 const APPROACH_OF: Partial<Record<Strategy, Approach>> = { worked: 'example', faded: 'example', visual: 'picture', analogy: 'analogy', compare: 'contrast', pretrain: 'stepback' };
 const STRATEGY_OF: Record<Approach, Strategy> = { example: 'worked', picture: 'visual', analogy: 'analogy', contrast: 'compare', stepback: 'pretrain' };
 const SAID_TRIED: Record<Approach, string> = { example: 'a worked example', picture: 'a picture', analogy: 'an analogy', contrast: 'a comparison', stepback: 'the idea underneath' };
@@ -931,7 +964,9 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
     for (const f of metBefore?.failed ?? []) tried.add(f);
     // a picture only where drawing is allowed; the rest are words
     const admissible = (a: Approach) => a !== 'picture' || mayDraw;
-    const pick = ROTATION[family].find((a) => !tried.has(a) && admissible(a)) ?? ROTATION[family].find((a) => admissible(a) && !before.has(STRATEGY_OF[a])) ?? 'stepback';
+    const order = leanRotation(ROTATION[family], i.course, family);
+    const pick = order.find((a) => !tried.has(a) && admissible(a)) ?? order.find((a) => admissible(a) && !before.has(STRATEGY_OF[a])) ?? 'stepback';
+    if (order !== ROTATION[family] && pick !== ROTATION[family].find((a) => !tried.has(a) && admissible(a))) reasons.push(`course:reframe-${pick}`);
     fill.approach = pick;
     if (family === 'procedure') fill.procedure = true;
     const lastTried = [...before].map((s) => APPROACH_OF[s]).find(Boolean);
@@ -979,6 +1014,8 @@ export function planExplanation(i: ExplainInput): ExplainPlan {
     push('causal', fill.manyCauses ? 'interacting-causes' : 'why');
   }
   if (kind === 'how') push('causal', 'mechanism');
+  // the course opens a topic with a concrete example: so does this explanation (where working one is allowed)
+  if (i.course?.opens === 'example' && (kind === 'what' || kind === 'how' || kind === 'why') && level !== 'expert' && mayWork && !before.has('worked')) push('worked', 'course-example-first');
   // a picture where one is drawn: words that point into it
   if (mayDraw && forms0.some((k) => VISUAL_FORMS.includes(k)) && (kind === 'how' || kind === 'why' || kind === 'relate' || kind === 'what')) push('visual', 'drawn');
   // how much they know

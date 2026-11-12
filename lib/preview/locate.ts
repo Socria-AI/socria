@@ -102,6 +102,8 @@ export function fold(s: string): string {
     .toLowerCase();
 }
 
+const LIST_MARK = /^(?:\(?(?:\d{1,3}|[a-z]|[ivxlc]{1,5})[.)]|[-*•▪◦·])\s+/;
+
 /**
  * The words a passage is looked for by in rendered text: its opening, folded,
  * long enough to be unlikely anywhere else and short enough to sit inside
@@ -109,7 +111,8 @@ export function fold(s: string): string {
  * find reliably.
  */
 export function needleOf(text: string, max = 64): string {
-  const f = fold(text);
+  // a list item's own number or bullet ("4.", "(b)", "iii)", "•") is drawn by the list in rendered text, not written in it
+  const f = fold(text).replace(LIST_MARK, '');
   if (f.replace(/[^a-z0-9]/g, '').length < 6) return '';
   if (f.length <= max) return f;
   const cut = f.slice(0, max);
