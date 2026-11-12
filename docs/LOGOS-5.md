@@ -1971,10 +1971,12 @@ beautiful, and less chatbot like. more or so ideas to explore".
 - **The +.** Not a bar at the foot of the map: a big plus drawn in the map itself, in every lens, so it sits where
   the conversations are (asked for: "in the today or this week or the timeline there should be a big plus. not a
   fat chatbox"; then "bigger and pop more … so obvious where it is"). One component, `StartDisc`
-  (`components/logos5/UniverseParts.tsx`): an ink disc bigger than most conversations, with a paper gap, a gold
-  ring and a gold glow round it — the one thing on the map in gold — a gold ring that keeps radiating out from it
-  (not with reduced motion), and "Start something new" under it in the large serif; light on Celestial. It opens
-  a new, empty line of thinking (`newFromHome`), as N does when nobody is typing.
+  (`components/logos5/UniverseParts.tsx`): an ink disc bigger than most conversations, with a paper gap, a ring in
+  the ground's primary (moss on Paper, white on Dark, gold on Celestial) and a glow round it (sage, the brand's glow,
+  on Paper), a ring that goes out from it twice as it arrives (not with reduced motion), and "Start something new"
+  under it in the large serif; light on the dark grounds. Under the pointer it lifts 2px and turns moss — it does not
+  grow or spin (the brand book; LOGOS-5-SYSTEM.md §8.15). It opens a new, empty line of thinking (`newFromHome`), as
+  N does when nobody is typing.
   - *Today and This week:* a disc bigger than most conversations (`START_R`), placed by the pure layout
     (`lib/logos5/bubbles.ts` `startSpot`, `BubbleIn.start`, `BubbleLayout.start`). On a wide screen it takes the
     free spot nearest the middle of the subjects (below first, then round the sides), clear of every ring, disc,

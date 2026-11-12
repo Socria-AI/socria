@@ -110,6 +110,8 @@ export function CaptureInbox({
   const [saving, setSaving] = useState(false);
   const [editing, setEditing] = useState<{ id: string; text: string } | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
+  // the capture whose deletion is being asked about, in its own row (never the browser's confirm box)
+  const [deleting, setDeleting] = useState<string | null>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const panelRef = useRef<HTMLDivElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
@@ -244,7 +246,7 @@ export function CaptureInbox({
   }
 
   async function remove(c: Capture) {
-    if (!window.confirm(`Delete “${captureTitle(c)}”? This can’t be undone.`)) return;
+    setDeleting(null);
     const before = list;
     const next = list.filter((x) => x.id !== c.id);
     setList(next);
@@ -440,6 +442,16 @@ export function CaptureInbox({
                                   Cancel
                                 </button>
                               </>
+                            ) : deleting === c.id ? (
+                              <div className="qc-confirm" role="group" aria-label={`Delete “${captureTitle(c)}”`}>
+                                <span className="qc-confirm-q">Delete it? It cannot be brought back.</span>
+                                <button type="button" className="qc-save is-small is-danger" onClick={() => void remove(c)}>
+                                  Delete it
+                                </button>
+                                <button type="button" className="qc-quiet" autoFocus onClick={() => setDeleting(null)}>
+                                  Keep it
+                                </button>
+                              </div>
                             ) : (
                               <>
                                 <button type="button" className="qc-go" onClick={() => onNewThread(c)} title="Start a new line of thinking with this in the box — nothing is sent">
@@ -457,7 +469,7 @@ export function CaptureInbox({
                                   <button type="button" className="qc-quiet" onClick={() => setEditing({ id: c.id, text: c.text })}>
                                     Edit
                                   </button>
-                                  <button type="button" className="qc-quiet is-danger" onClick={() => void remove(c)}>
+                                  <button type="button" className="qc-quiet is-danger" onClick={() => setDeleting(c.id)}>
                                     Delete
                                   </button>
                                 </span>

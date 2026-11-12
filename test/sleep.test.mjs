@@ -632,7 +632,7 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
   ok('the day spent: "Socria is resting", today’s 4,000 trial tokens, and what still works', /Socria is resting/.test(dhtml) && /You’ve used today’s 4,000 trial tokens/.test(dhtml) && /Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting/.test(dhtml), text(dhtml));
   ok('  when it wakes: a countdown, 00:00 UTC, and their own time as a clock time (no weekday)', /Wakes in/.test(dhtml) && /<span class="sl-keep">00:00 UTC<\/span> · <span class="sl-keep">\d{1,2}:00\s[AP]M your time<\/span>/.test(dhtml) && !/(Mon|Tues|Wednes|Thurs|Fri|Satur|Sun)day/.test(text(dhtml)), text(dhtml));
   ok('  Socria One offered as the way on: "Continue with Socria One" — it has no daily limit', /Keep exploring/.test(dhtml) && /Continue with Socria One/.test(dhtml) && /Socria One has no daily limit/.test(dhtml), text(dhtml));
-  ok('  and which day of the trial it is', /Day 1 of 7 of your trial · 7 days left/.test(text(dhtml)), text(dhtml));
+  ok('  and which day of the trial it is, over the headline', /Your trial · Day 1 of 7/.test(text(dhtml)), text(dhtml));
   const dmember = renderToStaticMarkup(h(UI.SleepScreen, { sleep: spent.today, open: true, onClose() {}, onWake() {}, timeZone: 'UTC' }));
   ok('  no offer where there is none to make; no local time where theirs is UTC', !/Socria One/.test(dmember) && !/your time/.test(dmember) && /00:00 UTC/.test(dmember));
   const dbar = renderToStaticMarkup(h(UI.SleepBar, { sleep: spent.today, onOpen() {}, onWake() {}, timeZone: 'UTC' }));

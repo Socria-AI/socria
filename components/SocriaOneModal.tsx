@@ -86,7 +86,7 @@ export function SocriaOneModal({
         </p>
 
         <h2 className="os-title" id={`${id}-t`}>
-          {limited ? LIMIT_HEADLINE : 'Socria, without a daily limit'}
+          {limited ? LIMIT_HEADLINE : 'Socria, without a daily limit.'}
         </h2>
         <p className="os-sub" id={`${id}-s`}>
           {reason ?? 'Keep thinking after your seven-day trial — conversations, Logic Maps and artifacts with no daily limit — with Socria Voice, sharing, the experiments and the Celestial and One themes, which only Socria One includes.'}

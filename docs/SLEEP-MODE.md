@@ -1,6 +1,6 @@
 # Sleep Mode
 
-> **Superseded on November 9, 2026 by the seven-day trial ([TRIAL.md](TRIAL.md)).** The holding and settling below is unchanged and still runs every request; the period is now the trial's UTC day (4,000 tokens, 28,000 in all) instead of the week, and an ended trial is refused with 402. The weekly words remain in `lib/sleep.ts` for the screen's week-period state only.
+> **Superseded on November 9, 2026 by the seven-day trial ([TRIAL.md](TRIAL.md)).** The holding and settling below is unchanged and still runs every request; the period is now the trial's UTC day (20,000 tokens, 140,000 in all) instead of the week, and an ended trial is refused with 402. The weekly words remain in `lib/sleep.ts` for the screen's week-period state only.
 
 A signed-in free account may spend **30,000 model tokens a week** on the AI requests it makes, across conversations, artifacts and Logic Maps. The week starts on **Monday at 00:00 UTC** and ends at the next Monday 00:00 UTC. When the week's tokens are spent, Socria rests until the reset: no new AI requests are made. Everything already made stays usable: conversations, Logic Maps, artifacts, writing, Files, manual map edits and exports. The conversation box still takes their words, so they can draft; sending waits for the reset.
 

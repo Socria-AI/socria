@@ -5,10 +5,11 @@
 // until the reset — Monday 00:00 UTC. Three pieces, all calm:
 //
 //   SleepScreen  said once, when it happens (and again only if they try to send):
-//                a moon, "Socria is resting", what still works, when it wakes —
-//                in UTC and in their own time — and, offered, never pressed,
-//                Socria One, which has no weekly limit. "Keep exploring"
-//                closes it.
+//                "Socria is resting.", what still works, when it wakes — in
+//                UTC and in their own time — and, offered, never pressed,
+//                Socria One, which has no limit. "Keep exploring" closes it.
+//                It is drawn as the Socria One sheet is (SheetShell, below),
+//                the sheet it leads to.
 //   SleepBar     while it lasts, one line over the conversation box: resting
 //                until Monday 00:00 UTC, in how long. The box still takes their
 //                words — they can draft, and sending waits — and everything
@@ -21,10 +22,12 @@
 // useSleepWatch hears a 429 Sleep reply from ANY route (the map, a reading, the
 // study tools), so every surface agrees without each one being taught.
 
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { RESET_WORDS, WEEK_MS, allowanceLine, formatTokens, leftLine, localReset, wakesIn, type SleepState } from '@/lib/sleep';
 import { DAY_RESET_WORDS, TRIAL_ENDED_NOTE, dayOfLine, daysLeftLine, dayResetLine, endsAtWords, todayLine, type TrialState } from '@/lib/trial';
 import { L5Close } from './L5Chrome';
+import '../one/one-sheet.css';
+import './l5-controls.css';
 import './sleep.css';
 
 /** Something the server said is resting, with its state. */
@@ -170,6 +173,54 @@ function ResetWithLocal({ local, day = false }: { local: string; day?: boolean }
   );
 }
 
+/**
+ * THE SHEET THE SLEEP AND TRIAL CARDS ARE DRAWN IN: the Socria One sheet's own (components/one/one-sheet.css),
+ * because both lead to it — a sheet from the bottom on a phone, a 420px panel from 640px; the page dimmed, the bare ×,
+ * left-aligned words, a serif headline, and the one way on as the sheet's full-width pill with the way to stay under it.
+ *
+ * The sheet itself takes the focus, not a button: it arrives unasked, often on the keypress that sent, so nothing is
+ * ringed on arrival and Enter buys nothing. Tab reaches the ×, then the way on, then the way to stay; Escape closes.
+ */
+function SheetShell({ open, onClose, labelledBy, describedBy, children }: { open: boolean; onClose: () => void; labelledBy: string; describedBy: string; children: ReactNode }) {
+  const ref = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open) return;
+    ref.current?.focus({ preventScroll: true });
+    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+    window.addEventListener('keydown', key);
+    return () => window.removeEventListener('keydown', key);
+  }, [open, onClose]);
+  return (
+    <div className="os-scrim sl-scrim" role="dialog" aria-modal="true" aria-labelledby={labelledBy} aria-describedby={describedBy}>
+      <div className="os-back" onClick={onClose} aria-hidden="true" />
+      <div className="os-sheet sl-sheet" ref={ref} tabIndex={-1}>
+        <span className="os-grab" aria-hidden="true" />
+        <L5Close label="Close" onClose={onClose} className="os-x" />
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/** The way on, as the sheet's one filled control (One's blue, full width), and the way to stay, a word under it. */
+function SheetActions({ upgrade, onUpgrade, onClose }: { upgrade?: string; onUpgrade?: () => void; onClose: () => void }) {
+  return (
+    <div className="os-actions">
+      {onUpgrade && upgrade && (
+        <button type="button" className="l5-btn is-primary is-one is-wide" onClick={onUpgrade}>
+          {upgrade}
+          <span className="l5-ar" aria-hidden="true">
+            →
+          </span>
+        </button>
+      )}
+      <button type="button" className="l5-btn is-quiet" onClick={onClose}>
+        Keep exploring
+      </button>
+    </div>
+  );
+}
+
 export function SleepScreen({
   sleep,
   open,
@@ -191,58 +242,35 @@ export function SleepScreen({
   trial?: TrialState | null;
 }) {
   const { left, local } = useWake(sleep, onWake, timeZone);
-  const closeRef = useRef<HTMLButtonElement>(null);
   const day = sleep?.period === 'day';
-  useEffect(() => {
-    if (!open) return;
-    closeRef.current?.focus();
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [open, onClose]);
-  if (!open || !sleep?.asleep) return null;
+  const shown = open && !!sleep?.asleep;
+  // the label over the headline names what ran out: the trial's day (and which), or the week's free tokens
+  const kicker = day ? (trial?.status === 'active' ? `Your trial · ${dayOfLine(trial)}` : 'Today’s trial tokens') : 'This week’s tokens';
+  if (!shown || !sleep) return null;
   return (
-    <div className="sl-scrim" role="dialog" aria-modal="true" aria-labelledby="sl-t" aria-describedby="sl-b">
-      <div className="sl-back" onClick={onClose} aria-hidden="true" />
-      <div className="sl-card">
-        <L5Close label="Close" onClose={onClose} className="sl-x" />
-        <div className="sl-moon">
-          <Moon size={30} />
-        </div>
-        <h2 id="sl-t" className="sl-t">
-          Socria is resting
-        </h2>
-        <p id="sl-b" className="sl-b">
-          {day
-            ? `You’ve used today’s ${formatTokens(sleep.limit)} trial tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`
-            : `You’ve used this week’s ${formatTokens(sleep.limit)} free tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`}
-        </p>
-        <p className="sl-when" aria-live="polite">
-          <span className="sl-when-k">Wakes in</span>
-          <span className="sl-when-v">{wakesIn(left)}</span>
-          <span className="sl-when-at">
-            <ResetWithLocal local={local} day={day} />
-          </span>
-        </p>
-        {day && trial?.status === 'active' && (
-          <p className="sl-trial">
-            {dayOfLine(trial)} of your trial · {daysLeftLine(trial).replace(' in your trial', '')}
-          </p>
-        )}
-        {/* the controls standard: the one filled control is the button that buys One, in One's blue; staying is a word */}
-        <div className="sl-acts">
-          <button ref={closeRef} type="button" className="l5-btn is-quiet" onClick={onClose}>
-            Keep exploring
-          </button>
-          {onUpgrade && (
-            <button type="button" className="l5-btn is-primary is-one" onClick={onUpgrade}>
-              {day ? 'Continue with Socria One' : 'Stay awake with Socria One'}
-            </button>
-          )}
-        </div>
-        {onUpgrade && <p className="sl-one">{day ? 'Socria One has no daily limit.' : 'Socria One has no weekly limit.'}</p>}
-      </div>
-    </div>
+    <SheetShell open={shown} onClose={onClose} labelledBy="sl-t" describedBy="sl-b">
+      <p className="sl-k">
+        <Moon size={15} />
+        <span className="l5-label">{kicker}</span>
+      </p>
+      <h2 id="sl-t" className="os-title">
+        Socria is resting.
+      </h2>
+      <p id="sl-b" className="os-sub">
+        {day
+          ? `You’ve used today’s ${formatTokens(sleep.limit)} trial tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`
+          : `You’ve used this week’s ${formatTokens(sleep.limit)} free tokens. Everything you’ve made is still here — open any conversation, move your Logic Maps, edit your writing, keep drafting.`}
+      </p>
+      <p className="sl-when" aria-live="polite">
+        <span className="l5-label">Wakes in</span>
+        <span className="sl-when-v">{wakesIn(left)}</span>
+        <span className="sl-when-at">
+          <ResetWithLocal local={local} day={day} />
+        </span>
+      </p>
+      <SheetActions upgrade={day ? 'Continue with Socria One' : 'Stay awake with Socria One'} onUpgrade={onUpgrade} onClose={onClose} />
+      {onUpgrade && <p className="os-foot">{day ? 'Socria One has no daily limit.' : 'Socria One has no weekly limit.'}</p>}
+    </SheetShell>
   );
 }
 
@@ -340,42 +368,26 @@ export function SleepRing({ sleep, onOpen, onWake, timeZone, trial }: { sleep: S
 // artifact and document opens as before, and everything done by hand works.
 
 export function TrialEndedScreen({ open, onClose, onUpgrade, note }: { open: boolean; onClose: () => void; onUpgrade: () => void; note?: string }) {
-  const closeRef = useRef<HTMLButtonElement>(null);
-  useEffect(() => {
-    if (!open) return;
-    closeRef.current?.focus();
-    const key = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
-    window.addEventListener('keydown', key);
-    return () => window.removeEventListener('keydown', key);
-  }, [open, onClose]);
   if (!open) return null;
   return (
-    <div className="sl-scrim" role="dialog" aria-modal="true" aria-labelledby="tr-t" aria-describedby="tr-b">
-      <div className="sl-back" onClick={onClose} aria-hidden="true" />
-      <div className="sl-card tr-card">
-        <L5Close label="Close" onClose={onClose} className="sl-x" />
-        <span className="l5-label tr-k">Your trial</span>
-        <h2 id="tr-t" className="sl-t">
-          Seven days are up
-        </h2>
-        <p id="tr-b" className="sl-b">
-          {note || TRIAL_ENDED_NOTE}
-        </p>
-        <ul className="tr-keep">
-          <li>Every conversation, Logic Map and artifact stays open</li>
-          <li>Move, write, rename, organise and export by hand</li>
-          <li>Socria One picks up exactly where you left off</li>
-        </ul>
-        <div className="sl-acts">
-          <button ref={closeRef} type="button" className="l5-btn is-quiet" onClick={onClose}>
-            Keep browsing
-          </button>
-          <button type="button" className="l5-btn is-primary is-one" onClick={onUpgrade}>
-            Continue with Socria One
-          </button>
-        </div>
-      </div>
-    </div>
+    <SheetShell open={open} onClose={onClose} labelledBy="tr-t" describedBy="tr-b">
+      <p className="sl-k">
+        <span className="l5-label">Your trial</span>
+      </p>
+      <h2 id="tr-t" className="os-title">
+        Seven days are up.
+      </h2>
+      <p id="tr-b" className="os-sub">
+        {note || TRIAL_ENDED_NOTE}
+      </p>
+      {/* what stays, as hairline rows (the One sheet's table is drawn the same way) */}
+      <ul className="tr-keep">
+        <li>Every conversation, Logic Map and artifact stays open</li>
+        <li>Move, write, rename, organise and export by hand</li>
+        <li>Socria One picks up exactly where you left off</li>
+      </ul>
+      <SheetActions upgrade="Continue with Socria One" onUpgrade={onUpgrade} onClose={onClose} />
+    </SheetShell>
   );
 }
 

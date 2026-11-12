@@ -252,12 +252,12 @@ console.log('\n=== the screens ===');
   const { renderToStaticMarkup } = await import('react-dom/server');
   const { createElement: h } = await import('react');
   const card = renderToStaticMarkup(h(T.TrialEndedScreen, { open: true, onClose() {}, onUpgrade() {} }));
-  ok('the card, drawn: a dialog, named, with what stays and one way on', /role="dialog"/.test(card) && /aria-labelledby="tr-t"/.test(card) && /Seven days are up/.test(card) && /Move, write, rename, organise and export by hand/.test(card) && /Continue with Socria One/.test(card) && /Keep browsing/.test(card), card);
+  ok('the card, drawn: a dialog, named, with what stays and one way on', /role="dialog"/.test(card) && /aria-labelledby="tr-t"/.test(card) && /Seven days are up/.test(card) && /Move, write, rename, organise and export by hand/.test(card) && /Continue with Socria One/.test(card) && /Keep exploring/.test(card), card);
   ok('  closed, it draws nothing; the bar only while the trial is over', renderToStaticMarkup(h(T.TrialEndedScreen, { open: false, onClose() {}, onUpgrade() {} })) === '' && renderToStaticMarkup(h(T.TrialEndedBar, { on: false, onOpen() {} })) === '' && /Your trial has ended/.test(renderToStaticMarkup(h(T.TrialEndedBar, { on: true, onOpen() {} }))));
   const now = Date.now();
   const d0 = T.dayStart(now);
   const day = renderToStaticMarkup(h(T.SleepScreen, { sleep: { asleep: true, used: 4000, limit: 4000, left: 0, weekStart: d0, resetAt: d0 + 86_400_000, period: 'day' }, open: true, onClose() {}, onUpgrade() {}, onWake() {}, timeZone: 'UTC', trial: T.trialState({ startedAt: now - 2 * 86_400_000, now, byDay: { [T.dayKey(now)]: 4000 } }) }));
-  ok('  the day spent, drawn: today’s 4,000, 00:00 UTC, day 3 of 7, and Socria One with no daily limit', /You’ve used today’s 4,000 trial tokens/.test(day) && /00:00 UTC/.test(day) && /Day 3 of 7 of your trial/.test(day) && /Socria One has no daily limit/.test(day) && !/Monday/.test(day), day);
+  ok('  the day spent, drawn: today’s 4,000, 00:00 UTC, day 3 of 7 (over the headline), and Socria One with no daily limit', /You’ve used today’s 4,000 trial tokens/.test(day) && /00:00 UTC/.test(day) && /Your trial · Day 3 of 7/.test(day) && /Socria One has no daily limit/.test(day) && !/Monday/.test(day), day);
   ok('  a guest is never shown the trial’s card: only an account has a trial to go on with', /plan !== 'one' && !!isSignedIn && !oneOpen/.test(read('components/LogosApp.tsx')) && /const trialOverNow = \(\) => !!trialEndedRef\.current && !!isSignedIn;/.test(read('components/LogosApp.tsx')));
 }
 

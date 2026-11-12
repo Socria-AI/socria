@@ -53,10 +53,11 @@ ok('the canvas filters say Artifacts and Conversations', /\{ id: 'made', label: 
 
 console.log('\n=== one system ===');
 {
-  // A dialog over the app dims the page with the one token and blurs nothing (the One sheets, Account, the guide,
-  // Sleep, Share, a Project, Rewards); the tour's spotlight and the picture page's bar blur nothing either.
-  const sheets = ['components/one/one-sheet.css', 'app/account-sheet.css', 'components/socria-guide.css', 'components/logos5/sleep.css', 'components/share/share.css', 'components/projects/project-sheet.css', 'components/rewards/rewards-pop.css'];
-  const blurred = [...sheets, 'app/tour.css', 'app/account/picture/picture.css'].filter((f) => /backdrop-filter:\s*blur/.test(read(f)));
+  // A dialog over the app dims the page with the one token and blurs nothing (the One sheets — which Sleep and the
+  // trial's end are drawn in — Account, the guide, Share, a Project, Rewards); the tour's spotlight and the picture
+  // page's bar blur nothing either.
+  const sheets = ['components/one/one-sheet.css', 'app/account-sheet.css', 'components/socria-guide.css', 'components/share/share.css', 'components/projects/project-sheet.css', 'components/rewards/rewards-pop.css'];
+  const blurred = [...sheets, 'components/logos5/sleep.css', 'app/tour.css', 'app/account/picture/picture.css'].filter((f) => /backdrop-filter:\s*blur/.test(read(f)));
   ok('no blur behind any sheet (every sheet over the app dims the page; none blurs it)', blurred.length === 0, blurred.join(', '));
   const undimmed = sheets.filter((f) => !/background: ?var\(--lg-dim/.test(read(f)));
   ok('  and each dims it with the one token, --lg-dim', undimmed.length === 0, undimmed.join(', '));

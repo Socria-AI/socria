@@ -4,134 +4,75 @@
    Logos 5's steps (components/logos5/l5-controls.css): type 32 / 18 / 15.5 /
    13.5 / 12.5 / 10.5, radii 999 / 16 / 10 / 6, controls 40 tall.
 
-   The screen is the app's one dialog: the page dimmed (--lg-dim), the panel at
-   the dialog radius on --l5-surface (declared on .logos-root for every theme, so
-   no ground needs its own colour here), the floating shadow, the bare × at the
-   top right (L5Close), and its actions from the controls standard — Socria One's
-   button in One's blue, "Keep exploring" a word. */
+   The resting card and the trial's end are drawn in the Socria One sheet
+   (components/one/one-sheet.css: .os-scrim, .os-sheet, .os-title, .os-sub,
+   .os-actions, .os-foot), because both lead to it: a sheet from the bottom on a
+   phone, a panel from 640px, the page dimmed, the bare ×, the words left-aligned
+   (the brand book: "Left-aligned, always"), a serif headline that ends on a full
+   stop, and Socria One's full-width pill with "Keep exploring" under it. What is
+   theirs alone is here: the label over the headline, when Socria wakes, and what
+   stays when the trial is over. */
 
-.sl-scrim {
-  position: fixed;
-  inset: 0;
+/* over a full-screen display (100) and the photo viewer, as the card always was */
+:is(.logos-root, .lg-tokens) .os-scrim.sl-scrim {
   z-index: 120;
-  display: grid;
-  place-items: center;
-  padding: 20px;
 }
-.sl-back {
-  position: absolute;
-  inset: 0;
-  background: var(--lg-dim);
+/* the sheet takes the focus when it arrives (nothing is ringed then); the ring is the controls' */
+:is(.logos-root, .lg-tokens) .os-sheet.sl-sheet:focus {
+  outline: none;
 }
-@media (prefers-reduced-motion: no-preference) {
-  .sl-back {
-    animation: sl-fade 0.3s ease both;
-  }
-  .sl-card {
-    animation: sl-rise 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
-  }
-}
-@keyframes sl-fade {
-  from {
-    opacity: 0;
-  }
-}
-@keyframes sl-rise {
-  from {
-    opacity: 0;
-    transform: translateY(8px);
-  }
-}
-.sl-card {
-  position: relative;
-  width: min(420px, 100%);
-  padding: 30px 28px 24px;
-  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
-  border-radius: var(--lg-r-dialog);
-  background: var(--l5-surface);
-  color: var(--lg-ink, #20201b);
-  box-shadow: var(--l5-shadow-up);
-  font-family: var(--lg-sans);
-  text-align: center;
-}
-/* the close: L5Close (the bare ×), whose -6px margin sets it 10px in from the corner */
-.sl-x {
-  position: absolute;
-  top: 16px;
-  right: 16px;
-}
-.sl-moon {
-  display: inline-grid;
-  place-items: center;
-  width: 56px;
-  height: 56px;
-  margin-bottom: 14px;
-  border-radius: 50%;
-  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
-  color: var(--lg-primary, #354620);
-}
-.sl-t {
-  margin: 0;
-  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
-  font-weight: 400;
-  font-size: 32px;
-  line-height: 1.1;
-  letter-spacing: -0.01em;
-}
-.sl-b {
-  margin: 10px auto 0;
-  max-width: 34ch;
-  font-size: 15.5px;
-  line-height: 1.55;
-  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
-}
-.sl-when {
+/* the label over the headline: the moon (for the resting card) and what ran out — where the One sheet has its name */
+:is(.logos-root, .lg-tokens) .sl-k {
   display: flex;
-  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  min-height: 26px;
+  margin: 0 44px 12px 0;
+  color: var(--c-moss);
+}
+:is(.logos-root, .lg-tokens) .sl-k svg {
+  flex: 0 0 auto;
+}
+/* when it wakes: set off by a hairline, the countdown in the serif, the moment under it */
+:is(.logos-root, .lg-tokens) .sl-when {
+  display: flex;
   align-items: baseline;
   flex-wrap: wrap;
-  gap: 4px 8px;
+  gap: 4px 10px;
   margin: 18px 0 0;
+  padding-top: 14px;
+  border-top: 1px solid var(--c-rule);
 }
-.sl-when-k {
-  font-size: 10.5px;
-  font-weight: 600;
-  letter-spacing: 0.18em;
-  text-transform: uppercase;
-  color: rgba(var(--lg-ink-rgb, 35, 36, 31), 0.55);
-}
-.sl-when-v {
+:is(.logos-root, .lg-tokens) .sl-when-v {
   font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
   font-size: 18px;
-  color: var(--lg-ink, #20201b);
+  color: var(--c-ink);
 }
-.sl-when-at {
+:is(.logos-root, .lg-tokens) .sl-when-at {
   flex-basis: 100%;
   font-size: 13.5px;
-  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
+  color: var(--c-ink-60);
 }
-/* "Keep exploring" (.l5-btn is-quiet, a word) beside "Stay awake with Socria One" (.l5-btn is-primary is-one) */
-.sl-acts {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  align-items: center;
-  gap: 8px 22px;
-  margin-top: 22px;
+/* the trial over: what stays, as hairline rows (no bullets, nothing centred) */
+:is(.logos-root, .lg-tokens) .tr-keep {
+  margin: 16px 0 0;
+  padding: 0;
+  list-style: none;
+  border-bottom: 1px solid var(--c-rule);
 }
+:is(.logos-root, .lg-tokens) .tr-keep li {
+  padding: 9px 0;
+  border-top: 1px solid var(--c-rule);
+  font-size: 13.5px;
+  line-height: 1.45;
+  color: var(--c-ink-70);
+}
+
+/* the bar, while it lasts: one line over the conversation box */
 .sl-bar:focus-visible {
   outline: 2px solid var(--lg-primary, #354620);
   outline-offset: 2px;
 }
-.sl-one {
-  margin: 12px 0 0;
-  font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif);
-  font-style: italic;
-  font-size: 15.5px;
-  color: var(--lg-ink-60, rgba(35, 36, 31, 0.6));
-}
-
-/* the bar, while it lasts: one line over the conversation box */
 .sl-bar {
   display: inline-flex;
   align-items: center;
@@ -218,11 +159,13 @@
   gap: 2px;
   width: max-content;
   max-width: min(280px, calc(100vw - 32px));
-  padding: 8px 11px;
-  border: 1px solid var(--lg-line, rgba(53, 70, 32, 0.14));
-  border-radius: 10px;
-  background: var(--l5-surface);
-  box-shadow: var(--l5-shadow);
+  padding: 9px 12px;
+  /* it floats on the page, so it is drawn as every tip is (tips.css): square paper with its grain, a hairline, no shadow */
+  border: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22));
+  border-radius: 0;
+  background-color: var(--c-paper, #f5f3eb);
+  background-image: var(--c-grain, none);
+  box-shadow: none;
   font-family: var(--lg-sans);
   text-align: left;
 }
@@ -248,8 +191,5 @@
 }
 
 /* ── the seven-day trial (lib/trial.ts): its day under the reset, its countdown in the ring's tip, its end ── */
-.sl-trial { margin: 10px 0 0; font-size: 12.5px; color: var(--c-ink-60, rgba(35, 36, 31, 0.66)); }
 .sl-ringtip-trial { display: flex; flex-direction: column; gap: 2px; margin-top: 8px; padding-top: 8px; border-top: 1px solid var(--c-rule-2, rgba(53, 70, 32, 0.22)); }
-.tr-card .tr-k { display: block; margin-bottom: 6px; }
-.tr-keep { margin: 14px 0 0; padding: 0 0 0 18px; display: flex; flex-direction: column; gap: 6px; font-size: 13.5px; color: var(--c-ink-70, rgba(35, 36, 31, 0.7)); }
 .tr-bar .sl-bar-n { color: var(--lg-one, #26485a); }

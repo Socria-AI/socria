@@ -435,6 +435,22 @@
 .qc-more {
   margin-top: 4px;
 }
+/* deleting asks in the row itself: the question, the one red pill, and "Keep it" as a word */
+.qc-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 14px;
+  width: 100%;
+}
+.qc-confirm-q {
+  font-size: 13.5px;
+  color: var(--qc-ink);
+}
+.qc-save.is-danger,
+.qc-save.is-danger:hover:not(:disabled) {
+  background: var(--lg-tension, #9c5b3c);
+}
 
 /* ── nothing kept yet ────────────────────────────────────────────────── */
 .qc-opening {

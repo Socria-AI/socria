@@ -20,6 +20,8 @@ export function DataPrivacyPanel() {
   const [note, setNote] = useState<string | null>(null);
   const [err, setErr] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState(false);
+  // clearing memory asks in its own card first (the browser's confirm box was the one dialog not in Socria's hand)
+  const [confirmClear, setConfirmClear] = useState(false);
   const [typed, setTyped] = useState('');
   // The occasional note by email: a map still where it was left, a
   // membership opening. One switch, backed by the same row the unsubscribe
@@ -105,7 +107,7 @@ export function DataPrivacyPanel() {
   }
 
   async function clearMemory() {
-    if (!confirm('Clear what Socria has worked out about your thinking? Your conversations and maps stay.')) return;
+    setConfirmClear(false);
     setBusy('memory'); setErr(null); setNote(null);
     try {
       const res = await fetch('/api/account/memory', { method: 'DELETE' });
@@ -239,10 +241,24 @@ export function DataPrivacyPanel() {
             Forget what Socria worked out, and keep everything you wrote. Your
             conversations, maps and drafts stay exactly as they are.
           </p>
+          {confirmClear && (
+            <p className="dp-ask">Clear it? What Socria worked out cannot be brought back; it starts fresh from your next message.</p>
+          )}
         </div>
-        <button type="button" onClick={clearMemory} disabled={busy !== null}>
-          {busy === 'memory' ? 'Clearing…' : 'Clear memory'}
-        </button>
+        {confirmClear ? (
+          <div className="dp-pair">
+            <button type="button" onClick={() => void clearMemory()} disabled={busy !== null}>
+              Clear it
+            </button>
+            <button type="button" className="dp-keep" autoFocus onClick={() => setConfirmClear(false)}>
+              Keep it
+            </button>
+          </div>
+        ) : (
+          <button type="button" onClick={() => setConfirmClear(true)} disabled={busy !== null}>
+            {busy === 'memory' ? 'Clearing…' : 'Clear memory'}
+          </button>
+        )}
       </section>
 
       <section className="dp-act dp-danger">

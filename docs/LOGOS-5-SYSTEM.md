@@ -721,8 +721,8 @@ Space" in places and needs legal review before it changes.
 
 ### 8.14 A seven-day hard trial, not a free tier
 
-Every account not on Socria One has seven days (7 × 24 hours from its first real request): 4,000 tokens a
-UTC day, 28,000 in all, held and settled on the server by Sleep Mode's machinery with the trial's day as its
+Every account not on Socria One has seven days (7 × 24 hours from its first real request): 20,000 tokens a
+UTC day, 140,000 in all, held and settled on the server by Sleep Mode's machinery with the trial's day as its
 period (`lib/trial.ts`, `lib/trial-server.ts`, `lib/sleep-server.ts`). A day spent rests until 00:00 UTC; the
 trial over, every new AI request needs Socria One, and everything made stays open and editable by hand. Socria
 One alone has no daily limit, Voice, sharing, the experiments and the Celestial and One themes. A keyed hash of
@@ -730,6 +730,43 @@ the verified address keeps it to one trial a person; existing free accounts got 
 request. The screens: the ring by the box is today's tokens (its tip says the day of seven and when the trial
 ends), a calm card when the day or the trial is over, the numbers a press away in Account. `docs/TRIAL.md` has
 the whole of it, `/dev/trial` the numbers, and `test/trial.test.mjs` holds it.
+
+### 8.15 The popups, to the brand book
+
+Asked for: "make the UX/UI more consistent, especially on popups and such. especially the sleep popup. or smaller
+stuff." Measured against the brand book (left-aligned, always; a headline ends on a full stop; pills for actions and a
+word for the rest; ink to moss and a 2px lift under the pointer; nothing scales, spins, bounces or overshoots; gold is a
+rare ornament; "say what happened, then what is safe") and against §8.13.
+
+- **Sleep and the trial's end are the One sheet.** The resting card was centred, with a moon in a bordered circle, a
+  headline with no full stop, its "Keep exploring" ringed the moment it opened and the way on beside it; the trial's
+  end was centred too, with bullets and "Keep browsing". Both lead to the Socria One sheet, so both are now drawn in it
+  (`components/one/one-sheet.css`; `SheetShell` in `SleepMode.tsx`): a sheet from the bottom on a phone and a 420px
+  panel from 640px, the page dimmed, the bare ×, a label over the headline (the moon and "Your trial · Day 3 of 7";
+  "Your trial"), the serif headline ("Socria is resting." "Seven days are up."), what happened and what is safe, when
+  Socria wakes set off by a hairline, what stays as hairline rows, Socria One's full-width pill with "Keep exploring"
+  under it, and "Socria One has no daily limit." as the closing line. The sheet takes the focus itself when it
+  arrives, so nothing is ringed and Enter buys nothing; Tab reaches the ×, the way on and the way to stay.
+- **The One sheet.** Its comparison could not wrap, so at 20,000 tokens a day the Socria One column was clipped on a
+  laptop and off the side on a phone; it wraps now. Its headline ends on a full stop, as its other headline (the
+  limit's) already did, and its label, column heads, words, closing line and inner card are on the scale (10.5 at
+  .18em, 15.5, 12.5, a 10px radius).
+- **No browser dialogs.** Deleting a course profile, clearing memory (Data & Privacy) and deleting a capture asked
+  with the browser's confirm box, the only dialogs Socria did not draw. Each now asks where it is, as deleting a
+  conversation on the map does: the question, the action (the one red pill where it cannot be undone), and "Keep it",
+  focused.
+- **Floats.** The ring's tip by the box was rounded and shadowed; it is square paper with a hairline, as every tip is.
+- **Motion.** The + grew and spun under the pointer and pulsed for ever, in gold. It lifts 2px and turns moss, its
+  ring goes out twice as it arrives and then it is still, and it is ink with a ring in the ground's primary and a
+  sage glow (white on Dark, gold on Celestial, where gold is the ground's own). The map's subjects arrived past their
+  size (to 107%) and seven of its transitions sprang past their mark; they arrive as the brand book's node card does
+  (.92 to 1, the house ease) and settle at their size. The empty conversation's idea bubbles grew under the pointer
+  and the ring round the middle one turned for ever; they lift 2px, and the ring is still.
+
+**Not done here, and why.** The map's small marks (a conversation's pip, a bead on the timeline, a subject's disc)
+still grow a little under the pointer: on a mark a few pixels across, growing is how it says it can be pressed, and a
+2px lift would not be seen. Live guidance keeps its looping demonstrations, because they show a movement to make. The
+SocriaUX workspace (/ux) keeps its own prompts. `test/popups-brand.test.mjs` holds the rest.
 
 ## 9. The Logic Map draws almost anything
 

@@ -5114,6 +5114,12 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 .dp-page .dp-danger .dp-go { background: var(--tension); box-shadow: none; color: var(--paper); }
 .dp-page .dp-danger .dp-go:hover:not(:disabled) { background: var(--tension); filter: brightness(0.92); }
 
+/* a question asked in the card itself: the action, then "Keep it", a word beside it */
+.dp-page .dp-ask { margin-top: 10px !important; color: var(--ink) !important; }
+.dp-page .dp-pair { flex: 0 0 auto; display: flex; align-items: center; gap: 16px; }
+.dp-page .dp-act .dp-keep { height: 40px; padding: 0; background: transparent; box-shadow: none; color: rgba(var(--ink-rgb, 31, 31, 31), 0.7); }
+.dp-page .dp-act .dp-keep:hover:not(:disabled) { background: transparent; color: var(--ink); transform: none; }
+
 .dp-page .dp-confirm { margin-top: 14px; }
 .dp-page .dp-confirm label { display: block; font-size: 12.5px; color: rgba(var(--ink-rgb, 31, 31, 31), 0.66); margin-bottom: 6px; }
 .dp-page .dp-confirm code { font-size: 12px; background: rgba(var(--moss-rgb, 53, 70, 32), 0.08); padding: 1px 5px; border-radius: 4px; }
@@ -5133,6 +5139,7 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
 @media (max-width: 620px) {
   .dp-page .dp-act { flex-direction: column; align-items: stretch; gap: 14px; }
   .dp-page .dp-act button { width: 100%; }
+  .dp-page .dp-pair { flex-direction: column; align-items: stretch; gap: 4px; }
 }
 
 /* ── non-production affordances ──────────────────────────────────────

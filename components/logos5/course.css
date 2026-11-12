@@ -86,6 +86,9 @@
 .logos-root .cs-add { display: flex; flex-direction: column; align-items: flex-start; gap: 8px; }
 .logos-root .cs-foot { display: flex; flex-direction: column; gap: 14px; margin-top: 22px; padding-top: 16px; border-top: 1px solid var(--c-rule); }
 .logos-root .cs-del { align-self: flex-start; color: var(--c-tension); }
+/* deleting a profile asks first, in the sheet itself (as deleting a conversation does on the map) */
+.logos-root .cs-confirm p { margin: 0 0 10px; font-size: 13.5px; line-height: 1.5; color: var(--c-ink-60); }
+.logos-root .cs-confirm-acts { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 16px; }
 
 /* the chatbox's chip */
 .logos-root .cs-chip { gap: 6px; max-width: 200px; overflow: hidden; text-overflow: ellipsis; }

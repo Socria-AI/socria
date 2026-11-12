@@ -91,6 +91,8 @@ const when = (t: number) => {
 export function CourseSheet(p: CourseSheetProps) {
   const [tab, setTab] = useState<Tab>('asks');
   const [allowed, setAllowed] = useState(false);
+  // the profile whose deletion is being asked about (the app's inline confirm — never the browser's dialog)
+  const [deleting, setDeleting] = useState<string | null>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const fileRef = useRef<HTMLInputElement>(null);
   const profile = p.profiles.find((x) => x.id === p.focus) ?? p.profiles[0] ?? null;
@@ -341,15 +343,23 @@ export function CourseSheet(p: CourseSheetProps) {
               </div>
               <footer className="cs-foot">
                 {adder}
-                <button
-                  type="button"
-                  className="l5-btn is-quiet is-sm cs-del"
-                  onClick={() => {
-                    if (window.confirm(`Delete the profile for ${profileLabel(profile)}? The files stay; what Socria read from them goes.`)) p.onDelete(profile.id);
-                  }}
-                >
-                  Delete this profile
-                </button>
+                {deleting === profile.id ? (
+                  <div className="cs-confirm" role="group" aria-label={`Delete the profile for ${profileLabel(profile)}`}>
+                    <p>Delete this profile? The files stay; what Socria read from them goes, and it cannot be brought back.</p>
+                    <div className="cs-confirm-acts">
+                      <button type="button" className="l5-btn is-sm is-danger is-solid" onClick={() => (setDeleting(null), p.onDelete(profile.id))}>
+                        Delete it
+                      </button>
+                      <button type="button" className="l5-btn is-sm" autoFocus onClick={() => setDeleting(null)}>
+                        Keep it
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button type="button" className="l5-btn is-quiet is-sm cs-del" onClick={() => setDeleting(profile.id)}>
+                    Delete this profile
+                  </button>
+                )}
               </footer>
             </>
           )}

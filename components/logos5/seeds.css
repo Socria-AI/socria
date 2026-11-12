@@ -35,17 +35,16 @@
 }
 /* in a short or narrow box the bubbles are drawn smaller (seedLayout's `small`), and their words go a size down */
 .logos-root .ls-seed.is-small { padding: 10px; font-size: 13.5px; }
-.logos-root .ls-seed:hover, .logos-root .ls-seed:focus-visible { transform: translateY(-3px) scale(1.04); box-shadow: var(--ls-lift); border-color: var(--sd-line); }
+/* under the pointer it lifts 2px and takes its colour's line — it does not grow (the brand book: nothing scales) */
+.logos-root .ls-seed:hover, .logos-root .ls-seed:focus-visible { transform: translateY(-2px); box-shadow: var(--ls-lift); border-color: var(--sd-line); }
 .logos-root .ls-seed:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 3px; }
 .logos-root .ls-seed.is-picked { border-color: var(--sd-line); box-shadow: 0 0 0 4px color-mix(in oklab, var(--sd-line) 22%, transparent), var(--ls-lift); }
 @media (prefers-reduced-motion: no-preference) {
   .logos-root .ls-seed { animation: lsSeedIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 60ms + 120ms); }
   .logos-root .ls-seed-centre.is-round { animation: lsSeedIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
-  .logos-root .ls-seed-centre.is-round::after { animation: lsSeedTurn 40s linear infinite; }
   .logos-root .ls-seed-lines path { stroke-dashoffset: 0; animation: lsSeedFade 0.8s ease-out both; animation-delay: 0.15s; }
 }
 @keyframes lsSeedIn { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
-@keyframes lsSeedTurn { to { transform: rotate(360deg); } }
 @keyframes lsSeedFade { from { opacity: 0; } }
 
 /* a phone: the centre, then each cluster as a row of rounded ideas */
