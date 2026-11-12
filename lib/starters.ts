@@ -267,6 +267,12 @@ const PENDING_OPENER: Record<string, (label: string) => string> = {
 /** The node types worth reopening, for callers that filter before passing. */
 export const PENDING_TYPES: readonly string[] = Object.keys(PENDING_OPENER);
 
+/** The opening a piece of unfinished business is offered with, or null when its type takes none (lib/logos5/seeds.ts). */
+export function pendingOpener(type: string, label: string): string | null {
+  if (!Object.prototype.hasOwnProperty.call(PENDING_OPENER, type) || !usable(label)) return null;
+  return PENDING_OPENER[type](label.trim().replace(/[.]+$/, ''));
+}
+
 /**
  * The chips to show, most personal first, always exactly `count` of them and
  * always ending with at least one generic opening.

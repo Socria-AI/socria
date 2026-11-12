@@ -7,12 +7,13 @@
 
 import { usePathname } from 'next/navigation';
 import { useEffect } from 'react';
+import { giftedTheme } from '@/lib/gifts';
 import { applyTheme, effectiveTheme, membership, readTheme, themeAppliesTo } from '@/lib/theme';
 
 export function ThemeScope() {
   const path = usePathname();
   useEffect(() => {
-    applyTheme(themeAppliesTo(path) ? effectiveTheme(readTheme(window.localStorage), membership() ?? true) : 'paper');
+    applyTheme(themeAppliesTo(path) ? effectiveTheme(readTheme(window.localStorage), membership() ?? true, giftedTheme()) : 'paper');
   }, [path]);
   return null;
 }

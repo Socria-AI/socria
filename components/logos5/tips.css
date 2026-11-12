@@ -287,3 +287,25 @@
 .logos-root .l5-onebtn-s {
   display: none;
 }
+
+/* A gift note (GiftNote.tsx, lib/gifts.ts): the tip's card, pinned top right under the header rather than pointing at
+   anything, so no arrow. Same layer as a tip: above the docks, below every sheet. */
+.logos-root .l5tip.l5gift {
+  left: auto;
+  right: 16px;
+  top: 72px;
+  /* a ring of the page's own paper round the card: whatever it sits over stops short of its edge, rather than
+     showing as a stray mark against the hairline */
+  box-shadow: 0 0 0 6px var(--c-paper);
+}
+.logos-root .l5tip.l5gift::before {
+  display: none;
+}
+@media (max-width: 640px) {
+  .logos-root .l5tip.l5gift {
+    left: 12px;
+    right: 12px;
+    top: 64px;
+    width: auto;
+  }
+}

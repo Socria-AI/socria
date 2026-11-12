@@ -7,12 +7,17 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
+import { giftedTheme } from '@/lib/gifts';
 import { applyTheme, chooseTheme, effectiveTheme, readTheme, setMembership, themeAppliesTo, THEME_CHANGED, THEME_IDS, THEMES, type ThemeId } from '@/lib/theme';
 
 export function ThemePicker({ isOne, onUpgrade }: { isOne: boolean; onUpgrade?: () => void }) {
   const [current, setCurrent] = useState<ThemeId>('paper');
+  // a theme pass running in this browser (lib/gifts.ts): that one theme is open for its days
+  const [granted, setGranted] = useState<ThemeId | null>(null);
   useEffect(() => {
-    setCurrent(effectiveTheme(readTheme(window.localStorage), isOne));
+    const g = giftedTheme();
+    setGranted(g);
+    setCurrent(effectiveTheme(readTheme(window.localStorage), isOne, g));
     const on = (e: Event) => setCurrent(((e as CustomEvent).detail as ThemeId) ?? 'paper');
     window.addEventListener(THEME_CHANGED, on);
     return () => window.removeEventListener(THEME_CHANGED, on);
@@ -22,7 +27,7 @@ export function ThemePicker({ isOne, onUpgrade }: { isOne: boolean; onUpgrade?: 
     <div className="themes" role="radiogroup" aria-label="Theme">
       {THEME_IDS.map((id) => {
         const t = THEMES[id];
-        const locked = t.one && !isOne;
+        const locked = t.one && !isOne && id !== granted;
         const [ground, ink, accent] = t.swatch;
         return (
           <button
@@ -35,7 +40,7 @@ export function ThemePicker({ isOne, onUpgrade }: { isOne: boolean; onUpgrade?: 
             data-theme-id={id}
             onClick={() => {
               if (locked) return;
-              setCurrent(chooseTheme(id, isOne));
+              setCurrent(chooseTheme(id, isOne, granted));
             }}
             title={locked ? `${t.says} — comes with Socria One` : t.says}
           >
@@ -48,7 +53,7 @@ export function ThemePicker({ isOne, onUpgrade }: { isOne: boolean; onUpgrade?: 
             </span>
             <span className="theme-name">
               {t.label}
-              {t.one && <span className="theme-one">One</span>}
+              {t.one && <span className="theme-one">{id === granted && !isOne ? 'Yours for now' : 'One'}</span>}
             </span>
           </button>
         );
@@ -75,7 +80,7 @@ export function useThemeGuard(isOne: boolean, known: boolean) {
     if (!known) return;
     setMembership(isOne);
     if (!themeAppliesTo(window.location.pathname)) return;
-    const shown = effectiveTheme(readTheme(window.localStorage), isOne);
+    const shown = effectiveTheme(readTheme(window.localStorage), isOne, giftedTheme());
     if ((document.documentElement.getAttribute('data-theme') ?? 'paper') !== shown) applyTheme(shown);
   }, [isOne, known]);
 }

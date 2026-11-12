@@ -112,6 +112,11 @@ export const EVENTS = [
   // `utm_source` / `ref` tokens from the link — never who, never a referrer
   // address. Counted first-party by event (lib/product-event-kinds.ts).
   'event_page_viewed',
+  // A taste of Socria One handed to someone on the trial (lib/gifts.ts): `kind` —
+  // 'deep' (an answer from One's deep model), 'theme-offer' or 'theme-ended'.
+  'gift_shown',
+  // …and taken up: `kind` 'theme-offer' (the pass begun) or the note's way to Socria One.
+  'gift_accepted',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 

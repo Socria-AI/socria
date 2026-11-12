@@ -112,3 +112,24 @@ service's own rows (`metrics:trial`, `mday:MM-DD`); events are counted once per 
   the day's total.
 - Set `SOCRIA_TRIAL_SECRET` (a long random string) so the eligibility hash does not depend on the Clerk key.
 - Legal review of the privacy policy and terms changes before production.
+
+## Gifts: a taste of Socria One, now and then
+
+Asked for: give free accounts "occasional random features … a bit, then take it away", "deep model replies
+and … a popup too, or show themes", "not annoying"; and then "no few days of the celestial theme, try it once
+then u must pay". `lib/gifts.ts`, `components/logos5/GiftNote.tsx`.
+
+- **A deep answer.** When a trial account's question needs depth (the router reads it as `deep`), the first such
+  question in each four-day window is answered by Socria One's deep model instead of the trial's. The server
+  decides and claims it once per window in `logos_usage` (`gift:deep:<window>`, an insert-once row: two requests
+  at once, one gift); if the store cannot be reached there is no gift. The reply says so in `X-Socria-Gift: deep`
+  and the app shows a small note. At most one deep answer per window: about 70 cents per trial at today's prices.
+- **One try of Celestial.** Two days after a browser first opens the app, the Celestial theme is offered once,
+  ever, to try for the rest of that visit. On the next visit the reader is put back on the theme they had and told
+  once, quietly.
+- **Not annoying.** The Celestial notes: at most one a day, and never during onboarding, over a sheet, while an
+  answer arrives, or on a visit that has already shown the welcome-back (and a visit with a gift note gets no
+  welcome-back). The deep answer's note comes with the answer it is about, so at most once in four days. Every note
+  is small, dismissible, never modal, and goes by itself after a while. Nothing made with a gift is taken away.
+- `SOCRIA_GIFTS=off` (server) and `NEXT_PUBLIC_SOCRIA_GIFTS=off` (the app) turn them off without a code change.
+  `gift_shown` and `gift_accepted` are counted. `test/gifts.test.mjs`.

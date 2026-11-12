@@ -33,6 +33,8 @@ import { meterFor, sleepAnswer, sleepGate } from '@/lib/sleep-server';
 import { uncounted, withMeter } from '@/lib/token-meter';
 import { resolvePlanForRequest } from '@/lib/socria-one-server';
 import { cacheKey, chooseModel, compressHistory, firstAccepted, levelOf, tierOf } from '@/lib/model-router';
+import { GIFT_HEADER, deepGiftRow, deepGiftWanted, giftsOn } from '@/lib/gifts';
+import { createOnce } from '@/lib/usage-rows';
 import { depthForPlan } from '@/lib/socria-one';
 import { boundaryNote, limitOf } from '@/lib/entitlements';
 import { reportUpstream } from '@/lib/upstream-error';
@@ -1283,9 +1285,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     // server above — and by how much this turn needs, read from what the
     // engine already knows about it (no model call). A refused id steps down
     // its ladder, never above the tier.
-    const route = chooseModel(
-      tierOf(userId, plan),
-      levelOf({
+    const level = levelOf({
         text: String(last.content ?? ''),
         exchange: runtime ? turnState.exchange.kind : null,
         move: assist?.mode ?? null,
@@ -1298,9 +1298,24 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         length: typeof body?.length === 'string' ? body.length : null,
         turns: clean.length,
         lastReplyAsked: /\?\s*$/.test(String(priorReply ?? '').trim()),
-      }),
-      process.env
-    );
+      });
+    let route = chooseModel(tierOf(userId, plan), level, process.env);
+    // NOW AND THEN, SOCRIA ONE'S DEEP MODEL (lib/gifts.ts): a trial question that genuinely needs
+    // depth, the first in its window, is answered by the model members get — claimed once per window
+    // (two requests at once, one gift), and said in a header so the app shows its note. The store
+    // unable to answer means no gift, never a failed turn.
+    let gift: 'deep' | null = null;
+    if (userId && deepGiftWanted({ tier: route.tier, level: route.level, on: giftsOn(process.env), unrouted: route.unrouted })) {
+      const claimed = await withTimeout(
+        createOnce(deepGiftRow(userId, Date.now()), 1, Date.now()).catch(() => false),
+        400,
+        false
+      );
+      if (claimed) {
+        route = { ...chooseModel('one', level, process.env), tier: 'free' };
+        gift = 'deep';
+      }
+    }
     const configured = route.model;
     // one conversation's requests kept on one cache (the id hashed; nothing identifying leaves)
     const promptCacheKey = cacheKey('chat', sessionId);
@@ -1705,6 +1720,7 @@ export const POST = withMeter(async function POST(req: NextRequest) {
         ...(explain && !explain.direct ? { 'X-Socria-Thread': encodeURIComponent(JSON.stringify(comprehensionAllowed ? threadNoteOf(explain) : { ...threadNoteOf(explain), c: undefined })) } : {}),
         // which model answered, and why it was chosen: tier/level/model (lib/model-router.ts)
         'X-Socria-Model': `${route.tier}/${route.level}/${served}`,
+        ...(gift ? { [GIFT_HEADER]: gift } : {}),
         // a write-up they asked for, answered here because the month's documents are spent (above)
         ...(writeUpRefused && !writeUpRefused.unavailable ? { 'X-Socria-Limit': 'documents', 'X-Socria-Limit-Used': String(writeUpRefused.used), 'X-Socria-Limit-Of': String(writeUpRefused.limit) } : {}),
         // Metacognitive Regulation's decision this turn: content-free codes (lib/mr/index.ts traceOf)

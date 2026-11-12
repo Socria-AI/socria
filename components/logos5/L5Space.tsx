@@ -147,6 +147,7 @@ export function L5Space({
   narrow = false,
   follow = false,
   spaceId = null,
+  empty = null,
 }: {
   ideas: SpaceIdea[];
   edges: IdeaEdgeLite[];
@@ -177,6 +178,8 @@ export function L5Space({
   narrow?: boolean;
   /** the open reply is still arriving: its last words stay in view */
   follow?: boolean;
+  /** what an empty line of thinking shows across the canvas instead of its one waiting card (IdeaSeeds) */
+  empty?: ReactNode;
   /** the conversation, so where its cards were put is kept for it (on this device) */
   spaceId?: string | null;
 }) {
@@ -665,7 +668,7 @@ export function L5Space({
     });
   };
   const targetOf = (el: Element, type: string): { kind: 'card'; key: string } | { kind: 'canvas' } | null => {
-    if (el.closest('input, textarea, select, a[href], [contenteditable="true"], .ls-zoom-keys')) return null;
+    if (el.closest('input, textarea, select, a[href], [contenteditable="true"], .ls-zoom-keys, .ls-seeds-box')) return null;
     // Socria's reply is words to read and copy: a mouse selects them, a finger moves the space
     const inReply = !!el.closest('.ls-bub');
     if (inReply && type !== 'touch') return null;
@@ -1154,6 +1157,9 @@ export function L5Space({
     </div>
   );
 
+  // an empty line of thinking: ideas to explore, until the first words are said (across the canvas; on a phone, the feed)
+  const seeding = !!empty && !ideas.length && !brought.length && !made.length && !turns.length;
+
   // ── A PHONE: one column ──
   if (narrow) {
     const around = open ? aroundOf(open.id, ideas, edges) : { before: [], after: [], against: [] };
@@ -1165,7 +1171,8 @@ export function L5Space({
       <div ref={rootRef} className={`ls is-phone${threadOn ? ' has-thread' : ''}`}>
         {kindsEl}
         <div className="ls-feed" ref={scrollRef}>
-          {kind === 'all' && (
+          {kind === 'all' && seeding && <div className="ls-seeds-box is-narrow">{empty}</div>}
+          {kind === 'all' && !seeding && (
             <>
               {openEl}
               {madeHere.length > 0 && <span className="l5-label ls-sec">Made from it</span>}
@@ -1256,7 +1263,8 @@ export function L5Space({
         onPointerCancel={(e) => onCanvasUp(e, true)}
         onKeyDown={onCanvasKey}
       >
-        <div className="ls-slack" ref={slackRef}>
+        {seeding ? <div className={`ls-seeds-box${narrow ? ' is-narrow' : ''}`}>{empty}</div> : null}
+        <div className="ls-slack" ref={slackRef} hidden={seeding || undefined}>
         <div className="ls-zoom" style={zoomBox}>
         <div className="ls-cols" ref={colsRef} style={zoom !== 1 ? { transform: `scale(${zoom})` } : undefined}>
           <svg className="ls-edges" width={drawn.w} height={drawn.h} aria-hidden="true">

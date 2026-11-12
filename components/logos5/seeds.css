@@ -1,0 +1,57 @@
+/* components/logos5/seeds.css — an empty line of thinking as ideas to explore (IdeaSeeds.tsx, lib/logos5/seeds.ts).
+   Drawn in the space's own tones (space-colour.css): what was left open in mustard, where to go further in moss,
+   something new in slate. Words in the serif, labels in the one label. Every theme's ground shows through. */
+
+.logos-root .ls-seeds-box { position: relative; width: 100%; height: 100%; min-height: 460px; box-sizing: border-box; padding: 8px 24px calc(var(--ls-foot, 134px) + 24px); }
+.logos-root .ls-seeds { position: relative; width: 100%; height: 100%; min-height: 420px; }
+.logos-root .ls-seeds [data-kind='open'] { --sd-tint: var(--ls-tint-mustard); --sd-line: var(--ls-mustard-dot); --sd-ink: var(--ls-mustard-ink); }
+.logos-root .ls-seeds [data-kind='further'] { --sd-tint: color-mix(in oklab, var(--ls-moss) 12%, var(--ls-card)); --sd-line: var(--ls-moss); --sd-ink: var(--ls-moss-ink); }
+.logos-root .ls-seeds [data-kind='new'] { --sd-tint: var(--ls-tint-slate); --sd-line: var(--ls-slate); --sd-ink: var(--ls-slate-ink); }
+
+/* the lines: the centre to each cluster, each cluster to its ideas */
+.logos-root .ls-seed-lines { position: absolute; inset: 0; pointer-events: none; overflow: visible; }
+.logos-root .ls-seed-lines path { fill: none; stroke: var(--sd-line); stroke-width: 1.5; opacity: 0.45; }
+.logos-root .ls-seed-lines path.is-twig { stroke-width: 1; opacity: 0.35; stroke-dasharray: 3 4; }
+
+/* the centre */
+.logos-root .ls-seed-centre { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; text-align: center; color: var(--c-ink); }
+.logos-root .ls-seed-centre.is-round { position: absolute; z-index: 2; box-sizing: border-box; padding: 18px; border-radius: 999px; background: var(--ls-card); border: 1.5px solid var(--c-moss); box-shadow: var(--ls-lift); }
+.logos-root .ls-seed-centre.is-round::after { content: ''; position: absolute; inset: -10px; border-radius: 999px; border: 1px dashed var(--c-rule-2); }
+.logos-root .ls-seed-ct { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 18px; line-height: 1.15; }
+.logos-root .ls-seed-cs { font-size: 12.5px; line-height: 1.35; color: var(--c-ink-60); max-width: 18ch; }
+
+/* a cluster's name, the one label, at its hub */
+.logos-root .ls-seed-gn { margin: 0; display: inline-flex; align-items: center; gap: 7px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--c-ink-60); white-space: nowrap; }
+.logos-root .ls-seed-gn i { width: 7px; height: 7px; border-radius: 999px; background: var(--sd-line); }
+.logos-root .ls-seed-gn.is-floating { position: absolute; z-index: 2; transform: translate(-50%, -50%); padding: 5px 10px; border-radius: 999px; background-color: var(--c-paper); background-image: var(--c-grain); border: 1px solid var(--c-rule); }
+
+/* an idea: a bubble in its cluster's tone */
+.logos-root .ls-seed {
+  position: absolute; z-index: 3; box-sizing: border-box; display: flex; align-items: center; justify-content: center; padding: 14px;
+  border-radius: 999px; border: 1.5px solid color-mix(in oklab, var(--sd-line) 55%, transparent); background: var(--sd-tint);
+  color: var(--sd-ink); font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 15.5px; line-height: 1.18; text-align: center;
+  cursor: pointer; box-shadow: var(--ls-rest);
+  transition: transform 0.25s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), box-shadow 0.25s, border-color 0.2s;
+}
+/* in a short or narrow box the bubbles are drawn smaller (seedLayout's `small`), and their words go a size down */
+.logos-root .ls-seed.is-small { padding: 10px; font-size: 13.5px; }
+.logos-root .ls-seed:hover, .logos-root .ls-seed:focus-visible { transform: translateY(-3px) scale(1.04); box-shadow: var(--ls-lift); border-color: var(--sd-line); }
+.logos-root .ls-seed:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 3px; }
+.logos-root .ls-seed.is-picked { border-color: var(--sd-line); box-shadow: 0 0 0 4px color-mix(in oklab, var(--sd-line) 22%, transparent), var(--ls-lift); }
+@media (prefers-reduced-motion: no-preference) {
+  .logos-root .ls-seed { animation: lsSeedIn 0.55s cubic-bezier(0.16, 1, 0.3, 1) both; animation-delay: calc(var(--i, 0) * 60ms + 120ms); }
+  .logos-root .ls-seed-centre.is-round { animation: lsSeedIn 0.5s cubic-bezier(0.16, 1, 0.3, 1) both; }
+  .logos-root .ls-seed-centre.is-round::after { animation: lsSeedTurn 40s linear infinite; }
+  .logos-root .ls-seed-lines path { stroke-dashoffset: 0; animation: lsSeedFade 0.8s ease-out both; animation-delay: 0.15s; }
+}
+@keyframes lsSeedIn { from { opacity: 0; transform: scale(0.86); } to { opacity: 1; transform: none; } }
+@keyframes lsSeedTurn { to { transform: rotate(360deg); } }
+@keyframes lsSeedFade { from { opacity: 0; } }
+
+/* a phone: the centre, then each cluster as a row of rounded ideas */
+.logos-root .ls-seeds-box.is-narrow { padding: 18px 16px calc(var(--ls-foot, 134px) + 24px); min-height: 0; height: auto; }
+.logos-root .ls-seeds.is-narrow { display: flex; flex-direction: column; gap: 22px; min-height: 0; height: auto; }
+.logos-root .ls-seeds.is-narrow .ls-seed-centre { padding: 16px 18px; border-radius: 16px; border: 1.5px solid var(--c-moss); background: var(--ls-card); box-shadow: var(--ls-lift); }
+.logos-root .ls-seed-group { display: flex; flex-direction: column; gap: 10px; }
+.logos-root .ls-seed-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.logos-root .ls-seed.is-pill { position: static; padding: 10px 15px; min-height: 44px; border-radius: 16px; font-size: 15.5px; }

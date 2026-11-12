@@ -56,10 +56,13 @@ export const THEME_CHANGED = 'socria:theme';
 
 export const isTheme = (v: unknown): v is ThemeId => typeof v === 'string' && (THEME_IDS as readonly string[]).includes(v);
 
-/** The theme to show: the chosen one, unless it is One's and this person is not a member. */
-export function effectiveTheme(chosen: unknown, isOne: boolean): ThemeId {
+/**
+ * The theme to show: the chosen one, unless it is One's and this person is not a member —
+ * or holds a pass for it just now (`granted`, lib/gifts.ts: a few days of Celestial, now and then).
+ */
+export function effectiveTheme(chosen: unknown, isOne: boolean, granted: ThemeId | null = null): ThemeId {
   if (!isTheme(chosen)) return 'paper';
-  return THEMES[chosen].one && !isOne ? 'paper' : chosen;
+  return THEMES[chosen].one && !isOne && chosen !== granted ? 'paper' : chosen;
 }
 
 export function readTheme(store: Pick<Storage, 'getItem'> | null | undefined): ThemeId {
@@ -90,8 +93,8 @@ export function setMembership(isOne: boolean) {
 export const membership = () => member;
 
 /** Choose a theme: remembered, applied, announced. Refuses a One theme for someone without One. */
-export function chooseTheme(id: ThemeId, isOne: boolean): ThemeId {
-  const shown = effectiveTheme(id, isOne);
+export function chooseTheme(id: ThemeId, isOne: boolean, granted: ThemeId | null = null): ThemeId {
+  const shown = effectiveTheme(id, isOne, granted);
   try {
     localStorage.setItem(THEME_KEY, shown);
   } catch {}

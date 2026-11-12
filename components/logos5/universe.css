@@ -3885,3 +3885,37 @@ html[data-theme="night"] .logos-root .l5 .l5b-mem-m {
 .logos-root .l5 .l5h-pv-mem-row:has(.l5h-pv-mem-fix) .l5b-mem-m {
   margin-top: 12px;
 }
+
+/* THE + (Universe.tsx onNew): where the box that found or started used to stand, one large, unmissable way to begin —
+   an ink disc with the plus, a slow ring of moss around it, and the words beside it. It opens a new line of thinking,
+   which waits with ideas to explore and its chatbox ready. */
+.logos-root .l5 .l5h-newwrap { flex: none; margin: 0 auto; display: flex; justify-content: center; }
+.logos-root .l5 .l5h-new {
+  position: relative; display: inline-flex; align-items: center; gap: 16px; padding: 10px 26px 10px 10px;
+  border: 1px solid var(--c-rule-2); border-radius: 999px; background-color: var(--c-paper); background-image: var(--c-grain);
+  color: var(--c-ink); font: inherit; cursor: pointer;
+  box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 18px 40px -22px rgba(35, 36, 31, 0.55);
+  transition: transform 0.3s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), box-shadow 0.3s, border-color 0.2s;
+}
+.logos-root .l5 .l5h-new:hover { transform: translateY(-3px); border-color: var(--c-moss); box-shadow: 0 1px 2px rgba(35, 36, 31, 0.06), 0 24px 48px -22px rgba(35, 36, 31, 0.6); }
+.logos-root .l5 .l5h-new:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 4px; }
+.logos-root .l5 .l5h-new-o {
+  position: relative; display: grid; place-items: center; width: 64px; height: 64px; border-radius: 999px;
+  background: var(--c-ink); color: var(--c-paper);
+  transition: transform 0.45s var(--c-ease, cubic-bezier(0.16, 1, 0.3, 1)), background-color 0.2s;
+}
+.logos-root .l5 .l5h-new-o::after { content: ''; position: absolute; inset: -7px; border-radius: 999px; border: 1.5px solid color-mix(in oklab, var(--c-moss) 55%, transparent); }
+.logos-root .l5 .l5h-new:hover .l5h-new-o { transform: rotate(90deg); background: var(--c-moss); }
+.logos-root .l5 .l5h-new-l { display: inline-flex; align-items: center; gap: 12px; }
+.logos-root .l5 .l5h-new-t { font-family: var(--l5-serif, 'Instrument Serif', Georgia, serif); font-size: 32px; line-height: 1; letter-spacing: -0.01em; }
+.logos-root .l5 .l5h-new-k { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 6px; border: 1px solid var(--c-rule-2); border-radius: 6px; font-size: 12.5px; color: var(--c-ink-60); }
+@media (prefers-reduced-motion: no-preference) {
+  .logos-root .l5 .l5h-new-o::after { animation: l5hNewRing 3.2s ease-in-out infinite; }
+}
+@keyframes l5hNewRing { 0%, 100% { transform: scale(1); opacity: 0.9; } 50% { transform: scale(1.12); opacity: 0.25; } }
+/* a phone: the disc and the words, centred above the edge */
+.logos-root .l5 .l5h.is-narrow .l5h-new { gap: 12px; padding: 8px 22px 8px 8px; }
+.logos-root .l5 .l5h.is-narrow .l5h-new-o { width: 56px; height: 56px; }
+.logos-root .l5 .l5h.is-narrow .l5h-new-t { font-size: 18px; }
+/* Celestial and the other dark grounds: the disc is the light one */
+html:is([data-theme='dark'], [data-theme='one'], [data-theme='night']) .logos-root .l5 .l5h-new { box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.8); }

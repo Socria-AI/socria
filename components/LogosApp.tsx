@@ -191,6 +191,11 @@ import { HANDCAM_EVENT, readHandCommand, type ArCommand, type HandCommand } from
 import { handPointer, stopHands } from '@/lib/hand-bus';
 import { L5Tips } from '@/components/logos5/L5Tips';
 import { OneButton, WelcomeBack } from '@/components/logos5/OneHeader';
+import { GiftNote, ThemeGiftCheck } from '@/components/logos5/GiftNote';
+import { IdeaSeeds } from '@/components/logos5/IdeaSeeds';
+import { buildSeeds } from '@/lib/logos5/seeds';
+import { GIFT_HEADER, THEME_GIFT, accepted as giftAccepted, beginTryVisit, giftsOn, lastNoteAt, noteAllowed, noteShown, readThemeGift, writeThemeGift, type GiftNoteKind } from '@/lib/gifts';
+import { chooseTheme, readTheme } from '@/lib/theme';
 import { SleepBar, SleepRing, SleepScreen, TrialEndedBar, TrialEndedScreen, useSleepWatch, useTrialEndedWatch } from '@/components/logos5/SleepMode';
 import type { SleepState } from '@/lib/sleep';
 import { dayOfLine, todayLine, type TrialState } from '@/lib/trial';
@@ -1842,6 +1847,23 @@ export function LogosApp({
    * Socria One, so they get the whole picture rather than a single sentence
    * about whatever just stopped.
    */
+  // ── NOW AND THEN, A TASTE OF SOCRIA ONE (lib/gifts.ts) ──
+  // A deep answer's note when the server says one was given; the Celestial pass offered once every few weeks;
+  // and the pass's end said once. At most one note a day, never over a sheet.
+  const [giftNote, setGiftNote] = useState<GiftNoteKind | null>(null);
+  // One note a visit: a gift note keeps the welcome-back away, and a welcome-back keeps the theme offer away.
+  const [giftThisVisit, setGiftThisVisit] = useState(false);
+  // a Socria One prompt has opened this visit (a welcome-back among them): the theme offer waits for another visit
+  const promptSeenRef = useRef(false);
+  const showGift = useCallback((kind: GiftNoteKind) => {
+    const now = Date.now();
+    if (!noteAllowed(kind, lastNoteAt(), now)) return;
+    noteShown(now);
+    setGiftThisVisit(true);
+    setGiftNote(kind);
+    track('gift_shown', { kind });
+  }, []);
+
   const askOne = useCallback(
     (reason?: string, limited = false) => {
       if (plan === 'one') return; // a member is never sold to
@@ -4818,6 +4840,8 @@ export function LogosApp({
       // A write-up they asked to keep, answered in the conversation because the
       // month's document is spent: the words come, and the boundary is said.
       if (res.headers.get('X-Socria-Limit') === 'documents' && !ask('documents-spent')) setError(boundaryNote('documents'));
+      // this answer came from Socria One's deep model, on us (lib/gifts.ts): said once, quietly
+      if (res.headers.get(GIFT_HEADER) === 'deep' && !one) showGift('deep');
       // a learning turn: noted in the ledger once its reply has landed (below) — never for a turn taken back or failed
       const learning = { learn: res.headers.get('X-Socria-Learn'), review: res.headers.get('X-Socria-Review'), lost: res.headers.get('X-Socria-Lost') };
       // what the reply will do, as the engine planned it — kept on the reply once it has landed (below)
@@ -9313,6 +9337,24 @@ export function LogosApp({
               narrow={narrow}
               follow={atNewest && (busyHere || !!streaming)}
               spaceId={activeId}
+              // an empty line of thinking: ideas to explore (lib/logos5/seeds.ts) — pressing one puts its question in the
+              // chatbox to be made their own, never sent by itself
+              empty={
+                !turns.length && !busyHere && !streaming && !groupView && !togetherReadOnly ? (
+                  <IdeaSeeds
+                    groups={buildSeeds({
+                      pending: pendingFromMaps,
+                      recent: sessions.filter((x) => x.id !== activeId && x.messages.length > 0).map((x) => ({ title: x.title, updatedAt: x.updatedAt })),
+                      day: Math.floor(Date.now() / 86_400_000),
+                    })}
+                    narrow={narrow}
+                    onPick={(seed) => {
+                      setInput(seed.prompt);
+                      focusComposer();
+                    }}
+                  />
+                ) : null
+              }
             />
           );
         }
@@ -9679,6 +9721,8 @@ export function LogosApp({
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
   /** the account chip opens the profile's own menu: the account, and Memory (Alex Tran: the mind graph lives in the profile) */
   const homeShown = l5 && l5Home && !l5Mind && !hydrating && !room.active;
+  // remembered for the visit (a ref, so no hook after the early return): a One prompt has shown
+  if (onePrompt?.open) promptSeenRef.current = true;
   /**
    * The welcome-back word is said on the Universal Map, and only there: never over a conversation, and never beside
    * the resting or trial-ended screen, which already say the one thing worth saying (one pitch at a time).
@@ -10003,6 +10047,8 @@ export function LogosApp({
       onOpen={(id) => downToPage(id)}
       onOpenChat={(id) => onOpenChat?.(id)}
       onStart={startFromHome}
+      // the big + at the map's foot: a new line of thinking, opened on ideas to explore
+      onNew={() => void newFromHome()}
       onFile={cloud ? fileFromHome : undefined}
       onCreateProject={onCreateProject}
       onUpdateProject={onUpdateProject}
@@ -10232,8 +10278,40 @@ export function LogosApp({
           onAction={doTipAction}
         />
       )}
+      <ThemeGiftCheck
+        ready={
+          giftsOn({ SOCRIA_GIFTS: process.env.NEXT_PUBLIC_SOCRIA_GIFTS }) &&
+          !!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun.synced && !introWanted && !whatsNewShown && !busy && !streaming && !oneOpen && !acctOpen && !guideOpen && !tourOpen && !trialEnded && !sleep?.asleep && !giftNote && !onePrompt?.open && !promptSeenRef.current
+        }
+        onEnded={(g) => {
+          // the try is over: the theme they had before, chosen again (so the head script stops painting
+          // Celestial first), then said once
+          chooseTheme(g.before ?? 'paper', false);
+          showGift('theme-ended');
+        }}
+        onDue={() => showGift('theme-offer')}
+      />
+      {giftNote && (
+        <GiftNote
+          kind={giftNote}
+          onClose={() => setGiftNote(null)}
+          onAction={() => {
+            const kind = giftNote;
+            setGiftNote(null);
+            track('gift_accepted', { kind });
+            if (kind === 'theme-offer') {
+              // the one try: this visit, then their own theme back
+              writeThemeGift(giftAccepted(readThemeGift(Date.now()), Date.now(), readTheme(window.localStorage)));
+              beginTryVisit();
+              chooseTheme(THEME_GIFT.theme, false, THEME_GIFT.theme);
+            } else {
+              askOne(kind === 'deep' ? 'Socria One answers hard questions with its deepest model, every time.' : 'Celestial and the other themes come with Socria One.');
+            }
+          }}
+        />
+      )}
       <WelcomeBack
-        ready={!!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun.synced && !introWanted && !whatsNewShown && !busy && !oneOpen && !acctOpen && !guideOpen && !trialEnded && !sleep?.asleep}
+        ready={!!isSignedIn && planKnown && !one && homeShown && !hydrating && firstRun.synced && !introWanted && !whatsNewShown && !busy && !oneOpen && !acctOpen && !guideOpen && !trialEnded && !sleep?.asleep && !giftNote && !giftThisVisit}
         ask={ask}
       />
       {whatsNewShown && (

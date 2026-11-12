@@ -1961,3 +1961,30 @@ anyone but the person who asked for it: there has been no study. Not
 verified: Safari, Firefox, iOS and Android; the real model's suggestions;
 how the browser's own spelling underline looks beside the rules' on each
 platform.
+
+### Start something new, and ideas to explore
+
+Asked for: "instead of there being a chatbox, in the universal map lets add a giant + sign somewhere very obvious
+to see and beautiful … to create a new chat … in a empty chat i want to add bubbles/mindmaps, but make them
+beautiful, and less chatbot like. more or so ideas to explore".
+
+- **The +.** The box at the Universal Map's foot is now one large control: an ink disc with a plus and "Start
+  something new" in the serif (`components/logos5/Universe.tsx`, `.l5h-new` in `universe.css`). N does the same
+  when nobody is typing. It opens a new, empty line of thinking (`newFromHome`). The box comes back only when an
+  opening is carried to the map (a Project's start, an opening chosen elsewhere), so nothing that used it is lost.
+  What moved: search stays in the header (Ctrl K); voice and files are in the line of thinking's own chatbox;
+  files are no longer dropped on the map itself.
+- **Ideas to explore.** An empty line of thinking opens on a small mind map instead of one waiting card
+  (`components/logos5/IdeaSeeds.tsx`, `lib/logos5/seeds.ts`): "A new line of thinking" in the middle, and around
+  it up to three groups and eight bubbles — *Left open* (an open question, a tension, an untested assumption from
+  their other maps), *Go further* (their recent lines of thinking, as they named or asked them) and *Something
+  new* (big and everyday questions, a different few each day). Pressing one puts its question in the chatbox to be
+  made their own; nothing is sent by itself, the same rule as the starters. All of it is worked out on the device,
+  without a model call.
+- **The drawing.** The bubbles sit on an ellipse round the centre, each group's together and the groups spread
+  evenly, spaced by their own sizes; each group's name finds free room between the centre and its ideas; lines
+  stop at the edges of what they join. In a short or narrow window everything is drawn a size smaller rather than
+  crowded. On a phone the groups are rows of rounded ideas under the centre card. `test/seeds.test.mjs` checks
+  that nothing sits on anything at six window sizes and three histories.
+- Checked in the real app (signed in through the stand-ins), desktop and phone, Paper and Celestial: the + opens a
+  new line, N does too, the bubbles show and none overlap, and pressing one fills the chatbox, focused, unsent.

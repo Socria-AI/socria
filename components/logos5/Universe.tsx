@@ -96,6 +96,7 @@ export function UniverseView({
   onOpen,
   onOpenChat,
   onStart,
+  onNew,
   onFile,
   onCreateProject,
   onUpdateProject,
@@ -136,6 +137,12 @@ export function UniverseView({
   onOpenChat?: (id: string) => void;
   /** begin a new line of thinking — with these words as its first question; with files, sorted into topics first */
   onStart: (text: string, files?: { atts: Attachment[]; goal: Intent }) => void;
+  /**
+   * Begin a new, empty line of thinking and open it — the big + at the map's foot, which stands where the box
+   * that found or started used to. Given, the + replaces the box (the box comes back only to carry an opening
+   * that was handed to it, \`startWith\`); the new line opens on ideas to explore, its chatbox ready.
+   */
+  onNew?: () => void;
   /** file a conversation in a Project, or take it out of one (null) */
   onFile?: (id: string, kind: 'logos' | 'core', projectId: string | null) => void;
   /** make a Project; its id, or null if it could not be made */
@@ -352,6 +359,21 @@ export function UniverseView({
     if (footRef.current) ro?.observe(footRef.current);
     return () => ro?.disconnect();
   }, [narrow, hasTop, lens]);
+
+  // N, anywhere on the map that is not a field, starts something new — the +'s key
+  useEffect(() => {
+    if (!onNew || startWith) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== 'n' && e.key !== 'N') return;
+      if (e.metaKey || e.ctrlKey || e.altKey || e.defaultPrevented) return;
+      const t = e.target as HTMLElement | null;
+      if (t && (t.closest('input, textarea, select, [contenteditable="true"], [role="dialog"]') || t.isContentEditable)) return;
+      e.preventDefault();
+      onNew();
+    };
+    window.addEventListener('keydown', onKey);
+    return () => window.removeEventListener('keydown', onKey);
+  }, [onNew, startWith]);
 
   useEffect(() => {
     if (!said) return;
@@ -953,9 +975,15 @@ export function UniverseView({
     body = (
       <div className="l5h-empty">
         <p>Every conversation you have appears here — a map of your thinking, by day, by week and by subject.</p>
-        <button type="button" className="l5h-go" onClick={() => findRef.current?.focus()}>
-          Ask anything, or drop your files in the box below <span aria-hidden="true">↓</span>
-        </button>
+        {onNew ? (
+          <button type="button" className="l5h-go" onClick={onNew}>
+            Start your first line of thinking <span aria-hidden="true">+</span>
+          </button>
+        ) : (
+          <button type="button" className="l5h-go" onClick={() => findRef.current?.focus()}>
+            Ask anything, or drop your files in the box below <span aria-hidden="true">↓</span>
+          </button>
+        )}
       </div>
     );
   else if (!shown.length)
@@ -1002,7 +1030,7 @@ export function UniverseView({
   else if (lens === 'today' && !todayTiles.length)
     body = (
       <div className="l5h-empty is-today">
-        <button type="button" className="l5h-todaynode" onClick={() => findRef.current?.focus()}>
+        <button type="button" className="l5h-todaynode" onClick={() => (onNew ? onNew() : findRef.current?.focus())}>
           <span className="l5h-todaynode-dot" aria-hidden="true" />
           {TODAY_EMPTY}
         </button>
@@ -1143,7 +1171,23 @@ export function UniverseView({
                 </li>
               </ul>
             )}
-            <div className="l5h-omni">{findEl}</div>
+            {onNew && !startWith ? (
+              <div className="l5h-newwrap">
+                <button type="button" className="l5h-new" onClick={onNew} aria-label="Start a new line of thinking" title="Start a new line of thinking (N)">
+                  <span className="l5h-new-o" aria-hidden="true">
+                    <svg viewBox="0 0 24 24" width="30" height="30" fill="none" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" aria-hidden="true">
+                      <path d="M12 5v14M5 12h14" />
+                    </svg>
+                  </span>
+                  <span className="l5h-new-l">
+                    <span className="l5h-new-t">Start something new</span>
+                    {!narrow && <span className="l5h-new-k">N</span>}
+                  </span>
+                </button>
+              </div>
+            ) : (
+              <div className="l5h-omni">{findEl}</div>
+            )}
           </div>
           {viewOpen && (
             <ViewMenu
