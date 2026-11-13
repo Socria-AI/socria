@@ -6,6 +6,8 @@
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
 import { sanitizeChallenge } from '@/lib/challenge/challenge';
+import { sanitizeSourceCheck } from '@/lib/logos6/evidence';
+import { sanitizeCompare } from '@/lib/logos6/disagree';
 import { sanitizeDid, sanitizeInlineState } from '@/lib/inline-ui';
 import { sanitizeThreadNote } from '@/lib/runtime/explain';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources, type ReplyRef } from '@/lib/chat-thread';
@@ -66,6 +68,9 @@ function sanitizeMessages(raw: unknown): Msg[] {
       const synthesis = m.role === 'assistant' ? sanitizeSynthesis(m.synthesis) : undefined;
       // A Logos 6 challenge: the findings, what each quoted, and what the person did with each (lib/challenge)
       const challenge = m.role === 'assistant' ? sanitizeChallenge(m.challenge) : undefined;
+      // …claims checked against their documents, and where the documents disagree (Logos 6): pointers and quotes
+      const check = m.role === 'assistant' ? sanitizeSourceCheck(m.check) : undefined;
+      const compare = m.role === 'assistant' ? sanitizeCompare(m.compare) : undefined;
       // what was done with the reply's inline elements (lib/inline-ui.ts) — never its words
       const ui = m.role === 'assistant' ? sanitizeInlineState(m.ui) : undefined;
       // Its name, when it was said, and what it answers (lib/chat-thread.ts):
@@ -98,6 +103,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),
         ...(challenge ? { challenge } : {}),
+        ...(check ? { check } : {}),
+        ...(compare ? { compare } : {}),
         ...(ui ? { ui } : {}),
         ...(explain ? { explain } : {}),
       };

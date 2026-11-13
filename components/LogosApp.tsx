@@ -276,7 +276,13 @@ import {
 } from '@/lib/challenge/challenge';
 import { challengeAsked } from '@/lib/challenge/challenge-intent';
 import { selectPassages, sourceText } from '@/lib/docs/ground';
-import type { ChallengeFrom, FindingKind } from '@/lib/logos6/vocab';
+import type { ChallengeFrom, FindingKind, LevelHow, OpenFrom } from '@/lib/logos6/vocab';
+import { Focus as IdeaFocus } from '@/components/logos6/Focus';
+import { CheckCard, CompareCard, GuessFirst, SourcesPending } from '@/components/logos6/SourcesCard';
+import { checkAsked, checkText, linkEvidence, passagesFor as evPassagesFor, sanitizeSourceCheck, type Checked, type Passage as EvPassage, type SourceCheck } from '@/lib/logos6/evidence';
+import { compareAsked, compareText, sanitizeCompare, type Disagreement, type DocCompare } from '@/lib/logos6/disagree';
+import { isTheirs, weightOf } from '@/lib/logos6/support';
+import { stateOf } from '@/lib/challenge/challenge';
 import { useThemeGuard } from '@/components/account/ThemePicker';
 import { LENSES, isMadeLens, type LensId, type MadeLens } from '@/lib/logos-layout';
 
@@ -736,6 +742,15 @@ export function LogosApp({
   const [chBusy, setChBusy] = useState<null | ChallengeScopeKind>(null);
   const chBusyRef = useRef(false);
   const [chipAside, setChipAside] = useState<ReadonlySet<string>>(() => new Set());
+  // LOGOS 6, PHASE 2: the idea in Focus; an idea waiting for its line to open (a link, a chip); a quiet line
+  const [focusIdea, setFocusIdea] = useState<string | null>(null);
+  const pendingIdeaRef = useRef<{ sid: string; node: string; door: OpenFrom } | null>(null);
+  const [l6Note, setL6Note] = useState<string | null>(null);
+  const focusLinkRef = useRef<{ key: string; v: ReturnType<typeof linkEvidence> } | null>(null);
+  // PHASE 3: a check against the sources, or a comparison of them, on its way
+  const [srcBusy, setSrcBusy] = useState<null | 'check' | 'compare'>(null);
+  // PHASE 4: Guess first — a challenge waiting for their guess at the weakest part
+  const [guessFor, setGuessFor] = useState<null | { scope: ChallengeScopeKind; ids?: string[]; door: ChallengeFrom; lean?: FindingKind[]; doc?: string }>(null);
   const [picked, setPicked] = useState<Set<string>>(() => new Set());
 
   const [explore, setExplore] = useState<{
@@ -2440,12 +2455,16 @@ export function LogosApp({
 
       // Deep-link from elsewhere in the app: /chat?s=<id>
       let wanted: string | null = null;
+      let wantedNode: string | null = null;
       // …or a new line of thinking begun from a Project's home: /chat?in=<id>
       let startIn: string | null = null;
       let sharedLink = false;
       try {
         const q = new URLSearchParams(window.location.search);
         wanted = q.get('s');
+        // LOGOS 6: one idea of it, opened in Focus (/chat?s=<line>&n=<idea>)
+        const nq = q.get('n');
+        if (nq && /^[A-Za-z0-9_.:-]{1,80}$/.test(nq)) wantedNode = nq;
         sharedLink = q.get('shared') === '1';
         const pin = q.get('in');
         startIn = pin && /^[A-Za-z0-9_-]{1,80}$/.test(pin) ? pin : null;
@@ -2508,6 +2527,7 @@ export function LogosApp({
       const target = (wanted && sorted.find((s) => s.id === wanted)?.id) || (left && sorted.find((s) => s.id === left)?.id) || sorted[0].id;
       setActiveId(target);
       activeIdRef.current = target;
+      if (wantedNode && wanted === target) pendingIdeaRef.current = { sid: target, node: wantedNode, door: 'link' };
       // LOGOS 5 opens on the Universal Map — unless a link, a Project or a
       // first message chose a line of thinking, or there is nothing on it yet.
       // A guest opens on it even then: nothing to get through first, the map and its box (lib/first-run.ts wantsWelcome)
@@ -3845,6 +3865,12 @@ export function LogosApp({
   // One engine for every way of asking — words, the chip, a card, a selection, a document. The card lands in
   // the conversation as itself, as a synthesis does; nothing touches the map until the person keeps a finding.
 
+  /** A Logos 6 card, into the conversation — through the room's record in a room, so it is on both screens, as a synthesis is. */
+  function postL6(sid: string, said: Msg) {
+    if (roomRef.current.active && sharedIdsRef.current.has(sid)) roomRef.current.onLocalReply(said);
+    else patchSession(sid, (x) => ({ ...x, messages: [...x.messages, said] }));
+  }
+
   /** Passages of their documents that bear on `query`, keyed as the conversation cites them (A3.12). */
   function passagesFor(query: string, max = 8): { key: string; doc: string; block: string; text: string; name: string }[] {
     if (!docRefs.length || !query.trim()) return [];
@@ -3890,7 +3916,7 @@ export function LogosApp({
       const c = res.ok ? sanitizeChallenge(json?.challenge) : undefined;
       if (!c) throw new Error(json?.error || 'Socria could not check this just now. Try again in a moment.');
       const said: Msg = { id: newMsgId(), at: Date.now(), role: 'assistant', content: challengeText(c), challenge: c };
-      patchSession(sid, (x) => ({ ...x, messages: [...x.messages, said] }));
+      postL6(sid, said);
       if (opts.scope === 'selection') setPicked(new Set());
       l6track('challenge_shown', { outcome: c.structural ? 'structural' : c.holds ? 'held' : 'found', count: c.findings.length, scope: opts.scope });
       if (opts.guess) l6track('guess_first', { outcome: c.guess?.hit ? 'hit' : 'miss' });
@@ -3929,7 +3955,7 @@ export function LogosApp({
     }
     if (act === 'resolved') {
       // the kept card, resolved by them: the moment it clicked (plan, note 8)
-      const node = mapRef.current.nodes.find((n) => n.finding?.from === c.id && n.label === card.node.label);
+      const node = mapRef.current.nodes.find((n) => n.finding?.from === c.id && mapKeyOf(n.label) === mapKeyOf(card.node.label));
       if (node) editMap([{ op: 'status', id: node.id, status: 'resolved' }]);
     }
     markFinding(c.id, f.id, act);
@@ -3957,6 +3983,217 @@ export function LogosApp({
       if (doc) return { scope: 'document', doc: doc.title || doc.name };
     }
     return { scope: 'line' };
+  }
+
+  // ── PHASE 2: MACRO TO MICRO ──────────────────────────────────────────────────────────
+
+  /** A quiet line over the box, gone in a moment. */
+  function noteL6(text: string) {
+    setL6Note(text);
+    window.setTimeout(() => setL6Note((t) => (t === text ? null : t)), 3500);
+  }
+
+  /** Focus: one idea, what it rests on and what rests on it. Without Logos 6's Focus, the Logic Map on it. */
+  function openFocus(id: string, door: OpenFrom) {
+    if (!L6.focus) return showNodes([id]);
+    setFocusIdea(id);
+    l6track('focus_opened', { door });
+    l6track('level_changed', { door: 'line', level: 'idea', kind: door === 'link' || door === 'chip' ? 'link' : 'press' });
+  }
+  function closeFocus(how: LevelHow) {
+    if (focusIdea) l6track('level_changed', { door: 'idea', level: 'line', kind: how });
+    setFocusIdea(null);
+  }
+
+  /** An idea opened from above its conversation — a chip on the Universal Map, a link: its line, then the idea. */
+  function openIdeaFrom(sid: string, node: string, door: OpenFrom) {
+    l6track('idea_opened', { door });
+    if (sid === activeIdRef.current && !l5Home && !l5Mind) return openFocus(node, door);
+    pendingIdeaRef.current = { sid, node, door };
+    downToPage(sid, door);
+  }
+
+  /** A link to one idea, copied: /chat?s=<line>&n=<idea>. */
+  function copyIdeaLink(id: string) {
+    const sid = activeIdRef.current;
+    if (!sid) return;
+    const url = `${window.location.origin}/chat?s=${encodeURIComponent(sid)}&n=${encodeURIComponent(id)}`;
+    void navigator.clipboard?.writeText(url).then(
+      () => noteL6('Link copied — it opens this idea.'),
+      () => noteL6('The link could not be copied here.')
+    );
+  }
+
+  /** Add as idea: what is typed goes on the map as their own card — no reply, no tokens. */
+  function addIdea() {
+    const text = input.replace(/\s+/g, ' ').trim();
+    if (!text || !activeIdRef.current) return;
+    const done = editMap([{ op: 'add', node: { label: text.slice(0, 160), type: 'idea', hand: true } }]);
+    if (!done) return;
+    setInput('');
+    l6track('idea_added', {});
+    noteL6('On your map, as your own idea — no reply.');
+  }
+
+  // ── PHASE 3: DOCUMENTS ──────────────────────────────────────────────────────────────
+
+  /** Check against my sources: claims — cards, or sentences — each against the passages that bear on it. */
+  async function runCheck(claims: { id: string; text: string; node?: string }[], door: OpenFrom) {
+    const sid = activeIdRef.current;
+    if (!sid || srcBusy || !claims.length) return;
+    if (!docRefs.length) {
+      setError('Bring a document into this line of thinking first — then it can be checked against.');
+      return;
+    }
+    setSrcBusy('check');
+    setError(null);
+    try {
+      const byClaim: Record<string, string[]> = {};
+      const all = new Map<string, EvPassage>();
+      for (const c of claims.slice(0, 12)) {
+        const ps = evPassagesFor(c.text, docRefs, 3);
+        byClaim[c.id] = ps.map((x) => x.key);
+        for (const x of ps) all.set(x.key, x);
+      }
+      if (!all.size) throw new Error('Nothing in your documents bears on that, in these words.');
+      const res = await fetch('/api/logos/evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({ mode: 'check', sessionId: sid, claims: claims.slice(0, 12), byClaim, passages: [...all.values()] }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 429 && json?.sleep) return;
+      const c = res.ok ? sanitizeSourceCheck(json?.check) : undefined;
+      if (!c) throw new Error(json?.error || 'Your sources could not be read for this just now.');
+      postL6(sid, { id: newMsgId(), at: Date.now(), role: 'assistant', content: checkText(c), check: c });
+      l6track('source_check', { outcome: c.results.some((r) => r.verdict !== 'not-found') ? 'found' : 'none', count: c.results.length, door });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Your sources could not be read for this just now.');
+    } finally {
+      setSrcBusy(null);
+    }
+  }
+
+  /** Where do these disagree: two documents or more, read side by side. */
+  async function runCompare(door: OpenFrom) {
+    const sid = activeIdRef.current;
+    if (!sid || srcBusy) return;
+    if (docRefs.length < 2) {
+      setError('Comparing needs two documents or more in this line of thinking.');
+      return;
+    }
+    setSrcBusy('compare');
+    setError(null);
+    try {
+      const s = sessionsRef.current.find((x) => x.id === sid);
+      const query = [...(s?.messages ?? []).filter((m) => m.role === 'user').slice(-4).map((m) => m.content), ...(s?.map.nodes ?? []).slice(0, 12).map((n) => n.label)].join('\n');
+      const refs = docRefs.slice(0, 6);
+      const per = Math.max(3, Math.floor(18 / refs.length));
+      const passages = refs.flatMap((r) => {
+        const found = query.trim() ? evPassagesFor(query, [r], per) : [];
+        if (found.length >= 2) return found;
+        // nothing said yet that bears on it: the document's opening passages stand for it
+        return r.doc.blocks
+          .filter((b) => b.kind !== 'header' && b.kind !== 'footer')
+          .slice(0, per)
+          .flatMap((b) => {
+            const text = sourceText(r.doc, b.id);
+            return text && text.trim().length > 40 ? [{ key: citeKey(r.letter, b.id), doc: r.doc.id, block: b.id, name: r.doc.title || r.doc.name, text: text.slice(0, 1600) }] : [];
+          });
+      });
+      const res = await fetch('/api/logos/evidence', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...keyHeaders() },
+        body: JSON.stringify({ mode: 'compare', sessionId: sid, passages }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (res.status === 429 && json?.sleep) return;
+      const c = res.ok ? sanitizeCompare(json?.compare) : undefined;
+      if (!c) throw new Error(json?.error || 'Your documents could not be compared just now.');
+      postL6(sid, { id: newMsgId(), at: Date.now(), role: 'assistant', content: compareText(c), compare: c });
+      l6track('compare_run', { outcome: c.pairs.length ? 'found' : 'none', count: c.docs.length, door });
+    } catch (e) {
+      setError(e instanceof Error ? e.message : 'Your documents could not be compared just now.');
+    } finally {
+      setSrcBusy(null);
+    }
+  }
+
+  /** A checked claim, linked to its card: the passage kept as a pointer on it. */
+  function linkChecked(c: SourceCheck, r: Checked) {
+    if (!r.node || !r.passage || r.verdict === 'not-found') return;
+    const done = editMap([{ op: 'evidence', id: r.node, evidence: [{ doc: r.passage.doc, block: r.passage.block, quote: r.passage.quote, verdict: r.verdict }] }]);
+    if (!done) return;
+    patchActive((x) => ({ ...x, messages: x.messages.map((m) => (m.check?.id === c.id ? { ...m, check: { ...m.check, taken: { ...(m.check.taken ?? {}), [r.id]: 'linked' } } } : m)) }));
+  }
+
+  /** A disagreement kept on the map — a tension, resting on both passages — or set aside. */
+  function actOnPair(c: DocCompare, d: Disagreement, act: 'kept' | 'dismissed') {
+    if (act === 'kept') {
+      const detail = `${d.a.name}: “${d.a.quote}” — ${d.b.name}: “${d.b.quote}”${d.because ? ` ${d.because}` : ''}`;
+      const done = editMap([
+        {
+          op: 'add',
+          node: {
+            label: d.about,
+            type: 'tension',
+            origin: 'socria',
+            hand: true,
+            detail,
+            evidence: [
+              { doc: d.a.doc, block: d.a.block, quote: d.a.quote },
+              { doc: d.b.doc, block: d.b.block, quote: d.b.quote },
+            ],
+          },
+        },
+      ]);
+      if (!done) return;
+    }
+    patchActive((x) => ({ ...x, messages: x.messages.map((m) => (m.compare?.id === c.id ? { ...m, compare: { ...m.compare, taken: { ...(m.compare.taken ?? {}), [d.id]: act } } } : m)) }));
+  }
+
+  // ── PHASE 4: LEARNING, OPT-IN ───────────────────────────────────────────────────────
+
+  /** A line of study: where Guess first and Explain it back are offered. Called after render, so `study` is there. */
+  function learningLine(): boolean {
+    return !!study || mapRef.current.context === 'learning';
+  }
+
+  /** Simpler / Deeper: an idea, or the latest reply, at another level — a turn about it, in plain words. */
+  function simplerDeeper(which: 'simpler' | 'deeper', about: { id: string; label: string; type: MapNodeRef['type'] } | null, door: OpenFrom) {
+    l6track('simpler_deeper', { kind: which, door });
+    if (about) {
+      const text = which === 'simpler' ? `Explain “${about.label}” simpler — the plainest true version, in a few sentences.` : `Go deeper on “${about.label}” — the next level of detail, and why it holds.`;
+      return askCardQuestion(about, text);
+    }
+    void send(which === 'simpler' ? 'Say that simpler — the plainest true version, in a few sentences.' : 'Go deeper on that — the next level of detail, and why it holds.');
+  }
+
+  /** Explain it back (the Feynman technique, theirs): the box, ready for their own account of the idea. */
+  function explainBack(label: string) {
+    l6track('explain_back', { outcome: 'started' });
+    // "so basically …" is how the explain planner knows a teach-back (lib/runtime/explain.ts): confirmed or sharpened, never re-explained
+    setInput(`So basically, ${label.replace(/[.!?]+$/, '')} — `);
+    focusComposer();
+  }
+
+  /** A challenge, asked: on a line of study with Guess first on, their guess comes first — one press skips it. */
+  function askChallenge(opts: { scope: ChallengeScopeKind; ids?: string[]; door: ChallengeFrom; lean?: FindingKind[]; doc?: string }) {
+    if (L6.guessFirst && learningLine() && guessOptions().length >= 2) {
+      setGuessFor(opts);
+      return;
+    }
+    void runChallenge(opts);
+  }
+  /** What they can guess between: their own ideas, the most load-bearing first. */
+  function guessOptions(): { id: string; label: string }[] {
+    const m = mapRef.current;
+    return m.nodes
+      .filter((n) => isTheirs(n) && ['claim', 'assumption', 'idea', 'decision', 'evidence', 'belief', 'concept', 'step'].includes(n.type))
+      .map((n) => ({ n, w: weightOf(m, n.id) }))
+      .sort((a, b) => b.w - a.w)
+      .slice(0, 5)
+      .map(({ n }) => ({ id: n.id, label: n.label }));
   }
 
   /** what this screen shows of the open line of thinking, as Instant Resume keeps it */
@@ -4698,7 +4935,38 @@ export function LogosApp({
         setReplyTo(null);
         postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, ...(replying ? { replyTo: replying } : {}), ...(via ? { via } : {}) }, true);
         const where = challengeScopeNow(asked);
-        void runChallenge({ ...where, door: where.scope === 'document' ? 'document' : 'words', lean: asked.lean });
+        askChallenge({ ...where, door: where.scope === 'document' ? 'document' : 'words', lean: asked.lean });
+        return;
+      }
+    }
+    // THEIR DOCUMENTS, AGAINST THEIR THINKING (Logos 6, Phase 3): "check this against my sources", "where do these
+    // disagree?" — read against the passages in the browser, answered as a card. Alone only, with documents here.
+    if (L6.sources && docRefs.length && !atts.length && !groupNow() && !(roomRef.current.active && sharedIdsRef.current.has(activeIdRef.current ?? ''))) {
+      const compare = L6.compare && docRefs.length >= 2 && compareAsked(content);
+      const check = !compare && checkAsked(content);
+      if (compare || check) {
+        setError(null);
+        clearBox();
+        setReplyTo(null);
+        postTurn({ id: newMsgId(), at: Date.now(), role: 'user', content: said0, ...(replying ? { replyTo: replying } : {}), ...(via ? { via } : {}) }, true);
+        if (compare) void runCompare('reply');
+        else {
+          // what is checked: the card in focus, the cards picked, or their last words before this
+          const m = mapRef.current;
+          const f = focusRef.current;
+          const cards = picked.size ? m.nodes.filter((n) => picked.has(n.id)) : f?.kind === 'node' ? m.nodes.filter((n) => n.id === f.id) : [];
+          const prior = [...(sessionsRef.current.find((x) => x.id === activeIdRef.current)?.messages ?? [])].reverse().find((x) => x.role === 'user' && x.content !== said0)?.content ?? '';
+          const claims = cards.length
+            ? cards.map((n, k) => ({ id: `c${k + 1}`, text: n.label, node: n.id }))
+            : prior
+                .split(/(?<=[.!?])\s+/)
+                .map((x) => x.trim())
+                .filter((x) => x.split(/\s+/).length >= 5)
+                .slice(0, 8)
+                .map((x, k) => ({ id: `c${k + 1}`, text: x }));
+          if (claims.length) void runCheck(claims, 'reply');
+          else setError('Say the claims you want checked, or pick their cards on the map, and ask again.');
+        }
         return;
       }
     }
@@ -5711,7 +5979,7 @@ export function LogosApp({
         return newFromHome() ? { said: 'Started a new line of thinking.', post: false } : { said: 'A new line of thinking could not be started just now.', post: false };
       case 'thinking':
         if (cmd.id === activeIdRef.current && !l5Home && !l5Mind) return { said: `“${cmd.title}” is the one open.` };
-        openFromHome(cmd.id);
+        openFromHome(cmd.id, undefined, 'search');
         return { said: `Opened “${cmd.title}”.`, post: false };
       case 'memory':
         if (!cloud) return { said: 'Memory is kept for an account — sign in to have one.' };
@@ -6356,6 +6624,7 @@ export function LogosApp({
   const [readingFiles, setReadingFiles] = useState<string | null>(null);
   /** Memory: what Socria remembers, as its own place (components/logos5/MemoryView.tsx) */
   const [l5Mind, setL5Mind] = useState(false);
+
   // MEMORY, WAITING (Revision IV): the header's gold count is what Memory's Review holds — the changes proposed and not
   // yet confirmed (/api/mind/changes, the private-filtered feed MemoryView reads). Read when signed in, and again
   // whenever Memory closes, so a decision made there is reflected here.
@@ -6833,6 +7102,17 @@ export function LogosApp({
   // opened from the map, and a new one begun from it. The rail is put away; it
   // is still there ("List") for renaming, deleting and filing.
   const [l5Home, setL5Home] = useState(false);
+
+  // LOGOS 6 — an idea waiting for its line (a link, a chip on the Universal Map): opened in Focus once the line and its card are here
+  useEffect(() => {
+    const p = pendingIdeaRef.current;
+    if (!p || p.sid !== activeId || l5Home || l5Mind) return;
+    if (!map.nodes.some((n) => n.id === p.node)) return;
+    pendingIdeaRef.current = null;
+    const t = window.setTimeout(() => openFocus(p.node, p.door), 160);
+    return () => window.clearTimeout(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeId, map.nodes.length, l5Home, l5Mind]);
   /** an opening chosen elsewhere, put in the map's box to be made their own before it is sent */
   const [homeStart, setHomeStart] = useState<string | null>(null);
   /** files sent from the map's box: sorted once the new line of thinking they begin is the one open */
@@ -8241,6 +8521,16 @@ export function LogosApp({
                   {synthBusy === 'selection' ? 'Reading…' : 'Synthesize these'}
                 </button>
               )}
+              {L6.sources && docRefs.length > 0 && picked.size >= 1 && (
+                <button
+                  type="button"
+                  className="is-go is-l6"
+                  disabled={!!srcBusy}
+                  onClick={() => void runCheck(map.nodes.filter((n) => picked.has(n.id)).map((n, k) => ({ id: `c${k + 1}`, text: n.label, node: n.id })), 'map')}
+                >
+                  {srcBusy === 'check' ? 'Reading…' : 'Check against my sources'}
+                </button>
+              )}
               {L6.challenge && picked.size >= 2 && (
                 <button type="button" className="is-go is-l6" disabled={!!chBusy} onClick={() => void runChallenge({ scope: 'selection', ids: [...picked], door: 'selection' })}>
                   {chBusy === 'selection' ? 'Checking…' : 'Challenge these'}
@@ -8558,6 +8848,10 @@ export function LogosApp({
     // map's own (its view's actions), Synthesize is the Content and Logic Map views' own, and hiding the bars is gone
     ...(LOGOS4.capture ? [{ label: 'Quick capture', hint: 'Keep a thought for later', onSelect: () => setCaptureOpen(true) }] : []),
     ...(onJoinWithCode ? [{ label: 'Join with a code', hint: 'Open what someone shared with you', onSelect: onJoinWithCode }] : []),
+    // LOGOS 6: the Project this line is filed in, its home a press away — before, only a link reached it
+    ...(L6.links && active?.projectId && onOpenProject && projects?.some((x) => x.id === active.projectId)
+      ? [{ label: 'Project home', hint: projects.find((x) => x.id === active.projectId)?.name ?? 'Its goals, and what it rests on', onSelect: () => { l6track('level_changed', { door: 'line', level: 'project', kind: 'press' }); onOpenProject(active.projectId!); } }]
+      : []),
     { label: 'Live guidance', hint: one ? 'Socria shows you how, on your camera · early access' : 'Socria shows you how, on your camera · Socria One', onSelect: one ? openGuide : () => askOne(FEATURE_NOTE.experiments, false, 'experiments') },
     // while big-screen mode is on, the way out stays here, where it is looked for; the rest of the experiments are in Account
     ...(cabin ? [{ label: 'Leave big-screen mode', hint: 'Back to the usual layout', onSelect: () => setCabinMode(false) }] : []),
@@ -8713,10 +9007,13 @@ export function LogosApp({
             text: `Challenge this — is “${node.label}” really so?`,
             run: () => {
               close();
-              if (L6.challenge) void runChallenge({ scope: 'card', ids: [node.id], door: 'card' });
+              if (L6.challenge) askChallenge({ scope: 'card', ids: [node.id], door: 'card' });
               else void runAction('challenge', node);
             },
           },
+          // LOGOS 6: the card in Focus — what it rests on, and what rests on it; and the card at a plainer level
+          ...(L6.focus ? [{ label: 'Focus', text: '', run: () => { close(); openFocus(node.id, 'card'); } }] : []),
+          ...(L6.simpler ? [{ label: 'Simpler', text: '', run: () => { close(); simplerDeeper('simpler', node, 'idea'); } }] : []),
           { label: 'Trace it back', text: `Trace “${node.label}” back — where did it come from, and what does it rest on?` },
           { label: 'Take it to research', text: `Take “${node.label}” to research — what does the evidence say?` },
         ]}
@@ -8769,6 +9066,36 @@ export function LogosApp({
   // WHAT AM I MISSING? (Logos 6): one quiet chip over the box, once the line has something to test — two claims,
   // options to choose between, a draft — and until it is used here, or set aside for this visit
   const chipShown = L6.chip && !!activeId && !togetherReadOnly && !groupView && !busyHere && !chBusy && !chipAside.has(activeId) && challengeReady(messages, map);
+  // WHERE DO THESE DISAGREE? (Logos 6, Phase 3): offered once two documents are here, until it is used
+  const compareShown = L6.compare && !!activeId && !togetherReadOnly && !groupView && !busyHere && !srcBusy && docRefs.length >= 2 && !messages.some((m) => m.compare) && !chipAside.has(`cmp:${activeId}`);
+  const compareChip = compareShown ? (
+    <div className="l6-chips" role="group" aria-label="Your documents">
+      <button type="button" className="l6-chip" onClick={() => void runCompare('chip')}>
+        Where do these disagree?
+      </button>
+      <button type="button" className="l6-chip l6-chip-x" aria-label="Not now" title="Not now" onClick={() => setChipAside((cur) => new Set(cur).add(`cmp:${activeId}`))}>
+        ×
+      </button>
+    </div>
+  ) : null;
+  // GUESS FIRST (Logos 6, Phase 4): before a challenge opens on a line of study, their guess — one press skips it
+  const guessEl = guessFor ? (
+    <GuessFirst
+      options={guessOptions()}
+      onGuess={(o) => {
+        const opts = guessFor;
+        setGuessFor(null);
+        l6track('guess_first', { outcome: 'taken' });
+        void runChallenge({ ...opts, guess: o });
+      }}
+      onSkip={() => {
+        const opts = guessFor;
+        setGuessFor(null);
+        l6track('guess_first', { outcome: 'skipped' });
+        void runChallenge(opts);
+      }}
+    />
+  ) : null;
   const l6Chips = chipShown ? (
     <div className="l6-chips" role="group" aria-label="Test your thinking">
       <button
@@ -8776,7 +9103,7 @@ export function LogosApp({
         className="l6-chip is-primary"
         onClick={() => {
           const where = challengeScopeNow();
-          void runChallenge({ ...where, door: 'chip' });
+          askChallenge({ ...where, door: 'chip' });
         }}
       >
         What am I missing?
@@ -8804,11 +9131,18 @@ export function LogosApp({
         }}
       />
       {voiceOffered && !voiceOn && <VoiceOffNote ear={ear} onOn={pressVoice} />}
+      {l6Note && (
+        <p className="l6-note" role="status">
+          {l6Note}
+        </p>
+      )}
       {l6Chips}
+      {compareChip}
       <LogosComposer
         layout="stacked"
         value={input}
         onChange={setInput}
+        {...(L6.addIdea && activeId && !togetherReadOnly ? { onAddIdea: addIdea } : {})}
         focusSignal={composerFocus}
         mathAvailable={mathAvailable}
         mathTopic={mathTopic}
@@ -9195,6 +9529,24 @@ export function LogosApp({
   ];
   /** One message as the conversation draws it — in the thread, and, in one view, in the sheet above the chatbox. */
   const msgEl = (m: Msg, i: number, go?: ReactNode, opts?: { listen?: boolean }) => {
+    if (m.check) {
+      const ck = m.check;
+      return (
+        <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="l5-synth l6-chal">
+          <CheckCard check={ck} readOnly={togetherReadOnly} onOpen={(doc, block) => { openCite(doc, block); l6track('evidence_opened', { door: 'check' }); }} onLink={(r) => linkChecked(ck, r)} />
+          <MsgActions m={m} who="Socria" canReply={!togetherReadOnly} onReply={startReply} />
+        </div>
+      );
+    }
+    if (m.compare) {
+      const cp = m.compare;
+      return (
+        <div key={m.id ?? i} id={m.id ? `lg-m-${m.id}` : undefined} className="l5-synth l6-chal">
+          <CompareCard compare={cp} readOnly={togetherReadOnly} onOpen={(doc, block) => { openCite(doc, block); l6track('evidence_opened', { door: 'compare' }); }} onAct={(d, act) => actOnPair(cp, d, act)} />
+          <MsgActions m={m} who="Socria" canReply={!togetherReadOnly} onReply={startReply} />
+        </div>
+      );
+    }
     if (m.challenge) {
       const ch = m.challenge;
       return (
@@ -9264,6 +9616,17 @@ export function LogosApp({
         {...(go ? { go } : {})}
         {...(opts?.listen && m.role === 'assistant' ? { listen: true } : {})}
       />
+      {/* SIMPLER / DEEPER (Logos 6): the latest reply, at another level — theirs to ask for */}
+      {latest && solo && !busy && L6.simpler && m.role === 'assistant' && (
+        <p className="l6-under" role="group" aria-label="This reply, at another level">
+          <button type="button" className="l5-link" onClick={() => simplerDeeper('simpler', null, 'reply')}>
+            Simpler
+          </button>
+          <button type="button" className="l5-link" onClick={() => simplerDeeper('deeper', null, 'reply')}>
+            Deeper
+          </button>
+        </p>
+      )}
       {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
       {brought.length > 0 && (
         <p className="l5v-ingest" role="note">
@@ -9364,6 +9727,8 @@ export function LogosApp({
           {streaming && <L5Pending text={streaming} group={groupView} to={groupView ? 'You' : null} place={pendingPlace} disclose={!depthAsked([...messages].reverse().find((x) => x.role === 'user')?.content ?? '', replyLength)} />}
           {synthBusy && <SynthesisPending scope={synthBusy} />}
           {chBusy && <ChallengePending scope={chBusy} />}
+          {srcBusy && <SourcesPending what={srcBusy} />}
+          {guessFor && !chBusy && guessEl}
           {busyHere && !streaming && (groupView ? <L5Pending text="" group to="You" /> : <L5Working steps={workingSteps} onStop={stopAnswer} />)}
           {error && (
             <p className="l5-error" role="alert">
@@ -9585,6 +9950,8 @@ export function LogosApp({
             )}
             {newest && synthBusy && <SynthesisPending scope={synthBusy} />}
             {newest && chBusy && <ChallengePending scope={chBusy} />}
+            {newest && srcBusy && <SourcesPending what={srcBusy} />}
+            {newest && guessFor && !chBusy && guessEl}
             {newest && busyHere && !streaming && <L5Working steps={workingSteps} onStop={stopAnswer} />}
             {newest && error && (
               <p className="l5-error" role="alert">
@@ -9621,6 +9988,8 @@ export function LogosApp({
               )}
               {atNewest && synthBusy && <SynthesisPending scope={synthBusy} />}
               {atNewest && chBusy && <ChallengePending scope={chBusy} />}
+              {atNewest && srcBusy && <SourcesPending what={srcBusy} />}
+              {atNewest && guessFor && !chBusy && guessEl}
               {atNewest && busyHere && !streaming && <L5Working steps={workingSteps} onStop={stopAnswer} />}
               {atNewest && error && (
                 <p className="l5-error" role="alert">
@@ -9689,6 +10058,13 @@ export function LogosApp({
                 setFocus({ kind: 'node', id });
               }}
               onPage={() => setSpaceView(false)}
+              // LOGOS 6: the Logic Map a press away from the space, and the open idea in Focus
+              onLogicMap={() => {
+                openStage();
+                if (wsLayout && !panelsOf(wsLayout).some((x) => x.type === 'map')) changeLayout(openBeside(wsLayout, { type: 'map' }, wsFacts).layout);
+                setStudyTab('logic_map');
+              }}
+              {...(L6.focus ? { onFocusIdea: (id: string) => openFocus(id, 'space') } : {})}
               onAnswer={() => focusComposer()}
               onZoomOut={() => upToMap()}
               narrow={narrow}
@@ -10076,6 +10452,67 @@ export function LogosApp({
     : null;
   /** where the tab row was: on a full view, the way back to the chat and that view's own actions; on the chat, nothing */
   const projectName = active?.projectId ? projects?.find((p) => p.id === active.projectId)?.name : undefined;
+  // FOCUS (Logos 6, Phase 2): one idea, what holds it up and what it holds up, its sources and its findings
+  const focusNode = L6.focus && focusIdea ? map.nodes.find((n) => n.id === focusIdea) : undefined;
+  const focusEl = (() => {
+    if (!focusNode || !activeId) return null;
+    const findings = messages.flatMap((m) =>
+      m.challenge ? m.challenge.findings.filter((f) => f.target === focusNode.id).map((f) => ({ kind: f.kind, text: f.text, state: stateOf(m.challenge!, f.id) })) : []
+    );
+    const letterOf = new Map(docRefs.map((r) => [r.doc.id, r.letter]));
+    const nameOf = (doc: string) => docs.get(doc)?.title || docs.get(doc)?.name || 'Your source';
+    const kept = (focusNode.evidence ?? []).map((e) => ({ key: letterOf.has(e.doc) ? citeKey(letterOf.get(e.doc)!, e.block) : e.block, name: nameOf(e.doc), quote: e.quote, verdict: e.verdict, doc: e.doc, block: e.block }));
+    // nothing kept on it: the passage its words plainly come from, linked in the browser (no model, no verdict) —
+    // worked out once for the card and the documents here, not on every render
+    const linkKey = `${focusNode.id}|${focusNode.label}|${docRefs.map((r) => r.doc.id).join(',')}`;
+    if (focusLinkRef.current?.key !== linkKey) focusLinkRef.current = { key: linkKey, v: !kept.length && L6.sources && docRefs.length ? linkEvidence(focusNode.label, docRefs) : null };
+    const linked = kept.length ? null : focusLinkRef.current.v;
+    const evidence = kept.length ? kept : linked ? [{ key: linked.key, name: linked.name, quote: linked.quote, doc: linked.doc, block: linked.block }] : [];
+    const cameId = links?.fromNode.get(focusNode.id)?.[0];
+    const cameMsg = cameId ? messages.find((m) => m.id === cameId) : undefined;
+    const came = cameMsg && cameId ? { said: cameMsg.content.replace(/\s+/g, ' ').trim(), id: cameId } : null;
+    const ref = { id: focusNode.id, label: focusNode.label, type: focusNode.type };
+    return (
+      <>
+        <div className="l6-focus-scrim" onClick={() => closeFocus('escape')} aria-hidden="true" />
+        <IdeaFocus
+          map={map}
+          id={focusNode.id}
+          line={active?.title && active.title !== UNTITLED ? active.title : 'This line of thinking'}
+          project={projectName ?? null}
+          findings={findings}
+          evidence={evidence}
+          came={came}
+          onIdea={(id) => openFocus(id, 'focus')}
+          onClose={() => closeFocus('escape')}
+          onLine={() => closeFocus('crumb')}
+          {...(active?.projectId && onOpenProject
+            ? {
+                onProject: () => {
+                  l6track('level_changed', { door: 'idea', level: 'project', kind: 'crumb' });
+                  setFocusIdea(null);
+                  onOpenProject(active.projectId!);
+                },
+              }
+            : {})}
+          {...(L6.challenge && !togetherReadOnly ? { onChallenge: () => { setFocusIdea(null); askChallenge({ scope: 'card', ids: [focusNode.id], door: 'focus' }); } } : {})}
+          {...(L6.simpler && !togetherReadOnly ? { onSimpler: () => { setFocusIdea(null); simplerDeeper('simpler', ref, 'idea'); }, onDeeper: () => { setFocusIdea(null); simplerDeeper('deeper', ref, 'idea'); } } : {})}
+          {...(L6.explainBack && learningLine() && !togetherReadOnly ? { onExplainBack: () => { setFocusIdea(null); explainBack(focusNode.label); } } : {})}
+          {...(L6.sources && docRefs.length && !togetherReadOnly ? { onCheckSources: () => { setFocusIdea(null); void runCheck([{ id: 'c1', text: focusNode.label, node: focusNode.id }], 'focus'); } } : {})}
+          onShowOnMap={() => {
+            setFocusIdea(null);
+            showNodes([focusNode.id]);
+          }}
+          {...(came ? { onCame: () => { setFocusIdea(null); jumpTo(came.id); } } : {})}
+          onEvidence={(doc, block) => {
+            openCite(doc, block);
+            l6track('evidence_opened', { door: 'focus' });
+          }}
+          {...(L6.links ? { onCopyLink: () => copyIdeaLink(focusNode.id) } : {})}
+        />
+      </>
+    );
+  })();
   /** the account chip opens the profile's own menu: the account, and Memory (Alex Tran: the mind graph lives in the profile) */
   const homeShown = l5 && l5Home && !l5Mind && !hydrating && !room.active;
   // remembered for the visit (a ref, so no hook after the early return): a One prompt has shown
@@ -10255,15 +10692,18 @@ export function LogosApp({
     );
   }
   /** Down a level: a conversation on the Universal Map opens into its page, its name becoming the page's title. */
-  function downToPage(id: string) {
-    morph('in', () => openFromHome(id), hubNameEl(id), pageTitleEl);
+  function downToPage(id: string, door: OpenFrom = 'disc') {
+    morph('in', () => openFromHome(id, undefined, door), hubNameEl(id), pageTitleEl);
   }
   /** the contents column, on home */
   function toggleList() {
     setL5List((v) => !v);
   }
   /** a conversation pressed on the map: opened — at the card pressed, when one was */
-  function openFromHome(id: string, node?: string) {
+  function openFromHome(id: string, node?: string, door?: OpenFrom) {
+    // LOGOS 6: which door a conversation, or an idea in one, was opened by — the Universal Map against the list (H8)
+    if (door && id !== activeIdRef.current) l6track('conversation_opened', { door });
+    if (node && door) l6track('idea_opened', { door });
     setL5Home(false);
     setL5Mind(false);
     setL5List(false);
@@ -10274,6 +10714,8 @@ export function LogosApp({
     switchSession(id);
     if (node)
       setTimeout(() => {
+        // LOGOS 6: the idea in Focus — what it rests on, and what rests on it
+        if (L6.focus) return openFocus(node, door ?? 'search');
         // the space shows the idea itself, opened; elsewhere the Logic Map, on it
         if (oneViewRef.current && spaceView) return setSpaceOpen(node);
         setStudyTab('logic_map');
@@ -10324,8 +10766,8 @@ export function LogosApp({
     if (art) setArtSel((m) => ({ ...m, [sid]: art! }));
     if (docId) setContentSel((m) => ({ ...m, [sid]: `doc:${docId}` }));
     setScreens((m) => ({ ...m, [sid]: fit(to, narrowRef.current) }));
-    if (e.kind === 'node') return openFromHome(sid, local);
-    openFromHome(sid);
+    if (e.kind === 'node') return openFromHome(sid, local, 'search');
+    openFromHome(sid, undefined, 'search');
     if (e.kind === 'message' && local && !/^\d+$/.test(local)) setTimeout(() => jumpTo(local), 140);
     // the passage, selected in its document, so what is asked next is about it
     if (docId) setTimeout(() => (block ? openCite(docId, block) : documentDisplay(docId)), 140);
@@ -10371,7 +10813,7 @@ export function LogosApp({
       signedIn={!!isSignedIn}
       narrow={narrow}
       onOpen={(place) => {
-        if (heldHere(place.id)) openFromHome(place.id);
+        if (heldHere(place.id)) openFromHome(place.id, undefined, 'memory');
         else if (place.surface === 'core') onOpenChat?.(place.id);
       }}
       head={(center) =>
@@ -10401,7 +10843,8 @@ export function LogosApp({
       activeId={activeId}
       signedIn={!!isSignedIn}
       narrow={narrow}
-      onOpen={(id) => downToPage(id)}
+      onOpen={(id, door) => downToPage(id, door ?? 'disc')}
+      onOpenIdea={L6.links ? (id, node) => openIdeaFrom(id, node, 'chip') : undefined}
       onOpenChat={(id) => onOpenChat?.(id)}
       onStart={startFromHome}
       // the big + at the map's foot: a new line of thinking, opened on ideas to explore
@@ -10769,6 +11212,7 @@ export function LogosApp({
           }}
         />
       )}
+      {focusEl}
       <Tour open={tourOpen} steps={workspaceOn ? LOGOS3_TOUR : LOGOS_TOUR} onDone={endTour} />
       {styleOpen && (
         <div className="lg-style-scrim" role="dialog" aria-modal="true" aria-label="How should Socria work with you?">

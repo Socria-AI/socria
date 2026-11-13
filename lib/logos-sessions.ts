@@ -15,6 +15,8 @@ import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
 import type { Challenge } from './challenge/challenge';
+import type { SourceCheck } from './logos6/evidence';
+import type { DocCompare } from './logos6/disagree';
 import type { InlineState } from './inline-ui';
 import type { AboutRef, ReplyRef, WebSourceRef } from './chat-thread';
 import type { WriteDoc } from './write/doc';
@@ -43,6 +45,10 @@ export interface LogosMsg {
   synthesis?: Synthesis;
   /** a challenge — what was worth checking, and what the person did with each finding (Logos 6, lib/challenge) */
   challenge?: Challenge;
+  /** claims checked against their documents (Logos 6, lib/logos6/evidence.ts) */
+  check?: SourceCheck;
+  /** where their documents disagree (Logos 6, lib/logos6/disagree.ts) */
+  compare?: DocCompare;
   /**
    * What was done with the inline elements in this reply — a slider moved, a
    * choice tapped, a draft edited — by the element's position in it

@@ -22,3 +22,11 @@ export { keepPlaced } from '@/lib/logos6/protect';
 export { sanitizeMap, sanitizeNodeFinding, sanitizeNodeEvidence } from '@/lib/logos';
 export { applyMapEdits } from '@/lib/map-edit';
 export { chooseAssist } from '@/lib/cognition/assist';
+// Phase 3: documents
+export {
+  linkEvidence, passagesFor, bestSentence, asEvidence, checkInCode, checkAll, gateChecks, sanitizeSourceCheck, checkText, checkAsked, VERDICTS,
+} from '@/lib/logos6/evidence';
+export {
+  gateCompare, figurePairs, mergePairs, sanitizeCompare, compareText, compareAsked, DISAGREE_LABEL, BOTH_CAN_HOLD, DISAGREE_KINDS,
+} from '@/lib/logos6/disagree';
+export { conflicts as docConflicts } from '@/lib/runtime/epistemic';

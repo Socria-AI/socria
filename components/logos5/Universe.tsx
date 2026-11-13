@@ -95,6 +95,7 @@ export function UniverseView({
   narrow = false,
   head,
   onOpen,
+  onOpenIdea,
   onOpenChat,
   onStart,
   onNew,
@@ -132,8 +133,10 @@ export function UniverseView({
   narrow?: boolean;
   /** the screen's header, given what goes in its middle (nothing: the box that finds or starts is at the map's foot) and how many conversations are on the map */
   head?: (center: ReactNode, count: number) => ReactNode;
-  /** open a line of thinking */
-  onOpen: (id: string) => void;
+  /** open a line of thinking — and the door it was opened by (Logos 6) */
+  onOpen: (id: string, door?: 'disc' | 'pinch' | 'double' | 'enter' | 'search' | 'pickup' | 'waiting') => void;
+  /** open one idea of a line of thinking, from its card on the map (Logos 6: the macro-to-micro way down) */
+  onOpenIdea?: (id: string, node: string) => void;
   /** open a Core chat */
   onOpenChat?: (id: string) => void;
   /** begin a new line of thinking — with these words as its first question; with files, sorted into topics first */
@@ -260,6 +263,10 @@ export function UniverseView({
   const homeByKey = useMemo(() => new Map(homes.list.map((h) => [h.key, h])), [homes]);
 
   const [query, setQuery] = useState('');
+  // THE MAP'S OWN SEARCH, BACK (Logos 6): since the + moved into the map the box at its foot was never mounted, so
+  // "/", dimming what does not match and dropping files on the map did nothing. "/" brings the box back; it goes
+  // again when it is emptied and left — the + stays where it was put.
+  const [findOpen, setFindOpen] = useState(false);
   const q = query.trim();
   const matches = useMemo(() => (q ? new Map(tiles.map((t) => [t.id, tileMatch(t, q)])) : null), [tiles, q]);
   const matchOf = useMemo(() => (matches ? (id: string) => matches.get(id) ?? null : null), [matches]);
@@ -440,16 +447,16 @@ export function UniverseView({
   }, [put, onFile]);
 
   const open = useCallback(
-    (t: Tile) => {
+    (t: Tile, door?: 'disc' | 'pinch' | 'double' | 'enter' | 'search' | 'pickup' | 'waiting') => {
       setPreview(null);
       if (t.kind === 'core') onOpenChat?.(t.id);
-      else onOpen(t.id);
+      else onOpen(t.id, door);
     },
     [onOpen, onOpenChat]
   );
-  const openId = (id: string) => {
+  const openId = (id: string, door?: 'disc' | 'pinch' | 'double' | 'enter' | 'search' | 'pickup' | 'waiting') => {
     const t = tileById.get(id);
-    if (t) open(t);
+    if (t) open(t, door);
   };
 
   // ── the lenses ──
@@ -633,7 +640,8 @@ export function UniverseView({
       if (typing) return;
       if (e.key === '/' && !e.metaKey && !e.ctrlKey) {
         e.preventDefault();
-        findRef.current?.focus();
+        setFindOpen(true);
+        requestAnimationFrame(() => findRef.current?.focus());
       } else if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === 'z') {
         e.preventDefault();
         if (e.shiftKey) redo();
@@ -732,7 +740,12 @@ export function UniverseView({
         sheet={narrow}
         taught={previewTaught}
         acts={{
-          onOpen: () => open(previewTile),
+          onOpen: () => open(previewTile, 'disc'),
+          // an idea chip pressed: that idea, opened in its conversation (Logos 6)
+          onIdea: onOpenIdea && previewTile.kind === 'logos' ? (node) => {
+            setPreview(null);
+            onOpenIdea(previewTile.id, node);
+          } : undefined,
           onStar: () => commit((a) => A.setIn(a, 'starred', [previewTile.id], !starredSet.has(previewTile.id))),
           onHide: () => {
             commit((a) => A.setIn(a, 'hidden', [previewTile.id], true));
@@ -1097,7 +1110,11 @@ export function UniverseView({
           className={`l5h-main lens-${lens}${inTime(lens) ? ' is-time' : ''}${dropping ? ' is-dropping' : ''}`}
           ref={mainRef}
           style={{ ['--l5h-foot' as string]: `${foot}px` }}
-          onDragEnter={(e) => takeRef.current && e.dataTransfer?.types?.includes('Files') && (e.preventDefault(), setDropping(true))}
+          onDragEnter={(e) => {
+            // files brought to the map: the box that takes them comes back to take them (Logos 6)
+            if (!takeRef.current && e.dataTransfer?.types?.includes('Files')) setFindOpen(true);
+            if (takeRef.current && e.dataTransfer?.types?.includes('Files')) (e.preventDefault(), setDropping(true));
+          }}
           onDragOver={(e) => takeRef.current && e.dataTransfer?.types?.includes('Files') && e.preventDefault()}
           onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node | null) && setDropping(false)}
           onDrop={(e) => {
@@ -1180,7 +1197,16 @@ export function UniverseView({
               </ul>
             )}
             {/* the + is in the map itself now (StartDisc); the box comes back only to carry an opening */}
-            {!startable && <div className="l5h-omni">{findEl}</div>}
+            {(!startable || findOpen || !!query) && (
+              <div
+                className="l5h-omni"
+                onBlur={(e) => {
+                  if (!query && !e.currentTarget.contains(e.relatedTarget as Node | null)) setFindOpen(false);
+                }}
+              >
+                {findEl}
+              </div>
+            )}
           </div>
           {viewOpen && (
             <ViewMenu

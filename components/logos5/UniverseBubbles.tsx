@@ -47,7 +47,8 @@ export interface BubbleActs {
   onSelect: (ids: string[], add?: boolean) => void;
   /** a conversation pressed: its card, beside where it is on screen */
   onPreview: (id: string | null, at: DOMRect | null) => void;
-  onOpen: (id: string) => void;
+  /** opened — and how, so Logos 6 can tell the map's doors apart (lib/logos6/vocab.ts OPEN_FROM) */
+  onOpen: (id: string, door?: 'pinch' | 'double' | 'enter') => void;
   /** conversations dropped into another subject: given it — into a Project, filed there */
   onRefile: (ids: string[], to: string) => void;
   /** This week: a subject folded away, or opened again */
@@ -294,7 +295,7 @@ export function BubbleMap({
           if (diveRef.current > 0.18) {
             diveRef.current = 0;
             const id = hub.getAttribute('data-node');
-            if (id) acts.onOpen(id);
+            if (id) acts.onOpen(id, 'pinch');
           }
           return;
         }
@@ -395,7 +396,24 @@ export function BubbleMap({
       const r = box.current!.getBoundingClientRect();
       const off = (p: { x: number; y: number }) => ({ x: p.x - r.left, y: p.y - r.top });
       touched.current = true;
-      setCam(keep(pinchCamera(g.cam0, off(g.pinch.a0), off(g.pinch.b0), off(pts[0]), off(pts[1]))));
+      const next = keep(pinchCamera(g.cam0, off(g.pinch.a0), off(g.pinch.b0), off(pts[0]), off(pts[1])));
+      setCam(next);
+      // ONE SPACE, BY TOUCH TOO (Logos 6): a pinch that opens a conversation until it fills the view goes down
+      // into it, as a trackpad's does — before, a touch pinch only ever zoomed
+      if (next.k > g.cam0.k * 1.15 && !diveRef.current) {
+        const mid = { x: (pts[0].x + pts[1].x) / 2, y: (pts[0].y + pts[1].y) / 2 };
+        const hub = (document.elementFromPoint(mid.x, mid.y) as Element | null)?.closest?.('.l5b-hub[data-node]');
+        if (hub && hub.getBoundingClientRect().width >= Math.min(r.width, r.height) * 0.62) {
+          const id = hub.getAttribute('data-node');
+          if (id) {
+            diveRef.current = 1;
+            gesture.current = null;
+            pointers.current.clear();
+            setTimeout(() => (diveRef.current = 0), 600);
+            acts.onOpen(id, 'pinch');
+          }
+        }
+      }
       return;
     }
     const dx = e.clientX - g.sx;
@@ -470,7 +488,7 @@ export function BubbleMap({
     const t = Date.now();
     if (lastTap.current?.id === id && t - lastTap.current.t < 360) {
       lastTap.current = null;
-      return acts.onOpen(id);
+      return acts.onOpen(id, 'double');
     }
     lastTap.current = { id, t };
     acts.onSelect([id]);
@@ -505,7 +523,7 @@ export function BubbleMap({
     }
     if (e.key === 'Enter' && cur) {
       e.preventDefault();
-      return acts.onOpen(cur);
+      return acts.onOpen(cur, 'enter');
     }
     if (e.key === ' ' && cur) {
       e.preventDefault();

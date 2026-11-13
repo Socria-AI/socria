@@ -330,6 +330,7 @@ const MODULES = [
   'test/helpers/events-under-test.ts',
   // Logos 6: switches, measures, feature tests, the challenge engine, Focus, links, evidence (docs/LOGOS-6.md)
   'test/helpers/logos6-under-test.ts',
+  'test/helpers/logos6-ui-under-test.tsx',
   // Logos 5: the turn, the chrome, rich reading and the stage preferences
   'test/helpers/logos5-under-test.tsx',
   // the Draft Space and the Writing Space: the document, Word, the checks, the board (lib/write/*)

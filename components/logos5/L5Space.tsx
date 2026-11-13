@@ -142,6 +142,8 @@ export function L5Space({
   openHero,
   onIdea,
   onPage,
+  onLogicMap,
+  onFocusIdea,
   onAnswer,
   onZoomOut,
   narrow = false,
@@ -172,6 +174,10 @@ export function L5Space({
   onIdea: (id: string) => void;
   /** the conversation as a page, every turn in order */
   onPage: () => void;
+  /** the Logic Map, beside (Logos 6: the space had no way to it) */
+  onLogicMap?: () => void;
+  /** the open idea in Focus: what it rests on, and what rests on it (Logos 6) */
+  onFocusIdea?: (id: string) => void;
   /** Socria's question pressed while the chatbox is answering it: the cursor goes to the box */
   onAnswer?: () => void;
   onZoomOut?: () => void;
@@ -1144,6 +1150,16 @@ export function L5Space({
           }}
         >
           Put back
+        </button>
+      )}
+      {onFocusIdea && picked && (
+        <button type="button" className="l5-link ls-focus" title="This idea: what it rests on, and what rests on it" onClick={() => onFocusIdea(picked)}>
+          Focus
+        </button>
+      )}
+      {onLogicMap && (
+        <button type="button" className="l5-link ls-logicmap" title="The Logic Map, beside" onClick={onLogicMap}>
+          Logic Map
         </button>
       )}
       <button type="button" className="l5-link is-go ls-page" onClick={onPage}>

@@ -41,6 +41,8 @@ import { hueOf } from '@/lib/share/hue';
 import { useComments } from '@/components/share/comments/useComments';
 import { CommentsPanel } from '@/components/share/comments/Comments';
 import './project-home.css';
+import { LOGOS6 } from '@/lib/logos6/switches';
+import { foundationsAcross, projectReadingKey } from '@/lib/logos6/project-rests';
 
 interface HomeChatRow {
   id: string;
@@ -127,6 +129,7 @@ export function ProjectHome({
   onShare,
   onRenamed,
   refreshKey,
+  onOpenIdea,
 }: {
   id: string;
   onOpenChat: (id: string, kind: 'chat' | 'logos') => void;
@@ -135,6 +138,8 @@ export function ProjectHome({
   onShare?: () => void;
   onRenamed?: (id: string, kind: 'chat' | 'logos', title: string) => void;
   refreshKey?: unknown;
+  /** one idea of one of its conversations, opened (Logos 6): what the Project rests on, pressed */
+  onOpenIdea?: (chatId: string, nodeId: string) => void;
 }) {
   const [data, setData] = useState<HomeData | null>(null);
   const [err, setErr] = useState<string | null>(null);
@@ -203,10 +208,23 @@ export function ProjectHome({
 
   useEffect(() => {
     setData(null);
-    setSynth({ busy: false, result: null, err: null });
+    // LOGOS 6: the Project's last reading, kept on this device, shown again rather than asked for again
+    let kept: ProjectSynthesis | null = null;
+    try {
+      const raw = localStorage.getItem(projectReadingKey(id));
+      const j = raw ? JSON.parse(raw) : null;
+      if (j && typeof j === 'object' && j.synthesis && typeof j.synthesis.summary === 'string') kept = j.synthesis as ProjectSynthesis;
+      setReadAt(j && typeof j.at === 'number' ? j.at : null);
+    } catch {
+      setReadAt(null);
+    }
+    setSynth({ busy: false, result: kept, err: null });
     setAllChats(false);
     void load();
-  }, [load, refreshKey]);
+  }, [load, refreshKey, id]);
+  const [readAt, setReadAt] = useState<number | null>(null);
+  // WHAT THIS PROJECT RESTS ON (Logos 6): the foundations its conversations lean on, read from their maps
+  const rests = useMemo(() => (LOGOS6.projectRests && data ? foundationsAcross(data.chats.filter((c) => c.kind === 'logos')) : []), [data]);
 
   const folded = (k: string) => prefs.folded.includes(k);
   const fold = (k: string) =>
@@ -225,6 +243,11 @@ export function ProjectHome({
       const j = await res.json().catch(() => null);
       if (!res.ok) throw new Error(j?.error || 'That could not be read just now.');
       setSynth({ busy: false, result: j.synthesis as ProjectSynthesis, err: null });
+      try {
+        const at = Date.now();
+        localStorage.setItem(projectReadingKey(id), JSON.stringify({ at, synthesis: j.synthesis }));
+        setReadAt(at);
+      } catch {}
     } catch (e) {
       setSynth({ busy: false, result: null, err: e instanceof Error ? e.message : 'That could not be read just now.' });
     }
@@ -580,6 +603,32 @@ export function ProjectHome({
           </Section>
         )}
 
+        {/* ── what it rests on (Logos 6) ── */}
+        {rests.length > 0 && (
+          <Section id="rests" title="What this Project rests on" folded={folded('rests')} onFold={fold}>
+            <ul className="ph-rests">
+              {rests.map((f) => (
+                <li key={`${f.where[0].chat}:${f.where[0].node}`}>
+                  <button
+                    className="ph-link ph-rest"
+                    onClick={() => (onOpenIdea ? onOpenIdea(f.where[0].chat, f.where[0].node) : onOpenChat(f.where[0].chat, 'logos'))}
+                    title="Open this idea"
+                  >
+                    {f.label}
+                  </button>
+                  <span className="ph-small">
+                    {' '}
+                    · {f.kind === 'assumption' ? 'an assumption' : 'a claim'}
+                    {f.where.length > 1 ? `, in ${f.where.length} conversations` : `, in “${titles.get(f.where[0].chat)?.title ?? 'one conversation'}”`}
+                    {f.unsupported ? ' · nothing under it yet' : ''}
+                  </span>
+                </li>
+              ))}
+            </ul>
+            <p className="ph-small">The ideas other ideas here rest on, read from your maps — the ones in more than one conversation first.</p>
+          </Section>
+        )}
+
         {/* ── the reading ── */}
         <Section id="synth" title="Synthesize the project" folded={folded('synth')} onFold={fold}>
           {!synth.result ? (
@@ -602,6 +651,7 @@ export function ProjectHome({
               <SynthList title="Could be stronger" items={synth.result.improvements} titles={titles} onOpenChat={onOpenChat} />
               <p className="ph-small">
                 {synth.result.source === 'model' ? 'Socria’s reading of your material.' : 'Read from the structure of your maps.'} Nothing here was written to your memory or marked as decided.
+                {readAt ? ` Read ${new Date(readAt).toLocaleDateString()}, kept on this device.` : ''}
                 {' '}<button className="ph-link" onClick={() => void synthesize()}>Read again</button>
               </p>
             </div>

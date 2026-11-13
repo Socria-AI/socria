@@ -286,7 +286,7 @@ console.log('\n=== the defect: "Challenge it" reaches a challenge ===');
   ok('"what am I missing?" reaching the reply is a challenge too', chooseAssist({ lastUserText: 'What am I missing?', history: [], guard: false }).mode === 'challenge');
   ok('a question of fact is still a question of fact', chooseAssist({ lastUserText: 'What is the capital of France?', history: [], guard: false }).mode !== 'challenge');
   const app = read('components/LogosApp.tsx');
-  ok('the card’s quick action runs a challenge, never a plain question', /label: 'Challenge it',[\s\S]{0,200}run: \(\) => \{[\s\S]{0,120}runChallenge\(\{ scope: 'card', ids: \[node\.id\], door: 'card' \}\)[\s\S]{0,60}else void runAction\('challenge', node\)/.test(app));
+  ok('the card’s quick action runs a challenge, never a plain question', /label: 'Challenge it',[\s\S]{0,200}run: \(\) => \{[\s\S]{0,120}askChallenge\(\{ scope: 'card', ids: \[node\.id\], door: 'card' \}\)[\s\S]{0,60}else void runAction\('challenge', node\)/.test(app));
   ok('Explore’s Challenge is the engine’s, when Logos 6 is on', /if \(mode === 'challenge' && L6\.challenge\) \{\s*void runChallenge\(\{ scope: 'card', ids: \[node\.id\], door: 'explore' \}\)/.test(app));
   ok('words are read before anything is sent, alone only', /const asked = challengeAsked\(content,/.test(app) && /!groupNow\(\)/.test(app));
   ok('what they placed is kept whenever a map lands', /const kept = keepPlaced\(s\.map, replayMapChange\(dropRemoved\(map/.test(app));

@@ -150,6 +150,8 @@ export function tileSaid(t: Tile, groupName?: string): string {
 
 export interface PreviewActs {
   onOpen: () => void;
+  /** an idea chip pressed: that idea, opened (Logos 6); absent, the chips are words only */
+  onIdea?: (nodeId: string) => void;
   onStar: () => void;
   onHide: () => void;
   onLink?: () => void;
@@ -339,11 +341,17 @@ export function PreviewCard({
             // a study's topic and an idea of the same name are one idea
             .filter((n, i, all) => all.findIndex((m) => m.label.trim().toLowerCase() === n.label.trim().toLowerCase()) === i)
             .slice(0, 6)
-            .map((n) => (
-              <span key={n.id} className={`l5h-chip${n.from === 'topic' ? ' is-topic' : ''}`}>
-                {n.label}
-              </span>
-            ))}
+            .map((n) =>
+              acts.onIdea && n.from === 'idea' ? (
+                <button key={n.id} type="button" className="l5h-chip is-link" title="Open this idea" onClick={() => acts.onIdea!(n.id)}>
+                  {n.label}
+                </button>
+              ) : (
+                <span key={n.id} className={`l5h-chip${n.from === 'topic' ? ' is-topic' : ''}`}>
+                  {n.label}
+                </span>
+              )
+            )}
         </div>
       )}
       {links.length > 0 && (

@@ -22,7 +22,7 @@
 // structure shows, found in code), challenge-gate.ts (the checks), challenge-prompt.ts (what the model is asked).
 
 import { CHALLENGE_SCOPES, FINDING_KINDS, type ChallengeScopeKind, type FindingKind } from '../logos6/vocab';
-import type { LogosNode, LogosRelation, ThinkingMap } from '../logos';
+import { MAP_LABEL_MAX, type LogosNode, type LogosRelation, type ThinkingMap } from '../logos';
 
 export { FINDING_KINDS, CHALLENGE_SCOPES };
 export type { FindingKind, ChallengeScopeKind };
@@ -265,7 +265,8 @@ export function findingCard(f: Finding, challengeId: string, map: Pick<ThinkingM
   fromNear?: boolean;
 } {
   const shape = AS_CARD[f.kind];
-  const label = f.text.length > LIMITS.label ? `${f.text.slice(0, LIMITS.label - 1).trimEnd()}…` : f.text;
+  // cut where the map cuts a card's words (lib/logos.ts), so the card kept is the card found again
+  const label = f.text.length > MAP_LABEL_MAX ? `${f.text.slice(0, MAP_LABEL_MAX - 1).trimEnd()}…` : f.text;
   const detail = [f.matters ? `If it's wrong: ${f.matters}` : '', f.settle ? `To settle it: ${f.settle}` : ''].filter(Boolean).join(' ');
   const target = f.target && map.nodes.some((n) => n.id === f.target) ? f.target : undefined;
   return {

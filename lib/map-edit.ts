@@ -75,7 +75,9 @@ export type MapEdit =
   /** what the drawing is of — "The water cycle" (empty clears it) */
   | { op: 'title'; title: string }
   /** a drawing put on the map — a reply's diagram opened there (lib/logos5/drawing.ts); the drawing before gives way */
-  | { op: 'drawing'; drawing: Drawing };
+  | { op: 'drawing'; drawing: Drawing }
+  /** Logos 6: the passages a card rests on in their documents, kept as pointers (lib/logos6/evidence.ts) */
+  | { op: 'evidence'; id: string; evidence: NonNullable<LogosNode['evidence']> };
 
 /** The most labels a map remembers removing. Past this the oldest is forgotten. */
 export const MAX_REMOVED = 40;
@@ -209,6 +211,13 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
         edges = [...edges, edit.fromNear ? { from: edit.near, to: id, relation, strength: 'normal' } : { from: id, to: edit.near, relation, strength: 'normal' }];
       }
       applied.push({ edit, said: `Added ${quote(label)} to the map${edit.node.origin === 'socria' ? ', marked as Socria’s suggestion' : ''}.` });
+    } else if (edit.op === 'evidence') {
+      const n = byId(edit.id);
+      if (!n) { refused.push(`Nothing on the map has the id ${edit.id}.`); continue; }
+      // the newest pointer for a passage replaces an older one; at most four
+      const merged = sanitizeNodeEvidence([...edit.evidence, ...(n.evidence ?? [])]);
+      nodes = nodes.map((x) => (x.id === n.id ? { ...x, ...(merged ? { evidence: merged } : {}) } : x));
+      applied.push({ edit, said: `Linked ${quote(n.label)} to ${edit.evidence.length === 1 ? 'a passage' : 'passages'} in your sources.` });
     } else if (edit.op === 'unlink') {
       const a = byId(edit.from), b = byId(edit.to);
       if (!a || !b) { refused.push(`Both ends of a connection have to be on the map.`); continue; }

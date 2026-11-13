@@ -469,6 +469,8 @@ export default function ChatPage() {
                 : undefined
             }
             onOpenChat={openFromHome}
+            // Logos 6: what the Project rests on, pressed — that idea, opened in Focus in its conversation
+            onOpenIdea={(chatId, nodeId) => window.location.assign(`/chat?s=${encodeURIComponent(chatId)}&n=${encodeURIComponent(nodeId)}`)}
             // Every new conversation is a line of thinking, begun in the Project.
             onNewChat={() => window.location.assign(`/chat?in=${encodeURIComponent(homeProject)}`)}
             onSettings={() => setSheet(homeProject)}

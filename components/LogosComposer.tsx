@@ -408,6 +408,7 @@ export function LogosComposer({
   drafts,
   setDrafts,
   onSend,
+  onAddIdea,
   busy,
   waiting,
   readImage,
@@ -454,6 +455,11 @@ export function LogosComposer({
   drafts: Draft[];
   setDrafts: (fn: (prev: Draft[]) => Draft[]) => void;
   onSend: () => void;
+  /**
+   * "Add as idea" (Logos 6): what is typed goes on the map as the person's own card — no reply, no tokens.
+   * Alt+Enter, or the word under the box. Absent: neither is offered.
+   */
+  onAddIdea?: () => void;
   busy: boolean;
   /** hands an image to the vision pass; returns what Logos read in it */
   readImage: (dataUrl: string) => Promise<string>;
@@ -1016,6 +1022,13 @@ export function LogosComposer({
                     return;
                   }
                 }
+                // ALT+ENTER: their own idea, on the map, with no reply (Logos 6)
+                if (e.key === 'Enter' && e.altKey && onAddIdea && value.trim() && !(e.nativeEvent as KeyboardEvent).isComposing) {
+                  e.preventDefault();
+                  onAddIdea();
+                  if (taRef.current) taRef.current.style.height = 'auto';
+                  return;
+                }
                 // Enter sends, Shift+Enter is a new line — and Enter that ends a
                 // word being composed (Japanese, Chinese, an accent) is not a send
                 if (e.key === 'Enter' && !e.shiftKey && !(e.nativeEvent as KeyboardEvent).isComposing) {
@@ -1088,6 +1101,11 @@ export function LogosComposer({
                   }}
                 />
                 {footer && <span className="l5-ctools-mid">{footer}</span>}
+                {onAddIdea && value.trim() && (
+                  <button type="button" className="l5-link l6-addidea" onClick={onAddIdea} title="Put this on your map as your own idea, with no reply (Alt+Enter)">
+                    Add as idea
+                  </button>
+                )}
               </span>
               <span className="l5-ctools-end">
                 {guide && (

@@ -1,6 +1,8 @@
 # Logos 6: challenge, macro to micro, and documents
 
-*A plan for approval. Nothing in it is built yet. It was written against dev at 87b2351 on 13 November 2026, after a read-only audit of the code.*
+*Approved on 13 November 2026 ("all phases, to the dev branch") and built on dev the same day. What is in the code, how it is switched, and what was deliberately left for later are in [LOGOS-6.md](LOGOS-6.md). The plan below is kept as written, apart from one correction: the trial is seven days, so voluntary return (H4, §7.D) is measured over days 2 to 7.*
+
+*It was written against dev at 87b2351, after a read-only audit of the code.*
 
 Sources:
 

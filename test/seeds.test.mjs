@@ -94,7 +94,8 @@ ok('two groups face each other across the centre', two.length === 2 && two[0].na
 
 console.log('\n=== wired where it belongs ===');
 const uni = read('components/logos5/Universe.tsx');
-ok('the + is drawn in the map itself, in every lens — no pill under it — and the box comes back only to carry an opening', /const startable = !!onNew && !startWith;/.test(uni) && (uni.match(/onStart: startable \? onNew : undefined/g) ?? []).length === 2 && /\{!startable && <div className="l5h-omni">\{findEl\}<\/div>\}/.test(uni) && !/className="l5h-new"/.test(uni) && /<StartDisc /.test(read('components/logos5/UniverseBubbles.tsx')) && /<StartDisc /.test(read('components/logos5/UniverseTime.tsx')) && (uni.match(/<EmptyStart /g) ?? []).length === 3);
+// Logos 6: the box also comes back when "/" asks to search the map (or a search is under way) — it was unreachable
+ok('the + is drawn in the map itself, in every lens — no pill under it — and the box comes back only to carry an opening, or when "/" asks to search', /const startable = !!onNew && !startWith;/.test(uni) && (uni.match(/onStart: startable \? onNew : undefined/g) ?? []).length === 2 && /\{\(!startable \|\| findOpen \|\| !!query\) && \(\s*<div\s+className="l5h-omni"/.test(uni) && /const \[findOpen, setFindOpen\] = useState\(false\)/.test(uni) && !/className="l5h-new"/.test(uni) && /<StartDisc /.test(read('components/logos5/UniverseBubbles.tsx')) && /<StartDisc /.test(read('components/logos5/UniverseTime.tsx')) && (uni.match(/<EmptyStart /g) ?? []).length === 3);
 ok('N starts something new, never while typing', /e\.key !== 'n' && e\.key !== 'N'/.test(uni) && /closest\('input, textarea, select/.test(uni));
 const app = read('components/LogosApp.tsx');
 ok('the + opens a new line of thinking', /onNew=\{\(\) => void newFromHome\(\)\}/.test(app));

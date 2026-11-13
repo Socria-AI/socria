@@ -48,6 +48,8 @@ import { can, type Role } from '@/lib/share/roles';
 import { displayNameOf, isShared, noteChange, shareAccess } from '@/lib/share/server';
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
 import { sanitizeChallenge } from '@/lib/challenge/challenge';
+import { sanitizeSourceCheck } from '@/lib/logos6/evidence';
+import { sanitizeCompare } from '@/lib/logos6/disagree';
 import { sanitizeStoredDraft } from '@/lib/write/doc';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources } from '@/lib/chat-thread';
 
@@ -147,6 +149,8 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         const about = role === 'user' ? cleanAboutRef(r.about) : undefined;
         const synthesis = role === 'assistant' ? sanitizeSynthesis(r.synthesis) : undefined;
         const challenge = role === 'assistant' ? sanitizeChallenge(r.challenge) : undefined;
+        const check = role === 'assistant' ? sanitizeSourceCheck(r.check) : undefined;
+        const compare = role === 'assistant' ? sanitizeCompare(r.compare) : undefined;
         // the web pages a reply read, listed under it — addresses and titles, never their text
         const sources = role === 'assistant' ? cleanWebSources(r.sources) : undefined;
         // what the reply did, as the explanation engine planned it: enum codes and a concept (lib/runtime/explain.ts)
@@ -157,7 +161,7 @@ export async function POST(req: NextRequest, { params }: Ctx) {
         // a person's turn is theirs, named; Socria's answer is Socria's
         return role === 'user'
           ? { ...extra, role, content, by }
-          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}), ...(challenge ? { challenge } : {}), ...(sources ? { sources } : {}), ...(explain ? { explain } : {}) };
+          : { ...extra, role, content, ...(synthesis ? { synthesis } : {}), ...(challenge ? { challenge } : {}), ...(check ? { check } : {}), ...(compare ? { compare } : {}), ...(sources ? { sources } : {}), ...(explain ? { explain } : {}) };
       }).filter((m) => m.content.trim())
     : [];
   const base = Number(body?.base) || 0;
