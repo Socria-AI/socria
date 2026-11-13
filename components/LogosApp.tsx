@@ -9069,14 +9069,14 @@ export function LogosApp({
   // WHERE DO THESE DISAGREE? (Logos 6, Phase 3): offered once two documents are here, until it is used
   const compareShown = L6.compare && !!activeId && !togetherReadOnly && !groupView && !busyHere && !srcBusy && docRefs.length >= 2 && !messages.some((m) => m.compare) && !chipAside.has(`cmp:${activeId}`);
   const compareChip = compareShown ? (
-    <div className="l6-chips" role="group" aria-label="Your documents">
-      <button type="button" className="l6-chip" onClick={() => void runCompare('chip')}>
-        Where do these disagree?
+    <p className="l6-offer">
+      <button type="button" className="l5-link is-go" onClick={() => void runCompare('chip')}>
+        Where do these documents disagree? <span className="l5-ar" aria-hidden="true">→</span>
       </button>
-      <button type="button" className="l6-chip l6-chip-x" aria-label="Not now" title="Not now" onClick={() => setChipAside((cur) => new Set(cur).add(`cmp:${activeId}`))}>
-        ×
+      <button type="button" className="l5-link is-meta" onClick={() => setChipAside((cur) => new Set(cur).add(`cmp:${activeId}`))}>
+        Not now
       </button>
-    </div>
+    </p>
   ) : null;
   // GUESS FIRST (Logos 6, Phase 4): before a challenge opens on a line of study, their guess — one press skips it
   const guessEl = guessFor ? (
@@ -9097,21 +9097,21 @@ export function LogosApp({
     />
   ) : null;
   const l6Chips = chipShown ? (
-    <div className="l6-chips" role="group" aria-label="Test your thinking">
+    <p className="l6-offer">
       <button
         type="button"
-        className="l6-chip is-primary"
+        className="l5-link is-go"
         onClick={() => {
           const where = challengeScopeNow();
           askChallenge({ ...where, door: 'chip' });
         }}
       >
-        What am I missing?
+        What am I missing? <span className="l5-ar" aria-hidden="true">→</span>
       </button>
-      <button type="button" className="l6-chip l6-chip-x" aria-label="Not now" title="Not now" onClick={() => setChipAside((cur) => new Set(cur).add(activeId!))}>
-        ×
+      <button type="button" className="l5-link is-meta" onClick={() => setChipAside((cur) => new Set(cur).add(activeId!))}>
+        Not now
       </button>
-    </div>
+    </p>
   ) : null;
   const l5Dock = (
       <div className="l5-dock" ref={pinRef}>
@@ -9588,6 +9588,21 @@ export function LogosApp({
         who={shownWho(m)}
         group={groupView}
         cont={!!prev && !prev.synthesis && authorKey(prev) === authorKey(m)}
+        // Simpler / Deeper (Logos 6): the latest reply at another level, in its own row of actions
+        {...(latest && solo && !busy && L6.simpler && m.role === 'assistant'
+          ? {
+              extra: (
+                <>
+                  <button type="button" className="l5-act" onClick={() => simplerDeeper('simpler', null, 'reply')} title="Say it more simply">
+                    <span className="l5-act-l">Simpler</span>
+                  </button>
+                  <button type="button" className="l5-act" onClick={() => simplerDeeper('deeper', null, 'reply')} title="Go a level deeper">
+                    <span className="l5-act-l">Deeper</span>
+                  </button>
+                </>
+              ),
+            }
+          : {})}
         hue={groupView && side === 'other' ? hueOf(authorKey(m)) : undefined}
         showQuote={!!m.replyTo && (m.role === 'user' || !prev?.id || prev.id !== m.replyTo.id)}
         toLabel={m.replyTo?.id && messages.some((x) => x.id === m.replyTo!.id && isMine(x)) ? 'You' : undefined}
@@ -9616,17 +9631,6 @@ export function LogosApp({
         {...(go ? { go } : {})}
         {...(opts?.listen && m.role === 'assistant' ? { listen: true } : {})}
       />
-      {/* SIMPLER / DEEPER (Logos 6): the latest reply, at another level — theirs to ask for */}
-      {latest && solo && !busy && L6.simpler && m.role === 'assistant' && (
-        <p className="l6-under" role="group" aria-label="This reply, at another level">
-          <button type="button" className="l5-link" onClick={() => simplerDeeper('simpler', null, 'reply')}>
-            Simpler
-          </button>
-          <button type="button" className="l5-link" onClick={() => simplerDeeper('deeper', null, 'reply')}>
-            Deeper
-          </button>
-        </p>
-      )}
       {/* RULE B: what was brought is read into Content in the background, said here in a line, a press away */}
       {brought.length > 0 && (
         <p className="l5v-ingest" role="note">
@@ -10474,7 +10478,6 @@ export function LogosApp({
     const ref = { id: focusNode.id, label: focusNode.label, type: focusNode.type };
     return (
       <>
-        <div className="l6-focus-scrim" onClick={() => closeFocus('escape')} aria-hidden="true" />
         <IdeaFocus
           map={map}
           id={focusNode.id}

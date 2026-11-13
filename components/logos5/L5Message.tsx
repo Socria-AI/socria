@@ -93,6 +93,8 @@ export interface L5MessageProps {
   onReply?: (m: LogosMsg) => void;
   /** the latest reply: its actions are always shown, and it can be asked again */
   latest?: boolean;
+  /** more actions at the end of the row (Logos 6: Simpler, Deeper) */
+  extra?: ReactNode;
   onRetry?: (m: LogosMsg) => void;
   /** your own message: it can be edited and sent again; `after` is how many messages that replaces */
   onEdit?: (m: LogosMsg, text: string) => void;
@@ -482,6 +484,7 @@ export function L5Message(p: L5MessageProps) {
               <span className="l5-act-l">Edit</span>
             </button>
           )}
+          {p.extra}
         </div>
       )}
     </article>

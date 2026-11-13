@@ -35,7 +35,7 @@ const MAP = sanitizeMap({
   ],
 }, { trust: 'stored' });
 
-console.log('=== the challenge card ===');
+console.log('=== the challenge card: the house system, not a widget ===');
 {
   const c = {
     id: 'ch_1', at: 1, scope: { kind: 'line' }, holds: false,
@@ -46,42 +46,41 @@ console.log('=== the challenge card ===');
       { id: 'f3', kind: 'alternative', text: 'Teachers may love demos and still not buy.', anchors: [{ from: 'said', ref: 'u2', quote: 'teachers love the tool' }], confidence: 'low', question: true, by: 'model' },
       { id: 'f4', kind: 'evidence', text: 'Nothing shows districts budget for it.', anchors: [{ from: 'source', ref: 'A1.1', quote: 'districts set budgets once a year', doc: 'docA', block: 'p1.1' }], confidence: 'medium', by: 'model' },
     ],
-    taken: { f2: 'considered' },
+    taken: { f2: 'dismissed' },
   };
-  const t = text(html(h(ChallengeCard, { challenge: c, onAct() {}, onAnchor() {} })));
-  ok('"Worth checking", and what was checked', /Worth checking/.test(t) && /Checked: this conversation · 5 ideas · 1 file/.test(t), t.slice(0, 200));
-  ok('the kind first, then the thing worth checking', /Hidden assumption/.test(t) && /Your plan needs schools to pay from week two\./.test(t));
-  ok('the words it rests on, where they are', /You said: “?We'll charge from week two/.test(t) || /You said:/.test(t));
-  ok('what moves, and how to settle it', /If it’s wrong: The hiring date moves\./.test(t) && /To settle it: Ask three schools\./.test(t));
-  ok('the four answers, on an open finding', /Keep on map/.test(t) && /I’ve thought about this/.test(t) && /Not relevant/.test(t) && /Talk it through/.test(t));
-  ok('one dealt with says so, quietly', /You’ve thought about this/.test(t));
-  ok('three at first, the rest a press away', /Show 1 more/.test(t) && !/Nothing shows districts/.test(t));
-  ok('unsure, said as worth asking', /worth asking/.test(t));
+  const m = html(h(ChallengeCard, { challenge: c, onAct() {}, onAnchor() {} }));
+  const t = text(m);
+  ok('the house label, and what was checked', /class="l5-label">Worth checking/.test(m) && /this conversation · 5 ideas · 1 file/.test(t));
+  ok('the finding, then its kind and the words it rests on, in one quiet line', /Your plan needs schools to pay from week two\./.test(t) && /Hidden assumption · “We'll charge from week two”/.test(t), t.slice(0, 300));
+  ok('actions are words, not pills: Keep on map, Dismiss, Discuss', /Keep on map/.test(t) && /Dismiss/.test(t) && /Discuss/.test(t) && (m.match(/class="l5-link is-meta/g) ?? []).length >= 6);
+  ok('no filled control in the card (Send is the surface’s one)', !/is-primary|l5-btn/.test(m));
+  ok('why it matters and how to settle it, a press away', !/If it’s wrong/.test(t) && /More/.test(t) && /aria-expanded="false"/.test(m));
+  ok('a dismissed one, quiet and said so', /class="l6-row is-out"/.test(m) && /Dismissed/.test(t));
+  ok('three at first, the rest a press away', /1 more/.test(t) && !/districts budget/.test(t));
+  ok('numbers are plain type, never badges', /class="l6-n"/.test(m) && !/badge/.test(m));
   const held = text(html(h(ChallengeCard, { challenge: { ...c, findings: [], holds: true, why: 'Each step follows from what you said.', weakest: 'The timeline is tight.' }, onAct() {} })));
-  ok('"This holds up" is drawn as an answer', /This holds up/.test(held) && /Each step follows/.test(held) && /The weakest point, and it’s minor: The timeline is tight\./.test(held));
-  const ro = text(html(h(ChallengeCard, { challenge: c, onAct() {}, readOnly: true })));
-  ok('read-only: nothing to press but the quotes', !/Keep on map/.test(ro));
-  ok('structure only, said so', /no model answered/.test(text(html(h(ChallengeCard, { challenge: { ...c, structural: true }, onAct() {} })))));
-  ok('a guess, compared', /Your guess, “?Schools will pay/.test(text(html(h(ChallengeCard, { challenge: { ...c, guess: { label: 'Schools will pay', hit: true } }, onAct() {} })))));
-  ok('while it is on its way, what is being checked', /Checking this card: your words, your map and your sources/.test(text(html(h(ChallengePending, { scope: 'card' })))));
+  ok('"This holds up" is an answer, in a sentence', /This holds up on what’s here\./.test(held) && /Weakest point, and it’s minor: The timeline is tight\./.test(held));
+  ok('read-only: nothing to press but the quotes', !/Keep on map/.test(text(html(h(ChallengeCard, { challenge: c, onAct() {}, readOnly: true })))));
+  ok('structure only, said so', /No model answered/.test(text(html(h(ChallengeCard, { challenge: { ...c, structural: true }, onAct() {} })))));
+  ok('while it is on its way, one quiet line', /Checking this card…/.test(text(html(h(ChallengePending, { scope: 'card' })))));
   ok('no scores, no alarms', !/\/\s*100|score|warning|error/i.test(t));
 }
 
-console.log('\n=== Focus: one idea, what holds it up ===');
+console.log('\n=== Focus: the app’s sheet ===');
 {
-  const f = text(html(h(Focus, { map: MAP, id: 'd', line: 'Launch decision', project: 'Socria pilot', onIdea() {}, onClose() {}, onProject() {}, onChallenge() {}, onSimpler() {}, onDeeper() {}, onShowOnMap() {}, onCopyLink() {}, came: { said: 'We will launch a paid pilot', id: 'u1' }, onCame() {}, findings: [{ kind: 'risk', text: 'Runway runs out first.', state: 'kept' }], evidence: [{ key: 'A1.1', name: 'District budgets report', quote: 'districts set budgets once a year', doc: 'docA', block: 'p1.1', verdict: 'contradicted' }] })));
-  ok('where it sits: Project › Line › Idea', /Socria pilot › Launch decision › Launch a paid pilot with schools/.test(f), f.slice(0, 200));
-  ok('the idea, large, with its kind', /Decision/.test(f) && /Launch a paid pilot with schools/.test(f));
-  ok('what it rests on', /Rests on/.test(f) && /Schools will pay from week two/.test(f));
-  ok('what rests on it', /Rests on it/.test(f) && /Profitable within a year/.test(f));
-  ok('what pulls against it', /Pulls against it/.test(f) && /Four months of runway/.test(f));
-  ok('a kept finding about it, as Socria’s', /Hidden assumption/.test(f));
-  ok('its sources, with what checking found', /In your sources/.test(f) && /cuts against it/.test(f));
-  ok('the findings about it, and what became of them', /Worth checking, about it/.test(f) && /on your map/.test(f));
-  ok('the turn it came from', /Came from:/.test(f));
-  ok('what can be done from here', /Challenge it/.test(f) && /Simpler/.test(f) && /Deeper/.test(f) && /Show on the Logic Map/.test(f) && /Copy link/.test(f));
-  ok('a dialog, closed by Escape', /role="dialog"/.test(html(h(Focus, { map: MAP, id: 'd', line: 'x', onIdea() {}, onClose() {} }))) && /Escape/.test(read('components/logos6/Focus.tsx')));
-  ok('a card no longer there: nothing', html(h(Focus, { map: MAP, id: 'gone', line: 'x', onIdea() {}, onClose() {} })) === '');
+  const props = { map: MAP, id: 'd', line: 'Launch decision', project: 'Socria pilot', onIdea() {}, onClose() {}, onProject() {}, onLine() {}, onChallenge() {}, onSimpler() {}, onDeeper() {}, onShowOnMap() {}, onCopyLink() {}, came: { said: 'We will launch a paid pilot', id: 'u1' }, onCame() {}, findings: [{ kind: 'risk', text: 'Runway runs out first.', state: 'kept' }], evidence: [{ key: 'A1.1', name: 'District budgets report', quote: 'districts set budgets once a year', doc: 'docA', block: 'p1.1', verdict: 'contradicted' }] };
+  const m = html(h(Focus, props));
+  const f = text(m);
+  ok('the One sheet’s parts: dimmed page, sheet, bare ×, serif title', /class="os-scrim l6-focus"/.test(m) && /class="os-back"/.test(m) && /class="os-sheet is-wide l6f-sheet"/.test(m) && /os-x/.test(m) && /class="os-title l6f-title"/.test(m));
+  ok('where it sits: Project / Line, as words', /Socria pilot \/ Launch decision/.test(f), f.slice(0, 120));
+  ok('the kind as the house label over the idea', /class="l5-label">Decision</.test(m) && /Launch a paid pilot with schools/.test(f));
+  ok('rows: rests on, builds on it, pulls against it', /Rests on Schools will pay from week two/.test(f) && /Builds on it Profitable within a year/.test(f) && /Pulls against it Four months of runway/.test(f));
+  ok('its sources, with what checking found', /In your sources “districts set budgets once a year” District budgets report, A1\.1 · says otherwise/.test(f));
+  ok('findings about it, and what became of them', /Worth checking Runway runs out first\. Decision risk · on your map/.test(f));
+  ok('the turn it came from', /Came from “We will launch a paid pilot”/.test(f));
+  ok('one filled control, Challenge it; the rest are words', (m.match(/l5-btn is-primary/g) ?? []).length === 1 && /Challenge it/.test(f) && /Simpler/.test(f) && /Deeper/.test(f) && /Show on the Logic Map/.test(f) && /Copy link/.test(f));
+  ok('a dialog, closed by Escape', /role="dialog"/.test(m) && /Escape/.test(read('components/logos6/Focus.tsx')));
+  ok('a card no longer there: nothing', html(h(Focus, { ...props, id: 'gone' })) === '');
   ok('no seventh renderer: lists, read through support.ts', /from '@\/lib\/logos6\/support'/.test(read('components/logos6/Focus.tsx')) && !/<svg|canvas/i.test(read('components/logos6/Focus.tsx')));
 }
 
@@ -91,22 +90,23 @@ console.log('\n=== the sources cards, and Guess first ===');
     { id: 'c1', claim: 'Districts budget once a year.', verdict: 'supported', passage: { key: 'A1.1', doc: 'docA', block: 'p1.1', name: 'District budgets report', quote: 'districts set budgets once a year' }, why: 'The passage says this.', by: 'words', node: 'a' },
     { id: 'c2', claim: 'The pilot converts in six weeks.', verdict: 'not-found', why: 'None of the passages says this.', by: 'words' },
   ] };
-  const t = text(html(h(CheckCard, { check: ck, onOpen() {}, onLink() {} })));
-  ok('each claim, and what the sources say of it', /Supported/.test(t) && /Not found in your sources/.test(t) && /2 claims · 2 documents/.test(t));
-  ok('the passage, named and keyed', /District budgets report · A1\.1/.test(t));
-  ok('a claim that is a card can be linked to it', /Link to the card/.test(t));
-  ok('words alone, said so', /by the words alone/.test(text(html(h(CheckCard, { check: { ...ck, wordsOnly: true } })))));
+  const cm = html(h(CheckCard, { check: ck, onOpen() {}, onLink() {} }));
+  const t = text(cm);
+  ok('each claim, and what the sources say of it', /Supported/.test(t) && /Not in your sources/.test(t) && /2 claims · 2 documents/.test(t));
+  ok('the passage quoted, its document and key after it', /“districts set budgets once a year” District budgets report, A1\.1/.test(t));
+  ok('a claim that is a card can be linked to it, as a word', /Link to the card/.test(t) && !/l5-btn/.test(cm));
+  ok('wording only, said so', /Matched by wording only/.test(text(html(h(CheckCard, { check: { ...ck, wordsOnly: true } })))));
   const cp = { id: 'dc_1', at: 1, docs: [{ doc: 'docA', name: 'District budgets report' }, { doc: 'docB', name: 'Pilot survey' }], pairs: [
     { id: 'd1', kind: 'populations', about: 'How often schools buy', because: 'Public districts against private schools.', a: { key: 'A1.1', doc: 'docA', block: 'p1.1', name: 'District budgets report', quote: 'districts set budgets once a year' }, b: { key: 'B1.2', doc: 'docB', block: 'p1.2', name: 'Pilot survey', quote: 'all of which bought software monthly' }, by: 'model' },
   ] };
   const c2 = text(html(h(CompareCard, { compare: cp, onOpen() {}, onAct() {} })));
   ok('where they disagree, both passages quoted', /Where your sources disagree/.test(c2) && /districts set budgets once a year/.test(c2) && /all of which bought software monthly/.test(c2));
-  ok('the kind, and that both can hold', /Different people or places/.test(c2) && /both can hold/.test(c2));
+  ok('the kind, and that both can hold', /Different people or places · both can hold/.test(c2));
   ok('never a winner', !/is right|is wrong|more reliable|trust/.test(c2));
-  ok('nothing found, said plainly', /don’t cut against each other/.test(text(html(h(CompareCard, { compare: { ...cp, pairs: [] } })))));
-  ok('while reading, said so', /Reading your documents side by side/.test(text(html(h(SourcesPending, { what: 'compare' })))));
+  ok('nothing found, said plainly', /don’t contradict each other/.test(text(html(h(CompareCard, { compare: { ...cp, pairs: [] } })))));
+  ok('while reading, one quiet line', /Reading your documents side by side/.test(text(html(h(SourcesPending, { what: 'compare' })))));
   const g = text(html(h(GuessFirst, { options: [{ id: 'a', label: 'Schools will pay from week two' }, { id: 'd', label: 'Launch a paid pilot' }], onGuess() {}, onSkip() {} })));
-  ok('Guess first: their guess, or one press to skip', /which part do you think is weakest/.test(g) && /Skip — show me/.test(g) && /Schools will pay from week two/.test(g));
+  ok('Guess first: their guess as words, or skip', /Which part do you think is weakest\?/.test(g) && /Skip and show me/.test(g) && /Schools will pay from week two/.test(g));
 }
 
 console.log('\n=== what a Project rests on ===');
@@ -157,11 +157,13 @@ console.log('\n=== the wiring ===');
   ok('the Project home, a press away from a filed line', /label: 'Project home'/.test(app));
   ok('Focus from the card’s popover', /label: 'Focus', text: '', run: \(\) => \{ close\(\); openFocus\(node\.id, 'card'\); \}/.test(app));
   ok('words that check and compare, read before anything is sent', /compareAsked\(content\)/.test(app) && /checkAsked\(content\)/.test(app));
-  ok('Simpler / Deeper under the latest reply and on an idea', /simplerDeeper\('simpler', null, 'reply'\)/.test(app) && /simplerDeeper\('deeper', ref, 'idea'\)/.test(app));
+  ok('Simpler / Deeper on the latest reply and on an idea', /simplerDeeper\('simpler', null, 'reply'\)/.test(app) && /simplerDeeper\('deeper', ref, 'idea'\)/.test(app));
   ok('Explain it back: "so basically", the explain planner’s teach-back', /setInput\(`So basically, /.test(app));
   ok('Guess first: on a line of study, before the challenge', /if \(L6\.guessFirst && learningLine\(\) && guessOptions\(\)\.length >= 2\)/.test(app));
   ok('Explore’s Challenge is the engine’s (Phase 5)', /if \(mode === 'challenge' && L6\.challenge\)/.test(app));
-  ok('Focus opens over the conversation, never a new panel', /\{focusEl\}/.test(app) && /className="l6-focus-scrim"/.test(app));
+  ok('Focus opens over the conversation as the app’s sheet, never a new panel', /\{focusEl\}/.test(app) && /className="os-scrim l6-focus"/.test(read('components/logos6/Focus.tsx')));
+  ok('the offers over the box are words, not chips', /className="l6-offer"/.test(app) && !/className="l6-chip/.test(app));
+  ok('Simpler and Deeper sit in the reply’s own row', /extra: \(/.test(app) && /\{p\.extra\}/.test(read('components/logos5/L5Message.tsx')));
 }
 
 console.log(`\n${pass} passed, ${fail} failed`);

@@ -77,7 +77,12 @@ With no key, or no model answering anywhere on the ladder, the structure answers
 
 When signed in, memory's recorded conflicts that this line touches are offered as earlier positions. They stand only if quoted.
 
-**The card.** `components/logos6/ChallengeCard.tsx` has four answers: *Keep on map*, *I've thought about this*, *Not relevant*, *Talk it through*. A kept finding becomes Socria's card (`origin: 'socria'`, `finding`), joined to the card it is about.
+**The card.** `components/logos6/ChallengeCard.tsx` is drawn as the conversation's other elements are: hairline rows, the house label, actions as words (*Keep on map*, *Dismiss*, *Discuss*, *More*), and no filled control (Send is the surface's one). A kept finding becomes Socria's card (`origin: 'socria'`, `finding`), joined to the card it is about.
+
+**In the house system.** Every Logos 6 surface uses the shared controls and tokens of `components/logos5/l5-controls.css`:
+- **Focus** is the app's sheet (`components/one/one-sheet.css`): the page dimmed, the bare ×, the label over the serif title, hairline rows, *Challenge it* as its one filled control and words for the rest.
+- **The offers over the box** ("What am I missing?", "Where do these documents disagree?") are words with *Not now*.
+- **Simpler and Deeper** sit in the latest reply's own row of actions.
 
 **The map pass.** `lib/logos6/protect.ts` puts back what the pass dropped, if it was placed by hand (`hand`) or kept from a challenge (`finding`). It also carries over the marks the pass cannot know about.
 
