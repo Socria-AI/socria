@@ -1,0 +1,3169 @@
+{
+  "version": 1,
+  "cases": [
+    {
+      "id": "stu-01",
+      "segment": "student",
+      "title": "Why Reconstruction ended",
+      "sound": false,
+      "said": [
+        "My thesis for the essay: Reconstruction failed because Northern voters simply lost interest in the South after the Panic of 1873. Once the depression hit, people cared about jobs and wages, not about what was happening in Mississippi or South Carolina.",
+        "My main evidence for the lost interest is that Northern newspapers basically stopped covering Southern politics by the mid-1870s. And then in 1877 the federal troops were pulled out, which proves my point that the North had moved on.",
+        "I feel like that's a pretty tight argument. Is it enough to carry 2,000 words?"
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "a",
+            "type": "claim",
+            "label": "Reconstruction failed because Northern voters lost interest after 1873"
+          },
+          {
+            "id": "b",
+            "type": "evidence",
+            "label": "Northern newspapers stopped covering Southern politics"
+          },
+          {
+            "id": "c",
+            "type": "evidence",
+            "label": "Federal troops pulled out in 1877"
+          },
+          {
+            "id": "d",
+            "type": "question",
+            "label": "Is this enough for 2,000 words?"
+          }
+        ],
+        "edges": [
+          {
+            "from": "b",
+            "to": "a",
+            "relation": "supports"
+          },
+          {
+            "from": "c",
+            "to": "a",
+            "relation": "supports"
+          },
+          {
+            "from": "d",
+            "to": "a",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "unsupported",
+          "what": "The thesis says Reconstruction 'failed' without saying by what measure, though some of what it built (the amendments, Black schools and churches) outlasted 1877.",
+          "keys": [
+            "failed",
+            "measure",
+            "define"
+          ],
+          "quote": "Reconstruction failed because Northern voters simply lost interest"
+        },
+        {
+          "id": "f2",
+          "kind": "evidence",
+          "what": "The claim that Northern papers stopped covering Southern politics carries the whole 'lost interest' argument, yet no paper, source or example is given for it.",
+          "keys": [
+            "newspapers",
+            "covering",
+            "source"
+          ],
+          "quote": "Northern newspapers basically stopped covering Southern politics by the mid-1870s"
+        },
+        {
+          "id": "f3",
+          "kind": "alternative",
+          "what": "The 1877 withdrawal can be explained by the bargain over the disputed 1876 election and by white Southern violence that made enforcement costly, so it does not by itself prove Northern indifference.",
+          "keys": [
+            "1877",
+            "troops",
+            "election",
+            "violence"
+          ],
+          "quote": "which proves my point that the North had moved on"
+        }
+      ]
+    },
+    {
+      "id": "stu-02",
+      "segment": "student",
+      "title": "Minimum wage essay",
+      "sound": false,
+      "said": [
+        "I'm arguing against raising the minimum wage to 12 pounds an hour in my econ essay. It's basic supply and demand: raise the price of labour and firms buy less of it, so a higher minimum wage always means fewer jobs.",
+        "For a real example I'm using the cafe on my street, which let two people go after the last increase. That shows the effect is actually happening, not just in theory.",
+        "So my conclusion is that the rise would hurt exactly the low-paid workers it's supposed to help."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "assumption",
+          "what": "The 'always' rests on a perfectly competitive labour market; where employers have wage-setting power (monopsony) a moderate rise need not cut jobs, and the essay never deals with that case.",
+          "keys": [
+            "always",
+            "competitive",
+            "monopsony"
+          ],
+          "quote": "so a higher minimum wage always means fewer jobs"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "One cafe letting two people go cannot show an economy-wide effect, and nothing rules out other reasons for those cuts.",
+          "keys": [
+            "cafe",
+            "two people",
+            "example"
+          ],
+          "quote": "That shows the effect is actually happening"
+        }
+      ]
+    },
+    {
+      "id": "stu-03",
+      "segment": "student",
+      "title": "Social media and depression",
+      "sound": false,
+      "said": [
+        "For my psych essay I'm using the study in chapter 4 of the course reader. It proves that social media causes depression in teenagers: they followed 1,200 teens and the more hours they spent on the apps, the more depressed they became.",
+        "So my argument is that schools should ban phones, since the evidence on harm is basically settled now."
+      ],
+      "sources": [
+        {
+          "key": "A4.2",
+          "name": "Course reader ch. 4",
+          "text": "The survey was completed once, in a single week, by 1,200 undergraduates aged 18 to 24 at two universities. Students who reported more daily hours on social media had somewhat higher scores on a depression questionnaire. Because the data were collected at one point in time, the authors caution that the direction of the link cannot be established: students who were already feeling low may simply spend more time online."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The chapter describes a one-off survey of undergraduates aged 18 to 24, not 1,200 teens followed over time, so it says nothing directly about teenagers or about change.",
+          "keys": [
+            "undergraduates",
+            "18 to 24",
+            "once",
+            "followed"
+          ],
+          "quote": "they followed 1,200 teens"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "The passage itself raises the reverse direction, that students already feeling low use social media more, which the essay's 'causes' does not rule out.",
+          "keys": [
+            "direction",
+            "already",
+            "reverse"
+          ],
+          "quote": "It proves that social media causes depression in teenagers"
+        }
+      ]
+    },
+    {
+      "id": "stu-04",
+      "segment": "student",
+      "title": "Catalase temperature lab",
+      "sound": false,
+      "said": [
+        "Lab report conclusion: we tested catalase from potato at 20, 37 and 60 degrees, one run at each temperature. The foam rose 11 mm at 20 degrees, 13 mm at 37 and 2 mm at 60.",
+        "So the optimum temperature for catalase is exactly 37 degrees, which makes sense because enzymes work best at body temperature. Our results prove this."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "With readings at only 20, 37 and 60 degrees the peak could sit anywhere between roughly 20 and 60; nothing locates it at exactly 37.",
+          "keys": [
+            "exactly 37",
+            "three",
+            "between"
+          ],
+          "quote": "the optimum temperature for catalase is exactly 37 degrees"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "One run per temperature, and only 2 mm between 20 and 37 degrees, cannot 'prove' anything; that difference could be run-to-run variation.",
+          "keys": [
+            "one run",
+            "2 mm",
+            "repeat"
+          ],
+          "quote": "Our results prove this"
+        },
+        {
+          "id": "f3",
+          "kind": "assumption",
+          "what": "The enzyme came from potato, so there is no reason its optimum should match human body temperature.",
+          "keys": [
+            "potato",
+            "body temperature",
+            "human"
+          ],
+          "quote": "which makes sense because enzymes work best at body temperature"
+        }
+      ]
+    },
+    {
+      "id": "stu-05",
+      "segment": "student",
+      "title": "Five-week revision plan",
+      "sound": true,
+      "said": [
+        "Revision plan check. I have three exams in five weeks: organic chem (40% of my year mark), stats (35%) and cell bio (25%). My practice test scores were 52% organic, 71% stats and 68% cell bio, so organic gets about half my hours and the rest is split between the other two.",
+        "I'm doing a timed past paper for each subject every Saturday instead of rereading notes. Last term I reread everything, felt ready, and then couldn't answer half the questions, so I'd rather find the gaps early.",
+        "I'll log the Saturday scores and move hours around if a subject isn't improving after two weeks. I know past papers won't cover everything, so I'm also ticking off the syllabus list to catch topics that haven't come up recently."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "g",
+            "type": "goal",
+            "label": "Do well across all three exams in five weeks"
+          },
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Give organic chem about half my revision hours"
+          },
+          {
+            "id": "e1",
+            "type": "evidence",
+            "label": "Practice scores: organic 52%, stats 71%, cell bio 68%"
+          },
+          {
+            "id": "e2",
+            "type": "evidence",
+            "label": "Organic chem is 40% of the year mark"
+          },
+          {
+            "id": "i1",
+            "type": "idea",
+            "label": "Timed past paper per subject every Saturday"
+          },
+          {
+            "id": "i2",
+            "type": "idea",
+            "label": "Log scores and move hours after two weeks"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e1",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "e2",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "d",
+            "to": "g",
+            "relation": "leads_to"
+          },
+          {
+            "from": "i1",
+            "to": "g",
+            "relation": "supports"
+          },
+          {
+            "from": "i1",
+            "to": "i2",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": []
+    },
+    {
+      "id": "stu-06",
+      "segment": "student",
+      "title": "Are zoos justified?",
+      "sound": false,
+      "said": [
+        "My ethics essay position: zoos are morally justified because they're essential for saving endangered species. Captive breeding brought the Arabian oryx back after it had died out in the wild.",
+        "Some of the small roadside zoos keep animals in pretty bad conditions, I'll admit that, but since conservation is what zoos are for, every zoo is justified.",
+        "In my conclusion I say that animal welfare should come first in how we treat captive animals."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "a",
+            "type": "claim",
+            "label": "Zoos are morally justified"
+          },
+          {
+            "id": "b",
+            "type": "evidence",
+            "label": "Captive breeding brought the Arabian oryx back"
+          },
+          {
+            "id": "c",
+            "type": "value",
+            "label": "Animal welfare should come first"
+          },
+          {
+            "id": "d",
+            "type": "claim",
+            "label": "Every zoo is justified, roadside ones included"
+          }
+        ],
+        "edges": [
+          {
+            "from": "b",
+            "to": "a",
+            "relation": "supports"
+          },
+          {
+            "from": "a",
+            "to": "d",
+            "relation": "leads_to"
+          },
+          {
+            "from": "c",
+            "to": "a",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "Conservation done by some zoos, such as the oryx programme, does not carry over to roadside zoos that may breed nothing endangered, so 'every zoo is justified' does not follow.",
+          "keys": [
+            "roadside",
+            "every zoo",
+            "breeding"
+          ],
+          "quote": "since conservation is what zoos are for, every zoo is justified"
+        },
+        {
+          "id": "f2",
+          "kind": "contradiction",
+          "what": "Saying welfare should come first cannot sit with justifying zoos they admit keep animals in bad conditions.",
+          "keys": [
+            "welfare",
+            "bad conditions",
+            "come first"
+          ],
+          "quote": "animal welfare should come first"
+        }
+      ]
+    },
+    {
+      "id": "stu-07",
+      "segment": "student",
+      "title": "Sugary drinks tax",
+      "sound": false,
+      "said": [
+        "Essay question: should the government tax sugary drinks? I'm saying yes. If a can costs 20p more, people will buy fewer cans, and since fizzy drinks are a big source of sugar for kids, obesity will go down.",
+        "I also argue it's a fair tax, because everyone pays exactly the same rate whoever they are.",
+        "My teacher said it needs a counterargument section, so I'm adding one about the drinks industry losing money."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "consequence",
+          "what": "Buyers may switch to untaxed sweets, juices or cheaper sugary products, so fewer cans need not mean less sugar or lower obesity.",
+          "keys": [
+            "fewer cans",
+            "switch",
+            "untaxed"
+          ],
+          "quote": "people will buy fewer cans"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "An equal rate is taken to be fair, but a flat charge per can takes a bigger share of poorer households' budgets, which makes it regressive.",
+          "keys": [
+            "same rate",
+            "poorer",
+            "regressive"
+          ],
+          "quote": "everyone pays exactly the same rate whoever they are"
+        }
+      ]
+    },
+    {
+      "id": "stu-08",
+      "segment": "student",
+      "title": "Reading 'Harbour Town'",
+      "sound": false,
+      "said": [
+        "I'm writing on 'Harbour Town' for my lit coursework. My reading is that the poem is completely bleak: every image of the town is about decay, like the rusted cranes and the boarded-up windows.",
+        "The speaker has nothing but contempt for the place, which is why they left at twenty and never went back. I'm planning to build the whole essay around that."
+      ],
+      "sources": [
+        {
+          "key": "B2.1",
+          "name": "Course anthology: Harbour Town, stanzas 3 to 5",
+          "text": "The cranes stand rusted where the ships once came, / the chandlers' windows boarded, blind with dust. // Yet Sundays, and the market fills the square, / the fishwives' voices bright as copper pans, / and children chase the gulls along the wall. // I left at twenty, swore I'd not come back. / I come back every summer, all the same."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The last stanza says the speaker comes back every summer, so they did not leave and never return.",
+          "keys": [
+            "every summer",
+            "come back",
+            "never went back"
+          ],
+          "quote": "they left at twenty and never went back"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "'Completely bleak' and 'nothing but contempt' rest on the cranes stanza alone; the Sunday market stanza, with voices 'bright as copper pans', points to affection the reading leaves out.",
+          "keys": [
+            "market",
+            "bright",
+            "Sundays"
+          ],
+          "quote": "the poem is completely bleak"
+        }
+      ]
+    },
+    {
+      "id": "stu-09",
+      "segment": "student",
+      "title": "Black Death and wages",
+      "sound": true,
+      "said": [
+        "Argument for my history essay: the Black Death shifted bargaining power towards surviving labourers in England. With something like a third to a half of the population dead by 1349, there were far fewer workers for the same land.",
+        "The government's own reaction backs this up. The Statute of Labourers in 1351 tried to hold wages at pre-plague levels, which you'd only bother doing if wages were already rising, and the fact that it had to be enforced again and again suggests it wasn't working.",
+        "I'm careful not to overclaim: I'm not saying peasants became well off, or that this alone caused the 1381 revolt, and the effects varied by region and took decades. The wage series in our textbook shows real wages climbing over the following decades, though it's patchy before about 1360."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "stu-10",
+      "segment": "student",
+      "title": "Sleep and grades survey",
+      "sound": false,
+      "said": [
+        "For my psychology coursework I surveyed 12 friends from my halls about sleep and grades. The ones who sleep more than 8 hours a night had a higher average grade, so I'm concluding that getting more sleep improves academic performance.",
+        "In my evaluation of the study we critiqued in week 3, I wrote that samples under 30 are too small to draw any conclusions from, and that was my main criticism of it.",
+        "Should I add a graph to make the sleep result stand out more?"
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "By the rule they used against the week 3 study, a sample of 12 supports no conclusion, yet it is used to conclude that more sleep improves grades.",
+          "keys": [
+            "12",
+            "under 30",
+            "week 3"
+          ],
+          "quote": "samples under 30 are too small to draw any conclusions from"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "The direction may run the other way or through a third factor: students who are on top of their work, or have lighter timetables, can afford to sleep longer.",
+          "keys": [
+            "reverse",
+            "direction",
+            "other way",
+            "workload"
+          ],
+          "quote": "getting more sleep improves academic performance"
+        }
+      ]
+    },
+    {
+      "id": "stu-11",
+      "segment": "student",
+      "title": "Congestion charge essay",
+      "sound": false,
+      "said": [
+        "I'm using the city transport review for my econ essay on road pricing. The congestion charge cut traffic across the whole city by 18 percent in its first year, which shows that pricing roads works.",
+        "It also got loads more people onto buses, which proves people switch to public transport when driving gets more expensive. I'm going to recommend every big city copies it."
+      ],
+      "sources": [
+        {
+          "key": "C1.3",
+          "name": "City transport review, section 2",
+          "text": "In the first year, traffic entering the charging zone during charging hours fell by about 18 percent compared with the year before. Traffic on the ring road around the zone rose by around 4 percent, and journeys across the wider city were broadly unchanged. Bus use into the centre increased, though the review notes that part of this growth began before the charge, following fare cuts the previous spring."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The 18 percent fall was in traffic entering the zone during charging hours; the review says journeys across the wider city were broadly unchanged.",
+          "keys": [
+            "charging zone",
+            "wider city",
+            "unchanged"
+          ],
+          "quote": "cut traffic across the whole city by 18 percent"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "Part of the bus growth began before the charge, after fare cuts the previous spring, so not all of it shows people switching because driving cost more.",
+          "keys": [
+            "fare cuts",
+            "before the charge",
+            "spring"
+          ],
+          "quote": "which proves people switch to public transport"
+        },
+        {
+          "id": "f3",
+          "kind": "consequence",
+          "what": "Ring road traffic rose about 4 percent, so some congestion was moved rather than removed, which the recommendation to copy the scheme leaves out.",
+          "keys": [
+            "ring road",
+            "4 percent",
+            "moved"
+          ],
+          "quote": "I'm going to recommend every big city copies it"
+        }
+      ]
+    },
+    {
+      "id": "stu-12",
+      "segment": "student",
+      "title": "Red light and seedlings",
+      "sound": false,
+      "said": [
+        "Results for my bio practical: after two weeks the seedlings under the red LED averaged 14 cm tall and the ones under the white LED averaged 9 cm. So red light is better for plant growth, and I'm saying in my conclusion that greenhouses should switch to red lighting.",
+        "We only had one red bulb and one white bulb, and the red one came from a different, cheaper set, but they were both LEDs so I don't think that matters."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "assumption",
+          "what": "Two different bulbs from different sets can differ in brightness and spectrum as well as colour, so the comparison assumes away the most likely confound.",
+          "keys": [
+            "bulb",
+            "brightness",
+            "cheaper"
+          ],
+          "quote": "they were both LEDs so I don't think that matters"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "Taller can mean stretched, light-starved stems rather than better growth; height alone does not show which plants grew more, as mass or leaf area would.",
+          "keys": [
+            "tall",
+            "height",
+            "stretch",
+            "mass"
+          ],
+          "quote": "So red light is better for plant growth"
+        },
+        {
+          "id": "f3",
+          "kind": "unsupported",
+          "what": "One two-week trial on seedlings with one bulb per colour is a long way from a recommendation for commercial greenhouses.",
+          "keys": [
+            "greenhouses",
+            "two weeks",
+            "seedlings"
+          ],
+          "quote": "greenhouses should switch to red lighting"
+        }
+      ]
+    },
+    {
+      "id": "stu-13",
+      "segment": "student",
+      "title": "Practice testing vs rereading",
+      "sound": true,
+      "said": [
+        "The chapter 7 study is my main evidence that practice testing beats rereading for remembering word lists over a week. People were randomly assigned to the two methods, so the gap isn't just keen students choosing to test themselves.",
+        "I'm careful not to stretch it: they only used simple word lists with a one-week delay, so I don't claim it works for maths problem-solving, and I mention the sample was undergraduates.",
+        "So my claim is narrow: for simple factual material, retrieval practice beat rereading in this experiment, and I suggest it's worth trying for vocab revision rather than saying it's proven for everything."
+      ],
+      "sources": [
+        {
+          "key": "D7.1",
+          "name": "Course reader ch. 7",
+          "text": "Ninety-six undergraduates were randomly assigned to study a word list either by rereading it or by taking practice tests on it. One week later, the practice-test group recalled more of the words on average (about 61 percent against 40 percent). The authors note that the materials were simple word lists and the delay was a single week; whether the advantage holds for complex material such as problem-solving was not tested."
+        }
+      ],
+      "flaws": []
+    },
+    {
+      "id": "stu-14",
+      "segment": "student",
+      "title": "Dissertation timeline",
+      "sound": false,
+      "said": [
+        "Dissertation plan: it's 10,000 words and due on 15 May. I'm spending March and April on reading, then doing all the writing in the first two weeks of May.",
+        "I'm not worried about the writing part, I write fast. I did my last 3,000-word essay in two days.",
+        "My supervisor is happy to read a full draft but needs a week's notice and then a week to read it. I've also got weekend shifts at the cafe through May."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "g",
+            "type": "goal",
+            "label": "Submit a 10,000-word dissertation by 15 May"
+          },
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Read in March and April, write in the first two weeks of May"
+          },
+          {
+            "id": "b",
+            "type": "belief",
+            "label": "I write fast"
+          },
+          {
+            "id": "e",
+            "type": "evidence",
+            "label": "Last 3,000-word essay took two days"
+          },
+          {
+            "id": "c1",
+            "type": "constraint",
+            "label": "Supervisor needs a week's notice and a week to read a draft"
+          },
+          {
+            "id": "c2",
+            "type": "constraint",
+            "label": "Weekend cafe shifts through May"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e",
+            "to": "b",
+            "relation": "supports"
+          },
+          {
+            "from": "b",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "d",
+            "to": "g",
+            "relation": "leads_to"
+          },
+          {
+            "from": "c1",
+            "to": "d",
+            "relation": "relates"
+          },
+          {
+            "from": "c2",
+            "to": "d",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "risk",
+          "what": "Writing only in the first two weeks of May leaves no room for the supervisor's week of notice plus a week of reading before the 15 May deadline.",
+          "keys": [
+            "supervisor",
+            "draft",
+            "15 May"
+          ],
+          "quote": "doing all the writing in the first two weeks of May"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "The pace of a 3,000-word essay is assumed to scale to 10,000 words of dissertation, in two weeks that also hold weekend shifts.",
+          "keys": [
+            "3,000",
+            "10,000",
+            "shifts"
+          ],
+          "quote": "I did my last 3,000-word essay in two days"
+        }
+      ]
+    },
+    {
+      "id": "stu-15",
+      "segment": "student",
+      "title": "Loneliness survey argument",
+      "sound": false,
+      "said": [
+        "Our union's wellbeing survey found that 60% of students are lonely most of the time, so I'm arguing in my sociology essay that loneliness should be the union's top funding priority this year.",
+        "Loneliness is also behind most of the dropouts at our uni, so funding it would help retention too. And with 812 responses, that's easily a big enough sample to speak for everyone."
+      ],
+      "sources": [
+        {
+          "key": "E2.4",
+          "name": "Student Union wellbeing survey, summary",
+          "text": "Of the 812 students who responded (a response rate of about 9 percent), 60 percent said they had felt lonely at least once during the autumn term, and 17 percent said they felt lonely often or always. The survey was open for two weeks and was promoted mainly through the union's own social media channels."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The survey's 60 percent felt lonely at least once in the term; only 17 percent said often or always, which is not 'most of the time'.",
+          "keys": [
+            "at least once",
+            "17 percent",
+            "most of the time"
+          ],
+          "quote": "60% of students are lonely most of the time"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "812 responses is about a 9 percent response rate, drawn mostly through the union's own channels, so its size does not make it speak for everyone.",
+          "keys": [
+            "response rate",
+            "9 percent",
+            "speak for everyone"
+          ],
+          "quote": "a big enough sample to speak for everyone"
+        },
+        {
+          "id": "f3",
+          "kind": "evidence",
+          "what": "The claim that loneliness is behind most dropouts carries the retention argument but has nothing under it, and the survey says nothing about dropouts.",
+          "keys": [
+            "dropouts",
+            "retention"
+          ],
+          "quote": "Loneliness is also behind most of the dropouts at our uni"
+        }
+      ]
+    },
+    {
+      "id": "stu-16",
+      "segment": "student",
+      "title": "Library and literacy in Ashby",
+      "sound": false,
+      "said": [
+        "My local history project: literacy in Ashby, measured by the share of people signing the marriage register rather than making a mark, rose from about 55% to 78% between 1875 and 1895. The free library opened in 1881, so I'm arguing the library drove the rise.",
+        "For context in the intro I mention that the town's first board schools opened in 1879, and that the mill started making workers sign their own contracts around 1880.",
+        "Does the argument flow OK? I want the library to be the star of the essay."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "The board schools opened in 1879, before the library, and children taught there would reach marrying age by the 1890s; they are treated as background rather than as a rival cause of the rise.",
+          "keys": [
+            "board schools",
+            "1879",
+            "marrying age"
+          ],
+          "quote": "the town's first board schools opened in 1879"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Signing the register is taken as literacy, but once the mill required signed contracts people had a reason to learn to sign their name without learning to read, which could lift the measure on its own.",
+          "keys": [
+            "signing",
+            "mill",
+            "reading"
+          ],
+          "quote": "measured by the share of people signing the marriage register"
+        }
+      ]
+    },
+    {
+      "id": "stu-17",
+      "segment": "student",
+      "title": "Titration conclusion",
+      "sound": true,
+      "said": [
+        "Chem lab conclusion check. We titrated 25.0 cm3 of our sodium hydroxide with 0.100 mol/dm3 hydrochloric acid. Rough titre 23.9, then 23.45, 23.40 and 23.50, so the three accurate ones agree within 0.10 cm3 and the mean is 23.45 cm3.",
+        "Moles of HCl = 0.100 x 0.02345 = 0.002345 mol. The reaction is 1:1, so that's also the moles of NaOH, giving 0.002345 / 0.0250 = 0.0938 mol/dm3.",
+        "I'm quoting it to 3 significant figures because each burette reading is plus or minus 0.05 cm3, so about half a percent on the titre, plus a bit from the pipette. I left the rough titre out because it was a deliberately fast run. The one thing I can't fully rule out is judging the end point colour, but the same person read all of them."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "stu-18",
+      "segment": "student",
+      "title": "Assisted dying essay",
+      "sound": false,
+      "said": [
+        "Ethics essay: I'm arguing assisted dying should be legal. People have a right to decide what happens to their own bodies, and we already let patients refuse life-saving treatment. So it follows that we should let doctors actively end a patient's life when they ask.",
+        "And legalising it wouldn't harm anyone else, because it's always just the patient's own choice."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "A right to refuse treatment is a right to be left alone; it does not by itself give a right to have a doctor actively end a life, and that step needs its own argument.",
+          "keys": [
+            "refuse",
+            "actively",
+            "doctor"
+          ],
+          "quote": "So it follows that we should let doctors actively end a patient's life"
+        },
+        {
+          "id": "f2",
+          "kind": "consequence",
+          "what": "Legalising could change the choice itself: people who are ill, old or disabled may feel pressure not to be a burden, which is exactly what 'always just the patient's own choice' takes for granted.",
+          "keys": [
+            "pressure",
+            "burden",
+            "vulnerable"
+          ],
+          "quote": "it's always just the patient's own choice"
+        }
+      ]
+    },
+    {
+      "id": "stu-19",
+      "segment": "student",
+      "title": "Dropping chemistry for medicine",
+      "sound": false,
+      "said": [
+        "I've decided to drop chemistry and take psychology A level instead. I want to study medicine, and psychology is way more relevant to actually dealing with patients than titrations are.",
+        "Also my chemistry mock was a C, and I'm sure I'd get an A in psych since my friend says it's mostly essays and I like essays."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "risk",
+          "what": "Most medical schools list A-level chemistry as an entry requirement, so dropping it could rule out the very degree the switch is meant to serve.",
+          "keys": [
+            "chemistry",
+            "medical schools",
+            "requirement"
+          ],
+          "quote": "I've decided to drop chemistry and take psychology A level instead"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "Being sure of an A rests on one friend's description of the course as mostly essays, which also leaves out its research methods and statistics.",
+          "keys": [
+            "friend",
+            "essays",
+            "statistics"
+          ],
+          "quote": "I'm sure I'd get an A in psych"
+        }
+      ]
+    },
+    {
+      "id": "stu-20",
+      "segment": "student",
+      "title": "Canteen price elasticity",
+      "sound": true,
+      "said": [
+        "Econ coursework: after our canteen raised the meal deal from 3 pounds to 3.50 (about 17%), daily sales fell from roughly 300 to 240 (20%) over the next month. That puts the price elasticity of demand at about -1.2, so demand is a bit elastic at this price.",
+        "I checked the obvious other explanations: sales in the same month last year didn't drop, the menu and opening hours didn't change, and no new shop opened nearby. Revenue went from about 900 pounds to 840 pounds a day, so the rise actually lost money.",
+        "I'm careful to say this is one price change over one month, so the estimate only describes demand around this price, and it could shift in exam season when more people are on campus."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "fou-01",
+      "segment": "founder",
+      "title": "School pilot pricing",
+      "sound": false,
+      "said": [
+        "Plan for the school pilot: 10 schools get the tool free for the first week, and we'll charge from week two at 400 pounds a term. That gets revenue in before our runway runs out in four months.",
+        "Teachers in the pilot loved the demo, so I'm confident most schools will convert. I've also budgeted to hire a second developer in month three off the back of that revenue.",
+        "One thing from the pricing chat last month: heads told us school budgets are set once a year, in the spring."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "g",
+            "type": "goal",
+            "label": "Revenue before the runway ends"
+          },
+          {
+            "id": "d1",
+            "type": "decision",
+            "label": "Charge from week two at 400 pounds a term"
+          },
+          {
+            "id": "c",
+            "type": "constraint",
+            "label": "Runway: four months"
+          },
+          {
+            "id": "d2",
+            "type": "decision",
+            "label": "Hire a second developer in month three"
+          },
+          {
+            "id": "e",
+            "type": "evidence",
+            "label": "Teachers loved the demo"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e",
+            "to": "d1",
+            "relation": "supports"
+          },
+          {
+            "from": "d1",
+            "to": "g",
+            "relation": "leads_to"
+          },
+          {
+            "from": "d1",
+            "to": "d2",
+            "relation": "leads_to"
+          },
+          {
+            "from": "c",
+            "to": "d1",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "Charging from week two needs schools to pay mid-year, but they were told budgets are set once a year, in the spring.",
+          "keys": [
+            "week two",
+            "budgets",
+            "once a year"
+          ],
+          "quote": "we'll charge from week two"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "Teachers enjoying a demo does not show schools will pay; teachers are usually not the people who hold the budget.",
+          "keys": [
+            "teachers",
+            "demo",
+            "budget"
+          ],
+          "quote": "Teachers in the pilot loved the demo, so I'm confident most schools will convert"
+        },
+        {
+          "id": "f3",
+          "kind": "risk",
+          "what": "The month-three hire is paid for by pilot revenue that may not arrive, inside a four-month runway.",
+          "keys": [
+            "month three",
+            "developer",
+            "runway"
+          ],
+          "quote": "hire a second developer in month three"
+        }
+      ]
+    },
+    {
+      "id": "fou-02",
+      "segment": "founder",
+      "title": "Undercutting on launch price",
+      "sound": false,
+      "said": [
+        "We're launching at 9 dollars a month. The main competitor charges 29, so we'll undercut them hard and make it up on volume.",
+        "Numbers from the beta: paid ads cost us about 120 dollars per customer who converts, and churn has been around 6% a month. More customers at a lower price is how we win."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "At 9 dollars a month and 6 percent monthly churn a customer pays roughly 150 dollars before leaving, against about 120 to acquire, so each extra customer adds little and volume cannot 'make it up'.",
+          "keys": [
+            "120",
+            "churn",
+            "150",
+            "lifetime"
+          ],
+          "quote": "make it up on volume"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Undercutting assumes buyers in this market choose mainly on price; nothing shows the competitor's customers would switch to save 20 dollars.",
+          "keys": [
+            "switch",
+            "on price",
+            "competitor"
+          ],
+          "quote": "we'll undercut them hard"
+        }
+      ]
+    },
+    {
+      "id": "fou-03",
+      "segment": "founder",
+      "title": "Market size slide",
+      "sound": false,
+      "said": [
+        "Working on the seed deck. Our market slide says pet grooming booking software is a 4 billion dollar market, straight from the industry report, so even 1% share makes us a 40 million dollar company.",
+        "Investors like big numbers so I want that slide up front."
+      ],
+      "sources": [
+        {
+          "key": "F1.2",
+          "name": "Pet services industry report, p. 14",
+          "text": "Spending on pet grooming services reached an estimated 4 billion dollars last year. Software used by groomers to manage bookings and payments is a much smaller category, at roughly 180 million dollars, though it has grown steadily as more independent groomers move away from paper diaries and phone bookings."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The report's 4 billion is spending on grooming services; the booking software category is about 180 million, more than twenty times smaller.",
+          "keys": [
+            "180 million",
+            "services",
+            "software"
+          ],
+          "quote": "pet grooming booking software is a 4 billion dollar market"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "One percent of a market is annual revenue, not company value, and on the report's software figure it would be about 1.8 million a year.",
+          "keys": [
+            "1%",
+            "revenue",
+            "1.8 million"
+          ],
+          "quote": "even 1% share makes us a 40 million dollar company"
+        }
+      ]
+    },
+    {
+      "id": "fou-04",
+      "segment": "founder",
+      "title": "Support lead before engineer",
+      "sound": true,
+      "said": [
+        "Decision: our next hire is a support lead, not a second engineer. Right now my cofounder, our only backend engineer, spends about 15 hours a week on tickets, and our median first response has slipped from 4 hours to 26 over the last quarter.",
+        "Five of the eight customers who cancelled last quarter mentioned slow support in their exit notes, and none mentioned missing features. A support lead costs us roughly half what an engineer would, and it gives my cofounder those 15 hours back for the roadmap.",
+        "I know eight cancellations is a small number, so I'm treating it as a signal rather than proof. We'll check after three months whether response times and cancellations actually moved, and if they haven't, the engineer hire comes next."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Hire a support lead before a second engineer"
+          },
+          {
+            "id": "e1",
+            "type": "evidence",
+            "label": "Cofounder spends about 15 hours a week on tickets"
+          },
+          {
+            "id": "e2",
+            "type": "evidence",
+            "label": "Median first response slipped from 4 hours to 26"
+          },
+          {
+            "id": "e3",
+            "type": "evidence",
+            "label": "5 of 8 cancellations cited slow support"
+          },
+          {
+            "id": "g",
+            "type": "goal",
+            "label": "Ship the roadmap and cut churn"
+          },
+          {
+            "id": "i",
+            "type": "idea",
+            "label": "Review response times and cancellations after three months"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e1",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "e2",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "e3",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "d",
+            "to": "g",
+            "relation": "leads_to"
+          },
+          {
+            "from": "i",
+            "to": "d",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": []
+    },
+    {
+      "id": "fou-05",
+      "segment": "founder",
+      "title": "Pivot to a team product",
+      "sound": false,
+      "said": [
+        "We're pivoting from the consumer habit app to selling a team version to companies. Three HR managers emailed us last month asking for one, which tells me the real market is B2B.",
+        "We'll stop work on the consumer app next week and put both developers on the team product. B2B customers pay more and churn less, so this is clearly the better business.",
+        "For reference, our 4,000 consumer users bring in about 6,000 dollars a month, which mostly covers hosting and tools."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "unsupported",
+          "what": "Three unsolicited emails show some interest, not a market; none of the three has been asked to pay or commit to anything.",
+          "keys": [
+            "three",
+            "HR managers",
+            "pay"
+          ],
+          "quote": "which tells me the real market is B2B"
+        },
+        {
+          "id": "f2",
+          "kind": "consequence",
+          "what": "Stopping consumer work next week puts at risk the 6,000 a month that covers hosting and tools, before any team revenue exists.",
+          "keys": [
+            "6,000",
+            "hosting",
+            "consumer"
+          ],
+          "quote": "We'll stop work on the consumer app next week"
+        }
+      ]
+    },
+    {
+      "id": "fou-06",
+      "segment": "founder",
+      "title": "Conference launch date",
+      "sound": false,
+      "said": [
+        "We're launching publicly at the Northfield conference on 3 March, that's where the press and the buyers all are. Missing it would cost us a year of visibility.",
+        "Separately, I've promised our two enterprise pilots that we won't launch until SSO and audit logs are in, because their security teams require both and we need them as launch references. Our lead engineer estimates SSO lands mid-March and audit logs early April."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "A 3 March launch breaks the promise not to launch before SSO and audit logs, which the engineer expects in mid-March and early April.",
+          "keys": [
+            "3 March",
+            "SSO",
+            "audit logs"
+          ],
+          "quote": "We're launching publicly at the Northfield conference on 3 March"
+        },
+        {
+          "id": "f2",
+          "kind": "evidence",
+          "what": "The claim that missing the conference costs a year of visibility sets the whole date, yet nothing is offered for it, such as past coverage or leads from the event.",
+          "keys": [
+            "year of visibility",
+            "conference",
+            "press"
+          ],
+          "quote": "Missing it would cost us a year of visibility"
+        }
+      ]
+    },
+    {
+      "id": "fou-07",
+      "segment": "founder",
+      "title": "Hiring off a strong quarter",
+      "sound": false,
+      "said": [
+        "Q3 new revenue grew 40% on Q2, so demand is clearly broad-based. I want to hire three more account executives in Q4 to keep that momentum going.",
+        "Our one rep closed most of it in the last six weeks of the quarter, so the playbook obviously works and we just need more people running it."
+      ],
+      "sources": [
+        {
+          "key": "G3.1",
+          "name": "Q3 sales report",
+          "text": "New revenue in Q3 was 210,000 dollars, up 40 percent on Q2. Of this, 70,000 dollars came from a single contract with Harlow Logistics, signed after a ten-month evaluation that began with an introduction from one of our board members. Excluding that contract, new revenue was 140,000 dollars, down about 7 percent on Q2."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The report shows the 40 percent rise came from one contract; without it, new revenue fell about 7 percent, which is the opposite of broad-based demand.",
+          "keys": [
+            "single contract",
+            "Harlow",
+            "7 percent"
+          ],
+          "quote": "so demand is clearly broad-based"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "The biggest deal came from a ten-month evaluation that began with a board member's introduction, which explains the late close better than a repeatable playbook does.",
+          "keys": [
+            "board member",
+            "introduction",
+            "ten-month"
+          ],
+          "quote": "so the playbook obviously works"
+        },
+        {
+          "id": "f3",
+          "kind": "risk",
+          "what": "Three new account executives would be hired on a quarter whose underlying sales fell, so the cost may land before there is pipeline to feed them.",
+          "keys": [
+            "three",
+            "account executives",
+            "pipeline"
+          ],
+          "quote": "hire three more account executives in Q4"
+        }
+      ]
+    },
+    {
+      "id": "fou-08",
+      "segment": "founder",
+      "title": "Keeping the new price",
+      "sound": true,
+      "said": [
+        "We moved the price for new signups from 19 to 25 dollars a month six weeks ago. Trial-to-paid conversion went from 11.2% to 10.6%, on about 1,900 trials in each period, so revenue per trial is up roughly 24%.",
+        "Existing customers kept the old price, so nobody already paying was pushed out. I compared the same six weeks last year to check for seasonality, and conversion was flat then too.",
+        "My plan is to keep 25. The thing I can't see yet is whether the new customers churn faster, so I'll compare 90-day retention between the two groups before touching price again."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "fou-09",
+      "segment": "founder",
+      "title": "All in on TikTok",
+      "sound": false,
+      "said": [
+        "Our TikTok explainer got 2 million views last week, way more than anything we've ever posted on LinkedIn. I'm moving the whole marketing budget to TikTok next month.",
+        "For context, our buyers are finance managers at mid-sized firms, and most of our paying accounts so far came through LinkedIn posts and referrals. The video brought in about 300 signups, 4 of them on a paid plan so far."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "unsupported",
+          "what": "Views are the measure, but the video produced 4 paying accounts; one viral post says little about what the channel will bring in buyers.",
+          "keys": [
+            "views",
+            "paid",
+            "paying",
+            "signups"
+          ],
+          "quote": "way more than anything we've ever posted on LinkedIn"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Moving the whole budget cuts off LinkedIn, which with referrals brought most paying accounts, so a miss on TikTok would leave no working channel funded.",
+          "keys": [
+            "whole",
+            "LinkedIn",
+            "referrals"
+          ],
+          "quote": "I'm moving the whole marketing budget to TikTok next month"
+        }
+      ]
+    },
+    {
+      "id": "fou-10",
+      "segment": "founder",
+      "title": "Choosing between term sheets",
+      "sound": false,
+      "said": [
+        "Two term sheets on the table: Fund A offers 2 million at a 12 million post-money, the angel syndicate offers 2 million at 8 million post. Fund A's terms include a 2x liquidation preference; the angels' is a standard 1x.",
+        "Fund A is obviously better, we give away 16.7% instead of 25%. We're at 300k ARR and we'll raise our Series A in about 18 months."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "Comparing dilution alone leaves out the 2x liquidation preference, which pays Fund A 4 million before anyone else in a sale, so 'obviously better' does not follow from the percentages.",
+          "keys": [
+            "2x",
+            "liquidation preference",
+            "4 million"
+          ],
+          "quote": "Fund A is obviously better, we give away 16.7% instead of 25%"
+        },
+        {
+          "id": "f2",
+          "kind": "consequence",
+          "what": "A 12 million post-money on 300k ARR sets a high bar for the Series A in 18 months; if growth falls short, the next round may be flat or down.",
+          "keys": [
+            "Series A",
+            "12 million",
+            "down round"
+          ],
+          "quote": "we'll raise our Series A in about 18 months"
+        }
+      ]
+    },
+    {
+      "id": "fou-11",
+      "segment": "founder",
+      "title": "Paid tier from six calls",
+      "sound": false,
+      "said": [
+        "Summary of the six customer calls: every single one said they'd pay for automated invoice chasing, so we're good to start building the paid tier.",
+        "I'm pricing it at 49 a month, because chasing invoices eats hours of their week and that time is worth far more than 49."
+      ],
+      "sources": [
+        {
+          "key": "H2.1",
+          "name": "Customer call notes, calls 1 to 6",
+          "text": "Calls 1, 2 and 5: interested, but only if it connects to the accounting system they already use; the three use three different systems. Call 3: would probably pay, wants to see it working first. Call 4: chases invoices by hand once a month and does not pay for any tool. Call 6: pays 15 dollars a month for a reminders add-on and is happy with it."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The notes record interest that is conditional, a 'probably', one person who pays for nothing and one happy with a 15-dollar add-on; none of the six plainly says they would pay.",
+          "keys": [
+            "only if",
+            "accounting system",
+            "probably"
+          ],
+          "quote": "every single one said they'd pay"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "The 49 price rests on chasing eating hours every week, which the notes don't show: one person chases by hand once a month and another is content paying 15 dollars for reminders.",
+          "keys": [
+            "hours",
+            "once a month",
+            "15 dollars"
+          ],
+          "quote": "chasing invoices eats hours of their week"
+        },
+        {
+          "id": "f3",
+          "kind": "risk",
+          "what": "Half the interest depends on connecting to three different accounting systems, so the paid tier carries three integrations nobody has scoped.",
+          "keys": [
+            "integration",
+            "three different",
+            "accounting"
+          ],
+          "quote": "we're good to start building the paid tier"
+        }
+      ]
+    },
+    {
+      "id": "fou-12",
+      "segment": "founder",
+      "title": "Runway for the board",
+      "sound": true,
+      "said": [
+        "Checking my runway maths before the board call. We have 540,000 in the bank and net burn over the last three months averaged 45,000 a month, which is 12 months at the current rate.",
+        "The two hires we've agreed add about 15,000 a month from June, so I'm telling the board roughly nine to ten months, not 12, and that we start the raise in month four so we still have about six months of cover while it closes.",
+        "I've left any revenue growth out on purpose, because I don't want the plan to depend on it."
+      ],
+      "sources": [
+        {
+          "key": "J1.1",
+          "name": "Finance pack, March: cash summary",
+          "text": "Closing cash balance at 31 March: 540,000. Net burn (operating costs less revenue) for January, February and March: 43,000, 47,000 and 45,000, an average of 45,000 a month. Approved hires starting in June: one engineer and one designer, with a combined fully loaded cost of about 15,000 a month."
+        }
+      ],
+      "flaws": []
+    },
+    {
+      "id": "fou-13",
+      "segment": "founder",
+      "title": "Rolling back a price rise",
+      "sound": false,
+      "said": [
+        "Churn jumped from 4% to 9% in May. We raised prices in April, so the increase is clearly what drove people away, and I'm going to roll it back.",
+        "Apart from that, April was a big month: we moved everyone onto the new editor and switched off the old one, and the support queue doubled.",
+        "Rolling back costs us about 8,000 a month in revenue, but keeping customers matters more."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "The forced move to the new editor in the same month, with the support queue doubling, could explain the churn as well as the price rise, and nothing separates the two.",
+          "keys": [
+            "new editor",
+            "old one",
+            "support"
+          ],
+          "quote": "so the increase is clearly what drove people away"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Rolling back gives up about 8,000 a month and will not bring anyone back if the editor switch is what drove them out.",
+          "keys": [
+            "8,000",
+            "roll",
+            "editor"
+          ],
+          "quote": "I'm going to roll it back"
+        }
+      ]
+    },
+    {
+      "id": "fou-14",
+      "segment": "founder",
+      "title": "Enterprise VP of Sales",
+      "sound": false,
+      "said": [
+        "We're hiring a VP of Sales who spent ten years at a big enterprise software firm and closed several million-dollar deals. With that track record, our sales problem is solved.",
+        "Our customers are small agencies paying around 30 dollars a month on self-serve, and that's the segment we're focused on for the next year."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "Closing million-dollar enterprise deals is a different job from growing a self-serve product at about 30 dollars a month for small agencies, so the track record does not carry over.",
+          "keys": [
+            "million-dollar",
+            "30 dollars",
+            "self-serve"
+          ],
+          "quote": "With that track record, our sales problem is solved"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Success at a big firm came with its brand, sales team and support staff behind it; the plan takes for granted it will repeat here without any of those.",
+          "keys": [
+            "brand",
+            "team",
+            "pipeline"
+          ],
+          "quote": "spent ten years at a big enterprise software firm"
+        }
+      ]
+    },
+    {
+      "id": "fou-15",
+      "segment": "founder",
+      "title": "Snack box margins",
+      "sound": false,
+      "said": [
+        "Unit economics for the snack box: the supplier quote puts our cost at 11 dollars a box, shipping is 5, so selling at 25 leaves 9 dollars of margin per box.",
+        "We're planning a first run of 1,000 boxes for the launch, then scaling once we see demand. At 9 dollars a box the launch pays for the ads budget easily."
+      ],
+      "sources": [
+        {
+          "key": "K2.2",
+          "name": "Supplier quote, Crestline Foods",
+          "text": "Price per assembled box: 11.00 dollars for orders of 5,000 boxes or more; 13.50 dollars for 2,000 to 4,999 boxes; 16.00 dollars for orders under 2,000. Prices exclude packaging inserts, quoted separately at 0.80 dollars per box. Quote valid for 60 days."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "At a first run of 1,000 boxes the quote is 16 dollars a box plus 0.80 for inserts, leaving about 3 dollars of margin, not 9; the 11-dollar price applies only from 5,000 boxes.",
+          "keys": [
+            "1,000",
+            "16",
+            "5,000"
+          ],
+          "quote": "the supplier quote puts our cost at 11 dollars a box"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "No ads budget or cost per order is given, and at the quote's real price the launch earns only about 3,200 dollars of margin, so 'easily' has nothing under it.",
+          "keys": [
+            "ads budget",
+            "easily",
+            "3,200"
+          ],
+          "quote": "the launch pays for the ads budget easily"
+        }
+      ]
+    },
+    {
+      "id": "fou-16",
+      "segment": "founder",
+      "title": "Dental clinics first",
+      "sound": true,
+      "said": [
+        "We're focusing our first sales push on dental clinics rather than all small clinics. Of our 40 trial accounts, 5 of the 11 dental ones converted to paid, against 4 of the other 29, and the dental ones all named the same pain: patients not showing up.",
+        "Dental also has two regional associations with newsletters we can reach cheaply, and our reminder feature maps straight onto the no-show problem.",
+        "Eleven accounts is a small base, so I'm treating this as a bet to test, not a fact. If we can't sign 20 dental clinics in the next quarter, we go back to the broad approach, and we're not turning other clinics away in the meantime."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Focus the first sales push on dental clinics"
+          },
+          {
+            "id": "e1",
+            "type": "evidence",
+            "label": "5 of 11 dental trials converted, against 4 of 29 others"
+          },
+          {
+            "id": "e2",
+            "type": "evidence",
+            "label": "Dental trials all named no-shows as the pain"
+          },
+          {
+            "id": "e3",
+            "type": "evidence",
+            "label": "Two regional dental associations with newsletters"
+          },
+          {
+            "id": "i1",
+            "type": "idea",
+            "label": "Reminder feature fits the no-show problem"
+          },
+          {
+            "id": "i2",
+            "type": "idea",
+            "label": "Test: 20 dental clinics signed next quarter, or go back to broad"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e1",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "e2",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "e3",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "i1",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "i2",
+            "to": "d",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": []
+    },
+    {
+      "id": "fou-17",
+      "segment": "founder",
+      "title": "Capping the free plan",
+      "sound": false,
+      "said": [
+        "To push upgrades, we're capping the free plan at 3 projects and 2 collaborators from next month. Our free users get a lot of value from the product, so plenty of them should convert.",
+        "Background: about 70% of our new signups last quarter came from invites sent by free users to their collaborators."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "consequence",
+          "what": "Capping free collaborators at 2 cuts the invites that bring in about 70 percent of new signups, so growth could fall even if some free users upgrade.",
+          "keys": [
+            "70%",
+            "invites",
+            "collaborators"
+          ],
+          "quote": "capping the free plan at 3 projects and 2 collaborators"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Getting value from something free is not the same as being willing to pay for it; capped users may leave or spread work across several free accounts instead.",
+          "keys": [
+            "value",
+            "pay",
+            "free accounts"
+          ],
+          "quote": "Our free users get a lot of value from the product, so plenty of them should convert"
+        }
+      ]
+    },
+    {
+      "id": "fou-18",
+      "segment": "founder",
+      "title": "Backend rewrite",
+      "sound": false,
+      "said": [
+        "Big decision: we're pausing feature work for four months to rewrite the backend in Rust. Customers are leaving because the app is slow, everyone knows that.",
+        "Our two biggest competitors ship something new every couple of weeks, and most of our annual renewals come up in Q3, right after the rewrite would finish."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Pause features for four months to rewrite the backend in Rust"
+          },
+          {
+            "id": "a",
+            "type": "claim",
+            "label": "Customers are leaving because the app is slow"
+          },
+          {
+            "id": "c",
+            "type": "constraint",
+            "label": "Most annual renewals come up in Q3"
+          },
+          {
+            "id": "t",
+            "type": "tension",
+            "label": "Competitors ship every couple of weeks"
+          }
+        ],
+        "edges": [
+          {
+            "from": "a",
+            "to": "d",
+            "relation": "supports"
+          },
+          {
+            "from": "c",
+            "to": "d",
+            "relation": "relates"
+          },
+          {
+            "from": "t",
+            "to": "d",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "evidence",
+          "what": "That customers leave because the app is slow is the reason for the whole rewrite, yet no exit reasons, complaint counts or speed measurements are given.",
+          "keys": [
+            "slow",
+            "leaving",
+            "exit"
+          ],
+          "quote": "Customers are leaving because the app is slow, everyone knows that"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Four months with no features while competitors ship every couple of weeks puts the Q3 renewals right after a freeze, or inside it if the rewrite runs late.",
+          "keys": [
+            "four months",
+            "renewals",
+            "Q3",
+            "competitors"
+          ],
+          "quote": "pausing feature work for four months"
+        }
+      ]
+    },
+    {
+      "id": "fou-19",
+      "segment": "founder",
+      "title": "Second cafe in Leeds",
+      "sound": false,
+      "said": [
+        "Our first cafe in Hackney does about 900 covers a week and has been profitable since month five. We're signing a ten-year lease on a second site in Leeds, and I've modelled it at the same 900 covers.",
+        "Most of our Hackney trade is regulars from the offices around us plus people who found us through local press. The Leeds site is on a residential street near the university."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "assumption",
+          "what": "Modelling Leeds at the same 900 covers assumes the same demand, though Hackney runs on nearby office regulars and local press that a new residential street will not have.",
+          "keys": [
+            "900 covers",
+            "office",
+            "residential"
+          ],
+          "quote": "I've modelled it at the same 900 covers"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Trade on a street near the university is likely to drop outside term time, which a flat 900-a-week model and a ten-year lease leave no room for.",
+          "keys": [
+            "term time",
+            "summer",
+            "holiday",
+            "students"
+          ],
+          "quote": "on a residential street near the university"
+        }
+      ]
+    },
+    {
+      "id": "fou-20",
+      "segment": "founder",
+      "title": "Opening the waitlist in batches",
+      "sound": true,
+      "said": [
+        "We're opening to the 2,400 people on the waitlist in batches of 120 a week rather than launching publicly. About half of beta users booked an onboarding call when we offered one, so 120 a week is roughly the 60 calls a week we can actually run.",
+        "Beta users who had a call were about twice as likely to still be active after a month. I know people who book calls may just be keener, so I'm not leaning on that alone; the bigger reason is that batches let us fix problems before the next group arrives. Our first beta cohort found three blocking bugs in week one.",
+        "The cost is slower growth for about five months and maybe some lost press interest, and I'm fine with that. If activation in the first two batches is no better than the beta's, we'll stop and rethink before opening further."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "res-01",
+      "segment": "researcher",
+      "title": "Green space and depression",
+      "sound": false,
+      "said": [
+        "Our cross-sectional data from 64 neighbourhoods show that areas in the top quarter for green space have about 20% lower rates of diagnosed depression than the bottom quarter, after controlling for age and sex. So green space reduces depression.",
+        "In the discussion I'm recommending that new housing estates include parks, which should bring depression rates down by around 20%."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "c",
+            "type": "claim",
+            "label": "Green space reduces depression"
+          },
+          {
+            "id": "e",
+            "type": "evidence",
+            "label": "Greenest quarter: about 20% lower diagnosed depression"
+          },
+          {
+            "id": "k",
+            "type": "concept",
+            "label": "Controlled for age and sex"
+          },
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Recommend parks on new housing estates"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e",
+            "to": "c",
+            "relation": "supports"
+          },
+          {
+            "from": "k",
+            "to": "e",
+            "relation": "applies_to"
+          },
+          {
+            "from": "c",
+            "to": "d",
+            "relation": "leads_to"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "Greener neighbourhoods tend to differ in income and deprivation, which were not controlled and could explain lower depression on their own.",
+          "keys": [
+            "income",
+            "deprivation",
+            "age and sex"
+          ],
+          "quote": "after controlling for age and sex. So green space reduces depression"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "A cross-sectional gap between existing neighbourhoods does not predict what adding parks to new estates would do, let alone a 20 percent fall.",
+          "keys": [
+            "20%",
+            "new",
+            "cross-sectional"
+          ],
+          "quote": "which should bring depression rates down by around 20%"
+        },
+        {
+          "id": "f3",
+          "kind": "assumption",
+          "what": "Diagnosed depression is treated as depression itself, but diagnosis rates also depend on access to and use of GPs, which can differ between neighbourhoods.",
+          "keys": [
+            "diagnosed",
+            "access",
+            "GP"
+          ],
+          "quote": "lower rates of diagnosed depression"
+        }
+      ]
+    },
+    {
+      "id": "res-02",
+      "segment": "researcher",
+      "title": "Time-restricted eating baseline",
+      "sound": false,
+      "said": [
+        "Related work, first paragraph: the trial in our reading pack shows that time-restricted eating improves insulin sensitivity in adults, so the effect is well established and we can treat it as the baseline expectation for our shift-worker study.",
+        "Our study will recruit night-shift nurses, mostly women in their 20s to 40s, so the prior result gives us a solid hypothesis to confirm."
+      ],
+      "sources": [
+        {
+          "key": "L1.4",
+          "name": "Reading pack, paper 3: results",
+          "text": "Twenty-four men aged 50 to 70 with prediabetes ate within a six-hour window for eight weeks. Insulin sensitivity improved compared with their own baseline. There was no control group. A parallel arm of 20 women did not complete the protocol because of scheduling problems, so no conclusions are drawn for women."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The trial enrolled 24 men aged 50 to 70 with prediabetes and draws no conclusion for women, so it does not show an effect in adults generally, still less in young women on night shifts.",
+          "keys": [
+            "men",
+            "50 to 70",
+            "prediabetes",
+            "women"
+          ],
+          "quote": "improves insulin sensitivity in adults"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "One small eight-week trial with no control group, compared only with participants' own baseline, cannot make the effect well established.",
+          "keys": [
+            "no control group",
+            "eight weeks",
+            "24"
+          ],
+          "quote": "so the effect is well established"
+        }
+      ]
+    },
+    {
+      "id": "res-03",
+      "segment": "researcher",
+      "title": "Trust in science survey",
+      "sound": false,
+      "said": [
+        "Plan for the trust-in-science survey: we'll recruit through our lab's social media accounts, which have about 30,000 followers, and aim for 1,000 responses. That should give us a good picture of how much the general public trusts scientists.",
+        "We'll report the headline as the percentage of the public who trust scientists 'a great deal', with a margin of error of about 3 points."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "assumption",
+          "what": "People who follow a science lab's accounts are likely to trust scientists more than the general public, so the sample cannot stand for the public.",
+          "keys": [
+            "followers",
+            "general public",
+            "trust"
+          ],
+          "quote": "That should give us a good picture of how much the general public trusts scientists"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "A margin of error presumes a random sample; for a self-selected convenience sample, a 3-point figure would hide how far off the estimate could be.",
+          "keys": [
+            "margin of error",
+            "random",
+            "self-selected"
+          ],
+          "quote": "with a margin of error of about 3 points"
+        }
+      ]
+    },
+    {
+      "id": "res-04",
+      "segment": "researcher",
+      "title": "Cluster-randomised feedback trial",
+      "sound": true,
+      "said": [
+        "Design note for the feedback study: we're randomising whole classes rather than individual students, because students in the same class share a teacher and would contaminate each other. That's 60 classes, about 1,500 students.",
+        "The power calculation uses an intraclass correlation of 0.15 from our own pilot, and the analysis is a multilevel model with students nested in classes, so the clustering is accounted for. The primary outcome, the end-of-term writing score, is pre-registered.",
+        "Teachers obviously know which arm they're in, so the essays are marked by assessors who don't know the allocation. The main limitation I'll flag is that the pilot ICC came from only 12 classes, so I've also checked power at 0.20 and we still have about 80% for the smallest effect we care about."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "res-05",
+      "segment": "researcher",
+      "title": "Mindfulness apps review",
+      "sound": false,
+      "said": [
+        "Synthesis for the review: of the seven studies on mindfulness apps and workplace stress, five found a significant reduction and two found none. Five to two, so the evidence clearly favours an effect.",
+        "The five positive ones are all from the same research group, which is nice for consistency since they used the same stress scale. The two null studies were the largest, with about 400 participants each, against 40 to 80 in the others."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "gap",
+          "what": "Counting significant results ignores study size: the two null studies, at about 400 participants each, may outweigh the five small ones combined.",
+          "keys": [
+            "vote",
+            "400",
+            "size",
+            "largest"
+          ],
+          "quote": "Five to two, so the evidence clearly favours an effect"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Five studies from one group are treated as five independent confirmations, though shared methods, samples and analytic choices mean they may count for much less.",
+          "keys": [
+            "same research group",
+            "independent",
+            "consistency"
+          ],
+          "quote": "The five positive ones are all from the same research group"
+        }
+      ]
+    },
+    {
+      "id": "res-06",
+      "segment": "researcher",
+      "title": "Anxiety scale for teenagers",
+      "sound": false,
+      "said": [
+        "We're measuring anxiety in our sample of 13 to 15 year olds with the 8-item short form of the Calder scale. It's a validated instrument with reliability of 0.91, so measurement isn't something reviewers can criticise.",
+        "Using the short form also halves completion time, which really matters with teenagers in a single school period."
+      ],
+      "sources": [
+        {
+          "key": "M2.1",
+          "name": "Calder Anxiety Scale manual, section 4",
+          "text": "The full 16-item scale showed internal consistency of 0.91 in the validation sample of 1,140 adults aged 25 to 60. The 8-item short form showed internal consistency of 0.71 in the same sample. Neither form has been validated with respondents under 18, and several items assume adult work and household roles."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The manual gives 0.91 for the full 16-item scale; the 8-item short form they are using came in at 0.71.",
+          "keys": [
+            "0.71",
+            "short form",
+            "16-item"
+          ],
+          "quote": "It's a validated instrument with reliability of 0.91"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "Neither form has been validated under 18 and several items assume adult work and household roles, so 'validated' does not extend to 13 to 15 year olds.",
+          "keys": [
+            "under 18",
+            "adult",
+            "13 to 15"
+          ],
+          "quote": "so measurement isn't something reviewers can criticise"
+        }
+      ]
+    },
+    {
+      "id": "res-07",
+      "segment": "researcher",
+      "title": "Instagram, envy and comparison",
+      "sound": false,
+      "said": [
+        "Our hypothesis was that social comparison is what makes Instagram use lead to envy. We predicted that heavier users would report more envy, and they did: r = 0.31 across 420 participants.",
+        "So the data confirm that social comparison is the mechanism. For the next paper we'll build an intervention that reduces comparison."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "evidence",
+          "what": "Social comparison was never measured, so nothing in the data sits under the mechanism claim; the same correlation would appear under other mechanisms.",
+          "keys": [
+            "comparison",
+            "measured",
+            "mechanism"
+          ],
+          "quote": "So the data confirm that social comparison is the mechanism"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "People who already feel more envious may use Instagram more, a direction the correlation cannot rule out.",
+          "keys": [
+            "reverse",
+            "envious",
+            "direction",
+            "other way"
+          ],
+          "quote": "heavier users would report more envy, and they did"
+        }
+      ]
+    },
+    {
+      "id": "res-08",
+      "segment": "researcher",
+      "title": "Rural GP burnout interviews",
+      "sound": true,
+      "said": [
+        "For the burnout paper we interviewed 18 GPs in rural practices and did a thematic analysis. Two of us coded a third of the transcripts independently and resolved disagreements before coding the rest, and no new themes came up after about interview 14.",
+        "I'm framing the findings as themes, not prevalence: I say 'isolation from colleagues came up repeatedly', not '70% of rural GPs feel isolated'. We also don't claim anything about urban practices, since we didn't speak to any.",
+        "The sample was recruited through a regional network, so people with strong views may be overrepresented, and that's in the limitations."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "res-09",
+      "segment": "researcher",
+      "title": "Triage protocol evaluation",
+      "sound": false,
+      "said": [
+        "Our evaluation of the new triage protocol: we introduced it in January because December had our worst waiting times on record, 4.1 hours on average. By March the average was down to 3.2 hours, so the protocol cut waits by over 20%.",
+        "We're writing it up as evidence the protocol works and recommending it to the other two hospitals in the trust."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "Starting right after a record-bad month means waits would likely ease anyway, through regression to the mean and the end of winter pressure; with no comparison period or site, the fall cannot be credited to the protocol.",
+          "keys": [
+            "December",
+            "regression",
+            "winter"
+          ],
+          "quote": "because December had our worst waiting times on record"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "One before-and-after comparison at one hospital is too thin to recommend the protocol to two others with their own patients and staffing.",
+          "keys": [
+            "other two hospitals",
+            "comparison",
+            "before"
+          ],
+          "quote": "recommending it to the other two hospitals in the trust"
+        }
+      ]
+    },
+    {
+      "id": "res-10",
+      "segment": "researcher",
+      "title": "Two reading programme papers",
+      "sound": false,
+      "said": [
+        "Two of the papers I'm synthesising directly contradict each other: one finds that the reading programme improved comprehension, the other finds no effect. So the literature on the programme is inconsistent, and I'm concluding the evidence is too mixed to recommend it.",
+        "I'd rather be cautious than recommend something with conflicting results. Does this paragraph read OK?"
+      ],
+      "sources": [
+        {
+          "key": "N1.1",
+          "name": "Paper A, abstract",
+          "text": "Pupils aged 7 to 8 who were reading below the expected level received the programme in small groups three times a week for one term. Their comprehension scores improved more than those of matched pupils who received usual teaching. Gains were still visible at a follow-up test six months later."
+        },
+        {
+          "key": "N2.3",
+          "name": "Paper B, abstract",
+          "text": "The programme was delivered once a week to whole classes of pupils aged 10 to 11, most of whom were already reading at or above the expected level. At the end of the year, comprehension scores did not differ from those of comparison classes."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "The papers studied different pupils and doses, struggling 7 to 8 year olds in small groups three times a week against whole classes of 10 to 11 year olds mostly at level once a week, so the results need not conflict.",
+          "keys": [
+            "below the expected level",
+            "whole classes",
+            "once a week",
+            "aged 7 to 8"
+          ],
+          "quote": "directly contradict each other"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "Read together, the papers point to a narrower recommendation, frequent small-group use with struggling younger readers, rather than to no recommendation at all.",
+          "keys": [
+            "recommend",
+            "too mixed",
+            "struggling readers"
+          ],
+          "quote": "the evidence is too mixed to recommend it"
+        }
+      ]
+    },
+    {
+      "id": "res-11",
+      "segment": "researcher",
+      "title": "Run-in period for an exercise trial",
+      "sound": false,
+      "said": [
+        "To deal with dropout in our 12-week home exercise trial for people with knee pain, we're adding a two-week run-in: only people who complete 90% of the run-in sessions get randomised.",
+        "That should give us much better adherence, and then we can tell GPs the programme is something their patients will stick with."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "consequence",
+          "what": "Screening out people who can't keep up in the run-in means the results describe only highly adherent patients, so benefits may look larger than they would in GP practice.",
+          "keys": [
+            "run-in",
+            "adherent",
+            "typical patients"
+          ],
+          "quote": "only people who complete 90% of the run-in sessions get randomised"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "High adherence among people selected for adherence says nothing about whether ordinary patients stick with the programme; the result is built into the design.",
+          "keys": [
+            "adherence",
+            "selected",
+            "GPs"
+          ],
+          "quote": "then we can tell GPs the programme is something their patients will stick with"
+        }
+      ]
+    },
+    {
+      "id": "res-12",
+      "segment": "researcher",
+      "title": "Citing an uncontrolled rollout",
+      "sound": true,
+      "said": [
+        "In the background section I cite the rollout report: among the 310 patients who completed the 12-month programme, average HbA1c fell by about 0.6 points. I'm careful to say 'among completers', since about a third of those who started didn't finish and weren't followed up.",
+        "There was no comparison group either, so I present it as the reason a trial is worth running, not as evidence the programme works. That's exactly the gap our randomised trial is designed to fill."
+      ],
+      "sources": [
+        {
+          "key": "P3.2",
+          "name": "Regional rollout report, section 3",
+          "text": "Of 468 patients who started the programme, 310 completed 12 months. Among completers, mean HbA1c fell from 8.1 to 7.5. Patients who left the programme were not followed up. The rollout did not include a comparison group, and the authors describe the results as encouraging but not conclusive."
+        }
+      ],
+      "flaws": []
+    },
+    {
+      "id": "res-13",
+      "segment": "researcher",
+      "title": "Classroom noise study design",
+      "sound": false,
+      "said": [
+        "The main selling point of our study is ecological validity: we want findings about background noise and working memory that apply directly to real primary school classrooms.",
+        "For speed, we'll run it online with adult participants from a panel, doing the memory task at home, with recorded classroom noise played through their own headphones at whatever volume is comfortable."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "Adults on a panel at home are not primary school children in classrooms, so the design undercuts the very generalisation the study is selling.",
+          "keys": [
+            "adult",
+            "primary school",
+            "children"
+          ],
+          "quote": "apply directly to real primary school classrooms"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Letting each person set their own volume means the noise level, the thing under test, varies uncontrolled between participants and could swamp the effect.",
+          "keys": [
+            "volume",
+            "headphones",
+            "noise level"
+          ],
+          "quote": "at whatever volume is comfortable"
+        }
+      ]
+    },
+    {
+      "id": "res-14",
+      "segment": "researcher",
+      "title": "Sleep app trial write-up",
+      "sound": false,
+      "said": [
+        "Results paragraph: our pre-registered primary outcome, self-rated sleep quality, improved significantly in the app group compared with controls (p = 0.03). Total sleep time measured by the wristbands didn't differ, but that was always a secondary measure.",
+        "So the trial is a clear positive result for the app, and that's how I'm framing the abstract."
+      ],
+      "sources": [
+        {
+          "key": "Q1.1",
+          "name": "Trial pre-registration, outcomes",
+          "text": "Primary outcome: total sleep time, measured objectively by wrist actigraphy over 14 nights at week 8. Secondary outcomes: self-rated sleep quality (questionnaire), daytime sleepiness and app engagement. Participants and staff are not blinded to group. Any change to outcomes after data collection begins will be reported as a deviation."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The registration names total sleep time by actigraphy as the primary outcome and self-rated quality as secondary, so the write-up has swapped them.",
+          "keys": [
+            "total sleep time",
+            "actigraphy",
+            "secondary"
+          ],
+          "quote": "our pre-registered primary outcome, self-rated sleep quality"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "With the registered primary outcome showing no difference and one secondary measure at p = 0.03, 'a clear positive result' goes well beyond what the trial shows.",
+          "keys": [
+            "primary outcome",
+            "no difference",
+            "abstract"
+          ],
+          "quote": "So the trial is a clear positive result for the app"
+        },
+        {
+          "id": "f3",
+          "kind": "alternative",
+          "what": "Participants were not blinded, so people who know they have the sleep app may rate their sleep better without sleeping more, which is what the wristbands suggest.",
+          "keys": [
+            "self-rated",
+            "not blinded",
+            "expectation"
+          ],
+          "quote": "improved significantly in the app group compared with controls"
+        }
+      ]
+    },
+    {
+      "id": "res-15",
+      "segment": "researcher",
+      "title": "Remote work and innovation",
+      "sound": false,
+      "said": [
+        "Working hypothesis for the grant: remote teams are less innovative because most new ideas come from spontaneous hallway conversations, which remote work removes.",
+        "We'll compare fully remote and office-based teams at the firm on the number of patents filed per team over two years. The firm let teams choose their own working arrangement in 2023, which makes the comparison easy."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "evidence",
+          "what": "That most new ideas come from hallway conversations carries the whole hypothesis, yet it is asserted with nothing under it.",
+          "keys": [
+            "hallway",
+            "new ideas"
+          ],
+          "quote": "most new ideas come from spontaneous hallway conversations"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Patent counts are taken as innovation, but filing depends on the kind of work and on legal decisions, and much innovation is never patented.",
+          "keys": [
+            "patents",
+            "innovation",
+            "measure"
+          ],
+          "quote": "on the number of patents filed per team"
+        },
+        {
+          "id": "f3",
+          "kind": "alternative",
+          "what": "Teams chose their own arrangement, so remote and office teams may differ in the kind of work they do, and that, not location, could drive any gap in patents.",
+          "keys": [
+            "choose",
+            "chose",
+            "self-select",
+            "kind of work"
+          ],
+          "quote": "The firm let teams choose their own working arrangement"
+        }
+      ]
+    },
+    {
+      "id": "res-16",
+      "segment": "researcher",
+      "title": "School lunch rule, difference-in-differences",
+      "sound": true,
+      "said": [
+        "We're estimating the effect of the 2022 sugar-free school lunch rule using the 14 districts that adopted it and 20 that didn't. Before 2022 the two groups' dental referral rates moved in parallel for five years, which we checked year by year, so difference-in-differences is reasonable. We find referrals fell about 8% relative to the comparison districts.",
+        "Adoption was set by a state budget formula, not by district interest, so districts didn't select themselves in. We also ran a placebo test pretending the rule started in 2019 and found nothing, as you'd hope.",
+        "The limit is that we only have two years after the change, so we call it a short-run effect, and referrals are a proxy that depends on school nurses, so nurse staffing is in the model as a control."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "c",
+            "type": "claim",
+            "label": "The lunch rule cut dental referrals by about 8% in the short run"
+          },
+          {
+            "id": "e1",
+            "type": "evidence",
+            "label": "Parallel pre-trends over five years"
+          },
+          {
+            "id": "e2",
+            "type": "evidence",
+            "label": "Adoption set by a state budget formula"
+          },
+          {
+            "id": "e3",
+            "type": "evidence",
+            "label": "Placebo start in 2019 shows nothing"
+          },
+          {
+            "id": "e4",
+            "type": "evidence",
+            "label": "Nurse staffing controlled"
+          },
+          {
+            "id": "k",
+            "type": "constraint",
+            "label": "Only two years of data after the change"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e1",
+            "to": "c",
+            "relation": "supports"
+          },
+          {
+            "from": "e2",
+            "to": "c",
+            "relation": "supports"
+          },
+          {
+            "from": "e3",
+            "to": "c",
+            "relation": "supports"
+          },
+          {
+            "from": "e4",
+            "to": "c",
+            "relation": "supports"
+          },
+          {
+            "from": "k",
+            "to": "c",
+            "relation": "applies_to"
+          }
+        ]
+      },
+      "flaws": []
+    },
+    {
+      "id": "res-17",
+      "segment": "researcher",
+      "title": "Dropping slow responders",
+      "sound": false,
+      "said": [
+        "Quick check on the analysis: with all 46 participants the priming effect on reaction time was p = 0.11. Three participants had very slow reaction times, so I removed them, and now it's p = 0.04.",
+        "Excluding slow responders is standard practice, so I'll just mention it briefly in the methods. The effect is real, it was just being hidden by noise."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "unsupported",
+          "what": "The exclusion was chosen after seeing it turn p = 0.11 into 0.04, so the result rests on a decision made after the fact and does not show the effect is real.",
+          "keys": [
+            "0.11",
+            "0.04",
+            "after"
+          ],
+          "quote": "The effect is real, it was just being hidden by noise"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "Standard practice is an exclusion rule fixed in advance, such as a cut-off; removing the three slowest people once results were known does not follow from it.",
+          "keys": [
+            "criterion",
+            "in advance",
+            "cut-off",
+            "before"
+          ],
+          "quote": "Excluding slow responders is standard practice"
+        }
+      ]
+    },
+    {
+      "id": "res-18",
+      "segment": "researcher",
+      "title": "Following graduates for three years",
+      "sound": false,
+      "said": [
+        "Plan for the transitions study: we recruit 600 final-year undergraduates this spring and follow them up once a year for three years to see how their career plans change.",
+        "Contact will be through their university email addresses, which keeps things simple, and since the survey only takes 15 minutes we don't need incentives."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "risk",
+          "what": "University email accounts are usually closed some time after graduation, so the only contact route may disappear before the first follow-up.",
+          "keys": [
+            "email",
+            "graduation",
+            "closed"
+          ],
+          "quote": "Contact will be through their university email addresses"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Assumes a short survey keeps people answering for three years; attrition in multi-year follow-ups is often heavy, and those who drop out may differ from those who stay.",
+          "keys": [
+            "attrition",
+            "incentives",
+            "three years"
+          ],
+          "quote": "since the survey only takes 15 minutes we don't need incentives"
+        }
+      ]
+    },
+    {
+      "id": "res-19",
+      "segment": "researcher",
+      "title": "Publishing village transcripts",
+      "sound": false,
+      "said": [
+        "For transparency we're going to post all 25 interview transcripts from the fishing village study on an open repository once the paper is out. We've removed names, so they're anonymised.",
+        "Participants signed our standard consent form, which says their words may be quoted in publications. Open data is the norm now and reviewers love it, so I can't see a downside."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "consequence",
+          "what": "In a small fishing village, jobs, boats, family ties and local events in full transcripts can identify people without their names, so posting them could expose participants to their neighbours.",
+          "keys": [
+            "village",
+            "identify",
+            "identifiable",
+            "small"
+          ],
+          "quote": "We've removed names, so they're anonymised"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "Consent to being quoted in publications does not cover posting full transcripts in an open repository.",
+          "keys": [
+            "consent",
+            "quoted",
+            "full transcripts"
+          ],
+          "quote": "which says their words may be quoted in publications"
+        }
+      ]
+    },
+    {
+      "id": "res-20",
+      "segment": "researcher",
+      "title": "Reporting a null replication",
+      "sound": true,
+      "said": [
+        "Our replication of the ego-depletion task found no effect: d = 0.03, with a 95% interval from -0.09 to 0.15, on 1,100 participants. I'm not concluding the effect is zero, because a null result alone can't show that.",
+        "What we did pre-register was an equivalence test with bounds of d = plus or minus 0.2, and the whole interval sits inside those bounds, so we can say the effect, if there is one, is probably smaller than 0.2 in this setup.",
+        "I'm also clear that we ran it online with adult panel participants, while the original used students in a lab, so the conclusion is about our version of the task, not every version."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "des-01",
+      "segment": "designer",
+      "title": "Why churned users left",
+      "sound": false,
+      "said": [
+        "Synthesis from the 8 churned-user interviews: users churn because onboarding is too long. Four of them mentioned the setup steps being tedious.",
+        "Two others said they'd finished the one project they signed up for and didn't need the tool after that, and two didn't remember much about the product at all.",
+        "So the plan is to cut onboarding from seven steps to three. That should fix churn."
+      ],
+      "map": {
+        "nodes": [
+          {
+            "id": "c",
+            "type": "claim",
+            "label": "Users churn because onboarding is too long"
+          },
+          {
+            "id": "e1",
+            "type": "evidence",
+            "label": "4 of 8 said setup was tedious"
+          },
+          {
+            "id": "e2",
+            "type": "evidence",
+            "label": "2 of 8 finished their one project"
+          },
+          {
+            "id": "d",
+            "type": "decision",
+            "label": "Cut onboarding from seven steps to three"
+          }
+        ],
+        "edges": [
+          {
+            "from": "e1",
+            "to": "c",
+            "relation": "supports"
+          },
+          {
+            "from": "c",
+            "to": "d",
+            "relation": "leads_to"
+          },
+          {
+            "from": "e2",
+            "to": "c",
+            "relation": "relates"
+          }
+        ]
+      },
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "Two of the eight left because they had finished the one project they came for, which points to limited ongoing need rather than onboarding length.",
+          "keys": [
+            "finished",
+            "one project",
+            "need"
+          ],
+          "quote": "users churn because onboarding is too long"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "Only four of eight called setup tedious, and finding it tedious is not the same as leaving because of it, so shorter onboarding cannot be expected to fix churn.",
+          "keys": [
+            "four",
+            "tedious",
+            "fix churn"
+          ],
+          "quote": "That should fix churn"
+        }
+      ]
+    },
+    {
+      "id": "des-02",
+      "segment": "designer",
+      "title": "Closing the export flow",
+      "sound": false,
+      "said": [
+        "Usability round 3 summary: the new navigation tested really well. All five participants completed the export task without help, so the export flow is done and we can move on to billing.",
+        "Export was the riskiest part of the redesign, so I'm happy to close it off and put the team on billing next sprint."
+      ],
+      "sources": [
+        {
+          "key": "R3.2",
+          "name": "Usability round 3, session notes (export task)",
+          "text": "P1: completed in 40 s. P2: looked in Settings first, found Export after a hint from the moderator, 2 min 10 s. P3: completed in 35 s. P4: gave up after 3 min; the moderator showed the menu. P5: completed in 50 s, said the export icon 'looks like share'."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The notes show P2 needed a hint from the moderator and P4 gave up and was shown the menu, so not all five completed without help.",
+          "keys": [
+            "P2",
+            "P4",
+            "hint",
+            "gave up"
+          ],
+          "quote": "All five participants completed the export task without help"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Closing the flow leaves a findability problem behind: two of five looked elsewhere or gave up, and one read the icon as 'share'.",
+          "keys": [
+            "Settings",
+            "icon",
+            "share"
+          ],
+          "quote": "so the export flow is done and we can move on to billing"
+        }
+      ]
+    },
+    {
+      "id": "des-03",
+      "segment": "designer",
+      "title": "Evening sessions persona",
+      "sound": false,
+      "said": [
+        "Persona update: analytics show about 60% of sessions happen between 9 and 11pm, so our core users are busy parents who can only get to this after the kids are in bed.",
+        "That's why the persona says they want every task finished in under five minutes. I'm going to use it to justify cutting the advanced filters, which only about 15% of weekly users touch anyway."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "Late-evening use fits many groups, such as students, shift workers or people doing this after work, so session times alone cannot show that users are parents.",
+          "keys": [
+            "9 and 11pm",
+            "parents",
+            "students"
+          ],
+          "quote": "so our core users are busy parents"
+        },
+        {
+          "id": "f2",
+          "kind": "evidence",
+          "what": "The five-minute need is written into the persona with no interview, survey or task data behind it, yet it is about to justify cutting a feature.",
+          "keys": [
+            "five minutes",
+            "persona",
+            "research"
+          ],
+          "quote": "they want every task finished in under five minutes"
+        },
+        {
+          "id": "f3",
+          "kind": "consequence",
+          "what": "The 15 percent who use advanced filters may be the heaviest or paying users, so cutting them could cost the most engaged accounts.",
+          "keys": [
+            "15%",
+            "heaviest",
+            "filters"
+          ],
+          "quote": "cutting the advanced filters"
+        }
+      ]
+    },
+    {
+      "id": "des-04",
+      "segment": "designer",
+      "title": "One-page checkout readout",
+      "sound": true,
+      "said": [
+        "Readout for the checkout test: the one-page checkout lifted completed orders from 3.1% to 3.4% of sessions, with about 48,000 sessions per arm over four full weeks. The interval on the difference runs from roughly +0.1 to +0.5 points, so it's unlikely to be noise.",
+        "We fixed the four-week duration and the primary metric before launch, and didn't stop early when it looked good. Average order value was flat across arms, so the extra orders aren't coming at the cost of smaller baskets.",
+        "I'm recommending we ship it. The caveat I'm writing down is that the test ran outside the holiday season, so we'll watch conversion in December rather than assume the same lift."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "des-05",
+      "segment": "designer",
+      "title": "Meal reminder interviews",
+      "sound": false,
+      "said": [
+        "Interview synthesis: we asked ten users 'Wouldn't it be great if the app reminded you to log your meals?' and nine said yes. So reminders are clearly a top need.",
+        "We're adding three daily push reminders, on by default, from the next release, since that's what people asked for."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "unsupported",
+          "what": "A question that suggests its own answer gets easy agreement; nine yeses show politeness as much as need, and say nothing about how reminders rank against other needs.",
+          "keys": [
+            "leading",
+            "Wouldn't it be great",
+            "top need"
+          ],
+          "quote": "So reminders are clearly a top need"
+        },
+        {
+          "id": "f2",
+          "kind": "consequence",
+          "what": "Three default pushes a day risk annoying people into turning notifications off or uninstalling, losing the channel altogether.",
+          "keys": [
+            "three daily",
+            "notifications",
+            "turn off"
+          ],
+          "quote": "three daily push reminders, on by default"
+        },
+        {
+          "id": "f3",
+          "kind": "gap",
+          "what": "Agreeing that reminders would be nice is not asking for three a day on by default; the frequency and the default are the team's choice, not the users'.",
+          "keys": [
+            "default",
+            "how many",
+            "asked"
+          ],
+          "quote": "since that's what people asked for"
+        }
+      ]
+    },
+    {
+      "id": "des-06",
+      "segment": "designer",
+      "title": "Pricing page test readout",
+      "sound": false,
+      "said": [
+        "The pricing page test is a clear win: the new layout lifted plan upgrades by 12%. I'm writing it up as a success and we'll roll it out to everyone on Monday.",
+        "It's especially good on mobile, which is where most of our traffic is, so the overall impact should be even bigger than the headline."
+      ],
+      "sources": [
+        {
+          "key": "S1.1",
+          "name": "Experiment dashboard export: pricing layout",
+          "text": "Upgrades: control 212 of 9,840 visitors (2.15%); new layout 237 of 9,790 (2.42%); relative difference +12.4%, 95% interval -7% to +35%. By device: desktop +31% (about 6,100 visitors per arm), mobile -9% (about 3,700 per arm). Test stopped on day 5 of a planned 14."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "unsupported",
+          "what": "The 95 percent interval runs from -7 to +35 percent and the test was stopped on day 5 of 14, so the lift is not established and 'clear win' goes beyond the data.",
+          "keys": [
+            "interval",
+            "7%",
+            "day 5"
+          ],
+          "quote": "the new layout lifted plan upgrades by 12%"
+        },
+        {
+          "id": "f2",
+          "kind": "contradiction",
+          "what": "The export shows mobile at -9 percent with desktop carrying the gain, and desktop has most of the visitors, so both halves of the claim are reversed.",
+          "keys": [
+            "mobile",
+            "9%",
+            "desktop"
+          ],
+          "quote": "It's especially good on mobile, which is where most of our traffic is"
+        }
+      ]
+    },
+    {
+      "id": "des-07",
+      "segment": "designer",
+      "title": "Burying the cancel link",
+      "sound": false,
+      "said": [
+        "Retention idea for the account page: we move the cancel link from Account settings into Help, then Manage plan, then More options. If fewer people find it, fewer people cancel, and our churn number goes down.",
+        "It's a small change, just moving a link, so we can ship it this week without much discussion."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "consequence",
+          "what": "People who want to leave and can't find how will still leave, by disputing charges, complaining or never coming back, and some places require cancelling to be as easy as signing up.",
+          "keys": [
+            "complain",
+            "dispute",
+            "chargeback",
+            "trust"
+          ],
+          "quote": "If fewer people find it, fewer people cancel"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "A lower churn number from hiding the link counts people stuck, not people retained, so the metric would improve while what it tracks gets worse.",
+          "keys": [
+            "churn number",
+            "want to leave",
+            "retained"
+          ],
+          "quote": "and our churn number goes down"
+        }
+      ]
+    },
+    {
+      "id": "des-08",
+      "segment": "designer",
+      "title": "Double entry in warehouses",
+      "sound": true,
+      "said": [
+        "Synthesis from the warehouse study: 9 of the 12 supervisors we interviewed, across four sites, described writing stock counts on paper during the shift and typing them in at the end. We also watched it happen at three of the four sites.",
+        "The system logs back it up: about 70% of count entries at those sites are made in the last 30 minutes of a shift. So I'm confident double entry is a real and common pain at sites like these.",
+        "I'm not claiming it's true of every warehouse, since all four sites run the same older scanners, and two supervisors said they like paper as a backup, so the design should keep an offline fallback rather than get rid of paper entirely."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "des-09",
+      "segment": "designer",
+      "title": "Light grey labels",
+      "sound": false,
+      "said": [
+        "We committed to WCAG AA contrast across the product this year. For the new dashboard I'm using our light grey #9AA0A6 on white for the 12px secondary labels, because it looks much cleaner than the dark grey.",
+        "Only about 3% of our users have told support they have a vision issue, so even if it's a bit light it won't affect many people."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "That grey on white gives a contrast of about 2.6 to 1, below the 4.5 to 1 that AA requires for small text, so it breaks the AA commitment.",
+          "keys": [
+            "contrast",
+            "AA",
+            "4.5"
+          ],
+          "quote": "using our light grey #9AA0A6 on white for the 12px secondary labels"
+        },
+        {
+          "id": "f2",
+          "kind": "assumption",
+          "what": "Low contrast affects far more people than those who report a vision issue to support, such as older users or anyone on a dim screen or in sunlight, so 3 percent undercounts who is affected.",
+          "keys": [
+            "3%",
+            "told support",
+            "older",
+            "sunlight"
+          ],
+          "quote": "Only about 3% of our users have told support they have a vision issue"
+        }
+      ]
+    },
+    {
+      "id": "des-10",
+      "segment": "designer",
+      "title": "Removing the calendar view",
+      "sound": false,
+      "said": [
+        "Strong signal from the interviews: P6 literally said 'I hate the calendar'. Two other people also mentioned the calendar, so I'm proposing we remove the calendar view and push everyone to the list view.",
+        "Less to maintain, and the list view tested fine last quarter."
+      ],
+      "sources": [
+        {
+          "key": "T6.1",
+          "name": "Interview transcript P6, 14:20",
+          "text": "Interviewer: Anything that frustrates you at the moment? P6: Honestly? I hate the calendar sync with Outlook, it duplicates everything and I spend ages deleting stuff. The calendar view itself is the only thing I use every day, it is why we picked you."
+        },
+        {
+          "key": "T2.4",
+          "name": "Interview notes, P2 and P9",
+          "text": "P2: books meeting rooms from the calendar view most days and wishes it showed weekends as well as weekdays. P9: plans the whole week in the calendar view, then uses the list view for the day itself. Neither raised the calendar as a problem."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "The transcript shows P6 hates the Outlook sync, and says the calendar view itself is the one thing they use every day and the reason they chose the product.",
+          "keys": [
+            "sync",
+            "Outlook",
+            "every day"
+          ],
+          "quote": "P6 literally said 'I hate the calendar'"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "The two other mentions are daily use, booking rooms and planning the week, plus a wish for weekends to be shown, which argue for keeping the view rather than removing it.",
+          "keys": [
+            "weekends",
+            "plans the whole week",
+            "P9"
+          ],
+          "quote": "Two other people also mentioned the calendar"
+        }
+      ]
+    },
+    {
+      "id": "des-11",
+      "segment": "designer",
+      "title": "Dropping search from the MVP",
+      "sound": false,
+      "said": [
+        "Usability takeaway: none of the eight participants used search during the session, so search isn't something our users need. I'm proposing we drop it from the MVP to save two sprints.",
+        "For context, the prototype had a library of ten sample documents, and the tasks were about creating and sharing a document. Most of our beta users are moving whole existing document libraries over from another tool."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "With ten sample documents and no task that needed finding anything, nobody had a reason to search; the session could not have shown a need for it either way.",
+          "keys": [
+            "ten sample",
+            "ten documents",
+            "sample documents",
+            "tasks"
+          ],
+          "quote": "so search isn't something our users need"
+        },
+        {
+          "id": "f2",
+          "kind": "risk",
+          "what": "Beta users bringing whole existing libraries across will need to find things from day one, so launching without search risks failing the very people the MVP is for.",
+          "keys": [
+            "existing",
+            "libraries",
+            "beta users"
+          ],
+          "quote": "drop it from the MVP to save two sprints"
+        }
+      ]
+    },
+    {
+      "id": "des-12",
+      "segment": "designer",
+      "title": "Leading with spreadsheet import",
+      "sound": true,
+      "said": [
+        "From the onboarding survey: 41% of new users said they came to us to replace spreadsheets, the most common answer, so I'm leading the first-run screen with a spreadsheet import.",
+        "I know it's only the people who answered, about a quarter of signups, so I'm not treating 41% as the whole picture. The import also helps the second-largest group, people moving from another tool, since most of the tools they named export to CSV.",
+        "If import usage in the first month is low, we'll swap the first-run screen back to the template gallery."
+      ],
+      "sources": [
+        {
+          "key": "U1.3",
+          "name": "Onboarding survey, August summary",
+          "text": "2,310 of 9,480 new signups answered (24 percent). Why did you sign up? Replacing spreadsheets 41 percent; moving from another tool 27 percent; starting a new process 22 percent; other 10 percent. Most respondents moving from another tool named products that offer CSV export."
+        }
+      ],
+      "flaws": []
+    },
+    {
+      "id": "des-13",
+      "segment": "designer",
+      "title": "Dark mode before sync fixes",
+      "sound": false,
+      "said": [
+        "Dark mode is the top request on our feature board with 230 votes, so it's the most important thing we can do for retention. I want it in the next release, ahead of the sync fixes.",
+        "The sync bugs only come up in support tickets, about 40 a week, and nobody votes on bugs on the board, so they're clearly less of a priority."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "assumption",
+          "what": "Votes record what engaged users would like, not what makes people leave; the step to retention assumes the two are the same.",
+          "keys": [
+            "leave",
+            "churn",
+            "engaged",
+            "requests"
+          ],
+          "quote": "so it's the most important thing we can do for retention"
+        },
+        {
+          "id": "f2",
+          "kind": "alternative",
+          "what": "Bugs go to support rather than the board, which explains the missing votes; 40 sync tickets a week may matter more to retention than a missing theme.",
+          "keys": [
+            "40 a week",
+            "support tickets",
+            "board"
+          ],
+          "quote": "nobody votes on bugs on the board, so they're clearly less of a priority"
+        }
+      ]
+    },
+    {
+      "id": "des-14",
+      "segment": "designer",
+      "title": "Mobile-first editor",
+      "sound": false,
+      "said": [
+        "Analytics settle the editor question: most of our users are on mobile, so the new editor will be designed mobile-first and adapted to desktop afterwards.",
+        "That also matches our persona, who's always on the go between client meetings, so I would rather get the small screen right first."
+      ],
+      "sources": [
+        {
+          "key": "V2.2",
+          "name": "Analytics dashboard, last 90 days",
+          "text": "Sessions by device: mobile 58 percent, desktop 39 percent, tablet 3 percent. Sessions that include editing a document: desktop 81 percent, mobile 15 percent, tablet 4 percent. Median mobile session length is 1 minute 40 seconds, mostly viewing and commenting."
+        }
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "Mobile leads overall sessions, but 81 percent of sessions that involve editing are on desktop, and the editor is what is being designed.",
+          "keys": [
+            "editing",
+            "81 percent",
+            "desktop"
+          ],
+          "quote": "most of our users are on mobile, so the new editor will be designed mobile-first"
+        },
+        {
+          "id": "f2",
+          "kind": "evidence",
+          "what": "The persona's always-on-the-go life is offered as confirmation, but nothing says what research it came from, and the editing data points the other way.",
+          "keys": [
+            "persona",
+            "on the go",
+            "research"
+          ],
+          "quote": "who's always on the go between client meetings"
+        }
+      ]
+    },
+    {
+      "id": "des-15",
+      "segment": "designer",
+      "title": "Black Friday redesign launch",
+      "sound": false,
+      "said": [
+        "Plan for the store redesign: we switch everyone over at once in Black Friday week. Traffic is at its peak then, so we'll get the most feedback in the shortest time.",
+        "We tested it with 6 participants last month and nobody got stuck, so I'm not worried about conversion."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "risk",
+          "what": "Switching everyone in the highest-revenue week means any conversion problem hits the most sales at once, with no control group to tell what caused a drop.",
+          "keys": [
+            "Black Friday",
+            "everyone",
+            "gradual"
+          ],
+          "quote": "we switch everyone over at once in Black Friday week"
+        },
+        {
+          "id": "f2",
+          "kind": "unsupported",
+          "what": "Six people getting through a session shows basic usability, not that the redesign will hold conversion under real shopping at peak traffic.",
+          "keys": [
+            "6 participants",
+            "conversion",
+            "stuck"
+          ],
+          "quote": "nobody got stuck, so I'm not worried about conversion"
+        }
+      ]
+    },
+    {
+      "id": "des-16",
+      "segment": "designer",
+      "title": "Moving the main button down",
+      "sound": true,
+      "said": [
+        "Decision: on mobile, the 'New request' button moves from the top-right corner to a bar at the bottom of the screen. In a first-click test with 40 participants on their own phones, 31 tapped the right place first with the new layout, against 18 of 40 with the current one.",
+        "Most of our mobile traffic is on larger phones, where the top corner is hard to reach one-handed, which fits what we saw. We checked the bar against the iPhone home indicator and the Android gesture area so it doesn't fight the system.",
+        "A first-click test isn't real use, so after launch we'll compare the share of requests started on mobile for four weeks before and after, and keep the old position behind a flag in case it drops."
+      ],
+      "flaws": []
+    },
+    {
+      "id": "des-17",
+      "segment": "designer",
+      "title": "Removing phone support",
+      "sound": false,
+      "said": [
+        "The support chatbot now resolves about 80% of conversations without a human, so I'm removing the 'Call us' option from the help screen. If the bot handles most things, nobody really needs the phone.",
+        "It also stops people skipping the bot and going straight to an agent, which is our most expensive channel."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "assumption",
+          "what": "The 20 percent the bot cannot resolve are likely the hardest and most urgent problems, which are exactly what phone support is for.",
+          "keys": [
+            "20%",
+            "complex",
+            "urgent",
+            "hardest"
+          ],
+          "quote": "If the bot handles most things, nobody really needs the phone"
+        },
+        {
+          "id": "f2",
+          "kind": "consequence",
+          "what": "People who need a human will still need one; without the phone they are pushed into bot loops, complaints, cancellations or other channels.",
+          "keys": [
+            "frustration",
+            "complain",
+            "cancel",
+            "human"
+          ],
+          "quote": "It also stops people skipping the bot and going straight to an agent"
+        }
+      ]
+    },
+    {
+      "id": "des-18",
+      "segment": "designer",
+      "title": "Nobody clicks Compare plans",
+      "sound": false,
+      "said": [
+        "The heatmap shows almost nobody clicks 'Compare plans' on the pricing page, under 1% of visitors. Users clearly aren't interested in comparing plans, so I'm removing the comparison table to simplify the page.",
+        "The link sits under the FAQ at the very bottom of the page and is styled like body text, the same as our footer links."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "alternative",
+          "what": "A link at the very bottom, under the FAQ and styled as body text, may simply go unseen, which explains the low clicks without any lack of interest.",
+          "keys": [
+            "bottom",
+            "body text",
+            "FAQ"
+          ],
+          "quote": "Users clearly aren't interested in comparing plans"
+        }
+      ]
+    },
+    {
+      "id": "des-19",
+      "segment": "designer",
+      "title": "Bedside charting app",
+      "sound": false,
+      "said": [
+        "From the ward shadowing: nurses do most of their charting at the bedside, often wearing gloves, and usually with one hand free at most.",
+        "So for the new charting app I'm going with a compact layout that fits all 14 vitals fields on one screen, with small tap targets and swipe gestures to move between patients. It looks great in the prototype on my laptop."
+      ],
+      "flaws": [
+        {
+          "id": "f1",
+          "kind": "contradiction",
+          "what": "Small tap targets and precise gestures clash with their own finding that nurses chart in gloves with at most one hand free.",
+          "keys": [
+            "gloves",
+            "one hand",
+            "tap targets"
+          ],
+          "quote": "a compact layout that fits all 14 vitals fields on one screen, with small tap targets"
+        },
+        {
+          "id": "f2",
+          "kind": "gap",
+          "what": "Looking good on a laptop says nothing about how the layout works on ward devices, at the bedside, in gloves.",
+          "keys": [
+            "laptop",
+            "ward",
+            "device"
+          ],
+          "quote": "It looks great in the prototype on my laptop"
+        },
+        {
+          "id": "f3",
+          "kind": "consequence",
+          "what": "A stray swipe that moves to another patient's chart invites recording vitals against the wrong patient, a safety risk the design does not guard against.",
+          "keys": [
+            "wrong patient",
+            "swipe",
+            "accidental"
+          ],
+          "quote": "swipe gestures to move between patients"
+        }
+      ]
+    },
+    {
+      "id": "des-20",
+      "segment": "designer",
+      "title": "Claims form policy number",
+      "sound": true,
+      "said": [
+        "Form analytics plus testing on the claims form: 38% of people who start it abandon at the 'policy number' field. In the six moderated sessions, four people left the form to dig out their policy documents, and two of them never came back to finish.",
+        "So the change is to let people look up their policy by email and date of birth, with the policy number optional. Support confirms 'where do I find my policy number' is one of their top five questions.",
+        "We'll A/B test it for three weeks with form completion as the primary metric, and I've asked legal to check the lookup doesn't expose policy details before identity is confirmed."
+      ],
+      "flaws": []
+    }
+  ]
+}
