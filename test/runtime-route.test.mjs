@@ -108,7 +108,7 @@ console.log('\n=== the persona, and taking it back ===');
 {
   const v5 = await turn({ messages: [U('We should launch in March.')] });
   ok('Logos 5 speaks by default', v5.status === 200 && /^You are Socria\. People come to you to think out loud/.test(v5.first) && /READ THE ROOM/.test(v5.first) && !/You are the mirror/.test(v5.first), v5.first.slice(0, 120));
-  ok('  and says so in the trace, with the exchange it read', /^logos5-v7;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
+  ok('  and says so in the trace, with the exchange it read', /^logos5-v8;path=standard;intent=conversation;/.test(v5.headers.get('x-socria-runtime') ?? '') && /;exchange=conversation;/.test(v5.headers.get('x-socria-runtime') ?? ''), v5.headers.get('x-socria-runtime'));
   const classic = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'classic' } });
   ok('LOGOS_PERSONA=classic: the Logos 3.5 prompt, the rest of the runtime kept', /You are the mirror/.test(classic.first) && /^classic;/.test(classic.headers.get('x-socria-runtime') ?? ''), classic.headers.get('x-socria-runtime'));
   const off = await turn({ messages: [U('We should launch in March.')] }, { env: { LOGOS_RUNTIME: 'off' } });
@@ -118,7 +118,7 @@ console.log('\n=== the persona, and taking it back ===');
   const l4costs = await turn({ surface: undefined, length: 'concise', messages: [U('My monthly costs are rent 1200, food 400, transport 150 and phone 60. Where is it all going?')] });
   ok('  with none of the new Socria in it: no inline elements offered, no length line', !/INLINE, IF IT HELPS/.test(l4costs.system) && !/=== LENGTH/.test(l4costs.first) && /;inline=none(;|$)/.test(l4costs.headers.get('x-socria-runtime') ?? ''), l4costs.headers.get('x-socria-runtime'));
   const every = await turn({ surface: undefined, messages: [U('We should launch in March.')] }, { env: { LOGOS_PERSONA: 'v5' } });
-  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v7;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
+  ok('LOGOS_PERSONA=v5: every Logos screen speaks as Logos 5', /^You are Socria\. People come to you to think out loud/.test(every.first) && /^logos5-v8;/.test(every.headers.get('x-socria-runtime') ?? ''), every.headers.get('x-socria-runtime'));
 }
 
 console.log('\n=== who does what, this turn ===');

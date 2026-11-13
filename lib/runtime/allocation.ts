@@ -316,6 +316,12 @@ const IDEA_LINE: Partial<Record<TurnState['domain'], string>> = {
 };
 /** Code is for work that makes or fixes something: "what is a closure?" is an idea, not a code review. */
 const CODE_WORK = new Set<TurnState['work']>(['execution', 'diagnosis', 'creation']);
+/**
+ * The room code needs on top of a reply's ceiling (route: max_tokens). A function is lines a sentence never is, and a
+ * block cut off at the ceiling ends mid-line with nothing to say so: worse than a long reply. A ceiling, not a cost.
+ */
+export const CODE_ROOM = 500;
+export const codeRoom = (st: Pick<TurnState, 'domain' | 'work'>): number => (st.domain === 'engineering' && CODE_WORK.has(st.work) ? CODE_ROOM : 0);
 /** With the shape of the reply set this turn, the idea line keeps only what the shape does not say. */
 const IDEA_SHAPED: Partial<Record<TurnState['domain'], string>> = {
   math: 'Exact results come from the engine when it gives them.',

@@ -107,7 +107,7 @@ console.log('\n=== what the turn is told: the move and the subject ===');
   ok('the maths block: the idea first, then the picture to change; proofs when asked', /EXPLORATION \(a concept, a theorem, a relationship\): the idea first, in one sentence/.test(I.LOGOS5_MATH) && /never dropped for brevity/.test(I.LOGOS5_MATH));
   // the cached core stays inside its budget: the rule rides on the turns that need it (the shape, the move, the maths block)
   ok('the core leads with the insight, and leaves the rest to the turns that need it', /Lead with what matters: the answer, the insight, the finding/.test(I.LOGOS5_CORE) && !/THE SHAPE OF THIS REPLY/.test(I.LOGOS5_CORE));
-  ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v7');
+  ok('the persona says it changed', I.PERSONA_VERSION === 'logos5-v8');
 }
 
 console.log('\n=== the shape, and what may be drawn ===');

@@ -3614,6 +3614,24 @@ html.js-anim [data-anim].in .word-inner { transform: translateY(0); }
   overflow-x: auto;
   overflow-y: hidden;
 }
+/* A formula or a code block wider than the column scrolls inside itself; the edge it continues past fades, so
+   "= e − (e" is not read as the whole of it. A scroll-driven timeline is inactive when nothing overflows, so a
+   block that fits draws no fade at all; where the browser has no such timelines, it scrolls as before. */
+@supports (animation-timeline: scroll(self inline)) {
+  .logos-root :is(.lg-tex-block, .socria-codeblock pre) {
+    animation: lg-edge-fade linear both;
+    animation-timeline: scroll(self inline);
+  }
+}
+@keyframes lg-edge-fade {
+  0% { -webkit-mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, #000 calc(100% - 36px), transparent); }
+  3%, 97% { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); mask-image: linear-gradient(to right, transparent, #000 36px, #000 calc(100% - 36px), transparent); }
+  100% { -webkit-mask-image: linear-gradient(to right, transparent, #000 36px); mask-image: linear-gradient(to right, transparent, #000 36px); }
+}
+/* on a phone a displayed formula is set a little smaller, so more of them fit the column whole */
+@media (max-width: 520px) {
+  .logos-root .lg-tex-block .katex-display > .katex { font-size: 1.06em; }
+}
 /* KaTeX default is a touch large next to Inter; settle it down in the map */
 .logos-root .lg-node .katex { font-size: 1em; }
 .logos-root .lg-msg-body .katex { font-size: 1.02em; }

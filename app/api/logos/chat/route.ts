@@ -98,6 +98,7 @@ import {
   logos5System,
   looksMathematical,
   replyCeiling,
+  codeRoom,
   memorable,
   modelFor,
   pathOf,
@@ -879,7 +880,8 @@ export const POST = withMeter(async function POST(req: NextRequest) {
     // presentation planner, the inline gate and the stream gate all enforce the
     // same budget. Any failure is the route exactly as it was: MR off.
     // an answer about a document quotes, cites and calculates: the room it gets follows what was asked of it
-    const baseReply = (persona === 'v5' ? replyCeiling(body?.length) : 640) + (docRefs.length ? docShape.room : 0);
+    // …and so does code: making or fixing something in an engineering turn writes lines, and a cut-off block is worse than a long one
+    const baseReply = (persona === 'v5' ? replyCeiling(body?.length) : 640) + (docRefs.length ? docShape.room : 0) + (runtime ? codeRoom(turnState) : 0);
     let mrRun: MRRegulation | null = null;
     let mrPolicy: 'full' | 'conversation_only' | 'none' = 'none';
     let mrPrior: Awaited<typeof mrPriorP> | null = null;
