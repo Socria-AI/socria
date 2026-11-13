@@ -1,0 +1,146 @@
+/* components/logos6/logos6.css — Logos 6 in the conversation: the challenge card, the chip, Focus, the sources
+   and comparison cards, the learning actions. The brand book's scale only — type 10.5 / 12.5 / 13.5 / 15.5 / 18,
+   radii 6 / 10 / 16 / 999 — and the Logos tokens, so every theme reaches it. Plain about the reasoning: no red
+   alarms, no scores, "This holds up" drawn as an answer. */
+
+/* ── the challenge card ─────────────────────────────────────────────────────────────────────────────────────── */
+.logos-root .l6c {
+  margin: 14px 0 22px;
+  padding: 16px 2px 12px;
+  border-top: 1px solid var(--lg-line);
+  border-bottom: 1px solid var(--lg-line);
+  color: var(--lg-ink);
+  font-family: var(--lg-sans);
+  animation: l6In 0.42s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@keyframes l6In { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) { .logos-root .l6c, .logos-root .l6-focus, .logos-root .l6s { animation: none; } }
+
+.logos-root .l6c-head { display: flex; flex-wrap: wrap; align-items: baseline; gap: 6px 14px; margin: 0 0 10px; }
+.logos-root .l6c-title { margin: 0; font-size: 10.5px; font-weight: 600; letter-spacing: 0.18em; text-transform: uppercase; color: var(--lg-primary); }
+.logos-root .l6c-checked { margin-left: auto; font-size: 10.5px; letter-spacing: 0.06em; color: var(--c-ink-45); }
+
+.logos-root .l6c-guess { margin: 0 0 10px; font-size: 13.5px; line-height: 1.45; color: var(--lg-ink-60); }
+.logos-root .l6c-guess q { font-family: var(--serif); font-style: italic; color: var(--lg-ink); }
+
+.logos-root .l6c-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 14px; }
+.logos-root .l6c-f { display: grid; grid-template-columns: 22px 1fr; gap: 0 10px; }
+.logos-root .l6c-n {
+  display: inline-grid; place-items: center; width: 22px; height: 22px; margin-top: 1px;
+  border-radius: 999px; border: 1px solid var(--l5-hair, var(--lg-line));
+  font-size: 10.5px; font-weight: 600; color: var(--lg-ink-60);
+}
+.logos-root .l6c-f.is-kept .l6c-n { background: var(--lg-primary); border-color: var(--lg-primary); color: var(--l5-on-primary, #fff); }
+.logos-root .l6c-f.is-quiet { opacity: 0.62; }
+.logos-root .l6c-kind { margin: 0 0 3px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.14em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .l6c-f.is-contradiction .l6c-kind,
+.logos-root .l6c-f.is-gap .l6c-kind { color: var(--lg-tension, var(--c-ink-45)); }
+.logos-root .l6c-unsure, .logos-root .l6c-state { font-weight: 500; letter-spacing: 0.06em; text-transform: none; color: var(--lg-ink-40); }
+.logos-root .l6c-text { margin: 0 0 6px; max-width: 62ch; font-family: var(--serif); font-size: 15.5px; line-height: 1.45; color: var(--lg-ink); }
+.logos-root .l6c-quotes { margin: 0 0 6px; display: grid; gap: 3px; }
+.logos-root .l6c-anchor {
+  display: block; width: fit-content; max-width: 100%; margin: 0; padding: 0; border: 0; background: none;
+  font: inherit; font-size: 13.5px; line-height: 1.45; text-align: left; color: var(--lg-ink-60); cursor: pointer;
+}
+.logos-root .l6c-anchor.is-still { cursor: default; }
+.logos-root button.l6c-anchor:hover .l6c-q { text-decoration: underline; text-decoration-color: var(--lg-ink-24, var(--lg-line)); text-underline-offset: 3px; }
+.logos-root button.l6c-anchor:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; border-radius: 6px; }
+.logos-root .l6c-where { color: var(--c-ink-45); }
+.logos-root .l6c-q { font-style: italic; color: var(--lg-ink); quotes: '“' '”'; }
+.logos-root .l6c-more { margin: 0 0 4px; max-width: 62ch; font-size: 13.5px; line-height: 1.45; color: var(--lg-ink-60); }
+.logos-root .l6c-k { color: var(--lg-ink); font-weight: 500; }
+
+.logos-root .l6c-acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 8px 0 0; }
+.logos-root .l6c-act {
+  min-height: 30px; padding: 4px 12px; border-radius: 999px;
+  border: 1px solid var(--l5-hair, var(--lg-line)); background: var(--l5-surface, transparent);
+  font: inherit; font-size: 12.5px; color: var(--lg-ink); cursor: pointer;
+  transition: background 0.15s ease, border-color 0.15s ease;
+}
+.logos-root .l6c-act.is-keep { border-color: var(--lg-primary); color: var(--lg-primary); font-weight: 500; }
+@media (hover: hover) { .logos-root .l6c-act:hover { background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.06); } }
+.logos-root .l6c-act:focus-visible, .logos-root .l6c-showmore:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+
+.logos-root .l6c-holds .l6c-text { font-size: 18px; }
+.logos-root .l6c-showmore { margin: 12px 0 0 32px; padding: 0; border: 0; background: none; font: inherit; font-size: 12.5px; color: var(--lg-primary); cursor: pointer; }
+.logos-root .l6c-note { margin: 10px 0 0; font-size: 12.5px; font-style: italic; color: var(--c-ink-45); }
+
+.logos-root .l6c-pending { display: flex; align-items: center; gap: 8px; margin: 10px 0 18px; font-size: 13.5px; color: var(--lg-ink-60); }
+.logos-root .l6c-dot { width: 8px; height: 8px; border-radius: 999px; background: var(--lg-primary); animation: l6Pulse 1.2s ease-in-out infinite; }
+@keyframes l6Pulse { 0%, 100% { opacity: 0.35; transform: scale(0.85); } 50% { opacity: 1; transform: scale(1); } }
+@media (prefers-reduced-motion: reduce) { .logos-root .l6c-dot { animation: none; } }
+
+/* ── the chip above the composer ────────────────────────────────────────────────────────────────────────────── */
+.logos-root .l6-chips { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin: 0 0 8px; }
+.logos-root .l6-chip {
+  display: inline-flex; align-items: center; gap: 6px; min-height: 30px; padding: 4px 12px;
+  border-radius: 999px; border: 1px solid var(--l5-hair, var(--lg-line)); background: var(--l5-surface, transparent);
+  font: inherit; font-size: 12.5px; color: var(--lg-ink); cursor: pointer;
+}
+.logos-root .l6-chip.is-primary { border-color: var(--lg-primary); color: var(--lg-primary); font-weight: 500; }
+.logos-root .l6-chip-x { width: 26px; min-height: 26px; padding: 0; justify-content: center; color: var(--c-ink-45); }
+.logos-root .l6-chip:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+@media (hover: hover) { .logos-root .l6-chip:hover { background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.06); } }
+
+/* the picked bar's own challenge, beside Synthesize these */
+.logos-root .lg-picked-bar .is-l6 { margin-left: 4px; }
+
+/* ── Focus: one idea, and what holds it up ──────────────────────────────────────────────────────────────────── */
+.logos-root .l6-focus-scrim { position: fixed; inset: 0; z-index: 70; background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.18); }
+.logos-root .l6-focus {
+  position: fixed; z-index: 71; top: 64px; left: 50%; transform: translateX(-50%);
+  width: min(980px, calc(100vw - 32px)); max-height: calc(100vh - 96px); overflow: auto;
+  padding: 14px 20px 20px; border-radius: 16px;
+  border: 1px solid var(--l5-hair, var(--lg-line)); background: var(--l5-surface, var(--lg-paper, #fff));
+  box-shadow: var(--l5-shadow, 0 18px 50px rgba(0, 0, 0, 0.18));
+  color: var(--lg-ink); font-family: var(--lg-sans); outline: none;
+  animation: l6In 0.32s cubic-bezier(0.16, 1, 0.3, 1) both;
+}
+@media (max-width: 720px) {
+  .logos-root .l6-focus { top: 0; left: 0; transform: none; width: 100vw; max-height: 100vh; height: 100vh; border-radius: 0; padding: 12px 16px 24px; }
+}
+.logos-root .l6f-crumbs { display: flex; flex-wrap: wrap; align-items: center; gap: 4px 6px; margin: 0 0 14px; font-size: 12.5px; color: var(--lg-ink-60); }
+.logos-root .l6f-crumb { max-width: 32ch; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; padding: 2px 4px; border: 0; border-radius: 6px; background: none; font: inherit; color: inherit; cursor: pointer; }
+.logos-root button.l6f-crumb:hover { color: var(--lg-ink); background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.05); }
+.logos-root .l6f-crumb.is-still { cursor: default; }
+.logos-root .l6f-crumb.is-here { color: var(--lg-ink); font-weight: 500; cursor: default; }
+.logos-root .l6f-sep { color: var(--c-ink-45); }
+.logos-root .l6f-close { margin-left: auto; width: 30px; height: 30px; border: 0; border-radius: 999px; background: none; font-size: 18px; line-height: 1; color: var(--lg-ink-60); cursor: pointer; }
+.logos-root .l6f-close:hover { background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.06); color: var(--lg-ink); }
+.logos-root .l6f-close:focus-visible, .logos-root .l6f-crumb:focus-visible, .logos-root .l6f-card:focus-visible, .logos-root .l6f-act:focus-visible, .logos-root .l6f-link:focus-visible { outline: 2px solid var(--c-moss); outline-offset: 2px; }
+
+.logos-root .l6f-grid { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) minmax(0, 1fr); gap: 18px; align-items: start; }
+@media (max-width: 720px) { .logos-root .l6f-grid { grid-template-columns: 1fr; } .logos-root .l6f-core { order: -1; } }
+.logos-root .l6f-h { margin: 0 0 8px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .l6f-cards { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.logos-root .l6f-card {
+  display: grid; gap: 2px; width: 100%; padding: 8px 10px; text-align: left;
+  border-radius: 10px; border: 1px solid var(--l5-hair, var(--lg-line)); background: transparent;
+  font: inherit; color: inherit; cursor: pointer; transition: background 0.15s ease, border-color 0.15s ease;
+}
+@media (hover: hover) { .logos-root .l6f-card:hover { background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.05); } }
+.logos-root .l6f-card.is-finding { border-style: dashed; }
+.logos-root .l6f-card.is-contradicted { border-color: var(--lg-tension, var(--lg-line)); }
+.logos-root .l6f-k { font-size: 10.5px; letter-spacing: 0.08em; text-transform: uppercase; color: var(--c-ink-45); }
+.logos-root .l6f-t { font-size: 13.5px; line-height: 1.4; color: var(--lg-ink); }
+.logos-root .l6f-empty { margin: 0; font-size: 12.5px; font-style: italic; color: var(--c-ink-45); }
+
+.logos-root .l6f-core { padding: 4px 4px 0; }
+.logos-root .l6f-kind { margin: 0 0 6px; font-size: 10.5px; font-weight: 600; letter-spacing: 0.16em; text-transform: uppercase; color: var(--lg-primary); }
+.logos-root .l6f-idea { margin: 0 0 8px; font-family: var(--serif); font-weight: 400; font-size: 32px; line-height: 1.1; letter-spacing: -0.01em; color: var(--lg-ink); }
+@media (max-width: 720px) { .logos-root .l6f-idea { font-size: 18px; } }
+.logos-root .l6f-detail { margin: 0 0 8px; font-size: 15.5px; line-height: 1.45; color: var(--lg-ink-60); }
+.logos-root .l6f-weight { margin: 0 0 12px; font-size: 12.5px; color: var(--c-ink-45); }
+.logos-root .l6f-acts { display: flex; flex-wrap: wrap; gap: 6px; margin: 0 0 12px; }
+.logos-root .l6f-act { min-height: 30px; padding: 4px 12px; border-radius: 999px; border: 1px solid var(--l5-hair, var(--lg-line)); background: transparent; font: inherit; font-size: 12.5px; color: var(--lg-ink); cursor: pointer; }
+.logos-root .l6f-act.is-primary { border-color: var(--lg-primary); color: var(--lg-primary); font-weight: 500; }
+@media (hover: hover) { .logos-root .l6f-act:hover { background: rgba(var(--l5-tint-rgb, 0, 0, 0), 0.06); } }
+.logos-root .l6f-came { margin: 0; font-size: 13.5px; line-height: 1.45; color: var(--lg-ink-60); }
+.logos-root .l6f-k2 { color: var(--c-ink-45); }
+.logos-root .l6f-link { padding: 0; border: 0; background: none; font: inherit; font-style: italic; color: var(--lg-ink); text-align: left; cursor: pointer; }
+.logos-root .l6f-link:hover { text-decoration: underline; text-underline-offset: 3px; }
+
+.logos-root .l6f-below { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 18px; margin-top: 18px; padding-top: 14px; border-top: 1px solid var(--lg-line); }
+.logos-root .l6f-below:empty { display: none; }
+.logos-root .l6f-finding { display: grid; gap: 2px; padding: 8px 10px; border-radius: 10px; border: 1px dashed var(--l5-hair, var(--lg-line)); }
+.logos-root .l6f-finding.is-considered, .logos-root .l6f-finding.is-dismissed { opacity: 0.6; }

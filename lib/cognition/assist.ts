@@ -41,6 +41,7 @@
 //
 // PURE. No model, no network, no clock (time arrives in the input).
 
+import { challengeAsked } from '../challenge/challenge-intent';
 import { readSignals } from '@/lib/core4/signals';
 import { budgetFrom } from '@/lib/core4/budget';
 import { questionPressure, asksAnything } from '@/lib/core4/questions';
@@ -406,6 +407,14 @@ export function chooseAssist(given: AssistInput): AssistDecision {
   if (s.directness === 'answer' || s.answersOnly || demanded) {
     if (input.guard && (acc?.math || acc?.computed || demanded)) return decide('explain', true, { questions: 0, scaffold: 'hint', reasons: ['answer-asked:guarded'] });
     return decide('inform', true, { questions: 0, reasons: ['answer-asked'] });
+  }
+
+  // 8b. They asked, in so many words, to have their own reasoning tested (Logos 6: lib/challenge/challenge-intent.ts
+  //     reads the same words in the browser and sends them to the challenge engine; this is for the turns that reach
+  //     the reply all the same — a room, Logos 6 switched off). Before the claim check and the selected card: "Challenge
+  //     this" about a card is a challenge, never an explanation of the card.
+  if (!talking && (challengeAsked(said) || (input.focus && /^\s*challenge\s+(?:this|it|that)\b/i.test(said)))) {
+    return decide('challenge', true, { ...(input.focus ? { target: input.focus.label } : {}), reasons: ['challenge:asked'] });
   }
 
   // 9. A question of fact, or a quick calculation: answered plainly. A claim to check is one: the verdict first.

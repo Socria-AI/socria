@@ -12,6 +12,7 @@ import { promoSnapshot } from '@/lib/rewards/promo-access';
 import { daysOf } from '@/lib/rewards/promo-engine';
 import { getSubscription, isCompCustomer } from '@/lib/subscriptions';
 import { mirrorEntitles, readStripeMirror, studentStatus } from '@/lib/socria-one-grant';
+import { armsFor } from '@/lib/logos6/arms-server';
 import {
   STUDENT_OFFER, eduDomainLabel, eduDomains, eduProgrammeOn, eduSchool, studentOfferOpen, warnIfEduOff,
 } from '@/lib/socria-edu';
@@ -83,11 +84,15 @@ export async function GET(req: NextRequest) {
       }
     : undefined;
 
+  // A Logos 6 feature test (lib/logos6/arms-server.ts): which arm, recomputed from the id — never stored.
+  const arms = armsFor(userId ?? null, plan === 'one' ? 'one' : 'free');
+
   return NextResponse.json({
     plan,
     manageable,
     cancelAtPeriodEnd: !!sub?.cancelAtPeriodEnd,
     ...(student ? { student } : {}),
     ...(promo ? { promo } : {}),
+    ...(arms ? { arms } : {}),
   });
 }

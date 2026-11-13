@@ -284,6 +284,73 @@ export interface LogosNode {
    * diagram stays nearly wordless and loses nothing.
    */
   detail?: string;
+  /**
+   * A FINDING OF SOCRIA'S CHALLENGE, KEPT (Logos 6, lib/challenge): what kind
+   * of weakness it is, the challenge it came from, and the words it quoted.
+   * Always origin 'socria' — a kept finding never becomes "their idea" — and
+   * the map pass keeps it, as it keeps what the person put here by hand.
+   */
+  finding?: NodeFinding;
+  /**
+   * PUT HERE BY HAND (Logos 6): "Add as idea", a typed "add a card", a
+   * suggestion they kept. The extractor is told to reorganise the map; a card
+   * the person placed is not its to reorganise away (lib/logos6/protect.ts).
+   */
+  hand?: true;
+  /**
+   * WHAT IT RESTS ON IN THEIR DOCUMENTS (Logos 6, Phase 3): the passage, by
+   * document and block, with the words that matched, and what checking it
+   * against them found. Pointers only — the text stays in their browser.
+   */
+  evidence?: NodeEvidence[];
+}
+
+/** A kept finding, on its card (lib/challenge/challenge.ts). */
+export interface NodeFinding {
+  kind: 'assumption' | 'gap' | 'unsupported' | 'contradiction' | 'evidence' | 'risk' | 'alternative' | 'consequence';
+  /** the challenge it came from */
+  from: string;
+  /** the first quote it rested on */
+  quote?: string;
+}
+
+/** A passage a card rests on (lib/logos6/evidence.ts). */
+export interface NodeEvidence {
+  doc: string;
+  block: string;
+  /** the words that matched, as the passage has them */
+  quote: string;
+  /** what checking the card against the passage found; absent when it was linked, not checked */
+  verdict?: 'supported' | 'partly' | 'contradicted';
+}
+
+const FINDING_KIND_SET = new Set(['assumption', 'gap', 'unsupported', 'contradiction', 'evidence', 'risk', 'alternative', 'consequence']);
+const EVIDENCE_VERDICTS = new Set(['supported', 'partly', 'contradicted']);
+const POINTER = /^[A-Za-z0-9_.:-]{1,80}$/;
+
+/** A kept finding off the wire, or nothing. */
+export function sanitizeNodeFinding(v: unknown): NodeFinding | undefined {
+  if (!v || typeof v !== 'object') return undefined;
+  const r = v as Record<string, unknown>;
+  if (!FINDING_KIND_SET.has(r.kind as string) || typeof r.from !== 'string' || !POINTER.test(r.from)) return undefined;
+  const quote = typeof r.quote === 'string' ? r.quote.replace(/\s+/g, ' ').trim().slice(0, 220) : '';
+  return { kind: r.kind as NodeFinding['kind'], from: r.from, ...(quote ? { quote } : {}) };
+}
+
+/** A card's evidence off the wire: at most four pointers, each whole, or none. */
+export function sanitizeNodeEvidence(v: unknown): NodeEvidence[] | undefined {
+  if (!Array.isArray(v)) return undefined;
+  const out: NodeEvidence[] = [];
+  for (const e of v.slice(0, 8)) {
+    if (!e || typeof e !== 'object') continue;
+    const r = e as Record<string, unknown>;
+    if (typeof r.doc !== 'string' || !POINTER.test(r.doc) || typeof r.block !== 'string' || !POINTER.test(r.block)) continue;
+    const quote = typeof r.quote === 'string' ? r.quote.replace(/\s+/g, ' ').trim().slice(0, 240) : '';
+    if (!quote || out.some((x) => x.doc === r.doc && x.block === r.block)) continue;
+    out.push({ doc: r.doc, block: r.block, quote, ...(EVIDENCE_VERDICTS.has(r.verdict as string) ? { verdict: r.verdict as NodeEvidence['verdict'] } : {}) });
+    if (out.length >= 4) break;
+  }
+  return out.length ? out : undefined;
 }
 
 /**
@@ -668,6 +735,8 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
       const at = str(n?.at, MAX_AT);
       const group = str(n?.group, MAX_GROUP);
       const detail = str(n?.detail, MAX_DETAIL);
+      const finding = sanitizeNodeFinding(n?.finding);
+      const evidence = sanitizeNodeEvidence(n?.evidence);
       return {
         id,
         type,
@@ -686,6 +755,10 @@ export function sanitizeMap(raw: any, opts?: { trust?: VizTrust }): ThinkingMap 
         ...(group ? { group } : {}),
         // a detail that only says the label again says nothing more
         ...(detail && wordsOf(detail) !== wordsOf(label) ? { detail } : {}),
+        // LOGOS 6: a kept finding (always Socria's), a card put here by hand, what it rests on in their documents
+        ...(finding && origin === 'socria' ? { finding } : {}),
+        ...(n?.hand === true ? { hand: true as const } : {}),
+        ...(evidence ? { evidence } : {}),
       };
     })
     .filter((n: LogosNode | null): n is LogosNode => {

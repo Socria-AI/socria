@@ -38,6 +38,23 @@ export const COUNTED_EVENTS = [
   'signup_completed',
   // a public event page opened: by event, and by the link's source tag
   'event_page_viewed',
+  // LOGOS 6 (lib/logos6/vocab.ts): each by its door, its kind and what came of it — and, while a feature
+  // test runs, by arm — so app/dev/logos6 can read the plan's measures back
+  'challenge_requested',
+  'challenge_shown',
+  'finding_action',
+  'focus_opened',
+  'idea_opened',
+  'conversation_opened',
+  'level_changed',
+  'idea_added',
+  'evidence_opened',
+  'source_check',
+  'compare_run',
+  'simpler_deeper',
+  'explain_back',
+  'guess_first',
+  'one_checkout_context',
 ] as const;
 export type CountedEvent = (typeof COUNTED_EVENTS)[number];
 

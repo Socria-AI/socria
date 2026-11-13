@@ -25,7 +25,7 @@
 // a suggestion.
 
 import type { LogosNodeStatus, LogosRelation, LogosNode, ThinkingMap } from './logos';
-import { DRAWING_LIMITS, MAP_LABEL_MAX, NODE_TYPES, RELATIONS, mapCaps } from './logos';
+import { DRAWING_LIMITS, MAP_LABEL_MAX, NODE_TYPES, RELATIONS, mapCaps, sanitizeNodeEvidence, sanitizeNodeFinding } from './logos';
 import { withDrawing, type Drawing } from './logos5/drawing';
 
 export type MapEdit =
@@ -35,7 +35,28 @@ export type MapEdit =
   | { op: 'link'; from: string; to: string; relation?: LogosRelation }
   | { op: 'unlink'; from: string; to: string }
   /** a node the person chose to take — a Socria suggestion keeps origin 'socria'; a part added to a drawing, 'drawn' */
-  | { op: 'add'; node: { label: string; type: LogosNode['type']; role?: LogosNode['role']; origin?: LogosNode['origin']; detail?: string; at?: string; group?: string }; near?: string }
+  | {
+      op: 'add';
+      node: {
+        label: string;
+        type: LogosNode['type'];
+        role?: LogosNode['role'];
+        origin?: LogosNode['origin'];
+        detail?: string;
+        at?: string;
+        group?: string;
+        /** Logos 6: a challenge finding the person kept (lib/challenge) */
+        finding?: LogosNode['finding'];
+        /** Logos 6: put here by hand, so the map pass keeps it (lib/logos6/protect.ts) */
+        hand?: true;
+        /** Logos 6: the passages it rests on (lib/logos6/evidence.ts) */
+        evidence?: LogosNode['evidence'];
+      };
+      near?: string;
+      /** what the line to `near` means (default 'relates'), and whether it runs from `near` to the new card */
+      rel?: LogosRelation;
+      fromNear?: boolean;
+    }
   // ── A DRAWING, EDITED (Logos 5): what a part is, what it says when opened, where it sits, what a line says ──
   /** what kind of thing a card is — a step that is really an event, a concept that is a component */
   | { op: 'retype'; id: string; type: LogosNode['type'] }
@@ -177,10 +198,16 @@ export function applyMapEdits(map: ThinkingMap, edits: readonly MapEdit[]): Edit
         const v = String(edit.node[f] ?? '').replace(/\s+/g, ' ').trim().slice(0, DRAWING_LIMITS[f]);
         if (v && !(f === 'detail' && keyOf(v) === keyOf(label))) extra[f] = v;
       }
-      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra }];
+      // LOGOS 6: a kept finding is Socria's for good; a card added by hand is marked so the map pass keeps it
+      const finding = edit.node.finding && edit.node.origin === 'socria' ? sanitizeNodeFinding(edit.node.finding) : undefined;
+      const evidence = sanitizeNodeEvidence(edit.node.evidence);
+      nodes = [...nodes, { id, type: edit.node.type, label, status: 'open', ...(edit.node.role ? { role: edit.node.role } : {}), ...(edit.node.origin ? { origin: edit.node.origin } : {}), ...extra, ...(finding ? { finding } : {}), ...(edit.node.hand ? { hand: true as const } : {}), ...(evidence ? { evidence } : {}) }];
       // A removal of the same wording is forgotten: they asked for it back.
       removed = removed.filter((r) => r !== keyOf(label));
-      if (edit.near && byId(edit.near)) edges = [...edges, { from: id, to: edit.near, relation: 'relates', strength: 'normal' }];
+      if (edit.near && byId(edit.near)) {
+        const relation: LogosRelation = edit.rel && (RELATIONS as readonly string[]).includes(edit.rel) ? edit.rel : 'relates';
+        edges = [...edges, edit.fromNear ? { from: edit.near, to: id, relation, strength: 'normal' } : { from: id, to: edit.near, relation, strength: 'normal' }];
+      }
       applied.push({ edit, said: `Added ${quote(label)} to the map${edit.node.origin === 'socria' ? ', marked as Socria’s suggestion' : ''}.` });
     } else if (edit.op === 'unlink') {
       const a = byId(edit.from), b = byId(edit.to);
@@ -483,7 +510,7 @@ export function readMapAdd(text: string, map: ThinkingMap, recent?: Touched | nu
   const clean = label.replace(/\?\s*$/, type === 'question' ? '?' : '');
   return {
     // the person's own idea: no origin is theirs (a Socria suggestion carries 'socria')
-    edits: [{ op: 'add', node: { label: clean, type }, ...(near ? { near: near.id } : {}) }],
+    edits: [{ op: 'add', node: { label: clean, type, hand: true }, ...(near ? { near: near.id } : {}) }],
     said: `Added ${quote(clean)} to the map${near ? `, from ${quote(near.label)}` : ''}.`,
   };
 }

@@ -686,7 +686,7 @@ console.log('\n=== the screen (components/logos5/SleepMode.tsx) ===');
 
   const app = readFileSync(join(root, 'components', 'LogosApp.tsx'), 'utf8');
   ok('in the box’s tools, beside Voice', /meter=\{\s*<SleepRing/.test(app) && /\{meter\}\s*\{voiceButton\}/.test(readFileSync(join(root, 'components', 'LogosComposer.tsx'), 'utf8')));
-  ok('Socria One opened from the screen says why, in words — not the word "sleep"', /askOne\(SLEEP_ONE\)/.test(app) && !/askOne\('sleep'\)/.test(app) && /const SLEEP_ONE = 'Socria One has no daily token allowance, so Socria stays awake/.test(app));
+  ok('Socria One opened from the screen says why, in words — not the word "sleep"', /askOne\(SLEEP_ONE(?:, false, 'sleep')?\)/.test(app) && !/askOne\('sleep'\)/.test(app) && /const SLEEP_ONE = 'Socria One has no daily token allowance, so Socria stays awake/.test(app));
   ok('the screen is said when Socria falls asleep, not again for every request refused while it rests', /const already = !!sleepRef\.current\?\.asleep && Date\.now\(\) < sleepRef\.current\.resetAt;\s*setSleep\(st\);\s*if \(!already\) setSleepOpen\(true\);/.test(app));
 }
 

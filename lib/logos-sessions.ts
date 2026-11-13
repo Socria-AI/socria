@@ -14,6 +14,7 @@ import type { Attachment } from './logos-attachments';
 import { sanitizeContexts, type NodeContexts } from './logos-sources';
 import type { ByRef } from './logos';
 import type { Synthesis } from './logos-synthesis';
+import type { Challenge } from './challenge/challenge';
 import type { InlineState } from './inline-ui';
 import type { AboutRef, ReplyRef, WebSourceRef } from './chat-thread';
 import type { WriteDoc } from './write/doc';
@@ -40,6 +41,8 @@ export interface LogosMsg {
   by?: ByRef;
   /** Socria's synthesis of the map, when this message is one — lib/logos-synthesis.ts */
   synthesis?: Synthesis;
+  /** a challenge — what was worth checking, and what the person did with each finding (Logos 6, lib/challenge) */
+  challenge?: Challenge;
   /**
    * What was done with the inline elements in this reply — a slider moved, a
    * choice tapped, a draft edited — by the element's position in it

@@ -17,6 +17,9 @@ import { INTENTS, START_MODELS } from './onboarding-intents';
 import { PATH_IDS } from './onboarding-paths';
 import { LANDING_KINDS, REFERRER_KINDS } from './first-touch';
 import { isCounted } from './product-events';
+import {
+  CAPABILITIES, CHALLENGE_FROM, CHALLENGE_SCOPES, FINDING_ACTIONS, FINDING_KINDS, L6_EVENTS, L6_OUTCOMES, LEVELS, LEVEL_HOW, OPEN_FROM,
+} from './logos6/vocab';
 
 /** The steps of the onboarding screen, in order, plus pressing an example. */
 export const ONBOARDING_STEPS = ['premise', 'name', 'who', 'how', 'thought', 'example'] as const;
@@ -81,6 +84,7 @@ export function kindsFor(event: unknown, props: unknown): string[] | null {
     const src = typeof p.ref === 'string' && UTM.test(p.ref) ? `ref:${p.ref}` : typeof p.utm_source === 'string' && UTM.test(p.utm_source) ? `utm:${p.utm_source}` : 'direct';
     return [`ev:${ev}`, `ev:${ev}|${src}`];
   }
+  if (L6.has(event)) return l6Kinds(event, p);
   // A first-run milestone: counted by surface when it names one.
   const surface = typeof p.surface === 'string' && SURFACES.has(p.surface) ? p.surface : 'any';
   return [surface];
@@ -89,4 +93,81 @@ export function kindsFor(event: unknown, props: unknown): string[] | null {
 /** The UTC day a count lands on: 'YYYY-MM-DD'. */
 export function dayOf(at: number): string {
   return new Date(at).toISOString().slice(0, 10);
+}
+
+// ── Logos 6 (lib/logos6/vocab.ts) ───────────────────────────────────────────────────────────────────────────────
+
+const L6 = new Set<string>(L6_EVENTS);
+const set = (xs: readonly string[]) => new Set<string>(xs);
+const KINDS_ = set(FINDING_KINDS);
+const ACTIONS_ = set(FINDING_ACTIONS);
+const CFROM = set(CHALLENGE_FROM);
+const SCOPES_ = set(CHALLENGE_SCOPES);
+const OFROM = set(OPEN_FROM);
+const LEVELS_ = set(LEVELS);
+const HOW_ = set(LEVEL_HOW);
+const CAPS = set(CAPABILITIES);
+const OUTS = set(L6_OUTCOMES);
+const TRIGGER = /^[a-z0-9][a-z0-9-]{0,39}$/;
+
+/**
+ * The counter keys a Logos 6 event increments. Each value is checked against its vocabulary; one that is
+ * not in it makes the whole event uncounted (null) rather than counted as something else. While a feature
+ * test runs, every key is counted again with its arm, so the two arms can be read side by side.
+ */
+function l6Kinds(event: string, p: Record<string, unknown>): string[] | null {
+  const tok = (v: unknown, s: Set<string>) => (typeof v === 'string' && s.has(v) ? v : null);
+  const arm = p.arm === 'control' || p.arm === 'treatment' ? p.arm : null;
+  const armed = (keys: string[]) => (arm ? [...keys, ...keys.map((k) => `${k}|arm:${arm}`)] : keys);
+  const count = typeof p.count === 'number' && Number.isFinite(p.count) ? String(Math.max(0, Math.min(9, Math.round(p.count)))) : null;
+  switch (event) {
+    case 'challenge_requested': {
+      const from = tok(p.door, CFROM);
+      const scope = tok(p.scope, SCOPES_);
+      return from ? armed([`from:${from}`, ...(scope ? [`scope:${scope}`] : [])]) : null;
+    }
+    case 'challenge_shown': {
+      const out = tok(p.outcome, OUTS) ?? 'found';
+      return armed([`outcome:${out}`, ...(count ? [`count:${count}`] : [])]);
+    }
+    case 'finding_action': {
+      const kind = tok(p.kind, KINDS_);
+      const act = tok(p.outcome, ACTIONS_);
+      return kind && act ? armed([`${kind}:${act}`]) : null;
+    }
+    case 'focus_opened':
+    case 'idea_opened':
+    case 'conversation_opened':
+    case 'evidence_opened': {
+      const from = tok(p.door, OFROM);
+      return from ? armed([`from:${from}`]) : null;
+    }
+    case 'level_changed': {
+      const a = tok(p.door, LEVELS_);
+      const b = tok(p.level, LEVELS_);
+      const how = tok(p.kind, HOW_);
+      return a && b && a !== b ? [`${a}>${b}`, ...(how ? [`how:${how}`] : [])] : null;
+    }
+    case 'idea_added':
+      return armed(['any']);
+    case 'simpler_deeper': {
+      const which = p.kind === 'simpler' || p.kind === 'deeper' ? p.kind : null;
+      const from = tok(p.door, OFROM);
+      return which ? armed([`which:${which}`, ...(from ? [`from:${from}`] : [])]) : null;
+    }
+    case 'source_check':
+    case 'compare_run':
+    case 'explain_back':
+    case 'guess_first': {
+      const out = tok(p.outcome, OUTS);
+      return out ? armed([`outcome:${out}`, ...(count ? [`count:${count}`] : [])]) : null;
+    }
+    case 'one_checkout_context': {
+      const cap = tok(p.kind, CAPS) ?? 'none';
+      const trig = typeof p.trigger === 'string' && TRIGGER.test(p.trigger) ? p.trigger : 'unknown';
+      return [`cap:${cap}`, `trigger:${trig}`];
+    }
+    default:
+      return null;
+  }
 }

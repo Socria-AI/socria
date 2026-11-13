@@ -33,8 +33,8 @@ export function L5Ask({
   exchange: AskExchange | null;
   /** where the card came from: "Came from 2 messages", pressed to show them */
   came: { said: string; onShow?: () => void } | null;
-  /** questions a press away: what the chip says, and what is asked */
-  quick: { label: string; text: string }[];
+  /** questions a press away: what the chip says, and what is asked — or, with `run`, what it does instead (Logos 6) */
+  quick: { label: string; text: string; run?: () => void }[];
   onAsk: (text: string) => void;
   onClose: () => void;
   busy: boolean;
@@ -88,7 +88,7 @@ export function L5Ask({
       )}
       <div className="l5-ask-chips">
         {quick.map((q) => (
-          <button key={q.label} type="button" className="l5-chip l5-ask-chip" disabled={busy} onClick={() => send(q.text)}>
+          <button key={q.label} type="button" className="l5-chip l5-ask-chip" disabled={busy} onClick={() => (q.run ? q.run() : send(q.text))}>
             {q.label}
           </button>
         ))}

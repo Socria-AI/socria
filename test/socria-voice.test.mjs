@@ -278,7 +278,8 @@ console.log('the Logic Map');
     edges: [{ from: 'a', to: 'b', relation: 'relates', strength: 'normal' }],
   };
   const add = (t, recent) => V.readMapAdd(t, map, recent);
-  ok('"add a branch called cost": hung from the idea at the centre', J(add('add a branch called cost').edits) === J([{ op: 'add', node: { label: 'cost', type: 'idea' }, near: 'a' }]));
+  // marked as theirs by hand (Logos 6, lib/logos6/protect.ts): the map pass keeps it
+  ok('"add a branch called cost": hung from the idea at the centre', J(add('add a branch called cost').edits) === J([{ op: 'add', node: { label: 'cost', type: 'idea', hand: true }, near: 'a' }]));
   ok('  "…to budget": from the idea named', add('add a branch called cost to budget').edits[0].near === 'b' && add('put an idea about cost under budget').edits[0].near === 'b');
   ok('  "another": beside the last one added, from what it hangs from', add('add another branch about time', { id: 'n_cost', label: 'cost', near: 'b' }).edits[0].near === 'b');
   ok('  a question is a question', add('add a question: why is rent so high?').edits[0].node.type === 'question');

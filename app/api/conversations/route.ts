@@ -5,6 +5,7 @@
 // POST /api/conversations          → bulk-upsert (used for localStorage → cloud migration)
 
 import { sanitizeSynthesis } from '@/lib/logos-synthesis';
+import { sanitizeChallenge } from '@/lib/challenge/challenge';
 import { sanitizeDid, sanitizeInlineState } from '@/lib/inline-ui';
 import { sanitizeThreadNote } from '@/lib/runtime/explain';
 import { cleanAboutRef, cleanAt, cleanMsgId, cleanReplyRef, cleanWebSources, type ReplyRef } from '@/lib/chat-thread';
@@ -63,6 +64,8 @@ function sanitizeMessages(raw: unknown): Msg[] {
       // A Logos synthesis: Socria's structured reading of the map, kept so it
       // re-renders as itself and so the next one can say what changed.
       const synthesis = m.role === 'assistant' ? sanitizeSynthesis(m.synthesis) : undefined;
+      // A Logos 6 challenge: the findings, what each quoted, and what the person did with each (lib/challenge)
+      const challenge = m.role === 'assistant' ? sanitizeChallenge(m.challenge) : undefined;
       // what was done with the reply's inline elements (lib/inline-ui.ts) — never its words
       const ui = m.role === 'assistant' ? sanitizeInlineState(m.ui) : undefined;
       // Its name, when it was said, and what it answers (lib/chat-thread.ts):
@@ -94,6 +97,7 @@ function sanitizeMessages(raw: unknown): Msg[] {
         ...(attachments.length ? { attachments } : {}),
         ...(by ? { by } : {}),
         ...(synthesis ? { synthesis } : {}),
+        ...(challenge ? { challenge } : {}),
         ...(ui ? { ui } : {}),
         ...(explain ? { explain } : {}),
       };

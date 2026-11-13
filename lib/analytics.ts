@@ -117,6 +117,26 @@ export const EVENTS = [
   'gift_shown',
   // …and taken up: `kind` 'theme-offer' (the pass begun) or the note's way to Socria One.
   'gift_accepted',
+  // LOGOS 6 (docs/LOGOS-6.md), shape only. Where a thing was opened from (`door`), what it covered
+  // (`scope`), how many (`count`), what kind of finding (`kind`), what the person did (`outcome`),
+  // and, while a feature test runs, its arm (`arm`) — never a label, a quote or a document.
+  'challenge_requested',
+  'challenge_shown',
+  'finding_action',
+  'focus_opened',
+  'idea_opened',
+  'conversation_opened',
+  'level_changed',
+  'idea_added',
+  'evidence_opened',
+  'source_check',
+  'compare_run',
+  'simpler_deeper',
+  'explain_back',
+  'guess_first',
+  // a checkout begun, with the last Logos 6 capability used in the seven days before it (`kind`)
+  // and the moment that opened the sheet (`trigger`) — the observational half of H5
+  'one_checkout_context',
 ] as const;
 export type AnalyticsEvent = (typeof EVENTS)[number];
 
@@ -182,6 +202,19 @@ export interface EventProps {
   event?: string;
   /** an event referral code from the link (?ref=), as a short token — never a person */
   ref?: string;
+  /**
+   * Logos 6: where something was opened from — 'words' | 'chip' | 'card' | 'disc' | 'search' … a door, never
+   * what was behind it. (Not `from`/`to`: those are an email's words, and an address must never fit a key.)
+   */
+  door?: string;
+  /** Logos 6: a level of the macro-to-micro ladder — 'everything' | 'project' | 'line' | 'idea' | 'passage' */
+  level?: string;
+  /** Logos 6: what a challenge covered — 'line' | 'card' | 'selection' | 'document' */
+  scope?: string;
+  /** Logos 6: how many — findings shown, documents compared, claims checked */
+  count?: number;
+  /** Logos 6: the arm of a running feature test — 'control' | 'treatment' (lib/logos6/arms-server.ts) */
+  arm?: string;
 }
 
 const ALLOWED_KEYS = new Set<keyof EventProps>([
@@ -211,6 +244,11 @@ const ALLOWED_KEYS = new Set<keyof EventProps>([
   'utm_campaign',
   'event',
   'ref',
+  'door',
+  'level',
+  'scope',
+  'count',
+  'arm',
 ]);
 
 /**
